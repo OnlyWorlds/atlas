@@ -363,7 +363,7 @@ export class ElementCreateModal extends BaseModal {
       const nameInput = form.querySelector<HTMLInputElement>('input[name="element-name"]')!;
       const name = nameInput.value.trim();
       if (!name) {
-        errorBox.textContent = 'Name is required';
+        errorBox.textContent = 'An element needs a name.';
         errorBox.dataset.reason = 'name';
         errorBox.hidden = false;
         nameInput.focus();

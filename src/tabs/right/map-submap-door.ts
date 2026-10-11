@@ -57,7 +57,7 @@ export function swapMapTab(fromMapId: string, to: WorldMap): void {
     patchSlice('ui', { ...ui, rightActiveIndex: already });
     return;
   }
-  const ref = { kind: 'map' as const, mapId: to.id, label: to.name || '(untitled)', worldId: getState().active?.worldId };
+  const ref = { kind: 'map' as const, mapId: to.id, label: to.name || '(unnamed)', worldId: getState().active?.worldId };
   const at = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === fromMapId);
   const rightTabs = [...ui.rightTabs];
   if (at >= 0) rightTabs[at] = ref; else rightTabs.push(ref);
@@ -123,7 +123,7 @@ export function refreshUpButton(entry: MapTabCacheEntry): void {
     });
     entry.toolbar.prepend(btn);
   }
-  const name = parent.name || '(untitled)';
+  const name = parent.name || '(unnamed)';
   btn.dataset.mapId = parent.id;
   btn.title = `Up to ${name}`;
   btn.setAttribute('aria-label', `Up to ${name}`);

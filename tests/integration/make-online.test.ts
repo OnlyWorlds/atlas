@@ -82,10 +82,9 @@ describe('createApiWorld (Route 1)', () => {
     expect(serverState.worldCreations).toHaveLength(0);
   });
 
-  it('surfaces the server-side 400 message verbatim (not the generic PIN error)', async () => {
-    // Force a server 400 carrying a specific message. The bug this guards: the
-    // throw that reads data.message used to sit INSIDE the try around JSON.parse,
-    // so the catch swallowed it and re-threw the generic PIN string.
+  it("shows Atlas's own sentence on a 400, whatever the body says", async () => {
+    // keel's 400 body is one generic line for every refusal (config/worldsync.py),
+    // so Atlas's sentence says more (copy pass S391, Kael F97a).
     const worldsyncUrl = `${TEST_BASE.replace('/worldapi', '/worldsync')}/create-world-external/`;
     mswServer.use(
       http.post(worldsyncUrl, () =>
@@ -94,7 +93,7 @@ describe('createApiWorld (Route 1)', () => {
     );
     await expect(
       createApiWorld({ name: 'X', email: 'a@b.c', pin: '1234' })
-    ).rejects.toThrow('That email already owns a world');
+    ).rejects.toThrow(/did not accept that email and PIN/i);
   });
 
   it('falls back to the generic 400 message when the body is not JSON', async () => {

@@ -13,7 +13,7 @@ import type { WorldMeta, WorldRegistryEntry, WorldsRegistry } from './types';
 
 /** A seat world whose secret this browser no longer has (a cleared registry, a folder opened again). */
 export const SEAT_SECRET_MISSING_LINE =
-  'This world was opened from onlyworlds.com as a seat, and this browser no longer has its secret. Open it again from onlyworlds.com to sync.';
+  'This world was opened on a seat, and this browser no longer has its secret, so it cannot sync.';
 
 /** keel's seat secret: `ow_s_` + urlsafe characters (accounts/agents.py). */
 const SEAT_SECRET_RE = /^ow_s_[\w-]{16,}$/;
@@ -37,7 +37,7 @@ export function seatRoleWords(role: string | undefined): string | null {
 }
 
 /** Where a seat is removed on onlyworlds.com: the owner's world page, or the person's own list. */
-export const SEAT_REMOVE_WHERE = 'under Members on the world\'s page, or under Your agents in your worlds';
+export const SEAT_REMOVE_WHERE = 'under Access, then Members, on the world\'s page, or under Your agents on your Worlds page';
 
 /** True when the world is linked as an agent seat. */
 export function isSeatWorld(entry: WorldRegistryEntry | null | undefined): boolean {

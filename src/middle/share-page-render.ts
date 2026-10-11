@@ -514,9 +514,8 @@ export function renderMapView(
   if (!frozen) {
     const hint = document.createElement('p');
     hint.className = 'atlas-share-hint atlas-share-map-unpublishable';
-    hint.textContent = 'This map can\'t publish yet: it needs a web image URL '
-      + '(images stored with the world never leave it; host the image and set image_url '
-      + 'on the map). Dimensions fill in automatically when the image loads in atlas.';
+    hint.textContent = 'This map can\'t publish yet: it needs an Image URL, since a local image never '
+      + 'leaves the world. Put the image online and set its URL in Configure map.';
     return hint;
   }
   const showLabels = frozen.showLabels !== false;

@@ -217,12 +217,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           placeholder="…or paste OnlyWorlds JSON: a full world export, or loose element lists"></textarea>
         <p class="atlas-import-live" data-role="live" hidden></p>
         <div class="atlas-import-paste-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="load">load pasted JSON</button>
-          <button type="button" class="atlas-btn-ghost" data-action="clear" hidden>clear</button>
+          <button type="button" class="atlas-btn-ghost" data-action="load">Load pasted JSON</button>
+          <button type="button" class="atlas-btn-ghost" data-action="clear" hidden>Clear</button>
           <span class="atlas-import-example">
-            <button type="button" class="atlas-btn-link" data-action="example-copy">copy example JSON</button>
+            <button type="button" class="atlas-btn-link" data-action="example-copy">Copy example JSON</button>
             <span class="atlas-import-example-sep">·</span>
-            <button type="button" class="atlas-btn-link" data-action="example-download">download example.json</button>
+            <button type="button" class="atlas-btn-link" data-action="example-download">Download example.json</button>
           </span>
         </div>
         <p class="atlas-import-error" data-role="error" hidden></p>
@@ -465,7 +465,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
               <span>New world name</span>
               <input type="text" class="atlas-import-name" data-role="world-name" value="${escapeText(worldName)}" />
             </label>
-            ${adopting ? `<p class="atlas-import-subnote">Keeps its original world id, so it round-trips cleanly back to onlyworlds.com.</p>` : ''}
+            ${adopting ? `<p class="atlas-import-subnote">Keeps its original world id, so it can link back to its world on onlyworlds.com.</p>` : ''}
           ` : ''}
 
           ${mode === 'merge' && mergeTargetIsActive && r.updated + r.skipped > 0 ? `
@@ -494,7 +494,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <p class="atlas-import-subnote is-warn"><span class="material-symbols-outlined">visibility</span> ${escapeText(mergeTargetName)} is view-only. Nothing can be written into it, so import as a separate copy instead.</p>
           ` : ''}
           <button type="button" class="atlas-btn-primary" data-action="import" ${importing || mergeTargetViewOnly ? 'disabled' : ''}>
-            ${importing ? 'importing…' : (mode === 'new' ? 'create world' : `merge into ${escapeText(mergeTargetName)}`)}
+            ${importing ? 'Importing…' : (mode === 'new' ? 'Create world' : `Merge into ${escapeText(mergeTargetName)}`)}
           </button>
           ${importing ? `<div class="atlas-import-progress" data-role="import-progress"><div class="atlas-import-progress-fill"></div><span class="atlas-import-progress-label">writing 0 / ${r.created + r.updated}</span></div>` : ''}
         `}
@@ -513,7 +513,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       <div class="atlas-import-issues" data-role="issues">
         <div class="atlas-import-issues-head">
           <span><span class="material-symbols-outlined">warning</span> ${issues.length} thing${issues.length === 1 ? '' : 's'} to check</span>
-          <button type="button" class="atlas-btn-ghost" data-action="copy-fix">copy fix prompt</button>
+          <button type="button" class="atlas-btn-ghost" data-action="copy-fix">Copy fix prompt</button>
         </div>
         <ul class="atlas-import-issue-list">
           ${shown.map(i => `<li><code>${escapeText(i.path)}</code>: ${escapeText(i.issue)}</li>`).join('')}
@@ -596,7 +596,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
         reportFailures(applied.failures, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.
-        if (hadCreds) toasts.info('Imported as a local world. To sync it, use "make online" in settings.');
+        if (hadCreds) toasts.info('Imported as a local world. To sync it, use "Make online" in this world\'s settings.');
         if (stillMine()) {
           clearLoaded();
           // New world is now active — refresh the export side.
@@ -654,7 +654,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         8000,
         { details: buildFailureDetails(failures, { ...detailsContext(), doing: 'importing' }) },
       );
-    } else if (droppedLinks > 0) toasts.info(`${droppedLinks} unresolved link${droppedLinks === 1 ? '' : 's'} dropped`);
+    } else if (droppedLinks > 0) toasts.info(`${droppedLinks} link${droppedLinks === 1 ? '' : 's'} to missing elements dropped`);
   }
 
   // ---------------------------------------------------------------------------

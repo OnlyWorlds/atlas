@@ -28,18 +28,18 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
   if (!reason) return null;
   switch (reason.kind) {
     case 'no-active-world':
-      toasts.info('No active world. Pick one from the sidebar');
+      toasts.info('No world open. Pick one from the sidebar.');
       return reason;
     case 'local-only':
       // S307: this branch NAMED a fix and left the user to find it, while
       // `pin-missing` two lines below has navigated to the fix since S221.
       // The file exists to stop exactly that ("users were left guessing where
       // to fix it") — the pattern was just never applied across its own switch.
-      toasts.info('This world is local-only. Connect it to OnlyWorlds to sync');
+      toasts.info('This world is local. Use Make online in Settings to sync it.');
       navigate(settingsHash(reason.worldId, 'world'));
       return reason;
     case 'pin-missing':
-      toasts.info('Enter your PIN in settings to enable sync');
+      toasts.info('Enter your PIN in Settings, under OnlyWorlds, to sync.');
       navigate(settingsHash(reason.worldId, 'onlyworlds'));
       return reason;
     case 'seat-secret-missing':

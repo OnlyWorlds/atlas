@@ -451,11 +451,11 @@ export async function pullNowAndRefresh(): Promise<import('../core/types').SyncR
     if (result.pulled.creates > 0) parts.push(`${result.pulled.creates} new`);
     if (result.pulled.updates > 0) parts.push(`${result.pulled.updates} updated`);
     if (result.meta_pulled?.length) parts.push('world settings');
-    toastManager.info(`Pulled ${parts.join(' + ')} from API`);
+    toastManager.info(`Pulled ${parts.join(' + ')} from OnlyWorlds`);
   } else if ((result.meta_pulled?.length ?? 0) > 0 && result.conflicts.length === 0) {
     // Meta-only round (world-meta gate R7): the element counters are zero but
     // something real changed — say so, or the pull reads as a silent no-op.
-    toastManager.info('Pulled world settings from API');
+    toastManager.info('Pulled world settings from OnlyWorlds');
   }
   return result;
 }
@@ -547,7 +547,7 @@ function emitConflictToasts(
     const when = secs >= 90 ? `${Math.round(secs / 60)} minutes` : `${secs} seconds`;
     toastManager.info(
       result.transient_reason === 'rate_limited'
-        ? `OnlyWorlds is limiting requests, which happens after too many wrong PIN tries. Atlas will try again in ${when}.`
+        ? `Too many wrong PIN tries. Check your PIN in Settings; Atlas tries again in ${when}.`
         : result.transient_reason === 'offline'
           ? `OnlyWorlds could not be reached. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas will try again in ${when}.`
           : `OnlyWorlds is busy. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas will try again in ${when}.`
@@ -559,15 +559,15 @@ function emitConflictToasts(
     // A seat (#104) has no PIN to check: removed on onlyworlds.com, it comes
     // back only through the world's page.
     if (isSeatWorld(getState().registry.worlds.find(w => w.id === currentWorldId))) {
-      toastManager.error('Sync paused: OnlyWorlds no longer accepts this world\'s seat. The owner may have removed it; open the world again from onlyworlds.com.');
+      toastManager.error('Sync paused: OnlyWorlds no longer accepts this world\'s seat. The owner may have removed it.');
       return;
     }
     // Revoked minted key ≠ wrong PIN (gate R4): the PIN advice would send the
     // user to the wrong fix. Re-opening from the sidebar mints a fresh key.
     toastManager.error(
       result.auth_reason === 'key_revoked'
-        ? 'Sync paused: this world\'s access key was revoked. Unlink it, then reopen it from the sidebar to get a new key.'
-        : 'Sync paused: authentication failed. Verify your PIN in settings, or unlink this world if it was deleted on the server.'
+        ? 'Sync paused: this world\'s key was revoked. Unlink the world, then link it again with Make online and a new key.'
+        : 'Sync paused: OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN in Settings, or unlink the world if it was deleted online.'
     );
     return;
   }
@@ -647,8 +647,8 @@ function emitConflictToasts(
 
   // Push or sync phase: server was overwritten — confirm.
   const message = phase === 'push'
-    ? `Saved over server change${n === 1 ? '' : 's'} for ${n} element${n === 1 ? '' : 's'}`
-    : `Resolved ${n} divergent element${n === 1 ? '' : 's'} in your favor`;
+    ? `Your version replaced the online one for ${n} element${n === 1 ? '' : 's'}`
+    : `Your version replaced the online one for ${n} element${n === 1 ? '' : 's'}`;
   toastManager.info(message);
 }
 

@@ -95,7 +95,7 @@ export function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager):
     // Reject duplicate tier labels.
     const values = [nextLabels.l1, nextLabels.l2, nextLabels.l3, nextLabels.l4];
     if (new Set(values).size !== 4) {
-      toasts.error('Tier labels must be distinct.');
+      toasts.error('Each level needs its own label.');
       // Revert input value.
       const el = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="writing_${key}"]`);
       if (el) el.value = current[key];

@@ -57,7 +57,7 @@ export class ViewWorldModal extends BaseModal {
         </label>
         ${whereChoiceHtml()}
         <p class="atlas-modal-hint">
-          The world downloads and stays current when its owner makes changes. View only: you can read everything, edit nothing. No PIN needed.
+          The world downloads and stays current as it changes. View only: you can read everything, edit nothing. No PIN needed.
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>

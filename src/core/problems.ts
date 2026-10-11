@@ -173,7 +173,7 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
         ? `Only the world's owner can change its details on OnlyWorlds, so Atlas could not finish ${doing}.${saved}`
         : `This world lets Atlas change only what it made, and someone else made this, so Atlas could not finish ${doing}.${saved}`;
     case 'auth':
-      return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, or reopen the world from the sidebar.`;
+      return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
     case 'offline':
       return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;
     case 'server-busy':

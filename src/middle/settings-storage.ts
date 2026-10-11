@@ -51,12 +51,12 @@ const POLICY_OPTIONS: Array<{
   {
     value: 'local-wins',
     label: 'Local wins',
-    hint: 'Your edits always win. Push overwrites server; pull skips applying server changes for elements you also edited. One toast per round, no badge.',
+    hint: 'Your edits always win: they replace the online copy, and online changes to an element you also edited are dropped. No ⚠ badge.',
   },
   {
     value: 'pause-and-review',
     label: 'Pause and review',
-    hint: 'On conflict, nothing auto-resolves. Push pauses, pull skips. ⚠ badge fires; modal lets you pick overwrite vs pull per element.',
+    hint: 'When an element changed both here and online, Atlas holds it and shows ⚠. You pick which copy wins, element by element.',
   },
 ];
 
@@ -298,14 +298,14 @@ function renderSyncTab(reg: WorldsRegistry): string {
   return `
     <section class="atlas-settings-section">
       <h3>Global sync</h3>
-      <p class="atlas-settings-hint">Applies to every API-linked world. Atlas is local-first: pulls are opt-in.</p>
+      <p class="atlas-settings-hint">Applies to every linked world. Atlas is local-first: pulls are opt-in.</p>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="pause-all" ${pauseAll ? 'checked' : ''} />
-        <span>Pause all sync (master kill switch)</span>
+        <span>Pause all sync</span>
       </label>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="pull-on-activate" ${pullOnActivate ? 'checked' : ''} ${pauseAll ? 'disabled' : ''} />
-        <span>Pull from API when a world activates</span>
+        <span>Pull from OnlyWorlds when a world activates</span>
       </label>
       <label class="atlas-settings-field">
         <span>Auto-refresh cadence</span>
@@ -321,7 +321,7 @@ function renderSyncTab(reg: WorldsRegistry): string {
           <input class="atlas-input atlas-settings-debounce-input" type="number" name="debounce-sec" min="1" max="3600" step="1" value="${debounceSec}" ${pauseAll ? 'disabled' : ''} />
           <span class="atlas-settings-debounce-unit">seconds</span>
         </span>
-        <span class="atlas-settings-hint-sub">After a local edit, atlas waits this long before pushing to the API. The sync pill shows a decay ring during the wait; click it to push now.</span>
+        <span class="atlas-settings-hint-sub">After a local edit, Atlas waits this long before syncing. The sync pill shows a decay ring during the wait; click it to push now.</span>
       </label>
       <fieldset class="atlas-settings-fieldset" ${pauseAll ? 'disabled' : ''}>
         <legend>Default conflict policy</legend>

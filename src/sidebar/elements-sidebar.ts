@@ -122,7 +122,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   const searchInput = document.createElement('input');
   searchInput.className = 'atlas-input';
   searchInput.type = 'text';
-  searchInput.placeholder = 'Search elements...';
+  searchInput.placeholder = 'Search elements…';
   searchInput.setAttribute('data-role', 'elements-search');
   searchInput.style.flex = '1 1 auto';
   searchRow.appendChild(searchInput);
@@ -344,7 +344,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     if (n && n.removed.length > 0) {
       const linked = getState().registry.worlds.find(w => w.id === n.worldId)?.state === 'api-linked';
       const tip = `Removed from the world folder by another program: ${n.removed.join(', ')}.`
-        + (linked ? ' They are gone from this folder only and stay on your OnlyWorlds account; a full refresh from the account brings them back.' : '');
+        + (linked ? ' They are gone from this folder only and stay on your OnlyWorlds account; Refresh from OnlyWorlds brings them back.' : '');
       parts.push(`<span class="atlas-disk-notice-warn" title="${escapeAttr(tip)}">${n.removed.length} removed on disk</span>`);
     }
     if (n && n.unreadable.length > 0) {
@@ -585,7 +585,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       } else if (state.registry.worlds.length === 0) {
         msg = 'No worlds yet. Create one from the Worlds tab.';
       } else {
-        msg = 'No active world. Pick one from the Worlds tab.';
+        msg = 'No world open. Pick one from the Worlds tab.';
       }
       listEl.innerHTML = msg ? `<div class="atlas-pane-empty">${msg}</div>` : '';
       return;
@@ -605,7 +605,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // rides into the modal as the name), and the + button pulses a few beats
     // to spotlight where creation lives (S255v3).
     const worldEmpty = elements.length === 0 && !state.data.loading;
-    searchInput.placeholder = worldEmpty ? 'Create an element...' : 'Search elements...';
+    searchInput.placeholder = worldEmpty ? 'Create an element…' : 'Search elements…';
     createBtn.classList.toggle('atlas-create-pulse', worldEmpty);
 
     // Knowledge lens: rows OUTSIDE the knower's known set dim. The banner

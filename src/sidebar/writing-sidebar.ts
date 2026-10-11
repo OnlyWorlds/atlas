@@ -264,7 +264,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     const searchInput = document.createElement('input');
     searchInput.className = 'atlas-input';
     searchInput.type = 'text';
-    searchInput.placeholder = `Search ${labels.l1.toLowerCase()}s...`;
+    searchInput.placeholder = `Search ${labels.l1.toLowerCase()}s…`;
     searchInput.setAttribute('data-role', 'writing-search');
     searchInput.style.flex = '1 1 auto';
     searchInput.value = searchQuery;
@@ -327,7 +327,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     if (idx.roots.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'atlas-pane-empty atlas-writing-sidebar-empty';
-      empty.textContent = `No ${labels.l1.toLowerCase()}s yet. Use the buttons above to create one.`;
+      empty.textContent = `No ${labels.l1.toLowerCase()}s yet. Use the button above to create one.`;
       list.appendChild(empty);
     } else {
       // Render only nodes that match the filter (when active) or all of them.

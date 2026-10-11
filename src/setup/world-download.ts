@@ -25,7 +25,7 @@ import { worldFileName, WORLD_FILE_MAX_BYTES } from '../store/world-tree';
 import { getCurrentSyncEngine, getCurrentSyncWorldId } from '../sync/sync-attach';
 import type { WorldRegistryEntry } from '../core/types';
 
-export const TORN_LINE = 'Something changed while saving. Try again.';
+export const TORN_LINE = 'The world changed while its file was being made. Try again.';
 const TOUR_LINE = 'The tour world can be downloaded once you keep it at the end of the tour.';
 
 /** Where the file goes, chosen inside the click. */
@@ -114,7 +114,7 @@ export async function downloadWorld(world: WorldRegistryEntry, target: SaveTarge
   try {
     await flushBeforeLeavingWorld();
     const where = await worldHandleFor(world);
-    if (where.kind !== 'ok') throw new PlainError('Atlas cannot reach this world\'s files right now, so it could not download it.');
+    if (where.kind !== 'ok') throw new PlainError('Atlas cannot reach this world\'s files right now. Open it again from the sidebar, then download it.');
     let bytes: Uint8Array;
     try {
       const collected = await ws.collectWorldFiles(where.handle);

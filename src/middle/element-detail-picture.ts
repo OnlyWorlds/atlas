@@ -116,7 +116,7 @@ async function removeFlow(el: Element, entry: WorldRegistryEntry, key: string, b
   const name = el.name || 'this element';
   const lines = [
     'Remove this picture from OnlyWorlds for good?',
-    'It leaves OnlyWorlds at once, but copies already cached on the way can keep showing at its link for days, so this does not take it off the internet.',
+    'It leaves OnlyWorlds at once, but copies already loaded elsewhere can keep showing for a long time.',
     others.length === 0
       ? `The image URL of ${name} is cleared.`
       : `It is also the picture of ${others.length} other element${others.length === 1 ? '' : 's'} here (${others.slice(0, 3).map(e => e.name || 'unnamed').join(', ')}${others.length > 3 ? ', and more' : ''}). Atlas clears their image URLs too.`,
@@ -136,7 +136,7 @@ async function removeFlow(el: Element, entry: WorldRegistryEntry, key: string, b
     const elsewhere = referenced - showing.length;
     toasts.success('Picture removed from OnlyWorlds'
       + (now.length > 0 ? ` and cleared from ${now.length === 1 ? 'its element' : `${now.length} elements`}.` : '.')
-      + (elsewhere > 0 ? ` OnlyWorlds counted ${elsewhere} more element${elsewhere === 1 ? '' : 's'} showing it that this copy does not have yet; they will show no picture.` : ''));
+      + (elsewhere > 0 ? ` ${elsewhere} more element${elsewhere === 1 ? '' : 's'} on OnlyWorlds, not yet in this copy, use it; they will show no picture.` : ''));
   } catch (err) {
     showProblem(err, { doing: 'removing the picture', toasts });
   } finally {

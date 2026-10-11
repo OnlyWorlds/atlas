@@ -91,7 +91,7 @@ describe('uploadPicture', () => {
     serve({ ticketError: { status: 403, code: 'storage_full' } });
     expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k' }), reg('1234'), png()))).toMatch(/used all of its picture storage/);
     serve({ ticketError: { status: 429, code: 'quota_exceeded' } });
-    expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k' }), reg('1234'), png()))).toMatch(/today's limit/);
+    expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k' }), reg('1234'), png()))).toMatch(/limit of picture uploads/);
   });
 
   it('too large is caught before the edge, against the ticket\'s own limit', async () => {
@@ -116,9 +116,9 @@ describe('uploadPicture', () => {
 
   it('a world that cannot take a picture says why and asks nothing', async () => {
     const seen = serve();
-    expect(await sentenceOf(uploadPicture(world(undefined, 'local-only'), reg('1234'), png()))).toMatch(/Put this world online first/);
+    expect(await sentenceOf(uploadPicture(world(undefined, 'local-only'), reg('1234'), png()))).toMatch(/use Make online first/);
     expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k', read_only: true }), reg('1234'), png()))).toMatch(/view-only/);
-    expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k', seat: {} }), reg('1234'), png()))).toMatch(/opened from onlyworlds.com as a seat/);
+    expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k', seat: {} }), reg('1234'), png()))).toMatch(/opened on a seat/);
     expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k' }), reg(), png()))).toMatch(/needs your OnlyWorlds PIN/);
     expect(seen.tickets).toHaveLength(0);
   });

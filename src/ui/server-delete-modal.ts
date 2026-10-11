@@ -87,7 +87,7 @@ export class ServerDeleteReviewModal extends BaseModal {
     });
     const hint = document.createElement('p');
     hint.className = 'atlas-conflict-hint';
-    hint.textContent = 'These elements were deleted on the server (web app, another atlas, etc.). Pick what to do with each.';
+    hint.textContent = 'Another tool or another Atlas deleted these on OnlyWorlds. Pick what to do with each.';
     body.appendChild(hint);
 
     body.appendChild(this.renderList());
@@ -122,7 +122,7 @@ export class ServerDeleteReviewModal extends BaseModal {
       </div>
       <div class="atlas-conflict-row-actions">
         <button class="atlas-btn-ghost" data-action="delete-locally" title="Remove this from local; matches the server">Delete locally</button>
-        <button class="atlas-btn-ghost" data-action="keep" title="Keep locally; next push re-creates on server">Keep + re-push</button>
+        <button class="atlas-btn-ghost" data-action="keep" title="Keep it here; the next sync puts it back online">Keep + re-push</button>
       </div>
     `;
     const box = row.querySelector<HTMLInputElement>('input[data-role="include"]');
@@ -299,7 +299,7 @@ export class ServerDeleteReviewModal extends BaseModal {
 
   private sameWorld(): boolean {
     if (getState().active?.worldId === this.capturedWorldId) return true;
-    this.toasts.info('World changed. Close and reopen to review');
+    this.toasts.info('Another world is open now. Switch back to review.');
     this.hide();
     return false;
   }

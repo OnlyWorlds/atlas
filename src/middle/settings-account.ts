@@ -33,7 +33,7 @@ export function signInErrorLine(err: unknown): string {
     if (err.code === 'key_revoked' || err.status === 401 || err.code === 'rate_limited') return accountErrorMessage(err);
     if (err.status === 429) return 'Too many attempts. Wait a moment and try again.';
     if (err.status >= 400 && err.status < 500) {
-      return 'OnlyWorlds did not accept that account token. Check it on onlyworlds.com, under Settings, then Account tokens.';
+      return 'OnlyWorlds did not accept that account token. Check it on onlyworlds.com, under Account, then Account tokens.';
     }
   }
   if (classifyError(err) === 'offline') return CANNOT_REACH_LINE;
@@ -44,7 +44,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
   return `
     <section class="atlas-settings-section">
       <h3>Account</h3>
-      <p class="atlas-settings-hint">Global, used when creating or linking online worlds. PIN changes take effect immediately; any active sync engine is re-attached.</p>
+      <p class="atlas-settings-hint">Your onlyworlds.com account PIN, used to create, link and sync online worlds. Changing it here does not change it there.</p>
       <label class="atlas-settings-field">
         <span>Email</span>
         <input class="atlas-input" type="email" name="email"
@@ -79,7 +79,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
           <span class="atlas-account-status">Signed in${reg.account_username ? ` as ${escapeText(reg.account_username)}` : ''} <span class="atlas-account-last4">· token …${escapeText(last4)}</span></span>
           <button type="button" class="atlas-btn-ghost" data-action="account-forget">forget</button>
         </div>
-        <p class="atlas-settings-hint">Atlas lists your OnlyWorlds worlds in the sidebar and creates its own access key when you open one. Forgetting the token keeps every opened world working.</p>
+        <p class="atlas-settings-hint">Atlas lists your OnlyWorlds worlds in the sidebar and makes its own key when you open one. Forgetting the token keeps every opened world working.</p>
       </div>
     `;
   }
@@ -92,7 +92,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
                autocomplete="off" spellcheck="false" />
         <button type="button" class="atlas-btn-primary" data-action="account-sign-in">sign in</button>
       </div>
-      <p class="atlas-settings-hint">Connects atlas to your OnlyWorlds account: see all your worlds, open any of them without hunting keys. Mint a token at onlyworlds.com → Settings → Account tokens.</p>
+      <p class="atlas-settings-hint">Connects Atlas to your OnlyWorlds account: see all your worlds, open any of them without hunting keys. Create a token on onlyworlds.com, under Account, then Account tokens.</p>
       <div class="atlas-modal-error" data-role="account-token-error" hidden></div>
     </div>
   `;

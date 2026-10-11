@@ -67,7 +67,8 @@ export interface SharingFakeState {
 }
 
 const RESERVED_SLUGS = new Set(['api', 'admin', 'assets', 'static', 'about', 'docs', 'help']);
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{2,38}[a-z0-9])?$/;
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const QUOTA = 20;
 const PAYLOAD_CAP_BYTES = 256 * 1024;
 const TITLE_MAX = 200;
@@ -86,7 +87,7 @@ function unauthorized() {
 
 /** Format validity only — reserved words are format-VALID but 409 slug_taken. */
 function validSlugFormat(slug: string): boolean {
-  return typeof slug === 'string' && slug.length >= 4 && slug.length <= 40 && SLUG_RE.test(slug);
+  return typeof slug === 'string' && slug.length >= 4 && slug.length <= 40 && SLUG_RE.test(slug) && !UUID_SHAPE_RE.test(slug);
 }
 
 let idCounter = 0;

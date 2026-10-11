@@ -90,7 +90,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'taxonomy',
     name: 'Label it your way',
-    concept: 'Supertype and subtype are free labels on every element. No fixed categories.',
+    concept: 'Supertype and subtype are free labels on every element, with no fixed list.',
     action: 'Set a supertype and a subtype on any element.',
     toast: 'Labels are yours to invent.',
     glyph: 'sell',
@@ -99,7 +99,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'links',
     name: 'Everything links',
-    concept: 'Relation fields weave elements into a world graph; stable ids are why the links hold.',
+    concept: 'Link fields tie elements into one world, and a link holds when a name changes.',
     action: 'Link one element to another, with a field or an @ mention.',
     toast: 'Your world is starting to connect.',
     glyph: 'hub',
@@ -108,7 +108,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'maps',
     name: 'Places on maps',
-    concept: 'Maps, pins and zones are world data too, spatial elements in the same schema.',
+    concept: 'Maps, pins and zones are world data too, in the same format.',
     action: 'Place a pin on a map.',
     toast: 'Your world has places now.',
     glyph: 'location_on',
@@ -117,7 +117,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'time',
     name: 'Your world through time',
-    concept: 'Events and dates are structured data; a chart is one view of it.',
+    concept: 'Events and dates are structured data; a chart is one view of them.',
     action: 'Open the charts room and click a node.',
     toast: 'Your world has a timeline of its own.',
     glyph: 'timeline',
@@ -146,7 +146,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'import',
     name: 'Turn messy notes into a world',
-    concept: 'The format is a clean target: an AI assistant can convert most notes into importable JSON.',
+    concept: 'An AI assistant can turn most notes into JSON that Atlas imports.',
     action: 'Import anything, or copy the example JSON.',
     toast: 'Notes from anywhere can become a world.',
     glyph: 'import_export',

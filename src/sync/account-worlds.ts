@@ -144,7 +144,7 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   let pin = state.registry.pin;
   if (!pin) {
     const entered = await new PinPromptModal().prompt(
-      `Opening "${row.name}": atlas needs your OnlyWorlds PIN to sync edits. It is saved in settings for every online world.`
+      `Opening "${row.name}": Atlas needs your OnlyWorlds PIN to sync edits. It is saved in settings for every online world.`
     );
     if (!entered) return false;
     pin = entered;
@@ -159,9 +159,9 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   const overlay = showLoadingOverlay(`Opening ${row.name}`);
   try {
     // ---- Mint (the one server-side mutation before the download) ----
-    overlay.update('Creating an access key…');
+    overlay.update('Making a key…');
     const minted = await new AccountClient(token).mintWorldKey(row.id, deviceKeyName());
-    toasts.info(`Created an access key for ${row.name}`);
+    toasts.info(`Made a key for ${row.name}`);
 
     // ---- Download + register, serialized on the activation chain (R2) ----
     overlay.update('Waiting for a free slot…');
@@ -189,7 +189,7 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
     navigate(homeHash(result.entry.id));
     completeWaypoint('ecosystem');
     if (result.failures.length > 0) {
-      toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. Refresh from API brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
+      toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
     } else {
       toasts.success(`Opened ${row.name} · ${result.downloaded} elements`);
     }

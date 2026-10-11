@@ -80,7 +80,7 @@ async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
   } catch (err) {
     throw keyCheckError(err, { readOnly: true });
   }
-  if (!meta?.id) throw new PlainError(`${DEMO_WORLD_NAME} did not answer as expected. Try again later.`);
+  if (!meta?.id) throw new PlainError(`OnlyWorlds did not send ${DEMO_WORLD_NAME} as expected. Try again later.`);
   if (opts.isHere?.(meta.id)) return { kind: 'here', worldId: meta.id };
   const name = meta.name?.trim() || DEMO_WORLD_NAME;
 

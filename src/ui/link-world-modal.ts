@@ -79,7 +79,7 @@ export class LinkWorldModal extends BaseModal {
         </div>
         <div class="atlas-modal-actions" data-role="busy-actions" hidden>
           <button type="button" class="atlas-btn-ghost" data-action="cancel-link" title="Stop now and remove what was downloaded; nothing is kept">Cancel download</button>
-          <button type="button" class="atlas-btn-primary" data-action="finish-early" title="Stop now and open the world with what has downloaded; Refresh from API brings the rest">Stop and keep what's here</button>
+          <button type="button" class="atlas-btn-primary" data-action="finish-early" title="Stop now and open the world with what has downloaded; Refresh from OnlyWorlds brings the rest">Stop and keep what's here</button>
         </div>
       </form>
     `;
@@ -118,7 +118,7 @@ export class LinkWorldModal extends BaseModal {
 
       // Taken synchronously, inside the click, before the first await.
       const where = takeWhereInClick(form);
-      const ready = await readyWhere(where, this.toasts, 'Linking a world downloads it into a new folder.');
+      const ready = await readyWhere(where, this.toasts, 'Downloading a world puts it in a new folder.');
       if (ready !== true) {
         errorBox.textContent = ready || '';
         errorBox.hidden = !ready;
@@ -180,9 +180,9 @@ export class LinkWorldModal extends BaseModal {
         );
         const failures = result.failures.length;
         if (result.stoppedEarly) {
-          this.toasts.info(`Linked ${result.entry.name} with ${result.downloaded} of ${result.stoppedEarly.total} elements. Use Refresh from API (the refresh icon on the sync pill) to download the rest.`);
+          this.toasts.info(`Linked ${result.entry.name} with ${result.downloaded} of ${result.stoppedEarly.total} elements. Use Refresh from OnlyWorlds to download the rest.`);
         } else if (failures > 0) {
-          this.toasts.error(`Linked ${result.entry.name}. ${failures} element${failures === 1 ? '' : 's'} did not download. Refresh from API brings ${failures === 1 ? 'it' : 'them'}.`);
+          this.toasts.error(`Linked ${result.entry.name}. ${failures} element${failures === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${failures === 1 ? 'it' : 'them'}.`);
         } else {
           this.toasts.success(`Linked ${result.entry.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
@@ -194,14 +194,14 @@ export class LinkWorldModal extends BaseModal {
         navigate(homeHash(result.entry.id));
       } catch (err) {
         if (err instanceof DownloadCancelledError) {
-          this.toasts.info('Link cancelled. Nothing was kept.');
+          this.toasts.info('Download cancelled. Nothing was kept.');
           this.hide();
           return;
         }
         // A refused key, an unknown world or no connection arrives worded
         // (keyCheckError); the rest is worded here (S369).
         console.warn('[link-world] link failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'linking the world', where }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the world', where }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;

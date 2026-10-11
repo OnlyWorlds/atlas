@@ -56,6 +56,37 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.30.0',
+    date: '2026-10-11',
+    theme: 'plainer words',
+    entries: [
+      {
+        id: 'copy-pass-plain-words',
+        title: 'Plainer words across Atlas',
+        body: 'Four readers went through every line Atlas shows. Engine words like pull, push, slug and API gave way to what the screen calls things: Refresh from OnlyWorlds, the page URL, onlyworlds.com. Every delete confirm now says it cannot be undone.',
+        tags: ['fix'],
+      },
+      {
+        id: 'copy-pass-true-remedies',
+        title: 'Error lines point at a step that works',
+        body: 'A few lines sent you somewhere that could not help: reopening a world that was still linked, or asking a shared world\'s owner for their key. A revoked or read key now points at Unlink, then Make online with a new key, and a member of a shared world is told to make their own key on onlyworlds.com.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'share-read-key-refusal',
+        title: 'A read key says why it cannot publish',
+        body: 'Publishing with a read key, such as the demo world\'s, said authentication failed. It now says the key can only read. A page URL with a doubled hyphen is refused right away, as OnlyWorlds would refuse it.',
+        tags: ['sharing', 'fix'],
+      },
+      {
+        id: 'web-legend-plural',
+        title: 'The web legend counts right',
+        body: 'The Web tab\'s legend read "1 links here" and "2 link here". It now agrees with its number.',
+        tags: ['web', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.29.0',
     date: '2026-10-11',
     theme: 'one step, not a hundred',

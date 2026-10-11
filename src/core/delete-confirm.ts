@@ -84,10 +84,9 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
   // The store still cascades by default, so proceeding silently here would be
   // the confirm floor failing in exactly the case it exists for.
   if (dependentsUnknown) {
-    const subjectName = (el.name ?? '').trim() || el.id;
     return {
       needed: true,
-      message: `Delete "${subjectName}"? Atlas could not check what else this would delete, so anything filed under it may go too. This cannot be undone.`,
+      message: `Delete ${subjectOf(el)}? Atlas could not check what else this would delete, so anything filed under it may go too. This cannot be undone.`,
       cascades: true,
     };
   }
@@ -95,7 +94,7 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
   const needed = confirmPref || cascades;
   if (!needed) return { needed: false, message: '', cascades };
 
-  const subject = (el.name ?? '').trim() || el.id;
+  const subject = subjectOf(el);
 
   if (el.type === 'narrative') {
     const summary = summarizeNarrativeDeletion(allElements, el.id, labels);
@@ -105,16 +104,22 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
     if (summary.total > 0) {
       return {
         needed: true,
-        message: `Delete "${subject}"? ${summary.sentence} This cannot be undone.`,
+        message: `Delete ${subject}? ${summary.sentence} This cannot be undone.`,
         cascades,
       };
     }
-    if (!cascades) return { needed: true, message: `Delete "${subject}"?`, cascades };
+    if (!cascades) return { needed: true, message: `Delete ${subject}? This cannot be undone.`, cascades };
   }
 
   const n = dependents.length;
   const extra = n > 0
-    ? ` This will also remove ${n} dependent element${n === 1 ? '' : 's'}. This cannot be undone.`
+    ? ` This also deletes ${n} element${n === 1 ? '' : 's'} filed under it.`
     : '';
-  return { needed: true, message: `Delete "${subject}"?${extra}`, cascades };
+  return { needed: true, message: `Delete ${subject}?${extra} This cannot be undone.`, cascades };
+}
+
+/** The confirm's subject: the name in quotes, or "this element" (never an id). */
+function subjectOf(el: { name?: string | null }): string {
+  const name = (el.name ?? '').trim();
+  return name ? `"${name}"` : 'this element';
 }

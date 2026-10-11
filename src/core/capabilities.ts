@@ -130,7 +130,7 @@ export function __resetOpfsStatusForTests(): void {
 
 /** The one plain line for a window that refuses browser storage (lens C R3-h). */
 export const NO_BROWSER_STORAGE_LINE =
-  'This window does not allow browser storage, so no world can live in this browser here. If it is a private window, open Atlas in a normal one.';
+  'This window does not allow browser storage, so no world can be kept here. If it is a private window, open Atlas in a normal one.';
 
 /** The plain line for a full origin, where no act is under way (the landing, Settings; S376 lens C C16). */
 export const BROWSER_STORAGE_FULL_LINE =

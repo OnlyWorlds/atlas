@@ -1789,7 +1789,7 @@ function renderCard(state: ViewState): void {
     }
     for (const [label, refs] of groups) chipsWrap.appendChild(buildChipGroup(state, label, refs));
     // Reverse links — one "Referenced by" group (who points at this node).
-    if (reverse.length > 0) chipsWrap.appendChild(buildChipGroup(state, 'Referenced by', reverse));
+    if (reverse.length > 0) chipsWrap.appendChild(buildChipGroup(state, 'Linked from', reverse));
   }
   card.appendChild(chipsWrap);
 

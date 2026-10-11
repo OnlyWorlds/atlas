@@ -207,7 +207,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
       });
     }
     wrap.appendChild(buildSection({
-      headerLabel: 'Referenced by',
+      headerLabel: 'Linked from',
       count: remaining.length,
       groups,
       navigateTo: 'element',

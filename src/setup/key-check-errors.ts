@@ -34,7 +34,7 @@ export function keyCheckError(err: unknown, opts: { readOnly?: boolean } = {}): 
   if (status === 401 || status === 403) {
     return new PlainError(opts.readOnly
       ? 'OnlyWorlds did not accept that read key. Check it, then try again.'
-      : 'OnlyWorlds did not accept that API key and PIN. Check both, then try again.');
+      : 'OnlyWorlds did not accept that API key. Check it, then try again.');
   }
   if (status === 404) {
     return new PlainError('OnlyWorlds has no world for that key. Check the key, then try again.');

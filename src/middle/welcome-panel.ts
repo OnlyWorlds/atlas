@@ -64,8 +64,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       root.innerHTML = `
         <header class="atlas-room-header"><h1>Welcome back</h1></header>
         <div class="atlas-welcome-empty">
-          <p>Atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
-          <p class="atlas-welcome-hint">Your worlds are still on disk. Click below to re-grant folder access and restore the world list.</p>
+          <p>Atlas found the folder you set up before on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
+          <p class="atlas-welcome-hint">Your worlds are still on disk. Allow the folder again below to bring the list back.</p>
           <div class="atlas-welcome-actions">
             <button class="atlas-btn-primary" data-action="recover-atlas">Re-link OnlyWorlds folder</button>
           </div>
@@ -158,7 +158,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // Chrome has no folder picker either, so the sentence says "desktop".
       const folderNote = folderMode
         ? ''
-        : 'Worlds you make here live in this browser. Folders on your drive need a desktop Chromium browser: Chrome, Edge or Brave.';
+        : 'Worlds you make here live in this browser. Folders on your drive need desktop Chrome, Edge or Brave.';
       // (The example-page door, "see an example page" → #/demo, was removed in
       // S368 with the other two example-page links. The #/demo route itself
       // still answers, for old links.)
@@ -299,7 +299,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
                   ><span class="material-symbols-outlined atlas-add-glyph-plus">add</span
                   ><span class="material-symbols-outlined atlas-add-glyph-main">folder</span></span>
                 button in the top left creates one. The <strong>add a world</strong> button
-                under it lists every way to start one, each with a line on what it does.`}</p>
+                under it lists every way to start one.`}</p>
             </div>
             <div class="atlas-grounded-detail" data-role="path-detail"></div>
           </div>
@@ -314,23 +314,23 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'add-world': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">add</span>
             <h3>add a world</h3>
-            <p>Every way to start a world, each with a line on what it does: start a world, open a world folder or a world file, or download or view one from OnlyWorlds.</p>
+            <p>Every way to start a world: start one, open a world folder or file, or download or view one from OnlyWorlds.</p>
             <p class="atlas-grounded-detail-hint">click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
             <h3>start a world</h3>
-            <p>A new world, in your OnlyWorlds folder or in this browser: the dialog asks. Elements become files as you build, and everything works offline. You can take it online later.</p>
+            <p>A new world, in your OnlyWorlds folder or in this browser: the dialog asks. It is plain files, works offline, and can go online later.</p>
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'new-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">cloud_upload</span>
             <h3>new world on OnlyWorlds</h3>
-            <p>Creates the world locally and on onlyworlds.com in one step, synced from the start. Needs a free account.</p>
+            <p>Creates the world here and on onlyworlds.com, synced from the start. Needs a free account.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'link-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">link</span>
             <h3>download a world from OnlyWorlds</h3>
-            <p>Already have a world online? Paste its key: Atlas downloads a full local copy and keeps the two in sync.</p>
+            <p>Already have a world online? Its API key and PIN bring down a full copy, kept in sync.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'view-api': `

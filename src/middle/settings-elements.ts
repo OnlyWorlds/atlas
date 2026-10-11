@@ -67,7 +67,7 @@ export function renderElementsTab(): string {
       </fieldset>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="refs-group-by-field" ${refsByField ? 'checked' : ''} />
-        <span>Group "Referenced by" by relationship ("Rival of…", "Birthplace of…") instead of by element type</span>
+        <span>Group "Linked from" by relationship ("Rival of…", "Birthplace of…") instead of by element type</span>
       </label>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="confirm-before-delete" ${confirmDelete ? 'checked' : ''} />

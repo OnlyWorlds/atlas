@@ -13,10 +13,11 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { mswServer } from '../setup';
 import { statefulSharingHandlers, type SharingFakeState } from '../msw-sharing-handlers';
 import {
-  SharingClient, SharingApiError, isValidSlug, suggestSlug,
+  SharingClient, SharingApiError, isValidSlug, suggestSlug, sharingErrorMessage,
 } from '../../src/sync/sharing-client';
 
 const BASE = 'https://sharing.test/api/sharing';
@@ -46,6 +47,10 @@ describe('slug helpers', () => {
     expect(isValidSlug('abcd-')).toBe(false);        // trailing hyphen
     expect(isValidSlug('Abcd')).toBe(false);         // uppercase
     expect(isValidSlug('a'.repeat(41))).toBe(false); // too long
+    // keel's rule (sharing/slug_rules.py): single hyphens, never a UUID's shape.
+    expect(isValidSlug('my--page')).toBe(false);     // doubled hyphen
+    expect(isValidSlug('my-big-page')).toBe(true);
+    expect(isValidSlug('0f8fad5b-d9cb-469f-a165-70867728950e')).toBe(false); // UUID-shaped
   });
 
   it('suggestSlug derives a rule-compliant slug from a page name', () => {
@@ -260,5 +265,26 @@ describe('error type', () => {
       expect((e as SharingApiError).code).toBe('not_found');
       expect((e as SharingApiError).status).toBe(404);
     }
+  });
+
+  // keel refuses a read key's publish with 403 permission_error, a code Atlas
+  // has no case for: it reads as "this key can only read", never as an
+  // authentication failure (copy pass S391, Kael B5).
+  it('a 403 without a known code is a read-key refusal, worded as one', async () => {
+    mswServer.use(http.post(`${BASE}/pages/`, () => HttpResponse.json(
+      { error: { type: 'permission_error', code: 'permission_error', message: 'Read-only key.' } }, { status: 403 },
+    )));
+    const err = await client().publish({ slug: 'read-key-page', title: 't', intent: 'show', payload: payload() })
+      .then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(SharingApiError);
+    expect((err as SharingApiError).code).toBe('forbidden');
+    expect(sharingErrorMessage(err as SharingApiError)).toMatch(/can only read/);
+  });
+
+  it('a 401 is still an authentication refusal', async () => {
+    mswServer.use(http.post(`${BASE}/pages/`, () => HttpResponse.json({}, { status: 401 })));
+    const err = await client().publish({ slug: 'bad-key-page', title: 't', intent: 'show', payload: payload() })
+      .then(() => null, (e: unknown) => e);
+    expect((err as SharingApiError).code).toBe('auth_failed');
   });
 });

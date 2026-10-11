@@ -402,7 +402,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   async function dateElement(id: string, date: number, edge: 'start' | 'end' = 'start'): Promise<void> {
     const store = getActiveStore();
     const el = getState().data.elements.find(e => e.id === id);
-    if (!store || !el) { toasts.error('element not found'); return; } // deleted mid-drag (gate)
+    if (!store || !el) { toasts.error('That element is not in this world any more.'); return; } // deleted mid-drag (gate)
     const mapping = TEMPORAL_TYPE_FIELDS[el.type];
     const field = edge === 'end' ? mapping?.end : mapping?.start;
     if (!field) { toasts.error('this type has no date field'); return; }
@@ -522,7 +522,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    *  guard here is a backstop, not the flow. */
   function openCalendarCreate(): void {
     if (!clockIsSet()) {
-      toasts.show('Set the world clock first: one step of time needs a meaning', 'info');
+      toasts.show('Set the world clock first, then make a calendar.', 'info');
       return;
     }
     new CalendarBuilderModal(toasts, {
@@ -700,7 +700,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     mintBanner.innerHTML =
       `<span class="material-symbols-outlined">history_edu</span>` +
       `<span class="atlas-cal-mint-text">This world carries old time fields. Mint your first calendar from them: the names move into the calendar and the old fields are cleared.</span>` +
-      `<button type="button" class="atlas-btn-ghost" data-action="mint-calendar">mint calendar</button>` +
+      `<button type="button" class="atlas-btn-ghost" data-action="mint-calendar">new calendar</button>` +
       `<button type="button" class="atlas-cal-mint-dismiss" data-action="mint-dismiss" title="Hide for this session">×</button>`;
     mintBanner.querySelector('[data-action="mint-calendar"]')!
       .addEventListener('click', () => void startMint());
@@ -762,7 +762,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   /** Save the current view as a named chart in `.atlas/charts.json`. */
   async function saveCurrentChart(): Promise<void> {
     const store = getActiveStore();
-    if (!store) { toasts.error('no active world to save into'); return; }
+    if (!store) { toasts.error('No world open. Pick one from the sidebar.'); return; }
     const all = getState().data.elements;
     const scope = currentScope();
     const axis = config?.axis ?? { kind: 'time' as const, direction: 'both' as const };
@@ -831,7 +831,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // the app that took it with no confirmation at all, while the map row and
     // the zone chip both ask first. There is no undo anywhere in atlas, so the
     // confirm IS the safety. Same `window.confirm` shape as those two.
-    if (!window.confirm(`Delete chart "${chart.name ?? 'untitled'}"?`)) return;
+    if (!window.confirm(`Delete chart "${chart.name ?? 'unnamed'}"? This cannot be undone.`)) return;
     const store = getActiveStore();
     try {
       if (store) await mutateCharts(store, charts => removeChart(charts, chart.id));

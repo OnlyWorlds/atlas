@@ -26,7 +26,7 @@ test('@firefox the landing offers the tour, and the tour builds its world in bro
   await boot(page);
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
   await expect(page.locator('[data-action="open-world-folder"]')).toHaveCount(0);
-  await expect(page.locator('.atlas-landing-note')).toContainText('Chromium');
+  await expect(page.locator('.atlas-landing-note')).toContainText('Chrome, Edge or Brave');
 
   await page.click('[data-action="start-tour"]');
   await page.locator('.atlas-tour-controls button', { hasText: /^Start$/ }).click();
@@ -72,7 +72,7 @@ test('@firefox the landing starts a world in this browser, and other ways in has
 test('@private a private window says why there is no tour, and offers no door that would stall', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
-  await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage, so no world can live in this browser here');
+  await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage, so no world can be kept here');
   await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
   // 1.17: every landing door needs browser storage here, so none is offered.
   await expect(page.locator('[data-action="start-world"]')).toHaveCount(0);
@@ -82,5 +82,5 @@ test('@private a private window says why there is no tour, and offers no door th
     const engine = await import('/src/tour/tour-engine.ts');
     try { await (engine as any).launchTour(); return 'started'; } catch (e) { return String((e as Error).message); }
   });
-  expect(refused).toContain('does not allow browser storage, so no world can live in this browser here');
+  expect(refused).toContain('does not allow browser storage, so no world can be kept here');
 });

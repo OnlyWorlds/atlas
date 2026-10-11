@@ -77,7 +77,7 @@ describe('the confirm FLOOR (the thing this module exists for)', () => {
       confirmPref: true,
     });
     expect(d.needed).toBe(true);
-    expect(d.message).toBe('Delete "s1"?');
+    expect(d.message).toBe('Delete "s1"? This cannot be undone.');
   });
 
   it('applies the floor to NON-narrative cascades too (a map with pins)', () => {
@@ -92,7 +92,7 @@ describe('the confirm FLOOR (the thing this module exists for)', () => {
     });
     expect(d.needed).toBe(true);
     expect(d.message).toBe(
-      'Delete "m1"? This will also remove 3 dependent elements. This cannot be undone.',
+      'Delete "m1"? This also deletes 3 elements filed under it. This cannot be undone.',
     );
   });
 
@@ -101,8 +101,8 @@ describe('the confirm FLOOR (the thing this module exists for)', () => {
     const d = decideDeleteConfirm({
       el: world[0], dependents: [world[1]], allElements: world, labels: L, confirmPref: false,
     });
-    expect(d.message).toContain('1 dependent element.');
-    expect(d.message).not.toContain('1 dependent elements');
+    expect(d.message).toContain('1 element filed under it.');
+    expect(d.message).not.toContain('1 elements');
   });
 });
 
@@ -159,12 +159,12 @@ describe('copy hygiene', () => {
     expect(d.message).toContain('This cannot be undone.');
   });
 
-  it('uses the element id as subject when the name is blank', () => {
+  it('says "this element" when the name is blank, never the id', () => {
     const nameless = { id: 'abc-123', type: 'narrative', name: '', supertype: L.l3 } as unknown as Element;
     const d = decideDeleteConfirm({
       el: nameless, dependents: [], allElements: [nameless], labels: L, confirmPref: true,
     });
-    expect(d.message).toBe('Delete "abc-123"?');
+    expect(d.message).toBe('Delete this element? This cannot be undone.');
   });
 });
 

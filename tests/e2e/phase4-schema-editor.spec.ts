@@ -188,7 +188,7 @@ test('referenced-by section appears on the target after linking', async ({ page 
   await page.click('.atlas-row[data-element-id]:has-text("Mordor")');
   await expect(page.locator('.atlas-middle-header h2')).toContainText('Mordor');
 
-  const refs = page.locator('.atlas-detail-section', { has: page.locator('.atlas-detail-section-header', { hasText: 'Referenced By' }) });
+  const refs = page.locator('.atlas-detail-section', { has: page.locator('.atlas-detail-section-header', { hasText: 'Linked from' }) });
   await expect(refs).toBeVisible();
   await expect(refs.locator('.atlas-link-chip')).toContainText('Sauron');
 });

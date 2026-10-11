@@ -138,7 +138,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
           <span class="material-symbols-outlined atlas-zone-kind-caret" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span>
           ${hasKind
-            ? `<button type="button" class="atlas-zone-kind-swatch" title="Colour for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the world)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Colour for ${escapeAttr(kindLabel(kind))}">
+            ? `<button type="button" class="atlas-zone-kind-swatch" title="Color for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the world)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Color for ${escapeAttr(kindLabel(kind))}">
                  <span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span>
                </button>`
             : `<span class="atlas-zone-kind-swatch is-inert"><span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span></span>`}
@@ -173,7 +173,7 @@ function renderChip(z: Zone, selectedId: string | null | undefined, rules: reado
   return `
     <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''} ${parts ? 'is-linked' : ''}" data-zone-id="${escapeAttr(z.id)}"${parts ? ` data-parts="${escapeAttr(parts.join(' '))}"` : ''} title="${escapeAttr(title)}">
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
-      <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own colour' : ''}"></span>
+      <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own color' : ''}"></span>
       <span class="atlas-zone-chip-name">${escapeText(z.name || '(unnamed)')}</span>${parts ? `
       <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
@@ -214,7 +214,7 @@ function renderTune(kind: Kind<Zone>, rule: StyleRule | undefined, resolved: Ret
         <span>Label first (with the pins)</span>
       </label>
       <div class="atlas-zone-tune-actions">
-        <button type="button" class="atlas-btn-link" data-action="apply-to-zones" title="Write this colour into every zone of the kind, so other tools see it too">Write into zones</button>
+        <button type="button" class="atlas-btn-link" data-action="apply-to-zones" title="Write this color into every zone of the kind, so other tools see it too">Write into zones</button>
         <button type="button" class="atlas-btn-link" data-action="clear-rule" ${rule ? '' : 'disabled'}>Clear</button>
       </div>
     </div>`;

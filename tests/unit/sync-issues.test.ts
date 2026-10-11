@@ -86,7 +86,7 @@ describe('syncIssueLine', () => {
   });
 
   it('names a schema field, never a custom one', () => {
-    expect(syncIssueLine(issueOf(fail('a', { status: 422, param: 'birth_location', source: 'server' })))).toContain('the birth location field');
+    expect(syncIssueLine(issueOf(fail('a', { status: 422, param: 'birth_location', source: 'server' })))).toContain('its birth location field');
     expect(syncIssueLine(issueOf(fail('a', { status: 422, param: 'x_lair', source: 'server' })))).not.toContain('field');
   });
 

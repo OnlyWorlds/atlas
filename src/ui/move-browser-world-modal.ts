@@ -29,12 +29,12 @@ function unlockApp(): void {
 /** Step 1, inside the click: the home folder, writable. `null`: the user did not give one (already said). */
 export async function readyHome(toasts: ToastManager): Promise<{ home: FileSystemDirectoryHandle; hint: string } | null> {
   if (!getState().atlasRoot) {
-    const ok = await ensureAtlasRoot(toasts, 'move this world to a folder on your drive', { worldPicked: 'refuse' });
+    const ok = await ensureAtlasRoot(toasts, 'Moving this world puts it in a new folder.', { worldPicked: 'refuse' });
     if (!ok) return null;
   }
   const home = await loadHandle(ATLAS_ROOT_HANDLE_KEY).catch(() => undefined);
   if (!home || !(await ensureWritable(home).catch(() => false))) {
-    toasts.info('Atlas needs to be allowed to change your OnlyWorlds folder to move the world there.');
+    toasts.info('To move the world there, try again and choose Allow when the browser asks.');
     return null;
   }
   const root = getState().atlasRoot;

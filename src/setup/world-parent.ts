@@ -16,7 +16,7 @@ export type WorldWhere = 'folder' | 'browser';
 
 /** The browser row's caption: where the loss model is said before it matters. */
 export const WHERE_BROWSER_CAPTION =
-  'Nothing to pick. Only this browser can open it, and clearing its site data (or closing a private window) removes it. You can move it to a folder or download it later.';
+  'Only this browser can open it, and clearing its site data (or closing a private window) removes it. You can move it to a folder or download it later.';
 
 /** Said instead of the question on a browser without the folder picker. */
 export const WHERE_BROWSER_ONLY_LINE = 'It lives in this browser.';

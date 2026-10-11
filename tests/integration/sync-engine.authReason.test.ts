@@ -61,7 +61,7 @@ describe('SyncEngine push auth_reason', () => {
     expect(state.kind).toBe('error');
     if (state.kind === 'error') {
       // Default guidance, not the revoked-key copy.
-      expect(state.message).toMatch(/verify pin/i);
+      expect(state.message).toMatch(/Check your PIN in Settings/);
     }
   });
 });

@@ -223,7 +223,7 @@ test('two tabs: B, opening the world while A copies it, is told it is being move
   await tabB.goto('/');
   await tabB.waitForSelector('.atlas-shell');
   expect(await activate(tabB, id)).toBe(false);
-  await expect(tabB.locator('.ow-toast', { hasText: 'This world is being moved to a folder in another tab.' })).toBeVisible();
+  await expect(tabB.locator('.ow-toast', { hasText: 'This world is moving to a folder in another tab.' })).toBeVisible();
   expect(dialogs).toBe(0);
 
   // A DUPLICATED tab shares A's tab id (Duplicate copies sessionStorage), so
@@ -237,7 +237,7 @@ test('two tabs: B, opening the world while A copies it, is told it is being move
   await dup.waitForSelector('.atlas-shell');
   expect(await dup.evaluate(() => sessionStorage.getItem('atlas_tab_id'))).toBe(aId);
   expect(await activate(dup, id)).toBe(false);
-  await expect(dup.locator('.ow-toast', { hasText: 'This world is being moved to a folder in another tab.' })).toBeVisible();
+  await expect(dup.locator('.ow-toast', { hasText: 'This world is moving to a folder in another tab.' })).toBeVisible();
   await dup.close();
 
   await page.evaluate(() => { (window as any).__copyGate = null; (window as any).__openCopyGate(); });

@@ -161,7 +161,7 @@ export class MakeOnlineModal extends BaseModal {
 
       <div data-route-pane="link" hidden>
         <p class="atlas-modal-hint">
-          Link this world to a world you've already created on onlyworlds.com. Choose how to handle elements that exist on both sides.
+          Link this world to a world you already have on onlyworlds.com. Choose how to handle elements that exist on both sides.
         </p>
         <form data-form="link-route">
           <label class="atlas-modal-field">
@@ -178,7 +178,7 @@ export class MakeOnlineModal extends BaseModal {
               <input type="radio" name="link-policy" value="b" checked />
               <span>
                 <strong>Overwrite <span class="atlas-settings-default-tag">default</span></strong>
-                <em>Local copy wins: pushes your version, server's is replaced.</em>
+                <em>Your copy wins: it replaces the one on onlyworlds.com.</em>
               </span>
             </label>
             <label class="atlas-policy-option">

@@ -341,8 +341,8 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   if (!linked) {
     pill.dataset.state = 'local';
     pill.title = filesWhereOf(entry) === 'browser'
-      ? 'Local-only world: kept in this browser'
-      : 'Local-only world: folder is the source of truth';
+      ? 'Local world: kept in this browser'
+      : 'Local world: the folder is the source of truth';
     pill.innerHTML = `
       <span class="atlas-sync-pill-dot"></span>
       <span>Local</span>
@@ -362,7 +362,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       <span class="atlas-sync-pill-dot"></span>
       <span class="material-symbols-outlined atlas-sync-pill-eye">visibility</span>
       <span>View only</span>
-      <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from API">refresh</span>
+      <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds">refresh</span>
     `;
     const refreshView = async (): Promise<void> => {
       try {
@@ -396,7 +396,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     : base;
   pill.dataset.state = dataState;
   pill.dataset.clickable = 'true';
-  pill.title = title + (conflictCount > 0 ? '' : ' · click to refresh from API');
+  pill.title = title + (conflictCount > 0 ? '' : ' · click to refresh from OnlyWorlds');
   const conflictBadge = conflictCount > 0
     ? `<span class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review">⚠ ${conflictCount}</span>`
     : '';
@@ -412,7 +412,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     <span>${label}</span>
     ${conflictBadge}
     ${issueBadge}
-    <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from API">refresh</span>
+    <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds">refresh</span>
   `;
   pill.querySelector<HTMLElement>('[data-role="sync-issues"]')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -475,12 +475,12 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       return;
     }
     if (cur?.kind === 'paused') {
-      toasts.info(cur.reason === 'network' ? 'Offline; pull skipped'
+      toasts.info(cur.reason === 'network' ? 'Offline, so nothing was refreshed.'
         : cur.reason === 'held' && cur.held_for === 'disk' ? 'Files changed on disk are waiting for your answer in the element list.'
-        : cur.reason === 'held' && cur.held_for === 'move' ? 'This world is being moved to a folder. Pull when that finishes.'
-        : cur.reason === 'held' && cur.held_for === 'download' ? 'This world is being saved as one file. Pull when that finishes.'
-        : cur.reason === 'held' ? 'Ids are being updated in this world. Pull when that finishes.'
-        : 'Sync paused. Flip stay-offline off to pull');
+        : cur.reason === 'held' && cur.held_for === 'move' ? 'This world is being moved to a folder. Refresh when that finishes.'
+        : cur.reason === 'held' && cur.held_for === 'download' ? 'This world is being saved as one file. Refresh when that finishes.'
+        : cur.reason === 'held' ? 'Ids are being updated in this world. Refresh when that finishes.'
+        : 'Sync is paused. Turn off Stay offline or Pause all sync in Settings to refresh.');
       return;
     }
     try {
@@ -525,7 +525,7 @@ function mapEngineStateToPill(
       return {
         dataState: 'error',
         label: 'No PIN',
-        title: 'This world is linked but cannot sync: no PIN is set. Add your PIN in Settings, then reopen the world.',
+        title: 'This world is linked but cannot sync: no PIN is set. Add your PIN in Settings, under OnlyWorlds.',
       };
     }
     if (reason?.kind === 'seat-secret-missing') {
@@ -534,7 +534,7 @@ function mapEngineStateToPill(
     return {
       dataState: 'api',
       label: 'Linked',
-      title: 'API-linked world · engine starting up',
+      title: 'Linked to OnlyWorlds · sync is starting',
     };
   }
   switch (engine.kind) {
@@ -554,7 +554,7 @@ function mapEngineStateToPill(
       return {
         dataState: 'saving',
         label: engine.phase === 'push' ? 'Saving…' : 'Fetching…',
-        title: `Syncing (${engine.phase})${engine.progress ? ` ${engine.progress.done}/${engine.progress.total}` : ''}`,
+        title: `Syncing${engine.progress ? ` ${engine.progress.done}/${engine.progress.total}` : ''}`,
       };
     case 'paused':
       if (engine.reason === 'held' && engine.held_for === 'disk') {

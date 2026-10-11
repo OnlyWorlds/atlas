@@ -98,12 +98,12 @@ function wireUnitFields(world: WorldRegistryEntry, toasts: ToastManager): void {
 /** A seat world's own line (#104): what the seat may do, and a lost secret said plainly. */
 export function seatLine(world: WorldRegistryEntry): string {
   const what = seatRoleWords(world.api?.seat?.role);
-  const base = `Connected from onlyworlds.com on its own seat.${what ? ` ${what}` : ''} The seat is removed on onlyworlds.com, ${SEAT_REMOVE_WHERE}.`;
+  const base = `Connected from onlyworlds.com on its own seat.${what ? ` ${what}` : ''} To remove the seat, go to onlyworlds.com, ${SEAT_REMOVE_WHERE}.`;
   return world.api?.seat_secret ? base : `${base} ${SEAT_SECRET_MISSING_LINE}`;
 }
 
 export function renderWorldTab(world: WorldRegistryEntry): string {
-  const stateLabel = world.state === 'api-linked' ? 'api-linked' : 'local-only';
+  const stateLabel = world.state === 'api-linked' ? 'linked' : 'local';
   // Where the world lives (1.17, conv. 129): a browser world has no folder to
   // show or keep, so Delete only (contract §3.1, §3.4); its ways out are Move
   // to a folder (Chromium) and Download the whole world (every browser). The
@@ -138,9 +138,9 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       ${isSeatWorld(world) ? `<p class="atlas-settings-hint" data-role="seat-line">${escapeText(seatLine(world))}</p>` : ''}
       ${renderSyncIssues(world)}
       <div class="atlas-settings-actions">
-        <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from API</button>
+        <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from OnlyWorlds</button>
         <button class="atlas-btn-ghost" data-action="test-connection">Test connection</button>
-        <button class="atlas-btn-ghost" data-action="unlink-from-api">Unlink from API</button>
+        <button class="atlas-btn-ghost" data-action="unlink-from-api">Unlink from OnlyWorlds</button>
       </div>`
     : world.demo === true
       ? `<p class="atlas-settings-hint">The tour world is a sandbox until you keep it at the end of the tour. Kept, it can go online.</p>`
@@ -174,16 +174,16 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
             title="A web page cannot open your file explorer, so this opens the folder picker inside this world's folder. Close it when you have looked.">Show folder</button></dd>`}
         <dt>ID</dt><dd><code>${escapeText(world.id)}</code></dd>
         ${world.state === 'api-linked' && world.api
-          ? `<dt>API world ID</dt><dd><code>${escapeText(world.api.world_id)}</code></dd>`
+          ? `<dt>Online ID</dt><dd><code>${escapeText(world.api.world_id)}</code></dd>`
           : ''}
         ${world.state === 'api-linked' && world.api?.world_name
           ? (() => {
               const apiName = world.api.world_name!;
               const differs = apiName !== world.name;
               const hint = differs
-                ? ' <span class="atlas-settings-hint-inline" title="Local name and server-side name diverged. Atlas never renames the server world automatically.">(differs from local)</span>'
+                ? ' <span class="atlas-settings-hint-inline" title="The name here and the name on onlyworlds.com differ. Atlas never renames the online world by itself.">(differs from local)</span>'
                 : '';
-              return `<dt>Name on API</dt><dd>${escapeText(apiName)}${hint}</dd>`;
+              return `<dt>Online name</dt><dd>${escapeText(apiName)}${hint}</dd>`;
             })()
           : ''}
       </dl>
@@ -308,7 +308,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
   testBtn?.addEventListener('click', async () => {
     if (!world.api) return;
     const pin = worldPin(world, getState().registry);
-    if (!pin) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN first'); return; }
+    if (!pin) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN on the OnlyWorlds tab first.'); return; }
     testBtn.disabled = true;
     try {
       // Test Connection via v2 GET /world (live 2026-07-12); buildV2Adapter
@@ -335,9 +335,9 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
             console.warn('[settings] persist api.world_name to world.json failed:', err);
           }
         }
-        toasts.success(`Connected. Name on API is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
+        toasts.success(`The key works. Online name is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
       } else {
-        toasts.success(`Connected: ${liveName ?? 'world'}`);
+        toasts.success(`The key works: ${liveName ?? 'world'}`);
       }
     } catch (err) {
       // Branch on the TYPED code, not on the status number. A revoked key and
@@ -348,11 +348,11 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       const code = (err as { code?: string } | null)?.code;
       const status = (err as { status?: number } | null)?.status;
       if (code === 'key_revoked') {
-        toasts.error('This world\'s access key was revoked. Unlink it here, then reopen it from the sidebar to get a new key.');
+        toasts.error('This world\'s key was revoked. Unlink the world here, then link it again with Make online and a new key.');
       } else if (code === 'permission_error') {
-        toasts.error('This access key is read-only, so edits can\'t sync. Reopen the world with a write key.');
+        toasts.error('This is a read key, so edits can\'t sync. Unlink the world here, then link it again with Make online and a write key.');
       } else if (isSeatWorld(world) && (code === 'invalid_credentials' || status === 401)) {
-        toasts.error('OnlyWorlds did not accept this world\'s seat. It may have been removed there; open the world again from onlyworlds.com.');
+        toasts.error('OnlyWorlds did not accept this world\'s seat. It may have been removed there.');
       } else if (code === 'invalid_credentials' || status === 401 || status === 403) {
         toasts.error('OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN on the OnlyWorlds tab.');
       } else if (status === 404) {
@@ -379,18 +379,18 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       // Best-effort; missing count just means the dialog is less specific.
     }
     const lines = [
-      `Unlink "${world.name}" from API?`,
+      `Unlink "${world.name}" from OnlyWorlds?`,
       '',
       `WHAT HAPPENS:`,
       filesWhereOf(world) === 'browser'
         ? `  • The world${elementCount > 0 ? ` (${elementCount} element${elementCount === 1 ? '' : 's'})` : ''} stays in this browser`
         : `  • Local folder${elementCount > 0 ? ` (${elementCount} element${elementCount === 1 ? '' : 's'})` : ''} stays exactly where it is`,
       `  • Sync stops immediately: no more push or pull`,
-      `  • Local sync history is cleared (server timestamps, pending tombstones)`,
+      `  • Deletes not yet sent to onlyworlds.com are dropped`,
       `  • The world on onlyworlds.com is NOT deleted`,
       ...(isSeatWorld(world) ? [`  • Its seat stays on onlyworlds.com until it is removed there, ${SEAT_REMOVE_WHERE}`] : []),
       '',
-      `REVERSIBLE: you can re-link later from settings or via "+ link api".`,
+      `REVERSIBLE: you can link it again with Make online.`,
       '',
       `Continue?`,
     ];
@@ -473,11 +473,10 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
   const deletePermBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="delete-world-permanent"]');
   deletePermBtn?.addEventListener('click', async () => {
     const ok = window.confirm(
-      `PERMANENTLY DELETE "${world.name}"?\n\n` +
-      `This removes atlas's record AND DELETES the world's folder on disk. ` +
-      `Everything in it (elements, maps, media) is gone forever.\n\n` +
-      `${world.state === 'api-linked' ? '\n(The matching API world on onlyworlds.com is NOT deleted server-side.)\n' : ''}` +
-      `There is no undo. Continue?`
+      `Permanently delete "${world.name}" and its folder on disk?\n\n` +
+      `Everything in it (elements, maps, media) is gone for good.` +
+      `${world.state === 'api-linked' ? ' The world on onlyworlds.com stays.' : ''}\n\n` +
+      `There is no undo.`
     );
     if (!ok) return;
     deletePermBtn.disabled = true;
@@ -611,7 +610,7 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
       console.error('[settings] finishing the re-key failed:', err);
       toasts.error(refused(err) ?? (stuckIsMerge
         ? 'Linking still could not finish. Nothing was lost; try Finish it again, or Undo it.'
-        : 'The id update still could not finish. Nothing was lost; the world stays offline until it does.'));
+        : 'The id update still could not finish. Nothing was lost; try Finish it again, or Undo it.'));
     }
     await show();
   });
@@ -694,7 +693,7 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       if (typeof f.status === 'number' && f.status >= 500) return 'OnlyWorlds had a problem on its side. Atlas tries again with your next save.';
       if (typeof f.status === 'number' && f.status >= 400) {
         const field = f.param && /^[a-z][a-z0-9_]*$/.test(f.param) && !/^(x|shadow)_/.test(f.param)
-          ? ` It named the ${f.param.replace(/_/g, ' ')} field.` : '';
+          ? ` The problem is in its ${f.param.replace(/_/g, ' ')} field.` : '';
         return `OnlyWorlds did not accept it.${field} Open it to check, or copy the details to report it.`;
       }
       return 'It could not sync. Atlas tries again with your next save; copy the details if it keeps happening.';
@@ -732,7 +731,7 @@ function renderSyncIssues(world: WorldRegistryEntry): string {
       <h4>${issues.length > 0 ? `Not syncing (${issues.length})` : 'Not syncing'}</h4>
       ${stoppedLine}
       ${issues.length > 0 ? `<ul class="atlas-settings-issue-list">${rows}</ul>${more}` : ''}
-      ${issues.length > 0 ? '<div class="atlas-settings-actions"><button class="atlas-btn-ghost" data-action="retry-sync-issues">Try again now</button></div>' : ''}
+      ${issues.length > 0 ? '<div class="atlas-settings-actions"><button class="atlas-btn-ghost" data-action="retry-sync-issues">Retry now</button></div>' : ''}
     </div>`;
 }
 

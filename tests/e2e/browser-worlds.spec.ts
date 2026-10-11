@@ -328,7 +328,7 @@ test('Cancel link into this browser leaves no directory and no row', async ({ pa
   await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
   await modal.locator('[data-action="cancel-link"]').click();
   await expect(modal).toHaveCount(0);
-  await expect(page.locator('.ow-toast', { hasText: 'Link cancelled' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'Download cancelled' })).toBeVisible();
   expect(await browserHomeDirs(page)).toEqual([]);
   expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
 });

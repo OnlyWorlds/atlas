@@ -122,23 +122,13 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
   });
 
   if (response.status === 400) {
-    // Parse OUTSIDE the throw: a `throw` inside the try lands in the catch, which
-    // would swallow the server's specific `message` and re-throw the generic one.
-    const text = await response.text();
-    let serverMessage: string | undefined;
-    try {
-      const data = JSON.parse(text) as { message?: unknown };
-      if (typeof data.message === 'string' && data.message.trim()) serverMessage = data.message;
-    } catch {
-      // Non-JSON body — fall through to the generic message.
-    }
-    // This endpoint's 400 text is written for people ("no account with that
-    // email"), so it is shown as a refusal; Details never print a refusal's
-    // words (S369). Anything else gets Atlas's own sentence.
-    throw new PlainError(serverMessage ?? 'OnlyWorlds did not accept that email and PIN. Check them against your onlyworlds.com account.');
+    // keel answers every refusal here with one generic body ("Invalid request.
+    // Please try again.", config/worldsync.py, on purpose), so Atlas's own
+    // sentence says more than the server's (copy pass S391, Kael F97a).
+    throw new PlainError('OnlyWorlds did not accept that email and PIN. Check them against your onlyworlds.com account.');
   }
   if (response.status === 429) {
-    throw new PlainError('OnlyWorlds is getting too many requests. Wait a minute, then try again.');
+    throw new PlainError('OnlyWorlds is getting too many requests. Try again in an hour.');
   }
   if (!response.ok) {
     throw new PlainError('OnlyWorlds had a problem on its side, so the world was not created. Try again in a while.');

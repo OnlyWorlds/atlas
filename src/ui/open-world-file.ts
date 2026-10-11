@@ -169,7 +169,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
   let moveTo: { home: FileSystemDirectoryHandle; hint: string } | null = null;
   const chooseWhere = hasFolderMode() && getState().atlasRoot
     ? async (): Promise<'browser' | 'folder' | null> => {
-        const answer = await askWhereWithHome({ title: words.title, action: 'Open it', purpose: 'open this world in a folder on your drive', toasts });
+        const answer = await askWhereWithHome({ title: words.title, action: 'Open it', purpose: 'Opening a world file puts it in a new folder.', toasts });
         if (answer?.where === 'folder') moveTo = { home: answer.home, hint: answer.hint };
         return answer?.where ?? null;
       }

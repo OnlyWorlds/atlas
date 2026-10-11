@@ -787,10 +787,10 @@ function buildMapAffordance(
   const hasImage = !!(m.image_url || m.image_media_id);
   if (hasImage) btn.classList.add('atlas-map-tree-icon-has-image');
   const titleSuffix = panToZoneId ? ' (will pan to zone)' : '';
-  btn.title = `Open map: ${m.name || '(untitled)'}${titleSuffix}`;
+  btn.title = `Open map: ${m.name || '(unnamed)'}${titleSuffix}`;
   const iconHtml = '<span class="material-symbols-outlined">map</span>';
   if (showName) {
-    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m.name || '(untitled)')}</span>`;
+    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m.name || '(unnamed)')}</span>`;
     btn.classList.add('atlas-header-map-affordance-labeled');
   } else {
     btn.innerHTML = iconHtml;
@@ -842,10 +842,10 @@ function buildOpenMapButton(
   if (m.image_url || m.image_media_id) btn.classList.add('atlas-map-tree-icon-has-image');
   btn.setAttribute('data-action', 'open-map');
   btn.setAttribute('data-map-id', m.id);
-  btn.title = `Open map: ${m.name || '(untitled)'}`;
+  btn.title = `Open map: ${m.name || '(unnamed)'}`;
   btn.innerHTML =
     '<span class="material-symbols-outlined">map</span>'
-    + `<span class="atlas-header-map-label">${escapeText(m.name || '(untitled)')}</span>`;
+    + `<span class="atlas-header-map-label">${escapeText(m.name || '(unnamed)')}</span>`;
   btn.addEventListener('click', () => {
     openMapTab(m, sourceElementId);
     if (typeof x === 'number' && typeof y === 'number') panMapTabTo(m.id, x, y);

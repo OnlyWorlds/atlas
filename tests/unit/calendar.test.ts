@@ -421,7 +421,7 @@ describe('validation', () => {
       version: 1, grain: 'year',
       intercalary: [{ name: 'Floating Day', after_month: 0 }],
     };
-    expect(validateCalendarConfig(bad).some((e) => e.includes('require months'))).toBe(true);
+    expect(validateCalendarConfig(bad).some((e) => e.includes('festival days need months'))).toBe(true);
   });
   it('all five fixture calendars validate clean', () => {
     for (const cfg of [KIRROWMOSS, VESSACH, DUNE, HARPTOS, SHIRE, MINIMAL]) {

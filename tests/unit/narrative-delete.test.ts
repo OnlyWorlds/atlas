@@ -208,7 +208,7 @@ describe('summarizeNarrativeDeletion + confirm message', () => {
     const s = summarizeNarrativeDeletion(standardWorld(), 's1', L);
     expect(s.total).toBe(0);
     expect(s.sentence).toBe('');
-    expect(narrativeDeleteConfirmMessage('Scene one', s)).toBe('Delete "Scene one"?');
+    expect(narrativeDeleteConfirmMessage('Scene one', s)).toBe('Delete "Scene one"? This cannot be undone.');
   });
 
   it('names drafts nested under a chapter (the flexible tier)', () => {
@@ -237,7 +237,7 @@ describe('summarizeNarrativeDeletion + confirm message', () => {
 
   it('falls back to a generic subject for an unnamed narrative', () => {
     const s = summarizeNarrativeDeletion(standardWorld(), 's1', L);
-    expect(narrativeDeleteConfirmMessage('   ', s)).toBe('Delete "this narrative"?');
+    expect(narrativeDeleteConfirmMessage('   ', s)).toBe('Delete this narrative? This cannot be undone.');
   });
 
   it('carries no em-dash (house voice law)', () => {

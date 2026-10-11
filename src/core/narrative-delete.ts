@@ -189,7 +189,7 @@ export function narrativeDeleteConfirmMessage(
   name: string,
   summary: NarrativeDeletionSummary,
 ): string {
-  const subject = name.trim() || 'this narrative';
-  if (summary.total === 0) return `Delete "${subject}"?`;
-  return `Delete "${subject}"? ${summary.sentence} This cannot be undone.`;
+  const subject = name.trim() ? `"${name.trim()}"` : 'this narrative';
+  if (summary.total === 0) return `Delete ${subject}? This cannot be undone.`;
+  return `Delete ${subject}? ${summary.sentence} This cannot be undone.`;
 }

@@ -95,7 +95,7 @@ export async function applyMapBackground(
       applyFlat();
       const hint = document.createElement('div');
       hint.className = 'atlas-map-loading-hint atlas-map-imgfail-hint';
-      hint.textContent = 'map image failed to load; showing the blank canvas';
+      hint.textContent = 'map image did not load; check it in Configure map';
       container.appendChild(hint);
     });
     backgroundApplied = true;

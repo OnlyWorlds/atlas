@@ -47,7 +47,7 @@ function renderBanner(name: string): void {
     banner.innerHTML =
       `<span class="material-symbols-outlined">ads_click</span>` +
       `<span class="atlas-map-placement-hint-text"></span>` +
-      `<button type="button" class="atlas-map-placement-hint-cancel" title="Cancel (Esc)">cancel</button>`;
+      `<button type="button" class="atlas-map-placement-hint-cancel" title="Cancel (Esc)">Cancel</button>`;
     banner.querySelector('.atlas-map-placement-hint-cancel')
       ?.addEventListener('click', clearPlacement);
     container.appendChild(banner);

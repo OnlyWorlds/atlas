@@ -227,7 +227,7 @@ test('Cancel link removes the new folder and registers nothing', async ({ page }
   await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
   await modal.locator('[data-action="cancel-link"]').click();
   await expect(modal).toHaveCount(0);
-  await expect(page.locator('.ow-toast', { hasText: 'Link cancelled' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'Download cancelled' })).toBeVisible();
   expect(await worldFolders(page)).toEqual(before);
   const linked = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length);
   expect(linked).toBe(0);

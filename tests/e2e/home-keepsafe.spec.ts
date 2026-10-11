@@ -67,7 +67,7 @@ test('the keep-safe card: shown past the threshold, × hides it for a week acros
   const card = page.locator('[data-role="keepsafe"]');
   await expect(card.locator('h2')).toHaveText('This world lives only in this browser');
   await expect(card).toContainText('Download a copy, or move it to a folder on your drive.');
-  await expect(card.locator('.atlas-home-keepsafe-actions button')).toHaveText(['Download the whole world', 'Move to a folder', 'Take it online']);
+  await expect(card.locator('.atlas-home-keepsafe-actions button')).toHaveText(['Download the whole world', 'Move to a folder', 'Make online']);
   await expect(card.locator('[data-action="keepsafe-hide"]')).toHaveAttribute('aria-label', 'Hide for a week');
   await card.locator('[data-action="keepsafe-hide"]').click();
   await expect(card).toHaveCount(0);

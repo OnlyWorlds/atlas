@@ -245,7 +245,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       id: 'a',
       body:
         'How do you create a world for something as big or as small as a single sentence?\nAtlas uses a folder per world, that contains elements as text files.' +
-        '\n\nClick the **create local world** icon in the top left. Call it Hyperion after the novel.',
+        '\n\nClick the **start a world** icon in the top left. Call it Hyperion after the novel.',
       meta: 'The tour world lives in this browser, not in a folder on your drive. At the end of the tour you can keep it.',
     }],
     handsOn: 'create-world',
@@ -706,7 +706,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       id: 'a',
       body:
         'There\'s more to the tool, so please give it a try.\nAtlas uses OnlyWorlds for the categories and their fields, and allows custom fields on top of them.' +
-        '\n\nCreate a [free account](https://onlyworlds.com/worlds) to sync atlas worlds online and into other applications.'  +
+        '\n\nCreate a [free account](https://www.onlyworlds.com/accounts/signup/) to sync Atlas worlds online and into other applications.'  +
         '\nQuestions, bugs, requests all welcome: through [Discord](https://discord.gg/twCjqvVBwb), the [feedback tracker](https://github.com/OnlyWorlds/feedback), or info@onlyworlds.com.' ,
  
     }],

@@ -53,7 +53,7 @@ export class ForgetBrowserModal extends BaseModal {
       online.hidden = false;
     }
     body.querySelector<HTMLElement>('[data-role="also"]')!.textContent = inv.seatWorlds > 0
-      ? `Also removed: your PIN and sign-in, the secret of each world opened on a seat (open ${inv.seatWorlds === 1 ? 'it' : 'them'} again from onlyworlds.com), the folders Atlas remembers, and every setting.`
+      ? `Also removed: your PIN and sign-in, the secret of each world opened on a seat (${inv.seatWorlds === 1 ? 'it stops' : 'they stop'} syncing), the folders Atlas remembers, and every setting.`
       : 'Also removed: your PIN and sign-in, the folders Atlas remembers, and every setting.';
     body.querySelector<HTMLElement>('[data-role="kept"]')!.textContent = inv.folderWorlds > 0
       ? `Never touched: your ${inv.folderWorlds === 1 ? 'world' : `${inv.folderWorlds} worlds`} in folders on your drive, and your worlds on onlyworlds.com. Open a folder again afterwards to bring ${inv.folderWorlds === 1 ? 'it' : 'them'} back.`

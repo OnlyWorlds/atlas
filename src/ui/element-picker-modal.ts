@@ -118,7 +118,7 @@ class ElementPickerModal extends BaseModal {
         <div class="atlas-modal-title">${escapeText(titleText)}</div>
         <div class="atlas-picker-count" data-role="count">0 elements</div>
       </div>
-      <input type="text" class="atlas-input atlas-picker-search" data-role="picker-search" placeholder="Search by name..." autocomplete="off" />
+      <input type="text" class="atlas-input atlas-picker-search" data-role="picker-search" placeholder="Search by name…" autocomplete="off" />
       <div class="atlas-picker-strip" data-role="type-strip"></div>
       <div class="atlas-picker-list" data-role="picker-list"></div>
     `;

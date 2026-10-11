@@ -111,7 +111,7 @@ export async function pickAndOpenWorldFolder(toasts: Toasts): Promise<void> {
       // (S365 gate lens B F9 / C M6). Without one, it becomes the home folder,
       // and the toast says so rather than "is set up".
       if (getState().atlasRoot) {
-        toasts.info('That folder keeps worlds rather than being one. To make it your home folder, use Settings, then Storage.');
+        toasts.info('That folder keeps worlds rather than being one. To make it your OnlyWorlds folder, use Settings, then Storage.');
         return;
       }
       const result = await setupAtlasRootFrom(picked);
@@ -286,7 +286,7 @@ const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line
   { action: 'create-local', get icon() { return newWorldGlyph(); }, title: 'Start a world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.', browserOnlyLine: 'Plain files, in this browser. Works offline; take it online any time.' },
   { action: 'open-folder', icon: 'folder_open', title: 'Open a world folder', line: 'One you already have, from Atlas, another tool, or your AI. It opens where it is; nothing is copied.' },
   { action: 'new-api', icon: 'cloud_upload', title: 'New world on OnlyWorlds', line: 'Created on onlyworlds.com and here, synced from the start. Needs a free account.' },
-  { action: 'link-api', icon: 'link', title: 'Download a world from OnlyWorlds', line: 'Paste its key: Atlas downloads a full copy and keeps the two in sync.' },
+  { action: 'link-api', icon: 'link', title: 'Download a world from OnlyWorlds', line: 'Its API key and PIN: Atlas downloads a full copy and keeps the two in sync.' },
   { action: 'view-api', icon: 'visibility', title: 'View a shared world', line: 'Someone gave you a read key: browse their world, view only. No PIN needed.' },
   { action: 'open-file', icon: 'file_open', title: 'Open a world file', line: 'A world file Atlas saved, from this or any other browser.' },
   { action: 'try-demo', icon: 'explore', title: 'Explore Moppetopia', line: 'The demo world, as your own copy in this browser to explore and change. Nothing goes back to OnlyWorlds.' },
@@ -348,7 +348,7 @@ class HomeFolderModal extends BaseModal {
       });
       body.innerHTML = `
         <p class="atlas-modal-hint" data-role="purpose"></p>
-        <p class="atlas-modal-hint">Atlas keeps each world it makes or downloads in one folder you choose, inside an <code>onlyworlds-atlas</code> folder there. The worlds you opened where they are stay there.</p>
+        <p class="atlas-modal-hint">Atlas keeps each world it makes or downloads in one folder you choose, inside an <code>onlyworlds-atlas</code> folder there. Worlds you opened from their own folder stay put.</p>
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
           <button type="button" class="atlas-btn-primary" data-action="choose">Choose a folder</button>

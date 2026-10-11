@@ -133,7 +133,7 @@ export function validateCalendarConfig(cfg: CalendarConfig): string[] {
       || months.names.length === 0 || months.names.length !== months.lengths.length) {
       errors.push('months.names and months.lengths must be same-length non-empty arrays');
     } else if (months.lengths.some((l) => !Number.isInteger(l) || l < 1)) {
-      errors.push('every month length must be a positive integer');
+      errors.push('every month length must be a whole number, 1 or more');
     }
     if (cfg.bundles?.year) errors.push('year.steps is legal only when no months are defined (year length is derived from months)');
   } else if (cfg.bundles?.year) {
@@ -144,19 +144,19 @@ export function validateCalendarConfig(cfg: CalendarConfig): string[] {
 
   const week = cfg.bundles?.week;
   if (week) {
-    if (!Number.isInteger(week.length) || week.length < 1) errors.push('week.length must be a positive integer');
-    else if (!Array.isArray(week.names) || week.names.length !== week.length) errors.push('week.names must have week.length entries');
+    if (!Number.isInteger(week.length) || week.length < 1) errors.push('the week length must be a whole number, 1 or more');
+    else if (!Array.isArray(week.names) || week.names.length !== week.length) errors.push('give the week as many day names as its length');
   }
 
   const inter = cfg.intercalary ?? [];
-  if (inter.length > 0 && !months) errors.push('intercalary days require months');
+  if (inter.length > 0 && !months) errors.push('festival days need months');
   const monthCount = months?.names.length ?? 0;
   for (const ic of inter) {
     if (!Number.isInteger(ic.after_month) || ic.after_month < 0 || ic.after_month > monthCount) {
-      errors.push(`intercalary "${ic.name}": after_month must be 0..${monthCount}`);
+      errors.push(`festival day "${ic.name}": pick the month it follows`);
     }
     if (ic.every_years != null && (!Number.isInteger(ic.every_years) || ic.every_years < 1)) {
-      errors.push(`intercalary "${ic.name}": every_years must be a positive integer`);
+      errors.push(`festival day "${ic.name}": every N yrs must be a whole number, 1 or more`);
     }
   }
 
@@ -169,7 +169,7 @@ export function validateCalendarConfig(cfg: CalendarConfig): string[] {
       errors.push(`era "${era.name}": end must be after start`);
     }
     if ((era.direction ?? 'up') === 'down' && era.end != null && era.end >= era.start) {
-      errors.push(`era "${era.name}": a down-era's end (lower bound) must be below its start (the pivot)`);
+      errors.push(`era "${era.name}": a counting-down era must end below its start`);
     }
   }
   // Overlap check over resolved domains.
@@ -716,7 +716,7 @@ export function parseDate(cfg: CalendarConfig, input: string, opts: ParseOptions
   };
 
   if (year == null) {
-    if (opts.now == null) return { error: 'add a year (no current time is set to infer one from)' };
+    if (opts.now == null) return { error: 'add a year (the world clock has no now set)' };
     return resolveInYear(absoluteYear(cfg, opts.now));
   }
 

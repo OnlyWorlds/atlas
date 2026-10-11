@@ -64,8 +64,8 @@ async function sendToEdge(ticket: MediaTicket, file: Blob): Promise<{ url: strin
 function ticketSentence(err: unknown): string | null {
   if (!(err instanceof OwV2Error)) return null;
   switch (err.code) {
-    case 'storage_full': return 'Your OnlyWorlds account has used all of its picture storage, so this picture was not uploaded.';
-    case 'quota_exceeded': return 'This world has reached today\'s limit for picture uploads. Try again tomorrow.';
+    case 'storage_full': return 'Your OnlyWorlds account has used all of its picture storage, so this picture was not uploaded. Remove one you no longer need, then try again.';
+    case 'quota_exceeded': return 'This world has reached its limit of picture uploads for now. Try again later.';
     case 'media_unavailable': return 'Picture upload is not available on OnlyWorlds right now. Try again later.';
     default: return null;
   }
@@ -95,7 +95,7 @@ export async function uploadPicture(
   reg: WorldsRegistry,
   file: Blob,
 ): Promise<string> {
-  if (!entry.api || entry.state !== 'api-linked') throw new PlainError('Put this world online first: pictures are hosted on OnlyWorlds.');
+  if (!entry.api || entry.state !== 'api-linked') throw new PlainError('Pictures are hosted on OnlyWorlds: use Make online first.');
   if (entry.api.read_only) throw new PlainError('This world is view-only here, so it cannot take a new picture.');
   const pin = worldPin(entry, reg);
   if (!pin) {

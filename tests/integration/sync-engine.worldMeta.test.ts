@@ -234,7 +234,7 @@ describe('failure routing', () => {
     expect(result.auth_reason).toBe('read_only_key');
     const state = engine.getState();
     expect(state.kind).toBe('error');
-    expect((state as { message: string }).message).toMatch(/read-only/i);
+    expect((state as { message: string }).message).toMatch(/read key/i);
   });
 
   it('an overlong field becomes a per-field failure and is NEVER sent (dig Q9)', async () => {

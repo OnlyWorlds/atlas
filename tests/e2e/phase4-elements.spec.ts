@@ -72,7 +72,7 @@ test('elements mode becomes enabled and toggles when a world is active', async (
   await expect(page.locator('.atlas-sidebar .atlas-list')).toBeVisible();
   // Empty world: no narration line; the + button pulses and the search field
   // invites creating instead (S255v3).
-  await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element...');
+  await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element…');
 });
 
 test('create element from elements sidebar → row + detail view', async ({ page }) => {
@@ -287,7 +287,7 @@ test('switching worlds resets the elements view to the new world', async ({ page
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'alpha hero' })).toHaveCount(0);
   // Empty world: no narration line; the search field placeholder invites
   // creating instead (S255v3).
-  await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element...');
+  await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element…');
 });
 
 test('muted types (S356): pins and markers close the strip greyed, stay out of "show all", list when filtered to, right-click toggles and persists per world', async ({ page }) => {

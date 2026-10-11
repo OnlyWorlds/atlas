@@ -1156,7 +1156,7 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   // whole sentence, so a copy polish does not fail this test but dropping the
   // honesty does.
   await expect(page.locator('.atlas-landing-note')).toContainText('desktop');
-  await expect(page.locator('.atlas-landing-note')).toContainText('Chromium');
+  await expect(page.locator('.atlas-landing-note')).toContainText('Chrome, Edge or Brave');
   // The example-page door is gone everywhere since S368; this stays as a
   // guard against it coming back.
   await expect(page.locator('[data-action="see-example"]')).toHaveCount(0);

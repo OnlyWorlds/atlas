@@ -192,7 +192,7 @@ class CommandPalette extends BaseModal {
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'atlas-cmdk-input';
-    input.placeholder = 'Search elements and rooms...';
+    input.placeholder = 'Search elements and rooms…';
     input.setAttribute('data-role', 'cmdk-input');
     body.appendChild(input);
 

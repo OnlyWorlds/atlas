@@ -141,7 +141,7 @@ export function freezeChartBlock(
   if (!Number.isFinite(axisMin)) { axisMin = 0; axisMax = 0; }
 
   const block: PayloadChartBlock = {
-    id: blockId, kind: 'chart', title: chart.name || '(untitled chart)', axisMin, axisMax, nodes: frozen,
+    id: blockId, kind: 'chart', title: chart.name || '(unnamed chart)', axisMin, axisMax, nodes: frozen,
   };
   if (lens && axisMax > axisMin) {
     const span = axisMax - axisMin;

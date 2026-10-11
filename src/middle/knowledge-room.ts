@@ -294,9 +294,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         dependentCount = (await folder.findDependents(id)).length;
       } catch { /* fall through with 0 */ }
       const extra = dependentCount > 0
-        ? ` This will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.`
+        ? ` This also deletes ${dependentCount} element${dependentCount === 1 ? '' : 's'} filed under it.`
         : '';
-      if (!window.confirm(`Delete "${el?.name || 'this knowledge entry'}"?${extra}`)) return;
+      if (!window.confirm(`Delete "${el?.name || 'this knowledge entry'}"?${extra} This cannot be undone.`)) return;
     }
     cancelPendingSave();
     // The teardown capture (A4) must not write the text back to the entry being
@@ -420,7 +420,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const folder = getActiveStore();
     if (!worldId || !folder || !draft) return;
     const data: Record<string, unknown> = {
-      name: (draft.name || '').trim() || 'untitled knowledge',
+      name: (draft.name || '').trim() || 'unnamed knowledge',
       subtype: KNOWLEDGE_SUBTYPE,
       story: draft.story,
       narrator: draft.narrator,
@@ -771,7 +771,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
         <span class="atlas-knowledge-row-main">
-          <span class="atlas-knowledge-row-name">${escapeText(entry.name || '(untitled)')}</span>
+          <span class="atlas-knowledge-row-name">${escapeText(entry.name || '(unnamed)')}</span>
           <span class="atlas-knowledge-row-meta">${escapeText(holderSummary(entry))}</span>
         </span>
       `;
@@ -937,7 +937,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const existing = listPages(getState().data.elements).find(p =>
           blocksOf(p).some(b => b.kind === 'circle' && b.knowerId === knower.id));
         if (existing) {
-          toasts.info(`Opened the existing page for this circle: "${existing.name || '(untitled)'}"`);
+          toasts.info(`Opened the existing page for this circle: "${existing.name || '(unnamed)'}"`);
           navigate(shareHash(worldId, existing.id));
           return;
         }
@@ -995,7 +995,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         row.innerHTML = `
           <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
           <span class="atlas-knowledge-row-main">
-            <span class="atlas-knowledge-row-name">${escapeText(entry.name || '(untitled)')}</span>
+            <span class="atlas-knowledge-row-name">${escapeText(entry.name || '(unnamed)')}</span>
           </span>
         `;
         row.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
@@ -1058,7 +1058,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           const src = document.createElement('button');
           src.type = 'button';
           src.className = 'atlas-knowledge-known-src';
-          src.textContent = `from ${entry.name || '(untitled)'}`;
+          src.textContent = `from ${entry.name || '(unnamed)'}`;
           src.title = 'Open this entry';
           src.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
           quote.appendChild(src);

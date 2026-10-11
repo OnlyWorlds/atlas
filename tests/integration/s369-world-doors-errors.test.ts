@@ -148,7 +148,7 @@ describe('keyCheckError (S369)', () => {
   it('names a refused key, for a write key and a read key', () => {
     const write = keyCheckError(owErr(401));
     expect(isPlainError(write)).toBe(true);
-    expect((write as Error).message).toMatch(/API key and PIN/);
+    expect((write as Error).message).toMatch(/that API key\. Check it/);
     expect((keyCheckError(owErr(403), { readOnly: true }) as Error).message).toMatch(/read key/);
   });
 

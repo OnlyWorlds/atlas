@@ -197,7 +197,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     const sourceParentId = sourceRow?.getAttribute('data-parent-id') ?? '';
     const targetParentId = row.getAttribute('data-parent-id') ?? '';
     if (sourceParentId !== targetParentId) {
-      toasts.info('Drag-to-reorder works within the same sibling group. Use the create modal\'s parent map override to reparent');
+      toasts.info('Drag only reorders maps under the same parent. To move a map, set its Parent map in Configure map.');
       return;
     }
 
@@ -282,7 +282,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'atlas-input atlas-map-index-search-input';
-      input.placeholder = 'Search maps...';
+      input.placeholder = 'Search maps…';
       input.value = searchTerm;
       input.spellcheck = false;
       input.autocomplete = 'off';
@@ -480,7 +480,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   const main = document.createElement('span');
   main.className = 'atlas-row-main';
   if (ctx.openMapIds.has(m.id)) main.classList.add('atlas-map-tree-row-open');
-  main.textContent = m.name || '(untitled map)';
+  main.textContent = m.name || '(unnamed map)';
   row.appendChild(main);
 
   // Location chip — surfaces loc-bound maps and lets users click through to
@@ -520,7 +520,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   if (node.brokenParent) {
     const chip = document.createElement('span');
     chip.className = 'atlas-row-chip atlas-row-chip-warn';
-    chip.title = 'parent_map references a missing map (or would create a cycle); surfaced at root';
+    chip.title = 'Its parent map is missing (or would loop), so it shows at the top level';
     chip.textContent = 'Broken parent';
     row.appendChild(chip);
   }
@@ -571,8 +571,8 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
 async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManager): Promise<void> {
   const store = getActiveStore();
   if (!store) return;
-  const cascadeNote = pinCount > 0 ? ` This will also remove ${pinCount} pin${pinCount === 1 ? '' : 's'} on this map.` : '';
-  if (!confirm(`Delete map "${m.name}"?${cascadeNote}`)) return;
+  const cascadeNote = pinCount > 0 ? ` This also removes ${pinCount} pin${pinCount === 1 ? '' : 's'} on this map.` : '';
+  if (!confirm(`Delete map "${m.name}"?${cascadeNote} This cannot be undone.`)) return;
   try {
     await store.deleteMap(m.id);
     // Drop the saved camera state for this map — no point retaining a view
@@ -633,7 +633,7 @@ export function openMapTab(m: WorldMap, preserveElementId?: string): void {
     const newTab: RightTabRef = {
       kind: 'map',
       mapId: m.id,
-      label: m.name || '(untitled)',
+      label: m.name || '(unnamed)',
       worldId: activeWorldId,
     };
     const nextTabs = [...ui.rightTabs, newTab];

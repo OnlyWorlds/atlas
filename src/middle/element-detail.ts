@@ -109,7 +109,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const el = getSelectedElement();
 
     if (!state.active) {
-      target.innerHTML = `<div class="atlas-pane-empty">No active world.</div>`;
+      target.innerHTML = `<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>`;
       return;
     }
     if (!el) {
@@ -121,7 +121,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const isEmptyWorld = getState().data.elements.length === 0;
       const worldId = state.active.worldId;
       const msg = route.elementId
-        ? `Element <code>${escapeText(route.elementId)}</code> not found in this world.`
+        ? 'This element is not in this world.'
         : isEmptyWorld
           ? 'This world has no elements yet. Create the first one with the <b>+</b> above the element list.'
           : 'No element selected. Pick one from the <b>elements</b> sidebar.';

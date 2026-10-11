@@ -235,8 +235,8 @@ async function runMove(worldId: string, lockedDir: string, opts: MoveOpts): Prom
     dest = made;
     await copyWorldTree(src, dest, { moveId: move.move_id, onProgress: opts.onProgress });
     const check = await verifyWorldTree(src, dest);
-    if (!check.ok) throw new PlainError(`The copy in the folder did not match the world (${check.path}).`);
-    if (!(await tokenIs(dest, move.move_id))) throw new PlainError('The copy in the folder changed while moving.');
+    if (!check.ok) throw new PlainError(`The copy in the folder did not match the world. Try again.`);
+    if (!(await tokenIs(dest, move.move_id))) throw new PlainError('The copy in the folder changed while moving. Try again.');
     // 5a. The destination's own store, claiming its lock (gate A10).
     destStore = new FsFolderStore();
     await destStore.open(dest);

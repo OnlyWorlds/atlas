@@ -99,7 +99,7 @@ export class ConflictReviewModal extends BaseModal {
       btn.addEventListener('click', async () => {
         const choice = btn.dataset.action === 'overwrite-mine' ? 'mine' as const : 'theirs' as const;
         if (getState().active?.worldId !== this.capturedWorldId) {
-          this.toasts.info('World changed. Close and reopen to review conflicts');
+          this.toasts.info('Another world is open now. Switch back to review its conflicts.');
           this.hide();
           return;
         }
@@ -137,7 +137,7 @@ export class ConflictReviewModal extends BaseModal {
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">${escapeText(c.type)}</span>
         <span class="atlas-conflict-name">${escapeText(name)}</span>
-        <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} diverged${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
+        <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} differ${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
       </div>
       <div class="atlas-conflict-row-actions">
         <button class="atlas-btn-ghost" data-action="overwrite-mine" title="Push local content to server">Overwrite (mine wins)</button>
@@ -152,7 +152,7 @@ export class ConflictReviewModal extends BaseModal {
         // guard, a mid-modal world switch would apply the user's choice to
         // the wrong world's local files.
         if (getState().active?.worldId !== this.capturedWorldId) {
-          this.toasts.info('World changed. Close and reopen to review conflicts');
+          this.toasts.info('Another world is open now. Switch back to review its conflicts.');
           this.hide();
           return;
         }

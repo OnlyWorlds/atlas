@@ -72,7 +72,7 @@ export function mountWritingSetup(
           <!-- div, not p: the HTML parser closes a <p> at a <details> (flow
                content), which would eject the info toggle onto its own line. -->
           <div class="atlas-writing-setup-lead">
-            These labels organise your narratives into a tree.<details class="atlas-writing-setup-tech"><summary title="How labels are stored"><span class="material-symbols-outlined atlas-writing-setup-tech-icon">info</span></summary><span class="atlas-writing-setup-tech-body">Each label is stored as the narrative's <code>supertype</code>, so other OnlyWorlds tools see the same labels too.</span></details>
+            These labels organize your narratives into a tree.<details class="atlas-writing-setup-tech"><summary title="How labels are stored"><span class="material-symbols-outlined atlas-writing-setup-tech-icon">info</span></summary><span class="atlas-writing-setup-tech-body">Each label is stored as the narrative's <code>supertype</code>, so other OnlyWorlds tools see the same labels too.</span></details>
           </div>
         </header>
 

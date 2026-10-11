@@ -183,7 +183,7 @@ class MapCreateModal extends BaseModal {
       <form data-form="${isConfigure ? 'configure-map' : 'create-map'}">
         <label class="atlas-modal-field">
           <span>Name</span>
-          <input class="atlas-input" type="text" name="map-name" placeholder="Map name..." autocomplete="off" value="${escapeAttr(initialName)}" />
+          <input class="atlas-input" type="text" name="map-name" placeholder="Map name…" autocomplete="off" value="${escapeAttr(initialName)}" />
         </label>
         <div class="atlas-modal-field">
           <span>Location (optional)</span>
@@ -329,7 +329,7 @@ class MapCreateModal extends BaseModal {
         hierarchyValue = parsed;
       }
       submitBtn.disabled = true;
-      submitBtn.textContent = isConfigure ? 'Saving...' : 'Creating...';
+      submitBtn.textContent = isConfigure ? 'Saving…' : 'Creating…';
       cancelBtn.hidden = true;
       try {
         const store = getActiveStore()!;

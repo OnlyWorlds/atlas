@@ -203,7 +203,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const url = publicUrlFor(pub.slug);
       const msg = client
         ? `"${el?.name || 'This page'}" is published at ${url}. Deleting it also takes the public page down. Continue?`
-        : `"${el?.name || 'This page'}" is published at ${url}, but atlas can't reach the sharing server for this world. The public page would stay up with no way to revoke it from here. Delete anyway?`;
+        : `"${el?.name || 'This page'}" is published at ${url}, but Atlas has no key or PIN for this world, so the public page would stay up with no way to revoke it from here. Delete anyway?`;
       if (!window.confirm(msg)) return;
       publishConfirmed = true;
       if (client) {
@@ -225,9 +225,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         dependentCount = (await folder.findDependents(id)).length;
       } catch { /* fall through with 0 */ }
       const extra = dependentCount > 0
-        ? ` This will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.`
+        ? ` This also deletes ${dependentCount} element${dependentCount === 1 ? '' : 's'} filed under it.`
         : '';
-      if (!window.confirm(`Delete "${el?.name || 'this page'}"?${extra}`)) return;
+      if (!window.confirm(`Delete "${el?.name || 'this page'}"?${extra} This cannot be undone.`)) return;
     }
     teardownEditSession();
     navigate(shareHash(worldId));
@@ -1526,7 +1526,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     const pub = page ? pagePubOf(page) : null;
     if (!page || !pub) return;
-    if (!window.confirm(`Revoke "${page.name || 'this page'}"? The public link will show "no longer shared". You keep the slug and can republish it later.`)) return;
+    if (!window.confirm(`Revoke "${page.name || 'this page'}"? The public link will show "no longer shared". You keep the URL and can republish later.`)) return;
     try {
       await client.revoke(pub.slug);
       await patchPage(pageId, {
@@ -1807,7 +1807,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     publishBtn.addEventListener('click', () => {
       const slug = slugInput.value.trim();
       if (!isValidSlug(slug)) {
-        toasts.error('Slug must be 4–40 chars: a–z, 0–9, hyphens (not at the edges).');
+        toasts.error('URL must be 4–40 characters: a–z, 0–9, single hyphens, not at the edges.');
         slugInput.focus();
         return;
       }
@@ -1821,7 +1821,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (!slugInput.disabled) {
       const slugHint = document.createElement('p');
       slugHint.className = 'atlas-share-section-hint atlas-share-slug-hint';
-      slugHint.textContent = '4–40 characters: lowercase letters, numbers, hyphens (not at the start or end).';
+      slugHint.textContent = '4–40 characters: lowercase letters, numbers, single hyphens (not at the start or end).';
       section.appendChild(slugHint);
     }
 
@@ -2005,7 +2005,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-share-row-icon">article</span>
         <span class="atlas-share-row-main">
-          <span class="atlas-share-row-name">${escapeText(page.name || '(untitled)')}</span>
+          <span class="atlas-share-row-name">${escapeText(page.name || '(unnamed)')}</span>
           <span class="atlas-share-row-meta">${escapeText(blockSummary(blocks))}</span>
         </span>
         ${pubBadge}

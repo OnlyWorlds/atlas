@@ -114,7 +114,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     lastInputs = inputs;
     const active = s.active;
     if (!active) {
-      root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      root.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
       return;
     }
     const elements = getState().data.elements;
@@ -310,7 +310,7 @@ function buildCover(
       ? ''
       : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">describe your world…</p>`;
   identity.innerHTML = `
-    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (a local name; the OnlyWorlds world name lives in settings)">${escapeText(meta.name)}</h1>
+    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (here only; the online name is in Settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   `;
   cover.appendChild(identity);
@@ -669,7 +669,7 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
     <div class="atlas-home-keepsafe-actions">
       <button type="button" class="atlas-btn-primary" data-action="keepsafe-download">Download the whole world</button>
       ${hasFolderMode() ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-move">Move to a folder</button>' : ''}
-      ${entry.state !== 'api-linked' ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Take it online</button>' : ''}
+      ${entry.state !== 'api-linked' ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Make online</button>' : ''}
     </div>`;
   section.querySelector<HTMLElement>('.atlas-home-onboarding-copy')!.textContent = line;
   section.querySelector<HTMLButtonElement>('[data-action="keepsafe-hide"]')!.addEventListener('click', () => {
@@ -725,7 +725,7 @@ function buildTour(
         <button type="button" class="atlas-home-have-dismiss" data-action="cards-dismiss"
           title="Hide these for this world" aria-label="Hide these for this world"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
       </div>
-      <p class="atlas-home-have-lead">Each kind of element opens a room of its own.</p>
+      <p class="atlas-home-have-lead">Each of these opens a room of its own.</p>
     `;
     section.appendChild(grid);
     section.querySelector('[data-action="cards-dismiss"]')!.addEventListener('click', () => persistDismiss(worldId, 'home-cards'));

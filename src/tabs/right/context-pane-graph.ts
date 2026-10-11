@@ -706,7 +706,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       if (ring1Omitted === 0) legend.setAttribute('aria-hidden', 'true');
       legend.innerHTML = (backlinkCount > 0
         ? `<span class="atlas-context-graph-legend-swatch"></span>` +
-          `<span>${backlinkCount} link${backlinkCount === 1 ? 's' : ''} here</span>`
+          `<span>${backlinkCount} link${backlinkCount === 1 ? '' : 's'} here</span>`
         : '')
         + (ring1Omitted > 0
           ? `<span class="atlas-context-graph-legend-more">+${ring1Omitted} more not shown</span>`

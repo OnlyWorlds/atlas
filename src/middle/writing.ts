@@ -82,7 +82,7 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     container.innerHTML = '';
     lastMode = mode;
     if (mode === 'empty') {
-      container.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      container.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
       return;
     }
     if (mode === 'setup') {
@@ -116,7 +116,7 @@ async function createNarrativeAtRoot(
 ): Promise<Element | null> {
   const folder = getActiveStore();
   if (!folder) {
-    toasts.error('No active world.');
+    toasts.error('No world open. Pick one from the sidebar.');
     return null;
   }
   const supertype = supertypeForTier(tier, worldId);
@@ -158,7 +158,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
   function render(): void {
     const active = getState().active;
     if (!active) {
-      detailSlot.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      detailSlot.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
       return;
     }
     const labels = getWritingLabels(active.worldId);

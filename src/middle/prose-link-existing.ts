@@ -91,6 +91,6 @@ export async function recordAliasIfForeign(picked: Element, label: string): Prom
     toastManager.info(`"${label}" saved as an alias of ${name || '(unnamed)'}`);
   } catch (err) {
     console.error('[prose-link-existing] alias write failed', err);
-    toastManager.error(`Linked, but could not save "${label}" as an alias. The chip may rename to ${name || 'the element name'}`);
+    toastManager.error(`Linked, but could not save "${label}" as an alias. The link may show ${name || 'the element name'} instead`);
   }
 }

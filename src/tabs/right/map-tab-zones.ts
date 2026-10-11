@@ -167,8 +167,8 @@ async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise
   try { markerCount = (await store.findDependents(zoneId)).length; }
   catch (err) { console.warn('[zone-chip] dependents probe failed:', err); }
   const ok = window.confirm(markerCount === null
-    ? `Delete zone "${zone.name}"? This will also remove its markers.`
-    : `Delete zone "${zone.name}"? This will also remove ${markerCount} marker(s).`);
+    ? `Delete zone "${zone.name}"? This also removes its markers. This cannot be undone.`
+    : `Delete zone "${zone.name}"? This also removes ${markerCount} marker(s). This cannot be undone.`);
   if (!ok) return;
   try {
     await store.deleteZone(zoneId);

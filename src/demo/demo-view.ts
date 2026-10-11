@@ -53,14 +53,14 @@ export function mountDemo(): void {
     <div class="atlas-demo-band">
       <span class="atlas-demo-band-title">Sikelia · example page · view only</span>
       <button type="button" class="atlas-demo-exit" data-action="demo-exit">
-        <span class="material-symbols-outlined">close</span> exit
+        <span class="material-symbols-outlined">close</span> Exit
       </button>
     </div>
     <div class="atlas-demo-scroll">
       <div class="atlas-demo-intro">
         <h1>Sikelia</h1>
         <p>Ancient Sicily around 505 BC: <span data-role="demo-pin-count">the settlements</span> on hand-made map art, each one placed, described, and sorted by what kind of place it was, from Greek poleis to native strongholds and Phoenician ports.</p>
-        <p class="atlas-demo-intro-sub">A page like this is what atlas publishes: blocks built from a real world. Zoom the map, click any pin. Below it: a dozen highlights from <span data-role="demo-element-count">its</span> elements.</p>
+        <p class="atlas-demo-intro-sub">A page like this is what Atlas publishes: blocks built from a real world. Zoom the map, click any pin. Below it: a dozen highlights from <span data-role="demo-element-count">its</span> elements.</p>
       </div>
       <div class="atlas-demo-map" data-role="demo-map"></div>
       <p class="atlas-demo-map-hint">Drag to pan · scroll to zoom · click a pin to read about the place</p>
@@ -68,7 +68,7 @@ export function mountDemo(): void {
       <div class="atlas-demo-footer">
         <p>Compose your own in the pages room: pick blocks, preview, publish.</p>
         <button type="button" class="atlas-btn-primary" data-action="demo-exit-setup">Set up a local folder</button>
-        <button type="button" class="atlas-btn-primary" data-action="demo-exit-back">Back to atlas</button>
+        <button type="button" class="atlas-btn-primary" data-action="demo-exit-back">Back to Atlas</button>
       </div>
     </div>
   `;

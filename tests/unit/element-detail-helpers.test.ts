@@ -323,9 +323,9 @@ describe('REF_SECTION_SPLITS - Located here (S317)', () => {
     const sections = [...wrap.querySelectorAll('.atlas-detail-section')];
     const labels = sections.map(s => s.getAttribute('data-section'));
     expect(labels).toContain('Located here');
-    expect(labels).toContain('Referenced by');
+    expect(labels).toContain('Linked from');
     expect(labels.indexOf('Located here'), 'Located here renders ABOVE Referenced by')
-      .toBeLessThan(labels.indexOf('Referenced by'));
+      .toBeLessThan(labels.indexOf('Linked from'));
 
     const located = sections[labels.indexOf('Located here')]!;
     // Real things present; the event (context) is not.
@@ -335,7 +335,7 @@ describe('REF_SECTION_SPLITS - Located here (S317)', () => {
     const groupLabels = [...located.querySelectorAll('.atlas-field-label')].map(g => g.textContent);
     expect(groupLabels.indexOf('Characters')).toBeLessThan(groupLabels.indexOf('Creatures'));
 
-    const refby = sections[labels.indexOf('Referenced by')]!;
+    const refby = sections[labels.indexOf('Linked from')]!;
     expect(refby.textContent).toContain('Perf'); // event stays in the generic bucket
     expect(refby.textContent).toContain('Dual'); // kept for its OTHER field (birthplace)
     expect(refby.textContent).not.toContain('Consul'); // fully moved
@@ -349,7 +349,7 @@ describe('REF_SECTION_SPLITS - Located here (S317)', () => {
     const wrap = renderReferencedBy(planet)!;
     const labels = [...wrap.querySelectorAll('.atlas-detail-section')].map(s => s.getAttribute('data-section'));
     expect(labels).toContain('Located here');
-    expect(labels).not.toContain('Referenced by');
+    expect(labels).not.toContain('Linked from');
   });
 
   it('non-location pages never grow the section', () => {

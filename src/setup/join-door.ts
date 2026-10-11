@@ -44,12 +44,12 @@ export interface JoinedSeat {
 }
 
 /** R5's first sentence: a code that will not open. */
-export const JOIN_REFUSED_LINE = 'This link was already used or has expired. Open the world again from onlyworlds.com.';
+export const JOIN_REFUSED_LINE = 'This link was already used or has expired. Ask for a new link.';
 /** R5's second sentence, when the code was alive a moment ago. */
 export const JOIN_TAKEN_LINE = `If you did not use this link just now, look on onlyworlds.com, ${SEAT_REMOVE_WHERE}, and remove any seat you do not recognise.`;
 /** A seat made and not used (R6 waits on keel Q5, a seat retiring itself). */
-export const SPARE_SEAT_LINE = `The seat this link made is spare: remove it on onlyworlds.com, ${SEAT_REMOVE_WHERE}.`;
-export const JOIN_MALFORMED_LINE = 'This link to open a world is not complete. Open the world again from onlyworlds.com.';
+export const SPARE_SEAT_LINE = `The seat this link made is unused: remove it on onlyworlds.com, ${SEAT_REMOVE_WHERE}.`;
+export const JOIN_MALFORMED_LINE = 'This link to open a world is not complete. Ask for a new link.';
 
 let baseOverride: string | null = null;
 /** Tests point the door at MSW; production asks keel. */

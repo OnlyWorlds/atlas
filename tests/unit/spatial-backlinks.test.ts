@@ -72,7 +72,7 @@ describe("the map's element page (Referenced by)", () => {
   it('prints no "(unnamed)", one chip per pin by its element, one per zone', () => {
     patchSlice('data', { elements: world });
     const wrap = renderReferencedBy(map)!;
-    const refby = wrap.querySelector('[data-section="Referenced by"]')!;
+    const refby = wrap.querySelector('[data-section="Linked from"]')!;
     expect(refby).toBeTruthy();
     expect(refby.textContent).not.toContain('(unnamed)');
     const group = (label: string) => [...refby.querySelectorAll('.atlas-field')]

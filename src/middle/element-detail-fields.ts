@@ -573,7 +573,7 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: () => void): HTMLE
     chip.title = `${linked.type} · id ${id}`;
   } else {
     name.textContent = id;
-    chip.title = `Unresolved ID (target type: ${meta.target ?? 'unknown'})`;
+    chip.title = `No ${meta.target ?? 'element'} with this id in this world`;
   }
   chip.appendChild(name);
 

@@ -58,14 +58,14 @@ export function openColourPopover(opts: ColourPopoverOpts): void {
   const pop = document.createElement('div');
   pop.className = 'atlas-colour-popover';
   pop.setAttribute('role', 'dialog');
-  pop.setAttribute('aria-label', 'Pick a colour');
+  pop.setAttribute('aria-label', 'Pick a color');
   pop.innerHTML = `
     <div class="atlas-colour-presets">
       ${PRESETS.map(p => `<button type="button" class="atlas-colour-preset ${p.hex.toLowerCase() === opts.current.toLowerCase() ? 'is-current' : ''}" data-hex="${p.hex}" title="${p.name}" aria-label="${p.name} ${p.hex}" style="background:${p.hex}"></button>`).join('')}
     </div>
     <div class="atlas-colour-hex-row">
       <span class="atlas-colour-hex-dot" style="background:${opts.current}"></span>
-      <input type="text" class="atlas-colour-hex" value="${opts.current}" maxlength="7" spellcheck="false" aria-label="Hex colour" />
+      <input type="text" class="atlas-colour-hex" value="${opts.current}" maxlength="7" spellcheck="false" aria-label="Hex color" />
       <button type="button" class="atlas-btn-primary atlas-colour-apply" data-action="apply">Apply</button>
       <button type="button" class="atlas-btn-ghost atlas-colour-cancel" data-action="cancel">Cancel</button>
     </div>`;

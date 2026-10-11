@@ -99,12 +99,12 @@ export function normalizeCustomFieldName(input: string): string {
 /** Reject reason for a candidate stored key on this element, or null when fine. */
 export function customFieldNameProblem(el: Element, key: string): string | null {
   if (!key) return 'Enter a field name';
-  if (input_is_atlas_namespace(key)) return 'The atlas_ namespace is reserved';
+  if (input_is_atlas_namespace(key)) return 'Atlas keeps atlas_ names for itself';
   const bare = key.startsWith('x_') ? key.slice(2) : key.startsWith('shadow_') ? key.slice(7) : key;
   if (knownFieldsFor(el.type).has(bare)) {
     return `"${humanizeFieldName(bare)}" is a built-in field for this type: use that field instead`;
   }
-  if (!isCustomEditableField(key)) return 'That name is reserved for atlas machinery';
+  if (!isCustomEditableField(key)) return 'Atlas uses that name itself. Pick another.';
   const current = (el as Record<string, unknown>)[key];
   if (current !== undefined && current !== null) {
     return `"${humanizeFieldName(key)}" already exists on this element`;

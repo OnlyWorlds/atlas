@@ -35,10 +35,13 @@ export function publicUrlFor(slug: string): string {
 // Validated client-side for instant UX; the server re-validates.
 // ---------------------------------------------------------------------------
 
-export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{2,38}[a-z0-9])?$/;
+// keel's rule (sharing/slug_rules.py): single hyphens between letters and
+// digits, and never a UUID's shape (page ids are UUIDs).
+export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export function isValidSlug(slug: string): boolean {
-  return slug.length >= 4 && slug.length <= 40 && SLUG_RE.test(slug);
+  return slug.length >= 4 && slug.length <= 40 && SLUG_RE.test(slug) && !UUID_SHAPE_RE.test(slug);
 }
 
 /** Suggest a slug from a page name: lowercase, hyphens, trimmed to the rules. */
@@ -76,32 +79,32 @@ export class SharingApiError extends Error {
 /** Human-facing message per code (toast copy). */
 export function sharingErrorMessage(err: SharingApiError): string {
   switch (err.code) {
-    case 'slug_taken': return 'That URL is already taken. Pick another slug.';
+    case 'slug_taken': return 'That URL is taken or reserved. Pick another.';
     case 'slug_invalid': {
       // The server's detail beats the generic rule recital (e.g. a RESERVED
       // slug passes the format rules — "must be 4–40 chars" would gaslight).
       const detail = err.message && err.message !== 'slug_invalid' ? err.message : ''; // raw-error-ok: the sharing server's slug detail is written for users (a reserved word)
       return detail
-        ? `Slug rejected: ${detail}`
-        : 'Slug must be 4–40 chars: a–z, 0–9, hyphens (not at the edges). Some words are reserved.';
+        ? `URL not accepted: ${detail}`
+        : 'URL must be 4–40 characters: a–z, 0–9, single hyphens, not at the edges.';
     }
     case 'quota_exceeded': return 'Page limit reached. Revoke an old page to publish a new one.';
-    case 'payload_too_large': return 'This page is too large to publish (256KB limit).';
+    case 'payload_too_large': return 'This page is over the 256KB publish limit. Remove some blocks to fit.';
     case 'revoked': return 'This page has been revoked.';
     case 'not_found': return 'Page not found on the server.';
-    case 'rate_limited': return 'Too many publishes. Wait a bit and try again.';
-    case 'admin_locked': return 'This slug has been locked by an administrator.';
+    case 'rate_limited': return 'Too many publishes or wrong PIN tries. Wait a bit and try again.';
+    case 'admin_locked': return 'An administrator locked this URL. Use a different URL.';
     case 'title_too_long': return 'Page name is too long to publish (200 characters max).';
-    case 'intent_invalid': return 'Page intent isn\'t valid. Pick show, reference, or publish.';
-    // As-built: 403 forbidden fires only for demo-world writes (cross-account
-    // mutations are existence-hidden 404s).
-    case 'forbidden': return 'This world doesn\'t allow publishing.';
+    case 'intent_invalid': return 'OnlyWorlds did not accept this page\'s type. Tell us at onlyworlds.com/feedback.';
+    // A read key (the demo key, any ow_r_) is refused with 403 permission_error
+    // (keel core/auth.py); cross-account mutations are existence-hidden 404s.
+    case 'forbidden': return 'This key can only read, so it can\'t publish. Use a write key.';
     // A contributor or guest seat (keel sharing `_require_page_manager`, #104).
     case 'owner_only': return 'Only the world\'s owner or a co-builder can publish, change or revoke its pages.';
     case 'unauthorized':
-    case 'auth_failed': return 'Authentication failed. Check the world\'s API key and PIN in settings.';
-    case 'network': return 'Could not reach the sharing server.';
-    default: return 'Publishing failed. Try again.';
+    case 'auth_failed': return 'OnlyWorlds did not accept the key or PIN. Check your PIN in Settings, under OnlyWorlds.';
+    case 'network': return 'Could not reach OnlyWorlds. Check your connection, then try again.';
+    default: return 'OnlyWorlds could not finish that. Try again.';
   }
 }
 
@@ -250,7 +253,8 @@ export class SharingClient {
       if (raw && isKnownCode(raw)) code = raw;
     } catch { /* non-JSON error body */ }
     if (code === 'unknown') {
-      if (res.status === 401 || res.status === 403) code = 'auth_failed';
+      if (res.status === 401) code = 'auth_failed';
+      else if (res.status === 403) code = 'forbidden';
       else if (res.status === 404) code = 'not_found';
       else if (res.status === 410) code = 'revoked';
       else if (res.status === 429) code = 'rate_limited';

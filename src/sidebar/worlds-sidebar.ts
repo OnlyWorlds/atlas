@@ -120,13 +120,13 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // button, locked (S365 gate lens C L3: nothing appears after the tour).
       header.innerHTML = `
         <div class="atlas-worlds-add-icons">
-        ${addIconButton('create-local', newWorldGlyph(), 'Create a world. This one is the tour’s: Hyperion.', { pulse: true })}
+        ${addIconButton('create-local', newWorldGlyph(), 'Start a world. This one is the tour’s: Hyperion.', { pulse: true })}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder already on your drive. Yours to use after the tour.', { locked: true }) : ''}
         ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'Create a world that lives on onlyworlds.com as well as on your drive or in this browser. Yours to use after the tour.' : 'Create a world that lives on onlyworlds.com as well as in this browser. Yours to use after the tour.', { locked: true })}
         ${addIconButton('link-api', 'link', 'Bring in a world you already keep on onlyworlds.com. Yours to use after the tour.', { locked: true })}
         ${addIconButton('view-api', 'visibility', 'Open someone else\'s world with a read key, look but do not touch. Yours to use after the tour.', { locked: true })}
         </div>
-        <button type="button" class="atlas-worlds-add-btn atlas-tour-locked" aria-disabled="true" title="Every way to add a world, each with a line on what it does. Yours to use after the tour.">
+        <button type="button" class="atlas-worlds-add-btn atlas-tour-locked" aria-disabled="true" title="Every way to add a world. Yours to use after the tour.">
           <span class="material-symbols-outlined" aria-hidden="true">add</span>add a world
         </button>
       `;
@@ -243,7 +243,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     if (remote.role === 'collaborator') {
       // Minting is owner-only (server 404s) — the honest path for a shared
       // world is a key from its owner via the existing link flow.
-      toasts.info('Shared world: ask its owner for an API key, then link it');
+      toasts.info('Shared world: make your own key on its onlyworlds.com page, then paste it here');
       void runAddWorldAction('link-api', toasts);
       return;
     }
@@ -336,7 +336,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         // Meta-only pulls already toast "Pulled world settings from API" in
         // pullNowAndRefresh — stay quiet here rather than double-toasting.
         if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
-        else if (elementTotal > 0) toasts.success(`Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
+        else if (elementTotal > 0) toasts.success(`${result.pulled.creates} new, ${result.pulled.updates} updated from OnlyWorlds`);
       } catch (err) {
         console.warn('[worlds-sidebar] refresh failed:', err);
         showProblem(err, {
@@ -410,7 +410,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
             <span class="material-symbols-outlined">refresh</span>
           </button>
         </div>
-        <div class="atlas-remote-error">${escapeText(aw.error ?? 'Could not reach onlyworlds')}</div>
+        <div class="atlas-remote-error">${escapeText(aw.error ?? 'Could not reach OnlyWorlds')}</div>
       `;
       return;
     }
@@ -428,7 +428,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         : '';
       return `
         <div class="atlas-row atlas-remote-row ${opening ? 'is-opening' : ''}" data-remote-world-id="${escapeAttr(r.id)}" role="button" tabindex="0"
-             title="${r.role === 'collaborator' ? 'Shared with you: link with a key from its owner' : (hasFolderMode() && getState().atlasRoot) ? 'Open: download this world into your OnlyWorlds folder' : 'Open: download this world into this browser'}">
+             title="${r.role === 'collaborator' ? 'Shared with you: make your own key for it on onlyworlds.com' : (hasFolderMode() && getState().atlasRoot) ? 'Open: download this world into your OnlyWorlds folder' : 'Open: download this world into this browser'}">
           <span class="material-symbols-outlined">${opening ? 'downloading' : 'cloud'}</span>
           <span class="atlas-row-main">${escapeText(r.name)}</span>
           ${roleChip}
@@ -534,7 +534,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
         </button>`
     : '';
   const stateIconHtml = world.state === 'api-linked' && !cleared
-    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from API">
+    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from OnlyWorlds">
         <span class="material-symbols-outlined">${stateIcon}</span>
       </button>`
     : `<span class="material-symbols-outlined"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>${stateIcon}</span>`;
@@ -917,7 +917,7 @@ async function doActivateWorld(
       const take = window.confirm(
         `"${entry.name}" appears to be open in another Atlas tab` +
         (ageS != null ? ` (last active ${ageS}s ago)` : '') +
-        `.\n\nClose the other tab, or take over here. Taking over while the other tab is still live can cause conflicting writes.\n\nTake over?`
+        `.\n\nClose the other tab, or take over here. Taking over while the other tab is still in use can lose changes.\n\nTake over?`
       );
       if (!take) {
         if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
@@ -990,7 +990,7 @@ async function doActivateWorld(
       const { rekeyJournalOrigin } = await import('../store/rekey');
       toasts.error((await rekeyJournalOrigin(store)) === 'merge'
         ? `Linking ${entry.name} to OnlyWorlds did not finish. Settings, under This world, can finish or undo it; then run Make online again with the same key.`
-        : `An id update in ${entry.name} could not finish, so it is not syncing. Settings, under This world, can finish or discard it.`);
+        : `An id update in ${entry.name} could not finish, so it is not syncing. Settings, under This world, can finish or undo it.`);
     }
   }
   setActiveStore(store);

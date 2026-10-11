@@ -70,7 +70,7 @@ export function openSplitDialog(opts: SplitOptions): void {
     return;
   }
   if (cursorPos >= docSize) {
-    toastManager.info('Cursor is at the end; nothing after it to split into a new sibling.');
+    toastManager.info('Cursor is at the end. Move it where you want to split.');
     return;
   }
 
@@ -94,7 +94,7 @@ export function openSplitDialog(opts: SplitOptions): void {
   new SplitConfirmModal({
     tierLabel,
     afterPreview: previewOf(afterMarkdown, PREVIEW_CHARS),
-    defaultName: `untitled ${tierLabel.toLowerCase()}`,
+    defaultName: `unnamed ${tierLabel.toLowerCase()}`,
     onConfirm: async (newName) => {
       await performSplit({
         currentNarrative: narrative,

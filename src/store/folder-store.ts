@@ -372,7 +372,7 @@ export interface RescanResult {
  */
 export class RekeyPendingError extends PlainError {
   constructor() {
-    super('Finish or discard the id update in Settings first.');
+    super('Finish or undo the id update in Settings first.');
     this.name = 'RekeyPendingError';
   }
 }

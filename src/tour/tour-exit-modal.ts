@@ -59,7 +59,7 @@ class TourExitModal extends BaseModal {
       <p class="atlas-tour-exit-replay">Replay the tour any time from the settings.</p>
       <div class="atlas-modal-actions">
         <button type="button" class="atlas-btn-ghost" data-action="tour-exit-cancel">Keep going</button>
-        <button type="button" class="atlas-btn-primary" data-action="tour-exit-confirm">Leave the tour</button>
+        <button type="button" class="atlas-btn-primary" data-action="tour-exit-confirm">Exit tour</button>
       </div>`;
 
     body.querySelector<HTMLButtonElement>('[data-action="tour-exit-cancel"]')

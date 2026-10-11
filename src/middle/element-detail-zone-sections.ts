@@ -75,8 +75,8 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   const kind = kindLabel({ supertype: typeof zone.supertype === 'string' ? zone.supertype : '', subtype: typeof zone.subtype === 'string' ? zone.subtype : '', role: role || undefined });
   const inheritLine = ownColor
     ? (rule.color
-        ? `This zone has its own colour. <button type="button" class="atlas-btn-link" data-action="use-kind-colour">Use the ${escapeText(kind)} colour (${escapeText(rule.color)})</button>`
-        : 'This zone has its own colour.')
+        ? `This zone has its own color. <button type="button" class="atlas-btn-link" data-action="use-kind-colour">Use the ${escapeText(kind)} color (${escapeText(rule.color)})</button>`
+        : 'This zone has its own color.')
     : (rule.color
         ? `Colour from the world style for ${escapeText(kind)}. Pick one here to override it for this zone only.`
         : 'No world style for this kind yet; set one from the zones panel on the map.');

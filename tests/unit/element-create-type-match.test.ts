@@ -83,7 +83,7 @@ describe('element create modal: type field', () => {
     typeInto(name, '');
     panel.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
     expect(error.hidden).toBe(false);
-    expect(error.textContent).toBe('Name is required');
+    expect(error.textContent).toBe('An element needs a name.');
     typeInto(name, 'A');
     expect(error.hidden).toBe(true);
   });

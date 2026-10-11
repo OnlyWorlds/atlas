@@ -37,7 +37,7 @@ export async function runPendingJoin(toasts: ToastManager): Promise<void> {
   if (code === null) return;
   if (code === '') { toasts.error(JOIN_MALFORMED_LINE); return; }
   if (isTourFlagActive()) {
-    toasts.info('Finish the tour first, then open the world again from onlyworlds.com.');
+    toasts.info('Finish the tour first, then open the link again.');
     return;
   }
   let preview: JoinPreview;
@@ -95,7 +95,7 @@ export class JoinWorldModal extends BaseModal {
         </div>
         <div class="atlas-modal-actions" data-role="busy-actions" hidden>
           <button type="button" class="atlas-btn-ghost" data-action="cancel-download" title="Stop now and remove what was downloaded; nothing is kept">Cancel download</button>
-          <button type="button" class="atlas-btn-primary" data-action="finish-early" title="Stop now and open the world with what has downloaded; Refresh from API brings the rest">Stop and keep what's here</button>
+          <button type="button" class="atlas-btn-primary" data-action="finish-early" title="Stop now and open the world with what has downloaded; Refresh from OnlyWorlds brings the rest">Stop and keep what's here</button>
         </div>
       </form>
     `;
@@ -197,8 +197,8 @@ export class JoinWorldModal extends BaseModal {
         this.hide();
         if (outcome.kind === 'downloaded') {
           const r = outcome.result;
-          if (r.stoppedEarly) this.toasts.info(`Opened ${r.entry.name} with ${r.downloaded} of ${r.stoppedEarly.total} elements. Use Refresh from API (the refresh icon on the sync pill) to download the rest.`);
-          else if (r.failures.length > 0) this.toasts.error(`Opened ${r.entry.name}. ${r.failures.length} element${r.failures.length === 1 ? '' : 's'} did not download. Refresh from API brings ${r.failures.length === 1 ? 'it' : 'them'}.`);
+          if (r.stoppedEarly) this.toasts.info(`Opened ${r.entry.name} with ${r.downloaded} of ${r.stoppedEarly.total} elements. Use Refresh from OnlyWorlds to download the rest.`);
+          else if (r.failures.length > 0) this.toasts.error(`Opened ${r.entry.name}. ${r.failures.length} element${r.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${r.failures.length === 1 ? 'it' : 'them'}.`);
           else this.toasts.success(`Opened ${r.entry.name} · ${r.downloaded} element${r.downloaded === 1 ? '' : 's'} downloaded`);
           completeWaypoint('ecosystem');
           navigate(homeHash(r.entry.id));
@@ -241,7 +241,7 @@ export class JoinWorldModal extends BaseModal {
         progressBox.hidden = true;
         // The seat is held: Open again retries without spending a new code.
         say(problemFor(err, { inline: true, doing: 'downloading the world', where }).sentence);
-        openBtn.textContent = 'Try again';
+        openBtn.textContent = 'Retry';
       }
     };
 

@@ -98,7 +98,7 @@ describe('customFieldNameProblem', () => {
   it('rejects empty, atlas_ namespace, schema collisions, and duplicates', () => {
     const el = makeCharacter({ x_mood: 'grim' });
     expect(customFieldNameProblem(el, '')).toMatch(/enter a field name/i);
-    expect(customFieldNameProblem(el, 'atlas_evil')).toMatch(/reserved/i);
+    expect(customFieldNameProblem(el, 'atlas_evil')).toMatch(/keeps atlas_ names/i);
     // 'height' is a character schema field → the built-in wins
     expect(customFieldNameProblem(el, 'x_height')).toMatch(/built-in/i);
     expect(customFieldNameProblem(el, 'x_mood')).toMatch(/already exists/i);

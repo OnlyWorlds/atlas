@@ -91,9 +91,9 @@ export class NewApiWorldModal extends BaseModal {
       const pin = pinInput.value.trim();
       const signedIn = !!getState().registry.account_token;
       errorEl.hidden = true;
-      if (!name) { errorEl.textContent = 'Name is required'; errorEl.hidden = false; return; }
-      if (!signedIn && !email) { errorEl.textContent = 'Email is required'; errorEl.hidden = false; return; }
-      if (!pin) { errorEl.textContent = 'PIN is required'; errorEl.hidden = false; return; }
+      if (!name) { errorEl.textContent = 'A world needs a name.'; errorEl.hidden = false; return; }
+      if (!signedIn && !email) { errorEl.textContent = 'Enter your email.'; errorEl.hidden = false; return; }
+      if (!pin) { errorEl.textContent = 'Enter your PIN.'; errorEl.hidden = false; return; }
 
       // Taken synchronously, inside the click, before the first await. A retry
       // that reuses the world already made skips the question's step.
@@ -133,7 +133,7 @@ export class NewApiWorldModal extends BaseModal {
         if (reuse) {
           entry = reuse;
         } else {
-          progressEl.textContent = where === 'browser' ? `Creating "${name}" in this browser...` : `Creating "${name}" in your folder...`;
+          progressEl.textContent = where === 'browser' ? `Creating "${name}" in this browser…` : `Creating "${name}" in your folder…`;
           ({ entry } = await createWorldInRoot(name, { where }));
           madeLocally = { id: entry.id, name: entry.name };
           // Waypoint: a real folder world exists from here on, even if the
@@ -149,7 +149,7 @@ export class NewApiWorldModal extends BaseModal {
         // includes them); v2 GET /world is the fallback for older servers.
         let world: { id?: string; name?: string } = { id: created.worldId, name: created.worldName };
         if (!world.id) {
-          progressEl.textContent = `Fetching new world ID...`;
+          progressEl.textContent = `Fetching new world ID…`;
           world = await buildV2Adapter(apiKey, pin).getWorld();
         }
         if (!world?.id) throw new Error('Server returned no world ID');
