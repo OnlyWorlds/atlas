@@ -768,3 +768,11 @@ The old Route 2 decided "local O is server N" from disk in a match phase, told t
 - **The UI moved before the disk** (H7): favourites, camera, URL and a grafted element on ids the folder never got when the merge then failed. Now nothing moves before the kernel; `onRekeyed` lets the screen follow the moment the disk has.
 
 The runner shares the Settings re-key's single flight (`withIdMoveLock`), which also waits out a live-folder pass already running (`settleLivePass`), and runs the link step inside the lock. A kernel failure is finished from its journal and merged again; a second failure leaves a journal whose `origin: 'merge'` makes the copy say to run Make online again. Records: design `Forge/Notes/2026-09-29-s365-orient/lane-a-route2.md`, recheck `Forge/Notes/2026-09-29-s366-orient/lane-b-route2-recheck.md`, gate `Forge/Notes/Archive/2026-09-29-s367-gate/`.
+
+---
+
+## "Edited here" compares two clocks (S392, #202)
+
+The push and the server-delete review call a copy edited when its `local_updated_at` (the device's clock, at the edit) is past its `server_updated_at` (keel's clock, at the push). Two clocks, one comparison. With clocks that agree, a push always lands after the edit and the copy reads clean. With a device clock ahead of keel's by D, an element edited in the last D reads as edited again after its push and is pushed again each round until D has passed: self-healing, because every push moves the server stamp forward, but it is a quiet re-push loop on a skewed device. Not fixed; worth knowing before anyone reads repeated PATCHes in a log as a bug.
+
+The same shape went off in a test: `tests/e2e/server-delete-bulk.spec.ts`'s mock keel stamped with a fixed date (09:00 UTC on 2026-10-11) while the browser used the real clock, so from that hour every copy read as edited. A fake server that stamps time must stamp with the real clock whenever the browser's clock is on the other side of the comparison.

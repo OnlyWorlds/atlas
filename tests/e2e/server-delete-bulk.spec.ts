@@ -14,8 +14,12 @@ type Rec = Record<string, unknown> & { id: string; type: string };
 
 /** A small keel: lists, /bulk, create, patch, get, and a /changes feed the test can feed deletes into. */
 async function mockKeel(page: Page) {
-  let t = 0;
-  const stamp = () => new Date(Date.UTC(2026, 9, 11, 9, 0, t++)).toISOString();
+  // The browser stamps local edits with the real clock, and the engine calls a
+  // copy edited when local_updated_at is past server_updated_at, so the server
+  // stamps with the real clock too, monotonic. A fixed date here went off at
+  // 09:00 UTC on 2026-10-11 and made every copy read as edited (#202).
+  let last = 0;
+  const stamp = () => { last = Math.max(Date.now(), last + 1); return new Date(last).toISOString(); };
   const db = new Map<string, Rec>();
   const writes: string[] = [];
   const queued: Array<{ op: 'delete'; type: string; id: string; change_seq: number; deleted_at: string }> = [];
