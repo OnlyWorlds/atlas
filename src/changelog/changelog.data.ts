@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.30.1',
+    date: '2026-10-11',
+    theme: 'a world comes back without the PIN',
+    entries: [
+      {
+        id: 'bring-down-without-pin',
+        title: 'Downloading a cleared world again needs no PIN',
+        body: 'When this browser cleared an online world, downloading it again asked for your PIN first. OnlyWorlds lets a key read without it, so the world now comes back either way, and its sync starts once your PIN is in Settings, under OnlyWorlds. An older ten-digit key still asks first.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.30.0',
     date: '2026-10-11',
     theme: 'plainer words',

@@ -29,7 +29,7 @@ import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
 import { saveRegistry, setActiveWorld, storedRegistry, updateWorldEntry } from '../registry/registry';
 import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
 import { buildV2Adapter } from '../sync/make-online';
-import { attachSyncEngine } from '../sync/sync-attach';
+import { attachSyncEngine, diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { abandonBrowserMake, releasePriorWorld, scaffoldBrowserWorld } from './atlas-root-flow';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 
@@ -52,10 +52,23 @@ const REGISTRY_NOT_SAVED =
 const CHANGED_ELSEWHERE =
   'This world changed in another tab while it was downloading. Look at its row, then try again.';
 
+/** A v2 key (`ow_w_`, `ow_r_`): keel never asks its PIN on a read route. */
+export function readsWithoutPin(apiKey: string): boolean {
+  return /^ow_[rw]_/.test(apiKey.trim());
+}
+
 const NOT_CLEARED_NOW = 'This world is no longer cleared: another tab may have brought it back. Look at its row.';
 
 export interface BringDownAgainOpts {
   onProgress?: (p: InitialDownloadProgress) => void;
+}
+
+export interface BringDownAgainResult {
+  entry: WorldRegistryEntry;
+  downloaded: number;
+  failures: number;
+  /** Back, but not syncing until this browser has the PIN or the seat secret. */
+  syncWaits: 'pin' | 'seat' | null;
 }
 
 /** The row as storage holds it now (another tab's save lands there first), else as this tab holds it. */
@@ -68,11 +81,11 @@ function entryNow(worldId: string): WorldRegistryEntry | undefined {
 export function bringDownAgain(
   worldId: string,
   opts: BringDownAgainOpts = {},
-): Promise<{ entry: WorldRegistryEntry; downloaded: number; failures: number }> {
+): Promise<BringDownAgainResult> {
   return withWorldLock(`bring-${worldId}`, () => enqueueActivationTask(() => run(worldId, opts)));
 }
 
-async function run(worldId: string, opts: BringDownAgainOpts): Promise<{ entry: WorldRegistryEntry; downloaded: number; failures: number }> {
+async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDownAgainResult> {
   const entry = entryNow(worldId);
   if (!entry || !isBrowserWorld(entry) || entry.demo === true) {
     throw new PlainError('Only a world this browser cleared can be downloaded again.');
@@ -83,7 +96,11 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<{ entry: 
   }
   const readOnly = !!entry.api.read_only;
   const pin = readOnly ? '' : (worldPin(entry, getState().registry) ?? '');
-  if (!readOnly && !pin) {
+  // The download only reads, and keel reads a prefixed key without its PIN
+  // (keel core/auth.py rulings 1 and 2, Skeld h16 #2957, #200): the world
+  // comes back and its sync waits on the PIN. A legacy ten-digit key on a
+  // private world still needs it to read.
+  if (!readOnly && !pin && !readsWithoutPin(entry.api.api_key)) {
     if (isSeatWorld(entry)) throw new PlainError(SEAT_SECRET_MISSING_LINE);
     throw new PlainError('Atlas needs your OnlyWorlds PIN to download this world. Enter it in Settings, under OnlyWorlds, then try again.');
   }
@@ -140,5 +157,9 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<{ entry: 
   }
   patchSlice('ui', { ...getState().ui, selectedElementId: null });
   attachSyncEngine(restored, store);
-  return { entry: restored, downloaded: downloaded.totalDownloaded, failures: downloaded.failures.length };
+  // Why sync did not start, asked of the pill's own diagnosis: a world back
+  // without its PIN (or seat secret) waits on it.
+  const why = diagnoseSyncUnavailable()?.kind;
+  const syncWaits = why === 'pin-missing' ? 'pin' : why === 'seat-secret-missing' ? 'seat' : null;
+  return { entry: restored, downloaded: downloaded.totalDownloaded, failures: downloaded.failures.length, syncWaits };
 }

@@ -12,6 +12,7 @@ import type { WorldRegistryEntry } from '../core/types';
 import { problemFor } from '../core/problems';
 import { bringDownAgain } from '../setup/bring-down-again';
 import { homeHash, navigate } from '../core/router';
+import { SEAT_SECRET_MISSING_LINE } from '../core/seat';
 
 export class BringDownAgainModal extends BaseModal {
   constructor(private readonly world: WorldRegistryEntry, private readonly toasts: ToastManager) {
@@ -55,7 +56,11 @@ export class BringDownAgainModal extends BaseModal {
         this.dismissLocked = false;
         this.hide();
         const missing = out.failures > 0 ? ` ${out.failures} element${out.failures === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${out.failures === 1 ? 'it' : 'them'}.` : '';
-        if (missing) this.toasts.error(`"${w.name}" is back in this browser.${missing}`);
+        // Back without the PIN (a v2 key reads without it, #200): say what sync waits on.
+        const waits = out.syncWaits === 'pin' ? ' It syncs once your PIN is in Settings, under OnlyWorlds.'
+          : out.syncWaits === 'seat' ? ` ${SEAT_SECRET_MISSING_LINE}` : '';
+        if (missing) this.toasts.error(`"${w.name}" is back in this browser.${missing}${waits}`);
+        else if (waits) this.toasts.info(`"${w.name}" is back in this browser.${waits}`, 10_000);
         else this.toasts.success(`"${w.name}" is back in this browser.`);
         navigate(homeHash(w.id));
       } catch (err) {

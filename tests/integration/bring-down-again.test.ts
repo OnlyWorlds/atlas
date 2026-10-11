@@ -204,8 +204,40 @@ describe('bring it down again', () => {
     }
   });
 
-  it('a write-key world without the PIN in this browser asks for it first, writing nothing', async () => {
-    putRegistry({ ...defaultRegistry(), worlds: [cleared()] });
+  it('with the PIN in this browser, sync starts: nothing waits', async () => {
+    const out = await bringDownAgain('w1');
+    expect(out.syncWaits).toBeNull();
+  });
+
+  // #200: the download only reads, and keel reads a prefixed key without its
+  // PIN (core/auth.py rulings 1 and 2). The fake checks no PIN at all, so the
+  // instrument here is the wire: no API-Pin header leaves, and the restore is
+  // the same restore, its sync waiting on the PIN.
+  it('a v2 write key without the PIN comes back anyway, sending no PIN, its sync waiting on it (#200)', async () => {
+    const V2_KEY = 'ow_w_restorekey'.padEnd(37, 'k');
+    putRegistry({ ...defaultRegistry(), worlds: [cleared({ api: { ...cleared().api!, api_key: V2_KEY } })] });
+    const pins: (string | null)[] = [];
+    mswServer.events.on('request:start', ({ request }) => { pins.push(request.headers.get('API-Pin')); });
+    const out = await bringDownAgain('w1');
+    mswServer.events.removeAllListeners();
+    expect(out.downloaded).toBe(2);
+    expect(out.syncWaits).toBe('pin');
+    expect(pins.length).toBeGreaterThan(0);
+    expect(pins.every(p => p === null)).toBe(true);
+    const e = getState().registry.worlds[0];
+    expect(e.cleared_at).toBeUndefined();
+    expect(e.review_first_sync).toBe(true);
+  });
+
+  it('a seat world whose secret this browser lost comes back too, its sync waiting on the seat (#200)', async () => {
+    const V2_KEY = 'ow_w_seatrestore'.padEnd(37, 'k');
+    putRegistry({ ...defaultRegistry(), pin: '1234', worlds: [cleared({ api: { ...cleared().api!, api_key: V2_KEY, seat: { role: 'editor' } } })] });
+    const out = await bringDownAgain('w1');
+    expect(out.syncWaits).toBe('seat');
+  });
+
+  it('a legacy ten-digit key without the PIN asks for it first, writing nothing (keel reads a private world with it only with the PIN)', async () => {
+    putRegistry({ ...defaultRegistry(), worlds: [cleared({ api: { ...cleared().api!, api_key: '4815162342' } })] });
     await expect(bringDownAgain('w1')).rejects.toThrow(/PIN/);
     expect([...home()!.children.keys()]).toEqual([]);
   });
