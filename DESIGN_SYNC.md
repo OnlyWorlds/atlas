@@ -74,7 +74,7 @@ There is no `server-wins`: a destructive implicit overwrite of local edits is th
 4. **Resume**: `resume()` pushes. It runs when the user turns off "stay offline" or pause-all, and when the `online` event finds the engine network-paused.
 5. **A hold's release** pushes when no other hold or pause remains.
 6. **The local-wins convergence push** after a pull conflict (`sync-attach.ts`, deferred past the in-flight round and dropped if the world changed).
-7. **Server-delete review, Keep**: clears the baseline and pushes at once (`src/ui/server-delete-modal.ts`).
+7. **Server-delete review, Keep**: clears the baseline and pushes at once (`src/ui/server-delete-modal.ts`). Its "Delete all locally" never pushes: it only removes local copies, each guarded by the stamp the user saw (conv. 140).
 8. **The live folder**: a pass that finds stamped outside edits calls `requestPushIfLinked()`; more than 50 hold the engine and ask (conv. 111).
 9. **The transient retry**: one timed `pushOnce` after a busy or unreachable server.
 

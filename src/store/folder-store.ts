@@ -127,6 +127,14 @@ export interface FolderStore {
    * `cascade: false` (silent delete is a surgical operation, not a sweep).
    */
   deleteElement(id: string, opts?: { cascade?: boolean; silent?: boolean }): Promise<{ tombstones: Tombstone[] }>;
+  /** A silent delete guarded INSIDE the per-id chain: removes the file only
+   *  if both its stamps still equal `expected` (`local_updated_at` null =
+   *  absent, a no-op that counts as done). Returns false when an edit, a Keep
+   *  (which clears `server_updated_at`) or a push landed after the caller
+   *  decided (#122, the server-delete review's bulk step; conv. 140). */
+  deleteSilentlyIfUnchanged(
+    id: string, expected: { local_updated_at: string | null; server_updated_at: string | null },
+  ): Promise<boolean>;
   /**
    * Preview what would be deleted alongside `id` if `deleteElement(id)` ran with
    * cascade enabled. Returns the dependents (NOT the primary). UI uses this for

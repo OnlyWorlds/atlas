@@ -1821,6 +1821,21 @@ export class FsFolderStore implements FolderStore {
     return result;
   }
 
+  async deleteSilentlyIfUnchanged(
+    id: string, expected: { local_updated_at: string | null; server_updated_at: string | null },
+  ): Promise<boolean> {
+    return this.writeChain.run(id, async () => {
+      // The file AS IT IS ON DISK, as in applyServerRecordIfUnchanged: an
+      // outside edit with a fresh stamp keeps the file. Both stamps: a Keep
+      // clears `server_updated_at` and leaves the edit time alone.
+      const current = await this.readForWrite(id);
+      if ((current?.local_updated_at ?? null) !== expected.local_updated_at) return false;
+      if (current && (current.server_updated_at ?? null) !== expected.server_updated_at) return false;
+      if (current) await this.deleteElementUnchained(id, { silent: true });
+      return true;
+    });
+  }
+
   private async deleteElementUnchained(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
     const silent = opts.silent ?? false;
     const cascade = silent ? false : (opts.cascade ?? true);

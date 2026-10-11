@@ -318,6 +318,15 @@ export interface ServerDeleteRecord {
   name?: string;
 }
 
+/** A server-delete record as the review shows it (#122): the local copy's
+ *  stamp when read, the guard for the bulk delete, and whether it holds
+ *  edits never synced. */
+export interface ServerDeleteReviewRow extends ServerDeleteRecord {
+  local_updated_at: string | null;
+  server_updated_at: string | null;
+  unsynced: boolean;
+}
+
 export interface Conflict {
   element_id: string;
   type: ElementType;

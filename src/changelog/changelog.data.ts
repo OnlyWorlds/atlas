@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.29.0',
+    date: '2026-10-11',
+    theme: 'one step, not a hundred',
+    entries: [
+      {
+        id: 'server-deletes-all-at-once',
+        title: 'Clear server deletes in one step',
+        body: 'When elements are deleted on onlyworlds.com, Atlas asks what to do with each local copy, one click at a time: 114 deletes took 114 clicks. Delete all locally now clears them in one confirmed step. A copy you edited here since the last sync is listed first and kept unless you tick it.',
+        tags: ['sync'],
+      },
+      {
+        id: 'zone-pentagon-icon',
+        title: 'Zones get their own icon',
+        body: 'A zone showed a drafting compass. It now shows a pentagon, the shape a zone draws on a map.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.28.1',
     date: '2026-10-10',
     theme: 'numbers stay numbers',

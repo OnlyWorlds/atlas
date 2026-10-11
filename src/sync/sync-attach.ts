@@ -477,6 +477,9 @@ async function maybeAutoOpenServerDeleteModal(): Promise<void> {
   try {
     const records = await currentEngine.listServerDeletes();
     if (records.length === 0) return;
+    // `open()` returns once the dialog shows, so the flag alone let every pull
+    // stack another review over the first (S390 gate F1): one on screen is enough.
+    if (document.querySelector('[data-modal="server-delete-review"]')) return;
     const { ServerDeleteReviewModal } = await import('../ui/server-delete-modal');
     serverDeleteModalOpen = true;
     const modal = new ServerDeleteReviewModal(toastManager);

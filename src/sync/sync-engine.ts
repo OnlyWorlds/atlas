@@ -1161,6 +1161,68 @@ export class SyncEngine {
   }
 
   /**
+   * The review's rows with what the bulk step needs (#122): each record's
+   * local stamp as read now, and whether the copy holds edits never synced
+   * (the push's own test: never synced, or `local_updated_at` past
+   * `server_updated_at`). A copy already gone reads as clean.
+   */
+  async reviewServerDeletes(): Promise<import('../core/types').ServerDeleteReviewRow[]> {
+    const records = await this.listServerDeletes();
+    const unsynced = new Set((await this.folder.listLocallyChangedSince(null)).map(e => e.id));
+    const rows: import('../core/types').ServerDeleteReviewRow[] = [];
+    for (const r of records) {
+      const local = await this.folder.getElement(r.id);
+      rows.push({
+        ...r,
+        local_updated_at: local?.local_updated_at ?? null,
+        server_updated_at: local?.server_updated_at ?? null,
+        unsynced: unsynced.has(r.id),
+      });
+    }
+    return rows;
+  }
+
+  /**
+   * "Delete all locally" (#122): the silent delete of `resolveServerDelete`
+   * for many rows, each guarded by both stamps the user saw (conv. 140). A
+   * row whose copy changed since (an edit, an outside write, a Keep, a push)
+   * is kept, entry and all, and comes back in `kept`; a row whose delete
+   * throws comes back in `failed` and the rest still run. Each entry is
+   * cleared right after its file goes, so a stop part way leaves only rows
+   * still to review. A hold or an unlink stops the loop where it is.
+   */
+  async deleteServerDeletesLocally(
+    rows: Array<{ id: string; local_updated_at: string | null; server_updated_at: string | null }>,
+  ): Promise<{ deleted: string[]; kept: string[]; failed: string[] }> {
+    await this.assertNotHeld();
+    const deleted: string[] = [];
+    const kept: string[] = [];
+    const failed: string[] = [];
+    for (const row of rows) {
+      // A world switch, an unlink, or a move or re-key begun meanwhile: the rest stay to review.
+      if (this.stopped || this.holds > 0) break;
+      // Read per row: a Keep or a per-row delete may have resolved it since.
+      const pending = ((await this.folder.readSyncState()).server_deletes ?? []).some(d => d.id === row.id);
+      if (!pending) continue;
+      try {
+        if (!(await this.folder.deleteSilentlyIfUnchanged(row.id, row))) {
+          kept.push(row.id);
+          continue;
+        }
+      } catch (err) {
+        console.warn(`[atlas:sync] delete all locally: ${row.id} failed`, err);
+        failed.push(row.id);
+        continue;
+      }
+      await this.folder.updateSyncState(s => ({
+        server_deletes: (s.server_deletes ?? []).filter(d => d.id !== row.id),
+      }));
+      deleted.push(row.id);
+    }
+    return { deleted, kept, failed };
+  }
+
+  /**
    * Push local changes to server, then pull remote changes to folder.
    * Pull skips elements push already conflicted on (dedup by id).
    *

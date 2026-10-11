@@ -8,16 +8,10 @@ import { ELEMENT_FAMILIES, elementColor } from './element-colors';
 
 /**
  * Material Symbol name per element type (re-exported from SDK with strict typing).
- * One local override: SDK 4.3.0 gives Marker `location_on`, the glyph the map
- * toolbar's show/hide pins button already uses. Skeld's next dist serial moves
- * Marker to `polyline` (a marker is a vertex of a zone's line); atlas takes it
- * now. `place` is no stopgap: it is an alias of the same pin glyph. Drop the
- * override once the SDK ships `polyline`.
+ * SDK 4.7.3 (dist.19) gives Marker `polyline` and Zone `pentagon`, so the local
+ * Marker override is gone (S390).
  */
-export const ELEMENT_ICONS = {
-  ...(SDK_ELEMENT_ICONS as Record<ElementType, string>),
-  marker: 'polyline',
-} as Record<ElementType, string>;
+export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
 
 /**
  * Element-type color palette — used by the context-pane graph for optional

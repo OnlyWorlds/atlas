@@ -267,6 +267,24 @@ export class MockFolderStore implements FolderStore {
     return result;
   }
 
+  /** Test hook: ids whose guarded delete throws, as a file that will not parse does in FsFolderStore. */
+  deleteFailures = new Set<string>();
+
+  async deleteSilentlyIfUnchanged(
+    id: string, expected: { local_updated_at: string | null; server_updated_at: string | null },
+  ): Promise<boolean> {
+    // Mirrors FsFolderStore: the check and the delete share one chain slot.
+    return this.writeChain.run(id, async () => {
+      if (this.deleteFailures.has(id)) throw new Error(`delete failed: ${id}`);
+      const current = await this.getElement(id);
+      if ((current?.local_updated_at ?? null) !== expected.local_updated_at) return false;
+      if (current && (current.server_updated_at ?? null) !== expected.server_updated_at) return false;
+      // A silent delete: no cascade, no tombstone (as deleteElementInChain).
+      if (current) this.elements.delete(id);
+      return true;
+    });
+  }
+
   private deleteElementInChain(id: string, opts: { cascade?: boolean; silent?: boolean }): Promise<{ tombstones: Tombstone[] }> {
     // Same chain as updateElement — an in-flight update lands before the
     // element disappears (mirrors FsFolderStore, convention #79).
