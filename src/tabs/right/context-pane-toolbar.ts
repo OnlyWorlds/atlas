@@ -116,7 +116,7 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
     hopRow.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'atlas-context-pane-toolbar-hop-pill';
-    wrap.title = 'Graph reach. 1 = direct neighbours only · higher = also neighbours of neighbours, and so on.';
+    wrap.title = 'Graph reach: 1 shows direct links only, and each step up adds their links too.';
     for (const n of [1, 2, 3, 4] as const) {
       const seg = document.createElement('button');
       seg.type = 'button';
@@ -140,8 +140,8 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
     if (current.lockLayout) btn.classList.add('is-on');
     btn.dataset.locked = current.lockLayout ? 'true' : 'false';
     btn.title = current.lockLayout
-      ? 'Layout locked: filter toggles hide nodes without re-arranging. Click to unlock.'
-      : 'Layout free: filter toggles re-run the sim so surviving nodes redistribute. Click to lock.';
+      ? 'Kept still: hiding a type leaves the other elements where they are. Click to let it move.'
+      : 'Free to move: hiding a type rearranges the rest. Click to keep it still.';
     btn.innerHTML =
       `<span class="material-symbols-outlined">${current.lockLayout ? 'lock' : 'lock_open'}</span>`;
     btn.addEventListener('click', () => onToggleLockLayout());

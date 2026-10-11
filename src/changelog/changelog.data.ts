@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.32.1',
+    date: '2026-10-11',
+    theme: 'the Web settings in plain words',
+    entries: [
+      {
+        id: 'web-settings-plain',
+        title: 'The Web settings in plain words',
+        body: 'Settings, Web spoke of hop depth, tier-derived defaults and per-ring caps. It now says Graph reach, explains Auto in one sentence, and calls the two switches by what they do: keep the graph still, and colour each line by type. The graph\'s own buttons say the same.',
+        tags: ['web', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.32.0',
     date: '2026-10-11',
     theme: 'capitals everywhere else',

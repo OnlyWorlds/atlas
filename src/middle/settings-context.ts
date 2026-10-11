@@ -18,42 +18,39 @@ export function renderContextTab(entry: WorldRegistryEntry): string {
     <section class="atlas-settings-section">
       <h3>Web pane</h3>
       <p class="atlas-settings-hint">
-        Preferences for the right-pane Web tab: the graph + element preview
-        / cast lists. Per-world. The same toolbar controls live above the graph
-        and write to the same settings.
+        The graph and lists in the right pane's Web tab, for this world. The
+        same controls sit above the graph.
       </p>
       <div class="atlas-settings-row">
-        <label class="atlas-settings-label">Default hop depth</label>
+        <label class="atlas-settings-label">Graph reach</label>
         <select class="atlas-select" data-setting="context_hop_depth">
-          <option value="" ${hopExplicit === undefined ? 'selected' : ''}>Auto (tier-derived)</option>
-          <option value="1" ${hopExplicit === 1 ? 'selected' : ''}>1-hop (direct cast only)</option>
-          <option value="2" ${hopExplicit === 2 ? 'selected' : ''}>2-hop (cast + adjacent)</option>
-          <option value="3" ${hopExplicit === 3 ? 'selected' : ''}>3-hop (deeper exploration)</option>
-          <option value="4" ${hopExplicit === 4 ? 'selected' : ''}>4-hop (very wide)</option>
+          <option value="" ${hopExplicit === undefined ? 'selected' : ''}>Auto</option>
+          <option value="1" ${hopExplicit === 1 ? 'selected' : ''}>1 · direct links only</option>
+          <option value="2" ${hopExplicit === 2 ? 'selected' : ''}>2 · their links too</option>
+          <option value="3" ${hopExplicit === 3 ? 'selected' : ''}>3 · wider</option>
+          <option value="4" ${hopExplicit === 4 ? 'selected' : ''}>4 · widest</option>
         </select>
       </div>
       <p class="atlas-settings-hint">
-        Auto mode: narrative subjects at scene / draft default to 2-hop;
-        chapter / book default to 1-hop; non-narrative subjects default to
-        2-hop. Picking 1-4 explicitly overrides for every subject in this
-        world. Higher depths use per-ring caps (12 / 8 / 6) so the graph
+        Auto reaches 1 step from a book or a chapter, and 2 from everything
+        else. A number sets the reach for everything in this world. The
+        farther steps show only their best-connected elements, so the graph
         stays readable.
       </p>
       <label class="atlas-settings-toggle">
         <input type="checkbox" data-setting="context_lock_layout" ${lockOn ? 'checked' : ''} />
-        <span>Lock graph layout when toggling type filters (no sim re-run; surviving nodes don't jump)</span>
+        <span>Keep the graph still when a type is hidden or shown (the other elements stay where they are)</span>
       </label>
     </section>
     <section class="atlas-settings-section">
-      <h3>Edge styling</h3>
+      <h3>Graph lines</h3>
       <label class="atlas-settings-toggle">
         <input type="checkbox" data-setting="context_edge_color" ${edgeColorOn ? 'checked' : ''} />
-        <span>Tint edges by the non-centre node's element type (uses the shared element palette)</span>
+        <span>Colour each line by the type of the element it leads to</span>
       </label>
       <p class="atlas-settings-hint">
-        Off (default): all edges render in the neutral cyan accent. On:
-        radial edges take the colour of the connected element's type, a quick
-        visual grouping by type at the edge of the graph.
+        Off (the default): every line is cyan. On: the lines take their
+        element's type colour, so the types group at a glance.
       </p>
     </section>
   `;
@@ -77,16 +74,16 @@ export function wireContextTab(entry: WorldRegistryEntry, toasts: ToastManager):
     else if (raw === '3') next = 3;
     else if (raw === '4') next = 4;
     else next = undefined;
-    commit({ context_hop_depth: next }, `Web hop set to ${next === undefined ? 'auto' : `${next}-hop`}`);
+    commit({ context_hop_depth: next }, `Graph reach: ${next === undefined ? 'auto' : next}`);
   });
 
   const lockCb = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="context_lock_layout"]`);
   lockCb?.addEventListener('change', () => {
-    commit({ context_lock_layout: lockCb.checked }, `Web layout ${lockCb.checked ? 'locked' : 'free'}`);
+    commit({ context_lock_layout: lockCb.checked }, `Graph ${lockCb.checked ? 'kept still' : 'free to move'}`);
   });
 
   const colorCb = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="context_edge_color"]`);
   colorCb?.addEventListener('change', () => {
-    commit({ context_edge_color: colorCb.checked }, `Edge colouring ${colorCb.checked ? 'on' : 'off'}`);
+    commit({ context_edge_color: colorCb.checked }, `Line colours ${colorCb.checked ? 'on' : 'off'}`);
   });
 }
