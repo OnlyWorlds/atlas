@@ -58,8 +58,26 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.31.0',
     date: '2026-10-11',
-    theme: 'named, not linked',
+    theme: 'names in the text, capitals on the buttons',
     entries: [
+      {
+        id: 'sentence-case-rooms',
+        title: 'Capitals on the buttons',
+        body: 'The Sharing room, the knowledge room, the calendar builder, the world clock and the new chapter dialog spoke in lowercase: publish, done, cancel. Their buttons, titles and labels now start with a capital, like the rest of Atlas. Small status tags such as live or not published stay as they were. A new page is called New page.',
+        tags: ['fix'],
+      },
+      {
+        id: 'pause-sync-name',
+        title: 'Stay offline is now Pause sync',
+        body: 'The switch that stops one world syncing was called Stay offline, which read like a lost connection. It is now Pause sync (this world), beside Pause all sync.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'type-not-category',
+        title: 'One word for the kinds of element',
+        body: 'Atlas called them both categories and types. It now says type everywhere. The landing\'s line reads Worldbuilding on OnlyWorlds.',
+        tags: ['fix'],
+      },
       {
         id: 'potentials-named-in-text',
         title: 'Potentials list the names in your text',

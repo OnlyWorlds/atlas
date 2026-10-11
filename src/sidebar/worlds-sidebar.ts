@@ -315,8 +315,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         }
       }
       toasts.info(!entry.sync_paused
-        ? 'Stayed offline'
-        : stillPaused ? 'This world is back online, but Pause all is still on' : 'Sync resumed');
+        ? 'Sync paused for this world'
+        : stillPaused ? 'This world can sync again, but Pause all sync is still on' : 'Sync resumed');
       return;
     }
     const refreshBtn = target.closest<HTMLElement>('[data-role="refresh-world"]');
@@ -512,7 +512,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // A cleared row has nothing to sync: no pause, no refresh (S376 lens C C13).
   const syncActions = world.state === 'api-linked' && !cleared
     ? `
-        <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'Resume sync' : 'Stay offline'}">
+        <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'Resume sync' : 'Pause sync (this world)'}">
           <span class="material-symbols-outlined">${world.sync_paused ? 'play_arrow' : 'pause'}</span>
         </button>`
     : '';

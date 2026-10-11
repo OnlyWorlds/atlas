@@ -67,7 +67,7 @@ function renderAffordanceSection(reg: WorldsRegistry): string {
       </label>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="show-pinned-element-names-in-header" ${showPinnedEls ? 'checked' : ''} />
-        <span>Show element names alongside category icons on Map detail</span>
+        <span>Show element names alongside type icons on Map detail</span>
       </label>
     </section>
   `;

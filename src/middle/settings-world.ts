@@ -129,7 +129,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
     ? `
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="world-paused" ${paused ? 'checked' : ''} />
-        <span>Stay offline (per-world)</span>
+        <span>Pause sync (this world)</span>
       </label>
       <div class="atlas-settings-dangling" data-role="foreign-ids" ${lastForeignCount[world.id] ? '' : 'hidden'}>
         <p class="atlas-settings-hint" data-role="foreign-text">${escapeText(foreignLine(lastForeignCount[world.id] ?? 0))}</p>
@@ -274,7 +274,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       else engine.resume();
     }
     toasts.info(pausedInput.checked
-      ? 'This world set to offline'
+      ? 'Sync paused for this world'
       : stillPaused ? 'This world will sync when Pause all sync is turned off' : 'Sync resumed for this world');
   });
 

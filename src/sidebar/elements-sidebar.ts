@@ -354,7 +354,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const held = n?.held
       ? `<div class="atlas-disk-notice-held">Sync is waiting: ${n.held.count} elements changed on disk. `
         + `<button type="button" class="atlas-disk-notice-btn" data-disk-action="upload">Upload them</button> `
-        + `<button type="button" class="atlas-disk-notice-btn" data-disk-action="offline">Stay offline</button></div>`
+        + `<button type="button" class="atlas-disk-notice-btn" data-disk-action="offline">Pause sync</button></div>`
       : '';
     const html = !active ? '' : `<div class="atlas-disk-notice-line">`
       + `<span class="material-symbols-outlined atlas-disk-notice-icon">folder_open</span>`

@@ -228,13 +228,13 @@ describe('list helpers', () => {
   });
 
   it('findUniquePageName avoids collisions among existing pages', () => {
-    expect(findUniquePageName([])).toBe('new page');
+    expect(findUniquePageName([])).toBe('New page');
     const pages = [
       el({ id: 'a', subtype: 'page', name: 'new page' }),
       el({ id: 'b', subtype: 'page', name: 'new page (2)' }),
       el({ id: 'c', name: 'new page (3)' }), // a STORY named like a page — ignored
     ];
-    expect(findUniquePageName(pages)).toBe('new page (3)');
+    expect(findUniquePageName(pages)).toBe('New page (3)');
   });
 });
 

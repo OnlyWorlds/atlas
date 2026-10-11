@@ -376,7 +376,7 @@ export class ElementCreateModal extends BaseModal {
         return;
       }
       if (!this.effectiveTypes().includes(this.selected)) {
-        errorBox.textContent = 'Pick a category';
+        errorBox.textContent = 'Pick a type';
         errorBox.hidden = false;
         return;
       }

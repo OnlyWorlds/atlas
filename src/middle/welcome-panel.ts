@@ -182,7 +182,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
               ${doors}
             </div>
             <p class="atlas-landing-more">${more}</p>
-            <p class="atlas-landing-tag">An OnlyWorlds worldbuilding solution.</p>
+            <p class="atlas-landing-tag">Worldbuilding on OnlyWorlds.</p>
             <p class="atlas-landing-note" data-role="storage-note"${folderNote ? '' : ' hidden'}>${folderNote}</p>
           </div>
         </div>

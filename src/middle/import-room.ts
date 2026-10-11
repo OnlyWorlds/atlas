@@ -207,9 +207,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <p class="atlas-import-ai-lead">Notes not in the format yet? <button type="button" class="atlas-btn-link" data-action="convert-prompt">Copy our prompt</button> and give it to an AI assistant with your notes, then paste the JSON it returns below. The prompt carries every field (~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens) and asks the assistant to add nothing your notes do not say. <a class="atlas-btn-link" href="${OW_AI_DOCS_URL}" target="_blank" rel="noopener">More ways to convert</a>.</p>
           ${agentLine}
         </div>
-        <div class="atlas-import-drop" data-role="drop" tabindex="0" title="drop or click to choose a .json file, or a world file Atlas saved (.zip)">
+        <div class="atlas-import-drop" data-role="drop" tabindex="0" title="Drop or click to choose a .json file, or a world file Atlas saved (.zip)">
           <span class="material-symbols-outlined">place_item</span>
-          <p>drop a world or elements <b>.json</b>, or a world file <b>.zip</b>, here</p>
+          <p>Drop a world or elements <b>.json</b>, or a world file <b>.zip</b>, here</p>
           <span class="atlas-import-drop-sub">or click to choose a file</span>
           <input type="file" accept="application/json,.json,.zip,application/zip" data-role="file" hidden />
         </div>
@@ -496,7 +496,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <button type="button" class="atlas-btn-primary" data-action="import" ${importing || mergeTargetViewOnly ? 'disabled' : ''}>
             ${importing ? 'Importing…' : (mode === 'new' ? 'Create world' : `Merge into ${escapeText(mergeTargetName)}`)}
           </button>
-          ${importing ? `<div class="atlas-import-progress" data-role="import-progress"><div class="atlas-import-progress-fill"></div><span class="atlas-import-progress-label">writing 0 / ${r.created + r.updated}</span></div>` : ''}
+          ${importing ? `<div class="atlas-import-progress" data-role="import-progress"><div class="atlas-import-progress-fill"></div><span class="atlas-import-progress-label">Writing 0 / ${r.created + r.updated}</span></div>` : ''}
         `}
       </div>
     `;
@@ -576,7 +576,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       const fill = el.querySelector<HTMLElement>('.atlas-import-progress-fill');
       const label = el.querySelector<HTMLElement>('.atlas-import-progress-label');
       if (fill) fill.style.width = `${pct}%`;
-      if (label) label.textContent = `writing ${p.done} / ${p.total}`;
+      if (label) label.textContent = `Writing ${p.done} / ${p.total}`;
     };
     // If the user loads ANOTHER payload while this import is still writing,
     // the completion path below must not stomp their fresh review — `parsed`
@@ -710,7 +710,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       <div class="atlas-import-typelist">
         <label class="atlas-import-type-all">
           <input type="checkbox" data-role="all" checked />
-          <span class="atlas-import-type-all-label">all types</span>
+          <span class="atlas-import-type-all-label">All types</span>
           <span class="atlas-import-type-all-count">${totalEls} element${totalEls === 1 ? '' : 's'}</span>
         </label>
         <div class="atlas-import-type-cols">
@@ -718,7 +718,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             ${contentTypes.map(typeRow).join('')}
           </div>
           <div class="atlas-import-type-col">
-            ${spatialTypes.length ? spatialTypes.map(typeRow).join('') : '<p class="atlas-import-type-col-empty">no maps, pins, or zones yet</p>'}
+            ${spatialTypes.length ? spatialTypes.map(typeRow).join('') : '<p class="atlas-import-type-col-empty">No maps, pins, or zones yet</p>'}
           </div>
         </div>
       </div>

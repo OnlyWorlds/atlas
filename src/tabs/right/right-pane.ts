@@ -480,7 +480,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         : cur.reason === 'held' && cur.held_for === 'move' ? 'This world is being moved to a folder. Refresh when that finishes.'
         : cur.reason === 'held' && cur.held_for === 'download' ? 'This world is being saved as one file. Refresh when that finishes.'
         : cur.reason === 'held' ? 'Ids are being updated in this world. Refresh when that finishes.'
-        : 'Sync is paused. Turn off Stay offline or Pause all sync in Settings to refresh.');
+        : 'Sync is paused. Turn off Pause sync or Pause all sync in Settings to refresh.');
       return;
     }
     try {
@@ -558,7 +558,7 @@ function mapEngineStateToPill(
       };
     case 'paused':
       if (engine.reason === 'held' && engine.held_for === 'disk') {
-        return { dataState: 'pending', label: 'Waiting', title: 'Many files changed on disk. Upload them or stay offline, from the element list.' };
+        return { dataState: 'pending', label: 'Waiting', title: 'Many files changed on disk. Upload them or pause sync, from the element list.' };
       }
       if (engine.reason === 'held' && engine.held_for === 'move') {
         return { dataState: 'saving', label: 'Moving', title: 'Moving this world to a folder. Sync resumes when it finishes.' };

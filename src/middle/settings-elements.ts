@@ -40,7 +40,7 @@ export function renderElementsTab(): string {
         <label class="atlas-settings-label">Default new-element type</label>
         <select class="atlas-select" name="default-create-type">${createTypeOptions}</select>
       </div>
-      <p class="atlas-settings-hint">The category the "New element" dialog preselects (sidebar +, home, hotkey). You can still pick any type in the dialog.</p>
+      <p class="atlas-settings-hint">The type the "New element" dialog preselects (sidebar +, home, hotkey). You can still pick another in the dialog.</p>
       <fieldset class="atlas-settings-fieldset">
         <legend>Field edit mode</legend>
         <label class="atlas-settings-radio">

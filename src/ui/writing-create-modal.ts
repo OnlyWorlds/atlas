@@ -34,14 +34,14 @@ export class WritingCreateModal extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({
-      title: `new ${this.opts.label.toLowerCase()}`,
+      title: `New ${this.opts.label.toLowerCase()}`,
       dataModal: 'writing-create',
     });
 
-    const defaultName = this.opts.defaultName ?? `new ${this.opts.label.toLowerCase()}`;
+    const defaultName = this.opts.defaultName ?? `New ${this.opts.label.toLowerCase()}`;
     body.innerHTML = `
       <div class="atlas-modal-field">
-        <label class="atlas-modal-label">name</label>
+        <label class="atlas-modal-label">Name</label>
         <input
           type="text"
           name="narrative-name"
@@ -52,8 +52,8 @@ export class WritingCreateModal extends BaseModal {
       </div>
       <div class="atlas-modal-error" data-role="error" hidden></div>
       <div class="atlas-modal-actions">
-        <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-        <button type="button" class="atlas-btn-primary" data-action="create">create</button>
+        <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+        <button type="button" class="atlas-btn-primary" data-action="create">Create</button>
       </div>
     `;
 
@@ -70,7 +70,7 @@ export class WritingCreateModal extends BaseModal {
     const submit = async (): Promise<void> => {
       const name = input.value.trim();
       if (!name) {
-        errorBox.textContent = 'name is required';
+        errorBox.textContent = 'Name is required';
         errorBox.hidden = false;
         return;
       }

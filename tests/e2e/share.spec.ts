@@ -71,9 +71,9 @@ test('create page → detail; rename + revert both persist; intent stays hidden 
   await page.click('button.atlas-share-new');
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
   // S369: a new page opens on its name, ready to type; Escape keeps the default.
-  await expect(page.locator('.atlas-share-detail-header input.atlas-element-name-input')).toHaveValue('new page');
+  await expect(page.locator('.atlas-share-detail-header input.atlas-element-name-input')).toHaveValue('New page');
   await page.keyboard.press('Escape');
-  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('New page');
   await expect(page.locator('[data-action="copy-payload"]')).toBeVisible();
   // T-S7: Theme + Publish sit behind the meta summary row — expand first.
   await page.click('.atlas-share-meta-summary');
@@ -87,8 +87,8 @@ test('create page → detail; rename + revert both persist; intent stays hidden 
   await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('barovia primer');
 
   // Revert to the original → commit must ALSO save (rename-revert discipline).
-  await setPageTitle(page, 'new page');
-  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
+  await setPageTitle(page, 'New page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('New page');
   await setPageTitle(page, 'barovia primer');
 
   // D5 (v1): the intent PICKER is gone from the UI — but the FIELD must
@@ -110,9 +110,9 @@ test('create page → detail; rename + revert both persist; intent stays hidden 
 
   // A second create gets a unique default name.
   await page.click('button.atlas-share-new');
-  await expect(page.locator('.atlas-share-detail-header input.atlas-element-name-input')).toHaveValue('new page');
+  await expect(page.locator('.atlas-share-detail-header input.atlas-element-name-input')).toHaveValue('New page');
   await page.keyboard.press('Escape');
-  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('New page');
   await page.click('.atlas-drillin-prefix');
   await expect(page.locator('.atlas-share-row')).toHaveCount(2);
 });
@@ -128,7 +128,7 @@ test('delete page: dismiss keeps it; accept removes it and lands on the list', a
   const dismissed = page.waitForEvent('dialog').then(d => d.dismiss());
   await page.click('.atlas-share-delete');
   await dismissed;
-  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('New page');
 
   const accepted = page.waitForEvent('dialog').then(d => d.accept());
   await page.click('.atlas-share-delete');
@@ -413,7 +413,7 @@ test('circle block: the Knowledge bridge mints a page; compiled entries render; 
   // Lands in the share room: circle block statically rendered with the
   // compiled entry; story mirror names it; intent prefilled to reference.
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
-  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('what the party know');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('What the party know');
   const circleBlock = page.locator('.atlas-share-block[data-block-kind="circle"]');
   await expect(circleBlock.locator('.atlas-share-circle-name')).toHaveText('the party');
   await expect(circleBlock.locator('.atlas-share-circle-entry-title')).toHaveText('the mists');

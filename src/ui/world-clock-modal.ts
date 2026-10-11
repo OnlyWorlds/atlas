@@ -42,7 +42,7 @@ export class WorldClockModal extends BaseModal {
     const max = typeof meta.time_range_max === 'number' ? String(meta.time_range_max) : '';
 
     const { overlay, body } = this.buildModalShell({
-      title: 'your world’s clock',
+      title: 'Your world’s clock',
       dataModal: 'world-clock',
       panelClass: 'atlas-worldclock-panel',
     });
@@ -60,24 +60,24 @@ export class WorldClockModal extends BaseModal {
 
         <div class="atlas-worldclock-optional">
           <div class="atlas-worldclock-row">
-            <label class="atlas-modal-label" for="wc-now">The now <span class="atlas-worldclock-opt">optional</span></label>
+            <label class="atlas-modal-label" for="wc-now">The now <span class="atlas-worldclock-opt">Optional</span></label>
             <input id="wc-now" name="now" type="number" class="atlas-modal-input" value="${escapeText(now)}"
-                   placeholder="where the story is" />
+                   placeholder="Where the story is" />
           </div>
           <div class="atlas-worldclock-row atlas-worldclock-range">
-            <label class="atlas-modal-label">Recorded history runs <span class="atlas-worldclock-opt">optional</span></label>
+            <label class="atlas-modal-label">Recorded history runs <span class="atlas-worldclock-opt">Optional</span></label>
             <div class="atlas-worldclock-range-inputs">
-              <input id="wc-min" name="min" type="number" class="atlas-modal-input" value="${escapeText(min)}" placeholder="from" />
+              <input id="wc-min" name="min" type="number" class="atlas-modal-input" value="${escapeText(min)}" placeholder="From" />
               <span>–</span>
-              <input id="wc-max" name="max" type="number" class="atlas-modal-input" value="${escapeText(max)}" placeholder="to" />
+              <input id="wc-max" name="max" type="number" class="atlas-modal-input" value="${escapeText(max)}" placeholder="To" />
             </div>
             <p class="atlas-worldclock-hint">Leave empty and the chart fits itself to your dated elements.</p>
           </div>
         </div>
 
         <div class="atlas-modal-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="save-clock">set the clock</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="save-clock">Set the clock</button>
         </div>
       </form>
     `;

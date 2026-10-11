@@ -48,7 +48,7 @@ test('first launch shows the landing, not create-local', async ({ page }) => {
   await expect(page.locator('.atlas-landing-mark')).toHaveText('Atlas');
   // Tagline = Captain's copy (rewritten 2026-07-24 launch day); the assertion
   // follows his `atlas-landing-tag` text, not the other way round.
-  await expect(page.locator('.atlas-middle')).toContainText('An OnlyWorlds worldbuilding solution.');
+  await expect(page.locator('.atlas-middle')).toContainText('Worldbuilding on OnlyWorlds.');
   // S301: the landing doors lost their headings and boxes; the buttons carry
   // the label, in the tool's lowercase voice (1.17: "set up a folder" became
   // "start a world", whose dialog asks where).

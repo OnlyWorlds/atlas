@@ -529,11 +529,11 @@ export function pageContentSig(el: Element): string {
   return `${(h >>> 0).toString(36)}-${material.length.toString(36)}`;
 }
 
-/** Unique default name for a new page: "new page", "new page (2)", ... */
+/** Unique default name for a new page: "New page", "New page (2)", ... (compared without case) */
 export function findUniquePageName(elements: Element[]): string {
   const names = new Set(listPages(elements).map(p => (p.name || '').toLowerCase()));
-  if (!names.has('new page')) return 'new page';
+  if (!names.has('new page')) return 'New page';
   for (let i = 2; ; i++) {
-    if (!names.has(`new page (${i})`)) return `new page (${i})`;
+    if (!names.has(`new page (${i})`)) return `New page (${i})`;
   }
 }

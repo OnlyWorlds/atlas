@@ -269,7 +269,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         when: (w) => w.hasRef('character:The Consul'),
         body: 
           'All elements share a set of \'base\' fields that you see at the top, ' + 
-          'besides category-specific fields (hidden for the tour).' +  
+          'besides type-specific fields (hidden for the tour).' +  
           '\nSo how do we model the diplomatic standing this character has?\nWe can write something in their *description* field. ' +
           'But this Hegemony sounds important enough to be an element.\n\nClick next to create it as an institution, as well as the consulship title.',
       },
@@ -705,7 +705,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'There\'s more to the tool, so please give it a try.\nAtlas uses OnlyWorlds for the categories and their fields, and allows custom fields on top of them.' +
+        'There\'s more to the tool, so please give it a try.\nAtlas uses OnlyWorlds for the element types and their fields, and allows custom fields on top of them.' +
         '\n\nCreate a [free account](https://www.onlyworlds.com/accounts/signup/) to sync Atlas worlds online and into other applications.'  +
         '\nQuestions, bugs, requests all welcome: through [Discord](https://discord.gg/twCjqvVBwb), the [feedback tracker](https://github.com/OnlyWorlds/feedback), or info@onlyworlds.com.' ,
  

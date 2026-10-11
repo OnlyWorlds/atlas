@@ -199,7 +199,7 @@ export class CalendarBuilderModal extends BaseModal {
     }
 
     const errors = validateCalendarConfig(config);
-    if (!this.draft.name.trim()) errors.unshift('the calendar needs a name');
+    if (!this.draft.name.trim()) errors.unshift('The calendar needs a name');
     return { config, errors };
   }
 
@@ -233,7 +233,7 @@ export class CalendarBuilderModal extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({
-      title: this.opts.elementId ? 'edit calendar' : 'create a calendar',
+      title: this.opts.elementId ? 'Edit calendar' : 'Create a calendar',
       dataModal: 'calendar-builder',
       panelClass: 'atlas-calbuilder-panel',
     });
@@ -245,42 +245,42 @@ export class CalendarBuilderModal extends BaseModal {
           <input id="cb-name" data-field="name" type="text" class="atlas-modal-input"
                  placeholder="The Imperial Reckoning" value="${escapeText(this.draft.name)}" />
 
-          <label class="atlas-modal-label" for="cb-step">What one ${escapeText(this.calendarGrain())} is called here <span class="atlas-calbuilder-opt">optional</span></label>
+          <label class="atlas-modal-label" for="cb-step">What one ${escapeText(this.calendarGrain())} is called here <span class="atlas-calbuilder-opt">Optional</span></label>
           <input id="cb-step" data-field="stepName" type="text" class="atlas-modal-input"
                  placeholder="${escapeText(this.calendarGrain())}" value="${escapeText(this.draft.stepName)}" />
           ${this.keptNotes()}
 
           <div class="atlas-calbuilder-section" data-section="eras">
-            <div class="atlas-calbuilder-section-head">Eras <span class="atlas-calbuilder-opt">named stretches with their own counting</span></div>
+            <div class="atlas-calbuilder-section-head">Eras <span class="atlas-calbuilder-opt">Named stretches with their own counting</span></div>
             <div class="atlas-calbuilder-rows" data-rows="eras"></div>
-            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="era">+ era</button>
+            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="era">+ Era</button>
           </div>
 
           ${this.yearGrain() ? '' : `
           <div class="atlas-calbuilder-section" data-section="months">
-            <div class="atlas-calbuilder-section-head">Months <span class="atlas-calbuilder-opt">group ${escapeText(this.grain)}s into a year</span></div>
+            <div class="atlas-calbuilder-section-head">Months <span class="atlas-calbuilder-opt">Group ${escapeText(this.grain)}s into a year</span></div>
             <div class="atlas-calbuilder-rows" data-rows="months"></div>
-            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="month">+ month</button>
+            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="month">+ Month</button>
           </div>
 
           <div class="atlas-calbuilder-section" data-section="week">
-            <div class="atlas-calbuilder-section-head">Week <span class="atlas-calbuilder-opt">a repeating cycle of named days</span></div>
+            <div class="atlas-calbuilder-section-head">Week <span class="atlas-calbuilder-opt">A repeating cycle of named days</span></div>
             <div class="atlas-calbuilder-week">
               <input data-field="weekLength" type="number" min="1" class="atlas-modal-input atlas-calbuilder-week-len"
-                     placeholder="length" value="${escapeText(this.draft.weekLength)}" />
+                     placeholder="Length" value="${escapeText(this.draft.weekLength)}" />
               <input data-field="weekNames" type="text" class="atlas-modal-input"
-                     placeholder="day names, comma-separated" value="${escapeText(this.draft.weekNames)}" />
-              <select data-field="weekMode" class="atlas-modal-input atlas-calbuilder-week-mode" title="free: the week runs across month boundaries. nested: it restarts with each month.">
-                <option value="free" ${this.draft.weekMode === 'free' ? 'selected' : ''}>runs freely</option>
-                <option value="nested" ${this.draft.weekMode === 'nested' ? 'selected' : ''}>restarts each month</option>
+                     placeholder="Day names, comma-separated" value="${escapeText(this.draft.weekNames)}" />
+              <select data-field="weekMode" class="atlas-modal-input atlas-calbuilder-week-mode" title="Free: the week runs across month boundaries. Nested: it restarts with each month.">
+                <option value="free" ${this.draft.weekMode === 'free' ? 'selected' : ''}>Runs freely</option>
+                <option value="nested" ${this.draft.weekMode === 'nested' ? 'selected' : ''}>Restarts each month</option>
               </select>
             </div>
           </div>
 
           <div class="atlas-calbuilder-section" data-section="intercalary">
-            <div class="atlas-calbuilder-section-head">Festival days <span class="atlas-calbuilder-opt">days between months, belonging to none</span></div>
+            <div class="atlas-calbuilder-section-head">Festival days <span class="atlas-calbuilder-opt">Days between months, belonging to none</span></div>
             <div class="atlas-calbuilder-rows" data-rows="intercalary"></div>
-            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="intercalary">+ festival day</button>
+            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="intercalary">+ Festival day</button>
           </div>
           `}
 
@@ -301,8 +301,8 @@ export class CalendarBuilderModal extends BaseModal {
         <div class="atlas-calbuilder-preview" data-role="preview"></div>
 
         <div class="atlas-modal-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-          <button type="button" class="atlas-btn-primary" data-action="save-calendar">${this.opts.elementId ? 'save calendar' : 'create calendar'}</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+          <button type="button" class="atlas-btn-primary" data-action="save-calendar">${this.opts.elementId ? 'Save calendar' : 'Create calendar'}</button>
         </div>
       </div>
     `;
@@ -387,21 +387,21 @@ export class CalendarBuilderModal extends BaseModal {
     if (eraRows) {
       eraRows.innerHTML = this.draft.eras.map((e, i) => `
         <div class="atlas-calbuilder-row" data-row="era:${i}">
-          <input data-col="name" type="text" class="atlas-modal-input" placeholder="era name" value="${escapeText(e.name)}" />
-          <input data-col="abbrev" type="text" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="abbr" value="${escapeText(e.abbrev)}" />
-          <input data-col="start" type="number" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="starts" title="Where this era begins on the world's line (for a countdown era: its pivot)" value="${escapeText(e.start)}" />
-          <input data-col="end" type="number" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="ends" title="Optional. Ends before the next era begins = a real gap in between" value="${escapeText(e.end)}" />
+          <input data-col="name" type="text" class="atlas-modal-input" placeholder="Era name" value="${escapeText(e.name)}" />
+          <input data-col="abbrev" type="text" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="Abbr" value="${escapeText(e.abbrev)}" />
+          <input data-col="start" type="number" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="Starts" title="Where this era begins on the world's line (for a countdown era: its pivot)" value="${escapeText(e.start)}" />
+          <input data-col="end" type="number" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="Ends" title="Optional. Ends before the next era begins = a real gap in between" value="${escapeText(e.end)}" />
           <select data-col="numbering" class="atlas-modal-input atlas-calbuilder-mid" title="How years number inside this era">
-            <option value="from-1" ${e.numbering === 'from-1' ? 'selected' : ''}>years from 1</option>
-            <option value="from-0" ${e.numbering === 'from-0' ? 'selected' : ''}>years from 0</option>
-            <option value="continuous" ${e.numbering === 'continuous' ? 'selected' : ''}>label only</option>
+            <option value="from-1" ${e.numbering === 'from-1' ? 'selected' : ''}>Years from 1</option>
+            <option value="from-0" ${e.numbering === 'from-0' ? 'selected' : ''}>Years from 0</option>
+            <option value="continuous" ${e.numbering === 'continuous' ? 'selected' : ''}>Label only</option>
           </select>
-          <select data-col="direction" class="atlas-modal-input atlas-calbuilder-mid" title="down = counts toward its pivot, like BC">
-            <option value="up" ${e.direction === 'up' ? 'selected' : ''}>counts up</option>
-            <option value="down" ${e.direction === 'down' ? 'selected' : ''}>counts down</option>
+          <select data-col="direction" class="atlas-modal-input atlas-calbuilder-mid" title="Down = counts toward its pivot, like BC">
+            <option value="up" ${e.direction === 'up' ? 'selected' : ''}>Counts up</option>
+            <option value="down" ${e.direction === 'down' ? 'selected' : ''}>Counts down</option>
           </select>
           <label class="atlas-calbuilder-check" title="A closed era still formats old dates but is never offered when entering new ones">
-            <input data-col="closed" type="checkbox" ${e.closed ? 'checked' : ''} /> closed
+            <input data-col="closed" type="checkbox" ${e.closed ? 'checked' : ''} /> Closed
           </label>
           <button type="button" class="atlas-calbuilder-remove" data-remove="era:${i}" title="Remove era">×</button>
         </div>
@@ -411,7 +411,7 @@ export class CalendarBuilderModal extends BaseModal {
     if (monthRows) {
       monthRows.innerHTML = this.draft.months.map((m, i) => `
         <div class="atlas-calbuilder-row" data-row="month:${i}">
-          <input data-col="name" type="text" class="atlas-modal-input" placeholder="month name" value="${escapeText(m.name)}" />
+          <input data-col="name" type="text" class="atlas-modal-input" placeholder="Month name" value="${escapeText(m.name)}" />
           <input data-col="length" type="number" min="1" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="${escapeText(this.grain)}s" value="${escapeText(m.length)}" />
           <button type="button" class="atlas-calbuilder-remove" data-remove="month:${i}" title="Remove month">×</button>
         </div>
@@ -420,21 +420,21 @@ export class CalendarBuilderModal extends BaseModal {
     const interRows = body.querySelector('[data-rows="intercalary"]');
     if (interRows) {
       const monthOptions = (selected: string): string => {
-        const opts = [`<option value="0" ${selected === '0' ? 'selected' : ''}>before month 1</option>`];
+        const opts = [`<option value="0" ${selected === '0' ? 'selected' : ''}>Before month 1</option>`];
         this.draft.months.forEach((m, i) => {
           const v = String(i + 1);
-          opts.push(`<option value="${v}" ${selected === v ? 'selected' : ''}>after ${escapeText(m.name.trim() || `month ${v}`)}</option>`);
+          opts.push(`<option value="${v}" ${selected === v ? 'selected' : ''}>After ${escapeText(m.name.trim() || `month ${v}`)}</option>`);
         });
         return opts.join('');
       };
       interRows.innerHTML = this.draft.intercalary.map((ic, i) => `
         <div class="atlas-calbuilder-row" data-row="intercalary:${i}">
-          <input data-col="name" type="text" class="atlas-modal-input" placeholder="festival name" value="${escapeText(ic.name)}" />
+          <input data-col="name" type="text" class="atlas-modal-input" placeholder="Festival name" value="${escapeText(ic.name)}" />
           <select data-col="after" class="atlas-modal-input atlas-calbuilder-mid">${monthOptions(ic.after)}</select>
-          <input data-col="every" type="number" min="1" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="every N yrs"
+          <input data-col="every" type="number" min="1" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="Every N yrs"
                  title="Leave empty for every year; 4 = a leap day every 4th year" value="${escapeText(ic.everyYears)}" />
           <label class="atlas-calbuilder-check" title="Counted in the week? Days outside the week keep every date on the same weekday forever">
-            <input data-col="inweek" type="checkbox" ${ic.inWeek ? 'checked' : ''} /> in week
+            <input data-col="inweek" type="checkbox" ${ic.inWeek ? 'checked' : ''} /> In week
           </label>
           <button type="button" class="atlas-calbuilder-remove" data-remove="intercalary:${i}" title="Remove day">×</button>
         </div>
@@ -446,7 +446,7 @@ export class CalendarBuilderModal extends BaseModal {
     const panel = body.querySelector('[data-role="preview"]');
     if (!panel) return;
     const { config, errors } = this.buildConfig();
-    const structural = errors.filter(e => e !== 'the calendar needs a name');
+    const structural = errors.filter(e => e !== 'The calendar needs a name');
     if (structural.length > 0) {
       panel.innerHTML = `<div class="atlas-calbuilder-errors">${structural.map(e => `<div>⚠ ${escapeText(e)}</div>`).join('')}</div>`;
       return;

@@ -420,7 +420,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const folder = getActiveStore();
     if (!worldId || !folder || !draft) return;
     const data: Record<string, unknown> = {
-      name: (draft.name || '').trim() || 'unnamed knowledge',
+      name: (draft.name || '').trim() || 'Unnamed knowledge',
       subtype: KNOWLEDGE_SUBTYPE,
       story: draft.story,
       narrator: draft.narrator,
@@ -517,7 +517,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (held.narrator) chips.appendChild(elementChip(held.narrator, () => ctx.setNarrator(null)));
     for (const id of held.collectives) chips.appendChild(elementChip(id, () => ctx.removeCircle(id)));
     if (!held.narrator) {
-      chips.appendChild(addAffordance('+ character', 'One character who holds this knowledge', async () => {
+      chips.appendChild(addAffordance('+ Character', 'One character who holds this knowledge', async () => {
         const p = await pickElement({ restrictToType: 'character', title: 'Who knows this?' });
         if (p) ctx.setNarrator(p.id);
       }));
@@ -525,7 +525,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       // A second individual knower can't be stored (narrator is single-link,
       // by design — two+ knowers ARE a circle). Offer the promotion instead
       // of dead-ending (S265, Susie's find).
-      chips.appendChild(addAffordance('+ character', 'Add a second knower: two individuals become a circle', async () => {
+      chips.appendChild(addAffordance('+ Character', 'Add a second knower: two individuals become a circle', async () => {
         const first = ctx.heldBy().narrator;
         if (!first) return;
         const p = await pickElement({
@@ -534,12 +534,12 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         if (p) openPromoteToCircle(first, p.id, ctx);
       }));
     }
-    chips.appendChild(addAffordance('+ existing circle', 'A group whose members inherit this knowledge', async () => {
+    chips.appendChild(addAffordance('+ Existing circle', 'A group whose members inherit this knowledge', async () => {
       const p = await pickElement({ restrictToType: 'collective', excludeIds: ctx.heldBy().collectives, title: 'Add a circle' });
       if (p) ctx.addCircle(p.id);
     }));
     // K9: mint a circle without leaving the entry — it joins the holders.
-    chips.appendChild(addAffordance('+ new circle', 'Create a circle and add it as a holder', () => {
+    chips.appendChild(addAffordance('+ New circle', 'Create a circle and add it as a holder', () => {
       openNewCircle((id) => ctx.addCircle(id));
     }));
     container.appendChild(chips);
@@ -567,7 +567,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'atlas-knowledge-add';
-    add.textContent = '+ add subject';
+    add.textContent = '+ Add subject';
     add.addEventListener('click', async () => {
       const p = await pickElement({ title: 'What is this knowledge about?', excludeIds: ctx.aboutIds() });
       if (!p) return;
@@ -708,7 +708,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         newBtn.type = 'button';
         newBtn.className = 'atlas-btn-ghost atlas-knowledge-new';
         newBtn.title = 'Create a new knowledge entry';
-        newBtn.textContent = '+ new knowledge entry';
+        newBtn.textContent = '+ New knowledge entry';
         newBtn.addEventListener('click', () => navigate(knowledgeHash(worldId, NEW)));
         actionSlot.appendChild(newBtn);
         buildEntriesList(worldId, listContainer);
@@ -717,7 +717,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         viewAs.type = 'button';
         viewAs.className = 'atlas-btn-ghost atlas-knowledge-viewas';
         viewAs.title = 'See the world as any character knows it';
-        viewAs.textContent = 'open known world →';
+        viewAs.textContent = 'Open known world →';
         viewAs.addEventListener('click', async () => {
           const p = await pickElement({ restrictToType: 'character', title: 'View the world as…' });
           if (p) navigate(knowledgeKnowerHash(worldId, p.id));
@@ -726,7 +726,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         newCircle.type = 'button';
         newCircle.className = 'atlas-btn-ghost atlas-knowledge-newcircle';
         newCircle.title = 'Create a circle (a collective acting as a knower-group)';
-        newCircle.textContent = '+ new circle';
+        newCircle.textContent = '+ New circle';
         newCircle.addEventListener('click', () => openNewCircle());
         actionSlot.append(viewAs, newCircle);
         buildKnowersList(worldId, listContainer);
@@ -754,7 +754,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const cta = document.createElement('button');
       cta.type = 'button';
       cta.className = 'atlas-btn-ghost atlas-knowledge-empty-cta';
-      cta.textContent = '+ new knowledge entry';
+      cta.textContent = '+ New knowledge entry';
       cta.addEventListener('click', () => navigate(knowledgeHash(worldId, NEW)));
       empty.appendChild(cta);
       container.appendChild(empty);
@@ -785,9 +785,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   function holderSummary(entry: Element): string {
     const held = heldByOf(entry);
     const ids = [...(held.narrator ? [held.narrator] : []), ...held.collectives];
-    if (ids.length === 0) return 'no holders yet';
+    if (ids.length === 0) return 'No holders yet';
     const first = elOf(ids[0])?.name || '(unnamed)';
-    return ids.length === 1 ? `held by ${first}` : `held by ${first} +${ids.length - 1}`;
+    return ids.length === 1 ? `Held by ${first}` : `Held by ${first} +${ids.length - 1}`;
   }
 
   function buildKnowersList(worldId: string, container: HTMLElement): void {
@@ -807,7 +807,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const cta = document.createElement('button');
       cta.type = 'button';
       cta.className = 'atlas-btn-ghost atlas-knowledge-empty-cta';
-      cta.textContent = '+ new circle';
+      cta.textContent = '+ New circle';
       cta.addEventListener('click', () => openNewCircle());
       empty.appendChild(cta);
       container.appendChild(empty);
@@ -910,7 +910,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     lensBtn.className = 'atlas-knowledge-lens-toggle' + (lensActive() ? ' is-active' : '');
     lensBtn.title = 'Dim everything this knower doesn\'t know (elements sidebar)';
     lensBtn.setAttribute('aria-pressed', String(lensActive()));
-    lensBtn.innerHTML = `<span class="material-symbols-outlined">visibility</span> lens`;
+    lensBtn.innerHTML = `<span class="material-symbols-outlined">visibility</span> Lens`;
     lensBtn.addEventListener('click', () => {
       const next = lensActive() ? null : { knowerId };
       patchSlice('ui', { ...getState().ui, knowledgeLens: next });
@@ -926,7 +926,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     makePage.type = 'button';
     makePage.className = 'atlas-knowledge-allfields';
     makePage.title = 'Create a sharing page from this knowledge (a circle block, ready to publish)';
-    makePage.textContent = 'create page →';
+    makePage.textContent = 'Create page →';
     makePage.addEventListener('click', () => {
       void (async () => {
         const folder = getActiveStore();
@@ -945,7 +945,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const resolveName = (id: string) => elOf(id)?.name || null;
         try {
           const created = await folder.createElement('narrative', {
-            name: `what ${knower.name || 'they'} know${knower.type === 'character' ? 's' : ''}`,
+            name: `What ${knower.name || 'they'} know${knower.type === 'character' ? 's' : ''}`,
             subtype: PAGE_SUBTYPE,
             atlas_page_intent: 'reference',
             ...pageBlocksPatch(blocks, resolveName),
@@ -965,7 +965,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     openEl.type = 'button';
     openEl.className = 'atlas-knowledge-allfields';
     openEl.title = 'Open in the full element editor';
-    openEl.textContent = 'open element →';
+    openEl.textContent = 'Open element →';
     openEl.addEventListener('click', () => navigate(elementHash(worldId, knower.id)));
     header.appendChild(openEl);
     root.appendChild(header);
@@ -1058,7 +1058,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           const src = document.createElement('button');
           src.type = 'button';
           src.className = 'atlas-knowledge-known-src';
-          src.textContent = `from ${entry.name || '(unnamed)'}`;
+          src.textContent = `From ${entry.name || '(unnamed)'}`;
           src.title = 'Open this entry';
           src.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
           quote.appendChild(src);
@@ -1161,7 +1161,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
     entryTitleHandle = makeEditableTitle({
       initial: isDraft ? draft!.name : (entry!.name || ''),
-      placeholder: 'what is known…',
+      placeholder: 'What is known…',
       ariaLabel: 'Knowledge entry name',
       onCommit: (next) => {
         if (isDraft) { draft!.name = next; persistDraft(); }
@@ -1183,7 +1183,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       allFields.type = 'button';
       allFields.className = 'atlas-knowledge-allfields';
       allFields.title = 'Open in the full element editor (all fields)';
-      allFields.textContent = 'all fields →';
+      allFields.textContent = 'All fields →';
       allFields.addEventListener('click', () => navigate(elementHash(worldId, entry!.id)));
       header.appendChild(allFields);
       const del = document.createElement('button');
@@ -1228,7 +1228,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     // writing-room :has() chrome rules key off .atlas-writing-workspace, which
     // has no ancestor here, so none of that leaks.
     proseHost.className = 'atlas-writing-workspace-prose atlas-knowledge-prose-rich';
-    proseHost.innerHTML = '<div class="atlas-knowledge-prose-loading">loading editor…</div>';
+    proseHost.innerHTML = '<div class="atlas-knowledge-prose-loading">Loading editor…</div>';
     proseSection.appendChild(proseHost);
     body.appendChild(proseSection);
 
@@ -1251,12 +1251,12 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const create = document.createElement('button');
       create.type = 'button';
       create.className = 'atlas-btn-primary';
-      create.textContent = 'create';
+      create.textContent = 'Create';
       create.addEventListener('click', () => { void createFromDraft(); });
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'atlas-btn-ghost';
-      cancel.textContent = 'cancel';
+      cancel.textContent = 'Cancel';
       cancel.addEventListener('click', () => {
         draft = null;
         clearDraftStash(worldId);
@@ -1285,11 +1285,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       host.innerHTML = '';
       const fail = document.createElement('div');
       fail.className = 'atlas-knowledge-prose-loading';
-      fail.append('editor failed to load. ');
+      fail.append('Editor failed to load. ');
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'atlas-knowledge-allfields';
-      retry.textContent = 'try again';
+      retry.textContent = 'Try again';
       retry.addEventListener('click', () => { void mountProseEditor(host, forId, ctx); });
       fail.appendChild(retry);
       host.appendChild(fail);

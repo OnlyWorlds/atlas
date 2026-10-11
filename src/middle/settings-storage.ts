@@ -365,7 +365,7 @@ function wireSyncTab(toasts: ToastManager): void {
     }
     toasts.info(pauseAll.checked
       ? 'All sync paused'
-      : entry?.sync_paused ? 'Sync resumed. This world stays offline.' : 'Sync resumed');
+      : entry?.sync_paused ? 'Sync resumed. This world\'s own pause is still on.' : 'Sync resumed');
   });
 
   pullOnAct?.addEventListener('change', () => {

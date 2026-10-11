@@ -318,10 +318,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (!page) return null;
     if (opts.onlyIfChanged) {
       const current = blocksOf(page).find(b => b.id === blockId);
-      if (current && current.kind === 'heading' && current.text === (text || 'heading') && current.level === level) return null;
+      if (current && current.kind === 'heading' && current.text === (text || 'Heading') && current.level === level) return null;
     }
     const blocks = blocksOf(page).map(b =>
-      b.id === blockId && b.kind === 'heading' ? { ...b, text: text || 'heading', level: level as 1 | 2 } : b,
+      b.id === blockId && b.kind === 'heading' ? { ...b, text: text || 'Heading', level: level as 1 | 2 } : b,
     );
     return saveBlocks(pageId, blocks);
   }
@@ -409,7 +409,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     if (!page) return;
     const block: PageBlock = kind === 'heading'
-      ? { id: newBlockId(), kind: 'heading', text: 'heading', level: 1 }
+      ? { id: newBlockId(), kind: 'heading', text: 'Heading', level: 1 }
       : { id: newBlockId(), kind: 'prose', markdown: '', richtextJson: null };
     const blocks = [...blocksOf(page), block];
     await saveBlocks(pageId, blocks);
@@ -551,7 +551,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       // Builder-only affordance: an empty prose block invites a click.
       const empty = document.createElement('p');
       empty.className = 'atlas-share-block-placeholder';
-      empty.textContent = 'empty text block · click to write';
+      empty.textContent = 'Empty text block · click to write';
       content.appendChild(empty);
       return content;
     }
@@ -570,7 +570,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     input.className = 'atlas-input atlas-share-heading-input';
     input.value = block.text;
     input.dataset.level = String(block.level);
-    input.placeholder = 'heading…';
+    input.placeholder = 'Heading…';
     wrap.appendChild(input);
 
     const levels = document.createElement('div');
@@ -622,7 +622,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // class scopes the context menu. The writing-room :has() chrome rules key
     // off .atlas-writing-workspace, which has no ancestor here — no leakage.
     host.className = 'atlas-writing-workspace-prose atlas-share-prose-rich';
-    host.innerHTML = '<div class="atlas-share-prose-loading">loading editor…</div>';
+    host.innerHTML = '<div class="atlas-share-prose-loading">Loading editor…</div>';
     wrap.appendChild(host);
 
     const doneRow = document.createElement('div');
@@ -630,7 +630,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
-    done.textContent = 'done';
+    done.textContent = 'Done';
     done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
@@ -657,11 +657,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       host.innerHTML = '';
       const fail = document.createElement('div');
       fail.className = 'atlas-share-prose-loading';
-      fail.textContent = 'editor failed to load.';
+      fail.textContent = 'Editor failed to load.';
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'atlas-btn-ghost';
-      retry.textContent = 'try again';
+      retry.textContent = 'Try again';
       retry.addEventListener('click', () => renderBlocks(pageId));
       host.appendChild(fail);
       host.appendChild(retry);
@@ -708,7 +708,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = el ? `element: ${el.name || '(unnamed)'} · change…` : 'pick element…';
+    changeBtn.textContent = el ? `Element: ${el.name || '(unnamed)'} · change…` : 'Pick element…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ title: 'Change card to…', excludeIds: [pageId] });
@@ -726,7 +726,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-share-heading-level' + (block.variant === v ? ' is-active' : '');
-      btn.textContent = v;
+      btn.textContent = v === 'compact' ? 'Compact' : 'Full';
       btn.title = v === 'compact' ? 'Identity row only' : 'Identity + chosen fields';
       btn.addEventListener('click', () => { void patchCardBlock(pageId, block.id, { variant: v }); });
       variants.appendChild(btn);
@@ -798,7 +798,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
-    done.textContent = 'done';
+    done.textContent = 'Done';
     done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
@@ -824,7 +824,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = knower ? `circle: ${knower.name || '(unnamed)'} · change…` : 'pick circle…';
+    changeBtn.textContent = knower ? `Circle: ${knower.name || '(unnamed)'} · change…` : 'Pick circle…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ restrictToType: 'collective', title: 'Whose knowledge? (a circle)' });
@@ -851,7 +851,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
-    done.textContent = 'done';
+    done.textContent = 'Done';
     done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
@@ -893,7 +893,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = map ? `map: ${map.name || '(unnamed)'} · change…` : 'pick map…';
+    changeBtn.textContent = map ? `Map: ${map.name || '(unnamed)'} · change…` : 'Pick map…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ restrictToType: 'map', title: 'Which map?' });
@@ -964,7 +964,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       zAllBtn.type = 'button';
       zAllBtn.className = 'atlas-share-map-pins-toggle';
       const zAllOn = zoneAllIds.every(isZoneIncluded);
-      zAllBtn.textContent = zAllOn ? 'none' : 'all';
+      zAllBtn.textContent = zAllOn ? 'None' : 'All';
       zAllBtn.addEventListener('click', () => {
         void patchMapBlock({ zoneIds: zAllOn ? [] : [...zoneAllIds] });
       });
@@ -1003,17 +1003,17 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const labelRow = document.createElement('div');
       labelRow.className = 'atlas-share-field-label';
       labelRow.textContent = 'Visible pins';
-      labelRow.title = 'Included pins share their element\'s name, type, description and image on the published page. Toggle "full" on a pin to share every populated field of that element.';
+      labelRow.title = 'Included pins share their element\'s name, type, description and image on the published page. Turn on Full for a pin to share every populated field of that element.';
       // Visible, not tooltip-only: the full toggle went unfound in the
       // release smoke (Captain, S254). One line states the disclosure rule.
       const disclosureHint = document.createElement('p');
       disclosureHint.className = 'atlas-share-hint atlas-share-map-disclosure-hint';
-      disclosureHint.textContent = 'Checked pins share name, type, description and image. Click full on a pin to share its whole profile.';
+      disclosureHint.textContent = 'Checked pins share name, type, description and image. Click Full on a pin to share its whole profile.';
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'atlas-share-map-pins-toggle';
       const allOn = mapPins.every(p => block.pinIds.includes(p.id));
-      allBtn.textContent = allOn ? 'none' : 'all';
+      allBtn.textContent = allOn ? 'None' : 'All';
       allBtn.addEventListener('click', () => {
         // "none" also clears the full-profile opt-ins (B6 resting state).
         void patchMapBlock(allOn
@@ -1051,7 +1051,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           const fullBtn = document.createElement('button');
           fullBtn.type = 'button';
           fullBtn.className = 'atlas-share-pin-full-toggle' + (isFull ? ' is-on' : '');
-          fullBtn.textContent = 'full';
+          fullBtn.textContent = 'Full';
           fullBtn.title = isFull
             ? 'Sharing every populated field of this element. Click to share only name, type, description and image'
             : 'Sharing name, type, description and image. Click to share every populated field of this element';
@@ -1078,7 +1078,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
-    done.textContent = 'done';
+    done.textContent = 'Done';
     done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
@@ -1135,7 +1135,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
-    done.textContent = 'done';
+    done.textContent = 'Done';
     done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
@@ -1189,7 +1189,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'atlas-btn-ghost';
-    addBtn.textContent = '+ add element';
+    addBtn.textContent = '+ Add element';
     addBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({
@@ -1207,7 +1207,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const done = document.createElement('button');
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
-    done.textContent = 'done';
+    done.textContent = 'Done';
     done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
@@ -1328,13 +1328,13 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // Add-block menu.
     const addRow = document.createElement('div');
     addRow.className = 'atlas-share-block-add';
-    addRow.appendChild(addBtn('title', '+ heading', () => { void addBlock(pageId, 'heading'); }, 'A section or subsection heading'));
-    addRow.appendChild(addBtn('notes', '+ text', () => { void addBlock(pageId, 'prose'); }, 'A rich-text block with @-mentions'));
-    addRow.appendChild(addBtn('badge', '+ element', () => { void addElementCard(pageId); }, 'One element: identity plus the fields you choose'));
-    addRow.appendChild(addBtn('grid_view', '+ collection', () => { void addCollectionBlock(pageId); }, 'A grid of several elements (identity only)'));
-    addRow.appendChild(addBtn('map', '+ map', () => { void addMapBlock(pageId); }, 'A map image with the pins you include'));
-    addRow.appendChild(addBtn('show_chart', '+ chart', () => { void addChartBlock(pageId); }, 'A saved chart from the Charts room'));
-    addRow.appendChild(addBtn('groups', '+ circle', () => { void addCircleBlock(pageId); }, 'A frozen snapshot of what a circle knows'));
+    addRow.appendChild(addBtn('title', '+ Heading', () => { void addBlock(pageId, 'heading'); }, 'A section or subsection heading'));
+    addRow.appendChild(addBtn('notes', '+ Text', () => { void addBlock(pageId, 'prose'); }, 'A rich-text block with @-mentions'));
+    addRow.appendChild(addBtn('badge', '+ Element', () => { void addElementCard(pageId); }, 'One element: identity plus the fields you choose'));
+    addRow.appendChild(addBtn('grid_view', '+ Collection', () => { void addCollectionBlock(pageId); }, 'A grid of several elements (identity only)'));
+    addRow.appendChild(addBtn('map', '+ Map', () => { void addMapBlock(pageId); }, 'A map image with the pins you include'));
+    addRow.appendChild(addBtn('show_chart', '+ Chart', () => { void addChartBlock(pageId); }, 'A saved chart from the Charts room'));
+    addRow.appendChild(addBtn('groups', '+ Circle', () => { void addCircleBlock(pageId); }, 'A frozen snapshot of what a circle knows'));
     blocksHost.appendChild(addRow);
 
     // Embeddable-suggestions (D5b): a quiet discoverability line — what the
@@ -1353,7 +1353,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (parts.length > 0) {
       const hint = document.createElement('p');
       hint.className = 'atlas-share-embeddable-hint';
-      hint.textContent = `from your world: ${parts.join(' · ')}`;
+      hint.textContent = `From your world: ${parts.join(' · ')}`;
       blocksHost.appendChild(hint);
     }
   }
@@ -1378,7 +1378,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const fontLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="preconnect"]'))
       .filter(l => l.href.includes('fonts.googleapis') || l.href.includes('fonts.gstatic'))
       .map(l => l.outerHTML).join('');
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeText(page.name || 'page preview')}</title>${fontLinks}<style>${css}</style></head><body class="atlas-share-fullpreview">${pageEl.outerHTML}</body></html>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeText(page.name || 'Page preview')}</title>${fontLinks}<style>${css}</style></head><body class="atlas-share-fullpreview">${pageEl.outerHTML}</body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank', 'noopener');
@@ -1626,13 +1626,13 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       PAGE_THEME_FONTS.map(f => ({ value: f.key, label: f.label })),
       theme.font ?? 'clean', 'clean', v => patchTheme({ font: v })));
     grid.appendChild(choiceRow('Mode',
-      [{ value: 'dark', label: 'dark' }, { value: 'light', label: 'light' }] as const,
+      [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }] as const,
       theme.mode ?? 'dark', 'dark', v => patchTheme({ mode: v as PageTheme['mode'] })));
     grid.appendChild(choiceRow('Density',
-      [{ value: 'compact', label: 'compact' }, { value: 'cozy', label: 'cozy' }, { value: 'airy', label: 'airy' }] as const,
+      [{ value: 'compact', label: 'Compact' }, { value: 'cozy', label: 'Cozy' }, { value: 'airy', label: 'Airy' }] as const,
       theme.density ?? 'cozy', 'cozy', v => patchTheme({ density: v as PageTheme['density'] })));
     grid.appendChild(choiceRow('Width',
-      [{ value: 'narrow', label: 'narrow' }, { value: 'regular', label: 'regular' }, { value: 'wide', label: 'wide' }] as const,
+      [{ value: 'narrow', label: 'Narrow' }, { value: 'regular', label: 'Regular' }, { value: 'wide', label: 'Wide' }] as const,
       theme.width ?? 'regular', 'regular', v => patchTheme({ width: v as PageTheme['width'] })));
 
     // Cover image URL.
@@ -1746,7 +1746,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         dot.className = 'atlas-share-stale-dot';
         stale.appendChild(dot);
         stale.appendChild(document.createTextNode(
-          'edited since publish; republish to update the public copy'));
+          'Edited since publish; republish to update the public copy'));
         section.appendChild(stale);
       }
 
@@ -1756,7 +1756,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       repub.type = 'button';
       repub.className = 'atlas-btn-ghost';
       repub.dataset.action = 'republish';
-      repub.textContent = 'republish';
+      repub.textContent = 'Republish';
       repub.title = 'Push the current composition to the public URL';
       repub.addEventListener('click', () => {
         repub.disabled = true; // in-flight guard (same as publish)
@@ -1767,7 +1767,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       rev.type = 'button';
       rev.className = 'atlas-btn-ghost';
       rev.dataset.action = 'revoke';
-      rev.textContent = 'revoke';
+      rev.textContent = 'Revoke';
       rev.title = 'Take the page down. The link shows "no longer shared"; you keep the slug';
       rev.addEventListener('click', () => {
         rev.disabled = true;
@@ -1803,7 +1803,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     publishBtn.type = 'button';
     publishBtn.className = 'atlas-btn-primary atlas-share-publish-btn';
     publishBtn.dataset.action = 'publish';
-    publishBtn.textContent = pub?.revoked ? 'republish' : 'publish';
+    publishBtn.textContent = pub?.revoked ? 'Republish' : 'Publish';
     publishBtn.addEventListener('click', () => {
       const slug = slugInput.value.trim();
       if (!isValidSlug(slug)) {
@@ -1832,13 +1832,13 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const change = document.createElement('button');
       change.type = 'button';
       change.className = 'atlas-btn-ghost atlas-share-slug-change';
-      change.textContent = 'use a different URL';
+      change.textContent = 'Use a different URL';
       change.title = 'Publish under a new slug instead of reviving this one';
       change.addEventListener('click', () => {
         slugInput.disabled = false;
         slugInput.focus();
         slugInput.select();
-        publishBtn.textContent = 'publish';
+        publishBtn.textContent = 'Publish';
         change.remove();
       });
       section.appendChild(change);
@@ -1959,7 +1959,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     newBtn.type = 'button';
     newBtn.className = 'atlas-btn-ghost atlas-share-new';
     newBtn.title = 'Create a new page';
-    newBtn.textContent = '+ new page';
+    newBtn.textContent = '+ New page';
     newBtn.addEventListener('click', () => { void createPage(); });
     actions.appendChild(newBtn);
     root.appendChild(actions);
@@ -1976,7 +1976,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           A page is a stack of blocks: headings, prose, elements, built
           from your world's elements. Create one to start composing.
         </p>
-        <p class="atlas-share-empty-examples">a character showcase · a player handout · a world landing page</p>
+        <p class="atlas-share-empty-examples">A character showcase · a player handout · a world landing page</p>
       `;
       root.appendChild(empty);
       return;
@@ -2048,7 +2048,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (autoEdit) renameOnOpen = null;
     pageTitleHandle = makeEditableTitle({
       initial: page.name || '',
-      placeholder: 'page name…',
+      placeholder: 'Page name…',
       ariaLabel: 'Page name',
       autoEdit,
       onCommit: (next) => {
@@ -2069,8 +2069,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     previewBtn.className = 'atlas-share-preview-toggle' + (previewMode ? ' is-active' : '');
     previewBtn.title = previewMode ? 'Back to the builder' : 'Preview as a visitor';
     previewBtn.innerHTML = previewMode
-      ? `<span class="material-symbols-outlined">edit</span> edit`
-      : `<span class="material-symbols-outlined">visibility</span> preview`;
+      ? `<span class="material-symbols-outlined">edit</span> Edit`
+      : `<span class="material-symbols-outlined">visibility</span> Preview`;
     previewBtn.addEventListener('click', () => {
       void (async () => {
         await commitOpenEdit(pageId);
@@ -2088,7 +2088,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     fullPreview.className = 'atlas-share-preview-toggle';
     fullPreview.dataset.action = 'full-preview';
     fullPreview.title = 'Open a full-page preview in a new tab';
-    fullPreview.innerHTML = `<span class="material-symbols-outlined">open_in_new</span> full page`;
+    fullPreview.innerHTML = `<span class="material-symbols-outlined">open_in_new</span> Full page`;
     fullPreview.addEventListener('click', () => {
       void (async () => {
         await commitOpenEdit(pageId);
@@ -2108,7 +2108,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     copyPayload.className = 'atlas-share-preview-toggle';
     copyPayload.dataset.action = 'copy-payload';
     copyPayload.title = 'Copy this page as JSON (for the show viewer or manual sharing)';
-    copyPayload.innerHTML = `<span class="material-symbols-outlined">data_object</span> copy JSON`;
+    copyPayload.innerHTML = `<span class="material-symbols-outlined">data_object</span> Copy JSON`;
     copyPayload.addEventListener('click', () => {
       void (async () => {
         await commitOpenEdit(pageId);
@@ -2137,7 +2137,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     publishBtn.title = pubNow && !pubNow.revoked
       ? 'Publish settings: republish or take the live page down'
       : 'Publish this page to a public link';
-    publishBtn.innerHTML = `<span class="material-symbols-outlined">public</span> ${pubNow && !pubNow.revoked ? 'published' : 'publish'}`;
+    publishBtn.innerHTML = `<span class="material-symbols-outlined">public</span> ${pubNow && !pubNow.revoked ? 'Published' : 'Publish'}`;
     publishBtn.addEventListener('click', () => {
       void (async () => {
         await commitOpenEdit(pageId);
