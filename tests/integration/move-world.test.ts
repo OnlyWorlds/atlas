@@ -264,6 +264,12 @@ describe('the crash matrix: a failure before the commit changes nothing (invaria
     }
   }
 
+  // Two rows below wait out a removal's real busy backoff (100 + 250 + 500 +
+  // 1000 ms, REMOVE_RETRY_MS in browser-world-move.ts and browser-worlds.ts):
+  // about 1.9 s alone, past 15 s once in a loaded full run (Boss, h11 #4238).
+  // The wait is the code's own, not work, so the limit is wide.
+  const BACKOFF_TIMEOUT_MS = 30_000;
+
   it('a throw at every write of the copy', async () => {
     const total = snapshot(browserDir());
     const writes = Object.keys(total).length + 1; // + the token
@@ -295,7 +301,7 @@ describe('the crash matrix: a failure before the commit changes nothing (invaria
     expect(await recoverBrowserMove('w1')).toBe('undone');
     expect(drive.children.has(TO)).toBe(false);
     expect(cur().move).toBeUndefined();
-  }, 15_000);
+  }, BACKOFF_TIMEOUT_MS);
 
   it('a throw storing the folder handle (5b) removes the folder and forgets the handle', async () => {
     vault.failPut = true;
@@ -319,7 +325,7 @@ describe('the crash matrix: a failure before the commit changes nothing (invaria
     expect(await recoverBrowserMove('w1')).toBe('finished');
     expect(browserDir()).toBeUndefined();
     expect(cur().moved_from).toBeUndefined();
-  }, 15_000);
+  }, BACKOFF_TIMEOUT_MS);
 });
 
 describe('recovery', () => {
