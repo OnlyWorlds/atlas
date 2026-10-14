@@ -13,7 +13,9 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **The SDK at 4.18.1** (Boss's flag, h11 #4238): additive for Atlas; against live 1.34.0 every chunk was byte-identical but one dead stopword `Set` in main (Kael told, h17 #4247), so it waited (`3ef417f`) and ships inside 1.35.0. `move-world.test.ts`'s two backoff rows take `BACKOFF_TIMEOUT_MS` (30 s).
 - **Atlas on a phone** (1.33.0, #244): the Captain's phone is still the check on the Writing case (`100dvh` + `interactive-widget=resizes-content`, not reproducible in emulation).
 - **Owed, a live walk** (unchanged): keel B4, a wrong PIN on a write key's Test connection.
-- ⚡ **NEXT**: Boss flies 1.35.0; Seethe reads the frames (h37). The Captain's phone on 1.33's Writing case (h43 #4243). #198/#199 wait on talks.
+- **1.35.0 LIVE** (Boss h11 #4295: Pages `76e13e4d`, `main-CRtTjd5a.js` byte-identical; his control: a real touch tap closes the "Opened" toast in 0.4 to 0.5 s on 1.35, 3 of 3, and did nothing on 1.34).
+- **Boss's unexpected-error toast** (h11 #4295): about one demo open in twenty on live showed "Atlas ran into a problem it did not expect while working in the background" beside a stuck "Downloading Moppetopia…", then 12 clean. That sentence is `src/ui/unexpected-errors.ts`: an unhandled rejection or error in the demo copy's background work (`src/setup/demo-copy.ts`, the world-file door). Lead, not cause: a race with a slow keel (keel ran 7 to 42 s from here between 14:12 and 14:23, h37 #4341). Needs a repro harness (a delayed or dropped demo fetch, many opens) before a fix.
+- ⚡ **NEXT**: (1) Boss's error toast above, harness first. (2) SDK 4.20.0 (Kael h37 #4294): the calendar kernel is now the SDK's (`formatStep`, `worldCalendars`, `resolveCalendarLens`, `CALENDAR_FIELD`; Atlas's `src/core/calendar.ts` byte for byte, Atlas 02d6a6d), so Atlas imports it and deletes its own copy, as I told Kael (h37 #4302), and his copy-drift record retires; `atlas_calendar` keeps its name (Skeld #4286). Seethe reads the 1.35 frames (h37 #4283). The Captain's phone on 1.33's Writing case (h43 #4243). #198/#199 wait on talks.
 
 ---
 
