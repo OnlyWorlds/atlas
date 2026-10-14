@@ -5,7 +5,7 @@
  * (Kirrowmoss / Dune / Vessach / Harptos).
  */
 import { describe, it, expect } from 'vitest';
-import type { CalendarConfig } from '../../src/core/calendar';
+import type { CalendarConfig } from '@onlyworlds/sdk';
 import {
   calendarTicks, eraBandsInRange, seasonBandsInRange, inEraGap,
 } from '../../src/core/calendar-axis';

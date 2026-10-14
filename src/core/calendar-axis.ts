@@ -21,7 +21,7 @@ import {
   resolveEraDomains, absYearForEraYear, absoluteYear, displayYear, eraForStep,
   yearStartStep, monthStartSteps, approxYearLength,
   formatYearLabel, formatMidLabel, isLeapYear,
-} from './calendar';
+} from '@onlyworlds/sdk';
 
 export interface CalendarTick {
   step: number;

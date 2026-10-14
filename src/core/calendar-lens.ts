@@ -12,7 +12,7 @@
  */
 
 import type { Element } from './types';
-import { readCalendarConfig, type CalendarConfig } from './calendar';
+import { readCalendarConfig, type CalendarConfig } from '@onlyworlds/sdk';
 
 export const CALENDAR_SUPERTYPE = 'calendar';
 

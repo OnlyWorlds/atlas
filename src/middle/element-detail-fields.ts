@@ -42,7 +42,7 @@ import { getEditorSettings } from '../registry/registry';
 import { suggestionsForField, reservedValueHint } from '../core/taxonomy';
 import { styleValueHint } from '../core/world-styles';
 import { resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
-import { formatStep } from '../core/calendar';
+import { formatStep } from '@onlyworlds/sdk';
 import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */

@@ -14,7 +14,7 @@ import {
   eraForStep, displayYear, breakdownStep, formatStep, parseDate, isParseError,
   validateCalendarConfig, readCalendarConfig, weekdayForStep,
   formatYearLabel, formatDuration, approxYearLength,
-} from '../../src/core/calendar';
+} from '@onlyworlds/sdk';
 
 // ---- Fixtures ----
 

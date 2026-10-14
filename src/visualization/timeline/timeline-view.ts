@@ -27,7 +27,7 @@ import { completeWaypoint } from '../../core/waypoints';
 import { openFieldEditPopover } from '../../ui/field-edit-popover';
 import {
   type CalendarConfig, formatStep, formatDuration, parseDate, isParseError,
-} from '../../core/calendar';
+} from '@onlyworlds/sdk';
 import {
   type CalendarTick, calendarTicks, eraBandsInRange, seasonBandsInRange,
 } from '../../core/calendar-axis';

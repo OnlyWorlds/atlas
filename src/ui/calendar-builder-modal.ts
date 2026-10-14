@@ -28,7 +28,7 @@ import { escapeText } from '../core/dom-utils';
 import {
   type CalendarConfig, type CalendarEra, type CalendarIntercalary,
   validateCalendarConfig, formatStep,
-} from '../core/calendar';
+} from '@onlyworlds/sdk';
 import { CALENDAR_SUPERTYPE, readCalendarValue } from '../core/calendar-lens';
 
 export interface CalendarBuilderOpts {

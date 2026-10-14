@@ -18,7 +18,7 @@ import type { TimelineViewExtras, TimelineViewHandle } from './timeline-view';
 import { layoutScroll, type ScrollLayout } from './scroll-layout';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { escapeText } from '../../core/dom-utils';
-import { formatStep, formatDuration, type CalendarConfig } from '../../core/calendar';
+import { formatStep, formatDuration, type CalendarConfig } from '@onlyworlds/sdk';
 
 export interface ScrollViewOptions {
   /** Peek — same grammar as the canvas view; null dismisses. */

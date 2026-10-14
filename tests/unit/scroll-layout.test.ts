@@ -4,7 +4,7 @@
  * calendar mirrors calendar-axis.test.ts (Vessach: two eras with a gap).
  */
 import { describe, it, expect } from 'vitest';
-import type { CalendarConfig } from '../../src/core/calendar';
+import type { CalendarConfig } from '@onlyworlds/sdk';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
 import {
   layoutScroll, SCROLL_TOP_PAD, SCROLL_MIN_GAP, SCROLL_MAX_GAP,

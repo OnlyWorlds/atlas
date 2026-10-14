@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { calendarDateText, isSchemaDateField } from '../../src/middle/element-detail-fields';
-import { formatStep, type CalendarConfig } from '../../src/core/calendar';
+import { formatStep, type CalendarConfig } from '@onlyworlds/sdk';
 import type { WorldCalendar } from '../../src/core/calendar-lens';
 
 const VESSACH: CalendarConfig = {

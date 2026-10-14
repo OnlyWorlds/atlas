@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { mountTimelineView } from '../../src/visualization/timeline/timeline-view';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
-import type { CalendarConfig } from '../../src/core/calendar';
+import type { CalendarConfig } from '@onlyworlds/sdk';
 
 beforeAll(() => {
   (globalThis as any).ResizeObserver ??= class { observe() {} disconnect() {} unobserve() {} };

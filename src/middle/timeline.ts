@@ -29,7 +29,7 @@ import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
 import { parseLegacySeed } from '../core/calendar-seed';
-import { formatStep } from '../core/calendar';
+import { formatStep } from '@onlyworlds/sdk';
 import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
 import { WorldClockModal } from '../ui/world-clock-modal';
 import { CalendarBuilderModal } from '../ui/calendar-builder-modal';

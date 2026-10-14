@@ -36,7 +36,7 @@ import { extractTemporalNodes } from './data-normalizer';
 import { filterNodesByScope } from './chart-recipe';
 import { rankAnchors, ANCHOR_CAP } from './degree';
 import { resolveCalendarLens } from '../../core/calendar-lens';
-import { formatStep } from '../../core/calendar';
+import { formatStep } from '@onlyworlds/sdk';
 import { calendarTicks } from '../../core/calendar-axis';
 
 /** One node in a frozen chart — identity + axis position only. */

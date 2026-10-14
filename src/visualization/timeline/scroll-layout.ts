@@ -10,7 +10,7 @@
  */
 
 import type { TimelineNode } from './types';
-import type { CalendarConfig } from '../../core/calendar';
+import type { CalendarConfig } from '@onlyworlds/sdk';
 import { eraBandsInRange } from '../../core/calendar-axis';
 
 /** A dated element's card anchor (the dot on the spine). */

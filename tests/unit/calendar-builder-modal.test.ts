@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { patchSlice } from '../../src/core/state';
 import { setActiveStore } from '../../src/core/active-store';
 import { CalendarBuilderModal } from '../../src/ui/calendar-builder-modal';
-import { validateCalendarConfig, type CalendarConfig } from '../../src/core/calendar';
+import { validateCalendarConfig, type CalendarConfig } from '@onlyworlds/sdk';
 
 const toasts = { success: vi.fn(), error: vi.fn(), show: vi.fn() } as any;
 
