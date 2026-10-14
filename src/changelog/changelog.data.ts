@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.35.2',
+    date: '2026-10-14',
+    theme: 'Moppetopia says it all the way',
+    entries: [
+      {
+        id: 'demo-opening-said',
+        title: 'Moppetopia says it is opening',
+        body: 'After the download, Atlas still says what it is doing while it sets up your copy, until Moppetopia is open. Before, the last seconds showed the front page with nothing on it.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.35.1',
     date: '2026-10-14',
     theme: 'Moppetopia on a weak line',

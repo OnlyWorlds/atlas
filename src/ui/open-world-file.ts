@@ -17,7 +17,7 @@ import { worldAlreadyHere } from '../core/browser-home';
 import { buildDemoWorldFile, DEMO_WORLD_ID, DEMO_WORLD_NAME } from '../setup/demo-copy';
 import type { WorldRegistryEntry } from '../core/types';
 import { isCodeLoadError } from '../core/reload-offer';
-import { showLoadingOverlay } from './loading-overlay';
+import { showLoadingOverlay, type LoadingOverlayHandle } from './loading-overlay';
 import { downloadingLine } from './download-progress';
 
 /**
@@ -153,26 +153,30 @@ async function openDemoWorldOnce(toasts: ToastManager): Promise<void> {
   // The copy's id is the live world's, known ahead: a copy already here opens
   // with no download and no connection.
   if (await answerDemoHere(DEMO_WORLD_ID, toasts)) return;
-  await openWorldBytes(async () => {
-    // The download takes seconds on a good line and longer on a weak one: a
-    // toast that left after four of them said nothing for the rest (S405,
-    // Boss h11 #4295). The overlay stays until the bytes are made, and closes
-    // before the where-question.
-    const overlay = showLoadingOverlay(`Downloading ${DEMO_WORLD_NAME}`);
-    overlay.update('Asking OnlyWorlds for it…');
-    try {
+  // The download takes seconds on a good line and longer on a weak one: a
+  // toast that left after four of them said nothing for the rest (S405, Boss
+  // h11 #4295). The overlay stays until the world is open (Boss #4385: closed
+  // at the download's end, the unpacking after it was two quiet seconds), and
+  // gives way to the where-question when there is one.
+  const overlay = showLoadingOverlay(`Downloading ${DEMO_WORLD_NAME}`);
+  overlay.update('Asking OnlyWorlds for it…');
+  try {
+    await openWorldBytes(async () => {
       const built = await buildDemoWorldFile({
         isHere: id => demoHere(id) !== null,
         onProgress: p => { if (p.phase === 'write') overlay.update(downloadingLine(p.done, p.total, 'browser')); },
       });
-      if (built.kind === 'file') return built.bytes;
+      if (built.kind === 'file') {
+        overlay.update(`Opening ${built.name}…`);
+        return built.bytes;
+      }
       overlay.close();
       await answerDemoHere(built.worldId, toasts);
       return null;
-    } finally {
-      overlay.close();
-    }
-  }, toasts, DEMO_WORDS);
+    }, toasts, DEMO_WORDS, overlay);
+  } finally {
+    overlay.close();
+  }
 }
 
 async function storageReady(toasts: ToastManager, words: OpenWords): Promise<boolean> {
@@ -182,8 +186,12 @@ async function storageReady(toasts: ToastManager, words: OpenWords): Promise<boo
   return false;
 }
 
-/** `getBytes` resolving null means it answered the user itself: nothing to open. */
-async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts: ToastManager, words: OpenWords): Promise<void> {
+/**
+ * `getBytes` resolving null means it answered the user itself: nothing to open.
+ * `overlay` (the demo's) is closed before anything else is said or asked, and
+ * once the world is open.
+ */
+async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts: ToastManager, words: OpenWords, overlay?: LoadingOverlayHandle): Promise<void> {
   // On Chromium with a home folder set, a NEW world asks where (contract §5.2,
   // §1.4, invariant 12): a folder answer opens it in this browser, then moves
   // it there with the home folder made writable inside the answer's click.
@@ -192,6 +200,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
   let moveTo: { home: FileSystemDirectoryHandle; hint: string } | null = null;
   const chooseWhere = hasFolderMode() && getState().atlasRoot
     ? async (): Promise<'browser' | 'folder' | null> => {
+        overlay?.close();
         const answer = await askWhereWithHome({ title: words.title, action: 'Open it', purpose: 'Opening a world file puts it in a new folder.', toasts });
         if (answer?.where === 'folder') moveTo = { home: answer.home, hint: answer.hint };
         return answer?.where ?? null;
@@ -204,6 +213,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
     const { openWorldFile } = await import('../setup/world-file-open');
     const { activateWorld } = await import('../sidebar/worlds-sidebar');
     const out = await openWorldFile(bytes, { chooseWhere });
+    if (out.kind !== 'opened' && out.kind !== 'restored') overlay?.close();
     if (out.kind === 'cancelled') {
       toasts.info(words.cancelled);
       return;
@@ -216,6 +226,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
     }
     const entry = getState().registry.worlds.find(w => w.id === out.worldId);
     const opened = await activateWorld(out.worldId, toasts);
+    overlay?.close();
     if (opened && words.waypoints) {
       completeWaypoint('first-world');
       completeWaypoint('import');
@@ -239,6 +250,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
       ? words.restored(name, entry?.state === 'api-linked')
       : words.opened(name));
   } catch (err) {
+    overlay?.close();
     console.warn('[open-world-file] failed:', err);
     // A code file this tab could not load already has its reload banner
     // (conv. 121); as a problem it read "OnlyWorlds could not be reached" (S405).
