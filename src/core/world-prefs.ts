@@ -270,7 +270,11 @@ export function installWorldPrefsSync(): () => void {
       const store = getActiveStore();
       if (store && !reconciling.has(worldId)) {
         reconciling.add(worldId);
-        void loadWorldPrefs(store, worldId).finally(() => reconciling.delete(worldId));
+        // Fired and forgotten (the S405 census): a failure here keeps the registry's
+        // prefs, so it is logged, never thrown at the background-error reporter.
+        void loadWorldPrefs(store, worldId)
+          .catch(err => console.warn('[atlas] world prefs did not reconcile:', err))
+          .finally(() => reconciling.delete(worldId));
       }
       return;
     }

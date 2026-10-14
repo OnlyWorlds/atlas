@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.35.3',
+    date: '2026-10-14',
+    theme: 'A world that will not open says so',
+    entries: [
+      {
+        id: 'open-failure-said',
+        title: 'A world that will not open says so',
+        body: 'When a world could not be opened from a message, a retry or the list, Atlas could report it as a problem with work in the background. It now says it could not open the world.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.35.2',
     date: '2026-10-14',
     theme: 'Moppetopia says it all the way',

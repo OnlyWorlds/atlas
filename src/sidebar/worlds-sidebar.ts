@@ -615,6 +615,14 @@ export async function activateWorld(
     }, 15_000);
     try {
       return await doActivateWorld(worldId, toasts, opts);
+    } catch (err) {
+      // An open never rejects (conv. 142, the S405 census): a toast's Open it, a
+      // retry and a row click fire this and forget it, so whatever escapes the
+      // open's own catches is said here, as what it was doing, never as
+      // background work. Silent opens (boot's auto-activate) only log.
+      console.warn('[atlas] opening a world failed:', err);
+      if (!opts.silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
+      return false;
     } finally {
       clearTimeout(watchdog);
       // Whatever path activation took (success primes, failures return
