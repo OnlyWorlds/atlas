@@ -336,6 +336,54 @@ test('muted types (S356): pins and markers close the strip greyed, stay out of "
   expect(await rowTypes()).toEqual(['map', 'marker', 'marker', 'zone']);
 });
 
+test('type names on the strip (#24, h20 B8): icons by default, the held types named, or every type', async ({ page }) => {
+  await setupWorldA(page);
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  const worldId = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    await store.createElement('character', { name: 'Ada' });
+    await store.createElement('character', { name: 'Bram' });
+    await store.createElement('location', { name: 'Harbour' });
+    api.patchData(await store.listElements());
+    return api.getState().active.worldId;
+  });
+  const strip = page.locator('.atlas-filter-strip');
+  const names = strip.locator('.atlas-filter-name');
+  const pick = async (value: string) => {
+    await page.evaluate((h) => { window.location.hash = h; }, `#/w/${worldId}/settings/elements`);
+    await page.locator(`input[name="type-strip-names"][value="${value}"]`).check();
+  };
+
+  // A, the default: icons only, the name on hover.
+  await expect(strip).toHaveAttribute('data-names', 'icons');
+  await expect(names).toHaveCount(0);
+
+  // C: the two held types named, first, with their counts; a break; the rest icons.
+  await pick('held');
+  await expect(strip).toHaveAttribute('data-names', 'held');
+  await expect(names).toHaveText(['Characters', 'Locations']);
+  const order = await strip.locator('.atlas-filter-btn, .atlas-filter-break').evaluateAll(els =>
+    els.slice(0, 3).map(e => e.classList.contains('atlas-filter-break') ? 'break' : e.getAttribute('data-filter-type')));
+  expect(order).toEqual(['character', 'location', 'break']);
+  await expect(strip.locator('[data-filter-type="character"] .atlas-filter-count')).toHaveText('2');
+  // A named chip says its name, so no hover tip doubles it; an icon keeps its tip.
+  await expect(strip.locator('[data-filter-type="character"]')).not.toHaveAttribute('data-tip', /.+/);
+  await expect(strip.locator('[data-filter-type="creature"]')).toHaveAttribute('data-tip', 'creatures');
+
+  // B: every type named.
+  await pick('all');
+  const buttons = await strip.locator('.atlas-filter-btn').count();
+  await expect(names).toHaveCount(buttons);
+  await expect(strip.locator('.atlas-filter-break')).toHaveCount(0);
+  const saved = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.editor_settings?.type_strip_names);
+  expect(saved).toBe('all');
+
+  // Back to A.
+  await pick('icons');
+  await expect(names).toHaveCount(0);
+});
+
 /** Setup shortcut through the active FolderStore (the real FsFolderStore on OPFS). */
 async function storeCreate(page: Page, type: string, data: Record<string, unknown>): Promise<string> {
   return await page.evaluate(async ({ type, data }) => {

@@ -14,7 +14,7 @@ import {
   type FieldEditMode,
 } from '../registry/registry';
 import { ToastManager } from '../ui/toast-manager';
-import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
+import { CONTENT_ELEMENT_TYPES, type ElementType, type TypeStripNames } from '../core/types';
 import { ELEMENT_LABELS } from '../core/constants';
 import { loadUiPrefs, setDefaultCreateTypePref } from '../core/ui-prefs';
 
@@ -28,6 +28,7 @@ export function renderElementsTab(): string {
   const confirmDelete = editor.confirm_before_delete;
   const showImages = editor.show_element_images;
   const hideEmpty = editor.hide_empty_fields;
+  const stripNames = editor.type_strip_names;
   const defaultCreateType = loadUiPrefs().defaultCreateType;
   const createTypeOptions = CREATABLE_TYPES
     .map((t) => `<option value="${t}" ${t === defaultCreateType ? 'selected' : ''}>${ELEMENT_LABELS[t].singular}</option>`)
@@ -81,6 +82,30 @@ export function renderElementsTab(): string {
         <input type="checkbox" name="hide-empty-fields" ${hideEmpty ? 'checked' : ''} />
         <span>Hide empty fields on element pages. An element with nothing filled in still shows its first section.</span>
       </label>
+      <fieldset class="atlas-settings-fieldset">
+        <legend>Type names in the sidebar</legend>
+        <label class="atlas-settings-radio">
+          <input type="radio" name="type-strip-names" value="icons" ${stripNames === 'icons' ? 'checked' : ''} />
+          <span class="atlas-settings-radio-body">
+            <strong>Icons only <span class="atlas-settings-default-tag">default</span></strong>
+            <em>The row of type icons over the element list. Hover an icon for its name.</em>
+          </span>
+        </label>
+        <label class="atlas-settings-radio">
+          <input type="radio" name="type-strip-names" value="held" ${stripNames === 'held' ? 'checked' : ''} />
+          <span class="atlas-settings-radio-body">
+            <strong>Name the types this world has</strong>
+            <em>Each with its count. The empty types stay icons below them.</em>
+          </span>
+        </label>
+        <label class="atlas-settings-radio">
+          <input type="radio" name="type-strip-names" value="all" ${stripNames === 'all' ? 'checked' : ''} />
+          <span class="atlas-settings-radio-body">
+            <strong>Name every type</strong>
+            <em>Two columns. The element list starts further down.</em>
+          </span>
+        </label>
+      </fieldset>
     </section>
   `;
 }
@@ -139,6 +164,19 @@ export function wireElementsTab(toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
     toasts.info(`Empty fields ${hideEmptyToggle.checked ? 'hidden' : 'shown'}`);
+  });
+
+  // Names on the sidebar's type strip (#24, h20 B8). The sidebar reads the registry on every
+  // render, so the strip changes the moment the radio does.
+  document.querySelectorAll<HTMLInputElement>('.atlas-settings input[name="type-strip-names"]').forEach((inp) => {
+    inp.addEventListener('change', () => {
+      if (!inp.checked) return;
+      const value = inp.value as TypeStripNames;
+      const next = setEditorSettings(getState().registry, { type_strip_names: value });
+      saveRegistry(next);
+      patchSlice('registry', next);
+      toasts.info(value === 'icons' ? 'Type names: icons only' : value === 'held' ? 'Type names: the types this world has' : 'Type names: every type');
+    });
   });
 
   // Default new-element type — an app-level UI pref (localStorage), read by

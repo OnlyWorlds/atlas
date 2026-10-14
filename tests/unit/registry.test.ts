@@ -40,6 +40,8 @@ import {
   setWorldPaused,
   setMapsSettings,
   getMapsSettings,
+  getEditorSettings,
+  setEditorSettings,
 } from '../../src/registry/registry';
 
 beforeEach(() => {
@@ -652,5 +654,17 @@ describe('registry — findWorldByOwIdentity (the import collision predicate)', 
       path.join(__dirname, '../../src/middle/import-room.ts'), 'utf-8');
     expect(src).toContain('findWorldByOwIdentity(');
     expect(src).not.toMatch(/registry\.worlds\.find\(\s*w\s*=>\s*w\.folder\?\.handle_key/);
+  });
+});
+
+describe('the type strip names setting (#24, h20 B8)', () => {
+  it('defaults to icons, keeps a chosen value, and reads one it does not know as the default', () => {
+    const reg = defaultRegistry();
+    expect(getEditorSettings(reg).type_strip_names).toBe('icons');
+    expect(getEditorSettings(setEditorSettings(reg, { type_strip_names: 'held' })).type_strip_names).toBe('held');
+    expect(getEditorSettings(setEditorSettings(reg, { type_strip_names: 'all' })).type_strip_names).toBe('all');
+    // A registry written by another atlas may carry a value this one does not know.
+    const odd = { ...reg, editor_settings: { type_strip_names: 'columns' as never } };
+    expect(getEditorSettings(odd).type_strip_names).toBe('icons');
   });
 });

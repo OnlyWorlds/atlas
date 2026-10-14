@@ -1126,6 +1126,58 @@ html {
   color: rgba(var(--atlas-ink-rgb), 0.55);
 }
 
+/* Names on the strip (#24, h20 B8): a setting in Settings, Elements. 'icons' is the strip above.
+   'all' names every type in two columns; 'held' names the types the world holds, with their
+   counts, and keeps the rest as icons on the rows below. A named chip carries its count inline,
+   and a muted one keeps its strike on the icon, not across the name. */
+.atlas-filter-strip:not([data-names='icons']) {
+  max-width: none;
+}
+
+.atlas-filter-strip[data-names='all'] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px 6px;
+}
+
+.atlas-filter-btn.named {
+  width: auto;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 0 6px 0 4px;
+}
+
+.atlas-filter-strip[data-names='all'] .atlas-filter-btn.named {
+  height: 21px;
+  min-width: 0;
+}
+
+.atlas-filter-btn.named .atlas-filter-name {
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-filter-btn.named .atlas-filter-count {
+  position: static;
+  font-size: 10px;
+}
+
+.atlas-filter-strip[data-names='all'] .atlas-filter-btn.named .atlas-filter-count {
+  margin-left: auto;
+}
+
+.atlas-filter-btn.named.muted::before {
+  right: auto;
+  width: 17px;
+}
+
+.atlas-filter-break {
+  flex-basis: 100%;
+  height: 2px;
+}
+
 /* Search row in sidebar */
 .atlas-search-row {
   padding: 6px 8px;

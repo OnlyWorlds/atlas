@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.34.0',
+    date: '2026-10-14',
+    theme: 'names on the type row',
+    entries: [
+      {
+        id: 'type-strip-names',
+        title: 'Names on the row of type icons',
+        body: 'Settings, Elements, Type names in the sidebar: keep the icons on their own (as before), name the types your world has with their counts, or name every type.',
+        tags: ['sidebar', 'settings'],
+      },
+    ],
+  },
+  {
     version: '1.33.0',
     date: '2026-10-14',
     theme: 'Atlas on a phone',

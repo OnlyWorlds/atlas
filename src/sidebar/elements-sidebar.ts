@@ -12,7 +12,7 @@
 import { isAtlasGrounded } from '../core/grounded';
 import { getState, subscribe, patchSlice } from '../core/state';
 import { onHashChange, navigate, elementHash, homeHash } from '../core/router';
-import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
+import { setWorldFavoriteElement, saveRegistry, getEditorSettings } from '../registry/registry';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { lensKnownSet } from '../core/knowledge';
@@ -490,17 +490,34 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // it GROWS as the world does, matching the reveal grammar (precision
     // audit #1, Captain-blessed 2026-07-20). Outside the tour: all types.
     const touring = isTourFlagActive();
-    FILTER_TYPES_WITH_MAP.forEach(type => {
+    // Names on the strip (#24, h20 B8, the Captain #3143): a setting, icons only by default; the
+    // tour keeps its own icon strip whatever the setting says.
+    const names = touring ? 'icons' : getEditorSettings(state.registry).type_strip_names;
+    strip.dataset.names = names;
+    const named = (type: ElementType): boolean =>
+      names === 'all' || (names === 'held' && (countByType.get(type) ?? 0) > 0);
+    // C: the named types first, in strip order, then a break, then the rest as icons.
+    const order = names === 'held'
+      ? [...FILTER_TYPES_WITH_MAP.filter(named), ...FILTER_TYPES_WITH_MAP.filter(t => !named(t))]
+      : FILTER_TYPES_WITH_MAP;
+    const firstIconOnly = names === 'held' ? order.find(t => !named(t)) : undefined;
+    order.forEach(type => {
       if (touring && !(countByType.get(type) ?? 0)) return;
+      if (type === firstIconOnly && order.some(named)) {
+        const brk = document.createElement('span');
+        brk.className = 'atlas-filter-break';
+        brk.setAttribute('aria-hidden', 'true');
+        strip.appendChild(brk);
+      }
       const btn = document.createElement('button');
       const isMuted = muted.has(type) && !filters.has(type);
-      btn.className = 'atlas-filter-btn' + (filters.has(type) ? ' active' : '') + (isMuted ? ' muted' : '');
+      btn.className = 'atlas-filter-btn' + (filters.has(type) ? ' active' : '') + (isMuted ? ' muted' : '') + (named(type) ? ' named' : '');
       // Instant CSS tooltip (S264, Captain: the category label should appear
       // the moment you hover) — data-tip drives a ::after pseudo; no native
-      // title (its OS delay is the complaint, and doubling would ghost).
-      btn.dataset.tip = isMuted
-        ? `${ELEMENT_LABELS[type].plural} (hidden when showing all; right-click to show)`
-        : ELEMENT_LABELS[type].plural;
+      // title (its OS delay is the complaint, and doubling would ghost). A
+      // named chip already says its name, so only the muted hint stays.
+      if (isMuted) btn.dataset.tip = `${ELEMENT_LABELS[type].plural} (hidden when showing all; right-click to show)`;
+      else if (!named(type)) btn.dataset.tip = ELEMENT_LABELS[type].plural;
       // ...and the SAME text as the accessible name. `data-tip` is invisible to
       // assistive tech, so with the icon ligature correctly hidden (S308) these
       // buttons would otherwise have no accessible name at all — my own
@@ -515,6 +532,15 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       icon.className = 'material-symbols-outlined';
       icon.textContent = ELEMENT_ICONS[type];
       btn.appendChild(icon);
+
+      if (named(type)) {
+        const label = ELEMENT_LABELS[type].plural;
+        const name = document.createElement('span');
+        name.className = 'atlas-filter-name';
+        name.setAttribute('aria-hidden', 'true'); // the button's aria-label already says it
+        name.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+        btn.appendChild(name);
+      }
 
       const count = countByType.get(type) ?? 0;
       if (count > 0) {

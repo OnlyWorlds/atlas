@@ -870,8 +870,17 @@ export interface WorldsRegistry {
      * first section whole. Default off; the line under the fields flips it.
      */
     hide_empty_fields?: boolean;
+    /**
+     * Names on the elements sidebar's type strip (#24, h20 B8, the Captain #3143: "default to
+     * current, but allow b and c too"). 'icons' (A, the default): icons only, names on hover.
+     * 'all' (B): every type named, two columns. 'held' (C): the types the world holds named with
+     * their counts, the rest icons below.
+     */
+    type_strip_names?: TypeStripNames;
   };
 }
+
+export type TypeStripNames = 'icons' | 'all' | 'held';
 
 export function defaultRegistry(): WorldsRegistry {
   return { version: 1, worlds: [] };
