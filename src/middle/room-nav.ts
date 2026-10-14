@@ -77,6 +77,81 @@ const PREVIEW_ROOM_IDS = new Set(['home', 'writing', 'knowledge', 'timeline', 's
 /** Persistent labels-on preference — the ghost expander toggles it (S255v3). */
 const NAV_LABELS_KEY = 'atlas_nav_labels';
 
+/** Rooms that fold into "More" at the phone width (#244); Home and Writing stay on the strip. */
+const PHONE_FOLDED_ROOMS = new Set(['knowledge', 'timeline', 'share', 'import']);
+
+/** The phone's "More" menu: one at a time, on `body` (the strip's host clips its overflow). */
+let moreMenu: HTMLElement | null = null;
+let moreMenuCleanup: (() => void) | null = null;
+
+function closeMoreMenu(): void {
+  moreMenuCleanup?.();
+  moreMenuCleanup = null;
+  moreMenu?.remove();
+  moreMenu = null;
+  document.querySelectorAll('.atlas-room-nav-more').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+
+function toggleMoreMenu(anchor: HTMLButtonElement): void {
+  if (moreMenu) { closeMoreMenu(); return; }
+  const strip = anchor.closest('.atlas-room-nav-strip');
+  if (!strip) return;
+  const menu = document.createElement('div');
+  menu.className = 'atlas-room-nav-more-menu';
+  menu.setAttribute('role', 'menu');
+  for (const room of ROOMS) {
+    if (!PHONE_FOLDED_ROOMS.has(room.id)) continue;
+    const roomBtn = strip.querySelector<HTMLButtonElement>(`[data-room="${room.id}"]`);
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'atlas-room-nav-more-item';
+    item.setAttribute('role', 'menuitem');
+    item.dataset.moreRoom = room.id;
+    if (roomBtn?.classList.contains('active')) item.classList.add('active');
+    item.innerHTML =
+      `<span class="material-symbols-outlined" aria-hidden="true">${room.icon}</span>` +
+      `<span>${escapeText(room.label)}</span>`;
+    item.addEventListener('click', () => {
+      closeMoreMenu();
+      // Read at the tap, not when the menu opened: a state tick may have re-rendered the strip.
+      document.querySelector<HTMLButtonElement>(`.atlas-room-nav-strip [data-room="${room.id}"]`)?.click();
+    });
+    menu.appendChild(item);
+  }
+  const r = anchor.getBoundingClientRect();
+  menu.style.top = `${Math.round(r.bottom + 4)}px`;
+  menu.style.left = `${Math.round(Math.max(8, Math.min(r.left, window.innerWidth - 200)))}px`;
+  document.body.appendChild(menu);
+  moreMenu = menu;
+  anchor.setAttribute('aria-expanded', 'true');
+
+  // Leave on a tap elsewhere, Escape (on window, capture: the global deselect hotkey must not
+  // win), a route change, or a resize past the phone width.
+  const onDown = (e: PointerEvent): void => {
+    const t = e.target as Node;
+    if (!menu.contains(t) && !anchor.contains(t)) closeMoreMenu();
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    closeMoreMenu();
+    anchor.focus();
+  };
+  const onLeave = (): void => { closeMoreMenu(); };
+  document.addEventListener('pointerdown', onDown, true);
+  window.addEventListener('keydown', onKey, true);
+  window.addEventListener('hashchange', onLeave);
+  window.addEventListener('resize', onLeave);
+  moreMenuCleanup = () => {
+    document.removeEventListener('pointerdown', onDown, true);
+    window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('hashchange', onLeave);
+    window.removeEventListener('resize', onLeave);
+  };
+  (menu.querySelector('.atlas-room-nav-more-item') as HTMLButtonElement | null)?.focus();
+}
+
 export function mountRoomNav(mount: RoomNavMount): () => void {
   const { target } = mount;
   target.innerHTML = '';
@@ -227,6 +302,23 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     });
     strip.appendChild(expander);
 
+    // On a phone (#244) the strip keeps Home and Writing and folds the other rooms into "More":
+    // rendered always and shown by CSS at the phone width, like the drawer toggles, so a resize
+    // never changes the strip's markup. Each menu row clicks the room's own (hidden) button, so
+    // a folded room navigates exactly as its button does.
+    const foldedActive = ROOMS.some(r => PHONE_FOLDED_ROOMS.has(r.id) && r.matches.includes(route.mode));
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'atlas-room-nav-more';
+    if (foldedActive) more.classList.add('active');
+    more.setAttribute('aria-label', 'More rooms');
+    more.setAttribute('aria-haspopup', 'menu');
+    more.setAttribute('aria-expanded', 'false');
+    more.title = 'More rooms';
+    more.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">more_horiz</span>`;
+    more.addEventListener('click', () => { toggleMoreMenu(more); });
+    strip.appendChild(more);
+
     // Selected-element chip (far right). Visible whenever a selection exists;
     // gives a persistent "you have X selected, click to return" affordance
     // and ensures the strip always has *something* highlighted when route
@@ -336,6 +428,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
   render();
 
   return () => {
+    closeMoreMenu();
     unsubState();
     unsubHash();
     unsubNarrow();

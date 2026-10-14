@@ -160,12 +160,42 @@ test.describe('narrow windows', () => {
     }
   });
 
+  test('at 390 the strip is a thumb strip: finger-sized controls, the other rooms under More (#244)', async ({ page }) => {
+    // The Captain's phone (h37 #4223): "the top bar is buggy; too many things in it". Six room
+    // icons, the label expander, a selected-element chip and search at 28px each.
+    await bootThenNarrow(page, 'narrow-phone-root', 390, 780);
+
+    for (const room of ['knowledge', 'timeline', 'share', 'import']) {
+      await expect(page.locator(`.atlas-room-nav-strip [data-room="${room}"]`), room).toBeHidden();
+    }
+    await expect(page.locator('.atlas-room-nav-expand')).toBeHidden();
+    const small = await page.evaluate(() => [...document.querySelectorAll('.atlas-room-nav-strip button')]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && (r.width < 40 || r.height < 40);
+      })
+      .map((b) => b.getAttribute('aria-label') ?? b.className));
+    expect(small).toEqual([]);
+
+    const more = page.getByRole('button', { name: 'More rooms' });
+    await more.click();
+    await expect(page.getByRole('menuitem')).toHaveCount(4);
+    await page.getByRole('menuitem', { name: 'Charts' }).click();
+    await expect(page).toHaveURL(/\/timeline$/);
+    await expect(page.getByRole('menuitem')).toHaveCount(0);
+    await expect(more).toHaveClass(/active/);
+    expect(await horizontalOverflow(page)).toBe(0);
+  });
+
   test('above the breakpoint nothing changes', async ({ page }) => {
     await bootThenNarrow(page, 'narrow-wide-root', 1440, 900);
 
     await expect(page.locator('body')).not.toHaveClass(/atlas-narrow/);
     await expect(page.locator('.atlas-room-nav-drawer-btn.is-right')).toBeHidden();
     await expect(page.locator('.atlas-room-nav-drawer-btn.is-sidebar')).toBeHidden();
+    // The phone's More is a phone's only (#244): every room keeps its own button here.
+    await expect(page.locator('.atlas-room-nav-more')).toBeHidden();
+    await expect(page.locator('.atlas-room-nav-strip [data-room="timeline"]')).toBeVisible();
 
     // All three panes are columns, side by side, inside the window.
     const boxes = await Promise.all(

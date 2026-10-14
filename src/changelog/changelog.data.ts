@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.33.0',
+    date: '2026-10-14',
+    theme: 'Atlas on a phone',
+    entries: [
+      {
+        id: 'phone-room-strip',
+        title: 'A top bar for a thumb',
+        body: 'On a phone the bar along the top keeps Home and Writing, puts Knowledge, Charts, Pages and Data under More, and every button in it is big enough to tap. Atlas is still built for a bigger screen; on a phone it now holds together.',
+        tags: ['layout'],
+      },
+      {
+        id: 'phone-visible-height',
+        title: 'The top bar stays in reach on a phone',
+        body: 'Atlas now sizes itself to the part of a phone\'s screen you can see, address bar and keyboard included, to keep the top bar in reach while you write.',
+        tags: ['layout', 'fix'],
+      },
+      {
+        id: 'phone-rooms-fit',
+        title: 'Rooms that fit a phone',
+        body: 'An element\'s fields put each name above its value, so the value gets the whole width. A chart\'s side panel sits under the chart. The small buttons in each room are big enough to tap.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.32.2',
     date: '2026-10-11',
     theme: 'one reader for world files',
