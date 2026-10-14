@@ -23,6 +23,8 @@ import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
 import { isOwV2Error } from '../../src/sync/ow-v2-client-adapter';
 import type { ChangesPage } from '../../src/sync/sync-engine';
+import { http } from 'msw';
+import { classifyError } from '../../src/core/problems';
 
 const TEST_BASE = 'https://test-ow.local/api/v2';
 const uuid = (): string => crypto.randomUUID();
@@ -397,5 +399,38 @@ describe('OwV2ClientAdapter — /changes cursor pull', () => {
     const tail = await adapter.pullChanges(since, 2);
     expect(tail.changes).toHaveLength(0);
     expect(tail.hasMore).toBe(false);
+  });
+});
+
+describe('OwV2ClientAdapter — a read that never answers (S405, Boss h11 #4295)', () => {
+  // A stalled connection never fails on its own: keel is played by a handler
+  // that never answers, and the adapter must give up on reads only.
+  const PENDING = Symbol('pending');
+  const settleWithin = <T>(p: Promise<T>, ms: number): Promise<T | typeof PENDING> =>
+    Promise.race([p, new Promise<typeof PENDING>(r => setTimeout(() => r(PENDING), ms))]);
+  const never = () => new Promise<never>(() => {});
+
+  beforeEach(() => {
+    mswServer.use(
+      http.get(`${TEST_BASE}/character`, never),
+      http.post(`${TEST_BASE}/character`, never),
+    );
+  });
+
+  it('gives up on a GET after readTimeoutMs, as a network failure ("could not be reached"), never as a cancel', async () => {
+    const adapter = new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '', baseUrl: TEST_BASE, readTimeoutMs: 40 });
+    const out = await settleWithin(adapter.listElements('character').then(() => 'answered', e => e), 2000);
+    expect(out).toBeInstanceOf(TypeError);
+    expect(classifyError(out)).toBe('offline');
+  });
+
+  it('waits on a GET when no readTimeoutMs is set (every other flow keeps its own way out)', async () => {
+    const adapter = new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '', baseUrl: TEST_BASE });
+    expect(await settleWithin(adapter.listElements('character'), 200)).toBe(PENDING);
+  });
+
+  it('never gives up on a write: one the server may already have taken is not safe to abandon', async () => {
+    const adapter = new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE, readTimeoutMs: 40 });
+    expect(await settleWithin(adapter.createElement('character', { id: uuid(), name: 'Kassad' }), 200)).toBe(PENDING);
   });
 });

@@ -16,6 +16,9 @@ import { WORLD_FILE_MAX_BYTES } from '../store/world-tree';
 import { worldAlreadyHere } from '../core/browser-home';
 import { buildDemoWorldFile, DEMO_WORLD_ID, DEMO_WORLD_NAME } from '../setup/demo-copy';
 import type { WorldRegistryEntry } from '../core/types';
+import { isCodeLoadError } from '../core/reload-offer';
+import { showLoadingOverlay } from './loading-overlay';
+import { downloadingLine } from './download-progress';
 
 /**
  * The file picker, opened SYNCHRONOUSLY inside the caller's click (a file
@@ -44,8 +47,8 @@ interface OpenWords {
   doing: string;
   /** The where-question's title. */
   title: string;
-  /** Said while the bytes are made and opened. */
-  opening: string;
+  /** Said while the bytes are made and opened; the demo shows its own progress instead. */
+  opening?: string;
   cancelled: string;
   already: string;
   opened: (name: string) => string;
@@ -95,6 +98,13 @@ export async function openDemoWorld(toasts: ToastManager): Promise<void> {
       patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
       setSidebarModePref('elements');
     }
+  } catch (err) {
+    // The door's callers do not catch (the #/try-demo link fires it and
+    // forgets), and opening a copy already here runs outside the download's
+    // own catch: a failure there became "a problem it did not expect while
+    // working in the background" (S405, Boss h11 #4295). Said here, as what it is.
+    console.warn('[open-world-file] demo failed:', err);
+    if (!isCodeLoadError(err)) showProblem(err, { doing: DEMO_WORDS.doing, where: 'browser', toasts });
   } finally {
     demoRunning = false;
   }
@@ -105,7 +115,6 @@ let demoRunning = false;
 const DEMO_WORDS: OpenWords = {
   doing: `downloading ${DEMO_WORLD_NAME}`,
   title: `Try ${DEMO_WORLD_NAME}`,
-  opening: `Downloading ${DEMO_WORLD_NAME}…`,
   cancelled: `${DEMO_WORLD_NAME} was not opened.`,
   already: `${DEMO_WORLD_NAME} is already in Atlas.`,
   opened: name => `Opened "${name}": your own copy, in this browser. Nothing you change goes back to OnlyWorlds.`,
@@ -145,10 +154,24 @@ async function openDemoWorldOnce(toasts: ToastManager): Promise<void> {
   // with no download and no connection.
   if (await answerDemoHere(DEMO_WORLD_ID, toasts)) return;
   await openWorldBytes(async () => {
-    const built = await buildDemoWorldFile({ isHere: id => demoHere(id) !== null });
-    if (built.kind === 'file') return built.bytes;
-    await answerDemoHere(built.worldId, toasts);
-    return null;
+    // The download takes seconds on a good line and longer on a weak one: a
+    // toast that left after four of them said nothing for the rest (S405,
+    // Boss h11 #4295). The overlay stays until the bytes are made, and closes
+    // before the where-question.
+    const overlay = showLoadingOverlay(`Downloading ${DEMO_WORLD_NAME}`);
+    overlay.update('Asking OnlyWorlds for it…');
+    try {
+      const built = await buildDemoWorldFile({
+        isHere: id => demoHere(id) !== null,
+        onProgress: p => { if (p.phase === 'write') overlay.update(downloadingLine(p.done, p.total, 'browser')); },
+      });
+      if (built.kind === 'file') return built.bytes;
+      overlay.close();
+      await answerDemoHere(built.worldId, toasts);
+      return null;
+    } finally {
+      overlay.close();
+    }
   }, toasts, DEMO_WORDS);
 }
 
@@ -174,7 +197,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
         return answer?.where ?? null;
       }
     : undefined;
-  toasts.info(words.opening);
+  if (words.opening) toasts.info(words.opening);
   try {
     const bytes = await getBytes();
     if (!bytes) return;
@@ -217,6 +240,9 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
       : words.opened(name));
   } catch (err) {
     console.warn('[open-world-file] failed:', err);
+    // A code file this tab could not load already has its reload banner
+    // (conv. 121); as a problem it read "OnlyWorlds could not be reached" (S405).
+    if (isCodeLoadError(err)) return;
     showProblem(err, { doing: words.doing, where: 'browser', toasts });
   }
 }

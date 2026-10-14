@@ -623,7 +623,7 @@ function pageBlocksFromStory(story: unknown): { atlas_page_blocks: PageBlock[]; 
 // /world endpoint; the SDK survives only for FIELD_SCHEMA statics).
 // ---------------------------------------------------------------------------
 
-export function buildV2Adapter(apiKey: string, apiPin: string, baseUrl?: string): OwV2ClientAdapter {
+export function buildV2Adapter(apiKey: string, apiPin: string, baseUrl?: string, opts: { readTimeoutMs?: number } = {}): OwV2ClientAdapter {
   // Test seam compat: `setMakeOnlineBaseUrl` stores a v1-worldapi-shaped base;
   // derive the /api/v2 sibling from its origin so MSW/staging overrides steer
   // both dialects together.
@@ -634,5 +634,6 @@ export function buildV2Adapter(apiKey: string, apiPin: string, baseUrl?: string)
     apiKey,
     apiPin,
     baseUrl: baseUrl ?? overriddenV2 ?? devV2Base() ?? undefined,
+    readTimeoutMs: opts.readTimeoutMs,
   });
 }

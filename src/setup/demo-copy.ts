@@ -44,6 +44,14 @@ export const DEMO_WORLD_NAME = 'Moppetopia';
  */
 export const DEMO_WORLD_ID = '0695db52-5433-7332-8000-db7fe10da375';
 
+/**
+ * A demo read that has not answered in this long is given up (S405): on a
+ * stalled connection the try otherwise waited forever with nothing on screen
+ * (Boss h11 #4295, the harness `Notes/ui-snapshots/2026-10-14-s405/demo-drop.mjs`).
+ * Moppetopia's biggest page comes down in about a second.
+ */
+export const DEMO_READ_TIMEOUT_MS = 30_000;
+
 const SCRATCH = 'atlas-scratch';
 const LOCK = 'atlas-demo-copy';
 
@@ -73,7 +81,7 @@ export async function buildDemoWorldFile(opts: DemoCopyOpts = {}): Promise<DemoW
 }
 
 async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
-  const client = opts.client ?? (await import('../sync/make-online')).buildV2Adapter(DEMO_WORLD_KEY, '');
+  const client = opts.client ?? (await import('../sync/make-online')).buildV2Adapter(DEMO_WORLD_KEY, '', undefined, { readTimeoutMs: DEMO_READ_TIMEOUT_MS });
   let meta: WorldMetaWire;
   try {
     meta = await client.getWorldMeta();

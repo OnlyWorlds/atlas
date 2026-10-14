@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.35.1',
+    date: '2026-10-14',
+    theme: 'Moppetopia on a weak line',
+    entries: [
+      {
+        id: 'demo-download-weak-line',
+        title: 'Moppetopia says how its download is going',
+        body: 'While Moppetopia comes down, Atlas shows that it is downloading until it opens. On a connection that stops answering, it gives up after 30 seconds and says to check your connection, instead of waiting in silence.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.35.0',
     date: '2026-10-14',
     theme: 'a phone, second pass',

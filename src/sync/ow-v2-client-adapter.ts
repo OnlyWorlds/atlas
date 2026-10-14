@@ -223,12 +223,21 @@ export interface OwV2ClientOptions {
   apiPin: string;
   /** Override the /api/v2 base (dev/staging). Default: production. */
   baseUrl?: string;
+  /**
+   * Give up on a read (GET) that has not finished after this long (S405). A
+   * stalled connection never fails on its own, so a flow with nothing else
+   * to end it (the demo copy) waits forever in silence. The give-up reads as
+   * a network failure ("could not be reached"). Writes never time out here:
+   * a write the server may already have taken is not safe to abandon.
+   */
+  readTimeoutMs?: number;
 }
 
 export class OwV2ClientAdapter implements OwApiClient {
   private readonly base: string;
   private readonly apiKey: string;
   private readonly apiPin: string;
+  private readonly readTimeoutMs: number | null;
 
   /**
    * Types whose most recent listElements() walk may be INCOMPLETE (safety cap
@@ -245,6 +254,7 @@ export class OwV2ClientAdapter implements OwApiClient {
     this.base = (opts.baseUrl ?? DEFAULT_V2_BASE).replace(/\/$/, '');
     this.apiKey = opts.apiKey.trim();
     this.apiPin = opts.apiPin.trim();
+    this.readTimeoutMs = opts.readTimeoutMs ?? null;
   }
 
   /** Engine-facing: types whose latest list walk may be incomplete. */
@@ -267,13 +277,30 @@ export class OwV2ClientAdapter implements OwApiClient {
       ...extraHeaders,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await fetch(`${this.base}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    const timeoutMs = method === 'GET' ? this.readTimeoutMs : null;
+    const controller = timeoutMs ? new AbortController() : null;
+    let timedOut = false;
+    const timer = controller ? setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs!) : null;
+    let response: Response;
+    let text: string;
+    try {
+      response = await fetch(`${this.base}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      // The body is read inside the timer too: a connection can stall mid-body.
+      text = response.status === 204 ? '' : await response.text();
+    } catch (err) {
+      // Our own give-up is a network failure, not a cancel: an AbortError
+      // would be read as the user cancelling, and nothing would be said.
+      if (timedOut) throw new TypeError(`fetch timed out after ${timeoutMs} ms (${method} ${path})`);
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     if (response.status === 204) return undefined;
-    const text = await response.text();
     if (!response.ok) {
       let envelope: { type?: string; code?: string; message?: string; param?: string | null } | null = null;
       try {
