@@ -230,6 +230,11 @@ test('world tab — api-linked worlds get stay-offline + refresh + unlink + test
   await expect(page.locator('[data-action="unlink-from-api"]')).toBeVisible();
   // Make-online button should NOT appear for api-linked.
   await expect(page.locator('[data-action="make-online"]')).toHaveCount(0);
+  // Invite someone (S407): the world's Access pane on onlyworlds.com, a new tab.
+  const invite = page.locator('[data-role="invite-line"] a[data-link="invite"]');
+  await expect(invite).toBeVisible();
+  await expect(invite).toHaveAttribute('href', 'https://www.onlyworlds.com/account/worlds/fake-id#access');
+  await expect(invite).toHaveAttribute('target', '_blank');
 
   // Stay-offline toggle persists.
   await page.check('input[name="world-paused"]');

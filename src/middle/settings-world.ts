@@ -41,6 +41,7 @@ import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
 import { hasFolderMode } from '../core/capabilities';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { escapeText, escapeAttr } from '../core/dom-utils';
+import { canOfferInvite, owAccessUrl } from '../core/ow-site';
 import { findDanglingLinks, scrubReferrers } from '../store/scrub-links';
 import { WORLD_UNIT_FIELDS, WORLD_UNIT_MAX_LENGTH, type WorldUnitField } from '../core/world-units';
 
@@ -137,6 +138,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </div>
       ${isSeatWorld(world) ? `<p class="atlas-settings-hint" data-role="seat-line">${escapeText(seatLine(world))}</p>` : ''}
       ${renderSyncIssues(world)}
+      ${canOfferInvite(world, getState().accountWorlds.rows) ? `<p class="atlas-settings-hint" data-role="invite-line"><a class="atlas-settings-link atlas-link-inline" data-link="invite" href="${escapeAttr(owAccessUrl(world.api!.world_id))}" target="_blank" rel="noopener">Invite someone</a> · opens this world on onlyworlds.com at Access, where you make an invite link to send. Your friend needs a free account.</p>` : ''}
       <div class="atlas-settings-actions">
         <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from OnlyWorlds</button>
         <button class="atlas-btn-ghost" data-action="test-connection">Test connection</button>

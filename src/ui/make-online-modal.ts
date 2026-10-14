@@ -46,6 +46,7 @@ import {
   type MergeProgress,
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
+import { noAccountYetHtml } from '../core/ow-site';
 import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
 import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
@@ -150,6 +151,7 @@ export class MakeOnlineModal extends BaseModal {
             <span>PIN</span>
             <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
           </label>
+          <p class="atlas-modal-hint" data-role="no-account">${noAccountYetHtml()}</p>
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
           <div class="atlas-modal-progress" data-role="create-progress" hidden></div>
           <div class="atlas-modal-actions">

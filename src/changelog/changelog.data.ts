@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.36.0',
+    date: '2026-10-15',
+    theme: 'Invite someone, and where an account comes from',
+    entries: [
+      {
+        id: 'invite-someone',
+        title: 'Invite someone to an online world',
+        body: 'Settings, This world, has an Invite someone link for a world you own online. It opens the world on onlyworlds.com at Access, where you make an invite link to send. The person you invite needs a free account.',
+        tags: ['sync', 'world'],
+      },
+      {
+        id: 'no-account-yet',
+        title: 'No account yet? The way to one',
+        body: 'Make online and New world on OnlyWorlds ask for an email and a PIN. Both now say where to make a free account on onlyworlds.com and where to set its PIN.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.35.3',
     date: '2026-10-14',
     theme: 'A world that will not open says so',

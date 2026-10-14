@@ -66,6 +66,10 @@ test('Make Online modal opens with both route tabs', async ({ page }) => {
   await expect(page.locator('[data-route-tab="create"]')).toHaveClass(/active/);
   await expect(page.locator('[data-route-pane="create"]')).toBeVisible();
   await expect(page.locator('[data-route-pane="link"]')).toBeHidden();
+  // No account yet (S407): where to make one and set its PIN.
+  const noAccount = page.locator('[data-route-pane="create"] [data-role="no-account"]');
+  await expect(noAccount.locator('a[data-link="signup"]')).toHaveAttribute('href', 'https://www.onlyworlds.com/accounts/signup/');
+  await expect(noAccount.locator('a[data-link="set-pin"]')).toHaveAttribute('href', 'https://www.onlyworlds.com/account/settings/pin');
 
   // Display name defaults to the world's name.
   await expect(page.locator('input[name="create-name"]')).toHaveValue('Sandbox');

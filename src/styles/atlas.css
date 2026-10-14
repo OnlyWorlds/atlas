@@ -5271,6 +5271,8 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   margin-right: 16px;
 }
 .atlas-settings-link:hover { text-decoration: underline; }
+/* A link inside a sentence (S407): no row spacing, the sentence's own size. */
+.atlas-settings-link.atlas-link-inline { margin-right: 0; font-size: inherit; }
 .atlas-settings-radio {
   display: flex;
   align-items: flex-start;

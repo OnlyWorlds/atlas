@@ -21,6 +21,7 @@ import { createApiWorld, buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
 import { escapeAttr, escapeText } from '../core/dom-utils';
+import { noAccountYetHtml } from '../core/ow-site';
 import { problemFor } from '../core/problems';
 
 export class NewApiWorldModal extends BaseModal {
@@ -54,6 +55,7 @@ export class NewApiWorldModal extends BaseModal {
         <span>PIN</span>
         <input class="atlas-input" type="password" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
       </label>
+      ${reg.account_token ? '' : `<p class="atlas-modal-hint" data-role="no-account">${noAccountYetHtml()}</p>`}
       ${whereChoiceHtml()}
       <p class="atlas-modal-error" data-role="error" hidden></p>
       <div class="atlas-modal-progress" data-role="progress" hidden></div>
