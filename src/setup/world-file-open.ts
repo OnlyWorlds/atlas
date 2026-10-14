@@ -46,6 +46,8 @@ export interface OpenWorldFileOpts {
    * first, and a folder answer is the §4 move after it opens. Null cancels.
    */
   chooseWhere?: () => Promise<'browser' | 'folder' | null>;
+  /** Each file written, with the count so far and the total (world.json last). */
+  onWritten?: (done: number, total: number) => void;
 }
 
 const REGISTRY_NOT_SAVED =
@@ -65,11 +67,29 @@ function placeOf(reg: WorldsRegistry, worldId: string): { restore: WorldRegistry
   return { restore: null, already: blocks ? here! : null };
 }
 
-async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileEntry[], worldJson: Uint8Array): Promise<void> {
+/**
+ * Files written at once. One at a time, Firefox's browser storage took 16 s
+ * for Moppetopia's 320 files against Chromium's 1.2 s (S407, Boss h57 #4679);
+ * each file's lookups and writer cost it about 50 ms, and they overlap.
+ */
+export const WRITE_CONCURRENCY = 8;
+
+export async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileEntry[], worldJson: Uint8Array, onWritten?: (done: number, total: number) => void): Promise<void> {
+  // Each folder is looked up (and made) once, however many files land in it.
+  const dirs = new Map<string, Promise<FileSystemDirectoryHandle>>();
+  const dirFor = (segs: string[]): Promise<FileSystemDirectoryHandle> => {
+    if (segs.length === 0) return Promise.resolve(dir);
+    const key = segs.join('/');
+    let p = dirs.get(key);
+    if (!p) {
+      p = dirFor(segs.slice(0, -1)).then(parent => parent.getDirectoryHandle(segs[segs.length - 1], { create: true }));
+      dirs.set(key, p);
+    }
+    return p;
+  };
   const write = async (path: string, data: Uint8Array): Promise<void> => {
-    let d = dir;
     const segs = path.split('/');
-    for (const seg of segs.slice(0, -1)) d = await d.getDirectoryHandle(seg, { create: true });
+    const d = await dirFor(segs.slice(0, -1));
     const w = await (await d.getFileHandle(segs[segs.length - 1], { create: true })).createWritable();
     try {
       await w.write(data as unknown as BufferSource);
@@ -79,8 +99,29 @@ async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileEntry[],
       throw err;
     }
   };
-  for (const f of files) if (f.path !== 'world.json') await write(f.path, f.data);
+  const rest = files.filter(f => f.path !== 'world.json');
+  const total = rest.length + 1;
+  let done = 0;
+  let next = 0;
+  let failed = false;
+  const lane = async (): Promise<void> => {
+    while (!failed && next < rest.length) {
+      const f = rest[next++];
+      try {
+        await write(f.path, f.data);
+        onWritten?.(++done, total);
+      } catch (err) {
+        failed = true; // no lane starts another file; the caller removes the half-made world
+        throw err;
+      }
+    }
+  };
+  const lanes = Array.from({ length: Math.min(WRITE_CONCURRENCY, rest.length) }, lane);
+  const settled = await Promise.allSettled(lanes);
+  const refused = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected');
+  if (refused) throw refused.reason;
   await write('world.json', worldJson); // last: nothing says "world" until every other file landed
+  onWritten?.(total, total);
 }
 
 /** Open a world file's bytes. Refusals throw a `PlainError`, having written nothing. */
@@ -113,7 +154,7 @@ async function openRead(read: { worldId: string; worldName: string; files: World
 
   const make = await openBrowserMake(read.worldName, read.worldId);
   try {
-    await writeAll(make.handle, read.files, worldJson);
+    await writeAll(make.handle, read.files, worldJson, opts.onWritten);
   } catch (err) {
     await make.abort().catch(e => console.warn('[world-file] could not remove the half-made world', e)); // raw-error-ok: a console record
     if (isQuotaError(err)) throw new PlainError(browserStorageFullSentence('opening the world file'));

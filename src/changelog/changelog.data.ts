@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.36.1',
+    date: '2026-10-15',
+    theme: 'Opening a world counts its files',
+    entries: [
+      {
+        id: 'opening-counts',
+        title: 'Opening a world counts its files',
+        body: 'Opening Moppetopia now shows how many of its files are in place. In Firefox it took about twenty seconds on one quiet line; it still takes a while there, and now says how far it has got. Moppetopia and world files also write several files at once, so in Chrome they open faster.',
+        tags: ['world', 'performance'],
+      },
+    ],
+  },
+  {
     version: '1.36.0',
     date: '2026-10-15',
     theme: 'Invite someone, and where an account comes from',

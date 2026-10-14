@@ -160,6 +160,10 @@ async function openDemoWorldOnce(toasts: ToastManager): Promise<void> {
   // gives way to the where-question when there is one.
   const overlay = showLoadingOverlay(`Downloading ${DEMO_WORLD_NAME}`);
   overlay.update('Asking OnlyWorlds for it…');
+  // Opening counts its files: Firefox writes each in about 40 ms, so the
+  // demo's 320 sat on one quiet line for 14 s (S407, Boss h57 #4679).
+  let openingName = DEMO_WORLD_NAME;
+  const openingLine = (done: number, total: number) => `Opening ${openingName}… ${done} of ${total} files`;
   try {
     await openWorldBytes(async () => {
       const built = await buildDemoWorldFile({
@@ -167,13 +171,14 @@ async function openDemoWorldOnce(toasts: ToastManager): Promise<void> {
         onProgress: p => { if (p.phase === 'write') overlay.update(downloadingLine(p.done, p.total, 'browser')); },
       });
       if (built.kind === 'file') {
+        openingName = built.name;
         overlay.update(`Opening ${built.name}…`);
         return built.bytes;
       }
       overlay.close();
       await answerDemoHere(built.worldId, toasts);
       return null;
-    }, toasts, DEMO_WORDS, overlay);
+    }, toasts, DEMO_WORDS, overlay, openingLine);
   } finally {
     overlay.close();
   }
@@ -189,9 +194,10 @@ async function storageReady(toasts: ToastManager, words: OpenWords): Promise<boo
 /**
  * `getBytes` resolving null means it answered the user itself: nothing to open.
  * `overlay` (the demo's) is closed before anything else is said or asked, and
- * once the world is open.
+ * once the world is open. `openingLine`, with the overlay, counts the files
+ * as they are written.
  */
-async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts: ToastManager, words: OpenWords, overlay?: LoadingOverlayHandle): Promise<void> {
+async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts: ToastManager, words: OpenWords, overlay?: LoadingOverlayHandle, openingLine?: (done: number, total: number) => string): Promise<void> {
   // On Chromium with a home folder set, a NEW world asks where (contract §5.2,
   // §1.4, invariant 12): a folder answer opens it in this browser, then moves
   // it there with the home folder made writable inside the answer's click.
@@ -212,7 +218,8 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
     if (!bytes) return;
     const { openWorldFile } = await import('../setup/world-file-open');
     const { activateWorld } = await import('../sidebar/worlds-sidebar');
-    const out = await openWorldFile(bytes, { chooseWhere });
+    const onWritten = overlay && openingLine ? (done: number, total: number) => overlay.update(openingLine(done, total)) : undefined;
+    const out = await openWorldFile(bytes, { chooseWhere, onWritten });
     if (out.kind !== 'opened' && out.kind !== 'restored') overlay?.close();
     if (out.kind === 'cancelled') {
       toasts.info(words.cancelled);
