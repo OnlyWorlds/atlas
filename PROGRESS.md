@@ -4,7 +4,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 ---
 
-## CURRENT STATE (2026-10-14, SESSION 406: **1.35.3 PUSHED** (an open never rejects, conv. 142 grown; and the calendar kernel is the SDK's, `245aad3`; gates on 1.35.3: typecheck 0 + **2796 vitest, exit 0** (`--no-cache`, 2 skipped) + **444 e2e, PLAYWRIGHT_EXIT=0, 444 passed, no flaky** + a production build, `main-CBiH4hxO.js`; the calendar commit alone had the same e2e and 2794 vitest); **1.35.2 LIVE** (Boss h11 #4424: Pages `cba7809a`, `main-Ch2Dhmen.js`; his throttled Pixel 7 control, 1.35.1 13 to 16 bare-front-door samples, 1.35.2 0, 0 and 0); S405's block is the newest entry in `docs-archive/PROGRESS-history.md`)
+## CURRENT STATE (2026-10-14, SESSION 406: **1.35.3 LIVE** (Boss h11 #4476: Pages `7e550594`, `main-CBiH4hxO.js`, bytes identical to his build) (an open never rejects, conv. 142 grown; and the calendar kernel is the SDK's, `245aad3`; gates on 1.35.3: typecheck 0 + **2796 vitest, exit 0** (`--no-cache`, 2 skipped) + **444 e2e, PLAYWRIGHT_EXIT=0, 444 passed, no flaky** + a production build, `main-CBiH4hxO.js`; the calendar commit alone had the same e2e and 2794 vitest); **1.35.2 LIVE** (Boss h11 #4424: Pages `cba7809a`, `main-Ch2Dhmen.js`; his throttled Pixel 7 control, 1.35.1 13 to 16 bare-front-door samples, 1.35.2 0, 0 and 0); S405's block is the newest entry in `docs-archive/PROGRESS-history.md`)
 
 **Records**: `Forge/Notes/ui-snapshots/2026-10-14-s406/atlas/` (vitest, e2e and build logs).
 
@@ -12,7 +12,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **Lantern reads the same kernel** (S406, Lantern `875c765`, `441aaa4`): a world's only calendar names its dates there, and with several the phone offers the choice, kept per phone as Atlas keeps its own.
 - **1.35.3, an open never rejects** (S405's census, closed): `activateWorld` catches whatever escapes its own catches, says it as opening this world and resolves false (a silent open only logs), so a toast's Open it, a retry and a world row, which fire it and forget it, can no longer reach the background-error reporter; the fired prefs reconcile in `world-prefs.ts` logs its failure. `tests/unit/activate-world-never-rejects.test.ts`, both rows red without the catch (its first fixture broke the registry for the problem reporter too, which reads it to name the world: the fault is now one-shot). The changelog line leaves out "a way to try again", since the retry action shows only for some kinds of failure.
 - **Still from S405** (the history entry): Boss's demo error not reproduced (the console line or the toast's Details names it if it comes again); the Captain's phone on the Writing case (1.33.0, #244); keel B4, a wrong PIN on a write key's Test connection.
-- ⚡ **NEXT**: (1) Boss flies 1.35.3 (it carries the calendar import). (2) Seethe reads the 1.35 frames (h37 #4283). #198/#199 wait on talks.
+- ⚡ **NEXT**: (1) Seethe reads the 1.35 frames (h37 #4283). #198/#199 wait on talks.
 
 ---
 
