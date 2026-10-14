@@ -14064,8 +14064,17 @@ a.atlas-share-map-pin { cursor: pointer; }
   padding: 0;
   opacity: 0;
   transition: opacity 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+.atlas-element-image-hide .material-symbols-outlined { font-size: 16px; }
 .atlas-element-image-wrap:hover .atlas-element-image-hide { opacity: 1; }
+/* A touch screen has no hover to reveal it, and a tap that shows it invites the wrong reading:
+   Settings, Elements keeps the switch (Seethe's phone pass, #4264). */
+@media (hover: none) {
+  .atlas-element-image-hide { display: none; }
+}
 .atlas-element-image-hide:hover { color: var(--atlas-text); background: rgba(var(--atlas-scrim-rgb), 0.75); }
 
 /* Header type-icon-as-thumbnail (images hidden + element has one) — click
@@ -16318,7 +16327,6 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
   /* A finger's size for the rooms' own small controls (measured at 412: 14 to 30px tall). Words
      inside a sentence stay links; these are the buttons. */
   .atlas-middle .atlas-icon-btn-sm,
-  .atlas-middle .atlas-element-image-hide,
   .atlas-middle .atlas-chart-now-clear {
     min-width: 40px;
     min-height: 40px;
@@ -16330,6 +16338,79 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
   .atlas-middle .atlas-settings-tab,
   .atlas-middle .atlas-settings-replay-chip {
     min-height: 40px;
+  }
+
+  /* The left drawer and its row of types at a finger's size (Seethe's phone pass, #4264: 25px
+     chips with the counts crammed above them, and the page's own words showing beside the
+     drawer). The drawer takes more of the width and the dim behind it deepens. */
+  body:not(.atlas-touring).atlas-narrow-sidebar .atlas-sidebar {
+    width: min(360px, 88vw) !important;
+  }
+
+  body:not(.atlas-touring).atlas-drawer-right-open .atlas-drawer-scrim,
+  body:not(.atlas-touring).atlas-drawer-sidebar-open .atlas-drawer-scrim {
+    background: rgba(0, 0, 0, 0.62);
+  }
+
+  body:not(.atlas-touring) .atlas-filter-strip {
+    gap: 4px;
+    max-width: none;
+  }
+
+  /* Icons only: a grid whose tiles share the drawer's width, so the rows end at its edge (eight
+     to a row at 412, three rows for a world that holds every type). */
+  body:not(.atlas-touring) .atlas-filter-strip[data-names='icons'] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 3px;
+  }
+
+  body:not(.atlas-touring) .atlas-filter-btn:not(.named) {
+    width: auto;
+    min-width: 40px;
+    height: 44px;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  body:not(.atlas-touring) .atlas-filter-btn .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  body:not(.atlas-touring) .atlas-filter-btn:not(.named) .atlas-filter-count {
+    position: static;
+    padding: 0;
+    font-size: 10px;
+  }
+
+  body:not(.atlas-touring) .atlas-filter-btn.named,
+  body:not(.atlas-touring) .atlas-filter-strip[data-names='all'] .atlas-filter-btn.named {
+    height: 40px;
+  }
+
+  body:not(.atlas-touring) .atlas-filter-btn.named .atlas-filter-name {
+    font-size: 13px;
+  }
+
+  body:not(.atlas-touring) .atlas-filter-btn.named.muted::before {
+    width: 20px;
+  }
+}
+
+/* A touch screen has no keys to name and nothing to drop (Seethe's phone pass, #4264). */
+@media (pointer: coarse) {
+  .atlas-edit-popover-hint {
+    display: none;
+  }
+
+  .atlas-import-drop .atlas-import-drop-pointer {
+    display: none;
+  }
+}
+
+@media not all and (pointer: coarse) {
+  .atlas-import-drop .atlas-import-drop-touch {
+    display: none;
   }
 }
 

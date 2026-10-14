@@ -18,6 +18,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  // Every file shares one DOM (singleFork): a #toast-container left here let the
+  // files after this one render real toasts that waypoints.test.ts then found (S404).
+  document.body.innerHTML = '';
 });
 
 const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
@@ -124,5 +127,33 @@ describe('toast manager', () => {
     toasts.problem({ sentence: 'Your disk is full.' }, { fixes: [{ label: 'Retry now', run }] });
     expect(live()[0].querySelector('.ow-toast-message')!.textContent).toBe('Your disk is full.');
     expect(live()[0].getAttribute('role')).toBe('alert');
+  });
+
+  // S404, Seethe's phone pass (#4264): a tap fired the emulated mouseenter and
+  // nothing left, so one tap pinned a toast for good.
+  const pointer = (el: HTMLElement, type: string, pointerType: string) => {
+    const e = new Event(type, { bubbles: type === 'pointerup' });
+    Object.defineProperty(e, 'pointerType', { value: pointerType });
+    el.dispatchEvent(e);
+  };
+
+  it('a mouse over a toast holds it, and it goes 2 s after the mouse leaves', () => {
+    toasts.info('Hold me.');
+    pointer(live()[0], 'pointerenter', 'mouse');
+    vi.advanceTimersByTime(30_000);
+    expect(live()).toHaveLength(1);
+    pointer(live()[0], 'pointerleave', 'mouse');
+    vi.advanceTimersByTime(2000);
+    expect(live()).toHaveLength(0);
+  });
+
+  it('a finger never holds a toast, and a tap dismisses it', () => {
+    toasts.info('Tap me.');
+    pointer(live()[0], 'pointerenter', 'touch');
+    vi.advanceTimersByTime(4000);
+    expect(live()).toHaveLength(0);
+    toasts.info('Tap me again.');
+    pointer(live()[0], 'pointerup', 'touch');
+    expect(live()).toHaveLength(0);
   });
 });

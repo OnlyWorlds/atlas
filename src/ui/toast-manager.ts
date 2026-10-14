@@ -182,11 +182,22 @@ export class ToastManager {
     if (toast.sticky) return;
     // Auto-dismiss after duration; hovering holds the toast open (reading
     // shouldn't race a timer — S255v2), with a short grace after leave.
+    // Only a mouse holds it: a tap fires the emulated mouseenter too, with no
+    // mouseleave until the next tap elsewhere, so one tap pinned a toast for
+    // good (S404, Seethe's phone pass #4264). A tap dismisses instead.
     let timer = setTimeout(() => this.removeToast(toast.id), toast.duration);
-    toastEl.addEventListener('mouseenter', () => clearTimeout(timer));
-    toastEl.addEventListener('mouseleave', () => {
+    toastEl.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'mouse') clearTimeout(timer);
+    });
+    toastEl.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse') return;
       clearTimeout(timer);
       timer = setTimeout(() => this.removeToast(toast.id), 2000);
+    });
+    toastEl.addEventListener('pointerup', (e) => {
+      if (e.pointerType === 'mouse') return;
+      clearTimeout(timer);
+      this.removeToast(toast.id);
     });
   }
 

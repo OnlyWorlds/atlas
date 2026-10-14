@@ -185,6 +185,40 @@ describe('the toast, after #127', () => {
     }
   });
 
+  // S404: a tap fired the emulated mouseenter with no leave, so a finger pinned
+  // the toast on a phone. Only a mouse holds it.
+  it('a mouse holds the toast and a finger does not', async () => {
+    vi.useFakeTimers();
+    const hover = (pointerType: string) => {
+      const e = new Event('pointerenter');
+      Object.defineProperty(e, 'pointerType', { value: pointerType });
+      container().querySelector('.atlas-waypoint-toast')!.dispatchEvent(e);
+    };
+    try {
+      completeWaypoint('import');
+      await flush();
+      hover('touch');
+      vi.advanceTimersByTime(7000);
+      vi.advanceTimersByTime(400);
+      expect(container().querySelector('.atlas-waypoint-toast')).toBeNull();
+      vi.advanceTimersByTime(10);
+      completeWaypoint('share');
+      await flush();
+      hover('mouse');
+      vi.advanceTimersByTime(30_000);
+      expect(container().querySelector('.atlas-waypoint-toast')).not.toBeNull();
+      // Let it leave, so the queue is idle for the files after this one.
+      const leave = new Event('pointerleave');
+      Object.defineProperty(leave, 'pointerType', { value: 'mouse' });
+      container().querySelector('.atlas-waypoint-toast')!.dispatchEvent(leave);
+      vi.advanceTimersByTime(2500);
+      vi.advanceTimersByTime(400);
+      expect(container().querySelector('.atlas-waypoint-toast')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('story and knowledge are world-data: gated in the demo world', () => {
     activate([entry({ demo: true })]);
     completeWaypoint('story');

@@ -476,9 +476,13 @@ function renderWaypointToast(id: WaypointId): void {
   let timer = setTimeout(() => dismiss(), TOAST_MS);
   // Hover holds the toast open (S255v2, Captain): reading shouldn't race a
   // timer. The countdown restarts with a short grace when the cursor leaves.
-  el.addEventListener('mouseenter', () => clearTimeout(timer));
-  el.addEventListener('mouseleave', () => {
-    if (dismissed) return;
+  // Only a mouse holds it: a tap fires the emulated mouseenter with no leave,
+  // which pinned the toast on a phone (S404, the toast manager's twin).
+  el.addEventListener('pointerenter', (e) => {
+    if (e.pointerType === 'mouse') clearTimeout(timer);
+  });
+  el.addEventListener('pointerleave', (e) => {
+    if (e.pointerType !== 'mouse' || dismissed) return;
     clearTimeout(timer);
     timer = setTimeout(() => dismiss(), 2500);
   });

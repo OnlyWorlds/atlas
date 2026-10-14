@@ -209,8 +209,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         </div>
         <div class="atlas-import-drop" data-role="drop" tabindex="0" title="Drop or click to choose a .json file, or a world file Atlas saved (.zip)">
           <span class="material-symbols-outlined">place_item</span>
-          <p>Drop a world or elements <b>.json</b>, or a world file <b>.zip</b>, here</p>
-          <span class="atlas-import-drop-sub">or click to choose a file</span>
+          <p class="atlas-import-drop-pointer">Drop a world or elements <b>.json</b>, or a world file <b>.zip</b>, here</p>
+          <span class="atlas-import-drop-sub atlas-import-drop-pointer">or click to choose a file</span>
+          <p class="atlas-import-drop-touch">Tap to choose a world or elements <b>.json</b>, or a world file <b>.zip</b></p>
           <input type="file" accept="application/json,.json,.zip,application/zip" data-role="file" hidden />
         </div>
         <textarea class="atlas-import-paste" data-role="paste" rows="6"

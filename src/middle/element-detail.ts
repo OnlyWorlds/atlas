@@ -170,8 +170,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
         const hide = document.createElement('button');
         hide.type = 'button';
         hide.className = 'atlas-element-image-hide';
+        // An eye, not a ×: it hides every element's picture (a view setting), and a × read as
+        // "remove this picture" (Seethe's phone pass, #4264).
         hide.title = 'Hide element images';
-        hide.textContent = '×';
+        hide.setAttribute('aria-label', 'Hide element images');
+        const glyph = document.createElement('span');
+        glyph.className = 'material-symbols-outlined';
+        glyph.textContent = 'visibility_off';
+        hide.appendChild(glyph);
         hide.addEventListener('click', () => {
           const next = setEditorSettings(getState().registry, { show_element_images: false });
           saveRegistry(next);

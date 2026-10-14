@@ -56,6 +56,37 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.35.0',
+    date: '2026-10-14',
+    theme: 'a phone, second pass',
+    entries: [
+      {
+        id: 'phone-type-tiles',
+        title: 'Type icons you can tap on a phone',
+        body: 'On a phone the type icons in the side panel are tiles big enough for a finger, each with its count under the icon, and the page behind the open panel is dimmed further.',
+        tags: ['layout'],
+      },
+      {
+        id: 'toast-tap-closes',
+        title: 'A tap closes a message',
+        body: 'On a touch screen a tap on a message at the bottom of the screen closes it. Before, a tap kept it there until you tapped somewhere else.',
+        tags: ['fix'],
+      },
+      {
+        id: 'image-hide-eye',
+        title: 'The hide button on a picture is an eye',
+        body: 'The button in the corner of an element\'s picture hides every element\'s picture, so it now shows a crossed-out eye instead of an ×. On a touch screen it is gone; Settings, Elements has the same switch.',
+        tags: ['editor'],
+      },
+      {
+        id: 'touch-words',
+        title: 'Words for a touch screen',
+        body: 'On a touch screen the edit box no longer names keyboard keys, and the Data room asks you to tap to choose a file instead of dropping or clicking.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.34.0',
     date: '2026-10-14',
     theme: 'names on the type row',
