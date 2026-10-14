@@ -22,6 +22,8 @@ function allCopy(): CopyPiece[] {
       out.push({ where: `${step.id}/${phase.id} body`, text: phase.body });
       if (phase.meta) out.push({ where: `${step.id}/${phase.id} meta`, text: phase.meta });
       if (phase.deeper) out.push({ where: `${step.id}/${phase.id} deeper`, text: phase.deeper });
+      if (phase.touchBody) out.push({ where: `${step.id}/${phase.id} touchBody`, text: phase.touchBody });
+      if (phase.touchDeeper) out.push({ where: `${step.id}/${phase.id} touchDeeper`, text: phase.touchDeeper });
     }
   }
   return out;

@@ -55,9 +55,10 @@ import {
   tourWorldIsActive,
 } from './tour-engine';
 import {
-  buildTourWorldView, canAdvance, countPresent, hasAll, resolvePhase,
+  buildTourWorldView, canAdvance, countPresent, hasAll, phaseCopy, resolvePhase,
   type TourPhase, type TourWorldView,
 } from './tour-view';
+import { isCoarsePointer } from '../core/pointer';
 
 let root: HTMLElement | null = null;
 let unsub: (() => void) | null = null;
@@ -507,7 +508,8 @@ function render(): void {
   copy.className = 'atlas-tour-copy';
   const body = document.createElement('div');
   body.className = 'atlas-tour-body';
-  renderBodyText(body, phase.body);
+  const words = phaseCopy(phase, isCoarsePointer());
+  renderBodyText(body, words.body);
   copy.appendChild(body);
   panel.appendChild(copy);
   // THE FOOT SLOT (S317): "more information" and the meta line live at the
@@ -518,7 +520,7 @@ function render(): void {
   // here, mounted into the controls row below; the opener renders neither.
   const extras = document.createElement('div');
   extras.className = 'atlas-tour-extras atlas-tour-spacer';
-  if (phase.deeper) {
+  if (words.deeper) {
     const bulb = document.createElement('button');
     bulb.type = 'button';
     bulb.className = 'atlas-tour-deeper-toggle';
@@ -529,7 +531,7 @@ function render(): void {
     // Paragraph breaks (\n\n in the step data) render as real paragraphs —
     // a wall of text defeats the point of going deeper. Paragraphs get the
     // same token pass as bodies (S312: Captain links council motions here).
-    for (const para of phase.deeper.split('\n\n')) {
+    for (const para of words.deeper.split('\n\n')) {
       const p = document.createElement('p');
       renderBodyText(p, para);
       deeper.appendChild(p);

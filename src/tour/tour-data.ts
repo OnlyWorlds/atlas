@@ -218,6 +218,14 @@ export function finaleMeta(opts: { folderMode: boolean; legacy: boolean }): stri
   return opts.folderMode ? FINALE_META.folder : FINALE_META.browser;
 }
 
+/** The chart steps' "More information" on a touch screen (#279): the chart's scroll and drags are a mouse's. */
+const CHART_TOUCH_DEEPER =
+  'The chart works off specific fields that elements have such as birth_date for characters and founding_date for locations.' +
+  '\n\nThe chart is a live view, not a picture: give an element its date on its own page ' +
+  'and it lands here. Save any arrangement as a named ' +
+  'chart to remember its window, its cast, and its lens.' +
+  '\n\nTap the \'Hegemony Standard\' chip above the view to inspect it.';
+
 export const TOUR_STEPS: readonly TourStep[] = [
   // ---------------------------------------------------------------- Opener
   // Step 0 (S303 rework): the sentence centre-stage on black, then it hands
@@ -371,6 +379,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
           'Maps are like layers on top of images that you create elsewhere. (as url or local upload). Turns them into a canvas on which you can place things.' +
           '\nMarkers combine to form zones, as seen in the map pane.' +
           '\nPins point an element to a coordinate on a map.\n\nCreate one now for the Consul by clicking the + pin icon in the middle pane, or dragging him in from the sidebar. Make sure to land him over the swamps.' ,
+        // A finger cannot drag from the sidebar (#279): the +pin tap, then a tap on the map.
+        touchBody:
+          'Maps are like layers on top of images that you create elsewhere. (as url or local upload). Turns them into a canvas on which you can place things.' +
+          '\nMarkers combine to form zones, as seen in the map pane.' +
+          '\nPins point an element to a coordinate on a map.\n\nCreate one now for the Consul by tapping the + pin icon in the middle pane, then tapping the map. Make sure to land him over the swamps.',
         deeper:
           'So why not create a pin for the spaceship, instead? ' +
           'There would be no relational certainty, then, of where the Consul is, ' +
@@ -386,6 +399,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         when: (w) => w.hasRef(TOUR_PIN_REF),
         body:
           'Drag the pin onto the zone, so that the Consul can observe the saurians below.',
+        touchBody:
+          'Slide the pin onto the zone with your finger, so that the Consul can observe the saurians below.',
         meta: 'Maps also support a 3D coordinate system: pins and markers have x, y, optional z fields. A 3D map editor is coming to Atlas.',
 
       },
@@ -548,6 +563,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
           '\nStories organize in three customizable tiers: Book, Chapter, Scene as defaults.' +
           '\nThe text detects elements by names and lets you link to them.' +
           '\n\nClick one of the blue underlined words, or hover + Tab to make one.',
+        touchBody:
+          'The writing room is where you write and organize long-form stories.' +
+          '\nStories organize in three customizable tiers: Book, Chapter, Scene as defaults.' +
+          '\nThe text detects elements by names and lets you link to them.' +
+          '\n\nTap one of the blue underlined words to make one.',
  
    
       },
@@ -563,6 +583,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         body:
           'The link button in the top right of the page catches all at once.' +
           '\nYou can create new elements by selecting text and right-clicking.' ,
+        touchBody: 'The link button in the top right of the page catches all at once.',
           meta:'The web pane on the right shows element relation graphs, tailored to the room you are in.',
       },
     ],
@@ -632,8 +653,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'in from the rail to give them their first date. Save any arrangement as a named ' +
         'chart to remember its window, its cast, and its lens.' +  
         '\n\nClick the \'Hegemony Standard\' chip above the view to inspect it.',
-   
-   
+        touchDeeper: CHART_TOUCH_DEEPER,
+
+
       },
     ],
     route: { kind: 'chart' },
@@ -651,6 +673,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'far back in the Old Earth era, centuries before anything else here. ' +
         '\nThe axis stretched out to hold them. You can scroll to zoom back in on the ' +
         'present.',
+      touchBody:
+        'Rachmaninov and his prelude join the world, and they are old: both sit ' +
+        'far back in the Old Earth era, centuries before anything else here. ' +
+        '\nThe axis stretched out to hold them.',
             deeper:
         'The chart works off specific fields that elements have such as birth_date for characters and founding_date for locations.' +
         '\n\nThe chart is a live view, not a picture: scroll to zoom from whole eras down ' +
@@ -658,7 +684,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'in from the rail to give them their first date. Save any arrangement as a named ' +
         'chart to remember its window, its cast, and its lens.' +  
         '\n\nClick the \'Hegemony Standard\' chip above the view to inspect it.',
-   
+      touchDeeper: CHART_TOUCH_DEEPER,
+
     }],
     spans: [
       { from: 13, to: 13, type: 'character' },

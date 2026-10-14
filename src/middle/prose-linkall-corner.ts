@@ -23,6 +23,7 @@
 import type { EditorView } from '@tiptap/pm/view';
 import { countAutolinkHints, convertAllAutolinks } from './writing-workspace-autolink';
 import type { ToastManager } from '../ui/toast-manager';
+import { forPointer } from '../core/pointer';
 
 export interface LinkAllCornerController {
   /** Recompute the hint count and show/hide accordingly. Cheap; call per transaction. */
@@ -68,7 +69,7 @@ export function createLinkAllCorner(deps: {
         const v = getView();
         if (!v) return;
         const n = convertAllAutolinks(v);
-        if (n > 0) toasts.info(`Linked ${n} element${n === 1 ? '' : 's'} · Ctrl+Z undoes`);
+        if (n > 0) toasts.info(`Linked ${n} element${n === 1 ? '' : 's'}${forPointer(' · Ctrl+Z undoes', '')}`);
       });
       host.appendChild(btn);
     }

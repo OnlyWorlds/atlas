@@ -9674,6 +9674,10 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-writing-tree-row:hover .atlas-writing-tree-row-add {
   opacity: 0.7;
 }
+/* A touch screen cannot hover to reveal it (conv. 141, #279): the + stays shown. */
+@media (hover: none) {
+  .atlas-writing-tree-row-add { opacity: 0.7; }
+}
 .atlas-writing-tree-row-add:hover {
   opacity: 1 !important;
   color: var(--atlas-cyan);

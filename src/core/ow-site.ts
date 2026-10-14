@@ -9,6 +9,13 @@ import type { WorldRegistryEntry, AccountWorldRow } from './types';
 
 export const OW_SIGNUP_URL = 'https://www.onlyworlds.com/accounts/signup/';
 export const OW_PIN_URL = 'https://www.onlyworlds.com/account/settings/pin';
+/** The OnlyWorlds app made for a phone (#279): a phone visitor hears of it from the first screen and help. */
+export const LANTERN_URL = 'https://lantern.onlyworlds.com';
+
+/** The line that points a phone visitor at Lantern. */
+export function lanternLineHtml(): string {
+  return `On a phone, <a class="atlas-settings-link atlas-link-inline" data-link="lantern" href="${LANTERN_URL}" target="_blank" rel="noopener">Lantern</a> is the OnlyWorlds app made for one: it catches notes at the table and keeps your world offline.`;
+}
 
 /** A world's page on onlyworlds.com, opened at Access (the pane reads the hash). */
 export function owAccessUrl(apiWorldId: string): string {

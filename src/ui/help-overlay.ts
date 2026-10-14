@@ -12,6 +12,8 @@ import { BaseModal } from './modal-base';
 import { buildShortcutsContent } from './shortcuts-content';
 import { helpForRoom } from './help-content';
 import { parseHash } from '../core/router';
+import { isCoarsePointer } from '../core/pointer';
+import { lanternLineHtml } from '../core/ow-site';
 
 class HelpOverlay extends BaseModal {
   open(roomMode?: string): void {
@@ -52,11 +54,28 @@ class HelpOverlay extends BaseModal {
       body.appendChild(divider);
     }
 
-    const shortcutsHead = document.createElement('h3');
-    shortcutsHead.className = 'atlas-help-can-head';
-    shortcutsHead.textContent = 'Keyboard and mouse';
-    body.appendChild(shortcutsHead);
-    body.appendChild(buildShortcutsContent());
+    // A touch screen gets no key or right-click reference (#279): it could
+    // use none of it. It hears of Lantern instead, the app made for a phone.
+    if (isCoarsePointer()) {
+      const touchHead = document.createElement('h3');
+      touchHead.className = 'atlas-help-can-head';
+      touchHead.textContent = 'On a touch screen';
+      body.appendChild(touchHead);
+      const touch = document.createElement('p');
+      touch.className = 'atlas-help-purpose';
+      touch.textContent = 'Tap to open and edit, and pinch to zoom a map. Shortcuts need a keyboard.';
+      body.appendChild(touch);
+      const lantern = document.createElement('p');
+      lantern.className = 'atlas-help-purpose atlas-help-lantern';
+      lantern.innerHTML = lanternLineHtml();
+      body.appendChild(lantern);
+    } else {
+      const shortcutsHead = document.createElement('h3');
+      shortcutsHead.className = 'atlas-help-can-head';
+      shortcutsHead.textContent = 'Keyboard and mouse';
+      body.appendChild(shortcutsHead);
+      body.appendChild(buildShortcutsContent());
+    }
 
     this.modal = overlay;
     this.show();

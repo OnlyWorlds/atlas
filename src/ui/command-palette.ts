@@ -29,6 +29,7 @@ import { browserStorageDoorOpen, hasFolderMode } from '../core/capabilities';
 import { filesWhereOf } from '../core/browser-worlds';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { Element, ElementType } from '../core/types';
+import { forPointer } from '../core/pointer';
 
 const MAX_ELEMENT_RESULTS = 12;
 const MAX_ROOM_RESULTS = 3;
@@ -247,7 +248,10 @@ class CommandPalette extends BaseModal {
     if (!this.query.trim()) {
       const hint = document.createElement('div');
       hint.className = 'atlas-cmdk-hint';
-      hint.textContent = 'Type to search names, aliases, types, and descriptions. ↑↓ to move, Enter to jump.';
+      hint.textContent = forPointer(
+      'Type to search names, aliases, types, and descriptions. ↑↓ to move, Enter to jump.',
+      'Type to search names, aliases, types, and descriptions. Tap one to jump.',
+    );
       this.list.appendChild(hint);
       return;
     }

@@ -73,10 +73,19 @@ export interface TourPhase {
   body: string;
   meta?: string;
   deeper?: string;
+  /** On a touch screen, in place of `body` / `deeper` where those name a mouse or key gesture (#279). */
+  touchBody?: string;
+  touchDeeper?: string;
   /** This phase applies when true. Absent = always (the opening phase). */
   when?: (w: TourWorldView) => boolean;
   /** Next renders only when true. Absent = always advanceable. */
   advanceWhen?: (w: TourWorldView) => boolean;
+}
+
+/** A phase's body and deeper text for this pointer: the touch lines on a touch screen, when the phase has them. */
+export function phaseCopy(phase: TourPhase, touch: boolean): { body: string; deeper?: string } {
+  if (!touch) return { body: phase.body, deeper: phase.deeper };
+  return { body: phase.touchBody ?? phase.body, deeper: phase.touchDeeper ?? phase.deeper };
 }
 
 /**

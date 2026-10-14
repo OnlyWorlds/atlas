@@ -56,6 +56,37 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.37.0',
+    date: '2026-10-15',
+    theme: 'A phone hears touch, and of Lantern',
+    entries: [
+      {
+        id: 'touch-help-and-tour',
+        title: 'Help and the tour speak touch',
+        body: 'On a touch screen, help and the tour say tap where they said click, right-click, drag or a key, and leave out what only a mouse or keyboard can do. Help shows a short touch section in place of the keyboard list. With a mouse, nothing changes.',
+        tags: ['layout'],
+      },
+      {
+        id: 'touch-messages',
+        title: 'Messages without keys on a touch screen',
+        body: 'Linking every mention no longer says Ctrl+Z undoes it on a touch screen, search says tap one to jump, and Charts says to tap an undated element to give it a date on its page, since dragging onto the chart needs a mouse.',
+        tags: ['layout'],
+      },
+      {
+        id: 'writing-plus-on-touch',
+        title: 'The + on a writing row shows on a touch screen',
+        body: 'A book or chapter in the writing list makes a chapter or scene from its +. With a mouse it shows when you point at the row; a touch screen cannot point, so there it now always shows.',
+        tags: ['fix'],
+      },
+      {
+        id: 'lantern-on-a-phone',
+        title: 'A phone hears of Lantern',
+        body: 'On a phone, the first screen and help point to Lantern, the OnlyWorlds app made for a phone: it catches notes at the table and keeps your world offline.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.36.1',
     date: '2026-10-15',
     theme: 'Opening a world counts its files',

@@ -22,6 +22,8 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { isNarrowSidebar, openDrawer } from '../layout/narrow-layout';
+import { isCoarsePointer } from '../core/pointer';
+import { lanternLineHtml } from '../core/ow-site';
 
 /**
  * Whether this no-world stretch already opened the sidebar drawer (S366).
@@ -184,6 +186,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <p class="atlas-landing-more">${more}</p>
             <p class="atlas-landing-tag">Worldbuilding on OnlyWorlds.</p>
             <p class="atlas-landing-note" data-role="storage-note"${folderNote ? '' : ' hidden'}>${folderNote}</p>
+            ${isCoarsePointer() ? `<p class="atlas-landing-note" data-role="lantern-note">${lanternLineHtml()}</p>` : ''}
           </div>
         </div>
       `;

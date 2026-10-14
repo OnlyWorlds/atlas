@@ -29,6 +29,7 @@ import { findExistingNameMatch } from './element-name-match';
 import { escapeAttr } from '../core/dom-utils';
 import { loadUiPrefs } from '../core/ui-prefs';
 import { TEMPORAL_TYPE_FIELDS } from '../visualization/timeline/temporal-fields';
+import { forPointer } from '../core/pointer';
 
 /**
  * Types offered in the create modal.
@@ -229,7 +230,7 @@ export class ElementCreateModal extends BaseModal {
           <span>Name</span>
           <div class="atlas-input-ghost-wrap">
             <span class="atlas-input-ghost"><span class="name-ghost-typed"></span><span class="name-ghost-suffix"></span></span>
-            <input class="atlas-input" type="text" name="element-name" placeholder="Element name (TAB to place existing)" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
+            <input class="atlas-input" type="text" name="element-name" placeholder="${forPointer('Element name (TAB to place existing)', 'Element name')}" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
           </div>
         </label>`
       : `<label class="atlas-modal-field">

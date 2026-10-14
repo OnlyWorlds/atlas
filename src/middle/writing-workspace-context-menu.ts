@@ -34,6 +34,7 @@ import { pushRecent } from './writing-workspace-recents';
 import { WRITING_INLINE_CREATE_EVENT, WRITING_SPLIT_EVENT } from '../core/hotkeys';
 import type { Element } from '../core/types';
 import type { WorkspaceEditorHandle } from './writing-workspace-editor';
+import { forPointer } from '../core/pointer';
 
 export interface ProseContextMenuController {
   destroy(): void;
@@ -70,7 +71,7 @@ export function createProseContextMenu(deps: {
     if (!editor) return;
     const { from, to } = editor.state.selection;
     if (from === to) {
-      toastManager.info('Select some text first, then Ctrl+Shift+E');
+      toastManager.info(forPointer('Select some text first, then Ctrl+Shift+E', 'Select some text first'));
       return;
     }
     const selectedText = editor.state.doc.textBetween(from, to, ' ', ' ').trim();
@@ -282,13 +283,13 @@ export function createProseContextMenu(deps: {
       dismissContextMenu();
       if (!editorHandle) return;
       const n = convertAllAutolinks(editorHandle.editor.view, { from, to });
-      if (n > 0) toastManager.info(`Linked ${n} element${n === 1 ? '' : 's'} · Ctrl+Z undoes`);
+      if (n > 0) toastManager.info(`Linked ${n} element${n === 1 ? '' : 's'}${forPointer(' · Ctrl+Z undoes', '')}`);
     });
     menu.querySelector<HTMLElement>('[data-role="unlink-selection"]')?.addEventListener('click', () => {
       dismissContextMenu();
       if (!editorHandle) return;
       const n = unlinkAllChips(editorHandle.editor.view, { from, to });
-      if (n > 0) toastManager.info(`Unlinked ${n} mention${n === 1 ? '' : 's'} · Ctrl+Z undoes`);
+      if (n > 0) toastManager.info(`Unlinked ${n} mention${n === 1 ? '' : 's'}${forPointer(' · Ctrl+Z undoes', '')}`);
     });
     menu.querySelector<HTMLElement>('[data-role="split"]')?.addEventListener('click', () => {
       dismissContextMenu();

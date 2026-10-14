@@ -10,6 +10,13 @@
 import { getState } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
 import { filesWhereOf } from '../core/browser-worlds';
+import { isCoarsePointer } from '../core/pointer';
+
+/**
+ * A line that names a mouse or key gesture carries its touch line (#279):
+ * `touch: null` leaves it out on a touch screen, where it is not true.
+ */
+export type HelpLine = string | { mouse: string; touch: string | null };
 
 export interface RoomHelp {
   /** Sentence-case room name for the overlay title. */
@@ -17,7 +24,7 @@ export interface RoomHelp {
   /** ONE sentence: what this room is for. */
   purpose: string;
   /** 3-4 verb-first "you can…" lines. */
-  can: string[];
+  can: HelpLine[];
   /** Lines true only for a world kept in a folder; left out for a browser world or a browser without folders. */
   folderCan?: string[];
 }
@@ -44,7 +51,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'label it your way with supertype and subtype',
       'add your own fields in the Custom fields section',
       'place it on a map from the header pin button',
-      'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)',
+      { mouse: 'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)', touch: null },
       'see in the Web tab where it is mentioned but not linked, and link every mention with one click',
     ],
   },
@@ -54,9 +61,12 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     can: [
       'rename the tiers to fit your project',
       'type @ to mention an element and link it',
-      'link every unlinked mention at once from the corner link icon; right-click a selection or a tree row for the same',
-      'find a word with Ctrl+F and link every match to one element; on a chapter or book this reaches every scene inside',
-      'create a chapter or scene inside a row with its hover +',
+      {
+        mouse: 'link every unlinked mention at once from the corner link icon; right-click a selection or a tree row for the same',
+        touch: 'link every unlinked mention at once from the corner link icon',
+      },
+      { mouse: 'find a word with Ctrl+F and link every match to one element; on a chapter or book this reaches every scene inside', touch: null },
+      { mouse: 'create a chapter or scene inside a row with its hover +', touch: 'create a chapter or scene inside a row with its +' },
       'split a long piece into siblings at the cursor',
     ],
   },
@@ -78,11 +88,17 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     can: [
       'click any element to focus on what it touches',
       'set the world clock, then create a calendar: dates read as "12 Frostwane, Year 454" and you can type calendar words into any date field',
-      'drag things into time: an undated element onto the axis, a dot to re-date it, a range\'s end cap to stretch it, the now-line to move the now',
+      {
+        mouse: 'drag things into time: an undated element onto the axis, a dot to re-date it, a range\'s end cap to stretch it, the now-line to move the now',
+        touch: 'give an element its date on its own page, and the chart places it',
+      },
       'focus a title or character to see its tenure or life drawn to the now',
-      'filter by type and zoom from eras down to days (no types picked = the cast and essentials, not everything)',
+      {
+        mouse: 'filter by type and zoom from eras down to days (no types picked = the cast and essentials, not everything)',
+        touch: 'filter by type (no types picked = the cast and essentials, not everything)',
+      },
       'switch to the document view and scroll through your history: eras section it, skipped time is named, the now is a seam you scroll across',
-      'save a chart and reload it from the gallery, or drop it onto a share page',
+      { mouse: 'save a chart and reload it from the gallery, or drop it onto a share page', touch: 'save a chart and reload it from the gallery, or put it on a page with + chart in Pages' },
     ],
   },
   share: {
@@ -99,7 +115,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     name: 'Data',
     purpose: 'Bring OnlyWorlds data into atlas, or take your world out as a file.',
     can: [
-      'drop or paste JSON and review before anything lands',
+      { mouse: 'drop or paste JSON and review before anything lands', touch: 'choose a .json or a world file .zip, or paste JSON, and review before anything lands' },
       'merge into the current world or create a new one',
       'export the whole world or a subset by type',
       'copy the AI prompt (it carries your world\'s exact fields) to turn freeform notes into importable JSON',
@@ -127,24 +143,47 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     purpose: 'Place your world in space: maps, the pins that put elements on them, and zones that give regions a shape.',
     can: [
       'create a map with no image at all and sketch on a blank canvas; attach a picture later and your pins and zones scale to fit it',
-      'place an element with the + pin button on its header, then click the map (drag a pin to move it, and click one any time to travel back to the element)',
-      'draw a zone with the polygon or line tool, then double-click it to reshape it by its handles',
+      {
+        mouse: 'place an element with the + pin button on its header, then click the map (drag a pin to move it, and click one any time to travel back to the element)',
+        touch: 'place an element with the + pin button on its header, then tap the map (slide a pin with your finger to move it, and tap one any time to travel back to the element)',
+      },
+      { mouse: 'draw a zone with the polygon or line tool, then double-click it to reshape it by its handles', touch: null },
       'nest maps under a parent map or a location, and switch between them from the map list',
       'tune what a map shows from its settings: pin style and labels, zone opacity, the grid',
       'colour zones by kind from the zones button: a swatch, an eye and a tune button per kind, saved with the world',
-      'hover a zone to see all of it; on a crowded map the labels that fit are shown and the rest appear as you zoom in',
+      {
+        mouse: 'hover a zone to see all of it; on a crowded map the labels that fit are shown and the rest appear as you zoom in',
+        touch: 'on a crowded map the labels that fit are shown and the rest appear as you pinch in',
+      },
     ],
   },
 };
 
+/** Help as the overlay shows it: each line resolved for this pointer. */
+export interface ResolvedHelp {
+  name: string;
+  purpose: string;
+  can: string[];
+}
+
+function resolveLines(lines: readonly HelpLine[], touch: boolean): string[] {
+  const out: string[] = [];
+  for (const line of lines) {
+    const text = typeof line === 'string' ? line : touch ? line.touch : line.mouse;
+    if (text !== null) out.push(text);
+  }
+  return out;
+}
+
 /** Resolve help for a router middle-mode; null = no help surface (welcome). */
-export function helpForRoom(mode: string): RoomHelp | null {
+export function helpForRoom(mode: string, touch: boolean = isCoarsePointer()): ResolvedHelp | null {
   const help = HELP_CONTENT[mode];
   if (!help) return null;
-  if (!help.folderCan) return help;
+  const can = resolveLines(help.can, touch);
+  if (!help.folderCan) return { name: help.name, purpose: help.purpose, can };
   // Folder-only lines need a browser with folders and an open world kept in one.
   const { registry, active } = getState();
   const entry = registry.worlds.find(w => w.id === active?.worldId);
   const inFolder = hasFolderMode() && filesWhereOf(entry) === 'folder';
-  return inFolder ? { ...help, can: [...help.can, ...help.folderCan] } : help;
+  return { name: help.name, purpose: help.purpose, can: inFolder ? [...can, ...help.folderCan] : can };
 }

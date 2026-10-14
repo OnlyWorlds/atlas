@@ -25,6 +25,7 @@ import { rankAnchors, ANCHOR_CAP } from './degree';
 import { applyAlpha, ensureIconFont } from './canvas-utils';
 import { completeWaypoint } from '../../core/waypoints';
 import { openFieldEditPopover } from '../../ui/field-edit-popover';
+import { forPointer } from '../../core/pointer';
 import {
   type CalendarConfig, formatStep, formatDuration, parseDate, isParseError,
 } from '@onlyworlds/sdk';
@@ -864,7 +865,8 @@ function draw(state: ViewState): void {
     const midY = (TOP_PAD + axisY) / 2;
     if (state.undated.length > 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.42)';
-      ctx.fillText('Drag an element from the list onto the line to give it a date.', w / 2, midY);
+      // The chart's drags are a mouse's (#279): a finger opens the element instead.
+      ctx.fillText(forPointer('Drag an element from the list onto the line to give it a date.', 'Tap an element in the list to give it a date on its page.'), w / 2, midY);
     } else if (state.universe.length === 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillText('Nothing in this world has a date yet.', w / 2, midY - 10);
@@ -1916,7 +1918,7 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
 
   const sub = document.createElement('div');
   sub.className = 'atlas-timeline-rail-undated-sub';
-  sub.textContent = 'Drag onto the timeline to date it';
+  sub.textContent = forPointer('Drag onto the timeline to date it', 'Tap one to date it on its page');
   wrap.appendChild(sub);
 
   const byType = new Map<string, Array<{ id: string; type: string; name: string }>>();

@@ -26,6 +26,7 @@
 import { toastManager } from './toast-manager';
 import { showProblem } from './problem-fixes';
 import { problemWasShown } from '../core/problems';
+import { forPointer } from '../core/pointer';
 
 export interface FieldEditOptions {
   /** Element whose bounding rect anchors the popover. */
@@ -209,7 +210,7 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
       const bad = input instanceof HTMLInputElement && input.validity.badInput;
       const n = Number(nextValue);
       if (bad || (nextValue !== '' && !Number.isFinite(n))) {
-        errorLine.textContent = 'That is not a number. Fix it, or press Esc to keep the old value.';
+        errorLine.textContent = forPointer('That is not a number. Fix it, or press Esc to keep the old value.', 'That is not a number. Fix it, or tap Cancel to keep the old value.');
         errorLine.dataset.active = 'true';
         input.focus();
         return;

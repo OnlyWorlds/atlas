@@ -42,6 +42,7 @@ import { PlainError } from '../core/plain-error';
 import { isWorldFile, openWorldFileFrom } from '../ui/open-world-file';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { filesWhereOf } from '../core/browser-worlds';
+import { forPointer } from '../core/pointer';
 
 type Mode = 'new' | 'merge';
 
@@ -202,7 +203,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     </div>
     <div class="atlas-import-body">
       <div class="atlas-import-panel" data-panel="in" role="tabpanel">
-        <p class="atlas-import-lead">Anything in the OnlyWorlds format comes in here: a world from onlyworlds.com, a world file Atlas saved (.zip), loose elements, or JSON an AI assistant made from your notes. Drop it or paste it; you review it before it lands.</p>
+        <p class="atlas-import-lead">Anything in the OnlyWorlds format comes in here: a world from onlyworlds.com, a world file Atlas saved (.zip), loose elements, or JSON an AI assistant made from your notes. ${forPointer('Drop it or paste it', 'Choose it or paste it')}; you review it before it lands.</p>
         <div class="atlas-import-ai">
           <p class="atlas-import-ai-lead">Notes not in the format yet? <button type="button" class="atlas-btn-link" data-action="convert-prompt">Copy our prompt</button> and give it to an AI assistant with your notes, then paste the JSON it returns below. The prompt carries every field (~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens) and asks the assistant to add nothing your notes do not say. <a class="atlas-btn-link" href="${OW_AI_DOCS_URL}" target="_blank" rel="noopener">More ways to convert</a>.</p>
           ${agentLine}
