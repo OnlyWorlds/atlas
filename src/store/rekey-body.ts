@@ -28,13 +28,15 @@
  * `atlas_page_theme`, `atlas_page_intent`, `atlas_aliases`.
  */
 import type { Element, ElementType } from '../core/types';
+import { SERVER_AUTHOR_FIELDS } from '../core/constants';
 import { OW_LINK_HREF_RE, createOwLinkScanner } from '../core/ow-links';
 import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
 
 export type IdMap = ReadonlyMap<string, string>;
 
-const SKIP = new Set([
-  'id', 'type', 'name', 'created_at', 'created_by', 'local_updated_at', 'server_updated_at', 'updated_at',
+const SKIP = new Set<string>([
+  ...SERVER_AUTHOR_FIELDS,
+  'id', 'type', 'name', 'created_at', 'local_updated_at', 'server_updated_at', 'updated_at',
   'image_media_id', 'atlas_page_pub', 'atlas_calendar', 'atlas_page_theme', 'atlas_page_intent', 'atlas_aliases',
 ]);
 const SIDECAR = 'atlas_richtext_json';

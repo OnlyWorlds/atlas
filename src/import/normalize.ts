@@ -15,7 +15,7 @@
  */
 
 import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
-import { isExtensionField, SPATIAL_TYPES } from '../core/constants';
+import { isExtensionField, SERVER_AUTHOR_FIELDS, SPATIAL_TYPES } from '../core/constants';
 import type { ElementType } from '../core/types';
 import type { RawRecord } from './types';
 
@@ -53,8 +53,9 @@ const STRIP_ALWAYS = new Set([
   'change_seq',    // keel's server-managed sequence stamp — was only ever
                    // dropped as an unknown field; the §8c keepUnknown path
                    // must not resurrect it onto disk
-  'created_by',    // keel membership id in the SOURCE world (2026-09-28):
-                   // names nobody in the world being imported into
+  ...SERVER_AUTHOR_FIELDS, // who wrote it in the SOURCE world (created_by,
+                   // changed_by, changed_via): names nobody in the world
+                   // being imported into
   'local_updated_at',
   'server_updated_at',
   // Published-state mirror — meaningless (and misleading: it claims a slug owned

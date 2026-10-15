@@ -23,7 +23,7 @@ import {
 import {
   ALL_ELEMENT_TYPES,
 } from '../core/types';
-import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
+import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../core/constants';
 import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { mergeForeignIds } from './foreign-ids';
 import type {
@@ -2920,14 +2920,16 @@ function stripServerOnlyFields(record: Record<string, unknown>): Record<string, 
  */
 /** Same content on the wire's terms: server stamps and atlas's local-only fields do not count. */
 function sameWireContent(local: Element, remote: Record<string, unknown>): boolean {
-  const ignore = new Set<string>(['created_at', 'created_by', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
+  // Who wrote it never reaches here: diffFieldNames skips SERVER_AUTHOR_FIELDS.
+  const ignore = new Set<string>(['created_at', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
   return !diffFieldNames(local, remote).some(k => !ignore.has(k));
 }
 
 function diffFieldNames(local: Element, remote: Record<string, unknown>): string[] {
-  // created_by is server-authored and read-only: a local file that never saw a
-  // pull lacks it, which is not a difference anyone made.
-  const SKIP = new Set(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at', 'created_by']);
+  // Who wrote it (created_by, changed_by, changed_via) is server-authored and
+  // read-only: a local file that never saw a pull lacks it, and every server
+  // write moves the last two, which is not a difference anyone made.
+  const SKIP = new Set<string>(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at', ...SERVER_AUTHOR_FIELDS]);
   const keys = new Set<string>([...Object.keys(local), ...Object.keys(remote)]);
   const diff: string[] = [];
   for (const key of keys) {

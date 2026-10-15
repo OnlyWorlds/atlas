@@ -206,6 +206,17 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
   'atlas_calendar',
 ] as const;
 
+/**
+ * Who wrote an element, as keel records it: `created_by` (keel membership
+ * phase 2, 2026-09-28), `changed_by` and `changed_via` (keel #299, SDK 4.26:
+ * the membership and the door of the LAST write). Server-authored and
+ * read-only: kept on disk as received, never sent (keel ignores them in a
+ * write body, `elements/serialize.py` IGNORED_READONLY_FIELDS; atlas does not
+ * rely on that), never a difference anyone made, and meaningless in another
+ * world, so an import drops them. One list for every site that must agree.
+ */
+export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via'] as const;
+
 export const ATLAS_LOCAL_ONLY_FIELDS = [
   'image_media_id',
   // Writing workspace richtext payload (DESIGN_WRITING.md §Storage model, convention #47).

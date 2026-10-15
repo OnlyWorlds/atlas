@@ -20,7 +20,7 @@
 
 import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from '../../src/sync/sync-engine';
 import type { ElementType } from '../../src/core/types';
-import { ATLAS_LOCAL_ONLY_FIELDS } from '../../src/core/constants';
+import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../../src/core/constants';
 
 interface ServerRecord {
   id: string;
@@ -218,7 +218,7 @@ export class FakeOwApiClient implements OwApiClient {
     if (!this.assignServerIds && this.bucket(type).has(id)) {
       throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
     }
-    const record: ServerRecord = { ...wireBody, id, type, updated_at: this.clock() };
+    const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
     this.bucket(type).set(id, record);
     this.appendUpsert(record);
     return { ...record };
@@ -243,7 +243,7 @@ export class FakeOwApiClient implements OwApiClient {
     // server-side delete and routes via the same review modal as pull-time
     // detection — see pushPhase / resolveConflict.
     if (!existing) throw new Error(`API Error 404: ${id} not found in this world.`);
-    const next: ServerRecord = { ...existing, ...wireBody, id, type, updated_at: this.clock() };
+    const next: ServerRecord = { ...existing, ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
     m.set(id, next);
     this.appendUpsert(next);
     return { ...next };
@@ -415,7 +415,7 @@ export class FakeOwApiClient implements OwApiClient {
       if (!wireBody) continue;
       const type = items[i].type;
       const id = results[i].id;
-      const record: ServerRecord = { ...wireBody, id, type, updated_at: this.clock() };
+      const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
       this.bucket(type).set(id, record);
       this.appendUpsert(record);
       if (!this.omitBulkTimestamps) results[i].updatedAt = record.updated_at;
@@ -639,6 +639,18 @@ export class FakeOwApiClient implements OwApiClient {
     this.othersIds.add(id);
   }
 
+  /**
+   * Keel #299: every element write records who made it and through which
+   * door (`changed_by`, `changed_via`), and the read hands both back. Off by
+   * default (the older suites predate it); a test about the author fields
+   * turns it on with the door its writes come through (atlas's own: `api`).
+   */
+  __stamp_write_door(changed_via: string | null, changed_by: string | null = null): void {
+    this.writeDoor = changed_via === null ? {} : { changed_by, changed_via };
+  }
+
+  private writeDoor: { changed_by?: string | null; changed_via?: string } = {};
+
   private memberRole: 'contributor' | 'co_builder' | 'guest' | null = null;
   private othersIds = new Set<string>();
 
@@ -855,6 +867,9 @@ function stripUndefined(body: Record<string, unknown>): Record<string, unknown> 
     // it before the wire. Without this mirror the fake would store + echo it,
     // moving tests off the production path.
     if (k === 'change_seq') continue;
+    // The same for who wrote it: a file written from a pull carries them, and
+    // the adapter never sends them (keel would ignore them anyway).
+    if ((SERVER_AUTHOR_FIELDS as readonly string[]).includes(k)) continue;
     out[k] = v;
   }
   return out;

@@ -34,6 +34,13 @@ describe('validatePayload', () => {
     expect(issues).toEqual([]);
   });
 
+  it('accepts who wrote it (created_by, changed_by, changed_via): a linked world\'s export carries them', () => {
+    const issues = validatePayload(parsePayload({
+      Character: [{ name: 'A', created_by: null, changed_by: 'b1c2d3e4-0000-4000-8000-000000000001', changed_via: 'seat' }],
+    }));
+    expect(issues).toEqual([]);
+  });
+
   it('flags an unknown element-type bucket', () => {
     const issues = validatePayload(parsePayload({ Character: [{ name: 'A' }], Widgets: [{ name: 'W' }] }));
     expect(issues.some(i => i.field === 'Widgets' && /unknown element type/i.test(i.issue))).toBe(true);

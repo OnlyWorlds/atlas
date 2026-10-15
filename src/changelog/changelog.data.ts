@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.47.1',
+    date: '2026-10-16',
+    theme: 'Who wrote it is not a change',
+    entries: [
+      {
+        id: 'author-fields-not-a-change',
+        title: 'Who last changed an element no longer reads as a change',
+        body: 'OnlyWorlds now records who last changed each element and how. Atlas keeps that as it arrives and never sends it back: a conflict lists only the fields someone changed, importing a world file from a synced world does not flag it as unknown, and a world imported from another world drops it, since it names people in the world it came from.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.47.0',
     date: '2026-10-16',
     theme: 'Invite someone, made here',

@@ -61,6 +61,14 @@ describe('normalizeRecord — keepUnknown (envelope §8c passthrough)', () => {
     expect(record.created_by).toBeUndefined();
   });
 
+  it('strips who last wrote it (changed_by, changed_via): the source world\'s, not this one\'s', () => {
+    const { record } = normalizeRecord(
+      { name: 'A', changed_by: 'b1c2d3e4-0000-4000-8000-000000000001', changed_via: 'seat' },
+      'character' as never, { keepUnknown: true });
+    expect(record.changed_by).toBeUndefined();
+    expect(record.changed_via).toBeUndefined();
+  });
+
   it('default path still drops and counts unknown fields (the pair)', () => {
     const { record, droppedUnknown } = normalizeRecord(
       { name: 'A', future_field: 'dropped' }, 'character' as never);

@@ -219,6 +219,19 @@ describe('OwV2ClientAdapter — created_by is read-only (keel membership phase 2
     expect('created_by' in toV2WireShape(body, 'character', 'create')).toBe(false);
     expect('created_by' in toV2WireShape(body, 'character', 'update')).toBe(false);
   });
+
+  it('nor who last wrote it (keel #299: changed_by, changed_via), which a pull keeps', async () => {
+    const { adaptV2Record, toV2WireShape } = await import('../../src/sync/ow-v2-client-adapter');
+    const member = uuid();
+    const rec = adaptV2Record({ id: uuid(), name: 'Frodo', updated_at: clock.next(), changed_by: member, changed_via: 'seat' }, 'character');
+    expect(rec.changed_by).toBe(member);
+    expect(rec.changed_via).toBe('seat');
+    for (const op of ['create', 'update'] as const) {
+      const wire = toV2WireShape({ ...rec }, 'character', op);
+      expect('changed_by' in wire).toBe(false);
+      expect('changed_via' in wire).toBe(false);
+    }
+  });
 });
 
 describe('OwV2ClientAdapter — LIST cursor walk', () => {
