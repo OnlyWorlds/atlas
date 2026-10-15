@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.39.0',
+    date: '2026-10-15',
+    theme: 'Find on a touch screen',
+    entries: [
+      {
+        id: 'touch-find-in-writing',
+        title: 'A Find button in Writing on a touch screen',
+        body: 'On a phone or tablet, the bar over a text has a search button that opens find, where Ctrl+F was the only way in. Link to element works from there too. With a mouse, nothing changes.',
+        tags: ['writing'],
+      },
+    ],
+  },
+  {
     version: '1.38.0',
     date: '2026-10-15',
     theme: 'Signing in, said plainly',

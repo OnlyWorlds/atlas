@@ -168,6 +168,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       viewModeByNarrative.set(el.id, mode);
       void flushPendingSave().then(() => mountForNarrative(el));
     },
+    onFind: () => openFind('find'),
   });
 
   // Prose right-click menu + inline-create / split / unlink-chip actions.
@@ -317,17 +318,22 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // mode and used to open Find as well, pulling the caret out of the prose
     // (S367 critic C10). Same rule for H.
     if (!isMeta || e.shiftKey) return;
+    if (e.key === 'f' || e.key === 'F') {
+      e.preventDefault();
+      openFind('find');
+    } else if (e.key === 'h' || e.key === 'H') {
+      e.preventDefault();
+      openFind('replace');
+    }
+  };
+
+  /** The find bar from a key or the touch screen's button (#301). */
+  function openFind(mode: 'find' | 'replace'): void {
     // The compiled view is a rendering, not the source: find works, replace
     // is hidden (Ctrl+H opens find there), linking writes the subtree.
     const readOnly = !editorHandle && compiledCountFor !== null;
-    if (e.key === 'f' || e.key === 'F') {
-      e.preventDefault();
-      ensureFindBar().open('find', { readOnly, prefill: currentSelectionText() });
-    } else if (e.key === 'h' || e.key === 'H') {
-      e.preventDefault();
-      ensureFindBar().open('replace', { readOnly, prefill: currentSelectionText() });
-    }
-  };
+    ensureFindBar().open(mode, { readOnly, prefill: currentSelectionText() });
+  }
   root.addEventListener('keydown', onWorkspaceHotkey);
 
   // "Add to cast" event from the writing-context pane's element preview.

@@ -65,7 +65,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
         mouse: 'link every unlinked mention at once from the corner link icon; right-click a selection or a tree row for the same',
         touch: 'link every unlinked mention at once from the corner link icon',
       },
-      { mouse: 'find a word with Ctrl+F and link every match to one element; on a chapter or book this reaches every scene inside', touch: null },
+      { mouse: 'find a word with Ctrl+F and link every match to one element; on a chapter or book this reaches every scene inside', touch: 'find a word with the search button over the text, and link every match to one element; on a chapter or book this reaches every scene inside' },
       { mouse: 'create a chapter or scene inside a row with its hover +', touch: 'create a chapter or scene inside a row with its +' },
       'split a long piece into siblings at the cursor',
     ],

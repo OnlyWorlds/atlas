@@ -84,6 +84,28 @@ for (const tag of ['', '@firefox ']) test.describe(`${tag}on a touch screen`, ()
     }
   });
 
+  test('Writing has a Find button: a tap finds a word, and its matches can be linked (#301)', async ({ page }) => {
+    const wid = await worldThenPhone(page);
+    const id = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const el = await api.getActiveStore().createElement('narrative', {
+        name: 'find scene', supertype: 'Book', story: 'the orc met the orc and another orc joined them',
+      });
+      api.patchData(await api.getActiveStore().listElements());
+      return el.id as string;
+    });
+    await page.evaluate(([w, n]) => { location.hash = `#/w/${w}/writing/${n}`; }, [wid, id]);
+    await expect(page.locator('.atlas-writing-workspace-prose .ProseMirror')).toBeVisible();
+    const find = page.locator('.atlas-writing-workspace-crumb-actions [data-action="find"]');
+    await expect(find).toBeVisible();
+    await find.tap();
+    await expect(page.locator('.atlas-find-bar')).toHaveAttribute('data-state', 'shown');
+    await page.locator('[data-role="find-input"]').fill('orc');
+    await expect(page.locator('[data-role="count"]')).toContainText('1 of 3');
+    await page.locator('[data-role="link-matches"]').tap();
+    await expect(page.locator('[data-modal="pick-element"]')).toBeVisible();
+  });
+
   test('the Data room says choose, not drop', async ({ page }) => {
     const wid = await worldThenPhone(page);
     await page.evaluate((h) => { location.hash = h; }, `#/w/${wid}/import`);
@@ -103,4 +125,15 @@ test('with a mouse, help keeps its keyboard reference and says nothing of Lanter
   const modal = page.locator('[data-modal="help-overlay"]');
   await expect(modal).toContainText('Keyboard and mouse');
   await expect(modal.locator('a[data-link="lantern"]')).toHaveCount(0);
+  // With a mouse, Writing's bar is as it was: Ctrl+F finds, no Find button (#301)
+  await page.keyboard.press('Escape');
+  const id = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const el = await api.getActiveStore().createElement('narrative', { name: 'mouse scene', supertype: 'Book', story: 'one orc' });
+    api.patchData(await api.getActiveStore().listElements());
+    return el.id as string;
+  });
+  await page.evaluate((n) => { location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/writing/${n}`; }, id);
+  await expect(page.locator('.atlas-writing-workspace-crumb-actions [data-action="focus"]')).toBeVisible();
+  await expect(page.locator('.atlas-writing-workspace-crumb-actions [data-action="find"]')).toHaveCount(0);
 });

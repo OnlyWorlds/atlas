@@ -20,6 +20,7 @@ import { buildNarrativeIndex, ancestorIds } from './writing-helpers';
 import { narrativeHasChildren } from './writing-compiled';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { WritingViewMode } from './writing-workspace';
+import { isCoarsePointer } from '../core/pointer';
 
 export interface StickyBarController {
   /** Build the sticky bar for `el`. */
@@ -30,8 +31,10 @@ export function createStickyBar(deps: {
   root: HTMLElement;
   getViewMode: (el: Element) => WritingViewMode;
   onSwitchViewMode: (el: Element, mode: WritingViewMode) => void;
+  /** Opens the find bar; a touch screen gets a button for it (#301: Ctrl+F was the only way). */
+  onFind?: () => void;
 }): StickyBarController {
-  const { root, getViewMode, onSwitchViewMode } = deps;
+  const { root, getViewMode, onSwitchViewMode, onFind } = deps;
 
   function render(el: Element): HTMLElement {
     // Sticky bar below the 36px element header. Single horizontal row:
@@ -147,6 +150,20 @@ export function createStickyBar(deps: {
       toggle.appendChild(compiledBtn);
 
       right.appendChild(toggle);
+    }
+
+    // Find on a touch screen (#301): with a mouse, Ctrl+F stays the way and
+    // the bar is unchanged (the 1.37 rule: the desktop's copy and chrome hold).
+    if (onFind && isCoarsePointer()) {
+      const findBtn = document.createElement('button');
+      findBtn.type = 'button';
+      findBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
+      findBtn.dataset.action = 'find';
+      findBtn.title = 'Find in this text';
+      findBtn.setAttribute('aria-label', 'Find in this text');
+      findBtn.innerHTML = '<span class="material-symbols-outlined">search</span>';
+      findBtn.addEventListener('click', () => onFind());
+      right.appendChild(findBtn);
     }
 
     const focusBtn = document.createElement('button');
