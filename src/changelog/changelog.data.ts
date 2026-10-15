@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.43.1',
+    date: '2026-10-15',
+    theme: 'Refresh says it once',
+    entries: [
+      {
+        id: 'refresh-says-once',
+        title: 'Refresh from OnlyWorlds says what came down once',
+        body: 'A refresh that brought changes showed two messages with the same count in different words. Now one says how many are new or updated, and a refresh with nothing new still says it is up to date.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.43.0',
     date: '2026-10-15',
     theme: 'The chart by finger',

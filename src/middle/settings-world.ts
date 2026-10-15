@@ -288,10 +288,10 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       if (!result) { surfaceSyncUnavailable(toasts); return; }
       const elementTotal = result.pulled.creates + result.pulled.updates;
       const metaTotal = result.meta_pulled?.length ?? 0;
-      // Meta-only pulls already toast "Pulled world settings from API" in
-      // pullNowAndRefresh — stay quiet here rather than double-toasting.
+      // pullNowAndRefresh says what came down (the counts, or the conflicts'
+      // own toasts): only the nothing-came case is said here, or a refresh
+      // says it twice (S411, the journey scout's gap C).
       if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
-      else if (elementTotal > 0) toasts.success(`Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
     } catch (err) {
       console.warn('[settings-world] refresh failed:', err);
       showProblem(err, {

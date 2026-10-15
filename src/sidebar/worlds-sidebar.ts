@@ -333,10 +333,9 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         if (!result) { surfaceSyncUnavailable(toasts); return; }
         const elementTotal = result.pulled.creates + result.pulled.updates;
         const metaTotal = result.meta_pulled?.length ?? 0;
-        // Meta-only pulls already toast "Pulled world settings from API" in
-        // pullNowAndRefresh — stay quiet here rather than double-toasting.
+        // pullNowAndRefresh says what came down (the counts, or the conflicts'
+        // own toasts): only the nothing-came case is said here (S411).
         if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
-        else if (elementTotal > 0) toasts.success(`${result.pulled.creates} new, ${result.pulled.updates} updated from OnlyWorlds`);
       } catch (err) {
         console.warn('[worlds-sidebar] refresh failed:', err);
         showProblem(err, {
