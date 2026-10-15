@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.43.2',
+    date: '2026-10-15',
+    theme: 'An imported world opens whole',
+    entries: [
+      {
+        id: 'import-opens-whole',
+        title: 'A world brought in as a new world opens with its own details',
+        body: 'After Data, Import as a new world, the world opened with only its name until a reload: Home asked you to describe a world that already had a description, and the map had no Now for its dated zones. It now opens with its description, its dates and the rest, and the address and the world tab name the new world, so a reload keeps you there.',
+        tags: ['import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.43.1',
     date: '2026-10-15',
     theme: 'Refresh says it once',

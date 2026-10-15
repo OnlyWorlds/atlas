@@ -822,7 +822,9 @@ export async function createWorldFromImportedData(
   // The store first (S364 gate lens C C9): a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
-  patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name }, opened: true });
+  // The whole world.json, as an ordinary open reads it: a local world has no
+  // sync round to fill in the imported description and dates later (S412).
+  patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta(), opened: true });
   const elements = await store.listElements();
   patchSlice('data', { elements });
   patchSlice('ui', { ...getState().ui, selectedElementId: null });

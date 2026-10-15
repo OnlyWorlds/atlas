@@ -12,7 +12,7 @@
  *     write goes through BOTH transforms or neither.
  *
  * Matching rules mirror the live autolink plugin exactly (its scan calls
- * into the same index): case-sensitive word-boundary match on name ∪
+ * into the same index): case-folded word-boundary match on name ∪
  * atlas_aliases, min 3 chars, ambiguous names skipped, first mention only
  * per document, existing links respected.
  */

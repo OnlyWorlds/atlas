@@ -93,6 +93,25 @@ test('import full-world JSON creates a new world (Mode A)', async ({ page }) => 
   })).toBe('068e5110-a410-7cbb-8000-5168e2a14b51');
 });
 
+test('import as new opens the world with its own details, not only a name (S412)', async ({ page }) => {
+  // The world opened on { id, name } alone until a reload: Home invited
+  // "Describe your world…" over the file's description, and the map's Now
+  // hid for want of time_current. A local world has no sync round to heal it.
+  await setupWorld(page);
+  await openImport(page);
+  await page.fill('[data-role="paste"]', JSON.stringify({ ...FULL_WORLD, World: { ...FULL_WORLD.World, time_current: 1849 } }));
+  await page.click('[data-action="load"]');
+  await importAsNew(page);
+  await expect.poll(async () => page.evaluate(() => (window as any).__atlasTestApi.getState().active?.meta?.name)).toBe('Blood Meridian');
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().active?.meta?.time_current)).toBe(1849);
+  // The address and the world tab follow the new world (they read the URL).
+  const activeId = await page.evaluate(() => (window as any).__atlasTestApi.getState().active?.worldId);
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(`#/w/${activeId}/import`);
+  await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveText('Blood Meridian');
+  await page.click('.atlas-room-nav-btn[data-room="home"]');
+  await expect(page.locator('.atlas-home-world-description')).toHaveText('The Glanton gang rides.');
+});
+
 test('import as new into this browser: the where-step lands a browser world, and Cancel imports nothing', async ({ page }) => {
   await setupWorld(page);
   await openImport(page);
