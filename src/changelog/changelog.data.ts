@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.47.0',
+    date: '2026-10-16',
+    theme: 'Invite someone, made here',
+    entries: [
+      {
+        id: 'invite-made-in-atlas',
+        title: 'Invite someone makes the link in Atlas',
+        body: 'Signed in with your account token, Settings, This world, Invite someone now makes the invite link here, as Lantern does: choose a contributor or a player, sign it with your name, and the link appears once, with Copy and a QR code (and Send it where your system can share). It works once, for 7 days. Seeing and taking back links stays on the world\'s page on onlyworlds.com. Signed out, Invite someone still opens that page.',
+        tags: ['sync', 'worlds'],
+      },
+    ],
+  },
+  {
     version: '1.46.0',
     date: '2026-10-16',
     theme: 'Your worlds on the first screen',

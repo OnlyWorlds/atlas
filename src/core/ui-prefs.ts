@@ -22,6 +22,8 @@ export interface UiPrefs {
   defaultCreateType: ElementType;
   /** Where the user last chose to put a new world (1.17); only read with no home folder. */
   newWorldWhere?: 'folder' | 'browser';
+  /** The name the owner signed their last invite link with (#341), asked again if empty. */
+  inviterName?: string;
 }
 
 /** Types the create modal can default to — content types plus 'map'. */
@@ -46,7 +48,12 @@ export function loadUiPrefs(): UiPrefs {
         ? parsed.defaultCreateType
         : DEFAULT_PREFS.defaultCreateType;
     const newWorldWhere = parsed.newWorldWhere === 'folder' || parsed.newWorldWhere === 'browser' ? parsed.newWorldWhere : undefined;
-    return { sidebarMode, defaultCreateType, ...(newWorldWhere ? { newWorldWhere } : {}) };
+    const inviterName = typeof parsed.inviterName === 'string' ? parsed.inviterName.slice(0, 80) : undefined;
+    return {
+      sidebarMode, defaultCreateType,
+      ...(newWorldWhere ? { newWorldWhere } : {}),
+      ...(inviterName ? { inviterName } : {}),
+    };
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -66,6 +73,11 @@ export function setSidebarModePref(mode: SidebarMode): void {
 
 export function setNewWorldWherePref(where: 'folder' | 'browser'): void {
   saveUiPrefs({ ...loadUiPrefs(), newWorldWhere: where });
+}
+
+export function setInviterNamePref(name: string): void {
+  const { inviterName: _old, ...rest } = loadUiPrefs();
+  saveUiPrefs(name ? { ...rest, inviterName: name.slice(0, 80) } : rest);
 }
 
 export function setDefaultCreateTypePref(type: ElementType): void {

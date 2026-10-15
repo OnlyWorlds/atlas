@@ -138,7 +138,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </div>
       ${isSeatWorld(world) ? `<p class="atlas-settings-hint" data-role="seat-line">${escapeText(seatLine(world))}</p>` : ''}
       ${renderSyncIssues(world)}
-      ${canOfferInvite(world, getState().accountWorlds.rows) ? `<p class="atlas-settings-hint" data-role="invite-line"><a class="atlas-settings-link atlas-link-inline" data-link="invite" href="${escapeAttr(owAccessUrl(world.api!.world_id))}" target="_blank" rel="noopener">Invite someone</a> · opens this world on onlyworlds.com at Access, where you make an invite link to send. Your friend needs a free account.</p>` : ''}
+      ${canOfferInvite(world, getState().accountWorlds.rows, inviteListLoaded()) ? inviteLineHtml(world) : ''}
       <div class="atlas-settings-actions">
         <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from OnlyWorlds</button>
         <button class="atlas-btn-ghost" data-action="test-connection">Test connection</button>
@@ -205,7 +205,42 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
   `;
 }
 
+/**
+ * Invite someone (#341). Signed in, Atlas makes the link itself, as Lantern
+ * does (`InviteModal`); signed out, the world's Access pane on onlyworlds.com
+ * is where a link is made (1.36), and the line says signing in brings it here.
+ */
+/** The signed-in account's world list has come, for the token signed in now. */
+function inviteListLoaded(): boolean {
+  const { registry, accountWorlds } = getState();
+  return !!registry.account_token && accountWorlds.status === 'ready' && accountWorlds.fetchedWithToken === registry.account_token;
+}
+
+/** One dialog per click: the click waits on a lazy import before it opens (gate L3). */
+let inviteOpening = false;
+
+function inviteLineHtml(world: WorldRegistryEntry): string {
+  if (getState().registry.account_token) {
+    return `<p class="atlas-settings-hint" data-role="invite-line"><button type="button" class="atlas-btn-link" data-action="invite-someone">Invite someone</button> · makes a link to send, for a contributor or a player. They need a free account.</p>`;
+  }
+  return `<p class="atlas-settings-hint" data-role="invite-line"><a class="atlas-settings-link atlas-link-inline" data-link="invite" href="${escapeAttr(owAccessUrl(world.api!.world_id))}" target="_blank" rel="noopener">Invite someone</a> · opens this world on onlyworlds.com at Access, where you make an invite link to send. Your friend needs a free account. Signed in with your account token, Atlas makes the link here.</p>`;
+}
+
 export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="invite-someone"]')
+    ?.addEventListener('click', async () => {
+      const token = getState().registry.account_token;
+      const worldId = world.api?.world_id;
+      if (!token || !worldId || inviteOpening) return;
+      inviteOpening = true;
+      try {
+        const { InviteModal } = await import('../ui/invite-modal');
+        new InviteModal(toasts, token, worldId, world.name).open();
+      } finally {
+        inviteOpening = false;
+      }
+    });
+
   // "Open the folder in Explorer" (Captain, S360): a web page cannot open an
   // OS folder or learn its full path. The nearest real thing is the system
   // folder picker opened INSIDE the world folder; whatever the user picks is

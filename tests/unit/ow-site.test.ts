@@ -25,6 +25,11 @@ describe('canOfferInvite', () => {
   it('not for a world the account only collaborates on', () => {
     expect(canOfferInvite(linked(), [row('collaborator')])).toBe(false);
   });
+  it('with the account list loaded, only a world on it as owner (#341, gate M2)', () => {
+    expect(canOfferInvite(linked(), [], true)).toBe(false);
+    expect(canOfferInvite(linked(), [row('owner')], true)).toBe(true);
+    expect(canOfferInvite(linked(), [row('collaborator')], true)).toBe(false);
+  });
   it('not for a seat, a view-only world, or a local one', () => {
     expect(canOfferInvite(linked({ seat: { role: 'contributor' } }), [])).toBe(false);
     expect(canOfferInvite(linked({ read_only: true }), [])).toBe(false);

@@ -28,13 +28,16 @@ export function owAccessUrl(apiWorldId: string): string {
  * Whether to offer "Invite someone" for this world: linked, not a seat, not
  * view-only, and not a world the signed-in account only collaborates on (its
  * Access pane is the owner's). Without the account list, the owner is the
- * likely case, and the website says so plainly if not.
+ * likely case, and the website says so plainly if not. With the list loaded
+ * (`listLoaded`), a world missing from it is someone else's: keel makes links
+ * for the owner only, so it is not offered (#341, the S414 gate's M2).
  */
-export function canOfferInvite(world: WorldRegistryEntry, accountRows: readonly AccountWorldRow[]): boolean {
+export function canOfferInvite(world: WorldRegistryEntry, accountRows: readonly AccountWorldRow[], listLoaded = false): boolean {
   const api = world.api;
   if (world.state !== 'api-linked' || !api?.world_id) return false;
   if (api.seat || api.read_only) return false;
   const row = accountRows.find(r => r.id === api.world_id);
+  if (listLoaded) return row?.role === 'owner';
   return !row || row.role === 'owner';
 }
 

@@ -76,6 +76,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/sync/rekey-route.ts`: `rekeyRouteHash`, the URL after ids change.
 - `src/sync/foreign-ids.ts`: ids another world holds, recorded on evidence (conv. 108).
 - `src/sync/account-client.ts`: signed-in account calls (v2 `POST /account/worlds` with the PIN dance for Route 1).
+- `src/sync/invite-link.ts`: Invite someone's link (#341, 1.47): `makeInvite` on the SDK's `createWorldLink` with the account token, a person's link, keel's 7 days; every refusal worded (`INVITE_NOT_OWNER_LINE`). Nothing kept.
 - `src/sync/sharing-client.ts`: the typed client for the sharing API (SHARING_CONTRACT §4): publish/getPublic/republish/revoke/list/slug-check, error-enum mapping, `SHARING_BASE_URL`.
 - `src/sync/auto-pull-scheduler.ts`: opt-in periodic pull with visibility/error-state gates.
 
@@ -148,6 +149,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/ui/help-overlay.ts` (the `?` overlay) over `src/ui/help-content.ts` (ALL per-room help strings, one file).
 - `src/ui/room-tabs.ts` (the room-section tab pattern), `src/ui/drill-in.ts` (the `‹ Room` back band on entity views).
 - `src/ui/shortcuts-content.ts`; `src/ui/hotkey-reference-modal.ts` is DORMANT (superseded by the help overlay).
+- `src/ui/invite-modal.ts` (#341, 1.47): `InviteModal`, Lantern's invite sheet in Atlas: who it is for, the name it is signed with, then the link once (Send it where the share sheet exists, Copy, the QR code from `src/ui/qr-code.ts`, the Access pane link).
 
 ## src/tour
 
