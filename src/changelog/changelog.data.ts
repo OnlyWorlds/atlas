@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.41.0',
+    date: '2026-10-15',
+    theme: 'Dates to check',
+    entries: [
+      {
+        id: 'home-date-conflicts',
+        title: 'Home points out dates worth a second look',
+        body: 'Loose threads at the bottom of a world\'s home now lead with dates to check: a title revoked before it was granted, an event set off by one that began later, a character linked to a battle that ended before they were born. Each shows both dates in your world\'s calendar, and both names open the element. Some can be right, like a historian of an old war, so Atlas only points and never changes anything.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.40.0',
     date: '2026-10-15',
     theme: 'Borders that move with time',

@@ -18,6 +18,8 @@ import { navigate, elementHash } from '../core/router';
 import { ELEMENT_ICONS } from '../core/constants';
 import { collectReferencedIds } from './element-detail-refs';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
+import { findDateConflicts, type DateConflict, type DatedRef } from '../core/date-continuity';
+import { worldDateFormatter } from '../core/world-date-text';
 
 interface LooseThread {
   key: string;
@@ -26,7 +28,15 @@ interface LooseThread {
   /** Material symbol shown before the expanded chips. */
   icon: string;
   elements: Element[];
+  /**
+   * Dates that cannot both be true (#281): the thread counts and lists these
+   * pairs, one sentence each, instead of chips.
+   */
+  conflicts?: DateConflict[];
 }
+
+/** How many a thread counts: its pairs, or its elements. */
+const threadCount = (t: LooseThread): number => t.conflicts?.length ?? t.elements.length;
 
 /** Read a possibly-absent field off an element without fighting the union. */
 function field(el: Element, name: string): unknown {
@@ -61,7 +71,16 @@ export function computeLooseThreads(elements: readonly Element[]): LooseThread[]
     return startField ? parseTemporalValue(field(el, startField)) === null : false;
   });
 
+  // Dates to check lead: every other thread is the world being thin, this one
+  // is the world perhaps contradicting itself (#281).
+  const conflicts = findDateConflicts(elements);
+  const byId = new Map(elements.map(e => [e.id, e]));
+  const conflictEls = [...new Set(conflicts.flatMap(c => [c.a.id, c.b.id]))]
+    .map(id => byId.get(id)).filter((e): e is Element => !!e);
+
   const threads: LooseThread[] = [
+    { key: 'date-conflicts', icon: 'event_busy', elements: conflictEls, conflicts,
+      noun: n => (n === 1 ? 'date to check' : 'dates to check') },
     { key: 'unmapped-locations', icon: ELEMENT_ICONS.location, elements: unmappedLocations,
       noun: n => (n === 1 ? 'location not on a map' : 'locations not on a map') },
     { key: 'undated-events', icon: ELEMENT_ICONS.event, elements: undatedEvents,
@@ -110,7 +129,7 @@ export function buildLooseThreads(elements: readonly Element[], worldId: string)
       sep.textContent = '·';
       row.appendChild(sep);
     }
-    const n = thread.elements.length;
+    const n = threadCount(thread);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'atlas-home-thread';
@@ -140,9 +159,67 @@ export function buildLooseThreads(elements: readonly Element[], worldId: string)
   return section;
 }
 
+/**
+ * A date to check as a sentence: text runs and the two elements as buttons.
+ * Both dates are stated, the verdict left to the reader: only `reversed` and
+ * `cause-after-effect` cannot be true, and the links across a birth can (a
+ * historian, a pretender; DESIGN_HOME §6).
+ */
+function conflictParts(c: DateConflict, date: (n: number) => string): Array<string | DatedRef> {
+  const d = (r: DatedRef) => date(r.date);
+  const over = (r: DatedRef) => (r.field === 'start_date' ? `took place ${d(r)}` : `ended ${d(r)}`);
+  switch (c.kind) {
+    case 'reversed':
+      return c.a.field === 'grant_date'
+        ? [c.a, ` is revoked (${d(c.b)}) before it is granted (${d(c.a)})`]
+        : [c.a, ` ends (${d(c.b)}) before it starts (${d(c.a)})`];
+    case 'cause-after-effect':
+      return [c.b, ` (began ${d(c.b)}) is set off by `, c.a, ` (began ${d(c.a)})`];
+    case 'born-after-event':
+    case 'born-after-relation':
+      return [c.a, ` (born ${d(c.a)}) is linked to `, c.b, ` (${over(c.b)})`];
+    case 'holder-born-after-revoke':
+      return [c.a, ` (born ${d(c.a)}) is a holder of `, c.b, ` (revoked ${d(c.b)})`];
+  }
+}
+
+function renderConflicts(expand: HTMLElement, conflicts: DateConflict[], worldId: string): void {
+  const list = document.createElement('div');
+  list.className = 'atlas-home-thread-conflicts';
+  const date = worldDateFormatter();
+  for (const c of conflicts) {
+    const row = document.createElement('div');
+    row.className = 'atlas-home-thread-conflict';
+    row.dataset.kind = c.kind;
+    for (const part of conflictParts(c, date)) {
+      if (typeof part === 'string') { row.appendChild(document.createTextNode(part)); continue; }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'atlas-home-thread-chip';
+      btn.title = `Open ${part.name}`;
+      const icon = document.createElement('span');
+      icon.className = 'material-symbols-outlined atlas-home-thread-chip-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = ELEMENT_ICONS[part.type as keyof typeof ELEMENT_ICONS] ?? 'circle';
+      btn.appendChild(icon);
+      const label = document.createElement('span');
+      label.textContent = part.name;
+      btn.appendChild(label);
+      btn.addEventListener('click', () => {
+        const el = getState().data.elements.find(e => e.id === part.id);
+        if (el) openElement(worldId, el);
+      });
+      row.appendChild(btn);
+    }
+    list.appendChild(row);
+  }
+  expand.appendChild(list);
+}
+
 function renderExpand(expand: HTMLElement, thread: LooseThread, worldId: string): void {
   expand.innerHTML = '';
   expand.hidden = false;
+  if (thread.conflicts) { renderConflicts(expand, thread.conflicts, worldId); return; }
   const list = document.createElement('div');
   list.className = 'atlas-home-thread-chips';
   const sorted = thread.elements.slice().sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));

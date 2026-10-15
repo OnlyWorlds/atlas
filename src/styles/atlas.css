@@ -14868,6 +14868,26 @@ a.atlas-share-map-pin { cursor: pointer; }
   border-color: var(--atlas-warn-soft);
 }
 .atlas-home-thread-chip-icon { font-size: 15px !important; color: var(--atlas-warn-soft); }
+/* Dates that do not add up (#281): one sentence per pair, both elements as chips. */
+.atlas-home-thread-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--atlas-warn-soft-border);
+  background: var(--atlas-warn-soft-tint);
+  border-radius: 8px;
+}
+.atlas-home-thread-conflict {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--atlas-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.atlas-home-thread-conflict .atlas-home-thread-chip {
+  margin: 0 2px;
+  vertical-align: baseline;
+}
 
 /* The chart strip (S15) — the world's history shape on the cover.
    S256: always the tableau; saved charts ride below as chips. */

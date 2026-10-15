@@ -35,6 +35,20 @@ describe('computeLooseThreads', () => {
     expect(threads.flatMap(t => t.elements.map(e => e.id))).not.toContain('char-linked');
   });
 
+  it('dates that cannot both be true lead, counted by pairs (#281)', () => {
+    const elements: Element[] = [
+      el('character', 'ireena', { birth_date: 120 }),
+      el('event', 'battle', { start_date: 100, end_date: 105, characters: ['ireena'] }),
+      el('title', 'mitre', { grant_date: 90, revoke_date: 40, characters: ['ireena'] }),
+      el('location', 'barovia'),
+      el('pin', 'p', { element_id: 'barovia', map: 'm' }),
+    ];
+    const threads = computeLooseThreads(elements);
+    expect(threads[0].key).toBe('date-conflicts');
+    expect(threads[0].conflicts?.map(c => c.kind)).toEqual(['reversed', 'born-after-event']);
+    expect(threads[0].elements.map(e => e.id).sort()).toEqual(['battle', 'ireena', 'mitre']);
+  });
+
   it('returns no threads for a fully woven world', () => {
     const elements: Element[] = [
       el('character', 'c1'),

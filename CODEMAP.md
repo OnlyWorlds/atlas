@@ -10,6 +10,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 - `src/core/problems.ts`: ERRORS (S368, conv. 125): `classifyError` / `problemFor` / `buildDetails` / `scrubForReport`; UI never shows `err.message`.
 - `src/core/plain-error.ts`: `PlainError`, a message already written for users (the refusal classes extend it).
+- `src/core/date-continuity.ts`: `findDateConflicts`, the dates to check (#281; two kinds cannot be true, the rest are links across a birth), pure; Home's loose threads list them (DESIGN_HOME §6). `src/core/world-date-text.ts`: a date as the world's active calendar says it. `src/core/link-ids.ts`: `linkIdsOf`, the tolerant link reader (conv. 94).
 - `src/core/types.ts`: Element, Conflict, SyncEngineState, Registry types, `SyncResult.pulled_ids`.
 - `src/core/constants.ts`: storage keys, folder layout, `ATLAS_WIRE_EXTENSION_FIELDS` (sent) + `ATLAS_LOCAL_ONLY_FIELDS` (stripped); see ATLAS_FIELDS.md.
 - `src/core/state.ts`: the observable store.

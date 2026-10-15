@@ -7,8 +7,7 @@
  */
 
 import { getState } from '../../core/state';
-import { resolveCalendarLens } from '../../core/calendar-lens';
-import { formatStep } from '@onlyworlds/sdk';
+import { worldDateText } from '../../core/world-date-text';
 import { effectiveZoneDate, zoneDateRange, zoneShownAt } from '../../core/zone-dates';
 import L from 'leaflet';
 import type { MapTabCacheEntry } from './map-tab-cache';
@@ -32,15 +31,6 @@ export function mapZoneDate(entry: MapTabCacheEntry): number | null {
  */
 export function zoneShownOnMap(entry: MapTabCacheEntry, zone: Zone, date = mapZoneDate(entry)): boolean {
   return zone.id === getState().ui.selectedElementId || zoneShownAt(zone, date);
-}
-
-/** A date as the world's calendar says it (the active lens, as the charts and the element page resolve it). */
-function dateText(n: number): string {
-  const s = getState();
-  const worldId = s.active?.worldId;
-  const reg = worldId ? s.registry.worlds.find(w => w.id === worldId) : undefined;
-  const lens = resolveCalendarLens(s.data.elements, reg?.active_calendar_id, { fallbackToOnly: true });
-  return lens && Number.isInteger(n) ? formatStep(lens.config, n) : String(n);
 }
 
 export function buildDateBar(): HTMLDivElement {
@@ -106,7 +96,7 @@ export function updateDateBar(entry: MapTabCacheEntry, onThisMap: readonly Zone[
   const date = mapZoneDate(entry);
   const choice = entry.zoneDate.kind;
   const label = bar.querySelector<HTMLElement>('[data-role="datebar-label"]')!;
-  label.textContent = date === null ? 'All dates' : dateText(date);
+  label.textContent = date === null ? 'All dates' : worldDateText(date);
   bar.dataset.choice = date === null ? 'all' : choice;
 
   const slider = bar.querySelector<HTMLInputElement>('[data-role="datebar-slider"]')!;
