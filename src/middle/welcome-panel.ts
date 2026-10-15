@@ -13,7 +13,7 @@ import { isCodeLoadError } from '../core/reload-offer';
 import { getActiveStore } from '../core/active-store';
 import { BROWSER_STORAGE_FULL_LINE, hasFolderMode, opfsStatus, NO_BROWSER_STORAGE_LINE } from '../core/capabilities';
 import { escapeText } from '../core/dom-utils';
-import { navigate, timelineHash } from '../core/router';
+import { navigate, settingsHash, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
 import { recoverAtlasRoot, setupAtlasRoot } from '../setup/atlas-root-flow';
 import { finishSetupDoor, openAddWorldChooser, pickAndOpenWorldFolder, runAddWorldAction } from '../setup/world-doors';
@@ -24,6 +24,8 @@ import { showProblem } from '../ui/problem-fixes';
 import { isNarrowSidebar, openDrawer } from '../layout/narrow-layout';
 import { isCoarsePointer } from '../core/pointer';
 import { lanternLineHtml } from '../core/ow-site';
+import { landingAccountWorldsHtml } from './landing-account-worlds';
+import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 
 /**
  * Whether this no-world stretch already opened the sidebar drawer (S366).
@@ -32,6 +34,11 @@ import { lanternLineHtml } from '../core/ow-site';
  * ONCE on arriving; a user who closes it is not fought on the next render.
  */
 let sidebarShownForNoWorld = false;
+
+/** A '1' flag in localStorage; false where storage refuses (private mode). */
+function localStorageFlag(key: string): boolean {
+  try { return localStorage.getItem(key) === '1'; } catch { return false; }
+}
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -42,6 +49,31 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
   // Active listener for the grounded state's sidebar-hover detail zone;
   // re-renders replace it, unmount clears it.
   let hoverCleanup: (() => void) | null = null;
+  // What the landing was last built from (S414): a notify that leaves it the
+  // same (the account list loading, a row opening) repaints only the account
+  // block, so the sigil does not restart and the storage probe's edits stay.
+  let landingKey: string | null = null;
+  // The account block as last written: compared against this string, never
+  // against innerHTML, which the browser re-serializes (the S414 gate's H1:
+  // every notify rebuilt the rows and a focused row lost its focus).
+  let lastAccountBlock = '';
+
+  // The landing's account rows (S414) open as the sidebar's do, owned or shared.
+  root.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-role="landing-worlds-retry"]')) {
+      refreshAccountWorlds(true);
+      return;
+    }
+    if (target.closest('[data-role="landing-worlds-settings"]')) {
+      navigate(settingsHash(null, 'onlyworlds'));
+      return;
+    }
+    const btn = target.closest<HTMLElement>('[data-landing-world-id]');
+    if (!btn) return;
+    const row = remoteAccountWorlds().find(r => r.id === btn.getAttribute('data-landing-world-id'));
+    if (row) void openAccountWorld(row, toastManager);
+  });
 
   async function render(): Promise<void> {
     hoverCleanup?.();
@@ -56,6 +88,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // root exists, a world is active, or the tour itself is running (the
     // tour's build-up owns the chrome then).
     const grounded = isAtlasGrounded(state);
+    // The tour too (gate M1): a replay exited before its world exists comes
+    // back to a landing whose tour button still says "Starting…".
+    if (grounded || active || (!atlasRoot && atlasRootRecoverable) || isTourFlagActive()) landingKey = null;
     const bare = !grounded && !active && !isTourFlagActive();
     document.body.classList.toggle('atlas-preroot', bare);
 
@@ -118,6 +153,20 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // (session 255 minimal form; tour door added 2026-07-19, Freek's "jarring
     // first screen"): the tour needs no folder, so it leads.
     if (!grounded) {
+      // Signed in: the account's worlds under the doors (S414). The fetch is
+      // token-guarded, so calling it on every render is a no-op once made.
+      if (state.registry.account_token) refreshAccountWorlds();
+      const accountBlock = landingAccountWorldsHtml(state);
+      const key = JSON.stringify([hasFolderMode(), isCoarsePointer(), localStorageFlag('atlas_tour_done_v1')]);
+      const block = root.querySelector<HTMLElement>('[data-role="landing-worlds"]');
+      if (block && key === landingKey) {
+        if (accountBlock !== lastAccountBlock) block.innerHTML = accountBlock;
+        lastAccountBlock = accountBlock;
+        block.hidden = accountBlock === '';
+        return;
+      }
+      landingKey = key;
+      lastAccountBlock = accountBlock;
       // 1.17 (contract §8, lens C R2-c, W5): a world can live in this browser,
       // so every browser gets "start a world" (the dialog asks where on
       // Chromium) and "other ways in" (the chooser: bring one down, view a
@@ -132,8 +181,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // stays one click from the first screen (his Q5) as a link: a choice,
       // not the first step.
       const folderMode = hasFolderMode();
-      let tourDone = false;
-      try { tourDone = localStorage.getItem('atlas_tour_done_v1') === '1'; } catch { /* private mode */ }
+      const tourDone = localStorageFlag('atlas_tour_done_v1');
       // S301 (Captain's round): the doors lost their headings and their boxes;
       // the compact doors kept a caption each (Captain, S302), one muted line,
       // no time claim, tool voice.
@@ -184,6 +232,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
               ${doors}
             </div>
             <p class="atlas-landing-more">${more}</p>
+            <div class="atlas-landing-worlds" data-role="landing-worlds"${accountBlock ? '' : ' hidden'}>${accountBlock}</div>
             <p class="atlas-landing-tag">Worldbuilding on OnlyWorlds.</p>
             <p class="atlas-landing-note" data-role="storage-note"${folderNote ? '' : ' hidden'}>${folderNote}</p>
             ${isCoarsePointer() ? `<p class="atlas-landing-note" data-role="lantern-note">${lanternLineHtml()}</p>` : ''}

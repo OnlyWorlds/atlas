@@ -22,6 +22,10 @@ import { OwV2Error } from '../sync/ow-v2-client-adapter';
 import { classifyError, problemFor } from '../core/problems';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
 import { OW_SETTINGS_URL } from '../core/ow-site';
+import { isAtlasGrounded } from '../core/grounded';
+import { isTourFlagActive } from '../tour/tour-flag';
+import { accountWorldsWhenFetched } from '../sync/account-worlds';
+import { navigate } from '../core/router';
 
 /**
  * The sign-in error line (B6, S369). `accountErrorMessage`'s code branches
@@ -176,7 +180,17 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       patchSlice('registry', next);
       toasts.success(`Signed in as ${profile.username}`);
       // A person's invitation that waited for this sign-in opens again (#294).
-      void import('../ui/person-join-modal').then(m => m.resumeJoinAfterSignIn(toasts));
+      // Otherwise, on a browser with no world yet, the account's worlds are
+      // on the first screen (S414): this room has no list of them. Said only
+      // once the list has come with worlds in it, and never under the tour.
+      void import('../ui/person-join-modal').then(async (m) => {
+        if (await m.resumeJoinAfterSignIn(toasts) || isAtlasGrounded() || isTourFlagActive()) return;
+        const rows = await accountWorldsWhenFetched(token);
+        if (!rows?.length || isAtlasGrounded() || isTourFlagActive()) return;
+        toasts.show(`Your worlds on OnlyWorlds (${rows.length}) are listed on the first screen.`, 'info', 0, {
+          actions: [{ label: 'Show them', run: () => navigate('#/') }],
+        });
+      });
       // The settings panel re-renders from the registry patch; the block
       // flips to the signed-in state on that pass.
     } catch (err) {

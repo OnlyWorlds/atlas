@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.46.0',
+    date: '2026-10-16',
+    theme: 'Your worlds on the first screen',
+    entries: [
+      {
+        id: 'first-screen-account-worlds',
+        title: 'Signed in, the first screen lists your worlds on OnlyWorlds',
+        body: 'Before you had a world in Atlas, the first screen showed only its two doors, even when you were signed in with your account token: your worlds on OnlyWorlds, your own and those shared with you, were offered nowhere. Now they are listed under the doors, and one click opens a world. Signing in from Settings on a browser with no world says where to find them.',
+        tags: ['sync', 'worlds'],
+      },
+    ],
+  },
+  {
     version: '1.45.0',
     date: '2026-10-15',
     theme: 'An invitation for a person opens in Atlas',

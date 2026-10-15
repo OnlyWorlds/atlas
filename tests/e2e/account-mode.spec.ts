@@ -248,3 +248,134 @@ test('a member whose account has no PIN opens to read, and the PIN they typed is
   expect(await sharedEntry(page)).toMatchObject({ found: true, readOnly: true, pin: null });
   await expect(page.locator('.ow-toast', { hasText: 'needs a PIN on your account' })).toBeVisible();
 });
+
+// ---- The first screen offers a signed-in account's worlds (S414) ----
+// A browser with no world and no home folder shows the landing, which has no
+// sidebar: signed in, the account's worlds are listed under its doors.
+
+async function seedTokenOnLanding(page: Page, token: string) {
+  await page.evaluate((t) => {
+    const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry') ?? '{"worlds":[]}');
+    reg.account_token = t;
+    reg.account_username = 'e2e-member';
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  }, token);
+  await page.reload();
+  await page.waitForSelector('.atlas-landing-compact');
+}
+
+test('signed out, the first screen lists no account worlds (S414)', async ({ page }) => {
+  await expect(page.locator('.atlas-landing-compact')).toBeVisible();
+  await expect(page.locator('[data-role="landing-worlds"]')).toBeHidden();
+});
+
+test('signed in, the first screen lists the account worlds and a row opens one (S414)', async ({ page }) => {
+  await mockSharedKeel(page, { memberRole: 'contributor', accountHasPin: true });
+  await seedTokenOnLanding(page, TOKEN);
+  const row = page.locator(`[data-landing-world-id="${SHARED_ID}"]`);
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Shared Realm');
+  await expect(row.locator('.atlas-world-state-chip')).toHaveText('shared');
+  await expect(page.locator('.atlas-landing-worlds-head')).toHaveText('Your worlds on OnlyWorlds');
+  await row.click();
+  const where = page.locator('[data-modal="where-ask"]');
+  await expect(where).toBeVisible();
+  await where.locator('input[name="where"][value="browser"]').check();
+  await where.locator('[data-action="go"]').click();
+  const prompt = page.locator('[data-modal="pin-prompt"]');
+  await prompt.locator('input[name="pin"]').fill('4242');
+  await prompt.locator('[data-action="confirm"]').click();
+  await expect.poll(async () => (await sharedEntry(page)).elements).toBe(1);
+  await expect(page.locator('.atlas-landing-compact')).toHaveCount(0);
+});
+
+test('the list arriving repaints only its block: the landing stays the same page (S414)', async ({ page }) => {
+  // Mark the first screen before the list comes, then look again after: a
+  // whole re-render would restart the sigil and undo the storage probe's edits.
+  let release!: () => void;
+  const gate = new Promise<void>(r => { release = r; });
+  await page.route(`${V2}/account/worlds`, async (route) => {
+    await gate;
+    await route.fulfill({ json: { data: [
+      { id: SHARED_ID, name: 'Shared Realm', role: 'collaborator', member_role: 'guest', public_read: false, keys: [] },
+    ] } });
+  });
+  await seedTokenOnLanding(page, TOKEN);
+  await expect(page.locator('.atlas-landing-worlds-head')).toBeVisible();
+  await page.evaluate(() => { (document.querySelector('.atlas-landing-sigil') as any).__mark = 1; });
+  release();
+  await expect(page.locator(`[data-landing-world-id="${SHARED_ID}"]`)).toBeVisible();
+  expect(await page.evaluate(() => (document.querySelector('.atlas-landing-sigil') as any)?.__mark ?? null)).toBe(1);
+});
+
+test('a notify leaves a focused row focused: the rows are not rebuilt (S414 gate H1)', async ({ page }) => {
+  await mockSharedKeel(page, { memberRole: 'guest', accountHasPin: true });
+  await seedTokenOnLanding(page, TOKEN);
+  const row = page.locator(`[data-landing-world-id="${SHARED_ID}"]`);
+  await row.focus();
+  await page.evaluate(() => { (document.activeElement as any).__mark = 1; });
+  // Any state change notifies every subscriber; this one changes nothing the landing shows.
+  await page.evaluate(() => (window as any).__atlasTestApi.patchSlice('busy', false));
+  await page.evaluate(() => (window as any).__atlasTestApi.patchSlice('busy', false));
+  expect(await page.evaluate(() => (document.activeElement as any)?.__mark ?? null)).toBe(1);
+});
+
+test('a token keel refuses on the first screen says so and offers Settings, not a retry; the doors stay (S414)', async ({ page }) => {
+  await page.route(`${V2}/account/worlds`, route => route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Invalid token.', param: null } } }));
+  await seedTokenOnLanding(page, BOGUS_TOKEN);
+  await expect(page.locator('.atlas-landing-worlds-error')).toContainText('Account token not recognized');
+  await expect(page.locator('[data-role="landing-worlds-retry"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="start-world"]')).toBeVisible();
+  await page.locator('[data-role="landing-worlds-settings"]').click();
+  // The account block, where the dead token is forgotten and a new one pasted.
+  await expect(page.locator('[data-action="account-forget"]')).toBeVisible();
+});
+
+test('a list that failed for another reason offers Try again, and Try again asks again (S414)', async ({ page }) => {
+  let calls = 0;
+  await page.route(`${V2}/account/worlds`, (route) => {
+    calls++;
+    if (calls === 1) return route.fulfill({ status: 503, json: { error: { type: 'api_error', code: 'unavailable', message: 'Down.', param: null } } });
+    return route.fulfill({ json: { data: [
+      { id: SHARED_ID, name: 'Shared Realm', role: 'collaborator', member_role: 'guest', public_read: false, keys: [] },
+    ] } });
+  });
+  await seedTokenOnLanding(page, TOKEN);
+  await page.locator('[data-role="landing-worlds-retry"]').click();
+  await expect(page.locator(`[data-landing-world-id="${SHARED_ID}"]`)).toBeVisible();
+  expect(calls).toBe(2);
+});
+
+async function signInFromSettings(page: Page) {
+  await page.route(`${V2}/account`, route => route.fulfill({ json: { username: 'e2e-member', email: null } }));
+  await page.evaluate(() => { location.hash = '#/settings/onlyworlds'; });
+  await page.fill('input[name="account-token"]', TOKEN);
+  await page.click('[data-action="account-sign-in"]');
+  await expect(page.locator('.ow-toast', { hasText: 'Signed in as e2e-member' })).toBeVisible();
+}
+
+test('signing in on a browser with no world points at the first screen, which lists the worlds (S414)', async ({ page }) => {
+  await mockSharedKeel(page, { memberRole: 'guest', accountHasPin: true });
+  await signInFromSettings(page);
+  const toast = page.locator('.ow-toast', { hasText: 'listed on the first screen' });
+  await expect(toast).toBeVisible();
+  await toast.getByRole('button', { name: 'Show them' }).click();
+  await expect(page.locator(`[data-landing-world-id="${SHARED_ID}"]`)).toBeVisible();
+});
+
+test('signing in with an account that has no worlds promises no list (S414 gate M2)', async ({ page }) => {
+  await page.route(`${V2}/account/worlds`, route => route.fulfill({ json: { data: [] } }));
+  await signInFromSettings(page);
+  await page.waitForFunction(() => (window as any).__atlasTestApi.getState().accountWorlds.status === 'ready');
+  await page.waitForTimeout(300);
+  await expect(page.locator('.ow-toast', { hasText: 'listed on the first screen' })).toHaveCount(0);
+});
+
+test('signing in where a world already is says nothing of the first screen (S414)', async ({ page }) => {
+  await setupAtlasRoot(page);
+  await mockSharedKeel(page, { memberRole: 'guest', accountHasPin: true });
+  await signInFromSettings(page);
+  await page.waitForFunction(() => (window as any).__atlasTestApi.getState().accountWorlds.status === 'ready');
+  await page.waitForTimeout(300);
+  await expect(page.locator('.ow-toast', { hasText: 'listed on the first screen' })).toHaveCount(0);
+});

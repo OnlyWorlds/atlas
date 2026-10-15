@@ -179,6 +179,8 @@ export interface AccountWorldsState {
    */
   fetchedWithToken?: string;
   error?: string;
+  /** What the error was: a token keel refused ('auth') needs Settings, not a retry (S414). */
+  errorKind?: 'auth' | 'other';
   /** Server world id of an open-flow currently in flight (row spinner + guard). */
   opening: string | null;
 }

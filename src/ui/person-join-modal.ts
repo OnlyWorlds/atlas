@@ -117,7 +117,7 @@ export class PersonJoinModal extends BaseModal {
         // The code is not spent; the world is already on the account's list.
         this.hide();
         refreshAccountWorlds(true);
-        this.toasts.info(`You are already a member of ${this.preview.world.name}. Open it from On OnlyWorlds in the Worlds list.`, 12_000);
+        this.toasts.info(`You are already a member of ${this.preview.world.name}. Open it from your list of worlds.`, 12_000);
         return;
       }
       if (isRefusedCode(err)) {
@@ -159,15 +159,18 @@ async function openUntilOpened(row: AccountWorldRow, toasts: ToastManager): Prom
   });
 }
 
-/** The sign-in in Settings succeeded: a person's code that waited for it runs the door again. */
-export async function resumeJoinAfterSignIn(toasts: ToastManager): Promise<void> {
+/**
+ * The sign-in in Settings succeeded: a person's code that waited for it runs
+ * the door again. True when a code was waiting (the door then speaks).
+ */
+export async function resumeJoinAfterSignIn(toasts: ToastManager): Promise<boolean> {
   const { takeJoinHeldForSignIn, previewJoin } = await import('../setup/join-door');
   const code = takeJoinHeldForSignIn();
-  if (!code) return;
+  if (!code) return false;
   const { isTourFlagActive } = await import('../tour/tour-flag');
   if (isTourFlagActive()) {
     toasts.info('Finish the tour first, then open the link again.');
-    return;
+    return true;
   }
   let preview: JoinPreview;
   try {
@@ -175,7 +178,8 @@ export async function resumeJoinAfterSignIn(toasts: ToastManager): Promise<void>
   } catch (err) {
     if (isRefusedCode(err)) toasts.error(JOIN_REFUSED_LINE, 12_000);
     else toasts.error(problemFor(err, { inline: true, doing: 'reading the invitation' }).sentence);
-    return;
+    return true;
   }
   new PersonJoinModal(toasts, code, preview).open();
+  return true;
 }

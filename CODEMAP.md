@@ -104,7 +104,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/middle/share-room.ts`: the Pages room: page list / block builder / payload-true preview / publish section; serialized writes.
 - `src/middle/share-editor.ts`: the LAZY page-prose TipTap embed (mentions/chips, NO derive; conv. 76).
 - `src/middle/share-page-render.ts`: the STORE-FREE renderer, two paths: world-backed (builder) and payload-backed (`renderPayloadPage`: preview + the viewer's path; conv. 78).
-- `src/middle/welcome-panel.ts`: first launch: two doors (start a world, explore Moppetopia) and one line of links (the tour, open a world folder, other ways in; #127), "Re-link OnlyWorlds folder" when recoverable.
+- `src/middle/welcome-panel.ts`: first launch: two doors (start a world, explore Moppetopia) and one line of links (the tour, open a world folder, other ways in; #127), "Re-link OnlyWorlds folder" when recoverable; signed in, the account's worlds under the doors (S414).
+- `src/middle/landing-account-worlds.ts`: the first screen's account worlds, markup only (`landingAccountWorldsHtml`): every account world not here yet, opened through the sidebar's `openAccountWorld`.
 - `src/middle/story-sidecar.ts`: `storyOutranksSidecar`: plain text wins at open (conv. 116); `src/middle/story-notice.ts`: the once-per-element notice.
 - `src/middle/timeline.ts`: the Charts room (owns ChartConfig, control bar, gallery; DESIGN_CHARTS).
 - `src/middle/world-home.ts`: the world home (cover, "What do you have?" and "Grow your world" with cards kept done, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).

@@ -4596,6 +4596,74 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-landing-more-link:hover,
 .atlas-landing-more-link:focus-visible { color: var(--atlas-accent); }
 .atlas-landing-more-sep { color: var(--atlas-text-muted); }
+/* Signed in, the account's worlds under the doors (S414): the first screen has
+   no sidebar, so this is where its On OnlyWorlds rows are offered. Quiet rows,
+   one per world, so the two doors stay the first decision. */
+.atlas-landing-worlds {
+  order: 3;
+  margin-top: 30px;
+  width: min(340px, 100%);
+}
+.atlas-landing-worlds[hidden] { display: none; }
+.atlas-landing-worlds-head {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--atlas-text-muted);
+}
+.atlas-landing-worlds-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.atlas-landing-world {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: rgba(var(--atlas-ink-rgb), 0.04);
+  color: var(--atlas-text-soft);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-landing-world:hover,
+.atlas-landing-world:focus-visible,
+.atlas-landing-world.is-opening {
+  color: var(--atlas-text);
+  border-color: rgba(var(--atlas-accent-rgb), 0.45);
+}
+.atlas-landing-world .material-symbols-outlined {
+  /* The landing's own icon rule sets a block with a 16px foot: not here. */
+  margin: 0;
+  font-size: 16px;
+  color: var(--atlas-text-muted);
+}
+.atlas-landing-world-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atlas-landing-world .atlas-world-state-chip { margin-left: 0; }
+@media (pointer: coarse) {
+  .atlas-landing-world { min-height: 44px; }
+}
+.atlas-landing-worlds-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+}
 .atlas-landing-compact .atlas-landing-tag { order: 2; }
 /* Each door is a button over its own caption (S302). The captions balance the
    pair; a single line under both would favour whichever button it sat closer

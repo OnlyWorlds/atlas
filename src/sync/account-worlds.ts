@@ -16,7 +16,7 @@
  */
 
 import { downloadingLine } from '../ui/download-progress';
-import { getState, patchSlice } from '../core/state';
+import { getState, patchSlice, subscribe } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { saveRegistry, setPin, findWorldByServerId, findLinkedWorld } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
@@ -66,7 +66,7 @@ export function refreshAccountWorlds(force = false): void {
       ...getState().accountWorlds,
       status: 'loading',
       fetchedWithToken: token,
-      error: undefined,
+      error: undefined, errorKind: undefined,
     });
     void run();
   });
@@ -80,14 +80,14 @@ export function refreshAccountWorlds(force = false): void {
         ...getState().accountWorlds,
         status: 'ready',
         rows,
-        error: undefined,
+        error: undefined, errorKind: undefined,
       });
     } catch (err) {
       if (getState().registry.account_token !== token) return;
       patchSlice('accountWorlds', {
         ...getState().accountWorlds,
         status: 'error',
-        error: accountErrorMessage(err),
+        error: accountErrorMessage(err), errorKind: isAccountAuthError(err) ? 'auth' : 'other',
         // A bad token's rows are meaningless; an offline blip keeps old rows.
         rows: isAccountAuthError(err) ? [] : getState().accountWorlds.rows,
       });
@@ -95,6 +95,35 @@ export function refreshAccountWorlds(force = false): void {
       if (inFlightToken === token) inFlightToken = null;
     }
   }
+}
+
+/**
+ * The account list for this token, once it has come (or failed, or 15 s
+ * passed): the rows still to open here, or null when none came. A sentence
+ * that promises the list waits on this (the S414 gate's M2: an account with
+ * no worlds was told they were listed).
+ */
+export function accountWorldsWhenFetched(token: string, timeoutMs = 15_000): Promise<AccountWorldRow[] | null> {
+  refreshAccountWorlds();
+  return new Promise((resolve) => {
+    let unsub: () => void = () => undefined;
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    function finish(rows: AccountWorldRow[] | null): void {
+      clearTimeout(timer);
+      unsub();
+      resolve(rows);
+    }
+    function check(): boolean {
+      const { registry, accountWorlds } = getState();
+      if (registry.account_token !== token) { finish(null); return true; }
+      if (accountWorlds.fetchedWithToken !== token) return false;
+      if (accountWorlds.status === 'ready') { finish(remoteAccountWorlds()); return true; }
+      if (accountWorlds.status === 'error') { finish(null); return true; }
+      return false;
+    }
+    if (check()) return;
+    unsub = subscribe(() => { check(); });
+  });
 }
 
 /**
@@ -160,6 +189,21 @@ export function sharedOpenLine(row: AccountWorldRow, why: ReadOnlyWhy | undefine
  * account's own key, download into a fresh folder, activate.
  */
 export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManager): Promise<boolean> {
+  // One open at a time from the first click: the `opening` slice is set only
+  // after the where-question, so a double tap on a browser that asks nothing
+  // started two opens and made two keys (the S414 gate's L1).
+  if (openStarted) return false;
+  openStarted = true;
+  try {
+    return await openAccountWorldOnce(row, toasts);
+  } finally {
+    openStarted = false;
+  }
+}
+
+let openStarted = false;
+
+async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager): Promise<boolean> {
   const state = getState();
   const token = state.registry.account_token;
   if (!token) return false;

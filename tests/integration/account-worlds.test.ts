@@ -271,6 +271,24 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     localStorage.removeItem('atlas_ui_prefs');
   });
 
+  it('a second open while the first waits on the where-question does nothing (S414 gate L1)', async () => {
+    (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
+    const state = mount();
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+    const toasts = makeToasts();
+
+    const first = openAccountWorld(row, toasts);
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull());
+    // `opening` is not set yet: before the guard, this started a second open.
+    expect(getState().accountWorlds.opening).toBeNull();
+    expect(await openAccountWorld(row, toasts)).toBe(false);
+    expect(document.querySelectorAll('[data-modal="where-ask"]')).toHaveLength(1);
+    document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="cancel"]')!.click();
+    expect(await first).toBe(false);
+    expect(state.minted).toHaveLength(0);
+    delete (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+  });
+
   it('returns false when the row is already represented in the registry', async () => {
     const state = mount();
     let reg = defaultRegistry();
