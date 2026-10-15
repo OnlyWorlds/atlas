@@ -13,7 +13,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 **Records**: `Forge/Notes/ui-snapshots/2026-10-15-s412/` (walk logs and frames; `atlas/` the e2e and build logs).
 
-- ⚡ **NEXT**: (1) Nothing with Boss. (2) Lantern's L8 mints invite links through SDK 4.24 if the Captain says yes on h56 B1; then Atlas's Invite someone can take the same methods. (3) #198/#199 wait on talks. (4) Create-from-selection in Writing stays right-click only (a long press gives `contextmenu` on Android, not iOS). Possible: pins by their element's dates, a date shared across a world's maps.
+- ⚡ **NEXT**: (1) Nothing with Boss. (2) Lantern makes invite links on the phone since the Captain's yes (h56 #5322, lantern fd513ee); Atlas's Invite someone still opens onlyworlds.com. Taking the same sheet into Atlas is his call to extend, not assumed from a Lantern ruling. (3) #198/#199 wait on talks. (4) Create-from-selection in Writing stays right-click only (a long press gives `contextmenu` on Android, not iOS). Possible: pins by their element's dates, a date shared across a world's maps.
 ---
 
 Earlier session entries (S253 to S376, newest first, moved verbatim 2026-10-05, with the July `BANKED / TODO` standing queue that sat among them) are at the bottom of `docs-archive/PROGRESS-history.md`.
