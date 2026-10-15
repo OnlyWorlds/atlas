@@ -24,6 +24,8 @@ import type { WorldRegistryEntry } from '../core/types';
 
 /** What `/join/preview` says about a code, without spending it. */
 export interface JoinPreview {
+  /** Who the code is for (keel #212): an agent redeems at /join, a person joins with their account; any other value is a kind this Atlas does not know. */
+  reader: 'agent' | 'person' | 'unknown';
   world: { name: string; description: string };
   /** Free text the inviter typed, or null: never shown as a checked name (R8). */
   invitedBy: string | null;
@@ -100,6 +102,9 @@ export async function previewJoin(code: string): Promise<JoinPreview> {
   const r = await postJoin('/join/preview', { code });
   const world = (r.world ?? {}) as Record<string, unknown>;
   return {
+    // A keel without the field made agent codes only; a value this Atlas does
+    // not know goes to neither route (S413 gate).
+    reader: r.reader === undefined || r.reader === 'agent' ? 'agent' : r.reader === 'person' ? 'person' : 'unknown',
     world: { name: str(world.name) || 'Untitled world', description: str(world.description) },
     invitedBy: strOrNull(r.invited_by),
     ownerCharacter: strOrNull(r.owner_character),
@@ -133,6 +138,29 @@ export function redeemRefusedSentence(preview: JoinPreview, now = Date.now()): s
 /** The role in plain words, for the dialog (keel's values: `seatRoleWords`). */
 export function roleLine(role: string): string {
   return seatRoleWords(role) ?? `Atlas joins with the role ${role.replace(/[^a-z _-]/gi, '').replace(/_/g, '-')}.`;
+}
+
+/** A person's role in plain words (keel's member page says the same, portal member_world.html). */
+export function personRoleLine(role: string): string {
+  switch (role) {
+    case 'co_builder': return 'You join as a co-builder: you can see and change everything in this world.';
+    case 'contributor': return 'You join as a contributor: you can see everything in this world and change what you create.';
+    // Atlas opens a guest's world to read (#199); Lantern is where a guest writes notes.
+    case 'guest': return 'You join as a guest: you see only part of this world, and Atlas opens it to read.';
+    default: return `You join with the role ${role.replace(/[^a-z _-]/gi, '').replace(/_/g, '-')}.`;
+  }
+}
+
+/**
+ * A person's code waiting for its owner to sign in (in memory, as the captured
+ * code is: it never reaches storage). The sign-in runs the door again.
+ */
+let heldForSignIn: string | null = null;
+export function holdJoinForSignIn(code: string): void { heldForSignIn = code; }
+export function takeJoinHeldForSignIn(): string | null {
+  const code = heldForSignIn;
+  heldForSignIn = null;
+  return code;
 }
 
 export type OpenJoinedOutcome =

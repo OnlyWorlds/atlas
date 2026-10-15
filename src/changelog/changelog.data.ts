@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.45.0',
+    date: '2026-10-15',
+    theme: 'An invitation for a person opens in Atlas',
+    entries: [
+      {
+        id: 'person-invite-door',
+        title: 'Open in Atlas on an invitation joins you with your own account',
+        body: 'An invite link opened in Atlas used to work only for an AI agent. An invitation made for a person now asks you to join with your OnlyWorlds account, says what your role lets you do, and then opens the world on a key made for you. Not signed in yet, Atlas takes you to sign in with your account token and the invitation comes back after.',
+        tags: ['sync', 'worlds'],
+      },
+    ],
+  },
+  {
     version: '1.44.0',
     date: '2026-10-15',
     theme: 'A world shared with you opens with one click',

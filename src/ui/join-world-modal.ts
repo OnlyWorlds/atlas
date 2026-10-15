@@ -48,6 +48,16 @@ export async function runPendingJoin(toasts: ToastManager): Promise<void> {
     else showProblem(err, { doing: 'reading the link to the world', toasts });
     return;
   }
+  if (preview.reader === 'unknown') {
+    toasts.error('This invitation is of a kind this version of Atlas does not know. Reload Atlas and open the link again, or ask for a new link.', 12_000);
+    return;
+  }
+  // A person's code joins with their account, never as a seat (keel #212, #294).
+  if (preview.reader === 'person') {
+    const { PersonJoinModal } = await import('./person-join-modal');
+    new PersonJoinModal(toasts, code, preview).open();
+    return;
+  }
   new JoinWorldModal(toasts, code, preview).open();
 }
 

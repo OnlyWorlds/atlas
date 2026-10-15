@@ -164,6 +164,23 @@ export class AccountClient {
   }
 
   /**
+   * Accept a person's join link (keel #212, `POST /account/join`, body
+   * `{code}`): the account becomes a member with the link's role. 404 for any
+   * code that will not open (or one made for an agent), 409 already_member.
+   */
+  async joinWithLink(code: string): Promise<{ world_id: string; world_name: string; role: string }> {
+    const raw = await this.request('POST', '/account/join', { code }) as { world_id?: unknown; world_name?: unknown; role?: unknown };
+    if (!raw || typeof raw.world_id !== 'string' || !raw.world_id) {
+      throw new Error('join response missing the world');
+    }
+    return {
+      world_id: raw.world_id,
+      world_name: typeof raw.world_name === 'string' ? raw.world_name : '',
+      role: typeof raw.role === 'string' ? raw.role : 'contributor',
+    };
+  }
+
+  /**
    * Create a new api world. `pin` per the dance: omit first; on 422 param=pin
    * the CALLER retries with the registry PIN (this method stays dumb — the
    * dance is flow logic, not wire logic).

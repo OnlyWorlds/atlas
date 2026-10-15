@@ -159,7 +159,7 @@ The guided tour (DESIGN_TOUR).
 ## src/setup, src/import, src/changelog, the rest
 
 - `src/setup/atlas-root-flow.ts`: `setupAtlasRoot` + `recoverAtlasRoot` + `discoverWorldsInRoot` + `openWorldFolder` + the link flow; browser-world scaffolding (1.17).
-- `src/setup/join-door.ts`: THE JOIN DOOR (S385, OW Infra #104): `previewJoin` / `redeemJoin` against keel's `/join`, `openJoinedWorld` (download as a seat, or open, adopt, say spare), the R5 sentences; the dialog is `src/ui/join-world-modal.ts` (`runPendingJoin`).
+- `src/setup/join-door.ts`: THE JOIN DOOR (S385, OW Infra #104): `previewJoin` / `redeemJoin` against keel's `/join`, `openJoinedWorld` (download as a seat, or open, adopt, say spare), the R5 sentences; the dialog is `src/ui/join-world-modal.ts` (`runPendingJoin`). A person's code (the preview's `reader`, keel #212) opens `src/ui/person-join-modal.ts` instead: Join at `/account/join` with the account token, then `openAccountWorld`; signed out, the code waits through the sign-in (1.45, keel #294; e2e `tests/e2e/person-door.spec.ts`).
 - `src/setup/world-doors.ts`: THE WORLD DOORS (conv. 114): open a picked world in place; `ensureAtlasRoot`; `runAddWorldAction`.
 - `src/setup/world-parent.ts`: where a new world goes (1.17): `defaultWorldWhere`, the persist ask, the where captions.
 - `src/setup/browser-world-delete.ts`: Delete for a browser world (1.17, conv. 129): close first, remove, then drop the entry; a failure keeps both.

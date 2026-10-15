@@ -175,6 +175,8 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       saveRegistry(next);
       patchSlice('registry', next);
       toasts.success(`Signed in as ${profile.username}`);
+      // A person's invitation that waited for this sign-in opens again (#294).
+      void import('../ui/person-join-modal').then(m => m.resumeJoinAfterSignIn(toasts));
       // The settings panel re-renders from the registry patch; the block
       // flips to the signed-in state on that pass.
     } catch (err) {
