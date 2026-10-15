@@ -539,9 +539,9 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
       </button>`
     : `<span class="material-symbols-outlined"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>${stateIcon}</span>`;
   return `
-    <div class="${cls}" data-world-id="${escapeAttr(world.id)}" role="button" tabindex="0"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>
+    <div class="${cls}" data-world-id="${escapeAttr(world.id)}"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>
       ${stateIconHtml}
-      <span class="atlas-row-main">${escapeText(world.name)}</span>
+      <button type="button" class="atlas-row-main atlas-world-row-open" data-role="open-world"${active ? ' aria-current="true"' : ''}>${escapeText(world.name)}</button>
       ${stateChip}
       <span class="atlas-inline-actions">${syncActions}${removeCleared}
         <button type="button" class="atlas-icon-btn-sm fav-btn ${favCls}" data-role="fav-toggle" data-world-id="${escapeAttr(world.id)}" title="${world.favorite ? 'Unfavorite' : 'Favorite'}">

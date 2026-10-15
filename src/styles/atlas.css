@@ -768,6 +768,25 @@ html {
   white-space: nowrap;
 }
 
+/* A world row's name is its one button (#303, axe nested-interactive): the row
+   holds the star and sync buttons, so it cannot be a control itself. The
+   button reads as the plain name it replaced. */
+.atlas-world-row-open {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-world-row-open:focus-visible {
+  outline: 2px solid var(--atlas-cyan);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .atlas-row-meta {
   color: var(--atlas-text-muted);
   font-size: 11px;
@@ -16557,6 +16576,13 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
   color: var(--atlas-text);
   font-size: 13px;
   backdrop-filter: blur(10px);
+}
+
+/* With the side drawer open, its footer row (gear, help, the sync pill) sits at
+   the bottom left too: the banner rises above it (#303, the Captain's S22,
+   Boss h11 #4792). */
+body.atlas-drawer-sidebar-open .atlas-update-banner {
+  bottom: 72px;
 }
 
 /* Reduced motion (S361, lane a A9): transitions go instant and the INFINITE

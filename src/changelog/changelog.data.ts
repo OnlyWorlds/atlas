@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.37.1',
+    date: '2026-10-15',
+    theme: 'The worlds list on a phone',
+    entries: [
+      {
+        id: 'world-row-name-button',
+        title: 'A world\'s name is its button',
+        body: 'In the worlds list, a world\'s name is now the button that opens it, beside its star and sync buttons rather than around them. Screen readers no longer meet a button inside a button, and Tab moves from a world\'s name to its star. A click anywhere on the row still opens the world.',
+        tags: ['fix'],
+      },
+      {
+        id: 'update-banner-over-drawer',
+        title: 'The update message clears the side panel\'s bottom row',
+        body: 'On a phone with the side panel open, "A new version of Atlas is ready" covered the row of buttons at the panel\'s foot. It now sits above them.',
+        tags: ['fix', 'layout'],
+      },
+    ],
+  },
+  {
     version: '1.37.0',
     date: '2026-10-15',
     theme: 'A phone hears touch, and of Lantern',
