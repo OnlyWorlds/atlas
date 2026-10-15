@@ -13,7 +13,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 **Records**: `tools/atlas/Notes/ui-snapshots/2026-10-16-s414/` (gitignored).
 
-- ⚡ **NEXT**: (1) Boss flies 1.46.0 (h11); Seethe's before and after of the first screen (h58 #5553). (2) #341, Atlas makes the invite link as Lantern does (drafted in S414: `src/sync/invite-link.ts` on the SDK's `createWorldLink`, an `InviteModal` with Lantern's choices and words, a QR code on `qrcode-generator` as Lantern's; signed out, the site's Access link stays), 1.47.0 with its own gate. (3) SDK to the blessed 4.26.0, then #347 (Atlas never sets `agent`). (4) #104 re-read against keel's current Open with. #198 waits on talks.
+- ⚡ **NEXT**: (1) Boss flies 1.46.0 (h11); Seethe's before and after of the first screen (h58 #5553). (2) #341, Atlas makes the invite link as Lantern does (drafted in S414: an invite-link module on the SDK's `createWorldLink`, an `InviteModal` with Lantern's choices and words, a QR code on `qrcode-generator` as Lantern's; signed out, the site's Access link stays), 1.47.0 with its own gate. (3) SDK to the blessed 4.26.0, then #347 (Atlas never sets `agent`). (4) #104 re-read against keel's current Open with. #198 waits on talks.
 ---
 
 Earlier session entries (S253 to S376, newest first, moved verbatim 2026-10-05, with the July `BANKED / TODO` standing queue that sat among them) are at the bottom of `docs-archive/PROGRESS-history.md`.
