@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+/** The CSP has one home, public/_headers (what Pages serves, #302); preview serves the same line so a walk runs under it. */
+const CSP = readFileSync('public/_headers', 'utf8').match(/Content-Security-Policy: (.+)/)?.[1]?.trim() ?? '';
 
 export default defineConfig({
   base: './',
@@ -7,6 +11,7 @@ export default defineConfig({
   // 'atlas_dev_api_base' override (dev-api-base.ts) — keel serves CORS since
   // 2026-07-11 (P15), so the old /keel dev proxy retired.
   server: { port: 3045 },
+  preview: { headers: CSP ? { 'Content-Security-Policy': CSP } : {} },
   build: {
     target: 'es2020',
     outDir: 'dist',

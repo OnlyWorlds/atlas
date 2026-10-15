@@ -183,7 +183,7 @@ The guided tour (DESIGN_TOUR).
 - `tests/fixtures/fake-ow-client.ts`: `FakeOwApiClient`: speaks `/changes` by default; rejects LOCAL_ONLY fields + stamps.
 - `tests/fixtures/monotonic-clock.ts`: strictly increasing ISO timestamps.
 - `tests/fixtures/folder-conformance/`: the Folder Format conformance fixture (an ecosystem artifact). `tests/fixtures/map-worlds/`: map fixture worlds.
-- `tests/unit/`: pure logic. Guards worth knowing: `tests/unit/docs-paths.test.ts` (this file), `tests/unit/no-raw-error-in-copy.test.ts` (the raw-error ratchet, conv. 125, 128), `tests/unit/name-sort-guarded.test.ts` (a source scan: `Element.name` is typed `string` but a foreign file may have none).
+- `tests/unit/`: pure logic. Guards worth knowing: `tests/unit/docs-paths.test.ts` (this file), `tests/unit/no-raw-error-in-copy.test.ts` (the raw-error ratchet, conv. 125, 128), `tests/unit/name-sort-guarded.test.ts` (a source scan: `Element.name` is typed `string` but a foreign file may have none), `tests/unit/security-headers.test.ts` (`public/_headers`, the host's CSP and HSTS: every fetch origin in connect-src, the meta CSP in step, the fetch call sites counted).
 - `tests/integration/`: loops over the fakes, named `<subject>.<case>.test.ts` (sync-engine, sync-attach, make-online, folder-store, rekey, initial-download, bulk-link-halves, ...). Real-store kernel tests run on `tests/fixtures/fake-fs.ts`.
 - `tests/e2e/`: Playwright specs named by area. Width-aware: `tests/e2e/narrow-layout.spec.ts`, `tests/e2e/tour-narrow.spec.ts`. The bootstrap recipe for a populated world (`freshBoot` / `setupWorld` / `createElement`) is in `tests/e2e/knowledge.spec.ts`.
 

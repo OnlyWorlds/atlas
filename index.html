@@ -32,7 +32,10 @@
   <!-- S360: a world folder is untrusted input and this origin holds the
        linked worlds' API keys, the PIN and the account token. No script
        runs unless it is a file served from this origin, so an injected
-       onerror= or script tag is inert even if an escape is ever missed. -->
+       onerror= or script tag is inert even if an escape is ever missed.
+       The whole policy is a header from public/_headers (#302); this meta
+       keeps its script lines for the dev server, which serves no headers,
+       and the headers test holds the two in step. -->
   <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <script src="./theme-stamp.js"></script>
   <style>

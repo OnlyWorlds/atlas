@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.37.2',
+    date: '2026-10-15',
+    theme: 'Tighter rules for your browser',
+    entries: [
+      {
+        id: 'security-headers',
+        title: 'Atlas tells your browser what it may load',
+        body: 'Atlas now asks your browser to reach it only over a secure connection, and to load scripts only from Atlas itself and send your world only to onlyworlds.com. Your keys and PIN stay safer even if a world file carries something it should not. Pictures still load from any address.',
+        tags: ['safety'],
+      },
+    ],
+  },
+  {
     version: '1.37.1',
     date: '2026-10-15',
     theme: 'The worlds list on a phone',
