@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.38.0',
+    date: '2026-10-15',
+    theme: 'Signing in, said plainly',
+    entries: [
+      {
+        id: 'account-one-sign-in',
+        title: 'One way to sign in, and where your PIN comes from',
+        body: 'Settings, OnlyWorlds, Account opens with the account token, the one way to sign in. Below it, the PIN says it is one for all your worlds and that you set it on onlyworlds.com, in Account settings under World PIN, and the email says Make online uses it.',
+        tags: ['sync', 'copy'],
+      },
+      {
+        id: 'picture-once-online',
+        title: 'A local world says when pictures can upload',
+        body: 'An element in a world that is not online now shows an Upload picture row that says pictures upload once the world is online, with Make online beside it. Until then, an image URL can still show a picture from any address.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.37.2',
     date: '2026-10-15',
     theme: 'Tighter rules for your browser',

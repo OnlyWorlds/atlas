@@ -26,7 +26,7 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { buildCustomFieldsSection } from './element-detail-custom-fields';
 import { buildMapLocalImageRow } from './element-detail-map-image';
-import { buildPictureUploadRow, pictureWorld } from './element-detail-picture';
+import { buildPictureUploadRow, buildPictureLaterRow, pictureLaterWorld, pictureWorld } from './element-detail-picture';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
@@ -239,12 +239,19 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     // "Upload picture" (#154): under the image_url row, only in an online
     // world this browser can write to (a local world has no host for it).
+    // A local world says when it could (#282), with Make online at hand: a
+    // word about the image URL row, so it shows only where that row does
+    // (Hide empty fields hides an empty one, and the word with it).
     const pictureEntry = pictureWorld();
-    if (pictureEntry && !isTourFlagActive()) {
-      const row = buildPictureUploadRow(el, pictureEntry, toastManager);
+    if (!isTourFlagActive()) {
       const urlRow = detail.querySelector('[data-field="image_url"]');
-      if (urlRow) urlRow.insertAdjacentElement('afterend', row);
-      else detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
+      if (pictureEntry) {
+        const row = buildPictureUploadRow(el, pictureEntry, toastManager);
+        if (urlRow) urlRow.insertAdjacentElement('afterend', row);
+        else detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
+      } else if (urlRow && pictureLaterWorld()) {
+        urlRow.insertAdjacentElement('afterend', buildPictureLaterRow(toastManager));
+      }
     }
 
     // Zone-specific sections (visuals + markers) — DESIGN_ZONES.md §4.4.

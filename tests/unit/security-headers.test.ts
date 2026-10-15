@@ -63,6 +63,10 @@ describe('public/_headers (#302)', () => {
     expect(all.has('x-robots-tag')).toBe(false);
   });
 
+  it('never lets a cache hold the service worker (Boss h11 #4978: the zone rewrote it to max-age=14400)', () => {
+    expect(headerBlock('/sw.js').get('cache-control')).toBe('no-store');
+  });
+
   it('draws a picture at any address, http included', () => {
     // A world's image_url can be any address. Firefox draws an http one on
     // today's page (it upgrades the request), but under `img-src https:` it

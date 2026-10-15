@@ -26,6 +26,50 @@ export function pictureWorld(): WorldRegistryEntry | null {
   return entry?.state === 'api-linked' && entry.api && !entry.api.read_only ? entry : null;
 }
 
+/**
+ * #282 (journey scout gap 4): a local world had no upload row and no word of
+ * one. Where Make online is offered (a local world that is not the tour's
+ * sandbox), the row says when pictures can upload, with Make online at hand.
+ */
+export function pictureLaterWorld(): WorldRegistryEntry | null {
+  const id = getState().active?.worldId;
+  const entry = id ? getState().registry.worlds.find(w => w.id === id) : undefined;
+  return entry && entry.state !== 'api-linked' && entry.demo !== true ? entry : null;
+}
+
+export function buildPictureLaterRow(toasts: ToastManager): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'atlas-field atlas-picture-upload';
+  // No data-field: it holds no value, and field counts (Hide empty fields) read data-field.
+  wrap.dataset.role = 'picture-later';
+
+  const label = document.createElement('div');
+  label.className = 'atlas-field-label';
+  label.textContent = 'Upload picture';
+  wrap.appendChild(label);
+
+  const value = document.createElement('div');
+  value.className = 'atlas-field-value atlas-picture-upload-value';
+  wrap.appendChild(value);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'atlas-picture-upload-btn';
+  btn.dataset.action = 'picture-make-online';
+  btn.textContent = 'Make online';
+  btn.addEventListener('click', async () => {
+    const { MakeOnlineModal } = await import('../ui/make-online-modal');
+    new MakeOnlineModal(toasts).open();
+  });
+  value.appendChild(btn);
+
+  const hint = document.createElement('span');
+  hint.className = 'atlas-picture-upload-hint';
+  hint.textContent = 'Pictures upload once this world is online. Until then, an image URL can show a picture from any address.';
+  value.appendChild(hint);
+  return wrap;
+}
+
 export function buildPictureUploadRow(el: Element, entry: WorldRegistryEntry, toasts: ToastManager): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-field atlas-picture-upload';

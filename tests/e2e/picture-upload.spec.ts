@@ -89,7 +89,7 @@ test('an online world\'s element uploads a picture and sets it as the image URL'
   }, CHAR_ID)).toBe(PICTURE);
 });
 
-test('a local world\'s element has no upload row', async ({ page }) => {
+test('a local world\'s element says pictures upload once online, with Make online at hand (#282)', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
   await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll(); });
@@ -113,7 +113,15 @@ test('a local world\'s element has no upload row', async ({ page }) => {
   });
   await page.evaluate(([w, c]) => { window.location.hash = `#/w/${w}/element/${c}`; }, [made.world, made.el]);
   await expect(page.locator('.atlas-detail-section-body').first()).toBeVisible();
-  await expect(page.locator('[data-field="upload_picture"]')).toHaveCount(0);
+  // No way to upload (no host for it), but a word on when, under the image URL row.
+  const row = page.locator('[data-role="picture-later"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Pictures upload once this world is online.');
+  await expect(page.locator('[data-action="upload-picture"]')).toHaveCount(0);
+  await expect(row.locator('input[type="file"]')).toHaveCount(0);
+  expect(await page.evaluate(() => document.querySelector('[data-field="image_url"]')?.nextElementSibling?.getAttribute('data-role'))).toBe('picture-later');
+  await row.locator('[data-action="picture-make-online"]').click();
+  await expect(page.locator('[data-modal="make-online"]')).toBeVisible();
 });
 
 test('an uploaded picture of this world can be removed: asked first, then the image URL is cleared', async ({ page }) => {

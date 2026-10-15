@@ -9,6 +9,8 @@ import type { WorldRegistryEntry, AccountWorldRow } from './types';
 
 export const OW_SIGNUP_URL = 'https://www.onlyworlds.com/accounts/signup/';
 export const OW_PIN_URL = 'https://www.onlyworlds.com/account/settings/pin';
+/** The website's Account settings page: World PIN and Account tokens live there (keel portal/urls.py). */
+export const OW_SETTINGS_URL = 'https://www.onlyworlds.com/account/settings';
 /** The OnlyWorlds app made for a phone (#279): a phone visitor hears of it from the first screen and help. */
 export const LANTERN_URL = 'https://lantern.onlyworlds.com';
 

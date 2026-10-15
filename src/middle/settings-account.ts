@@ -21,6 +21,7 @@ import { AccountClient, accountErrorMessage } from '../sync/account-client';
 import { OwV2Error } from '../sync/ow-v2-client-adapter';
 import { classifyError, problemFor } from '../core/problems';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
+import { OW_SETTINGS_URL } from '../core/ow-site';
 
 /**
  * The sign-in error line (B6, S369). `accountErrorMessage`'s code branches
@@ -33,18 +34,37 @@ export function signInErrorLine(err: unknown): string {
     if (err.code === 'key_revoked' || err.status === 401 || err.code === 'rate_limited') return accountErrorMessage(err);
     if (err.status === 429) return 'Too many attempts. Wait a moment and try again.';
     if (err.status >= 400 && err.status < 500) {
-      return 'OnlyWorlds did not accept that account token. Check it on onlyworlds.com, under Account, then Account tokens.';
+      return 'OnlyWorlds did not accept that account token. Check it on onlyworlds.com, in Account settings under Account tokens.';
     }
   }
   if (classifyError(err) === 'offline') return CANNOT_REACH_LINE;
   return problemFor(err, { inline: true, doing: 'signing in' }).sentence;
 }
 
+/**
+ * #282 (journey scout gap 3): the tab read as two sign-ins side by side. The
+ * account token is the one sign-in, so it comes first; the PIN and email
+ * below it are what Atlas keeps for writing, each saying what it is for and
+ * where it comes from (keel: one PIN per account, set on Account settings).
+ */
 export function renderAccountTab(reg: WorldsRegistry): string {
   return `
     <section class="atlas-settings-section">
       <h3>Account</h3>
-      <p class="atlas-settings-hint">Your onlyworlds.com account PIN, used to create, link and sync online worlds. Changing it here does not change it there.</p>
+      <p class="atlas-settings-hint" data-role="account-lead">Sign in with an account token to see your onlyworlds.com worlds here. Your PIN lets Atlas save changes to your online worlds.</p>
+      ${renderAccountTokenBlock(reg)}
+      <label class="atlas-settings-field">
+        <span>PIN</span>
+        <div class="atlas-settings-pin-row">
+          <input class="atlas-input" type="password" name="pin"
+                 value="${escapeAttr(reg.pin ?? '')}"
+                 placeholder="4 digits"
+                 inputmode="numeric"
+                 maxlength="4" />
+          <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">Show</button>
+        </div>
+      </label>
+      <p class="atlas-settings-hint" data-role="pin-hint">One PIN for all your worlds. You set it on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
       <label class="atlas-settings-field">
         <span>Email</span>
         <input class="atlas-input" type="email" name="email"
@@ -52,18 +72,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
                placeholder="you@example.com"
                autocomplete="email" />
       </label>
-      <label class="atlas-settings-field">
-        <span>PIN</span>
-        <div class="atlas-settings-pin-row">
-          <input class="atlas-input" type="password" name="pin"
-                 value="${escapeAttr(reg.pin ?? '')}"
-                 placeholder="OnlyWorlds PIN (4 digits)"
-                 inputmode="numeric"
-                 maxlength="4" />
-          <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">Show</button>
-        </div>
-      </label>
-      ${renderAccountTokenBlock(reg)}
+      <p class="atlas-settings-hint" data-role="email-hint">Your onlyworlds.com email. Make online asks for it when it makes a new online world, and Atlas fills it in from here.</p>
     </section>
   `;
 }
@@ -92,7 +101,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
                autocomplete="off" spellcheck="false" />
         <button type="button" class="atlas-btn-primary" data-action="account-sign-in">Sign in</button>
       </div>
-      <p class="atlas-settings-hint">Connects Atlas to your OnlyWorlds account: see all your worlds, open any of them without hunting keys. Create a token on onlyworlds.com, under Account, then Account tokens.</p>
+      <p class="atlas-settings-hint">Your worlds appear in the sidebar, and each opens without a key to copy. Make a token on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-tokens" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under Account tokens.</p>
       <div class="atlas-modal-error" data-role="account-token-error" hidden></div>
     </div>
   `;

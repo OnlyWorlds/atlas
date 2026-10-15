@@ -47,6 +47,8 @@ test('Hide empty fields shows only what the element holds, and Show them brings 
   await expect(page.locator('[data-action="show-empty-fields"]')).toBeVisible();
   const shown = await rows(page).evaluateAll(rs => rs.map(r => (r as HTMLElement).dataset.field).sort());
   expect(shown).toEqual(['description', 'physicality']);
+  // The local world's picture word (#282) is about the image URL row, and hides with it.
+  await expect(page.locator('[data-role="picture-later"]')).toHaveCount(0);
   await expect(page.locator('.atlas-empty-fields-toggle')).toContainText(`${all - 2} empty fields hidden`);
 
   // The setting holds across elements and reloads of the page; Settings says the same.

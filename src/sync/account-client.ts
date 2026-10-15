@@ -72,7 +72,7 @@ export function isAccountAuthError(err: unknown): boolean {
 export function accountErrorMessage(err: unknown): string {
   if (err instanceof OwV2Error) {
     if (err.code === 'key_revoked') return 'This account token was revoked. Create a new one on onlyworlds.com.';
-    if (err.status === 401) return 'Account token not recognized. Check it on onlyworlds.com, under Account, then Account tokens.';
+    if (err.status === 401) return 'Account token not recognized. Check it on onlyworlds.com, in Account settings under Account tokens.';
     if (err.code === 'rate_limited') return 'Too many attempts. Wait a moment and try again.';
   }
   // Anything else is worded, never read out (S369): the fallback used to be

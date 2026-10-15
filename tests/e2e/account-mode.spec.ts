@@ -58,6 +58,24 @@ test('signed out: settings shows the paste field, sidebar shows no remote sectio
   await expect(page.locator('.atlas-remote-worlds')).toBeEmpty();
 });
 
+test('the Account section says which way to sign in and where the PIN comes from (#282)', async ({ page }) => {
+  await setupAtlasRoot(page);
+  await page.click('[data-action="open-settings"]');
+  await expect(page.locator('[data-role="account-lead"]')).toContainText('Sign in with an account token');
+  // One sign-in, first: the token's field stands above the PIN and the email.
+  const order = await page.evaluate(() => {
+    const at = (sel: string) => document.querySelector(sel)!.getBoundingClientRect().top;
+    return [at('input[name="account-token"]'), at('input[name="pin"]'), at('input[name="email"]')];
+  });
+  expect(order[0]).toBeLessThan(order[1]);
+  expect(order[1]).toBeLessThan(order[2]);
+  const pinHint = page.locator('[data-role="pin-hint"]');
+  await expect(pinHint).toContainText('One PIN for all your worlds.');
+  await expect(pinHint).toContainText('under World PIN');
+  await expect(pinHint.locator('a[data-link="account-settings"]')).toHaveAttribute('href', 'https://www.onlyworlds.com/account/settings');
+  await expect(page.locator('[data-role="email-hint"]')).toContainText('Make online asks for it');
+});
+
 test('sign-in rejects a token without the ow_a_ prefix inline, without storing it', async ({ page }) => {
   await setupAtlasRoot(page);
   await page.click('[data-action="open-settings"]');
