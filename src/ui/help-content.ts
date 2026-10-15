@@ -51,7 +51,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'label it your way with supertype and subtype',
       'add your own fields in the Custom fields section',
       'place it on a map from the header pin button',
-      { mouse: 'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)', touch: null },
+      { mouse: 'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)', touch: 'tap Hide types at the end of the sidebar strip, then tap a type to keep it out of the full list (pins and markers start that way)' },
       'see in the Web tab where it is mentioned but not linked, and link every mention with one click',
     ],
   },

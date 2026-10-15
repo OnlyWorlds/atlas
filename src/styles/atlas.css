@@ -16519,6 +16519,14 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     font-size: 13px;
   }
 
+  /* Hide types (#301) is no type: its own row under the tiles, its words whole. */
+  body:not(.atlas-touring) .atlas-filter-strip .atlas-filter-btn.atlas-filter-hide-types {
+    grid-column: 1 / -1;
+    width: auto;
+    justify-content: center;
+    gap: 6px;
+  }
+
   body:not(.atlas-touring) .atlas-filter-btn.named.muted::before {
     width: 20px;
   }

@@ -28,6 +28,7 @@ import { roomOf } from '../core/element-room';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { locateTargetFor } from './pin-locate';
 import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDiskNotice, setDiskShowOnly } from '../core/live-folder';
+import { isCoarsePointer } from '../core/pointer';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 // Pins and markers close the strip (S356): browsable when asked for, muted
@@ -476,6 +477,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     row?.classList.remove('atlas-row-dragging');
   });
 
+  // The strip's "Hide types" mode on a touch screen (#301), for this sidebar's life.
+  let hidingTypes = false;
+
   function renderFilters(): void {
     const state = getState();
     const elements = state.data.elements;
@@ -551,6 +555,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       }
 
       btn.addEventListener('click', () => {
+        // Hiding types on a touch screen (#301): a tap mutes, as a right-click does.
+        if (hidingTypes) { toggleMuted(type); return; }
         const curr = getState().ui.elementFilters;
         const next = new Set(curr);
         if (next.has(type)) next.delete(type); else next.add(type);
@@ -560,22 +566,50 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // Right-click → MUTE (S356): the type drops out of "show all" and
       // greys, one right-click brings it back. This replaced the per-type
       // "refresh from API" intent (a global pull dressed as a type action;
-      // the sync pill's pull-now is the honest home for it). Muting a type
-      // that was explicitly filtered on also drops that filter.
+      // the sync pill's pull-now is the honest home for it).
       btn.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        const ui = getState().ui;
-        const nextMuted = new Set(ui.mutedTypes);
-        const nextFilters = new Set(ui.elementFilters);
-        if (nextMuted.has(type)) nextMuted.delete(type);
-        else { nextMuted.add(type); nextFilters.delete(type); }
-        const worldId = getState().active?.worldId;
-        if (worldId) saveMutedTypes(worldId, nextMuted);
-        patchSlice('ui', { ...ui, mutedTypes: nextMuted, elementFilters: nextFilters });
+        toggleMuted(type);
       });
 
       strip.appendChild(btn);
     });
+
+    // A touch screen has no right-click (#301): the strip ends with "Hide
+    // types", and while it is on a tap mutes or brings back a type. Not
+    // during the tour, which owns the strip.
+    if (isCoarsePointer() && !touring) {
+      const hide = document.createElement('button');
+      hide.type = 'button';
+      hide.className = 'atlas-filter-btn atlas-filter-hide-types named' + (hidingTypes ? ' active' : '');
+      hide.dataset.action = 'hide-types';
+      hide.setAttribute('aria-pressed', String(hidingTypes));
+      const icon = document.createElement('span');
+      icon.className = 'material-symbols-outlined';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = hidingTypes ? 'check' : 'visibility_off';
+      const label = document.createElement('span');
+      label.className = 'atlas-filter-name';
+      label.textContent = hidingTypes ? 'Done' : 'Hide types';
+      hide.append(icon, label);
+      hide.addEventListener('click', () => { hidingTypes = !hidingTypes; renderFilters(); });
+      strip.appendChild(hide);
+      strip.classList.toggle('is-hiding-types', hidingTypes);
+    } else {
+      strip.classList.remove('is-hiding-types');
+    }
+  }
+
+  /** Mute or bring back a type: it drops out of "show all"; muting a type that was filtered on drops that filter. */
+  function toggleMuted(type: ElementType): void {
+    const ui = getState().ui;
+    const nextMuted = new Set(ui.mutedTypes);
+    const nextFilters = new Set(ui.elementFilters);
+    if (nextMuted.has(type)) nextMuted.delete(type);
+    else { nextMuted.add(type); nextFilters.delete(type); }
+    const worldId = getState().active?.worldId;
+    if (worldId) saveMutedTypes(worldId, nextMuted);
+    patchSlice('ui', { ...ui, mutedTypes: nextMuted, elementFilters: nextFilters });
   }
 
   // THE LIST MEMO (S362). `render` runs on EVERY state notify and every hash

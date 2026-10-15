@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.42.0',
+    date: '2026-10-15',
+    theme: 'Hide types on a touch screen',
+    entries: [
+      {
+        id: 'touch-hide-types',
+        title: 'Hide a type from the list on a phone',
+        body: 'On a touch screen the type strip in the sidebar ends with Hide types. Tap it, then tap a type to keep it out of the full list, or tap a hidden one to bring it back, and tap Done. With a mouse, a right-click on a type still does it.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.41.0',
     date: '2026-10-15',
     theme: 'Dates to check',

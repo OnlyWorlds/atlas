@@ -106,6 +106,36 @@ for (const tag of ['', '@firefox ']) test.describe(`${tag}on a touch screen`, ()
     await expect(page.locator('[data-modal="pick-element"]')).toBeVisible();
   });
 
+  test('Hide types: a tap on it, then on a type, keeps the type out of the full list (#301)', async ({ page }) => {
+    const wid = await worldThenPhone(page);
+    await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      await store.createElement('character', { name: 'Ireena' });
+      await store.createElement('location', { name: 'Barovia' });
+      api.patchData(await store.listElements());
+    });
+    await page.evaluate((w) => { location.hash = `#/w/${w}/home`; }, wid);
+    await page.locator('[data-drawer="sidebar"]').first().tap();
+    const rows = page.locator('.atlas-sidebar [data-element-id]');
+    await expect(rows.filter({ hasText: 'Ireena' })).toHaveCount(1);
+    const character = page.locator('.atlas-filter-btn[data-filter-type="character"]');
+
+    await page.locator('[data-action="hide-types"]').tap();
+    await expect(page.locator('[data-action="hide-types"]')).toHaveAttribute('aria-pressed', 'true');
+    await character.tap();
+    await expect(character).toHaveClass(/\bmuted\b/);
+    await expect(rows.filter({ hasText: 'Ireena' })).toHaveCount(0);
+    await expect(rows.filter({ hasText: 'Barovia' })).toHaveCount(1);
+
+    // Done: a tap filters again, as it always did; the muted type stays out of the full list.
+    await page.locator('[data-action="hide-types"]').tap();
+    await expect(page.locator('[data-action="hide-types"]')).toHaveAttribute('aria-pressed', 'false');
+    await page.locator('.atlas-filter-btn[data-filter-type="location"]').tap();
+    await expect(page.locator('.atlas-filter-btn[data-filter-type="location"]')).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => [...(window as any).__atlasTestApi.getState().ui.mutedTypes])).toContain('character');
+  });
+
   test('the Data room says choose, not drop', async ({ page }) => {
     const wid = await worldThenPhone(page);
     await page.evaluate((h) => { location.hash = h; }, `#/w/${wid}/import`);
@@ -125,6 +155,8 @@ test('with a mouse, help keeps its keyboard reference and says nothing of Lanter
   const modal = page.locator('[data-modal="help-overlay"]');
   await expect(modal).toContainText('Keyboard and mouse');
   await expect(modal.locator('a[data-link="lantern"]')).toHaveCount(0);
+  // With a mouse the type strip has no Hide types: a right-click mutes (#301).
+  await expect(page.locator('[data-action="hide-types"]')).toHaveCount(0);
   // With a mouse, Writing's bar is as it was: Ctrl+F finds, no Find button (#301)
   await page.keyboard.press('Escape');
   const id = await page.evaluate(async () => {
