@@ -40,7 +40,8 @@ import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import { saveCameraState, getCameraState } from '../../core/map-camera-persist';
 import { disposeDraftForMap } from './zone-drawing';
 import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
-import { syncZones, wireChipStrip, refreshActiveMapZones } from './map-tab-zones';
+import { syncZones, wireChipStrip, refreshActiveMapZones, refreshZoneDates } from './map-tab-zones';
+import { buildDateBar, wireDateBar } from './map-date-bar';
 import { enterEditMode, abortEditModeForMap, syncEditMode } from './zone-edit-mode';
 
 let containerSeq = 0;
@@ -132,6 +133,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   chipStrip.className = 'atlas-pin-filter-strip';
   container.appendChild(chipStrip);
 
+  // The date bar (#280): bottom left, shown once a zone here carries dates.
+  const dateBar = buildDateBar();
+  container.appendChild(dateBar);
+
   // Legacy imageless maps may lack stored dims — the flat-canvas default is
   // the shared IMAGELESS_MAP_SIZE square (applyMapBackground persists it on
   // first open so the space becomes durable; DESIGN_MAPS.md §4.2).
@@ -169,11 +174,14 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     chipStrip,
     hiddenPinTypes: new Set(),
     hiddenZoneKinds: new Set(),
+    dateBar,
+    zoneDate: { kind: 'now' },
     lastBg: '',
     zoneOverlay: null,
     zoneStrip,
   };
   wireChipStrip(entry, toasts);
+  wireDateBar(entry, () => refreshZoneDates(entry));
   mapTabCache.set(mapId, entry);
 
   entry.ready = (async () => {
@@ -412,6 +420,7 @@ onPinVisualsReady(() => {
 let lastElementsRef: unknown = null;
 let lastSelectedRef: unknown = null;
 let lastStylesRef: unknown = null;
+let lastNow: unknown = null;
 subscribe(() => {
   const state = getState();
   const elements = state.data.elements;
@@ -420,11 +429,14 @@ subscribe(() => {
   // toggle calls refreshActiveMapZones itself; keying on the ui slice here
   // would re-sync 300 zones on every search keystroke.)
   const styles = state.styles;
-  if (elements === lastElementsRef && selected === lastSelectedRef && styles === lastStylesRef) return;
+  // The world's now moves the zones of a map whose date bar follows it (#280).
+  const now = state.active?.meta?.time_current;
+  if (elements === lastElementsRef && selected === lastSelectedRef && styles === lastStylesRef && now === lastNow) return;
   const zonesOnly = elements === lastElementsRef && selected === lastSelectedRef;
   lastElementsRef = elements;
   lastSelectedRef = selected;
   lastStylesRef = styles;
+  lastNow = now;
   if (zonesOnly) { refreshActiveMapZones(); return; }
   refreshActiveMapPins();
   // Dims drifted under a BACKGROUND tab (image attached / dims corrected

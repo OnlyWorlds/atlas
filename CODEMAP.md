@@ -117,6 +117,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/tabs/right/context-pane-graph.ts`: the Web tab's graph (sim, rings, paint); `src/tabs/right/graph-labels.ts`: its label pass, pure (#141); DESIGN_SHELL "The graph".
 - `src/tabs/right/map-submap-door.ts`: into a submap from a selected pin, and "↑ parent" in the toolbar (#139); DESIGN_MAPS §3.6.
 - `src/tabs/right/map-zone-panel.ts`: THE ZONE PANEL (S356): kinds / legend / browser; DESIGN_ZONES §4.5.
+- `src/tabs/right/map-date-bar.ts`: the map's date bar (#280): the date, the slider, Now, All dates; the rule is `src/core/zone-dates.ts` (pure); DESIGN_ZONES §4.6, conv. 143.
 - `src/tabs/right/map-visual-settings-popover.ts`: docked at midpanel-right; retargets across a map switch.
 - `src/tabs/right/zone-drawing.ts` (draft state machine), `src/tabs/right/zone-edit-mode.ts` (per-world snapshot store, vertex/centroid drag), `src/tabs/right/zone-derived.ts` (`getZoneShape`).
 - `src/visualization/leaflet-2d/Leaflet2DManager.ts` (Leaflet wrapper, lifecycle cache, fitToCanvas), `src/visualization/leaflet-2d/ZoneOverlay.ts`, `src/visualization/leaflet-2d/ZoneGeometry.ts`, `src/visualization/leaflet-2d/CoordinateUtils.ts` (stored x/y ARE CRS.Simple lat/lng: `lat = y`).

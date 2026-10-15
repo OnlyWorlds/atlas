@@ -9,6 +9,7 @@
 
 import type { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
 import type { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
+import type { ZoneDateChoice } from '../../core/zone-dates';
 
 export interface MapTabCacheEntry {
   mapId: string;
@@ -77,6 +78,13 @@ export interface MapTabCacheEntry {
    * map from the zone panel's eye. Session-only, like `hiddenPinTypes`.
    */
   hiddenZoneKinds: Set<string>;
+  /**
+   * The date bar (#280, `map-date-bar.ts`), bottom left of the canvas, shown
+   * while a zone on this map is dated; and what it is set to (the world's now
+   * by default). Session-only, like `hiddenZoneKinds`.
+   */
+  dateBar: HTMLDivElement;
+  zoneDate: ZoneDateChoice;
 }
 
 export const mapTabCache = new Map<string, MapTabCacheEntry>();

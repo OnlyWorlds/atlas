@@ -35,6 +35,7 @@ import { openColourPopover } from '../../ui/colour-popover';
 import { panMapTabTo } from './map-tab';
 import { refreshActiveMapZones } from './map-tab-zones';
 import { markersForZoneOnMap, listLinkedZonesOnMap } from './zone-derived';
+import { mapZoneDate, zoneShownOnMap } from './map-date-bar';
 import { partitionZonesAndMarkers } from './zone-derived';
 
 const DEFAULT_ZONE_COLOR = '#22d3ee';
@@ -81,9 +82,15 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     if (btn) { btn.style.display = 'none'; btn.classList.remove('is-open'); }
     return;
   }
+  // The date bar (#280, conv. 143): the panel lists what the map's date
+  // shows. Kinds are grouped from EVERY zone and then narrowed, so a kind's
+  // key (its eye, colour and tune) is the same whatever the date: grouping
+  // only the date's zones split or merged roles differently (the S410 gate).
+  const date = mapZoneDate(entry);
+  const shownIds = new Set(zones.filter(z => zoneShownOnMap(entry, z, date)).map(z => z.id));
   if (btn) {
     btn.style.display = '';
-    if (countEl) countEl.textContent = String(zones.length);
+    if (countEl) countEl.textContent = String(shownIds.size);
   }
   strip.style.display = '';
 
@@ -94,10 +101,14 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   ps.stale = false;
   const rules = getState().styles.rules;
   // Zones drawn as their linked zones (a road as its segments, S362) join the
-  // panel beside the zones they link: listed, lit on hover, never drawn.
+  // panel beside the zones they link: listed, lit on hover, never drawn. A
+  // road lists at its own dates, with the parts the date shows.
   const linked = listLinkedZonesOnMap(zones, partitionZonesAndMarkers(getState().data.elements).zones);
-  const partsOf = new Map(linked.map(l => [l.zone.id, l.parts]));
-  const kinds = zoneKinds([...zones, ...linked.map(l => l.zone)]);
+  const partsOf = new Map(linked.map(l => [l.zone.id, l.parts.filter(id => shownIds.has(id))]));
+  const linkedShown = (z: Zone): boolean => (partsOf.get(z.id)?.length ?? 0) > 0 && zoneShownOnMap(entry, z, date);
+  const kinds = zoneKinds([...zones, ...linked.map(l => l.zone)])
+    .map(k => ({ ...k, members: k.members.filter(z => shownIds.has(z.id) || (partsOf.has(z.id) && linkedShown(z))) }))
+    .filter(k => k.members.length > 0);
   const q = ps.search.trim().toLowerCase();
   // One kind (a small hand-drawn world) opens itself: the panel reads as the
   // flat list it was. Many kinds start closed; the selected zone's kind opens.
@@ -153,7 +164,8 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
         </div>
       </div>`);
   }
-  if (q && parts.length === 1) parts.push(`<div class="atlas-zone-panel-empty">No zone matches "${escapeText(ps.search.trim())}"</div>`);
+  if (kinds.length === 0) parts.push(`<div class="atlas-zone-panel-empty">No zone on this map at this date</div>`);
+  else if (q && parts.length === 1) parts.push(`<div class="atlas-zone-panel-empty">No zone matches "${escapeText(ps.search.trim())}"</div>`);
 
   strip.innerHTML = parts.join('');
   if (hadFocus) {
@@ -235,6 +247,8 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     return zones.filter(z => ids.has(z.id));
   };
   const kindOf = (key: string): Kind<Zone> | undefined => zoneKinds(zonesOnMap()).find(k => k.key === key);
+  // Every zone on the map, as `syncZones` hands it; the panel narrows to the
+  // map's date itself (#280), and a kind's verbs reach every member.
   const rerender = (): void => {
     renderZonePanel(entry, zonesOnMap(), getState().ui.selectedElementId);
   };

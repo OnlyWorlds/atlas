@@ -625,6 +625,13 @@ export class ZoneOverlay {
     } else {
       this.hideVertexDots(entry);
     }
+    // A hidden zone is drawn at opacity 0, so it must stop taking the pointer
+    // too (#280): an earlier era lying over the one on show stole its clicks
+    // and hovers, and a kind hidden by its eye still selected on a click.
+    const hitEl = (entry.hitLayer as (L.Path & { _path?: SVGElement }) | null | undefined)?._path;
+    for (const el of [visibleEl, hitEl]) {
+      if (el) el.style.pointerEvents = showShape ? '' : 'none';
+    }
   }
 
   private buildLabelMarker(shape: ZoneShape): L.Marker {

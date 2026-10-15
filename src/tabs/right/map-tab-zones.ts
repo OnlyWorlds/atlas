@@ -26,6 +26,7 @@ import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { ToastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
+import { mapZoneDate, updateDateBar, zoneShownOnMap } from './map-date-bar';
 
 /**
  * Sync the ZoneOverlay to the current state. Adds new zones, updates changed
@@ -40,13 +41,6 @@ export function syncZones(entry: MapTabCacheEntry): void {
   const present = new Set<string>();
   const prefs = getEffectiveMapPrefs(entry.mapId);
   const rules = state.styles.rules;
-  // Kind → hidden, from the zone panel's eyes (session-only, per map).
-  const hiddenIds = new Set<string>();
-  if (entry.hiddenZoneKinds.size > 0) {
-    for (const kind of groupByKind(onThisMap, { byRole: true })) {
-      if (entry.hiddenZoneKinds.has(kind.key)) for (const z of kind.members) hiddenIds.add(z.id);
-    }
-  }
 
   for (const zone of onThisMap) {
     present.add(zone.id);
@@ -82,7 +76,6 @@ export function syncZones(entry: MapTabCacheEntry): void {
       weight: style.weight,
       dash: style.dash,
     });
-    entry.zoneOverlay.setZoneVisible(zone.id, !hiddenIds.has(zone.id));
   }
 
   // Remove overlay entries that are no longer on this map. Iterate the
@@ -103,8 +96,39 @@ export function syncZones(entry: MapTabCacheEntry): void {
     entry.zoneOverlay.setZoneSelected(zone.id, zone.id === selectedId);
   }
 
-  renderZonePanel(entry, onThisMap, selectedId);
+  applyZoneVisibility(entry, onThisMap);
+}
+
+/**
+ * Which zones show: the panel's eyes (kinds hidden, session-only, per map)
+ * and the date bar (#280, conv. 143); then the bar, the panel and the label
+ * pass. The slider runs only this, so a drag never rebuilds the zones (a
+ * rebuild resets every label and the density pass flickered them).
+ */
+function applyZoneVisibility(entry: MapTabCacheEntry, onThisMap: Zone[]): void {
+  if (!entry.zoneOverlay) return;
+  const hiddenIds = new Set<string>();
+  if (entry.hiddenZoneKinds.size > 0) {
+    for (const kind of groupByKind(onThisMap, { byRole: true })) {
+      if (entry.hiddenZoneKinds.has(kind.key)) for (const z of kind.members) hiddenIds.add(z.id);
+    }
+  }
+  const date = mapZoneDate(entry);
+  let shown = 0;
+  for (const zone of onThisMap) {
+    const atDate = zoneShownOnMap(entry, zone, date);
+    if (atDate) shown++;
+    entry.zoneOverlay.setZoneVisible(zone.id, atDate && !hiddenIds.has(zone.id));
+  }
+  updateDateBar(entry, onThisMap, shown);
+  renderZonePanel(entry, onThisMap, getState().ui.selectedElementId);
   scheduleLabelDensity(entry);
+}
+
+/** The date bar moved (#280): visibility only, the zones stay as built. */
+export function refreshZoneDates(entry: MapTabCacheEntry): void {
+  const { zones, markers } = partitionZonesAndMarkers(getState().data.elements);
+  applyZoneVisibility(entry, listZonesOnMap(entry.mapId, markers, zones));
 }
 
 function zoneEffectiveOpacity(zone: Zone, mapDefault: number): number {

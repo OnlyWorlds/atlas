@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.40.0',
+    date: '2026-10-15',
+    theme: 'Borders that move with time',
+    entries: [
+      {
+        id: 'map-zones-by-date',
+        title: 'A map shows its zones as of a date',
+        body: 'When zones on a map have a start or end date, a bar along the bottom of the map shows them as of the world\'s now. Slide it to watch a border change, or choose All dates to see every era at once. A zone without dates always shows, and dates read in your world\'s calendar.',
+        tags: ['maps'],
+      },
+      {
+        id: 'hidden-zones-ignore-clicks',
+        title: 'A hidden zone no longer catches clicks',
+        body: 'A zone you hid with its eye in the zones list, or that the date hides, could still be clicked where it would have been drawn. Now a click lands on what you can see.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.39.0',
     date: '2026-10-15',
     theme: 'Find on a touch screen',

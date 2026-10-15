@@ -577,6 +577,88 @@ html {
   font-weight: 600;
 }
 
+/* The date bar (#280): along the bottom of the canvas; while it shows, the
+ * zoom control rises above it. Canvas chrome (conv. 90): the dark chip in
+ * both themes. A long calendar date ellipsizes; its title holds it whole. */
+.atlas-map-has-datebar .leaflet-bottom {
+  bottom: 74px;
+}
+/* Two rows: the date gets the bar's whole width (a calendar's "61 Greening,
+ * Year 1 FT" clipped beside the slider on every width), the controls below. */
+.atlas-map-datebar {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  /* Under the pin tooltip (800), over the map's panes. */
+  z-index: 700;
+  max-width: 420px;
+  display: grid;
+  grid-template-columns: auto minmax(56px, 1fr) auto auto;
+  grid-template-areas:
+    "icon label label label"
+    "slider slider now all";
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 6px 8px 6px 10px;
+  border-radius: 14px;
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.78);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(var(--atlas-canvas-ink-rgb), 0.16);
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.92);
+  font-size: 12px;
+}
+.atlas-map-datebar-icon {
+  grid-area: icon;
+  font-size: 16px;
+  opacity: 0.8;
+}
+.atlas-map-datebar-label {
+  grid-area: label;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.atlas-map-datebar-slider {
+  grid-area: slider;
+  min-width: 0;
+  margin: 0;
+  accent-color: rgb(var(--atlas-accent-rgb));
+}
+.atlas-map-datebar[data-choice="all"] .atlas-map-datebar-slider {
+  opacity: 0.5;
+}
+.atlas-map-datebar-btn[data-action="datebar-now"] { grid-area: now; }
+.atlas-map-datebar-btn[data-action="datebar-all"] { grid-area: all; }
+.atlas-map-datebar-btn {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--atlas-canvas-ink-rgb), 0.22);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  .atlas-map-datebar-btn:hover {
+    background: rgba(var(--atlas-canvas-ink-rgb), 0.1);
+  }
+}
+.atlas-map-datebar-btn[aria-pressed="true"] {
+  border-color: rgba(var(--atlas-accent-rgb), 0.8);
+  background: rgba(var(--atlas-accent-rgb), 0.22);
+}
+@media (pointer: coarse) {
+  .atlas-map-datebar-btn {
+    min-height: 32px;
+  }
+}
+
 /* Pin trash drop-zone — appears top-right of the map canvas while a pin is
  * being dragged. Drop the pin on it → delete. Hidden by default; toggles via
  * data-active. Pointer-events stays "none" so it doesn't intercept anything;
