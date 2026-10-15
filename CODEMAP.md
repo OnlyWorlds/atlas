@@ -12,7 +12,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/plain-error.ts`: `PlainError`, a message already written for users (the refusal classes extend it).
 - `src/core/date-continuity.ts`: `findDateConflicts`, the dates to check (#281; two kinds cannot be true, the rest are links across a birth), pure; Home's loose threads list them (DESIGN_HOME §6). `src/core/world-date-text.ts`: a date as the world's active calendar says it. `src/core/link-ids.ts`: `linkIdsOf`, the tolerant link reader (conv. 94).
 - `src/core/types.ts`: Element, Conflict, SyncEngineState, Registry types, `SyncResult.pulled_ids`.
-- `src/core/constants.ts`: storage keys, folder layout, `ATLAS_WIRE_EXTENSION_FIELDS` (sent) + `ATLAS_LOCAL_ONLY_FIELDS` (stripped); see ATLAS_FIELDS.md.
+- `src/core/constants.ts`: storage keys, folder layout, `ATLAS_WIRE_EXTENSION_FIELDS` (sent) + `ATLAS_LOCAL_ONLY_FIELDS` (stripped) + `SERVER_AUTHOR_FIELDS` (who wrote it: kept, never sent, never a change; 1.47.1); see ATLAS_FIELDS.md.
+- `src/core/agent-mark.ts`: `agentMarkFor`, the quiet agent mark's rule (#347, conv. 144): keel's door of the last write through the SDK's `isAgentDoor`, a seat named from the roster.
 - `src/core/state.ts`: the observable store.
 - `src/core/router.ts`: hash router, `settingsHash(world, tab)` deep-link helpers. The route table is DESIGN_SHELL "Routes".
 - `src/core/map-view-prefs.ts`: per-map visual prefs (grid, pin style/labels/tint, zone opacity/labels; 'auto' = the density layer, S356).
@@ -50,7 +51,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/store/folder-store.ts`: the FolderStore INTERFACE, the seam (`updateSyncState` mutator, conv. 86).
 - `src/store/folder-store-fs.ts`: FsFolderStore: body-based fileIndex + id-sorted tidy + sticky writes (conv. 87), 30 s lock heartbeat, tombstone + sync-state chains.
 - `src/store/write-chain.ts`: `PerIdWriteChain`, per-id update/delete serialization (conv. 79; both stores use it).
-- `src/store/sync-stamp.ts`: `stampedBody`: a push stamp keeps an edit made IN FLIGHT dirty (conv. 96).
+- `src/store/sync-stamp.ts`: `stampedBody`: a push stamp keeps an edit made IN FLIGHT dirty (conv. 96); `dropLastWriter`, a local edit is the person's (conv. 144).
 - `src/store/disk-link-names.ts`: pin/marker link fields read under BOTH disk spellings (`map`/`map_id`); per-FILE spelling recorded in fileIndex and written back the way it came (conv. 8).
 - `src/store/fs-utils.ts`: `writeJsonAtomic` (ONE writable + read-back verify, busy files retried about 2 s; conv. 123), slugify / idTail / elementFilename / validElementFilenames / `sameFsName` (the File-naming contract).
 - `src/store/scrub-links.ts`: a delete removes the dead ids from every link (conv. 101).
@@ -76,6 +77,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/sync/rekey-route.ts`: `rekeyRouteHash`, the URL after ids change.
 - `src/sync/foreign-ids.ts`: ids another world holds, recorded on evidence (conv. 108).
 - `src/sync/account-client.ts`: signed-in account calls (v2 `POST /account/worlds` with the PIN dance for Route 1).
+- `src/sync/world-roster.ts`: a linked world's roster (`members()`), read once per world and session when the agent mark asks; a failure waits a minute (#347).
 - `src/sync/invite-link.ts`: Invite someone's link (#341, 1.47): `makeInvite` on the SDK's `createWorldLink` with the account token, a person's link, keel's 7 days; every refusal worded (`INVITE_NOT_OWNER_LINE`). Nothing kept.
 - `src/sync/sharing-client.ts`: the typed client for the sharing API (SHARING_CONTRACT §4): publish/getPublic/republish/revoke/list/slug-check, error-enum mapping, `SHARING_BASE_URL`.
 - `src/sync/auto-pull-scheduler.ts`: opt-in periodic pull with visibility/error-state gates.
@@ -97,7 +99,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 ## src/middle
 
-- `src/middle/element-detail.ts`: the schema-driven editor; widget-aware empty placeholders. Its concerns split into `src/middle/element-detail-header.ts`, `src/middle/element-detail-fields.ts` (`linkIdsOf` reads {id} objects and a lone id string), `src/middle/element-detail-refs.ts`, `src/middle/element-detail-zone-sections.ts`, `src/middle/element-detail-custom-fields.ts`, `src/middle/element-detail-map-image.ts` (a map's Local image row), `src/middle/element-detail-picture.ts` (Upload picture, #154: online worlds only), `src/middle/filled-fields.ts` (which fields show when empty ones hide: the tour and the Hide empty fields setting, #24).
+- `src/middle/element-detail.ts`: the schema-driven editor; widget-aware empty placeholders. Its concerns split into `src/middle/element-detail-header.ts`, `src/middle/element-detail-fields.ts` (`linkIdsOf` reads {id} objects and a lone id string), `src/middle/element-detail-refs.ts`, `src/middle/element-detail-zone-sections.ts`, `src/middle/element-detail-custom-fields.ts`, `src/middle/element-detail-map-image.ts` (a map's Local image row), `src/middle/element-detail-picture.ts` (Upload picture, #154: online worlds only), `src/middle/element-agent-mark.ts` (the quiet agent mark after the name, #347), `src/middle/filled-fields.ts` (which fields show when empty ones hide: the tour and the Hide empty fields setting, #24).
 - `src/middle/editable-title.ts`: `makeEditableTitle`, the shared click-to-edit entity title (conv. 80).
 - `src/middle/settings-panel.ts`: the orchestrator over per-tab modules: `src/middle/settings-general.ts`, `src/middle/settings-onlyworlds.ts`, `src/middle/settings-storage.ts`, `src/middle/settings-elements.ts`, `src/middle/settings-maps.ts`, `src/middle/settings-world.ts`, `src/middle/settings-writing.ts`, `src/middle/settings-context.ts` (tab id 'context' is LABELED "Web").
 - `src/middle/writing-workspace.ts`: the TipTap prose editor + its `writing-workspace-*` concern modules (DESIGN_WRITING).

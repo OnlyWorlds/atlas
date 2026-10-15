@@ -1461,6 +1461,12 @@ html {
   outline-offset: 1px;
 }
 
+/* The quiet agent mark after the name (#347): dimmer than any action. */
+.atlas-icon-btn-sm.atlas-agent-mark {
+  color: var(--atlas-text-dim);
+  margin-left: 2px;
+}
+
 /* Empty editable title (e.g. a fresh draft) shows its placeholder muted. */
 .atlas-element-name.is-placeholder {
   color: var(--atlas-text-muted);

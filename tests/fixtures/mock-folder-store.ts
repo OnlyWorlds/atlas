@@ -27,7 +27,7 @@ import type {
 } from '../../src/core/types';
 import type { ChartConfig } from '../../src/visualization/timeline/types';
 import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
-import { stampedBody, editStamp } from '../../src/store/sync-stamp';
+import { stampedBody, editStamp, dropLastWriter } from '../../src/store/sync-stamp';
 import { scrubReferrers } from '../../src/store/scrub-links';
 import { CorruptFileError } from '../../src/store/fs-utils';
 import { withoutSeatSecret } from '../../src/core/seat';
@@ -171,14 +171,14 @@ export class MockFolderStore implements FolderStore {
       // refs (fakes encode the real store's isolation, convention #20).
       const patch = mutate(structuredClone(existing));
       if (patch === null || Object.keys(patch).length === 0) return structuredClone(existing);
-      const next: Element = {
+      const next: Element = dropLastWriter({
         ...existing,
         ...patch,
         id: existing.id,
         type: existing.type,
         local_updated_at: editStamp(this.clock(), patch.server_updated_at ?? existing.server_updated_at),
         server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
-      };
+      });
       this.elements.set(id, next);
       return { ...next };
     });
@@ -193,7 +193,7 @@ export class MockFolderStore implements FolderStore {
       // write) so an UNSERIALIZED read-merge-write race manifests in vitest —
       // fakes encode real-world failure modes (convention #20).
       await Promise.resolve();
-      const next: Element = {
+      const next: Element = dropLastWriter({
         ...existing,
         ...patch,
         id: existing.id,
@@ -201,7 +201,7 @@ export class MockFolderStore implements FolderStore {
         local_updated_at: editStamp(this.clock(), patch.server_updated_at ?? existing.server_updated_at),
         // Preserve server_updated_at unless patch explicitly sets it.
         server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
-      };
+      });
       this.elements.set(id, next);
       return { ...next };
     });

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.48.0',
+    date: '2026-10-16',
+    theme: 'Made by an agent, said quietly',
+    entries: [
+      {
+        id: 'agent-mark',
+        title: 'An element an agent changed last carries a quiet mark',
+        body: 'In a synced world, when an agent made the last change to an element (an agent\'s own seat, MCP, or a tool that says it is an agent), a small mark sits after its name. Point at it or tap it to read who: "Last changed by Skeld, an agent". A person\'s change carries none, and your own edit takes the mark away.',
+        tags: ['sync', 'worlds'],
+      },
+    ],
+  },
+  {
     version: '1.47.1',
     date: '2026-10-16',
     theme: 'Who wrote it is not a change',

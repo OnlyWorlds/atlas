@@ -101,7 +101,7 @@ interface LayoutScan {
   unreadableLc: Set<string>;
 }
 import { PerIdWriteChain } from './write-chain';
-import { stampedBody, editStamp } from './sync-stamp';
+import { stampedBody, editStamp, dropLastWriter } from './sync-stamp';
 import { scrubReferrers } from './scrub-links';
 import { withoutSeatSecret } from '../core/seat';
 import {
@@ -1695,7 +1695,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   private async applyPatchUnchained(existing: Element, patch: Partial<Element>): Promise<Element> {
-    const next: Element = {
+    const next: Element = dropLastWriter({
       ...existing,
       ...patch,
       id: existing.id,
@@ -1703,7 +1703,7 @@ export class FsFolderStore implements FolderStore {
       // An edit sorts past the baseline it was made on, whatever this clock says (S387).
       local_updated_at: editStamp(this.clock(), patch.server_updated_at ?? existing.server_updated_at),
       server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
-    };
+    });
     await this.writeElementAndRename(existing.type, existing.id, next, existing.name);
     return next;
   }

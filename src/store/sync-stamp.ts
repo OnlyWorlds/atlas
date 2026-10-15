@@ -27,7 +27,10 @@ export function stampedBody(
   serverUpdatedAt: string,
   sentLocalUpdatedAt?: string | null,
 ): Element {
-  const next: Element = { ...existing, server_updated_at: serverUpdatedAt };
+  // A push that landed is keel's last write, through Atlas's own door: whoever wrote the copy on
+  // disk before is no longer the last writer (#347; the S415 gate: an outside edit adopted from the
+  // live folder, or Make Online, pushed and stamped while the old agent mark stayed for good).
+  const next: Element = dropLastWriter({ ...existing, server_updated_at: serverUpdatedAt });
   if (sentLocalUpdatedAt === undefined) return next;
   if (sentLocalUpdatedAt !== null && existing.local_updated_at === sentLocalUpdatedAt) return next;
   // Edited in flight. Already newer than the baseline: nothing to do.
@@ -49,6 +52,22 @@ export function stampedBody(
  * An edit is always newer than the baseline it was made on. Shared by
  * FsFolderStore and the MockFolderStore fixture (parity).
  */
+/**
+ * A local edit is this person's: who last wrote the element on the server
+ * (`changed_by`, `changed_via`, keel #299) no longer describes it, and the
+ * next push is made through Atlas's own door. Dropped on every edit, so the
+ * quiet agent mark (#347, `src/core/agent-mark.ts`) never sits on a person's
+ * change; the next pull brings keel's word back. `created_by` stays: the
+ * creator does not change. Mutates and returns `next`. Shared by
+ * FsFolderStore and the MockFolderStore fixture (parity).
+ */
+export function dropLastWriter(next: Element): Element {
+  const rec = next as Record<string, unknown>;
+  delete rec.changed_by;
+  delete rec.changed_via;
+  return next;
+}
+
 export function editStamp(now: string, serverUpdatedAt: unknown): string {
   if (typeof serverUpdatedAt !== 'string' || now > serverUpdatedAt) return now;
   const serverMs = Date.parse(serverUpdatedAt);

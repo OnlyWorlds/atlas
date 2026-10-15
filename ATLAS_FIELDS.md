@@ -45,6 +45,10 @@ Before the v2 port (2026-07-12) the zone visuals were local-only because the old
 
 A page's canonical `story` carries a derived plain-markdown compilation of its blocks (synced, readable by other tools, regenerated on every blocks save, never hand-edited). The published artifact is a frozen snapshot on the sharing backend: `SHARING_CONTRACT.md`.
 
+## Server-authored, kept as received (`SERVER_AUTHOR_FIELDS`)
+
+Not atlas's fields and not the schema's: who wrote the element, as keel records it. `created_by` (the membership that made it), `changed_by` and `changed_via` (the membership and the door of the last write, keel #299). A pull keeps them on disk; atlas never sends them, never counts them as a change, drops them on import from another world, and drops the last two on every local edit (conv. 144). The quiet agent mark reads `changed_via` (#347). A linked world's roster, which names an agent seat, is held in memory for the session only (`src/sync/world-roster.ts`).
+
 ## Semantic reinterpretations (candidates for first-class schema)
 
 Atlas also reads canon fields in ways other tools cannot see:
