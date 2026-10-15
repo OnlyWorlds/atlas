@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.43.0',
+    date: '2026-10-15',
+    theme: 'The chart by finger',
+    entries: [
+      {
+        id: 'touch-chart',
+        title: 'Pinch, slide and re-date on a phone\'s chart',
+        body: 'On a touch screen, two fingers zoom the chart from eras down to days, and one finger slides it through time or moves the band in the strip below it. Tap a dot, then slide it along the axis to give it a new date, or slide a range by its end; the now-line slides too. Sliding across a dot you have not tapped moves the chart, so a crowded chart still travels. Up and down still scroll the page.',
+        tags: ['charts'],
+      },
+    ],
+  },
+  {
     version: '1.42.0',
     date: '2026-10-15',
     theme: 'Hide types on a touch screen',

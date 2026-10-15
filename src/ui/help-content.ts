@@ -86,16 +86,19 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     name: 'Charts',
     purpose: 'Your world along a time axis, in your world\'s own words.',
     can: [
-      'click any element to focus on what it touches',
+      {
+        mouse: 'click any element to focus on what it touches',
+        touch: 'tap any element to see what it touches, and tap it again to focus the chart on it',
+      },
       'set the world clock, then create a calendar: dates read as "12 Frostwane, Year 454" and you can type calendar words into any date field',
       {
         mouse: 'drag things into time: an undated element onto the axis, a dot to re-date it, a range\'s end cap to stretch it, the now-line to move the now',
-        touch: 'give an element its date on its own page, and the chart places it',
+        touch: 'tap a dot, then slide it along the axis to re-date it (a range stretches by its end); slide the now-line to move the now; an undated element takes its date on its own page',
       },
       'focus a title or character to see its tenure or life drawn to the now',
       {
         mouse: 'filter by type and zoom from eras down to days (no types picked = the cast and essentials, not everything)',
-        touch: 'filter by type (no types picked = the cast and essentials, not everything)',
+        touch: 'filter by type, pinch to zoom from eras down to days and slide sideways to travel (no types picked = the cast and essentials, not everything)',
       },
       'switch to the document view and scroll through your history: eras section it, skipped time is named, the now is a seam you scroll across',
       { mouse: 'save a chart and reload it from the gallery, or drop it onto a share page', touch: 'save a chart and reload it from the gallery, or put it on a page with + chart in Pages' },

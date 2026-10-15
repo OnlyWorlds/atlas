@@ -86,6 +86,9 @@ const TRAVEL_MS = 280;           // focus-jump window animation
 // appreciation), and it reads distinct from the cyan viewport band + cast marks.
 const NOW_COLOR = '245, 180, 90';
 const NOW_GRAB_PX = 6;           // px tolerance to grab the now-line for dragging
+// A finger (#301) gets wider grips than a cursor.
+const TOUCH_NOW_GRAB_PX = 16;
+const TOUCH_STRIP_EDGE_GRAB = 14;
 const FUTURE_NODE_ALPHA = 0.4;   // ahead-of-now glyphs render dim/hollow (S11)
 
 export interface TimelineViewOptions {
@@ -269,6 +272,14 @@ interface ViewState {
   destroyed: boolean;           // set on destroy(); guards late async redraws
   onSelect: (id: string) => void;
   onOpenElement: (id: string) => void;
+  // Touch (#301): the fingers on the canvas, a two-finger pinch in progress,
+  // and whether this gesture already became a pinch (the finger left behind
+  // when one lifts does nothing until both are up). `nowBefore` puts the now
+  // back when a second finger interrupts a now-line drag.
+  touchPts: Map<number, { x: number; y: number }>;
+  pinch: { dist0: number; mid0: number; anchor: number; win0: TimeWindow } | null;
+  touchSpent: boolean;
+  nowBefore: number | null;
 }
 
 export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions): TimelineViewHandle {
@@ -322,6 +333,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     destroyed: false,
     onSelect: opts.onSelect,
     onOpenElement: opts.onOpenElement,
+    touchPts: new Map(), pinch: null, touchSpent: false, nowBefore: null,
   };
 
   const onMove = (e: MouseEvent): void => handleMouseMove(state, e);
@@ -329,11 +341,19 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   const onDown = (e: MouseEvent): void => handleMouseDown(state, e);
   const onUp = (e: MouseEvent): void => handleMouseUp(state, e);
   const onWheel = (e: WheelEvent): void => handleWheel(state, e);
+  const onTouchDown = (e: PointerEvent): void => handleTouchDown(state, e);
+  const onTouchMove = (e: PointerEvent): void => handleTouchMove(state, e);
+  const onTouchUp = (e: PointerEvent): void => handleTouchUp(state, e, false);
+  const onTouchCancel = (e: PointerEvent): void => handleTouchUp(state, e, true);
   canvas.addEventListener('mousemove', onMove);
   canvas.addEventListener('mouseleave', onLeave);
   canvas.addEventListener('mousedown', onDown);
   window.addEventListener('mouseup', onUp);
   canvas.addEventListener('wheel', onWheel, { passive: false });
+  canvas.addEventListener('pointerdown', onTouchDown);
+  canvas.addEventListener('pointermove', onTouchMove);
+  canvas.addEventListener('pointerup', onTouchUp);
+  canvas.addEventListener('pointercancel', onTouchCancel);
 
   // Observe the canvas CELL — when the docked card mounts/unmounts, the cell
   // reflows and the chart redraws to its new width/height.
@@ -422,6 +442,10 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       canvas.removeEventListener('mousedown', onDown);
       window.removeEventListener('mouseup', onUp);
       canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('pointerdown', onTouchDown);
+      canvas.removeEventListener('pointermove', onTouchMove);
+      canvas.removeEventListener('pointerup', onTouchUp);
+      canvas.removeEventListener('pointercancel', onTouchCancel);
       target.innerHTML = '';
     },
   };
@@ -796,6 +820,8 @@ function draw(state: ViewState): void {
   state.baseRange = base;
   if (emptyChart) { state.placedDots = []; state.labelBoxes = []; }
   const view = currentViewRange(state) ?? { start: base.min, end: base.max };
+  // The window on screen, readable from outside the canvas (the touch specs).
+  canvas.dataset.window = `${view.start.toFixed(3)},${view.end.toFixed(3)}`;
   const range = { min: view.start, max: view.end };
   const dateToX = createDateToX(range, w);
   const ticks = axisTicksFor(state, range, w, dateToX);
@@ -1435,7 +1461,10 @@ function drawStrip(ctx: CanvasRenderingContext2D, state: ViewState, w: number, h
 }
 
 /** Which strip control is under (mx,my), if any. */
-function stripHit(state: ViewState, mx: number, my: number, w: number, h: number, view: TimeWindow):
+function stripHit(
+  state: ViewState, mx: number, my: number, w: number, h: number, view: TimeWindow,
+  edgeGrab: number = STRIP_EDGE_GRAB,
+):
   | { kind: 'left' | 'right' | 'band' | 'track' }
   | null {
   if (my < stripTop(h)) return null;
@@ -1450,8 +1479,11 @@ function stripHit(state: ViewState, mx: number, my: number, w: number, h: number
   const clampX = (x: number): number => Math.min(capMax, Math.max(capMin, x));
   const b0 = clampX(scale.toX(view.start));
   const b1 = clampX(scale.toX(view.end));
-  if (Math.abs(mx - b0) <= STRIP_EDGE_GRAB) return { kind: 'left' };
-  if (Math.abs(mx - b1) <= STRIP_EDGE_GRAB) return { kind: 'right' };
+  // A band narrower than both grips together gives each grip its own half,
+  // so a wide finger grip never leaves the band without a middle to move.
+  const grab = Math.min(edgeGrab, Math.max(STRIP_EDGE_GRAB, (b1 - b0) / 3));
+  if (Math.abs(mx - b0) <= grab) return { kind: 'left' };
+  if (Math.abs(mx - b1) <= grab) return { kind: 'right' };
   if (mx > b0 && mx < b1) return { kind: 'band' };
   return { kind: 'track' };
 }
@@ -2266,11 +2298,11 @@ function endCapHit(state: ViewState, mx: number, my: number, w: number): PlacedD
 }
 
 /** Is (mx,my) close enough to grab the now-line for a drag? (Act 1) */
-function nearNowLine(state: ViewState, mx: number, my: number, w: number, h: number): boolean {
+function nearNowLine(state: ViewState, mx: number, my: number, w: number, h: number, grab: number = NOW_GRAB_PX): boolean {
   if (state.now == null) return false;
   const x = nowLineX(state, w);
   if (x == null) return false;
-  return my >= TOP_PAD - 6 && my <= axisYOf(h) && Math.abs(mx - x) <= NOW_GRAB_PX;
+  return my >= TOP_PAD - 6 && my <= axisYOf(h) && Math.abs(mx - x) <= grab;
 }
 
 /** The date under a main-canvas x (uses the current on-screen window).
@@ -2282,7 +2314,7 @@ function dateAtX(state: ViewState, x: number, w: number): number | null {
   return createXToDate({ min: view.start, max: view.end }, w)(x);
 }
 
-function handleMouseMove(state: ViewState, e: MouseEvent): void {
+function handleMouseMove(state: ViewState, e: Pick<MouseEvent, 'clientX' | 'clientY'>): void {
   // A date-drag owns the pointer — the window-level drag handler draws the
   // guide; the canvas hover/pan must stay out of the way (gate finding: two
   // "what's under the cursor" systems fighting + a cursor tug-of-war).
@@ -2408,7 +2440,14 @@ function handleMouseLeave(state: ViewState): void {
   draw(state);
 }
 
-function handleMouseDown(state: ViewState, e: MouseEvent): void {
+/** A press on the canvas, from a mouse or (`touch`) a finger: the finger gets
+ *  wider grips, and only re-dates a dot it has already tapped (#301), so a
+ *  finger that lands on a dot while panning a crowded chart still pans. */
+function handleMouseDown(
+  state: ViewState,
+  e: Pick<MouseEvent, 'button' | 'clientX' | 'clientY'>,
+  touch = false,
+): void {
   if (e.button !== 0) return;
   if (state.dateDrag) return; // a date-drag owns the pointer
   const rect = state.canvas.getBoundingClientRect();
@@ -2418,7 +2457,7 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
 
   // Strip interactions first (the strip owns its vertical band).
   if (view) {
-    const sh = stripHit(state, mx, my, rect.width, rect.height, view);
+    const sh = stripHit(state, mx, my, rect.width, rect.height, view, touch ? TOUCH_STRIP_EDGE_GRAB : STRIP_EDGE_GRAB);
     if (sh) {
       if (sh.kind === 'track') {
         // Jump: center the band on the clicked date, then drag continues as a move.
@@ -2449,7 +2488,8 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
   const dotHit = dotOnlyHit(state, mx, my);
   const capHit = dotHit ? null : endCapHit(state, mx, my, rect.width);
   const hitDot = dotHit ?? (capHit ? null : hitTest(state, mx, my));
-  if (hitDot && state.onDateElement && TEMPORAL_TYPE_FIELDS[hitDot.node.elementType]) {
+  const grips = (d: PlacedDot): boolean => !touch || d.node.id === state.selectedId;
+  if (hitDot && grips(hitDot) && state.onDateElement && TEMPORAL_TYPE_FIELDS[hitDot.node.elementType]) {
     state.glyphDrag = {
       dot: hitDot, startX: mx, startY: my, active: false,
       edge: 'start', maxDate: hitDot.node.endDate ?? null, minDate: null,
@@ -2460,7 +2500,7 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
   // A range's END CAP arms an end-stretch drag (S265, the banked v2 of the
   // S264 ruling: the start-drag anchors the end; this is the other grip).
   // Only RECORDED ends — an open tenure's fade-cap has no value to move.
-  if (capHit && state.onDateElement && TEMPORAL_TYPE_FIELDS[capHit.node.elementType]?.end) {
+  if (capHit && grips(capHit) && state.onDateElement && TEMPORAL_TYPE_FIELDS[capHit.node.elementType]?.end) {
     state.glyphDrag = {
       dot: capHit, startX: mx, startY: my, active: false,
       edge: 'end', maxDate: null, minDate: capHit.node.startDate,
@@ -2470,8 +2510,9 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
 
   // Now-line grab (Act 1) — after the strip, before pan. A dot under the cursor
   // wins (it's the more common intent, and a dot can sit right on the seam).
-  if (nearNowLine(state, mx, my, rect.width, rect.height) && !hitDot) {
+  if (nearNowLine(state, mx, my, rect.width, rect.height, touch ? TOUCH_NOW_GRAB_PX : NOW_GRAB_PX) && !hitDot) {
     state.nowDrag = true;
+    state.nowBefore = state.now;
     return;
   }
 
@@ -2481,7 +2522,7 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
   state.dragStartWindow = view;
 }
 
-function handleMouseUp(state: ViewState, e?: MouseEvent): void {
+function handleMouseUp(state: ViewState, e?: Pick<MouseEvent, 'clientX' | 'clientY'>): void {
   // A date-drag's own window mouseup handler does the drop — this canvas-level
   // one (registered first) must bail so it can't also pan/select/dismiss.
   if (state.dateDrag) return;
@@ -2566,6 +2607,99 @@ function handleWheel(state: ViewState, e: WheelEvent): void {
   if (anchor == null) return;
   const factor = e.deltaY < 0 ? 1 / ZOOM_STEP : ZOOM_STEP;
   state.window = zoomWindow(view, factor, anchor, bounds);
+  state.anim = null;
+  draw(state);
+}
+
+// ====== Touch (#301): one finger is the mouse, two fingers pinch ======
+//
+// Pointer events from a finger only; a mouse and a pen keep the mouse handlers
+// above. The canvas takes `touch-action: pan-y`, so a vertical swipe still
+// scrolls the room and everything sideways is the chart's: a pan, the strip's
+// band, the now-line, a tapped dot re-dated. Two fingers zoom around their
+// midpoint and pan with it, as the wheel does around the cursor.
+
+function handleTouchDown(state: ViewState, e: PointerEvent): void {
+  if (e.pointerType !== 'touch') return;
+  // A tap would also arrive as made-up mouse events and run the click
+  // progression twice (peek, then focus); a cancelled pointerdown stops them
+  // in Chromium and Firefox (measured, S411). The click event still fires,
+  // and the canvas has no click listener.
+  e.preventDefault();
+  try { state.canvas.setPointerCapture(e.pointerId); } catch { /* not capturable: moves still arrive over the canvas */ }
+  state.touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (state.touchSpent) return;
+  if (state.touchPts.size === 1) {
+    // No hover on a finger: what the press lands on is what it would have hovered.
+    const rect = state.canvas.getBoundingClientRect();
+    state.mouseX = e.clientX - rect.left;
+    state.mouseY = e.clientY - rect.top;
+    state.hoveredDot = hitTest(state, state.mouseX, state.mouseY);
+    handleMouseDown(state, { button: 0, clientX: e.clientX, clientY: e.clientY }, true);
+    return;
+  }
+  if (state.touchPts.size === 2) {
+    abandonPress(state);
+    startPinch(state);
+  }
+}
+
+function handleTouchMove(state: ViewState, e: PointerEvent): void {
+  if (e.pointerType !== 'touch' || !state.touchPts.has(e.pointerId)) return;
+  state.touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (state.pinch) { movePinch(state, state.pinch); return; }
+  if (!state.touchSpent && state.touchPts.size === 1) handleMouseMove(state, { clientX: e.clientX, clientY: e.clientY });
+}
+
+function handleTouchUp(state: ViewState, e: PointerEvent, cancelled: boolean): void {
+  if (e.pointerType !== 'touch' || !state.touchPts.has(e.pointerId)) return;
+  state.touchPts.delete(e.pointerId);
+  if (state.touchPts.size < 2) state.pinch = null;
+  if (state.touchPts.size > 0) return;
+  if (state.touchSpent) state.touchSpent = false;
+  else if (cancelled) abandonPress(state);
+  else handleMouseUp(state, { clientX: e.clientX, clientY: e.clientY });
+  handleMouseLeave(state); // the finger is gone: no labels left around where it was
+}
+
+/** A second finger lands mid-gesture: what the first started stops, and
+ *  writes nothing (a now-line drag goes back to where it was). */
+function abandonPress(state: ViewState): void {
+  state.glyphDrag = null;
+  state.dropDate = null;
+  if (state.nowDrag) { state.now = state.nowBefore; state.nowDrag = false; }
+  state.stripDrag = null;
+  state.dragging = false;
+  draw(state);
+}
+
+function startPinch(state: ViewState): void {
+  const [a, b] = [...state.touchPts.values()];
+  const view = currentViewRange(state);
+  if (!a || !b || !view || !state.baseRange) return;
+  const rect = state.canvas.getBoundingClientRect();
+  const mid0 = (a.x + b.x) / 2 - rect.left;
+  const anchor = dateAtX(state, mid0, rect.width);
+  if (anchor == null) return;
+  state.anim = null;
+  state.pinch = { dist0: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), mid0, anchor, win0: view };
+  state.touchSpent = true; // the finger left after this pinch selects nothing
+}
+
+function movePinch(state: ViewState, p: NonNullable<ViewState['pinch']>): void {
+  const [a, b] = [...state.touchPts.values()];
+  if (!a || !b || !state.baseRange) return;
+  const rect = state.canvas.getBoundingClientRect();
+  const w = rect.width;
+  if (w <= 0) return;
+  const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+  const mid = (a.x + b.x) / 2 - rect.left;
+  const bounds = navBounds(state) ?? state.baseRange;
+  // Fingers apart = zoom in, as the span shrinks by the ratio of the spreads;
+  // the date under the midpoint stays under it, then follows the midpoint.
+  const zoomed = zoomWindow(p.win0, p.dist0 / dist, p.anchor, bounds);
+  const shift = (mid - p.mid0) * (zoomed.end - zoomed.start) / w;
+  state.window = clampWindow({ start: zoomed.start - shift, end: zoomed.end - shift }, bounds);
   state.anim = null;
   draw(state);
 }
