@@ -240,13 +240,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const worldId = row.getAttribute('data-remote-world-id')!;
     const remote = remoteAccountWorlds().find(r => r.id === worldId);
     if (!remote) return;
-    if (remote.role === 'collaborator') {
-      // Minting is owner-only (server 404s) — the honest path for a shared
-      // world is a key from its owner via the existing link flow.
-      toasts.info('Shared world: make your own key on its onlyworlds.com page, then paste it here');
-      void runAddWorldAction('link-api', toasts);
-      return;
-    }
+    // A shared world opens like an owned one, on a key made for this member (#199).
     await openAccountWorld(remote, toasts);
   });
 
@@ -427,7 +421,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         : '';
       return `
         <div class="atlas-row atlas-remote-row ${opening ? 'is-opening' : ''}" data-remote-world-id="${escapeAttr(r.id)}" role="button" tabindex="0"
-             title="${r.role === 'collaborator' ? 'Shared with you: make your own key for it on onlyworlds.com' : (hasFolderMode() && getState().atlasRoot) ? 'Open: download this world into your OnlyWorlds folder' : 'Open: download this world into this browser'}">
+             title="${r.role === 'collaborator' ? 'Shared with you. ' : ''}${(hasFolderMode() && getState().atlasRoot) ? 'Open: download this world into your OnlyWorlds folder' : 'Open: download this world into this browser'}">
           <span class="material-symbols-outlined">${opening ? 'downloading' : 'cloud'}</span>
           <span class="atlas-row-main">${escapeText(r.name)}</span>
           ${roleChip}

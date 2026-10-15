@@ -741,6 +741,8 @@ export interface AccountWorldRow {
   id: string;
   name: string;
   role: 'owner' | 'collaborator';
+  /** A member's role on a shared row (keel D72); absent on an owned one. */
+  member_role?: 'co_builder' | 'contributor' | 'guest';
   public_read: boolean;
   keys: Array<{ last4: string; scope: 'READ' | 'WRITE'; revoked: boolean }>;
 }

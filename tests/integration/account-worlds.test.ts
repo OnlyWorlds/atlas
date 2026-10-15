@@ -31,7 +31,11 @@ import {
   remoteAccountWorlds,
   openAccountWorld,
   deviceKeyName,
+  mintOwnKey,
+  opensToWrite,
+  sharedOpenLine,
 } from '../../src/sync/account-worlds';
+import { AccountClient } from '../../src/sync/account-client';
 import type { AccountWorldRow } from '../../src/core/types';
 import type { ToastManager } from '../../src/ui/toast-manager';
 
@@ -283,6 +287,68 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     expect(state.minted).toHaveLength(0);
     expect(toasts.calls.some(c => c.level === 'info' && /already here/i.test(c.msg))).toBe(true);
     await tick(20); // the branch fires a background refreshAccountWorlds(true)
+  });
+});
+
+describe('mintOwnKey — a shared world takes a key made for the member (#199, keel D72 R9)', () => {
+  const contributor: AccountWorldRow = { id: 'srv-collab', name: 'Collab World', role: 'collaborator', member_role: 'contributor', public_read: true, keys: [] };
+  const guest: AccountWorldRow = { ...contributor, member_role: 'guest' };
+  const owned: AccountWorldRow = { id: 'srv-owned', name: 'Owned World', role: 'owner', public_read: false, keys: [] };
+
+  it('an owner and a member with an account PIN get a write key', async () => {
+    const state = mount({ worlds: [owned, contributor], accountHasPin: true });
+    const client = new AccountClient(TOKEN);
+    expect(await mintOwnKey(client, owned)).toMatchObject({ readOnly: false });
+    expect(await mintOwnKey(client, contributor)).toMatchObject({ readOnly: false });
+    expect(state.minted.map(m => m.scope)).toEqual(['WRITE', 'WRITE']);
+  });
+
+  it('a guest gets a read key, and only one mint', async () => {
+    const state = mount({ worlds: [guest], accountHasPin: true });
+    const out = await mintOwnKey(new AccountClient(TOKEN), guest);
+    expect(out).toMatchObject({ readOnly: true, why: 'guest' });
+    expect(out.minted.key).toMatch(/^ow_r_/);
+    expect(state.minted.map(m => m.scope)).toEqual(['READ']);
+  });
+
+  it('a member with no account PIN: the write mint is refused (409), then a read key', async () => {
+    const state = mount({ worlds: [contributor], accountHasPin: false });
+    const out = await mintOwnKey(new AccountClient(TOKEN), contributor);
+    expect(out).toMatchObject({ readOnly: true, why: 'no-pin' });
+    expect(state.minted.map(m => m.scope)).toEqual(['READ']);
+  });
+
+  it('an owner never falls back to a read key: a 409 on its mint rethrows', async () => {
+    const state = mount({ worlds: [owned], accountHasPin: true });
+    mswServer.use(
+      // Only the write mint is refused: a read mint here would answer, so a
+      // fallback taken for an owner would show as a read key.
+      http.post(`${V2_BASE}/account/worlds/srv-owned/keys`, async ({ request }) => {
+        const body = (await request.json().catch(() => ({}))) as { scope?: string } | null;
+        if (body?.scope === 'read') {
+          return HttpResponse.json({ id: 'k', last4: 'rrrr', scope: 'READ', name: '', revoked: false, key: 'ow_r_ownerread' }, { status: 201 });
+        }
+        return HttpResponse.json({ error: { type: 'invalid_request', code: 'pin_required', message: 'x', param: null } }, { status: 409 });
+      }),
+    );
+    await expect(mintOwnKey(new AccountClient(TOKEN), owned)).rejects.toMatchObject({ status: 409, code: 'pin_required' });
+    expect(state.minted).toHaveLength(0);
+  });
+
+  it('a world the account is not in still throws (404), with nothing minted', async () => {
+    const state = mount({ worlds: [], accountHasPin: true });
+    await expect(mintOwnKey(new AccountClient(TOKEN), contributor)).rejects.toMatchObject({ status: 404 });
+    expect(state.minted).toHaveLength(0);
+  });
+
+  it('who asks for the PIN, and the line each open leaves', () => {
+    expect([owned, contributor, { ...contributor, member_role: 'co_builder' as const }, guest].map(opensToWrite))
+      .toEqual([true, true, true, false]);
+    expect(sharedOpenLine(owned, undefined)).toBeNull();
+    expect(sharedOpenLine({ ...contributor, member_role: 'co_builder' }, undefined)).toBeNull();
+    expect(sharedOpenLine(contributor, undefined)).toContain('As a contributor in Collab World');
+    expect(sharedOpenLine(guest, 'guest')).toContain('you are a guest in it');
+    expect(sharedOpenLine(contributor, 'no-pin')).toContain('under World PIN');
   });
 });
 

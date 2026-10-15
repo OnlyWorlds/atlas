@@ -7,11 +7,12 @@
  * transition while mounted). Offline-first law: failures land in the slice
  * as a quiet error string; local rendering never waits on this.
  *
- * `openAccountWorld` is the owned-row click: preconditions (where it lands, PIN)
- * → mint a WRITE key → download via the existing link pipeline ON the
- * activation chain → navigate home + waypoint. Ordering is the gate's R1:
- * every precondition resolves BEFORE the mint so a failed open never leaves
- * an orphaned server-side key.
+ * `openAccountWorld` is a row's click, owned or shared (#199): preconditions
+ * (where it lands, the PIN when it will write) → mint this account's own key
+ * → download via the existing link pipeline ON the activation chain →
+ * navigate home + waypoint. Ordering is the gate's R1: every precondition
+ * resolves BEFORE the mint so a failed open never leaves an orphaned
+ * server-side key.
  */
 
 import { downloadingLine } from '../ui/download-progress';
@@ -21,7 +22,8 @@ import { saveRegistry, setPin, findWorldByServerId, findLinkedWorld } from '../r
 import { enqueueActivationTask } from '../core/activation-chain';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import { completeWaypoint } from '../core/waypoints';
-import { AccountClient, accountErrorMessage, isAccountAuthError } from './account-client';
+import { AccountClient, accountErrorMessage, isAccountAuthError, type MintedWorldKey } from './account-client';
+import { OwV2Error } from './ow-v2-client-adapter';
 import { PinPromptModal } from '../ui/pin-prompt-modal';
 import { showLoadingOverlay } from '../ui/loading-overlay';
 import { ToastManager } from '../ui/toast-manager';
@@ -108,9 +110,54 @@ export function remoteAccountWorlds(): AccountWorldRow[] {
 }
 
 /**
- * Open an owned account world: mint a key, download into a fresh folder,
- * activate. Collaborator rows never reach here (the sidebar routes them to
- * the link-by-key path — minting is owner-only, server 404s).
+ * True when opening the row asks for a write key: an owner, a co-builder, a
+ * contributor. A guest (Lantern's player) reads, as in Lantern.
+ */
+export function opensToWrite(row: AccountWorldRow): boolean {
+  return row.role === 'owner' || row.member_role !== 'guest';
+}
+
+/** Why a row opened to read: a guest's seat, or a member with no account PIN. */
+export type ReadOnlyWhy = 'guest' | 'no-pin';
+
+/**
+ * Mint this account's own key for the row (keel D72 R9: a member's key is
+ * bound to their membership). A member's write key needs an account PIN on
+ * onlyworlds.com (409 pin_required); without one the member gets a read key
+ * and the world opens to read. The owner always has a PIN (keel's create
+ * requires one), so the fallback is a member's only.
+ */
+export async function mintOwnKey(
+  client: AccountClient,
+  row: AccountWorldRow,
+): Promise<{ minted: MintedWorldKey; readOnly: boolean; why?: ReadOnlyWhy }> {
+  const name = deviceKeyName();
+  if (!opensToWrite(row)) {
+    return { minted: await client.mintWorldKey(row.id, name, 'read'), readOnly: true, why: 'guest' };
+  }
+  try {
+    return { minted: await client.mintWorldKey(row.id, name), readOnly: false };
+  } catch (err) {
+    if (row.role !== 'owner' && err instanceof OwV2Error && err.code === 'pin_required') {
+      return { minted: await client.mintWorldKey(row.id, name, 'read'), readOnly: true, why: 'no-pin' };
+    }
+    throw err;
+  }
+}
+
+/** The line a shared world's open leaves after its toast, or null. */
+export function sharedOpenLine(row: AccountWorldRow, why: ReadOnlyWhy | undefined): string | null {
+  if (why === 'guest') return `${row.name} is open to read: you are a guest in it, so you see only part of it.`;
+  // This copy stays a read key: a swap in place is #198, not built. The way to
+  // edit is the read key's (settings-world.ts): Unlink, then Make online.
+  if (why === 'no-pin') return `${row.name} is open to read: editing a world shared with you needs a PIN on your account, set on onlyworlds.com in Account settings under World PIN. This copy stays read-only. To edit it after that, make a write key on the world's page there, then here Unlink it in Settings, This world, and link it again with Make online.`;
+  if (row.member_role === 'contributor') return `As a contributor in ${row.name}, you can add to it and change what you add.`;
+  return null;
+}
+
+/**
+ * Open an account world, owned or shared with this account (#199): mint this
+ * account's own key, download into a fresh folder, activate.
  */
 export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManager): Promise<boolean> {
   const state = getState();
@@ -141,16 +188,16 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
     toasts,
   });
   if (!where) return false;
+  // A guest reads, so only a world that opens to write asks for the PIN.
   let pin = state.registry.pin;
-  if (!pin) {
-    const entered = await new PinPromptModal().prompt(
-      `Opening "${row.name}": Atlas needs your OnlyWorlds PIN to sync edits. It is saved in settings for every online world.`
+  let enteredPin: string | null = null;
+  if (!pin && opensToWrite(row)) {
+    enteredPin = await new PinPromptModal().prompt(row.role === 'owner'
+      ? `Opening "${row.name}": Atlas needs your OnlyWorlds PIN to sync edits. It is saved in settings for every online world.`
+      : `Opening "${row.name}", shared with you: Atlas needs your OnlyWorlds PIN to save your edits. No PIN yet? You set it on onlyworlds.com, in Account settings under World PIN.`
     );
-    if (!entered) return false;
-    pin = entered;
-    const next = setPin(getState().registry, entered);
-    saveRegistry(next);
-    patchSlice('registry', next);
+    if (!enteredPin) return false;
+    pin = enteredPin;
   }
 
   patchSlice('accountWorlds', { ...getState().accountWorlds, opening: row.id });
@@ -160,7 +207,14 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   try {
     // ---- Mint (the one server-side mutation before the download) ----
     overlay.update('Making a key…');
-    const minted = await new AccountClient(token).mintWorldKey(row.id, deviceKeyName());
+    const { minted, readOnly, why } = await mintOwnKey(new AccountClient(token), row);
+    // A typed PIN is kept only for a world that writes: a member whose
+    // account has no PIN typed one keel cannot know.
+    if (enteredPin && !readOnly) {
+      const next = setPin(getState().registry, enteredPin);
+      saveRegistry(next);
+      patchSlice('registry', next);
+    }
     toasts.info(`Made a key for ${row.name}`);
 
     // ---- Download + register, serialized on the activation chain (R2) ----
@@ -169,7 +223,8 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
       linkExistingApiWorldInRoot({
         where,
         apiKey: minted.key,
-        apiPin: pin!,
+        apiPin: readOnly ? '' : pin!,
+        readOnly,
         displayName: row.name,
         knownWorld: { id: row.id, name: row.name },
         onProgress: (p) => {
@@ -191,8 +246,10 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
     if (result.failures.length > 0) {
       toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
     } else {
-      toasts.success(`Opened ${row.name} · ${result.downloaded} elements`);
+      toasts.success(`Opened ${row.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'}`);
     }
+    const line = sharedOpenLine(row, why);
+    if (line) toasts.info(line, why === 'no-pin' ? 20_000 : 12_000);
     return true;
   } catch (err) {
     if (err instanceof Error && /not_found|404/.test(err.message)) {

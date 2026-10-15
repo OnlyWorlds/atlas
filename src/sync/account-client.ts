@@ -17,7 +17,11 @@
  *        pin (becomes the account pin); account with a pin REJECTS it
  *        (422 param=pin either way — callers retry per the dance).
  *   POST /account/worlds/{id}/keys     → 201 {..., key} (full key once).
- *        Empty body = WRITE scope default. Owner-only; non-owner → 404.
+ *        Empty body = WRITE scope default; {scope: 'read'} mints a READ key.
+ *        The owner mints owner keys; a member mints keys bound to their
+ *        membership (D72 R9, keel accounts/api.py `mint_world_key`), and a
+ *        member's WRITE key needs an account PIN (409 pin_required). Anyone
+ *        else → 404.
  *        Optional {name} (≤255 chars, else 422 param=name) — echoed in the
  *        mint response, GET .../keys rows, and the portal keys table. LIVE
  *        on prod 2026-07-13 (Skeld OPS-3). Unknown body fields are silently
@@ -140,14 +144,18 @@ export class AccountClient {
   }
 
   /**
-   * Mint a WRITE key for an owned world. The response's `key` is shown once —
-   * the caller must persist it (world.json api block) before dropping it.
+   * Mint this account's own key for a world it owns or is a member of (WRITE
+   * unless `scope` is 'read'). The response's `key` is shown once — the caller
+   * must persist it (world.json api block) before dropping it.
    * `name` labels the key in the portal ("atlas · windows") so the keys table
    * reads honestly — Captain's named-keys condition, live 2026-07-13. Omitted
    * name keeps the old bare mint (server stores "").
    */
-  async mintWorldKey(worldId: string, name?: string): Promise<MintedWorldKey> {
-    const body = name ? { name } : undefined;
+  async mintWorldKey(worldId: string, name?: string, scope: 'write' | 'read' = 'write'): Promise<MintedWorldKey> {
+    const fields: Record<string, string> = {};
+    if (name) fields.name = name;
+    if (scope === 'read') fields.scope = 'read';
+    const body = Object.keys(fields).length > 0 ? fields : undefined;
     const raw = await this.request('POST', `/account/worlds/${worldId}/keys`, body) as MintedWorldKey;
     if (!raw || typeof raw.key !== 'string' || !raw.key) {
       throw new Error('key mint response missing the full key');

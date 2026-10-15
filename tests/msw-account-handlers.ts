@@ -9,13 +9,14 @@
  *   GET  /account                    → 200 {id, username, email, date_joined}
  *   GET  /account/worlds             → 200 {data:[AccountWorldRow]}
  *   POST /account/worlds             → 201 row + full ow_w_ key (pin dance)
- *   POST /account/worlds/{id}/keys   → 201 {..., key}; owner-only, else 404
+ *   POST /account/worlds/{id}/keys   → 201 {..., key}; owner or member, else 404
  *
  * Errors ride the same §9 envelope as statefulV2Handlers.envelope(): a bad
  * bearer token 401s with code `invalid_credentials`; a revoked token 401s with
  * `key_revoked` (distinct code, distinct user message). The mint + create
- * paths reproduce the owner-only 404 and the PIN-dance 422 exactly so the
- * client's flow logic is exercised against real status codes.
+ * paths reproduce the not-a-member 404, a member's 409 pin_required and the
+ * PIN-dance 422 exactly so the client's flow logic is exercised against real
+ * status codes.
  */
 
 import { http, HttpResponse, type HttpHandler } from 'msw';
@@ -53,9 +54,9 @@ export interface StatefulAccountOptions {
 }
 
 export interface AccountHandlerState {
-  /** Every WRITE key minted via POST /account/worlds/{id}/keys, in order.
+  /** Every key minted via POST /account/worlds/{id}/keys, in order.
    *  `name` mirrors the server: stored verbatim, "" when absent. */
-  minted: Array<{ worldId: string; key: string; name: string }>;
+  minted: Array<{ worldId: string; key: string; name: string; scope: 'READ' | 'WRITE' }>;
   /** Every world created via POST /account/worlds, in order. */
   created: Array<{ name: string; id: string; key: string }>;
   /** GET /account/worlds hit count — lets the caller assert fetch de-dup. */
@@ -155,29 +156,39 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
       );
     }),
 
-    // POST /account/worlds/{id}/keys — mint a WRITE key. Owner-only; a row that
-    // isn't owned (or doesn't exist) 404s per the contract. Optional {name}
-    // (live 2026-07-13): stored verbatim + echoed, "" when absent, >255 chars
-    // → 422 param=name. Unknown body fields are silently IGNORED (spec §2 —
-    // the route never 422'd unknowns; Skeld's correction).
+    // POST /account/worlds/{id}/keys — mint this account's own key (keel D72
+    // R9, accounts/api.py mint_world_key): the owner's, or a member's bound to
+    // their membership; a world the account is not in 404s. {scope:'read'}
+    // mints a READ key; a member's WRITE key needs an account PIN
+    // (`accountHasPin`, else 409 pin_required, membership.mint_member_key).
+    // Optional {name} (live 2026-07-13): stored verbatim + echoed, "" when
+    // absent, >255 chars → 422 param=name. Unknown body fields are silently
+    // IGNORED (spec §2 — the route never 422'd unknowns; Skeld's correction).
     http.post(`${base}/account/worlds/:id/keys`, async ({ request, params }) => {
       const fail = authFail(request);
       if (fail) return fail;
       const worldId = String(params.id);
       const row = worlds.find(w => w.id === worldId);
-      if (!row || row.role !== 'owner') {
+      if (!row) {
         return envelope(404, 'not_found', `World '${worldId}' not found.`);
       }
-      const body = (await request.json().catch(() => ({}))) as { name?: unknown } | null;
+      const body = (await request.json().catch(() => ({}))) as { name?: unknown; scope?: unknown } | null;
       const name = typeof body?.name === 'string' ? body.name : '';
       if (name.length > 255) {
         return envelope(422, 'invalid_request', 'name must be at most 255 characters.', 'name');
       }
+      const scope: 'READ' | 'WRITE' = body?.scope === 'read' ? 'READ' : 'WRITE';
+      if (row.role !== 'owner' && scope === 'WRITE' && !options.accountHasPin) {
+        return HttpResponse.json(
+          { error: { type: 'invalid_request', code: 'pin_required', message: 'Set an account PIN first.', param: null } },
+          { status: 409 },
+        );
+      }
       mintCounter += 1;
-      const key = `ow_w_test${mintCounter}`;
-      state.minted.push({ worldId, key, name });
+      const key = `${scope === 'READ' ? 'ow_r_' : 'ow_w_'}test${mintCounter}`;
+      state.minted.push({ worldId, key, name, scope });
       return HttpResponse.json(
-        { id: `key-${mintCounter}`, last4: key.slice(-4), scope: 'WRITE', name, last_used_at: null, revoked: false, key },
+        { id: `key-${mintCounter}`, last4: key.slice(-4), scope, name, last_used_at: null, revoked: false, key },
         { status: 201 },
       );
     }),

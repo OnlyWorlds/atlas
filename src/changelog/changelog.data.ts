@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.44.0',
+    date: '2026-10-15',
+    theme: 'A world shared with you opens with one click',
+    entries: [
+      {
+        id: 'shared-world-opens',
+        title: 'A world shared with you opens like one you own',
+        body: 'Signed in with your account token, a world you were invited into used to send you to onlyworlds.com to make a key and paste it back. Now its row under On OnlyWorlds opens it, with a key made for you. A co-builder or contributor edits with their own PIN, a guest opens it to read, and a member whose account has no PIN yet opens it to read and is told where to set one.',
+        tags: ['sync', 'worlds'],
+      },
+    ],
+  },
+  {
     version: '1.43.4',
     date: '2026-10-15',
     theme: 'Moppetopia from Settings, help beside an open map',

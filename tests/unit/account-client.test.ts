@@ -99,14 +99,27 @@ describe('AccountClient.mintWorldKey', () => {
     expect(state.minted[0].worldId).toBe('srv-owned');
   });
 
-  it('404s (not an auth error) when the world is not owned', async () => {
+  it('404s (not an auth error) when the account is not in the world', async () => {
     mount();
     let caught: unknown;
-    await new AccountClient(TOKEN).mintWorldKey('srv-collab').catch(err => { caught = err; });
+    await new AccountClient(TOKEN).mintWorldKey('srv-elsewhere').catch(err => { caught = err; });
     expect(caught).toBeInstanceOf(OwV2Error);
     expect((caught as OwV2Error).status).toBe(404);
     expect((caught as OwV2Error).code).toBe('not_found');
     expect(isAccountAuthError(caught)).toBe(false);
+  });
+
+  it('a member mints their own key; a write key without an account PIN is 409 pin_required (keel D72 R9)', async () => {
+    const state = mount();
+    let caught: unknown;
+    await new AccountClient(TOKEN).mintWorldKey('srv-collab').catch(err => { caught = err; });
+    expect((caught as OwV2Error).status).toBe(409);
+    expect((caught as OwV2Error).code).toBe('pin_required');
+    expect(isAccountAuthError(caught)).toBe(false);
+    const read = await new AccountClient(TOKEN).mintWorldKey('srv-collab', 'atlas · test', 'read');
+    expect(read.key).toMatch(/^ow_r_/);
+    expect(read.scope).toBe('READ');
+    expect(state.minted).toEqual([expect.objectContaining({ worldId: 'srv-collab', name: 'atlas · test', scope: 'READ' })]);
   });
 
   it('sends the key name and gets it echoed; omitting it keeps the bare mint (live 2026-07-13)', async () => {
