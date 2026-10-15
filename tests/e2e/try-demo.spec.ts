@@ -240,3 +240,29 @@ test('a demo world that does not come down whole opens nothing and leaves nothin
   });
   expect(left).toEqual({ worlds: 0, dirs: [] });
 });
+
+test('once a world exists, Settings offers Explore Moppetopia above Replay the tour (h58 #5443)', async ({ page }) => {
+  await boot(page);
+  const seen = await mockMoppetopia(page);
+  // A world first, so the first screen's door is gone.
+  await page.click('[data-action="start-world"]');
+  const rows = page.locator('[data-modal="create-world"] .atlas-where-row input');
+  if (await rows.count() > 1) await rows.nth(1).check();
+  await page.fill('[data-modal="create-world"] input[name="world-name"]', 'Mine');
+  await page.locator('[data-modal="create-world"] [data-action="pick"]').click();
+  await expect(page.locator('h1', { hasText: 'Mine' })).toBeVisible();
+  await expect(page.locator('[data-action="try-demo"]')).toHaveCount(0);
+
+  await page.evaluate(() => { const m = window.location.hash.match(/#\/w\/([^/]+)/); window.location.hash = `#/w/${m![1]}/settings`; });
+  const chips = page.locator('.atlas-settings-replay-chip');
+  await expect(chips).toHaveText(['Explore Moppetopia', 'Replay the tour']);
+  await chips.first().click();
+  await expect(page.locator('.ow-toast', { hasText: 'your own copy, in this browser' })).toBeVisible({ timeout: 20_000 });
+  const state = await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    const s = getState();
+    return { names: s.registry.worlds.map((w: any) => w.name).sort(), active: s.registry.worlds.find((w: any) => w.id === s.active?.worldId)?.name ?? null };
+  });
+  expect(state).toEqual({ names: ['Mine', 'Moppetopia'], active: 'Moppetopia' });
+  expect(seen.filter(r => r.method !== 'GET')).toEqual([]);
+});

@@ -5305,6 +5305,11 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   cursor: default;
   opacity: 0.5;
 }
+/* Explore Moppetopia above Replay the tour (S412): the first chip takes the
+   auto margin to the column's foot, the second sits just under it. */
+.atlas-settings-replay-chip + .atlas-settings-replay-chip {
+  margin-top: 8px;
+}
 
 .atlas-settings-version {
   margin-top: 0;

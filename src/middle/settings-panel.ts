@@ -114,6 +114,8 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
                 <span>${groupLabel}</span>
               </div>${buttons}`;
           }).join('')}
+          <button type="button" class="atlas-settings-replay-chip" data-action="explore-demo"
+            title="Open Moppetopia, a demo world: your own copy to look around and change. If you have one already, it opens that.">Explore Moppetopia</button>
           <button type="button" class="atlas-settings-replay-chip" data-action="replay-tour"
             title="Replay the guided tour. It always starts fresh: the tour world is rebuilt from scratch, and at the end you can keep it.">Replay the tour</button>
           <div class="atlas-settings-version"><a href="changelog.html" target="_blank" rel="noopener" data-link="version-changelog" title="What's new in Atlas">Atlas v${pkg.version}</a> · <a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></div>
@@ -138,6 +140,11 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
    * Wired here so it works from whichever tab is open.
    */
   function wireReplayChip(): void {
+    // The demo's door once a world exists (the Captain, h58 #5443): the first
+    // screen and an empty world's Home are the only others, and both go.
+    root.querySelector<HTMLButtonElement>('[data-action="explore-demo"]')?.addEventListener('click', () => {
+      void import('../setup/world-doors').then(m => m.runAddWorldAction('try-demo', toasts));
+    });
     root.querySelector<HTMLButtonElement>('[data-action="replay-tour"]')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
       btn.disabled = true;

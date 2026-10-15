@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.43.4',
+    date: '2026-10-15',
+    theme: 'Moppetopia from Settings, help beside an open map',
+    entries: [
+      {
+        id: 'demo-in-settings',
+        title: 'Explore Moppetopia from Settings, once you have a world',
+        body: 'The demo world could only be opened from the first screen or an empty world, so it was gone once you had a world of your own. Settings now has Explore Moppetopia above Replay the tour, and it opens your copy if you already have one.',
+        tags: ['onboarding'],
+      },
+      {
+        id: 'help-open-map',
+        title: 'Help covers the map you have open',
+        body: 'With a map open in the right pane, the help panel now adds what you can do on a map under the room\'s own lines. Before, it showed only the room you were in.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.43.3',
     date: '2026-10-15',
     theme: 'Maps inside maps, said',

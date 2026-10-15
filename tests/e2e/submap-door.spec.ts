@@ -127,3 +127,19 @@ test('the map badge says what it means on hover, and only on a location with its
   await expect(page.locator('.leaflet-marker-pane img[alt="Plain Place"]')).toHaveAttribute('title', HINT);
   await expect.poll(() => titleOf('Isle')).toBeFalsy();
 });
+
+test("help follows a map open in the right pane, whose address stays the room's (h58 #5443)", async ({ page }) => {
+  await setupWorld(page);
+  expect(await page.evaluate(() => window.location.hash)).not.toContain('/map/');
+  await page.keyboard.press('?');
+  const openMap = page.locator('[data-modal="help-overlay"] [data-role="help-open-map"]');
+  await expect(openMap).toContainText('give a location its own map');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-modal="help-overlay"]')).toHaveCount(0);
+
+  // With the maps list in front instead of a map, the room's help stands alone.
+  await page.locator('.atlas-tab', { hasText: 'Maps' }).first().click();
+  await page.keyboard.press('?');
+  await expect(page.locator('[data-modal="help-overlay"]')).toBeVisible();
+  await expect(openMap).toHaveCount(0);
+});

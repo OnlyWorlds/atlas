@@ -14,6 +14,13 @@ import { helpForRoom } from './help-content';
 import { parseHash } from '../core/router';
 import { isCoarsePointer } from '../core/pointer';
 import { lanternLineHtml } from '../core/ow-site';
+import { getState } from '../core/state';
+
+/** True while the right pane's active tab is a map (its address stays the room's). */
+function rightPaneShowsMap(): boolean {
+  const ui = getState().ui;
+  return ui.rightTabs[ui.rightActiveIndex]?.kind === 'map';
+}
 
 class HelpOverlay extends BaseModal {
   open(roomMode?: string): void {
@@ -48,6 +55,26 @@ class HelpOverlay extends BaseModal {
         list.appendChild(li);
       }
       body.appendChild(list);
+
+      // A map open in the right pane leaves the address on the room, so its
+      // help would never show there: the map's lines follow the room's (S412,
+      // the Captain h58 #5443).
+      const mapHelp = mode !== 'map' && rightPaneShowsMap() ? helpForRoom('map') : null;
+      if (mapHelp) {
+        const mapHead = document.createElement('h3');
+        mapHead.className = 'atlas-help-can-head';
+        mapHead.textContent = 'On the open map';
+        body.appendChild(mapHead);
+        const mapList = document.createElement('ul');
+        mapList.className = 'atlas-help-can';
+        mapList.setAttribute('data-role', 'help-open-map');
+        for (const line of mapHelp.can) {
+          const li = document.createElement('li');
+          li.textContent = line;
+          mapList.appendChild(li);
+        }
+        body.appendChild(mapList);
+      }
 
       const divider = document.createElement('div');
       divider.className = 'atlas-help-divider';
