@@ -264,8 +264,8 @@ const MAP: FieldMap = {
   width: 'Width in pixels',
   height: 'Height in pixels',
   depth: 'Depth in pixels (reserved, unused)',
-  parent_map: 'Reference to a map this one is geographically within. Sets explicit position in the map tree.',
-  location: 'Reference to the Location this map represents. When set without parent_map, atlas infers tree placement via the location’s parent chain.',
+  parent_map: 'The map this one sits under, in the maps list and for the up arrow at its top. Left empty, Atlas places it under the map of its location’s parent location.',
+  location: 'The location this map shows. Its pin on another map opens this one: click the pin, then Open.',
 };
 
 const MARKER: FieldMap = {

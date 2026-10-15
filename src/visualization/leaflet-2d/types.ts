@@ -34,6 +34,8 @@ export interface PinData {
    *                          at the actual map coord rather than hovering above.
    */
   anchor?: 'center' | 'bottom-tip';
+  /** Hover text on the pin (the marker's title); '' clears it. */
+  hint?: string;
   metadata?: Record<string, unknown>;  // Tool-specific data
 }
 

@@ -21,6 +21,9 @@ import { getAssociatedMaps } from './auto-open-map';
 import { buildMapTree, type LocationLike, type MapTreeNode } from './map-tree';
 import type { MapTabCacheEntry } from './map-tab-cache';
 
+/** Hover text on a pin that wears the map badge: the badge says what it means (the Captain, h58 #5429). */
+export const SUBMAP_PIN_HINT = 'This location has its own map: click it, then Open';
+
 /** The maps of a Location element other than `exceptMapId`, in the tree's order (hierarchy, then name). */
 export function submapsFor(elementId: string, elements: readonly Element[], exceptMapId: string): WorldMap[] {
   const el = elements.find(e => e.id === elementId);

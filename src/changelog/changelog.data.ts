@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.43.3',
+    date: '2026-10-15',
+    theme: 'Maps inside maps, said',
+    entries: [
+      {
+        id: 'nested-maps-said',
+        title: 'Going down into a location\'s own map is explained where you meet it',
+        body: 'A location can have its own map, and its pin on a bigger map leads into it. Now the map badge on that pin says so when you hover it, help on a map has a line on how to make one and go down and back up, and the Location and Parent Map fields on a map\'s page say in plain words what each does.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.43.2',
     date: '2026-10-15',
     theme: 'An imported world opens whole',

@@ -152,6 +152,10 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       },
       { mouse: 'draw a zone with the polygon or line tool, then double-click it to reshape it by its handles', touch: null },
       'nest maps under a parent map or a location, and switch between them from the map list',
+      {
+        mouse: 'give a location its own map with the + map button on its header; its pin on a bigger map then wears a map badge: click the pin, then Open, to go down, and the up arrow at the top of the inner map brings you back',
+        touch: 'give a location its own map with the + map button on its header; its pin on a bigger map then wears a map badge: tap the pin, then Open, to go down, and the up arrow at the top of the inner map brings you back',
+      },
       'tune what a map shows from its settings: pin style and labels, zone opacity, the grid',
       'colour zones by kind from the zones button: a swatch, an eye and a tune button per kind, saved with the world',
       {

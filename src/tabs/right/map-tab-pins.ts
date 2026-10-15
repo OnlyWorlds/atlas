@@ -18,7 +18,7 @@ import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import type { PinLabels } from '../../core/map-view-prefs';
 import { medianNearestNeighbour, pinScaleForSpacing, scheduleLabelDensity } from './map-label-density';
-import { refreshSubmapDoor, refreshUpButton } from './map-submap-door';
+import { refreshSubmapDoor, refreshUpButton, SUBMAP_PIN_HINT } from './map-submap-door';
 
 export function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;
@@ -66,7 +66,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
         // pin-shape's visible tip should align with the latlng (bottom-tip
         // anchor); icon + round-icon are symmetric and stay centered.
         const anchor: 'center' | 'bottom-tip' = prefs.pin_style === 'pin-shape' ? 'bottom-tip' : 'center';
-        entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl, anchor });
+        entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl, anchor, hint: hasMapBadge ? SUBMAP_PIN_HINT : '' });
       } else {
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y });
       }
@@ -87,6 +87,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
         icon: visual.iconUrl,
         scale: 1,
         anchor,
+        ...(hasMapBadge ? { hint: SUBMAP_PIN_HINT } : {}),
       });
       enablePinDrag(entry, added.marker, pin.id);
     }

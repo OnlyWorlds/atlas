@@ -105,3 +105,25 @@ test("every pin's image is named by its place, never 'Marker' (#176)", async ({ 
   await expect(page.locator('.leaflet-marker-pane img[alt="Wide Plain"]')).toHaveCount(1);
   await expect(page.locator('.leaflet-marker-pane img[alt="Marker"]')).toHaveCount(0);
 });
+
+test('the map badge says what it means on hover, and only on a location with its own map (h58 #5429)', async ({ page }) => {
+  await setupWorld(page);
+  const HINT = 'This location has its own map: click it, then Open';
+  const titleOf = (alt: string) => page.locator(`.leaflet-marker-pane img[alt="${alt}"]`).getAttribute('title');
+  await expect(page.locator('.leaflet-marker-pane img[alt="Isle"]')).toHaveAttribute('title', HINT);
+  expect(await titleOf('Plain Place')).toBeFalsy();
+
+  // A map made for the plain place gives its pin the words; the isle's map gone takes them away.
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const els = api.getState().data.elements;
+    const plain = els.find((e: any) => e.name === 'Plain Place');
+    const isleMap = els.find((e: any) => e.name === 'Isle Map');
+    await store.createElement('map', { name: 'Plain Map', location: plain.id });
+    await store.deleteElement(isleMap.id);
+    api.patchData(await store.listElements());
+  });
+  await expect(page.locator('.leaflet-marker-pane img[alt="Plain Place"]')).toHaveAttribute('title', HINT);
+  await expect.poll(() => titleOf('Isle')).toBeFalsy();
+});

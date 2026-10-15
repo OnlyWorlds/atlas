@@ -416,6 +416,7 @@ export class Leaflet2DManager {
         iconAnchor: iconAnchorXY
       }),
       alt: pinAlt(data),
+      ...(data.hint ? { title: data.hint } : {}),
     });
 
     // Create label — anchored to the pin's latlng with PIXEL-space iconAnchor so
@@ -537,6 +538,11 @@ export class Leaflet2DManager {
       pin.marker.options.alt = alt;
       const img = pin.marker.getElement();
       if (img instanceof HTMLImageElement) img.alt = alt;
+    }
+    if (updates.hint !== undefined) {
+      pin.marker.options.title = updates.hint;
+      const img = pin.marker.getElement();
+      if (img instanceof HTMLImageElement) img.title = updates.hint;
     }
 
     // Update position if changed
