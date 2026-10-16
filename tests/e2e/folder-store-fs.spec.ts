@@ -604,7 +604,7 @@ test('reads a map written to elements/map/ — the layout every other tool write
   expect(result.directName).toBe('Shipped World');
 });
 
-test('still reads a legacy spatial/map/, and keeps writing that world there', async ({ page }) => {
+test('still reads a legacy spatial/map/ and edits it there, while a NEW map goes to elements/', async ({ page }) => {
   await seedRawElement(page, 'spatial', 'map', 'legacy--dddddddd.json', {
     id: MAP_B, type: 'map', name: 'Legacy World',
   });
@@ -614,8 +614,8 @@ test('still reads a legacy spatial/map/, and keeps writing that world there', as
     const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
     await store.open(root);
     const maps = await store.listMaps();
-    // A NEW map in a legacy-layout world joins its siblings rather than
-    // splitting one world across two directories.
+    // A NEW map goes to elements/ even here (folder spec v0.3.8 §4): every
+    // conforming reader reads both layouts, so nothing is split for a reader.
     await store.createMap({ name: 'Second Legacy' });
     // An EDIT to the existing one rewrites it where it lives.
     await store.updateElement(mapId, { description: 'edited' });
@@ -627,9 +627,10 @@ test('still reads a legacy spatial/map/, and keeps writing that world there', as
   expect(result.count).toBe(1);
   expect(result.name).toBe('Legacy World');
   expect(result.desc).toBe('edited');
-  // Two maps in the legacy home; the canonical map dir was never created.
-  expect(await listLayoutFiles(page, 'spatial', 'map')).toHaveLength(2);
-  expect((await listLayoutFiles(page, 'elements', 'map')) ?? []).toHaveLength(0);
+  // The edited legacy map is still the one file in its legacy home (the tidy
+  // gives it its slug there); the new one is canonical.
+  expect(await listLayoutFiles(page, 'spatial', 'map')).toEqual(['legacy-world--dddddddd.json']);
+  expect((await listLayoutFiles(page, 'elements', 'map')) ?? []).toHaveLength(1);
 });
 
 test('an id present in BOTH layouts serves one copy and deletes neither file', async ({ page }) => {
@@ -654,8 +655,10 @@ test('an id present in BOTH layouts serves one copy and deletes neither file', a
   });
   // One element, not two — the id is the identity.
   expect(result.count).toBe(1);
-  // The newer stamp wins.
-  expect(result.name).toBe('Legacy Copy');
+  // The elements/ copy is served though the legacy one carries the newer
+  // stamp (folder spec v0.3.8 §4: a conforming writer stamps nothing, so a
+  // stamp rule would always hand the id to the old copy).
+  expect(result.name).toBe('Canonical Copy');
   // NEITHER file is removed. Same-directory twins are a rename crash and get
   // deduped; cross-directory twins are two tools writing legitimately, and
   // atlas does not resolve someone else's folder by destroying half of it.

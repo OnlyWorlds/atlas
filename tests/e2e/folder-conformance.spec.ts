@@ -162,11 +162,10 @@ test('a bare-spelled pin keeps its spelling through an edit, and a new pin follo
     const pinDir = await (await root.getDirectoryHandle('elements')).getDirectoryHandle('pin');
     const readRaw = async (name: string) => JSON.parse(await (await (await pinDir.getFileHandle(name)).getFile()).text());
     const bareRaw = await readRaw('on-the-map--55555508.json');
-    // The fixture carries a legacy `spatial/` directory, so the union read's
-    // sticky layout sends NEW spatial files there (convention #91). The
-    // spelling rule is layout-independent; look in both homes.
+    // The fixture carries a legacy `spatial/` directory, and a NEW pin still
+    // goes to `elements/` (folder spec v0.3.8 §4, convention #91): look only there.
     let newRaw: Record<string, unknown> | null = null;
-    for (const segments of [['elements', 'pin'], ['spatial', 'pin']]) {
+    for (const segments of [['elements', 'pin']]) {
       let dir: FileSystemDirectoryHandle | null = root;
       for (const s of segments) {
         try { dir = await dir!.getDirectoryHandle(s); } catch { dir = null; break; }

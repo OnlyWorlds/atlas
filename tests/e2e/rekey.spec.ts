@@ -33,7 +33,8 @@ test.describe('store calls on a real folder', () => {
         await w.close();
       };
       // A folder from two writers: a bare-spelled pin in elements/, a suffixed
-      // one in the legacy spatial/ home (so new pins default to spatial/ + suffix).
+      // one in the legacy spatial/ home (so new pins default to the suffix; the
+      // layout half only holds the line, since new files go to elements/ anyway).
       await write(['elements', 'map'], 'map.json', { id: M, type: 'map', name: 'Map' });
       await write(['elements', 'pin'], 'p.json', { id: 'aaaaaaaa-0000-4000-8000-000000000001', type: 'pin', name: 'P', map: M, x: 1, y: 1 });
       await write(['spatial', 'pin'], 'q.json', { id: 'aaaaaaaa-0000-4000-8000-000000000002', type: 'pin', name: 'Q', map_id: M, x: 2, y: 2 });

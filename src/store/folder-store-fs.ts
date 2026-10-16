@@ -52,7 +52,7 @@ import {
 } from '../core/constants';
 import type { LayoutDir } from '../core/constants';
 import { parseWorldStyles, type WorldStyles } from '../core/world-styles';
-import { ALL_ELEMENT_TYPES, CONTENT_ELEMENT_TYPES, SPATIAL_ELEMENT_TYPES } from '../core/types';
+import { ALL_ELEMENT_TYPES } from '../core/types';
 import { findDuplicatePin, DuplicatePinError } from '../core/pin-uniqueness';
 import type {
   Element,
@@ -219,13 +219,6 @@ export class FsFolderStore implements FolderStore {
    * Detected per type at index time; cleared in close().
    */
   private bareSpellingTypes = new Set<ElementType>();
-  /**
-   * Where NEW spatial elements go in THIS world. Detected once at open:
-   * `spatial/` when the folder already keeps spatial files there (an atlas
-   * v1.0-era world), `elements/` otherwise — which is every world any other
-   * tool writes, and every world atlas creates from now on.
-   */
-  private spatialWriteLayout: LayoutDir = ELEMENTS_DIR;
   /** Set of types whose dirs have been scanned into fileIndex. */
   private indexedTypes: Set<ElementType> = new Set();
   /**
@@ -360,7 +353,6 @@ export class FsFolderStore implements FolderStore {
   async open(handle: FileSystemDirectoryHandle | null): Promise<void> {
     if (!handle) throw new Error('FsFolderStore.open requires a directory handle');
     this.root = handle;
-    await this.detectSpatialLayout();
     await this.ensureLayout();
     await this.runLockOp(() => this.claimLock());
     if (!this.opts.disableHeartbeat) {
@@ -500,43 +492,16 @@ export class FsFolderStore implements FolderStore {
 
   // ---- Layout setup + lock ----
 
-  /**
-   * Decide where this world's NEW spatial elements go, BEFORE ensureLayout
-   * creates anything (otherwise every world would look legacy the moment we
-   * made the directories).
-   *
-   * The test is FILES, not directories: an atlas world that never had a map
-   * still carries four empty `spatial/` dirs from the old ensureLayout, and
-   * an empty legacy dir is not a layout — it is litter. One `.json` under
-   * `spatial/<type>/` means this folder's maps genuinely live there, so we
-   * keep writing there and the folder stays internally coherent for whatever
-   * other tool reads it next.
-   */
-  private async detectSpatialLayout(): Promise<void> {
-    const root = this.requireRoot();
-    for (const t of SPATIAL_ELEMENT_TYPES) {
-      const dir = await tryGetDir(root, [SPATIAL_DIR, t]);
-      if (!dir) continue;
-      const files = await listFiles(dir);
-      if (files.some(f => f.endsWith('.json'))) {
-        this.spatialWriteLayout = SPATIAL_DIR;
-        return;
-      }
-    }
-    this.spatialWriteLayout = ELEMENTS_DIR;
-  }
-
   private async ensureLayout(): Promise<void> {
     const root = this.requireRoot();
     await getDir(root, [ATLAS_INTERNAL_DIR]);
     await getDir(root, [ELEMENTS_DIR]);
     await getDir(root, [MEDIA_DIR]);
-    for (const t of CONTENT_ELEMENT_TYPES) await getDir(root, [ELEMENTS_DIR, t]);
-    // Spatial dirs are created in whichever layout this world uses. A world
-    // that has never held a map gets `elements/<type>/` for all 22 and no
-    // `spatial/` at all — atlas stops minting a legacy directory tree inside
-    // folders it was merely asked to open.
-    for (const t of SPATIAL_ELEMENT_TYPES) await getDir(root, [this.spatialWriteLayout, t]);
+    // `elements/<type>/` for all 22, and never `spatial/`: new elements go to
+    // `elements/` in every folder, one with legacy `spatial/` files included
+    // (folder spec v0.3.8 §4). Those legacy files are still read, and an edit
+    // rewrites each where it was found.
+    for (const t of ALL_ELEMENT_TYPES) await getDir(root, [ELEMENTS_DIR, t]);
   }
 
   private async claimLock(): Promise<void> {
@@ -641,9 +606,8 @@ export class FsFolderStore implements FolderStore {
    * home) — and the results merge into one index. Content types have only
    * ever had one home, so they scan one directory as before.
    *
-   * Order matters: `elements/` is scanned FIRST, so when the same element id
-   * exists in both layouts and the tie cannot be broken by timestamp, the
-   * canonical copy is the one served.
+   * When the same element id exists in both layouts, the `elements/` copy is
+   * served (folder spec v0.3.8 §4).
    */
   private async buildIndexFor(type: ElementType): Promise<void> {
     const layouts: LayoutDir[] = SPATIAL_TYPES.has(type)
@@ -661,9 +625,11 @@ export class FsFolderStore implements FolderStore {
     // Across directories it is nothing of the sort: two tools, or one tool
     // across a format change, each wrote a legitimate file. **Nothing is
     // deleted here** — atlas does not get to resolve someone else's folder by
-    // destroying half of it. Newest `local_updated_at` is served, ties go to
-    // `elements/`, and the shadowed copy is named in a warning so the state
-    // is discoverable rather than mysterious.
+    // destroying half of it. The `elements/` copy is served (folder spec
+    // v0.3.8 §4, "One id, one file": never by stamp, since a conforming writer
+    // stamps nothing and would lose to any old stamped copy), and the shadowed
+    // copy is named in a warning so the state is discoverable rather than
+    // mysterious.
     // New-file spelling for this type (S354, BORN BARE since S359): a new
     // file takes the format's bare `map`/`zone` unless some file of this
     // type already declares atlas's suffixed spelling, in which case the
@@ -689,10 +655,7 @@ export class FsFolderStore implements FolderStore {
         const existing = this.fileIndex.get(id);
         if (existing && existing.type === type) {
           this.shadowedIds.add(id);
-          const kept = this.bodyCache.get(id);
-          const keptStamp = kept?.local_updated_at ?? '';
-          const challengerStamp = rec.body.local_updated_at ?? '';
-          const challengerWins = challengerStamp > keptStamp;
+          const challengerWins = layout === ELEMENTS_DIR && existing.layout !== ELEMENTS_DIR;
           console.warn(
             `[fs-folder-store] index(${type}): id ${id} exists in BOTH layouts ` +
             `(${existing.layout}/${existing.filename} and ${layout}/${rec.filename}); ` +
@@ -1314,11 +1277,6 @@ export class FsFolderStore implements FolderStore {
     return total;
   }
 
-  /** Where NEW elements of this type are written in THIS world. */
-  private writeLayoutFor(type: ElementType): LayoutDir {
-    return SPATIAL_TYPES.has(type) ? this.spatialWriteLayout : ELEMENTS_DIR;
-  }
-
   /** Link spelling for a NEW file of `type` in this folder (S354). */
   private writeSpellingFor(type: ElementType): LinkSpelling {
     return this.bareSpellingTypes.has(type) ? 'bare' : 'atlas';
@@ -1348,9 +1306,9 @@ export class FsFolderStore implements FolderStore {
     if (spelling && entry && entry.spelling !== spelling) this.fileIndex.set(id, { ...entry, spelling });
   }
 
-  /** The layout an element ACTUALLY lives in: its recorded one, else the write default. */
+  /** The layout an element ACTUALLY lives in: its recorded one, else `elements/`, where every new file goes. */
   private layoutOf(id: string, type: ElementType): LayoutDir {
-    return this.fileIndex.get(id)?.layout ?? this.writeLayoutFor(type);
+    return this.fileIndex.get(id)?.layout ?? ELEMENTS_DIR;
   }
 
   /** Directory handle for an existing element, created if the layout dir is absent. */
@@ -1615,7 +1573,7 @@ export class FsFolderStore implements FolderStore {
     // In the id's chain (S364 gate lens A F7): a live-folder pass that finds
     // the new file between its write and its index entry waits for both.
     return this.writeChain.run(id, async () => {
-      const layout = this.writeLayoutFor(type);
+      const layout = ELEMENTS_DIR;
       const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
       const filename = this.resolveFilename(type, layout, id, elem.name);
       await this.writeElementFile(dir, filename, elem);
@@ -1652,7 +1610,7 @@ export class FsFolderStore implements FolderStore {
       // so a re-key in someone else's folder changes names, not dialect.
       const from = opts?.bindingFrom ? this.fileIndex.get(opts.bindingFrom) : undefined;
       const inherit = !!from && from.type === type;
-      const layout = inherit ? from!.layout : this.writeLayoutFor(type);
+      const layout = inherit ? from!.layout : ELEMENTS_DIR;
       const spelling = inherit ? from!.spelling : this.writeSpellingFor(type);
       const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
       const filename = this.resolveFilename(type, layout, id, elem.name);
@@ -1733,7 +1691,7 @@ export class FsFolderStore implements FolderStore {
     // `elements/` on its next edit. Only a brand-new element uses the world's
     // write layout.
     const entry = this.indexEntry(id);
-    const layout = entry?.layout ?? this.writeLayoutFor(type);
+    const layout = entry?.layout ?? ELEMENTS_DIR;
     const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
     const currentFilename = entry?.filename ?? elementFilename(id, previousName);
     if (validElementFilenames(id, next.name).some(f => sameFsName(f, currentFilename))) {

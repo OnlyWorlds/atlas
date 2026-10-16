@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.51.2',
+    date: '2026-10-17',
+    theme: 'One element, one file',
+    entries: [
+      {
+        id: 'new-maps-in-elements-folder',
+        title: 'New maps, pins, zones and markers go in elements/',
+        body: 'In a world folder from an older Atlas that keeps its maps in spatial/, a new map, pin, zone or marker is now written to elements/, as the folder format asks. The old files stay where they are and still open, and an edit to one is saved in its own file.',
+        tags: ['folder', 'fix'],
+      },
+      {
+        id: 'elements-copy-served',
+        title: 'One element in two places opens from elements/',
+        body: 'When a folder holds the same element in both elements/ and spatial/, Atlas opens the one in elements/, as every other OnlyWorlds tool now does. Neither file is changed.',
+        tags: ['folder', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.51.1',
     date: '2026-10-16',
     theme: 'Said once, said true',
