@@ -110,6 +110,8 @@ Hash-based, so no server rewrites (Cloudflare Pages friendly). `parseHash` retur
 | `#/` (or empty) | `welcome` | the welcome panel |
 | `#/demo` | `demo` | the example page overlay above whatever the middle resolves to |
 | `#/try-demo` | `try-demo` | an action, not a place (1.18.1): `app.ts` replaces the hash with `#/` and runs the "try a demo world" door once (the onlyworlds.com home page's "explore Moppetopia") |
+| `#/join/<code>` | none | an action (1.22, #104): `core/join-capture.ts` takes the code out of the address bar before anything else, then the join door runs once (`setup/join-door.ts`; keel's `/join` page's Open in Atlas) |
+| `#/open/<world id>` | none | an action (1.49, #104): `core/open-capture.ts` takes the id out the same way, then `setup/open-door.ts` opens that world once: the copy here, or the signed-in account's row after an Open, or it waits for the sign-in (a world page's Open in Atlas on onlyworlds.com) |
 | `#/settings[/<tab>]` | `settings`, no world | settings with only atlas-wide tabs live |
 | `#/w/<id>` | `home` | home (the default for an active world) |
 | `#/w/<id>/element/<eid>` | `element` | element detail |

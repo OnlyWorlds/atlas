@@ -179,12 +179,17 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       saveRegistry(next);
       patchSlice('registry', next);
       toasts.success(`Signed in as ${profile.username}`);
-      // A person's invitation that waited for this sign-in opens again (#294).
-      // Otherwise, on a browser with no world yet, the account's worlds are
-      // on the first screen (S414): this room has no list of them. Said only
-      // once the list has come with worlds in it, and never under the tour.
+      // A person's invitation that waited for this sign-in opens again (#294),
+      // and so does a world page's Open in Atlas (#104). Otherwise, on a
+      // browser with no world yet, the account's worlds are on the first
+      // screen (S414): this room has no list of them. Said only once the list
+      // has come with worlds in it, and never under the tour.
       void import('../ui/person-join-modal').then(async (m) => {
-        if (await m.resumeJoinAfterSignIn(toasts) || isAtlasGrounded() || isTourFlagActive()) return;
+        const door = await import('../setup/open-door');
+        // One door takes the sign-in; the other's waiting link is dropped,
+        // never left for a later sign-in (the S416 gate's F4).
+        if (await m.resumeJoinAfterSignIn(toasts)) { door.dropHeldOpen(); return; }
+        if (await door.resumeOpenAfterSignIn(toasts) || isAtlasGrounded() || isTourFlagActive()) return;
         const rows = await accountWorldsWhenFetched(token);
         if (!rows?.length || isAtlasGrounded() || isTourFlagActive()) return;
         toasts.show(`Your worlds on OnlyWorlds (${rows.length}) are listed on the first screen.`, 'info', 0, {
@@ -210,6 +215,9 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     const next = setAccountToken(getState().registry, undefined);
     saveRegistry(next);
     patchSlice('registry', next);
+    // A link that waited for a sign-in waited for this account's: it goes too.
+    void import('../setup/open-door').then(m => m.dropHeldOpen());
+    void import('../setup/join-door').then(m => { m.takeJoinHeldForSignIn(); });
     toasts.info('Account token forgotten. Opened worlds keep their own keys.');
   });
 }

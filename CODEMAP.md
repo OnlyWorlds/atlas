@@ -45,6 +45,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/seat.ts`: AGENT SEATS (S385, conv. 132): `worldPin` (the one PIN reader for a world's calls), `isSeatSecret`, `seatFromFile`, `diskApiBlock`, `withoutSeatSecret`.
 - `src/core/spatial-backlinks.ts`: pins and markers do not vote (#171, conv. 136): `foldBacklinks` splits a backlink list into the story's links, pins named by their other end (`pinBacklink`) and markers folded per zone (`markerFoldLabel`); the Web tab's card, the element page's Referenced by and the graph's pin labels read it.
 - `src/core/join-capture.ts`: the `#/join/` code out of the address bar first (contract R2), held in memory for the door.
+- `src/core/open-capture.ts`: the `#/open/<world id>` id out of the address bar the same way (1.49, #104), held in memory for `src/setup/open-door.ts`.
 
 ## src/store
 
@@ -165,6 +166,7 @@ The guided tour (DESIGN_TOUR).
 
 - `src/setup/atlas-root-flow.ts`: `setupAtlasRoot` + `recoverAtlasRoot` + `discoverWorldsInRoot` + `openWorldFolder` + the link flow; browser-world scaffolding (1.17).
 - `src/setup/join-door.ts`: THE JOIN DOOR (S385, OW Infra #104): `previewJoin` / `redeemJoin` against keel's `/join`, `openJoinedWorld` (download as a seat, or open, adopt, say spare), the R5 sentences; the dialog is `src/ui/join-world-modal.ts` (`runPendingJoin`). A person's code (the preview's `reader`, keel #212) opens `src/ui/person-join-modal.ts` instead: Join at `/account/join` with the account token, then `openAccountWorld`; signed out, the code waits through the sign-in (1.45, keel #294; e2e `tests/e2e/person-door.spec.ts`).
+- `src/setup/open-door.ts`: THE OPEN DOOR (1.49, OW Infra #104): `#/open/<world id>` from a world page on onlyworlds.com, no code and no key in the URL. A copy here activates (`openHere`: silently, else an Open it toast for a folder that wants the click); signed in, the account row for the id opens through `openAccountWorld` after a toast's Open (the confirm, and the gesture the storage request needs); signed out, the id waits in memory for the sign-in (`resumeOpenAfterSignIn`, called from `src/middle/settings-account.ts`). e2e `tests/e2e/open-door.spec.ts` (one `@firefox`).
 - `src/setup/world-doors.ts`: THE WORLD DOORS (conv. 114): open a picked world in place; `ensureAtlasRoot`; `runAddWorldAction`.
 - `src/setup/world-parent.ts`: where a new world goes (1.17): `defaultWorldWhere`, the persist ask, the where captions.
 - `src/setup/browser-world-delete.ts`: Delete for a browser world (1.17, conv. 129): close first, remove, then drop the entry; a failure keeps both.

@@ -44,6 +44,7 @@ import type { WorldMap } from './core/types';
 import { installLiveFolder } from './core/live-folder';
 import { installWorldPrefsSync } from './core/world-prefs';
 import { captureJoinCode, hasPendingJoin } from './core/join-capture';
+import { captureOpenWorld, takePendingOpen } from './core/open-capture';
 import { installForgetPresence } from './setup/forget-browser';
 
 export interface AppHandle {
@@ -207,6 +208,14 @@ export function startApp(container: HTMLElement): AppHandle {
     captureJoinCode();
     if (hasPendingJoin()) {
       void import('./ui/join-world-modal').then(m => m.runPendingJoin(toasts));
+    }
+    // #/open/<world id> (#104, S416): a world page's Open in Atlas, the same way.
+    // The id is taken before the chunk loads, so a chunk that fails to load
+    // (a tab older than a deploy) is not asked for again on every render.
+    captureOpenWorld();
+    const openId = takePendingOpen();
+    if (openId !== null) {
+      void import('./setup/open-door').then(m => m.runOpenLink(openId, toasts));
     }
     const linkMode = parseHash(window.location.hash).mode;
     if (linkMode === 'start' || linkMode === 'bring-in') {

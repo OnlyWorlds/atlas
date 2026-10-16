@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.49.0',
+    date: '2026-10-16',
+    theme: 'Open in Atlas, from the world itself',
+    entries: [
+      {
+        id: 'open-in-atlas-link',
+        title: 'A link to one of your worlds opens it in Atlas',
+        body: 'Atlas now answers a link that names one of your worlds on OnlyWorlds, the kind the world\'s own page there can give. Signed in, it asks once and opens the world, or opens the copy you already have. Signed out, it asks you to sign in first and then opens it in the same tab.',
+        tags: ['sync', 'worlds'],
+      },
+    ],
+  },
+  {
     version: '1.48.0',
     date: '2026-10-16',
     theme: 'Made by an agent, said quietly',

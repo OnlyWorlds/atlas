@@ -1,0 +1,182 @@
+/**
+ * The `#/open/<world id>` door (OW Infra #104, S416) through the real page: a
+ * world page's Open in Atlas opens that world on the signed-in account, after
+ * the person says Open; a copy already here opens without a second key; signed
+ * out, the id waits for the sign-in in Settings; a world not on the account's
+ * list, or a truncated id, is said. keel's account routes and the element
+ * lists are routed (the mint follows keel's rule, as account-mode.spec.ts).
+ */
+import { test, expect, type Page, type Route } from '@playwright/test';
+
+const V2 = 'https://www.onlyworlds.com/api/v2';
+const TOKEN = 'ow_a_e2e0open00token0000000000000000000000000';
+const ID = '33333333-4444-4555-8666-777777777777';
+const OTHER_ID = '44444444-5555-4666-8777-888888888888';
+
+async function freshBoot(page: Page) {
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll(); });
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await page.waitForSelector('.atlas-shell');
+}
+
+async function setupAtlasRoot(page: Page) {
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const root = await navigator.storage.getDirectory();
+    api.setNextDirectory(await root.getDirectoryHandle('open-door-root', { create: true }));
+  });
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
+  await page.waitForSelector('[data-action="create-local"]');
+}
+
+interface Keel { mints: number; lists: number }
+
+async function mockKeel(page: Page): Promise<Keel> {
+  const keel: Keel = { mints: 0, lists: 0 };
+  const now = '2026-10-16T00:00:00.000Z';
+  await page.route(`${V2}/**`, async (route: Route) => {
+    const path = new URL(route.request().url()).pathname.replace('/api/v2', '');
+    if (path === '/account') return route.fulfill({ json: { username: 'e2e-owner' } });
+    if (path === '/account/worlds') {
+      keel.lists++;
+      return route.fulfill({ json: { data: [
+        { id: ID, name: 'Open Realm', role: 'owner', member_role: null, public_read: false, keys: [] },
+      ] } });
+    }
+    if (path === `/account/worlds/${ID}/keys`) {
+      keel.mints++;
+      const key = 'ow_w_' + 'M'.repeat(32);
+      return route.fulfill({ status: 201, json: { id: 'k-1', last4: key.slice(-4), scope: 'WRITE', name: '', revoked: false, key } });
+    }
+    if (path === '/world' || path === '/world/') return route.fulfill({ json: { id: ID, name: 'Open Realm', updated_at: now } });
+    const type = path.split('/').filter(Boolean)[0];
+    const data = type === 'character'
+      ? [{ id: 'c0000000-0000-4000-8000-000000000077', type: 'character', name: 'Open Hero', updated_at: now, created_at: now }]
+      : [];
+    return route.fulfill({ json: { data, has_more: false, next_cursor: null } });
+  });
+  return keel;
+}
+
+async function seedSignIn(page: Page) {
+  await page.evaluate((token) => {
+    const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry') ?? '{"worlds":[]}');
+    reg.account_token = token;
+    reg.account_username = 'e2e-owner';
+    reg.pin = '4242';
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  }, TOKEN);
+}
+
+/** A fresh load of the app at a hash, the way a link from another site arrives. */
+async function arriveAt(page: Page, hash: string) {
+  await page.goto('about:blank');
+  await page.goto('/' + hash);
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+}
+
+function entryFor(page: Page) {
+  return page.evaluate((id) => {
+    const st = (window as any).__atlasTestApi.getState();
+    const w = st.registry.worlds.find((x: any) => x.api?.world_id === id);
+    return { found: !!w, localId: w?.id ?? null, active: st.active?.worldId ?? null, elements: st.data.elements.length };
+  }, ID);
+}
+
+test.beforeEach(async ({ page }) => {
+  await freshBoot(page);
+});
+
+/**
+ * With a home folder (Chromium) the where-question follows Open; with none
+ * (Firefox) the world lands in this browser, and the toast's click is the
+ * only gesture the storage request gets.
+ */
+async function opensAndReopens(page: Page, folder: boolean) {
+  if (folder) await setupAtlasRoot(page);
+  const keel = await mockKeel(page);
+  await seedSignIn(page);
+  await arriveAt(page, `#/open/${ID}`);
+  // The id left the address bar before anything else.
+  expect(await page.evaluate(() => location.hash)).not.toContain('/open/');
+  const ask = page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' });
+  await expect(ask).toBeVisible();
+  expect(keel.mints).toBe(0);
+  await ask.locator('.ow-toast-action', { hasText: 'Open' }).click();
+  const where = page.locator('[data-modal="where-ask"]');
+  if (folder) {
+    await expect(where).toContainText('Open Realm');
+    await where.locator('input[name="where"][value="browser"]').check();
+    await where.locator('[data-action="go"]').click();
+  }
+  await expect.poll(async () => (await entryFor(page)).elements).toBe(1);
+  await expect(where).toHaveCount(0);
+  expect(keel.mints).toBe(1);
+
+  // The same link again, into this running tab, from another room:
+  // the copy here opens, with no second key and no question.
+  await page.evaluate(() => { location.hash = '#/settings/general'; });
+  await page.evaluate((id) => { location.hash = `#/open/${id}`; }, ID);
+  const entry = await entryFor(page);
+  await expect.poll(async () => page.evaluate(() => location.hash)).toBe(`#/w/${entry.localId}`);
+  await expect.poll(async () => (await entryFor(page)).active).toBe(entry.localId);
+  await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
+  expect(keel.mints).toBe(1);
+
+  // Signed out since, the copy here still opens: no sign-in asked for.
+  await page.evaluate(() => {
+    const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry')!);
+    delete reg.account_token;
+    delete reg.account_username;
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  });
+  // A fresh load opens on no world; the door activates the copy itself.
+  await arriveAt(page, `#/open/${ID}`);
+  await expect.poll(async () => (await entryFor(page)).active).toBe(entry.localId);
+  await expect.poll(async () => (await entryFor(page)).elements).toBe(1);
+  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toHaveCount(0);
+  expect(keel.mints).toBe(1);
+}
+
+test('signed in, a world page link opens the world after Open, and again opens the copy here (#104)', async ({ page }) => {
+  await opensAndReopens(page, true);
+});
+
+test('@firefox signed in, a world page link opens the world after Open, and again opens the copy here (#104)', async ({ page }) => {
+  await opensAndReopens(page, false);
+});
+
+test('a world not on the signed-in account is said, and nothing is made (#104)', async ({ page }) => {
+  const keel = await mockKeel(page);
+  await seedSignIn(page);
+  await arriveAt(page, `#/open/${OTHER_ID}`);
+  await expect(page.locator('.ow-toast', { hasText: 'not among the worlds of e2e-owner on OnlyWorlds' })).toBeVisible();
+  expect(keel.lists).toBeGreaterThan(0);
+  expect(keel.mints).toBe(0);
+});
+
+test('signed out, the link waits for the sign-in in Settings, then asks to open (#104)', async ({ page }) => {
+  const keel = await mockKeel(page);
+  await arriveAt(page, `#/open/${ID}`);
+  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
+  const token = page.locator('input[name="account-token"]');
+  await expect(token).toBeVisible();
+  expect(keel.lists).toBe(0);
+  await token.fill(TOKEN);
+  await page.click('[data-action="account-sign-in"]');
+  await expect(page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' })).toBeVisible();
+  expect(keel.mints).toBe(0);
+});
+
+test('a truncated link is said, and the address bar is cleared (#104)', async ({ page }) => {
+  const keel = await mockKeel(page);
+  await seedSignIn(page);
+  await arriveAt(page, `#/open/${ID.slice(0, 20)}`);
+  await expect(page.locator('.ow-toast', { hasText: 'This link to open a world is not complete' })).toBeVisible();
+  expect(await page.evaluate(() => location.hash)).not.toContain('/open');
+  await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
+  expect(keel.mints).toBe(0);
+});

@@ -103,8 +103,16 @@ export function refreshAccountWorlds(force = false): void {
  * that promises the list waits on this (the S414 gate's M2: an account with
  * no worlds was told they were listed).
  */
-export function accountWorldsWhenFetched(token: string, timeoutMs = 15_000): Promise<AccountWorldRow[] | null> {
-  refreshAccountWorlds();
+export function accountWorldsWhenFetched(
+  token: string,
+  timeoutMs = 15_000,
+  opts: { fresh?: boolean } = {},
+): Promise<AccountWorldRow[] | null> {
+  refreshAccountWorlds(opts.fresh);
+  // `fresh` waits for a fetch begun now or already running: the slice turns
+  // 'loading' a microtask after the call, and until then its old answer (an
+  // old list, an old failure) is no answer (the S416 gate's F2, F3).
+  let begun = !opts.fresh || getState().accountWorlds.status === 'loading';
   return new Promise((resolve) => {
     let unsub: () => void = () => undefined;
     const timer = setTimeout(() => finish(null), timeoutMs);
@@ -116,6 +124,10 @@ export function accountWorldsWhenFetched(token: string, timeoutMs = 15_000): Pro
     function check(): boolean {
       const { registry, accountWorlds } = getState();
       if (registry.account_token !== token) { finish(null); return true; }
+      if (!begun) {
+        if (accountWorlds.status === 'loading') begun = true;
+        return false;
+      }
       if (accountWorlds.fetchedWithToken !== token) return false;
       if (accountWorlds.status === 'ready') { finish(remoteAccountWorlds()); return true; }
       if (accountWorlds.status === 'error') { finish(null); return true; }

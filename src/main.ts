@@ -24,6 +24,7 @@ import { installTruncationTitles } from './ui/truncation-title';
 import { applyTheme } from './core/theme';
 import { installUnexpectedErrorReporter } from './ui/unexpected-errors';
 import { captureJoinCode } from './core/join-capture';
+import { captureOpenWorld } from './core/open-capture';
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -54,6 +55,8 @@ function boot(): void {
   // A `#/join/` link's code leaves the address bar before anything else runs
   // (#104, contract R2); the app's render runs the door with it.
   captureJoinCode();
+  // A `#/open/<world id>` link (#104, S416) leaves the address bar the same way.
+  captureOpenWorld();
   // Re-assert the theme (index.html's pre-paint script stamped it; this keeps
   // the meta theme-color in sync and covers any embed that skipped the inline
   // script).
