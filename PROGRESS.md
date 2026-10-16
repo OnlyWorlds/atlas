@@ -11,7 +11,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **P2** is Lantern's (`8643e9c`). **P3** (a removed-and-rejoined member's copy keeps a dead key, and the message blames the PIN or a deletion) is a note on #198: signed in, Atlas could make a fresh key itself; not built, for his talk.
 - **Harness traps met** (not Atlas defects): a killed browser leaves the world lock for 90 s, and Playwright dismisses the take-over `confirm` by default, so the world reads "No world open"; an empty world shows no elements search (wait for the home's "No maps yet").
 
-- ⚡ **NEXT**: (1) When v1 goes (the Captain's Q7, not ruled): Make online signed out moves to sign-in only (h29 #5947). (2) #350, the ruling's second half (a made-by filter, the mark in Knowledge and Pages), on its talk. #198 (with P3 beside it) on his talk list.
+- ⚡ **NEXT**: (0) **#198, the Captain's go** (terminal, 2026-10-16 ~16:10; the item's note, h20 #6013): a linked world takes a new key in place, never Unlink. Signed in and an account world: Atlas mints the fresh key itself when keel refuses the old one (P3, Skeld's rotation h16 #5923); otherwise Settings, This world swaps a pasted key; the refused-key message names the real cause. (1) When v1 goes (the Captain's Q7, not ruled): Make online signed out moves to sign-in only (h29 #5947). (2) #350, the ruling's second half (a made-by filter, the mark in Knowledge and Pages), on its talk. #198 (with P3 beside it) on his talk list.
 
 ---
 
