@@ -14,7 +14,6 @@
 import { getState } from '../core/state';
 import { homeHash, navigate, settingsHash } from '../core/router';
 import { enqueueActivationTask } from '../core/activation-chain';
-import { isBrowserWorld } from '../core/browser-worlds';
 import { findLinkedWorld, findWorldByServerId } from '../registry/registry';
 import { accountWorldsWhenFetched, openAccountWorld } from '../sync/account-worlds';
 import { activateWorld } from '../sidebar/worlds-sidebar';
@@ -109,10 +108,11 @@ function askToOpen(row: AccountWorldRow, token: string, toasts: ToastManager): v
 /**
  * A copy already here opens as it is. True when there was one. A route alone
  * never activates a world mid-session, so this activates it. Silently only
- * where nothing can be lost: no world open, or a copy in browser storage,
- * which asks no permission. A folder's permission query runs after the open
- * world is cleared, so a refused one would leave that world empty (the
- * gate's F1): that case, and any open that did not happen, asks for a click.
+ * when no world is open: a link from anyone never moves a person out of the
+ * world they are in without their click (Kael, h37 #5811), and a folder's
+ * permission query runs after the open world is cleared, so a refused one
+ * would leave that world empty (the gate's F1). Any open that did not happen
+ * asks for a click too.
  */
 async function openHere(id: string, toasts: ToastManager): Promise<boolean> {
   const reg = getState().registry;
@@ -129,7 +129,7 @@ async function openHere(id: string, toasts: ToastManager): Promise<boolean> {
     said();
     return true;
   }
-  if (active === null || isBrowserWorld(here)) {
+  if (active === null) {
     if (await activateWorld(here.id, toasts, { silent: true, permissionMode: 'query' })) {
       said();
       return true;

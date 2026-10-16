@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.49.1',
+    date: '2026-10-16',
+    theme: 'A link asks before it moves you',
+    entries: [
+      {
+        id: 'open-link-asks-in-another-world',
+        title: 'A link to a world never takes you out of the one you are in without asking',
+        body: 'While another world is open, a link to a world you already have asks "Open it here?" and waits for your click, so you never keep working in a world you did not choose.',
+        tags: ['worlds', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.49.0',
     date: '2026-10-16',
     theme: 'Open in Atlas, from the world itself',

@@ -126,6 +126,22 @@ async function opensAndReopens(page: Page, folder: boolean) {
   await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
   expect(keel.mints).toBe(1);
 
+  if (folder) {
+    // In another world, a link never moves the person out of it without
+    // their click (Kael, h37 #5811): it asks, and Open it opens.
+    await page.click('[data-action="create-local"]');
+    await page.fill('input[name="world-name"]', 'Other Desk');
+    await page.click('[data-modal="create-world"] [data-action="pick"]');
+    await expect.poll(async () => (await entryFor(page)).active).not.toBe(entry.localId);
+    const other = (await entryFor(page)).active;
+    await page.evaluate((id) => { location.hash = `#/open/${id}`; }, ID);
+    const ask = page.locator('.ow-toast', { hasText: 'Open "Open Realm" here?' });
+    await expect(ask).toBeVisible();
+    expect((await entryFor(page)).active).toBe(other);
+    await ask.locator('.ow-toast-action', { hasText: 'Open it' }).click();
+    await expect.poll(async () => (await entryFor(page)).active).toBe(entry.localId);
+  }
+
   // Signed out since, the copy here still opens: no sign-in asked for.
   await page.evaluate(() => {
     const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry')!);
