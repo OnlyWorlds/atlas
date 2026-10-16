@@ -15,6 +15,9 @@
 
 export interface LoadingOverlayHandle {
   update(status: string): void;
+  /** Out of the way for a question the flow asks midway (it blocks every click while shown). */
+  hide(): void;
+  show(): void;
   close(): void;
 }
 
@@ -40,6 +43,12 @@ export function showLoadingOverlay(title: string): LoadingOverlayHandle {
   return {
     update(status: string): void {
       if (!closed) statusEl.textContent = status;
+    },
+    hide(): void {
+      overlay.style.display = 'none';
+    },
+    show(): void {
+      if (!closed) overlay.style.display = '';
     },
     close(): void {
       if (closed) return;

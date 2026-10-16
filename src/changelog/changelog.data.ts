@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.50.2',
+    date: '2026-10-16',
+    theme: 'No PIN, no question',
+    entries: [
+      {
+        id: 'member-no-pin-not-asked',
+        title: 'Joining a world without a PIN asks for none',
+        body: 'Someone who joins a world shared with them, on an account that has no PIN yet, now opens it to read straight away, with a line on where to set one. Atlas asks for the PIN only when the account has one.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.50.1',
     date: '2026-10-16',
     theme: 'Asked once',

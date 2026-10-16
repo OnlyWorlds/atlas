@@ -143,10 +143,10 @@ const V2 = 'https://www.onlyworlds.com/api/v2';
 const TOKEN = 'ow_a_e2e0shared0token000000000000000000000000';
 const SHARED_ID = '33333333-4444-4555-8666-777777777777';
 
-interface SharedKeel { mints: Array<Record<string, unknown>> }
+interface SharedKeel { mints: Array<Record<string, unknown>>; revokes: string[] }
 
 async function mockSharedKeel(page: Page, opts: { memberRole: 'contributor' | 'guest'; accountHasPin: boolean }): Promise<SharedKeel> {
-  const keel: SharedKeel = { mints: [] };
+  const keel: SharedKeel = { mints: [], revokes: [] };
   const now = '2026-10-15T00:00:00.000Z';
   await page.route(`${V2}/**`, async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace('/api/v2', '');
@@ -154,6 +154,11 @@ async function mockSharedKeel(page: Page, opts: { memberRole: 'contributor' | 'g
       return route.fulfill({ json: { data: [
         { id: SHARED_ID, name: 'Shared Realm', role: 'collaborator', member_role: opts.memberRole, public_read: false, keys: [] },
       ] } });
+    }
+    const revoke = path.match(new RegExp(`^/account/worlds/${SHARED_ID}/keys/([^/]+)$`));
+    if (revoke && route.request().method() === 'DELETE') {
+      keel.revokes.push(revoke[1]);
+      return route.fulfill({ status: 204, body: '' });
     }
     if (path === `/account/worlds/${SHARED_ID}/keys`) {
       const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
@@ -233,20 +238,49 @@ test('a guest opens a shared world to read, with no PIN asked (#199)', async ({ 
   await expect(page.locator('.ow-toast', { hasText: 'you are a guest in it' })).toBeVisible();
 });
 
-test('a member whose account has no PIN opens to read, and the PIN they typed is not kept (#199)', async ({ page }) => {
+test('a member whose account has no PIN opens to read, and is never asked for one (#199, #294 walk)', async ({ page }) => {
   await setupAtlasRoot(page);
   const keel = await mockSharedKeel(page, { memberRole: 'contributor', accountHasPin: false });
   await signInWith(page, null);
   await openSharedRow(page);
+  await expect.poll(async () => (await sharedEntry(page)).elements).toBe(1);
+  // The write mint is refused (409 pin_required), then a read key; no question in between.
+  expect(keel.mints.map(m => m.scope ?? 'write')).toEqual(['write', 'read']);
+  await expect(page.locator('[data-modal="pin-prompt"]')).toHaveCount(0);
+  expect(keel.revokes).toEqual([]);
+  expect(await sharedEntry(page)).toMatchObject({ found: true, readOnly: true, pin: null });
+  await expect(page.locator('.ow-toast', { hasText: 'needs a PIN on your account' })).toBeVisible();
+});
+
+test('a member whose account has a PIN, none saved here, is asked after the key is made, and the PIN is kept', async ({ page }) => {
+  await setupAtlasRoot(page);
+  const keel = await mockSharedKeel(page, { memberRole: 'contributor', accountHasPin: true });
+  await signInWith(page, null);
+  await openSharedRow(page);
   const prompt = page.locator('[data-modal="pin-prompt"]');
   await expect(prompt.locator('[data-role="context"]')).toContainText('shared with you');
+  expect(keel.mints).toHaveLength(1);
+  // The loading overlay stands aside for the question.
+  await expect(page.locator('[data-role="loading-overlay"]')).toBeHidden();
   await prompt.locator('input[name="pin"]').fill('4242');
   await prompt.locator('[data-action="confirm"]').click();
   await expect.poll(async () => (await sharedEntry(page)).elements).toBe(1);
-  // The write mint is refused (409 pin_required), then a read key.
-  expect(keel.mints.map(m => m.scope ?? 'write')).toEqual(['write', 'read']);
-  expect(await sharedEntry(page)).toMatchObject({ found: true, readOnly: true, pin: null });
-  await expect(page.locator('.ow-toast', { hasText: 'needs a PIN on your account' })).toBeVisible();
+  expect(keel.mints).toHaveLength(1);
+  expect(keel.revokes).toEqual([]);
+  expect(await sharedEntry(page)).toMatchObject({ found: true, readOnly: false, pin: '4242' });
+});
+
+test('a member who cancels the PIN question opens nothing, and the key made for them is taken back', async ({ page }) => {
+  await setupAtlasRoot(page);
+  const keel = await mockSharedKeel(page, { memberRole: 'contributor', accountHasPin: true });
+  await signInWith(page, null);
+  await openSharedRow(page);
+  const prompt = page.locator('[data-modal="pin-prompt"]');
+  await expect(prompt).toBeVisible();
+  await prompt.locator('[data-action="cancel"]').click();
+  await expect.poll(() => keel.revokes).toEqual(['k-1']);
+  await expect(page.locator('[data-role="loading-overlay"]')).toHaveCount(0);
+  expect(await sharedEntry(page)).toMatchObject({ found: false });
 });
 
 // ---- The first screen offers a signed-in account's worlds (S414) ----

@@ -244,13 +244,16 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
     toasts,
   });
   if (!where) return false;
-  // A guest reads, so only a world that opens to write asks for the PIN.
+  // A guest reads, so only a world that opens to write asks for the PIN. The
+  // owner is asked before the mint (keel's create requires a PIN, so they
+  // have one). A member is asked only after it: the mint says whether their
+  // account has a PIN at all, and one who joined with a new account has none
+  // and opens to read without a question they cannot answer (#294's walk).
   let pin = state.registry.pin;
   let enteredPin: string | null = null;
-  if (!pin && opensToWrite(row)) {
-    enteredPin = await new PinPromptModal().prompt(row.role === 'owner'
-      ? `Opening "${row.name}": Atlas needs your OnlyWorlds PIN to sync edits. It is saved in settings for every online world.`
-      : `Opening "${row.name}", shared with you: Atlas needs your OnlyWorlds PIN to save your edits. No PIN yet? You set it on onlyworlds.com, in Account settings under World PIN.`
+  if (!pin && opensToWrite(row) && row.role === 'owner') {
+    enteredPin = await new PinPromptModal().prompt(
+      `Opening "${row.name}": Atlas needs your OnlyWorlds PIN to sync edits. It is saved in settings for every online world.`
     );
     if (!enteredPin) return false;
     pin = enteredPin;
@@ -263,9 +266,23 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
   try {
     // ---- Mint (the one server-side mutation before the download) ----
     overlay.update('Making a key…');
-    const { minted, readOnly, why } = await mintOwnKey(new AccountClient(token), row);
-    // A typed PIN is kept only for a world that writes: a member whose
-    // account has no PIN typed one keel cannot know.
+    const client = new AccountClient(token);
+    const { minted, readOnly, why } = await mintOwnKey(client, row);
+    // A member with a PIN on their account and none saved here: asked now,
+    // with the overlay down. A Cancel takes the new key back, so a refusal
+    // leaves nothing on keel (gate R1).
+    if (!pin && !readOnly) {
+      overlay.hide();
+      enteredPin = await new PinPromptModal().prompt(
+        `Opening "${row.name}", shared with you: Atlas needs your OnlyWorlds PIN to save your edits. It is the one PIN of your account, set on onlyworlds.com in Account settings under World PIN.`
+      );
+      if (!enteredPin) {
+        await client.revokeWorldKey(row.id, minted.id).catch(() => {});
+        return false;
+      }
+      pin = enteredPin;
+      overlay.show();
+    }
     if (enteredPin && !readOnly) {
       const next = setPin(getState().registry, enteredPin);
       saveRegistry(next);
