@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.51.3',
+    date: '2026-10-17',
+    theme: 'A click that lands',
+    entries: [
+      {
+        id: 'worlds-list-click-kept',
+        title: 'A click in the Worlds list is no longer lost',
+        body: 'The Worlds list and its Start a world buttons were redrawn whenever anything changed, and a click that fell across a redraw did nothing. They now redraw only when what they show changes.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.51.2',
     date: '2026-10-17',
     theme: 'One element, one file',

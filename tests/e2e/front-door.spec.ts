@@ -201,6 +201,47 @@ test('cancelling the home-folder question creates nothing', async ({ page }) => 
   expect(after.worlds).toBe(1); // only the world opened in place above
 });
 
+// S421: the sidebar rebuilt its add-a-world buttons on every state change and
+// hashchange, so a press on the old button and a release on its twin sent the
+// click to their common ancestor, and the click was lost. A route to `#/` sets
+// off a burst of those rebuilds: the race `cancelling the home-folder
+// question` lost 5 of 20 runs to (S419). Here the rebuild lands between the
+// press and the release on purpose.
+test('a click on Start a world survives a sidebar re-render between press and release', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-8');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  await page.goto('/#/');
+  const button = page.locator('[data-action="create-local"]');
+  await expect(button).toBeVisible();
+  await page.waitForTimeout(500); // the route's own re-renders settle; only ours lands inside the click
+  const box = (await button.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent('hashchange')));
+  await page.mouse.up();
+  await expect(page.locator('[data-modal="create-world"]')).toBeVisible();
+});
+
+// The family of the test above: the worlds list was rebuilt the same way.
+test('a click on a world row survives a sidebar re-render between press and release', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-9');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  await page.goto('/#/');
+  const row = page.locator('[data-world-id]').first();
+  await expect(row).toBeVisible();
+  await page.waitForTimeout(500);
+  const box = (await row.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent('hashchange')));
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.location.hash)).not.toBe('#/');
+});
+
 test('"add a world" opens the chooser; its open-a-world row opens a picked world', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-6');

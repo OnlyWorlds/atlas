@@ -80,6 +80,27 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   header.className = 'atlas-section atlas-worlds-header';
   content.appendChild(header);
 
+  // The header is rebuilt only when it would come out different (S421). It
+  // used to be rebuilt on every state change and hashchange, and a press on
+  // the old button with a release on its fresh twin sends the click to their
+  // common ancestor: the click was lost, most often right after a route to
+  // `#/`, which sets off a burst of renders (front-door.spec, S419's race).
+  // The list and On OnlyWorlds below hold the same rule; their listeners are
+  // delegated, so an identical rebuild is skipped outright. The comparison is
+  // with the string last written, never `innerHTML` (the parser rewrites it).
+  const lastHtml = new WeakMap<HTMLElement, string>();
+  const setHtml = (el: HTMLElement, html: string): void => {
+    if (lastHtml.get(el) === html) return;
+    lastHtml.set(el, html);
+    el.innerHTML = html;
+  };
+  let headerKey: string | null = null;
+  const headerUnchanged = (key: string): boolean => {
+    if (key === headerKey) return true;
+    headerKey = key;
+    return false;
+  };
+
   function renderHeader(): void {
     const state = getState();
     const root = isAtlasGrounded(state);
@@ -105,11 +126,14 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         ${addIconButton('link-api', 'link', 'Download a world from OnlyWorlds with its API key')}
         ${addIconButton('view-api', 'visibility', 'View a shared world with a read key, view only')}
         </div>`;
-      header.innerHTML = `${icons}
+      const html = `${icons}
         <button type="button" class="atlas-worlds-add-btn" data-action="add-world">
           <span class="material-symbols-outlined" aria-hidden="true">add</span>Add a world
         </button>
       `;
+      // The zero-worlds highlight below is part of what the header shows.
+      if (headerUnchanged(`root|${state.registry.worlds.length === 0}|${html}`)) return;
+      header.innerHTML = html;
     } else if (isTouring()) {
       // Guided tour, stage 1: the sidebar shows its TRUE
       // final structure — all five action icons in their real places — with
@@ -118,7 +142,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // existence later).
       // Same geometry as the real header: the icon wrapper and the labelled
       // button, locked (S365 gate lens C L3: nothing appears after the tour).
-      header.innerHTML = `
+      const html = `
         <div class="atlas-worlds-add-icons">
         ${addIconButton('create-local', newWorldGlyph(), 'Start a world. This one is the tour’s: Hyperion.', { pulse: true })}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder already on your drive. Yours to use after the tour.', { locked: true }) : ''}
@@ -130,6 +154,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined" aria-hidden="true">add</span>Add a world
         </button>
       `;
+      if (headerUnchanged(`tour|${html}`)) return;
+      header.innerHTML = html;
       header.querySelector<HTMLButtonElement>('[data-action="create-local"]')
         ?.addEventListener('click', () => {
           void import('../tour/tour-engine').then(async (engine) => {
@@ -149,6 +175,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // orphaned against the column of compound-icon create buttons that
       // appear when a root IS set. Dropping it removes the visual mismatch
       // and consolidates the first-launch path to one place.
+      if (headerUnchanged('empty')) return;
       header.innerHTML = '';
     }
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
@@ -363,7 +390,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // Silent in both pre-root and zero-worlds states (S255v2): pre-root the
       // landing is the one voice; with a root, the tour tag + hover details
       // teach — a narration line under them was redundant.
-      listEl.innerHTML = '';
+      setHtml(listEl, '');
       return;
     }
 
@@ -375,16 +402,16 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       return (a.name ?? '').localeCompare(b.name ?? '');
     });
     const globalPaused = !!state.registry.sync_pause_all;
-    listEl.innerHTML = sorted
+    setHtml(listEl, sorted
       .map(w => renderRow(w, w.id === activeId, route.mode === 'settings' && w.id === activeId, globalPaused))
-      .join('');
+      .join(''));
   }
 
   function renderRemote(): void {
     const state = getState();
     const token = state.registry.account_token;
     if (!token || !isAtlasGrounded(state)) {
-      remoteEl.innerHTML = '';
+      setHtml(remoteEl, '');
       return;
     }
     // R6: render-path fetch trigger — token-identity-guarded no-op when the
@@ -394,7 +421,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const aw = state.accountWorlds;
     const rows = remoteAccountWorlds();
     if (aw.status === 'error' && rows.length === 0) {
-      remoteEl.innerHTML = `
+      setHtml(remoteEl, `
         <div class="atlas-remote-head">
           <span>On OnlyWorlds</span>
           <button type="button" class="atlas-icon-btn-sm" data-role="remote-refresh" title="Retry">
@@ -402,14 +429,14 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           </button>
         </div>
         <div class="atlas-remote-error">${escapeText(aw.error ?? 'Could not reach OnlyWorlds')}</div>
-      `;
+      `);
       return;
     }
     if (rows.length === 0) {
       // Nothing remote-only (or still loading a first fetch) — stay quiet.
-      remoteEl.innerHTML = aw.status === 'loading'
+      setHtml(remoteEl, aw.status === 'loading'
         ? '<div class="atlas-remote-head"><span>On OnlyWorlds</span><span class="atlas-remote-loading">…</span></div>'
-        : '';
+        : '');
       return;
     }
     const items = rows.map(r => {
@@ -427,7 +454,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         </div>
       `;
     }).join('');
-    remoteEl.innerHTML = `
+    setHtml(remoteEl, `
       <div class="atlas-remote-head">
         <span>On OnlyWorlds</span>
         <button type="button" class="atlas-icon-btn-sm" data-role="remote-refresh" title="Refresh list">
@@ -435,7 +462,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         </button>
       </div>
       ${items}
-    `;
+    `);
   }
 
   function renderAll(): void {
