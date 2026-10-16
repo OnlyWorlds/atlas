@@ -14,7 +14,7 @@ import { getState, patchSlice } from '../core/state';
 import { saveRegistry, setPin, setEmail, setAccountToken } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine } from '../sync/sync-attach';
-import { ToastManager } from '../ui/toast-manager';
+import { ToastManager, WAITS_FOR_SIGN_IN } from '../ui/toast-manager';
 import type { WorldsRegistry } from '../core/types';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { AccountClient, accountErrorMessage } from '../sync/account-client';
@@ -178,6 +178,8 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       const next = setAccountToken(getState().registry, token, profile.username);
       saveRegistry(next);
       patchSlice('registry', next);
+      // The ask to sign in is answered: it goes before the door's next question (Kael, h57 #5950).
+      toasts.dismiss(WAITS_FOR_SIGN_IN);
       toasts.success(`Signed in as ${profile.username}`);
       // A person's invitation that waited for this sign-in opens again (#294),
       // and so does a world page's Open in Atlas (#104). Otherwise, on a
@@ -218,6 +220,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     // A link that waited for a sign-in waited for this account's: it goes too.
     void import('../setup/open-door').then(m => m.dropHeldOpen());
     void import('../setup/join-door').then(m => { m.takeJoinHeldForSignIn(); });
+    toasts.dismiss(WAITS_FOR_SIGN_IN);
     toasts.info('Account token forgotten. Opened worlds keep their own keys.');
   });
 }

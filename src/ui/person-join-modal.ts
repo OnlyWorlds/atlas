@@ -12,7 +12,7 @@
  */
 
 import { BaseModal } from './modal-base';
-import type { ToastManager } from './toast-manager';
+import { WAITS_FOR_SIGN_IN, type ToastManager } from './toast-manager';
 import { getState } from '../core/state';
 import { navigate, settingsHash } from '../core/router';
 import { problemFor } from '../core/problems';
@@ -85,7 +85,7 @@ export class PersonJoinModal extends BaseModal {
           holdJoinForSignIn(this.code);
           this.hide();
           navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
-          this.toasts.info('Paste your account token under Account and press Sign in. The invitation opens again after that, in this tab; if you reload, open the link again.', 15_000);
+          this.toasts.show('Paste your account token under Account and press Sign in. The invitation opens again after that, in this tab; if you reload, open the link again.', 'info', 15_000, { dedupeKey: WAITS_FOR_SIGN_IN });
           return;
         }
         await this.join(say, goBtn, cancelBtn);

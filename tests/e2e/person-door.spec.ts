@@ -141,10 +141,14 @@ test('a person code, signed out: it waits through the sign-in, then the invitati
   // Settings, OnlyWorlds: the token, Sign in, and the invitation is back.
   const tokenInput = page.locator('input[name="account-token"]');
   await expect(tokenInput).toBeVisible();
+  const ask = page.locator('.ow-toast', { hasText: 'Paste your account token under Account' });
+  await expect(ask).toBeVisible();
   await tokenInput.fill(TOKEN);
   await page.click('[data-action="account-sign-in"]');
   await expect(modal).toBeVisible();
   await expect(modal.locator('[data-action="join"]')).toBeVisible();
+  // The ask to sign in is answered, so it is gone (Kael's walk on the open door, h57 #5950).
+  await expect(ask).toHaveCount(0);
   expect(keel.personJoins).toHaveLength(0);
 });
 

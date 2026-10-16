@@ -18,7 +18,7 @@ import { findLinkedWorld, findWorldByServerId } from '../registry/registry';
 import { accountWorldsWhenFetched, openAccountWorld } from '../sync/account-worlds';
 import { activateWorld } from '../sidebar/worlds-sidebar';
 import { isTourFlagActive } from '../tour/tour-flag';
-import type { ToastManager } from '../ui/toast-manager';
+import { WAITS_FOR_SIGN_IN, type ToastManager } from '../ui/toast-manager';
 import type { AccountWorldRow } from '../core/types';
 
 export const OPEN_MALFORMED_LINE = 'This link to open a world is not complete. Open the world again from onlyworlds.com.';
@@ -65,7 +65,9 @@ async function openWorldById(id: string, toasts: ToastManager): Promise<void> {
   if (!token) {
     heldForSignIn = id;
     navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
-    toasts.info(OPEN_SIGN_IN_LINE, 20_000);
+    // Taken down by the sign-in itself (settings-account), never left up
+    // through the Open question it leads to (Kael's walk, h57 #5950).
+    toasts.show(OPEN_SIGN_IN_LINE, 'info', 20_000, { dedupeKey: WAITS_FOR_SIGN_IN });
     return;
   }
   // A fresh read: a world made or shared since this tab last asked is on it,

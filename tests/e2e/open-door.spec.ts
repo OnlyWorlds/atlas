@@ -184,6 +184,8 @@ test('signed out, the link waits for the sign-in in Settings, then asks to open 
   await token.fill(TOKEN);
   await page.click('[data-action="account-sign-in"]');
   await expect(page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' })).toBeVisible();
+  // The ask to sign in is answered, so it is gone (Kael's walk, h57 #5950).
+  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toHaveCount(0);
   expect(keel.mints).toBe(0);
 });
 

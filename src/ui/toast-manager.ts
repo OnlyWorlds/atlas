@@ -9,6 +9,13 @@
 
 type ToastType = 'success' | 'error' | 'info';
 
+/**
+ * The key of a toast asking for the sign-in a waiting link needs (the open
+ * door's, a person's invitation's): the sign-in takes it down when it lands
+ * (`settings-account.ts`), so it never outlives what it asked for.
+ */
+export const WAITS_FOR_SIGN_IN = 'waits-for-sign-in';
+
 export interface ToastAction {
   label: string;
   run: () => void | Promise<void>;
@@ -118,6 +125,11 @@ export class ToastManager {
 
   info(message: string, duration?: number): void {
     this.show(message, 'info', duration);
+  }
+
+  /** Take down every toast shown with this key: what it said is over (a sign-in it asked for landed). */
+  dismiss(dedupeKey: string): void {
+    for (const t of this.toasts.filter(t => t.opts.dedupeKey === dedupeKey)) this.removeToast(t.id);
   }
 
   /**

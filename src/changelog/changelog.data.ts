@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.50.1',
+    date: '2026-10-16',
+    theme: 'Asked once',
+    entries: [
+      {
+        id: 'sign-in-ask-goes',
+        title: 'The ask to sign in goes once you have',
+        body: 'A link that waits for you to sign in, to open a world or to accept an invitation, now takes its message down the moment the sign-in lands, instead of leaving it on screen through the next question.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.50.0',
     date: '2026-10-16',
     theme: 'Pins keep their own time',
