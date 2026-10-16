@@ -561,10 +561,17 @@ export class FakeOwApiClient implements OwApiClient {
   __inject_auth_failure(
     enabled = true,
     code?: 'invalid_credentials' | 'key_revoked',
+    /** keel #357: a wrong or missing PIN is `invalid_credentials` with param
+     *  `API-Pin`; a key keel does not know (a removed member's, a deleted
+     *  world's) is the same code with no param. */
+    param: 'API-Pin' | null = null,
   ): void {
     this.authBlocked = enabled;
     this.authBlockedCode = enabled ? (code ?? null) : null;
+    this.authBlockedParam = enabled ? param : null;
   }
+
+  private authBlockedParam: 'API-Pin' | null = null;
 
   private throwIfAuthBlocked(): void {
     if (this.authBlocked) {
@@ -572,8 +579,10 @@ export class FakeOwApiClient implements OwApiClient {
       // With a code, mimic a real OwV2Error so typedError() classifies the
       // bail as key_revoked (vs the message-only default that stays untyped).
       if (this.authBlockedCode) {
-        (err as Error & { status?: number; code?: string }).status = 401;
-        (err as Error & { status?: number; code?: string }).code = this.authBlockedCode;
+        const typed = err as Error & { status?: number; code?: string; param?: string | null };
+        typed.status = 401;
+        typed.code = this.authBlockedCode;
+        typed.param = this.authBlockedParam;
       }
       throw err;
     }

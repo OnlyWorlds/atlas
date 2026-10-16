@@ -36,6 +36,8 @@ import {
   requestPushIfLinked,
 } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
+import { keyRefusalFor, makeNewWorldKey, newKeyCures, offersMakeKey } from '../sync/world-key';
+import { keyRefusalHere, keyRefusalOf, seatRefusalLine } from '../sync/world-key-lines';
 import type { WorldRegistryEntry } from '../core/types';
 import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
 import { hasFolderMode } from '../core/capabilities';
@@ -103,6 +105,28 @@ export function seatLine(world: WorldRegistryEntry): string {
   return world.api?.seat_secret ? base : `${base} ${SEAT_SECRET_MISSING_LINE}`;
 }
 
+/** A press of Make a new key in flight: the panel rebuilds on every state change, so the button reads this. */
+let makingKey = false;
+
+/**
+ * The world's key and the two ways a new one goes in place (#198): never
+ * Unlink. Make a new key is offered signed in, to a world that reads only or
+ * whose sync stopped; Put in a new key always.
+ */
+export function worldKeyHtml(world: WorldRegistryEntry): string {
+  if (!world.api) return '';
+  const tail = world.api.api_key.slice(-4);
+  const engine = getState().sync.byWorld[world.id];
+  const offerMake = offersMakeKey(world) && (!!world.api.read_only || engine?.kind === 'error');
+  return `<div class="atlas-settings-key" data-role="world-key">
+      <p class="atlas-settings-hint" data-role="key-line">This world's key ends in ${escapeText(tail)} and ${world.api.read_only ? 'can only read' : 'reads and writes'}. A new key takes its place here, and everything in the world stays as it is.</p>
+      <div class="atlas-settings-actions">
+        ${offerMake ? `<button class="atlas-btn-ghost" data-action="make-new-key" ${makingKey ? 'disabled' : ''} title="Atlas makes a key from your OnlyWorlds account">${makingKey ? 'Making a key…' : 'Make a new key'}</button>` : ''}
+        <button class="atlas-btn-ghost" data-action="put-new-key" title="Paste a key from the world's page on onlyworlds.com">Put in a new key</button>
+      </div>
+    </div>`;
+}
+
 export function renderWorldTab(world: WorldRegistryEntry): string {
   const stateLabel = world.state === 'api-linked' ? 'linked' : 'local';
   // Where the world lives (1.17, conv. 129): a browser world has no folder to
@@ -138,6 +162,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </div>
       ${isSeatWorld(world) ? `<p class="atlas-settings-hint" data-role="seat-line">${escapeText(seatLine(world))}</p>` : ''}
       ${renderSyncIssues(world)}
+      ${isSeatWorld(world) ? '' : worldKeyHtml(world)}
       ${canOfferInvite(world, getState().accountWorlds.rows, inviteListLoaded()) ? inviteLineHtml(world) : ''}
       <div class="atlas-settings-actions">
         <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from OnlyWorlds</button>
@@ -227,6 +252,33 @@ function inviteLineHtml(world: WorldRegistryEntry): string {
 }
 
 export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="put-new-key"]')
+    ?.addEventListener('click', () => {
+      void import('../ui/world-key-modal').then(({ NewKeyModal }) => new NewKeyModal(world, toasts).open());
+    });
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="make-new-key"]')
+    ?.addEventListener('click', async () => {
+      if (makingKey) return;
+      const refusal = keyRefusalFor(world.id);
+      // A refused PIN is not the key's: a new key would meet the same answer.
+      if (refusal === 'pin') { toasts.error(keyRefusalHere('pin')); return; }
+      makingKey = true;
+      patchSlice('registry', { ...getState().registry }); // repaint the button as busy
+      try {
+        const entry = getState().registry.worlds.find(w => w.id === world.id) ?? world;
+        const outcome = await makeNewWorldKey(entry, { keyDead: newKeyCures(refusal), cause: refusal });
+        if (outcome.kind === 'swapped') toasts.success(outcome.line);
+        else if (outcome.kind === 'gone' || outcome.kind === 'not-on-account') toasts.error(outcome.line);
+        else if (outcome.kind === 'kept') toasts.info(outcome.line, 12_000);
+        else if (outcome.kind === 'failed') {
+          if (outcome.error) showProblem(outcome.error, { doing: 'making a new key', worldId: world.id, toasts });
+          else toasts.error('Atlas could not reach your OnlyWorlds account to make a key. Try again, or put in a key from the world\'s page on onlyworlds.com.');
+        }
+      } finally {
+        makingKey = false;
+        patchSlice('registry', { ...getState().registry });
+      }
+    });
   document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="invite-someone"]')
     ?.addEventListener('click', async () => {
       const token = getState().registry.account_token;
@@ -384,14 +436,14 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       // "test connection" was still giving one answer for three causes (S323).
       const code = (err as { code?: string } | null)?.code;
       const status = (err as { status?: number } | null)?.status;
-      if (code === 'key_revoked') {
-        toasts.error('This world\'s key was revoked. Unlink the world here, then link it again with Make online and a new key.');
-      } else if (code === 'permission_error') {
-        toasts.error('This is a read key, so edits can\'t sync. Unlink the world here, then link it again with Make online and a write key.');
-      } else if (isSeatWorld(world) && (code === 'invalid_credentials' || status === 401)) {
-        toasts.error('OnlyWorlds did not accept this world\'s seat. It may have been removed there.');
-      } else if (code === 'invalid_credentials' || status === 401 || status === 403) {
-        toasts.error('OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN on the OnlyWorlds tab.');
+      const refusal = keyRefusalOf(err);
+      if (isSeatWorld(world) && (code === 'invalid_credentials' || status === 401)) {
+        toasts.error(seatRefusalLine(refusal, { paused: false }));
+      } else if (refusal) {
+        // The cause keel named, and the fix in this tab (#198): never Unlink.
+        toasts.error(keyRefusalHere(refusal));
+      } else if (status === 401 || status === 403) {
+        toasts.error(keyRefusalHere(null));
       } else if (status === 404) {
         toasts.error('OnlyWorlds has no world for this key. It may have been deleted there.');
       } else {

@@ -189,9 +189,8 @@ export async function mintOwnKey(
 /** The line a shared world's open leaves after its toast, or null. */
 export function sharedOpenLine(row: AccountWorldRow, why: ReadOnlyWhy | undefined): string | null {
   if (why === 'guest') return `${row.name} is open to read: you are a guest in it, so you see only part of it.`;
-  // This copy stays a read key: a swap in place is #198, not built. The way to
-  // edit is the read key's (settings-world.ts): Unlink, then Make online.
-  if (why === 'no-pin') return `${row.name} is open to read: editing a world shared with you needs a PIN on your account, set on onlyworlds.com in Account settings under World PIN. This copy stays read-only. To edit it after that, make a write key on the world's page there, then here Unlink it in Settings, This world, and link it again with Make online.`;
+  // After a PIN is set, the key is swapped in place (#198, `world-key.ts`).
+  if (why === 'no-pin') return `${row.name} is open to read: editing a world shared with you needs a PIN on your account, set on onlyworlds.com in Account settings under World PIN. Then press Make a new key in Settings, This world, and it opens to edit.`;
   if (row.member_role === 'contributor') return `As a contributor in ${row.name}, you can add to it and change what you add.`;
   return null;
 }

@@ -357,6 +357,16 @@ export type SyncEngineState =
   | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number; held_for?: SyncHoldReason }
   | { kind: 'error'; message: string; recoverable: boolean };
 
+/**
+ * Why keel refused a world's key (#198), from its typed error: `key_revoked`
+ * (revoked on onlyworlds.com), `key_unknown` (401 `invalid_credentials` with
+ * no param: keel no longer knows the key, because the world was deleted or
+ * the member removed, keel #357), `pin` (the same code with param `API-Pin`:
+ * a wrong or missing PIN), `read_only_key` (403 `permission_error` on a
+ * write). Copy: `src/sync/world-key-lines.ts`.
+ */
+export type KeyRefusal = 'key_revoked' | 'key_unknown' | 'pin' | 'read_only_key';
+
 export interface SyncResult {
   pushed: { creates: number; updates: number; deletes: number };
   pulled: { creates: number; updates: number; deletes: number };
@@ -388,7 +398,7 @@ export interface SyncResult {
    * auth failure but the copy must say "read-only key", never "check your
    * PIN" (world-meta gate R1, 2026-07-13).
    */
-  auth_reason?: 'key_revoked' | 'read_only_key';
+  auth_reason?: KeyRefusal;
   /**
    * The round stopped early because OnlyWorlds was busy (503 server_busy),
    * rate limited (429, e.g. a PIN lockout) or unreachable (S361, lane b M4).

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.51.0',
+    date: '2026-10-16',
+    theme: 'A new key, in place',
+    entries: [
+      {
+        id: 'new-key-in-place',
+        title: 'An online world takes a new key without unlinking',
+        body: 'When OnlyWorlds stops taking a world\'s key, Settings, This world now takes a new one in its place: paste it from the world\'s page, or, signed in, Atlas makes one from your account by itself. Everything in the world stays as it is, edits not yet sent included.',
+        tags: ['sync'],
+      },
+      {
+        id: 'key-refusal-says-why',
+        title: 'A refused key says why',
+        body: 'Sync now tells a revoked key, a key OnlyWorlds no longer knows (the world was deleted there, or you were removed from it), a read key and a wrong PIN apart, and says where each is fixed.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.50.2',
     date: '2026-10-16',
     theme: 'No PIN, no question',

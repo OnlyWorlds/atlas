@@ -32,6 +32,7 @@ import { detailsContext, resolveFixes } from '../ui/problem-fixes';
 import type { PerElementFailure } from '../core/types';
 import { effectiveSyncPaused, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { isSeatWorld, worldPin } from '../core/seat';
+import { keyRefusalLine, seatRefusalLine } from './world-key-lines';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -120,7 +121,7 @@ export function attachSyncEngine(
       // The list Settings → World and the pill read (S369). Repaint the pill
       // when it moved: the sync slice is the pill's subscription.
       if (noteRoundIssues(entry.id, phase, result)) patchSlice('sync', { ...getState().sync });
-      emitConflictToasts(phase, result);
+      emitConflictToasts(phase, result, { worldId: entry.id, current: currentEngine === engine });
     },
     // No onIdSwap hook: keel keeps client ids on CREATE (2026-07-12), and
     // Route 2 moves ids before any server call through the re-key kernel,
@@ -534,7 +535,11 @@ function publishSyncState(worldId: string, engineState: SyncEngineState): void {
  */
 function emitConflictToasts(
   phase: 'push' | 'pull' | 'sync',
-  result: import('../core/types').SyncResult
+  result: import('../core/types').SyncResult,
+  /** The world whose engine ran the round, and whether that engine is still
+   *  the attached one (the #198 gate's G1: a stopped engine's late refusal
+   *  must never act on the world open now). */
+  from: { worldId: string | null; current: boolean } = { worldId: currentWorldId, current: true },
 ): void {
   // Auth-blocked: one clear toast. Engine state is already 'error' so the
   // pill carries the persistent signal; this toast is the moment-it-happened
@@ -558,17 +563,27 @@ function emitConflictToasts(
   if (result.auth_blocked) {
     // A seat (#104) has no PIN to check: removed on onlyworlds.com, it comes
     // back only through the world's page.
-    if (isSeatWorld(getState().registry.worlds.find(w => w.id === currentWorldId))) {
-      toastManager.error('Sync paused: OnlyWorlds no longer accepts this world\'s seat. The owner may have removed it.');
+    // A replaced engine's refusal is about a key no longer in use (a swap, a
+    // world switch): its world's own engine speaks for it.
+    if (!from.current) return;
+    if (isSeatWorld(getState().registry.worlds.find(w => w.id === from.worldId))) {
+      toastManager.error(seatRefusalLine(result.auth_reason));
       return;
     }
-    // Revoked minted key ≠ wrong PIN (gate R4): the PIN advice would send the
-    // user to the wrong fix. Re-opening from the sidebar mints a fresh key.
-    toastManager.error(
-      result.auth_reason === 'key_revoked'
-        ? 'Sync paused: this world\'s key was revoked. Unlink the world, then link it again with Make online and a new key.'
-        : 'Sync paused: OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN in Settings, or unlink the world if it was deleted online.'
-    );
+    // Say the cause keel named (#198): a revoked or unknown key is never "check
+    // your PIN". Signed in, a key the account can replace is replaced in
+    // place, once per world and session; otherwise the line says where a new
+    // key goes in.
+    const entry = getState().registry.worlds.find(w => w.id === from.worldId);
+    const reason = result.auth_reason;
+    void import('./world-key')
+      .then(({ recoverRefusedKey }) => entry ? recoverRefusedKey(entry, reason) : null)
+      .catch((err) => { console.warn('[sync-attach] key recovery failed:', err); return null; }) // raw-error-ok: a log
+      .then((said) => {
+        if (!said) toastManager.error(keyRefusalLine(reason));
+        else if (said.ok) toastManager.success(said.line);
+        else toastManager.error(said.line);
+      });
     return;
   }
 
@@ -659,9 +674,10 @@ function emitConflictToasts(
  */
 export function __test_emitConflictToasts(
   phase: 'push' | 'pull' | 'sync',
-  result: import('../core/types').SyncResult
+  result: import('../core/types').SyncResult,
+  from?: { worldId: string | null; current: boolean },
 ): void {
-  emitConflictToasts(phase, result);
+  emitConflictToasts(phase, result, from);
 }
 
 /** Re-prime `state.data.elements` from the active folder. Fire-and-forget. */

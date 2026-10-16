@@ -48,6 +48,23 @@ describe('SyncEngine push auth_reason', () => {
     }
   });
 
+  it('tells a key keel no longer knows from a refused PIN (keel #357, #198)', async () => {
+    await folder.createElement('character', { name: 'Cleo' });
+    client.__inject_auth_failure(true, 'invalid_credentials');
+    const unknown = await engine.pushOnce();
+    expect(unknown.auth_reason).toBe('key_unknown');
+    let state = engine.getState();
+    expect(state.kind === 'error' && state.message).toMatch(/no longer knows this world's key/);
+
+    const again = new SyncEngine({ folder, client });
+    client.__inject_auth_failure(true, 'invalid_credentials', 'API-Pin');
+    const pin = await again.pushOnce();
+    expect(pin.auth_reason).toBe('pin');
+    state = again.getState();
+    expect(state.kind === 'error' && state.message).toMatch(/did not accept your PIN/);
+    expect(state.kind === 'error' && state.message).not.toMatch(/Unlink/);
+  });
+
   it('leaves auth_reason undefined for a plain (untyped) 401', async () => {
     await folder.createElement('character', { name: 'Bob' });
     client.__inject_auth_failure(true); // no code — historic message-only shape

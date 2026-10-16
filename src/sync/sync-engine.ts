@@ -26,10 +26,12 @@ import {
 import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../core/constants';
 import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { mergeForeignIds } from './foreign-ids';
+import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
 import type {
   Conflict,
   Element,
   ElementType,
+  KeyRefusal,
   PerElementFailure,
   SyncEngineState,
   SyncHoldReason,
@@ -537,31 +539,23 @@ export class SyncEngine {
     this.pauseReason = 'manual';
     this.setState({
       kind: 'error',
-      message: this.lastAuthReason === 'key_revoked'
-        ? 'This world\'s key was revoked. Unlink the world, then link it again with Make online'
-        : this.lastAuthReason === 'read_only_key'
-          ? 'This is a read key, so edits can\'t sync. Unlink the world, then link it again with Make online'
-          : 'OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN in Settings, or unlink',
+      message: keyRefusalPill(this.lastAuthReason),
       recoverable: true,
     });
   }
 
   /**
-   * Cause of the most recent auth bail, when the typed error distinguished it:
-   * key_revoked (mint a new key) or read_only_key (403 permission_error — the
-   * key can never write; "check your PIN" would be the wrong advice, world-meta
-   * gate R1) vs the invalid-credentials default. Read into SyncResult's
-   * `auth_reason` and setAuthError's pill copy; reset at each bail site.
+   * Cause of the most recent auth bail, when the typed error distinguished it
+   * (`keyRefusalOf`, #198): a revoked key, a key keel no longer knows, a
+   * refused PIN, a read key (403 permission_error: "check your PIN" would be
+   * the wrong advice, world-meta gate R1). Null for an untyped 401. Read into
+   * SyncResult's `auth_reason` and setAuthError's pill copy; reset at each
+   * bail site.
    */
-  private lastAuthReason: 'key_revoked' | 'read_only_key' | null = null;
+  private lastAuthReason: KeyRefusal | null = null;
 
   private noteAuthBail(err: unknown): void {
-    const t = typedError(err);
-    this.lastAuthReason = t?.code === 'key_revoked'
-      ? 'key_revoked'
-      : t?.code === 'permission_error'
-        ? 'read_only_key'
-        : null;
+    this.lastAuthReason = keyRefusalOf(err);
   }
 
   /**

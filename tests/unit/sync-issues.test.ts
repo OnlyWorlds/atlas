@@ -33,6 +33,15 @@ describe('noteRoundIssues', () => {
     expect(issuesFor('w').map(i => i.element_id).sort()).toEqual(['a', 'c']);
   });
 
+  it('a refused key is the world\'s, never a row for the element that carried it (#198)', () => {
+    noteRoundIssues('w', 'push', round([fail('k', { status: 401, code: 'invalid_credentials' })], { auth_blocked: true }));
+    noteRoundIssues('w', 'push', round([fail('r', { status: 403, code: 'permission_error' })], { auth_blocked: true }));
+    expect(issuesFor('w')).toEqual([]);
+    // A member's refusal is about one element and stays its row.
+    noteRoundIssues('w', 'push', round([fail('m', { status: 403, code: 'not_author' })], { auth_blocked: true }));
+    expect(issuesFor('w').map(i => i.element_id)).toEqual(['m']);
+  });
+
   it('keeps when an element first failed and counts the rounds', () => {
     noteRoundIssues('w', 'push', round([fail('a')]), '2026-10-04T10:00:00Z');
     noteRoundIssues('w', 'push', round([fail('a')]), '2026-10-04T10:05:00Z');

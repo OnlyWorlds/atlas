@@ -62,6 +62,10 @@ export function noteRoundIssues(
     [...prev].filter(([, i]) => !replaces(sideOf(i.failure))),
   );
   for (const f of result.failures) {
+    // A refused key is the world's, said by the pill, the toast and Settings'
+    // key block (#198): the element that happened to carry the request did
+    // nothing wrong, and its row read "OnlyWorlds did not accept it".
+    if (result.auth_blocked && isKeyRefusal(f)) continue;
     const before = prev.get(f.element_id);
     next.set(f.element_id, {
       element_id: f.element_id,
@@ -79,6 +83,11 @@ export function noteRoundIssues(
   else byWorld.set(worldId, next);
   if (changed) announce(worldId);
   return changed;
+}
+
+/** A failure that is the key's refusal, not the element's: a 401, or a read key's 403. */
+function isKeyRefusal(f: PerElementFailure): boolean {
+  return f.status === 401 || (f.status === 403 && f.code === 'permission_error');
 }
 
 /** Which kind of round retries this failure: a pull-side write is recorded as `read`. */
