@@ -36,7 +36,7 @@ import type { WorldRegistryEntry } from '../core/types';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
-import { surfaceSyncUnavailable } from '../ui/sync-toasts';
+import { surfaceSyncUnavailable, upToDate } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
 import { ToastManager } from '../ui/toast-manager';
 import { rightTabHashFor } from './sidebar';
@@ -325,11 +325,9 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       try {
         const result = await pullNowAndRefresh();
         if (!result) { surfaceSyncUnavailable(toasts); return; }
-        const elementTotal = result.pulled.creates + result.pulled.updates;
-        const metaTotal = result.meta_pulled?.length ?? 0;
         // pullNowAndRefresh says what came down (the counts, or the conflicts'
         // own toasts): only the nothing-came case is said here (S411).
-        if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
+        if (upToDate(result)) toasts.success('Already up to date');
       } catch (err) {
         console.warn('[worlds-sidebar] refresh failed:', err);
         showProblem(err, {

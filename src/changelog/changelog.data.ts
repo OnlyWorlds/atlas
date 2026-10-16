@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.51.1',
+    date: '2026-10-16',
+    theme: 'Said once, said true',
+    entries: [
+      {
+        id: 'refresh-up-to-date-only-when-true',
+        title: 'Refresh says up to date only when it is',
+        body: 'A refresh that met a refused key, a busy or unreachable OnlyWorlds, or a change that did not send now says only that, and no longer also that everything is up to date.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'key-line-says-refused',
+        title: 'A refused key\'s line says so',
+        body: 'In Settings, This world, a key OnlyWorlds no longer takes is no longer described as one that reads and writes.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.51.0',
     date: '2026-10-16',
     theme: 'A new key, in place',

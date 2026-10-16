@@ -23,7 +23,7 @@ import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash, settingsHash } from '../../core/router';
 import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount, diagnoseSyncUnavailable } from '../../sync/sync-attach';
-import { surfaceSyncUnavailable } from '../../ui/sync-toasts';
+import { surfaceSyncUnavailable, upToDate } from '../../ui/sync-toasts';
 import { issuesFor } from '../../sync/sync-issues';
 import { showProblem } from '../../ui/problem-fixes';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
@@ -368,9 +368,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       try {
         const result = await pullNowAndRefresh();
         if (!result) { surfaceSyncUnavailable(toasts); return; }
-        const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes
-          + (result.meta_pulled?.length ?? 0);
-        if (totalPulled === 0) toasts.info('Already up to date');
+        if (upToDate(result)) toasts.info('Already up to date');
       } catch (err) {
         console.warn('[right-pane] view-only refresh failed:', err);
         showProblem(err, { doing: 'refreshing from OnlyWorlds', retry: refreshView, toasts });
@@ -489,21 +487,15 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         surfaceSyncUnavailable(toasts);
         return;
       }
-      const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes
-        + (result.meta_pulled?.length ?? 0);
-      const totalPushed = result.pushed.creates + result.pushed.updates + result.pushed.deletes
-        + (result.meta_pushed?.length ?? 0);
       // pullNowAndRefresh fires the "pulled N" toast itself (so cadence /
       // pull-on-activate / catch-up pulls also surface). Pill-click adds ONLY
       // the "already up to date" affordance — it's a manual-only signal that
       // would spam if it fired on every cadence tick.
       //
-      // Gate on BOTH push and pull counts: the engine's inFlight dedup means a
+      // `upToDate` counts pushes too: the engine's inFlight dedup means a
       // pillClick that fires during a debounced push round returns the push's
-      // shared promise (push-shaped result, pulled.* all zero). Without the
-      // pushed.* check, "already up to date" would fire after a push that
-      // actually moved N records, misleading the user. (SYNC_NOTES M2.)
-      if (totalPulled === 0 && totalPushed === 0 && result.conflicts.length === 0) {
+      // shared promise (push-shaped result, pulled.* all zero). (SYNC_NOTES M2.)
+      if (upToDate(result)) {
         toasts.info('Already up to date');
       }
     } catch (err) {

@@ -21,7 +21,7 @@ import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active
 import { deleteWorldFolderUnderRoot, whyWorldFolderNotDeletable } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
-import { surfaceSyncUnavailable } from '../ui/sync-toasts';
+import { surfaceSyncUnavailable, upToDate } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
 import { elementHash, navigate } from '../core/router';
 import { issuesFor, clearSyncIssues, type SyncIssue } from '../sync/sync-issues';
@@ -118,8 +118,13 @@ export function worldKeyHtml(world: WorldRegistryEntry): string {
   const tail = world.api.api_key.slice(-4);
   const engine = getState().sync.byWorld[world.id];
   const offerMake = offersMakeKey(world) && (!!world.api.read_only || engine?.kind === 'error');
+  // The key's kind says what it could do; a refusal sync met says what it
+  // does now (S419, #198's live walk: "reads and writes" under "Sync stopped").
+  const refusal = engine?.kind === 'error' ? keyRefusalFor(world.id) : undefined;
+  const does = refusal === 'key_revoked' || refusal === 'key_unknown' ? ', and OnlyWorlds no longer takes it'
+    : world.api.read_only || refusal === 'read_only_key' ? ' and can only read' : ' and reads and writes';
   return `<div class="atlas-settings-key" data-role="world-key">
-      <p class="atlas-settings-hint" data-role="key-line">This world's key ends in ${escapeText(tail)} and ${world.api.read_only ? 'can only read' : 'reads and writes'}. A new key takes its place here, and everything in the world stays as it is.</p>
+      <p class="atlas-settings-hint" data-role="key-line">This world's key ends in ${escapeText(tail)}${does}. A new key takes its place here, and everything in the world stays as it is.</p>
       <div class="atlas-settings-actions">
         ${offerMake ? `<button class="atlas-btn-ghost" data-action="make-new-key" ${makingKey ? 'disabled' : ''} title="Atlas makes a key from your OnlyWorlds account">${makingKey ? 'Making a key…' : 'Make a new key'}</button>` : ''}
         <button class="atlas-btn-ghost" data-action="put-new-key" title="Paste a key from the world's page on onlyworlds.com">Put in a new key</button>
@@ -373,12 +378,10 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     try {
       const result = await pullNowAndRefresh();
       if (!result) { surfaceSyncUnavailable(toasts); return; }
-      const elementTotal = result.pulled.creates + result.pulled.updates;
-      const metaTotal = result.meta_pulled?.length ?? 0;
       // pullNowAndRefresh says what came down (the counts, or the conflicts'
       // own toasts): only the nothing-came case is said here, or a refresh
       // says it twice (S411, the journey scout's gap C).
-      if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
+      if (upToDate(result)) toasts.success('Already up to date');
     } catch (err) {
       console.warn('[settings-world] refresh failed:', err);
       showProblem(err, {

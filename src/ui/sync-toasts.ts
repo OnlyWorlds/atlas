@@ -14,6 +14,23 @@ import { navigate, settingsHash } from '../core/router';
 import { diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { SEAT_SECRET_MISSING_LINE } from '../core/seat';
 import type { ToastManager } from './toast-manager';
+import type { SyncResult } from '../core/types';
+
+/**
+ * True when a refresh may say "Already up to date": the round reached
+ * OnlyWorlds and nothing moved, clashed or failed. A refused key, a busy or
+ * unreachable OnlyWorlds and a failed write each have their own line, so a
+ * round that met one is not up to date (S419: #198's live walk heard "Sync
+ * paused" and "Already up to date" from one press).
+ */
+export function upToDate(result: SyncResult): boolean {
+  if (result.auth_blocked || result.transient_blocked) return false;
+  if (result.conflicts.length > 0 || result.failures.length > 0) return false;
+  const moved = result.pulled.creates + result.pulled.updates + result.pulled.deletes
+    + result.pushed.creates + result.pushed.updates + result.pushed.deletes
+    + (result.meta_pulled?.length ?? 0) + (result.meta_pushed?.length ?? 0);
+  return moved === 0;
+}
 
 /**
  * Inspect why sync is unavailable and toast accordingly. Returns the reason

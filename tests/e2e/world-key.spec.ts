@@ -158,6 +158,9 @@ test('signed out, a refused key says its cause, and Settings, This world takes a
   await page.evaluate((id) => { location.hash = `#/w/${id}/settings/world`; }, worldId);
   const keyLine = page.locator('[data-role="key-line"]');
   await expect(keyLine).toContainText('ends in FFFF');
+  // What the key does now, not what its kind could (S419's live walk).
+  await expect(keyLine).toContainText('OnlyWorlds no longer takes it');
+  await expect(keyLine).not.toContainText('reads and writes');
   await expect(page.locator('[data-action="make-new-key"]')).toHaveCount(0);
 
   await page.click('[data-action="put-new-key"]');
@@ -174,6 +177,7 @@ test('signed out, a refused key says its cause, and Settings, This world takes a
   await expect(page.locator('.ow-toast', { hasText: 'has a new key. Sync is on again.' })).toBeVisible();
   await expect.poll(() => worldKey(page)).toBe(PASTED);
   await expect(keyLine).toContainText('ends in PPPP');
+  await expect(keyLine).toContainText('reads and writes');
   // The edit made while the key was dead goes up on the pasted key: nothing was unlinked.
   await expect.poll(() => keel.created).toEqual([{ key: PASTED, name: 'Kept here' }]);
 });
