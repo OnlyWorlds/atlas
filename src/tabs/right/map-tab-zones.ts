@@ -114,13 +114,10 @@ function applyZoneVisibility(entry: MapTabCacheEntry, onThisMap: Zone[]): void {
     }
   }
   const date = mapZoneDate(entry);
-  let shown = 0;
   for (const zone of onThisMap) {
-    const atDate = zoneShownOnMap(entry, zone, date);
-    if (atDate) shown++;
-    entry.zoneOverlay.setZoneVisible(zone.id, atDate && !hiddenIds.has(zone.id));
+    entry.zoneOverlay.setZoneVisible(zone.id, zoneShownOnMap(entry, zone, date) && !hiddenIds.has(zone.id));
   }
-  updateDateBar(entry, onThisMap, shown);
+  updateDateBar(entry);
   renderZonePanel(entry, onThisMap, getState().ui.selectedElementId);
   scheduleLabelDensity(entry);
 }

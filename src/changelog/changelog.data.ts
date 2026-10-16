@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.50.0',
+    date: '2026-10-16',
+    theme: 'Pins keep their own time',
+    entries: [
+      {
+        id: 'pins-by-their-dates',
+        title: 'A map shows its pins as of a date, by their element\'s dates',
+        body: 'The date bar under a map now moves pins too: a character\'s pin from their birth on, a place\'s from its founding, an event\'s only while it lasts. Pins without dates always show, and so does the one you have selected. All dates shows every pin.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.49.1',
     date: '2026-10-16',
     theme: 'A link asks before it moves you',

@@ -38,6 +38,7 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-att
 import { getAssociatedMaps } from '../tabs/right/auto-open-map';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
+import { revealPinsOnMap } from '../tabs/right/map-tab-pins';
 import { createMapDialog } from '../ui/map-create-modal';
 import { getMapsSettings } from '../registry/registry';
 import { escapeText } from '../core/dom-utils';
@@ -753,7 +754,11 @@ function navigateToPinnedElement(mapEl: Element, pinnedEl: Element): void {
       && (e as Record<string, unknown>).map_id === mapEl.id
       && (e as Record<string, unknown>).element_id === pinnedEl.id,
   );
-  if (pin) panMapTabTo(mapEl.id, pin.x, pin.y);
+  if (pin) {
+    // A located pin shows, whatever the map's date (the S416 gate's F3).
+    revealPinsOnMap(mapEl.id, pinnedEl.id);
+    panMapTabTo(mapEl.id, pin.x, pin.y);
+  }
 }
 
 /**
@@ -894,7 +899,8 @@ function buildPinAffordance(
       openMapTab(m, sourceElementId);
     }
     // panMapTabTo waits on entry.ready, so a freshly opened tab settles
-    // before the camera moves.
+    // before the camera moves. The pin shows whatever the map's date (F3).
+    if (pin.element_id) revealPinsOnMap(pin.map_id, pin.element_id);
     panMapTabTo(pin.map_id, pin.x, pin.y);
   });
   btn.addEventListener('contextmenu', (e) => {

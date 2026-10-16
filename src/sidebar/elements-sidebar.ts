@@ -26,6 +26,7 @@ import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom
 import { elementMatchesQuery } from '../core/element-search';
 import { roomOf } from '../core/element-room';
 import { panMapTabTo } from '../tabs/right/map-tab';
+import { revealPinsOnMap } from '../tabs/right/map-tab-pins';
 import { locateTargetFor } from './pin-locate';
 import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDiskNotice, setDiskShowOnly } from '../core/live-folder';
 import { isCoarsePointer } from '../core/pointer';
@@ -868,6 +869,8 @@ function locateOnActiveMap(id: string): boolean {
   if (!activeMapId) return false;
   const target = locateTargetFor(getState().data.elements, id, activeMapId);
   if (!target) return false;
+  // A located pin shows, whatever the map's date (the S416 gate's F2).
+  revealPinsOnMap(activeMapId, id);
   panMapTabTo(activeMapId, target.x, target.y);
   return true;
 }

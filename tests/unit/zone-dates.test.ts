@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { zoneShownAt, zoneDateRange, effectiveZoneDate, isDatedZone, zoneSpan } from '../../src/core/zone-dates';
+import { zoneShownAt, zoneDateRange, effectiveZoneDate, isDatedZone, zoneSpan, elementSpan, spanShownAt, spanDateRange } from '../../src/core/zone-dates';
 
 // #280: a map shows each zone as of a chosen date, on the zone's own dates.
 describe('zone dates (#280)', () => {
@@ -56,5 +56,39 @@ describe('zone dates (#280)', () => {
     expect(effectiveZoneDate({ kind: 'now' }, null)).toBeNull();
     expect(effectiveZoneDate({ kind: 'date', value: 120 }, 454)).toBe(120);
     expect(effectiveZoneDate({ kind: 'all' }, 454)).toBeNull();
+  });
+});
+
+describe('an element\'s span, for its pins (Q11)', () => {
+  it('reads each type\'s own date fields, as the charts do', () => {
+    expect(elementSpan({ type: 'character', birth_date: 100 })).toEqual({ start: 100, end: null });
+    expect(elementSpan({ type: 'location', founding_date: '40' })).toEqual({ start: 40, end: null });
+    expect(elementSpan({ type: 'event', start_date: 120, end_date: 140 })).toEqual({ start: 120, end: 140 });
+    expect(elementSpan({ type: 'title', grant_date: 5, revoke_date: 9 })).toEqual({ start: 5, end: 9 });
+    // Another type's field names never count: an Event has no birth.
+    expect(elementSpan({ type: 'event', birth_date: 100 })).toEqual({ start: null, end: null });
+  });
+
+  it('has none for a type without dates, a missing element or a foreign type', () => {
+    expect(elementSpan({ type: 'object', start_date: 100 })).toEqual({ start: null, end: null });
+    expect(elementSpan(undefined)).toEqual({ start: null, end: null });
+    expect(elementSpan({ type: 'toString' })).toEqual({ start: null, end: null });
+    expect(elementSpan({ type: 7, start_date: 1 })).toEqual({ start: null, end: null });
+  });
+
+  it('shows half-open, as a zone: from the start, gone at the end, always when undated', () => {
+    const siege = { start: 120, end: 140 };
+    expect(spanShownAt(siege, 119)).toBe(false);
+    expect(spanShownAt(siege, 120)).toBe(true);
+    expect(spanShownAt(siege, 139)).toBe(true);
+    expect(spanShownAt(siege, 140)).toBe(false);
+    expect(spanShownAt({ start: 100, end: null }, 5000)).toBe(true);
+    expect(spanShownAt({ start: null, end: null }, -5)).toBe(true);
+    expect(spanShownAt(siege, null)).toBe(true);
+  });
+
+  it('reaches over zones and pins together', () => {
+    expect(spanDateRange([{ start: 100, end: null }, { start: 120, end: 140 }, { start: null, end: null }], null)).toEqual({ min: 100, max: 140 });
+    expect(spanDateRange([{ start: null, end: null }], 454)).toBeNull();
   });
 });

@@ -28,6 +28,7 @@ import { toggleGhostsAtSourcePin } from './ghost-pins';
 import { buildPinTooltipHtml } from './map-tab-tooltip';
 import { clampToCanvas } from './map-tab-pin-drag';
 import type { MapTabCacheEntry } from './map-tab-cache';
+import { revealPinsOnMap } from './map-tab-pins';
 import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing } from './zone-drawing';
 import { isEditing, getEditingMapId, isMidDragSuppression } from './zone-edit-mode';
 
@@ -209,6 +210,10 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     const writePin = async (elementId: string, elementType: string): Promise<void> => {
       const store = getActiveStore();
       if (!store) return;
+      // A pin just placed shows, whatever the map's date (the S416 gate's
+      // F1); revealed before the write, so an element already pinned here,
+      // refused as a duplicate, shows the pin it has.
+      revealPinsOnMap(entry.mapId, elementId);
       await store.createPin({
         map_id: entry.mapId,
         element_id: elementId,
@@ -339,6 +344,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       const tourMod = document.body.classList.contains('atlas-touring')
         ? await import('../../tour/tour-engine') : null;
       const bake = tourMod ? await tourMod.tourPinBake(payload.id, entry.mapId) : null;
+      revealPinsOnMap(entry.mapId, payload.id);
       await store.createPin({
         map_id: entry.mapId,
         element_id: payload.id,

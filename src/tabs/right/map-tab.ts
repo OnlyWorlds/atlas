@@ -28,7 +28,7 @@ import { ToastManager } from '../../ui/toast-manager';
 import { IMAGELESS_MAP_SIZE } from '../../ui/image-dims';
 import { navigate, elementHash } from '../../core/router';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
-import { syncPins, refreshActiveMapPins, applyPinScale } from './map-tab-pins';
+import { syncPins, refreshActiveMapPins, applyPinScale, refreshPinDates } from './map-tab-pins';
 import { scheduleLabelDensity } from './map-label-density';
 import { enablePinDrag } from './map-tab-pin-drag';
 import { applyMapBackground, refreshCachedBackgrounds } from './map-tab-backgrounds';
@@ -181,7 +181,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     zoneStrip,
   };
   wireChipStrip(entry, toasts);
-  wireDateBar(entry, () => refreshZoneDates(entry));
+  // The date moved: the zones' visibility, then the pins by their elements' dates (Q11).
+  wireDateBar(entry, () => { refreshZoneDates(entry); refreshPinDates(entry); });
   mapTabCache.set(mapId, entry);
 
   entry.ready = (async () => {
@@ -429,15 +430,21 @@ subscribe(() => {
   // toggle calls refreshActiveMapZones itself; keying on the ui slice here
   // would re-sync 300 zones on every search keystroke.)
   const styles = state.styles;
-  // The world's now moves the zones of a map whose date bar follows it (#280).
+  // The world's now moves the zones of a map whose date bar follows it (#280),
+  // and its pins by their elements' dates (Q11).
   const now = state.active?.meta?.time_current;
   if (elements === lastElementsRef && selected === lastSelectedRef && styles === lastStylesRef && now === lastNow) return;
   const zonesOnly = elements === lastElementsRef && selected === lastSelectedRef;
+  const nowMoved = now !== lastNow;
   lastElementsRef = elements;
   lastSelectedRef = selected;
   lastStylesRef = styles;
   lastNow = now;
-  if (zonesOnly) { refreshActiveMapZones(); return; }
+  if (zonesOnly) {
+    refreshActiveMapZones();
+    if (nowMoved) refreshActiveMapPins();
+    return;
+  }
   refreshActiveMapPins();
   // Dims drifted under a BACKGROUND tab (image attached / dims corrected
   // while the tab wasn't active): evict its cache so the next activation

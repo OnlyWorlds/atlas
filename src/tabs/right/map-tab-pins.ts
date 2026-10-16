@@ -8,7 +8,7 @@
  * point map-tab.ts's subscriber calls.
  */
 
-import type { Pin } from '../../core/types';
+import type { Element, Pin } from '../../core/types';
 import { getState } from '../../core/state';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
 import { pinVisualFor } from './pin-visuals';
@@ -19,6 +19,7 @@ import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import type { PinLabels } from '../../core/map-view-prefs';
 import { medianNearestNeighbour, pinScaleForSpacing, scheduleLabelDensity } from './map-label-density';
 import { refreshSubmapDoor, refreshUpButton, SUBMAP_PIN_HINT } from './map-submap-door';
+import { mapZoneDate, pinShownOnMap, revealOnMap } from './map-date-bar';
 
 export function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;
@@ -32,13 +33,13 @@ export function syncPins(entry: MapTabCacheEntry): void {
   // A pin without finite x/y is schema-legal (only `name` is required) but
   // cannot be drawn; Leaflet throws on it and every later pin went missing
   // (S360). Skip it here, as pin-locate and the share payload already do.
+  // The date bar (Q11, 1.50) is applied after, as visibility only
+  // (`applyPinDates`): a marker the date hides stays built, so a slider drag
+  // never re-creates icons and labels (the S416 gate's F4).
+  const byId = new Map(elements.map(e => [e.id, e] as const));
   const minePins = allMinePins.filter(p =>
     !entry.hiddenPinTypes.has(p.element_type ?? '') && Number.isFinite(p.x) && Number.isFinite(p.y));
   const mineIds = new Set(minePins.map(p => p.id));
-
-  // Refresh the chip strip on every sync — type set may have changed if a
-  // pin was added/removed/element type changed.
-  refreshChipStrip(entry, allMinePins);
 
   // Read per-map visual prefs once. Pins inherit the active map's tint setting
   // so all pins on a single map look coherent; switching tint via the visual
@@ -50,7 +51,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
   }
 
   for (const pin of minePins) {
-    const el = elements.find(e => e.id === pin.element_id);
+    const el = pin.element_id ? byId.get(pin.element_id) : undefined;
     const existing = entry.manager.getPin(pin.id);
 
     if (existing) {
@@ -96,18 +97,64 @@ export function syncPins(entry: MapTabCacheEntry): void {
   // The icon-scale rule (S356): median nearest-neighbour gap of THIS pin
   // set in storage units, computed once per sync; applyPinScale turns it
   // into a per-zoom scale. Sparse maps measure a gap wider than the icon
-  // and keep scale 1 — the rule only ever shrinks.
+  // and keep scale 1 — the rule only ever shrinks. Measured over every pin
+  // the chips show, whatever the date, so scrubbing never resizes the icons
+  // (the S416 gate's F5).
   entry.pinSpacing = medianNearestNeighbour(minePins.map(p => ({ x: p.x, y: p.y })));
   applyPinScale(entry);
 
+  applyPinDates(entry, allMinePins, minePins, byId, prefs);
+}
+
+/**
+ * Show an element's pins on a map whatever its date, because the person just
+ * placed or located one there (`revealOnMap`), and apply it now if the tab is
+ * built; a sync that follows a write applies it anyway.
+ */
+export function revealPinsOnMap(mapId: string, elementId: string): void {
+  revealOnMap(mapId, elementId);
+  const entry = mapTabCache.get(mapId);
+  if (entry) void entry.ready.then(() => refreshPinDates(entry));
+}
+
+/**
+ * The date bar moved (Q11): which built pins show, visibility only, then the
+ * chips, labels and the submap door that read what shows.
+ */
+export function refreshPinDates(entry: MapTabCacheEntry): void {
+  const elements = getState().data.elements;
+  const allMinePins = elements.filter((e): e is Pin => e.type === 'pin' && e.map_id === entry.mapId);
+  const minePins = allMinePins.filter(p =>
+    !entry.hiddenPinTypes.has(p.element_type ?? '') && Number.isFinite(p.x) && Number.isFinite(p.y));
+  applyPinDates(entry, allMinePins, minePins, new Map(elements.map(e => [e.id, e] as const)), getEffectiveMapPrefs(entry.mapId));
+}
+
+function applyPinDates(
+  entry: MapTabCacheEntry,
+  allMinePins: Pin[],
+  minePins: Pin[],
+  byId: Map<string, Element>,
+  prefs: ReturnType<typeof getEffectiveMapPrefs>,
+): void {
+  const date = mapZoneDate(entry);
+  const shownAt = (p: Pin) => pinShownOnMap(entry, p, p.element_id ? byId.get(p.element_id) : undefined, date);
+  const visible = minePins.filter(shownAt);
+  entry.manager.setPinVisibility(visible.map(p => p.id));
+
+  // Refresh the chip strip on every sync — type set may have changed if a
+  // pin was added/removed/element type changed. Its chips come from every pin
+  // here and count the ones the date shows, so a type's chip never comes and
+  // goes with the date (the zone panel's lesson, S410).
+  refreshChipStrip(entry, allMinePins, allMinePins.filter(shownAt));
+
   // Apply label visibility AFTER the pin set is reconciled so we count the
   // post-sync set (relevant for threshold mode).
-  applyLabelVisibility(entry, prefs.pin_labels, prefs.pin_label_threshold, minePins.length);
+  applyLabelVisibility(entry, prefs.pin_labels, prefs.pin_label_threshold, visible.length);
   scheduleLabelDensity(entry);
   // Into a submap and back up (#139): both read the pins and the selection
   // just reconciled.
-refreshSubmapDoor(entry);
-refreshUpButton(entry);
+  refreshSubmapDoor(entry);
+  refreshUpButton(entry);
 }
 
 /**
@@ -176,9 +223,10 @@ function applyLabelVisibility(
  * Hidden when 0 distinct types (nothing to filter) or 1 type (toggling all
  * off would empty the map — not useful as a chip strip).
  */
-function refreshChipStrip(entry: MapTabCacheEntry, allMinePins: Pin[]): void {
+function refreshChipStrip(entry: MapTabCacheEntry, allMinePins: Pin[], atDate: Pin[]): void {
   const elements = getState().data.elements;
   const countByType = new Map<string, number>();
+  const shownIds = new Set(atDate.map(p => p.id));
   for (const pin of allMinePins) {
     let type = pin.element_type;
     if (!type) {
@@ -189,7 +237,7 @@ function refreshChipStrip(entry: MapTabCacheEntry, allMinePins: Pin[]): void {
       type = el?.type ?? '';
     }
     if (!type) continue;
-    countByType.set(type, (countByType.get(type) ?? 0) + 1);
+    countByType.set(type, (countByType.get(type) ?? 0) + (shownIds.has(pin.id) ? 1 : 0));
   }
 
   if (countByType.size < 2) {
