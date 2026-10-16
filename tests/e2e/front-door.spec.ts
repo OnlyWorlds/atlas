@@ -242,6 +242,40 @@ test('a click on a world row survives a sidebar re-render between press and rele
   await expect.poll(() => page.evaluate(() => window.location.hash)).not.toBe('#/');
 });
 
+/** Press on `selector`, re-render everything that listens to the hash, release. */
+async function clickAcrossRerender(page: Page, selector: string): Promise<void> {
+  const target = page.locator(selector).first();
+  await expect(target).toBeVisible();
+  await page.waitForTimeout(500); // the route's own re-renders settle; only ours lands inside the click
+  const box = (await target.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent('hashchange')));
+  await page.mouse.up();
+}
+
+// The census's first two rows (Forge/Notes/2026-10-17-s421-rerender-census.md):
+// the room strip and the sidebar's mode toggle, both always on screen.
+test('a click on a room in the strip survives a re-render between press and release', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-10');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  await clickAcrossRerender(page, '.atlas-room-nav-btn[data-room="knowledge"]');
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('knowledge');
+});
+
+test('a click on the sidebar mode toggle survives a re-render between press and release', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-11');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  const before = await page.evaluate(() => (window as any).__atlasTestApi.getState().ui.sidebarMode);
+  const other = before === 'worlds' ? 'mode-elements' : 'mode-worlds';
+  await clickAcrossRerender(page, `[data-action="${other}"]`);
+  await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().ui.sidebarMode)).not.toBe(before);
+});
+
 test('"add a world" opens the chooser; its open-a-world row opens a picked world', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-6');

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.51.4',
+    date: '2026-10-17',
+    theme: 'A click that lands, along the top',
+    entries: [
+      {
+        id: 'room-strip-click-kept',
+        title: 'A click on a room or the sidebar\'s two tabs is no longer lost',
+        body: 'The row of rooms along the top and the Worlds and world tabs above the sidebar were redrawn whenever anything changed, as the Worlds list was until 1.51.3, and a click that fell across a redraw did nothing. They now redraw only when what they show changes.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.51.3',
     date: '2026-10-17',
     theme: 'A click that lands',

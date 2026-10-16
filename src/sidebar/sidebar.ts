@@ -106,8 +106,16 @@ export function mountSidebar(mount: SidebarMount): () => void {
   //
   // Right toggle is hidden when no world is active — there's nothing
   // meaningful to switch to. The Worlds toggle is always present.
+  // Rebuilt only when it would come out different (conv. 146, S421): a
+  // rebuild between a press and its release loses the click. Its handlers
+  // read state at the click, so the key is what it draws.
+  let toggleKey: string | null = null;
+  const toggleUnchanged = (key: string): boolean => {
+    if (key === toggleKey) return true;
+    toggleKey = key;
+    return false;
+  };
   function renderToggle(): void {
-    toggle.innerHTML = '';
     const route = parseHash(window.location.hash);
     const mode = getState().ui.sidebarMode;
     const reg = getState().registry;
@@ -120,12 +128,17 @@ export function mountSidebar(mount: SidebarMount): () => void {
     // hiding the toggle left the tour stuck in worlds mode, 2026-07-19) —
     // OR during the tour's world-create step (the sidebar must appear in its
     // exact final structure, Worlds tab included).
-    if (!isAtlasGrounded() && !entry && !isTourFlagActive()) return;
+    if (!isAtlasGrounded() && !entry && !isTourFlagActive()) {
+      if (!toggleUnchanged('hidden')) toggle.innerHTML = '';
+      return;
+    }
     // When the writing-room takeover is active, neither toggle button is lit —
     // the body is the writing tree, the toggle is an escape hatch.
     const effective = resolveEffectiveBody();
     const worldsActive = mode === 'worlds' && effective !== 'writing';
     const elementsActive = mode === 'elements' && effective !== 'writing';
+    if (toggleUnchanged(JSON.stringify([worldsActive, elementsActive, entry?.name ?? null, !!entry, isTourFlagActive()]))) return;
+    toggle.innerHTML = '';
 
     const worldsBtn = document.createElement('button');
     worldsBtn.type = 'button';

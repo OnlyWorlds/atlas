@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "1.51.3",
+  "version": "1.51.4",
   "private": true,
   "description": "Atlas — folder-first OnlyWorlds world browser and editor with optional API sync",
   "scripts": {

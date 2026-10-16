@@ -165,8 +165,16 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
   // so the icons visibly slide into their real nav positions (S255v2).
   let wasPreview = false;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // The strip is rebuilt only when it would come out different (conv. 146,
+  // S421): a rebuild between a press and its release loses the click. The key
+  // holds everything the strip draws and everything its handlers capture at
+  // render (the world, the selected element); the rest is read at the click.
+  let stripKey: string | null = null;
 
   function renderPreview(): void {
+    const key = `preview|${isDrawerOpen('sidebar')}`;
+    if (key === stripKey) return;
+    stripKey = key;
     strip.innerHTML = '';
     strip.classList.add('is-preview');
     // The sidebar toggle belongs here too (S366): with no world open the
@@ -219,6 +227,12 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
 
     const labelsOn = localStorage.getItem(NAV_LABELS_KEY) === '1';
     const settling = wasPreview && !labelsOn;
+    const selected = getState().ui.selectedElementId;
+    const selectedEl = selected ? getState().data.elements.find(e => e.id === selected) : undefined;
+    const key = JSON.stringify([worldId, route.mode, labelsOn, settling, selected,
+      selectedEl?.name ?? null, selectedEl?.type ?? null, isDrawerOpen('sidebar'), isDrawerOpen('right')]);
+    if (key === stripKey) return;
+    stripKey = key;
     wasPreview = false;
     strip.innerHTML = '';
     strip.classList.remove('is-preview');
