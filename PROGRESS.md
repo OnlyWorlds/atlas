@@ -15,7 +15,8 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 **Records**: `tools/atlas/Notes/ui-snapshots/2026-10-16-s415/` (gitignored).
 
-- ⚡ **NEXT**: (1) #347's live walk on W11: a declared scratch write (SDK `agent: true`, keel's probe-write world), seen in Atlas and Lantern once Boss has flown both, then deleted; then #347 done. (2) keel's new 409 `idempotency_in_flight` on /bulk (keel #307, D105): read what Atlas's own adapter does with it on a retried create, then the SDK to 4.27.0. (3) #104 re-read against keel's current Open with. #198 waits on talks.
+- **Live**: 1.48.0 (Boss h11 #5761, deployment `69b929ae`); #347 done, walked live on W11 in Firefox on production (`tools/atlas/Notes/ui-snapshots/2026-10-16-s415/live.mjs`: a declared scratch Character marked, the tap says it, a person's not, deleted; Lantern's half the same, `37eabb5`). keel #307's 409 `idempotency_in_flight` cannot reach Atlas: every /bulk mints a fresh key and none is replayed (`sync-engine.ts`, `make-online.ts`); Lantern replays its keys and did meet it (fixed, `37eabb5`).
+- ⚡ **NEXT**: (1) the SDK to the blessed 4.27.0, a pin move that rides the next release. (2) #104 re-read against keel's current Open with. (3) The ruling's second half when asked: a filter for made by agents or by people, and the mark in the Knowledge and Pages rooms. #198 waits on talks.
 ---
 
 Earlier session entries (S253 to S376, newest first, moved verbatim 2026-10-05, with the July `BANKED / TODO` standing queue that sat among them) are at the bottom of `docs-archive/PROGRESS-history.md`.
