@@ -6912,6 +6912,13 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 14px;
 }
 
+/* Trace held on (S423): it changes what a drag does, so it reads as pressed. */
+.atlas-zone-draft-btn.is-active {
+  background: rgba(var(--atlas-accent-rgb), 0.18);
+  border-color: rgba(var(--atlas-accent-rgb), 0.55);
+  color: var(--atlas-cyan);
+}
+
 .atlas-zone-draft-btn-primary {
   background: rgba(var(--atlas-accent-rgb), 0.18);
   border-color: rgba(var(--atlas-accent-rgb), 0.55);

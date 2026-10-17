@@ -195,6 +195,55 @@ export function snapToAxis(anchor: Point, click: Point): Point {
 }
 
 /**
+ * Douglas-Peucker on an open run of points: keeps both ends and every point
+ * that sits farther than `tolerance` from the line the kept points make. A
+ * traced stroke (S423) comes in at one point every few pixels and goes into
+ * the world as the few that carry its shape: every point kept is a Marker
+ * file, so the stored shape stays at meaning resolution and the ink draws
+ * the rest.
+ */
+export function simplifyPath(points: Point[], tolerance: number): Point[] {
+  if (points.length < 3) return points.slice();
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack: Array<[number, number]> = [[0, points.length - 1]];
+  while (stack.length) {
+    const [s, e] = stack.pop()!;
+    let maxD = -1;
+    let at = -1;
+    for (let i = s + 1; i < e; i++) {
+      const d = distanceToSegment(points[i], points[s], points[e]);
+      if (d > maxD) { maxD = d; at = i; }
+    }
+    if (at > 0 && maxD > tolerance) {
+      keep[at] = 1;
+      stack.push([s, at], [at, e]);
+    }
+  }
+  return points.filter((_, i) => keep[i] === 1);
+}
+
+/**
+ * A traced stroke to the points a zone stores (S423): a moving average over
+ * `2 * radius + 1` samples takes out the hand's wobble (the ink puts a coast's
+ * raggedness back at draw time), then `simplifyPath`. Without the average, a
+ * wobble near the tolerance survives and nearly doubles the points kept.
+ */
+export function simplifyStroke(points: Point[], tolerance: number, radius = 2): Point[] {
+  if (points.length < 3) return points.slice();
+  const n = points.length;
+  const smooth = points.map((p, i) => {
+    if (i === 0 || i === n - 1) return p;
+    const a = Math.max(0, i - radius), b = Math.min(n - 1, i + radius);
+    let sx = 0, sy = 0;
+    for (let j = a; j <= b; j++) { sx += points[j].x; sy += points[j].y; }
+    return { x: sx / (b - a + 1), y: sy / (b - a + 1) };
+  });
+  return simplifyPath(smooth, tolerance);
+}
+
+/**
  * Whether two point lists are equal coordinate-by-coordinate. Used to skip
  * needless re-render when zone geometry hasn't actually changed.
  */

@@ -23,7 +23,7 @@ import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
-import { snapToAxis, findClosestSegment, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
+import { snapToAxis, findClosestSegment, simplifyStroke, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
 import { clampToCanvas } from './map-tab-pin-drag';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { buildDrawingOverlay, type DrawingOverlayRefs } from './zone-drawing-overlay';
@@ -54,6 +54,12 @@ interface ActiveDraft {
   toasts: ToastManager;
   // For cleanup on cancel/finish.
   containerListeners: Array<{ el: HTMLElement; type: string; handler: EventListener }>;
+  /**
+   * Trace (S423): while on, a press and drag lays a stroke instead of panning;
+   * on release the stroke is simplified (`simplifyStroke`) and appended as
+   * points. `endedAt` swallows the click the browser fires after the release.
+   */
+  trace: { on: boolean; stroke: Point[] | null; strokeLayer: L.Polyline | null; endedAt: number };
 }
 
 let active: ActiveDraft | null = null;
@@ -136,6 +142,7 @@ export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: To
     onUndo: undoLastMarker,
     onFinish: () => finishDrawing(toasts),
     onCancel: cancelDrawing,
+    onTrace: setTrace,
   });
   entry.wrapper.appendChild(overlay.root);
 
@@ -149,6 +156,7 @@ export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: To
     overlay,
     toasts,
     containerListeners: [],
+    trace: { on: false, stroke: null, strokeLayer: null, endedAt: 0 },
   };
 
   // Cursor cue: crosshair while drawing.
@@ -176,6 +184,8 @@ const CREATE_INSERT_THRESHOLD = 20;
 /** Called from map-tab.ts on every map click while drafting. */
 export function placeMarkerAt(rawPoint: Point, canvasWidth: number, canvasHeight: number): void {
   if (!active) return;
+  // The click a traced stroke's release fires is the stroke, not a point.
+  if (active.trace.on && performance.now() - active.trace.endedAt < 400) return;
 
   let point: Point = {
     x: clampToCanvas(Math.round(rawPoint.x), canvasWidth),
@@ -322,7 +332,100 @@ export function disposeDraftForMap(mapId: string): void {
 
 // ----- internals -----
 
+/** Screen pixels a traced stroke may stray from the points kept for it. */
+const TRACE_TOLERANCE_PX = 3;
+
+/**
+ * Trace on or off (S423). On: the map stops panning under a drag, and a
+ * press-drag-release on it lays a stroke that lands as points on release.
+ * Clicks still place single points; the wheel still zooms.
+ */
+export function setTrace(on: boolean): void {
+  if (!active || active.trace.on === on) return;
+  const entry = mapTabCache.get(active.mapId);
+  const lMap = entry?.manager.getMap();
+  if (!entry || !lMap) return;
+  active.trace.on = on;
+  active.overlay.setTrace(on);
+  if (on) {
+    lMap.dragging.disable();
+    const el = lMap.getContainer();
+    const listen = (type: string, handler: (e: PointerEvent) => void) => {
+      const h = handler as EventListener;
+      el.addEventListener(type, h);
+      active!.containerListeners.push({ el, type, handler: h });
+    };
+    listen('pointerdown', e => traceStart(e, lMap));
+    listen('pointermove', e => traceMove(e, lMap));
+    listen('pointerup', () => traceEnd(lMap));
+    listen('pointercancel', () => traceEnd(lMap));
+  } else {
+    removeTraceListeners(active);
+    lMap.dragging.enable();
+  }
+}
+
+function removeTraceListeners(draft: ActiveDraft): void {
+  for (const { el, type, handler } of draft.containerListeners) el.removeEventListener(type, handler);
+  draft.containerListeners = [];
+  draft.trace.stroke = null;
+  draft.trace.strokeLayer = null;
+}
+
+function traceStart(e: PointerEvent, lMap: L.Map): void {
+  if (!active || e.button !== 0) return;
+  // Controls on the map keep their clicks, and a placed point keeps its drag.
+  if ((e.target as HTMLElement | null)?.closest('.leaflet-control, .atlas-zone-draft-overlay, .leaflet-marker-icon')) return;
+  // The stroke keeps the pointer even when it leaves the map mid-drag.
+  try { lMap.getContainer().setPointerCapture(e.pointerId); } catch { /* noop */ }
+  const p = leafletToStorage(lMap.mouseEventToLatLng(e as unknown as MouseEvent));
+  active.trace.stroke = [p];
+  active.trace.strokeLayer = L.polyline([lMap.mouseEventToLatLng(e as unknown as MouseEvent)], {
+    color: '#22d3ee', weight: 2, opacity: 0.9, interactive: false,
+  }).addTo(active.previewLayer);
+}
+
+function traceMove(e: PointerEvent, lMap: L.Map): void {
+  const t = active?.trace;
+  if (!t?.stroke || !t.strokeLayer) return;
+  const latlng = lMap.mouseEventToLatLng(e as unknown as MouseEvent);
+  const p = { x: latlng.lng, y: latlng.lat };
+  const last = t.stroke[t.stroke.length - 1];
+  // About one sample per two screen pixels; the simplification decides what stays.
+  if (Math.hypot(p.x - last.x, p.y - last.y) * Math.pow(2, lMap.getZoom()) < 2) return;
+  t.stroke.push(p);
+  t.strokeLayer.addLatLng(latlng);
+}
+
+function traceEnd(lMap: L.Map): void {
+  if (!active) return;
+  const t = active.trace;
+  const stroke = t.stroke;
+  t.stroke = null;
+  if (t.strokeLayer) active.previewLayer.removeLayer(t.strokeLayer);
+  t.strokeLayer = null;
+  // A press without a drag is a click: placeMarkerAt places it.
+  if (!stroke || stroke.length < 3) return;
+  t.endedAt = performance.now();
+  const entry = mapTabCache.get(active.mapId);
+  if (!entry) return;
+  const { canvasWidth, canvasHeight } = entry.manager.getConfig();
+  const tolerance = TRACE_TOLERANCE_PX / Math.pow(2, lMap.getZoom());
+  for (const p of simplifyStroke(stroke, tolerance)) {
+    const q = { x: clampToCanvas(Math.round(p.x), canvasWidth), y: clampToCanvas(Math.round(p.y), canvasHeight) };
+    const last = active.points[active.points.length - 1];
+    if (last && last.x === q.x && last.y === q.y) continue;
+    active.points.push(q);
+  }
+  rerenderPreview();
+  refreshOverlay();
+}
+
 function teardown(draft: ActiveDraft): void {
+  if (draft.trace.on) {
+    removeTraceListeners(draft);
+    try { mapTabCache.get(draft.mapId)?.manager.getMap()?.dragging.enable(); } catch { /* noop */ }
+  }
   try { draft.previewLayer.clearLayers(); } catch { /* noop */ }
   try {
     const entry = mapTabCache.get(draft.mapId);
