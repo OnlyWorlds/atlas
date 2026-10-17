@@ -769,7 +769,7 @@ export class ZoneOverlay {
       style.opacity = showShape ? (ink.weight > 0 ? ink.strokeOpacity : lit ? 0.6 : 0) : 0;
       style.dashArray = entry.editing ? '5, 5' : ink.dash;
       if (entry.shape.mode === 'polygon') {
-        const fill = ink.pattern ? `url(#${ensureInkPattern(this.map, ink.pattern, ink.patternColor ?? ink.stroke)})` : ink.fill;
+        const fill = ink.pattern ? `url(#${ensureInkPattern(this.map, ink.pattern, ink.patternColor ?? ink.stroke, ink.patternBg)})` : ink.fill;
         style.fillColor = fill ?? ink.stroke;
         style.fillOpacity = showShape && fill ? 1 : 0;
       }
@@ -868,16 +868,23 @@ const PATTERN_BODY: Record<InkPattern, (c: string) => string> = {
   marsh: c => `<line x1="1" y1="4" x2="7" y2="4" stroke="${c}" stroke-width="0.9"/><line x1="8" y1="8" x2="12" y2="8" stroke="${c}" stroke-width="0.9"/>`,
   // Seethe's contour dots (style-atlas.html, S424)
   dots: c => `<circle cx="2.5" cy="2.5" r="0.9" fill="${c}" opacity="0.85"/><circle cx="7.5" cy="7.5" r="0.6" fill="${c}" opacity="0.6"/>`,
+  // Seethe's modern-atlas grids (map-atlas.ts, S424): forest dots, marsh dashes, a territory's faint hatch
+  fdots: c => `<circle cx="2" cy="2" r="0.85" fill="${c}" opacity="0.8"/><circle cx="6" cy="6" r="0.6" fill="${c}" opacity="0.6"/>`,
+  dashes: c => `<line x1="1" y1="3" x2="5" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/><line x1="7" y1="3" x2="11" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/>`,
+  thinhatch: c => `<line x1="0" y1="0" x2="0" y2="18" stroke="${c}" stroke-width="0.4" opacity="0.14"/>`,
 };
-const PATTERN_TILE: Record<InkPattern, string> = {
-  hatch: 'width="6" height="6" patternTransform="rotate(35)"',
-  stipple: 'width="9" height="9"',
-  marsh: 'width="14" height="8"',
-  dots: 'width="10" height="10"',
+const PATTERN_TILE: Record<InkPattern, { w: number; h: number; rotate?: number }> = {
+  hatch: { w: 6, h: 6, rotate: 35 },
+  stipple: { w: 9, h: 9 },
+  marsh: { w: 14, h: 8 },
+  dots: { w: 10, h: 10 },
+  fdots: { w: 8, h: 8 },
+  dashes: { w: 12, h: 6 },
+  thinhatch: { w: 18, h: 18, rotate: 45 },
 };
 
-function ensureInkPattern(map: L.Map, pattern: InkPattern, color: string): string {
-  const id = inkPatternId(pattern, color);
+function ensureInkPattern(map: L.Map, pattern: InkPattern, color: string, bg?: string): string {
+  const id = inkPatternId(pattern, color, bg);
   const svg = (getZoneSvgRendererForMap(map) as L.Renderer & { _container?: SVGSVGElement })._container;
   if (!svg) return id;
   let defs = svg.querySelector('defs[data-atlas-ink]');
@@ -889,8 +896,11 @@ function ensureInkPattern(map: L.Map, pattern: InkPattern, color: string): strin
   if (!defs.querySelector(`#${id}`)) {
     // The colour is a preset's constant, never world text; checked anyway (conv. 93).
     const c = hexColourOr(color, '#000000');
+    const tile = PATTERN_TILE[pattern];
+    const ground = bg ? `<rect width="${tile.w}" height="${tile.h}" fill="${hexColourOr(bg, '#ffffff')}"/>` : '';
+    const turn = tile.rotate ? ` patternTransform="rotate(${tile.rotate})"` : '';
     defs.insertAdjacentHTML('beforeend',
-      `<pattern id="${id}" patternUnits="userSpaceOnUse" ${PATTERN_TILE[pattern]}>${PATTERN_BODY[pattern](c)}</pattern>`);
+      `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${tile.w}" height="${tile.h}"${turn}>${ground}${PATTERN_BODY[pattern](c)}</pattern>`);
   }
   return id;
 }

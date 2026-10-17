@@ -104,7 +104,7 @@ test('a modern atlas map draws the same zones in its own register (S424)', async
       riverName: getComputedStyle(document.querySelector('.atlas-map-pane .atlas-ink-line-label')!).fill,
     };
   });
-  expect(f.fills).toEqual(['url(#atlas-ink-dots-9a8a6d)']);   // the Range in Seethe's contour dots
+  expect(f.fills).toEqual(['url(#atlas-ink-dots-9a8a6d-on-f0e6cf)']);   // the Range: Seethe's contour dots on her warm ground
   expect(f.shoreBands).toBe(0);
   expect(f.styleClass).toBe(true);
   expect(f.inkClass).toBe(false);

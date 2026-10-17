@@ -6499,9 +6499,9 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transition: opacity 140ms ease;
 }
 
-/* Modern atlas (S424): Seethe's lettering (style-atlas.html), a plain sans
-   over soft tints; the selectors carry the style's class, so they win over
-   the ink rules above. */
+/* Modern atlas (S424): Seethe's lettering (map-atlas.ts, h20 #6542), a plain
+   sans over soft tints, her sizes on a 12.5px base; the selectors carry the
+   style's class, so they win over the ink rules above. */
 .atlas-map-style-atlas .atlas-zone-label-ink span {
   color: #253040;
   font: 500 13px 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
@@ -6511,31 +6511,54 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 .atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-landmass span {
   color: #1a2838;
-  font-size: 18px;
+  font-size: 20px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
 }
-.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-sea span {
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-sea span,
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-lake span {
   color: #306585;
   font-style: italic;
-  font-size: 15px;
-  letter-spacing: 2px;
+  font-weight: 400;
   text-shadow: none;
 }
-.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-lake span { color: #306585; font-style: italic; }
-.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-range span {
-  color: #5a4d3a;
-  font-size: 12px;
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-sea span { font-size: 15px; letter-spacing: 1px; }
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-lake span { font-size: 12.5px; }
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-range span,
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-forest span,
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-desert span {
+  font-size: 14px;
   letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-range span { color: #5a4d3a; }
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-forest span { color: #4a5a40; }
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-desert span { color: #8a7540; letter-spacing: 2px; }
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-marsh span {
+  color: #5a5538;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 12.5px;
+}
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-territory span {
+  color: #1a2838;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 3px;
   text-transform: uppercase;
 }
 .atlas-map-style-atlas .atlas-ink-line-label {
   fill: #306585;
-  font: italic 400 11px 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
+  font: italic 400 12px 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
   letter-spacing: 1px;
   stroke: #f5efe0;
 }
-.atlas-map-style-atlas .atlas-ink-line-label.atlas-ink-road { fill: #7a3c2c; font-style: normal; }
+.atlas-map-style-atlas .atlas-ink-line-label.atlas-ink-road {
+  fill: #5a5048;
+  font: 500 11px 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
 .atlas-map-pane .atlas-map-style-atlas .leaflet-marker-pane img.leaflet-marker-icon {
   filter: grayscale(1) brightness(0.35) sepia(0.3) hue-rotate(180deg);
 }

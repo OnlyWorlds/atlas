@@ -342,6 +342,10 @@ function labelFace(el: HTMLElement): string {
   return Array.from(el.classList).filter(c => c.startsWith('atlas-zone-label') || c.startsWith('atlas-ink-')).sort().join(' ');
 }
 const zoneMetricsByEntry = new WeakMap<MapTabCacheEntry, Map<string, LabelMetrics>>();
+/** A name along a line's face: its classes, never the pass's own cull. */
+function alongFaceKey(el: globalThis.Element): string {
+  return Array.from(el.classList).filter(c => c !== LABEL_CULLED_CLASS).sort().join(' ');
+}
 
 /** One rect read of a rendered span, before any write this pass makes. */
 function calibrate(el: HTMLElement, anchor: { x: number; y: number }, origin: DOMRect): LabelMetrics | null {
@@ -447,16 +451,22 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
       if (along) alongEls.push({ id, ...along });
     }
   }
-  // One style read before any write: the face every name along a line takes.
-  let alongFont: { font: string; spacing: number; size: number } | null = null;
-  if (zonesAuto && alongEls.length > 0) {
-    const cs = getComputedStyle(alongEls[0].el);
-    const size = parseFloat(cs.fontSize) || 12;
-    alongFont = {
-      font: `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,
-      spacing: parseFloat(cs.letterSpacing) || 0,
-      size,
-    };
+  // Style reads before any write: one per face a name along a line takes
+  // (a river's italic, a road's capitals), by the text's class.
+  type AlongFace = { font: string; upper: boolean; spacing: number; size: number };
+  const alongFaces = new Map<string, AlongFace>();
+  if (zonesAuto) {
+    for (const { el } of alongEls) {
+      const key = alongFaceKey(el);
+      if (alongFaces.has(key)) continue;
+      const cs = getComputedStyle(el);
+      alongFaces.set(key, {
+        font: `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,
+        upper: cs.textTransform === 'uppercase',
+        spacing: parseFloat(cs.letterSpacing) || 0,
+        size: parseFloat(cs.fontSize) || 12,
+      });
+    }
   }
 
   const origin = entry.container.getBoundingClientRect();
@@ -568,14 +578,16 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
     }
   }
   const alongById = new Map<string, { zoneId: string; el: SVGTextElement; shares: number[] }>();
-  if (zonesAuto && alongFont && entry.zoneOverlay) {
+  if (zonesAuto && entry.zoneOverlay) {
     for (const { id, el, points } of alongEls) {
       if (!entry.zoneOverlay.isZoneVisible(id)) continue;
+      const face = alongFaces.get(alongFaceKey(el));
+      if (!face) continue;
       const text = el.textContent ?? '';
       if (fixedPinNames.has(labelNameKey(text) ?? '')) { el.classList.add(LABEL_CULLED_CLASS); continue; }
-      const textW = textWidth(text, alongFont.font) + alongFont.spacing * text.length;
+      const textW = measured(face, text);
       // The glyphs stand above the line (dy -4 in ZoneOverlay): centre the pieces there.
-      const placements = alongLabelPlacements(points, textW, alongFont.size * 0.7, 4 + alongFont.size * 0.35);
+      const placements = alongLabelPlacements(points, textW, face.size * 0.7, 4 + face.size * 0.35);
       if (placements.length === 0) { el.classList.add(LABEL_CULLED_CLASS); continue; }
       const zone = byId.get(id);
       const prioritised = zone ? Boolean(resolveStyle(rules, zone).label_priority) : false;
