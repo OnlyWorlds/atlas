@@ -6568,6 +6568,64 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   text-shadow: 0 0 3px #f5efe0, 0 0 3px #f5efe0, 0 0 2px #f5efe0;
 }
 
+/* Hatched (S425): Seethe's lettering (map-hatched.ts, h20 #6572), small caps
+   and italic as the two voices, one sepia, her sizes on a 12.5px base. EB
+   Garamond is not bundled: a reader who has it gets it, everyone else Georgia,
+   which she named as the honest fallback. */
+.atlas-map-style-hatched .atlas-zone-label-ink span {
+  color: #3a2c1a;
+  font: 400 12.5px 'EB Garamond', 'Cormorant Garamond', Garamond, Georgia, serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 0 3px #f0e9cf, 0 0 3px #f0e9cf, 0 0 2px #f0e9cf;
+}
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-landmass span {
+  color: #28220f;
+  font-size: 20px;
+  letter-spacing: 4px;
+}
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-sea span,
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-lake span,
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-marsh span {
+  font-style: italic;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-sea span { font-size: 15px; text-shadow: none; }
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-range span { font-size: 14px; }
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-desert span { font-size: 14px; letter-spacing: 3px; }
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-territory span {
+  color: #28220f;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 4px;
+}
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-road span,
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-border span { color: #5a4a30; font-size: 11px; letter-spacing: 1.5px; }
+.atlas-map-style-hatched .atlas-zone-label-ink.atlas-ink-wall span { color: #28220f; font-size: 11px; letter-spacing: 1.5px; }
+.atlas-map-style-hatched .atlas-ink-line-label {
+  fill: #28220f;
+  font: italic 400 12.5px 'EB Garamond', 'Cormorant Garamond', Garamond, Georgia, serif;
+  letter-spacing: 1px;
+  stroke: #f0e9cf;
+}
+.atlas-map-style-hatched .atlas-ink-line-label.atlas-ink-road {
+  fill: #5a4a30;
+  font: 400 11px 'EB Garamond', 'Cormorant Garamond', Garamond, Georgia, serif;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.atlas-map-pane .atlas-map-style-hatched .leaflet-marker-pane img.leaflet-marker-icon {
+  filter: grayscale(1) sepia(0.6) brightness(0.3);
+}
+.atlas-map-pane .atlas-map-style-hatched .leaflet-2d-pin-label .pin-label-text {
+  color: #28220f;
+  font: 400 12.5px 'EB Garamond', 'Cormorant Garamond', Garamond, Georgia, serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 3px #f0e9cf, 0 0 3px #f0e9cf, 0 0 2px #f0e9cf;
+}
+
 /* The density layer (S356, map-label-density.ts): a pin or zone label that
    lost its spot to a higher-ranked neighbour at this zoom. A class, not
    inline display, so it cannot fight the mode toggle (display) or the hover

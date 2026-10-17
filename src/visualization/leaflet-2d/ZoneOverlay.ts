@@ -882,6 +882,18 @@ const PATTERN_BODY: Record<InkPattern, (c: string) => string> = {
   fdots: c => `<circle cx="2" cy="2" r="0.85" fill="${c}" opacity="0.8"/><circle cx="6" cy="6" r="0.6" fill="${c}" opacity="0.6"/>`,
   dashes: c => `<line x1="1" y1="3" x2="5" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/><line x1="7" y1="3" x2="11" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/>`,
   thinhatch: c => `<line x1="0" y1="0" x2="0" y2="18" stroke="${c}" stroke-width="0.4" opacity="0.14"/>`,
+  // Seethe's hatched textures (map-hatched.ts, S425): one ink, the kind in the texture
+  rhatch: c => `<line x1="0" y1="0" x2="0" y2="6" stroke="${c}" stroke-width="0.85" opacity="0.85"/>`,
+  trees: c => `<line x1="2" y1="4" x2="2" y2="7" stroke="${c}" stroke-width="0.7" opacity="0.75"/>`
+    + `<circle cx="2" cy="3.5" r="0.7" fill="none" stroke="${c}" stroke-width="0.5" opacity="0.75"/>`
+    + `<line x1="5.5" y1="5" x2="5.5" y2="7" stroke="${c}" stroke-width="0.55" opacity="0.7"/>`
+    + `<circle cx="5.5" cy="4.5" r="0.5" fill="none" stroke="${c}" stroke-width="0.4" opacity="0.7"/>`,
+  hmarsh: c => [[1, 2, 4], [6, 2, 9], [3, 5, 6], [8, 5, 10], [0, 5, 1]]
+    .map(([x1, y, x2]) => `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${c}" stroke-width="0.5" opacity="0.75"/>`).join(''),
+  grain: c => [[2, 3, 0.4, 0.65], [7, 5, 0.35, 0.6], [4, 9, 0.4, 0.65], [10, 10, 0.35, 0.6], [9, 1, 0.3, 0.55]]
+    .map(([cx, cy, r, o]) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}" opacity="${o}"/>`).join(''),
+  crosshatch: c => `<line x1="0" y1="0" x2="0" y2="14" stroke="${c}" stroke-width="0.35" opacity="0.14"/>`
+    + `<line x1="0" y1="0" x2="14" y2="0" stroke="${c}" stroke-width="0.35" opacity="0.14"/>`,
 };
 const PATTERN_TILE: Record<InkPattern, { w: number; h: number; rotate?: number }> = {
   hatch: { w: 6, h: 6, rotate: 35 },
@@ -891,6 +903,11 @@ const PATTERN_TILE: Record<InkPattern, { w: number; h: number; rotate?: number }
   fdots: { w: 8, h: 8 },
   dashes: { w: 12, h: 6 },
   thinhatch: { w: 18, h: 18, rotate: 45 },
+  rhatch: { w: 6, h: 6, rotate: 45 },
+  trees: { w: 7, h: 7 },
+  hmarsh: { w: 10, h: 7 },
+  grain: { w: 12, h: 12 },
+  crosshatch: { w: 14, h: 14, rotate: 30 },
 };
 
 function ensureInkPattern(map: L.Map, pattern: InkPattern, color: string, bg?: string): string {

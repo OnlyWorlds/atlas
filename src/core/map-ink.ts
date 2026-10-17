@@ -38,8 +38,13 @@ export function zoneKindOf(subtype: unknown): InkKind | undefined {
   return KIND_WORDS[subtype.trim().toLowerCase()];
 }
 
-/** Pattern shapes; `fdots`, `dashes` and `thinhatch` are Seethe's modern-atlas grids (S424). */
-export type InkPattern = 'hatch' | 'stipple' | 'marsh' | 'dots' | 'fdots' | 'dashes' | 'thinhatch';
+/**
+ * Pattern shapes; `fdots`, `dashes` and `thinhatch` are Seethe's modern-atlas
+ * grids (S424), `rhatch`, `trees`, `hmarsh`, `grain` and `crosshatch` her
+ * hatched ones (S425).
+ */
+export type InkPattern = 'hatch' | 'stipple' | 'marsh' | 'dots' | 'fdots' | 'dashes' | 'thinhatch'
+  | 'rhatch' | 'trees' | 'hmarsh' | 'grain' | 'crosshatch';
 
 /** How one kind draws in one style. */
 export interface InkTreatment {
@@ -81,7 +86,7 @@ export interface MapStylePreset {
   kinds: Record<InkKind, InkTreatment>;
 }
 
-export const MAP_STYLE_IDS = ['ink', 'atlas'] as const;
+export const MAP_STYLE_IDS = ['ink', 'atlas', 'hatched'] as const;
 export type MapStyleId = typeof MAP_STYLE_IDS[number];
 
 const INK = '#3b2a1a';
@@ -141,7 +146,44 @@ const MODERN_ATLAS: MapStylePreset = {
   },
 };
 
-const PRESETS: Record<MapStyleId, MapStylePreset> = { ink: INK_ON_PARCHMENT, atlas: MODERN_ATLAS };
+/**
+ * Hatched (S425): an engraver's atlas, one sepia ink on aged paper, the kinds
+ * told apart by texture, never by hue. Seethe's table (h20 #6572, `Studio/desk/
+ * current/2026-10-17-atlas-three-styles/map-hatched.ts`); its lettering is in
+ * atlas.css under `.atlas-map-style-hatched`. Her double coast is drawn as two
+ * shore bands, so the second line runs on the sea side 5 px out (the period's
+ * water-lining) rather than inside the land. The areas take a light hand's
+ * wobble, my reading where her table is silent. Not taken: her pin ring (a pin
+ * keeps its type's icon), the wall's ticks, the sea's rhumb lines (off in her
+ * own table).
+ */
+const SEPIA = '#28220f';
+const HATCH_LAND = '#f0e9cf';
+const HATCHED: MapStylePreset = {
+  id: 'hatched',
+  name: 'Hatched',
+  sea: '#e8e2cc',
+  edge: SEPIA,
+  ink: SEPIA,
+  kinds: {
+    sea:       t('sea',       { stroke: SEPIA, weight: 1, strokeOpacity: 1, fill: '#e8e2cc', rough: 0.12, layer: 1, region: 'water' }),
+    landmass:  t('landmass',  { stroke: SEPIA, weight: 2.2, strokeOpacity: 1, fill: HATCH_LAND, rough: 0.12, layer: 2, region: 'land',
+      shore: [{ color: SEPIA, width: 10.7 }, { color: '#e8e2cc', width: 9.3 }] }),
+    lake:      t('lake',      { stroke: SEPIA, weight: 0.9, strokeOpacity: 1, fill: '#dcd6b8', rough: 0.12, layer: 3, region: 'water' }),
+    desert:    t('desert',    { stroke: SEPIA, weight: 0.4, strokeOpacity: 1, pattern: 'grain', patternBg: HATCH_LAND, rough: 0.12, layer: 4 }),
+    marsh:     t('marsh',     { stroke: SEPIA, weight: 0.4, strokeOpacity: 1, pattern: 'hmarsh', patternBg: HATCH_LAND, rough: 0.12, layer: 4 }),
+    forest:    t('forest',    { stroke: SEPIA, weight: 0.5, strokeOpacity: 1, pattern: 'trees', patternBg: HATCH_LAND, rough: 0.12, layer: 4 }),
+    range:     t('range',     { stroke: SEPIA, weight: 0.6, strokeOpacity: 1, pattern: 'rhatch', patternBg: HATCH_LAND, rough: 0.12, layer: 4 }),
+    territory: t('territory', { stroke: '#3a2c1a', weight: 0.9, strokeOpacity: 1, dash: '5, 3', pattern: 'crosshatch', rough: 0, layer: 5 }),
+    coast:     t('coast',     { stroke: SEPIA, weight: 2.2, strokeOpacity: 1, rough: 0.12, layer: 6 }),
+    river:     t('river',     { stroke: '#3a2c1a', weight: 1.3, strokeOpacity: 1, rough: 0.12, layer: 6, labelAlong: true, clipToLand: true }),
+    road:      t('road',      { stroke: '#5a4a30', weight: 0.9, strokeOpacity: 1, dash: '4, 3', rough: 0, layer: 6, labelAlong: true }),
+    wall:      t('wall',      { stroke: SEPIA, weight: 1.6, strokeOpacity: 1, rough: 0.04, layer: 6 }),
+    border:    t('border',    { stroke: '#5a4a30', weight: 1.2, strokeOpacity: 1, dash: '3, 2', rough: 0, layer: 6 }),
+  },
+};
+
+const PRESETS: Record<MapStyleId, MapStylePreset> = { ink: INK_ON_PARCHMENT, atlas: MODERN_ATLAS, hatched: HATCHED };
 
 /** A pattern's id in the renderer's defs: one per shape, colour and ground, so two styles never share a wrong one. */
 export function inkPatternId(pattern: InkPattern, color: string, bg?: string): string {

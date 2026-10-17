@@ -98,6 +98,13 @@ describe('the styles (S424: ink on parchment, modern atlas)', () => {
   it('modern atlas draws every line straight', () => {
     for (const t of Object.values(mapStylePreset('atlas')!.kinds)) expect(t.rough).toBe(0);
   });
+  it('hatched tells its kinds apart by texture, never by hue (S425)', () => {
+    const sepias = new Set(['#28220f', '#3a2c1a', '#5a4a30']);
+    const k = mapStylePreset('hatched')!.kinds;
+    for (const t of Object.values(k)) expect(sepias.has(t.patternColor ?? t.stroke)).toBe(true);
+    const areas = [k.range, k.forest, k.marsh, k.desert, k.territory];
+    expect(new Set(areas.map(t => t.pattern)).size).toBe(areas.length);
+  });
   it('a pattern in two colours is two patterns', () => {
     expect(inkPatternId('dots', '#3b2a1a')).not.toBe(inkPatternId('dots', '#9a8a6d'));
     expect(inkPatternId('dots', '#9a8a6d')).toMatch(/^[a-z0-9-]+$/i);
