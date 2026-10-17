@@ -16,6 +16,7 @@ import { getActiveStore } from '../../core/active-store';
 import { findWorld } from '../../registry/registry';
 import type { WorldMap } from '../../core/types';
 import { pickMapImageSource } from './map-image-source';
+import { mapStyleOf } from '../../core/map-ink';
 import { extractEdgeColor } from './edge-color';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 
@@ -36,7 +37,8 @@ export function sourceKey(map: WorldMap): string {
   if (s.kind === 'local') return `local:${s.mediaId}:${dims}`;
   // Flat canvas: background_color is part of the render, so an edit to it
   // must drift the key (the subscriber re-applies live).
-  return `flat:${typeof map.background_color === 'string' ? map.background_color : ''}`;
+  // The map's style paints the sea when it has no colour of its own (S423).
+  return `flat:${typeof map.background_color === 'string' ? map.background_color : ''}:${mapStyleOf(map)?.id ?? ''}`;
 }
 
 /**
@@ -84,7 +86,9 @@ export async function applyMapBackground(
     container.style.backgroundColor = '#0a0a0a';
     const leafEl = container.querySelector('.leaflet-container') as HTMLElement | null;
     if (leafEl) leafEl.style.backgroundColor = '#0a0a0a';
-    manager.setBackgroundFlat(bg);
+    const style = mapStyleOf(map);
+    if (style) manager.setBackgroundFlat(bg ?? style.sea, style.edge);
+    else manager.setBackgroundFlat(bg);
   };
 
   const applyImage = (url: string, dims: { w: number; h: number }) => {

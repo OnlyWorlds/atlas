@@ -20,6 +20,7 @@ import L from 'leaflet';
 import { storageToLeaflet } from './CoordinateUtils';
 import type { Point } from './ZoneGeometry';
 import { escapeText } from '../../core/dom-utils';
+import { inkPoints, inkMinSegment, type InkTreatment } from '../../core/map-ink';
 
 const DEFAULT_COLOR = '#22d3ee';
 const DEFAULT_OPACITY = 0.4;
@@ -71,6 +72,12 @@ export interface ZoneShape {
   weight?: number;
   /** Stroke pattern (world style rule, S356); edit mode's dash overrides. */
   dash?: 'solid' | 'dashed' | 'dotted';
+  /**
+   * The kind's treatment on a styled map (S423, `core/map-ink.ts`): it wins
+   * over colour, opacity, weight and dash. Its ink exists only on screen;
+   * the stored points are drawn plain while the zone is being edited.
+   */
+  ink?: InkTreatment;
 }
 
 interface ZoneEntry {
@@ -114,7 +121,13 @@ interface ZoneEntry {
   shape: ZoneShape;
   selected: boolean;
   visible: boolean;
+  /** Shore bands under an inked landmass (S423), non-interactive. */
+  underLayers: L.Path[];
+  /** An inked line's name along it (S423): an SVG text on the hit layer's path. */
+  labelAlong?: SVGTextElement;
 }
+
+let overlaySeq = 0;
 
 type ZoneClickHandler = (zoneId: string, event: L.LeafletMouseEvent) => void;
 type ZoneContextHandler = (zoneId: string, event: L.LeafletMouseEvent) => void;
@@ -136,11 +149,63 @@ export class ZoneOverlay {
    */
   private clickFallsThrough?: () => boolean;
 
+  /** Unique per overlay: a zone can sit on two mounted map tabs, and an id must name one path. */
+  private readonly seq = ++overlaySeq;
+
   constructor(
     private map: L.Map,
     private canvasHeight: number,
   ) {
     this.layerGroup = L.layerGroup().addTo(this.map);
+    this.map.on('zoomend', this.reinkOnZoom);
+  }
+
+  /** The ink's detail follows the zoom (about ten screen pixels a piece). */
+  private reinkOnZoom = (): void => {
+    for (const entry of this.entries.values()) {
+      if (entry.shape.ink && entry.shape.ink.rough > 0 && !entry.editing) this.setDrawnPoints(entry);
+    }
+  };
+
+  /** What the visible path draws: the ink on a styled map, the stored points otherwise and while editing. */
+  private drawnLatLngs(shape: ZoneShape, editing: boolean): L.LatLng[] {
+    const ink = shape.ink;
+    const pts = ink && ink.rough > 0 && !editing
+      ? inkPoints(shape.points, inkMinSegment(this.map.getZoom()), ink.rough, shape.mode === 'polygon')
+      : shape.points;
+    return pts.map(p => storageToLeaflet(p, this.canvasHeight));
+  }
+
+  /** The hit layer's points: stored, and left to right when a name runs along them (never upside down). */
+  private hitLatLngs(shape: ZoneShape): L.LatLng[] {
+    let pts = shape.points;
+    if (shape.ink?.labelAlong && pts.length > 1 && pts[0].x > pts[pts.length - 1].x) pts = pts.slice().reverse();
+    return pts.map(p => storageToLeaflet(p, this.canvasHeight));
+  }
+
+  private setDrawnPoints(entry: ZoneEntry): void {
+    const latLngs = this.drawnLatLngs(entry.shape, entry.editing);
+    for (const layer of [entry.visibleLayer, ...entry.underLayers]) {
+      (layer as L.Path & { setLatLngs?: (l: L.LatLng[]) => void }).setLatLngs?.(latLngs);
+    }
+  }
+
+  /**
+   * Paint order on a styled map (S423): seas, then land and its shore, then
+   * the areas on it, then the lines; names along lines on top. Zones without
+   * a kind sit between the areas and the lines.
+   */
+  applyInkOrder(plainLayer: number): void {
+    const ordered = Array.from(this.entries.values())
+      .sort((a, b) => (a.shape.ink?.layer ?? plainLayer) - (b.shape.ink?.layer ?? plainLayer));
+    for (const e of ordered) {
+      for (const u of e.underLayers) u.bringToFront();
+      e.visibleLayer.bringToFront();
+      e.hitLayer?.bringToFront();
+    }
+    for (const e of ordered) {
+      if (e.labelAlong?.parentNode) e.labelAlong.parentNode.appendChild(e.labelAlong);
+    }
   }
 
   /** Add or replace a zone shape. Idempotent — calling twice for the same id replaces. */
@@ -165,8 +230,11 @@ export class ZoneOverlay {
       patch.points !== undefined &&
       !pointsEqual(entry.shape.points, patch.points);
     const modeChanged = patch.mode !== undefined && patch.mode !== entry.shape.mode;
+    // A styled map's treatment builds layers of its own (shore bands, a name
+    // along a line): a change of treatment rebuilds, like a change of shape.
+    const inkChanged = 'ink' in patch && patch.ink !== entry.shape.ink;
 
-    if (modeChanged) {
+    if (modeChanged || inkChanged) {
       // Mode change → rebuild (different primitive: polygon vs polyline).
       this.removeZone(id);
       this.addZone(nextShape);
@@ -179,14 +247,13 @@ export class ZoneOverlay {
       // path caused (Captain smoke session 219: "in editmode, when i drag a
       // marker, the lines look a bit glitchy"). The handlers and selection
       // state stay intact since the primitive doesn't change.
-      const latLngs = patch.points.map(p => storageToLeaflet(p, this.canvasHeight));
       const layer = entry.visibleLayer as L.Path & {
         setLatLngs?: (latlngs: L.LatLng[]) => void;
       };
       if (typeof layer.setLatLngs === 'function') {
-        layer.setLatLngs(latLngs);
-        if (entry.hitLayer) entry.hitLayer.setLatLngs(latLngs);
         entry.shape = nextShape;
+        this.setDrawnPoints(entry);
+        if (entry.hitLayer) entry.hitLayer.setLatLngs(this.hitLatLngs(nextShape));
         this.applyStyle(entry);
         // Vertex dots reposition on next selection/edit state change; cheap
         // to re-show when selected.
@@ -214,10 +281,12 @@ export class ZoneOverlay {
     // the labelMarker, not just patch the icon of an existing one. Without
     // this branch, switching from 'never' → 'always' did nothing on already-
     // rendered zones (labelMarker was never created during buildEntry).
-    if (patch.labelText !== undefined || ('labelText' in patch)) {
+    if (alongLine(nextShape)) {
+      this.setLabelAlong(entry);
+    } else if (patch.labelText !== undefined || ('labelText' in patch)) {
       const desired = nextShape.labelText;
       if (desired && entry.labelMarker) {
-        entry.labelMarker.setIcon(this.buildLabelIcon(desired, nextShape.labelBelow));
+        entry.labelMarker.setIcon(this.buildLabelIcon(desired, nextShape.labelBelow, nextShape.ink));
         entry.labelMarker.setLatLng(storageToLeaflet(labelAnchorFor(nextShape), this.canvasHeight));
       } else if (desired && !entry.labelMarker) {
         entry.labelMarker = this.buildLabelMarker(nextShape);
@@ -233,9 +302,11 @@ export class ZoneOverlay {
     const entry = this.entries.get(id);
     if (!entry) return;
     this.hideVertexDots(entry);
+    for (const u of entry.underLayers) this.layerGroup.removeLayer(u);
     this.layerGroup.removeLayer(entry.visibleLayer);
     if (entry.hitLayer) this.layerGroup.removeLayer(entry.hitLayer);
     if (entry.labelMarker) this.layerGroup.removeLayer(entry.labelMarker);
+    entry.labelAlong?.remove();
     this.entries.delete(id);
   }
 
@@ -372,13 +443,14 @@ export class ZoneOverlay {
   /** Tear down — removes all layers and event subscriptions. */
   dispose(): void {
     for (const id of Array.from(this.entries.keys())) this.removeZone(id);
+    this.map.off('zoomend', this.reinkOnZoom);
     this.map.removeLayer(this.layerGroup);
   }
 
   // ----- internals -----
 
   private buildEntry(shape: ZoneShape): ZoneEntry {
-    const latLngs = shape.points.map(p => storageToLeaflet(p, this.canvasHeight));
+    const latLngs = this.drawnLatLngs(shape, false);
     const color = shape.color ?? DEFAULT_COLOR;
     const opacity = shape.opacity ?? DEFAULT_OPACITY;
 
@@ -392,6 +464,18 @@ export class ZoneOverlay {
     // dashed strokes for both polygon AND polyline (Captain smoke
     // session 219). One shared renderer per map.
     const renderer = getZoneSvgRendererForMap(this.map);
+
+    // Shore bands go in first, so they sit under the land they ring (S423).
+    const underLayers: L.Path[] = [];
+    if (shape.mode === 'polygon' && shape.ink?.shore) {
+      for (const band of shape.ink.shore) {
+        const u = L.polygon(latLngs, {
+          color: band.color, weight: band.width, opacity: 1, fill: false, interactive: false, renderer,
+        });
+        u.addTo(this.layerGroup);
+        underLayers.push(u);
+      }
+    }
 
     if (shape.mode === 'polygon') {
       visibleLayer = L.polygon(latLngs, {
@@ -410,7 +494,7 @@ export class ZoneOverlay {
         renderer,
       });
       // Invisible hit-overlay for line zones (wider click target).
-      hitLayer = L.polyline(latLngs, {
+      hitLayer = L.polyline(this.hitLatLngs(shape), {
         color: '#000000',
         weight: LINE_HIT_WEIGHT,
         opacity: 0,
@@ -421,6 +505,7 @@ export class ZoneOverlay {
 
     visibleLayer.addTo(this.layerGroup);
     hitLayer?.addTo(this.layerGroup);
+    if (shape.ink) ensureInkDefs(renderer);
 
     // Wire interaction handlers. Both the visible and hit layers forward
     // clicks to the same zone callback. Leaflet natively suppresses the
@@ -474,14 +559,48 @@ export class ZoneOverlay {
       vertexDotsSuppressed: false,
       editing: false,
       hovered: false,
+      underLayers,
     };
 
-    if (shape.labelText) {
+    if (alongLine(shape)) {
+      this.setLabelAlong(entry);
+    } else if (shape.labelText) {
       entry.labelMarker = this.buildLabelMarker(shape);
       entry.labelMarker.addTo(this.layerGroup);
     }
 
     return entry;
+  }
+
+  /**
+   * An inked line's name, written along it (S423): an SVG `<textPath>` on the
+   * hit layer's path, which runs left to right. Kept beside the paths in the
+   * zone renderer's svg; created, renamed or removed to match `labelText`.
+   */
+  private setLabelAlong(entry: ZoneEntry): void {
+    const text = entry.shape.labelText;
+    const path = (entry.hitLayer as (L.Path & { _path?: SVGPathElement }) | undefined)?._path;
+    if (!text || !path?.parentNode) {
+      entry.labelAlong?.remove();
+      entry.labelAlong = undefined;
+      return;
+    }
+    const NS = 'http://www.w3.org/2000/svg';
+    if (!path.id) path.id = `atlas-ink-line-${this.seq}-${entry.shape.id}`;
+    if (!entry.labelAlong) {
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('class', 'atlas-ink-line-label');
+      t.setAttribute('dy', '-4');
+      const tp = document.createElementNS(NS, 'textPath');
+      tp.setAttribute('href', `#${path.id}`);
+      tp.setAttribute('startOffset', '50%');
+      tp.setAttribute('text-anchor', 'middle');
+      t.appendChild(tp);
+      path.parentNode.appendChild(t);
+      entry.labelAlong = t;
+    }
+    // textContent: world text never becomes markup (conv. 93).
+    (entry.labelAlong.firstChild as SVGTextPathElement).textContent = text;
   }
 
   /**
@@ -556,6 +675,8 @@ export class ZoneOverlay {
     if (!entry) return;
     if (entry.editing === editing) return;
     entry.editing = editing;
+    // Inked: the handles sit on the stored points, so the path draws them plain while editing.
+    if (entry.shape.ink && entry.shape.ink.rough > 0) this.setDrawnPoints(entry);
     this.applyStyle(entry);
   }
 
@@ -587,6 +708,25 @@ export class ZoneOverlay {
       style.fillColor = color;
       style.fillOpacity = showShape ? (entry.hovered && !entry.selected ? Math.min(1, opacity + 0.15) : opacity) : 0;
     }
+    const ink = entry.shape.ink;
+    if (ink) {
+      // A styled map: the kind's treatment draws the zone (S423). Lit adds a
+      // pixel of ink, so a stroke-less forest still answers the cursor.
+      style.color = ink.stroke;
+      style.weight = ink.weight + (lit ? 1 : 0);
+      style.opacity = showShape ? (ink.weight > 0 ? ink.strokeOpacity : lit ? 0.6 : 0) : 0;
+      style.dashArray = entry.editing ? '5, 5' : ink.dash;
+      if (entry.shape.mode === 'polygon') {
+        const fill = ink.pattern ? `url(#atlas-ink-${ink.pattern})` : ink.fill;
+        style.fillColor = fill ?? ink.stroke;
+        style.fillOpacity = showShape && fill ? 1 : 0;
+      }
+      for (const u of entry.underLayers) u.setStyle({ opacity: showShape ? 1 : 0 });
+      if (entry.labelAlong) {
+        const shown = showShape && !(entry.shape.labelHoverOnly && !entry.hovered);
+        entry.labelAlong.style.opacity = shown ? '1' : '0';
+      }
+    }
     entry.visibleLayer.setStyle(style);
     if (entry.labelMarker) {
       const labelEl = entry.labelMarker.getElement();
@@ -605,7 +745,7 @@ export class ZoneOverlay {
         // The chip's hairline takes the zone's colour (S356): with kinds
         // coloured, a river's name reads as a river's name.
         const span = labelEl.querySelector('span') as HTMLElement | null;
-        if (span) span.style.borderColor = color;
+        if (span && !ink) span.style.borderColor = color;
       }
     }
     // Selected styling: drop-shadow glow on the SVG path + show vertex dots.
@@ -619,6 +759,7 @@ export class ZoneOverlay {
         visibleEl.classList.remove('atlas-zone-selected');
       }
       visibleEl.classList.toggle('atlas-zone-hovered', Boolean(entry.hovered && !entry.selected && showShape));
+      visibleEl.classList.toggle('atlas-zone-ink', Boolean(ink));
     }
     if (entry.selected && showShape) {
       this.showVertexDots(entry);
@@ -638,21 +779,53 @@ export class ZoneOverlay {
     const anchor = labelAnchorFor(shape);
     const latlng = storageToLeaflet(anchor, this.canvasHeight);
     return L.marker(latlng, {
-      icon: this.buildLabelIcon(shape.labelText ?? '', shape.labelBelow),
+      icon: this.buildLabelIcon(shape.labelText ?? '', shape.labelBelow, shape.ink),
       interactive: false,
       keyboard: false,
     });
   }
 
-  private buildLabelIcon(text: string, below?: boolean): L.DivIcon {
+  private buildLabelIcon(text: string, below?: boolean, ink?: InkTreatment): L.DivIcon {
     const safe = escapeText(text);
     return L.divIcon({
-      className: 'atlas-zone-label' + (below ? ' atlas-zone-label-below' : ''),
+      className: 'atlas-zone-label' + (below ? ' atlas-zone-label-below' : '')
+        + (ink ? ` atlas-zone-label-ink atlas-ink-${ink.kind}` : ''),
       html: `<span>${safe}</span>`,
       iconSize: undefined as unknown as L.PointExpression,
       iconAnchor: [0, 0] as L.PointTuple,
     });
   }
+}
+
+/** An inked line whose kind writes its name along it (rivers, roads). */
+function alongLine(shape: ZoneShape): boolean {
+  return shape.mode === 'line' && Boolean(shape.ink?.labelAlong);
+}
+
+/**
+ * The fill patterns a styled map uses (S423), once per zone renderer's svg.
+ * `userSpaceOnUse` puts them in the renderer's layer-pixel space, which a pan
+ * does not move: the hatch travels with its shape and stays the same size on
+ * screen at every zoom. Two mounted maps carry identical copies under the
+ * same ids, so whichever one a `url(#…)` resolves to draws the same.
+ */
+function ensureInkDefs(renderer: L.Renderer): void {
+  const svg = (renderer as L.Renderer & { _container?: SVGSVGElement })._container;
+  if (!svg || svg.querySelector('defs[data-atlas-ink]')) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  const defs = document.createElementNS(NS, 'defs');
+  defs.setAttribute('data-atlas-ink', '');
+  const ink = '#3b2a1a';
+  defs.innerHTML = `
+    <pattern id="atlas-ink-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(35)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="${ink}" stroke-width="1.1" stroke-opacity="0.75"/></pattern>
+    <pattern id="atlas-ink-stipple" patternUnits="userSpaceOnUse" width="9" height="9">
+      <circle cx="2" cy="2" r="1.1" fill="#4a5a2e"/><circle cx="6.5" cy="6" r="0.9" fill="#4a5a2e"/></pattern>
+    <pattern id="atlas-ink-marsh" patternUnits="userSpaceOnUse" width="14" height="8">
+      <line x1="1" y1="4" x2="7" y2="4" stroke="${ink}" stroke-width="0.9"/><line x1="8" y1="8" x2="12" y2="8" stroke="${ink}" stroke-width="0.9"/></pattern>
+    <pattern id="atlas-ink-dots" patternUnits="userSpaceOnUse" width="12" height="12">
+      <circle cx="3" cy="3" r="0.8" fill="${ink}"/><circle cx="9" cy="9" r="0.8" fill="${ink}"/></pattern>`;
+  svg.prepend(defs);
 }
 
 /** Where a zone's label anchors: bottom-centre when `labelBelow`, else the

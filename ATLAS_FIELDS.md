@@ -25,6 +25,7 @@
 | `atlas_opacity` | Zone | fill opacity, 0..1 | no, visual preference |
 | `atlas_label_visible` | Zone | whether the zone label renders | no, visual preference |
 | `atlas_shape` | Zone | `'polygon' \| 'line'` | **yes**: this is geometry, not a preference |
+| `atlas_map_style` | Map | the map's style (`'ink'`, ink on parchment): its zones draw from their kinds, read from the subtype (S423, `src/core/map-ink.ts`); absent means plain | no, presentation |
 | `atlas_calendar` | Construct (supertype `calendar` by convention) | the calendar's machine config, a nested object; DETECTION keys on this field's presence, never the supertype | maybe, once calendars prove out across tools |
 
 Before the v2 port (2026-07-12) the zone visuals were local-only because the old server refused unknown fields; under keel they sync, so two devices converge on zone styling. DESIGN_ZONES §5 and DESIGN_CHARTS "Calendars" hold their design.

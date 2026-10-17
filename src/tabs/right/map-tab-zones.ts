@@ -20,6 +20,7 @@ import {
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { scheduleLabelDensity } from './map-label-density';
 import { resolveStyle, groupByKind } from '../../core/world-styles';
+import { mapStyleOf, zoneKindOf, PLAIN_ZONE_LAYER, type MapStylePreset, type InkTreatment } from '../../core/map-ink';
 import { renderZonePanel, wireZonePanel } from './map-zone-panel';
 import type { Zone } from '../../core/types';
 import { getActiveStore } from '../../core/active-store';
@@ -41,6 +42,9 @@ export function syncZones(entry: MapTabCacheEntry): void {
   const present = new Set<string>();
   const prefs = getEffectiveMapPrefs(entry.mapId);
   const rules = state.styles.rules;
+  // A map drawn from its own zones (S423): the map's style gives each zone
+  // whose subtype names a kind that kind's treatment; the rest draw plain.
+  const preset = mapStyleOf(state.data.elements.find(e => e.id === entry.mapId));
 
   for (const zone of onThisMap) {
     present.add(zone.id);
@@ -64,6 +68,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
     const labelText = labelMode === 'never' ? undefined : zone.name;
     const labelHoverOnly = labelMode === 'hover';
 
+    const ink = preset ? kindTreatment(preset, zone) : undefined;
     entry.zoneOverlay.addZone({
       id: zone.id,
       mode,
@@ -72,11 +77,14 @@ export function syncZones(entry: MapTabCacheEntry): void {
       opacity,
       labelText,
       labelHoverOnly,
-      labelBelow: prefs.zone_label_position === 'below',
+      // On a styled map an area's name is lettering inside it, not a chip under it.
+      labelBelow: prefs.zone_label_position === 'below' && !ink,
       weight: style.weight,
       dash: style.dash,
+      ink,
     });
   }
+  if (preset) entry.zoneOverlay.applyInkOrder(PLAIN_ZONE_LAYER);
 
   // Remove overlay entries that are no longer on this map. Iterate the
   // OVERLAY's known ids (ZD2 fix) — iterating `zones` from state was wrong
@@ -126,6 +134,11 @@ function applyZoneVisibility(entry: MapTabCacheEntry, onThisMap: Zone[]): void {
 export function refreshZoneDates(entry: MapTabCacheEntry): void {
   const { zones, markers } = partitionZonesAndMarkers(getState().data.elements);
   applyZoneVisibility(entry, listZonesOnMap(entry.mapId, markers, zones));
+}
+
+function kindTreatment(preset: MapStylePreset, zone: Zone): InkTreatment | undefined {
+  const kind = zoneKindOf(zone.subtype);
+  return kind ? preset.kinds[kind] : undefined;
 }
 
 function zoneEffectiveOpacity(zone: Zone, mapDefault: number): number {

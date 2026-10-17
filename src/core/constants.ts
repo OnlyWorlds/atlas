@@ -195,6 +195,9 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
   'atlas_opacity',
   'atlas_label_visible',
   'atlas_shape',
+  // A map's style (S423, `core/map-ink.ts`): 'ink' draws its zones from their
+  // kinds. Synced, so a collaborator opens the map in the same register.
+  'atlas_map_style',
   // Calendar config (2B, design 2026-07-14): the machine structure of a
   // calendar Construct (supertype 'calendar' by convention; DETECTION keys on
   // this field's presence, never the supertype). A nested JSON object — the

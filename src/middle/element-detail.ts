@@ -26,6 +26,7 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { buildCustomFieldsSection, pendingCustomFieldEdit } from './element-detail-custom-fields';
 import { buildMapLocalImageRow } from './element-detail-map-image';
+import { buildMapStyleRow } from './element-detail-map-style';
 import { buildPictureUploadRow, buildPictureLaterRow, pictureLaterWorld, pictureWorld } from './element-detail-picture';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildWarRecordSection } from './element-detail-war-record';
@@ -248,6 +249,11 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const urlRow = detail.querySelector('[data-field="image_url"]');
       if (urlRow) urlRow.insertAdjacentElement('afterend', row);
       else detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
+      // "Map style" (S423) goes under the Background colour it can stand in for.
+      const styleRow = buildMapStyleRow(el as import('../core/types').WorldMap, toastManager);
+      const bgRow = detail.querySelector('[data-field="background_color"]');
+      if (bgRow) bgRow.insertAdjacentElement('afterend', styleRow);
+      else row.insertAdjacentElement('afterend', styleRow);
     }
 
     // "Upload picture" (#154): under the image_url row, only in an online

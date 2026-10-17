@@ -6450,6 +6450,42 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transform: translate(-50%, 6px);
 }
 
+/* A map drawn from its own zones (S423, core/map-ink.ts): on a styled map the
+   names are lettering on the drawing, not chips over it. The colours are the
+   style's ink and paper, part of the picture like its patterns, so they do
+   not follow the app theme (conv. 90's canvas side). */
+.atlas-zone-label-ink span {
+  padding: 0;
+  background: none;
+  border: none;
+  color: #3b2a1a;
+  font: italic 600 13px 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  text-shadow: 0 0 3px #f3ead2, 0 0 3px #f3ead2, 0 0 2px #f3ead2;
+}
+.atlas-zone-label-ink.atlas-ink-landmass span,
+.atlas-zone-label-ink.atlas-ink-sea span {
+  font-size: 17px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+.atlas-zone-label-ink.atlas-ink-sea span { opacity: 0.6; }
+.atlas-zone-label-ink.atlas-ink-range span {
+  font: 600 11px 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.atlas-ink-line-label {
+  fill: #3b2a1a;
+  font: italic 600 12px 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  letter-spacing: 2px;
+  paint-order: stroke;
+  stroke: #f3ead2;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
 /* The density layer (S356, map-label-density.ts): a pin or zone label that
    lost its spot to a higher-ranked neighbour at this zoom. A class, not
    inline display, so it cannot fight the mode toggle (display) or the hover
@@ -7676,6 +7712,12 @@ svg .atlas-zone-selected {
    click, a lighter glow than selection. Weight and fill ride applyStyle. */
 svg .atlas-zone-hovered {
   filter: drop-shadow(0 0 3px rgba(var(--atlas-accent-rgb), 0.6));
+}
+
+/* On a styled map (S423) a hover darkens the ink instead of glowing cyan;
+   a selection keeps the accent, since it is the app speaking, not the map. */
+svg .atlas-zone-ink.atlas-zone-hovered {
+  filter: drop-shadow(0 0 2px rgba(59, 42, 26, 0.55));
 }
 
 /* ============================================================

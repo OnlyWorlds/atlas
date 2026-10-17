@@ -15,6 +15,8 @@
 
 import { BaseModal } from './modal-base';
 import { escapeAttr } from '../core/dom-utils';
+// The kinds a styled map draws (S423): offered, never required.
+import { ZONE_KIND_WORDS } from '../core/map-ink';
 
 export type ZoneShape = 'polygon' | 'line';
 
@@ -82,9 +84,11 @@ class ZoneCreateModal extends BaseModal {
             id="zone-create-subtype"
             class="atlas-input"
             data-role="zone-create-subtype"
-            placeholder="E.g. forest, road, plaza…"
+            placeholder="E.g. Landmass, River, Forest…"
             autocomplete="off"
+            list="zone-create-kinds"
           />
+          <datalist id="zone-create-kinds">${ZONE_KIND_WORDS.map(w => `<option value="${w}"></option>`).join('')}</datalist>
         </div>
 
         <div class="atlas-modal-error" data-role="zone-create-error" hidden></div>
