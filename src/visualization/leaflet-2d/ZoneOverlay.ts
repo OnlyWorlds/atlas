@@ -18,7 +18,7 @@
 
 import L from 'leaflet';
 import { storageToLeaflet } from './CoordinateUtils';
-import type { Point } from './ZoneGeometry';
+import { poleOfInaccessibility, type Point } from './ZoneGeometry';
 import { escapeText } from '../../core/dom-utils';
 import { inkPoints, inkMinSegment, type InkTreatment } from '../../core/map-ink';
 
@@ -838,6 +838,9 @@ function labelAnchorFor(shape: ZoneShape): Point {
   // small CSS below-nudge keeps it reading against the line itself. Polygons
   // keep the below/centroid choice.
   if (shape.mode === 'line') return lineMidAnchor(shape.points);
+  // On a styled map an area's name is lettering inside it (S423): the point
+  // farthest from its outline, which a bay or a crescent cannot push outside.
+  if (shape.ink) return poleOfInaccessibility(shape.points);
   if (shape.labelBelow) return bottomCenter(shape.points);
   return centroid(shape.points);
 }

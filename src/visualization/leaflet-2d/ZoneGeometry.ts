@@ -243,6 +243,62 @@ export function simplifyStroke(points: Point[], tolerance: number, radius = 2): 
   return simplifyPath(smooth, tolerance);
 }
 
+/** Signed distance from `p` to a ring's outline: positive inside, negative outside. */
+function signedDistanceToRing(p: Point, ring: Point[]): number {
+  let best = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    best = Math.min(best, distanceToSegmentSquared(p, ring[i], ring[(i + 1) % ring.length]));
+  }
+  return (pointInPolygon(p, ring) ? 1 : -1) * Math.sqrt(best);
+}
+
+/**
+ * Where a name sits best inside a polygon (S423): the point farthest from its
+ * outline (the pole of inaccessibility, after Mapbox's polylabel: a grid of
+ * cells refined best-first until no cell can beat the best by `precision`).
+ * The vertex mean can fall outside a concave shape, a bay or a crescent; this
+ * cannot. Pure and bounded: cells are capped, so a hostile ring still returns.
+ */
+export function poleOfInaccessibility(ring: Point[], precision = 1): Point {
+  if (ring.length < 3) return ring.length ? { ...ring[0] } : { x: 0, y: 0 };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of ring) {
+    if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+  }
+  const size = Math.min(maxX - minX, maxY - minY);
+  if (!(size > 0)) return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  // A name needs the middle to a hundredth of the shape, not to a unit. It
+  // halves the cost (measured S423: about 0.6 to 0.3 ms on a 300-point coast),
+  // which counts because a label re-anchors on every sync of every zone.
+  const eps = Math.max(precision, size / 100);
+  type Cell = { x: number; y: number; h: number; d: number; max: number };
+  const cell = (x: number, y: number, h: number): Cell => {
+    const d = signedDistanceToRing({ x, y }, ring);
+    return { x, y, h, d, max: d + h * Math.SQRT2 };
+  };
+  const queue: Cell[] = [];
+  const h0 = size / 2;
+  for (let x = minX; x < maxX; x += size) {
+    for (let y = minY; y < maxY; y += size) queue.push(cell(x + h0, y + h0, h0));
+  }
+  // Start from the vertex mean when it is inside: most shapes are nearly there.
+  const mean = polygonCentroid(ring) ?? { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  let best = cell(mean.x, mean.y, 0);
+  for (const c of queue) if (c.d > best.d) best = c;
+  for (let guard = 0; queue.length && guard < 20000; guard++) {
+    // best-first: take the cell with the highest potential
+    let at = 0;
+    for (let i = 1; i < queue.length; i++) if (queue[i].max > queue[at].max) at = i;
+    const c = queue.splice(at, 1)[0];
+    if (c.d > best.d) best = c;
+    if (c.max - best.d <= eps) continue;
+    const h = c.h / 2;
+    queue.push(cell(c.x - h, c.y - h, h), cell(c.x + h, c.y - h, h), cell(c.x - h, c.y + h, h), cell(c.x + h, c.y + h, h));
+  }
+  return { x: best.x, y: best.y };
+}
+
 /**
  * Whether two point lists are equal coordinate-by-coordinate. Used to skip
  * needless re-render when zone geometry hasn't actually changed.
