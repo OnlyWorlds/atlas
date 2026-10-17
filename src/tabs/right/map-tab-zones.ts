@@ -85,6 +85,8 @@ export function syncZones(entry: MapTabCacheEntry): void {
     });
   }
   if (preset) entry.zoneOverlay.applyInkOrder(PLAIN_ZONE_LAYER);
+  // The pins read the style from the container (CSS: inked icons, lettered names).
+  entry.container.classList.toggle('atlas-map-ink', Boolean(preset));
 
   // Remove overlay entries that are no longer on this map. Iterate the
   // OVERLAY's known ids (ZD2 fix) — iterating `zones` from state was wrong

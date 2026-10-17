@@ -3499,6 +3499,19 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   pointer-events: none;
 }
 
+/* Pins on a styled map (S423): the type's icon stays (it carries the type),
+   printed in the map's ink; the name is lettering on the paper, not a chip. */
+.atlas-map-pane .atlas-map-ink .leaflet-marker-pane img.leaflet-marker-icon {
+  filter: grayscale(1) sepia(0.5) brightness(0.45) contrast(1.4);
+}
+.atlas-map-pane .atlas-map-ink .leaflet-2d-pin-label .pin-label-text {
+  padding: 0;
+  background: none;
+  color: #3b2a1a;
+  font: italic 600 12px 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  text-shadow: 0 0 3px #f3ead2, 0 0 3px #f3ead2, 0 0 2px #f3ead2;
+}
+
 .atlas-pin-tooltip {
   position: absolute;
   z-index: 800;
