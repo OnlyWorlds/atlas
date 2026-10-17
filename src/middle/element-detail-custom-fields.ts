@@ -39,6 +39,11 @@ const MAX_FIELD_NAME_LEN = 60;
  */
 let pendingEdit: { elementId: string; fieldName: string } | null = null;
 
+/** The pending edit, for the page's rebuild gate: a request is an input to the next render. */
+export function pendingCustomFieldEdit(): string | null {
+  return pendingEdit ? `${pendingEdit.elementId}|${pendingEdit.fieldName}` : null;
+}
+
 /**
  * Custom-field rows for an element: non-machinery extension keys, null =
  * deleted (hidden). SCALAR values only — object/array values are STRUCTURED

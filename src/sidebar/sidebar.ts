@@ -24,6 +24,7 @@ import { mountElementsBody } from './elements-sidebar';
 import { mountWritingBody } from './writing-sidebar';
 import { ToastManager } from '../ui/toast-manager';
 import { escapeText } from '../core/dom-utils';
+import { renderGate } from '../ui/render-gate';
 
 /**
  * Effective sidebar body — accounts for the writing-room takeover. When the
@@ -109,12 +110,8 @@ export function mountSidebar(mount: SidebarMount): () => void {
   // Rebuilt only when it would come out different (conv. 146, S421): a
   // rebuild between a press and its release loses the click. Its handlers
   // read state at the click, so the key is what it draws.
-  let toggleKey: string | null = null;
-  const toggleUnchanged = (key: string): boolean => {
-    if (key === toggleKey) return true;
-    toggleKey = key;
-    return false;
-  };
+  const toggleGate = renderGate();
+  const toggleUnchanged = (key: string): boolean => !toggleGate.changed([key]);
   function renderToggle(): void {
     const route = parseHash(window.location.hash);
     const mode = getState().ui.sidebarMode;

@@ -34,6 +34,7 @@ import { renderWorldTab, wireWorldTab } from './settings-world';
 import { renderWritingTab, wireWritingTab } from './settings-writing';
 import { renderContextTab, wireContextTab } from './settings-context';
 import pkg from '../../package.json';
+import { renderGate } from '../ui/render-gate';
 
 export interface SettingsMount {
   target: HTMLElement;
@@ -78,6 +79,8 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     try { localStorage.setItem(SETTINGS_LAST_TAB_KEY, t); } catch { /* private mode */ }
   }
 
+  const gate = renderGate();
+
   function render(): void {
     const state = getState();
     const tab = activeTab();
@@ -89,7 +92,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     const activeWorldId = state.active?.worldId;
     const activeWorld = activeWorldId ? reg.worlds.find((w) => w.id === activeWorldId) : undefined;
 
-    root.innerHTML = `
+    const html = `
       <header class="atlas-room-header">
         <h1>Settings</h1>
         <p class="atlas-room-subtitle">Atlas preferences and this world's configuration.</p>
@@ -125,6 +128,13 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
         </section>
       </div>
     `;
+    // Rebuilt only when it would come out different (conv. 146, S422): a
+    // rebuild between a press and its release loses the click. The tabs read
+    // state kept outside the store (a key being made, sync issues, the invite
+    // list), so the part is the markup itself, plus the world entry the
+    // handlers capture at render.
+    if (!gate.changed([html, activeWorld])) return;
+    root.innerHTML = html;
 
     wireTabClicks();
     wireReplayChip();
@@ -177,8 +187,15 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
 
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
+  // Waypoints live outside the store: the OnlyWorlds tab's count moves on
+  // their own event (S422; it used to wait for the next unrelated redraw).
+  document.addEventListener('atlas:waypoints-changed', render);
   render();
-  return () => { unsubState(); unsubHash(); };
+  return () => {
+    unsubState();
+    unsubHash();
+    document.removeEventListener('atlas:waypoints-changed', render);
+  };
 }
 
 /** Tab display label — 'onlyworlds' is the brand name, the rest sentence-case. */

@@ -32,6 +32,7 @@ import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
 import { filesWhereOf } from '../../core/browser-worlds';
 import { SEAT_SECRET_MISSING_LINE } from '../../core/seat';
+import { renderGate } from '../../ui/render-gate';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -183,7 +184,20 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     }
   }
 
+  // Rebuilt only when it would come out different (conv. 146, S422): a
+  // rebuild between a press and its release loses the click. The handlers
+  // capture each tab and its index, which the key holds; the rest they read
+  // at the click.
+  const tabBarGate = renderGate();
+
   function renderTabBar(tabs: RightTabRef[], activeIndex: number): void {
+    const elements = getState().data.elements;
+    const drawn = tabs.map((t) => {
+      if (t.kind !== 'map') return [t.kind];
+      const m = elements.find(e => e.type === 'map' && e.id === t.mapId);
+      return [t.kind, t.mapId, t.label ?? null, !!m, m?.name ?? null];
+    });
+    if (!tabBarGate.changed([JSON.stringify([activeIndex, drawn])])) return;
     tabBar.innerHTML = '';
     tabs.forEach((tab, idx) => {
       const btn = document.createElement('button');
@@ -311,6 +325,20 @@ function closeMapTab(idx: number, mapId: string): void {
  *   (SyncEngineState.kind): idle→synced, syncing→saving, paused→offline, error→error.
  *   Falls back to `linked` if no engine state has reported yet.
  */
+/**
+ * The pill's inside is rewritten only when it would come out different (conv.
+ * 146, S422): a badge rebuilt between a press and its release handed the click
+ * to the pill, which refreshed instead of opening the review. The pill itself
+ * persists; the world is a part because the badges' listeners capture it.
+ * Returns whether it wrote.
+ */
+const pillGate = renderGate();
+function writePill(pill: HTMLElement, html: string, worldId: string | null): boolean {
+  if (!pillGate.changed([html, worldId])) return false;
+  pill.innerHTML = html;
+  return true;
+}
+
 function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastManager): void {
   let pill = document.querySelector<HTMLElement>('[data-role="sync-pill"]');
   if (!pill) {
@@ -323,6 +351,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     // that bypass the shell, etc.).
     const target = document.querySelector('.atlas-sidebar-footer') ?? document.body;
     target.appendChild(pill);
+    pillGate.reset();
   }
   // Schedule a periodic tick so "synced 3m ago" ages naturally. State doesn't
   // re-render on its own; we just re-run this function from a 30s interval.
@@ -332,7 +361,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const active = state.active;
   if (!active) {
     pill.dataset.state = 'none';
-    pill.innerHTML = '';
+    writePill(pill, '', null);
     pill.removeAttribute('data-clickable');
     return;
   }
@@ -343,10 +372,10 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     pill.title = filesWhereOf(entry) === 'browser'
       ? 'Local world: kept in this browser'
       : 'Local world: the folder is the source of truth';
-    pill.innerHTML = `
+    writePill(pill, `
       <span class="atlas-sync-pill-dot"></span>
       <span>Local</span>
-    `;
+    `, active.worldId);
     pill.removeAttribute('data-clickable');
     return;
   }
@@ -358,12 +387,12 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     pill.dataset.state = 'view';
     pill.dataset.clickable = 'true';
     pill.title = "View-only world: you can read everything, edit nothing · click to refresh";
-    pill.innerHTML = `
+    writePill(pill, `
       <span class="atlas-sync-pill-dot"></span>
       <span class="material-symbols-outlined atlas-sync-pill-eye">visibility</span>
       <span>View only</span>
       <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds">refresh</span>
-    `;
+    `, active.worldId);
     const refreshView = async (): Promise<void> => {
       try {
         const result = await pullNowAndRefresh();
@@ -405,14 +434,16 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const issueBadge = issueCount > 0
     ? `<span class="atlas-sync-pill-conflict atlas-sync-pill-issues" data-role="sync-issues" title="${issueCount} change${issueCount === 1 ? '' : 's'} not syncing · click to see why">⚠ ${issueCount}</span>`
     : '';
-  pill.innerHTML = `
+  // The badges' listeners go on with the markup that made them; a skipped
+  // write keeps both (conv. 146).
+  const wrote = writePill(pill, `
     <span class="atlas-sync-pill-dot"></span>
     <span>${label}</span>
     ${conflictBadge}
     ${issueBadge}
     <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds">refresh</span>
-  `;
-  pill.querySelector<HTMLElement>('[data-role="sync-issues"]')?.addEventListener('click', (e) => {
+  `, active.worldId);
+  if (wrote) pill.querySelector<HTMLElement>('[data-role="sync-issues"]')?.addEventListener('click', (e) => {
     e.stopPropagation();
     navigate(settingsHash(active.worldId, 'world'));
   });
@@ -435,7 +466,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
 
   // Conflict badge click — open the review modal. Caller stops propagation
   // so the pill's parent click handler doesn't fire a refresh.
-  pill.querySelector<HTMLElement>('[data-role="review-conflicts"]')?.addEventListener('click', (e) => {
+  if (wrote) pill.querySelector<HTMLElement>('[data-role="review-conflicts"]')?.addEventListener('click', (e) => {
     e.stopPropagation();
     void new ConflictReviewModal(toasts).open().then(() => refreshConflictsCount());
   });

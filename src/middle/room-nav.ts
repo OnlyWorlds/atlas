@@ -29,6 +29,7 @@ import { isDrawerOpen, onNarrowChange, toggleDrawer, type DrawerName } from '../
 import { ELEMENT_ICONS } from '../core/constants';
 import { elementHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
+import { renderGate } from '../ui/render-gate';
 
 interface RoomDef {
   id: RouteMode | 'home' | 'writing' | 'knowledge' | 'timeline' | 'search' | 'share' | 'import' | 'templates' | 'settings';
@@ -169,12 +170,10 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
   // S421): a rebuild between a press and its release loses the click. The key
   // holds everything the strip draws and everything its handlers capture at
   // render (the world, the selected element); the rest is read at the click.
-  let stripKey: string | null = null;
+  const stripGate = renderGate();
 
   function renderPreview(): void {
-    const key = `preview|${isDrawerOpen('sidebar')}`;
-    if (key === stripKey) return;
-    stripKey = key;
+    if (!stripGate.changed([`preview|${isDrawerOpen('sidebar')}`])) return;
     strip.innerHTML = '';
     strip.classList.add('is-preview');
     // The sidebar toggle belongs here too (S366): with no world open the
@@ -229,10 +228,8 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     const settling = wasPreview && !labelsOn;
     const selected = getState().ui.selectedElementId;
     const selectedEl = selected ? getState().data.elements.find(e => e.id === selected) : undefined;
-    const key = JSON.stringify([worldId, route.mode, labelsOn, settling, selected,
-      selectedEl?.name ?? null, selectedEl?.type ?? null, isDrawerOpen('sidebar'), isDrawerOpen('right')]);
-    if (key === stripKey) return;
-    stripKey = key;
+    if (!stripGate.changed([JSON.stringify([worldId, route.mode, labelsOn, settling, selected,
+      selectedEl?.name ?? null, selectedEl?.type ?? null, isDrawerOpen('sidebar'), isDrawerOpen('right')])])) return;
     wasPreview = false;
     strip.innerHTML = '';
     strip.classList.remove('is-preview');

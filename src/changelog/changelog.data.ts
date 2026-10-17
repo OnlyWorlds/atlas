@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.51.5',
+    date: '2026-10-17',
+    theme: 'A click that lands, on the page and in Settings',
+    entries: [
+      {
+        id: 'page-click-kept',
+        title: 'A click on an element\'s page, in Settings or on the right pane\'s tabs is no longer lost',
+        body: 'These were redrawn whenever anything changed, even a sync step that changed nothing they show, and a click that fell across a redraw did nothing. They now redraw only when what they show changes.',
+        tags: ['fix'],
+      },
+      {
+        id: 'sync-badge-click-kept',
+        title: 'A click on a sync badge opens what it says',
+        body: 'A click on the conflicts or not-syncing badge on the sync pill could land on the pill instead and refresh from OnlyWorlds. It now opens the review, or Settings.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.51.4',
     date: '2026-10-17',
     theme: 'A click that lands, along the top',

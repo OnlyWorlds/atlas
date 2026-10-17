@@ -24,15 +24,16 @@ import { toastManager } from '../ui/toast-manager';
 import { sectionsFor } from '../editor/field-schema';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { buildZoneSections } from './element-detail-zone-sections';
-import { buildCustomFieldsSection } from './element-detail-custom-fields';
+import { buildCustomFieldsSection, pendingCustomFieldEdit } from './element-detail-custom-fields';
 import { buildMapLocalImageRow } from './element-detail-map-image';
 import { buildPictureUploadRow, buildPictureLaterRow, pictureLaterWorld, pictureWorld } from './element-detail-picture';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
-import { renderHeader, isEditingIn } from './element-detail-header';
+import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-detail-header';
 import { renderElementImage } from '../ui/element-image';
+import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
 
 /**
@@ -100,8 +101,20 @@ export function mountElementDetail(target: HTMLElement): () => void {
   };
   target.addEventListener('focusout', onFocusOut);
 
+  // Rebuilt only when an input moved (conv. 146, S422): a rebuild between a
+  // press and its release loses the click, and the page subscribes to every
+  // store patch (each sync step patches `sync`, which nothing here reads).
+  // The parts are every slice the page and its builders read, the route, the
+  // tour's two switches and the two pending edit requests.
+  const gate = renderGate();
+
   function render(): void {
     if (isEditingIn(target)) { renderDeferred = true; return; }
+    const s = getState();
+    const touring = isTourFlagActive();
+    if (!gate.changed([window.location.hash, s.active, s.data, s.ui, s.registry, s.styles, touring,
+      touring && document.body.classList.contains('atlas-tour-basefull'),
+      pendingInlineNameEdit(), pendingCustomFieldEdit()])) return;
     captureScrollBeforeRender();
     target.innerHTML = '';
     const state = getState();

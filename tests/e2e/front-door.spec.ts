@@ -242,15 +242,31 @@ test('a click on a world row survives a sidebar re-render between press and rele
   await expect.poll(() => page.evaluate(() => window.location.hash)).not.toBe('#/');
 });
 
-/** Press on `selector`, re-render everything that listens to the hash, release. */
+/**
+ * Press on `selector`, re-render everything that listens to the hash or the
+ * store (a sync publish patches the `sync` slice on every engine step), release.
+ */
 async function clickAcrossRerender(page: Page, selector: string): Promise<void> {
   const target = page.locator(selector).first();
   await expect(target).toBeVisible();
+  // The target sits still first: the strip's opening settle rebuilds it, takes
+  // its labels off and slides every room left (by design, 420 ms, later under
+  // load), and a press across it is released over another spot.
+  await expect.poll(async () => {
+    const a = JSON.stringify(await target.boundingBox());
+    await page.waitForTimeout(250);
+    return a !== 'null' && a === JSON.stringify(await target.boundingBox());
+  }).toBe(true);
+  await target.scrollIntoViewIfNeeded(); // a raw mouse press lands only on what is in the viewport
   await page.waitForTimeout(500); // the route's own re-renders settle; only ours lands inside the click
   const box = (await target.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent('hashchange')));
+  await page.evaluate(() => {
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    const api = (window as any).__atlasTestApi;
+    api.patchSlice('sync', { ...api.getState().sync });
+  });
   await page.mouse.up();
 }
 
@@ -274,6 +290,87 @@ test('a click on the sidebar mode toggle survives a re-render between press and 
   const other = before === 'worlds' ? 'mode-elements' : 'mode-worlds';
   await clickAcrossRerender(page, `[data-action="${other}"]`);
   await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().ui.sidebarMode)).not.toBe(before);
+});
+
+// Row 3: the element page, where most of a world's editing happens.
+test('a click on the element page survives a re-render between press and release', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-12');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/element/00000000-0000-4000-8000-0000000000a1`; });
+  const toggle = page.locator('.atlas-empty-fields-toggle button');
+  const before = await toggle.getAttribute('data-action');
+  await clickAcrossRerender(page, '.atlas-empty-fields-toggle button');
+  await expect(toggle).not.toHaveAttribute('data-action', before!);
+});
+
+// Row 4: the settings room's tabs. From General: the OnlyWorlds tab's waypoint
+// count moves on its own when a waypoint lands, a real change, not the class.
+test('a click on a settings tab survives a re-render between press and release', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-13');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/settings/general`; });
+  await clickAcrossRerender(page, '.atlas-settings-tab[data-settings-tab="storage"]');
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('storage');
+});
+
+// Waypoints live outside the store, so Settings redraws on their own event:
+// with redraws keyed (1.51.5), nothing else would show a new count.
+test('the OnlyWorlds tab\'s waypoint count moves when a waypoint lands', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-16');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/settings/onlyworlds`; });
+  const count = page.locator('.atlas-ow-waypoints-count');
+  await expect(count).toBeVisible();
+  await page.waitForTimeout(500);
+  const total = Number((await count.textContent())!.split(' of ')[1]);
+  await page.evaluate(() => {
+    const raw = localStorage.getItem('atlas_waypoints_v1');
+    const s = raw ? JSON.parse(raw) : { completed: {} };
+    s.completed = s.completed ?? {};
+    document.querySelectorAll('[data-waypoint]').forEach((el) => { s.completed[(el as HTMLElement).dataset.waypoint!] = new Date().toISOString(); });
+    localStorage.setItem('atlas_waypoints_v1', JSON.stringify(s));
+    document.dispatchEvent(new CustomEvent('atlas:waypoints-changed'));
+  });
+  await expect(count).toHaveText(`${total} of ${total}`);
+});
+
+// Row 5: the right pane's tab bar, and the badges on the sync pill, where a
+// click across a redraw fell to the pill and refreshed instead.
+test('a click on a right pane tab survives a re-render between press and release', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-14');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  const before = await page.evaluate(() => (window as any).__atlasTestApi.getState().ui.rightActiveIndex);
+  const other = await page.evaluate((b) => (window as any).__atlasTestApi.getState().ui.rightTabs.findIndex((_: unknown, i: number) => i !== b), before);
+  await clickAcrossRerender(page, `.atlas-tab[data-tab-index="${other}"]`);
+  await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().ui.rightActiveIndex)).toBe(other);
+});
+
+test('a click on the sync pill\'s conflict badge stays on the badge across a re-render', async ({ page }) => {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, 'agent-world-15');
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  // The pill's linked branch with two conflicts (no server: the UI branch only).
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const s = api.getState();
+    const worlds = s.registry.worlds.map((w: any) => w.id === s.active.worldId
+      ? { ...w, state: 'api-linked', api: { world_id: 'fake-server-id', api_key: 'fake-key' } } : w);
+    api.patchSlice('registry', { ...s.registry, worlds });
+    api.patchSlice('sync', { ...api.getState().sync, activeConflictsCount: 2 });
+    (window as any).__clickTargets = [];
+    document.addEventListener('click', (e) => (window as any).__clickTargets.push((e.target as HTMLElement).dataset.role ?? null), true);
+  });
+  await clickAcrossRerender(page, '[data-role="review-conflicts"]');
+  await expect.poll(() => page.evaluate(() => (window as any).__clickTargets)).toEqual(['review-conflicts']);
 });
 
 test('"add a world" opens the chooser; its open-a-world row opens a picked world', async ({ page }) => {

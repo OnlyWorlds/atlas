@@ -58,6 +58,11 @@ export function requestInlineNameEditOnNextRender(elementId: string): void {
   pendingAutoEditNameForId = elementId;
 }
 
+/** The pending signal, for the page's rebuild gate: a request is an input to the next render. */
+export function pendingInlineNameEdit(): string | null {
+  return pendingAutoEditNameForId;
+}
+
 // ====== Public API ======
 
 export function renderHeader(el: Element): HTMLElement {
