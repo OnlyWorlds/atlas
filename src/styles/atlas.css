@@ -6499,6 +6499,52 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transition: opacity 140ms ease;
 }
 
+/* Modern atlas (S424): Seethe's lettering (style-atlas.html), a plain sans
+   over soft tints; the selectors carry the style's class, so they win over
+   the ink rules above. */
+.atlas-map-style-atlas .atlas-zone-label-ink span {
+  color: #253040;
+  font: 500 13px 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+  text-shadow: 0 0 3px #f5efe0, 0 0 3px #f5efe0, 0 0 2px #f5efe0;
+}
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-landmass span {
+  color: #1a2838;
+  font-size: 18px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-sea span {
+  color: #306585;
+  font-style: italic;
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-shadow: none;
+}
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-lake span { color: #306585; font-style: italic; }
+.atlas-map-style-atlas .atlas-zone-label-ink.atlas-ink-range span {
+  color: #5a4d3a;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.atlas-map-style-atlas .atlas-ink-line-label {
+  fill: #306585;
+  font: italic 400 11px 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
+  letter-spacing: 1px;
+  stroke: #f5efe0;
+}
+.atlas-map-style-atlas .atlas-ink-line-label.atlas-ink-road { fill: #7a3c2c; font-style: normal; }
+.atlas-map-pane .atlas-map-style-atlas .leaflet-marker-pane img.leaflet-marker-icon {
+  filter: grayscale(1) brightness(0.35) sepia(0.3) hue-rotate(180deg);
+}
+.atlas-map-pane .atlas-map-style-atlas .leaflet-2d-pin-label .pin-label-text {
+  color: #1a2838;
+  font: 500 12px 'Source Sans Pro', 'Helvetica Neue', Arial, sans-serif;
+  text-shadow: 0 0 3px #f5efe0, 0 0 3px #f5efe0, 0 0 2px #f5efe0;
+}
+
 /* The density layer (S356, map-label-density.ts): a pin or zone label that
    lost its spot to a higher-ranked neighbour at this zoom. A class, not
    inline display, so it cannot fight the mode toggle (display) or the hover

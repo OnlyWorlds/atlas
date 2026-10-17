@@ -299,6 +299,77 @@ export function poleOfInaccessibility(ring: Point[], precision = 1): Point {
   return { x: best.x, y: best.y };
 }
 
+/** Where segment a-b crosses segment c-d, as a share of a-b (0..1), or undefined. */
+function crossingT(a: Point, b: Point, c: Point, d: Point): number | undefined {
+  const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
+  const den = rx * sy - ry * sx;
+  if (den === 0) return undefined;
+  const qx = c.x - a.x, qy = c.y - a.y;
+  const t = (qx * sy - qy * sx) / den;
+  const u = (qx * ry - qy * rx) / den;
+  return t > 0 && t < 1 && u >= 0 && u <= 1 ? t : undefined;
+}
+
+interface Ring { pts: Point[]; minX: number; minY: number; maxX: number; maxY: number }
+
+function ringOf(pts: Point[]): Ring {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  return { pts, minX, minY, maxX, maxY };
+}
+
+function inRing(p: Point, r: Ring): boolean {
+  return p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY && p.y <= r.maxY && pointInPolygon(p, r.pts);
+}
+
+/**
+ * The parts of a line that lie on land (S423, Seethe's receipt h20 #6514:
+ * a river ends at the coast). A point is on land when it is inside some
+ * `land` ring (or there are none: the map's own ground is the land) and
+ * inside no `water` ring (a sea, a lake). Each segment is cut where it
+ * crosses any ring's edge and each piece is kept or dropped by its
+ * midpoint, so the line ends exactly on the outline it meets. Pure: the
+ * stored line is never touched, only what is drawn.
+ */
+export function clipLineToLand(line: Point[], land: Point[][], water: Point[][]): Point[][] {
+  const landR = land.filter(r => r.length >= 3).map(ringOf);
+  const waterR = water.filter(r => r.length >= 3).map(ringOf);
+  if (line.length < 2 || (landR.length === 0 && waterR.length === 0)) return line.length ? [line] : [];
+  const onLand = (p: Point): boolean =>
+    (landR.length === 0 || landR.some(r => inRing(p, r))) && !waterR.some(r => inRing(p, r));
+  const rings = [...landR, ...waterR];
+  const out: Point[][] = [];
+  let cur: Point[] | null = null;
+  for (let i = 0; i < line.length - 1; i++) {
+    const a = line[i], b = line[i + 1];
+    const sx0 = Math.min(a.x, b.x), sx1 = Math.max(a.x, b.x), sy0 = Math.min(a.y, b.y), sy1 = Math.max(a.y, b.y);
+    const ts: number[] = [0, 1];
+    for (const r of rings) {
+      if (r.maxX < sx0 || r.minX > sx1 || r.maxY < sy0 || r.minY > sy1) continue;
+      for (let k = 0, j = r.pts.length - 1; k < r.pts.length; j = k++) {
+        const t = crossingT(a, b, r.pts[j], r.pts[k]);
+        if (t !== undefined) ts.push(t);
+      }
+    }
+    ts.sort((x, y) => x - y);
+    const at = (t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    for (let k = 0; k < ts.length - 1; k++) {
+      const t0 = ts[k], t1 = ts[k + 1];
+      if (t1 - t0 < 1e-9) continue;
+      if (onLand(at((t0 + t1) / 2))) {
+        if (!cur) { cur = [at(t0)]; out.push(cur); }
+        cur.push(at(t1));
+      } else {
+        cur = null;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Whether two point lists are equal coordinate-by-coordinate. Used to skip
  * needless re-render when zone geometry hasn't actually changed.

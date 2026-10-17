@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inkPoints, inkMinSegment, mapStyleOf, zoneKindOf, segmentHash } from '../../src/core/map-ink';
+import { inkPoints, inkMinSegment, mapStyleOf, zoneKindOf, segmentHash, MAP_STYLE_IDS, mapStylePreset, inkPatternId, ZONE_KIND_WORDS } from '../../src/core/map-ink';
 
 const ring = Array.from({ length: 40 }, (_, i) => {
   const a = (i / 40) * Math.PI * 2;
@@ -76,5 +76,30 @@ describe('the ink holds still', () => {
     const drawn = inkPoints(line, 5, 0.22, false);
     expect(drawn[drawn.length - 1]).toEqual(line[4]);
     expect(drawn.filter(p => key(p) === key(line[4]))).toHaveLength(1);
+  });
+});
+
+describe('the styles (S424: ink on parchment, modern atlas)', () => {
+  it('every style draws every kind, each under its own name', () => {
+    for (const id of MAP_STYLE_IDS) {
+      const p = mapStylePreset(id)!;
+      expect(p.id).toBe(id);
+      for (const w of ZONE_KIND_WORDS) expect(p.kinds[zoneKindOf(w)!].kind).toBe(zoneKindOf(w));
+    }
+  });
+  it('a river ends at the coast in every style, and land and water are named for the clip', () => {
+    for (const id of MAP_STYLE_IDS) {
+      const k = mapStylePreset(id)!.kinds;
+      expect(k.river.clipToLand).toBe(true);
+      expect(k.landmass.region).toBe('land');
+      expect([k.sea.region, k.lake.region]).toEqual(['water', 'water']);
+    }
+  });
+  it('modern atlas draws every line straight', () => {
+    for (const t of Object.values(mapStylePreset('atlas')!.kinds)) expect(t.rough).toBe(0);
+  });
+  it('a pattern in two colours is two patterns', () => {
+    expect(inkPatternId('dots', '#3b2a1a')).not.toBe(inkPatternId('dots', '#9a8a6d'));
+    expect(inkPatternId('dots', '#9a8a6d')).toMatch(/^[a-z0-9-]+$/i);
   });
 });

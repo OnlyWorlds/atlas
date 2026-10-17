@@ -48,6 +48,10 @@ export interface LabelCandidate {
   weight: number;
   /** Placements in preference order; the first that fits is taken. */
   boxes: readonly Box[];
+  /** A placement that is not one box (a name along a river, S424): what it
+   *  covers, piece by piece, per placement. `boxes[i]` is then its bounds,
+   *  for the screen test; collisions are tested on the pieces. */
+  parts?: readonly (readonly Box[])[];
   /** The obstacle this label belongs to (its own pin icon), which it may overlap. */
   owner?: string;
   /** The text the label prints, normalised. A map prints a name once: a zone
@@ -117,10 +121,13 @@ export function chooseVisibleLabels(
       // A box across the viewport's edge prints a clipped name ("aky Bucket"
       // on a phone): another side, or hover.
       if (!inside(c.boxes[i], screen)) continue;
-      const pb = padded(c.boxes[i]);
-      if (placed.some(b => overlaps(pb, b))) continue;
-      if (onScreen.some(o => o.id !== c.owner && overlaps(pb, o.box))) continue;
-      placed.push(c.boxes[i]);
+      const pieces = c.parts?.[i] ?? [c.boxes[i]];
+      const clear = pieces.every(piece => {
+        const pb = padded(piece);
+        return !placed.some(b => overlaps(pb, b)) && !onScreen.some(o => o.id !== c.owner && overlaps(pb, o.box));
+      });
+      if (!clear) continue;
+      placed.push(...pieces);
       chosen.set(c.id, i);
       if (c.name) names.add(c.name);
       break;
@@ -152,6 +159,62 @@ export function pinLabelPlacements(ink: Box, icon: Box, gap: number): Box[] {
   const left: Box = { x0: icon.x0 - gap - w, x1: icon.x0 - gap, y0: cy - h / 2, y1: cy + h / 2 };
   const above: Box = { x0: cx - w / 2, x1: cx + w / 2, y0: icon.y0 - gap - h, y1: icon.y0 - gap };
   return [ink, right, left, above];
+}
+
+/** Where along its line a name may sit, as a share of the line's length, in preference order. */
+export const ALONG_SHARES = [0.5, 0.35, 0.65, 0.2, 0.8] as const;
+
+/**
+ * The places a name written along a line may take (S424): for each share
+ * of the line's length (the name centred there, as `startOffset` with a
+ * middle anchor draws it), the pieces of screen it covers, one square per
+ * `half`-sized step of its span, lifted `lift` px to the side the glyphs
+ * stand on (left of travel: the line runs left to right, so up). A share
+ * whose span would run off either end is left out, so a name longer than
+ * its line has no place at all. `points` are container px, in reading order.
+ */
+export function alongLabelPlacements(
+  points: readonly { x: number; y: number }[],
+  textW: number,
+  half: number,
+  lift: number,
+  shares: readonly number[] = ALONG_SHARES,
+): Array<{ share: number; box: Box; parts: Box[] }> {
+  const cum = [0];
+  for (let i = 1; i < points.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+  }
+  const total = cum[cum.length - 1];
+  if (points.length < 2 || !(total > 0) || textW > total) return [];
+  // The point at arc length s, and the unit "up" there (left of travel).
+  const at = (s: number): { x: number; y: number; ux: number; uy: number } => {
+    let i = 1;
+    while (i < cum.length - 1 && cum[i] < s) i++;
+    const a = points[i - 1], b = points[i];
+    const seg = cum[i] - cum[i - 1] || 1;
+    const t = Math.min(1, Math.max(0, (s - cum[i - 1]) / seg));
+    const tx = (b.x - a.x) / seg, ty = (b.y - a.y) / seg;
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, ux: ty, uy: -tx };
+  };
+  const out: Array<{ share: number; box: Box; parts: Box[] }> = [];
+  for (const share of shares) {
+    const s0 = share * total - textW / 2;
+    const s1 = share * total + textW / 2;
+    if (s0 < 0 || s1 > total) continue;
+    const parts: Box[] = [];
+    const steps = Math.max(1, Math.ceil((s1 - s0) / half));
+    for (let k = 0; k <= steps; k++) {
+      const p = at(s0 + ((s1 - s0) * k) / steps);
+      const cx = p.x + p.ux * lift, cy = p.y + p.uy * lift;
+      parts.push({ x0: cx - half, y0: cy - half, x1: cx + half, y1: cy + half });
+    }
+    const box: Box = {
+      x0: Math.min(...parts.map(b => b.x0)), y0: Math.min(...parts.map(b => b.y0)),
+      x1: Math.max(...parts.map(b => b.x1)), y1: Math.max(...parts.map(b => b.y1)),
+    };
+    out.push({ share, box, parts });
+  }
+  return out;
 }
 
 /**
@@ -241,6 +304,14 @@ interface LabelMetrics {
   /** Width of the span the offsets were calibrated on (spans centre on x). */
   calibratedW: number;
   font: string;
+  /** The face's case and spacing, which a canvas does not apply (S424: a
+   *  styled map letters a landmass in spaced capitals). */
+  upper: boolean;
+  spacing: number;
+}
+
+function measured(m: Pick<LabelMetrics, 'font' | 'upper' | 'spacing'>, text: string): number {
+  return textWidth(m.upper ? text.toUpperCase() : text, m.font) + m.spacing * text.length;
 }
 
 let measureCtx: CanvasRenderingContext2D | null | undefined;
@@ -266,15 +337,24 @@ function textWidth(text: string, font: string): number {
   return w;
 }
 
+/** A zone label's face: the classes that decide its font and anchor, never the pass's own. */
+function labelFace(el: HTMLElement): string {
+  return Array.from(el.classList).filter(c => c.startsWith('atlas-zone-label') || c.startsWith('atlas-ink-')).sort().join(' ');
+}
+const zoneMetricsByEntry = new WeakMap<MapTabCacheEntry, Map<string, LabelMetrics>>();
+
 /** One rect read of a rendered span, before any write this pass makes. */
 function calibrate(el: HTMLElement, anchor: { x: number; y: number }, origin: DOMRect): LabelMetrics | null {
   const span = el.querySelector('span') as HTMLElement | null;
   if (!span) return null;
   const r = span.getBoundingClientRect();
   if (r.width === 0) return null;
-  const font = getComputedStyle(span).font;
+  const cs = getComputedStyle(span);
+  const font = cs.font || `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const upper = cs.textTransform === 'uppercase';
+  const spacing = parseFloat(cs.letterSpacing) || 0;
   const text = span.textContent ?? '';
-  const tw = textWidth(text, font);
+  const tw = measured({ font, upper, spacing }, text);
   return {
     chromeW: r.width - tw,
     h: r.height,
@@ -282,11 +362,13 @@ function calibrate(el: HTMLElement, anchor: { x: number; y: number }, origin: DO
     dy: r.top - origin.top - anchor.y,
     calibratedW: r.width,
     font,
+    upper,
+    spacing,
   };
 }
 
 function inkBox(m: LabelMetrics, anchor: { x: number; y: number }, text: string): Box {
-  const w = textWidth(text, m.font) + m.chromeW;
+  const w = measured(m, text) + m.chromeW;
   // Both label kinds centre on their anchor's x; dx was calibrated on a span
   // of another width, so re-centre from it.
   const x0 = anchor.x + m.dx + (m.calibratedW - w) / 2;
@@ -357,6 +439,25 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
       if (el && anchor) zoneLabelEls.push({ id, el, anchor });
     }
   }
+  // Names written along lines on a styled map (S424): SVG text, no anchor.
+  const alongEls: Array<{ id: string; el: SVGTextElement; points: Array<{ x: number; y: number }> }> = [];
+  if (entry.zoneOverlay) {
+    for (const id of entry.zoneOverlay.getZoneIds()) {
+      const along = entry.zoneOverlay.getAlongLabel(id);
+      if (along) alongEls.push({ id, ...along });
+    }
+  }
+  // One style read before any write: the face every name along a line takes.
+  let alongFont: { font: string; spacing: number; size: number } | null = null;
+  if (zonesAuto && alongEls.length > 0) {
+    const cs = getComputedStyle(alongEls[0].el);
+    const size = parseFloat(cs.fontSize) || 12;
+    alongFont = {
+      font: `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,
+      spacing: parseFloat(cs.letterSpacing) || 0,
+      size,
+    };
+  }
 
   const origin = entry.container.getBoundingClientRect();
   const viewport = { w: origin.width, h: origin.height };
@@ -365,7 +466,12 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
   const defaultMarginLeft = `${-PIN_LABEL_HALF_WIDTH}px`;
   const defaultMarginTop = `${iconHalf + gap}px`;
   let pinMetrics: LabelMetrics | null = null;
-  let zoneMetrics: LabelMetrics | null = null;
+  // Zone labels by their face (S424): on a styled map each kind letters in
+  // its own, so one calibration per label class, kept per map across passes
+  // (a kind whose every label was culled last pass still has its numbers).
+  let zoneMetrics = zoneMetricsByEntry.get(entry);
+  if (!zoneMetrics) { zoneMetrics = new Map(); zoneMetricsByEntry.set(entry, zoneMetrics); }
+  const calibratedNow = new Set<string>();
   if (pinsAuto && viewport.w > 0) {
     for (const { el, anchor } of pinLabelEls) {
       if (el.classList.contains(LABEL_CULLED_CLASS) || el.style.display === 'none') continue;
@@ -377,8 +483,10 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
   if (zonesAuto && viewport.w > 0) {
     for (const { el, anchor } of zoneLabelEls) {
       if (el.classList.contains(LABEL_CULLED_CLASS)) continue;
-      zoneMetrics = calibrate(el, anchor, origin);
-      if (zoneMetrics) break;
+      const face = labelFace(el);
+      if (calibratedNow.has(face)) continue;
+      const m = calibrate(el, anchor, origin);
+      if (m) { zoneMetrics.set(face, m); calibratedNow.add(face); }
     }
   }
 
@@ -390,13 +498,17 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
     el.style.marginTop = defaultMarginTop;
   }
   for (const { el } of zoneLabelEls) el.classList.remove(LABEL_CULLED_CLASS);
+  for (const { id, el } of alongEls) {
+    el.classList.remove(LABEL_CULLED_CLASS);
+    entry.zoneOverlay?.setAlongLabelShare(id, ALONG_SHARES[0]);
+  }
   if (!pinsAuto && !zonesAuto) return;
   if (viewport.w === 0 || viewport.h === 0) return;
   // Nothing to calibrate on (every label of a kind culled or moved by the
   // previous pass, or a pass before the first paint): everything is reset
   // now, so the next moveend calibrates cleanly. Leaving them all visible
   // for one settle is the honest fallback.
-  if ((pinsAuto && !pinMetrics && pinLabelEls.length > 0) || (zonesAuto && !zoneMetrics && zoneLabelEls.length > 0)) return;
+  if ((pinsAuto && !pinMetrics && pinLabelEls.length > 0) || (zonesAuto && zoneLabelEls.some(z => !zoneMetrics.has(labelFace(z.el))))) return;
 
   const state = getState();
   const selectedId = state.ui.selectedElementId ?? null;
@@ -445,17 +557,41 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
       pinById.set(key, { el, ink });
     }
   }
-  if (zonesAuto && zoneMetrics && entry.zoneOverlay) {
-    const rules = state.styles.rules;
-    // Pin labels the pass does not place (their mode is 'always') still print
-    // their names, so a zone of the same name stays quiet.
-    const fixedPinNames = new Set<string>();
-    if (!pinsAuto) {
-      for (const { el } of pinLabelEls) {
-        const k = el.style.display === 'none' ? undefined : labelNameKey(el.textContent);
-        if (k) fixedPinNames.add(k);
-      }
+  const rules = state.styles.rules;
+  // Pin labels the pass does not place (their mode is 'always') still print
+  // their names, so a zone of the same name stays quiet.
+  const fixedPinNames = new Set<string>();
+  if (zonesAuto && !pinsAuto) {
+    for (const { el } of pinLabelEls) {
+      const k = el.style.display === 'none' ? undefined : labelNameKey(el.textContent);
+      if (k) fixedPinNames.add(k);
     }
+  }
+  const alongById = new Map<string, { zoneId: string; el: SVGTextElement; shares: number[] }>();
+  if (zonesAuto && alongFont && entry.zoneOverlay) {
+    for (const { id, el, points } of alongEls) {
+      if (!entry.zoneOverlay.isZoneVisible(id)) continue;
+      const text = el.textContent ?? '';
+      if (fixedPinNames.has(labelNameKey(text) ?? '')) { el.classList.add(LABEL_CULLED_CLASS); continue; }
+      const textW = textWidth(text, alongFont.font) + alongFont.spacing * text.length;
+      // The glyphs stand above the line (dy -4 in ZoneOverlay): centre the pieces there.
+      const placements = alongLabelPlacements(points, textW, alongFont.size * 0.7, 4 + alongFont.size * 0.35);
+      if (placements.length === 0) { el.classList.add(LABEL_CULLED_CLASS); continue; }
+      const zone = byId.get(id);
+      const prioritised = zone ? Boolean(resolveStyle(rules, zone).label_priority) : false;
+      const key = `along:${id}`;
+      cands.push({
+        id: key,
+        pri: selectedId === id ? 0 : prioritised ? 1 : 3,
+        weight: entry.zoneOverlay.getZoneScreenExtent(id),
+        boxes: placements.map(p => p.box),
+        parts: placements.map(p => p.parts),
+        name: labelNameKey(text),
+      });
+      alongById.set(key, { zoneId: id, el, shares: placements.map(p => p.share) });
+    }
+  }
+  if (zonesAuto && entry.zoneOverlay) {
     for (const { id, el, anchor } of zoneLabelEls) {
       // A hidden zone's label is already at opacity 0; it must not claim space.
       if (!entry.zoneOverlay.isZoneVisible(id)) continue;
@@ -472,7 +608,7 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
         id: key,
         pri: selected ? 0 : prioritised ? 1 : line ? 3 : 2,
         weight: extent,
-        boxes: [inkBox(zoneMetrics, anchor, el.textContent ?? '')],
+        boxes: [inkBox(zoneMetrics.get(labelFace(el))!, anchor, el.textContent ?? '')],
         name: labelNameKey(el.textContent),
       });
       zoneById.set(key, el);
@@ -493,6 +629,12 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
       const to = c.boxes[idx];
       pin.el.style.marginLeft = `${-PIN_LABEL_HALF_WIDTH + (to.x0 - pin.ink.x0)}px`;
       pin.el.style.marginTop = `${iconHalf + gap + (to.y0 - pin.ink.y0)}px`;
+      continue;
+    }
+    const along = alongById.get(c.id);
+    if (along) {
+      if (idx === undefined) along.el.classList.add(LABEL_CULLED_CLASS);
+      else entry.zoneOverlay?.setAlongLabelShare(along.zoneId, along.shares[idx]);
       continue;
     }
     const zoneEl = zoneById.get(c.id);

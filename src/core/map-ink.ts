@@ -51,6 +51,8 @@ export interface InkTreatment {
   /** A colour, or a pattern by name. Absent: no fill. */
   fill?: string;
   pattern?: InkPattern;
+  /** The pattern's colour. Absent: the stroke's. */
+  patternColor?: string;
   /** Midpoint displacement as a share of a segment's length; 0 = drawn straight. */
   rough: number;
   /** Shore bands under a landmass, widest first, in screen px. */
@@ -59,6 +61,10 @@ export interface InkTreatment {
   layer: number;
   /** A line's name follows the line. */
   labelAlong?: boolean;
+  /** What a line clipped to land is clipped by: land holds it, water cuts it. */
+  region?: 'land' | 'water';
+  /** A line drawn only where it is on land (a river ends at the coast). */
+  clipToLand?: boolean;
 }
 
 export interface MapStylePreset {
@@ -72,7 +78,7 @@ export interface MapStylePreset {
   kinds: Record<InkKind, InkTreatment>;
 }
 
-export const MAP_STYLE_IDS = ['ink'] as const;
+export const MAP_STYLE_IDS = ['ink', 'atlas'] as const;
 export type MapStyleId = typeof MAP_STYLE_IDS[number];
 
 const INK = '#3b2a1a';
@@ -85,24 +91,59 @@ const INK_ON_PARCHMENT: MapStylePreset = {
   edge: '#8a7458',
   ink: INK,
   kinds: {
-    sea:       t('sea',       { stroke: INK, weight: 1.2, strokeOpacity: 0.8, fill: '#dfd0b0', rough: 0.22, layer: 1 }),
-    landmass:  t('landmass',  { stroke: INK, weight: 1.6, strokeOpacity: 1, fill: '#f3ead2', rough: 0.22, layer: 2,
+    sea:       t('sea',       { stroke: INK, weight: 1.2, strokeOpacity: 0.8, fill: '#dfd0b0', rough: 0.22, layer: 1, region: 'water' }),
+    landmass:  t('landmass',  { stroke: INK, weight: 1.6, strokeOpacity: 1, fill: '#f3ead2', rough: 0.22, layer: 2, region: 'land',
       shore: [{ color: '#c9b48d', width: 26 }, { color: '#d6c4a0', width: 18 }, { color: '#dfd0b0', width: 10 }] }),
-    lake:      t('lake',      { stroke: INK, weight: 1.2, strokeOpacity: 1, fill: '#dccba6', rough: 0.18, layer: 3 }),
+    lake:      t('lake',      { stroke: INK, weight: 1.2, strokeOpacity: 1, fill: '#dccba6', rough: 0.18, layer: 3, region: 'water' }),
     desert:    t('desert',    { stroke: INK, weight: 0, strokeOpacity: 0, pattern: 'dots', rough: 0.2, layer: 4 }),
     marsh:     t('marsh',     { stroke: INK, weight: 0, strokeOpacity: 0, pattern: 'marsh', rough: 0.2, layer: 4 }),
-    forest:    t('forest',    { stroke: INK, weight: 0, strokeOpacity: 0, pattern: 'stipple', rough: 0.2, layer: 4 }),
+    forest:    t('forest',    { stroke: INK, weight: 0, strokeOpacity: 0, pattern: 'stipple', patternColor: '#4a5a2e', rough: 0.2, layer: 4 }),
     range:     t('range',     { stroke: INK, weight: 0.6, strokeOpacity: 0.5, pattern: 'hatch', rough: 0.22, layer: 4 }),
     territory: t('territory', { stroke: INK, weight: 1.2, strokeOpacity: 0.7, dash: '6, 4', rough: 0.08, layer: 5 }),
     coast:     t('coast',     { stroke: INK, weight: 1.6, strokeOpacity: 1, rough: 0.22, layer: 6 }),
-    river:     t('river',     { stroke: INK, weight: 1.3, strokeOpacity: 1, rough: 0.22, layer: 6, labelAlong: true }),
+    river:     t('river',     { stroke: INK, weight: 1.3, strokeOpacity: 1, rough: 0.22, layer: 6, labelAlong: true, clipToLand: true }),
     road:      t('road',      { stroke: INK, weight: 1, strokeOpacity: 0.8, dash: '5, 3', rough: 0, layer: 6, labelAlong: true }),
     wall:      t('wall',      { stroke: INK, weight: 2.2, strokeOpacity: 1, rough: 0.04, layer: 6 }),
     border:    t('border',    { stroke: INK, weight: 1.2, strokeOpacity: 0.8, dash: '2, 4, 8, 4', rough: 0.08, layer: 6 }),
   },
 };
 
-const PRESETS: Record<MapStyleId, MapStylePreset> = { ink: INK_ON_PARCHMENT };
+/**
+ * Modern atlas (S424): soft tints, clean lines, nothing jittered. Sea, land,
+ * range and river are Seethe's (h20 #6514, `Studio/desk/current/
+ * 2026-10-17-atlas-three-styles/style-atlas.html`); the other kinds are mine
+ * in the same register, sent to her to check.
+ */
+const NAVY = '#1a2838';
+const MODERN_ATLAS: MapStylePreset = {
+  id: 'atlas',
+  name: 'Modern atlas',
+  sea: '#dfe9ed',
+  edge: '#9fb3bf',
+  ink: NAVY,
+  kinds: {
+    sea:       t('sea',       { stroke: '#9fb3bf', weight: 0.8, strokeOpacity: 1, fill: '#d3e2e8', rough: 0, layer: 1, region: 'water' }),
+    landmass:  t('landmass',  { stroke: '#4a5a6a', weight: 1, strokeOpacity: 1, fill: '#f5efe0', rough: 0, layer: 2, region: 'land' }),
+    lake:      t('lake',      { stroke: '#5a8bb0', weight: 0.8, strokeOpacity: 1, fill: '#cfe0e8', rough: 0, layer: 3, region: 'water' }),
+    desert:    t('desert',    { stroke: '#c9b07a', weight: 0, strokeOpacity: 0, fill: '#f1e4c2', rough: 0, layer: 4 }),
+    marsh:     t('marsh',     { stroke: '#7a9aa8', weight: 0, strokeOpacity: 0, pattern: 'marsh', rough: 0, layer: 4 }),
+    forest:    t('forest',    { stroke: '#a9b98f', weight: 0.5, strokeOpacity: 1, fill: '#dfe8cf', rough: 0, layer: 4 }),
+    range:     t('range',     { stroke: '#9a8a6d', weight: 0.5, strokeOpacity: 1, pattern: 'dots', rough: 0, layer: 4 }),
+    territory: t('territory', { stroke: '#8a6a9a', weight: 1.2, strokeOpacity: 0.7, dash: '6, 4', rough: 0, layer: 5 }),
+    coast:     t('coast',     { stroke: '#4a5a6a', weight: 1, strokeOpacity: 1, rough: 0, layer: 6 }),
+    river:     t('river',     { stroke: '#5a8bb0', weight: 1.4, strokeOpacity: 1, rough: 0, layer: 6, labelAlong: true, clipToLand: true }),
+    road:      t('road',      { stroke: '#a0523c', weight: 1.2, strokeOpacity: 0.85, rough: 0, layer: 6, labelAlong: true }),
+    wall:      t('wall',      { stroke: '#4a4a4a', weight: 2, strokeOpacity: 1, rough: 0, layer: 6 }),
+    border:    t('border',    { stroke: '#7a6a8a', weight: 1.2, strokeOpacity: 0.8, dash: '2, 4, 8, 4', rough: 0, layer: 6 }),
+  },
+};
+
+const PRESETS: Record<MapStyleId, MapStylePreset> = { ink: INK_ON_PARCHMENT, atlas: MODERN_ATLAS };
+
+/** A pattern's id in the renderer's defs: one per shape and colour, so two styles never share a wrong one. */
+export function inkPatternId(pattern: InkPattern, color: string): string {
+  return `atlas-ink-${pattern}-${color.replace(/[^0-9a-z]/gi, '')}`;
+}
 
 export function mapStylePreset(id: unknown): MapStylePreset | undefined {
   return typeof id === 'string' && (MAP_STYLE_IDS as readonly string[]).includes(id)

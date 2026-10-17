@@ -90,6 +90,169 @@ test('an ink map draws each zone from its kind, and the zones stay as they are',
   expect(after).toBe(before);
 });
 
+test('a modern atlas map draws the same zones in its own register (S424)', async ({ page }) => {
+  await setupWorld(page);
+  await openMap(page, await seedMap(page, 'atlas'));
+  await expect.poll(async () => (await inkFacts(page)).inkLabels).toEqual(['Isle', 'Spine']);
+  const f = await page.evaluate(() => {
+    const paths = [...document.querySelectorAll('.atlas-map-pane .leaflet-overlay-pane path')];
+    return {
+      fills: paths.map(p => p.getAttribute('fill') || '').filter(s => s.startsWith('url(#atlas-ink-')),
+      shoreBands: paths.filter(p => p.getAttribute('stroke') === '#c9b48d').length,
+      styleClass: document.querySelector('.atlas-map-pane .atlas-map-style-atlas') !== null,
+      inkClass: document.querySelector('.atlas-map-pane .atlas-map-style-ink') !== null,
+      riverName: getComputedStyle(document.querySelector('.atlas-map-pane .atlas-ink-line-label')!).fill,
+    };
+  });
+  expect(f.fills).toEqual(['url(#atlas-ink-dots-9a8a6d)']);   // the Range in Seethe's contour dots
+  expect(f.shoreBands).toBe(0);
+  expect(f.styleClass).toBe(true);
+  expect(f.inkClass).toBe(false);
+  expect(f.riverName).toBe('rgb(48, 101, 133)');               // #306585
+});
+
+/** An island lettered in spaced capitals, a pin either side of its middle at `dx` units (S424). */
+async function seedLetteredIsland(page: Page, name: string, dx: number): Promise<{ worldId: string; mapId: string }> {
+  return page.evaluate(async ({ name, dx }) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = await store.createElement('map', { name, atlas_map_style: 'ink' });
+    const zone = async (zname: string, subtype: string, pts: number[][]) => {
+      const z = await store.createZone({ name: zname, subtype, atlas_shape: 'polygon' });
+      for (let i = 0; i < pts.length; i++) {
+        await store.createMarker({ name: '', map_id: map.id, zone_id: z.id, x: pts[i][0], y: pts[i][1], order: i });
+      }
+    };
+    // A wood in another face (italic, lowercase) in a corner, first by name: the
+    // density layer must not measure the island's capitals by it.
+    await zone('Alder', 'Forest', [[350, 1350], [650, 1350], [650, 1650], [350, 1650]]);
+    await zone(name, 'Landmass', [[300, 300], [1700, 300], [1700, 1700], [300, 1700]]);
+    for (const x of [1000 - dx, 1000 + dx]) {
+      const loc = await store.createElement('location', { name: `${name} ${x}` });
+      await store.createElement('pin', { name: `${name} ${x}`, map_id: map.id, element_id: loc.id, element_type: 'location', x, y: 1000 });
+    }
+    api.patchData(await store.listElements());
+    return { worldId: api.getState().active.worldId, mapId: map.id };
+  }, { name, dx });
+}
+
+/** Whether the island's name prints, over how many pins, and the map's px per unit. */
+const letteringFacts = (page: Page, name: string) => page.evaluate((name) => {
+  const span = [...document.querySelectorAll('.atlas-map-pane .atlas-zone-label-ink span')]
+    .find(s => s.textContent === name) as HTMLElement | undefined;
+  const land = [...document.querySelectorAll('.atlas-map-pane .leaflet-overlay-pane path')]
+    .find(p => p.getAttribute('fill') === '#f3ead2');
+  if (!span || !land) return null;
+  const a = span.getBoundingClientRect();
+  const covered = [...document.querySelectorAll('.atlas-map-pane img.leaflet-marker-icon')]
+    .map(i => i.getBoundingClientRect())
+    .filter(b => a.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top).length;
+  return { shown: a.width > 0, covered, width: Math.round(a.width), scale: land.getBoundingClientRect().width / 1400 };
+}, name);
+
+/** The facts once the fit and the density pass have settled (two reads 300 ms apart agree). */
+async function settledLettering(page: Page, name: string) {
+  await expect(page.locator('.atlas-map-pane img.leaflet-marker-icon')).toHaveCount(2);
+  let prev = JSON.stringify(await letteringFacts(page, name));
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(300);
+    const next = JSON.stringify(await letteringFacts(page, name));
+    if (next === prev && next !== 'null') break;
+    prev = next;
+  }
+  return (await letteringFacts(page, name))!;
+}
+
+test('an island\'s spaced capitals never print over the pins beside them (S424)', async ({ page }) => {
+  await setupWorld(page);
+  // The control: pins far out, so the name has room and prints.
+  await openMap(page, await seedLetteredIsland(page, 'Ostmark', 650));
+  const far = await settledLettering(page, 'Ostmark');
+  expect(far).toMatchObject({ shown: true, covered: 0 });
+  // Pins at half the printed width from the middle: under the spaced
+  // capitals, outside a lowercase, unspaced measure of the same name.
+  const dx = Math.round((far.width * 0.5) / far.scale);
+  await openMap(page, await seedLetteredIsland(page, 'Westmark', dx));
+  const near = await settledLettering(page, 'Westmark');
+  expect(near.covered).toBe(0);
+});
+
+/** An island with a river that runs out over its east coast, through a forest on its middle (S424). */
+async function seedRiverMap(page: Page): Promise<{ worldId: string; mapId: string }> {
+  return page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = await store.createElement('map', { name: 'Isle', atlas_map_style: 'ink' });
+    const zone = async (name: string, subtype: string, shape: string, pts: number[][]) => {
+      const z = await store.createZone({ name, subtype, atlas_shape: shape });
+      for (let i = 0; i < pts.length; i++) {
+        await store.createMarker({ name: '', map_id: map.id, zone_id: z.id, x: pts[i][0], y: pts[i][1], order: i });
+      }
+    };
+    await zone('Isle', 'Landmass', 'polygon', [[500, 500], [1500, 450], [1600, 1300], [900, 1550], [450, 1100]]);
+    // away from the island's own name, which sits at its middle
+    await zone('Greenwood', 'Forest', 'polygon', [[1150, 600], [1350, 600], [1350, 780], [1150, 780]]);
+    await zone('Outflow', 'River', 'line', [[600, 700], [1000, 700], [1900, 700]]);
+    api.patchData(await store.listElements());
+    return { worldId: api.getState().active.worldId, mapId: map.id };
+  });
+}
+
+/** The river's drawn ink and the island's, in container px (the river: the one unfilled ink path). */
+const riverAndLand = (page: Page) => page.evaluate(() => {
+  const paths = [...document.querySelectorAll('.atlas-map-pane .leaflet-overlay-pane path.atlas-zone-ink')] as SVGPathElement[];
+  const river = paths.find(p => p.getAttribute('fill') === 'none');
+  const land = paths.find(p => p.getAttribute('fill') === '#f3ead2');
+  const r = river?.getBoundingClientRect(), l = land?.getBoundingClientRect();
+  const c = document.querySelector('.atlas-map-pane .leaflet-container')!.getBoundingClientRect();
+  // Leaflet cuts every path at its renderer's edge: until the whole island is
+  // on screen, river and coast can end at the same cut and prove nothing.
+  const whole = Boolean(l && l.left > c.left && l.right < c.right && l.top > c.top && l.bottom < c.bottom);
+  return r && l && whole ? { riverRight: r.right, landRight: l.right, riverLeft: r.left } : null;
+});
+
+test('a river on an ink map ends at the coast it runs out over', async ({ page }) => {
+  await setupWorld(page);
+  await openMap(page, await seedRiverMap(page));
+  // Read once the fit has settled: two reads 300 ms apart agree, no zoom animating.
+  let f = await riverAndLand(page);
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(300);
+    const next = await riverAndLand(page);
+    const still = await page.locator('.atlas-map-pane .leaflet-zoom-anim').count() === 0;
+    if (next && still && JSON.stringify(next) === JSON.stringify(f)) break;
+    f = next;
+  }
+  expect(f).not.toBeNull();
+  // stored, the river runs 300 units past the coast (about 100 px at this view)
+  expect(f!.riverRight).toBeLessThanOrEqual(f!.landRight + 1);
+  expect(f!.riverLeft).toBeLessThan(f!.landRight - 100);   // and is still drawn inland
+});
+
+test('a name along a river moves along it, clear of an area\'s name on its middle', async ({ page }) => {
+  // Room on the river for its name somewhere: at 1280 the map pane is so
+  // narrow that every place along it meets Greenwood, and the name drops.
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await setupWorld(page);
+  await openMap(page, await seedRiverMap(page));
+  const along = page.locator('.atlas-map-pane .atlas-ink-line-label');
+  const forest = page.locator('.atlas-map-pane .atlas-zone-label-ink span', { hasText: 'Greenwood' });
+  await expect(forest).toBeVisible();
+  await expect.poll(() => along.locator('textPath').getAttribute('startOffset')).not.toBe('50%');
+  const overlap = () => page.evaluate(() => {
+    const a = document.querySelector('.atlas-map-pane .atlas-ink-line-label')!.getBoundingClientRect();
+    const spans = [...document.querySelectorAll('.atlas-map-pane .atlas-zone-label-ink span')];
+    const b = spans.find(s => s.textContent === 'Greenwood')!.getBoundingClientRect();
+    return a.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  });
+  await expect(along).toBeVisible();
+  await expect(forest).toBeVisible();
+  expect(await overlap()).toBe(false);
+  // The control: at the middle the two names would print over each other.
+  await along.locator('textPath').evaluate(t => t.setAttribute('startOffset', '50%'));
+  expect(await overlap()).toBe(true);
+});
+
 const readTransform = (page: Page) =>
   page.locator('.atlas-map-pane .leaflet-map-pane').evaluate(el => (el as HTMLElement).style.transform);
 

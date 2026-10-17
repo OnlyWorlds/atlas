@@ -20,7 +20,7 @@ import {
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { scheduleLabelDensity } from './map-label-density';
 import { resolveStyle, groupByKind } from '../../core/world-styles';
-import { mapStyleOf, zoneKindOf, PLAIN_ZONE_LAYER, type MapStylePreset, type InkTreatment } from '../../core/map-ink';
+import { mapStyleOf, zoneKindOf, PLAIN_ZONE_LAYER, MAP_STYLE_IDS, type MapStylePreset, type InkTreatment } from '../../core/map-ink';
 import { renderZonePanel, wireZonePanel } from './map-zone-panel';
 import type { Zone } from '../../core/types';
 import { getActiveStore } from '../../core/active-store';
@@ -87,6 +87,8 @@ export function syncZones(entry: MapTabCacheEntry): void {
   if (preset) entry.zoneOverlay.applyInkOrder(PLAIN_ZONE_LAYER);
   // The pins read the style from the container (CSS: inked icons, lettered names).
   entry.container.classList.toggle('atlas-map-ink', Boolean(preset));
+  // ...and the lettering from the style's own class (S424).
+  for (const id of MAP_STYLE_IDS) entry.container.classList.toggle(`atlas-map-style-${id}`, preset?.id === id);
 
   // Remove overlay entries that are no longer on this map. Iterate the
   // OVERLAY's known ids (ZD2 fix) — iterating `zones` from state was wrong
