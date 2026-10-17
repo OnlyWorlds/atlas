@@ -45,6 +45,15 @@ describe('alongLabelPlacements', () => {
     expect(alongLabelPlacements([{ x: 0, y: 0 }, { x: 50, y: 0 }], 80, 8, 0)).toEqual([]);
   });
 
+  it('keeps a river\'s name on its land, the middle of the longest stretch first', () => {
+    const line = [{ x: 0, y: 0 }, { x: 1000, y: 0 }];
+    // land on the first 60%, the mouth at sea after it
+    const ps = alongLabelPlacements(line, 100, 8, 0, ALONG_SHARES, [[0, 0.6]]);
+    expect(ps[0].share).toBeCloseTo(0.3, 9);
+    for (const p of ps) expect(p.box.x1 - 8).toBeLessThanOrEqual(600 + 1e-6);
+    expect(ps.map(p => p.share)).not.toContain(0.65);
+  });
+
   it('leaves out a share whose span runs off an end', () => {
     // 200 px line, 100 px name: 0.2 and 0.8 would run off (centres at 40 and 160)
     const ps = alongLabelPlacements([{ x: 0, y: 0 }, { x: 200, y: 0 }], 100, 8, 0);

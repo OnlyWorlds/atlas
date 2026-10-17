@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { clipLineToLand, pointInPolygon, type Point } from '../../src/visualization/leaflet-2d/ZoneGeometry';
+import { clipLineToLand, landSpansAlong, pointInPolygon, type Point } from '../../src/visualization/leaflet-2d/ZoneGeometry';
 
 const square = (x0: number, y0: number, x1: number, y1: number): Point[] =>
   [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
@@ -49,6 +49,18 @@ describe('clipLineToLand', () => {
 
   it('a line wholly at sea has no land part', () => {
     expect(clipLineToLand([{ x: 200, y: 10 }, { x: 300, y: 10 }], [island], [])).toEqual([]);
+  });
+
+  it('says where along the line its land lies, as shares of its length', () => {
+    // 100 units: 50 on land, then 50 at sea past x 100
+    const spans = landSpansAlong(river, [island], []);
+    expect(spans).toHaveLength(1);
+    expect(spans[0][0]).toBeCloseTo(0, 9);
+    expect(spans[0][1]).toBeCloseTo(0.5, 9);
+    const lake = square(60, 40, 70, 60);
+    const two = landSpansAlong(river, [island], [lake]);
+    expect(two.map(s => s.map(v => Math.round(v * 100) / 100))).toEqual([[0, 0.1], [0.2, 0.5]]);
+    expect(landSpansAlong(river, [], [])).toEqual([[0, 1]]);
   });
 
   it('every kept piece lies on land, on a concave coast', () => {

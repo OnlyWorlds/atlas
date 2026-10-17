@@ -18,7 +18,7 @@
 
 import L from 'leaflet';
 import { storageToLeaflet } from './CoordinateUtils';
-import { poleOfInaccessibility, clipLineToLand, type Point } from './ZoneGeometry';
+import { poleOfInaccessibility, clipLineToLand, landSpansAlong, type Point } from './ZoneGeometry';
 import { escapeText, hexColourOr } from '../../core/dom-utils';
 import { inkPoints, inkMinSegment, inkPatternId, type InkTreatment, type InkPattern } from '../../core/map-ink';
 
@@ -202,9 +202,12 @@ export class ZoneOverlay {
 
   /** The hit layer's points: stored, and left to right when a name runs along them (never upside down). */
   private hitLatLngs(shape: ZoneShape): L.LatLng[] {
-    let pts = shape.points;
-    if (shape.ink?.labelAlong && pts.length > 1 && pts[0].x > pts[pts.length - 1].x) pts = pts.slice().reverse();
-    return pts.map(p => storageToLeaflet(p, this.canvasHeight));
+    return this.readingPoints(shape).map(p => storageToLeaflet(p, this.canvasHeight));
+  }
+
+  private readingPoints(shape: ZoneShape): Point[] {
+    const pts = shape.points;
+    return shape.ink?.labelAlong && pts.length > 1 && pts[0].x > pts[pts.length - 1].x ? pts.slice().reverse() : pts;
   }
 
   private setDrawnPoints(entry: ZoneEntry, regions?: { land: Point[][]; water: Point[][] }): void {
@@ -415,14 +418,21 @@ export class ZoneOverlay {
    * An inked line's name along it (S424), for the density layer: its text
    * element and the line it follows in container px, in reading order.
    */
-  getAlongLabel(id: string): { el: SVGTextElement; points: Array<{ x: number; y: number }> } | undefined {
+  getAlongLabel(id: string): {
+    el: SVGTextElement;
+    points: Array<{ x: number; y: number }>;
+    /** A river's stretches on land, as shares of its length (S424): its name keeps to them. */
+    land?: Array<[number, number]>;
+  } | undefined {
     const entry = this.entries.get(id);
     if (!entry?.labelAlong || !entry.labelAlong.isConnected) return undefined;
     const points = this.hitLatLngs(entry.shape).map(ll => {
       const p = this.map.latLngToContainerPoint(ll);
       return { x: p.x, y: p.y };
     });
-    return { el: entry.labelAlong, points };
+    if (!entry.shape.ink?.clipToLand || entry.editing) return { el: entry.labelAlong, points };
+    const r = this.inkRegions();
+    return { el: entry.labelAlong, points, land: landSpansAlong(this.readingPoints(entry.shape), r.land, r.water) };
   }
 
   /** Where along its line the name sits, as a share of the line's length. */

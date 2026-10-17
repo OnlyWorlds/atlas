@@ -335,14 +335,60 @@ function inRing(p: Point, r: Ring): boolean {
  * stored line is never touched, only what is drawn.
  */
 export function clipLineToLand(line: Point[], land: Point[][], water: Point[][]): Point[][] {
+  if (line.length < 2) return line.length ? [line] : [];
+  const out: Point[][] = [];
+  let cur: Point[] | null = null;
+  const cut = eachLandPiece(line, land, water, (_seg, a, b, t0, t1, on) => {
+    const at = (t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    if (!on) { cur = null; return; }
+    if (!cur) { cur = [at(t0)]; out.push(cur); }
+    cur.push(at(t1));
+  });
+  return cut ? out : [line];
+}
+
+/**
+ * Where along a line its land lies (S424), as shares of the line's length
+ * from its first point: the stretches `clipLineToLand` draws. A name along
+ * a river keeps to them, so it never prints over the mouth's stretch at sea.
+ * With no regions at all, the whole line.
+ */
+export function landSpansAlong(line: Point[], land: Point[][], water: Point[][]): Array<[number, number]> {
+  const lens: number[] = [];
+  let total = 0;
+  for (let i = 0; i < line.length - 1; i++) {
+    const d = Math.hypot(line[i + 1].x - line[i].x, line[i + 1].y - line[i].y);
+    lens.push(d);
+    total += d;
+  }
+  if (!(total > 0)) return [];
+  const spans: Array<[number, number]> = [];
+  let open: [number, number] | null = null;
+  const before = lens.map((_, i) => lens.slice(0, i).reduce((x, y) => x + y, 0));
+  const cut = eachLandPiece(line, land, water, (seg, _a, _b, t0, t1, on) => {
+    if (!on) { open = null; return; }
+    const s0 = (before[seg] + lens[seg] * t0) / total, s1 = (before[seg] + lens[seg] * t1) / total;
+    if (open) open[1] = s1;
+    else { open = [s0, s1]; spans.push(open); }
+  });
+  return cut ? spans : [[0, 1]];
+}
+
+/**
+ * The walk both share: every piece of every segment, cut where it crosses a
+ * region's outline, with whether its midpoint is on land. False when there
+ * are no regions to cut by (the line is all land).
+ */
+function eachLandPiece(
+  line: Point[], land: Point[][], water: Point[][],
+  visit: (seg: number, a: Point, b: Point, t0: number, t1: number, onLand: boolean) => void,
+): boolean {
   const landR = land.filter(r => r.length >= 3).map(ringOf);
   const waterR = water.filter(r => r.length >= 3).map(ringOf);
-  if (line.length < 2 || (landR.length === 0 && waterR.length === 0)) return line.length ? [line] : [];
+  if (landR.length === 0 && waterR.length === 0) return false;
   const onLand = (p: Point): boolean =>
     (landR.length === 0 || landR.some(r => inRing(p, r))) && !waterR.some(r => inRing(p, r));
   const rings = [...landR, ...waterR];
-  const out: Point[][] = [];
-  let cur: Point[] | null = null;
   for (let i = 0; i < line.length - 1; i++) {
     const a = line[i], b = line[i + 1];
     const sx0 = Math.min(a.x, b.x), sx1 = Math.max(a.x, b.x), sy0 = Math.min(a.y, b.y), sy1 = Math.max(a.y, b.y);
@@ -355,19 +401,14 @@ export function clipLineToLand(line: Point[], land: Point[][], water: Point[][])
       }
     }
     ts.sort((x, y) => x - y);
-    const at = (t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
     for (let k = 0; k < ts.length - 1; k++) {
       const t0 = ts[k], t1 = ts[k + 1];
       if (t1 - t0 < 1e-9) continue;
-      if (onLand(at((t0 + t1) / 2))) {
-        if (!cur) { cur = [at(t0)]; out.push(cur); }
-        cur.push(at(t1));
-      } else {
-        cur = null;
-      }
+      const m = (t0 + t1) / 2;
+      visit(i, a, b, t0, t1, onLand({ x: a.x + (b.x - a.x) * m, y: a.y + (b.y - a.y) * m }));
     }
   }
-  return out;
+  return true;
 }
 
 /**

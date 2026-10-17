@@ -229,6 +229,40 @@ test('a river on an ink map ends at the coast it runs out over', async ({ page }
   expect(f!.riverLeft).toBeLessThan(f!.landRight - 100);   // and is still drawn inland
 });
 
+test('a river\'s name keeps to its land, never the stretch out at sea', async ({ page }) => {
+  await setupWorld(page);
+  const ids = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = await store.createElement('map', { name: 'Isle', atlas_map_style: 'ink' });
+    const zone = async (name: string, subtype: string, shape: string, pts: number[][]) => {
+      const z = await store.createZone({ name, subtype, atlas_shape: shape });
+      for (let i = 0; i < pts.length; i++) {
+        await store.createMarker({ name: '', map_id: map.id, zone_id: z.id, x: pts[i][0], y: pts[i][1], order: i });
+      }
+    };
+    await zone('Isle', 'Landmass', 'polygon', [[500, 500], [1500, 450], [1600, 1300], [900, 1550], [450, 1100]]);
+    // 1050 units long, the last 40% past the coast: its middle sits on the coast
+    await zone('Outflow', 'River', 'line', [[900, 700], [1300, 700], [1950, 700]]);
+    api.patchData(await store.listElements());
+    return { worldId: api.getState().active.worldId, mapId: map.id };
+  });
+  await openMap(page, ids);
+  const along = page.locator('.atlas-map-pane .atlas-ink-line-label');
+  await expect(along).toBeVisible();
+  await expect.poll(() => along.locator('textPath').getAttribute('startOffset')).not.toBe('50%');
+  // Read once the fit has settled (no zoom animating, the pane still), and one density pass after it.
+  await mapPaneTransform(page);
+  await expect(page.locator('.atlas-map-pane .leaflet-zoom-anim')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  const ends = await page.evaluate(() => {
+    const river = [...document.querySelectorAll('.atlas-map-pane .leaflet-overlay-pane path.atlas-zone-ink')]
+      .find(p => p.getAttribute('fill') === 'none')!.getBoundingClientRect();
+    return { name: document.querySelector('.atlas-map-pane .atlas-ink-line-label')!.getBoundingClientRect().right, river: river.right };
+  });
+  expect(ends.name).toBeLessThanOrEqual(ends.river + 2);
+});
+
 test('a name along a river moves along it, clear of an area\'s name on its middle', async ({ page }) => {
   // Room on the river for its name somewhere: at 1280 the map pane is so
   // narrow that every place along it meets Greenwood, and the name drops.
@@ -248,6 +282,13 @@ test('a name along a river moves along it, clear of an area\'s name on its middl
   await expect(along).toBeVisible();
   await expect(forest).toBeVisible();
   expect(await overlap()).toBe(false);
+  // ...and it keeps to the river's land, never the stretch past the coast.
+  const ends = await page.evaluate(() => {
+    const river = [...document.querySelectorAll('.atlas-map-pane .leaflet-overlay-pane path.atlas-zone-ink')]
+      .find(p => p.getAttribute('fill') === 'none')!.getBoundingClientRect();
+    return { name: document.querySelector('.atlas-map-pane .atlas-ink-line-label')!.getBoundingClientRect().right, river: river.right };
+  });
+  expect(ends.name).toBeLessThanOrEqual(ends.river + 2);
   // The control: at the middle the two names would print over each other.
   await along.locator('textPath').evaluate(t => t.setAttribute('startOffset', '50%'));
   expect(await overlap()).toBe(true);

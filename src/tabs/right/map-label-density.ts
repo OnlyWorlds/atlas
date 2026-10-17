@@ -172,6 +172,8 @@ export const ALONG_SHARES = [0.5, 0.35, 0.65, 0.2, 0.8] as const;
  * stand on (left of travel: the line runs left to right, so up). A share
  * whose span would run off either end is left out, so a name longer than
  * its line has no place at all. `points` are container px, in reading order.
+ * With `within` (a river's stretches on land, shares of its length), a name
+ * keeps inside one of them, and the middle of the longest is tried first.
  */
 export function alongLabelPlacements(
   points: readonly { x: number; y: number }[],
@@ -179,7 +181,12 @@ export function alongLabelPlacements(
   half: number,
   lift: number,
   shares: readonly number[] = ALONG_SHARES,
+  within?: ReadonlyArray<readonly [number, number]>,
 ): Array<{ share: number; box: Box; parts: Box[] }> {
+  if (within) {
+    const mids = [...within].sort((p, q) => (q[1] - q[0]) - (p[1] - p[0])).map(([a, b]) => (a + b) / 2);
+    shares = [...mids, ...shares.filter(s => !mids.includes(s))];
+  }
   const cum = [0];
   for (let i = 1; i < points.length; i++) {
     cum.push(cum[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
@@ -201,6 +208,7 @@ export function alongLabelPlacements(
     const s0 = share * total - textW / 2;
     const s1 = share * total + textW / 2;
     if (s0 < 0 || s1 > total) continue;
+    if (within && !within.some(([a, b]) => s0 >= a * total - 1e-6 && s1 <= b * total + 1e-6)) continue;
     const parts: Box[] = [];
     const steps = Math.max(1, Math.ceil((s1 - s0) / half));
     for (let k = 0; k <= steps; k++) {
@@ -444,7 +452,7 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
     }
   }
   // Names written along lines on a styled map (S424): SVG text, no anchor.
-  const alongEls: Array<{ id: string; el: SVGTextElement; points: Array<{ x: number; y: number }> }> = [];
+  const alongEls: Array<{ id: string; el: SVGTextElement; points: Array<{ x: number; y: number }>; land?: Array<[number, number]> }> = [];
   if (entry.zoneOverlay) {
     for (const id of entry.zoneOverlay.getZoneIds()) {
       const along = entry.zoneOverlay.getAlongLabel(id);
@@ -579,7 +587,7 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
   }
   const alongById = new Map<string, { zoneId: string; el: SVGTextElement; shares: number[] }>();
   if (zonesAuto && entry.zoneOverlay) {
-    for (const { id, el, points } of alongEls) {
+    for (const { id, el, points, land } of alongEls) {
       if (!entry.zoneOverlay.isZoneVisible(id)) continue;
       const face = alongFaces.get(alongFaceKey(el));
       if (!face) continue;
@@ -587,7 +595,7 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
       if (fixedPinNames.has(labelNameKey(text) ?? '')) { el.classList.add(LABEL_CULLED_CLASS); continue; }
       const textW = measured(face, text);
       // The glyphs stand above the line (dy -4 in ZoneOverlay): centre the pieces there.
-      const placements = alongLabelPlacements(points, textW, face.size * 0.7, 4 + face.size * 0.35);
+      const placements = alongLabelPlacements(points, textW, face.size * 0.7, 4 + face.size * 0.35, ALONG_SHARES, land);
       if (placements.length === 0) { el.classList.add(LABEL_CULLED_CLASS); continue; }
       const zone = byId.get(id);
       const prioritised = zone ? Boolean(resolveStyle(rules, zone).label_priority) : false;
