@@ -30,6 +30,7 @@ import { revealPinsOnMap } from '../tabs/right/map-tab-pins';
 import { locateTargetFor } from './pin-locate';
 import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDiskNotice, setDiskShowOnly } from '../core/live-folder';
 import { isCoarsePointer } from '../core/pointer';
+import { renderGate } from '../ui/render-gate';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 // Pins and markers close the strip (S356): browsable when asked for, muted
@@ -480,6 +481,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
   // The strip's "Hide types" mode on a touch screen (#301), for this sidebar's life.
   let hidingTypes = false;
+  const filterGate = renderGate();
 
   function renderFilters(): void {
     const state = getState();
@@ -489,7 +491,6 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const countByType = new Map<ElementType, number>();
     for (const el of elements) countByType.set(el.type, (countByType.get(el.type) ?? 0) + 1);
 
-    strip.innerHTML = '';
     filterSummaryLine.textContent = filterSummary(filters, muted);
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
@@ -498,6 +499,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // Names on the strip (#24, h20 B8, the Captain #3143): a setting, icons only by default; the
     // tour keeps its own icon strip whatever the setting says.
     const names = touring ? 'icons' : getEditorSettings(state.registry).type_strip_names;
+    // Rebuilt only when it would come out different (conv. 146, S422): a
+    // rebuild between a press and its release loses the click. The handlers
+    // capture only their type and read the rest at the click.
+    if (!filterGate.changed([JSON.stringify([names, touring, isCoarsePointer(), hidingTypes,
+      [...filters].sort(), [...muted].sort(), [...countByType].sort()])])) return;
+    strip.innerHTML = '';
     strip.dataset.names = names;
     const named = (type: ElementType): boolean =>
       names === 'all' || (names === 'held' && (countByType.get(type) ?? 0) > 0);
@@ -631,6 +638,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     if (!state.active) {
       lastList = null;
       strip.innerHTML = '';
+      filterGate.reset();
       subFilterRow.hidden = true;
       subFilterType = null; superFilter = null; subtypeFilter = null;
       lensBanner.setAttribute('data-active', 'false');

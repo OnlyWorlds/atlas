@@ -353,6 +353,78 @@ test('a click on a right pane tab survives a re-render between press and release
   await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().ui.rightActiveIndex)).toBe(other);
 });
 
+/** Open the seeded world and add one element of `type` through the active store. */
+async function openWorldWith(page: Page, dir: string, type: string, fields: Record<string, unknown>): Promise<string> {
+  await freshBoot(page);
+  await seedWorldFolderForPicker(page, dir);
+  await page.click('[data-action="open-world-folder"]');
+  await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
+  return await page.evaluate(async ({ type, fields }) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const created = await store.createElement(type, fields);
+    api.patchData(await store.listElements());
+    return created.id as string;
+  }, { type, fields });
+}
+
+// Rows 6 to 8: the elements filter strip, the writing tree, the map index.
+test('a click on a type in the elements filter strip survives a re-render between press and release', async ({ page }) => {
+  await openWorldWith(page, 'agent-world-18', 'location', { name: 'The Harbour' });
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    api.patchSlice('ui', { ...api.getState().ui, sidebarMode: 'elements' });
+  });
+  await clickAcrossRerender(page, '.atlas-filter-btn[data-filter-type="character"]');
+  await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().ui.elementFilters.has('character'))).toBe(true);
+});
+
+test('a click on a row in the writing tree survives a re-render between press and release', async ({ page }) => {
+  const id = await openWorldWith(page, 'agent-world-19', 'narrative', { name: 'Book One', supertype: 'Book' });
+  await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/writing`; });
+  await clickAcrossRerender(page, '.atlas-writing-tree-row-body');
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toContain(id);
+});
+
+test('a click on a map in the map index survives a re-render between press and release', async ({ page }) => {
+  const id = await openWorldWith(page, 'agent-world-20', 'map', { name: 'Coast' });
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const ui = api.getState().ui;
+    api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+  });
+  await clickAcrossRerender(page, `.atlas-map-tree-row[data-map-id="${id}"]`);
+  await expect.poll(() => page.evaluate((mapId) => (window as any).__atlasTestApi.getState().ui.rightTabs.some((t: any) => t.kind === 'map' && t.mapId === mapId), id)).toBe(true);
+});
+
+// Row 9: the chart room's control bar.
+test('a click on the chart room\'s Set now time survives a re-render between press and release', async ({ page }) => {
+  await openWorldWith(page, 'agent-world-22', 'event', { name: 'The Founding', start_date: 120 });
+  await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/timeline`; });
+  await clickAcrossRerender(page, '[data-action="set-now"]');
+  await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().active.meta.time_current ?? null)).not.toBeNull();
+});
+
+// The collapsed maps live outside the store: the chevron's redraw must still run.
+test('the map index chevron folds a parent map', async ({ page }) => {
+  const parent = await openWorldWith(page, 'agent-world-21', 'map', { name: 'Realm' });
+  const child = await page.evaluate(async (parentId) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const created = await store.createElement('map', { name: 'Province', parent_map: parentId });
+    api.patchData(await store.listElements());
+    return created.id as string;
+  }, parent);
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const ui = api.getState().ui;
+    api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+  });
+  await expect(page.locator(`.atlas-map-tree-row[data-map-id="${child}"]`)).toBeVisible();
+  await page.locator(`.atlas-map-tree-row[data-map-id="${parent}"] .atlas-map-tree-chevron`).click();
+  await expect(page.locator(`.atlas-map-tree-row[data-map-id="${child}"]`)).toHaveCount(0);
+});
+
 test('a click on the sync pill\'s conflict badge stays on the badge across a re-render', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-15');

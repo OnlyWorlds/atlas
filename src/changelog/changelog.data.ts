@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.51.6',
+    date: '2026-10-17',
+    theme: 'A click that lands, in the lists and the chart',
+    entries: [
+      {
+        id: 'list-click-kept',
+        title: 'A click on the type strip, the writing tree, the map list or the chart\'s controls is no longer lost',
+        body: 'The row of element types above the elements list, the tree of books in the writing sidebar, the list of maps and the bar above the chart were redrawn whenever anything changed, and a click that fell across a redraw did nothing. They now redraw only when what they show changes.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.51.5',
     date: '2026-10-17',
     theme: 'A click that lands, on the page and in Settings',

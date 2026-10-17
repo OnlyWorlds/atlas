@@ -34,6 +34,7 @@ import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
 import { WorldClockModal } from '../ui/world-clock-modal';
 import { CalendarBuilderModal } from '../ui/calendar-builder-modal';
 import { narrativeKindOf } from '../core/narrative-kind';
+import { renderGate } from '../ui/render-gate';
 
 /** A sensible first "now": the LATEST recorded moment (Captain, S318 —
  *  "snap to the center of whatever elements are at the latest date"). The
@@ -1030,14 +1031,24 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     if (!suppressGallery) renderGallery(); // keep the active-chart highlight in sync
   }
 
-  if (getState().active) render();
+  // A store patch or a hashchange redraws only when the room's inputs moved
+  // (conv. 146, S422): a rebuild between a press and its release loses the
+  // click. The room's own controls change its closure state (the type lens,
+  // the mode, the gallery) and call render() themselves, ungated.
+  const tickGate = renderGate();
+  const onTick = (): void => {
+    const s = getState();
+    if (tickGate.changed([s.active, s.data, s.registry, window.location.hash])) render();
+  };
+
+  if (getState().active) onTick();
   void refreshGallery();
   // charts.json can change out-of-band (id-swap migration on make-online) —
   // re-read so the gallery never shows a stale saved scope.
   const onChartsChanged = () => { void refreshGallery(); };
   window.addEventListener('atlas:charts-changed', onChartsChanged);
-  const unsubState = subscribe(render);
-  const unsubHash = onHashChange(render);
+  const unsubState = subscribe(onTick);
+  const unsubHash = onHashChange(onTick);
 
   return () => {
     window.removeEventListener('atlas:charts-changed', onChartsChanged);

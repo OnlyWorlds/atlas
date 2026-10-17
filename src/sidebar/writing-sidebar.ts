@@ -36,6 +36,7 @@ import { bulkLinkNarratives } from '../middle/writing-bulk-link';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { isTourFlagActive } from '../tour/tour-flag';
+import { renderGate } from '../ui/render-gate';
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -169,7 +170,14 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
   // (O(N·depth) — the same prose was rescanned by every ancestor).
   let subtreeLinkMemo = new Map<string, number>();
 
+  // Rebuilt only when an input moved (conv. 146, S422): a rebuild between a
+  // press and its release loses the click. The parts are the slices the tree
+  // reads, the route (the open narrative) and its own search box.
+  const gate = renderGate();
+
   function render(): void {
+    const s = getState();
+    if (!gate.changed([s.active, s.data, s.registry, window.location.hash, searchQuery, isTourFlagActive()])) return;
     const active = getState().active;
     if (!active) {
       root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';

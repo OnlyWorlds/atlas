@@ -25,6 +25,7 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-
 import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
+import { renderGate } from '../../ui/render-gate';
 
 // ---- Collapsed tree-node state ----
 
@@ -237,8 +238,16 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     }
   });
 
+  // Rebuilt only when an input moved (conv. 146, S422): a rebuild between a
+  // press and its release loses the click. The parts are the slices the index
+  // reads, its search box and a count of the redraws its rows ask for (the
+  // collapsed maps live outside the store).
+  const gate = renderGate();
+  let rerenderSeq = 0;
+
   function render(): void {
     const state = getState();
+    if (!gate.changed([state.active, state.data, state.ui, searchTerm, rerenderSeq])) return;
     if (!state.active) {
       root.innerHTML = `<div class="atlas-pane-empty">No active world.</div>`;
       return;
@@ -380,7 +389,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       locationNames,
       toasts,
       worldId,
-      requestRerender: render,
+      requestRerender: () => { rerenderSeq++; render(); },
       // During active search, ignore collapsed state — every match is
       // visible and reachable. Clearing the search restores it.
       ignoreCollapsed: !!trimmedSearch,
