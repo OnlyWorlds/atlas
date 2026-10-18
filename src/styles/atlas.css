@@ -6615,8 +6615,12 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
+/* A washed sepia, not a black stamp: at a map's own zoom a dark icon read as a cartoon over the
+   terrain (Seethe, h57 #6789). The icon still carries its type. */
 .atlas-map-pane .atlas-map-style-hatched .leaflet-marker-pane img.leaflet-marker-icon {
-  filter: grayscale(1) sepia(0.6) brightness(0.3);
+  /* invert lifts the black glyph to a grey, sepia warms it: about #5a4a30, her secondary ink */
+  filter: grayscale(1) invert(0.26) sepia(1);
+  opacity: 0.9;
 }
 .atlas-map-pane .atlas-map-style-hatched .leaflet-2d-pin-label .pin-label-text {
   color: #28220f;
