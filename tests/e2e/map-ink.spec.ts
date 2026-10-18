@@ -472,6 +472,10 @@ test('Trace turns one drag into a few points and does not pan the map', async ({
 // The drifting click is a behaviour check only: before G15's floor it also
 // landed one point, the moving average folding three samples into one.
 test('Trace keeps a coast to its budget, a drifting click to one point, and the drag to itself', async ({ page }) => {
+  // Its own workload (a 1500-move coast) runs ~40 s alone, at the suite's 45 s
+  // limit, so it flipped with machine load and failed at HEAD too (S427 flaky;
+  // S429 red 5 of 5 at 45 s, green at 39.7 s with room). Time, not an assertion.
+  test.setTimeout(120_000);
   await setupWorld(page);
   await openMap(page, await seedMap(page, 'ink'));
   await page.click('button[data-action="draw-polygon"]');

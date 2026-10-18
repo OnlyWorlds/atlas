@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.53.2',
+    date: '2026-10-18',
+    theme: 'World details in a shared world',
+    entries: [
+      {
+        id: 'world-details-told-once',
+        title: 'In a world you share, a change to its details is told once',
+        body: 'Only a world\'s owner can change its own details on OnlyWorlds, such as its description and its now. When you change them in a world someone shared with you, Atlas says once that the change stays in your copy, and no longer sends it again and repeats itself with every save. Change them again and Atlas tries once more.',
+        tags: ['fix', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.53.1',
     date: '2026-10-18',
     theme: 'Make online, signed in',

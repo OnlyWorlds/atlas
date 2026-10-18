@@ -278,6 +278,16 @@ export class SyncEngine {
    * built per attach — so this latch never needs resetting.
    */
   private stopped = false;
+  /**
+   * The world-meta fields keel last refused as `owner_only` (a co-builder or
+   * contributor changed the world's own details), with the failure it raised.
+   * While the dirty fields are exactly these, the meta step does not PATCH
+   * again: it reports the SAME failure object, which `failureToastOnce` has
+   * already decided, so the change stays honest in the status and is told once
+   * (S429, Kael's collaborator walk h57 #7224, finding 6: it was re-sent and
+   * re-told on every round). A new edit changes the fields and tries again.
+   */
+  private metaOwnerRefusal: { sig: string; failure: PerElementFailure } | null = null;
   /** Debounce timer for `requestPush()` autosave. Reset on each write. */
   private debouncePushTimer: ReturnType<typeof setTimeout> | null = null;
   /** Debounce window for autosave pushes. ms. Configurable via setDebounceMs. */
@@ -1081,8 +1091,13 @@ export class SyncEngine {
     // adopting the full body would swallow concurrent server-side changes).
     // View-only (S264): never PATCH — local meta can't legitimately diverge
     // (the store guard blocks UI writes), so anything here stays unpushed.
-    const pushedNames = this.readOnly ? [] : Object.keys(pushFields);
+    let pushedNames = this.readOnly ? [] : Object.keys(pushFields);
     let serverUpdatedAt = server.updated_at || null;
+    const pushSig = JSON.stringify(pushedNames.slice().sort().map(f => [f, pushFields[f]]));
+    if (pushedNames.length > 0 && this.metaOwnerRefusal?.sig === pushSig) {
+      failures.push(this.metaOwnerRefusal.failure);
+      pushedNames = [];
+    }
     if (pushedNames.length > 0) {
       try {
         const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush(pushFields));
@@ -1108,8 +1123,10 @@ export class SyncEngine {
           return { meta_pushed: [], meta_pulled: pulled, failures, auth_blocked: true };
         }
         console.warn('[atlas:sync] meta step: PATCH /world failed — fields stay dirty', err);
-        failures.push(metaFailure('update', err));
-        pushedNames.length = 0; // nothing landed; baselines for them unchanged
+        const failure = metaFailure('update', err);
+        failures.push(failure);
+        if (memberRefusal(err) === 'owner_only') this.metaOwnerRefusal = { sig: pushSig, failure };
+        pushedNames = []; // nothing landed; baselines for them unchanged
       }
     }
 
