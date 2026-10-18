@@ -4,13 +4,13 @@
 
 ---
 
-## Charter: DRAFT for the Captain's signature
+## Charter (signed)
 
-*Unsigned until you write your name under it. Signed once; changed only by you.*
+*Signed by the Captain; changed only by him. The 2026-10-18 change below is his (the catch-up, h20 #6839).*
 
 **Outcome.** Atlas at atlas.onlyworlds.com is the place anyone sees, explores, creates and edits an OnlyWorlds world, on any desktop browser: the folder is the world, OnlyWorlds online is an optional sync target, and nothing a person makes is ever lost or quietly changed.
 
-**Current milestone.** **Worlds in your browser** (1.17): a world can live in the browser's own storage on every browser (Firefox and Safari included), move to a folder, and be downloaded whole; the tour's world can be kept at the end. Contract first, Skeld reads it for the folder format before any code, then gated bouts, then your full smoke on the walk page.
+**Current milestone.** **The journey** (OW Journey, h57): a stranger gets from onlyworlds.com into a world of their own in Atlas and back out, every Atlas step of it (A1 to A19, `Forge/Notes/2026-10-15-journey-atlas.md`) walked by the crew and then by you as the new user, the pinches it finds fixed. Before it: **Worlds in your browser** (1.17), done.
 
 **Crew.** Temper leads (the tool, the build, its record). Skeld (the folder format and keel; reads every contract that touches identity or the format). Boss (deploys and the edge numbers, by letter). Kael (cards of Atlas's tech, reviewed by Temper). Hangout: Atlas (h20).
 
