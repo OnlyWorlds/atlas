@@ -16,6 +16,14 @@ describe('zone kinds (Skeld h20 #6449: the subtype)', () => {
     expect(zoneKindOf('Route')).toBe('road');
     expect(zoneKindOf('path')).toBe('road');
   });
+  it('reads a "Class: kind" subtype by its halves, the class first (Skeld h58 #6762)', () => {
+    expect(zoneKindOf('Border: treaty line')).toBe('border');
+    expect(zoneKindOf('Itinerary: route')).toBe('road');
+    expect(zoneKindOf('River: Forest')).toBe('river');
+    expect(zoneKindOf('historical')).toBeUndefined();
+    expect(zoneKindOf('Itinerary: sea lane')).toBeUndefined();
+    expect(zoneKindOf(':')).toBeUndefined();
+  });
   it('leaves any other subtype plain', () => {
     expect(zoneKindOf('Sea lane')).toBeUndefined();
     expect(zoneKindOf('')).toBeUndefined();

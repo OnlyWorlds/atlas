@@ -33,9 +33,18 @@ export const ZONE_KIND_WORDS = [
   'River', 'Road', 'Wall', 'Border', 'Coast',
 ] as const;
 
+/**
+ * A subtype written "Class: kind" (Blood Meridian's "Border: treaty line",
+ * the form Windrose reads as two fields) is tried by its halves, the part
+ * before the colon first, and the first that names a kind styles the zone
+ * (Skeld h58 #6762). The seed's own words never have to move.
+ */
 export function zoneKindOf(subtype: unknown): InkKind | undefined {
   if (typeof subtype !== 'string') return undefined;
-  return KIND_WORDS[subtype.trim().toLowerCase()];
+  const word = (s: string) => KIND_WORDS[s.trim().toLowerCase()];
+  const colon = subtype.indexOf(':');
+  if (colon < 0) return word(subtype);
+  return word(subtype.slice(0, colon)) ?? word(subtype.slice(colon + 1));
 }
 
 /**
