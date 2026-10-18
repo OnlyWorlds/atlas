@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'map-styles',
         title: 'A map can draw its zones as a coast, a forest or a river',
-        body: 'On a map\'s page, Map style offers Ink on parchment, Modern atlas and Hatched. A zone whose subtype names its kind (Landmass, Sea, Lake, Range, Forest, Marsh, Desert, Territory, River, Road, Wall, Border, Coast) is drawn as one: a coast with its shore, a range hatched, a river that ends at the sea with its name along it. Only the look changes: your zones stay exactly as they are, and Plain brings back the usual map. On a map with a picture, the zones take the style\'s lines and names and the picture stays the ground.',
+        body: 'On a map\'s page, Map style offers Ink on parchment, Modern atlas and Hatched. A zone whose subtype names its kind (Landmass, Sea, Lake, Range, Forest, Marsh, Desert, Territory, River, Road, Wall, Border, Coast; a Route or a Path draws as a Road) is drawn as one: a coast with its shore, a range hatched, a river that ends at the sea with its name along it. Only the look changes: your zones stay exactly as they are, and Plain brings back the usual map. On a map with a picture, the zones take the style\'s lines and names and the picture stays the ground.',
         tags: ['maps'],
       },
       {
