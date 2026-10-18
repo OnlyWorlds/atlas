@@ -346,6 +346,19 @@ test('imageless map is first-class: flat canvas opens, pin places, zone draft st
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-zone-draft-overlay]')).toHaveCount(0);
 
+  // A zone made with its supertype left empty carries the shape's word there,
+  // for tools that have no atlas_shape (the Captain's interim, h20 #6839).
+  await page.click('[data-action="draw-polygon"]');
+  for (const [x, y] of [[150, 330], [300, 330], [220, 430]]) await canvas.click({ position: { x, y } });
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-role="zone-create-supertype"]')).toHaveValue('');
+  await page.click('[data-action="create"]:has-text("Create zone")');
+  await expect.poll(async () => page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    const z = els.find((e: any) => e.type === 'zone');
+    return z ? `${z.supertype}|${z.atlas_shape}` : null;
+  })).toBe('polygon|polygon');
+
   // "Add art later": attaching an image whose dims differ from the stamped
   // 2000x2000 square must REMOUNT the open tab into the image's coordinate
   // space (S300 close gate — a background re-apply alone leaves the manager

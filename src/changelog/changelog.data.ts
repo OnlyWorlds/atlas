@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.52.1',
+    date: '2026-10-18',
+    theme: 'A new zone says its shape',
+    entries: [
+      {
+        id: 'zone-shape-word',
+        title: 'A new zone with no supertype gets polygon or line there',
+        body: 'Other OnlyWorlds tools cannot yet tell an area from a line by anything a zone carries, so when you leave a new zone\'s supertype empty, Atlas writes its shape there, polygon or line. A supertype you type is kept as you typed it.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.52.0',
     date: '2026-10-18',
     theme: 'Sign in with your email and password',
