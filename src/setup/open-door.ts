@@ -22,7 +22,7 @@ import { WAITS_FOR_SIGN_IN, type ToastManager } from '../ui/toast-manager';
 import type { AccountWorldRow } from '../core/types';
 
 export const OPEN_MALFORMED_LINE = 'This link to open a world is not complete. Open the world again from onlyworlds.com.';
-export const OPEN_SIGN_IN_LINE = 'To open this world from onlyworlds.com, sign in to Atlas with your OnlyWorlds account: paste your account token under Account and press Sign in. The world opens after that, in this tab; if you reload, open it again from onlyworlds.com.';
+export const OPEN_SIGN_IN_LINE = 'To open this world from onlyworlds.com, sign in to Atlas with your OnlyWorlds account: your email or username and password, under Account. The world opens after that, in this tab; if you reload, open it again from onlyworlds.com.';
 export const OPEN_UNREAD_LINE = 'Atlas could not read your worlds on OnlyWorlds just now. Open the world again from onlyworlds.com in a moment.';
 const OPEN_TOUR_LINE = 'Finish the tour first, then open the world again from onlyworlds.com.';
 

@@ -253,7 +253,7 @@ function inviteLineHtml(world: WorldRegistryEntry): string {
   if (getState().registry.account_token) {
     return `<p class="atlas-settings-hint" data-role="invite-line"><button type="button" class="atlas-btn-link" data-action="invite-someone">Invite someone</button> · makes a link to send, for a contributor or a player. They need a free account.</p>`;
   }
-  return `<p class="atlas-settings-hint" data-role="invite-line"><a class="atlas-settings-link atlas-link-inline" data-link="invite" href="${escapeAttr(owAccessUrl(world.api!.world_id))}" target="_blank" rel="noopener">Invite someone</a> · opens this world on onlyworlds.com at Access, where you make an invite link to send. Your friend needs a free account. Signed in with your account token, Atlas makes the link here.</p>`;
+  return `<p class="atlas-settings-hint" data-role="invite-line"><a class="atlas-settings-link atlas-link-inline" data-link="invite" href="${escapeAttr(owAccessUrl(world.api!.world_id))}" target="_blank" rel="noopener">Invite someone</a> · opens this world on onlyworlds.com at Access, where you make an invite link to send. Your friend needs a free account. Signed in to your account, Atlas makes the link here.</p>`;
 }
 
 export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {

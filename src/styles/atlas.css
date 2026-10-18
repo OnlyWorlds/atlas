@@ -5128,6 +5128,16 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   margin-bottom: 12px;
 }
 
+/* #387: the token paste is the second way in, so its line speaks as a hint does. */
+.atlas-account-token-alt summary {
+  color: rgba(var(--atlas-ink-rgb), 0.6);
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.atlas-account-token-alt[open] summary { margin-bottom: 6px; }
+.atlas-account-password { display: flex; flex-direction: column; gap: 6px; }
+
 .atlas-settings-field {
   display: flex;
   flex-direction: column;

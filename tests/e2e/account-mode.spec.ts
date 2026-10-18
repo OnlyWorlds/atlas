@@ -50,9 +50,13 @@ test.beforeEach(async ({ page }) => {
   await freshBoot(page);
 });
 
-test('signed out: settings shows the paste field, sidebar shows no remote section', async ({ page }) => {
+test('signed out: settings asks for email and password, the token behind its own line, and the sidebar shows no remote section (#387)', async ({ page }) => {
   await setupAtlasRoot(page);
   await page.click('[data-action="open-settings"]');
+  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await expect(page.locator('input[name="account-password"]')).toBeVisible();
+  await expect(page.locator('input[name="account-token"]')).toBeHidden();
+  await page.click('[data-role="account-token-alt"] summary');
   await expect(page.locator('input[name="account-token"]')).toBeVisible();
   await expect(page.locator('[data-action="account-sign-in"]')).toBeVisible();
   await expect(page.locator('.atlas-remote-worlds')).toBeEmpty();
@@ -61,11 +65,11 @@ test('signed out: settings shows the paste field, sidebar shows no remote sectio
 test('the Account section says which way to sign in and where the PIN comes from (#282)', async ({ page }) => {
   await setupAtlasRoot(page);
   await page.click('[data-action="open-settings"]');
-  await expect(page.locator('[data-role="account-lead"]')).toContainText('Sign in with an account token');
-  // One sign-in, first: the token's field stands above the PIN and the email.
+  await expect(page.locator('[data-role="account-lead"]')).toContainText('Sign in to see your onlyworlds.com worlds');
+  // One sign-in, first: its field stands above the PIN and the email.
   const order = await page.evaluate(() => {
     const at = (sel: string) => document.querySelector(sel)!.getBoundingClientRect().top;
-    return [at('input[name="account-token"]'), at('input[name="pin"]'), at('input[name="email"]')];
+    return [at('input[name="account-login"]'), at('input[name="pin"]'), at('input[name="email"]')];
   });
   expect(order[0]).toBeLessThan(order[1]);
   expect(order[1]).toBeLessThan(order[2]);
@@ -79,6 +83,7 @@ test('the Account section says which way to sign in and where the PIN comes from
 test('sign-in rejects a token without the ow_a_ prefix inline, without storing it', async ({ page }) => {
   await setupAtlasRoot(page);
   await page.click('[data-action="open-settings"]');
+  await page.click('[data-role="account-token-alt"] summary');
   await page.fill('input[name="account-token"]', 'not-a-token');
   await page.click('[data-action="account-sign-in"]');
   await expect(page.locator('[data-role="account-token-error"]')).toBeVisible();
@@ -125,7 +130,7 @@ test('forget drops the token and the remote section disappears', async ({ page }
   await page.waitForSelector('.atlas-shell');
   await page.click('[data-action="open-settings"]');
   await page.click('[data-action="account-forget"]');
-  await expect(page.locator('input[name="account-token"]')).toBeVisible();
+  await expect(page.locator('input[name="account-login"]')).toBeVisible();
   await expect(page.locator('.atlas-remote-worlds')).toBeEmpty();
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('atlas_worlds_registry')!).account_token ?? null
@@ -383,6 +388,7 @@ test('a list that failed for another reason offers Try again, and Try again asks
 async function signInFromSettings(page: Page) {
   await page.route(`${V2}/account`, route => route.fulfill({ json: { username: 'e2e-member', email: null } }));
   await page.evaluate(() => { location.hash = '#/settings/onlyworlds'; });
+  await page.click('[data-role="account-token-alt"] summary');
   await page.fill('input[name="account-token"]', TOKEN);
   await page.click('[data-action="account-sign-in"]');
   await expect(page.locator('.ow-toast', { hasText: 'Signed in as e2e-member' })).toBeVisible();
@@ -412,4 +418,54 @@ test('signing in where a world already is says nothing of the first screen (S414
   await page.waitForFunction(() => (window as any).__atlasTestApi.getState().accountWorlds.status === 'ready');
   await page.waitForTimeout(300);
   await expect(page.locator('.ow-toast', { hasText: 'listed on the first screen' })).toHaveCount(0);
+});
+
+// #387: email and password, as Lantern signs in. keel's app login, then this
+// browser's own token minted with the session, then the session ended; only
+// the token is kept, never the password.
+const AUTH = `${V2}/auth/app/v1/auth`;
+const PASSWORD = 'e2e-correct-horse';
+
+test('signing in with email and password keeps a token made for this browser, never the password (#387)', async ({ page }) => {
+  await page.route(`${V2}/account/worlds`, route => route.fulfill({ json: { data: [] } }));
+  await page.route(`${V2}/account`, route => route.fulfill({ json: { username: 'e2e-member', email: null } }));
+  const minted: Array<{ session: string | null; name: string }> = [];
+  let ended = 0;
+  await page.route(`${AUTH}/login`, route => route.fulfill({ json: { status: 200, meta: { session_token: 'e2e-session' } } }));
+  await page.route(`${AUTH}/session`, route => { ended++; return route.fulfill({ status: 401, json: {} }); });
+  await page.route(`${V2}/account/tokens`, route => {
+    minted.push({ session: route.request().headers()['x-session-token'] ?? null, name: JSON.parse(route.request().postData() ?? '{}').name });
+    return route.fulfill({ status: 201, json: { token: TOKEN, id: 'e2e-token-id', name: 'Atlas in Chrome', last4: TOKEN.slice(-4) } });
+  });
+  await page.evaluate(() => { location.hash = '#/settings/onlyworlds'; });
+  await page.fill('input[name="account-login"]', 'e2e@example.com');
+  await page.fill('input[name="account-password"]', PASSWORD);
+  await page.click('[data-action="account-sign-in-password"]');
+  await expect(page.locator('.ow-toast', { hasText: 'Signed in as e2e-member' })).toBeVisible();
+  expect(minted).toHaveLength(1);
+  expect(minted[0].session).toBe('e2e-session');
+  expect(minted[0].name).toMatch(/^Atlas in /);
+  await expect.poll(() => ended).toBe(1);
+  const kept = await page.evaluate(() => ({
+    token: JSON.parse(localStorage.getItem('atlas_worlds_registry')!).account_token ?? null,
+    all: JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }),
+  }));
+  expect(kept.token).toBe(TOKEN);
+  expect(kept.all).not.toContain(PASSWORD);
+});
+
+test('a wrong password says so in Atlas\'s words and keeps nothing (#387)', async ({ page }) => {
+  let mints = 0;
+  await page.route(`${AUTH}/login`, route => route.fulfill({ status: 400, json: { status: 400, errors: [{ code: 'email_password_mismatch', message: 'The email address and/or password you specified are not correct.' }] } }));
+  await page.route(`${V2}/account/tokens`, route => { mints++; return route.fulfill({ status: 500, json: {} }); });
+  await page.evaluate(() => { location.hash = '#/settings/onlyworlds'; });
+  await page.fill('input[name="account-login"]', 'e2e@example.com');
+  await page.fill('input[name="account-password"]', 'wrong');
+  await page.click('[data-action="account-sign-in-password"]');
+  const error = page.locator('[data-role="account-token-error"]');
+  await expect(error).toContainText('did not match an OnlyWorlds account');
+  await expect(page.locator('[data-action="account-sign-in-password"]')).toBeEnabled();
+  expect(mints).toBe(0);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_worlds_registry') ?? '{}').account_token ?? null);
+  expect(stored).toBeNull();
 });

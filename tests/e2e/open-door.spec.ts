@@ -178,6 +178,8 @@ test('signed out, the link waits for the sign-in in Settings, then asks to open 
   const keel = await mockKeel(page);
   await arriveAt(page, `#/open/${ID}`);
   await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
+  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await page.click('[data-role="account-token-alt"] summary');
   const token = page.locator('input[name="account-token"]');
   await expect(token).toBeVisible();
   expect(keel.lists).toBe(0);
