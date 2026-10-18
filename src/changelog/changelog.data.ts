@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.53.1',
+    date: '2026-10-18',
+    theme: 'Make online, signed in',
+    entries: [
+      {
+        id: 'make-online-signed-in',
+        title: 'Signed in, Make online asks only for your PIN',
+        body: 'Signed in to OnlyWorlds, Make online makes the new world on your account and says so, so it no longer asks for your email. Your PIN still goes with it, once, so Atlas can upload the world\'s contents.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.53.0',
     date: '2026-10-18',
     theme: 'A map drawn from its own zones',

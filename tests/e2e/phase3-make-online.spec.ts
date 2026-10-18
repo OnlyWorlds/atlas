@@ -75,6 +75,45 @@ test('Make Online modal opens with both route tabs', async ({ page }) => {
   await expect(page.locator('input[name="create-name"]')).toHaveValue('Sandbox');
 });
 
+// The journey's A7 (S427): signed in, the account makes the world, so Make online
+// asks no email and says whose account; the PIN alone goes with it.
+test('Signed in, Make online asks only the PIN and makes the world on the account', async ({ page }) => {
+  const V2 = 'https://www.onlyworlds.com/api/v2';
+  let made: unknown = null;
+  await page.route(`${V2}/**`, async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname.replace('/api/v2', '');
+    if (path === '/account/worlds' && req.method() === 'POST') {
+      made = req.postDataJSON();
+      return route.fulfill({ status: 201, json: { id: '0e2e0000-0000-4000-8000-0000000000a7', name: 'Sandbox', key: 'ow_w_' + 'a'.repeat(40) } });
+    }
+    if (path === '/account') return route.fulfill({ json: { username: 'e2e-member', email: null } });
+    return route.fulfill({ json: { data: [] } });
+  });
+  await setupAtlasRoot(page);
+  await createLocalWorld(page, 'Sandbox');
+  await page.evaluate(() => {
+    const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry')!);
+    reg.account_token = 'ow_a_' + 'e'.repeat(40);
+    reg.account_username = 'e2e-member';
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  });
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="world"]');
+  await page.click('[data-action="make-online"]');
+  const pane = page.locator('[data-route-pane="create"]');
+  await expect(pane).toBeVisible();
+  await expect(pane.locator('input[name="create-email"]')).toHaveCount(0);
+  await expect(pane.locator('[data-role="no-account"]')).toHaveCount(0);
+  await expect(pane.locator('[data-role="signed-in"]')).toContainText('e2e-member');
+  await pane.locator('input[name="create-pin"]').fill('1234');
+  await pane.locator('[data-action="create-submit"]').click();
+  await expect(page.locator('[data-modal="make-online"]')).toHaveCount(0, { timeout: 15_000 });
+  expect(made).toEqual(expect.objectContaining({ name: 'Sandbox' }));
+});
+
 test('Tab switching toggles the active route pane', async ({ page }) => {
   await setupAtlasRoot(page);
   await createLocalWorld(page, 'Sandbox');

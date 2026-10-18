@@ -127,6 +127,19 @@ export class MakeOnlineModal extends BaseModal {
     const defaultName = active.meta.name || 'Untitled world';
     const prefilledPin = reg.pin ?? '';
     const prefilledEmail = reg.email ?? '';
+    // Signed in, the world is made on the account (createApiWorld's token route): no email to ask,
+    // and no "No account yet?" (the journey's A7 frame, S427).
+    const signedIn = Boolean(reg.account_token);
+    const accountLine = signedIn
+      ? `<p class="atlas-modal-hint" data-role="signed-in">On your account${reg.account_username ? `, ${escapeAttr(reg.account_username)}` : ''}. The PIN lets Atlas upload the world's contents.</p>`
+      : '';
+    const emailField = signedIn
+      ? ''
+      : `<label class="atlas-modal-field">
+            <span>Email</span>
+            <input class="atlas-input" type="email" name="create-email" value="${escapeAttr(prefilledEmail)}" placeholder="Your OnlyWorlds account email" autocomplete="off" />
+          </label>`;
+    const noAccount = signedIn ? '' : `<p class="atlas-modal-hint" data-role="no-account">${noAccountYetHtml()}</p>`;
 
     body.innerHTML = `
       <div class="atlas-tab-bar atlas-modal-tab-bar">
@@ -143,15 +156,13 @@ export class MakeOnlineModal extends BaseModal {
             <span>Display name</span>
             <input class="atlas-input" type="text" name="create-name" value="${escapeAttr(defaultName)}" autocomplete="off" />
           </label>
-          <label class="atlas-modal-field">
-            <span>Email</span>
-            <input class="atlas-input" type="email" name="create-email" value="${escapeAttr(prefilledEmail)}" placeholder="Your OnlyWorlds account email" autocomplete="off" />
-          </label>
+          ${emailField}
           <label class="atlas-modal-field">
             <span>PIN</span>
             <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
           </label>
-          <p class="atlas-modal-hint" data-role="no-account">${noAccountYetHtml()}</p>
+          ${accountLine}
+          ${noAccount}
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
           <div class="atlas-modal-progress" data-role="create-progress" hidden></div>
           <div class="atlas-modal-actions">
@@ -268,7 +279,9 @@ export class MakeOnlineModal extends BaseModal {
     progressBox.hidden = true;
 
     const name = (form.querySelector<HTMLInputElement>('input[name="create-name"]')!).value.trim();
-    const email = (form.querySelector<HTMLInputElement>('input[name="create-email"]')!).value.trim();
+    // Absent when signed in: the account makes the world.
+    const emailInput = form.querySelector<HTMLInputElement>('input[name="create-email"]');
+    const email = emailInput?.value.trim() ?? '';
     const pin = (form.querySelector<HTMLInputElement>('input[name="create-pin"]')!).value.trim();
 
     // Pre-validate all three required fields BEFORE disabling inputs or
@@ -277,13 +290,13 @@ export class MakeOnlineModal extends BaseModal {
     // AFTER the submit button shows "Creating…" which feels like the partial
     // state went out. Session 221 W7: validate up front, focus the empty
     // field, leave inputs editable.
-    const missing = !name ? 'Name' : !email ? 'Email' : !pin ? 'PIN' : null;
+    const missing = !name ? 'Name' : emailInput && !email ? 'Email' : !pin ? 'PIN' : null;
     if (missing) {
       errorBox.textContent = `${missing} is required`;
       errorBox.hidden = false;
       // Focus the first empty input so the user knows what to type next.
       const target = !name ? form.querySelector<HTMLInputElement>('input[name="create-name"]')
-        : !email ? form.querySelector<HTMLInputElement>('input[name="create-email"]')
+        : emailInput && !email ? emailInput
         : form.querySelector<HTMLInputElement>('input[name="create-pin"]');
       target?.focus();
       return;
@@ -360,7 +373,7 @@ export class MakeOnlineModal extends BaseModal {
       // A seat's secret is this world's PIN only (#104), never the account's.
       const seatSecret = isSeatSecret(pin) ? pin : undefined;
       if (!reg.pin && !seatSecret) reg = setPin(reg, pin);
-      if (!reg.email) reg = setEmail(reg, email);
+      if (!reg.email && email) reg = setEmail(reg, email);
       reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name, seatSecret });
       saveRegistry(reg);
       patchSlice('registry', reg);
