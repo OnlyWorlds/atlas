@@ -179,14 +179,29 @@ export class ZoneOverlay {
 
   /** The land and water a river is clipped by (S424): each region zone's outline as drawn now. */
   private inkRegions(): { land: Point[][]; water: Point[][] } {
+    const zoom = this.map.getZoom();
+    const from: Array<{ shape: ZoneShape; editing: boolean }> = [];
+    for (const e of this.entries.values()) {
+      if (e.shape.mode === 'polygon' && e.shape.ink?.region) from.push({ shape: e.shape, editing: e.editing });
+    }
+    // Kept while the zoom and every region's shape are the same objects: the
+    // same ring arrays let the geometry reuse its edge index (gate G2: a clip
+    // per river per pass re-inked every coast).
+    const c = this.regionCache;
+    if (c && c.zoom === zoom && c.from.length === from.length
+      && c.from.every((f, i) => f.shape === from[i].shape && f.editing === from[i].editing)) return c.regions;
     const land: Point[][] = [];
     const water: Point[][] = [];
-    for (const e of this.entries.values()) {
-      const region = e.shape.mode === 'polygon' ? e.shape.ink?.region : undefined;
-      if (region) (region === 'land' ? land : water).push(this.drawnPoints(e.shape, e.editing));
-    }
-    return { land, water };
+    for (const f of from) (f.shape.ink!.region === 'land' ? land : water).push(this.drawnPoints(f.shape, f.editing));
+    this.regionCache = { zoom, from, regions: { land, water } };
+    return this.regionCache.regions;
   }
+
+  private regionCache?: {
+    zoom: number;
+    from: Array<{ shape: ZoneShape; editing: boolean }>;
+    regions: { land: Point[][]; water: Point[][] };
+  };
 
   private drawnLatLngs(shape: ZoneShape, editing: boolean, regions?: { land: Point[][]; water: Point[][] }): L.LatLng[] | L.LatLng[][] {
     const pts = this.drawnPoints(shape, editing);
@@ -225,11 +240,8 @@ export class ZoneOverlay {
   applyInkOrder(plainLayer: number): void {
     const ordered = Array.from(this.entries.values())
       .sort((a, b) => (a.shape.ink?.layer ?? plainLayer) - (b.shape.ink?.layer ?? plainLayer));
-    for (const e of ordered) {
-      for (const u of e.underLayers) u.bringToFront();
-      e.visibleLayer.bringToFront();
-      e.hitLayer?.bringToFront();
-    }
+    this.bringInOrder(ordered);
+    this.inkOrdered = true;
     for (const e of ordered) {
       if (e.labelAlong?.parentNode) e.labelAlong.parentNode.appendChild(e.labelAlong);
     }
@@ -237,6 +249,28 @@ export class ZoneOverlay {
     const regions = this.inkRegions();
     for (const e of ordered) {
       if (e.shape.ink?.clipToLand && !e.editing) this.setDrawnPoints(e, regions);
+    }
+  }
+
+  /**
+   * Back on a plain map after a style: the zones in the order a plain load
+   * draws them (gate G4: only the rebuilt kinds came to the top, so a
+   * map-wide sea took the clicks meant for the kingdom on it). A no-op on a
+   * map that was never styled.
+   */
+  applyPlainOrder(ids: string[]): void {
+    if (!this.inkOrdered) return;
+    this.inkOrdered = false;
+    this.bringInOrder(ids.map(id => this.entries.get(id)).filter((e): e is ZoneEntry => Boolean(e)));
+  }
+
+  private inkOrdered = false;
+
+  private bringInOrder(ordered: ZoneEntry[]): void {
+    for (const e of ordered) {
+      for (const u of e.underLayers) u.bringToFront();
+      e.visibleLayer.bringToFront();
+      e.hitLayer?.bringToFront();
     }
   }
 
@@ -738,7 +772,8 @@ export class ZoneOverlay {
     if (entry.editing === editing) return;
     entry.editing = editing;
     // Inked: the handles sit on the stored points, so the path draws them plain while editing.
-    if (entry.shape.ink && entry.shape.ink.rough > 0) this.setDrawnPoints(entry);
+    // A clipped river draws whole too, so its handles out at sea sit on it (gate G7).
+    if (entry.shape.ink && (entry.shape.ink.rough > 0 || entry.shape.ink.clipToLand)) this.setDrawnPoints(entry);
     this.applyStyle(entry);
   }
 

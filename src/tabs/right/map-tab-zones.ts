@@ -20,9 +20,10 @@ import {
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { scheduleLabelDensity } from './map-label-density';
 import { resolveStyle, groupByKind } from '../../core/world-styles';
-import { mapStyleOf, zoneKindOf, PLAIN_ZONE_LAYER, MAP_STYLE_IDS, type MapStylePreset, type InkTreatment } from '../../core/map-ink';
+import { mapStyleOf, overPicture, zoneKindOf, PLAIN_ZONE_LAYER, MAP_STYLE_IDS, type MapStylePreset, type InkTreatment } from '../../core/map-ink';
 import { renderZonePanel, wireZonePanel } from './map-zone-panel';
-import type { Zone } from '../../core/types';
+import type { Zone, WorldMap } from '../../core/types';
+import { pickMapImageSource } from './map-image-source';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { ToastManager } from '../../ui/toast-manager';
@@ -44,7 +45,10 @@ export function syncZones(entry: MapTabCacheEntry): void {
   const rules = state.styles.rules;
   // A map drawn from its own zones (S423): the map's style gives each zone
   // whose subtype names a kind that kind's treatment; the rest draw plain.
-  const preset = mapStyleOf(state.data.elements.find(e => e.id === entry.mapId));
+  // Over a picture the picture is the ground: the zones keep their ink and cover nothing (gate G3).
+  const thisMap = state.data.elements.find(e => e.id === entry.mapId) as WorldMap | undefined;
+  const style = mapStyleOf(thisMap);
+  const preset = style && thisMap && pickMapImageSource(thisMap).kind !== 'flat' ? overPicture(style) : style;
 
   for (const zone of onThisMap) {
     present.add(zone.id);
@@ -85,6 +89,8 @@ export function syncZones(entry: MapTabCacheEntry): void {
     });
   }
   if (preset) entry.zoneOverlay.applyInkOrder(PLAIN_ZONE_LAYER);
+  // Back from a style, the zones take their plain order again (gate G4).
+  else entry.zoneOverlay.applyPlainOrder(onThisMap.map(z => z.id));
   // The pins read the style from the container (CSS: inked icons, lettered names).
   entry.container.classList.toggle('atlas-map-ink', Boolean(preset));
   // ...and the lettering from the style's own class (S424).

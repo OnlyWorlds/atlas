@@ -32,6 +32,7 @@ The same pattern fits future subsystems (`DESIGN_TIMELINES.md`, `DESIGN_WRITING.
 11. [Map visual settings](#11-map-visual-settings-per-map-prefs-popover)
 12. [Canvas toolbar](#12-canvas-toolbar-always-visible-above-the-leaflet-canvas)
 13. [Zone chip strip → toolbar dropdown](#13-zone-chip-strip--toolbar-dropdown-revised-session-217-zc9)
+15. [Map styles: a map drawn from its own zones](#15-map-styles-a-map-drawn-from-its-own-zones-365-153-s423-s426)
 
 ---
 
@@ -787,6 +788,24 @@ Mirrors the existing pin chip strip pattern. Mounts at the bottom of each map ta
 Horizontal scrollable strip, ~32px tall. Selected zone's chip gets a stronger border + slight scale-up. CSS subscribes to `data.elements` changes — chips appear/disappear when zones are added/deleted in another flow (drawing, element-create modal, deletion from element-detail).
 
 If the chip strip ever grows too wide for the canvas width, it horizontally scrolls. Future: overflow chip "+N more" opening a picker (deferred).
+
+---
+
+## 15. Map styles: a map drawn from its own zones (#365, 1.53, S423-S426)
+
+The Captain's lead (h20 #6442); the research, trial and session record: `Forge/Notes/2026-10-17-s423-map-from-zones-design.md`. Notes decide, this section holds.
+
+**The line**: the stored shape is the meaning; the look is the renderer's reading of it. Jitter, patterns, shore bands, paper and lettering are computed at render time from the zone's points and its kind, never stored. Choosing a style writes one field on the Map and nothing else. Never in scope: brushes, a symbol library, painted relief, a base-map painter.
+
+- **The kind** (Skeld h20 #6449): read from the zone's **subtype**, trimmed, case-insensitive (`zoneKindOf`, `core/map-ink.ts`). Areas `Landmass`, `Sea`, `Lake`, `Range`, `Forest`, `Marsh`, `Desert`, `Territory`; lines `River`, `Road` (`Route`, `Path` read as roads), `Wall`, `Border`, `Coast`. A subtype written `Class: kind` is tried by its halves, the class first (Skeld h58 #6762: Blood Meridian's "Border: treaty line" draws as a border). Any other subtype draws exactly as on a Plain map. The supertype carries the shape (DESIGN_ZONES §1.5); `role` is the author's own words and no style reads it. The New zone step offers the kind words on the subtype (a datalist), never requires them.
+- **The style** (`atlas_map_style` on Map, a wire extension, ATLAS_FIELDS; null = Plain): `ink` (Ink on parchment), `atlas` (Modern atlas, Seethe h20 #6542), `hatched` (Seethe h20 #6572). A preset is a table per kind: stroke, fill, a pattern, shore bands, a wobble, a region (`land` or `water`) and whether a line clips to land. The **Map style** row sits on the map's page under Background colour. An unknown value reads as Plain. On an imageless map (§4.2) the flat canvas takes the style's sea and edge when the map has no `background_color` of its own; on a map with a picture the picture is the ground (`overPicture`, the S426 gate's G3): the zones keep their ink, patterns, lettering and names, and cover nothing (land and water lose their fill and shore bands, a pattern its tint), so Blood Meridian's territories, borders and roads draw over its relief, and an Ink landmass never paints paper over a photograph. World styles (DESIGN_ZONES §5b) do not override a styled kind: the style is the register.
+- **The ink holds still**: `inkPoints` is seeded midpoint displacement keyed to each segment's endpoints in world coordinates, never a vertex index, so a redraw, a pan or an inserted vertex elsewhere leaves the rest of the coast alone, and zooming in keeps every coarser ink point (`tests/unit/map-ink.test.ts`). The bulge side is taken from the endpoints in one fixed order, so an edge two zones share draws as one line whichever way each runs it (G5). Re-inked on `zoomend`. A zone being edited draws its stored points plain, so the handles sit on them.
+- **The renderer** (`ZoneOverlay`): patterns are `<pattern>` defs in the zone renderer's own svg, one per shape and colour (`inkPatternId`); shore bands under a landmass; `applyInkOrder` stacks seas, land and shore, areas, plain zones, lines, names. A river is cut to land (`clipLineToLand`, `ZoneGeometry.ts`): inside some landmass (anywhere, with none on the map), inside no sea or lake, against each region's outline as drawn at this zoom; a river with no land under it draws whole. The cost is bounded (G2): each ring's edges sit on a 64 x 64 grid, a segment tests only the edges near it, land is carried between outlines, and the overlay keeps the inked regions while the zoom and the regions' shapes stay the same. After Plain the zones take their plain order again (`applyPlainOrder`, G4).
+- **Names**: an area's name sits at its pole of inaccessibility (the point farthest inside), in the style's lettering (`.atlas-map-style-<id>`, a face per kind); a line's name runs along it on a `<textPath>`, left to right. Both join the density layer (§11.6): metrics per label face, cached per map; a name along a line tries five shares of the line, middle first, and drops when an area name or a pin is in the way.
+- **Pins** on a styled map print in its ink (one `atlas-map-ink` class on the container, the icon filtered, so it still carries its type); on Hatched in a washed sepia (Seethe h57 #6789).
+- **Trace** (DESIGN_ZONES §2.5): a toggle on the drawing strip; while on, a drag lays a stroke instead of panning, and on release `simplifyStroke` (a five-sample moving average, then Douglas-Peucker at 3 screen px) puts its points into the ordinary draft, which finishes through the usual modal. A click still places one point, and so does a press that moves under 8 screen px. Each vertex is a Marker file, so the point budget is the design: at most 60 points a stroke (the tolerance grows by a quarter until it fits), and the raggedness comes from the renderer. While Trace is on the container takes `touch-action: none`, so a finger's drag is the stroke's; the stroke follows one pointer, a second finger drops it, and a cancelled stroke lands nothing (G6).
+- **Not taken** (from Seethe's tables): her pin ring and dot, the wall's ticks, the sea's rhumb lines. EB Garamond is not bundled (Georgia stands in). **Later, only when asked**: "Download as picture" with a key box; never "set as the map's picture".
+- **Guards**: `tests/e2e/map-ink.spec.ts` (the style row, Plain restoring, rivers ending at the coast, a name sliding clear, capitals never over a pin, a hatched map), units `map-ink`, `zone-clip-to-land`, `map-label-along`, `zone-label-pole`, `zone-trace-simplify`.
 
 ---
 

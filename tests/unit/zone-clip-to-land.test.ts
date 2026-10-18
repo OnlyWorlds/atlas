@@ -80,3 +80,73 @@ describe('clipLineToLand', () => {
     }
   });
 });
+
+// gate G2: the clip walks an edge index and carries land between outlines.
+// The instrument: the S424 walk, every segment against every edge, every
+// piece by its midpoint, run on the same jagged shapes.
+describe('clipLineToLand against the plain walk', () => {
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const blob = (cx: number, cy: number, r: number, n: number): Point[] =>
+    Array.from({ length: n }, (_, i) => {
+      const t = (i / n) * Math.PI * 2, k = r * (0.7 + 0.6 * rnd());
+      return { x: cx + k * Math.cos(t), y: cy + k * Math.sin(t) };
+    });
+  const crossT = (a: Point, b: Point, c: Point, d: Point): number | undefined => {
+    const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
+    const den = rx * sy - ry * sx;
+    if (den === 0) return undefined;
+    const qx = c.x - a.x, qy = c.y - a.y;
+    const t = (qx * sy - qy * sx) / den, u = (qx * ry - qy * rx) / den;
+    return t > 0 && t < 1 && u >= 0 && u <= 1 ? t : undefined;
+  };
+  const plain = (line: Point[], land: Point[][], water: Point[][]): Point[][] => {
+    const on = (p: Point) => land.some(r => pointInPolygon(p, r)) && !water.some(r => pointInPolygon(p, r));
+    const out: Point[][] = [];
+    let cur: Point[] | null = null;
+    for (let i = 0; i < line.length - 1; i++) {
+      const a = line[i], b = line[i + 1];
+      const ts = [0, 1];
+      for (const r of [...land, ...water]) for (let k = 0, j = r.length - 1; k < r.length; j = k++) {
+        const t = crossT(a, b, r[j], r[k]);
+        if (t !== undefined) ts.push(t);
+      }
+      ts.sort((x, y) => x - y);
+      const at = (t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      for (let k = 0; k < ts.length - 1; k++) {
+        if (ts[k + 1] - ts[k] < 1e-9) continue;
+        if (!on(at((ts[k] + ts[k + 1]) / 2))) { cur = null; continue; }
+        if (!cur) { cur = [at(ts[k])]; out.push(cur); }
+        cur.push(at(ts[k + 1]));
+      }
+    }
+    return out;
+  };
+
+  it('cuts every wandering river where the plain walk does', () => {
+    for (let trial = 0; trial < 40; trial++) {
+      const land = [blob(500, 500, 300, 400), blob(1200, 600, 150, 120)];
+      const water = [blob(500, 500, 80, 60)];
+      let x = 100 + 1000 * rnd(), y = 100 + 800 * rnd();
+      const line: Point[] = [{ x, y }];
+      for (let i = 0; i < 60; i++) { x += 60 * (rnd() - 0.5); y += 60 * (rnd() - 0.5); line.push({ x, y }); }
+      expect(clipLineToLand(line, land, water)).toEqual(plain(line, land, water));
+    }
+  });
+
+  it('stays quick against a coast inked to twelve thousand points', () => {
+    // shaped like ink: short edges, a wobble of a few units
+    const coast = Array.from({ length: 12000 }, (_, i) => {
+      const t = (i / 12000) * Math.PI * 2, k = 700 * (1 + 0.1 * Math.sin(5 * t)) + 4 * rnd();
+      return { x: 1000 + k * Math.cos(t), y: 1000 + k * Math.sin(t) };
+    });
+    const rivers = Array.from({ length: 100 }, (_, i) => {
+      const t = (i / 100) * Math.PI * 2;
+      return Array.from({ length: 80 }, (_, k) => ({ x: 1000 + (400 + 5 * k) * Math.cos(t), y: 1000 + (400 + 5 * k) * Math.sin(t) }));
+    });
+    const t0 = performance.now();
+    for (const r of rivers) clipLineToLand(r, [coast], []);
+    // The plain walk took about 630 ms here (S426); the index takes a few.
+    expect(performance.now() - t0).toBeLessThan(150);
+  }, 30000);
+});

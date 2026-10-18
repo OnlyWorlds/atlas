@@ -151,6 +151,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
         touch: 'place an element with the + pin button on its header, then tap the map (slide a pin with your finger to move it, and tap one any time to travel back to the element)',
       },
       { mouse: 'draw a zone with the polygon or line tool, then double-click it to reshape it by its handles', touch: null },
+      { mouse: 'trace a coast or a river while drawing: turn on Trace and drag, and Atlas keeps the few points that carry its shape', touch: null },
+      'give a map a style from its page (Ink on parchment, Modern atlas, Hatched): a zone whose subtype names its kind, such as Landmass, Range, Forest or River, is drawn as one, and Plain brings back the usual look; the zones themselves never change',
       'nest maps under a parent map or a location, and switch between them from the map list',
       {
         mouse: 'give a location its own map with the + map button on its header; its pin on a bigger map then wears a map badge: click the pin, then Open, to go down, and the up arrow at the top of the inner map brings you back',

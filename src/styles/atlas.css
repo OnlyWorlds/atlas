@@ -6509,6 +6509,13 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transition: opacity 140ms ease;
 }
 
+/* The Map style row on a map with a picture (gate G3): what the style does there. */
+.atlas-map-style-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+}
+
 /* Modern atlas (S424): Seethe's lettering (map-atlas.ts, h20 #6542), a plain
    sans over soft tints, her sizes on a 12.5px base; the selectors carry the
    style's class, so they win over the ink rules above. */

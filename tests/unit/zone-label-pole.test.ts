@@ -47,6 +47,24 @@ describe('poleOfInaccessibility', () => {
     expect(ms).toBeLessThan(50);
   });
 
+  // gate G1: a sliver from another tool seeded 200,000 cells and hung the tab.
+  it('returns quickly for slivers, and still inside a thin strip', () => {
+    const slivers = [
+      [{ x: 0, y: 0 }, { x: 2000, y: 0 }, { x: 1000, y: 0.01 }],
+      [{ x: 0, y: 0 }, { x: 200000, y: 0 }, { x: 100000, y: 1 }],
+      [{ x: 0, y: 0 }, { x: 0.01, y: 0 }, { x: 0.005, y: 2000 }],
+    ];
+    for (const s of slivers) {
+      const t0 = performance.now();
+      poleOfInaccessibility(s);
+      expect(performance.now() - t0).toBeLessThan(200);
+    }
+    const strip = [{ x: 0, y: 0 }, { x: 2000, y: 0 }, { x: 2000, y: 20 }, { x: 0, y: 20 }];
+    const p = poleOfInaccessibility(strip);
+    expect(pointInPolygon(p, strip)).toBe(true);
+    expect(Math.abs(p.y - 10)).toBeLessThan(2);
+  }, 10000);
+
   it('returns for a flat or tiny ring', () => {
     expect(poleOfInaccessibility([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }])).toEqual({ x: 10, y: 0 });
     expect(poleOfInaccessibility([{ x: 3, y: 4 }])).toEqual({ x: 3, y: 4 });

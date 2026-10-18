@@ -277,24 +277,54 @@ export function poleOfInaccessibility(ring: Point[], precision = 1): Point {
     const d = signedDistanceToRing({ x, y }, ring);
     return { x, y, h, d, max: d + h * Math.SQRT2 };
   };
+  // A binary max-heap on `max`: a sliver's queue grows into the tens of
+  // thousands, and a linear scan per step hung the tab (gate G1).
   const queue: Cell[] = [];
-  const h0 = size / 2;
-  for (let x = minX; x < maxX; x += size) {
-    for (let y = minY; y < maxY; y += size) queue.push(cell(x + h0, y + h0, h0));
+  const push = (c: Cell): void => {
+    queue.push(c);
+    for (let i = queue.length - 1; i > 0;) {
+      const up = (i - 1) >> 1;
+      if (queue[up].max >= queue[i].max) break;
+      [queue[up], queue[i]] = [queue[i], queue[up]];
+      i = up;
+    }
+  };
+  const pop = (): Cell => {
+    const top = queue[0];
+    const last = queue.pop()!;
+    if (queue.length) {
+      queue[0] = last;
+      for (let i = 0; ;) {
+        const l = 2 * i + 1, r = l + 1;
+        let at = i;
+        if (l < queue.length && queue[l].max > queue[at].max) at = l;
+        if (r < queue.length && queue[r].max > queue[at].max) at = r;
+        if (at === i) break;
+        [queue[at], queue[i]] = [queue[i], queue[at]];
+        i = at;
+      }
+    }
+    return top;
+  };
+  // Seed cells are the shape's short side, but never more than 32 along the
+  // long one: a 2000 x 0.01 sliver seeded 200,000 of them (gate G1).
+  const seed = Math.max(size, Math.max(maxX - minX, maxY - minY) / 32);
+  const h0 = seed / 2;
+  for (let x = minX; x < maxX; x += seed) {
+    for (let y = minY; y < maxY; y += seed) push(cell(x + h0, y + h0, h0));
   }
   // Start from the vertex mean when it is inside: most shapes are nearly there.
   const mean = polygonCentroid(ring) ?? { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
   let best = cell(mean.x, mean.y, 0);
   for (const c of queue) if (c.d > best.d) best = c;
-  for (let guard = 0; queue.length && guard < 20000; guard++) {
+  for (let guard = 0; queue.length && guard < 4000; guard++) {
     // best-first: take the cell with the highest potential
-    let at = 0;
-    for (let i = 1; i < queue.length; i++) if (queue[i].max > queue[at].max) at = i;
-    const c = queue.splice(at, 1)[0];
+    const c = pop();
     if (c.d > best.d) best = c;
     if (c.max - best.d <= eps) continue;
     const h = c.h / 2;
-    queue.push(cell(c.x - h, c.y - h, h), cell(c.x + h, c.y - h, h), cell(c.x - h, c.y + h, h), cell(c.x + h, c.y + h, h));
+    push(cell(c.x - h, c.y - h, h)); push(cell(c.x + h, c.y - h, h));
+    push(cell(c.x - h, c.y + h, h)); push(cell(c.x + h, c.y + h, h));
   }
   return { x: best.x, y: best.y };
 }
@@ -310,19 +340,67 @@ function crossingT(a: Point, b: Point, c: Point, d: Point): number | undefined {
   return t > 0 && t < 1 && u >= 0 && u <= 1 ? t : undefined;
 }
 
-interface Ring { pts: Point[]; minX: number; minY: number; maxX: number; maxY: number }
+/**
+ * A ring with its edges bucketed on a grid of at most GRID x GRID cells, so a
+ * short segment tests only the edges near it (gate G2: an inked coast at deep
+ * zoom has thousands of edges, and every river segment tested all of them).
+ */
+interface Ring {
+  pts: Point[]; minX: number; minY: number; maxX: number; maxY: number;
+  cell: number; cols: number; rows: number; edges: Map<number, number[]>;
+}
+
+const GRID = 64;
+const ringIndex = new WeakMap<Point[], Ring>();
 
 function ringOf(pts: Point[]): Ring {
+  const known = ringIndex.get(pts);
+  if (known) return known;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of pts) {
     if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
     if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
   }
-  return { pts, minX, minY, maxX, maxY };
+  const cell = Math.max(maxX - minX, maxY - minY) / GRID || 1;
+  const cols = Math.min(GRID, Math.floor((maxX - minX) / cell)) + 1;
+  const rows = Math.min(GRID, Math.floor((maxY - minY) / cell)) + 1;
+  const r: Ring = { pts, minX, minY, maxX, maxY, cell, cols, rows, edges: new Map() };
+  // Edge k runs from pts[k - 1] (pts[n - 1] for k = 0) to pts[k], as the crossing walk reads them.
+  for (let k = 0, j = pts.length - 1; k < pts.length; j = k++) {
+    const a = pts[j], b = pts[k];
+    forCells(r, Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y), key => {
+      const list = r.edges.get(key);
+      if (list) list.push(k); else r.edges.set(key, [k]);
+    });
+  }
+  ringIndex.set(pts, r);
+  return r;
+}
+
+function forCells(r: Ring, x0: number, y0: number, x1: number, y1: number, visit: (key: number) => void): void {
+  const clampC = (v: number) => Math.max(0, Math.min(r.cols - 1, Math.floor((v - r.minX) / r.cell)));
+  const clampR = (v: number) => Math.max(0, Math.min(r.rows - 1, Math.floor((v - r.minY) / r.cell)));
+  const c0 = clampC(x0), c1 = clampC(x1), r0 = clampR(y0), r1 = clampR(y1);
+  for (let c = c0; c <= c1; c++) for (let rr = r0; rr <= r1; rr++) visit(rr * r.cols + c);
+}
+
+/** The ring's edges whose cells meet a box, each once. */
+function edgesNear(r: Ring, x0: number, y0: number, x1: number, y1: number): number[] {
+  const seen = new Set<number>();
+  forCells(r, x0, y0, x1, y1, key => { for (const k of r.edges.get(key) ?? []) seen.add(k); });
+  return [...seen];
 }
 
 function inRing(p: Point, r: Ring): boolean {
-  return p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY && p.y <= r.maxY && pointInPolygon(p, r.pts);
+  if (!(p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY && p.y <= r.maxY) || r.pts.length < 3) return false;
+  // pointInPolygon's ray, cast right, meets only edges in the cells of p's row from p on.
+  const n = r.pts.length;
+  let inside = false;
+  for (const k of edgesNear(r, p.x, p.y, r.maxX, p.y)) {
+    const a = r.pts[k], b = r.pts[(k + n - 1) % n];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
 }
 
 /**
@@ -389,23 +467,34 @@ function eachLandPiece(
   const onLand = (p: Point): boolean =>
     (landR.length === 0 || landR.some(r => inRing(p, r))) && !waterR.some(r => inRing(p, r));
   const rings = [...landR, ...waterR];
+  // Land or not can change only where an outline passes, so a segment with no
+  // edge near it carries the state its neighbour ended in (gate G2).
+  let carried: boolean | undefined;
   for (let i = 0; i < line.length - 1; i++) {
     const a = line[i], b = line[i + 1];
     const sx0 = Math.min(a.x, b.x), sx1 = Math.max(a.x, b.x), sy0 = Math.min(a.y, b.y), sy1 = Math.max(a.y, b.y);
     const ts: number[] = [0, 1];
+    let near = false;
     for (const r of rings) {
       if (r.maxX < sx0 || r.minX > sx1 || r.maxY < sy0 || r.minY > sy1) continue;
-      for (let k = 0, j = r.pts.length - 1; k < r.pts.length; j = k++) {
-        const t = crossingT(a, b, r.pts[j], r.pts[k]);
+      const n = r.pts.length;
+      for (const k of edgesNear(r, sx0, sy0, sx1, sy1)) {
+        near = true;
+        const t = crossingT(a, b, r.pts[(k + n - 1) % n], r.pts[k]);
         if (t !== undefined) ts.push(t);
       }
+    }
+    if (!near && carried !== undefined) {
+      visit(i, a, b, 0, 1, carried);
+      continue;
     }
     ts.sort((x, y) => x - y);
     for (let k = 0; k < ts.length - 1; k++) {
       const t0 = ts[k], t1 = ts[k + 1];
       if (t1 - t0 < 1e-9) continue;
       const m = (t0 + t1) / 2;
-      visit(i, a, b, t0, t1, onLand({ x: a.x + (b.x - a.x) * m, y: a.y + (b.y - a.y) * m }));
+      carried = onLand({ x: a.x + (b.x - a.x) * m, y: a.y + (b.y - a.y) * m });
+      visit(i, a, b, t0, t1, carried);
     }
   }
   return true;

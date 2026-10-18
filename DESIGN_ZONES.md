@@ -241,6 +241,7 @@ A small floating control strip near the top-center of the canvas (transient, mou
 - ↶ undo — pops the last marker from `points`
 - ✓ finish — gated. Disabled if `mode === 'polygon' && points.length < 3` or `mode === 'line' && points.length < 2`. Enabled otherwise.
 - ✗ cancel — ESC also.
+- Trace (1.53, #365) — a toggle: while on, a drag lays a stroke instead of panning and lands its simplified points in the draft; a click still places one point. The design: DESIGN_MAPS §15.
 
 ### 2.6 Finish
 
@@ -451,6 +452,7 @@ Born on Sikelia: 113 rivers, 192 routes and 14 chorai in one cyan, no legend. **
 - **Where it shows beyond the map**: the taxonomy value lights up wherever `reservedValueHint` marks atlas's own reserved values: a swatch beside the field label in element detail (`styleValueHint`) and on sidebar rows (`styleRowHint`). The zone page's visuals section shows the inherited colour in the picker and says where it came from ("Colour from the world style for Line · River"), with "Use the kind's colour" to clear an own override (`atlas_color: null`).
 - **Write into zones**: the tune form's button materialises the kind's colour into every member's `atlas_color`, for tools that read the wire and know nothing of `styles.json`.
 - **Not in the rule**: label position, hover mode, the map's own defaults (those stay per-map view prefs, §11).
+- **On a styled map** (1.53, DESIGN_MAPS §15), a zone whose subtype names a kind draws in the style's treatment, which wins over its own colour and the world style; the rest keep this resolution.
 
 ---
 

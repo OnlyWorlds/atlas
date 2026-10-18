@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { inkPoints, inkMinSegment, mapStyleOf, zoneKindOf, segmentHash, MAP_STYLE_IDS, mapStylePreset, inkPatternId, ZONE_KIND_WORDS } from '../../src/core/map-ink';
+import { inkPoints, inkMinSegment, mapStyleOf, zoneKindOf, segmentHash, MAP_STYLE_IDS, mapStylePreset, inkPatternId, ZONE_KIND_WORDS, overPicture } from '../../src/core/map-ink';
+
+describe('a style over a picture (gate G3)', () => {
+  it('covers nothing: no land or water fill, no shore, no tint under a pattern; the ink and the names stay', () => {
+    for (const id of MAP_STYLE_IDS) {
+      const full = mapStylePreset(id)!;
+      const over = overPicture(full);
+      for (const w of ZONE_KIND_WORDS) {
+        const k = zoneKindOf(w)!;
+        const t = over.kinds[k], f = full.kinds[k];
+        expect(t.shore).toBeUndefined();
+        expect(t.patternBg).toBeUndefined();
+        if (f.region && !f.pattern) expect(t.fill).toBeUndefined();
+        expect([t.stroke, t.weight, t.rough, t.pattern, t.labelAlong, t.clipToLand, t.layer])
+          .toEqual([f.stroke, f.weight, f.rough, f.pattern, f.labelAlong, f.clipToLand, f.layer]);
+      }
+      expect(full.kinds.landmass.fill).toBeDefined();   // the instrument: the full style does cover
+      expect(overPicture(full)).toBe(over);
+    }
+  });
+});
 
 const ring = Array.from({ length: 40 }, (_, i) => {
   const a = (i / 40) * Math.PI * 2;
@@ -73,6 +93,28 @@ describe('the ink holds still', () => {
 
   it('does not depend on which way a segment runs', () => {
     expect(segmentHash(ring[0], ring[1])).toBe(segmentHash(ring[1], ring[0]));
+  });
+
+  it('an edge two zones share draws as one line, whichever way each runs it (gate G5)', () => {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      const forth = inkPoints([a, b], 2, 0.4, false);
+      const back = inkPoints([b, a], 2, 0.4, false).reverse();
+      expect(back).toEqual(forth);
+    }
+  });
+
+  it('coordinates near the float limit draw stored, never NaN (gate G10)', () => {
+    const huge = [{ x: -1e308, y: 0 }, { x: 1e308, y: 1e308 }, { x: 0, y: -1e308 }];
+    for (const p of inkPoints(huge, 2, 0.22, true)) {
+      expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
+    }
+  });
+
+  it('a word from the object prototype is not a kind (gate G10)', () => {
+    expect(zoneKindOf('constructor')).toBeUndefined();
+    expect(zoneKindOf('__proto__')).toBeUndefined();
+    expect(zoneKindOf('toString: river')).toBe('river');
   });
 
   it('rough 0 draws the stored points straight', () => {

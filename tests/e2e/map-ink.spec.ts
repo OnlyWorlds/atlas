@@ -90,6 +90,74 @@ test('an ink map draws each zone from its kind, and the zones stay as they are',
   expect(after).toBe(before);
 });
 
+// gate G3: over a picture the picture is the ground: the zones keep their ink,
+// names and patterns, and the land neither fills with paper nor rings with shore.
+test('a map with a picture takes the style\'s ink and covers nothing', async ({ page }) => {
+  await setupWorld(page);
+  const ids = await seedMap(page, 'ink');
+  await page.evaluate(async (mapId) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const png1x1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    await store.updateMap(mapId, { image_url: png1x1, width: 2000, height: 2000 });
+    api.patchData(await store.listElements());
+  }, ids.mapId);
+  await openMap(page, ids);
+  await expect.poll(async () => (await inkFacts(page)).inkLabels).toEqual(['Isle', 'Spine']);
+  const f = await inkFacts(page);
+  expect(f.patterned).toBe(1);                 // the Range's hatch, over the picture
+  expect(f.alongLine).toEqual(['Sallow']);
+  expect(f.inkPins).toBe(1);
+  const cover = await page.evaluate(() => {
+    const paths = [...document.querySelectorAll('.atlas-map-pane .leaflet-overlay-pane path')];
+    return {
+      // ink on parchment's paper and its three shore bands
+      paper: paths.filter(p => (p.getAttribute('fill') || '').toLowerCase() === '#f3ead2').length,
+      bands: paths.filter(p => ['#c9b48d', '#d6c4a0', '#dfd0b0'].includes((p.getAttribute('stroke') || '').toLowerCase())).length,
+    };
+  });
+  expect(cover).toEqual({ paper: 0, bands: 0 });
+});
+
+// gate G4: back on Plain, a map-wide sea drawn first stays under the kingdom on it.
+test('back from a style to Plain, the zones keep their plain order', async ({ page }) => {
+  await setupWorld(page);
+  const ids = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = await store.createElement('map', { name: 'Gulf', atlas_map_style: 'ink' });
+    const zone = async (name: string, subtype: string, pts: number[][]) => {
+      const z = await store.createZone({ name, subtype, atlas_shape: 'polygon' });
+      for (let i = 0; i < pts.length; i++) {
+        await store.createMarker({ name: '', map_id: map.id, zone_id: z.id, x: pts[i][0], y: pts[i][1], order: i });
+      }
+    };
+    await zone('Ocean', 'Sea', [[0, 0], [2000, 0], [2000, 2000], [0, 2000]]);
+    await zone('Kingdom', 'Kingdom', [[800, 800], [1200, 800], [1200, 1200], [800, 1200]]);
+    api.patchData(await store.listElements());
+    return { worldId: api.getState().active.worldId, mapId: map.id };
+  });
+  await openMap(page, ids);
+  await expect.poll(async () => (await inkFacts(page)).inkPins).toBe(1);
+  await page.evaluate(async (mapId) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    await store.updateMap(mapId, { atlas_map_style: null });
+    api.patchData(await store.listElements());
+  }, ids.mapId);
+  await expect.poll(async () => (await inkFacts(page)).inkPins).toBe(0);
+  // The order the svg paints in: the largest path is the Ocean, the smallest the Kingdom.
+  const order = await page.evaluate(() => {
+    const paths = [...document.querySelectorAll('.atlas-map-pane .leaflet-overlay-pane path')] as SVGPathElement[];
+    const area = (p: SVGPathElement) => { const b = p.getBBox(); return b.width * b.height; };
+    const filled = paths.filter(p => area(p) > 0);
+    const big = filled.reduce((a, b) => (area(b) > area(a) ? b : a));
+    const small = filled.reduce((a, b) => (area(b) < area(a) ? b : a));
+    return { ocean: paths.indexOf(big), kingdom: paths.indexOf(small) };
+  });
+  expect(order.ocean).toBeLessThan(order.kingdom);
+});
+
 test('a modern atlas map draws the same zones in its own register (S424)', async ({ page }) => {
   await setupWorld(page);
   await openMap(page, await seedMap(page, 'atlas'));
@@ -397,4 +465,45 @@ test('Trace turns one drag into a few points and does not pan the map', async ({
   await page.mouse.up();
   expect(await mapPaneTransform(page)).not.toBe(t1);
   await expect(overlay.locator('.atlas-zone-draft-count-num')).toHaveText(String(n));
+});
+
+// gates G6, G8: a finger's drag is the stroke's (red without the touch-action),
+// and a coast full of bays keeps at most 60 points (98 without the cap, S426).
+// The drifting click is a behaviour check only: before G15's floor it also
+// landed one point, the moving average folding three samples into one.
+test('Trace keeps a coast to its budget, a drifting click to one point, and the drag to itself', async ({ page }) => {
+  await setupWorld(page);
+  await openMap(page, await seedMap(page, 'ink'));
+  await page.click('button[data-action="draw-polygon"]');
+  const overlay = page.locator('[data-zone-draft-overlay]');
+  const count = async () => Number(await overlay.locator('.atlas-zone-draft-count-num').textContent());
+  const touchAction = () => page.locator('.atlas-map-pane .leaflet-container').evaluate(el => getComputedStyle(el).touchAction);
+  const before = await touchAction();
+  await overlay.locator('[data-action="trace"]').click();
+  expect(await touchAction()).toBe('none');
+
+  const box = (await page.locator('.atlas-map-pane .leaflet-container').boundingBox())!;
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2, r = Math.min(box.width, box.height) * 0.3;
+  // a click that drifts four pixels, as on a trackpad
+  await page.mouse.move(cx + 0.5 * r, cy - 0.5 * r);
+  await page.mouse.down();
+  for (let i = 1; i <= 4; i++) await page.mouse.move(cx + 0.5 * r + i, cy - 0.5 * r);
+  await page.mouse.up();
+  await expect.poll(count).toBe(1);
+
+  // a coast full of bays: far more turns than 60 points can follow at 3 px
+  await page.mouse.move(cx + r, cy);
+  await page.mouse.down();
+  for (let i = 1; i <= 1500; i++) {
+    const t = (i / 1500) * Math.PI * 1.9;
+    const k = r * (1 + 0.12 * Math.sin(47 * t) + 0.06 * Math.sin(131 * t));
+    await page.mouse.move(cx + k * Math.cos(t), cy + k * Math.sin(t));
+  }
+  await page.mouse.up();
+  const n = await count();
+  expect(n - 1).toBeGreaterThan(20);
+  expect(n - 1).toBeLessThanOrEqual(60);
+
+  await overlay.locator('[data-action="trace"]').click();
+  expect(await touchAction()).toBe(before);
 });

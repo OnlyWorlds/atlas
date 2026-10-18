@@ -41,7 +41,11 @@ export const ZONE_KIND_WORDS = [
  */
 export function zoneKindOf(subtype: unknown): InkKind | undefined {
   if (typeof subtype !== 'string') return undefined;
-  const word = (s: string) => KIND_WORDS[s.trim().toLowerCase()];
+  // Own keys only: "constructor" is not a kind (gate G10).
+  const word = (s: string) => {
+    const k = s.trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(KIND_WORDS, k) ? KIND_WORDS[k] : undefined;
+  };
   const colon = subtype.indexOf(':');
   if (colon < 0) return word(subtype);
   return word(subtype.slice(0, colon)) ?? word(subtype.slice(colon + 1));
@@ -206,6 +210,28 @@ export function mapStylePreset(id: unknown): MapStylePreset | undefined {
     : undefined;
 }
 
+const overPictureCache = new Map<MapStyleId, MapStylePreset>();
+
+/**
+ * A style over a map's picture (gate G3): the picture is the ground, so the
+ * zones keep their ink, patterns, names and lettering but cover nothing:
+ * land and water lose their fill and shore bands, a pattern its tint. Blood
+ * Meridian's territories, borders and roads over its relief draw as before.
+ */
+export function overPicture(preset: MapStylePreset): MapStylePreset {
+  const known = overPictureCache.get(preset.id);
+  if (known) return known;
+  const kinds = {} as Record<InkKind, InkTreatment>;
+  for (const [k, t] of Object.entries(preset.kinds) as Array<[InkKind, InkTreatment]>) {
+    const next: InkTreatment = { ...t, shore: undefined, patternBg: undefined };
+    if (t.region && !t.pattern) next.fill = undefined;
+    kinds[k] = next;
+  }
+  const out = { ...preset, kinds };
+  overPictureCache.set(preset.id, out);
+  return out;
+}
+
 /** The style a map names (`atlas_map_style`), or undefined: plain. */
 export function mapStyleOf(map: unknown): MapStylePreset | undefined {
   if (!map || typeof map !== 'object') return undefined;
@@ -239,9 +265,14 @@ const MAX_DEPTH = 10;
 function subdivide(a: Point, b: Point, minSeg: number, rough: number, out: Point[], depth: number): void {
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy);
-  if (len < minSeg || depth >= MAX_DEPTH) return;
+  // Coordinates near the float limit overflow the midpoint: draw the stored segment (gate G10).
+  if (!Number.isFinite(len) || len < minSeg || depth >= MAX_DEPTH) return;
   const off = (segmentHash(a, b) - 0.5) * len * rough;
-  const m = { x: (a.x + b.x) / 2 - (dy / len) * off, y: (a.y + b.y) / 2 + (dx / len) * off };
+  // The bulge side comes from the endpoints in one fixed order, so an edge two
+  // zones share draws as one line whichever way each runs it (gate G5).
+  const flip = a.x > b.x || (a.x === b.x && a.y > b.y) ? -1 : 1;
+  const m = { x: (a.x + b.x) / 2 - (dy / len) * off * flip, y: (a.y + b.y) / 2 + (dx / len) * off * flip };
+  if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
   subdivide(a, m, minSeg, rough, out, depth + 1);
   out.push(m);
   subdivide(m, b, minSeg, rough, out, depth + 1);

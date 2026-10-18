@@ -10,6 +10,7 @@ import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { MAP_STYLE_IDS, mapStylePreset, mapStyleOf } from '../core/map-ink';
 import type { WorldMap } from '../core/types';
+import { pickMapImageSource } from '../tabs/right/map-image-source';
 
 export function buildMapStyleRow(m: WorldMap, toasts: ToastManager): HTMLElement {
   const wrap = document.createElement('div');
@@ -27,13 +28,21 @@ export function buildMapStyleRow(m: WorldMap, toasts: ToastManager): HTMLElement
   wrap.appendChild(value);
 
   const select = document.createElement('select');
-  select.className = 'atlas-map-style-select';
+  select.className = 'atlas-select atlas-map-style-select';
   select.setAttribute('aria-label', 'Map style');
   const plain = new Option('Plain', '');
   select.add(plain);
   for (const id of MAP_STYLE_IDS) select.add(new Option(mapStylePreset(id)!.name, id));
   select.value = mapStyleOf(m)?.id ?? '';
   value.appendChild(select);
+
+  // Over a picture the style draws the zones' ink and covers nothing (gate G3, `overPicture`).
+  if (pickMapImageSource(m).kind !== 'flat') {
+    const note = document.createElement('div');
+    note.className = 'atlas-map-style-note';
+    note.textContent = 'Over a picture, the zones take the style\'s lines and names, and the picture stays the ground.';
+    value.appendChild(note);
+  }
 
   select.addEventListener('change', async () => {
     const store = getActiveStore();

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.53.0',
+    date: '2026-10-18',
+    theme: 'A map drawn from its own zones',
+    entries: [
+      {
+        id: 'map-styles',
+        title: 'A map can draw its zones as a coast, a forest or a river',
+        body: 'On a map\'s page, Map style offers Ink on parchment, Modern atlas and Hatched. A zone whose subtype names its kind (Landmass, Sea, Lake, Range, Forest, Marsh, Desert, Territory, River, Road, Wall, Border, Coast) is drawn as one: a coast with its shore, a range hatched, a river that ends at the sea with its name along it. Only the look changes: your zones stay exactly as they are, and Plain brings back the usual map. On a map with a picture, the zones take the style\'s lines and names and the picture stays the ground.',
+        tags: ['maps'],
+      },
+      {
+        id: 'zone-trace',
+        title: 'Trace a zone by dragging',
+        body: 'While drawing a zone, turn on Trace and drag along a coast or a river. Atlas keeps the few points that carry its shape, so the zone stays light to store and to edit. A click still places one point.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.52.1',
     date: '2026-10-18',
     theme: 'A new zone says its shape',

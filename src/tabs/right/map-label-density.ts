@@ -448,7 +448,9 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
     for (const id of entry.zoneOverlay.getZoneIds()) {
       const el = entry.zoneOverlay.getLabelElement(id);
       const anchor = entry.zoneOverlay.getLabelPoint(id);
-      if (el && anchor) zoneLabelEls.push({ id, el, anchor });
+      // A name of only spaces prints nothing and can never be measured: left
+      // in, its face had no metrics and stopped every pass (gate G11).
+      if (el && anchor && el.textContent?.trim()) zoneLabelEls.push({ id, el, anchor });
     }
   }
   // Names written along lines on a styled map (S424): SVG text, no anchor.
