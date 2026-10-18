@@ -66,7 +66,7 @@ export class PersonJoinModal extends BaseModal {
     const username = getState().registry.account_username;
     body.querySelector<HTMLElement>('[data-role="account"]')!.textContent = signedIn
       ? `You join with your OnlyWorlds account${username ? ` (${username})` : ''}. Then Atlas downloads the world, with a key made for you.`
-      : 'This invitation is for a person: you join with your own OnlyWorlds account. Sign in to Atlas with your account token first; the invitation waits until you do.';
+      : 'This invitation is for a person: you join with your own OnlyWorlds account. Sign in to Atlas with your OnlyWorlds account first; the invitation waits until you do.';
 
     const form = body.querySelector<HTMLFormElement>('form')!;
     const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
@@ -85,7 +85,7 @@ export class PersonJoinModal extends BaseModal {
           holdJoinForSignIn(this.code);
           this.hide();
           navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
-          this.toasts.show('Paste your account token under Account and press Sign in. The invitation opens again after that, in this tab; if you reload, open the link again.', 'info', 15_000, { dedupeKey: WAITS_FOR_SIGN_IN });
+          this.toasts.show('Sign in under Account with your email or username and password. The invitation opens again after that, in this tab; if you reload, open the link again.', 'info', 15_000, { dedupeKey: WAITS_FOR_SIGN_IN });
           return;
         }
         await this.join(say, goBtn, cancelBtn);

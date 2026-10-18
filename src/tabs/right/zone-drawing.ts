@@ -32,6 +32,7 @@ import { openZoneCreateModal } from '../../ui/zone-create-modal';
 import type { Zone } from '../../core/types';
 import type { ToastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
+import { supertypeForNewZone } from '../../core/zone-shape-word';
 
 export type DrawMode = 'polygon' | 'line';
 
@@ -273,10 +274,11 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
 
   try {
     // Create the zone. atlas_shape locks the geometry kind; supertype +
-    // subtype are user-meaningful taxonomy fields (free text).
+    // subtype are user-meaningful taxonomy fields (free text). An empty
+    // supertype takes the shape's word for other tools (the Captain's interim).
     const zone = await store.createZone({
       name: values.name,
-      supertype: values.supertype,
+      supertype: supertypeForNewZone(values.supertype, draft.mode),
       subtype: values.subtype,
       atlas_shape: draft.mode,
     } as Partial<Zone>);

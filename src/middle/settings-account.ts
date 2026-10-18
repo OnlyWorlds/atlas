@@ -21,7 +21,8 @@ import { AccountClient, accountErrorMessage } from '../sync/account-client';
 import { OwV2Error } from '../sync/ow-v2-client-adapter';
 import { classifyError, problemFor } from '../core/problems';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
-import { OW_SETTINGS_URL } from '../core/ow-site';
+import { OW_SETTINGS_URL, noAccountYetHtml } from '../core/ow-site';
+import { signInWithPassword, passwordSignInLine } from '../sync/password-sign-in';
 import { isAtlasGrounded } from '../core/grounded';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { accountWorldsWhenFetched } from '../sync/account-worlds';
@@ -55,7 +56,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
   return `
     <section class="atlas-settings-section">
       <h3>Account</h3>
-      <p class="atlas-settings-hint" data-role="account-lead">Sign in with an account token to see your onlyworlds.com worlds here. Your PIN lets Atlas save changes to your online worlds.</p>
+      <p class="atlas-settings-hint" data-role="account-lead">Sign in to see your onlyworlds.com worlds here. Your PIN lets Atlas save changes to your online worlds.</p>
       ${renderAccountTokenBlock(reg)}
       <label class="atlas-settings-field">
         <span>PIN</span>
@@ -96,17 +97,32 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
       </div>
     `;
   }
+  // #387: email and password first, as Lantern signs in; the token paste
+  // stays for whoever already made one, behind its own line.
   return `
     <div class="atlas-settings-field atlas-account-token-block" data-role="account-token-block">
-      <span>Account token</span>
-      <div class="atlas-settings-pin-row">
-        <input class="atlas-input" type="password" name="account-token"
-               placeholder="ow_a_..."
-               autocomplete="off" spellcheck="false" />
-        <button type="button" class="atlas-btn-primary" data-action="account-sign-in">Sign in</button>
-      </div>
-      <p class="atlas-settings-hint">Your worlds appear in the sidebar, and each opens without a key to copy. Make a token on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-tokens" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under Account tokens.</p>
+      <span>Sign in to OnlyWorlds</span>
+      <form class="atlas-account-password" data-role="account-password-form" novalidate>
+        <input class="atlas-input" type="text" name="account-login" placeholder="Email or username"
+               autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Email or username" />
+        <div class="atlas-settings-pin-row">
+          <input class="atlas-input" type="password" name="account-password" placeholder="Password"
+                 autocomplete="current-password" aria-label="Password" />
+          <button type="submit" class="atlas-btn-primary" data-action="account-sign-in-password">Sign in</button>
+        </div>
+      </form>
       <div class="atlas-modal-error" data-role="account-token-error" hidden></div>
+      <p class="atlas-settings-hint">Your worlds appear in the sidebar, and each opens without a key to copy. Atlas keeps a token of its own for this browser, never your password. ${noAccountYetHtml()}</p>
+      <details class="atlas-account-token-alt" data-role="account-token-alt">
+        <summary>I have an account token</summary>
+        <div class="atlas-settings-pin-row">
+          <input class="atlas-input" type="password" name="account-token"
+                 placeholder="ow_a_..."
+                 autocomplete="off" spellcheck="false" aria-label="Account token" />
+          <button type="button" class="atlas-btn-primary" data-action="account-sign-in">Sign in</button>
+        </div>
+        <p class="atlas-settings-hint">Made on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-tokens" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under Account tokens.</p>
+      </details>
     </div>
   `;
 }
@@ -162,6 +178,40 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     errorEl.hidden = false;
   };
 
+  const passwordForm = block.querySelector<HTMLFormElement>('[data-role="account-password-form"]');
+  const loginInput = passwordForm?.querySelector<HTMLInputElement>('input[name="account-login"]');
+  const passwordInput = passwordForm?.querySelector<HTMLInputElement>('input[name="account-password"]');
+  const passwordBtn = passwordForm?.querySelector<HTMLButtonElement>('[data-action="account-sign-in-password"]');
+
+  passwordForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!loginInput || !passwordInput || !passwordBtn) return;
+    if (!loginInput.value.trim() || !passwordInput.value) {
+      showError('Enter your email or username and your password.');
+      return;
+    }
+    if (errorEl) errorEl.hidden = true;
+    passwordBtn.disabled = true;
+    passwordBtn.textContent = 'Signing in…';
+    void (async () => {
+      let token: string;
+      try {
+        token = await signInWithPassword(loginInput.value, passwordInput.value);
+      } catch (err) {
+        console.warn('[settings] password sign-in refused');
+        showError(passwordSignInLine(err));
+        passwordBtn.disabled = false;
+        passwordBtn.textContent = 'Sign in';
+        return;
+      }
+      passwordInput.value = '';
+      await completeSignIn(token, () => {
+        passwordBtn.disabled = false;
+        passwordBtn.textContent = 'Sign in';
+      });
+    })();
+  });
+
   const signIn = async (): Promise<void> => {
     if (!tokenInput || !signInBtn) return;
     const token = tokenInput.value.trim();
@@ -173,6 +223,14 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     if (errorEl) errorEl.hidden = true;
     signInBtn.disabled = true;
     signInBtn.textContent = 'Checking…';
+    await completeSignIn(token, () => {
+      signInBtn.disabled = false;
+      signInBtn.textContent = 'Sign in';
+    });
+  };
+
+  /** A token in hand, pasted or just minted: check it, keep it, and open what waited for it. */
+  const completeSignIn = async (token: string, onRefused: () => void): Promise<void> => {
     try {
       const profile = await new AccountClient(token).getProfile();
       const next = setAccountToken(getState().registry, token, profile.username);
@@ -203,8 +261,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     } catch (err) {
       console.warn('[settings] sign-in failed:', err);
       showError(signInErrorLine(err));
-      signInBtn.disabled = false;
-      signInBtn.textContent = 'Sign in';
+      onRefused();
     }
   };
 

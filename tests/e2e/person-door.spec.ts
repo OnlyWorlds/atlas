@@ -131,7 +131,7 @@ test('a person code, signed out: it waits through the sign-in, then the invitati
   await page.goto(`/#/join/${CODE}`);
 
   const modal = page.locator('[data-modal="person-join"]');
-  await expect(modal.locator('[data-role="account"]')).toContainText('Sign in to Atlas with your account token first');
+  await expect(modal.locator('[data-role="account"]')).toContainText('Sign in to Atlas with your OnlyWorlds account first');
   await modal.locator('[data-action="sign-in"]').click();
   await expect(modal).toHaveCount(0);
   expect(keel.personJoins).toHaveLength(0);
@@ -139,9 +139,11 @@ test('a person code, signed out: it waits through the sign-in, then the invitati
   expect(page.url()).not.toContain(CODE);
 
   // Settings, OnlyWorlds: the token, Sign in, and the invitation is back.
+  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await page.click('[data-role="account-token-alt"] summary');
   const tokenInput = page.locator('input[name="account-token"]');
   await expect(tokenInput).toBeVisible();
-  const ask = page.locator('.ow-toast', { hasText: 'Paste your account token under Account' });
+  const ask = page.locator('.ow-toast', { hasText: 'Sign in under Account with your email or username and password' });
   await expect(ask).toBeVisible();
   await tokenInput.fill(TOKEN);
   await page.click('[data-action="account-sign-in"]');

@@ -26,7 +26,7 @@ export interface MadeInvite {
   line: string;
 }
 
-export const INVITE_NOT_OWNER_LINE = 'Only the world\'s owner can make an invite link for it, signed in with their own account token.';
+export const INVITE_NOT_OWNER_LINE = 'Only the world\'s owner can make an invite link for it, signed in with their own account.';
 
 export const INVITE_CAP_LINE = 'This world has as many open invites as it can hold, links not yet used included. Take some back on its page on onlyworlds.com, under Access, then make a new one.';
 
@@ -52,7 +52,7 @@ export async function makeInvite(
     if (err instanceof OwNetworkError) throw new PlainError('Atlas could not reach OnlyWorlds, so no link was made. Check the connection and try again.');
     if (err instanceof OwApiError) {
       if (err.isNotFound) throw new PlainError(INVITE_NOT_OWNER_LINE);
-      if (err.isAuthError) throw new PlainError('Your account token was not recognized. Sign in again in Settings, OnlyWorlds.');
+      if (err.isAuthError) throw new PlainError('OnlyWorlds no longer takes this browser\'s sign-in. Sign in again in Settings, OnlyWorlds.');
       // keel's cap on a world's open invites (50, links not yet used counted:
       // keel accounts/agents.py, MAX_PENDING_INVITES) is a 422 naming no field;
       // a retry never helps (the S414 gate's M1).

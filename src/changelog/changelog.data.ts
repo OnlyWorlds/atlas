@@ -56,6 +56,32 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.52.1',
+    date: '2026-10-18',
+    theme: 'A new zone says its shape',
+    entries: [
+      {
+        id: 'zone-shape-word',
+        title: 'A new zone with no supertype gets polygon or line there',
+        body: 'Other OnlyWorlds tools cannot yet tell an area from a line by anything a zone carries, so when you leave a new zone\'s supertype empty, Atlas writes its shape there, polygon or line. A supertype you type is kept as you typed it.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
+    version: '1.52.0',
+    date: '2026-10-18',
+    theme: 'Sign in with your email and password',
+    entries: [
+      {
+        id: 'password-sign-in',
+        title: 'Sign in to OnlyWorlds with your email or username and password',
+        body: 'Settings, OnlyWorlds, Account now asks for the email or username and password of your onlyworlds.com account, as Lantern does. Atlas keeps a token of its own for this browser, named for it on your Account tokens page, and never your password. If you already made an account token, "I have an account token" under the form still takes it.',
+        tags: ['settings'],
+      },
+    ],
+  },
+  {
     version: '1.51.6',
     date: '2026-10-17',
     theme: 'A click that lands, in the lists and the chart',
