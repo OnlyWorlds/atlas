@@ -162,7 +162,7 @@ test('signed in, the owner makes a player\'s link in Atlas: shown once, Copy and
   await expect(modal.locator('[data-role="invite-link"]')).toHaveText(/^https:\/\/www\.onlyworlds\.com\/join#ow_j_/);
   await expect(modal.locator('[data-role="invite-lead"]')).toHaveText('Your invite to Invite Realm, as a player with an account:');
   await expect(modal.locator('svg.atlas-invite-qr-code')).toBeVisible();
-  await expect(modal.locator('a[data-link="invite-access"]')).toHaveAttribute('href', `https://www.onlyworlds.com/account/worlds/${WORLD_ID}#access`);
+  await expect(modal.locator('a[data-link="invite-access"]')).toHaveAttribute('href', `https://www.onlyworlds.com/account/worlds/${WORLD_ID}/access`);
   // keel was asked for a person's link, as the chosen role, signed with the trimmed name, on the account token.
   expect(keel.links).toHaveLength(1);
   expect(keel.links[0].body).toMatchObject({ reader: 'person', role: 'guest', days: 7, inviter_name: 'Titus' });
@@ -280,7 +280,7 @@ test('signed out, Invite someone still opens the website\'s Access pane, and say
   await routeKeel(page, { owner: true });
   await linkedWorldInSettings(page, false);
   const invite = page.locator('[data-role="invite-line"] a[data-link="invite"]');
-  await expect(invite).toHaveAttribute('href', `https://www.onlyworlds.com/account/worlds/${WORLD_ID}#access`);
+  await expect(invite).toHaveAttribute('href', `https://www.onlyworlds.com/account/worlds/${WORLD_ID}/access`);
   await expect(page.locator('[data-role="invite-line"]')).toContainText('Atlas makes the link here');
   await expect(page.locator('[data-action="invite-someone"]')).toHaveCount(0);
 });

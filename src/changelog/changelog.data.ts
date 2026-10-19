@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.55.2',
+    date: '2026-10-19',
+    theme: 'Invite someone lands at Access',
+    entries: [
+      {
+        id: 'access-link-after-sign-in',
+        title: 'The link to Access survives signing in',
+        body: 'Signed out of Atlas, Invite someone opens your world on onlyworlds.com at Access. If the site asked you to sign in first, it then opened the world\'s overview instead. It now opens at Access either way.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.55.1',
     date: '2026-10-19',
     theme: 'A wrong PIN is called a wrong PIN',

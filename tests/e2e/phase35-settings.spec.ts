@@ -233,7 +233,7 @@ test('world tab — api-linked worlds get stay-offline + refresh + unlink + test
   // Invite someone (S407): the world's Access pane on onlyworlds.com, a new tab.
   const invite = page.locator('[data-role="invite-line"] a[data-link="invite"]');
   await expect(invite).toBeVisible();
-  await expect(invite).toHaveAttribute('href', 'https://www.onlyworlds.com/account/worlds/fake-id#access');
+  await expect(invite).toHaveAttribute('href', 'https://www.onlyworlds.com/account/worlds/fake-id/access');
   await expect(invite).toHaveAttribute('target', '_blank');
 
   // Stay-offline toggle persists.

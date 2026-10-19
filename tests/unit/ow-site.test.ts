@@ -39,8 +39,8 @@ describe('canOfferInvite', () => {
 
 describe('the onlyworlds.com addresses', () => {
   it('opens the world page at Access, the id encoded', () => {
-    expect(owAccessUrl('0e1f')).toBe('https://www.onlyworlds.com/account/worlds/0e1f#access');
-    expect(owAccessUrl('a/b')).toBe('https://www.onlyworlds.com/account/worlds/a%2Fb#access');
+    expect(owAccessUrl('0e1f')).toBe('https://www.onlyworlds.com/account/worlds/0e1f/access');
+    expect(owAccessUrl('a/b')).toBe('https://www.onlyworlds.com/account/worlds/a%2Fb/access');
   });
   it('the no-account line carries both links, opening a new tab', () => {
     const html = noAccountYetHtml();
