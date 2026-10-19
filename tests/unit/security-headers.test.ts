@@ -79,13 +79,12 @@ describe('public/_headers (#302)', () => {
   it('lets connect-src reach every origin Atlas fetches from', () => {
     const origins = [
       new URL(DEFAULT_V2_BASE).origin,
-      // make-online's create-world-external and the media edge keep their
-      // constants private: read them from the source.
-      ...[...read('src/sync/make-online.ts').matchAll(/DEFAULT_OW_BASE = '([^']+)'/g)].map((m) => new URL(m[1]).origin),
+      // The media edge keeps its constant private: read it from the source.
+      // (make-online's create-world-external retired, Keel #134, S432.)
       ...[...read('src/sync/media-upload.ts').matchAll(/EDGE_ORIGINS = \[([^\]]+)\]/g)]
         .flatMap((m) => [...m[1].matchAll(/'([^']+)'/g)].map((s) => s[1])),
     ];
-    expect(origins.length).toBe(3);
+    expect(origins.length).toBe(2);
     const allowed = csp.get('connect-src') ?? [];
     for (const o of origins) expect(allowed, o).toContain(o);
   });
@@ -101,8 +100,8 @@ describe('public/_headers (#302)', () => {
   it('counts the fetch call sites (a new one checks connect-src first)', () => {
     const sites = tsFiles('src').flatMap((f) =>
       read(f).split(/\r?\n/).filter((l) => /\bfetch\(/.test(l) && !/^\s*(\*|\/\/)/.test(l)).map((l) => `${f}: ${l.trim()}`));
-    // eight today: keel v2 (adapter, account, join), worldsync, the media edge
-    // twice, and the tour's own pictures twice (same origin).
-    expect(sites, sites.join('\n')).toHaveLength(8);
+    // seven today: keel v2 (adapter, account, join), the media edge twice, and
+    // the tour's own pictures twice (same origin). worldsync's left at S432.
+    expect(sites, sites.join('\n')).toHaveLength(7);
   });
 });

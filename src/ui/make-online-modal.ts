@@ -3,10 +3,10 @@
  *
  * Two routes (selectable via tabs at the top):
  *
- *   - Route 1, "create new": `createApiWorld` (`sync/make-online.ts`):
- *       signed in, `POST /api/v2/account/worlds`; signed out, the legacy v1
- *       `create-world-external`. Then every local element uploads through
- *       `pushOnce` on a transient engine.
+ *   - Route 1, "create new": `createApiWorld` (`sync/make-online.ts`),
+ *       `POST /api/v2/account/worlds` on the account; signed out, the pane
+ *       signs in first (`sign-in-fields.ts`, Keel #134). Then every local
+ *       element uploads through `pushOnce` on a transient engine.
  *
  *   - Route 2, "link existing": validate with `getWorld()` on the v2
  *       adapter, then the Route 2 runner (`sync/make-online-run.ts`):
@@ -25,7 +25,7 @@
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
-import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
+import { attachApi, saveRegistry, setPin, findLinkedWorld } from '../registry/registry';
 import { completeWaypoint } from '../core/waypoints';
 import { isBrowserWorld } from '../core/browser-worlds';
 import { isSeatSecret } from '../core/seat';
@@ -46,7 +46,10 @@ import {
   type MergeProgress,
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
-import { noAccountYetHtml } from '../core/ow-site';
+import { signInFieldsHtml, signedInLineHtml, missingSignIn, signInInputs, signInFromFields } from './sign-in-fields';
+
+/** The signed-in line's second sentence on the Create new pane. */
+const PIN_REST = 'The PIN lets Atlas upload the world\'s contents.';
 import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
 import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
@@ -126,20 +129,11 @@ export class MakeOnlineModal extends BaseModal {
     const active = getState().active!;
     const defaultName = active.meta.name || 'Untitled world';
     const prefilledPin = reg.pin ?? '';
-    const prefilledEmail = reg.email ?? '';
-    // Signed in, the world is made on the account (createApiWorld's token route): no email to ask,
-    // and no "No account yet?" (the journey's A7 frame, S427).
+    // The world is made on the account (createApiWorld): signed in, the PIN alone
+    // (the journey's A7 frame, S427); signed out, the form signs in first (Keel #134).
     const signedIn = Boolean(reg.account_token);
-    const accountLine = signedIn
-      ? `<p class="atlas-modal-hint" data-role="signed-in">On your account${reg.account_username ? `, ${escapeAttr(reg.account_username)}` : ''}. The PIN lets Atlas upload the world's contents.</p>`
-      : '';
-    const emailField = signedIn
-      ? ''
-      : `<label class="atlas-modal-field">
-            <span>Email</span>
-            <input class="atlas-input" type="email" name="create-email" value="${escapeAttr(prefilledEmail)}" placeholder="Your OnlyWorlds account email" autocomplete="off" />
-          </label>`;
-    const noAccount = signedIn ? '' : `<p class="atlas-modal-hint" data-role="no-account">${noAccountYetHtml()}</p>`;
+    const accountLine = signedIn ? signedInLineHtml(reg.account_username, PIN_REST) : '';
+    const signInFields = signedIn ? '' : signInFieldsHtml(reg.email ?? '');
 
     body.innerHTML = `
       <div class="atlas-tab-bar atlas-modal-tab-bar">
@@ -156,13 +150,12 @@ export class MakeOnlineModal extends BaseModal {
             <span>Display name</span>
             <input class="atlas-input" type="text" name="create-name" value="${escapeAttr(defaultName)}" autocomplete="off" />
           </label>
-          ${emailField}
+          ${signInFields}
           <label class="atlas-modal-field">
             <span>PIN</span>
             <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
           </label>
           ${accountLine}
-          ${noAccount}
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
           <div class="atlas-modal-progress" data-role="create-progress" hidden></div>
           <div class="atlas-modal-actions">
@@ -279,26 +272,20 @@ export class MakeOnlineModal extends BaseModal {
     progressBox.hidden = true;
 
     const name = (form.querySelector<HTMLInputElement>('input[name="create-name"]')!).value.trim();
-    // Absent when signed in: the account makes the world.
-    const emailInput = form.querySelector<HTMLInputElement>('input[name="create-email"]');
-    const email = emailInput?.value.trim() ?? '';
     const pin = (form.querySelector<HTMLInputElement>('input[name="create-pin"]')!).value.trim();
 
-    // Pre-validate all three required fields BEFORE disabling inputs or
-    // calling the server. Without this gate, createApiWorld throws "Email is
-    // required" (etc.) and the user sees the error in the modal — but only
-    // AFTER the submit button shows "Creating…" which feels like the partial
-    // state went out. Session 221 W7: validate up front, focus the empty
-    // field, leave inputs editable.
-    const missing = !name ? 'Name' : emailInput && !email ? 'Email' : !pin ? 'PIN' : null;
+    // Pre-validate every required field BEFORE disabling inputs or calling
+    // the server, so an empty one never looks like a partial send. Session
+    // 221 W7: validate up front, focus the empty field, leave inputs editable.
+    const signIn = missingSignIn(form);
+    const missing = !name ? { input: form.querySelector<HTMLInputElement>('input[name="create-name"]'), line: 'Name is required' }
+      : signIn ? signIn
+      : !pin ? { input: form.querySelector<HTMLInputElement>('input[name="create-pin"]'), line: 'PIN is required' }
+      : null;
     if (missing) {
-      errorBox.textContent = `${missing} is required`;
+      errorBox.textContent = missing.line;
       errorBox.hidden = false;
-      // Focus the first empty input so the user knows what to type next.
-      const target = !name ? form.querySelector<HTMLInputElement>('input[name="create-name"]')
-        : emailInput && !email ? emailInput
-        : form.querySelector<HTMLInputElement>('input[name="create-pin"]');
-      target?.focus();
+      missing.input?.focus();
       return;
     }
 
@@ -317,10 +304,16 @@ export class MakeOnlineModal extends BaseModal {
     this.setBusy(true);
 
     try {
+      // 0. Signed out: sign in first, so the account makes the world (Keel #134).
+      if (signInInputs(form)) {
+        progressBox.textContent = 'Signing in to OnlyWorlds…';
+        progressBox.hidden = false;
+        await signInFromFields(form, PIN_REST, this.toasts);
+      }
       // 1. Create new api world (server-side).
       progressBox.textContent = 'Creating world on onlyworlds.com…';
       progressBox.hidden = false;
-      const created = await createApiWorld({ name, email, pin });
+      const created = await createApiWorld({ name, pin });
       const apiKey = created.apiKey;
 
       // 2. Build the v2 adapter for element CRUD (gate 10.7: the SDK client
@@ -373,7 +366,6 @@ export class MakeOnlineModal extends BaseModal {
       // A seat's secret is this world's PIN only (#104), never the account's.
       const seatSecret = isSeatSecret(pin) ? pin : undefined;
       if (!reg.pin && !seatSecret) reg = setPin(reg, pin);
-      if (!reg.email && email) reg = setEmail(reg, email);
       reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name, seatSecret });
       saveRegistry(reg);
       patchSlice('registry', reg);

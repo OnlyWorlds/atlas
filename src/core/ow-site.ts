@@ -41,7 +41,7 @@ export function canOfferInvite(world: WorldRegistryEntry, accountRows: readonly 
   return !row || row.role === 'owner';
 }
 
-/** The "no account yet" line under an email and PIN form. */
+/** The "no account yet" line under a sign-in or PIN form. */
 export function noAccountYetHtml(): string {
   return `No account yet? <a class="atlas-settings-link atlas-link-inline" data-link="signup" href="${OW_SIGNUP_URL}" target="_blank" rel="noopener">Make a free one on onlyworlds.com</a>, then <a class="atlas-settings-link atlas-link-inline" data-link="set-pin" href="${OW_PIN_URL}" target="_blank" rel="noopener">set its PIN</a>.`;
 }

@@ -77,7 +77,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
                placeholder="you@example.com"
                autocomplete="email" />
       </label>
-      <p class="atlas-settings-hint" data-role="email-hint">Your onlyworlds.com email. Make online asks for it when it makes a new online world, and Atlas fills it in from here.</p>
+      <p class="atlas-settings-hint" data-role="email-hint">Your onlyworlds.com email. Where Atlas asks you to sign in, such as Make online, it fills it in from here.</p>
     </section>
   `;
 }

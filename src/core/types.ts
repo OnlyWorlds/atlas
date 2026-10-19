@@ -762,7 +762,7 @@ export interface WorldsRegistry {
   worlds: WorldRegistryEntry[];
   /** Global PIN for OW api access. */
   pin?: string;
-  /** Global email for OW account (used by create-world-external). */
+  /** Global email for OW account: prefills the sign-in in Make online and New world on OnlyWorlds. */
   email?: string;
   /**
    * OnlyWorlds account token (`ow_a_...`), pasted from the portal Tokens UI.

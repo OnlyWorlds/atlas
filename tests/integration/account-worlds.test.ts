@@ -370,7 +370,7 @@ describe('mintOwnKey — a shared world takes a key made for the member (#199, k
   });
 });
 
-describe('createApiWorld — signed-in v2 lane vs signed-out v1 fallback (session 260)', () => {
+describe('createApiWorld — the signed-in v2 lane (session 260); signed out it refuses (Keel #134, S432)', () => {
   const WORLDSYNC_BASE = 'https://test-ow.local/api/worldapi';
 
   it('signed in, pinless account: the PIN dance retries with the pin and returns the row + key', async () => {
@@ -380,7 +380,7 @@ describe('createApiWorld — signed-in v2 lane vs signed-out v1 fallback (sessio
     const state = mount({ accountHasPin: false });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
 
-    const result = await createApiWorld({ name: 'Fresh World', email: 'ignored@e.com', pin: '4242' });
+    const result = await createApiWorld({ name: 'Fresh World', pin: '4242' });
 
     expect(result.apiKey).toMatch(/^ow_w_/);
     expect(result.worldId).toBeTruthy();
@@ -393,23 +393,21 @@ describe('createApiWorld — signed-in v2 lane vs signed-out v1 fallback (sessio
     const state = mount({ accountHasPin: true });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
 
-    const result = await createApiWorld({ name: 'Second World', email: 'ignored@e.com', pin: '4242' });
+    const result = await createApiWorld({ name: 'Second World', pin: '4242' });
 
     expect(result.apiKey).toMatch(/^ow_w_/);
     expect(result.worldName).toBe('Second World');
     expect(state.created).toHaveLength(1);
   });
 
-  it('signed out: falls back to the v1 create-world-external endpoint', async () => {
-    // No account token (beforeEach reset the registry) → the legacy lane.
+  it('signed out: refuses, and the retired v1 create-world-external is never called', async () => {
+    // No account token (beforeEach reset the registry). The v1 handlers stay
+    // mounted as a tripwire: a regression back to the legacy lane would land there.
     const v1 = statefulOwHandlers({ baseUrl: WORLDSYNC_BASE });
     mswServer.use(...v1.handlers);
     setMakeOnlineBaseUrl(WORLDSYNC_BASE);
 
-    const result = await createApiWorld({ name: 'Legacy World', email: 'titus@example.com', pin: '4242' });
-
-    expect(result.apiKey).toMatch(/^mock-api-key-/);
-    expect(v1.worldCreations).toHaveLength(1);
-    expect(v1.worldCreations[0]).toMatchObject({ name: 'Legacy World', email: 'titus@example.com' });
+    await expect(createApiWorld({ name: 'Legacy World', pin: '4242' })).rejects.toThrow(/Sign in to OnlyWorlds first/);
+    expect(v1.worldCreations).toHaveLength(0);
   });
 });

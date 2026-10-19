@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.54.0',
+    date: '2026-10-19',
+    theme: 'Make online signs you in',
+    entries: [
+      {
+        id: 'make-online-signs-in',
+        title: 'Making a world online signs you in to OnlyWorlds',
+        body: 'Signed out, Make online and New world on OnlyWorlds now ask for your email or username and password, sign you in, and make the world on your account, as they do when you are already signed in. They used to take an email and a PIN through the older OnlyWorlds API. Atlas keeps a token for this browser, never your password.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.53.3',
     date: '2026-10-19',
     theme: 'The now in a shared world',

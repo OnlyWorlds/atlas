@@ -77,7 +77,7 @@ test('the Account section says which way to sign in and where the PIN comes from
   await expect(pinHint).toContainText('One PIN for all your worlds.');
   await expect(pinHint).toContainText('under World PIN');
   await expect(pinHint.locator('a[data-link="account-settings"]')).toHaveAttribute('href', 'https://www.onlyworlds.com/account/settings');
-  await expect(page.locator('[data-role="email-hint"]')).toContainText('Make online asks for it');
+  await expect(page.locator('[data-role="email-hint"]')).toContainText('it fills it in from here');
 });
 
 test('sign-in rejects a token without the ow_a_ prefix inline, without storing it', async ({ page }) => {

@@ -1,9 +1,10 @@
 /**
  * + new api world shortcut (Phase 3.5+).
  *
- * One-form path: name + email + pin → creates a local-only world inside the
- * atlas root, then immediately runs Route 1 (create new api world) so the
- * resulting registry entry is api-linked from the start.
+ * One-form path: name + pin (and, signed out, the account's sign-in) → creates
+ * a local-only world inside the atlas root, then immediately runs Route 1
+ * (create new api world on the account) so the resulting registry entry is
+ * api-linked from the start.
  *
  * For users who don't have local content yet but want to start a fresh
  * cloud-synced world. Where the local half lives is the where-question
@@ -14,15 +15,15 @@ import { BaseModal } from './modal-base';
 import { lockWhereChoice, readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
-import { saveRegistry, attachApi, setPin, setEmail } from '../registry/registry';
+import { saveRegistry, attachApi, setPin } from '../registry/registry';
 import { completeWaypoint } from '../core/waypoints';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { createApiWorld, buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
 import { escapeAttr, escapeText } from '../core/dom-utils';
-import { noAccountYetHtml } from '../core/ow-site';
 import { problemFor } from '../core/problems';
+import { signInFieldsHtml, missingSignIn, signInInputs, signInFromFields } from './sign-in-fields';
 
 export class NewApiWorldModal extends BaseModal {
   constructor(private toasts: ToastManager) {
@@ -45,17 +46,11 @@ export class NewApiWorldModal extends BaseModal {
       </label>
       ${reg.account_token ? `
       <p class="atlas-modal-hint atlas-account-create-as">Creating on your OnlyWorlds account${reg.account_username ? ` (${escapeText(reg.account_username)})` : ''}.</p>
-      ` : `
-      <label class="atlas-modal-field">
-        <span>Email</span>
-        <input class="atlas-input" type="email" name="api-email" placeholder="you@example.com" value="${escapeAttr(reg.email ?? '')}" autocomplete="email" required />
-      </label>
-      `}
+      ` : signInFieldsHtml(reg.email ?? '')}
       <label class="atlas-modal-field">
         <span>PIN</span>
         <input class="atlas-input" type="password" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
       </label>
-      ${reg.account_token ? '' : `<p class="atlas-modal-hint" data-role="no-account">${noAccountYetHtml()}</p>`}
       ${whereChoiceHtml()}
       <p class="atlas-modal-error" data-role="error" hidden></p>
       <div class="atlas-modal-progress" data-role="progress" hidden></div>
@@ -66,8 +61,6 @@ export class NewApiWorldModal extends BaseModal {
     `;
 
     const nameInput = body.querySelector<HTMLInputElement>('input[name="api-name"]')!;
-    // Absent when signed in (the account token replaces the email lane).
-    const emailInput = body.querySelector<HTMLInputElement>('input[name="api-email"]');
     const pinInput = body.querySelector<HTMLInputElement>('input[name="api-pin"]')!;
     const errorEl = body.querySelector<HTMLElement>('[data-role="error"]')!;
     const progressEl = body.querySelector<HTMLElement>('[data-role="progress"]')!;
@@ -89,12 +82,11 @@ export class NewApiWorldModal extends BaseModal {
 
     submitBtn.addEventListener('click', async () => {
       const name = nameInput.value.trim();
-      const email = emailInput?.value.trim() ?? '';
       const pin = pinInput.value.trim();
-      const signedIn = !!getState().registry.account_token;
       errorEl.hidden = true;
       if (!name) { errorEl.textContent = 'A world needs a name.'; errorEl.hidden = false; return; }
-      if (!signedIn && !email) { errorEl.textContent = 'Enter your email.'; errorEl.hidden = false; return; }
+      const signIn = missingSignIn(body);
+      if (signIn) { errorEl.textContent = signIn.line; errorEl.hidden = false; signIn.input.focus(); return; }
       if (!pin) { errorEl.textContent = 'Enter your PIN.'; errorEl.hidden = false; return; }
 
       // Taken synchronously, inside the click, before the first await. A retry
@@ -116,14 +108,19 @@ export class NewApiWorldModal extends BaseModal {
       // user shouldn't even see the affordance.
       cancelBtn.hidden = true;
       nameInput.disabled = true;
-      if (emailInput) emailInput.disabled = true;
+      const signInFields = signInInputs(body);
+      if (signInFields) { signInFields.login.disabled = true; signInFields.password.disabled = true; }
       pinInput.disabled = true;
       progressEl.hidden = false;
 
       try {
-        // 1. Persist global identity fields if not already set.
+        // 0. Signed out: sign in first, so the account makes the world (Keel #134).
+        if (signInFields) {
+          progressEl.textContent = 'Signing in to OnlyWorlds…';
+          await signInFromFields(body, 'The PIN lets Atlas upload the world\'s contents.', this.toasts);
+        }
+        // 1. Persist the PIN if not already set.
         let regAfter = getState().registry;
-        if (!regAfter.email && email) regAfter = setEmail(regAfter, email);
         if (!regAfter.pin) regAfter = setPin(regAfter, pin);
         if (regAfter !== getState().registry) {
           saveRegistry(regAfter);
@@ -144,7 +141,7 @@ export class NewApiWorldModal extends BaseModal {
         }
 
         progressEl.textContent = `Creating the world on onlyworlds.com…`;
-        const created = await createApiWorld({ name: entry.name, email, pin });
+        const created = await createApiWorld({ name: entry.name, pin });
         const apiKey = created.apiKey;
 
         // World id + name come straight from the create response (keel
@@ -197,7 +194,7 @@ export class NewApiWorldModal extends BaseModal {
         cancelBtn.hidden = false;
         nameInput.disabled = reusable;
         lockWhereChoice(body, reusable);
-        if (emailInput) emailInput.disabled = false;
+        if (signInFields) { signInFields.login.disabled = false; signInFields.password.disabled = false; }
         pinInput.disabled = false;
       }
     });

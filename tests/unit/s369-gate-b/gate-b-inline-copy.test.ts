@@ -29,7 +29,7 @@ describe('B-7 an account error Atlas did not expect is not passed off as a refus
     patchSlice('registry', { ...defaultRegistry(), account_token: 'tok' } as never);
     vi.spyOn(AccountClient.prototype, 'createWorld').mockRejectedValue(new Error('create-world response missing id or key'));
     let caught: unknown = null;
-    try { await createApiWorld({ name: 'W', email: '', pin: '1234' }); } catch (e) { caught = e; }
+    try { await createApiWorld({ name: 'W', pin: '1234' }); } catch (e) { caught = e; }
     expect(caught).not.toBeNull();
     expect(isPlainError(caught)).toBe(false);
   });

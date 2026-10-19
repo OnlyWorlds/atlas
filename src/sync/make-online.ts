@@ -1,9 +1,9 @@
 /**
  * Make-Online helpers — used by the Make-Online modal (Bouts F+G).
  *
- * Route 1 (create new api world): POST to /worldsync/create-world-external/
- * (outside the worldapi prefix; not exposed by the SDK), then push all
- * local elements to the new api world as CREATEs.
+ * Route 1 (create new api world): POST /api/v2/account/worlds on the
+ * signed-in account, then push all local elements to the new api world as
+ * CREATEs. Signed out, the forms sign in first (`ui/sign-in-fields.ts`).
  *
  * Route 2 (link existing api world): list all server elements, plan the
  * match (`plan-merge.ts`), move name-matched locals onto the server's ids
@@ -19,7 +19,7 @@ import { OwV2ClientAdapter, OwV2Error } from './ow-v2-client-adapter';
 import { AccountClient, accountErrorMessage } from './account-client';
 import { PlainError } from '../core/plain-error';
 import { getState } from '../core/state';
-import { devWorldapiBase, devV2Base } from './dev-api-base';
+import { devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { planMerge, type ServerRec } from './plan-merge';
@@ -29,22 +29,14 @@ import { isPageNarrative, newBlockId, type PageBlock } from '../core/sharing';
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
 
-const DEFAULT_OW_BASE = 'https://www.onlyworlds.com/api/worldapi';
-
-/** Test seam: override the OW base URL (worldapi). The worldsync path is derived. */
+/** Test seam: override the OW base URL; buildV2Adapter derives its /api/v2 from it. */
 export function setMakeOnlineBaseUrl(url: string): void {
-  // Stored at module level so tests can swap before invoking createApiWorld.
+  // Stored at module level so tests can swap before building an adapter.
   // Production code never calls this — base defaults to onlyworlds.com.
   overriddenBase = url;
 }
 
 let overriddenBase: string | null = null;
-
-function getWorldsyncUrl(): string {
-  const base = overriddenBase ?? devWorldapiBase() ?? DEFAULT_OW_BASE;
-  const worldsyncBase = base.endsWith('/worldapi') ? base.replace(/\/worldapi$/, '/worldsync') : base;
-  return `${worldsyncBase}/create-world-external/`;
-}
 
 // ---------------------------------------------------------------------------
 // Route 1: create new api world
@@ -52,7 +44,6 @@ function getWorldsyncUrl(): string {
 
 export interface CreateApiWorldOpts {
   name: string;
-  email: string;
   pin: string;
 }
 
@@ -69,25 +60,21 @@ export interface CreateApiWorldResult {
 }
 
 /**
- * Create a new api world. Two lanes (session 260):
+ * Create a new api world on the signed-in account (session 260):
+ * `POST /api/v2/account/worlds` with the PIN dance — try WITHOUT `pin` first
+ * (an account that already has a PIN rejects one, even the correct value);
+ * on 422 param=pin retry WITH the caller's PIN (fresh accounts require it,
+ * and it becomes the account PIN). The 201 carries the world row + full
+ * WRITE key in one round-trip.
  *
- *   - SIGNED IN (registry has an account token): `POST /api/v2/account/worlds`
- *     with the PIN dance — try WITHOUT `pin` first (an account that already
- *     has a PIN rejects one, even the correct value); on 422 param=pin retry
- *     WITH the caller's PIN (fresh accounts require it, and it becomes the
- *     account PIN). The 201 carries the world row + full WRITE key in one
- *     round-trip. This retires the v1 path for account users.
- *
- *   - SIGNED OUT: the legacy v1 `create-world-external` endpoint
- *     (name + email + pin), unchanged — the no-account path until keel
- *     sunsets it.
+ * Signed out it refuses: the v1 `create-world-external` lane (name + email +
+ * PIN) is retired (Keel #134, S432); the forms sign in first.
  *
  * Throws on validation failure, rate limit, network error — the caller
  * surfaces these as inline error messages.
  */
 export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateApiWorldResult> {
   const name = opts.name.trim();
-  const email = opts.email.trim();
   const pin = opts.pin.trim();
   if (!name) throw new Error('Name is required');
 
@@ -112,43 +99,7 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
     return { apiKey: created.key, worldId: created.id, worldName: created.name };
   }
 
-  if (!email) throw new PlainError('Enter the email of your onlyworlds.com account first.');
-  if (!pin) throw new PlainError('Enter your PIN first.');
-
-  const response = await fetch(getWorldsyncUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, pin }),
-  });
-
-  if (response.status === 400) {
-    // keel answers every refusal here with one generic body ("Invalid request.
-    // Please try again.", config/worldsync.py, on purpose), so Atlas's own
-    // sentence says more than the server's (copy pass S391, Kael F97a).
-    throw new PlainError('OnlyWorlds did not accept that email and PIN. Check them against your onlyworlds.com account.');
-  }
-  if (response.status === 429) {
-    throw new PlainError('OnlyWorlds is getting too many requests. Try again in an hour.');
-  }
-  if (!response.ok) {
-    throw new PlainError('OnlyWorlds had a problem on its side, so the world was not created. Try again in a while.');
-  }
-  const data = await response.json() as {
-    success?: boolean;
-    api_key?: string;
-    message?: string;
-    world_id?: string;
-    name?: string;
-  };
-  if (!data.success || !data.api_key) {
-    if (data.message) console.warn('[make-online] create-world failed:', data.message);
-    throw new PlainError('OnlyWorlds could not create the world. Try again in a while.');
-  }
-  return {
-    apiKey: data.api_key,
-    ...(typeof data.world_id === 'string' && data.world_id ? { worldId: data.world_id } : {}),
-    ...(typeof data.name === 'string' && data.name ? { worldName: data.name } : {}),
-  };
+  throw new PlainError('Sign in to OnlyWorlds first: the new world is made on your account.');
 }
 
 // ---------------------------------------------------------------------------

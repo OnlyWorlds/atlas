@@ -2,16 +2,15 @@
  * make-online — integration test against MSW + MockFolderStore.
  *
  * Covers the two Make-Online routes (Bouts F+G):
- *   - Route 1 (`createApiWorld`): POST to /worldsync/create-world-external/
- *     returns an api_key for a brand-new world. Validates the URL path
- *     swap (worldapi → worldsync) and the success/failure response shapes.
+ *   - Route 1 (`createApiWorld`): signed out it refuses and sends nothing
+ *     (the v1 create-world-external lane is retired, Keel #134, S432); the
+ *     signed-in lane is in account-worlds.test.ts.
  *   - Route 2 (`mergeLocalIntoApi`): merges local folder state into an
  *     existing api world per the chosen policy (b = overwrite-on-match,
  *     c = push-only-new).
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { http, HttpResponse } from 'msw';
 import { mswServer } from '../setup';
 import { statefulOwHandlers, statefulV2Handlers } from '../msw-handlers';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
@@ -23,8 +22,8 @@ import {
   setMakeOnlineBaseUrl,
 } from '../../src/sync/make-online';
 
-// Route 1 (create-world-external) is a v1 /worldsync route that STAYS on v1 in
-// production, so its handler (from statefulOwHandlers) is still registered.
+// statefulOwHandlers still serves the v1 create-world-external route, so a
+// regression that called it would show in serverState.worldCreations.
 // Route 2 element CRUD + /bulk goes through the v2 adapter against the keel v2
 // MSW at the /api/v2 sibling base.
 const TEST_BASE = 'https://test-ow.local/api/worldapi';
@@ -36,8 +35,8 @@ let folder: MockFolderStore;
 
 beforeEach(async () => {
   clock = new MonotonicClock('2026-01-01T00:00:00.000Z');
-  // v1 handlers: only the /worldsync create-world-external route is consumed
-  // (Route 1). v2 handlers serve all element CRUD + /bulk (Route 2).
+  // v1 handlers: the retired create-world-external route, as a tripwire.
+  // v2 handlers serve all element CRUD + /bulk (Route 2).
   serverState = statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next });
   const v2 = statefulV2Handlers({ baseUrl: V2_BASE, clock: clock.next });
   mswServer.use(...serverState.handlers, ...v2.handlers);
@@ -61,49 +60,22 @@ function makeAdapter(): OwV2ClientAdapter {
 // ---------------------------------------------------------------------------
 
 describe('createApiWorld (Route 1)', () => {
-  it('returns an api_key when name/email/pin are valid', async () => {
-    const { apiKey } = await createApiWorld({
-      name: 'My World',
-      email: 'titus@example.com',
-      pin: '4242',
-    });
-    expect(apiKey).toMatch(/^mock-api-key-/);
-    expect(serverState.worldCreations).toHaveLength(1);
-    expect(serverState.worldCreations[0]).toMatchObject({
-      name: 'My World',
-      email: 'titus@example.com',
-    });
-  });
-
-  it('throws when required fields are missing', async () => {
-    await expect(createApiWorld({ name: '', email: 'a@b.c', pin: '1' })).rejects.toThrow(/name/i);
-    await expect(createApiWorld({ name: 'X', email: '', pin: '1' })).rejects.toThrow(/email/i);
-    await expect(createApiWorld({ name: 'X', email: 'a@b.c', pin: '' })).rejects.toThrow(/pin/i);
+  it('signed out: refuses with a sign-in line and sends nothing (Keel #134)', async () => {
+    const sent: string[] = [];
+    const onRequest = ({ request }: { request: Request }) => { sent.push(`${request.method} ${request.url}`); };
+    mswServer.events.on('request:start', onRequest);
+    try {
+      await expect(createApiWorld({ name: 'My World', pin: '4242' })).rejects.toThrow(/Sign in to OnlyWorlds first/);
+    } finally {
+      mswServer.events.removeListener('request:start', onRequest);
+    }
+    expect(sent).toEqual([]);
     expect(serverState.worldCreations).toHaveLength(0);
   });
 
-  it("shows Atlas's own sentence on a 400, whatever the body says", async () => {
-    // keel's 400 body is one generic line for every refusal (config/worldsync.py),
-    // so Atlas's sentence says more (copy pass S391, Kael F97a).
-    const worldsyncUrl = `${TEST_BASE.replace('/worldapi', '/worldsync')}/create-world-external/`;
-    mswServer.use(
-      http.post(worldsyncUrl, () =>
-        HttpResponse.json({ success: false, message: 'That email already owns a world' }, { status: 400 })
-      )
-    );
-    await expect(
-      createApiWorld({ name: 'X', email: 'a@b.c', pin: '1234' })
-    ).rejects.toThrow(/did not accept that email and PIN/i);
-  });
-
-  it('falls back to the generic 400 message when the body is not JSON', async () => {
-    const worldsyncUrl = `${TEST_BASE.replace('/worldapi', '/worldsync')}/create-world-external/`;
-    mswServer.use(
-      http.post(worldsyncUrl, () => new HttpResponse('gateway boom', { status: 400 }))
-    );
-    await expect(
-      createApiWorld({ name: 'X', email: 'a@b.c', pin: '1234' })
-    ).rejects.toThrow(/did not accept that email and PIN/i);
+  it('throws when the name is missing', async () => {
+    await expect(createApiWorld({ name: '', pin: '1' })).rejects.toThrow(/name/i);
+    expect(serverState.worldCreations).toHaveLength(0);
   });
 });
 
