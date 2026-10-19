@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.58.2',
+    date: '2026-10-19',
+    theme: 'Two more dark cards in light mode',
+    entries: [
+      {
+        id: 'dark-cards-light',
+        title: 'The OnlyWorlds tips and the map\'s placing hint read in light mode',
+        body: 'In light mode, the dark card that names an OnlyWorlds idea (such as "One world, many tools") showed its second line and its See all and Turn off row dark on dark, and the hint over a map while placing a pin did the same with its Cancel. Both now keep light text on their dark card.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.58.1',
     date: '2026-10-19',
     theme: 'The drawing strip in light mode',

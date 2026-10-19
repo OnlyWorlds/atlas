@@ -196,7 +196,9 @@ html {
 :root[data-theme='light'] .atlas-tour-root,
 :root[data-theme='light'] .atlas-timeline-view,
 :root[data-theme='light'] .atlas-timeline-canvas,
-:root[data-theme='light'] .atlas-zone-draft-overlay {
+:root[data-theme='light'] .atlas-zone-draft-overlay,
+:root[data-theme='light'] .atlas-waypoint-toast,
+:root[data-theme='light'] .atlas-map-placement-hint {
   --atlas-ink-rgb: 255, 255, 255;
   --atlas-accent-rgb: 34, 211, 238;
   --atlas-text: #e8e8e8;
