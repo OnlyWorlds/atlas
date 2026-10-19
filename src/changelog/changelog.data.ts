@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.55.0',
+    date: '2026-10-19',
+    theme: 'A player needs no account',
+    entries: [
+      {
+        id: 'player-link-no-account',
+        title: 'Invite a player with no account',
+        body: 'In Invite someone, A player now makes a link that needs no account: your friend opens it in Lantern and reads the world as one Character, seeing only what that Character knows. Pick which Character they play, or let the link make a new one for them. A player who wants their own account is one choice down, as A player with an account.',
+        tags: ['sync'],
+      },
+      {
+        id: 'player-link-opens',
+        title: 'Atlas opens a player\'s link',
+        body: 'A player\'s link opened in Atlas used to say it was of a kind Atlas did not know. It now opens the world to read, as the Character the link gives you, with no account and no PIN. You can give the name the game master sees.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.54.0',
     date: '2026-10-19',
     theme: 'Make online signs you in',

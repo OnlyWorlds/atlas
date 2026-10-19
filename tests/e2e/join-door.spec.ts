@@ -23,7 +23,9 @@ async function freshBoot(page: Page) {
 
 interface Keel { previews: number; joins: Array<Record<string, unknown>>; releasePreview: () => void }
 
-async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean } = {}): Promise<Keel> {
+const READ_KEY = 'ow_r_' + 'R'.repeat(32);
+
+async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean; player?: boolean } = {}): Promise<Keel> {
   const now = '2026-10-10T00:00:00.000Z';
   const keel: Keel = { previews: 0, joins: [], releasePreview: () => {} };
   let release!: () => void;
@@ -38,13 +40,21 @@ async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean
       await held;
       if (opts.refuse) return route.fulfill(notFound);
       return route.fulfill({ json: {
+        reader: opts.player ? 'player' : 'agent',
         world: { name: opts.worldName ?? 'Moppetopia', description: '' },
-        invited_by: 'tmo', owner_character: 'Admiral Fluffington', role: 'contributor',
-        with_character: false, expires_at: '2099-01-01T00:00:00Z',
+        invited_by: 'tmo', owner_character: 'Admiral Fluffington', role: opts.player ? 'guest' : 'contributor',
+        with_character: !!opts.player, expires_at: '2099-01-01T00:00:00Z',
       } });
     }
     if (path === '/join') {
-      keel.joins.push(route.request().postDataJSON() as Record<string, unknown>);
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      keel.joins.push(body);
+      // keel #353's PlayerJoined (join_api.py `_player_join`): a read key and the Character.
+      if (opts.player) return route.fulfill({ status: 201, json: {
+        kind: 'player', key: READ_KEY, role: 'guest',
+        world: { id: WORLD_ID, name: opts.worldName ?? 'Moppetopia', description: '' },
+        character: { id: 'c0000000-0000-4000-8000-000000000009', name: typeof body.name === 'string' && body.name ? body.name : 'Player' },
+      } });
       return route.fulfill({ status: 201, json: {
         world: { id: WORLD_ID, name: opts.worldName ?? 'Moppetopia', description: '' },
         seat: { id: 'seat-1', role: 'contributor', agent_name: 'Atlas (Chrome)' },
@@ -101,6 +111,40 @@ test('a join link: the code is gone before keel answers, the screen names the wo
   expect(after.pin).toBeNull();
   expect(after.meta).not.toContain(SECRET);
   expect(after.meta).toContain('"seat"');
+});
+
+test('a player link (#416, keel #353): opens to read as the Character, no account, no seat, no PIN', async ({ page }) => {
+  await freshBoot(page);
+  const keel = await mockKeel(page, { player: true });
+  keel.releasePreview();
+  await page.goto('about:blank');
+  await page.goto(`/#/join/${CODE}`);
+  const modal = page.locator('[data-modal="join-world"]');
+  await expect(modal).toBeVisible();
+  await expect(modal.locator('.atlas-join-question')).toHaveText('Open Moppetopia as a player?');
+  await expect(modal.locator('[data-role="role"]')).toContainText('as your Character, with no account');
+  await expect(modal.locator('[data-role="character"]')).toBeHidden();
+  expect(keel.joins).toHaveLength(0);
+
+  await modal.locator('input[name="player-name"]').fill('  Bartlett ');
+  await modal.locator('input[name="where"][value="browser"]').check();
+  await modal.locator('[data-action="open"]').click();
+  await expect(modal).toHaveCount(0);
+  // The redeem is a player's: the name, never an agent_name.
+  expect(keel.joins).toEqual([{ code: CODE, name: 'Bartlett' }]);
+  await expect(page.locator('.ow-toast', { hasText: 'Opened Moppetopia as Bartlett' })).toBeVisible();
+
+  await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().data.elements.length)).toBe(1);
+  const after = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const st = api.getState();
+    const w = st.registry.worlds.find((x: any) => x.api?.world_id === '22222222-3333-4444-8555-666666666666');
+    const meta = await api.getActiveStore().readWorldMeta();
+    return { api: w?.api, pin: st.registry.pin ?? null, meta: meta.api };
+  });
+  expect(after.api).toEqual({ world_id: WORLD_ID, api_key: READ_KEY, world_name: 'Moppetopia', read_only: true });
+  expect(after.pin).toBeNull();
+  expect(after.meta).toMatchObject({ world_id: WORLD_ID, read_only: true });
 });
 
 test('a refused code says so once and opens nothing', async ({ page }) => {

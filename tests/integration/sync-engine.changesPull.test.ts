@@ -288,3 +288,64 @@ describe('changes pull: rewind guard (v2 tail — head below last-applied seq)',
     expect(r).toBeDefined();
   });
 });
+
+// keel core/changes.py: a guest's cursor from before its view moved answers
+// 409 resync_required, "pull again from since=0". A player world in Atlas
+// (#416) meets it whenever the roster moves, i.e. every time a player joins.
+describe('changes pull: resync_required (a guest\'s view moved)', () => {
+  const A = '00000000-0000-4000-8000-00000000s001';
+  const B = '00000000-0000-4000-8000-00000000s002';
+  const resync = () => Object.assign(new Error('API Error 409: resync'), { status: 409, code: 'resync_required', param: null });
+
+  /** After one ordinary pull, the server's view loses `gone`: an old cursor gets the 409, a walk from 0 omits it. */
+  async function viewMoves(gone: string): Promise<{ calls: Array<string | null> }> {
+    const real = client.pullChanges!.bind(client);
+    const calls: Array<string | null> = [];
+    client.pullChanges = async (since, limit) => {
+      calls.push(since);
+      if (since) throw resync();
+      const page = await real(since, limit);
+      return { ...page, changes: page.changes.filter(op => op.id !== gone) };
+    };
+    return { calls };
+  }
+
+  it('a view-only world walks again from 0 and drops what left the view, without a review', async () => {
+    engine = new SyncEngine({ folder, client, readOnly: true });
+    await client.createElement('character', { id: A, name: 'Judge Holden' });
+    await client.createElement('event', { id: B, name: 'Kept from the Judge' });
+    await engine.pullNow();
+    expect((await folder.listElements()).map(e => e.id).sort()).toEqual([A, B]);
+
+    const { calls } = await viewMoves(B);
+    const r = await engine.pullNow();
+    expect(calls[0]).toBeTruthy();   // the old cursor, refused
+    expect(calls[1]).toBeNull();     // the walk from 0
+    expect((await folder.listElements()).map(e => e.id)).toEqual([A]);
+    expect(r.pulled.deletes).toBe(1);
+    const state = await folder.readSyncState();
+    expect(state.server_deletes ?? []).toEqual([]);
+    expect(state.changes_cursor).toBeTruthy();
+  });
+
+  it('a writable world walks again from 0 and keeps what it holds (what leaves a member\'s view is keel\'s question)', async () => {
+    await client.createElement('character', { id: A, name: 'Judge Holden' });
+    await client.createElement('event', { id: B, name: 'Kept from the Judge' });
+    await engine.pullNow();
+    await viewMoves(B);
+    const r = await engine.pullNow();
+    expect((await folder.listElements()).map(e => e.id).sort()).toEqual([A, B]);
+    expect(r.pulled.deletes).toBe(0);
+  });
+
+  it('a second resync_required in one round is thrown, never looped', async () => {
+    engine = new SyncEngine({ folder, client, readOnly: true });
+    await client.createElement('character', { id: A, name: 'Judge Holden' });
+    await engine.pullNow();
+    let n = 0;
+    client.pullChanges = async () => { n++; throw resync(); };
+    await expect(engine.pullNow()).rejects.toThrow(/409/);
+    expect(n).toBe(2);
+    expect((await folder.listElements()).map(e => e.id)).toEqual([A]);
+  });
+});

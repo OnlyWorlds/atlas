@@ -855,6 +855,10 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
 export interface FakePass {
   code: string;
   world: { id: string; name: string; description?: string };
+  /** keel #212/#353. Left out, the preview sends no `reader` (a keel before #212: an agent code). */
+  reader?: 'agent' | 'person' | 'player';
+  /** A player code's picked Character; left out, the redeem makes one named for the player. */
+  character?: { id: string; name: string };
   role?: 'contributor' | 'co_builder' | 'guest';
   invitedBy?: string | null;
   ownerCharacter?: string | null;
@@ -887,16 +891,44 @@ export function joinV2Handlers(opts: { baseUrl: string; passes: FakePass[] }): {
       const p = live(body?.code);
       if (!p) return notFound();
       return HttpResponse.json({
+        ...(p.reader ? { reader: p.reader } : {}),
         world: { name: p.world.name, description: p.world.description ?? '' },
         invited_by: p.invitedBy ?? null,
         owner_character: p.ownerCharacter ?? null,
-        role: p.role ?? 'contributor',
-        with_character: p.withCharacter ?? false,
+        role: p.reader === 'player' ? 'guest' : p.role ?? 'contributor',
+        with_character: p.reader === 'player' ? true : p.withCharacter ?? false,
         expires_at: expires(p),
       });
     }),
     http.post(`${base}/join`, async ({ request }) => {
-      const body = await request.json().catch(() => null) as { code?: unknown; agent_name?: unknown } | null;
+      const body = await request.json().catch(() => null) as { code?: unknown; agent_name?: unknown; name?: unknown } | null;
+      // keel #353 (join_api.py `_player_join`, agents.redeem_player): a player
+      // code takes an optional `name` (checked before the code is touched) and
+      // no agent_name, and answers a read key and the Character it reads as.
+      const asPlayer = opts.passes.find(x => x.code === body?.code)?.reader === 'player';
+      if (asPlayer) {
+        if (body!.name !== undefined && body!.name !== null && (typeof body!.name !== 'string' || body!.name.trim().length > 80)) {
+          return HttpResponse.json(
+            { error: { type: 'invalid_request', code: 'invalid_request', message: 'name must be 80 characters or fewer.', param: 'name' } },
+            { status: 422 },
+          );
+        }
+        const p = live(body!.code);
+        if (!p) return notFound();
+        used.add(p.code);
+        const n = redeemed.length + 1;
+        const key = `ow_r_playerkey${n}`.padEnd(37, 'r');
+        const name = typeof body!.name === 'string' && body!.name.trim() ? body!.name.trim() : '';
+        const character = p.character ?? { id: `char-${n}`, name: name || 'Player' };
+        redeemed.push({ code: p.code, agent_name: name, key, secret: '' });
+        return HttpResponse.json({
+          kind: 'player',
+          key,
+          world: { id: p.world.id, name: p.world.name, description: p.world.description ?? '' },
+          character,
+          role: 'guest',
+        }, { status: 201 });
+      }
       if (typeof body?.agent_name !== 'string' || !body.agent_name.trim() || body.agent_name.length > 80) {
         return HttpResponse.json(
           { error: { type: 'invalid_request', code: 'invalid_request', message: 'agent_name is required.', param: 'agent_name' } },

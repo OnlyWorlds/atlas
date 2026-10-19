@@ -14,7 +14,16 @@ import { DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { PlainError } from '../core/plain-error';
 
-export type InviteRole = 'contributor' | 'guest';
+/**
+ * Who a link is for (the sharing floor's Q1, the Captain's yes, h50 #7610):
+ * `player` is keel's no-account player link (#353), a friend reading as one
+ * Character; `guest` is a person's link with role guest, the same reading
+ * with an account of their own; `contributor` a person's link.
+ */
+export type InviteFor = 'contributor' | 'player' | 'guest';
+
+/** A player link's Character: one of the world's, by its id, or a new one named for the player. */
+export const NEW_CHARACTER = 'new';
 
 /** How long a link works, said where it is made (keel's default; the SDK takes 1, 7 or 30). */
 export const INVITE_DAYS = 7;
@@ -30,22 +39,25 @@ export const INVITE_NOT_OWNER_LINE = 'Only the world\'s owner can make an invite
 
 export const INVITE_CAP_LINE = 'This world has as many open invites as it can hold, links not yet used included. Take some back on its page on onlyworlds.com, under Access, then make a new one.';
 
-/** A new invite link for a person, made by the signed-in owner. Nothing about it is kept. */
+export const INVITE_CHARACTER_GONE_LINE = 'That Character is not on OnlyWorlds yet, or no longer. Let the world sync, or pick another, then make the link.';
+
+/**
+ * A new invite link, made by the signed-in owner. Nothing about it is kept.
+ * `character` is for a player link only: a Character's id, or `NEW_CHARACTER`.
+ */
 export async function makeInvite(
   token: string,
   worldId: string,
-  role: InviteRole,
+  inviteFor: InviteFor,
   inviterName: string,
+  character: string = NEW_CHARACTER,
 ): Promise<MadeInvite> {
   const name = inviterName.trim();
   const client = new OwV2Client({ apiKey: token, baseUrl: devV2Base() ?? DEFAULT_V2_BASE });
   try {
-    const made = await client.createWorldLink(worldId, {
-      reader: 'person',
-      role,
-      days: INVITE_DAYS,
-      ...(name ? { inviterName: name } : {}),
-    });
+    const made = await client.createWorldLink(worldId, inviteFor === 'player'
+      ? { reader: 'player', character, days: INVITE_DAYS, ...(name ? { inviterName: name } : {}) }
+      : { reader: 'person', role: inviteFor, days: INVITE_DAYS, ...(name ? { inviterName: name } : {}) });
     return { link: made.link, line: made.line };
   } catch (err) {
     // Every refusal is worded here, never read out (conv. 125).
@@ -57,6 +69,9 @@ export async function makeInvite(
       // keel accounts/agents.py, MAX_PENDING_INVITES) is a 422 naming no field;
       // a retry never helps (the S414 gate's M1).
       if (err.status === 422 && !err.param) throw new PlainError(INVITE_CAP_LINE);
+      // keel refuses a Character it does not hold in this world (agents.py
+      // `_clean_link_character`): made here and not synced yet, or deleted there.
+      if (err.status === 422 && err.param === 'character') throw new PlainError(INVITE_CHARACTER_GONE_LINE);
     }
     throw new PlainError('The link was not made. Try again in a moment.');
   }

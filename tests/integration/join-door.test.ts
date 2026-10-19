@@ -5,6 +5,7 @@
  * storage through the link flow (as `link-browser.test.ts` sets it up).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { mswServer } from '../setup';
 import { joinV2Handlers, statefulV2Handlers, type FakePass } from '../msw-handlers';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
@@ -40,8 +41,8 @@ vi.mock('../../src/sync/sync-attach', async (importOriginal) => ({
 
 import { captureJoinCode, hasPendingJoin, takePendingJoin } from '../../src/core/join-capture';
 import {
-  JOIN_REFUSED_LINE, JOIN_TAKEN_LINE, isRefusedCode, openJoinedWorld, previewJoin, redeemJoin,
-  redeemRefusedSentence, roleLine, seatAgentName, setJoinBaseForTests,
+  JOIN_REFUSED_LINE, JOIN_TAKEN_LINE, isRefusedCode, openJoinedWorld, openPlayerWorld, playerAlreadyHereLine,
+  previewJoin, redeemJoin, redeemPlayerJoin, redeemRefusedSentence, roleLine, seatAgentName, setJoinBaseForTests,
 } from '../../src/setup/join-door';
 
 const WORLD_ID = '068e5012-d77c-799d-8000-95548fbae701';
@@ -221,5 +222,85 @@ describe('openJoinedWorld', () => {
     const out = await openJoinedWorld({ seat: await redeemJoin(CODE), where: 'browser' });
     expect(out.kind).toBe('here-unlinked');
     expect(getState().registry.worlds[0].state).toBe('local-only');
+  });
+});
+
+// keel #353, the sharing floor's T2 (#416): a player's code opens in Atlas to
+// read, as the Character the link gives, with no account and no PIN.
+describe('a player link', () => {
+  const PLAYER = 'ow_j_' + 'P'.repeat(32);
+  const playerPass = (over: Partial<FakePass> = {}): FakePass => pass({ code: PLAYER, reader: 'player', ...over });
+
+  it('the preview says player, and Atlas knows the kind', async () => {
+    serve([playerPass()]);
+    const p = await previewJoin(PLAYER);
+    expect(p.reader).toBe('player');
+    expect(p.role).toBe('guest');
+    expect(redeemed).toHaveLength(0);
+  });
+
+  it('the redeem sends the player\'s name and no agent_name, and keeps the read key and the Character', async () => {
+    serve([playerPass()]);
+    const joined = await redeemPlayerJoin(PLAYER, '  Bartlett  ');
+    expect(redeemed).toEqual([expect.objectContaining({ code: PLAYER, agent_name: 'Bartlett' })]);
+    expect(joined.world).toEqual({ id: WORLD_ID, name: 'Moppetopia' });
+    expect(joined.key).toMatch(/^ow_r_/);
+    expect(joined.character.name).toBe('Bartlett');
+  });
+
+  it('no name: keel names the Character, a picked one keeps its own', async () => {
+    serve([playerPass(), playerPass({ code: PLAYER + 'x', character: { id: 'c-holden', name: 'Judge Holden' } })]);
+    expect((await redeemPlayerJoin(PLAYER)).character.name).toBe('Player');
+    expect((await redeemPlayerJoin(PLAYER + 'x', 'Kid')).character).toEqual({ id: 'c-holden', name: 'Judge Holden' });
+  });
+
+  it('a spent code is the one refusal, and a player is never sent to an account page (gate M2)', async () => {
+    serve([playerPass()]);
+    const p = await previewJoin(PLAYER);
+    await redeemPlayerJoin(PLAYER);
+    const err = await redeemPlayerJoin(PLAYER).catch(e => e);
+    expect(isRefusedCode(err)).toBe(true);
+    const said = redeemRefusedSentence(p);
+    expect(said).toContain('tell the person who sent it');
+    expect(said).not.toContain(JOIN_TAKEN_LINE);
+  });
+
+  it('an answer that is not a player\'s read key is refused, never linked', async () => {
+    // An agent's answer (a write key and a secret) is never taken as a player's.
+    mswServer.use(http.post(`${TEST_BASE}/join`, () => HttpResponse.json({
+      kind: 'agent', world: { id: WORLD_ID, name: 'Moppetopia' }, key: 'ow_w_' + 'k'.repeat(32), pin: 'ow_s_x', character: null,
+    }, { status: 201 })));
+    await expect(redeemPlayerJoin(PLAYER)).rejects.toThrow(/player/);
+    expect(getState().registry.worlds).toHaveLength(0);
+  });
+
+  it('downloads the world view-only on the read key: no PIN, no seat, the account PIN untouched', async () => {
+    serve([playerPass()]);
+    const player = await redeemPlayerJoin(PLAYER, 'Bartlett');
+    const out = await openPlayerWorld({ player, where: 'browser' });
+    expect(out.kind).toBe('downloaded');
+    if (out.kind !== 'downloaded') return;
+    const entry = getState().registry.worlds.find(w => w.id === out.result.entry.id)!;
+    expect(entry.api).toMatchObject({ world_id: WORLD_ID, api_key: player.key, read_only: true });
+    expect(entry.api?.seat).toBeUndefined();
+    expect(entry.api?.seat_secret).toBeUndefined();
+    expect(getState().registry.pin).toBe('1234');
+    const meta = await getActiveStore()!.readWorldMeta();
+    expect(meta.api).toMatchObject({ world_id: WORLD_ID, read_only: true });
+  });
+
+  it('a world already linked here keeps its own key: the player key never replaces it', async () => {
+    serve([playerPass()]);
+    const e = {
+      id: 'here-1', name: 'Moppetopia', state: 'api-linked', api: { world_id: WORLD_ID, api_key: 'ow_w_owner' },
+      folder: { handle_key: 'world-here-1', folder_name: 'moppetopia' },
+      created_at: '2026-01-01T00:00:00.000Z', last_opened_at: '2026-01-01T00:00:00.000Z',
+    } as WorldRegistryEntry;
+    patchSlice('registry', { ...getState().registry, worlds: [e] });
+    const out = await openPlayerWorld({ player: await redeemPlayerJoin(PLAYER), where: 'browser' });
+    expect(out.kind).toBe('already-here');
+    expect(getState().registry.worlds).toHaveLength(1);
+    expect(getState().registry.worlds[0].api).toEqual({ world_id: WORLD_ID, api_key: 'ow_w_owner' });
+    if (out.kind === 'already-here') expect(playerAlreadyHereLine(out)).toContain('the world\'s owner can remove it');
   });
 });

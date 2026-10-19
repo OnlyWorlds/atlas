@@ -24,8 +24,8 @@ import type { WorldRegistryEntry } from '../core/types';
 
 /** What `/join/preview` says about a code, without spending it. */
 export interface JoinPreview {
-  /** Who the code is for (keel #212): an agent redeems at /join, a person joins with their account; any other value is a kind this Atlas does not know. */
-  reader: 'agent' | 'person' | 'unknown';
+  /** Who the code is for (keel #212, #353): an agent redeems at /join, a person joins with their account, a player redeems at /join with no account for a read key; any other value is a kind this Atlas does not know. */
+  reader: 'agent' | 'person' | 'player' | 'unknown';
   world: { name: string; description: string };
   /** Free text the inviter typed, or null: never shown as a checked name (R8). */
   invitedBy: string | null;
@@ -69,6 +69,17 @@ export function seatAgentName(ua: string = typeof navigator === 'undefined' ? ''
   return 'Atlas';
 }
 
+/** What `/join` hands a player (keel #353), kept in memory only: a read key, never a secret. */
+export interface JoinedPlayer {
+  world: { id: string; name: string };
+  key: string;
+  /** The Character the player reads as. */
+  character: { id: string; name: string };
+}
+
+/** The player seat made and not used: a player has no account, so only the owner can remove it. */
+export const SPARE_PLAYER_LINE = 'The link is used up, and the seat it made is unused: the world\'s owner can remove it on onlyworlds.com, under Members.';
+
 /** POST without an API-Key: the code in the body is the credential. */
 async function postJoin(path: '/join' | '/join/preview', body: unknown): Promise<Record<string, unknown>> {
   const res = await fetch(`${joinBase()}${path}`, {
@@ -104,7 +115,8 @@ export async function previewJoin(code: string): Promise<JoinPreview> {
   return {
     // A keel without the field made agent codes only; a value this Atlas does
     // not know goes to neither route (S413 gate).
-    reader: r.reader === undefined || r.reader === 'agent' ? 'agent' : r.reader === 'person' ? 'person' : 'unknown',
+    reader: r.reader === undefined || r.reader === 'agent' ? 'agent'
+      : r.reader === 'person' || r.reader === 'player' ? r.reader : 'unknown',
     world: { name: str(world.name) || 'Untitled world', description: str(world.description) },
     invitedBy: strOrNull(r.invited_by),
     ownerCharacter: strOrNull(r.owner_character),
@@ -129,10 +141,75 @@ export async function redeemJoin(code: string, agentName = seatAgentName()): Pro
   return out;
 }
 
+/**
+ * Spends a player's code (keel #353): no account, no credential. `name` is
+ * the player's, optional (keel names a fresh Character for it, or keeps a
+ * picked Character's). A 404 after a good preview: someone else may have used it.
+ */
+export async function redeemPlayerJoin(code: string, name = ''): Promise<JoinedPlayer> {
+  const trimmed = name.trim();
+  const r = await postJoin('/join', trimmed ? { code, name: trimmed } : { code });
+  const world = (r.world ?? {}) as Record<string, unknown>;
+  const character = (r.character ?? {}) as Record<string, unknown>;
+  const out: JoinedPlayer = {
+    world: { id: str(world.id), name: str(world.name) },
+    key: str(r.key),
+    character: { id: str(character.id), name: str(character.name) },
+  };
+  if (r.kind !== 'player' || !out.world.id || !out.key.startsWith('ow_r_') || !out.character.id) {
+    throw new Error('join: the reply was not a player\'s read key, world and Character');
+  }
+  return out;
+}
+
+/**
+ * Bring a player's world down to read, or open the copy already here. The
+ * read key goes on a view-only link (S264's flag: no PIN, pull-only, every UI
+ * write refused); keel answers it with what the Character knows, so the slice
+ * is the server's, never computed here. Runs on the activation chain.
+ */
+export async function openPlayerWorld(opts: {
+  player: JoinedPlayer;
+  where: WorldWhere;
+  onProgress?: (p: InitialDownloadProgress) => void;
+  shouldStop?: () => DownloadStop;
+}): Promise<Exclude<OpenJoinedOutcome, { kind: 'reconnected' }>> {
+  const { player } = opts;
+  const reg = getState().registry;
+  // Already linked here (the owner trying their own link, or a second link):
+  // the world stays what it is; a player key never replaces another key.
+  const linked = findLinkedWorld(reg, player.world.id);
+  if (linked) return { kind: 'already-here', entry: linked };
+  const former = findWorldByServerId(reg, player.world.id);
+  if (former) return { kind: 'here-unlinked', entry: former };
+  const result = await linkExistingApiWorldInRoot({
+    where: opts.where,
+    apiKey: player.key,
+    apiPin: '',
+    readOnly: true,
+    knownWorld: { id: player.world.id, name: player.world.name },
+    onProgress: opts.onProgress,
+    shouldStop: opts.shouldStop,
+  });
+  return { kind: 'downloaded', result };
+}
+
+/** The line after a player's link met a world already here. */
+export function playerAlreadyHereLine(outcome: Exclude<OpenJoinedOutcome, { kind: 'downloaded' | 'reconnected' }>): string {
+  const name = outcome.entry.name;
+  return outcome.kind === 'already-here'
+    ? `${name} is already here, so Atlas opened it as it is. ${SPARE_PLAYER_LINE}`
+    : `${name} is already here from an earlier link, so Atlas opened it as it is. ${SPARE_PLAYER_LINE}`;
+}
+
+/** R5's second sentence for a player, who has no account and so no page to remove a seat from. */
+export const PLAYER_TAKEN_LINE = 'If you did not use this link just now, tell the person who sent it: they can remove the seat it made on onlyworlds.com, under Members.';
+
 /** The refusal sentence for a redeem that failed after the preview (R5). */
 export function redeemRefusedSentence(preview: JoinPreview, now = Date.now()): string {
   const alive = Date.parse(preview.expiresAt);
-  return Number.isFinite(alive) && alive > now ? `${JOIN_REFUSED_LINE} ${JOIN_TAKEN_LINE}` : JOIN_REFUSED_LINE;
+  if (!(Number.isFinite(alive) && alive > now)) return JOIN_REFUSED_LINE;
+  return `${JOIN_REFUSED_LINE} ${preview.reader === 'player' ? PLAYER_TAKEN_LINE : JOIN_TAKEN_LINE}`;
 }
 
 /** The role in plain words, for the dialog (keel's values: `seatRoleWords`). */

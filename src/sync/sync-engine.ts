@@ -2437,6 +2437,16 @@ export class SyncEngine {
      */
     let lastAppliedSeq: number | null = syncState.changes_last_seq ?? null;
     let rewindDetected = false;
+    /**
+     * A guest's view moved (keel core/changes.py: a role, a Character given or
+     * taken, the roster: every player who joins moves it): the old cursor
+     * answers 409 `resync_required`, and keel's word is to pull again from 0.
+     * Once per round. The ids the fresh walk names are what this reader may
+     * see now; in a view-only world whatever else is here has left its view
+     * and goes without a review (#416: a player world in Atlas).
+     */
+    let resynced = false;
+    const seenInResync = new Set<string>();
     let walkComplete = false;
     /** Local writes another program's hold refused (S369): per element, not the round. */
     const failures: PerElementFailure[] = [];
@@ -2492,6 +2502,14 @@ export class SyncEngine {
             });
             break;
           }
+          if (!resynced && isResyncRequired(err)) {
+            console.info('[atlas:sync] /changes answered resync_required — this reader\'s view moved; walking again from 0');
+            resynced = true;
+            cursor = null;
+            lastAppliedCursor = null;
+            lastAppliedSeq = null;
+            continue;
+          }
           throw err;
         }
 
@@ -2522,6 +2540,7 @@ export class SyncEngine {
             console.info(`[atlas:sync] changes: skipping op for unknown type "${op.type}"`);
             continue;
           }
+          if (resynced && op.op === 'upsert') seenInResync.add(op.id);
           if (tombstoneIds.has(op.id)) continue; // pending local delete owns this id
           if (skipIds.has(op.id)) continue;      // push already conflicted on it
 
@@ -2653,6 +2672,30 @@ export class SyncEngine {
       };
     }
 
+    // After a resync, a view-only world keeps only what the fresh walk named:
+    // the rest left this reader's view (hidden, a Character taken, a role
+    // lowered), and nothing here can have been edited, so nothing is asked.
+    // Only on a complete walk, and only what the server once gave (a stamp).
+    // A writable world keeps what it holds: what leaves a member's view is
+    // keel's question still (h50 #7629), never a guess made here.
+    let deletes = 0;
+    if (resynced && walkComplete && this.readOnly && !this.stopped && !heldStop) {
+      for (const el of await this.folder.listElements()) {
+        if (this.stopped) break;
+        if (seenInResync.has(el.id) || !el.server_updated_at) continue;
+        try {
+          if (await this.folder.deleteSilentlyIfUnchanged(el.id, {
+            local_updated_at: el.local_updated_at ?? null,
+            server_updated_at: el.server_updated_at,
+          })) deletes++;
+        } catch (err) {
+          console.warn(`[atlas:sync] resync: ${el.type}/${el.id} left the view but could not be removed`, err);
+          failures.push({ ...failureOf(el.id, el.type, 'delete', err), source: 'disk' });
+        }
+      }
+      if (deletes > 0) console.info(`[atlas:sync] resync: ${deletes} element(s) left this reader's view and were removed`);
+    }
+
     // A held sync-state file leaves the cursor where it was: the next pull
     // replays from there (S369, gate A M4), never the round's end.
     try {
@@ -2661,7 +2704,7 @@ export class SyncEngine {
       if (!isFileBusyError(err)) throw err;
       failures.push({ ...failureOf('world', 'world', 'read', err), source: 'disk' });
     }
-    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures, pulled_ids: pulledIds };
+    return { pushed: zero(), pulled: { creates, updates, deletes }, conflicts, failures, pulled_ids: pulledIds };
   }
 
   private async pullPhaseFullList(skipIds: Set<string> = new Set()): Promise<SyncResult> {
@@ -3016,6 +3059,15 @@ function typedError(err: unknown): { status: number; code: string; param: string
   const e = err as Error & { status?: unknown; code?: unknown; param?: unknown };
   if (typeof e.status !== 'number' || typeof e.code !== 'string') return null;
   return { status: e.status, code: e.code, param: typeof e.param === 'string' ? e.param : null, message: e.message };
+}
+
+/**
+ * keel's 409 `resync_required` on /changes (core/changes.py): a guest's cursor
+ * from before its view moved. The answer is a fresh walk from 0.
+ */
+export function isResyncRequired(err: unknown): boolean {
+  const t = typedError(err);
+  return !!t && t.status === 409 && t.code === 'resync_required';
 }
 
 /**
