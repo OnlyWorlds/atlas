@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.53.3',
+    date: '2026-10-19',
+    theme: 'The now in a shared world',
+    entries: [
+      {
+        id: 'co-builder-now-goes-through',
+        title: 'A co-builder\'s change to the now goes through',
+        body: 'A co-builder may move a shared world\'s now on OnlyWorlds, though not its other details. When you changed the now together with the description, both stayed in your copy. Now the now is sent on its own and lands, and only the description stays behind.',
+        tags: ['fix', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.53.2',
     date: '2026-10-18',
     theme: 'World details in a shared world',
@@ -63,7 +76,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'world-details-told-once',
         title: 'In a world you share, a change to its details is told once',
-        body: 'Only a world\'s owner can change its own details on OnlyWorlds, such as its description and its now. When you change them in a world someone shared with you, Atlas says once that the change stays in your copy, and no longer sends it again and repeats itself with every save. Change them again and Atlas tries once more.',
+        body: 'Only a world\'s owner can change its own details on OnlyWorlds, such as its description and its calendar. When you change them in a world someone shared with you, Atlas says once that the change stays in your copy, and no longer sends it again and repeats itself with every save. Change them again and Atlas tries once more.',
         tags: ['fix', 'sync'],
       },
     ],

@@ -1125,8 +1125,24 @@ export class SyncEngine {
         console.warn('[atlas:sync] meta step: PATCH /world failed — fields stay dirty', err);
         const failure = metaFailure('update', err);
         failures.push(failure);
-        if (memberRefusal(err) === 'owner_only') this.metaOwnerRefusal = { sig: pushSig, failure };
+        let refusedSig = pushSig;
         pushedNames = []; // nothing landed; baselines for them unchanged
+        // Keel #240: a co-builder may send the world's now alone, and keel
+        // refuses a mixed body whole. So a refused body that held the now sends
+        // the now by itself once; the rest stays refused (Kael h20 #7361).
+        if (memberRefusal(err) === 'owner_only' && 'time_current' in pushFields && Object.keys(pushFields).length > 1) {
+          try {
+            const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush({ time_current: pushFields.time_current }));
+            baselineNext.time_current = canonicalMetaValue(META_SYNC_FIELDS.time_current, (resp as unknown as Record<string, unknown>).time_current);
+            serverUpdatedAt = resp.updated_at || serverUpdatedAt;
+            pushedNames = ['time_current'];
+            const rest = Object.keys(pushFields).filter(f => f !== 'time_current').sort();
+            refusedSig = JSON.stringify(rest.map(f => [f, pushFields[f]]));
+          } catch (nowErr) {
+            console.warn('[atlas:sync] meta step: the now alone was refused too', nowErr);
+          }
+        }
+        if (memberRefusal(err) === 'owner_only') this.metaOwnerRefusal = { sig: refusedSig, failure };
       }
     }
 
