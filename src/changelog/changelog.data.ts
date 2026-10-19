@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.56.0',
+    date: '2026-10-19',
+    theme: 'Files on an element',
+    entries: [
+      {
+        id: 'element-files',
+        title: 'Keep files with an element',
+        body: 'In an online world, an element\'s page has a Files section: add a pdf, a text file or a world\'s own bundle, up to 25 MB each, with a label that says what it is for. Each file shows who added it and when, and an agent\'s is marked. Download fetches it fresh; Remove takes it off OnlyWorlds for everyone. The header shows how much of the world\'s 250 MB is used. Files live on OnlyWorlds only, never in your copy of the world or its world file.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.55.2',
     date: '2026-10-19',
     theme: 'Invite someone lands at Access',

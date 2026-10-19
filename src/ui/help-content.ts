@@ -50,6 +50,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'create a missing element straight from an empty link field',
       'label it your way with supertype and subtype',
       'add your own fields in the Custom fields section',
+      'keep files with it in an online world, in the Files section: text, pdf, or a world\'s own bundle, up to 25 MB each',
       'place it on a map from the header pin button',
       { mouse: 'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)', touch: 'tap Hide types at the end of the sidebar strip, then tap a type to keep it out of the full list (pins and markers start that way)' },
       'see in the Web tab where it is mentioned but not linked, and link every mention with one click',

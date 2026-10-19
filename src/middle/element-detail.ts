@@ -28,6 +28,7 @@ import { buildCustomFieldsSection, pendingCustomFieldEdit } from './element-deta
 import { buildMapLocalImageRow } from './element-detail-map-image';
 import { buildMapStyleRow } from './element-detail-map-style';
 import { buildPictureUploadRow, buildPictureLaterRow, pictureLaterWorld, pictureWorld } from './element-detail-picture';
+import { buildFilesSection, filesWorld } from './element-detail-files';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
@@ -286,6 +287,11 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // first pages should not offer schema extension (precision audit #2,
     // Captain-blessed 2026-07-20).
     if (!isTourFlagActive()) detail.appendChild(buildCustomFieldsSection(el));
+
+    // Files (keel #393): kept on OnlyWorlds with the element, so an online
+    // world only. The card reads and repaints itself (element-detail-files).
+    const filesEntry = filesWorld();
+    if (filesEntry && !isTourFlagActive()) detail.appendChild(buildFilesSection(el, filesEntry, toastManager));
 
     // Character war record (2026-07-19): recorded battles as a curated strip,
     // above the exhaustive reverse-reference scan.
