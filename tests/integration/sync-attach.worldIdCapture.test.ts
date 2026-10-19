@@ -26,6 +26,7 @@ import {
   attachSyncEngine,
   detachSyncEngine,
   getCurrentSyncEngine,
+  getCurrentSyncWorldId,
   __test_emitConflictToasts,
 } from '../../src/sync/sync-attach';
 import { patchSlice } from '../../src/core/state';
@@ -62,6 +63,14 @@ function fakeConflictResult(): SyncResult {
   };
 }
 
+/**
+ * The round ran under Local wins, as the engine says it did (B12 Q1): right
+ * after attach the engine is still settling (pause-and-review until keel's
+ * roster answers), and a conflict met then is held, never pushed, so these
+ * bail-outs would pass for the wrong reason.
+ */
+const underLocalWins = () => ({ worldId: getCurrentSyncWorldId(), current: true, policy: 'local-wins' as const });
+
 beforeEach(() => {
   vi.useFakeTimers();
   detachSyncEngine();
@@ -86,7 +95,7 @@ describe('sync-attach pull-conflict defer guards against world-switch race', () 
       failures: [],
     });
 
-    __test_emitConflictToasts('pull', fakeConflictResult());
+    __test_emitConflictToasts('pull', fakeConflictResult(), underLocalWins());
     // Before timer fires, no push.
     expect(pushSpy).not.toHaveBeenCalled();
 
@@ -109,7 +118,7 @@ describe('sync-attach pull-conflict defer guards against world-switch race', () 
     });
 
     // Schedule the deferred push on world A.
-    __test_emitConflictToasts('pull', fakeConflictResult());
+    __test_emitConflictToasts('pull', fakeConflictResult(), underLocalWins());
 
     // User switches to world B before the timer fires.
     const folderB = new MockFolderStore();
@@ -145,7 +154,7 @@ describe('sync-attach pull-conflict defer guards against world-switch race', () 
       failures: [],
     });
 
-    __test_emitConflictToasts('pull', fakeConflictResult());
+    __test_emitConflictToasts('pull', fakeConflictResult(), underLocalWins());
     detachSyncEngine();
 
     vi.advanceTimersByTime(0);
@@ -167,7 +176,7 @@ describe('sync-attach pull-conflict defer guards against world-switch race', () 
 
     // Push-phase conflicts under local-wins are already resolved (server was
     // overwritten by the push); no follow-up needed.
-    __test_emitConflictToasts('push', fakeConflictResult());
+    __test_emitConflictToasts('push', fakeConflictResult(), underLocalWins());
 
     vi.advanceTimersByTime(0);
     await Promise.resolve();

@@ -23,9 +23,8 @@ import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import {
   getCurrentSyncEngine,
-  getCurrentSyncFolder,
   getCurrentSyncWorldId,
-  refreshConflictsCount,
+  reapplySyncPolicy,
 } from '../sync/sync-attach';
 import type { WorldsRegistry } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -334,6 +333,7 @@ function renderSyncTab(reg: WorldsRegistry): string {
             </span>
           </label>
         `).join('')}
+        <p class="atlas-settings-hint-sub" data-role="shared-policy-note">A world shared with others always holds a change made both here and online for you to choose, and pulls when it opens. To turn that off for one world, open Settings, This world.</p>
       </fieldset>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="confirm-server-del" ${confirmServerDel ? 'checked' : ''} />
@@ -407,42 +407,13 @@ function wireSyncTab(toasts: ToastManager): void {
     input.addEventListener('change', () => {
       if (!input.checked) return;
       const v = input.value as 'local-wins' | 'pause-and-review';
-      const prior = getState().registry.sync_default_policy;
       const next = setSyncDefaultPolicy(getState().registry, v);
       saveRegistry(next);
       patchSlice('registry', next);
-      // Apply to the running engine immediately — no detach/re-attach needed.
-      const engine = getCurrentSyncEngine();
-      if (engine) engine.setPolicy(v);
-      // Flipping pause-and-review → local-wins clears any persisted conflicts
-      // for the active world. Under local-wins, divergence is auto-resolved
-      // on the next sync round (local pushes anyway, server overwritten), so
-      // a stale conflict badge from the prior policy would lie. (SYNC_NOTES
-      // M4.) Only fire when the flip direction actually changes the semantic.
-      //
-      // Then ACTIVELY converge: fire a push so the cleared elements' pending
-      // local edits overwrite the server NOW. Under the v2 cursor pull, the
-      // conflicting ops are already behind the watermark — nothing re-detects
-      // them (event-once detection), so without this push the divergence
-      // would sit invisible until the next edit on either side (gate finding,
-      // 2026-07-12). The conflicted elements all have local_updated_at ahead
-      // of baseline, so pushOnce covers exactly the cleared set.
-      if (prior === 'pause-and-review' && v === 'local-wins') {
-        const folder = getCurrentSyncFolder();
-        if (folder) {
-          void folder.writeSyncState({ conflicts: [] })
-            .then(() => refreshConflictsCount())
-            .then(() => {
-              const eng = getCurrentSyncEngine();
-              if (eng) {
-                return eng.pushOnce().then(() => undefined).catch((err) => {
-                  console.warn('[settings] post-policy-flip convergence push failed:', err);
-                });
-              }
-            })
-            .catch((err) => console.warn('[settings] clear conflicts failed:', err));
-        }
-      }
+      // The running engine follows its world's policy, which a shared world
+      // keeps as pause-and-review whatever this says (B12 Q1). Leaving
+      // pause-and-review clears the held conflicts and pushes (SYNC_NOTES M4).
+      reapplySyncPolicy();
     });
   });
 

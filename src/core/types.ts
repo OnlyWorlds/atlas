@@ -593,6 +593,16 @@ export interface WorldRegistryEntry {
    * third condition, h20 #511). Cleared once a round has run.
    */
   review_first_sync?: boolean;
+  /**
+   * What keel's roster last said (B12 Q1, the Captain's (a), h20 #8007):
+   * someone besides the owner can write here (an active person or agent; a
+   * player's link does not count). Unset until a roster read answers. A
+   * shared world syncs as pause-and-review and pulls when it opens
+   * (`src/sync/shared-world.ts`).
+   */
+  shared_with_others?: boolean;
+  /** The person turned the shared rule off for this world in Settings: it follows the default policy. */
+  shared_keep_policy?: boolean;
   created_at: string;
   last_opened_at?: string;
   /**

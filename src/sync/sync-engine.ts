@@ -333,6 +333,11 @@ export class SyncEngine {
     this.policy = normalizePolicy(p);
   }
 
+  /** The policy this engine runs now (a shared world's may differ from the default, B12 Q1). */
+  getPolicy(): CanonicalPolicy {
+    return this.policy;
+  }
+
   pause(reason: 'manual' | 'network' = 'manual'): void {
     this.paused = true;
     this.pauseReason = reason;

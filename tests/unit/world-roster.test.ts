@@ -18,6 +18,39 @@ beforeEach(() => {
 });
 
 describe('the world roster', () => {
+  it('sync asks with an age (B12 Q1): 0 reads afresh, past a kept failure too; an older answer is read again, a newer one is not', async () => {
+    const spy = vi.spyOn(OwV2Client.prototype, 'members').mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    let now = 2_000_000;
+    expect(await rosterFor(linked(), () => now)).toBeNull();
+    spy.mockResolvedValue(rows);
+    now += 1_000;
+    expect(await rosterFor(linked(), () => now)).toBeNull(); // the kept failure
+    expect(await rosterFor(linked(), () => now, { maxAgeMs: 0 })).toEqual(rows); // afresh, past it
+    expect(spy).toHaveBeenCalledTimes(2);
+    now += 60_000;
+    expect(await rosterFor(linked(), () => now, { maxAgeMs: 300_000 })).toEqual(rows); // newer than five minutes
+    expect(spy).toHaveBeenCalledTimes(2);
+    now += 300_000;
+    const moved = [...rows, { id: 'm9', kind: 'person', role: 'co_builder', character: null, status: 'active' } as OwMember];
+    spy.mockResolvedValue(moved);
+    expect(await rosterFor(linked(), () => now, { maxAgeMs: 300_000 })).toEqual(moved); // older: read again
+    expect(rosterNow(linked())).toEqual(moved);
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect(await rosterFor(linked(), () => now)).toEqual(moved); // the mark's plain ask stays on memory
+    expect(spy).toHaveBeenCalledTimes(3);
+  });
+
+  it('a PIN given is sent (a legacy key reads a private world only with it)', async () => {
+    let pinSeen: unknown;
+    vi.spyOn(OwV2Client.prototype, 'members').mockImplementation(function (this: unknown) {
+      pinSeen = (this as { apiPin?: unknown }).apiPin;
+      return Promise.resolve(rows);
+    });
+    await rosterFor(linked('1234567890'), Date.now, { maxAgeMs: 0, pin: '4321' });
+    expect(pinSeen).toBe('4321');
+  });
+
   it('reads once, and answers from memory after', async () => {
     const spy = vi.spyOn(OwV2Client.prototype, 'members').mockResolvedValue(rows);
     expect(rosterNow(linked())).toBeNull();

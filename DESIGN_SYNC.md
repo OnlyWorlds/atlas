@@ -21,7 +21,7 @@ Local-first by default: pushes follow user intent (you typed, it saves), pulls a
 
 ## Attaching the engine
 
-`attachSyncEngine(entry, folder)` in `src/sync/sync-attach.ts` is the one place an engine is made. It no-ops (and detaches any prior engine) for a local-only world. For an api-linked world it builds the adapter from `world.json`'s key and the registry PIN, creates the engine with `onStateChange` publishing into `state.sync`, applies the registry's `sync_debounce_ms`, adopts a persisted big-batch hold (conv. 111) BEFORE anything can push, pauses when `sync_pause_all` or the world's `sync_paused` is set, and then runs, in order: the flush-on-attach, then pull-on-activate (conv. 25). A view-only world skips the flush and always pulls on activate.
+`attachSyncEngine(entry, folder)` in `src/sync/sync-attach.ts` is the one place an engine is made. It no-ops (and detaches any prior engine) for a local-only world. For an api-linked world it builds the adapter from `world.json`'s key and the registry PIN, creates the engine with `onStateChange` publishing into `state.sync`, applies the registry's `sync_debounce_ms`, adopts a persisted big-batch hold (conv. 111) BEFORE anything can push, pauses when `sync_pause_all` or the world's `sync_paused` is set, and then runs, in order: the roster read (whether others share the world, conv. 150; the engine runs pause-and-review until it answers), the flush-on-attach, then pull-on-activate (conv. 25). A view-only world skips the roster and the flush and always pulls on activate. **The policy** is `worldSyncPolicy` (`src/sync/shared-world.ts`): a world shared with others runs pause-and-review whatever `sync_default_policy` says, unless the person turned that off for the world (`shared_keep_policy`, Settings, This world); a world restored from a world file reviews its first round (`review_first_sync`); every other world runs the default. Settings changes reach the running engine through `reapplySyncPolicy()`.
 
 Callers: `activateWorld` (`src/sidebar/worlds-sidebar.ts`), the root flows in `src/setup/atlas-root-flow.ts` (create, import, link), both Make Online routes and the new-api-world modal (with `justLinked`), the tour world, and the PIN change in `src/middle/settings-account.ts` (a fresh engine is the recovery from an auth error). Exposed: `getCurrentSyncEngine()`, `requestPushIfLinked()`, `detachSyncEngine()`.
 
@@ -84,7 +84,7 @@ Make Online Route 1 also runs `pushOnce()` on its own transient engine.
 
 Pulls never happen unasked:
 - **Manual**: the pill (when nothing is armed), Settings, the worlds sidebar refresh, and a per-type refresh from a filter chip's context menu.
-- **Pull-on-activate**: `registry.sync_pull_on_activate`, default off; always on for view-only worlds.
+- **Pull-on-activate**: `registry.sync_pull_on_activate`, default off; always on for view-only worlds and for a world shared with others (conv. 150), after the flush.
 - **Cadence**: `registry.sync_cadence_ms`, default off (`src/sync/auto-pull-scheduler.ts`). The interval keeps running while the tab is hidden and those ticks skip; on becoming visible after a missed window it fires one catch-up pull. Ticks skip while the engine is paused, syncing or in error, or under pause-all.
 - The `online` event does NOT pull; it only resumes a network-paused engine, which pushes.
 

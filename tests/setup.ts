@@ -11,9 +11,17 @@
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
 import { __setRegistryTabBaseForTests } from '../src/registry/registry';
 
-export const mswServer = setupServer();
+// Every attach asks keel's roster whether others share the world (B12 Q1).
+// By default a world is its owner's alone; a file about sharing mocks its own
+// roster. A base handler, so it survives `resetHandlers`.
+export const mswServer = setupServer(
+  http.get('*/api/v2/members/', () => HttpResponse.json({
+    data: [{ id: null, kind: 'owner', role: 'owner', character: null, status: 'active' }],
+  })),
+);
 
 beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => mswServer.resetHandlers());

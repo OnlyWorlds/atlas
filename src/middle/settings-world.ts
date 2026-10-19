@@ -16,6 +16,7 @@ import {
   setApiWorldName,
   setWorldPaused,
   effectiveSyncPaused,
+  updateWorldEntry,
 } from '../registry/registry';
 import { deleteHandle, loadHandle } from '../store/handle-vault';
 import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
@@ -33,9 +34,11 @@ import {
   getCurrentSyncEngine,
   getCurrentSyncWorldId,
   pullNowAndRefresh,
+  reapplySyncPolicy,
   refreshElementsAfterWrite,
   requestPushIfLinked,
 } from '../sync/sync-attach';
+import { sharedRuleHolds, sharedWorldLine } from '../sync/shared-world';
 import { buildV2Adapter } from '../sync/make-online';
 import { keyRefusalFor, makeNewWorldKey, newKeyCures, offersMakeKey } from '../sync/world-key';
 import { keyRefusalHere, keyRefusalOf, seatRefusalLine } from '../sync/world-key-lines';
@@ -163,6 +166,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <input type="checkbox" name="world-paused" ${paused ? 'checked' : ''} />
         <span>Pause sync (this world)</span>
       </label>
+      ${sharedLineHtml(world)}
       <div class="atlas-settings-dangling" data-role="foreign-ids" ${lastForeignCount[world.id] ? '' : 'hidden'}>
         <p class="atlas-settings-hint" data-role="foreign-text">${escapeText(foreignLine(lastForeignCount[world.id] ?? 0))}</p>
         <button class="atlas-btn-ghost" data-action="give-new-ids">${lastForeignCount[world.id] === 1 ? 'Give it a new id' : 'Give them new ids'}</button>
@@ -250,6 +254,19 @@ function inviteListLoaded(): boolean {
 
 /** One dialog per click: the click waits on a lazy import before it opens (gate L3). */
 let inviteOpening = false;
+
+/** B12 Q1: a world shared with others says how it syncs, with its own switch. Nothing for a world alone. */
+function sharedLineHtml(world: WorldRegistryEntry): string {
+  const text = sharedWorldLine(world, getState().registry);
+  if (!text) return '';
+  return `<div class="atlas-settings-shared" data-role="shared-line">
+        <label class="atlas-settings-toggle">
+          <input type="checkbox" name="world-shared-review" ${sharedRuleHolds(world) ? 'checked' : ''} />
+          <span>Pause and review in this shared world</span>
+        </label>
+        <p class="atlas-settings-hint" data-role="shared-text">${escapeText(text)}</p>
+      </div>`;
+}
 
 function inviteLineHtml(world: WorldRegistryEntry): string {
   if (getState().registry.account_token) {
@@ -372,6 +389,19 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     toasts.info(pausedInput.checked
       ? 'Sync paused for this world'
       : stillPaused ? 'This world will sync when Pause all sync is turned off' : 'Sync resumed for this world');
+  });
+
+  // B12 Q1: a shared world's own switch for the rule (Settings, Storage's
+  // default never turns it off on its own).
+  const sharedInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-shared-review"]');
+  sharedInput?.addEventListener('change', () => {
+    const next = updateWorldEntry(getState().registry, world.id, { shared_keep_policy: sharedInput.checked ? undefined : true });
+    saveRegistry(next);
+    patchSlice('registry', next);
+    if (getCurrentSyncWorldId() === world.id) reapplySyncPolicy();
+    const line = document.querySelector<HTMLElement>('.atlas-settings [data-role="shared-line"] [data-role="shared-text"]');
+    const entry = next.worlds.find(w => w.id === world.id);
+    if (line && entry) line.textContent = sharedWorldLine(entry, next) ?? '';
   });
 
   const refreshBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="refresh-from-api"]');

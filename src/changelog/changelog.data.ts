@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.59.0',
+    date: '2026-10-20',
+    theme: 'A shared world asks before it overwrites',
+    entries: [
+      {
+        id: 'shared-world-pause-and-review',
+        title: 'In a world shared with others, Atlas asks before it overwrites',
+        body: 'When others can change a world with you (people you invited, or an agent you gave a seat), Atlas no longer lets your copy replace their newer words. An element changed both here and online is held, marked ⚠, and you choose which version stays. A shared world also pulls the latest changes when it opens. Working alone, nothing changes. Settings, This world shows the rule for a shared world and can turn it off there.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.58.3',
     date: '2026-10-20',
     theme: 'A dim line made readable',

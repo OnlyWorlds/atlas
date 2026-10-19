@@ -278,7 +278,9 @@ export function attachApi(
       // Making a world online also un-demos it (Bout OW class rule): the
       // world is genuinely the user's now, so gestures in it count.
       // A former-link memory is stale the moment a live link exists.
-      const { demo: _clearDemo, former_api_world_id: _clearFormer, ...rest } = w;
+      // What a roster said, and the person's switch for it, belong to the
+      // link they were learned on (B12 Q1, the S438 gate's G5).
+      const { demo: _clearDemo, former_api_world_id: _clearFormer, shared_with_others: _clearShared, shared_keep_policy: _clearKeep, ...rest } = w;
       return { ...rest, state: 'api-linked', api: apiBlock };
     }),
   };
@@ -316,7 +318,7 @@ export function detachApi(reg: WorldsRegistry, worldId: string): WorldsRegistry 
     ...reg,
     worlds: reg.worlds.map(w => {
       if (w.id !== worldId) return w;
-      const { api, ...rest } = w;
+      const { api, shared_with_others: _clearShared, shared_keep_policy: _clearKeep, ...rest } = w;
       return {
         ...rest,
         state: 'local-only',

@@ -33,9 +33,16 @@ import type { PerElementFailure } from '../core/types';
 import { effectiveSyncPaused, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { isSeatWorld, worldPin } from '../core/seat';
 import { keyRefusalLine, seatRefusalLine } from './world-key-lines';
+import { rosterFor } from './world-roster';
+import { rosterIsShared, worldPullsOnOpen, worldSyncPolicy, type SyncPolicy } from './shared-world';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
+/** The attached engine's policy as its world stands now (B12 Q1): read by `reapplySyncPolicy`. */
+let currentPolicyNow: (() => SyncPolicy) | null = null;
+
+/** A round re-reads the roster once its answer is this old (an invite accepted while the world is open). */
+const ROUND_ROSTER_MAX_AGE_MS = 5 * 60_000;
 
 /**
  * Attach a fresh SyncEngine to the given (api-linked) world's folder. Returns
@@ -91,17 +98,32 @@ export function attachSyncEngine(
     apiPin: readOnly ? '' : (pin as string),
     baseUrl: devV2Base() ?? undefined,
   });
+  // Pause if either global or per-world pause flag is set.
+  const shouldPause = effectiveSyncPaused(entry, reg); // S367 critic C7: one predicate
   // A linked world restored from a world file (1.17, contract §5.2): its
   // first round is reviewed whatever the policy, so the file's older edits
   // never overwrite newer ones on OnlyWorlds (gate A9). Then the policy.
   let reviewFirst = entry.review_first_sync === true;
+  // B12 Q1: whether others share this world decides its policy, and keel's
+  // roster says so. Until keel has answered in this attach, nothing is
+  // overwritten: the engine runs pause-and-review, the flush below waits for
+  // the answer, and an edit made meanwhile meets the review. A paused world
+  // asks nothing (it stays offline), so a resume pushes under the review and
+  // its round asks (the S438 gate's G1); a world keel cannot answer for stays
+  // under the review and asks again each round (G2).
+  let settling = !readOnly;
+  const policyNow = (): SyncPolicy => worldSyncPolicy(
+    getState().registry.worlds.find(w => w.id === entry.id) ?? entry,
+    getState().registry,
+    { reviewFirst, settling },
+  );
   const engine = new SyncEngine({
     folder,
     client: adapter,
     readOnly,
     where: filesWhereOf(entry),
     apiWorldId: entry.api.world_id,
-    policy: reviewFirst ? 'pause-and-review' : reg.sync_default_policy ?? 'local-wins',
+    policy: policyNow(),
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => {
       // The review ends only after a round that really compared (not offline,
@@ -112,16 +134,19 @@ export function attachSyncEngine(
         void folder.readSyncState().then(st => {
           if (!reviewFirst || (st.conflicts?.length ?? 0) > 0 || currentEngine !== engine) return;
           reviewFirst = false;
-          engine.setPolicy(getState().registry.sync_default_policy ?? 'local-wins');
+          engine.setPolicy(policyNow());
           const next = updateWorldEntry(getState().registry, entry.id, { review_first_sync: undefined });
           saveRegistry(next);
           patchSlice('registry', next);
         }).catch(() => {});
       }
+      // Someone joined or left while the world is open, or keel had not
+      // answered yet: the next round runs under what the roster says now.
+      if (!readOnly && !result.transient_blocked) void settle(ROUND_ROSTER_MAX_AGE_MS);
       // The list Settings → World and the pill read (S369). Repaint the pill
       // when it moved: the sync slice is the pill's subscription.
       if (noteRoundIssues(entry.id, phase, result)) patchSlice('sync', { ...getState().sync });
-      emitConflictToasts(phase, result, { worldId: entry.id, current: currentEngine === engine });
+      emitConflictToasts(phase, result, { worldId: entry.id, current: currentEngine === engine, policy: engine.getPolicy() });
     },
     // No onIdSwap hook: keel keeps client ids on CREATE (2026-07-12), and
     // Route 2 moves ids before any server call through the re-key kernel,
@@ -135,6 +160,19 @@ export function attachSyncEngine(
 
   currentEngine = engine;
   currentWorldId = entry.id;
+  currentPolicyNow = policyNow;
+  /** Ask the roster, and move the engine to what it says once keel has answered. */
+  const settle = async (maxAgeMs: number): Promise<void> => {
+    let answered = false;
+    try {
+      answered = await learnShared(entry.id, entry.api!.api_key, maxAgeMs);
+    } catch (err) {
+      console.warn('[atlas:sync] the roster read failed:', err);
+    }
+    if (currentEngine !== engine) return;
+    if (answered) settling = false;
+    await movePolicy(engine, folder, policyNow());
+  };
   // A batch of outside edits that was waiting for the user's answer when the
   // world was left (or the page reloaded) keeps waiting (S364 gate lens B B3):
   // the hold goes on BEFORE the flush-on-attach below, which would push it.
@@ -147,15 +185,15 @@ export function attachSyncEngine(
     world: entry.name,
     worldId: entry.id,
     apiWorldId: entry.api.world_id,
-    policy: reg.sync_default_policy ?? 'local-wins',
+    policy: engine.getPolicy(),
+    settling,
+    sharedWithOthers: entry.shared_with_others ?? null,
     pullOnActivate: !!reg.sync_pull_on_activate,
     cadenceMs: reg.sync_cadence_ms ?? null,
     globalPaused: !!reg.sync_pause_all,
     worldPaused: !!entry.sync_paused,
   });
 
-  // Pause if either global or per-world pause flag is set.
-  const shouldPause = effectiveSyncPaused(entry, reg); // S367 critic C7: one predicate
   if (shouldPause) {
     engine.pause('manual');
   }
@@ -176,9 +214,20 @@ export function attachSyncEngine(
   // Order: flush goes FIRST. Pending writes already encode user intent (they
   // typed in a prior session, lost the debounce to a reload) and should land
   // server-side before pull-on-activate looks for newer remote changes. Flush
-  // is unconditional when pending exist; pull-on-activate is opt-in.
+  // is unconditional when pending exist; pull-on-activate is opt-in, except
+  // in a world shared with others (B12 Q1).
+  //
+  // Before the flush, the roster (B12 Q1): the flush is the round most likely
+  // to meet a collaborator's newer words (edits from a last session against a
+  // world others kept writing), so its policy must be known before it runs.
+  // The read is bounded (`world-roster.ts`, 15 s); offline or refused, the
+  // world stays under the review until keel answers.
   if (!shouldPause) {
     void (async () => {
+      if (!readOnly) {
+        await settle(0);
+        if (currentEngine !== engine) return;
+      }
       // View-only: nothing local can be pending (writes are blocked at the
       // store seam), so the flush is skipped — and the pull-on-activate runs
       // UNCONDITIONALLY: a viewer's whole intent is seeing the world's current
@@ -192,7 +241,8 @@ export function attachSyncEngine(
           console.warn('[sync-attach] flush-on-attach failed:', err);
         }
       }
-      if (reg.sync_pull_on_activate || readOnly) {
+      const now = getState().registry;
+      if (readOnly || worldPullsOnOpen(now.worlds.find(w => w.id === entry.id), now)) {
         try {
           await pullNowAndRefresh();
         } catch (err) {
@@ -314,6 +364,76 @@ export function detachSyncEngine(): void {
   currentEngine = null;
   currentWorldId = null;
   currentFolder = null;
+  currentPolicyNow = null;
+}
+
+/**
+ * Ask keel's roster whether others share this world, and keep the answer on
+ * its registry entry (B12 Q1). Resolves whether keel answered; no answer
+ * (offline, refused, timed out) changes nothing. `maxAgeMs` 0 reads afresh.
+ * The answer is kept only while the world is still linked with the key it
+ * was read with (the S438 gate's G8: a re-link during the read).
+ */
+async function learnShared(worldId: string, apiKey: string, maxAgeMs: number): Promise<boolean> {
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  if (!entry || entry.state !== 'api-linked' || entry.api?.read_only || entry.api?.api_key !== apiKey) return false;
+  // A legacy key reads a private world only with its PIN (the gate's G4).
+  const rows = await rosterFor(entry, Date.now, { maxAgeMs, pin: worldPin(entry, getState().registry) ?? undefined });
+  if (!rows) return false;
+  const shared = rosterIsShared(rows);
+  const reg = getState().registry;
+  const now = reg.worlds.find(w => w.id === worldId);
+  if (!now || now.api?.api_key !== apiKey) return false;
+  if (now.shared_with_others !== shared) {
+    const next = updateWorldEntry(reg, worldId, { shared_with_others: shared });
+    saveRegistry(next);
+    patchSlice('registry', next);
+  }
+  return true;
+}
+
+/**
+ * Move a running engine to the policy its world calls for, as the world
+ * changes on its own (keel answered, someone joined or left, a first review
+ * ended). Toward the review it moves at once. Away from it, only once nothing
+ * is held: an element held for the person to choose stays held until they
+ * have chosen (the S438 gate's G3), and the move waits for a round after.
+ * Only a choice the person makes in Settings clears what is held
+ * (`reapplySyncPolicy`).
+ */
+async function movePolicy(engine: SyncEngine, folder: FolderStore, target: SyncPolicy): Promise<void> {
+  if (target === 'local-wins' && engine.getPolicy() === 'pause-and-review') {
+    const held = await folder.readSyncState().then(st => st.conflicts?.length ?? 0, () => 1);
+    if (held > 0 || currentEngine !== engine) return;
+  }
+  engine.setPolicy(target);
+}
+
+/**
+ * Re-apply the attached engine's policy after a setting it reads changed
+ * (Settings, Storage's default; This world's shared switch). When that takes
+ * the world from pause-and-review to local-wins, the held conflicts are
+ * cleared and pushed at once: under the v2 cursor nothing re-detects them,
+ * so without the push the divergence would sit invisible until the next edit
+ * on either side (SYNC_NOTES M4; gate finding, 2026-07-12). A shared world
+ * whose rule holds never takes this path from the default's change (B12 Q1).
+ */
+export function reapplySyncPolicy(): void {
+  const engine = currentEngine;
+  const folder = currentFolder;
+  if (!engine || !currentPolicyNow) return;
+  const before = engine.getPolicy();
+  engine.setPolicy(currentPolicyNow());
+  if (before !== 'pause-and-review' || engine.getPolicy() !== 'local-wins' || !folder) return;
+  void folder.writeSyncState({ conflicts: [] })
+    .then(() => refreshConflictsCount())
+    .then(() => {
+      if (currentEngine !== engine) return;
+      return engine.pushOnce().then(() => undefined).catch((err) => {
+        console.warn('[atlas:sync] post-policy-flip convergence push failed:', err);
+      });
+    })
+    .catch((err) => console.warn('[atlas:sync] clear conflicts failed:', err));
 }
 
 /**
@@ -539,7 +659,7 @@ function emitConflictToasts(
   /** The world whose engine ran the round, and whether that engine is still
    *  the attached one (the #198 gate's G1: a stopped engine's late refusal
    *  must never act on the world open now). */
-  from: { worldId: string | null; current: boolean } = { worldId: currentWorldId, current: true },
+  from: { worldId: string | null; current: boolean; policy?: SyncPolicy } = { worldId: currentWorldId, current: true },
 ): void {
   // Auth-blocked: one clear toast. Engine state is already 'error' so the
   // pill carries the persistent signal; this toast is the moment-it-happened
@@ -619,8 +739,9 @@ function emitConflictToasts(
   }
 
   if (result.conflicts.length === 0) return;
-  const reg = getState().registry;
-  const policy = reg.sync_default_policy ?? 'local-wins';
+  // The engine's own policy, never the default: a shared world runs
+  // pause-and-review whatever Settings names (B12 Q1).
+  const policy = from.policy ?? currentEngine?.getPolicy() ?? getState().registry.sync_default_policy ?? 'local-wins';
   if (policy === 'pause-and-review') return; // badge + modal handle it
 
   const n = result.conflicts.length;
@@ -675,7 +796,7 @@ function emitConflictToasts(
 export function __test_emitConflictToasts(
   phase: 'push' | 'pull' | 'sync',
   result: import('../core/types').SyncResult,
-  from?: { worldId: string | null; current: boolean },
+  from?: { worldId: string | null; current: boolean; policy?: SyncPolicy },
 ): void {
   emitConflictToasts(phase, result, from);
 }
