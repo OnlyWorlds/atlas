@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.58.3',
+    date: '2026-10-20',
+    theme: 'A dim line made readable',
+    entries: [
+      {
+        id: 'waypoint-rider-muted',
+        title: 'The small print on the tip card is easier to read',
+        body: 'On the OnlyWorlds tip card, the small "These are optional." before See all and Turn off was too faint to read comfortably, in both themes. It now matches the two links beside it.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.58.2',
     date: '2026-10-19',
     theme: 'Two more dark cards in light mode',

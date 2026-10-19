@@ -15623,7 +15623,9 @@ body.atlas-share-fullpreview > * {
   padding: 6px 14px 8px;
   border-top: 1px solid var(--atlas-divider);
   font-size: 11px;
-  color: var(--atlas-text-dim);
+  /* Muted, as its two buttons: dim measured 2.28:1 on the chip once the
+     contrast spec composited the text's own alpha (S437). */
+  color: var(--atlas-text-muted);
 }
 .atlas-waypoint-toast-rider-btn {
   background: none;

@@ -127,7 +127,12 @@ async function contrastOf(page: Page, probe: Probe): Promise<number> {
     }
     const bg = `rgb(${composite[0]}, ${composite[1]}, ${composite[2]})`;
 
-    const lf = luminance(fg);
+    // Text drawn at an alpha shows the floor through it: composite it too, or white
+    // at 0.28 measures as white (S437: the waypoint rider read 18.41:1, about 2.3:1 in fact).
+    const fm = fg.match(/[\d.]+/g)!;
+    const fa = fm.length === 4 ? +fm[3] : 1;
+    const fgShown = `rgb(${[0, 1, 2].map((i) => +fm[i] * fa + composite[i] * (1 - fa)).join(', ')})`;
+    const lf = luminance(fgShown);
     const lb = luminance(bg);
     if (lf === null || lb === null) return -1;
     const hi = Math.max(lf, lb);
