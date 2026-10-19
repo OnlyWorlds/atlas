@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.55.1',
+    date: '2026-10-19',
+    theme: 'A wrong PIN is called a wrong PIN',
+    entries: [
+      {
+        id: 'wrong-pin-said',
+        title: 'A wrong PIN is called a wrong PIN',
+        body: 'Downloading a world with its key and a mistyped PIN said OnlyWorlds did not accept the key, which sent you to check the wrong thing. It now says the PIN was not accepted.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.55.0',
     date: '2026-10-19',
     theme: 'A player needs no account',

@@ -31,6 +31,13 @@ function statusOf(err: unknown): number | null {
  */
 export function keyCheckError(err: unknown, opts: { readOnly?: boolean } = {}): unknown {
   const status = statusOf(err);
+  // keel names the half it refused: a right key with a wrong PIN is
+  // invalid_credentials with param "API-Pin" ("Incorrect PIN."), a wrong key
+  // has none (S434, #417's live walk: a wrong PIN was told as a wrong key).
+  const param = (err as { param?: unknown } | null)?.param;
+  if (status === 401 && !opts.readOnly && typeof param === 'string' && param.toLowerCase() === 'api-pin') {
+    return new PlainError('OnlyWorlds did not accept that PIN. Check it, then try again.');
+  }
   if (status === 401 || status === 403) {
     return new PlainError(opts.readOnly
       ? 'OnlyWorlds did not accept that read key. Check it, then try again.'

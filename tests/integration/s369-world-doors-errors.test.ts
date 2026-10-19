@@ -152,6 +152,15 @@ describe('keyCheckError (S369)', () => {
     expect((keyCheckError(owErr(403), { readOnly: true }) as Error).message).toMatch(/read key/);
   });
 
+  it('names the PIN when keel refused the PIN, the key when it refused the key (S434)', () => {
+    // keel's own answers, read on live 2026-10-19: param "API-Pin" for a right key with a wrong PIN.
+    const pin = keyCheckError(new OwV2Error(401, { code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' }, ''));
+    expect(isPlainError(pin)).toBe(true);
+    expect((pin as Error).message).toBe('OnlyWorlds did not accept that PIN. Check it, then try again.');
+    const key = keyCheckError(new OwV2Error(401, { code: 'invalid_credentials', message: 'No valid API-Key.', param: null }, ''));
+    expect((key as Error).message).toMatch(/that API key\. Check it/);
+  });
+
   it('reads the legacy "API Error NNN:" prefix, never a digit run elsewhere', () => {
     expect(isPlainError(keyCheckError(new Error('API Error 404: Not found')))).toBe(true);
     const odd = new Error('element 4011 broke');
