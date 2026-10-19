@@ -68,6 +68,8 @@ export interface FileUpload {
   name: string;
   loaded: number;
   total: number;
+  /** The ticket's file id, once known: the listed row this upload stands for until it ends. */
+  fileId?: string;
 }
 
 interface ElementSlot {
@@ -211,16 +213,24 @@ export function refreshFiles(entry: WorldRegistryEntry, type: string, id: string
   return Promise.all(reads).then(() => undefined);
 }
 
-/** The world's total read again at once (after an add or a remove). */
-function rereadWorld(entry: WorldRegistryEntry): void {
+/**
+ * The world's total read again (after an add or a remove). A read already in
+ * flight may have left before the change, so this one follows it rather than
+ * standing in for it. keel counts a stored file at once (S435
+ * `total-probe.log`), so the caller reads this beside the list and the card
+ * never shows a new row with the old total.
+ */
+function rereadWorld(entry: WorldRegistryEntry): Promise<void> {
   const wk = worldKey(entry);
-  if (!wk) return;
+  if (!wk) return Promise.resolve();
   const w = worldSlot(wk);
-  if (w.pending) return;
-  w.pending = withTimeout(Promise.resolve().then(() => readClient(entry).worldFiles()), 'the world files read').then(
+  const before = w.pending ?? Promise.resolve();
+  const read: Promise<void> = before.then(() => withTimeout(Promise.resolve().then(() => readClient(entry).worldFiles()), 'the world files read')).then(
     f => { w.used = f.used_bytes; w.cap = f.cap_bytes; },
     () => { /* the line keeps its last answer */ },
-  ).finally(() => { w.readAt = Date.now(); w.pending = null; notify(); });
+  ).finally(() => { w.readAt = Date.now(); if (w.pending === read) w.pending = null; notify(); });
+  w.pending = read;
+  return read;
 }
 
 /**
@@ -313,6 +323,7 @@ export async function addFile(
         throw new PlainError(addRefusal(err, file));
       }
       fileId = ticket.file_id;
+      upload.fileId = fileId;
       let origin = '';
       try { origin = new URL(ticket.upload_url).origin; } catch { /* stays empty */ }
       if (!(uploadOriginsForTests ?? UPLOAD_ORIGINS).includes(origin)) {
@@ -330,18 +341,25 @@ export async function addFile(
         throw new PlainError(addRefusal(err, file));
       }
     }
+  } catch (err) {
+    slot.uploads = slot.uploads.filter(u => u !== upload);
+    notify();
+    throw err;
+  }
+  // The upload's row stays until the world's total and the list are both read
+  // again, so the card goes from "Adding" to the new row and the new total in
+  // one step. The host reports the file to keel a moment after it answers:
+  // the list once more shortly if the file is not in it yet.
+  try {
+    await Promise.all([rereadWorld(entry), rereadElement(entry, type, id)]);
+    if (!(slot.rows ?? []).some(r => r.id === fileId)) {
+      await new Promise(r => setTimeout(r, 1500));
+      await Promise.all([rereadWorld(entry), rereadElement(entry, type, id)]);
+    }
   } finally {
     slot.uploads = slot.uploads.filter(u => u !== upload);
     notify();
   }
-  // The host reports the file to keel a moment after it answers: read the
-  // list now, and once more shortly if the file is not in it yet.
-  await rereadElement(entry, type, id);
-  if (!(slot.rows ?? []).some(r => r.id === fileId)) {
-    await new Promise(r => setTimeout(r, 1500));
-    await rereadElement(entry, type, id);
-  }
-  rereadWorld(entry);
 }
 
 async function rereadElement(entry: WorldRegistryEntry, type: string, id: string): Promise<void> {
@@ -392,19 +410,21 @@ export async function removeFile(
     await client.removeFile(type, id, fileId);
   } catch (err) {
     if (!(err instanceof OwApiError && err.status === 404)) {
+      slot.removing.delete(fileId);
+      notify();
       if (err instanceof OwNetworkError) throw new PlainError(`${NOT_REACHED} The file is still there.`);
       if (err instanceof OwApiError && err.status === 403) throw new PlainError('Only the person who added this file, or the world\'s owner, can remove it.');
       if (err instanceof OwApiError && err.isAuthError && err.param === 'API-Pin') throw new PlainError('OnlyWorlds did not accept that PIN. Check it in Settings, under OnlyWorlds.');
       if (err instanceof OwApiError && err.isAuthError) throw new PlainError(SIGN_IN_AGAIN);
       throw new PlainError('The file was not removed. Try again in a moment.');
     }
-  } finally {
-    slot.removing.delete(fileId);
-    notify();
   }
+  // The row says "Removing…" until the world's total is read again, then
+  // leaves with the new total in one step.
+  await rereadWorld(entry);
   if (slot.rows) slot.rows = slot.rows.filter(r => r.id !== fileId);
+  slot.removing.delete(fileId);
   notify();
-  rereadWorld(entry);
 }
 
 /** Tests only. */

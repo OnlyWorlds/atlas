@@ -86,7 +86,8 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
 
   function paint(): void {
     const view = filesNow(entry, el.type, el.id);
-    const rows = view.rows ?? [];
+    // A file still being added shows as its upload until the add ends (the new total read beside it).
+    const rows = (view.rows ?? []).filter(r => !view.uploads.some(u => u.fileId === r.id));
 
     const parts: string[] = [];
     if (view.rows) parts.push(String(rows.length));

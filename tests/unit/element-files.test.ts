@@ -145,6 +145,37 @@ describe('addFile', () => {
     expect(v.rows?.map(r => r.id)).toEqual(['f-new', 'f1']);
   });
 
+  it('the new row and the new total reach the card in one step (S435: a 20 MB row beside "0 bytes")', async () => {
+    let listed = [row('f1')];
+    let used = 1000;
+    const f = fake({
+      listFiles: vi.fn(async () => listed),
+      worldFiles: vi.fn(async () => ({ data: [], used_bytes: used, cap_bytes: 250 * 1024 * 1024 })),
+    });
+    f.uploadFile = vi.fn(async () => {
+      listed = [row('f-new'), row('f1')];
+      used = 3000;
+      return { key: 'k', fid: 'f-new', bytes: 2000, type: 'application/pdf', etag: 'e' };
+    }) as FilesClient['uploadFile'];
+    await refreshFiles(entry, 'character', 'e1');
+    const torn: string[] = [];
+    let phase: 'add' | 'remove' = 'add';
+    onFilesChanged(() => {
+      const v = filesNow(entry, 'character', 'e1');
+      const shown = (v.rows ?? []).filter(r => !v.uploads.some(u => u.fileId === r.id)).map(r => r.id);
+      if (phase === 'add' && shown.includes('f-new') && v.used !== 3000) torn.push(`add: ${shown} with ${v.used}`);
+      if (phase === 'remove' && !shown.includes('f1') && v.used !== 2000) torn.push(`remove: ${shown} with ${v.used}`);
+    });
+    await addFile(entry, reg, 'character', 'e1', file(), null);
+    expect(filesNow(entry, 'character', 'e1').used).toBe(3000);
+    phase = 'remove';
+    listed = [row('f-new')];
+    used = 2000;
+    await removeFile(entry, reg, 'character', 'e1', 'f1');
+    expect(torn).toEqual([]);
+    expect(filesNow(entry, 'character', 'e1').used).toBe(2000);
+  });
+
   it('never sends the bytes to an address it does not know', async () => {
     const f = fake();
     setFileUploadOriginsForTests(['https://elsewhere.test']);

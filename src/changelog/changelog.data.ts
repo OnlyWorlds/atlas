@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.56.1',
+    date: '2026-10-19',
+    theme: 'The files total keeps up',
+    entries: [
+      {
+        id: 'files-total-in-step',
+        title: 'A new file and the world\'s total arrive together',
+        body: 'Right after a file was added, the Files section could show it beside the world\'s old total for a moment. The file now stays as Adding until the new total is in, and a removed file leaves together with its share of the total.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.56.0',
     date: '2026-10-19',
     theme: 'Files on an element',
