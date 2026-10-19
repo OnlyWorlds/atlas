@@ -20,7 +20,7 @@
 import type { Element } from '../core/types';
 import { isCustomEditableField, isPopulatedCustomValue } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
-import { getState } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { knownFieldsFor, type FieldMeta, type WidgetKind, type SectionLayout } from '../editor/field-schema';
 import { renderSection, humanizeFieldName } from './element-detail-fields';
@@ -131,8 +131,7 @@ function input_is_atlas_namespace(key: string): boolean {
  * read-key walk). Null then.
  */
 export function buildCustomFieldsSection(el: Element): HTMLElement | null {
-  const activeId = getState().active?.worldId;
-  const viewOnly = !!getState().registry.worlds.find(w => w.id === activeId)?.api?.read_only;
+  const viewOnly = worldIsViewOnly();
   const fields = customFieldMetasFor(el);
   const structured = structuredFieldEntriesFor(el);
   if (viewOnly && fields.length === 0 && structured.length === 0) return null;

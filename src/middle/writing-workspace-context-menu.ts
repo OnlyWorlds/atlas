@@ -17,6 +17,7 @@
  */
 
 import { getState } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { escapeText } from '../core/dom-utils';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
@@ -56,7 +57,8 @@ export function createProseContextMenu(deps: {
     const editor = getEditorHandle()?.editor;
     const el = getActiveNarrative();
     const worldId = getState().active?.worldId;
-    if (!editor || !el || !worldId) return;
+    // A split writes two narratives; a view-only world refuses both (conv. 149).
+    if (!editor || !el || !worldId || worldIsViewOnly()) return;
     openSplitDialog({ narrative: el, editor, worldId });
   }
 
@@ -68,7 +70,8 @@ export function createProseContextMenu(deps: {
    */
   function openInlineCreate(): void {
     const editor = getEditorHandle()?.editor;
-    if (!editor) return;
+    // A view-only world takes no new element (conv. 149).
+    if (!editor || worldIsViewOnly()) return;
     const { from, to } = editor.state.selection;
     if (from === to) {
       toastManager.info(forPointer('Select some text first, then Ctrl+Shift+E', 'Select some text first'));
@@ -126,6 +129,8 @@ export function createProseContextMenu(deps: {
     // header, sidebar, etc. keep their native menus.
     const target = e.target as HTMLElement | null;
     if (!target?.closest('.atlas-writing-workspace-prose .ProseMirror')) return;
+    // Every item here writes; a view-only world keeps the browser's own menu (conv. 149).
+    if (worldIsViewOnly()) return;
     const editorHandle = getEditorHandle();
     const editor = editorHandle?.editor;
     if (!editor) return;

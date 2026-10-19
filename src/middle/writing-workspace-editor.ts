@@ -54,6 +54,12 @@ export interface WorkspaceEditorOptions {
    */
   storyOutranksStaleSidecar?: boolean;
   /**
+   * False mounts the prose read-only: a view-only world (conv. 149). Default
+   * true. Programmatic commands still run, so a caller that writes on
+   * `onUpdate` must skip the write itself.
+   */
+  editable?: boolean;
+  /**
    * Fired after every content change, debounced upstream by the workspace.
    * Provides both markdown + JSON snapshots so the workspace can persist both
    * the canonical `story` field (markdown) and `atlas_richtext_json` (JSON).
@@ -278,7 +284,7 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
     // sidecar-less narrative to ever hit the path (2026-07-19).
     contentType: typeof initial === 'string' ? 'markdown' : 'json',
     autofocus: false,
-    editable: true,
+    editable: opts.editable !== false,
     onUpdate: ({ editor }) => {
       const json = editor.getJSON();
       // Use our custom serializer so element chips become ow:// markdown links.

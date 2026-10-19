@@ -17,6 +17,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType, type WorldMap } from '../core/types';
@@ -124,6 +125,10 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-field';
   wrap.dataset.field = meta.name;
+  // A view-only world reads (conv. 149): no click-to-edit, picker, × or
+  // placeholder glyph, since the store refuses every write there.
+  const readOnly = worldIsViewOnly();
+  if (readOnly) wrap.classList.add('atlas-field-readonly');
 
   // T-E1 (Bout E): sparse elements read as a wall of placeholder rows — dim
   // whole empty rows a step further. Hover restores full strength so the
@@ -186,8 +191,8 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   // value — opens the popover for text/number, opens the picker for links.
   // The actual click handlers live on the value/pick button below; we just
   // forward the click here.
-  label.classList.add('atlas-field-label-clickable');
-  label.addEventListener('click', (e) => {
+  if (!readOnly) label.classList.add('atlas-field-label-clickable');
+  if (!readOnly) label.addEventListener('click', (e) => {
     // Don't double-fire if user clicked the value (would bubble up otherwise).
     if ((e.target as HTMLElement).closest('.atlas-field-value, .atlas-link-pick, .atlas-link-chip, .atlas-aliases-display')) return;
     // Forward to whichever affordance lives in this row.
@@ -199,17 +204,17 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   wrap.appendChild(label);
 
   if (meta.widget === 'single-link') {
-    wrap.appendChild(renderSingleLink(meta, el));
+    wrap.appendChild(renderSingleLink(meta, el, readOnly));
     return wrap;
   }
   if (meta.widget === 'multi-link') {
-    wrap.appendChild(renderMultiLink(meta, el));
+    wrap.appendChild(renderMultiLink(meta, el, readOnly));
     return wrap;
   }
   if (meta.name === 'atlas_aliases') {
     // Custom widget — chip strip + dedicated modal (one row per alias).
     // The CSV-in-a-text-input approach was unintuitive (Captain feedback).
-    wrap.appendChild(renderAliasesRow(el));
+    wrap.appendChild(renderAliasesRow(el, readOnly));
     return wrap;
   }
 
@@ -233,7 +238,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const isEmpty = !valueText;
   const valueEl = document.createElement('div');
   valueEl.className = 'atlas-field-value' + (isEmpty ? ' empty' : '');
-  if (isEmpty) {
+  if (isEmpty && !readOnly) {
     // Widget-aware empty placeholder via CSS ::before (see atlas.css). Number
     // shows '#', text fields show a thin line. Avoids putting the placeholder
     // glyph in textContent so copy/select doesn't pick up sentinel chars.
@@ -251,6 +256,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   // gates on a flag set by mouseup. Fixes the bug where text selection
   // (especially left→right) opened the modal instead of leaving the user
   // with their highlight.
+  if (readOnly) return withCalendarDate(wrap, valueEl, meta, raw, isEmpty);
   let mouseDownAt: { x: number; y: number } | null = null;
   let suppressNextClick = false;
   valueEl.addEventListener('mousedown', (e) => {
@@ -333,9 +339,15 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
       },
     });
   });
-  // A date with a calendar (S369): the number stays the editable value; the
-  // calendar's reading sits under it, read-only, in the same column. Outside
-  // the value element, so editing and copying the number never touch it.
+  return withCalendarDate(wrap, valueEl, meta, raw, isEmpty);
+}
+
+/**
+ * A date with a calendar (S369): the number stays the editable value; the
+ * calendar's reading sits under it, read-only, in the same column. Outside
+ * the value element, so editing and copying the number never touch it.
+ */
+function withCalendarDate(wrap: HTMLElement, valueEl: HTMLElement, meta: FieldMeta, raw: unknown, isEmpty: boolean): HTMLElement {
   const lens = isSchemaDateField(meta) && !isEmpty ? activeCalendarLens() : null;
   const dateText = calendarDateText(meta, raw, lens);
   if (lens && dateText) {
@@ -361,10 +373,10 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
  * anywhere on the empty value also opens the modal (matches the rest of
  * the row-click affordances in element-detail).
  */
-function renderAliasesRow(el: Element): HTMLElement {
+function renderAliasesRow(el: Element, readOnly: boolean): HTMLElement {
   const row = document.createElement('div');
   row.className = 'atlas-aliases-display';
-  row.title = 'Click to edit aliases';
+  if (!readOnly) row.title = 'Click to edit aliases';
 
   const aliases: string[] = Array.isArray(el.atlas_aliases)
     ? el.atlas_aliases.filter((s): s is string => typeof s === 'string' && s.length > 0)
@@ -381,6 +393,7 @@ function renderAliasesRow(el: Element): HTMLElement {
   };
 
   if (aliases.length === 0) {
+    if (readOnly) return row;
     const empty = document.createElement('span');
     empty.className = 'atlas-aliases-display-empty';
     empty.textContent = 'Add aliases…';
@@ -396,7 +409,7 @@ function renderAliasesRow(el: Element): HTMLElement {
 
   // Whole-row click opens the modal — matches the row-click affordance of
   // every other field in element-detail. No separate edit button needed.
-  row.addEventListener('click', openModal);
+  if (!readOnly) row.addEventListener('click', openModal);
 
   return row;
 }
@@ -437,7 +450,7 @@ function openCreateForLink(el: Element, meta: FieldMeta, existingIds: string[]):
   }).open();
 }
 
-function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
+function renderSingleLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLElement {
   const row = document.createElement('div');
   row.className = 'atlas-link-row';
   // A single link another tool wrote as `{id, name}` (or a one-item list)
@@ -448,7 +461,7 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   const offerCreate = !raw && candidates === 0 && !!meta.target && LINK_CREATABLE.has(meta.target);
 
   if (raw) {
-    row.appendChild(buildLinkChip(String(raw), meta, async () => {
+    row.appendChild(buildLinkChip(String(raw), meta, readOnly ? null : async () => {
       // Use `null`, not `undefined`. undefined gets dropped by JSON.stringify
       // at disk-write AND by the adapter's wire serializer, so the PATCH
       // body omits the field and the server keeps its old value. See
@@ -458,6 +471,7 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   } else {
     row.classList.add('atlas-link-row-empty');
   }
+  if (readOnly) return row;
 
   const pickBtn = document.createElement('button');
   pickBtn.type = 'button';
@@ -502,7 +516,7 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   return row;
 }
 
-function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
+function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-link-row';
 
@@ -519,13 +533,14 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
   const offerCreate = ids.length === 0 && candidates === 0 && !!meta.target && LINK_CREATABLE.has(meta.target);
 
   ids.forEach(id => {
-    wrap.appendChild(buildLinkChip(id, meta, async () => {
+    wrap.appendChild(buildLinkChip(id, meta, readOnly ? null : async () => {
       const next = ids.filter(x => x !== id);
       await persistFieldPatch(el, meta.name, next);
     }));
   });
 
   if (ids.length === 0) wrap.classList.add('atlas-link-row-empty');
+  if (readOnly) return wrap;
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
@@ -562,7 +577,8 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
   return wrap;
 }
 
-function buildLinkChip(id: string, meta: FieldMeta, onRemove: () => void): HTMLElement {
+/** `onRemove` null = no × (a view-only world, conv. 149). */
+function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void) | null): HTMLElement {
   const linked = getState().data.elements.find(e => e.id === id);
   const chip = document.createElement('span');
   chip.className = 'atlas-link-chip' + (linked ? '' : ' atlas-link-chip-unresolved');
@@ -585,6 +601,7 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: () => void): HTMLE
       navigate(elementHash(worldId, linked.id));
     }
   });
+  if (!onRemove) return chip;
 
   const rm = document.createElement('span');
   rm.className = 'material-symbols-outlined atlas-link-chip-remove';

@@ -20,7 +20,8 @@ export interface FindBarOpts {
   onClose: () => void;
   /**
    * "Link to element…" (S355): the workspace opens the picker and links every
-   * match. Resolves when the doc has settled so the bar can recount.
+   * match. Resolves when the doc has settled so the bar can recount. Left out,
+   * the button is not shown (a view-only world, conv. 149).
    */
   onLinkMatches?: () => Promise<void>;
 }
@@ -116,6 +117,8 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
   const caseToggle = bar.querySelector<HTMLButtonElement>('[data-role="case-toggle"]')!;
   const wordToggle = bar.querySelector<HTMLButtonElement>('[data-role="word-toggle"]')!;
   const linkBtn = bar.querySelector<HTMLButtonElement>('[data-role="link-matches"]')!;
+  // No link handler, no link button: never offer what would be refused (conv. 149).
+  linkBtn.hidden = !opts.onLinkMatches;
 
   let caseSensitive = false;
   let wholeWord = false;

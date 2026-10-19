@@ -24,6 +24,7 @@
  */
 
 import { getState, subscribe } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { navigate, shareHash, elementHash, settingsHash, parseHash, onHashChange } from '../core/router';
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
@@ -77,6 +78,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   // didn't change (hash-echo renders, ui-slice patches).
   let lastBuiltElementsRef: readonly Element[] | null = null;
   let pageTitleHandle: EditableTitleHandle | null = null;  // detail header title (sync on tick)
+  // A view-only world reads its pages: each opens in the visitor preview, with
+  // no new page, rename, block edit, theme, publish or delete (conv. 149).
+  // Rooms remount per world, so one read at mount holds.
+  const viewOnly = worldIsViewOnly();
 
   const wid = () => getState().active?.worldId ?? null;
   const elOf = (id: string): Element | undefined => getState().data.elements.find(e => e.id === id);
@@ -118,6 +123,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     store?: ReturnType<typeof getActiveStore>,
     opts: { quiet?: boolean } = {},
   ): Promise<boolean> {
+    // Every page write funnels here; a view-only world's store refuses them all (conv. 149).
+    if (viewOnly) return Promise.resolve(false);
     const step = writeChain.then(async () => {
       // S367 critic C4: a caller that captured its store before an await
       // writes through THAT store, and only while it is still the active one
@@ -158,7 +165,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   async function createPage(): Promise<void> {
     const worldId = wid();
     const folder = getActiveStore();
-    if (!worldId || !folder) return;
+    if (!worldId || !folder || viewOnly) return;
     try {
       const created = await folder.createElement('narrative', {
         name: findUniquePageName(getState().data.elements),
@@ -188,7 +195,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   async function deletePage(id: string): Promise<void> {
     const folder = getActiveStore();
     const worldId = wid();
-    if (!folder || !worldId) return;
+    if (!folder || !worldId || viewOnly) return;
     const el = elOf(id);
 
     // Published-page guard: deleting the element destroys the only mirror of
@@ -1437,7 +1444,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   /** Publish (or revive a tombstoned slug) → write the mirror → rebuild. */
   async function publishPage(pageId: string, slug: string): Promise<void> {
     const client = sharingClientForActiveWorld();
-    if (!client) return;
+    if (!client || viewOnly) return; // it writes the mirror back (conv. 149)
     await commitOpenEdit(pageId);
     // A just-blurred name/intent patch is still queued in the write chain
     // (blur fires on the publish click's mousedown) — let it land before
@@ -1476,7 +1483,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   /** Republish the current composition to the existing slug. */
   async function republishPage(pageId: string): Promise<void> {
     const client = sharingClientForActiveWorld();
-    if (!client) return;
+    if (!client || viewOnly) return; // it writes the mirror back (conv. 149)
     await commitOpenEdit(pageId);
     await writeChain; // same stale-title guard as publishPage
     const page = elOf(pageId);
@@ -1522,7 +1529,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   /** Revoke — tombstone on the server; the mirror keeps the slug for revival. */
   async function revokePage(pageId: string): Promise<void> {
     const client = sharingClientForActiveWorld();
-    if (!client) return;
+    if (!client || viewOnly) return; // it writes the mirror back (conv. 149)
     const page = elOf(pageId);
     const pub = page ? pagePubOf(page) : null;
     if (!page || !pub) return;
@@ -1860,7 +1867,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // S367 critic C4: capture the world's store before the await; bail if the
     // room unmounted or the world changed while the list call was out.
     const store = getActiveStore();
-    if (!store) return;
+    // A view-only world's store refuses the heal, and its refusal toasted on room entry (conv. 149).
+    if (!store || worldIsViewOnly(worldId)) return;
     const stale = () => disposed || wid() !== worldId || getActiveStore() !== store;
     let rows: SharedPageRow[];
     try {
@@ -1949,7 +1957,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     header.className = 'atlas-room-header';
     header.innerHTML = `
       <h1>Pages</h1>
-      <p class="atlas-room-subtitle">Build pages from your world to share with anyone.</p>
+      <p class="atlas-room-subtitle">${viewOnly ? 'Pages built from this world.' : 'Build pages from your world to share with anyone.'}</p>
     `;
     root.appendChild(header);
 
@@ -1962,7 +1970,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     newBtn.textContent = '+ New page';
     newBtn.addEventListener('click', () => { void createPage(); });
     actions.appendChild(newBtn);
-    root.appendChild(actions);
+    // Not on a view-only world (conv. 149).
+    if (!viewOnly) root.appendChild(actions);
 
     const pages = listPages(getState().data.elements)
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -1970,7 +1979,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (pages.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'atlas-share-empty';
-      empty.innerHTML = `
+      empty.innerHTML = viewOnly ? '<p class="atlas-share-empty-title">No pages in this world.</p>' : `
         <p class="atlas-share-empty-title">No pages yet.</p>
         <p class="atlas-share-hint">
           A page is a stack of blocks: headings, prose, elements, built
@@ -2050,7 +2059,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       initial: page.name || '',
       placeholder: 'Page name…',
       ariaLabel: 'Page name',
-      autoEdit,
+      autoEdit: autoEdit && !viewOnly,
+      readOnly: viewOnly,
       onCommit: (next) => {
         const current = elOf(pageId)?.name || '';
         if (next && next !== current) void patchPage(pageId, { name: next });
@@ -2081,7 +2091,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         buildDetail(pageId);
       })();
     });
-    header.appendChild(previewBtn);
+    // A view-only page is only ever the preview: no builder to go back to (conv. 149).
+    if (!viewOnly) header.appendChild(previewBtn);
     // S3: full-page preview in its OWN tab — payload-true, standalone document.
     const fullPreview = document.createElement('button');
     fullPreview.type = 'button';
@@ -2147,14 +2158,15 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         root.querySelector('[data-role="publish-section"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
       })();
     });
-    header.appendChild(publishBtn);
+    // Publish and delete write the world; not on a view-only one (conv. 149).
+    if (!viewOnly) header.appendChild(publishBtn);
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'atlas-share-delete';
     del.title = 'Delete this page';
     del.innerHTML = `<span class="material-symbols-outlined">delete</span>`;
     del.addEventListener('click', () => { void deletePage(page.id); });
-    header.appendChild(del);
+    if (!viewOnly) header.appendChild(del);
     root.appendChild(header);
 
     // Preview mode: the reader's view, rendered FROM THE PUBLISH PAYLOAD —
@@ -2312,7 +2324,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // View switch — flush + tear down any live editor session (back-button
     // commits explicitly; this is the defensive path for direct URL changes).
     flushAndTeardown(mountedView);
-    previewMode = false;
+    // A view-only page opens as the visitor sees it, and stays so (conv. 149).
+    previewMode = viewOnly;
     metaExpanded = false;
     mountedView = tgt;
     if (tgt === 'list') buildList();

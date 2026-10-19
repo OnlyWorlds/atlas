@@ -22,6 +22,7 @@ import type {
   StoragePoint
 } from './types';
 import { leafletToStorage, storageToLeaflet, generateId } from './CoordinateUtils';
+// view-only-ok: its updatePin is the manager's own marker redraw, not a store write (conv. 149).
 
 /**
  * Translate the semantic `anchor` choice to a Leaflet [x, y] iconAnchor.

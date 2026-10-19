@@ -54,6 +54,7 @@ import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
 import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
 import { keyCheckError } from '../setup/key-check-errors';
+// view-only-ok: a view-only world is already online, and Make online is for a local world (conv. 149).
 
 /** Where the world being taken online keeps its files: the open world (1.17). */
 function activeFilesWhere(): 'folder' | 'browser' {

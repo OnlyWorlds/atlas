@@ -24,6 +24,7 @@ import { getActiveStore } from '../core/active-store';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
 import { signInFieldsHtml, missingSignIn, signInInputs, signInFromFields } from './sign-in-fields';
+// view-only-ok: writes a new world of its own, never the active one (conv. 149).
 
 export class NewApiWorldModal extends BaseModal {
   constructor(private toasts: ToastManager) {

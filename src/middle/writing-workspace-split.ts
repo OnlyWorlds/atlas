@@ -35,6 +35,7 @@ import {
   getWritingLabels,
 } from './writing-helpers';
 import type { Element } from '../core/types';
+// view-only-ok: reached only from the prose menu and Ctrl+Shift+D, both closed on a view-only world (conv. 149).
 
 const PREVIEW_CHARS = 80;
 

@@ -21,6 +21,7 @@ import { showProblem } from '../../ui/problem-fixes';
 import { createMapDialog } from '../../ui/map-create-modal';
 import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../core/active-store';
+import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
@@ -247,7 +248,10 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
   function render(): void {
     const state = getState();
-    if (!gate.changed([state.active, state.data, state.ui, searchTerm, rerenderSeq])) return;
+    // A view-only world gets no New map, no drag reorder and no delete
+    // (conv. 149); keyed in the gate so a key change redraws.
+    const viewOnly = worldIsViewOnly();
+    if (!gate.changed([state.active, state.data, state.ui, searchTerm, rerenderSeq, viewOnly])) return;
     if (!state.active) {
       root.innerHTML = `<div class="atlas-pane-empty">No active world.</div>`;
       return;
@@ -260,24 +264,26 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     title.className = 'atlas-section-title';
     title.textContent = 'Maps';
     header.appendChild(title);
-
-    const newBtn = document.createElement('button');
-    // Zero maps → the + glyph glows: the affordance IS the empty-state teaching
-    // (S264 — the explainer paragraph is gone; the glow points at the action).
-    const mapCount = state.data.elements.filter(e => e.type === 'map').length;
-    newBtn.className = 'atlas-create-icon-btn atlas-header-add-glyph'
-      + (mapCount === 0 ? ' atlas-create-glow' : '');
-    newBtn.setAttribute('data-action', 'new-map');
-    newBtn.innerHTML =
-      '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
-      '<span class="material-symbols-outlined atlas-add-glyph-main">map</span>';
-    newBtn.title = 'New map';
-    newBtn.addEventListener('click', async () => {
-      const result = await createMapDialog(toasts);
-      if (result) openMapTab(result.map);
-    });
-    header.appendChild(newBtn);
     root.appendChild(header);
+
+    if (!viewOnly) {
+      const newBtn = document.createElement('button');
+      // Zero maps → the + glyph glows: the affordance IS the empty-state teaching
+      // (S264 — the explainer paragraph is gone; the glow points at the action).
+      const mapCount = state.data.elements.filter(e => e.type === 'map').length;
+      newBtn.className = 'atlas-create-icon-btn atlas-header-add-glyph'
+        + (mapCount === 0 ? ' atlas-create-glow' : '');
+      newBtn.setAttribute('data-action', 'new-map');
+      newBtn.innerHTML =
+        '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
+        '<span class="material-symbols-outlined atlas-add-glyph-main">map</span>';
+      newBtn.title = 'New map';
+      newBtn.addEventListener('click', async () => {
+        const result = await createMapDialog(toasts);
+        if (result) openMapTab(result.map);
+      });
+      header.appendChild(newBtn);
+    }
 
     // Search input — filters the tree by map name (case-insensitive
     // substring). Hidden when there are 0 maps (no point) and at fewer than
@@ -393,6 +399,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       // During active search, ignore collapsed state — every match is
       // visible and reachable. Clearing the search restores it.
       ignoreCollapsed: !!trimmedSearch,
+      viewOnly,
     });
   }
 
@@ -413,6 +420,8 @@ interface RenderCtx {
   /** When true, collapsed state is ignored — everything renders expanded.
    *  Set during active search so matching descendants are reachable. */
   ignoreCollapsed: boolean;
+  /** The world is view-only: rows open and select, never move or delete. */
+  viewOnly: boolean;
 }
 
 function renderTree(list: HTMLElement, nodes: MapTreeNode[], depth: number, parentId: string | null, ctx: RenderCtx): void {
@@ -437,7 +446,8 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   // an explicit `parent_map` whose tree position came from location inference
   // sits under the inferred parent's id here.
   row.setAttribute('data-parent-id', parentId ?? '');
-  row.setAttribute('draggable', 'true');
+  // Drag re-stamps `hierarchy`: no drag on a view-only world (conv. 149).
+  if (!ctx.viewOnly) row.setAttribute('draggable', 'true');
   if (depth > 0) row.setAttribute('data-depth', String(depth));
   row.style.setProperty('--atlas-map-tree-depth', String(depth));
   row.setAttribute('role', 'button');
@@ -548,20 +558,23 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   meta.appendChild(badge);
   row.appendChild(meta);
 
-  const actions = document.createElement('span');
-  actions.className = 'atlas-inline-actions';
-  const del = document.createElement('button');
-  del.type = 'button';
-  del.className = 'atlas-icon-btn-sm';
-  del.setAttribute('data-action', 'delete-map');
-  del.title = 'Delete map';
-  del.innerHTML = '<span class="material-symbols-outlined">delete</span>';
-  del.addEventListener('click', (e) => {
-    e.stopPropagation();
-    void handleMapDelete(m, pinCount, ctx.toasts);
-  });
-  actions.appendChild(del);
-  row.appendChild(actions);
+  // No delete on a view-only world (conv. 149).
+  if (!ctx.viewOnly) {
+    const actions = document.createElement('span');
+    actions.className = 'atlas-inline-actions';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'atlas-icon-btn-sm';
+    del.setAttribute('data-action', 'delete-map');
+    del.title = 'Delete map';
+    del.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      void handleMapDelete(m, pinCount, ctx.toasts);
+    });
+    actions.appendChild(del);
+    row.appendChild(actions);
+  }
 
   row.addEventListener('click', () => openMapTab(m));
   // Right-click → select this map ELEMENT (navigate to element-detail). The

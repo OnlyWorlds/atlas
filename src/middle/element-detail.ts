@@ -17,6 +17,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { onHashChange, parseHash, worldHash } from '../core/router';
 import type { Element } from '../core/types';
 import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
@@ -246,15 +247,17 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // Map-specific: the "Local image" row, directly under the image_url row
     // (folder-stored file as map background; session 253).
     if (el.type === 'map') {
-      const row = buildMapLocalImageRow(el as import('../core/types').WorldMap, toastManager);
+      // A view-only world keeps no picture of its own in a folder (conv. 149).
+      const row = worldIsViewOnly() ? null : buildMapLocalImageRow(el as import('../core/types').WorldMap, toastManager);
       const urlRow = detail.querySelector('[data-field="image_url"]');
-      if (urlRow) urlRow.insertAdjacentElement('afterend', row);
-      else detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
+      if (row && urlRow) urlRow.insertAdjacentElement('afterend', row);
+      else if (row) detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
       // "Map style" (S423) goes under the Background colour it can stand in for.
       const styleRow = buildMapStyleRow(el as import('../core/types').WorldMap, toastManager);
       const bgRow = detail.querySelector('[data-field="background_color"]');
       if (bgRow) bgRow.insertAdjacentElement('afterend', styleRow);
-      else row.insertAdjacentElement('afterend', styleRow);
+      else if (row) row.insertAdjacentElement('afterend', styleRow);
+      else detail.querySelector('.atlas-detail-section-body')?.appendChild(styleRow);
     }
 
     // "Upload picture" (#154): under the image_url row, only in an online

@@ -19,6 +19,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { getEditorSettings, setEditorSettings, saveRegistry, setWorldFavoriteElement } from '../registry/registry';
 import {
   parseHash, navigate, homeHash, elementHash, writingHash, mapHash,
@@ -65,6 +66,25 @@ export function pendingInlineNameEdit(): string | null {
 
 // ====== Public API ======
 
+function wireRename(title: HTMLElement, el: Element): void {
+  title.title = 'Click to rename';
+  title.tabIndex = 0;
+  title.addEventListener('click', () => startInlineNameEdit(title, el));
+  title.addEventListener('keydown', (e) => {
+    // Only the title itself opens edit mode (the guard editable-title.ts has
+    // always had, missing here until S312): while the rename input is mounted
+    // INSIDE this h2, its keys bubble up — without this check every Space was
+    // preventDefault'ed (unable to type a space; Captain pasted names instead)
+    // and Enter committed then instantly reopened the editor with the stale
+    // name, so Enter "did not work".
+    if (e.target !== title) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      startInlineNameEdit(title, el);
+    }
+  });
+}
+
 export function renderHeader(el: Element): HTMLElement {
   const header = document.createElement('div');
   header.className = 'atlas-middle-header';
@@ -104,22 +124,9 @@ export function renderHeader(el: Element): HTMLElement {
   title.dataset.role = 'element-name';
   title.className = 'atlas-element-name';
   title.textContent = el.name || '(unnamed)';
-  title.title = 'Click to rename';
-  title.tabIndex = 0;
-  title.addEventListener('click', () => startInlineNameEdit(title, el));
-  title.addEventListener('keydown', (e) => {
-    // Only the title itself opens edit mode (the guard editable-title.ts has
-    // always had, missing here until S312): while the rename input is mounted
-    // INSIDE this h2, its keys bubble up — without this check every Space was
-    // preventDefault'ed (unable to type a space; Captain pasted names instead)
-    // and Enter committed then instantly reopened the editor with the stale
-    // name, so Enter "did not work".
-    if (e.target !== title) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      startInlineNameEdit(title, el);
-    }
-  });
+  // A view-only world's name is not a door (conv. 149).
+  const viewOnly = worldIsViewOnly();
+  if (!viewOnly) wireRename(title, el);
   header.appendChild(title);
 
   // Last changed by an agent, said quietly (#347).
@@ -165,8 +172,6 @@ export function renderHeader(el: Element): HTMLElement {
 
   // A view-only world offers no Delete: the store would refuse it after the
   // confirm (S380 row).
-  const activeId = getState().active?.worldId;
-  const viewOnly = !!getState().registry.worlds.find(w => w.id === activeId)?.api?.read_only;
   if (!viewOnly) {
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
@@ -411,7 +416,8 @@ function renderWritingTierActions(el: Element, header: HTMLElement): void {
   const childTiers: Array<'l1' | 'l2' | 'l3' | 'l4'> = [];
   if (tier === 'l1') childTiers.push('l2', 'l4');
   else if (tier === 'l2') childTiers.push('l3', 'l4');
-  // l3 + l4: no child creation.
+  // l3 + l4: no child creation; nor a view-only world (conv. 149).
+  if (worldIsViewOnly()) childTiers.length = 0;
 
   for (const childTier of childTiers) {
     const childLabel = labels[childTier];
@@ -574,7 +580,9 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
   const createCluster = document.createElement('div');
   createCluster.className = 'atlas-header-cluster atlas-header-create';
 
-  if (isLocation) {
+  // A view-only world creates nothing: no +map, no +pin (conv. 149).
+  const viewOnly = worldIsViewOnly();
+  if (isLocation && !viewOnly) {
     const addMapBtn = document.createElement('button');
     addMapBtn.type = 'button';
     addMapBtn.className = 'atlas-icon-btn-sm atlas-header-add-glyph';
@@ -610,7 +618,7 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
   // this element's pins across every map.
   const alreadyPinnedHere = !!activeMapId
     && pinsForElement.some(p => (p as Record<string, unknown>).map_id === activeMapId);
-  if (activeMapId && !SPATIAL_TYPES.has(el.type) && !alreadyPinnedHere) {
+  if (activeMapId && !SPATIAL_TYPES.has(el.type) && !alreadyPinnedHere && !viewOnly) {
     const placing = ui.pinPlacement?.elementId === el.id;
     const pinBtn = document.createElement('button');
     pinBtn.type = 'button';
@@ -883,7 +891,9 @@ function buildPinAffordance(
   btn.setAttribute('data-pin-id', pin.id);
   // Surface the right-click affordance in the tooltip — symmetric with
   // the drag-to-trash on the map canvas and the right-click-ghost prune.
-  btn.title = `Pin on ${mapName} · click to open and center, right-click to delete pin`;
+  btn.title = worldIsViewOnly()
+    ? `Pin on ${mapName} · click to open and center`
+    : `Pin on ${mapName} · click to open and center, right-click to delete pin`;
   const iconHtml = '<span class="material-symbols-outlined">push_pin</span>';
   if (showMapName) {
     btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(mapName)}</span>`;
@@ -908,7 +918,7 @@ function buildPinAffordance(
     if (pin.element_id) revealPinsOnMap(pin.map_id, pin.element_id);
     panMapTabTo(pin.map_id, pin.x, pin.y);
   });
-  btn.addEventListener('contextmenu', (e) => {
+  if (!worldIsViewOnly()) btn.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     void deletePinFromHeader(pin.id, mapName);
   });

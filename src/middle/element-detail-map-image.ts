@@ -17,6 +17,7 @@ import { escapeText } from '../core/dom-utils';
 import { readImageDimsFromFile, smallMapImageHint, IMAGELESS_MAP_SIZE } from '../ui/image-dims';
 import { countSpatialOnMap, spatialPhrase, rescaleSketchOntoImage } from './map-attach-scale';
 import type { WorldMap } from '../core/types';
+// view-only-ok: the element page builds this row only on a world that can change (element-detail.ts) (conv. 149).
 
 export function buildMapLocalImageRow(m: WorldMap, toasts: ToastManager): HTMLElement {
   const wrap = document.createElement('div');

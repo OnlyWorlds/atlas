@@ -7,6 +7,7 @@
 import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { getActiveStore } from '../core/active-store';
+import { worldIsViewOnly } from '../core/view-only';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { MAP_STYLE_IDS, mapStylePreset, mapStyleOf } from '../core/map-ink';
 import type { WorldMap } from '../core/types';
@@ -34,6 +35,8 @@ export function buildMapStyleRow(m: WorldMap, toasts: ToastManager): HTMLElement
   select.add(plain);
   for (const id of MAP_STYLE_IDS) select.add(new Option(mapStylePreset(id)!.name, id));
   select.value = mapStyleOf(m)?.id ?? '';
+  // A view-only world shows its style with nothing to change (conv. 149).
+  select.disabled = worldIsViewOnly();
   value.appendChild(select);
 
   // Over a picture the style draws the zones' ink and covers nothing (gate G3, `overPicture`).

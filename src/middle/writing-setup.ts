@@ -16,6 +16,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { saveRegistry } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
@@ -52,8 +53,21 @@ export function mountWritingSetup(
   const candidates = buildPromoteCandidates(allElements, currentLabels);
   const detected = detectExistingLabels(candidates);
 
+  // A view-only world (conv. 149): the setup only picks how Atlas SHOWS the
+  // tree. Labels are a registry pref, never written to the world; nothing is
+  // promoted or renamed, so the labels start at what the narratives already
+  // carry, and the tree appears as its owner built it.
+  const viewOnly = worldIsViewOnly(worldId);
+
   // Working state — what the user has picked. Starts at current labels.
-  const labels: WritingLabels = { ...currentLabels };
+  const labels: WritingLabels = viewOnly
+    ? {
+      l1: detected.l1 ?? currentLabels.l1,
+      l2: detected.l2 ?? currentLabels.l2,
+      l3: detected.l3 ?? currentLabels.l3,
+      l4: detected.l4 ?? currentLabels.l4,
+    }
+    : { ...currentLabels };
 
   const root = document.createElement('div');
   root.className = 'atlas-writing-setup';
@@ -66,8 +80,9 @@ export function mountWritingSetup(
         <header class="atlas-writing-setup-header">
           <h1>Set up writing</h1>
           <p class="atlas-writing-setup-subtitle">
-            A common shape: Book / Chapter / Scene, plus a flexible Draft tier.
-            Rename any of them to fit your project.
+            ${viewOnly
+              ? 'This world is view-only. These labels only change how Atlas shows its narratives to you; the world itself stays as it is.'
+              : 'A common shape: Book / Chapter / Scene, plus a flexible Draft tier. Rename any of them to fit your project.'}
           </p>
           <!-- div, not p: the HTML parser closes a <p> at a <details> (flow
                content), which would eject the info toggle onto its own line. -->
@@ -85,15 +100,15 @@ export function mountWritingSetup(
           ${draftRowHtml('l4', labels.l4, DEFAULT_WRITING_LABELS.l4, detected.l4)}
         </section>
 
-        ${candidates.length > 0 ? promoteSectionHtml(candidates, labels) : ''}
+        ${candidates.length > 0 && !viewOnly ? promoteSectionHtml(candidates, labels) : ''}
 
         <div class="atlas-writing-setup-actions">
-          ${candidates.length > 0
+          ${candidates.length > 0 && !viewOnly
             ? '<button class="atlas-btn-ghost" data-action="skip">Skip for now</button>'
             : ''}
-          <button class="atlas-btn-primary" data-action="save">Save and start writing</button>
+          <button class="atlas-btn-primary" data-action="save">${viewOnly ? 'Use these labels' : 'Save and start writing'}</button>
         </div>
-        ${candidates.length > 0
+        ${candidates.length > 0 && !viewOnly
           ? '<p class="atlas-writing-setup-skip-note">Skip leaves the room unconfigured, so setup reappears next visit. You can also set it up later in Settings → Writing.</p>'
           : ''}
       </div>
@@ -238,7 +253,7 @@ export function mountWritingSetup(
     });
     const saveBtn = root.querySelector<HTMLButtonElement>('[data-action="save"]');
     saveBtn?.addEventListener('click', () => {
-      void runFinish({ promote: shouldPromote() }, saveBtn);
+      void runFinish({ promote: !viewOnly && shouldPromote() }, saveBtn);
     });
     const skipBtn = root.querySelector<HTMLButtonElement>('[data-action="skip"]');
     skipBtn?.addEventListener('click', () => {
@@ -286,10 +301,11 @@ export function mountWritingSetup(
     }
 
     // Apply rename migration if labels changed FROM existing initialized state.
+    // Never on a view-only world: it rewrites narratives (conv. 149).
     const reg = getState().registry;
     const entry = reg.worlds.find(w => w.id === worldId);
     const wasInitialized = entry?.writing_initialized === true;
-    if (wasInitialized && entry?.writing_labels) {
+    if (wasInitialized && entry?.writing_labels && !viewOnly) {
       const oldLabels: WritingLabels = {
         l1: entry.writing_labels.l1 ?? DEFAULT_WRITING_LABELS.l1,
         l2: entry.writing_labels.l2 ?? DEFAULT_WRITING_LABELS.l2,
@@ -318,7 +334,7 @@ export function mountWritingSetup(
     patchSlice('registry', nextReg);
 
     // Promote candidates. Each failure is logged but doesn't abort the batch.
-    if (opts.promote && candidates.length > 0) {
+    if (opts.promote && candidates.length > 0 && !viewOnly) {
       const finalCandidates = buildPromoteCandidates(getState().data.elements, labels);
       let written = 0;
       const failures: Array<{ id: string; error: unknown }> = [];
@@ -355,7 +371,7 @@ export function mountWritingSetup(
       patchSlice('data', { elements: fresh });
     }
 
-    requestPushIfLinked();
+    if (!viewOnly) requestPushIfLinked();
     onFinish();
   }
 

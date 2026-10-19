@@ -11,6 +11,7 @@
 
 import { isAtlasGrounded } from '../core/grounded';
 import { getState, subscribe, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { onHashChange, navigate, elementHash, homeHash } from '../core/router';
 import { setWorldFavoriteElement, saveRegistry, getEditorSettings } from '../registry/registry';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
@@ -462,7 +463,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // because they're marker-constructed not pinned. Both render in the
     // sidebar list (zones for browsing, maps for selection) but neither
     // can become a pin target.
-    if (type === 'map' || type === 'zone') {
+    // Nor does anything become a pin on a view-only world (conv. 149).
+    if (type === 'map' || type === 'zone' || worldIsViewOnly()) {
       e.preventDefault();
       return;
     }
@@ -673,8 +675,11 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // Empty world: the search field invites creating instead (typed text
     // rides into the modal as the name), and the + button pulses a few beats
     // to spotlight where creation lives (S255v3).
-    const worldEmpty = elements.length === 0 && !state.data.loading;
+    // A view-only world creates nothing: no +, no invitation (conv. 149).
+    const viewOnly = worldIsViewOnly();
+    const worldEmpty = elements.length === 0 && !state.data.loading && !viewOnly;
     searchInput.placeholder = worldEmpty ? 'Create an element…' : 'Search elements…';
+    createBtn.hidden = viewOnly;
     createBtn.classList.toggle('atlas-create-pulse', worldEmpty);
 
     // Knowledge lens: rows OUTSIDE the knower's known set dim. The banner

@@ -19,6 +19,7 @@ import type { Element } from '../core/types';
 import { isStoryNarrative } from '../core/narrative-kind';
 import type { FsFolderStore } from '../store/folder-store-fs';
 import type { WritingLabels } from './writing-helpers';
+// view-only-ok: reached only from writing setup, which writes nothing on a view-only world (writing-setup.ts) (conv. 149).
 
 interface PromoteCandidate {
   el: Element;

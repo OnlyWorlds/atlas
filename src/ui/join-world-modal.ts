@@ -31,6 +31,7 @@ import {
   playerAlreadyHereLine, previewJoin, redeemJoin, redeemPlayerJoin, redeemRefusedSentence, roleLine,
   SPARE_PLAYER_LINE, SPARE_SEAT_LINE, type JoinedPlayer, type JoinedSeat, type JoinPreview, type OpenJoinedOutcome,
 } from '../setup/join-door';
+// view-only-ok: writes a new world of its own, never the active one (conv. 149).
 
 /** Run the door for a code `join-capture` took, once. */
 export async function runPendingJoin(toasts: ToastManager): Promise<void> {

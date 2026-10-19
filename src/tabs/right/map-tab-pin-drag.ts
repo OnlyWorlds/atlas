@@ -15,6 +15,7 @@
 import { getState, patchSlice } from '../../core/state';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { getActiveStore } from '../../core/active-store';
+import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { MapTabCacheEntry } from './map-tab-cache';
 import { showProblem } from '../../ui/problem-fixes';
@@ -34,6 +35,8 @@ export function clampToCanvas(value: number, max: number): number {
 }
 
 export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: string): void {
+  // A view-only world's pins stay put: no move, no trash (conv. 149).
+  if (worldIsViewOnly()) return;
   try {
     if (marker.dragging) marker.dragging.enable();
     else marker.options.draggable = true;

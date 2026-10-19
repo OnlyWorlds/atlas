@@ -14,6 +14,7 @@
  */
 
 import type { WorkspaceEditorHandle } from './writing-workspace-editor';
+import { worldIsViewOnly } from '../core/view-only';
 
 export interface SelectionBubbleController {
   destroy(): void;
@@ -52,7 +53,8 @@ export function mountSelectionBubble(deps: {
 
   function place(): void {
     const editor = getHandle()?.editor;
-    if (!editor) { hide(); return; }
+    // Every button here writes; a view-only world shows no bubble (conv. 149).
+    if (!editor || worldIsViewOnly()) { hide(); return; }
     const { from, to, empty } = editor.state.selection;
     if (empty) { hide(); return; }
     // Lost focus hides unless the user is mid-click inside the bubble itself.

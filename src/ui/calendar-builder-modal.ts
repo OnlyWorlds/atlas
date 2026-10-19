@@ -30,6 +30,7 @@ import {
   validateCalendarConfig, formatStep,
 } from '@onlyworlds/sdk';
 import { CALENDAR_SUPERTYPE, readCalendarValue } from '../core/calendar-lens';
+// view-only-ok: opened only from the Charts calendar menu, which a view-only world does not show (timeline.ts) (conv. 149).
 
 export interface CalendarBuilderOpts {
   /** Present = edit this calendar element; absent = create a new one. */

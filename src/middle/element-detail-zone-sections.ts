@@ -14,6 +14,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import type { Zone, Marker, WorldMap, Element } from '../core/types';
@@ -33,10 +34,21 @@ import { resolveStyle, kindLabel } from '../core/world-styles';
 const MARKERS_FOLD_ABOVE = 8;
 
 export function buildZoneSections(zone: Zone, toasts: ToastManager): HTMLElement[] {
-  return [
+  const sections = [
     buildZoneVisualsSection(zone, toasts),
     buildZoneMarkersSection(zone, toasts),
   ];
+  // A view-only world reads (conv. 149): the visuals show their values with
+  // nothing to change, and Edit shape, Delete zone and each marker's delete
+  // go; Pan stays.
+  if (worldIsViewOnly()) {
+    for (const s of sections) {
+      s.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select').forEach(i => { i.disabled = true; });
+      s.querySelectorAll('[data-action="use-kind-colour"], [data-action="toggle-edit"], [data-action="cancel-edit"], [data-action="delete-zone"], [data-action="delete"]')
+        .forEach(b => b.remove());
+    }
+  }
+  return sections;
 }
 
 function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement {

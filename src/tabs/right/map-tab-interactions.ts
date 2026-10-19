@@ -14,6 +14,7 @@
 
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
+import { worldIsViewOnly } from '../../core/view-only';
 import { completeWaypoint } from '../../core/waypoints';
 import { navigate, elementHash } from '../../core/router';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
@@ -92,6 +93,8 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     }
     const placement = getState().ui.pinPlacement;
     if (!placement) return;
+    // A view-only world takes no pin (conv. 149).
+    if (worldIsViewOnly()) return;
     // Imageless maps accept pins since S300 — the flat canvas has stored
     // width/height, so the coordinate space is as stable as an image's
     // (DESIGN_MAPS.md §4.2). No image gate.
@@ -191,6 +194,8 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
 
   // Right-click empty map → contextual element-create + drop pin at click point.
   manager.getMap()?.on('contextmenu', async (e) => {
+    // A view-only world offers no New pin: the browser's own menu stays (conv. 149).
+    if (worldIsViewOnly()) return;
     (e.originalEvent as MouseEvent).preventDefault();
     const latlng = (e as any).latlng;
     if (!latlng) return;
@@ -280,11 +285,14 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         manager.fitToCanvas();
         break;
       case 'z':
+        // A view-only world draws no zone, so z and l stay plain keys (conv. 149).
+        if (worldIsViewOnly()) break;
         e.preventDefault();
         if (active && active.mode === 'polygon' && active.mapId === mapId) cancelDrawing();
         else startDrawing(cacheEntry, 'polygon', toasts);
         break;
       case 'l':
+        if (worldIsViewOnly()) break;
         e.preventDefault();
         if (active && active.mode === 'line' && active.mapId === mapId) cancelDrawing();
         else startDrawing(cacheEntry, 'line', toasts);
@@ -299,6 +307,8 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
   // and write a pin.
   container.addEventListener('dragover', (e) => {
     if (!e.dataTransfer?.types.includes('application/x-atlas-element')) return;
+    // A view-only world is no drop target, so no drop fires (conv. 149).
+    if (worldIsViewOnly()) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     container.classList.add('atlas-map-drop-target');

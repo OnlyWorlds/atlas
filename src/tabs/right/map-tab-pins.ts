@@ -20,6 +20,7 @@ import type { PinLabels } from '../../core/map-view-prefs';
 import { medianNearestNeighbour, pinScaleForSpacing, scheduleLabelDensity } from './map-label-density';
 import { refreshSubmapDoor, refreshUpButton, SUBMAP_PIN_HINT } from './map-submap-door';
 import { mapZoneDate, pinShownOnMap, revealOnMap } from './map-date-bar';
+// view-only-ok: its updatePin calls are the Leaflet manager's, a redraw, not a store write (conv. 149).
 
 export function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;

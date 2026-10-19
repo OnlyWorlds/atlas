@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.57.0',
+    date: '2026-10-19',
+    theme: 'A world you can only view reads as one',
+    entries: [
+      {
+        id: 'view-only-reads',
+        title: 'A view-only world offers nothing it would refuse',
+        body: 'A world opened with a read key, or from a player link, still showed what Atlas would then refuse: fields to click and edit, link pickers, Add aliases, + buttons, the writing editor, map drawing, chart dragging. Now everything reads. Element pages show their values plainly, writing and knowledge open as text to read, pages open as their visitors see them, maps and charts move and zoom with nothing to drag into place, and no + appears anywhere. Search, Find, opening and your own view settings work as before.',
+        tags: ['editor', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.56.2',
     date: '2026-10-19',
     theme: 'A view-only world offers no edits it would refuse',

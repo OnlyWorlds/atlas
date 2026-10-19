@@ -11,6 +11,7 @@
 
 import { ToastManager } from '../../ui/toast-manager';
 import { getState, patchSlice } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
 import { mapTabCache } from './map-tab-cache';
 import { toggleVisualSettingsPopover } from './map-visual-settings-popover';
@@ -97,14 +98,15 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   // Order (Captain, S356, twice): the left set is settings | show/hide |
   // create; fit-to-image is a VIEW-state control and sits on the right,
   // just left of the map element's own door. The dividers stay.
+  // A view-only world has no create set (conv. 149). Read at mount: a world
+  // switch disposes every map tab (right-pane).
+  const making = worldIsViewOnly() ? [] : [divider(), drawPolygonBtn, drawLineBtn];
   root.append(
     settingsBtn,
     divider(),
     toggleZonesBtn,
     togglePinsBtn,
-    divider(),
-    drawPolygonBtn,
-    drawLineBtn,
+    ...making,
     spacer,
     zonesDropdownBtn,
     fitToImageBtn,

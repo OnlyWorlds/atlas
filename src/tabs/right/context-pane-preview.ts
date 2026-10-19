@@ -24,6 +24,7 @@
 import type { Element } from '../../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
 import { getState } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 import { getEditorSettings } from '../../registry/registry';
 import { navigate, elementHash, writingHash } from '../../core/router';
 import { renderElementImage } from '../../ui/element-image';
@@ -256,8 +257,11 @@ function buildPreview(
         linkAll.disabled = false;
       });
     });
-    mn.appendChild(document.createTextNode(' · '));
-    mn.appendChild(linkAll);
+    // A view-only world lists the mentions but offers no "Link all" (conv. 149).
+    if (!worldIsViewOnly()) {
+      mn.appendChild(document.createTextNode(' · '));
+      mn.appendChild(linkAll);
+    }
     body.appendChild(mn);
   }
 
@@ -288,7 +292,8 @@ function buildPreview(
   }
 
   // "+ add to story" only in writing mode, only for non-subject + non-featured.
-  if (isWriting && !isSubject && !featured) {
+  // Not on a view-only world: the prose there cannot take a chip (conv. 149).
+  if (isWriting && !isSubject && !featured && !worldIsViewOnly()) {
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'atlas-btn-primary';

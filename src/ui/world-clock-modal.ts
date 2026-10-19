@@ -21,6 +21,7 @@ import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
+// view-only-ok: opened only from the Charts calendar menu, which a view-only world does not show (timeline.ts) (conv. 149).
 
 const STEP_SUGGESTIONS = ['year', 'day', 'cycle', 'turn', 'age'];
 

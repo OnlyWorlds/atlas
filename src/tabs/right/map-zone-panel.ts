@@ -20,6 +20,7 @@
  */
 
 import { getState, patchSlice } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
 import { ELEMENT_LABELS } from '../../core/constants';
 import { escapeText, escapeAttr, hexColourOr } from '../../core/dom-utils';
@@ -110,6 +111,9 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     .map(k => ({ ...k, members: k.members.filter(z => shownIds.has(z.id) || (partsOf.has(z.id) && linkedShown(z))) }))
     .filter(k => k.members.length > 0);
   const q = ps.search.trim().toLowerCase();
+  // A view-only world lists, lights and hides its zones, and styles or
+  // deletes none: no swatch picker, no tune, no delete (conv. 149).
+  const viewOnly = worldIsViewOnly();
   // One kind (a small hand-drawn world) opens itself: the panel reads as the
   // flat list it was. Many kinds start closed; the selected zone's kind opens.
   if (!ps.touched && kinds.length === 1) ps.openKinds.add(kinds[0].key);
@@ -142,7 +146,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     // A kind made only of linked zones has nothing on the map to colour,
     // tune or hide: its row lists them and stops there.
     const linkedOnly = kind.members.every(z => partsOf.has(z.id));
-    const hasKind = Boolean(kind.supertype || kind.subtype || kind.role) && !linkedOnly;
+    const hasKind = Boolean(kind.supertype || kind.subtype || kind.role) && !linkedOnly && !viewOnly;
     const tuning = ps.tuning === kind.key;
     parts.push(`
       <div class="atlas-zone-kind ${open ? 'is-open' : ''} ${hidden ? 'is-hidden' : ''}" data-kind-key="${escapeAttr(kind.key)}">
@@ -160,7 +164,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
         </div>
         ${tuning && hasKind ? renderTune(kind, rule, resolved) : ''}
         <div class="atlas-zone-kind-members" ${open ? '' : 'hidden'}>
-          ${matching.map(z => renderChip(z, selectedId, rules, partsOf.get(z.id))).join('')}
+          ${matching.map(z => renderChip(z, selectedId, rules, partsOf.get(z.id), viewOnly)).join('')}
         </div>
       </div>`);
   }
@@ -174,7 +178,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   }
 }
 
-function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[], parts?: string[]): string {
+function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[], parts?: string[], viewOnly = false): string {
   const shapeIcon = parts ? 'route' : getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
   const own = (z as { atlas_color?: string }).atlas_color;
   // A zone's own colour is from its file: hex only into style="" (S360).
@@ -187,10 +191,10 @@ function renderChip(z: Zone, selectedId: string | null | undefined, rules: reado
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
       <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own color' : ''}"></span>
       <span class="atlas-zone-chip-name">${escapeText(z.name || '(unnamed)')}</span>${parts ? `
-      <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}
+      <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}${viewOnly ? '' : `
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
         <span class="material-symbols-outlined">delete</span>
-      </button>
+      </button>`}
     </div>`;
 }
 
@@ -382,6 +386,8 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
   strip.addEventListener('contextmenu', (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLElement>('.atlas-zone-chip');
     if (!chip) return;
+    // Its menu is Rename and Delete: none on a view-only world (conv. 149).
+    if (worldIsViewOnly()) return;
     e.preventDefault();
     const zoneId = chip.getAttribute('data-zone-id');
     if (zoneId) handlers.onContext(zoneId, e.clientX, e.clientY);

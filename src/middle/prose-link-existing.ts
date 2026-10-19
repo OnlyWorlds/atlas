@@ -19,6 +19,7 @@
  */
 
 import { getState } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
@@ -43,7 +44,8 @@ export async function linkSelectionToExisting(
   opts: LinkExistingOptions = {},
 ): Promise<boolean> {
   const editor = getHandle()?.editor;
-  if (!editor) return false;
+  // A view-only world's prose takes no chip (conv. 149).
+  if (!editor || worldIsViewOnly()) return false;
   const { from, to } = editor.state.selection;
   if (from === to) return false;
   const selectedText = editor.state.doc.textBetween(from, to, ' ', ' ').trim();
@@ -82,6 +84,7 @@ export async function recordAliasIfForeign(picked: Element, label: string): Prom
     ? live.atlas_aliases.filter((a): a is string => typeof a === 'string')
     : [];
   if (label === name || aliases.includes(label)) return;
+  if (worldIsViewOnly()) return; // the store would refuse it (conv. 149)
   const folder = getActiveStore();
   if (!folder) return;
   try {

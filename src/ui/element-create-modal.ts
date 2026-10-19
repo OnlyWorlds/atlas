@@ -30,6 +30,7 @@ import { escapeAttr } from '../core/dom-utils';
 import { loadUiPrefs } from '../core/ui-prefs';
 import { TEMPORAL_TYPE_FIELDS } from '../visualization/timeline/temporal-fields';
 import { forPointer } from '../core/pointer';
+// view-only-ok: opened only through the create door (create-element-door.ts) or a link field's create, both closed on a view-only world (conv. 149).
 
 /**
  * Types offered in the create modal.

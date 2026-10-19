@@ -18,6 +18,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
 import { storageToLeaflet } from '../../visualization/leaflet-2d/CoordinateUtils';
 import type { Element, Pin, WorldMap } from '../../core/types';
@@ -295,6 +296,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         // handling AND expose vertex handles that reshape the polygon pinInZone
         // tests against. Placing wins; edit the zone after the pin is set.
         if (getState().ui.pinPlacement) return;
+        // A view-only world's zones keep their shape (conv. 149).
+        if (worldIsViewOnly()) return;
         enterEditMode(zoneId, mapId, toasts);
       });
       entry.zoneOverlay = overlay;

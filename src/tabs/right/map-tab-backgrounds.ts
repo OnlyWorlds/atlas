@@ -12,6 +12,7 @@
 
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 import { getActiveStore } from '../../core/active-store';
 import { findWorld } from '../../registry/registry';
 import type { WorldMap } from '../../core/types';
@@ -141,7 +142,8 @@ export async function applyMapBackground(
       const hint = showLoadingHint(container);
       const decoded = await decodeImageDims(source.url).finally(hint.remove);
       dims = decoded ?? { w: defaultWidth, h: defaultHeight };
-      if (decoded) {
+      // A view-only world keeps the decoded size for this session only (conv. 149).
+      if (decoded && !worldIsViewOnly()) {
         const store = getActiveStore();
         const worldId = getState().active?.worldId;
         if (store && worldId) {

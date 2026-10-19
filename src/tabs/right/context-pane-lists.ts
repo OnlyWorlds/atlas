@@ -19,6 +19,7 @@
  */
 
 import { getState } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 import type { Element } from '../../core/types';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { getActiveStore } from '../../core/active-store';
@@ -167,6 +168,8 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   host.innerHTML = '';
 
   const rowEls = new Map<string, HTMLElement>();
+  // A view-only world shows both lists but offers no link or dismiss (conv. 149).
+  const viewOnly = worldIsViewOnly();
 
   const dismissedRaw = (narrative as Element & { atlas_dismissed_suggestions?: string[] }).atlas_dismissed_suggestions;
   const dismissed = new Set<string>(Array.isArray(dismissedRaw) ? dismissedRaw : []);
@@ -250,7 +253,7 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
     const row = buildRow(el, {
       reason: 'in the text',
       onClick: () => onSelect(el.id),
-      onLink: () => linkNamed(narrative.id, el.id, row),
+      onLink: viewOnly ? undefined : () => linkNamed(narrative.id, el.id, row),
     });
     row.dataset.named = '';
     sugBody.appendChild(row);
@@ -269,7 +272,7 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
       const row = buildRow(s.el, {
         reason: s.reason,
         onClick: () => onSelect(s.el.id),
-        onDismiss: () => dismissSuggestion(narrative.id, s.el.id),
+        onDismiss: viewOnly ? undefined : () => dismissSuggestion(narrative.id, s.el.id),
       });
       sugBody.appendChild(row);
       rowEls.set(s.el.id, row);

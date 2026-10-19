@@ -18,6 +18,7 @@
  */
 
 import { getState, subscribe } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { onHashChange, parseHash } from '../core/router';
 import type { Element } from '../core/types';
 import { getActiveStore } from '../core/active-store';
@@ -110,6 +111,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   const root = document.createElement('div');
   root.className = 'atlas-writing-workspace';
   target.appendChild(root);
+  // A view-only world reads its prose and never writes it: the editor mounts
+  // read-only and every save path below stands down (conv. 149). Rooms remount
+  // on a world switch, so one read at mount holds.
+  const viewOnly = worldIsViewOnly();
 
   // Apply per-world prose font size (registry pref → CSS var on root).
   applyProseFontSize(root);
@@ -218,6 +223,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * later scenes (same rule as linking a selection to an existing element).
    */
   async function linkFindMatchesToElement(): Promise<void> {
+    if (viewOnly) return; // the bar shows no link button there (conv. 149)
     const info = findBarSearchProxy.getInfo();
     if (!info.query || info.total === 0) return;
     const picked = await pickElement({ title: `Link every "${info.query}" to which element?` });
@@ -283,7 +289,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         // Editor regains focus so typing resumes immediately.
         editorHandle?.editor.commands.focus();
       },
-      onLinkMatches: linkFindMatchesToElement,
+      // Find only on a view-only world: no "Link to element" (conv. 149).
+      onLinkMatches: viewOnly ? undefined : linkFindMatchesToElement,
     });
     return findBar;
   }
@@ -331,7 +338,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   function openFind(mode: 'find' | 'replace'): void {
     // The compiled view is a rendering, not the source: find works, replace
     // is hidden (Ctrl+H opens find there), linking writes the subtree.
-    const readOnly = !editorHandle && compiledCountFor !== null;
+    // A view-only world finds and never replaces (conv. 149).
+    const readOnly = viewOnly || (!editorHandle && compiledCountFor !== null);
     ensureFindBar().open(mode, { readOnly, prefill: currentSelectionText() });
   }
   root.addEventListener('keydown', onWorkspaceHotkey);
@@ -420,7 +428,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
   function scheduleSave(snapshot: { markdown: string; json: JSONContent }): void {
     // Address the write NOW, while we still know who it belongs to.
-    if (mountedForId === null) return;
+    // A view-only world never saves: the chip-label sync's transaction lands here too (conv. 149).
+    if (mountedForId === null || viewOnly) return;
     pendingSnapshot = { id: mountedForId, baseline: lastSavedMarkdown, ...snapshot };
     if (pendingSaveTimer !== null) {
       window.clearTimeout(pendingSaveTimer);
@@ -541,6 +550,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * route and the mounted editor are simply not consulted.
    */
   async function persistSnapshot(snap: PendingWrite): Promise<void> {
+    if (viewOnly) return; // the unmount and pagehide captures reach here too (conv. 149)
     const seq = ++saveSeq;
     latestSave.set(snap.id, seq);
     const el = getState().data.elements.find(e => e.id === snap.id) ?? null;
@@ -657,7 +667,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // legacy markdown-only narratives loaded from another OW tool, and any
     // narrative whose relations drifted from the prose. No-op when relations
     // already match. Deferred to a microtask so the editor mounts first.
-    if (typeof el.story === 'string' && el.story.length > 0) {
+    // A view-only world is never healed: its store refuses the write (conv. 149).
+    if (typeof el.story === 'string' && el.story.length > 0 && !worldIsViewOnly()) {
       const initialPatch = computeRelationPatch(el, el.story, linkTargetsIn(getState().data.elements));
       if (Object.keys(initialPatch).length > 0) {
         queueMicrotask(() => {
@@ -714,6 +725,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         initialJson,
         initialMarkdown,
         storyOutranksStaleSidecar: true,
+        editable: !viewOnly,
         autolinkSeed: { elements: getState().data.elements },
         onUpdate: (snap) => {
           scheduleSave({ markdown: snap.markdown, json: snap.json });
@@ -771,8 +783,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       // exist. Click converts every hint in one transaction (one Ctrl+Z
       // undoes the batch). Refreshed on every editor transaction — the
       // autolink plugin's decorations are the candidate truth.
-      editorHandle.editor.on('transaction', refreshLinkAllWidget);
-      refreshLinkAllWidget();
+      // Not on a view-only world: the corner's one action links (conv. 149).
+      if (!viewOnly) {
+        editorHandle.editor.on('transaction', refreshLinkAllWidget);
+        refreshLinkAllWidget();
+      }
 
       // Register the live bulk ops so the tree-level "link mentions in all
       // scenes" routes THIS narrative through the editor (a disk write here

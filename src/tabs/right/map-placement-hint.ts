@@ -16,6 +16,7 @@
 
 import { isNarrow, openDrawer } from '../../layout/narrow-layout';
 import { getState, patchSlice, subscribe } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 
 const BANNER_CLASS = 'atlas-map-placement-hint';
 
@@ -64,7 +65,9 @@ function removeBanners(): void {
 export function installPlacementHintWatcher(): void {
   let lastPlacement: unknown = null;
   subscribe(() => {
-    const placement = getState().ui.pinPlacement;
+    // A view-only world places no pin, so it shows no crosshair or
+    // "Click the map" banner either (conv. 149).
+    const placement = worldIsViewOnly() ? null : getState().ui.pinPlacement;
     if (placement === lastPlacement) return;
     lastPlacement = placement;
     if (placement) {

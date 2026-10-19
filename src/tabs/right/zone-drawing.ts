@@ -21,6 +21,7 @@
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
+import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { snapToAxis, findClosestSegment, simplifyStroke, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
@@ -137,6 +138,9 @@ export function getActiveDraft(): { mode: DrawMode; mapId: string; markerCount: 
  * marker coords anchor to a stable space (DESIGN_MAPS.md §4.2, S300).
  */
 export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: ToastManager): void {
+  // The backstop under every door (toolbar, z and l): a view-only world
+  // starts no draft its finish would be refused (conv. 149).
+  if (worldIsViewOnly()) return;
   ensureKeyListeners();
   cancelDrawing(); // clear any stale draft
 

@@ -26,6 +26,7 @@ import { getLiveEditorOps } from './writing-live-editor-ops';
 import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
 import { serializeDocToMarkdown } from './writing-workspace-markdown';
+// view-only-ok: reached only from the writing tree's menu, which a view-only world does not open (writing-sidebar.ts) (conv. 149).
 
 /**
  * ONE HALF IS THE TRUTH (S365 gate lens A H3). Every Atlas save keeps

@@ -34,6 +34,7 @@ import { syncPins } from './map-tab-pins';
 import { syncZones } from './map-tab-zones';
 import { getActiveStore } from '../../core/active-store';
 import { getState } from '../../core/state';
+import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite } from '../../sync/sync-attach';
 import { flipMapVertically } from '../../core/map-flip';
 import { toastManager } from '../../ui/toast-manager';
@@ -124,7 +125,7 @@ function openVisualSettingsPopover(entry: MapTabCacheEntry, _anchor: HTMLElement
     const liveEntry = openPopover?.entry ?? entry;
     const liveMapId = liveEntry.mapId;
     const prefs = getEffectiveMapPrefs(liveMapId);
-    wrapper.innerHTML = template(prefs, !!getMapOverride(liveMapId));
+    wrapper.innerHTML = visualSettingsTemplate(prefs, !!getMapOverride(liveMapId));
     wireControls(wrapper, liveEntry, render);
   };
 
@@ -186,7 +187,14 @@ function repositionAgainstMidpanel(wrapper: HTMLElement): void {
   wrapper.style.maxHeight = `${Math.round(rect.height - 16)}px`;
 }
 
-function template(prefs: MapViewPrefs, hasOverride: boolean): string {
+/**
+ * The popover's markup (exported as a test seam). Every setting here is a
+ * view pref in localStorage except the flip, which rewrites the map's pins
+ * and markers: a view-only world gets no flip, and no drag lock for pins
+ * that never drag (conv. 149). Read per render, so a retarget re-reads it.
+ */
+export function visualSettingsTemplate(prefs: MapViewPrefs, hasOverride: boolean): string {
+  const viewOnly = worldIsViewOnly();
   return `
     <div class="atlas-popover-header">
       <span class="material-symbols-outlined">tune</span>
@@ -247,12 +255,12 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
         </div>
       </section>
 
-      <section class="atlas-popover-section">
+      ${viewOnly ? '' : `<section class="atlas-popover-section">
         <label class="atlas-popover-toggle-row">
           <input type="checkbox" data-field="lock_pin_drag" ${prefs.lock_pin_drag ? 'checked' : ''} />
           <span>Lock pin dragging</span>
         </label>
-      </section>
+      </section>`}
 
       <section class="atlas-popover-section">
         <div class="atlas-popover-section-divider">Zones</div>
@@ -274,11 +282,11 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
         </div>
       </section>
 
-      <section class="atlas-popover-section">
+      ${viewOnly ? '' : `<section class="atlas-popover-section">
         <div class="atlas-popover-section-divider">Upside down?</div>
         <button type="button" class="atlas-btn-ghost" data-action="flip-map">Flip pins and zones</button>
         <p class="atlas-popover-hint">Maps placed in Atlas before 1.8 can show upside down. This mirrors every pin and zone point on this map top to bottom. Press it again to undo.</p>
-      </section>
+      </section>`}
     </div>
 
     <div class="atlas-popover-footer">
@@ -470,11 +478,13 @@ function applyGrid(entry: MapTabCacheEntry, show: boolean, spacing: number): voi
 }
 
 function applyPinDragLock(entry: MapTabCacheEntry, lock: boolean): void {
+  // Unlocking must not wake a view-only world's pins (conv. 149).
+  const off = lock || worldIsViewOnly();
   const pins = entry.manager.getAllPins();
   for (const p of pins) {
     const dragging = p.marker?.dragging;
     if (!dragging) continue;
-    if (lock) dragging.disable();
+    if (off) dragging.disable();
     else dragging.enable();
   }
 }

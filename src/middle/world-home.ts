@@ -15,6 +15,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { buildLooseThreads } from './home-loose-threads';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { ToastManager } from '../ui/toast-manager';
@@ -303,21 +304,27 @@ function buildCover(
   const identity = document.createElement('div');
   // View-only worlds (S264): the empty-description INVITE is withheld (the
   // write would only toast); an existing description still renders plainly.
-  const viewOnly = !!getState().registry.worlds.find(w => w.id === worldId)?.api?.read_only;
+  // The name and an existing description read plainly there too (conv. 149).
+  const viewOnly = worldIsViewOnly(worldId);
   const descriptionMarkup = meta.description
-    ? `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
+    ? viewOnly
+      ? `<p class="atlas-home-world-description">${escapeText(meta.description)}</p>`
+      : `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
     : viewOnly
       ? ''
       : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">Describe your world…</p>`;
-  identity.innerHTML = `
+  identity.innerHTML = viewOnly ? `
+    <h1 class="atlas-home-world-name">${escapeText(meta.name)}</h1>
+    ${descriptionMarkup}
+  ` : `
     <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Click to rename (here only; the online name is in Settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   `;
   cover.appendChild(identity);
 
-  const nameEl = identity.querySelector<HTMLElement>('[data-edit="name"]')!;
+  const nameEl = identity.querySelector<HTMLElement>('[data-edit="name"]');
   const descEl = identity.querySelector<HTMLElement>('[data-edit="description"]');
-  nameEl.addEventListener('click', () => openIdentityEdit('name', meta.name, nameEl, toasts));
+  if (nameEl) nameEl.addEventListener('click', () => openIdentityEdit('name', meta.name, nameEl, toasts));
   descEl?.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
 
   // (The old quick text-links — new element / open writing / import — were

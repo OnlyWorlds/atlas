@@ -15,6 +15,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/constants.ts`: storage keys, folder layout, `ATLAS_WIRE_EXTENSION_FIELDS` (sent) + `ATLAS_LOCAL_ONLY_FIELDS` (stripped) + `SERVER_AUTHOR_FIELDS` (who wrote it: kept, never sent, never a change; 1.47.1); see ATLAS_FIELDS.md.
 - `src/core/agent-mark.ts`: `agentMarkFor`, the quiet agent mark's rule (#347, conv. 144): keel's door of the last write through the SDK's `isAgentDoor`, a seat named from the roster.
 - `src/core/state.ts`: the observable store.
+- `src/core/view-only.ts`: `worldIsViewOnly`, the one read of a view-only world (conv. 149); `tests/unit/view-only-ratchet.test.ts` keeps every UI writer asking it.
 - `src/core/router.ts`: hash router, `settingsHash(world, tab)` deep-link helpers. The route table is DESIGN_SHELL "Routes".
 - `src/core/map-view-prefs.ts`: per-map visual prefs (grid, pin style/labels/tint, zone opacity/labels; 'auto' = the density layer, S356).
 - `src/core/world-styles.ts`: WORLD STYLES (S356): rules per kind (type + supertype/subtype) to colour/fill/weight/dash/label priority; `.atlas/styles.json` via `src/core/world-styles-state.ts` + `FolderStore.readStyles/writeStyles`; DESIGN_ZONES §5b.

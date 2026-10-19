@@ -31,6 +31,7 @@
  */
 
 import { isZoneGestureActive } from './zone-gesture';
+import { worldIsViewOnly } from './view-only';
 
 export interface HotkeyBinding {
   /** Stable identifier for tests + the reference modal. */
@@ -339,9 +340,10 @@ export function defaultBindings(): HotkeyBinding[] {
       modifier: 'mod+shift',
       // INTENTIONALLY allowed in text input — the writer's selection is
       // in the prose surface; we want this to fire while they're typing.
+      // Unbound on a view-only world: it creates an element (conv. 149).
       when: () => {
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        return hash.includes('/writing/');
+        return hash.includes('/writing/') && !worldIsViewOnly();
       },
       action: () => { dispatchWritingInlineCreate(); },
     },
@@ -352,10 +354,10 @@ export function defaultBindings(): HotkeyBinding[] {
       key: 'd',
       modifier: 'mod+shift',
       // INTENTIONALLY allowed in text input — the writer's cursor IS in
-      // the editor when invoking.
+      // the editor when invoking. Unbound on a view-only world (conv. 149).
       when: () => {
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        return hash.includes('/writing/');
+        return hash.includes('/writing/') && !worldIsViewOnly();
       },
       action: () => { dispatchWritingSplit(); },
     },

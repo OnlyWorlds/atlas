@@ -24,6 +24,7 @@
  */
 
 import { getState } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { escapeText } from '../core/dom-utils';
 import { aboutFieldFor } from '../core/knowledge';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
@@ -70,6 +71,9 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
 
   const chipPreview: ChipPreviewController = createChipPreview(roomRoot);
   let collectiveMentionToasted = false;
+  // A view-only world reads the entry: prose read-only, no right-click
+  // writes, no link-all corner (conv. 149). The room remounts per world.
+  const viewOnly = worldIsViewOnly();
 
   const editorHandle: WorkspaceEditorHandle = mountWorkspaceEditor({
     target: host,
@@ -78,6 +82,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
     // Drafts are Atlas's own two halves; a saved entry's `story` can have
     // changed outside (S365).
     storyOutranksStaleSidecar: opts.getEntry() !== null,
+    editable: !viewOnly,
     autolinkSeed: { elements: getState().data.elements },
     onUpdate: (snap) => {
       opts.onSnapshot({ markdown: snap.markdown, json: snap.json });
@@ -156,6 +161,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
    * only via the Held-by editor, never as a side effect of prose edits).
    */
   async function unlinkChip(chip: { id: string; label: string; from: number; to: number }): Promise<void> {
+    if (viewOnly) return; // the menu never opens there (conv. 149)
     const editor = editorHandle.editor;
     editor
       .chain()
@@ -309,7 +315,8 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
       document.addEventListener('keydown', onMenuKey, true);
     });
   };
-  roomRoot.addEventListener('contextmenu', onContextMenu);
+  // Every item writes; a view-only world keeps the browser's menu (conv. 149).
+  if (!viewOnly) roomRoot.addEventListener('contextmenu', onContextMenu);
 
   // ---- handle -----------------------------------------------------------------
 
@@ -328,8 +335,9 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
     getView: () => editorHandle.editor.view,
     toasts,
   });
-  editorHandle.editor.on('transaction', () => linkAllCorner.refresh());
-  linkAllCorner.refresh();
+  const refreshCorner = (): void => { if (!viewOnly) linkAllCorner.refresh(); };
+  editorHandle.editor.on('transaction', refreshCorner);
+  refreshCorner();
 
   return {
     refresh(elements: Element[]): void {
@@ -341,7 +349,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
       applySpellcheck(editorHandle);
       // A rebuilt autolink index changes the hint count, so the badge has to
       // recount here as well as on transactions.
-      linkAllCorner.refresh();
+      refreshCorner();
     },
     getMarkdown: () => editorHandle.getMarkdown(),
     getJson: () => editorHandle.getJson(),

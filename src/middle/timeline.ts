@@ -11,6 +11,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { navigate, elementHash, timelineHash, parseHash, onHashChange, type Route } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -102,7 +103,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       },
     });
   });
-  actions.appendChild(newEventBtn);
+  // A view-only world adds nothing and saves no chart (conv. 149); the room
+  // remounts per world (conv. 109), so this read holds for its life.
+  const viewOnly = worldIsViewOnly();
+  if (!viewOnly) actions.appendChild(newEventBtn);
 
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
@@ -111,7 +115,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   saveBtn.title = 'Save the current view as a chart you can reopen or share';
   saveBtn.innerHTML = `<span class="material-symbols-outlined">bookmark_add</span> Save chart`;
   saveBtn.addEventListener('click', () => void saveCurrentChart());
-  actions.appendChild(saveBtn);
+  if (!viewOnly) actions.appendChild(saveBtn);
 
   // Saved-chart gallery — rides the actions row (right of the buttons) so a
   // first save never reflows the layout below (S264, Captain: the appearing
@@ -302,7 +306,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const now = nowValue();
     const nowWrap = document.createElement('div');
     nowWrap.className = 'atlas-chart-now';
-    if (now == null) {
+    if (now == null && viewOnly) {
+      // Nothing to set on a view-only world (conv. 149).
+    } else if (now == null) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-chart-now-set';
@@ -317,16 +323,16 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     } else {
       const chip = document.createElement('span');
       chip.className = 'atlas-chart-now-chip';
-      chip.title = "The world's now. Drag the line on the chart to move it";
+      chip.title = viewOnly ? "The world's now" : "The world's now. Drag the line on the chart to move it";
       // The now speaks the active lens (2B): "454 AE" instead of "454".
       const lensForNow = activeLens();
       const nowLabel = lensForNow ? formatStep(lensForNow.config, Math.round(now)) : String(now);
       chip.innerHTML =
         `<span class="material-symbols-outlined">schedule</span>` +
         `<span>${escapeText(nowLabel)}</span>` +
-        `<button type="button" class="atlas-chart-now-clear" title="Clear now (remove the seam)">×</button>`;
-      chip.querySelector('.atlas-chart-now-clear')!
-        .addEventListener('click', () => void setNow(null));
+        (viewOnly ? '' : `<button type="button" class="atlas-chart-now-clear" title="Clear now (remove the seam)">×</button>`);
+      chip.querySelector('.atlas-chart-now-clear')
+        ?.addEventListener('click', () => void setNow(null));
       nowWrap.appendChild(chip);
     }
     // Appended into the right stack below — mode toggle above, now below
@@ -920,11 +926,13 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       nameBtn.addEventListener('click', () => applyChart(chart));
       card.appendChild(nameBtn);
 
-      const acts = document.createElement('div');
-      acts.className = 'atlas-saved-chart-actions';
-      acts.appendChild(galleryActionBtn('edit', 'Rename chart', () => startRename(card, chart)));
-      acts.appendChild(galleryActionBtn('close', 'Delete chart', () => void deleteChart(chart)));
-      card.appendChild(acts);
+      if (!viewOnly) {
+        const acts = document.createElement('div');
+        acts.className = 'atlas-saved-chart-actions';
+        acts.appendChild(galleryActionBtn('edit', 'Rename chart', () => startRename(card, chart)));
+        acts.appendChild(galleryActionBtn('close', 'Delete chart', () => void deleteChart(chart)));
+        card.appendChild(acts);
+      }
 
       gallery.appendChild(card);
     }
@@ -988,9 +996,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         onFocus: (id) => { const w = worldId(); if (w) navigate(timelineHash(w, id)); },
         onOpenElement: (id) => { const w = worldId(); if (w) navigate(elementHash(w, id)); },
         // The now-line was dragged/established → persist to World.time_current.
-        onSetNow: (value) => void setNow(value),
-        // A rail element was dragged onto the axis and dropped at `date`.
-        onDateElement: (id, date, edge) => void dateElement(id, date, edge),
+        // A view-only world passes neither, so nothing on the chart drags to a write (conv. 149).
+        ...(viewOnly ? {} : {
+          onSetNow: (value: number | null) => void setNow(value),
+          // A rail element was dragged onto the axis and dropped at `date`.
+          onDateElement: (id: string, date: number, edge?: 'start' | 'end') => void dateElement(id, date, edge),
+        }),
       });
     }
 

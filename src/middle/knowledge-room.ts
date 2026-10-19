@@ -27,6 +27,7 @@ import { getState, subscribe, patchSlice } from '../core/state';
 import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, shareHash, parseHash, onHashChange } from '../core/router';
 import { PAGE_SUBTYPE, blocksOf, listPages, newBlockId, pageBlocksPatch, type PageBlock } from '../core/sharing';
 import { getActiveStore } from '../core/active-store';
+import { worldIsViewOnly } from '../core/view-only';
 import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { completeWaypoint } from '../core/waypoints';
@@ -194,6 +195,10 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   // rebuild when nothing in the data actually changed (hash-echo renders,
   // ui-slice patches), so scroll position survives idle ticks.
   let lastBuiltElementsRef: readonly Element[] | null = null;
+  // A view-only world reads its knowledge and offers no write: no new entry
+  // or circle, no rename, no holder or subject edits, prose read-only, no
+  // delete, no page (conv. 149). Rooms remount per world, so one read holds.
+  const viewOnly = worldIsViewOnly();
 
   // ---- prose editor session (K3) --------------------------------------------
   let editorMount: KnowledgeEditorHandle | null = null;
@@ -224,7 +229,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   /** True when the write landed (the prose save advances its baseline on it). */
   async function patchEntry(id: string, patch: Record<string, unknown>): Promise<boolean> {
     const folder = getActiveStore();
-    if (!folder) return false;
+    if (!folder || viewOnly) return false;
     try {
       await folder.updateElement(id, patch as Partial<Element>);
       await refreshElementsAfterWrite(folder);
@@ -246,6 +251,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   }
 
   function scheduleEditorSave(snap: { markdown: string; json: JSONContent }): void {
+    // The chip-label sync's transaction lands here too; nothing saves (conv. 149).
+    if (viewOnly) return;
     pendingSnapshot = snap;
     if (pendingSaveTimer !== null) window.clearTimeout(pendingSaveTimer);
     pendingSaveTimer = window.setTimeout(() => {
@@ -286,7 +293,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   async function deleteEntry(id: string): Promise<void> {
     const folder = getActiveStore();
     const worldId = wid();
-    if (!folder || !worldId) return;
+    if (!folder || !worldId || viewOnly) return;
     const el = elOf(id);
     if (getEditorSettings(getState().registry).confirm_before_delete) {
       let dependentCount = 0;
@@ -321,7 +328,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
    */
   async function persistEditorSnapshot(snap: { markdown: string; json: JSONContent }): Promise<void> {
     const entryId = editorForId;
-    if (!entryId || entryId === NEW) return;
+    if (!entryId || entryId === NEW || viewOnly) return;
     if (lastSavedMarkdown !== null && snap.markdown === lastSavedMarkdown) return;
     const el = elOf(entryId);
     if (!el) return;
@@ -418,7 +425,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   async function createFromDraft(): Promise<void> {
     const worldId = wid();
     const folder = getActiveStore();
-    if (!worldId || !folder || !draft) return;
+    if (!worldId || !folder || !draft || viewOnly) return;
     const data: Record<string, unknown> = {
       name: (draft.name || '').trim() || 'Unnamed knowledge',
       subtype: KNOWLEDGE_SUBTYPE,
@@ -494,6 +501,14 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     return chip;
   }
 
+  /** A quiet line in a chips band, for a view-only world's empty zone. */
+  function noneLine(text: string): HTMLElement {
+    const none = document.createElement('span');
+    none.className = 'atlas-knowledge-none';
+    none.textContent = text;
+    return none;
+  }
+
   function addAffordance(label: string, title: string, onClick: () => void): HTMLButtonElement {
     const add = document.createElement('button');
     add.type = 'button';
@@ -514,8 +529,14 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const held = ctx.heldBy();
     const chips = document.createElement('div');
     chips.className = 'atlas-knowledge-chips';
-    if (held.narrator) chips.appendChild(elementChip(held.narrator, () => ctx.setNarrator(null)));
-    for (const id of held.collectives) chips.appendChild(elementChip(id, () => ctx.removeCircle(id)));
+    // A view-only world shows the holders, without remove or add (conv. 149).
+    if (held.narrator) chips.appendChild(elementChip(held.narrator, viewOnly ? undefined : () => ctx.setNarrator(null)));
+    for (const id of held.collectives) chips.appendChild(elementChip(id, viewOnly ? undefined : () => ctx.removeCircle(id)));
+    if (viewOnly) {
+      if (!held.narrator && held.collectives.length === 0) chips.appendChild(noneLine('No one holds this yet.'));
+      container.appendChild(chips);
+      return;
+    }
     if (!held.narrator) {
       chips.appendChild(addAffordance('+ Character', 'One character who holds this knowledge', async () => {
         const p = await pickElement({ restrictToType: 'character', title: 'Who knows this?' });
@@ -557,12 +578,18 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const ids = ctx.aboutIds();
     const chips = document.createElement('div');
     chips.className = 'atlas-knowledge-chips';
-    for (const id of ids) chips.appendChild(elementChip(id, () => ctx.removeAbout(id)));
+    for (const id of ids) chips.appendChild(elementChip(id, viewOnly ? undefined : () => ctx.removeAbout(id)));
     if (derivedExtra) {
       for (const id of derivedExtra) {
         if (ids.includes(id)) continue;
         chips.appendChild(elementChip(id, undefined, true));
       }
+    }
+    // A view-only world lists the subjects, with no add or remove (conv. 149).
+    if (viewOnly) {
+      if (ids.length === 0) chips.appendChild(noneLine('No subjects.'));
+      container.appendChild(chips);
+      return;
     }
     const add = document.createElement('button');
     add.type = 'button';
@@ -710,7 +737,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         newBtn.title = 'Create a new knowledge entry';
         newBtn.textContent = '+ New knowledge entry';
         newBtn.addEventListener('click', () => navigate(knowledgeHash(worldId, NEW)));
-        actionSlot.appendChild(newBtn);
+        // No "New" actions on a view-only world (conv. 149); "Open known world" reads.
+        if (!viewOnly) actionSlot.appendChild(newBtn);
         buildEntriesList(worldId, listContainer);
       } else {
         const viewAs = document.createElement('button');
@@ -728,7 +756,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         newCircle.title = 'Create a circle (a collective acting as a knower-group)';
         newCircle.textContent = '+ New circle';
         newCircle.addEventListener('click', () => openNewCircle());
-        actionSlot.append(viewAs, newCircle);
+        actionSlot.append(viewAs);
+        if (!viewOnly) actionSlot.append(newCircle);
         buildKnowersList(worldId, listContainer);
       }
     };
@@ -744,6 +773,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (entries.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'atlas-knowledge-empty';
+      if (viewOnly) {
+        empty.innerHTML = '<p class="atlas-knowledge-empty-title">No knowledge entries in this world.</p>';
+        container.appendChild(empty);
+        return;
+      }
       empty.innerHTML = `
         <p class="atlas-knowledge-empty-title">No knowledge entries yet.</p>
         <p class="atlas-knowledge-hint">
@@ -797,6 +831,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (knowers.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'atlas-knowledge-empty';
+      if (viewOnly) {
+        empty.innerHTML = '<p class="atlas-knowledge-empty-title">No knowers in this world.</p>';
+        container.appendChild(empty);
+        return;
+      }
       empty.innerHTML = `
         <p class="atlas-knowledge-empty-title">No knowers yet.</p>
         <p class="atlas-knowledge-hint">
@@ -877,6 +916,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       initial: knower.name || '',
       placeholder: '(unnamed)',
       ariaLabel: 'Knower name',
+      readOnly: viewOnly,
       onCommit: (next) => {
         const current = elOf(knowerId)?.name || '';
         if (next && next !== current) void patchEntry(knowerId, { name: next });
@@ -959,7 +999,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         }
       })();
     });
-    header.appendChild(makePage);
+    // Not on a view-only world: it creates a page (conv. 149).
+    if (!viewOnly) header.appendChild(makePage);
 
     const openEl = document.createElement('button');
     openEl.type = 'button';
@@ -982,7 +1023,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (held.length === 0) {
       const none = document.createElement('p');
       none.className = 'atlas-knowledge-none';
-      none.textContent = 'Holds no knowledge yet. Assign it in an entry\'s "Who knows this".';
+      none.textContent = viewOnly
+        ? 'Holds no knowledge yet.'
+        : 'Holds no knowledge yet. Assign it in an entry\'s "Who knows this".';
       heldSection.appendChild(none);
     } else {
       const list = document.createElement('div');
@@ -1016,7 +1059,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       none.className = 'atlas-knowledge-none';
       none.textContent = held.length === 0
         ? 'Nothing known yet.'
-        : 'Held entries have no subjects yet. Mention elements in their text, or add subjects.';
+        : viewOnly
+          ? 'Held entries have no subjects yet.'
+          : 'Held entries have no subjects yet. Mention elements in their text, or add subjects.';
       knownSection.appendChild(none);
     } else {
       const known = knownIds
@@ -1163,6 +1208,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       initial: isDraft ? draft!.name : (entry!.name || ''),
       placeholder: 'What is known…',
       ariaLabel: 'Knowledge entry name',
+      readOnly: viewOnly,
       onCommit: (next) => {
         if (isDraft) { draft!.name = next; persistDraft(); }
         else {
@@ -1192,7 +1238,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       del.title = 'Delete this knowledge entry';
       del.innerHTML = `<span class="material-symbols-outlined">delete</span>`;
       del.addEventListener('click', () => { void deleteEntry(entry!.id); });
-      header.appendChild(del);
+      // Not on a view-only world (conv. 149).
+      if (!viewOnly) header.appendChild(del);
     }
     root.appendChild(header);
 
@@ -1221,8 +1268,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     // WHAT — the text, dominant. The embedded writing editor (K3), lazy-loaded.
     const proseSection = document.createElement('section');
     proseSection.className = 'atlas-knowledge-section atlas-knowledge-zone-what';
-    proseSection.innerHTML = `<h2 class="atlas-knowledge-section-title">What they know</h2>
-      <p class="atlas-knowledge-section-hint">Type @ to mention an element.</p>`;
+    proseSection.innerHTML = `<h2 class="atlas-knowledge-section-title">What they know</h2>${viewOnly ? '' : `
+      <p class="atlas-knowledge-section-hint">Type @ to mention an element.</p>`}`;
     const proseHost = document.createElement('div');
     // Reuses the writing prose CSS (typography, chips, autolink hints) — the
     // writing-room :has() chrome rules key off .atlas-writing-workspace, which
@@ -1384,7 +1431,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const route = parseHash(window.location.hash);
     const kid = route.mode === 'knowledge' ? route.knowledgeId : undefined;
     const knowerId = route.mode === 'knowledge' ? route.knowerId : undefined;
-    const tgt = knowerId ? `knower:${knowerId}` : (!kid ? 'list' : kid);
+    // A view-only world has no draft: a link to the new-entry route shows the list (conv. 149).
+    const tgt = knowerId ? `knower:${knowerId}` : (!kid || (kid === NEW && viewOnly) ? 'list' : kid);
 
     if (tgt === mountedView) {
       if (!mountedResolved) {

@@ -10,6 +10,7 @@
 import type { FolderStore } from '../store/folder-store';
 import type { CanvasDims } from '../core/map-spatial-scale';
 import { scaleSpatialPatches, spatialElementsOnMap } from '../core/map-spatial-scale';
+// view-only-ok: reached only from an image_url edit, which a view-only world's page does not offer (conv. 149).
 
 /** Count of pins + markers on the map — for confirm/toast copy. */
 export async function countSpatialOnMap(store: FolderStore, mapId: string): Promise<{ pins: number; markers: number }> {

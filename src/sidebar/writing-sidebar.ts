@@ -10,6 +10,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
 import { completeWaypoint } from '../core/waypoints';
 import { ToastManager } from '../ui/toast-manager';
@@ -102,7 +103,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     targetId: string,
     insertAbove: boolean,
   ): Promise<void> {
-    if (draggedId === targetId) return;
+    if (draggedId === targetId || viewOnly) return;
     const folder = getActiveStore();
     if (!folder) return;
     const els = getState().data.elements;
@@ -174,6 +175,9 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
   // press and its release loses the click. The parts are the slices the tree
   // reads, the route (the open narrative) and its own search box.
   const gate = renderGate();
+  // Read at each render (the registry is a gate input): a view-only world's
+  // tree navigates and folds, and offers no create, reorder, link or delete (conv. 149).
+  let viewOnly = false;
 
   function render(): void {
     const s = getState();
@@ -184,6 +188,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       return;
     }
     subtreeLinkMemo = new Map();
+    viewOnly = worldIsViewOnly(active.worldId);
     const labels = getWritingLabels(active.worldId);
     const elements = getState().data.elements;
     const idx = buildNarrativeIndex(elements, active.worldId);
@@ -260,7 +265,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     // tier — existing ones render and behave — they're just no longer pushed.
     // Chapters and scenes create from their PARENT row's hover "+" instead.
 
-    root.appendChild(createRow);
+    if (!viewOnly) root.appendChild(createRow);
 
     // Band 2 — search row (mirrors the elements sidebar's search row exactly).
     // [input] [magnifier opens search room] [tune opens writing settings].
@@ -335,7 +340,9 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     if (idx.roots.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'atlas-pane-empty atlas-writing-sidebar-empty';
-      empty.textContent = `No ${labels.l1.toLowerCase()}s yet. Use the button above to create one.`;
+      empty.textContent = viewOnly
+        ? `No ${labels.l1.toLowerCase()}s in this world.`
+        : `No ${labels.l1.toLowerCase()}s yet. Use the button above to create one.`;
       list.appendChild(empty);
     } else {
       // Render only nodes that match the filter (when active) or all of them.
@@ -419,7 +426,8 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     // Drag-and-drop for sibling reorder (session 224). Each row is draggable;
     // dragover/drop on a sibling row inserts above or below based on mouse y.
     // Same parent_narrative only — re-parenting deferred.
-    row.draggable = true;
+    // Not on a view-only world: no drag starts, so no drop reorders (conv. 149).
+    row.draggable = !viewOnly;
     const myParent = (node.el as Element & { parent_narrative?: string }).parent_narrative ?? null;
 
     row.addEventListener('dragstart', (e) => {
@@ -526,7 +534,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     // makes a chapter, a chapter row a scene. The container question answers
     // itself: it's the row you clicked. Scenes and drafts get no button.
     const childTier = node.tier === 'l1' ? 'l2' as const : node.tier === 'l2' ? 'l3' as const : null;
-    if (childTier) {
+    if (childTier && !viewOnly) {
       const childLabel = labels[childTier];
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
@@ -556,7 +564,8 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     }
 
     // Right-click → bulk link/unlink over this node + descendants (S265).
-    row.addEventListener('contextmenu', (e) => {
+    // Every item writes; a view-only world keeps the browser's menu (conv. 149).
+    if (!viewOnly) row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       openTreeContextMenu(e, node, tierLabel, toasts);
     });

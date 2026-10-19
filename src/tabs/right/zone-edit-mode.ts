@@ -32,6 +32,7 @@
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
+import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { polygonCentroid, polylineLabelAnchor, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
@@ -322,6 +323,10 @@ export function enterEditMode(
   mapId: string,
   toasts: ToastManager,
 ): void {
+  // The backstop under every door (the canvas double-click, the zone page's
+  // Edit shape): a view-only world opens no edit whose every drag the store
+  // would refuse (conv. 149).
+  if (worldIsViewOnly()) return;
   ensureEscListener();
   if (active && active.zoneId === zoneId && active.mapId === mapId) return;
   if (active) exitEditMode('commit');

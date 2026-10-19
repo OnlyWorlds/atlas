@@ -1786,6 +1786,12 @@ html {
   background: rgba(var(--atlas-ink-rgb), 0.03);
 }
 
+/* A view-only world reads (conv. 149): its rows are not doors. */
+.atlas-field-readonly .atlas-field-value,
+.atlas-field-readonly .atlas-aliases-display { cursor: auto; }
+.atlas-field-readonly .atlas-field-value:hover,
+.atlas-field-readonly .atlas-aliases-display:hover { background: none; }
+
 .atlas-field-value.empty {
   color: var(--atlas-text-dim);
   font-style: normal;

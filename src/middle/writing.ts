@@ -15,6 +15,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { onHashChange, parseHash, navigate, writingHash, settingsHash } from '../core/router';
 import { completeWaypoint } from '../core/waypoints';
 import { ToastManager } from '../ui/toast-manager';
@@ -164,6 +165,8 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
     const labels = getWritingLabels(active.worldId);
     const elements = getState().data.elements;
     const idx = buildNarrativeIndex(elements, active.worldId);
+    // A view-only world reads its stories: no create, no label edit (conv. 149).
+    const viewOnly = worldIsViewOnly(active.worldId);
     const route = parseHash(window.location.hash);
     const activeId = route.narrativeId ?? null;
     const activeNode = activeId ? idx.byId.get(activeId) : null;
@@ -185,8 +188,8 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       roomHeader.className = 'atlas-room-header';
       roomHeader.innerHTML = `
         <h1>Writing</h1>
-        <p class="atlas-room-subtitle">Write your world's stories.</p>
-        <p class="atlas-writing-landing-labels">labels: ${escapeText(labels.l1)} › ${escapeText(labels.l2)} › ${escapeText(labels.l3)} · <a class="atlas-writing-landing-labels-edit" href="${escapeText(settingsHash(active.worldId, 'writing'))}">edit</a></p>
+        <p class="atlas-room-subtitle">${viewOnly ? "Read this world's stories." : "Write your world's stories."}</p>
+        <p class="atlas-writing-landing-labels">labels: ${escapeText(labels.l1)} › ${escapeText(labels.l2)} › ${escapeText(labels.l3)}${viewOnly ? '' : ` · <a class="atlas-writing-landing-labels-edit" href="${escapeText(settingsHash(active.worldId, 'writing'))}">edit</a>`}</p>
       `;
       detailSlot.appendChild(roomHeader);
 
@@ -198,6 +201,10 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
             Pick a ${escapeText(labels.l1.toLowerCase())}, ${escapeText(labels.l2.toLowerCase())},
             ${escapeText(labels.l3.toLowerCase())}, or ${escapeText(labels.l4.toLowerCase())} from the sidebar to begin.
           </p>
+        `;
+      } else if (viewOnly) {
+        empty.innerHTML = `
+          <p class="atlas-writing-editor-empty-headline">No ${escapeText(pluralize(labels.l1.toLowerCase()))} in this world.</p>
         `;
       } else {
         empty.innerHTML = `

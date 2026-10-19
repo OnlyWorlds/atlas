@@ -6,6 +6,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { diskApiBlock, isSeatWorld, SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE, seatRoleWords, worldPin } from '../core/seat';
 import {
   saveRegistry,
@@ -54,14 +55,15 @@ const UNIT_ROWS: Readonly<Record<WorldUnitField, { label: string; placeholder: s
   distance_unit: { label: 'Distance', placeholder: 'km, mi, leagues', toast: 'Distance unit' },
 };
 
-function renderUnitFields(): string {
+function renderUnitFields(viewOnly: boolean): string {
   const meta = (getState().active?.meta ?? {}) as Partial<Record<WorldUnitField, string>>;
+  // A view-only world shows its units with nothing to change (conv. 149).
   const cells = WORLD_UNIT_FIELDS.map((f) => `
           <label class="atlas-settings-unit">
             <span>${UNIT_ROWS[f].label}</span>
             <input class="atlas-input" type="text" name="world-${f.replace('_', '-')}" data-unit-field="${f}"
               maxlength="${WORLD_UNIT_MAX_LENGTH}" autocomplete="off"
-              value="${escapeAttr(meta[f] ?? '')}" placeholder="${escapeAttr(UNIT_ROWS[f].placeholder)}" />
+              value="${escapeAttr(meta[f] ?? '')}"${viewOnly ? ' disabled' : ` placeholder="${escapeAttr(UNIT_ROWS[f].placeholder)}"`} />
           </label>`).join('');
   return `
       <div class="atlas-settings-field" data-role="world-units">
@@ -194,9 +196,9 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <span>Image URL</span>
         <input class="atlas-input" type="text" name="world-image-url"
           value="${escapeAttr(((getState().active?.meta ?? {}) as { image_url?: string }).image_url ?? '')}"
-          placeholder="https://… (the world's cover image)" />
+          ${worldIsViewOnly(world.id) ? 'disabled' : `placeholder="https://… (the world's cover image)"`} />
       </label>
-      ${renderUnitFields()}
+      ${renderUnitFields(worldIsViewOnly(world.id))}
       <dl class="atlas-settings-meta">
         <dt>State</dt><dd>${stateLabel}</dd>
         ${inBrowser
@@ -418,7 +420,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         saveRegistry(next);
         patchSlice('registry', next);
         const folder = getActiveStore();
-        if (folder) {
+        // A view-only world's store refuses the write (conv. 149); the registry holds the name.
+        if (folder && !worldIsViewOnly(world.id)) {
           try {
             await folder.writeWorldMeta({
               api: diskApiBlock(world.api, { world_name: liveName }),

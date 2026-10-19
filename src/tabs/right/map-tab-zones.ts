@@ -29,6 +29,7 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-
 import type { ToastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
 import { mapZoneDate, updateDateBar, zoneShownOnMap } from './map-date-bar';
+// view-only-ok: reached only from the zone panel's Write into zones and the chip menu, both closed on a view-only world (map-zone-panel.ts) (conv. 149).
 
 /**
  * Sync the ZoneOverlay to the current state. Adds new zones, updates changed

@@ -9,6 +9,7 @@ import { saveRegistry, updateWorldEntry } from '../registry/registry';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 import { escapeAttr } from '../core/dom-utils';
+import { worldIsViewOnly } from '../core/view-only';
 
 export function renderWritingTab(entry: WorldRegistryEntry): string {
   const labels = {
@@ -17,6 +18,9 @@ export function renderWritingTab(entry: WorldRegistryEntry): string {
     l3: entry.writing_labels?.l3 ?? 'Scene',
     l4: entry.writing_labels?.l4 ?? 'Draft',
   };
+  // A rename rewrites narratives; a view-only world shows the labels, locked (conv. 149).
+  const viewOnly = worldIsViewOnly(entry.id);
+  const lock = viewOnly ? ' disabled' : '';
   return `
     <section class="atlas-settings-section">
       <h3>Writing</h3>
@@ -26,21 +30,22 @@ export function renderWritingTab(entry: WorldRegistryEntry): string {
         rewrites existing narratives' supertype so display and storage stay
         consistent.
       </p>
+      ${viewOnly ? '<p class="atlas-settings-hint" data-role="writing-labels-view-only">This world is view-only, so its labels cannot be renamed here.</p>' : ''}
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Level 1 (top)</label>
-        <input class="atlas-input" data-setting="writing_l1" value="${escapeAttr(labels.l1)}" placeholder="Book" />
+        <input class="atlas-input" data-setting="writing_l1" value="${escapeAttr(labels.l1)}" placeholder="Book"${lock} />
       </div>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Level 2 (middle)</label>
-        <input class="atlas-input" data-setting="writing_l2" value="${escapeAttr(labels.l2)}" placeholder="Chapter" />
+        <input class="atlas-input" data-setting="writing_l2" value="${escapeAttr(labels.l2)}" placeholder="Chapter"${lock} />
       </div>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Level 3 (deepest)</label>
-        <input class="atlas-input" data-setting="writing_l3" value="${escapeAttr(labels.l3)}" placeholder="Scene" />
+        <input class="atlas-input" data-setting="writing_l3" value="${escapeAttr(labels.l3)}" placeholder="Scene"${lock} />
       </div>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Level 4 (flexible / draft)</label>
-        <input class="atlas-input" data-setting="writing_l4" value="${escapeAttr(labels.l4)}" placeholder="Draft" />
+        <input class="atlas-input" data-setting="writing_l4" value="${escapeAttr(labels.l4)}" placeholder="Draft"${lock} />
       </div>
       <p class="atlas-settings-hint">
         Examples: Story / Substory / Scene / Note · Volume / Book / Chapter / Sketch.
@@ -80,7 +85,7 @@ export function renderWritingTab(entry: WorldRegistryEntry): string {
 export function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager): void {
   const save = async (key: 'l1' | 'l2' | 'l3' | 'l4', value: string): Promise<void> => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || worldIsViewOnly(entry.id)) return;
     const reg = getState().registry;
     const idx = reg.worlds.findIndex(w => w.id === entry.id);
     if (idx < 0) return;

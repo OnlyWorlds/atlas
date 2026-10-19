@@ -20,6 +20,7 @@
 import type { Editor } from '@tiptap/core';
 import type { Element } from '../core/types';
 import { getState } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
@@ -37,6 +38,8 @@ export async function handleAddToCast(
   editor: Editor | null,
 ): Promise<void> {
   if (!detail || typeof detail.id !== 'string' || typeof detail.type !== 'string') return;
+  // The preview offers no "Add to story" on a view-only world; nor does this (conv. 149).
+  if (worldIsViewOnly()) return;
   if (!editor) {
     toastManager.info('Open the writing room first');
     return;

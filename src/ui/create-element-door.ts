@@ -19,6 +19,7 @@
 
 import { getActiveStore } from '../core/active-store';
 import { getState } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { ElementCreateModal, type ElementCreateOptions } from './element-create-modal';
 import type { ToastManager } from './toast-manager';
@@ -33,6 +34,11 @@ import type { ToastManager } from './toast-manager';
  * a world-blind hijack produces when the user has switched to their own world.
  */
 export function openCreateDoor(toasts: ToastManager, opts: ElementCreateOptions = {}): void {
+  // A view-only world shows no + (conv. 149); a hotkey that reaches here says why once.
+  if (worldIsViewOnly()) {
+    toasts.info('This world is view-only, so nothing can be added here.');
+    return;
+  }
   if (!isTourFlagActive()) {
     new ElementCreateModal(toasts, opts).open();
     return;

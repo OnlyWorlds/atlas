@@ -26,6 +26,7 @@ import { readImageDimsFromFile, readImageDimsFromUrl, IMAGELESS_MAP_SIZE, smallM
 import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
 import { escapeText, escapeAttr } from '../core/dom-utils';
+// view-only-ok: opened only from +map and New map, both closed on a view-only world (conv. 149).
 
 export interface MapCreateResult {
   map: WorldMap;

@@ -2510,7 +2510,8 @@ function handleMouseDown(
 
   // Now-line grab (Act 1) — after the strip, before pan. A dot under the cursor
   // wins (it's the more common intent, and a dot can sit right on the seam).
-  if (nearNowLine(state, mx, my, rect.width, rect.height, touch ? TOUCH_NOW_GRAB_PX : NOW_GRAB_PX) && !hitDot) {
+  // No onSetNow (a view-only world, conv. 149): the line is not grabbed, so the drag pans.
+  if (state.onSetNow && nearNowLine(state, mx, my, rect.width, rect.height, touch ? TOUCH_NOW_GRAB_PX : NOW_GRAB_PX) && !hitDot) {
     state.nowDrag = true;
     state.nowBefore = state.now;
     return;

@@ -27,13 +27,17 @@ export function makeEditableTitle(opts: {
   ariaLabel?: string;
   /** Start directly in edit mode (e.g. a brand-new draft). */
   autoEdit?: boolean;
+  /** Show the name only, never an input: a view-only world (conv. 149). */
+  readOnly?: boolean;
   /** Fired on Enter/blur when the trimmed value changed from the last value. */
   onCommit: (next: string) => void;
 }): EditableTitleHandle {
   const host = document.createElement('h2');
   host.className = 'atlas-element-name';
-  host.tabIndex = 0;
-  host.title = 'Click to rename';
+  if (!opts.readOnly) {
+    host.tabIndex = 0;
+    host.title = 'Click to rename';
+  }
 
   let current = opts.initial;
 
@@ -52,6 +56,7 @@ export function makeEditableTitle(opts: {
   }
 
   function startEdit(): void {
+    if (opts.readOnly) return;
     if (host.querySelector('input')) return; // already editing
     const original = current;
     const input = document.createElement('input');

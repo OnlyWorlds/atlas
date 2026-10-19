@@ -20,6 +20,7 @@
 
 import { BaseModal } from './modal-base';
 import { getState, patchSlice } from '../core/state';
+import { worldIsViewOnly } from '../core/view-only';
 import { navigate, elementHash, homeHash } from '../core/router';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { scoreElementMatch } from '../core/element-search';
@@ -164,8 +165,9 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
 export function paletteRows(query: string, elements: readonly Element[]): PaletteResult[] {
   const results = searchPalette(query, elements);
   const name = query.trim();
-  // The tour scripts every create; a typed name would be ignored there.
-  if (!name || isTourFlagActive() || results.some(r => r.kind === 'element')) return results;
+  // The tour scripts every create; a typed name would be ignored there. A
+  // view-only world creates nothing (conv. 149).
+  if (!name || isTourFlagActive() || worldIsViewOnly() || results.some(r => r.kind === 'element')) return results;
   return [...results, { kind: 'create', id: name, name: `Create "${name}" as…`, hint: 'new element', score: 0 }];
 }
 
