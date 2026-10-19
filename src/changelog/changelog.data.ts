@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.58.1',
+    date: '2026-10-19',
+    theme: 'The drawing strip in light mode',
+    entries: [
+      {
+        id: 'draft-strip-light',
+        title: 'The drawing strip reads in light mode',
+        body: 'While drawing a zone on a map in light mode, the strip at the top (Trace, Finish, Cancel and the hints) was dark text on a dark floor and close to invisible. It now keeps its dark floor with light text in both themes, like the rest of the controls over a map.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.58.0',
     date: '2026-10-19',
     theme: 'Agent-made knowledge and pages, marked quietly',

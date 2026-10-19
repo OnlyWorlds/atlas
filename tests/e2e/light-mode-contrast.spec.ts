@@ -57,6 +57,10 @@ const PROBES: Probe[] = [
   // Modal error box (S368): a literal pale-pink foreground on a pink wash over
   // the light theme's white panel. Body text, so the 4.5:1 floor.
   { name: 'modal error', chain: ['atlas-modal-panel', 'atlas-modal-error'], min: 4.5 },
+  // The zone draft strip over the map (S426 gate G13: a literal dark floor under themed ink).
+  { name: 'zone draft strip', chain: ['atlas-zone-draft-overlay'] },
+  { name: 'zone draft mode', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-mode'] },
+  { name: 'zone draft button', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-btn'] },
 ];
 
 /**

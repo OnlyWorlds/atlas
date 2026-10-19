@@ -195,7 +195,8 @@ html {
    behind it wears the light theme. */
 :root[data-theme='light'] .atlas-tour-root,
 :root[data-theme='light'] .atlas-timeline-view,
-:root[data-theme='light'] .atlas-timeline-canvas {
+:root[data-theme='light'] .atlas-timeline-canvas,
+:root[data-theme='light'] .atlas-zone-draft-overlay {
   --atlas-ink-rgb: 255, 255, 255;
   --atlas-accent-rgb: 34, 211, 238;
   --atlas-text: #e8e8e8;
@@ -6965,7 +6966,9 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   /* Cap width to the pane (minus a small inset so the rounded corners breathe).
      Without this, the overlay extends past the map container at narrow widths. */
   max-width: calc(100% - 32px);
-  background: rgba(10, 10, 10, 0.92);
+  /* Chrome over the map: the canvas floor, dark in both themes, its ink re-pinned with
+     the islands above (conv. 90; S426 gate G13 measured 1.02:1 in light mode). */
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.92);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.35);
   border-radius: 24px;
