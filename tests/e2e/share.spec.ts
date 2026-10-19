@@ -782,3 +782,30 @@ test('an open text block survives a charts refresh', async ({ page }) => {
   await page.keyboard.type(', ever.');
   await expect(pm).toContainText('The mists never lift, ever.');
 });
+
+test('a page that arrived with only its story opens with that text, and a new block keeps it (S437)', async ({ page }) => {
+  // Blocks are atlas-local: a page from the server, another device or another
+  // tool carries only its story. It read "No blocks yet" and the first block
+  // compiled the story over (the S437 live walk's "This page has no content yet").
+  await setupWorld(page);
+  const pageId = await createElement(page, 'narrative', {
+    name: 'Wanted poster', subtype: 'page', story: 'The Kid, for crossing the river.',
+  });
+  await openShare(page);
+  await page.locator('.atlas-share-row', { hasText: 'Wanted poster' }).click();
+  await expect(page).toHaveURL(new RegExp(`/share/${pageId}$`));
+  await expect(page.locator('.atlas-share-room')).toContainText('The Kid, for crossing the river.');
+  await expect(page.locator('.atlas-share-room')).not.toContainText('No blocks yet');
+
+  await page.click('.atlas-share-block-add-btn:has-text("heading")');
+  await page.fill('input.atlas-share-heading-input', 'Reward');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => {
+    const p = (window as any).__atlasTestApi.getState().data.elements
+      .find((e: any) => e.type === 'narrative' && e.subtype === 'page');
+    return Array.isArray(p?.atlas_page_blocks) && p.atlas_page_blocks.length === 2 && String(p.story).includes('Reward');
+  });
+  const saved = await getPage(page);
+  expect(saved.story).toBe('The Kid, for crossing the river.\n\n# Reward');
+  expect(saved.atlas_page_blocks[0]).toMatchObject({ kind: 'prose', markdown: 'The Kid, for crossing the river.' });
+});

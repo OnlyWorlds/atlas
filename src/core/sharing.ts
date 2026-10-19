@@ -337,9 +337,19 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
  * the counts line up by construction; an id-swap rewrites VALUES in the flat
  * array, never its length. Falls back to the block's own ids when the mirror
  * is missing/short (out-of-band edits degrade gracefully).
+ *
+ * A page with no blocks here but a `story` is the server's or another
+ * device's page (blocks are atlas-local, never synced): its story is the
+ * page, read as one prose block (`pageBlocksFromStory`), so a reader of a
+ * shared world sees the text and a first save keeps it rather than
+ * compiling over it (S437; the Captain's A9 ruling for Make Online,
+ * 2026-10-04). The block's id is fixed per page, so an edit finds it again.
  */
 export function blocksOf(el: Element): PageBlock[] {
   const blocks = parsePageBlocks((el as Record<string, unknown>).atlas_page_blocks);
+  if (blocks.length === 0) {
+    return pageBlocksFromStory((el as Record<string, unknown>).story, `story-${el.id}`).atlas_page_blocks;
+  }
   const rawRefs = (el as Record<string, unknown>).atlas_page_refs;
   const refs = Array.isArray(rawRefs)
     ? rawRefs.filter((v): v is string => typeof v === 'string')
@@ -389,6 +399,24 @@ export function blocksOf(el: Element): PageBlock[] {
     }
   }
   return blocks;
+}
+
+/**
+ * A page's blocks rebuilt from its `story`: one prose block holding it, so
+ * the page shows that text and its next save compiles the same text back
+ * (`compilePageStory` writes a prose block's markdown, trimmed). Cards and
+ * other blocks the story only names come back as their text; that is the cost
+ * of keeping the online version. An empty story gives no blocks.
+ */
+export function pageBlocksFromStory(
+  story: unknown,
+  id: string = newBlockId(),
+): { atlas_page_blocks: PageBlock[]; atlas_page_refs: string[] } {
+  const text = typeof story === 'string' ? story : '';
+  return {
+    atlas_page_blocks: text.trim() ? [{ id, kind: 'prose', markdown: text, richtextJson: null }] : [],
+    atlas_page_refs: [],
+  };
 }
 
 /**

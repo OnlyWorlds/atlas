@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.57.2',
+    date: '2026-10-19',
+    theme: 'A page made elsewhere reads here',
+    entries: [
+      {
+        id: 'page-reads-its-story',
+        title: 'A page made on another device shows its text',
+        body: 'A page keeps its layout on the computer that built it, and OnlyWorlds holds its text. Opened anywhere else (a world you view, a shared world, your own world on a second device), the page said it had no content yet. It now shows that text, and adding to it there keeps the text instead of starting over.',
+        tags: ['pages', 'sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.57.1',
     date: '2026-10-19',
     theme: 'A view-only world names what it does',

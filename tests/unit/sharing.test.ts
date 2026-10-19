@@ -199,6 +199,31 @@ describe('blocksOf — refs-mirror heal (id-swap correctness)', () => {
   });
 });
 
+describe('blocksOf: a page with no blocks here reads its story (S437)', () => {
+  // A page from the server or another device: blocks are atlas-local, so only
+  // the story arrives (the walk's Handout read "no content yet" on 1.57.1).
+  const pulled = el({ id: 'pg', subtype: 'page', story: '# Wanted\n\nThe Kid, for crossing the river.' });
+
+  it('reads the story as one prose block, with an id that holds across reads', () => {
+    const first = blocksOf(pulled);
+    expect(first).toEqual([{ id: 'story-pg', kind: 'prose', markdown: '# Wanted\n\nThe Kid, for crossing the river.', richtextJson: null }]);
+    expect(blocksOf(pulled)[0].id).toBe(first[0].id);
+  });
+
+  it('a first save keeps the story it read instead of compiling over it', () => {
+    const added: PageBlock = { id: 'h2', kind: 'heading', text: 'Reward', level: 2 };
+    const patch = pageBlocksPatch([...blocksOf(pulled), added], () => null);
+    expect(patch.story).toBe('# Wanted\n\nThe Kid, for crossing the river.\n\n## Reward');
+  });
+
+  it('control: the page\'s own blocks win over its story, and no story gives no blocks', () => {
+    const own = el({ atlas_page_blocks: [{ id: 'h', kind: 'heading', text: 'Mine', level: 1 }], story: 'other text' });
+    expect(blocksOf(own).map(b => b.id)).toEqual(['h']);
+    expect(blocksOf(el({ subtype: 'page', story: '   ' }))).toEqual([]);
+    expect(blocksOf(el({ subtype: 'page', atlas_page_blocks: [], story: '' }))).toEqual([]);
+  });
+});
+
 describe('compilePageStory — the derived mirror', () => {
   it('compiles headings, prose, and cards into plain markdown', () => {
     const blocks: PageBlock[] = [

@@ -134,9 +134,10 @@ describe('sharing page sync round-trip (full stack: adapter + SDK + MSW)', () =>
     expect((after as any).atlas_page_refs).toHaveLength(2);
   });
 
-  it('a page created server-side (story only) arrives locally with empty composition', async () => {
-    // A collaborator's tool creates a page-subtype narrative without atlas
-    // composition — it pulls down clean and renders as an empty page.
+  it('a page created server-side (story only) arrives with no composition and reads its story', async () => {
+    // A collaborator's tool (or Atlas on another device) creates a page-subtype
+    // narrative without atlas composition: it pulls down clean, and its story is
+    // the page, one prose block (S437; it rendered as an empty page before).
     await adapter.createElement('narrative', {
       name: 'foreign page', subtype: 'page', story: '# Hello',
     } as any);
@@ -145,7 +146,8 @@ describe('sharing page sync round-trip (full stack: adapter + SDK + MSW)', () =>
     expect(pull.pulled.creates).toBe(1);
 
     const local = await byName('foreign page');
-    expect(blocksOf(local)).toEqual([]);
+    expect((local as any).atlas_page_blocks).toBeUndefined();
+    expect(blocksOf(local)).toEqual([{ id: `story-${local.id}`, kind: 'prose', markdown: '# Hello', richtextJson: null }]);
     expect((local as any).story).toBe('# Hello');
   });
 });

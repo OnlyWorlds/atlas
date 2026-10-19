@@ -24,7 +24,7 @@ import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { planMerge, type ServerRec } from './plan-merge';
 import { startRekey, type RekeyHooks } from '../store/rekey';
-import { isPageNarrative, newBlockId, type PageBlock } from '../core/sharing';
+import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
@@ -550,21 +550,6 @@ export async function mergeLocalIntoApi(
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err); // raw-error-ok: failure records only (Route 2's result), never shown
-}
-
-/**
- * A page's blocks rebuilt from the server's `story`: one prose block holding
- * it, so the page shows the online text and its next save compiles the same
- * text back (`compilePageStory` writes a prose block's markdown, trimmed).
- * Cards and other blocks the story only names come back as their text; that
- * is the cost of keeping the online version. An empty story gives no blocks.
- */
-function pageBlocksFromStory(story: unknown): { atlas_page_blocks: PageBlock[]; atlas_page_refs: string[] } {
-  const text = typeof story === 'string' ? story : '';
-  return {
-    atlas_page_blocks: text.trim() ? [{ id: newBlockId(), kind: 'prose', markdown: text, richtextJson: null }] : [],
-    atlas_page_refs: [],
-  };
 }
 
 // ---------------------------------------------------------------------------

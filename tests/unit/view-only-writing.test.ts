@@ -475,6 +475,18 @@ describe('the pages room', () => {
     expect(t.querySelector<HTMLElement>('.atlas-share-detail-header .atlas-element-name')!.title).toBe('');
   });
 
+  it('a page whose blocks stayed on its maker\'s machine reads its story (S437, the live walk\'s "no content yet")', () => {
+    for (const u of unmounts) u();
+    unmounts = [];
+    openWorld(true, [el('pg2', 'narrative', 'Wanted poster', { subtype: 'page', story: 'The Kid, for crossing the river.' })]);
+    window.location.hash = shareHash(WORLD, 'pg2');
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    unmounts.push(mountShareRoom(target, toasts));
+    expect(target.textContent).toContain('The Kid, for crossing the river.');
+    expect(target.textContent).not.toContain('This page has no content yet.');
+  });
+
   it('control: a writable page opens in the builder with publish and delete', () => {
     const t = room(false, shareHash(WORLD, 'pg1'));
     expect(t.querySelector('.atlas-share-blocks')).not.toBeNull();
