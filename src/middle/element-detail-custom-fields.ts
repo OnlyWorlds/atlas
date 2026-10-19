@@ -5,7 +5,7 @@
  * non-machinery atlas_ keys) as normal field rows via the shared
  * `renderSection` machinery — click-to-edit, autosave, sync push all work
  * unchanged. Adds:
- *   - a quiet `+ add field` row (always visible, the feature's discoverability)
+ *   - a quiet `+ add field` row (always visible but on a view-only world, the feature's discoverability)
  *     with a datalist over custom names already used across the world;
  *   - a per-row × that deletes the field by persisting `null` (the wire's
  *     clear semantics — keel keeps null-valued extension keys, probed
@@ -20,6 +20,7 @@
 import type { Element } from '../core/types';
 import { isCustomEditableField, isPopulatedCustomValue } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
+import { getState } from '../core/state';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { knownFieldsFor, type FieldMeta, type WidgetKind, type SectionLayout } from '../editor/field-schema';
 import { renderSection, humanizeFieldName } from './element-detail-fields';
@@ -125,20 +126,31 @@ function input_is_atlas_namespace(key: string): boolean {
  * Build the whole custom-fields section (section shell + rows + add row).
  * Returns the section element; re-renders happen through the normal
  * element-detail subscription (persist → new elements array → render).
+ * A view-only world gets the rows alone: no add row, no ×, and no section at
+ * all when the element has none (the store would refuse the write; S435's
+ * read-key walk). Null then.
  */
-export function buildCustomFieldsSection(el: Element): HTMLElement {
-  const layout: SectionLayout = { name: SECTION_NAME, order: 999, fields: customFieldMetasFor(el) };
-  const section = renderSection(layout, el, false, {
+export function buildCustomFieldsSection(el: Element): HTMLElement | null {
+  const activeId = getState().active?.worldId;
+  const viewOnly = !!getState().registry.worlds.find(w => w.id === activeId)?.api?.read_only;
+  const fields = customFieldMetasFor(el);
+  const structured = structuredFieldEntriesFor(el);
+  if (viewOnly && fields.length === 0 && structured.length === 0) return null;
+  const layout: SectionLayout = { name: SECTION_NAME, order: 999, fields };
+  const section = renderSection(layout, el, false, viewOnly ? undefined : {
     allowEmpty: true,
     onRemoveField: (fieldName) => { void removeField(el, fieldName); },
-  })!;
+  });
+  if (!section) return null;
   section.classList.add('atlas-custom-fields-section');
 
   // Concise how-it-works on hover (Captain's ask, 2026-07-12). Voice: plain
   // statements, no em-dashes.
   const headerLabel = section.querySelector<HTMLElement>('.atlas-detail-section-header span');
   if (headerLabel) {
-    headerLabel.title = 'Your own fields for this element. They sync, import, and export like any other data.';
+    headerLabel.title = viewOnly
+      ? 'Fields of its own on this element. They sync, import, and export like any other data.'
+      : 'Your own fields for this element. They sync, import, and export like any other data.';
   }
 
   // The add row lives inside the section body (collapsed section hides it too).
@@ -147,7 +159,7 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
     // Structured (object/array) extension fields: read-only rows ABOVE the
     // add row. Label + pretty JSON in a quiet mono block; deletable with the
     // same confirm as scalar rows, never editable (the destruction class).
-    for (const entry of structuredFieldEntriesFor(el)) {
+    for (const entry of structured) {
       // Known tool records get a real card (tangle battles, tropaia) —
       // still read-only, still deletable below via the same confirmed ×.
       const renderCard = TANGLE_CARD_RENDERERS[entry.name];
@@ -155,13 +167,7 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
       if (cardEl) {
         const wrap = document.createElement('div');
         wrap.className = 'atlas-custom-structured-row atlas-custom-structured-card';
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'atlas-custom-structured-remove';
-        del.title = `Remove ${humanizeFieldName(entry.name)} from this element`;
-        del.textContent = '×';
-        del.addEventListener('click', () => { void removeField(el, entry.name, { alwaysConfirm: true }); });
-        wrap.appendChild(del);
+        if (!viewOnly) wrap.appendChild(structuredRemoveButton(el, entry.name));
         wrap.appendChild(cardEl);
         body.appendChild(wrap);
         continue;
@@ -177,18 +183,12 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
       let text: string;
       try { text = JSON.stringify(entry.value, null, 2); } catch { text = String(entry.value); }
       pre.textContent = text;
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'atlas-custom-structured-remove';
-      del.title = `Remove ${humanizeFieldName(entry.name)} from this element`;
-      del.textContent = '×';
-      del.addEventListener('click', () => { void removeField(el, entry.name, { alwaysConfirm: true }); });
       row.appendChild(label);
-      row.appendChild(del);
+      if (!viewOnly) row.appendChild(structuredRemoveButton(el, entry.name));
       row.appendChild(pre);
       body.appendChild(row);
     }
-    body.appendChild(buildAddRow(el));
+    if (!viewOnly) body.appendChild(buildAddRow(el));
   }
 
   // Add-flow continuation: open the value editor on the just-created row.
@@ -209,6 +209,16 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
     });
   }
   return section;
+}
+
+function structuredRemoveButton(el: Element, fieldName: string): HTMLButtonElement {
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'atlas-custom-structured-remove';
+  del.title = `Remove ${humanizeFieldName(fieldName)} from this element`;
+  del.textContent = '×';
+  del.addEventListener('click', () => { void removeField(el, fieldName, { alwaysConfirm: true }); });
+  return del;
 }
 
 async function removeField(el: Element, fieldName: string, opts?: { alwaysConfirm?: boolean }): Promise<void> {

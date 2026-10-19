@@ -104,7 +104,7 @@ describe('C2: real editor keeps the stored number', () => {
 
   it('custom number field: bad text + Enter does not delete the field', async () => {
     const { store, el } = await world({ x_strength: 7 });
-    const section = buildCustomFieldsSection(el);
+    const section = buildCustomFieldsSection(el)!;
     document.body.appendChild(section);
     section.querySelector<HTMLElement>('[data-field="x_strength"] .atlas-field-value')!.click();
     const input = document.querySelector<HTMLInputElement>('.atlas-edit-popover input')!;

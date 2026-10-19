@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.56.2',
+    date: '2026-10-19',
+    theme: 'A view-only world offers no edits it would refuse',
+    entries: [
+      {
+        id: 'view-only-custom-fields',
+        title: 'Custom fields on a view-only world are for reading',
+        body: 'A world you can only view showed "+ Add field" and a remove button on each custom field, and then refused the change. Its custom fields now show as they are, with nothing to add or remove, and an element with none shows no Custom fields section.',
+        tags: ['editor', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.56.1',
     date: '2026-10-19',
     theme: 'The files total keeps up',

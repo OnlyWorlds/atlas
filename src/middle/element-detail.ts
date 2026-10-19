@@ -285,8 +285,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // what's there, let the user add more. Always present (the add row is
     // the feature's discoverability) — EXCEPT during the tour: a beginner's
     // first pages should not offer schema extension (precision audit #2,
-    // Captain-blessed 2026-07-20).
-    if (!isTourFlagActive()) detail.appendChild(buildCustomFieldsSection(el));
+    // Captain-blessed 2026-07-20). A view-only world shows only the rows it has.
+    const customFields = isTourFlagActive() ? null : buildCustomFieldsSection(el);
+    if (customFields) detail.appendChild(customFields);
 
     // Files (keel #393): kept on OnlyWorlds with the element, so an online
     // world only. The card reads and repaints itself (element-detail-files).
