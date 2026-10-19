@@ -117,6 +117,9 @@ export interface TimelineViewOptions {
    * scope, so a bare write would silently vanish it, gate finding).
    */
   onDateElement?: (id: string, date: number, edge?: 'start' | 'end') => void;
+  /** A view-only world (conv. 149): the room passes no onSetNow or
+   *  onDateElement, and the words drop every drag and edit they would name. */
+  readOnly?: boolean;
 }
 
 /** Render extras the room threads in alongside the node set (S4/S5). */
@@ -272,6 +275,7 @@ interface ViewState {
   destroyed: boolean;           // set on destroy(); guards late async redraws
   onSelect: (id: string) => void;
   onOpenElement: (id: string) => void;
+  readOnly: boolean;
   // Touch (#301): the fingers on the canvas, a two-finger pinch in progress,
   // and whether this gesture already became a pinch (the finger left behind
   // when one lifts does nothing until both are up). `nowBefore` puts the now
@@ -333,6 +337,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     destroyed: false,
     onSelect: opts.onSelect,
     onOpenElement: opts.onOpenElement,
+    readOnly: !!opts.readOnly,
     touchPts: new Map(), pinch: null, touchSpent: false, nowBefore: null,
   };
 
@@ -892,7 +897,9 @@ function draw(state: ViewState): void {
     if (state.undated.length > 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.42)';
       // The chart's drags are a mouse's (#279): a finger opens the element instead.
-      ctx.fillText(forPointer('Drag an element from the list onto the line to give it a date.', 'Tap an element in the list to give it a date on its page.'), w / 2, midY);
+      ctx.fillText(state.readOnly
+        ? 'Nothing in this world has a date yet.'
+        : forPointer('Drag an element from the list onto the line to give it a date.', 'Tap an element in the list to give it a date on its page.'), w / 2, midY);
     } else if (state.universe.length === 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillText('Nothing in this world has a date yet.', w / 2, midY - 10);
@@ -1845,8 +1852,10 @@ function renderCard(state: ViewState): void {
   const edit = document.createElement('button');
   edit.type = 'button';
   edit.className = 'atlas-timeline-card-action';
-  edit.innerHTML = '<span class="material-symbols-outlined">edit</span><span>Edit</span>';
-  edit.title = 'Open this element for editing';
+  edit.innerHTML = state.readOnly
+    ? '<span class="material-symbols-outlined">open_in_new</span><span>Open</span>'
+    : '<span class="material-symbols-outlined">edit</span><span>Edit</span>';
+  edit.title = state.readOnly ? 'Open this element' : 'Open this element for editing';
   edit.addEventListener('click', () => state.onOpenElement(node.id));
   actions.appendChild(edit);
   card.appendChild(actions);
@@ -1950,7 +1959,9 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
 
   const sub = document.createElement('div');
   sub.className = 'atlas-timeline-rail-undated-sub';
-  sub.textContent = forPointer('Drag onto the timeline to date it', 'Tap one to date it on its page');
+  sub.textContent = state.readOnly
+    ? forPointer('Click one to open it', 'Tap one to open it')
+    : forPointer('Drag onto the timeline to date it', 'Tap one to date it on its page');
   wrap.appendChild(sub);
 
   const byType = new Map<string, Array<{ id: string; type: string; name: string }>>();
@@ -1982,6 +1993,14 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'atlas-timeline-rail-undated-item';
+      // A view-only world (conv. 149): no grip and no drag, a click opens it.
+      if (state.readOnly) {
+        b.title = `Open ${it.name}`;
+        b.innerHTML = `<span class="atlas-timeline-rail-undated-name">${escapeText(it.name)}</span>`;
+        b.addEventListener('click', () => state.onOpenElement(it.id));
+        group.appendChild(b);
+        continue;
+      }
       b.title = `Drag onto the timeline to date ${it.name}, or click to open it`;
       // A grip glyph + the name — the grip is the "you can drag this" signal.
       b.innerHTML =

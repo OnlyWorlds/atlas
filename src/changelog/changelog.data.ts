@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.57.1',
+    date: '2026-10-19',
+    theme: 'A view-only world names what it does',
+    entries: [
+      {
+        id: 'view-only-words',
+        title: 'Words that match a view-only world',
+        body: 'On a world you can only view, Home\'s recent rows said Edit and could be dragged, and the Charts list of undated elements said to drag them onto the timeline. Home now says Open (or Read for a story) and its rows stay put, the undated list says to click one to open it, and a chart card\'s Edit is Open.',
+        tags: ['editor', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.57.0',
     date: '2026-10-19',
     theme: 'A world you can only view reads as one',

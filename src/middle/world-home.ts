@@ -67,6 +67,8 @@ const CONTENT_ELEMENT_TYPES: ElementType[] = [
  *  label can never promise a room the click does not go to. */
 function verbFor(el: Element, worldId: string): string {
   const label = roomOf(el, worldId).label;
+  // A view-only world's rooms open to read (conv. 149).
+  if (worldIsViewOnly(worldId)) return label === 'writing' ? 'Read' : label === 'map' ? 'Map' : 'Open';
   return label === 'writing' ? 'Write' : label === 'map' ? 'Map' : 'Edit';
 }
 
@@ -625,7 +627,8 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
       // rows, so they drop onto any open map tab as a pin. Maps/zones are
       // excluded (not pinnable — the sidebar's rule, DESIGN_MAPS.md §1.4;
       // the drop site double-checks).
-      if (row.el.type !== 'map' && row.el.type !== 'zone') {
+      // A view-only world places no pin, so its rows do not drag (conv. 149).
+      if (row.el.type !== 'map' && row.el.type !== 'zone' && !worldIsViewOnly(worldId)) {
         btn.draggable = true;
         btn.addEventListener('dragstart', (e) => {
           e.dataTransfer?.setData('application/x-atlas-element', JSON.stringify({ id: row.el.id, type: row.el.type }));

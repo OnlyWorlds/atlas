@@ -997,6 +997,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         onOpenElement: (id) => { const w = worldId(); if (w) navigate(elementHash(w, id)); },
         // The now-line was dragged/established → persist to World.time_current.
         // A view-only world passes neither, so nothing on the chart drags to a write (conv. 149).
+        readOnly: viewOnly,
         ...(viewOnly ? {} : {
           onSetNow: (value: number | null) => void setNow(value),
           // A rail element was dragged onto the axis and dropped at `date`.
