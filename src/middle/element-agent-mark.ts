@@ -13,6 +13,29 @@ import { agentMarkFor, type AgentMark } from '../core/agent-mark';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 import { toastManager } from '../ui/toast-manager';
 
+/**
+ * The mark for a header that stays up across data ticks (Knowledge's entry,
+ * Pages' page; #350): `sync` re-reads the element, so a pull that brings an
+ * agent's write shows the mark and the person's own edit takes it away
+ * without a rebuild. A rebuild only when the line changes, so an unchanged
+ * tick leaves a focused mark alone.
+ */
+export function mountAgentMarkSlot(): { el: HTMLElement; sync(el: Element): void } {
+  const slot = document.createElement('span');
+  slot.className = 'atlas-agent-mark-slot';
+  let shown: string | null = null;
+  return {
+    el: slot,
+    sync(el: Element): void {
+      const mark = buildAgentMark(el);
+      const line = mark?.getAttribute('aria-label') ?? null;
+      if (line === shown && (mark === null) === (slot.firstChild === null)) return;
+      shown = line;
+      slot.replaceChildren(...(mark ? [mark] : []));
+    },
+  };
+}
+
 export function buildAgentMark(el: Element): HTMLElement | null {
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);

@@ -54,6 +54,7 @@ import { makeRoomTabs } from '../ui/room-tabs';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
 import { rekeyOwLinks, rekeySidecar } from '../store/rekey-body';
+import { mountAgentMarkSlot } from './element-agent-mark';
 
 /** Sentinel knowledgeId for the unsaved draft editor (`/knowledge/new`). */
 const NEW = 'new';
@@ -186,6 +187,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   let heldByMount: HTMLElement | null = null;
   let aboutMount: HTMLElement | null = null;
   let entryTitleHandle: EditableTitleHandle | null = null;  // editor header title (sync on tick)
+  let entryAgentMark: ReturnType<typeof mountAgentMarkSlot> | null = null;  // the quiet agent mark (sync on tick)
   let knowerTitleHandle: EditableTitleHandle | null = null;  // knower header title (sync on tick)
   // Whether the mounted view actually found its target. False = not-found
   // interim (deep URL before elements load, id-swap transient, deleted entry)
@@ -1219,6 +1221,10 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       },
     });
     header.appendChild(entryTitleHandle.el);
+    // Last changed by an agent, said quietly, as on the element page (#350).
+    entryAgentMark = mountAgentMarkSlot();
+    if (!isDraft) entryAgentMark.sync(entry!);
+    header.appendChild(entryAgentMark.el);
 
     const spacer = document.createElement('div');
     spacer.className = 'atlas-middle-spacer';
@@ -1404,6 +1410,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     }
     // Sync the header title (no-op while the user is editing it).
     entryTitleHandle?.sync(el.name || '');
+    entryAgentMark?.sync(el);
     const ctx = makeCtx(entryId);
     if (heldByMount) renderHeldBy(heldByMount, ctx);
     if (aboutMount) renderAbout(aboutMount, ctx);

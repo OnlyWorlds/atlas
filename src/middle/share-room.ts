@@ -40,6 +40,7 @@ import {
   type PageBlock, type HeadingBlock, type ProseBlock, type ElementCardBlock, type PagePubState,
 } from '../core/sharing';
 import { renderBlockView, renderPayloadPage, populatedCardFields, setBuilderCharts } from './share-page-render';
+import { mountAgentMarkSlot } from './element-agent-mark';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { buildPagePayload } from '../core/share-payload';
 import {
@@ -78,6 +79,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   // didn't change (hash-echo renders, ui-slice patches).
   let lastBuiltElementsRef: readonly Element[] | null = null;
   let pageTitleHandle: EditableTitleHandle | null = null;  // detail header title (sync on tick)
+  let pageAgentMark: ReturnType<typeof mountAgentMarkSlot> | null = null;  // the quiet agent mark (sync on tick)
   // A view-only world reads its pages: each opens in the visitor preview, with
   // no new page, rename, block edit, theme, publish or delete (conv. 149).
   // Rooms remount per world, so one read at mount holds.
@@ -2067,6 +2069,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       },
     });
     header.appendChild(pageTitleHandle.el);
+    // Last changed by an agent, said quietly, as on the element page (#350).
+    pageAgentMark = mountAgentMarkSlot();
+    pageAgentMark.sync(page);
+    header.appendChild(pageAgentMark.el);
 
     const spacer = document.createElement('div');
     spacer.className = 'atlas-middle-spacer';
@@ -2277,6 +2283,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     }
     // Sync the header title (no-op while the user is editing it).
     pageTitleHandle?.sync(page.name || '');
+    pageAgentMark?.sync(page);
 
     if (previewMode) return; // static reader view — rebuilt on toggle, not per tick
     if (editingBlockId) {

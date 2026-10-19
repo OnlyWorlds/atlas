@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.58.0',
+    date: '2026-10-19',
+    theme: 'Agent-made knowledge and pages, marked quietly',
+    entries: [
+      {
+        id: 'agent-mark-knowledge-pages',
+        title: 'The agent mark in Knowledge and Pages',
+        body: 'In a synced world, a knowledge entry or a page an agent changed last now carries the same small mark after its name as an element page does. Point at it or tap it for who made the change. A person\'s change carries none, and your own edit takes it away.',
+        tags: ['sync', 'world'],
+      },
+    ],
+  },
+  {
     version: '1.57.2',
     date: '2026-10-19',
     theme: 'A page made elsewhere reads here',
