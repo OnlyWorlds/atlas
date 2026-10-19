@@ -72,7 +72,8 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
   input.type = 'file';
   input.accept = FILES_ACCEPT;
   input.hidden = true;
-  section.appendChild(input);
+  // Only where a file can be added: a view-only card carries no upload input (S435's read-key walk).
+  if (!readOnly) section.appendChild(input);
   input.addEventListener('change', () => {
     const file = input.files?.[0];
     input.value = '';
