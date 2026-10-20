@@ -43,11 +43,8 @@ import { getEditorSettings } from '../registry/registry';
 import { suggestionsForField, reservedValueHint } from '../core/taxonomy';
 import { styleValueHint } from '../core/world-styles';
 import { resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
-import { formatStep } from '@onlyworlds/sdk';
+import { fieldLabel, formatStep } from '@onlyworlds/sdk';
 import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
-
-/** Known acronyms uppercased in labels: "image_url" → "Image URL". */
-const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
 
 /** Set of `${type}::${section}` keys currently collapsed. Module-level (survives re-render). */
 const collapsedSections = new Set<string>();
@@ -807,7 +804,7 @@ function activeCalendarLens(): WorldCalendar | null {
   return resolveCalendarLens(s.data.elements, entry?.active_calendar_id, { fallbackToOnly: true });
 }
 
-/** "image_url" → "Image URL" via the ACRONYMS set. */
+/** "image_url" → "Image URL": the SDK's `fieldLabel` after the prefix step. */
 export function humanizeFieldName(name: string): string {
   // Drop extension-namespace prefixes (atlas_/x_/shadow_) when surfacing
   // fields in the UI — keeps labels clean ("x_mood" → "Mood"). The on-disk
@@ -815,15 +812,9 @@ export function humanizeFieldName(name: string): string {
   const ns = EXTENSION_FIELD_NAMESPACES.find(p => name.startsWith(p));
   const cleaned = ns ? name.slice(ns.length) : name;
   // Sentence case, acronyms kept ("Birth date", "Image URL"): the house rule
-  // (the Captain, h63 #8074; Seethe's F-28).
-  return cleaned
-    .split('_')
-    .map((word, i) => {
-      const lower = word.toLowerCase();
-      if (ACRONYMS.has(lower)) return lower.toUpperCase();
-      return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
-    })
-    .join(' ');
+  // (the Captain, h63 #8074), one copy for every tool since SDK 4.34
+  // (seeded from this function, Kael h63 #8126).
+  return fieldLabel(cleaned);
 }
 
 /** Stringify a field value for display; null/undefined/'' become empty string. */
