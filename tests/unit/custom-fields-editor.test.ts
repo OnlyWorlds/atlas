@@ -21,6 +21,7 @@ import {
   customFieldMetasFor,
   normalizeCustomFieldName,
   customFieldNameProblem,
+  profileFieldEntriesFor,
 } from '../../src/middle/element-detail-custom-fields';
 import { humanizeFieldName } from '../../src/middle/element-detail-fields';
 import { customFieldNameSuggestions } from '../../src/core/taxonomy';
@@ -182,5 +183,24 @@ describe('constants predicates', () => {
     expect(isPopulatedCustomValue([])).toBe(false);
     expect(isPopulatedCustomValue(null)).toBe(false);
     expect(isPopulatedCustomValue(undefined)).toBe(false);
+  });
+});
+
+describe('a published profile key is never a custom field (x_identity_, Skeld h58 #8890)', () => {
+  const KEY = '019a1f3c-2b4e-7d10-8c3a-6f2e9b0d4a71';
+
+  it('typed as "Identity key", the name is refused', () => {
+    const key = normalizeCustomFieldName('Identity key');
+    expect(key).toBe('x_identity_key');
+    expect(customFieldNameProblem(makeCharacter(), key)).toMatch(/identity key/i);
+    expect(customFieldNameProblem(makeCharacter(), 'x_identity')).toBeNull();
+  });
+
+  it('a carried key is no editable row, shows read-only, and is never suggested', () => {
+    const el = makeCharacter({ x_identity_key: KEY, x_mood: 'grim' });
+    expect(customFieldMetasFor(el).map(m => m.name)).toEqual(['x_mood']);
+    expect(profileFieldEntriesFor(el)).toEqual([{ name: 'x_identity_key', value: KEY }]);
+    patchSlice('data', { ...getState().data, elements: [el, makeCharacter({ id: 'b2', x_identity_key: KEY })] as Element[] });
+    expect(customFieldNameSuggestions()).toEqual(['mood']);
   });
 });

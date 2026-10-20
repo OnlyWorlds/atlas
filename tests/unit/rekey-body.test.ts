@@ -165,3 +165,11 @@ describe('rekeyBody: page blocks, walked raw', () => {
     expect(healed.fullPinIds).toEqual([N]);
   });
 });
+
+describe('rekeyBody: a published profile key is never an id (identity profile rule 9)', () => {
+  it('x_identity_key equal to a moved id stays, while an x_ link beside it moves', () => {
+    const { body } = rekeyBody(el('character', { x_identity_key: O, x_rival: O }), map);
+    expect(body.x_identity_key).toBe(O);
+    expect(body.x_rival).toBe(N);
+  });
+});

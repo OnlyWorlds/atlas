@@ -286,15 +286,30 @@ export function isExtensionField(name: string): boolean {
 }
 
 /**
+ * Published extension profiles' keys (schema-dist `profiles/`): a meaning other
+ * tools read the same way, so a person never names, edits or deletes one as a
+ * custom field. `x_identity_key` says two elements are one being (the
+ * cross-world identity profile, Skeld h58 #8890): a typed "Identity key" would
+ * merge two beings, and a deleted one would split one (Kael #8886). Shown
+ * read-only, and never rewritten by a re-key (the profile's rule 9).
+ */
+export const PROFILE_FIELD_PREFIXES = ['x_identity_'] as const;
+
+export function isProfileField(name: string): boolean {
+  return PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));
+}
+
+/**
  * A user-editable custom field: extension-namespaced but NOT atlas machinery
- * (page blocks, richtext, aliases, zone visuals, ...). The D9 custom-fields
- * section in element detail renders exactly these; a `null` value is the
- * field's delete tombstone (keel keeps null-valued extension keys — probed
- * 2026-07-12) and hides the row.
+ * (page blocks, richtext, aliases, zone visuals, ...) and not a published
+ * profile's key. The D9 custom-fields section in element detail renders
+ * exactly these; a `null` value is the field's delete tombstone (keel keeps
+ * null-valued extension keys — probed 2026-07-12) and hides the row.
  */
 export function isCustomEditableField(name: string): boolean {
   return isExtensionField(name)
-    && !(ATLAS_LOCAL_EXTENSION_FIELDS as readonly string[]).includes(name);
+    && !(ATLAS_LOCAL_EXTENSION_FIELDS as readonly string[]).includes(name)
+    && !isProfileField(name);
 }
 
 /**

@@ -18,7 +18,7 @@
  */
 
 import type { Element } from '../core/types';
-import { isCustomEditableField, isPopulatedCustomValue } from '../core/constants';
+import { isCustomEditableField, isPopulatedCustomValue, isProfileField } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { worldIsViewOnly } from '../core/view-only';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
@@ -75,6 +75,17 @@ export function structuredFieldEntriesFor(el: Element): Array<{ name: string; va
   return out;
 }
 
+/** Published profile keys (`x_identity_key`): shown read-only, never editable or deletable here. */
+export function profileFieldEntriesFor(el: Element): Array<{ name: string; value: unknown }> {
+  const out: Array<{ name: string; value: unknown }> = [];
+  for (const [k, v] of Object.entries(el)) {
+    if (!isProfileField(k)) continue;
+    if (v === null || v === undefined || v === '') continue;
+    out.push({ name: k, value: v });
+  }
+  return out;
+}
+
 function inferWidget(value: unknown): WidgetKind {
   if (typeof value === 'number') return 'number';
   if (typeof value === 'string' && value.length > 120) return 'text-long';
@@ -106,6 +117,7 @@ export function normalizeCustomFieldName(input: string): string {
 export function customFieldNameProblem(el: Element, key: string): string | null {
   if (!key) return 'Enter a field name';
   if (input_is_atlas_namespace(key)) return 'Atlas keeps atlas_ names for itself';
+  if (isProfileField(key)) return 'That name is kept for the identity key other tools read. Pick another.';
   const bare = key.startsWith('x_') ? key.slice(2) : key.startsWith('shadow_') ? key.slice(7) : key;
   if (knownFieldsFor(el.type).has(bare)) {
     return `"${humanizeFieldName(bare)}" is a built-in field for this type: use that field instead`;
@@ -134,9 +146,10 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
   const viewOnly = worldIsViewOnly();
   const fields = customFieldMetasFor(el);
   const structured = structuredFieldEntriesFor(el);
-  if (viewOnly && fields.length === 0 && structured.length === 0) return null;
+  const profiles = profileFieldEntriesFor(el);
+  if (viewOnly && fields.length === 0 && structured.length === 0 && profiles.length === 0) return null;
   const layout: SectionLayout = { name: SECTION_NAME, order: 999, fields };
-  const section = renderSection(layout, el, false, viewOnly ? undefined : {
+  const section = renderSection(layout, el, false, viewOnly ? { allowEmpty: structured.length + profiles.length > 0 } : {
     allowEmpty: true,
     onRemoveField: (fieldName) => { void removeField(el, fieldName); },
   });
@@ -185,6 +198,23 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
       row.appendChild(label);
       if (!viewOnly) row.appendChild(structuredRemoveButton(el, entry.name));
       row.appendChild(pre);
+      body.appendChild(row);
+    }
+    // A published profile's key: its value, read only, with no ×. Changing or
+    // removing it would merge or split a being for every tool that reads it.
+    for (const entry of profiles) {
+      const row = document.createElement('div');
+      row.className = 'atlas-custom-structured-row';
+      row.dataset.profileField = entry.name;
+      const label = document.createElement('div');
+      label.className = 'atlas-custom-structured-label';
+      label.textContent = humanizeFieldName(entry.name);
+      label.title = `${entry.name}: says which elements, in this world or others, are the same being. Atlas shows it read-only.`;
+      const value = document.createElement('pre');
+      value.className = 'atlas-custom-structured-value';
+      value.textContent = typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value);
+      row.appendChild(label);
+      row.appendChild(value);
       body.appendChild(row);
     }
     if (!viewOnly) body.appendChild(buildAddRow(el));

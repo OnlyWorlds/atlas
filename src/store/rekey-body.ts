@@ -25,10 +25,11 @@
  *     unknown kind are left alone.
  * Never touched: `id`, `type`, `name`, stamps, `image_media_id` (a media id),
  * `atlas_page_pub` (the published page's own id), `atlas_calendar`,
- * `atlas_page_theme`, `atlas_page_intent`, `atlas_aliases`.
+ * `atlas_page_theme`, `atlas_page_intent`, `atlas_aliases`, and a published
+ * profile's key (`x_identity_key`).
  */
 import type { Element, ElementType } from '../core/types';
-import { SERVER_AUTHOR_FIELDS } from '../core/constants';
+import { SERVER_AUTHOR_FIELDS, isProfileField } from '../core/constants';
 import { OW_LINK_HREF_RE, createOwLinkScanner } from '../core/ow-links';
 import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
 
@@ -182,7 +183,9 @@ export function rekeyBody(body: Element, map: IdMap): { body: Element; changed: 
   let out: Record<string, unknown> | null = null;
   const src = body as unknown as Record<string, unknown>;
   for (const [key, value] of Object.entries(src)) {
-    if (SKIP.has(key)) continue;
+    // A profile key is never an id, even when it equals one (the identity
+    // profile's rule 9, folder spec v0.3.11): rewriting it splits the being.
+    if (SKIP.has(key) || isProfileField(key)) continue;
     let next: unknown = value;
     if (key === SIDECAR) next = rekeySidecar(value, map);
     else if (key === BLOCKS) next = rekeyBlocks(value, map);

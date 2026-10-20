@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.66.0',
+    date: '2026-10-20',
+    theme: 'The same being in two worlds',
+    entries: [
+      {
+        id: 'identity-key',
+        title: 'An identity key is shown, never changed',
+        body: 'Some tools mark two elements, in one world or in two, as the same being with an identity key. Atlas shows that key on the element, where you can read it but not change or remove it, and keeps it as it is when it gives elements new ids. A custom field can no longer be named Identity key.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.65.0',
     date: '2026-10-20',
     theme: 'Quiet text you can read',
