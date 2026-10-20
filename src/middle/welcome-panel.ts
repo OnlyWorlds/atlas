@@ -191,18 +191,18 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
            <span class="atlas-landing-choice-note">${note}</span>
          </span>`;
       const doors = [
-        choice('start-world', 'atlas-btn-primary', 'start a world', folderMode
-          ? 'your first world, in a folder on your drive or in this browser'
-          : 'it lives in this browser'),
+        choice('start-world', 'atlas-btn-primary', 'Start a world', folderMode
+          ? 'Your first world, in a folder on your drive or in this browser'
+          : 'It lives in this browser'),
         // #113: the demo world as the user's own copy (needs browser storage).
-        choice('try-demo', 'atlas-btn-ghost', 'explore Moppetopia', 'a demo world, your own copy to change'),
+        choice('try-demo', 'atlas-btn-ghost', 'Explore Moppetopia', 'A demo world, your own copy to change'),
       ].join('');
       const link = (action: string, label: string, hint: string): string =>
         `<button type="button" class="atlas-btn-link atlas-landing-more-link" data-door="${action}" data-action="${action}" title="${hint}">${label}</button>`;
       const more = [
-        link('start-tour', tourDone ? 'replay the tour' : 'take the tour', 'a guided build of a world from one sentence of a novel'),
-        folderMode ? link('open-world-folder', 'open a world folder', 'one you already have, from Atlas, another tool or your AI') : '',
-        link('other-ways-in', 'other ways in', 'download one from OnlyWorlds, view a shared world, open a world file'),
+        link('start-tour', tourDone ? 'Replay the tour' : 'Take the tour', 'A guided build of a world from one sentence of a novel'),
+        folderMode ? link('open-world-folder', 'Open a world folder', 'One you already have, from Atlas, another tool or your AI') : '',
+        link('other-ways-in', 'Other ways in', 'Download one from OnlyWorlds, view a shared world, open a world file'),
       ].filter(Boolean).join('<span class="atlas-landing-more-sep" aria-hidden="true">·</span>');
       // The note names the DESKTOP part of the constraint (S323): mobile
       // Chrome has no folder picker either, so the sentence says "desktop".
@@ -265,8 +265,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           const note = root.querySelector(`[data-door="${action}"] .atlas-landing-choice-note`);
           if (note) note.textContent = text;
         };
-        caption('start-world', 'your first world, in a folder on your drive');
-        root.querySelector('[data-door="other-ways-in"]')?.setAttribute('title', 'download one from OnlyWorlds, or view a shared world');
+        caption('start-world', 'Your first world, in a folder on your drive');
+        root.querySelector('[data-door="other-ways-in"]')?.setAttribute('title', 'Download one from OnlyWorlds, or view a shared world');
         const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
         if (!note) return;
         // A full origin is not a private window (gate B20): say which.

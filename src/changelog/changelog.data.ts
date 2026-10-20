@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.59.1',
+    date: '2026-10-20',
+    theme: 'One way of writing labels',
+    entries: [
+      {
+        id: 'sentence-case-house-rule',
+        title: 'Labels read in sentence case everywhere',
+        body: 'The first screen\'s doors and the room names along the top now start with a capital, and field names take one only on their first word ("Birth date", "Image URL"): the house rule for every OnlyWorlds tool. A few messages say "cannot" where they said "can\'t", and a pane with no world open now says what to do: pick one from the sidebar.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.59.0',
     date: '2026-10-20',
     theme: 'A shared world asks before it overwrites',

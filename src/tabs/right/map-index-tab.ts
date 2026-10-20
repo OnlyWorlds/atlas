@@ -253,7 +253,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     const viewOnly = worldIsViewOnly();
     if (!gate.changed([state.active, state.data, state.ui, searchTerm, rerenderSeq, viewOnly])) return;
     if (!state.active) {
-      root.innerHTML = `<div class="atlas-pane-empty">No active world.</div>`;
+      root.innerHTML = `<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>`;
       return;
     }
     root.innerHTML = '';

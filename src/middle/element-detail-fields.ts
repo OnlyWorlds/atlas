@@ -814,12 +814,14 @@ export function humanizeFieldName(name: string): string {
   // field name still uses the prefix; the row tooltip discloses it (D9).
   const ns = EXTENSION_FIELD_NAMESPACES.find(p => name.startsWith(p));
   const cleaned = ns ? name.slice(ns.length) : name;
+  // Sentence case, acronyms kept ("Birth date", "Image URL"): the house rule
+  // (the Captain, h63 #8074; Seethe's F-28).
   return cleaned
     .split('_')
-    .map(word => {
+    .map((word, i) => {
       const lower = word.toLowerCase();
       if (ACRONYMS.has(lower)) return lower.toUpperCase();
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
+      return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
     })
     .join(' ');
 }

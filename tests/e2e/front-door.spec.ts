@@ -59,8 +59,8 @@ test('first visit: two doors, start a world and Moppetopia, then the tour, a wor
   const doors = page.locator('.atlas-landing-actions .atlas-landing-btn');
   // #127 (the Captain's Q4): two doors; the rest is one quiet line of links,
   // the tour one click from the first screen (his Q5).
-  await expect(doors).toHaveText(['start a world', 'explore Moppetopia']);
-  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['take the tour', 'open a world folder', 'other ways in']);
+  await expect(doors).toHaveText(['Start a world', 'Explore Moppetopia']);
+  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Take the tour', 'Open a world folder', 'Other ways in']);
   await expect(page.locator('.atlas-landing-note')).toBeHidden();
 
   await page.click('[data-action="other-ways-in"]');
@@ -80,11 +80,11 @@ test('first visit, browser storage refused on Chromium: no tour, and the doors l
   await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage');
   await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
   const notes = page.locator('.atlas-landing-choice-note');
-  await expect(notes).toHaveText(['your first world, in a folder on your drive']);
+  await expect(notes).toHaveText(['Your first world, in a folder on your drive']);
   // The link line keeps the folder doors, without a dangling separator.
-  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['open a world folder', 'other ways in']);
+  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Open a world folder', 'Other ways in']);
   await expect(page.locator('.atlas-landing-more-sep')).toHaveCount(1);
-  await expect(page.locator('[data-action="other-ways-in"]')).toHaveAttribute('title', 'download one from OnlyWorlds, or view a shared world');
+  await expect(page.locator('[data-action="other-ways-in"]')).toHaveAttribute('title', 'Download one from OnlyWorlds, or view a shared world');
 });
 
 test('first visit: start a world asks where, folder first, and the browser row lands a world in this browser', async ({ page }) => {

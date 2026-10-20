@@ -56,7 +56,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   const state = getState();
   const worldId = state.active?.worldId;
   if (!worldId) {
-    pane.innerHTML = `<div class="atlas-empty-state">No active world.</div>`;
+    pane.innerHTML = `<div class="atlas-empty-state">No world open. Pick one from the sidebar.</div>`;
     return;
   }
   const map = state.data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);

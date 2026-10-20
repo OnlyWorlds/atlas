@@ -538,7 +538,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   });
   expect(after).toEqual({ worlds: 0, active: false, done: '1' });
   // S301: the doors lost their headings — the button IS the label now.
-  await expect(page.locator('[data-action="start-tour"]')).toContainText('replay the tour');
+  await expect(page.locator('[data-action="start-tour"]')).toContainText('Replay the tour');
 });
 
 test('the pin beat is a SOFT correction: place anywhere, Next only over the swamps (S303)', async ({ page }) => {

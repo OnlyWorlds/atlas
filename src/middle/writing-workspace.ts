@@ -598,7 +598,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   function render(): void {
     const state = getState();
     if (!state.active) {
-      root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      root.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
       teardownEditor();
       return;
     }

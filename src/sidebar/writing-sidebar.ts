@@ -184,7 +184,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     if (!gate.changed([s.active, s.data, s.registry, window.location.hash, searchQuery, isTourFlagActive()])) return;
     const active = getState().active;
     if (!active) {
-      root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      root.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
       return;
     }
     subtreeLinkMemo = new Map();

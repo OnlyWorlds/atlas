@@ -149,7 +149,7 @@ test('object-valued extension fields render read-only, never as an editable row'
   // …the UNKNOWN structured field falls back to the generic read-only row…
   const generic = page.locator('.atlas-custom-structured-row:not(.atlas-custom-structured-card)');
   await expect(generic).toHaveCount(1);
-  await expect(generic.locator('.atlas-custom-structured-label')).toHaveText('Other Tool');
+  await expect(generic.locator('.atlas-custom-structured-label')).toHaveText('Other tool');
   await expect(generic.locator('.atlas-custom-structured-value')).toContainText('"unknown structure"');
   // …and NEITHER renders as an editable field row (the destruction class).
   await expect(page.locator('.atlas-field[data-field="x_tangle_battle"]')).toHaveCount(0);

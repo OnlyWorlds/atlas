@@ -182,7 +182,7 @@ test('a range start cannot pass its recorded end (popover rejects, nothing writt
   await input.fill('99');
   await input.press('Enter');
 
-  await expect(page.locator('.ow-toast', { hasText: "the start can't pass the end (8)" })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: "the start cannot pass the end (8)" })).toBeVisible();
   expect(await page.evaluate((id) => {
     return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.start_date ?? null;
   }, siegeId)).toBe(5);
@@ -257,7 +257,7 @@ test('an end-stretch cannot precede the start (popover rejects, nothing written)
   await input.fill('-25');
   await input.press('Enter');
 
-  await expect(page.locator('.ow-toast', { hasText: "the end can't precede the start (-20)" })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: "the end cannot precede the start (-20)" })).toBeVisible();
   expect(await page.evaluate((id) => {
     return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.end_date ?? null;
   }, siegeId)).toBe(5);

@@ -420,14 +420,14 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const endRaw = mapping.end ? (el as Record<string, unknown>)[mapping.end] : undefined;
       const endVal = parseTemporalValue(endRaw);
       if (endVal != null && date > endVal) {
-        toasts.error(`The start can't pass the end (${endVal})`);
+        toasts.error(`The start cannot pass the end (${endVal})`);
         return;
       }
     } else {
       const startRaw = mapping.start ? (el as Record<string, unknown>)[mapping.start] : undefined;
       const startVal = parseTemporalValue(startRaw);
       if (startVal != null && date < startVal) {
-        toasts.error(`The end can't precede the start (${startVal})`);
+        toasts.error(`The end cannot precede the start (${startVal})`);
         return;
       }
     }

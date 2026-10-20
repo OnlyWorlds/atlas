@@ -334,7 +334,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     // already refuses both, but a future drag source could bypass that —
     // gate at the drop site too so the rule lives where pins are created).
     if (payload.type === 'zone' || payload.type === 'map') {
-      toasts.info(`${payload.type}s can't be pinned`);
+      toasts.info(`${payload.type}s cannot be pinned`);
       return;
     }
     const lMap = manager.getMap();

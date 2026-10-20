@@ -43,7 +43,7 @@ export function mountWritingSetup(
 ): () => void {
   const active = getState().active;
   if (!active) {
-    target.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+    target.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
     return () => {};
   }
   const worldId = active.worldId;

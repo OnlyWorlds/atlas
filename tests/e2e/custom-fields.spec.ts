@@ -117,7 +117,7 @@ test('add-field flow: name → x_ prefix → value editor auto-opens → save', 
 
   // Row appears with the clean label; the value editor auto-opened.
   const row = page.locator(`${section} [data-field="x_battle_cry"]`);
-  await expect(row.locator('.atlas-field-label span').first()).toHaveText('Battle Cry');
+  await expect(row.locator('.atlas-field-label span').first()).toHaveText('Battle cry');
   const popover = page.locator('.atlas-edit-popover');
   await expect(popover).toBeVisible();
 

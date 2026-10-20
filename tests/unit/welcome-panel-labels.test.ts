@@ -39,8 +39,8 @@ describe('welcome-panel label restores', () => {
     expect(source).not.toContain(`textContent = 'Take the tour'`);
   });
 
-  it('still renders the lowercase door labels the design calls for', () => {
-    for (const label of ["'start a world'", "'open a world folder'", "'other ways in'"]) expect(source).toContain(label);
+  it('renders the door labels in sentence case (the Captain, h63 #8074: sentence case everywhere)', () => {
+    for (const label of ["'Start a world'", "'Explore Moppetopia'", "'Open a world folder'", "'Other ways in'"]) expect(source).toContain(label);
   });
 
   it('the tour door has TWO labels, which is why capturing beats restating', () => {
@@ -48,7 +48,7 @@ describe('welcome-panel label restores', () => {
     // restore could not be right for both, and the shipped one ("Take the
     // tour") was right for neither. A returning user who hit a launch error
     // would have watched "replay the tour" become "Take the tour".
-    expect(source).toContain(`'replay the tour'`);
-    expect(source).toContain(`'take the tour'`);
+    expect(source).toContain(`'Replay the tour'`);
+    expect(source).toContain(`'Take the tour'`);
   });
 });

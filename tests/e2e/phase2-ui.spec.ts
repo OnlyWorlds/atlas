@@ -52,7 +52,7 @@ test('first launch shows the landing, not create-local', async ({ page }) => {
   // S301: the landing doors lost their headings and boxes; the buttons carry
   // the label, in the tool's lowercase voice (1.17: "set up a folder" became
   // "start a world", whose dialog asks where).
-  await expect(page.locator('.atlas-middle')).toContainText('start a world');
+  await expect(page.locator('.atlas-middle')).toContainText('Start a world');
   // The tour door (2026-07-19) leads the landing.
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
 });

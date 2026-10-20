@@ -22,24 +22,29 @@ describe('humanizeFieldName', () => {
     expect(humanizeFieldName('description')).toBe('Description');
   });
 
+  it('is sentence case: only the first word takes a capital (the Captain, h63 #8074; Seethe F-28)', () => {
+    expect(humanizeFieldName('birth_date')).toBe('Birth date');
+    expect(humanizeFieldName('primary_power')).toBe('Primary power');
+  });
+
   it('uppercases known acronyms', () => {
     expect(humanizeFieldName('image_url')).toBe('Image URL');
-    expect(humanizeFieldName('api_key')).toBe('API Key');
-    expect(humanizeFieldName('ui_state')).toBe('UI State');
-    expect(humanizeFieldName('html_content')).toBe('HTML Content');
+    expect(humanizeFieldName('api_key')).toBe('API key');
+    expect(humanizeFieldName('ui_state')).toBe('UI state');
+    expect(humanizeFieldName('html_content')).toBe('HTML content');
     expect(humanizeFieldName('uuid')).toBe('UUID');
-    expect(humanizeFieldName('sdk_version')).toBe('SDK Version');
+    expect(humanizeFieldName('sdk_version')).toBe('SDK version');
   });
 
   it('handles ACRONYMS additions from session 224', () => {
     // PIN and GPS were added — verify they still uppercase.
-    expect(humanizeFieldName('pin_code')).toBe('PIN Code');
-    expect(humanizeFieldName('gps_coords')).toBe('GPS Coords');
+    expect(humanizeFieldName('pin_code')).toBe('PIN code');
+    expect(humanizeFieldName('gps_coords')).toBe('GPS coords');
   });
 
   it('handles multi-word names with mixed acronyms', () => {
-    expect(humanizeFieldName('image_url_thumbnail')).toBe('Image URL Thumbnail');
-    expect(humanizeFieldName('api_key_id')).toBe('API Key ID');
+    expect(humanizeFieldName('image_url_thumbnail')).toBe('Image URL thumbnail');
+    expect(humanizeFieldName('api_key_id')).toBe('API key ID');
   });
 
   it('handles already-capitalized input', () => {

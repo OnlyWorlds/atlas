@@ -1430,7 +1430,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
   function render(): void {
     if (!wid()) {
-      root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      root.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
       destroyEditorSession();
       mountedView = null;
       return;

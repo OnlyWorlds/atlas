@@ -198,7 +198,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
         // shortener written when the label was "Import & export" and stranded
         // by the rename to "Data" — so the tooltip said Data and the label
         // underneath said import, on one control.
-        `<span class="atlas-room-nav-label">${room.label.toLowerCase()}</span>`;
+        `<span class="atlas-room-nav-label">${room.label}</span>`;
       strip.appendChild(btn);
     }
     wasPreview = true;
@@ -253,7 +253,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       // Labels ride along while settling (then collapse) or permanently when
       // the ghost expander has them toggled on.
       const labelHtml = (settling || labelsOn) && PREVIEW_ROOM_IDS.has(room.id)
-        ? `<span class="atlas-room-nav-label">${room.label.toLowerCase()}</span>`
+        ? `<span class="atlas-room-nav-label">${room.label}</span>`
         : '';
       btn.innerHTML = `<span class="material-symbols-outlined">${room.icon}</span>${labelHtml}`;
       btn.addEventListener('click', () => {

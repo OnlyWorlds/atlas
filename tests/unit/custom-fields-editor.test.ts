@@ -114,9 +114,9 @@ describe('customFieldNameProblem', () => {
 describe('humanizeFieldName prefix stripping', () => {
   it('strips all three extension namespaces', () => {
     expect(humanizeFieldName('x_mood')).toBe('Mood');
-    expect(humanizeFieldName('shadow_secret_note')).toBe('Secret Note');
+    expect(humanizeFieldName('shadow_secret_note')).toBe('Secret note');
     expect(humanizeFieldName('atlas_aliases')).toBe('Aliases');
-    expect(humanizeFieldName('x_population_count')).toBe('Population Count');
+    expect(humanizeFieldName('x_population_count')).toBe('Population count');
   });
 });
 
