@@ -58,8 +58,20 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.66.0',
     date: '2026-10-20',
-    theme: 'The same being in two worlds',
+    theme: 'Light mode you can read, and one being in two worlds',
     entries: [
+      {
+        id: 'light-text',
+        title: 'Light mode reads as clearly as dark',
+        body: 'In light mode, the quiet text that read well on black was too pale on white: setting names, counts, field labels and hints. It now uses the same quiet grey as the rest, and links and button words take a deeper blue that stays readable on their own tint. Empty fields on an element are quieter by colour, not by fading.',
+        tags: ['layout'],
+      },
+      {
+        id: 'control-font',
+        title: 'Buttons and tabs in the same typeface as the page',
+        body: 'Some buttons, tabs and chips, such as the Settings tabs, the chart filters and the counts on the type filters, were drawn in the browser\'s default typeface. They now use Open Sans like the rest of Atlas.',
+        tags: ['layout'],
+      },
       {
         id: 'identity-key',
         title: 'An identity key is shown, never changed',

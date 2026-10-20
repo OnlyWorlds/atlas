@@ -129,14 +129,14 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const readOnly = worldIsViewOnly() || isKnownOf(el);
   if (readOnly) wrap.classList.add('atlas-field-readonly');
 
-  // T-E1 (Bout E): sparse elements read as a wall of placeholder rows — dim
-  // whole empty rows a step further. Hover restores full strength so the
-  // edit affordance survives (see atlas.css .atlas-field-empty-row).
+  // T-E1 (Bout E): sparse elements read as a wall of placeholder rows, so an
+  // empty row's label sits a step quieter, by colour (F-43). Hover restores it
+  // (see atlas.css .atlas-field-empty-row).
   const rowRaw = (el as Record<string, unknown>)[meta.name];
   const rowEmpty = Array.isArray(rowRaw) ? rowRaw.length === 0 : !formatValue(rowRaw);
   if (rowEmpty) wrap.classList.add('atlas-field-empty-row');
   // Link-field candidate awareness (S264): an empty link field whose target
-  // type has ZERO elements in the world stays extra-muted (there is nothing to
+  // type has ZERO elements in the world is marked apart (there is nothing to
   // pick — clicking it offers creation instead); an empty link field WITH
   // candidates keeps the brighter baseline so "there's something to connect
   // here" is visible at a glance.

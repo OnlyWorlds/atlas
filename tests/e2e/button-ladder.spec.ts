@@ -39,7 +39,8 @@ const LADDER = {
   },
   light: {
     entry: { bg: 'rgb(14, 116, 144)', ink: 'rgb(255, 255, 255)' },
-    standard: { bg: 'rgba(14, 116, 144, 0.14)', edge: 'rgba(14, 116, 144, 0.6)', ink: 'rgb(14, 116, 144)' },
+    // A light word on the wash is #155e75 (Seethe's corrected ladder, h63 #8801; conv. 157): #0e7490 read 4.27.
+    standard: { bg: 'rgba(14, 116, 144, 0.14)', edge: 'rgba(14, 116, 144, 0.6)', ink: 'rgb(21, 94, 117)' },
   },
 } as const;
 
