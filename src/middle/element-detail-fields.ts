@@ -813,7 +813,8 @@ export function humanizeFieldName(name: string): string {
   const cleaned = ns ? name.slice(ns.length) : name;
   // Sentence case, acronyms kept ("Birth date", "Image URL"): the house rule
   // (the Captain, h63 #8074), one copy for every tool since SDK 4.34
-  // (seeded from this function, Kael h63 #8126).
+  // (seeded from this function, Kael h63 #8126); a word in capitals is
+  // kept as written since 4.36 ("STR", Kael h63 #8201).
   return fieldLabel(cleaned);
 }
 

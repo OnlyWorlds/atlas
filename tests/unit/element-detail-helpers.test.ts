@@ -49,7 +49,10 @@ describe('humanizeFieldName', () => {
 
   it('handles already-capitalized input', () => {
     expect(humanizeFieldName('Name')).toBe('Name');
-    expect(humanizeFieldName('IMAGE_URL')).toBe('Image URL');
+    // A word written in capitals stays as written (SDK 4.36, Kael h63 #8201): a stat block reads STR.
+    expect(humanizeFieldName('IMAGE_URL')).toBe('IMAGE URL');
+    expect(humanizeFieldName('x_STR')).toBe('STR');
+    expect(humanizeFieldName('x_max_HP')).toBe('Max HP');
   });
 
   it('handles single character / edge cases', () => {
