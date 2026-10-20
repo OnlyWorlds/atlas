@@ -1060,6 +1060,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           const fullBtn = document.createElement('button');
           fullBtn.type = 'button';
           fullBtn.className = 'atlas-share-pin-full-toggle' + (isFull ? ' is-on' : '');
+          fullBtn.setAttribute('aria-pressed', isFull ? 'true' : 'false');
           fullBtn.textContent = 'Full';
           fullBtn.title = isFull
             ? 'Sharing every populated field of this element. Click to share only name, type, description and image'
