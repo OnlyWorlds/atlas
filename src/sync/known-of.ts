@@ -25,13 +25,28 @@ export function isKnownOf(el: unknown): boolean {
   return !!el && typeof el === 'object' && (el as Record<string, unknown>).known_of === true;
 }
 
+/** Who wrote it: null on every stub keel serves (the SDK's `known_of` doc), never kept on one. */
+const KNOWN_OF_AUTHOR_KEYS: readonly string[] = ['created_by', 'changed_by', 'changed_via'];
+
+function unset(v: unknown): boolean {
+  return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
 /**
- * I1 (rule 1): a stub as it is, `known_of: true` and only the kept keys. The
+ * I1 (rule 1): a stub as it is, `known_of: true`, the kept keys, and the
+ * fields keel shares on a stub (keel #448, PR 117: a Character's physicality,
+ * height, weight, species and reputation, from a public tag in keel's
+ * schema). keel serves every other field unset, so a field with a value is one
+ * keel shares: read from the wire, never from a list here that keel's schema
+ * outgrows (S444: this list alone dropped PR 117's fields on live 1.64.0). The
  * unset fields are left out, never written as `""`, `null` or `[]`.
  */
 export function stubShape(record: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const k of KNOWN_OF_KEPT_KEYS) if (k in record) out[k] = record[k];
+  for (const [k, v] of Object.entries(record)) {
+    if (KNOWN_OF_AUTHOR_KEYS.includes(k) || k === 'change_seq') continue;
+    if (KNOWN_OF_KEPT_KEYS.includes(k) || !unset(v)) out[k] = v;
+  }
   out.known_of = true;
   return out;
 }

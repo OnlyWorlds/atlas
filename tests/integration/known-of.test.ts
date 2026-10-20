@@ -23,18 +23,23 @@ const KID = '00000000-0000-4000-8000-0000000000b1';
 const ANA = '00000000-0000-4000-8000-0000000000b2';
 const STAMP = '2026-01-01T00:00:05.000Z';
 
-/** keel's stub of a whole record, as served live: the kept keys, every other field unset. */
+/**
+ * keel's stub of a whole record, as served live since PR 117 (S444's probe,
+ * `Forge/Notes/ui-snapshots/2026-10-20-s444/probe-stub.log`): the kept keys and
+ * a Character's public fields, every other field unset.
+ */
 function asStub(whole: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(whole)) {
-    if (['id', 'type', 'name', 'description', 'supertype', 'subtype', 'image_url', 'created_at', 'updated_at'].includes(k)) out[k] = v;
+    if (['id', 'type', 'name', 'description', 'supertype', 'subtype', 'image_url', 'created_at', 'updated_at',
+      'physicality', 'height', 'weight', 'species', 'reputation'].includes(k)) out[k] = v;
     else out[k] = Array.isArray(v) ? [] : typeof v === 'string' ? '' : null;
   }
   out.known_of = true;
   return out;
 }
 
-const anaWhole = { id: ANA, type: 'character', name: 'Ana', description: 'Sells mules.', reputation: 'Honest', friends: [KID], updated_at: STAMP };
+const anaWhole = { id: ANA, type: 'character', name: 'Ana', description: 'Sells mules.', reputation: 'Honest', mentality: 'Sly', height: null, friends: [KID], updated_at: STAMP };
 
 // ---- the stores (I1, I2, I5) ----
 
@@ -56,13 +61,13 @@ async function mockStore(): Promise<FolderStore> {
 }
 
 describe.each([['the real store', realStore], ['the mock store', mockStore]] as const)('%s', (_name, make) => {
-  it('writes a stub as a stub: known_of and the kept keys, the unset fields left out (I1)', async () => {
+  it('writes a stub as a stub: known_of, the kept keys and what keel shares, the unset fields left out (I1; PR 117)', async () => {
     const s = await make();
     await s.applyServerRecord('character', asStub(anaWhole), STAMP);
     const got = (await s.getElement(ANA)) as unknown as Record<string, unknown>;
     expect(got.known_of).toBe(true);
-    expect([got.name, got.description]).toEqual(['Ana', 'Sells mules.']);
-    for (const unset of ['reputation', 'friends', 'height', 'created_by']) expect(unset in got).toBe(false);
+    expect([got.name, got.description, got.reputation]).toEqual(['Ana', 'Sells mules.', 'Honest']);
+    for (const unset of ['mentality', 'friends', 'height', 'created_by']) expect(unset in got).toBe(false);
   });
 
   it('a stub over a whole copy keeps none of the copy\'s wire fields, only the person\'s own (I1)', async () => {
@@ -142,7 +147,7 @@ function reset(reason: 'view' | 'role'): void {
 
 async function world(engine: SyncEngine): Promise<void> {
   await client.createElement('character', { id: KID, name: 'The Kid', friends: [ANA] });
-  await client.createElement('character', { id: ANA, name: 'Ana', description: 'Sells mules.', reputation: 'Honest' });
+  await client.createElement('character', { id: ANA, name: 'Ana', description: 'Sells mules.', reputation: 'Honest', mentality: 'Sly' });
   await engine.pullNow();
 }
 const local = async (id: string) => (await folder.getElement(id)) as unknown as Record<string, unknown>;
@@ -152,7 +157,7 @@ describe('the engine', () => {
     stubbed.add(ANA);
     await world(new SyncEngine({ folder, client }));
     const ana = await local(ANA);
-    expect([ana.known_of, 'reputation' in ana]).toEqual([true, false]);
+    expect([ana.known_of, 'mentality' in ana, ana.reputation]).toEqual([true, false, 'Honest']);
   });
 
   it('a stub arriving whole lands though its stamp did not move (I2)', async () => {
@@ -173,7 +178,7 @@ describe('the engine', () => {
     reset('view');
     await engine.pullNow();
     const ana = await local(ANA);
-    expect([ana.known_of, 'reputation' in ana]).toEqual([true, false]);
+    expect([ana.known_of, 'mentality' in ana, ana.reputation]).toEqual([true, false, 'Honest']);
   });
 
   it('a whole copy is kept as last known on a role reset (I3, B12)', async () => {

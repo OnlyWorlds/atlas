@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.64.1',
+    date: '2026-10-20',
+    theme: 'What anyone could see',
+    entries: [
+      {
+        id: 'known-of-shared',
+        title: 'Someone you only know of shows what anyone could see',
+        body: "OnlyWorlds now shares a little more of a Character you only know of: what anyone could see of them, such as how they look and their reputation. Atlas shows those on the page, where you can read them but not change them, under a line that says you know only what anyone could see. Before, Atlas left them out.",
+        tags: ['world', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.64.0',
     date: '2026-10-20',
     theme: 'What your Character knows of',

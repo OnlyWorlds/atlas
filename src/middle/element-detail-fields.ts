@@ -18,6 +18,7 @@
 
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
+import { isKnownOf } from '../sync/known-of';
 import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType, type WorldMap } from '../core/types';
@@ -124,7 +125,8 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   wrap.dataset.field = meta.name;
   // A view-only world reads (conv. 149): no click-to-edit, picker, × or
   // placeholder glyph, since the store refuses every write there.
-  const readOnly = worldIsViewOnly();
+  // keel's stub reads the same way in any world (conv. 155, I5).
+  const readOnly = worldIsViewOnly() || isKnownOf(el);
   if (readOnly) wrap.classList.add('atlas-field-readonly');
 
   // T-E1 (Bout E): sparse elements read as a wall of placeholder rows — dim

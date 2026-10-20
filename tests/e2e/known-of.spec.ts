@@ -29,16 +29,16 @@ async function setupWorld(page: Page) {
 const ANA = '00000000-0000-4000-8000-0000000000b2';
 const KID = '00000000-0000-4000-8000-0000000000b1';
 
-test('a stub reads as known of: name, picture and description, no rows, no rename; a whole Character keeps its page', async ({ page }) => {
+test('a stub reads as known of: name, picture, description and what keel shares, read only, no rename; a whole Character keeps its page', async ({ page }) => {
   await setupWorld(page);
   const worldId = await page.evaluate(async ({ ANA, KID }) => {
     const api = (window as any).__atlasTestApi;
     const store = api.getActiveStore();
     const at = '2026-10-20T11:54:07.533243+00:00';
-    // As keel served it live (probe-stub.log): every other field unset.
+    // As keel serves it live since PR 117 (S444 probe-stub.log): the public fields kept, every other field unset.
     await store.applyServerRecord('character', {
       id: ANA, type: 'character', name: 'Ana', description: 'Sells mules.', supertype: '', subtype: '', image_url: '',
-      reputation: '', height: null, friends: [], location: null, created_at: at, updated_at: at, known_of: true,
+      reputation: 'Honest', physicality: 'Tall', mentality: '', height: null, friends: [], location: null, created_at: at, updated_at: at, known_of: true,
     }, at);
     await store.applyServerRecord('character', { id: KID, type: 'character', name: 'The Kid', description: 'Rides west.', friends: [ANA], updated_at: at }, at);
     api.patchData(await store.listElements());
@@ -48,9 +48,12 @@ test('a stub reads as known of: name, picture and description, no rows, no renam
   await page.evaluate(([w, id]) => { location.hash = `#/w/${w}/element/${id}`; }, [worldId, ANA]);
   const body = page.locator(`.atlas-middle-body[data-element-id="${ANA}"]`);
   await expect(body).toBeVisible();
-  await expect(body.locator('[data-role="known-of"]')).toHaveText('Known of: you know of this one, not its details.');
+  await expect(body.locator('[data-role="known-of"]')).toHaveText('Known of: you know only what anyone could see of Ana.');
   await expect(body.locator('.atlas-known-of-description')).toHaveText('Sells mules.');
-  await expect(body.locator('[data-field]')).toHaveCount(0);
+  // Only what keel shares, as rows nothing changes (conv. 155, I5, I6).
+  expect(await body.locator('[data-field]').evaluateAll(rs => rs.map(r => r.getAttribute('data-field')).sort())).toEqual(['physicality', 'reputation']);
+  await expect(body.locator('[data-field].atlas-field-readonly')).toHaveCount(2);
+  await expect(body.locator('[data-field="mentality"]')).toHaveCount(0);
   await expect(body.locator('.atlas-empty-fields-toggle')).toHaveCount(0);
   await page.locator('[data-role="element-name"]').click();
   await expect(page.locator('[data-role="element-name"] input, .atlas-element-name-input')).toHaveCount(0);
@@ -61,4 +64,21 @@ test('a stub reads as known of: name, picture and description, no rows, no renam
   await expect(whole).toBeVisible();
   await expect(whole.locator('[data-role="known-of"]')).toHaveCount(0);
   await expect(whole.locator('[data-field="description"]')).toBeVisible();
+});
+
+test('a stub with nothing shared shows no rows at all (never a first section of empty ones)', async ({ page }) => {
+  await setupWorld(page);
+  const worldId = await page.evaluate(async ({ ANA }) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const at = '2026-10-20T11:54:07.533243+00:00';
+    // keel before PR 117, or a type with no public fields: every field but the kept keys unset.
+    await store.applyServerRecord('character', { id: ANA, type: 'character', name: 'Ana', description: 'Sells mules.', reputation: '', height: null, created_at: at, updated_at: at, known_of: true }, at);
+    api.patchData(await store.listElements());
+    return api.getState().active.worldId as string;
+  }, { ANA });
+  await page.evaluate(([w, id]) => { location.hash = `#/w/${w}/element/${id}`; }, [worldId, ANA]);
+  const body = page.locator(`.atlas-middle-body[data-element-id="${ANA}"]`);
+  await expect(body.locator('[data-role="known-of"]')).toBeVisible();
+  await expect(body.locator('[data-field]')).toHaveCount(0);
 });

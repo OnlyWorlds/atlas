@@ -206,13 +206,15 @@ export function mountElementDetail(target: HTMLElement): () => void {
       }
     }
 
-    // keel's stub (conv. 155, I6): the name, the picture and the description, and a line
-    // saying it is known of. Its other fields are unknown, not empty, so no rows show.
+    // keel's stub (conv. 155, I6): the name, the picture and the description, a line
+    // saying it is known of, and the fields keel shares on it (PR 117) as read-only
+    // rows. Its other fields are unknown, not empty, so they never show, toggle or not.
     if (isKnownOf(el)) {
       const note = document.createElement('p');
       note.className = 'atlas-known-of-note';
       note.dataset.role = 'known-of';
-      note.textContent = 'Known of: you know of this one, not its details.';
+      const named = typeof el.name === 'string' && el.name.trim() ? el.name.trim() : 'this one';
+      note.textContent = `Known of: you know only what anyone could see of ${named}.`;
       detail.appendChild(note);
       const description = typeof el.description === 'string' ? el.description.trim() : '';
       if (description) {
@@ -220,6 +222,15 @@ export function mountElementDetail(target: HTMLElement): () => void {
         text.className = 'atlas-known-of-description';
         text.textContent = description;
         detail.appendChild(text);
+      }
+      // Only filled rows, never filledSections' fallback of a whole first section.
+      const shown = new Set(['name', 'description', 'image_url']);
+      const shared = sectionsFor(el.type)
+        .map(section => ({ ...section, fields: section.fields.filter(f => !shown.has(f.name) && isFieldFilled(el, f.name)) }))
+        .filter(section => section.fields.length > 0);
+      for (const section of shared) {
+        const sectionEl = renderSection(section, el, false);
+        if (sectionEl) detail.appendChild(sectionEl);
       }
       const knownRefs = renderReferencedBy(el);
       if (knownRefs) detail.appendChild(knownRefs);
