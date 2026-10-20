@@ -113,4 +113,76 @@ describe('the role, said once (I4)', () => {
     expect(said).toHaveLength(1);
     expect(shown.filter(s => /deleted/i.test(s))).toEqual([]);
   });
+
+  it('a lowering a push finds first moves the role and the kept count at once, and the next pull says it no more (S440)', async () => {
+    // Ids of its own: what was said lives for the session, across this file's tests.
+    const E = '00000000-0000-4000-8000-0000000a0005';
+    await client.createElement('character', { id: A, name: 'Cy' });
+    await client.createElement('character', { id: E, name: 'Ana' });
+    client.keyRole = 'co_builder';
+    const engine = attachSyncEngine(entryNow(), folder)!;
+    await settle();
+    await engine.pullNow();
+    await settle();
+    expect(entryNow().api?.member_role).toBe('co_builder');
+
+    // Lowered while open; the member's edit reaches keel before any pull does.
+    client.keyRole = 'guest';
+    client.outOfView.add(E);
+    await folder.updateElement(E, { description: 'mine' });
+    await engine.pushOnce();
+    await settle();
+    expect(entryNow().api?.member_role).toBe('guest');
+    expect(keptCountFor('w1')).toBe(1);
+    expect(shown.filter(s => /You are now a guest in The Ferry/.test(s))).toHaveLength(1);
+    // The role line says the edit stays here; its own line would say it twice.
+    expect(shown.filter(s => /stays here: OnlyWorlds no longer shows it/.test(s))).toEqual([]);
+    await engine.pushOnce();
+    await settle();
+    expect(shown.filter(s => /stays here: OnlyWorlds no longer shows it/.test(s))).toEqual([]);
+
+    // The resync keeps nothing new here (E was kept by the push): the role line was the news.
+    lowered(new Set([A]));
+    await engine.pullNow();
+    await settle();
+    expect(shown.filter(s => /You are now/.test(s))).toHaveLength(1);
+
+    // That resync used the promise up: a later hide is news of its own.
+    lowered(new Set());
+    await engine.pullNow();
+    await settle();
+    expect(keptCountFor('w1')).toBe(2);
+    expect(shown.filter(s => /1 element of The Ferry is no longer shown to you online/.test(s))).toHaveLength(1);
+  });
+
+  it('the resync after a push said the role keeps its count quiet once; later kept news is said (S440)', async () => {
+    const C = '00000000-0000-4000-8000-0000000a0003';
+    const D = '00000000-0000-4000-8000-0000000a0004';
+    for (const [id, name] of [[A, 'Cy'], [B, 'Ana'], [C, 'Bo'], [D, 'The Ferry']]) await client.createElement('character', { id, name });
+    client.keyRole = 'co_builder';
+    const engine = attachSyncEngine(entryNow(), folder)!;
+    await settle();
+    await engine.pullNow();
+    await settle();
+
+    client.keyRole = 'guest';
+    client.outOfView.add(B);
+    await folder.updateElement(B, { description: 'mine' });
+    await engine.pushOnce();
+    await settle();
+    const noLongerShown = () => shown.filter(s => /no longer shown to you online/.test(s));
+
+    lowered(new Set([A, D]));        // C left with the lowering: the role line promised it
+    await engine.pullNow();
+    await settle();
+    expect(keptCountFor('w1')).toBe(2);
+    expect(noLongerShown()).toEqual([]);
+
+    lowered(new Set([A]));           // later, D leaves the view: news of its own
+    await engine.pullNow();
+    await settle();
+    expect(keptCountFor('w1')).toBe(3);
+    expect(noLongerShown()).toHaveLength(1);
+    expect(shown.filter(s => /You are now/.test(s))).toHaveLength(1);
+  });
 });

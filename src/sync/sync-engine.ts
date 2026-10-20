@@ -2519,6 +2519,10 @@ export class SyncEngine {
     if (busy && !transient && !authBlocked && !this.stopped && this.busyRounds <= 5) {
       this.scheduleTransientRetry(undefined);
     }
+    // The role this round read, reported so Settings moves with the first
+    // kept 404, not at the next pull's resync (S440). A round that never
+    // asked reports nothing; an unknown role is not news.
+    const roundRole = this.roundRole ? await this.roundRole : null;
     return {
       pushed: { creates, updates, deletes },
       pulled: zero(),
@@ -2527,6 +2531,7 @@ export class SyncEngine {
       auth_blocked: authBlocked || undefined,
       ...(transient ? transientFields(transient) : {}),
       ...(keptEdits.length > 0 ? { kept_edit_ids: keptEdits } : {}),
+      ...(roundRole !== null ? { own_role: roundRole } : {}),
     };
   }
 
@@ -3232,9 +3237,9 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   return true;
 }
 
-/** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result. */
+/** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result; the latest phase's role wins. */
 function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept' | 'kept_edit_ids'> {
-  const role = parts.map(p => p.own_role).find(r => r !== undefined);
+  const role = parts.map(p => p.own_role).filter(r => r !== undefined).pop();
   const kept = parts.reduce((n, p) => n + (p.kept ?? 0), 0);
   const edits = [...new Set(parts.flatMap(p => p.kept_edit_ids ?? []))];
   return {

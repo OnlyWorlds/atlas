@@ -247,6 +247,45 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
     expect((await folder.readSyncState()).server_deletes ?? []).toEqual([]);
   });
 
+  it('the push reports the role its round read, so the attach can say it before any pull (S440)', async () => {
+    const engine = new SyncEngine({ folder, client });
+    client.keyRole = 'co_builder';
+    await worldOfThree(engine);
+    client.keyRole = 'guest';
+    client.outOfView.add(B);
+    await folder.updateElement(B, { description: 'edited after the lowering' });
+    const p = await engine.pushOnce();
+    expect(p.own_role).toBe('guest');
+  });
+
+  it('a push that never needed the role reports none and asks keel nothing (S440)', async () => {
+    const engine = new SyncEngine({ folder, client });
+    client.keyRole = 'guest';
+    await worldOfThree(engine);
+    await folder.updateElement(A, { description: 'my own, still in view' });
+    const before = client.meReads;
+    const p = await engine.pushOnce();
+    expect(p.own_role).toBeUndefined();
+    expect(client.meReads).toBe(before);
+  });
+
+  it('a round whose push and pull read different roles reports the pull\'s, the later read (S440)', async () => {
+    const engine = new SyncEngine({ folder, client });
+    client.keyRole = 'co_builder';
+    await worldOfThree(engine);
+    client.outOfView.add(B);
+    await folder.updateElement(B, { description: 'mine' });
+    // The push reads guest; by the pull's resync the owner has raised the key.
+    const realMe = client.me.bind(client);
+    let reads = 0;
+    client.me = async () => (reads++ === 0 ? { role: 'guest' } : realMe());
+    client.keyRole = 'contributor';
+    viewMoves(new Set([A, B, C]));
+    const r = await engine.syncNow();
+    expect(reads).toBeGreaterThan(1);
+    expect(r.own_role).toBe('contributor');
+  });
+
   it('an unknown role on a 404: neither kept nor reviewed, the edit waits for the next round (G5)', async () => {
     const engine = new SyncEngine({ folder, client });
     client.keyRole = 'guest';
@@ -254,7 +293,8 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
     client.meFails = true;
     client.outOfView.add(B);
     await folder.updateElement(B, { description: 'mine' });
-    await engine.pushOnce();
+    const p = await engine.pushOnce();
+    expect(p.own_role).toBeUndefined();       // unknown is not news (S440)
     const st = await folder.readSyncState();
     expect(st.server_deletes ?? []).toEqual([]);
     expect(st.kept_outside_view ?? []).toEqual([]);

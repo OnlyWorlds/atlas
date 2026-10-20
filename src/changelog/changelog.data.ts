@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.60.1',
+    date: '2026-10-20',
+    theme: 'Your new role, said when Atlas first meets it',
+    entries: [
+      {
+        id: 'role-said-at-first-meeting',
+        title: 'Settings names your new role as soon as Atlas finds it',
+        body: 'When your edit is the first thing to meet a role change (the owner made you a guest, and you changed something you no longer see), Atlas now says so at once, and Settings, This world names your new role and the kept count straight away. Before, Settings kept the old role until Atlas next read the world from OnlyWorlds.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.60.0',
     date: '2026-10-20',
     theme: 'Your copy stays yours when your role changes',

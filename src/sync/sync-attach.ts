@@ -358,6 +358,12 @@ function toastFailuresOnce(
 const keptSets: Record<string, ReadonlySet<string>> = {};
 /** `<world>:<element>` whose kept edit was said this session. */
 const keptEditsSaid = new Set<string>();
+/**
+ * The role a push's 404 said this session, per world, until the resync after
+ * it (S440): that round's kept count is what the role line already promised
+ * ("what you no longer see online stays here"), so it is not said again.
+ */
+const roleSaidBeforeResync: Record<string, string> = {};
 
 export function keptCountFor(worldId: string): number {
   return keptSets[worldId]?.size ?? 0;
@@ -394,13 +400,20 @@ async function noteRoleNews(worldId: string, folder: FolderStore, result: SyncRe
     if (line) {
       toastManager.show(line, 'info', 12000);
       roleSaid = true;
+      if (!result.kept && (result.kept_edit_ids?.length ?? 0) > 0) roleSaidBeforeResync[worldId] = result.own_role;
+      else delete roleSaidBeforeResync[worldId];
     }
   }
-  if (result.kept && !roleSaid) toastManager.show(keptLine(entry.name, result.kept), 'info', 10000);
+  if (result.kept && !roleSaid && roleSaidBeforeResync[worldId] !== entry.api.member_role) {
+    toastManager.show(keptLine(entry.name, result.kept), 'info', 10000);
+  }
+  // The promise covers the one resync after it, whatever that resync kept.
+  if (!roleSaid && (result.kept || result.own_role !== undefined)) delete roleSaidBeforeResync[worldId];
   const edits = result.kept_edit_ids ?? [];
   if (edits.some(id => !keptEditsSaid.has(`${worldId}:${id}`))) {
     for (const id of edits) keptEditsSaid.add(`${worldId}:${id}`);
-    toastManager.show(keptEditsLine(entry.name, edits.length), 'info', 10000);
+    // A role line said this round already says "changes you make to it stay here too" (S440).
+    if (!roleSaid) toastManager.show(keptEditsLine(entry.name, edits.length), 'info', 10000);
   }
   if (result.kept || edits.length > 0 || result.own_role !== undefined) await refreshKeptCount(worldId, folder);
 }
