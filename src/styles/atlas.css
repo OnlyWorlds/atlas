@@ -16411,7 +16411,7 @@ body.atlas-share-fullpreview > * {
 
 .atlas-chart-mode button.active {
   background: rgba(var(--atlas-accent-rgb), 0.10);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-chart-mode .material-symbols-outlined { font-size: 17px; }
