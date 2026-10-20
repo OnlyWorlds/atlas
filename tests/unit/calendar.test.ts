@@ -533,3 +533,32 @@ describe('malformed step sizes (S367 critic K1)', () => {
     }
   });
 });
+
+describe('a down era with a mid-year pivot (Quillon h58 #8962)', () => {
+  // Day grain, two 10-day months, a down era and an up era both pivoting at
+  // step 5, half way through a month. What Atlas shows, typed back into the
+  // timeline, must land on the same step on both sides of the pivot; SDK 4.42.2
+  // moved the display and left parseDate's inverse, so dates before the pivot
+  // parsed a year early. Held for the SDK bump past 4.42.2 (4.42.3).
+  const MIDYEAR: CalendarConfig = {
+    version: 1,
+    grain: 'day',
+    eras: [
+      { name: 'Before Gate', abbrev: 'BG', start: 5, direction: 'down', restart: true },
+      { name: 'After Gate', abbrev: 'AG', start: 5, restart: true },
+    ],
+    bundles: { months: { names: ['Frost', 'Thaw'], lengths: [10, 10] } },
+    format: '{day} {month}, {year} {era}',
+  };
+
+  it('every step from 60 before the pivot to 60 after reads back as itself', () => {
+    const misses: string[] = [];
+    for (let step = -55; step <= 65; step++) {
+      const words = formatStep(MIDYEAR, step);
+      const r = parseDate(MIDYEAR, words);
+      const back = isParseError(r) ? 'error' : r.step;
+      if (back !== step) misses.push(`${step} "${words}" -> ${back}`);
+    }
+    expect(misses).toEqual([]);
+  });
+});
