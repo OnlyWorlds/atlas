@@ -41,8 +41,9 @@ vi.mock('../../src/sync/sync-attach', async (importOriginal) => ({
 
 import { captureJoinCode, hasPendingJoin, takePendingJoin } from '../../src/core/join-capture';
 import {
-  JOIN_REFUSED_LINE, JOIN_TAKEN_LINE, isRefusedCode, openJoinedWorld, openPlayerWorld, playerAlreadyHereLine,
-  previewJoin, redeemJoin, redeemPlayerJoin, redeemRefusedSentence, roleLine, seatAgentName, setJoinBaseForTests,
+  JOIN_REFUSED_LINE, JOIN_TAKEN_LINE, isPickRefused, isRefusedCode, isWorldFull, openJoinedWorld, openPlayerWorld,
+  PICK_GONE_LINE, PICK_TAKEN_LINE, pickRefusedLine, playerAlreadyHereLine, previewJoin, redeemJoin, redeemPlayerJoin,
+  redeemRefusedSentence, roleLine, seatAgentName, setJoinBaseForTests, tablePicks, tableTimesLine,
 } from '../../src/setup/join-door';
 
 const WORLD_ID = '068e5012-d77c-799d-8000-95548fbae701';
@@ -302,5 +303,73 @@ describe('a player link', () => {
     expect(getState().registry.worlds).toHaveLength(1);
     expect(getState().registry.worlds[0].api).toEqual({ world_id: WORLD_ID, api_key: 'ow_w_owner' });
     if (out.kind === 'already-here') expect(playerAlreadyHereLine(out)).toContain('the world\'s owner can remove it');
+  });
+});
+
+// keel #422 PR 2 (PR 110; the sheet Orrery/keel/party-link.md §2): one player
+// link for a table, each player picking a Character from the owner's list, or
+// on a table with no list naming a fresh one. A refused pick spends nothing.
+describe('a party link', () => {
+  const TABLE = 'ow_j_' + 'T'.repeat(32);
+  const WHITE = { id: 'c-white', name: 'Captain White' };
+  const DONIPHAN = { id: 'c-doniphan', name: 'Alexander Doniphan' };
+  const LINCOLN = { id: 'c-lincoln', name: 'A. L. Lincoln' };
+  const tablePass = (over: Partial<FakePass> = {}): FakePass => pass({
+    code: TABLE, reader: 'player', maxUses: 5, characters: [WHITE, LINCOLN, DONIPHAN], taken: [LINCOLN.id],
+    expiresAt: '2099-10-26T12:00:00.000Z', ...over,
+  });
+
+  it('is told apart from a link for one, and lists the owner\'s picks in order, taken ones last', async () => {
+    serve([tablePass(), pass({ code: CODE, reader: 'player' })]);
+    const p = await previewJoin(TABLE);
+    expect(p.table).toMatchObject({ maxUses: 5, usesLeft: 5, nameRequired: false });
+    expect(tablePicks(p.table!).map(c => [c.name, c.taken])).toEqual([['Captain White', false], ['Alexander Doniphan', false], ['A. L. Lincoln', true]]);
+    expect(tableTimesLine(p.table!, p.expiresAt)).toBe('The link works 5 times, until 26 October. 5 places are left.');
+    expect((await previewJoin(CODE)).table).toBeUndefined();
+  });
+
+  it('a pick opens as that Character; the next preview has it taken and one place fewer', async () => {
+    serve([tablePass()]);
+    const joined = await redeemPlayerJoin(TABLE, '  Mara ', DONIPHAN.id);
+    expect(joined.character).toEqual(DONIPHAN);
+    expect(redeemed[redeemed.length - 1]).toMatchObject({ code: TABLE, agent_name: 'Mara' });
+    const p = await previewJoin(TABLE);
+    expect(p.table!.usesLeft).toBe(4);
+    expect(p.table!.characters.find(c => c.id === DONIPHAN.id)?.taken).toBe(true);
+  });
+
+  it('a pick taken since the preview, or off the list now, is refused by name and spends nothing', async () => {
+    serve([tablePass({ hidden: [DONIPHAN.id] })]);
+    const taken = await redeemPlayerJoin(TABLE, '', LINCOLN.id).catch(e => e);
+    expect([isPickRefused(taken), pickRefusedLine(taken)]).toEqual([true, PICK_TAKEN_LINE]);
+    const hidden = await redeemPlayerJoin(TABLE, '', DONIPHAN.id).catch(e => e);
+    expect([isPickRefused(hidden), pickRefusedLine(hidden)]).toEqual([true, PICK_GONE_LINE]);
+    const none = await redeemPlayerJoin(TABLE).catch(e => e);
+    expect(isPickRefused(none)).toBe(true);
+    expect(isRefusedCode(taken) || isRefusedCode(hidden) || isRefusedCode(none)).toBe(false);
+    const p = await previewJoin(TABLE);
+    expect(p.table!.usesLeft).toBe(5);
+    // A hidden Character leaves the list keel shows.
+    expect(p.table!.characters.map(c => c.id)).toEqual([WHITE.id, LINCOLN.id]);
+    expect(redeemed).toHaveLength(0);
+  });
+
+  it('a table with no list asks each name, and the fresh Character takes it', async () => {
+    serve([tablePass({ characters: [], taken: [] })]);
+    const p = await previewJoin(TABLE);
+    expect(p.table).toMatchObject({ nameRequired: true, characters: [] });
+    const unnamed = await redeemPlayerJoin(TABLE).catch(e => e);
+    expect(isPickRefused(unnamed)).toBe(false);
+    expect(unnamed).toMatchObject({ status: 422, param: 'name' });
+    expect((await redeemPlayerJoin(TABLE, 'Briony')).character.name).toBe('Briony');
+  });
+
+  it('a full link is the one 404, and a full world is world_full, on a table and on a link for one', async () => {
+    serve([tablePass({ maxUses: 2 }), pass({ code: CODE, reader: 'player', worldFull: true })]);
+    await redeemPlayerJoin(TABLE, '', WHITE.id);
+    await redeemPlayerJoin(TABLE, '', DONIPHAN.id);
+    expect(isRefusedCode(await redeemPlayerJoin(TABLE, '', DONIPHAN.id).catch(e => e))).toBe(true);
+    const full = await redeemPlayerJoin(CODE).catch(e => e);
+    expect([isWorldFull(full), isPickRefused(full), isRefusedCode(full)]).toEqual([true, false, false]);
   });
 });

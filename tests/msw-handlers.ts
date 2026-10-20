@@ -865,6 +865,18 @@ export interface FakePass {
   withCharacter?: boolean;
   /** ISO; default an hour from now. A past value makes the pass expired. */
   expiresAt?: string;
+  /**
+   * A party link (keel #422 PR 2, PR 110's `table_preview` and `_table_pick`):
+   * a player pass with `maxUses` 2 or more. `characters` is the owner's list
+   * (empty: each player names a fresh Character); `taken` holds the ids a live
+   * seat plays (the fake adds each pick); `hidden` ones leave the preview and
+   * are refused at the pick; `worldFull` answers keel's cap (422 world_full).
+   */
+  maxUses?: number;
+  characters?: Array<{ id: string; name: string }>;
+  taken?: string[];
+  hidden?: string[];
+  worldFull?: boolean;
 }
 
 export function joinV2Handlers(opts: { baseUrl: string; passes: FakePass[] }): {
@@ -878,12 +890,19 @@ export function joinV2Handlers(opts: { baseUrl: string; passes: FakePass[] }): {
     { error: { type: 'not_found', code: 'not_found', message: 'This join code is not valid.', param: null } },
     { status: 404 },
   );
+  const seats = new Map<string, number>();
+  const isTable = (p: FakePass) => p.reader === 'player' && (p.maxUses ?? 1) > 1;
   const live = (code: unknown): FakePass | null => {
     const p = opts.passes.find(x => x.code === code);
     if (!p || used.has(p.code)) return null;
     if (p.expiresAt && Date.parse(p.expiresAt) <= Date.now()) return null;
+    if (isTable(p) && (seats.get(p.code) ?? 0) >= p.maxUses!) return null;
     return p;
   };
+  const invalid = (message: string, param: string | null, code = 'invalid_request') => HttpResponse.json(
+    { error: { type: 'invalid_request', code, message, param } },
+    { status: 422 },
+  );
   const expires = (p: FakePass) => p.expiresAt ?? new Date(Date.now() + 3_600_000).toISOString();
   const handlers: HttpHandler[] = [
     http.post(`${base}/join/preview`, async ({ request }) => {
@@ -898,6 +917,13 @@ export function joinV2Handlers(opts: { baseUrl: string; passes: FakePass[] }): {
         role: p.reader === 'player' ? 'guest' : p.role ?? 'contributor',
         with_character: p.reader === 'player' ? true : p.withCharacter ?? false,
         expires_at: expires(p),
+        ...(isTable(p) ? {
+          max_uses: p.maxUses,
+          uses_left: p.maxUses! - (seats.get(p.code) ?? 0),
+          name_required: !(p.characters?.length),
+          characters: (p.characters ?? []).filter(c => !p.hidden?.includes(c.id))
+            .map(c => ({ id: c.id, name: c.name, image_url: null, taken: !!p.taken?.includes(c.id) })),
+        } : {}),
       });
     }),
     http.post(`${base}/join`, async ({ request }) => {
@@ -915,11 +941,32 @@ export function joinV2Handlers(opts: { baseUrl: string; passes: FakePass[] }): {
         }
         const p = live(body!.code);
         if (!p) return notFound();
-        used.add(p.code);
         const n = redeemed.length + 1;
-        const key = `ow_r_playerkey${n}`.padEnd(37, 'r');
         const name = typeof body!.name === 'string' && body!.name.trim() ? body!.name.trim() : '';
-        const character = p.character ?? { id: `char-${n}`, name: name || 'Player' };
+        let character = p.character ?? { id: `char-${n}`, name: name || 'Player' };
+        if (isTable(p)) {
+          // `_table_pick`: the pick (or the name, on a table with no list), then the world's cap; a refusal spends nothing.
+          const pick = (body as { character?: unknown }).character;
+          const listed = p.characters ?? [];
+          if (!listed.length) {
+            if (pick !== undefined && pick !== null && pick !== '') return invalid('This link has no list: send name, not character.', 'character');
+            if (!name) return invalid('name is required: your name, as the game master sees it.', 'name');
+            character = { id: `char-${n}`, name };
+          } else {
+            const ch = listed.find(c => c.id === pick && !p.hidden?.includes(c.id));
+            if (!ch) return invalid("Pick a Character from this link's list.", 'character');
+            if (p.taken?.includes(ch.id)) return invalid('That Character is taken: pick another from the list.', 'character', 'character_taken');
+            character = ch;
+          }
+        }
+        if (p.worldFull) return invalid('This world is full: it can have at most 50 players.', null, 'world_full');
+        if (isTable(p)) {
+          seats.set(p.code, (seats.get(p.code) ?? 0) + 1);
+          if (p.characters?.length) (p.taken ??= []).push(character.id);
+        } else {
+          used.add(p.code);
+        }
+        const key = `ow_r_playerkey${n}`.padEnd(37, 'r');
         redeemed.push({ code: p.code, agent_name: name, key, secret: '' });
         return HttpResponse.json({
           kind: 'player',

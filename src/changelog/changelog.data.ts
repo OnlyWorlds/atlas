@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.63.0',
+    date: '2026-10-20',
+    theme: 'One link for the whole table',
+    entries: [
+      {
+        id: 'party-link-pick',
+        title: 'A link for a whole table: each player picks who they are',
+        body: 'A game master can now make one player link that works for several people. Opened in Atlas, it says how many places are left and lists the Characters the game master chose; taken ones are greyed at the bottom. Pick one and Atlas opens the world as that Character, with no account. If someone took it a moment before you, Atlas shows the list again and nothing is used up. A link with no list asks your name and makes a Character for you.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.62.0',
     date: '2026-10-20',
     theme: 'Buttons by what they do',

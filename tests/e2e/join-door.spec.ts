@@ -147,6 +147,108 @@ test('a player link (#416, keel #353): opens to read as the Character, no accoun
   expect(after.meta).toMatchObject({ world_id: WORLD_ID, read_only: true });
 });
 
+// keel #422 PR 2 (PR 110), Seethe's frame 5: a party link's pick in Atlas.
+// The table keel here answers as `table_preview` and `_table_pick` do.
+async function mockTable(page: Page, opts: { characters?: Array<{ id: string; name: string }>; taken?: string[]; stealOnPick?: string } = {}) {
+  const now = '2026-10-10T00:00:00.000Z';
+  const listed = opts.characters ?? [];
+  const taken = new Set(opts.taken ?? []);
+  const t = { previews: 0, seated: 0, joins: [] as Array<Record<string, unknown>> };
+  await page.route(`${V2}/**`, async (route: Route) => {
+    const path = new URL(route.request().url()).pathname.replace('/api/v2', '');
+    if (path === '/join/preview') {
+      t.previews++;
+      return route.fulfill({ json: {
+        reader: 'player', world: { name: 'BM walk copy', description: '' }, invited_by: 'Seethe', owner_character: null,
+        role: 'guest', with_character: true, expires_at: '2099-10-26T12:00:00Z',
+        max_uses: 5, uses_left: 5 - t.seated, name_required: listed.length === 0,
+        characters: listed.map(c => ({ ...c, image_url: null, taken: taken.has(c.id) })),
+      } });
+    }
+    if (path === '/join') {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      t.joins.push(body);
+      // Someone else takes this one between the preview and the pick.
+      if (opts.stealOnPick && body.character === opts.stealOnPick && !taken.has(opts.stealOnPick)) {
+        taken.add(opts.stealOnPick);
+        return route.fulfill({ status: 422, json: { error: { type: 'invalid_request', code: 'character_taken', param: 'character', message: 'That Character is taken: pick another from the list.' } } });
+      }
+      const ch = listed.find(c => c.id === body.character) ?? { id: 'c0000000-0000-4000-8000-00000000000f', name: String(body.name ?? '') };
+      taken.add(ch.id);
+      t.seated++;
+      return route.fulfill({ status: 201, json: { kind: 'player', key: READ_KEY, role: 'guest', world: { id: WORLD_ID, name: 'BM walk copy', description: '' }, character: ch } });
+    }
+    if (path === '/world' || path === '/world/') return route.fulfill({ json: { id: WORLD_ID, name: 'BM walk copy', updated_at: now } });
+    return route.fulfill({ json: { data: [], has_more: false, next_cursor: null } });
+  });
+  return t;
+}
+
+const WHITE = { id: 'c0000000-0000-4000-8000-0000000000a1', name: 'Captain White' };
+const DONIPHAN = { id: 'c0000000-0000-4000-8000-0000000000a2', name: 'Alexander Doniphan' };
+const LINCOLN = { id: 'c0000000-0000-4000-8000-0000000000a3', name: 'A. L. Lincoln' };
+
+test('a party link: pick who you are, taken ones greyed and last; a pick taken a moment ago looks again and spends nothing', async ({ page }) => {
+  await freshBoot(page);
+  const t = await mockTable(page, { characters: [WHITE, LINCOLN, DONIPHAN], taken: [LINCOLN.id], stealOnPick: WHITE.id });
+  await page.goto('about:blank');
+  await page.goto(`/#/join/${CODE}`);
+  const modal = page.locator('[data-modal="join-world"]');
+  await expect(modal.locator('[data-role="times"]')).toHaveText('The link works 5 times, until 26 October. 5 places are left.');
+  await expect(modal.locator('[data-role="picks"] legend')).toHaveText('Who are you at this table?');
+  const rows = modal.locator('.atlas-pick-row');
+  await expect(rows).toHaveText(['Captain White', 'Alexander Doniphan', 'A. L. Lincolntaken']);
+  await expect(rows.nth(2).locator('input')).toBeDisabled();
+  const open = modal.locator('[data-action="open"]');
+  await expect(open).toBeDisabled();
+  await expect(open).toHaveText('Pick who you are');
+
+  await modal.locator('input[name="where"][value="browser"]').check();
+  await rows.nth(0).click();
+  await expect(open).toHaveText('Open as Captain White');
+  await open.click();
+  // Taken between the preview and the pick: the sentence above the fresh list, the code unspent.
+  await expect(modal.locator('[data-role="pick-refused"]')).toHaveText('Someone took that Character a moment ago. Pick another.');
+  await expect(rows).toHaveText(['Alexander Doniphan', 'Captain Whitetaken', 'A. L. Lincolntaken']);
+  await expect(open).toBeDisabled();
+  expect(t.previews).toBe(2);
+
+  await rows.nth(0).click();
+  await open.click();
+  await expect(modal).toHaveCount(0);
+  expect(t.joins.map(j => j.character)).toEqual([WHITE.id, DONIPHAN.id]);
+  expect(t.joins[1]).not.toHaveProperty('name');
+  await expect(page.locator('.ow-toast', { hasText: 'Opened BM walk copy as Alexander Doniphan' })).toBeVisible();
+});
+
+test('a party link with no list asks each player\'s name; with every Character taken it offers no Open', async ({ page }) => {
+  await freshBoot(page);
+  const t = await mockTable(page);
+  await page.goto('about:blank');
+  await page.goto(`/#/join/${CODE}`);
+  const modal = page.locator('[data-modal="join-world"]');
+  await expect(modal.locator('[data-role="role"]')).toContainText('a Character of your own');
+  await expect(modal.locator('[data-role="picks"]')).toHaveCount(0);
+  await modal.locator('input[name="where"][value="browser"]').check();
+  await modal.locator('[data-action="open"]').click();
+  await expect(modal.locator('[data-role="error"]')).toHaveText('Type your name: your Character takes it, and the game master sees it.');
+  expect(t.joins).toHaveLength(0);
+  await modal.locator('input[name="player-name"]').fill('Briony');
+  await modal.locator('[data-action="open"]').click();
+  await expect(modal).toHaveCount(0);
+  expect(t.joins).toEqual([{ code: CODE, name: 'Briony' }]);
+
+  // A second table, every pick taken.
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await mockTable(page, { characters: [WHITE], taken: [WHITE.id] });
+  await page.evaluate((c) => { location.hash = `#/join/${c}`; }, CODE);
+  await expect(modal.locator('[data-role="all-taken"]')).toHaveText('Every Character on this link is taken. Ask the game master.');
+  await expect(modal.locator('[data-action="open"]')).toBeHidden();
+  await expect(modal.locator('[data-action="cancel"]')).toHaveText('Close');
+  // Nothing can open, so where it would live is not asked.
+  await expect(modal.locator('[data-role="where"], [data-role="where-browser"], [data-role="persist-note"]')).toHaveCount(0);
+});
+
 test('a refused code says so once and opens nothing', async ({ page }) => {
   await freshBoot(page);
   const keel = await mockKeel(page, { refuse: true });

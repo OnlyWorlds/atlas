@@ -35,7 +35,24 @@ export interface JoinPreview {
   withCharacter: boolean;
   /** ISO 8601; the tool's own clock tells "spent by someone else" from "expired" (R5). */
   expiresAt: string;
+  /** A player link for a whole table (keel #422 PR 2); absent on a link for one. */
+  table?: JoinTable;
 }
+
+/**
+ * A party link's table, from the preview (keel `table_preview`, the sheet
+ * `Orrery/keel/party-link.md` §2): how often it works, how many places are
+ * left, and the Characters the owner listed, in the owner's order. An empty
+ * list means each player names a fresh Character (`nameRequired`).
+ */
+export interface JoinTable {
+  maxUses: number;
+  usesLeft: number;
+  nameRequired: boolean;
+  characters: TablePick[];
+}
+
+export interface TablePick { id: string; name: string; taken: boolean }
 
 /** What `/join` hands back once, kept in memory only. */
 export interface JoinedSeat {
@@ -123,7 +140,64 @@ export async function previewJoin(code: string): Promise<JoinPreview> {
     role: str(r.role) || 'contributor',
     withCharacter: r.with_character === true,
     expiresAt: str(r.expires_at),
+    ...(r.reader === 'player' && typeof r.max_uses === 'number' ? { table: readTable(r) } : {}),
   };
+}
+
+/** keel adds the table's keys only when `max_uses` is 2 or more; a name or flag of the wrong shape reads as absent. */
+function readTable(r: Record<string, unknown>): JoinTable {
+  const listed = Array.isArray(r.characters) ? r.characters : [];
+  const characters: TablePick[] = [];
+  for (const c of listed) {
+    if (!c || typeof c !== 'object') continue;
+    const row = c as Record<string, unknown>;
+    if (typeof row.id !== 'string' || !row.id) continue;
+    characters.push({ id: row.id, name: str(row.name).trim() || 'A Character', taken: row.taken === true });
+  }
+  const maxUses = r.max_uses as number;
+  return {
+    maxUses,
+    usesLeft: typeof r.uses_left === 'number' ? Math.max(0, r.uses_left) : maxUses,
+    nameRequired: r.name_required === true,
+    characters,
+  };
+}
+
+/** The owner's list in the owner's order, taken ones last (the sheet §2: "a screen keeps the order and puts taken ones last"). */
+export function tablePicks(table: JoinTable): TablePick[] {
+  return [...table.characters.filter(c => !c.taken), ...table.characters.filter(c => c.taken)];
+}
+
+/** "The link works 5 times, until 26 October. 3 places are left." (Seethe's frame 5). */
+export function tableTimesLine(table: JoinTable, expiresAt: string): string {
+  const t = Date.parse(expiresAt);
+  const until = Number.isFinite(t)
+    ? `, until ${new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`
+    : '';
+  const left = table.usesLeft === 1 ? 'One place is left.' : `${table.usesLeft} places are left.`;
+  return `The link works ${table.maxUses} times${until}. ${left}`;
+}
+
+/** A pick keel refused, spending nothing: taken since the preview (`character_taken`), or off the list or hidden now. */
+export function isPickRefused(err: unknown): boolean {
+  return err instanceof OwV2Error && err.status === 422 && err.param === 'character';
+}
+
+/** The world has as many players as keel seats (keel PR 110's `world_full`, from a table or a link for one). */
+export function isWorldFull(err: unknown): boolean {
+  return err instanceof OwV2Error && err.status === 422 && err.code === 'world_full';
+}
+
+export const PICK_TAKEN_LINE = 'Someone took that Character a moment ago. Pick another.';
+export const PICK_GONE_LINE = 'That Character can no longer be picked. Pick another.';
+export const WORLD_FULL_LINE = 'This world is full: it has as many players as it can seat. Ask the game master to make room.';
+export const TABLE_GONE_LINE = 'This link has no places left, or it was taken back. Ask the game master for a new one.';
+export const NAME_NEEDED_LINE = 'Type your name: your Character takes it, and the game master sees it.';
+export const ALL_TAKEN_LINE = 'Every Character on this link is taken. Ask the game master.';
+
+/** The sentence above the fresh list after a refused pick. */
+export function pickRefusedLine(err: unknown): string {
+  return err instanceof OwV2Error && err.code === 'character_taken' ? PICK_TAKEN_LINE : PICK_GONE_LINE;
 }
 
 /** Spends the code. A 404 here after a good preview means someone else may have used it. */
@@ -145,10 +219,15 @@ export async function redeemJoin(code: string, agentName = seatAgentName()): Pro
  * Spends a player's code (keel #353): no account, no credential. `name` is
  * the player's, optional (keel names a fresh Character for it, or keeps a
  * picked Character's). A 404 after a good preview: someone else may have used it.
+ * On a table the player's pick goes as `character` (keel #422 PR 2); a refused
+ * pick (`isPickRefused`) spends nothing.
  */
-export async function redeemPlayerJoin(code: string, name = ''): Promise<JoinedPlayer> {
+export async function redeemPlayerJoin(code: string, name = '', pick?: string): Promise<JoinedPlayer> {
   const trimmed = name.trim();
-  const r = await postJoin('/join', trimmed ? { code, name: trimmed } : { code });
+  const body: Record<string, string> = { code };
+  if (pick) body.character = pick;
+  if (trimmed) body.name = trimmed;
+  const r = await postJoin('/join', body);
   const world = (r.world ?? {}) as Record<string, unknown>;
   const character = (r.character ?? {}) as Record<string, unknown>;
   const out: JoinedPlayer = {
