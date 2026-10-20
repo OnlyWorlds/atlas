@@ -54,6 +54,7 @@ import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
 import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
 import { keyCheckError } from '../setup/key-check-errors';
+import { slicePushRefusal } from '../core/provenance';
 // view-only-ok: a view-only world is already online, and Make online is for a local world (conv. 149).
 
 /** Where the world being taken online keeps its files: the open world (1.17). */
@@ -107,6 +108,13 @@ export class MakeOnlineModal extends BaseModal {
     // ends the sandbox; then it goes online like any world.
     if (entry?.demo === true) {
       this.toasts.info('The tour world is a sandbox until you keep it at the end of the tour.');
+      return;
+    }
+    // One Character's view, or the public one, is not the whole world, and
+    // never goes online as a world of its own (folder spec §4.2, P1).
+    const sliceRefusal = slicePushRefusal(active.meta, entry?.name ?? String(active.meta?.name ?? 'this world'));
+    if (sliceRefusal) {
+      this.toasts.info(sliceRefusal);
       return;
     }
     if (!getActiveStore()) {

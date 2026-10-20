@@ -146,7 +146,10 @@ async function openRead(read: { worldId: string; worldName: string; files: World
   let worldJson = read.files.find(f => f.path === 'world.json')!.data;
   if (restore?.api) {
     // The link goes back from this browser's registry, never from the file.
-    const meta = JSON.parse(new TextDecoder().decode(worldJson)) as Record<string, unknown>;
+    // A file's provenance lines are about the file's slice; the link going back
+    // is this browser's own, so they go (the S446 gate's G3: a guest's file
+    // would otherwise call the owner's world one Character's view for good).
+    const { source: _source, exported_as: _slice, ...meta } = JSON.parse(new TextDecoder().decode(worldJson)) as Record<string, unknown>;
     // diskApiBlock: the mirrored flags, never a seat's secret (conv. 132);
     // these bytes skip the store's writeWorldMeta and its strip.
     worldJson = new TextEncoder().encode(JSON.stringify({ ...meta, api: diskApiBlock(restore.api) }, null, 2) + '\n');

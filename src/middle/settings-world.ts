@@ -52,6 +52,8 @@ import { escapeText, escapeAttr } from '../core/dom-utils';
 import { canOfferInvite, owAccessUrl } from '../core/ow-site';
 import { findDanglingLinks, scrubReferrers } from '../store/scrub-links';
 import { WORLD_UNIT_FIELDS, WORLD_UNIT_MAX_LENGTH, type WorldUnitField } from '../core/world-units';
+import { downloadLabel, exportDate, isPartialSlice, sliceLine } from '../core/provenance';
+import { unlinkProvenance } from '../sync/export-provenance';
 
 /** World units (Atlas #149): label, placeholder, the fields it labels. */
 const UNIT_ROWS: Readonly<Record<WorldUnitField, { label: string; placeholder: string; toast: string }>> = {
@@ -156,9 +158,9 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
     : isBrowserWorld(world)
       ? `<div class="atlas-settings-actions">
         ${hasFolderMode() ? '<button class="atlas-btn-ghost" data-action="move-to-folder" title="Copy it into a folder on your drive, where other tools can open it, and remove it from this browser">Move to a folder</button>' : ''}
-        <button class="atlas-btn-ghost" data-action="download-world">Download the whole world</button>
+        <button class="atlas-btn-ghost" data-action="download-world">${downloadLabel(getState().active?.meta)}</button>
       </div>
-      <p class="atlas-settings-hint" data-role="download-hint">One file holding the whole world: elements, pages, notes, charts and images. Atlas 1.17 or later opens it in any browser.${world.state === 'api-linked' ? ' It leaves out the OnlyWorlds link and its key, so the copy opens as a local world.' : ''}</p>
+      <p class="atlas-settings-hint" data-role="download-hint">One file holding ${isPartialSlice(getState().active?.meta) ? 'this copy' : 'the whole world'}: elements, pages, notes, charts and images. Atlas 1.17 or later opens it in any browser.${world.state === 'api-linked' ? ' It leaves out the OnlyWorlds link and its key, so the copy opens as a local world.' : ''}</p>
       <div class="atlas-settings-actions atlas-settings-actions-danger">
         <button class="atlas-btn-ghost atlas-btn-danger" data-action="delete-browser-world" title="Remove it from Atlas and from this browser">Delete world</button>
       </div>`
@@ -193,9 +195,9 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <p class="atlas-settings-hint" data-role="dangling-text"></p>
         <button class="atlas-btn-ghost" data-action="remove-dangling-links">Remove those links</button>
       </div>
-      <div class="atlas-settings-actions">
+      ${isPartialSlice(getState().active?.meta) ? '' : `<div class="atlas-settings-actions">
         <button class="atlas-btn-primary" data-action="make-online">Make online</button>
-      </div>`;
+      </div>`}`;
   return `
     <section class="atlas-settings-section">
       <h3>Active world</h3>
@@ -232,6 +234,11 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
             })()
           : ''}
       </dl>
+      ${(() => {
+        // Where a copy came from and which slice it is (folder spec §4.2, R1).
+        const line = sliceLine(getState().active?.meta, exportDate);
+        return line ? `<p class="atlas-settings-hint" data-role="slice-line">${escapeText(line)}</p>` : '';
+      })()}
       ${apiActions}
       <div class="atlas-settings-dangling" data-role="rekey-interrupted" hidden>
         <p class="atlas-settings-hint" data-role="rekey-interrupted-text">An id update in this world did not finish, so it is not syncing.</p>
@@ -542,6 +549,9 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     clearSyncIssues(world.id);
     const folder = getActiveStore();
     if (folder) {
+      // A guest's folder is one Character's view: say so before the link goes (folder spec §4.2).
+      const slice = unlinkProvenance(world, new Date());
+      if (slice) await folder.writeWorldMeta(slice as never).catch((err) => console.warn('[unlink] the slice line was not written:', err)); // raw-error-ok: a console record
       try {
         await folder.resetSyncBaseline();
       } catch (err) {
@@ -588,7 +598,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     // The save picker opens inside this click (static import: no chunk wait).
     await downloadWorldFromClick(world, toasts, on => {
       downloadBtn.disabled = on;
-      downloadBtn.textContent = on ? 'Saving…' : 'Download the whole world';
+      downloadBtn.textContent = on ? 'Saving…' : downloadLabel(getState().active?.meta);
     });
   });
   document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="move-to-folder"]')

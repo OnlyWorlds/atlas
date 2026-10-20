@@ -33,6 +33,7 @@ import { pickSyncedMeta, isMetaEmpty } from '../sync/world-meta-sync';
 import { keyCheckError } from './key-check-errors';
 import type { OwApiClient, WorldMetaWire } from '../sync/sync-engine';
 import type { WorldMeta } from '../core/types';
+import { serverOrigin } from '../sync/export-provenance';
 
 /** Moppetopia's public demo key (read scope, no PIN). */
 export const DEMO_WORLD_KEY = '0000000001';
@@ -110,7 +111,9 @@ async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
       for (const [field, value] of Object.entries(pickSyncedMeta(meta as unknown as Record<string, unknown>))) {
         if (!isMetaEmpty(field, value)) own[field] = value;
       }
-      await store.writeWorldMeta({ id: meta.id, name, ...own } as Partial<WorldMeta>);
+      // Where the copy came from (folder spec §4.2); a demo key's slice is none of the four, so no exported_as.
+      const source = { server: serverOrigin(), world: String(meta.id), at: new Date().toISOString() };
+      await store.writeWorldMeta({ id: meta.id, name, ...own, source } as Partial<WorldMeta>);
       const result = await initialDownloadAll(store, client, opts.onProgress, opts.shouldStop, { stopOnQuota: true });
       failed = result.failures.length;
       stopped = !!result.stoppedEarly;

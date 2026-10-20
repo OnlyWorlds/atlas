@@ -14,7 +14,7 @@ A world is a folder. Atlas keeps new world folders inside one user-chosen home f
   onlyworlds-atlas/                     the wrapper (legacy name: atlas-worlds/)
     .atlas-root                         marker: {version, created_at}
     <world-slug>-<id8>/                 one world
-      world.json                        metadata + api block when linked; format_version stamped at birth (spec §4.2);
+      world.json                        metadata + api block when linked; format_version stamped at birth (spec §4.2); a linked world's world file adds `source` and `exported_as` (below);
                                         a LINKED folder's id IS the server world id (spec §4.1, 2026-09-04; older links keep their minted id)
       .atlas/                           atlas internal state
         lock                            {tab_id, started_at, last_heartbeat}: one writer at a time (conv. 13)
@@ -67,6 +67,12 @@ The file names under `.atlas/` are constants in `src/core/constants.ts` (`SYNC_S
 | tidy | scheduled per (type, layout): two directories are two occupancy spaces. A file shadowed by the merge is absent from the index and therefore never renamed |
 
 `elementDirSegmentsIn(layout, type)` makes every caller name the layout. **Why it matters**: before this, a world written to spec opened in atlas showing every content element, a clean UI, and no maps, pins, zones or markers at all, with no warning anywhere. Guards: `tests/e2e/folder-store-fs.spec.ts` (both halves revert-checked) and the conformance fixture below. This is conv. 91.
+
+## Provenance lines: where a copy came from, and which slice (spec §4.2, v0.3.9; Atlas 1.67, S446)
+
+The world file of a **linked** world carries two lines in its world.json, and the spec version it was written against (`format_version`, `FOLDER_FORMAT_VERSION`): `source` (`{server, world, at}`: the link's server origin, its world id, the export's time) and `exported_as` (`{kind, role, character}`: `owner`, `member` with its role, or `character` with the guest's Character by id and name). The slice comes from `/me`, asked with the world's own key at export time (`src/sync/export-provenance.ts`); no signal, a refusal, a guest whose Character keel hides, or a Character not in the copy means no `exported_as` (absent, never guessed). Atlas never writes `public`; a demo key is never asked, and `/me` must answer for the link's own world. **Unlink** of a guest's or a seat's world records `exported_as: {kind: character, role: guest, character: null}` before the link goes (the role is known, the Character is not). The Data room's JSON export and an import as a new world carry both lines (keel's one-file export is that envelope). A **restore** that puts this browser's link back drops the lines it brings, since they are about the file's slice. The demo copy writes `source`. Only the file's bytes change: the world's own world.json is left as it is (`withProvenanceLines`, `src/store/world-file.ts`). A local world's file carries whatever its world.json already holds. Bringing a world down from onlyworlds.com makes a linked folder, not a portable copy, so no lines.
+
+Reading: Settings, This world says where a copy came from and which slice (`sliceLine`); the Home cover says a Character's view or the public view is not the whole world (`partialSliceNote`). Make online is not offered on such a slice (Settings, the Home card, an element's picture row), and refuses one at the modal's door and again in route 2's merge kernel (`slicePushRefusal`, a `MergeRefusedError` before anything is read). Beside a slice the download says "Download this world". All of it in `src/core/provenance.ts` and `src/sync/export-provenance.ts`. Every copy path keeps the two keys (unknown world.json keys survive `writeWorldMeta`, the world file's reader drops only `api`, a move copies bytes); import as a new world is a whitelist on purpose. The contract: `Forge/Notes/2026-10-20-s446-provenance-lines.md`. Guards: `tests/unit/provenance.test.ts`, `tests/unit/provenance-gate.test.ts` (the S446 gate's G1-G11), `tests/integration/world-download.test.ts`, `tests/integration/world-file-open.test.ts`.
 
 ## The conformance fixture (2026-07-28)
 

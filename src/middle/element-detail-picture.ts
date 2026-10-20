@@ -13,6 +13,7 @@
 import type { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { getState } from '../core/state';
+import { isPartialSlice } from '../core/provenance';
 import { uploadPicture, removePicture, uploadedPictureKey, PICTURE_TYPES } from '../sync/media-upload';
 import { persistFieldPatch } from './element-detail-fields';
 import type { Element, WorldRegistryEntry } from '../core/types';
@@ -29,12 +30,14 @@ export function pictureWorld(): WorldRegistryEntry | null {
 /**
  * #282 (journey scout gap 4): a local world had no upload row and no word of
  * one. Where Make online is offered (a local world that is not the tour's
- * sandbox), the row says when pictures can upload, with Make online at hand.
+ * sandbox, nor one Character's view or the public one, which never goes
+ * online: folder spec §4.2, conv. 159), the row says when pictures can upload,
+ * with Make online at hand.
  */
 export function pictureLaterWorld(): WorldRegistryEntry | null {
   const id = getState().active?.worldId;
   const entry = id ? getState().registry.worlds.find(w => w.id === id) : undefined;
-  return entry && entry.state !== 'api-linked' && entry.demo !== true ? entry : null;
+  return entry && entry.state !== 'api-linked' && entry.demo !== true && !isPartialSlice(getState().active?.meta) ? entry : null;
 }
 
 export function buildPictureLaterRow(toasts: ToastManager): HTMLElement {

@@ -21,7 +21,8 @@
 
 import { readWorldFile, writeWorldFile, OwWorldFileError, type OwWorldFileReason } from '@onlyworlds/sdk';
 import { PlainError } from '../core/plain-error';
-import { ATLAS_INTERNAL_DIR } from '../core/constants';
+import { ATLAS_INTERNAL_DIR, FOLDER_FORMAT_VERSION } from '../core/constants';
+import { withProvenance, type ExportedAs, type WorldSource } from '../core/provenance';
 import { isTransientPath, walkWorld, worldFileName, WORLD_FILE_MAX_BYTES, WORLD_FILE_MAX_ENTRIES } from './world-tree';
 
 const WORLD_FILE = 'world.json';
@@ -75,9 +76,29 @@ function withoutLink(data: Uint8Array): Uint8Array {
   try { meta = JSON.parse(new TextDecoder().decode(data)); } catch {
     throw new PlainError("This world's world.json will not open, so Atlas could not make a download. Fix the file, then try again.");
   }
-  if (!meta || typeof meta !== 'object' || !('api' in meta)) return data;
+  // A world.json that is not one object is refused the same way: it cannot be
+  // a world, and an array's nested key would never be stripped (S446 gate G10).
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+    throw new PlainError("This world's world.json will not open, so Atlas could not make a download. Fix the file, then try again.");
+  }
+  if (!('api' in meta)) return data;
   const { api: _link, ...rest } = meta as Record<string, unknown>;
   return new TextEncoder().encode(JSON.stringify(rest, null, 2) + '\n');
+}
+
+/**
+ * The collected files with the provenance lines in `world.json` (folder spec
+ * §4.2; `core/provenance.ts`), and the spec version this file is written
+ * against. Only the bytes that go into the file change: the world's own
+ * world.json on disk is left as it is.
+ */
+export function withProvenanceLines(files: CollectedFile[], source: WorldSource, exportedAs: ExportedAs | null): CollectedFile[] {
+  return files.map((f) => {
+    if (f.path !== WORLD_FILE) return f;
+    const meta = JSON.parse(new TextDecoder().decode(f.data)) as Record<string, unknown>;
+    const stamped = { ...withProvenance(meta, source, exportedAs), format_version: FOLDER_FORMAT_VERSION };
+    return { ...f, data: new TextEncoder().encode(JSON.stringify(stamped, null, 2) + '\n') };
+  });
 }
 
 /**

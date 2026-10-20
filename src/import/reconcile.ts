@@ -347,6 +347,13 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
     const unit = str(world[f])?.trim();
     if (unit) out[f] = unit;
   }
+  // Where the copy came from and which slice it is (folder spec §4.2): keel's
+  // one-file export is this envelope, so a Character's view imported as a new
+  // world stays one and is never offered to go online as the whole (the S446
+  // gate's G1). Kept only as objects; their parts are read defensively later.
+  const lines = out as Record<string, unknown>;
+  if (world.source && typeof world.source === 'object' && !Array.isArray(world.source)) lines.source = world.source;
+  if (world.exported_as && typeof world.exported_as === 'object' && !Array.isArray(world.exported_as)) lines.exported_as = world.exported_as;
   // api_key + id intentionally dropped — never auto-arm sync (convention #85);
   // atlas generates its own WorldMeta.id.
   return out;

@@ -29,6 +29,7 @@ import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
 import { isKnownOf } from './known-of';
+import { slicePushRefusal } from '../core/provenance';
 
 /** Test seam: override the OW base URL; buildV2Adapter derives its /api/v2 from it. */
 export function setMakeOnlineBaseUrl(url: string): void {
@@ -219,6 +220,10 @@ export async function mergeLocalIntoApi(
   if (await folder.hasRekeyJournal()) {
     throw new MergeRefusedError('An id update in this world did not finish. In Settings, under This world, use Finish it or Undo it, then link again.');
   }
+  // A slice that is not the whole world is never merged in as the whole (folder spec §4.2, P1).
+  const sliceMeta = await folder.readWorldMeta().catch(() => null);
+  const sliceRefusal = slicePushRefusal(sliceMeta, String(sliceMeta?.name ?? 'this world'));
+  if (sliceRefusal) throw new MergeRefusedError(sliceRefusal);
 
   // 1. List all server elements (one fetch per type).
   const serverByType = new Map<ElementType, ServerRec[]>();

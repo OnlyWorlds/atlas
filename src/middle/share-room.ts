@@ -58,6 +58,7 @@ import type { ShareEditorHandle } from './share-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
+import { isPartialSlice } from '../core/provenance';
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -1689,13 +1690,18 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (!entry?.api?.api_key) {
       const hint = document.createElement('p');
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
-      hint.append('Publishing to a public URL needs an online world. Use ');
-      // Not "Settings → World": that tab wears the WORLD'S OWN NAME in the
-      // settings nav (Captain, 2026-07-24), so the label named a tab nobody
-      // can see. Describe the destination instead of restating a label that
-      // is computed elsewhere (S323).
-      hint.appendChild(settingsLink(worldId, 'world', '"Make online" in this world\'s settings'));
-      hint.append(' first.');
+      if (isPartialSlice(getState().active?.meta)) {
+        // One Character's view never goes online (folder spec §4.2), so there is no Make online to point at (S446 gate G7).
+        hint.append('Publishing to a public URL needs an online world, and this copy is one view of a world, which can\'t go online.');
+      } else {
+        hint.append('Publishing to a public URL needs an online world. Use ');
+        // Not "Settings → World": that tab wears the WORLD'S OWN NAME in the
+        // settings nav (Captain, 2026-07-24), so the label named a tab nobody
+        // can see. Describe the destination instead of restating a label that
+        // is computed elsewhere (S323).
+        hint.appendChild(settingsLink(worldId, 'world', '"Make online" in this world\'s settings'));
+        hint.append(' first.');
+      }
       section.appendChild(hint);
       return section;
     }

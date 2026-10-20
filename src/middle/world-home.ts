@@ -51,6 +51,7 @@ import { extractTemporalNodes } from '../visualization/timeline/data-normalizer'
 import { freezeChartBlock } from '../visualization/timeline/chart-freeze';
 import { renderChartView } from '../visualization/timeline/chart-static';
 import type { ChartConfig } from '../visualization/timeline/types';
+import { downloadLabel, isPartialSlice, partialSliceNote } from '../core/provenance';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -322,6 +323,9 @@ function buildCover(
     <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Click to rename (here only; the online name is in Settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   `;
+  // A copy that is one Character's view, or the public one (folder spec §4.2, R1).
+  const sliceNote = partialSliceNote(meta);
+  if (sliceNote) identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="slice-note">${escapeText(sliceNote)}</p>`);
   cover.appendChild(identity);
 
   const nameEl = identity.querySelector<HTMLElement>('[data-edit="name"]');
@@ -677,9 +681,9 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
     </div>
     <p class="atlas-home-onboarding-copy"></p>
     <div class="atlas-home-keepsafe-actions">
-      <button type="button" class="atlas-btn-primary" data-action="keepsafe-download">Download the whole world</button>
+      <button type="button" class="atlas-btn-primary" data-action="keepsafe-download">${downloadLabel(getState().active?.meta)}</button>
       ${hasFolderMode() ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-move">Move to a folder</button>' : ''}
-      ${entry.state !== 'api-linked' ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Make online</button>' : ''}
+      ${entry.state !== 'api-linked' && !isPartialSlice(getState().active?.meta) ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Make online</button>' : ''}
     </div>`;
   section.querySelector<HTMLElement>('.atlas-home-onboarding-copy')!.textContent = line;
   section.querySelector<HTMLButtonElement>('[data-action="keepsafe-hide"]')!.addEventListener('click', () => {
@@ -691,7 +695,7 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
   const download = section.querySelector<HTMLButtonElement>('[data-action="keepsafe-download"]')!;
   download.addEventListener('click', () => {
     const now = getState().registry.worlds.find(w => w.id === worldId);
-    if (now) void downloadWorldFromClick(now, toasts, on => { download.disabled = on; download.textContent = on ? 'Saving…' : 'Download the whole world'; });
+    if (now) void downloadWorldFromClick(now, toasts, on => { download.disabled = on; download.textContent = on ? 'Saving…' : downloadLabel(getState().active?.meta); });
   });
   section.querySelector<HTMLButtonElement>('[data-action="keepsafe-move"]')?.addEventListener('click', async () => {
     const now = getState().registry.worlds.find(w => w.id === worldId);

@@ -8522,6 +8522,12 @@ svg .atlas-zone-ink.atlas-zone-hovered {
   line-height: 1.5;
   max-width: 720px;
 }
+/* A copy that is one Character's view, or the public one (folder spec §4.2). */
+.atlas-home-slice-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--atlas-text-soft);
+}
 
 .atlas-home-clickable {
   cursor: text;

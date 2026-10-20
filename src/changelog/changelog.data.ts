@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.67.0',
+    date: '2026-10-20',
+    theme: 'A copy says where it came from',
+    entries: [
+      {
+        id: 'world-file-provenance',
+        title: 'A world file says where it came from, and whose view it is',
+        body: 'Downloading a world that is on OnlyWorlds now writes into the file where it came from and when, and which part of the world it holds: the whole world for its owner, a member\'s copy, or one character\'s view for a player. Atlas asks OnlyWorlds at the moment you download; offline, the file says only where it came from. Opened again, the world says so in Settings, and a player\'s view says on its Home that it is not the whole world. One character\'s view can\'t be put online as a world of its own, so Make online is not offered there.',
+        tags: ['world', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.66.1',
     date: '2026-10-20',
     theme: 'A story is dated by its telling',

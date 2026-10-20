@@ -23,6 +23,7 @@ import { hasFolderMode } from '../core/capabilities';
 import { saveRegistry, updateWorldEntry } from '../registry/registry';
 import { worldFileName, WORLD_FILE_MAX_BYTES } from '../store/world-tree';
 import { getCurrentSyncEngine, getCurrentSyncWorldId } from '../sync/sync-attach';
+import { exportProvenance } from '../sync/export-provenance';
 import type { WorldRegistryEntry } from '../core/types';
 
 export const TORN_LINE = 'The world changed while its file was being made. Try again.';
@@ -110,6 +111,13 @@ export async function downloadWorld(world: WorldRegistryEntry, target: SaveTarge
   if (engine && !engine.isPaused() && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
     await engine.pushOnce().catch(err => console.warn('[atlas:download] push before the download failed', err)); // raw-error-ok: a console record
   }
+  // A linked world's file says where it came from and which slice it is
+  // (folder spec §4.2), asked before the walk so the walk stays short.
+  const provenance = await exportProvenance(world, async (id) => {
+    const el = await store.getElement(id).catch(() => null);
+    const name = (el as { name?: unknown } | null)?.name;
+    return typeof name === 'string' && name.trim() ? name.trim() : undefined;
+  }, opts.now ?? new Date());
   const release = engine ? await engine.hold('download') : () => {};
   try {
     await flushBeforeLeavingWorld();
@@ -117,7 +125,8 @@ export async function downloadWorld(world: WorldRegistryEntry, target: SaveTarge
     if (where.kind !== 'ok') throw new PlainError('Atlas cannot reach this world\'s files right now. Open it again from the sidebar, then download it.');
     let bytes: Uint8Array;
     try {
-      const collected = await ws.collectWorldFiles(where.handle);
+      const walked = await ws.collectWorldFiles(where.handle);
+      const collected = provenance ? ws.withProvenanceLines(walked, provenance.source, provenance.exportedAs) : walked;
       // A file no Atlas could open again is never handed over, on any target
       // (S373 gate F4): the reader's budget is the uncompressed size.
       if (collected.reduce((n, f) => n + f.data.byteLength, 0) > (opts.maxBytes ?? WORLD_FILE_MAX_BYTES)) {

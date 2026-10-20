@@ -69,6 +69,11 @@ export async function buildWorldExport(
   if (meta.length_unit) world.length_unit = meta.length_unit;
   if (meta.mass_unit) world.mass_unit = meta.mass_unit;
   if (meta.distance_unit) world.distance_unit = meta.distance_unit;
+  // Where a copy came from and which slice it is travel with it (folder spec
+  // §4.2): a Character's view exported as JSON stays one (the S446 gate's G1).
+  const lines = meta as unknown as Record<string, unknown>;
+  if (lines.source && typeof lines.source === 'object') world.source = lines.source;
+  if (lines.exported_as && typeof lines.exported_as === 'object') world.exported_as = lines.exported_as;
 
   // THE ENVELOPE (S354, converging on keel's `onlyworlds-world-export`, owed
   // to Skeld since S313). One shape both ways now: keel exports it, atlas

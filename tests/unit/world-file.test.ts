@@ -51,6 +51,14 @@ describe('the portable copy', () => {
     await expect(collectWorldFiles(as(d))).rejects.toThrow(/world\.json/);
   });
 
+  it('a world.json that is not one object is refused too (the S446 gate\'s G10)', async () => {
+    for (const body of ['null', '[]', '[{"api":{"api_key":"ow_w_secret"}}]', '"a world"']) {
+      const d = new FakeDirHandle('w');
+      d.put('world.json', body);
+      await expect(collectWorldFiles(as(d))).rejects.toThrow(/world\.json will not open/);
+    }
+  });
+
   it('names the file and its one top-level folder after the world', () => {
     expect(worldFileName('Hollow Reach', WID, new Date('2026-10-05T10:00:00Z'))).toEqual({
       file: 'hollow-reach-2026-10-05.zip', dir: 'hollow-reach-0192a000',

@@ -15,6 +15,8 @@ import { diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { SEAT_SECRET_MISSING_LINE } from '../core/seat';
 import type { ToastManager } from './toast-manager';
 import type { SyncResult } from '../core/types';
+import { getState } from '../core/state';
+import { isPartialSlice } from '../core/provenance';
 
 /**
  * True when a refresh may say "Already up to date": the round reached
@@ -52,6 +54,11 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
       // `pin-missing` two lines below has navigated to the fix since S221.
       // The file exists to stop exactly that ("users were left guessing where
       // to fix it") — the pattern was just never applied across its own switch.
+      if (isPartialSlice(getState().active?.meta)) {
+        // One Character's view never goes online (folder spec §4.2; S446 gate G7).
+        toasts.info('This world is local: one view of a world, which can\'t go online.');
+        return reason;
+      }
       toasts.info('This world is local. Use Make online in Settings to sync it.');
       navigate(settingsHash(reason.worldId, 'world'));
       return reason;

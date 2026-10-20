@@ -292,6 +292,14 @@ export async function openWorldFolder(
   }
   const restore = clearedOwnTwin(getState().registry, meta.id);
   if (restore) {
+    // The link going back is this browser's own; a folder's provenance lines
+    // are about its own slice, so they go before the link does (the S446
+    // gate's G3, as the world-file door).
+    const lines = meta as Record<string, unknown>;
+    if (restore.api && ('source' in lines || 'exported_as' in lines)) {
+      const { source: _source, exported_as: _slice, ...rest } = lines;
+      await writeJsonAtomic(picked, 'world.json', rest);
+    }
     await storeHandle(restore.folder.handle_key, picked);
     const adopted = updateWorldEntry(getState().registry, restore.id, {
       where: undefined,

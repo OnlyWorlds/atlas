@@ -24,6 +24,8 @@ vi.mock('../../src/sync/sync-attach', () => ({
 }));
 
 import { downloadWorld, TORN_LINE } from '../../src/setup/world-download';
+import { setExportMeReaderForTests } from '../../src/sync/export-provenance';
+import { FOLDER_FORMAT_VERSION } from '../../src/core/constants';
 
 const j = (v: unknown) => JSON.stringify(v, null, 2) + '\n';
 const asDir = (d: FakeDirHandle) => d as unknown as FileSystemDirectoryHandle;
@@ -33,6 +35,8 @@ let opfs: FakeDirHandle;
 let world: FakeDirHandle;
 let store: FsFolderStore;
 let saved: { name: string; bytes: Uint8Array } | null;
+let meReads: string[] = [];
+let meAnswer: () => { role: string; character?: string | null; world?: { id?: string } } = () => ({ role: 'owner', character: null, world: { id: 'srv' } });
 
 function entry(over: Partial<WorldRegistryEntry> = {}): WorldRegistryEntry {
   return {
@@ -57,10 +61,14 @@ beforeEach(async () => {
   await store.open(asDir(world));
   await store.createElement('character', { name: 'Ana' } as never);
   setActiveStore(store);
+  meReads = [];
+  meAnswer = () => ({ role: 'owner', character: null, world: { id: 'srv' } });
+  setExportMeReaderForTests(async (key) => { meReads.push(key); return meAnswer(); });
   patchSlice('registry', { ...defaultRegistry(), worlds: [entry()] });
   patchSlice('active', { worldId: 'w1', meta: { id: WID, name: 'Hollow Reach' }, opened: true } as never);
 });
 afterEach(async () => {
+  setExportMeReaderForTests(null);
   await store.close().catch(() => {});
   setActiveStore(null);
   setOpfsRootForTests(null);
@@ -115,6 +123,30 @@ describe('downloadWorld', () => {
     sync.worldId = 'w1';
     await downloadWorld(cur(), save);
     expect(sync.order).toEqual(['push', 'hold:download', 'release']);
+  });
+
+  // Folder spec §4.2 (W1-W3): a linked world's file says where it came from and which slice it is.
+  const fileMeta = () => JSON.parse(new TextDecoder().decode(unzipSync(saved!.bytes)['hollow-reach-0192a000/world.json']));
+
+  it('a linked world\'s file carries source and its slice from /me, asked with its own key', async () => {
+    const ana = (await store.listElements('character'))[0];
+    meAnswer = () => ({ role: 'guest', character: ana.id, world: { id: 'srv' } });
+    patchSlice('registry', { ...defaultRegistry(), worlds: [entry({ state: 'api-linked', api: { world_id: 'srv', api_key: 'ow_w_mine' } })] });
+    await downloadWorld(cur(), save, { now: new Date('2026-10-20T19:00:00Z') });
+    expect(meReads).toEqual(['ow_w_mine']);
+    const meta = fileMeta();
+    expect(meta.source).toEqual({ server: 'https://www.onlyworlds.com', world: 'srv', at: '2026-10-20T19:00:00.000Z' });
+    expect(meta.exported_as).toEqual({ kind: 'character', role: 'guest', character: { id: ana.id, name: 'Ana' } });
+    expect(meta.format_version).toBe(FOLDER_FORMAT_VERSION);
+    // The world's own world.json is left as it was.
+    expect((await store.readWorldMeta() as unknown as Record<string, unknown>).source).toBeUndefined();
+  });
+
+  it('a local world\'s file asks nothing and adds no line', async () => {
+    await downloadWorld(cur(), save);
+    expect(meReads).toEqual([]);
+    expect(fileMeta().source).toBeUndefined();
+    expect(fileMeta().exported_as).toBeUndefined();
   });
 
   it('refuses a world bigger than Atlas can open again, on every target (gate F4)', async () => {

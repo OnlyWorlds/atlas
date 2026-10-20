@@ -98,6 +98,29 @@ describe('openWorldFile', () => {
     expect(meta).toMatchObject({ id: WID, api: { world_id: 'srv-1', api_key: 'ow_w_key' } });
   });
 
+  it('a file\'s provenance lines go when the restore puts this browser\'s link back (the S446 gate\'s G3)', async () => {
+    const cleared: WorldRegistryEntry = {
+      id: 'w1', name: 'Hollow Reach', state: 'api-linked', where: 'browser', cleared_at: '2026-10-05T09:00:00.000Z',
+      created_at: '2026-10-05T00:00:00.000Z', api: { world_id: 'srv-1', api_key: 'ow_w_key', world_name: 'Hollow Reach' },
+      folder: { handle_key: `world-${WID}`, folder_name: 'hollow-reach-0192a000-dead' },
+    };
+    patchSlice('registry', { ...defaultRegistry(), worlds: [cleared] });
+    const lines = { source: { server: 'https://www.onlyworlds.com', world: 'srv-1', at: '2026-10-20T19:00:00.000Z' }, exported_as: { kind: 'character', role: 'guest', character: { id: 'a', name: 'Ana' } } };
+    expect(await openWorldFile(worldZip({ id: WID, name: 'Hollow Reach', ...lines }))).toEqual({ kind: 'restored', worldId: 'w1' });
+    const meta = JSON.parse((home.children.get(reg().worlds[0].folder.folder_name) as FakeDirHandle).get('world.json')!);
+    expect(meta.api).toMatchObject({ world_id: 'srv-1' });
+    expect('source' in meta || 'exported_as' in meta).toBe(false);
+  });
+
+  it('a world file opened as a new world keeps its lines (no link goes back)', async () => {
+    const lines = { source: { server: 'https://www.onlyworlds.com', world: 'srv-9', at: '2026-10-20T19:00:00.000Z' }, exported_as: { kind: 'character', role: 'guest', character: { id: 'a', name: 'Ana' } } };
+    const out = await openWorldFile(worldZip({ id: WID, name: 'Hollow Reach', ...lines }));
+    expect(out.kind).toBe('opened');
+    const e = reg().worlds.find(w => w.id === (out as { worldId: string }).worldId)!;
+    const meta = JSON.parse((home.children.get(e.folder.folder_name) as FakeDirHandle).get('world.json')!);
+    expect(meta).toMatchObject(lines);
+  });
+
   it('a cleared seat world restores its seat marker, never its secret (conv. 132, S386 gate)', async () => {
     const SECRET = 'ow_s_' + 'S'.repeat(32);
     const cleared: WorldRegistryEntry = {
