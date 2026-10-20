@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.65.0',
+    date: '2026-10-20',
+    theme: 'Quiet text you can read',
+    entries: [
+      {
+        id: 'faint-text',
+        title: 'The quietest text is easier to read',
+        body: 'Hints, counts, labels and small icon buttons that Atlas drew in its faintest grey now use the quiet grey that stays readable on every background, in dark and light mode. Toggles that are on also fill their icon or turn bold, so on and off differ by more than colour.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.64.1',
     date: '2026-10-20',
     theme: 'What anyone could see',

@@ -101,6 +101,7 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
       chip.type = 'button';
       chip.className = 'atlas-context-pane-toolbar-chip';
       if (isHidden) chip.classList.add('is-off');
+      chip.setAttribute('aria-pressed', isHidden ? 'false' : 'true');
       chip.dataset.type = t;
       chip.title = isHidden
         ? `Show ${ELEMENT_LABELS[t]?.plural ?? t}`

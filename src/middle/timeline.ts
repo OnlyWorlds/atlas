@@ -284,6 +284,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'atlas-chart-type-chip' + (on ? ' active' : '');
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
       const label = ELEMENT_LABELS[t]?.plural ?? t;
       chip.innerHTML =
         `<span class="material-symbols-outlined">${escapeText(ELEMENT_ICONS[t] ?? 'category')}</span>` +
@@ -346,6 +347,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const b = document.createElement('button');
       b.type = 'button';
       b.className = renderMode === m ? 'active' : '';
+      b.setAttribute('aria-pressed', renderMode === m ? 'true' : 'false');
       b.dataset.action = m === 'scroll' ? 'chart-mode-scroll' : 'chart-mode-canvas';
       b.title = title;
       b.innerHTML = `<span class="material-symbols-outlined">${icon}</span>`;
