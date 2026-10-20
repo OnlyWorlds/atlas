@@ -58,6 +58,10 @@ for (const theme of ['dark', 'light'] as const) {
     expect(d).toMatchObject({ ...LADDER[theme].standard, h: 36, radius: '6px', size: '14px', weight: '500' });
     // The two doors used to share one wash (1.61): they must not read alike.
     expect(s.bg).not.toBe(d.bg);
+    // The line of links under them is the Link rung: weight 500 (1.66.1).
+    const link = '.atlas-landing-more-link';
+    await expect(page.locator(link).first()).toBeVisible();
+    expect((await look(page, link)).weight).toBe('500');
   });
 }
 

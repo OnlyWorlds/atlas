@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.66.1',
+    date: '2026-10-20',
+    theme: 'A story is dated by its telling',
+    entries: [
+      {
+        id: 'narrative-dates-told',
+        title: 'A Narrative\'s dates say when it is told',
+        body: 'The help on a Narrative\'s two dates follows the OnlyWorlds standard: the start date is when the story is first told or recorded, and the end date is when it stops being told, empty while it still is. The span a story recounts lives on its events. Nothing moves on your timeline.',
+        tags: ['world'],
+      },
+      {
+        id: 'front-door-links',
+        title: 'The first screen\'s links are easier to see',
+        body: 'The line of links under the two doors on the first screen is a little heavier, like links elsewhere in the OnlyWorlds tools.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.66.0',
     date: '2026-10-20',
     theme: 'Light mode you can read, and one being in two worlds',

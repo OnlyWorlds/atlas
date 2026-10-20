@@ -4651,6 +4651,9 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: inherit;
   color: var(--atlas-text-soft);
 }
+/* The ladder's Link rung (OW Style, conv. 153). Two classes, because
+   .atlas-btn-link's `font: inherit` comes later in this file and would reset it. */
+.atlas-btn-link.atlas-landing-more-link { font-weight: 500; }
 .atlas-landing-more-link:hover,
 .atlas-landing-more-link:focus-visible { color: var(--atlas-accent-text); }
 .atlas-landing-more-sep { color: var(--atlas-text-muted); }

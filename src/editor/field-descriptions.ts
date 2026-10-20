@@ -280,8 +280,10 @@ const MARKER: FieldMap = {
 const NARRATIVE: FieldMap = {
   story: 'The narrative content from a perspective',
   consequences: 'Outcomes or legacy',
-  start_date: 'Beginning date',
-  end_date: 'Ending date',
+  // The standard's 00.32.02 (Skeld h65 #8812, h58 #8732): a Narrative's dates
+  // are when it is told, not the span it recounts (that lives on its events).
+  start_date: 'When it is first told or recorded',
+  end_date: 'When it stops being told, empty while still told',
   order: 'Position in parent sequence',
   parent_narrative: 'Containing narrative',
   protagonist: 'Primary character',
