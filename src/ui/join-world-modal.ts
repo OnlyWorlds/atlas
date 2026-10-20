@@ -27,7 +27,7 @@ import { attachSyncEngine } from '../sync/sync-attach';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { DownloadCancelledError, type DownloadStop, type InitialDownloadProgress } from '../sync/initial-download';
 import {
-  alreadyHereLine, isRefusedCode, JOIN_MALFORMED_LINE, JOIN_REFUSED_LINE, openJoinedWorld, openPlayerWorld,
+  AGENT_LINK_LINE, alreadyHereLine, isRefusedCode, JOIN_MALFORMED_LINE, JOIN_REFUSED_LINE, openJoinedWorld, openPlayerWorld,
   playerAlreadyHereLine, previewJoin, redeemJoin, redeemPlayerJoin, redeemRefusedSentence, roleLine,
   SPARE_PLAYER_LINE, SPARE_SEAT_LINE, type JoinedPlayer, type JoinedSeat, type JoinPreview, type OpenJoinedOutcome,
 } from '../setup/join-door';
@@ -102,7 +102,8 @@ export class JoinWorldModal extends BaseModal {
     const { overlay, body } = this.buildModalShell({ title: 'Open a world from OnlyWorlds', dataModal: 'join-world' });
     body.innerHTML = `
       <form data-form="join-world" data-reader="${player ? 'player' : 'agent'}">
-        <p class="atlas-join-question">Open <strong data-role="world-name"></strong> ${player ? 'as a player' : 'from onlyworlds.com'}?</p>
+        <p class="atlas-join-question">Open <strong data-role="world-name"></strong> ${player ? 'as a player' : 'as an AI agent'}?</p>
+        ${player ? '' : `<p class="atlas-modal-hint" data-role="agent-note">${AGENT_LINK_LINE}</p>`}
         <p class="atlas-modal-hint" data-role="who" hidden></p>
         <p class="atlas-modal-hint" data-role="role"></p>
         <p class="atlas-modal-hint" data-role="character" hidden>Joining also adds a Character for Atlas to this world.</p>
@@ -119,7 +120,7 @@ export class JoinWorldModal extends BaseModal {
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
         <div class="atlas-modal-actions" data-role="form-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="open">Open</button>
+          <button type="submit" class="atlas-btn-primary" data-action="open">${player ? 'Open' : 'Open as an AI agent'}</button>
         </div>
         <div class="atlas-modal-actions" data-role="busy-actions" hidden>
           <button type="button" class="atlas-btn-ghost" data-action="cancel-download" title="Stop now and remove what was downloaded; nothing is kept">Cancel download</button>
