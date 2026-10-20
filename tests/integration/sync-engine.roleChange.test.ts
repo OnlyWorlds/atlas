@@ -163,14 +163,15 @@ describe('keel\'s word that the view moved still drops in a view-only world (I6)
     expect(r.pulled.deletes).toBe(2);
   });
 
-  it('a writable world never drops, whatever keel says: it keeps what left', async () => {
+  it('a writable world drops only on keel\'s own `view` (one-rule §3; S441 narrowed "never drops")', async () => {
     const engine = new SyncEngine({ folder, client });
     client.keyRole = 'guest';
     await worldOfThree(engine);
     viewMoves(new Set([A]), 'view');
     const r = await engine.pullNow();
-    expect(await ids()).toEqual([A, B, C]);
-    expect(r.pulled.deletes).toBe(0);
+    expect(await ids()).toEqual([A]);
+    expect(r.pulled.deletes).toBe(2);
+    expect([...((await folder.readSyncState()).left_view ?? [])].sort()).toEqual([B, C]);
   });
 });
 

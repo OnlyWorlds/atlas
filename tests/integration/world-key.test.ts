@@ -137,6 +137,15 @@ describe('a new key in place', () => {
     expect(st.kept_outside_view).toEqual(['k1']);
   });
 
+  it('what left the old key\'s view walks again from 0 too (S441 gate G6)', async () => {
+    patchSlice('registry', { ...getState().registry, worlds: [entry({ member_role: 'contributor' })] });
+    await store.updateSyncState(() => ({ changes_cursor: '9:x', changes_last_seq: 9, left_view: ['h1'], walked_as_role: 'contributor' }));
+    await putKeyInPlace(current(), NEW, false);
+    const st = await store.readSyncState();
+    expect(st.changes_cursor).toBeNull();
+    expect(st.left_view).toEqual(['h1']);
+  });
+
   it('a write key opens a read-only world to edit, and a read key closes it', async () => {
     patchSlice('registry', { ...getState().registry, worlds: [entry({ read_only: true })] });
     store.setViewOnly(true);

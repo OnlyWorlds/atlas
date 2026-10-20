@@ -114,12 +114,14 @@ export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, read
       console.warn('[world-key] world.json api mirror not written:', err); // raw-error-ok: a log
     }
     store.setViewOnly(readOnly);
-    // What the old key kept is the old key's view: the new key walks from 0,
-    // so what it sees syncs again and the rest stays kept (conv. 151, G6).
+    // What the old key kept, or saw leave its view, is the old key's view:
+    // the new key walks from 0, so what it sees syncs again and the rest stays
+    // kept or left (conv. 151, G6; `left_view`, the S441 gate's G6).
     // The old engine stops first, so no round of its writes the old cursor
     // back after the reset (the second S439 gate's H4).
     try {
-      if (((await store.readSyncState()).kept_outside_view?.length ?? 0) > 0) {
+      const st = await store.readSyncState();
+      if ((st.kept_outside_view?.length ?? 0) > 0 || (st.left_view?.length ?? 0) > 0) {
         if (getState().active?.worldId === entry.id) detachSyncEngine();
         await store.updateSyncState(() => ({ changes_cursor: null, changes_last_seq: null, walked_as_role: undefined }));
       }

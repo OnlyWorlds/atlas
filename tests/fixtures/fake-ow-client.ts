@@ -38,6 +38,8 @@ interface ChangeOp {
   seq: number;
   updated_at?: string;
   deleted_at?: string;
+  /** keel's word on a delete row (one-rule §3): `hidden` for a hide. */
+  reason?: string;
   /** Full element snapshot AT COMMIT TIME (upsert ops only). */
   element?: ServerRecord;
 }
@@ -168,7 +170,7 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /** Append a delete op (no element body — mirrors keel's delete op). */
-  private appendDelete(type: ElementType, id: string): void {
+  private appendDelete(type: ElementType, id: string, reason?: string): void {
     this.opSeq += 1;
     this.opLog.push({
       op: 'delete',
@@ -176,6 +178,7 @@ export class FakeOwApiClient implements OwApiClient {
       id,
       seq: this.opSeq,
       deleted_at: this.clock(),
+      ...(reason ? { reason } : {}),
     });
   }
 
@@ -216,6 +219,11 @@ export class FakeOwApiClient implements OwApiClient {
     // Mirror keel (convention #20, S361): a POST for an id the world already
     // holds is 409 `id_conflict`, never a silent overwrite. The engine's
     // adopt path (gate F3) is only testable against a fake that says so.
+    // An id hidden from this key: 404, nothing made, never id_conflict (keel's
+    // create read live S441, Skeld h29 #8254).
+    if (!this.assignServerIds && this.outOfView.has(id)) {
+      throw new Error(`API Error 404: ${type} '${id}' not found.`);
+    }
     if (!this.assignServerIds && this.bucket(type).has(id)) {
       throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
     }
@@ -430,6 +438,13 @@ export class FakeOwApiClient implements OwApiClient {
     for (const it of items) {
       const wireBody = stripUndefined(it.element);
       const id = (wireBody.id as string) ?? cryptoRandomId();
+      // An id hidden from this key: the item is 404, nothing made (keel's /bulk, Skeld h29 #8254).
+      if (this.outOfView.has(id)) {
+        anyError = true;
+        results.push({ status: 404, id, error: { code: 'not_found', message: `${it.type} '${id}' not found.`, param: null } as V2ItemError });
+        wireBodies.push(null);
+        continue;
+      }
       // Injection seam takes priority over intrinsic validation.
       const err = this.takeInjectedBulkError(id)
         ?? validateBulkItem(it.type, wireBody, id, existingIds, batchIds);
@@ -528,6 +543,7 @@ export class FakeOwApiClient implements OwApiClient {
             id: o.id,
             changeSeq: o.seq,
             deletedAt: o.deleted_at ?? '',
+            ...(o.reason ? { reason: o.reason } : {}),
           },
     );
     // `head` = the world's current change_seq (v2 tail) — the engine's rewind
@@ -644,6 +660,26 @@ export class FakeOwApiClient implements OwApiClient {
     const next: ServerRecord = { ...existing, ...patch, id, type, updated_at: this.clock() };
     m.set(id, next);
     this.appendUpsert(next);
+  }
+
+  /**
+   * The owner hides an element from this key (keel's hidden mark, one-rule
+   * §3): a full-world reader (a contributor) gets one delete row with reason
+   * `hidden`, and the element reads and PATCHes as 404 (`outOfView`). It
+   * stays in the world for the owner.
+   */
+  __server_hide(type: ElementType, id: string): void {
+    if (!this.bucket(type).has(id)) throw new Error(`__server_hide: ${type}/${id} not found`);
+    this.outOfView.add(id);
+    this.appendDelete(type, id, 'hidden');
+  }
+
+  /** The owner unhides it: readable again, and the feed names it again. */
+  __server_unhide(type: ElementType, id: string): void {
+    const existing = this.bucket(type).get(id);
+    if (!existing) throw new Error(`__server_unhide: ${type}/${id} not found`);
+    this.outOfView.delete(id);
+    this.appendUpsert(existing);
   }
 
   /**

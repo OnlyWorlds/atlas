@@ -589,6 +589,7 @@ export class OwV2ClientAdapter implements OwApiClient {
         change_seq: number;
         updated_at?: string;
         deleted_at?: string;
+        reason?: unknown;
         element?: Record<string, unknown>;
       }>;
     };
@@ -617,6 +618,8 @@ export class OwV2ClientAdapter implements OwApiClient {
         id: op.id,
         changeSeq: op.change_seq,
         deletedAt: op.deleted_at ?? '',
+        // keel's word on why the row exists (`deleted`, `hidden`; one-rule §3).
+        ...(typeof op.reason === 'string' ? { reason: op.reason } : {}),
       };
     });
     return {

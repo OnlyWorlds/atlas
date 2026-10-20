@@ -265,6 +265,15 @@ export interface SyncState {
    */
   kept_outside_view?: string[];
   /**
+   * Ids that left this copy because keel took them out of the key's view (a
+   * delete row with reason `hidden`, a resync with reason `view`; keel's
+   * one-rule §3). Links to them stay in the copy and never go out in a body,
+   * as for kept ids (keel refuses a write naming one and keeps the link).
+   * The feed naming one again (an unhide, a raise) takes it out.
+   * Cleared by resetSyncBaseline.
+   */
+  left_view?: string[];
+  /**
    * The key's role (keel `GET /me`) when the folder was last walked whole: a
    * resync under another role is a role change, and keeps (conv. 151).
    */

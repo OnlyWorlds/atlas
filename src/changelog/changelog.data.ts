@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.61.0',
+    date: '2026-10-20',
+    theme: 'What the owner hides leaves your copy',
+    entries: [
+      {
+        id: 'hidden-leaves-the-copy',
+        title: 'An element the owner hides from you leaves your copy quietly',
+        body: 'When the owner of a world shared with you hides an element, OnlyWorlds tells Atlas, and Atlas now takes it out of your copy without asking. Before, it opened the "deleted on OnlyWorlds" review and offered to keep it. If you had changed it here, your change stays here and stops syncing. Your own elements keep their links to it, and when the owner shows it again, it comes back. As a guest, the same holds when OnlyWorlds says your view of the world changed: what you can no longer see leaves your copy, unless you changed it here.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.60.2',
     date: '2026-10-20',
     theme: 'Field names read the same in every OnlyWorlds tool',
