@@ -104,6 +104,8 @@ html {
   --atlas-cyan: #22d3ee;
   --atlas-cyan-soft: rgba(var(--atlas-accent-rgb), 0.5);
   --atlas-cyan-tint: rgba(var(--atlas-accent-rgb), 0.08);
+  /* Ink on a solid accent fill (the Entry button, OW Style's ladder). */
+  --atlas-on-accent: rgb(3, 16, 20);
   --atlas-danger: #ef4444;
   --atlas-danger-hover: #f87171;
   --atlas-danger-hover-tint: rgba(248, 113, 113, 0.08);
@@ -169,6 +171,7 @@ html {
   --atlas-cyan: #0e7490;
   --atlas-cyan-soft: rgba(14, 116, 144, 0.55);
   --atlas-cyan-tint: rgba(14, 116, 144, 0.07);
+  --atlas-on-accent: #ffffff;
   --atlas-danger: #dc2626;
   --atlas-danger-hover: #b91c1c;
   --atlas-danger-hover-tint: rgba(220, 38, 38, 0.08);
@@ -208,6 +211,7 @@ html {
   --atlas-cyan: #22d3ee;
   --atlas-cyan-soft: rgba(34, 211, 238, 0.5);
   --atlas-cyan-tint: rgba(34, 211, 238, 0.08);
+  --atlas-on-accent: rgb(3, 16, 20);
 }
 
 /* ============================================================
@@ -932,7 +936,15 @@ html {
 }
 
 /* ============================================================
-   Buttons — slim ghost + primary
+   Buttons: OW Style's ladder (Studio style/RULES.md section 8, the
+   Captain's "looks good", h63 #8314). Entry .atlas-btn-entry, the solid
+   fill, one per screen at most, where someone begins. Standard
+   .atlas-btn-primary, the wash and edge, the everyday default. Quiet
+   .atlas-btn-ghost, a neutral edge, for cancel, back and toolbar actions
+   (keel's Quiet wears the same, Skeld h63 #8319). Link .atlas-btn-link.
+   A destructive action is Standard in the danger colour (.atlas-btn-danger).
+   Inside the rooms they keep Atlas's compact size; the front door takes
+   the ladder's full shape (.atlas-landing-compact .atlas-landing-btn).
    ============================================================ */
 
 .atlas-btn-ghost {
@@ -958,14 +970,51 @@ html {
   cursor: not-allowed;
 }
 
+.atlas-btn-danger,
+.atlas-btn-ghost.atlas-btn-danger {
+  background: color-mix(in srgb, var(--atlas-danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--atlas-danger) 60%, transparent);
+  color: var(--atlas-danger);
+  font-weight: 500;
+}
+
+/* Alone (not on a ghost), it takes the Standard metrics. */
+.atlas-btn-danger:not(.atlas-btn-ghost) {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.atlas-btn-danger:hover:not(:disabled),
 .atlas-btn-ghost.atlas-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--atlas-danger) 20%, transparent);
   border-color: var(--atlas-danger);
   color: var(--atlas-danger);
 }
 
+.atlas-btn-entry {
+  background: var(--atlas-cyan);
+  border: 1px solid var(--atlas-cyan);
+  color: var(--atlas-on-accent);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 600;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.atlas-btn-entry:hover:not(:disabled) {
+  background: rgba(var(--atlas-accent-rgb), 0.88);
+}
+
 .atlas-btn-primary {
-  background: var(--atlas-cyan-tint);
-  border: 1px solid var(--atlas-cyan-soft);
+  background: rgba(var(--atlas-accent-rgb), 0.14);
+  border: 1px solid rgba(var(--atlas-accent-rgb), 0.6);
   color: var(--atlas-cyan);
   padding: 5px 12px;
   font-size: 12px;
@@ -977,7 +1026,7 @@ html {
 }
 
 .atlas-btn-primary:hover:not(:disabled) {
-  background: rgba(var(--atlas-accent-rgb), 0.16);
+  background: rgba(var(--atlas-accent-rgb), 0.22);
   border-color: var(--atlas-cyan);
 }
 
@@ -4710,10 +4759,12 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   text-align: center;
 }
 .atlas-landing-compact .atlas-landing-btn {
-  padding: 7px 18px;
-  font-size: 12.5px;
-  letter-spacing: 0.1px;
-  border-radius: 4px;
+  /* The ladder's full shape (OW Style, studio style/control/ladder.json):
+     36 high, 6 round, 14px, 18 across. Each door keeps its rung's look and
+     weight (Entry 600, Standard 500). */
+  padding: 0 18px;
+  font-size: 14px;
+  border-radius: 6px;
   /* ONE SHAPE for both doors (Captain, S354: the right button sat higher
      than the left on a non-Chromium landing). The primary and ghost classes
      carry different line-heights and weights, and Firefox's default button
@@ -4721,10 +4772,9 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
      two depending on the browser. Pin every dimension that a class or a
      browser default could vary. */
   box-sizing: border-box;
-  height: 34px;
+  height: 36px;
   min-width: 152px;
   line-height: 1.4;
-  font-weight: 500;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
@@ -4757,18 +4807,13 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 /* (The in-body rooms row moved into the room-nav strip's preview mode —
    see .atlas-room-nav-preview-btn.) */
 
+/* The doors' look is their rung's (Entry, Standard): this rule used to paint
+   both doors one wash with a glow, so the main door and the demo door read
+   alike (Seethe's catch, h63 #8280). */
 .atlas-landing-btn {
   padding: 12px 32px;
   font-size: 14px;
-  border-radius: 4px;
-  background: rgba(var(--atlas-accent-rgb), 0.14);
-  border-color: rgba(var(--atlas-accent-rgb), 0.6);
-  box-shadow: 0 0 24px rgba(var(--atlas-accent-rgb), 0.10);
-}
-
-.atlas-landing-btn:hover:not(:disabled) {
-  background: rgba(var(--atlas-accent-rgb), 0.22);
-  box-shadow: 0 0 32px rgba(var(--atlas-accent-rgb), 0.16);
+  border-radius: 6px;
 }
 
 /* Grounded state (root set): confirmation + the three path cards. */
@@ -17012,6 +17057,8 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 /* A6: a disabled primary button looks disabled (the first-run "Create" was
    live-looking and silently did nothing until a folder was picked). */
 .atlas-btn-primary:disabled,
+.atlas-btn-entry:disabled,
+.atlas-btn-danger:disabled,
 .atlas-icon-btn-sm:disabled {
   opacity: 0.4;
   cursor: not-allowed;

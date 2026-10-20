@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.62.0',
+    date: '2026-10-20',
+    theme: 'Buttons by what they do',
+    entries: [
+      {
+        id: 'button-ladder',
+        title: 'The main button stands out, and deleting looks like deleting',
+        body: 'Atlas now draws its buttons the way every OnlyWorlds tool will: one solid button where you begin (Start a world on the first screen), an everyday button for saving and creating, a quiet one for Cancel and Back, and a link. On the first screen, Start a world and Explore Moppetopia no longer look alike. Buttons that delete or forget, in Settings and in their dialogs, are red, and Forget everything is no longer a plain grey button.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.61.0',
     date: '2026-10-20',
     theme: 'What the owner hides leaves your copy',

@@ -160,11 +160,11 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </div>
       <p class="atlas-settings-hint" data-role="download-hint">One file holding the whole world: elements, pages, notes, charts and images. Atlas 1.17 or later opens it in any browser.${world.state === 'api-linked' ? ' It leaves out the OnlyWorlds link and its key, so the copy opens as a local world.' : ''}</p>
       <div class="atlas-settings-actions atlas-settings-actions-danger">
-        <button class="atlas-btn-ghost" data-action="delete-browser-world" title="Remove it from Atlas and from this browser">Delete world</button>
+        <button class="atlas-btn-ghost atlas-btn-danger" data-action="delete-browser-world" title="Remove it from Atlas and from this browser">Delete world</button>
       </div>`
       : `<div class="atlas-settings-actions atlas-settings-actions-danger">
         <button class="atlas-btn-ghost" data-action="delete-world">Forget world (keep folder)</button>
-        <button class="atlas-btn-ghost" data-action="delete-world-permanent" title="Remove from atlas AND delete the world folder on disk">Delete world + folder</button>
+        <button class="atlas-btn-ghost atlas-btn-danger" data-action="delete-world-permanent" title="Remove from atlas AND delete the world folder on disk">Delete world + folder</button>
       </div>`;
   const paused = !!world.sync_paused;
   const apiActions = world.state === 'api-linked'

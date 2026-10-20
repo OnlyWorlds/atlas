@@ -104,7 +104,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <p>Atlas found the folder you set up before on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
           <p class="atlas-welcome-hint">Your worlds are still on disk. Allow the folder again below to bring the list back.</p>
           <div class="atlas-welcome-actions">
-            <button class="atlas-btn-primary" data-action="recover-atlas">Re-link OnlyWorlds folder</button>
+            <button class="atlas-btn-entry" data-action="recover-atlas">Re-link OnlyWorlds folder</button>
           </div>
           <p class="atlas-welcome-hint"><button class="atlas-btn-link" data-action="setup-atlas">Or set up a different folder</button></p>
         </div>
@@ -191,11 +191,13 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
            <span class="atlas-landing-choice-note">${note}</span>
          </span>`;
       const doors = [
-        choice('start-world', 'atlas-btn-primary', 'Start a world', folderMode
+        // OW Style's ladder (h63 #8314): Start a world is this screen's one
+        // Entry; the demo door is Standard, the everyday button.
+        choice('start-world', 'atlas-btn-entry', 'Start a world', folderMode
           ? 'Your first world, in a folder on your drive or in this browser'
           : 'It lives in this browser'),
         // #113: the demo world as the user's own copy (needs browser storage).
-        choice('try-demo', 'atlas-btn-ghost', 'Explore Moppetopia', 'A demo world, your own copy to change'),
+        choice('try-demo', 'atlas-btn-primary', 'Explore Moppetopia', 'A demo world, your own copy to change'),
       ].join('');
       const link = (action: string, label: string, hint: string): string =>
         `<button type="button" class="atlas-btn-link atlas-landing-more-link" data-door="${action}" data-action="${action}" title="${hint}">${label}</button>`;

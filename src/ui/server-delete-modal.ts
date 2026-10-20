@@ -121,7 +121,7 @@ export class ServerDeleteReviewModal extends BaseModal {
         ${r.unsynced ? '<label class="atlas-conflict-include"><input type="checkbox" data-role="include"> Include in Delete all</label>' : ''}
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="atlas-btn-ghost" data-action="delete-locally" title="Remove this from local; matches the server">Delete locally</button>
+        <button class="atlas-btn-ghost atlas-btn-danger" data-action="delete-locally" title="Remove this from local; matches the server">Delete locally</button>
         <button class="atlas-btn-ghost" data-action="keep" title="Keep it here; the next sync puts it back online">Keep + re-push</button>
       </div>
     `;
