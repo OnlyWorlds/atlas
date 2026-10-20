@@ -379,6 +379,12 @@ describe('the writing room', () => {
     expect(t.querySelector('.atlas-writing-landing-labels-edit')).not.toBeNull();
   });
 
+  it('the labels line reads in sentence case, its link too (Seethe h63 #8218: a plain link is a label)', () => {
+    const t = room(false, []);
+    expect(t.querySelector('.atlas-writing-landing-labels')?.textContent?.trim()).toMatch(/^Labels: /);
+    expect(t.querySelector('.atlas-writing-landing-labels-edit')?.textContent).toBe('Edit');
+  });
+
   // A chained tree under labels Atlas does not know yet: the setup screen.
   const tome = el('t1', 'narrative', 'Saga', { supertype: 'Tome' });
   const part = el('p1', 'narrative', 'Opening', { supertype: 'Part', parent_narrative: 't1' });

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.60.2',
+    date: '2026-10-20',
+    theme: 'Field names read the same in every OnlyWorlds tool',
+    entries: [
+      {
+        id: 'field-names-one-rule',
+        title: 'A field name written in capitals stays as written',
+        body: 'Field names now come from the rule every OnlyWorlds tool shares, so Atlas and Lantern name a field the same way. A custom field written in capitals keeps them: a stat block\'s STR reads STR, not Str, and "max_HP" reads Max HP. The Writing room\'s line about your book, chapter and scene names now reads "Labels: ... · Edit".',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.60.1',
     date: '2026-10-20',
     theme: 'Your new role, said when Atlas first meets it',
