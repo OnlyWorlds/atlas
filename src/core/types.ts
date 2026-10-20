@@ -258,6 +258,18 @@ export interface SyncState {
    */
   server_deletes?: ServerDeleteRecord[];
   /**
+   * Elements this world's key no longer sees online, kept here as they are
+   * (B12 Q2, the Captain h20 #8014; conv. 151): a role change never takes
+   * from the copy. Kept elements stop syncing; a later walk that names one
+   * gives it back. Cleared by resetSyncBaseline.
+   */
+  kept_outside_view?: string[];
+  /**
+   * The key's role (keel `GET /me`) when the folder was last walked whole: a
+   * resync under another role is a role change, and keeps (conv. 151).
+   */
+  walked_as_role?: string;
+  /**
    * World-meta sync baseline (S262, gate R2): a CANONICAL snapshot of the 8
    * synced world.json wire fields as last confirmed with the server
    * (''/[]/null empties — see META_SYNC_FIELDS in sync/world-meta-sync.ts).
@@ -417,6 +429,12 @@ export interface SyncResult {
    */
   meta_pushed?: string[];
   meta_pulled?: string[];
+  /** The key's role, when the round read keel's `GET /me` (B12 Q2, conv. 151). */
+  own_role?: string;
+  /** Elements a resync found outside this key's view and kept (conv. 151). */
+  kept?: number;
+  /** Local edits to kept elements: they stay here, unsent (conv. 151). */
+  kept_edit_ids?: string[];
 }
 
 export interface PerElementFailure {
@@ -493,6 +511,12 @@ export interface WorldRegistryEntry {
      * seam. Mirrored in `WorldMeta.api.read_only` so discovery restores it.
      */
     read_only?: boolean;
+    /**
+     * The key's role as last told to the person (keel `GET /me`: owner,
+     * co_builder, contributor, guest; B12 Q2, conv. 151). A change from a
+     * known role is said once; first sight is recorded silently.
+     */
+    member_role?: string;
     /** An agent seat (#104, S385); mirrored in `WorldMeta.api.seat`. Read through `worldPin`. */
     seat?: { role?: string };
     /**

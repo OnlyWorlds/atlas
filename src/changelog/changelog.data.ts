@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.60.0',
+    date: '2026-10-20',
+    theme: 'Your copy stays yours when your role changes',
+    entries: [
+      {
+        id: 'role-change-keeps-the-copy',
+        title: 'When the owner changes your role, your copy keeps everything',
+        body: 'If the owner of a world shared with you makes you a guest, Atlas keeps everything you had and says so once. What you no longer see online stays here as it is and stops syncing, and changes you make to it stay here too. Before, editing such an element offered to delete it as if someone had removed it online. When the owner gives you a bigger role again, those elements sync again. Settings, This world names your role and how many elements are kept from before.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.59.1',
     date: '2026-10-20',
     theme: 'One way of writing labels',

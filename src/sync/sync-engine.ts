@@ -27,6 +27,7 @@ import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../core/constants
 import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { mergeForeignIds } from './foreign-ids';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
+import { withKeptLinks, withoutKeptLinks } from './kept-links';
 import type {
   Conflict,
   Element,
@@ -146,6 +147,8 @@ export interface OwApiClient {
    * the previous page (null = from the world's epoch).
    */
   pullChanges?(since: string | null, limit?: number): Promise<ChangesPage>;
+  /** GET /me: the key's role (B12 Q2, conv. 151). Absent: the role is unknown, and a resync keeps. */
+  me?(): Promise<{ role: string }>;
   /**
    * Optional: report which element types' most recent listElements() walk may
    * be INCOMPLETE (cursor walk aborted / capped / not advancing). The engine
@@ -519,6 +522,45 @@ export class SyncEngine {
   /** Push rounds in a row that met a held file (S368): caps the busy retries. */
   private busyRounds = 0;
 
+  /**
+   * The key's role from keel's `GET /me` (B12 Q2, conv. 151): read when a
+   * resync or a guest's 404 needs it, kept for the engine's life, read again
+   * after every 409. Undefined: not read yet; null: unknown (no `me`, or the
+   * read failed), and an unknown role keeps.
+   */
+  private roleRead: Promise<string | null> | null = null;
+
+  /** The kept set as the running push or resolve read it: links to these never go out (`kept-links.ts`). */
+  private roundKept: ReadonlySet<string> = new Set();
+  /** What the running push found out of a guest's view (a 404, a peer keel says does not exist): kept at its end. */
+  private roundKeptAdd: string[] = [];
+  /** The role as the running push read it, afresh once per round (S439 gates G1, H1): a lowering while open moves it. */
+  private roundRole: Promise<string | null> | null = null;
+
+  private roundRoleNow(): Promise<string | null> {
+    this.roundRole ??= this.ownRole(true);
+    return this.roundRole;
+  }
+
+  /** An element's body as sent: sync stamps off, links to kept elements left out (keel keeps them, S439 G3). */
+  private outgoing(elem: Element): Record<string, unknown> {
+    return withoutKeptLinks(elem.type, stripSyncFields(elem), this.roundKept);
+  }
+
+  private ownRole(fresh = false): Promise<string | null> {
+    if (fresh || !this.roleRead) {
+      const me = this.client.me?.bind(this.client);
+      this.roleRead = me
+        ? me().then(r => r.role, (err: unknown) => {
+          console.info('[atlas:sync] the key\'s role could not be read', err);
+          this.roleRead = null;
+          return null;
+        })
+        : Promise.resolve(null);
+    }
+    return this.roleRead;
+  }
+
   /** One retry after a busy/unreachable round, never a loop: the timer is
    *  single, and a round that fails again schedules the next one itself. */
   private scheduleTransientRetry(ms: number | undefined): void {
@@ -734,11 +776,25 @@ export class SyncEngine {
       console.info(`[atlas:sync] resolveConflict: no conflict entry for ${id} — already cleared`);
       return;
     }
+    // Kept elements (conv. 151): neither side can reach keel for this key, and
+    // links to them never go out (the S439 gate's G2, G3).
+    this.roundKept = new Set(syncState.kept_outside_view ?? []);
+    const keepHere = async (): Promise<void> => {
+      await this.folder.updateSyncState(s => ({
+        conflicts: s.conflicts.filter(c => c.element_id !== id),
+        kept_outside_view: [...new Set([...(s.kept_outside_view ?? []), id])],
+      }));
+    };
 
     if (action === 'overwrite-mine') {
       const local = await this.folder.getElement(id);
       if (!local) throw new Error(`element ${id} not found locally`);
-      const body = stripSyncFields(local);
+      if (this.roundKept.has(id)) {
+        console.info('[atlas:sync] resolveConflict overwrite-mine: kept outside this key\'s view — stays here', { id });
+        await keepHere();
+        return;
+      }
+      const body = this.outgoing(local);
       console.info(`[atlas:sync] resolveConflict overwrite-mine: pushing local to server`, {
         id, type: local.type, hasServerBaseline: !!local.server_updated_at,
       });
@@ -749,6 +805,12 @@ export class SyncEngine {
         await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at);
         console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
       } catch (err) {
+        if (local.server_updated_at && isNotFoundError(err) && await this.ownRole(true) === 'guest') {
+          // A guest's 404 is out of view, not deleted (conv. 151): kept here.
+          console.info('[atlas:sync] resolveConflict overwrite-mine: a guest\'s 404 — kept here', { id });
+          await keepHere();
+          return;
+        }
         if (local.server_updated_at && isNotFoundError(err)) {
           // Server deleted this element between the conflict and our resolve.
           // Don't surface as a raw error — clear the conflict, route to
@@ -772,9 +834,17 @@ export class SyncEngine {
       }
     } else if (action === 'pull-theirs') {
       console.info(`[atlas:sync] resolveConflict pull-theirs: fetching ${conflict.type}/${id}`);
-      const remote = await this.client.getElement(conflict.type, id);
+      const remote = this.roundKept.has(id) ? null : await this.client.getElement(conflict.type, id);
+      if (!remote && (this.roundKept.has(id) || await this.ownRole(true) === 'guest')) {
+        // Nothing online this key may read: the copy keeps its own (conv. 151).
+        console.info('[atlas:sync] resolveConflict pull-theirs: outside this key\'s view — the copy keeps its own', { id });
+        await keepHere();
+        return;
+      }
       if (!remote) throw new Error(`element ${id} not found on server (already deleted?)`);
-      const { updated_at, ...body } = remote;
+      const local = await this.folder.getElement(id);
+      const { updated_at, ...fetched } = remote;
+      const body = local ? withKeptLinks(conflict.type, fetched, local, this.roundKept) : fetched;
       console.info(`[atlas:sync] resolveConflict pull-theirs: applying server record`, {
         id,
         type: conflict.type,
@@ -1366,6 +1436,7 @@ export class SyncEngine {
       retry_after_ms: pushResult.retry_after_ms,
       meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
       meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
+      ...keptFields(pushResult),
     };
     this.onSyncResult('push', result);
     return result;
@@ -1410,6 +1481,7 @@ export class SyncEngine {
       auth_reason: pullResult.auth_blocked ? this.lastAuthReason ?? undefined : undefined,
       meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
       meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
+      ...keptFields(pullResult),
     };
     this.onSyncResult('pull', result);
     return result;
@@ -1474,6 +1546,7 @@ export class SyncEngine {
         transient_blocked: true,
         transient_reason: pushResult.transient_reason,
         retry_after_ms: pushResult.retry_after_ms,
+        ...keptFields(pushResult),
       };
       this.onSyncResult('sync', result);
       return result;
@@ -1497,7 +1570,16 @@ export class SyncEngine {
       auth_reason: (pushResult.auth_blocked || pullResult.auth_blocked) ? this.lastAuthReason ?? undefined : undefined,
       meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
       meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
+      ...keptFields(pushResult, pullResult),
     };
+    // A raise in this round's pull gave back what its push had kept: those
+    // edits no longer stay here (the S439 gate's G9).
+    if (result.kept_edit_ids && pullResult.own_role !== undefined) {
+      const keptAfter = new Set((await this.folder.readSyncState().catch(() => null))?.kept_outside_view ?? result.kept_edit_ids);
+      const still = result.kept_edit_ids.filter(id => keptAfter.has(id));
+      if (still.length > 0) result.kept_edit_ids = still;
+      else delete result.kept_edit_ids;
+    }
     if (pullResult.auth_blocked) {
       this.setAuthError();
     } else {
@@ -1615,7 +1697,18 @@ export class SyncEngine {
     child: { id: string; type: ElementType },
     serverDeletesDetected: import('../core/types').ServerDeleteRecord[]
   ): Promise<boolean> {
+    // A kept peer is out of this key's view, not deleted (conv. 151): never a
+    // review row. For a guest, keel's "does not exist" says the same of a peer
+    // it once gave (a stamp) and not kept yet (probed S439): it joins the kept
+    // set, and the next round sends the child without the link, which keel
+    // keeps. A peer never sent is a local create, not out of view (the second
+    // S439 gate's H2); the role is this round's (H1).
+    if (this.roundKept.has(parsed.refId)) return false;
     const peer = await this.folder.getElement(parsed.refId);
+    if (peer?.server_updated_at && await this.roundRoleNow() === 'guest') {
+      this.roundKeptAdd.push(parsed.refId);
+      return false;
+    }
     if (peer && peer.server_updated_at) {
       if (!serverDeletesDetected.some(d => d.id === peer.id)) {
         serverDeletesDetected.push({
@@ -1686,7 +1779,7 @@ export class SyncEngine {
           });
         }
       }
-      items.push({ type: current.type, element: stripSyncFields(current) });
+      items.push({ type: current.type, element: this.outgoing(current) });
       sentStamps.set(current.id, current.local_updated_at);
     }
     if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false };
@@ -1995,6 +2088,35 @@ export class SyncEngine {
     const roundForeign: Array<{ id: string; type: ElementType }> = [];
     /** Every create actually SENT this round: one that is not refused as foreign again leaves the list (lens B F4). */
     const attemptedCreates = new Set<string>();
+    /**
+     * Elements this key no longer sees (conv. 151): an edit to one stays
+     * here, unsent and never offered for deletion. `keptAdd`: a guest's 404
+     * or out-of-view peer this round, kept (keel answers a guest's out-of-view
+     * element exactly as a deleted one, and the ruling keeps both).
+     */
+    const kept = new Set((await this.folder.readSyncState()).kept_outside_view ?? []);
+    this.roundKept = kept;
+    this.roundKeptAdd = [];
+    this.roundRole = null;
+    const keptAdd = this.roundKeptAdd;
+    const keptEdits: string[] = [];
+    /** Ids this round's 404s left for the next round: the role could not be read (the S439 gate's G5). */
+    const roleUnknown: string[] = [];
+    /** A 404 on an element someone else may still see: a guest keeps it, anyone else reviews it, an unknown role waits. */
+    const keepsOn404 = async (id: string): Promise<boolean> => {
+      // The role, read afresh once per push round: a lowering while the world is open moves the next 404 (G1).
+      const role = await this.roundRoleNow();
+      if (role === null) {
+        roleUnknown.push(id);
+        console.info('[atlas:sync] push: a 404 and the key\'s role unknown — left for the next round', { id });
+        return true;
+      }
+      if (role !== 'guest') return false;
+      keptAdd.push(id);
+      keptEdits.push(id);
+      console.info('[atlas:sync] push: a guest\'s 404 — outside this key\'s view, kept here', { id });
+      return true;
+    };
 
     if (useBulk) {
       const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
@@ -2028,6 +2150,12 @@ export class SyncEngine {
       if (authBlocked || transient || this.stopped) break;
       const isCreate = !elem.server_updated_at;
       const failuresBefore = failures.length;
+      if (!isCreate && kept.has(elem.id)) {
+        keptEdits.push(elem.id);
+        done++;
+        this.onPushProgress(done, total);
+        continue;
+      }
       if (!isCreate && refusedCreates.size > 0 && splitByRefusedLinks([elem], refusedCreates).blocked.length > 0) {
         failures.push({
           element_id: elem.id,
@@ -2075,7 +2203,7 @@ export class SyncEngine {
               });
             }
           }
-          const body = stripSyncFields(current);
+          const body = this.outgoing(current);
           attemptedCreates.add(current.id);
           const response = await this.client.createElement(current.type, body);
           if (response.id !== current.id) {
@@ -2122,7 +2250,8 @@ export class SyncEngine {
             // admin, another atlas instance, or never landed despite a local
             // baseline). PATCH would 404 — skip it. Add to server_deletes;
             // the review modal will offer keep + re-push (clears baseline)
-            // or delete-locally.
+            // or delete-locally. A guest's 404 is kept instead (conv. 151).
+            if (await keepsOn404(current.id)) continue;
             serverDeletesDetected.push({
               id: current.id,
               type: current.type,
@@ -2157,7 +2286,7 @@ export class SyncEngine {
           }
 
           if (!skipPush) {
-            const body = stripSyncFields(current);
+            const body = this.outgoing(current);
             const response = await this.client.updateElement(current.type, current.id, body);
             // The body sent carried `current.local_updated_at`; an edit that
             // landed while this request was in flight keeps the element dirty
@@ -2192,6 +2321,7 @@ export class SyncEngine {
         // Route to server_deletes — same UX as the inline detection above.
         // Don't add to failures (would surface as a raw error elsewhere).
         else if (!isCreate && isNotFoundError(err)) {
+          if (await keepsOn404(elem.id)) continue;
           serverDeletesDetected.push({
             id: elem.id,
             type: elem.type,
@@ -2217,6 +2347,13 @@ export class SyncEngine {
         else if (parseInvalidLinkError(err)) {
           const parsed = parseInvalidLinkError(err)!;
           const routedPeer = await this.routeDanglingPeer(parsed, elem, serverDeletesDetected);
+          // A peer just found out of a guest's view: no failure, the element
+          // stays changed and the next round sends it without that link. A
+          // create stays refused this round, so nothing links it yet (H2).
+          if (!routedPeer && this.roundKeptAdd.includes(parsed.refId)) {
+            if (isCreate) refusedCreates.add(elem.id);
+            continue;
+          }
           failures.push({
             element_id: elem.id,
             type: elem.type,
@@ -2344,14 +2481,23 @@ export class SyncEngine {
       const roundNow = nowIso();
       try {
         await this.folder.updateSyncState(curr => {
-          const foreignNext = (curr.foreign || roundForeign.length > 0)
-            ? { foreign: mergeForeignIds(curr.foreign, this.apiWorldId, roundForeign, stillUnsynced, roundNow, attemptedCreates) }
-            : {};
-          if (serverDeletesDetected.length === 0) return { last_push_at: roundNow, ...foreignNext };
-          const existing = curr.server_deletes ?? [];
+          const foreignNext = {
+            ...(curr.foreign || roundForeign.length > 0
+              ? { foreign: mergeForeignIds(curr.foreign, this.apiWorldId, roundForeign, stillUnsynced, roundNow, attemptedCreates) }
+              : {}),
+          };
+          // The kept set: this round's guest 404s in, deleted-here ids out (G10).
+          const deletedHere = new Set(tombstones.map(t => t.id));
+          const keptNext = [...new Set([...(curr.kept_outside_view ?? []), ...keptAdd])].filter(id => !deletedHere.has(id));
+          const keptPart = keptNext.length > 0 || (curr.kept_outside_view?.length ?? 0) > 0 ? { kept_outside_view: keptNext } : {};
+          // No review row for a kept element, whatever wrote it (G4: 1.59.1's own, a side path's).
+          const keptIds = new Set(keptNext);
+          const existing = (curr.server_deletes ?? []).filter(d => !keptIds.has(d.id));
           const existingIds = new Set(existing.map(d => d.id));
-          const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
-          return { last_push_at: roundNow, server_deletes: [...existing, ...fresh], ...foreignNext };
+          const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id) && !keptIds.has(d.id));
+          const deletesPart = fresh.length > 0 || existing.length !== (curr.server_deletes ?? []).length
+            ? { server_deletes: [...existing, ...fresh] } : {};
+          return { last_push_at: roundNow, ...foreignNext, ...keptPart, ...deletesPart };
         });
       } catch (err) {
         // A cloud client re-uploading `.atlas/sync-state.json` each round
@@ -2380,6 +2526,7 @@ export class SyncEngine {
       failures,
       auth_blocked: authBlocked || undefined,
       ...(transient ? transientFields(transient) : {}),
+      ...(keptEdits.length > 0 ? { kept_edit_ids: keptEdits } : {}),
     };
   }
 
@@ -2452,6 +2599,16 @@ export class SyncEngine {
      */
     let resynced = false;
     const seenInResync = new Set<string>();
+    /** keel's word on why the view moved, when it said (conv. 151). */
+    let resyncWhy: 'role' | 'view' | null = null;
+    /** Kept elements the feed named again: back in view, so they sync again (conv. 151 I8). */
+    const revealed = new Set<string>();
+    /** Elements this round's resync found outside the view and kept. */
+    const keptNow: string[] = [];
+    /** The role the folder was walked whole under this round, when read. */
+    let walkedAs: string | undefined;
+    /** What earlier role changes kept, as this round began. */
+    const keptBefore = new Set(syncState.kept_outside_view ?? []);
     let walkComplete = false;
     /** Local writes another program's hold refused (S369): per element, not the round. */
     const failures: PerElementFailure[] = [];
@@ -2478,12 +2635,19 @@ export class SyncEngine {
           const ids = new Set(curr.conflicts.map(c => c.element_id));
           persistedConflicts = [...curr.conflicts, ...conflicts.filter(c => !ids.has(c.element_id))];
         }
+        const keptBefore = curr.kept_outside_view ?? [];
+        const keptNext = [...new Set([...keptBefore.filter(id => !revealed.has(id)), ...keptNow])];
+        // A kept element is neither deleted nor reachable: no review row and
+        // no conflict holds it (the S439 gate's G2, G4).
+        const keptIds = new Set(keptNext);
         return {
           ...(walkComplete ? { last_pull_at: nowIso() } : {}),
           changes_cursor: lastAppliedCursor,
           changes_last_seq: lastAppliedSeq,
-          conflicts: persistedConflicts,
-          server_deletes: [...existing, ...fresh],
+          conflicts: persistedConflicts.filter(c => !keptIds.has(c.element_id)),
+          server_deletes: [...existing, ...fresh].filter(d => !keptIds.has(d.id)),
+          ...(keptBefore.length > 0 || keptNext.length > 0 ? { kept_outside_view: keptNext } : {}),
+          ...(walkedAs !== undefined ? { walked_as_role: walkedAs } : {}),
         };
       });
     };
@@ -2508,7 +2672,8 @@ export class SyncEngine {
             break;
           }
           if (!resynced && isResyncRequired(err)) {
-            console.info('[atlas:sync] /changes answered resync_required — this reader\'s view moved; walking again from 0');
+            resyncWhy = resyncReason(err);
+            console.info('[atlas:sync] /changes answered resync_required — this reader\'s view moved; walking again from 0', { reason: resyncWhy });
             resynced = true;
             cursor = null;
             lastAppliedCursor = null;
@@ -2546,6 +2711,7 @@ export class SyncEngine {
             continue;
           }
           if (resynced && op.op === 'upsert') seenInResync.add(op.id);
+          if (op.op === 'upsert') revealed.add(op.id);
           if (tombstoneIds.has(op.id)) continue; // pending local delete owns this id
           if (skipIds.has(op.id)) continue;      // push already conflicted on it
 
@@ -2556,9 +2722,12 @@ export class SyncEngine {
             const idx = newServerDeletes.findIndex(d => d.id === op.id);
             if (idx >= 0) newServerDeletes.splice(idx, 1);
 
-            const remoteBody = stripServerOnlyFields(op.element);
             const serverStamp = op.element.updated_at;
             const local = await this.folder.getElement(op.id);
+            // keel's read leaves out links this key may not see; the copy keeps them (conv. 151, S439 G3).
+            const remoteBody = local
+              ? withKeptLinks(op.type, stripServerOnlyFields(op.element), local, keptBefore)
+              : stripServerOnlyFields(op.element);
             if (!local) {
               if (!await this.pullWrite(failures, op.id, op.type, () =>
                 this.folder.applyServerRecord(op.type, remoteBody, serverStamp))) { heldStop = true; continue; }
@@ -2677,17 +2846,29 @@ export class SyncEngine {
       };
     }
 
-    // After a resync, a view-only world keeps only what the fresh walk named:
-    // the rest left this reader's view (hidden, a Character taken, a role
-    // lowered), and nothing here can have been edited, so nothing is asked.
-    // Only on a complete walk, and only what the server once gave (a stamp).
-    // A writable world keeps what it holds: what leaves a member's view is
-    // keel's question still (h50 #7629), never a guess made here.
+    // After a resync, what the fresh walk did not name left this key's view.
+    // A role change never takes from the copy (B12 Q2, the Captain h20 #8014;
+    // conv. 151): it is kept, marked, and stops syncing. Only keel's own word
+    // that the view moved (`view`), or a role Atlas knows did not move, drops
+    // it, and then only in a view-only world, where nothing can have been
+    // edited; never what an earlier role change kept. Only on a complete
+    // walk, and only what the server once gave (a stamp).
     let deletes = 0;
-    if (resynced && walkComplete && this.readOnly && !this.stopped && !heldStop) {
+    if (walkComplete && !this.stopped && !heldStop && (resynced || syncState.walked_as_role === undefined)) {
+      const role = await this.ownRole(resynced);
+      if (role !== null) walkedAs = role;
+    }
+    const roleMoved = walkedAs === undefined || syncState.walked_as_role === undefined || walkedAs !== syncState.walked_as_role;
+    const drops = resyncWhy === 'view' || (resyncWhy === null && !roleMoved);
+    if (resynced && walkComplete && !this.stopped && !heldStop) {
       for (const el of await this.folder.listElements()) {
         if (this.stopped) break;
         if (seenInResync.has(el.id) || !el.server_updated_at) continue;
+        if (keptBefore.has(el.id)) continue;
+        if (!this.readOnly || !drops) {
+          keptNow.push(el.id);
+          continue;
+        }
         try {
           if (await this.folder.deleteSilentlyIfUnchanged(el.id, {
             local_updated_at: el.local_updated_at ?? null,
@@ -2709,7 +2890,12 @@ export class SyncEngine {
       if (!isFileBusyError(err)) throw err;
       failures.push({ ...failureOf('world', 'world', 'read', err), source: 'disk' });
     }
-    return { pushed: zero(), pulled: { creates, updates, deletes }, conflicts, failures, pulled_ids: pulledIds };
+    if (keptNow.length > 0) console.info(`[atlas:sync] resync: ${keptNow.length} element(s) left this key's view and are kept here`, { reason: resyncWhy, role: walkedAs ?? null });
+    return {
+      pushed: zero(), pulled: { creates, updates, deletes }, conflicts, failures, pulled_ids: pulledIds,
+      ...(walkedAs !== undefined ? { own_role: walkedAs } : {}),
+      ...(keptNow.length > 0 ? { kept: keptNow.length } : {}),
+    };
   }
 
   private async pullPhaseFullList(skipIds: Set<string> = new Set()): Promise<SyncResult> {
@@ -3046,6 +3232,18 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   return true;
 }
 
+/** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result. */
+function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept' | 'kept_edit_ids'> {
+  const role = parts.map(p => p.own_role).find(r => r !== undefined);
+  const kept = parts.reduce((n, p) => n + (p.kept ?? 0), 0);
+  const edits = [...new Set(parts.flatMap(p => p.kept_edit_ids ?? []))];
+  return {
+    ...(role !== undefined ? { own_role: role } : {}),
+    ...(kept > 0 ? { kept } : {}),
+    ...(edits.length > 0 ? { kept_edit_ids: edits } : {}),
+  };
+}
+
 function zero(): { creates: number; updates: number; deletes: number } {
   return { creates: 0, updates: 0, deletes: 0 };
 }
@@ -3073,6 +3271,18 @@ function typedError(err: unknown): { status: number; code: string; param: string
 export function isResyncRequired(err: unknown): boolean {
   const t = typedError(err);
   return !!t && t.status === 409 && t.code === 'resync_required';
+}
+
+/**
+ * Why keel moved this reader (one-rule §3, Skeld h20 #8021): `view` (a delete,
+ * a hide, a Character change: drop what the walk no longer names) or `role`
+ * (a role or roster move: keep). Null when keel did not say; any other value
+ * reads as `role`, the Captain's side of the error (conv. 151).
+ */
+export function resyncReason(err: unknown): 'role' | 'view' | null {
+  const r = (err as { reason?: unknown } | null)?.reason;
+  if (typeof r !== 'string') return null;
+  return r === 'view' ? 'view' : 'role';
 }
 
 /**

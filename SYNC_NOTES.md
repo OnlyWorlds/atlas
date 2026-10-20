@@ -427,6 +427,8 @@ Real OW returns `400 — element_type must be provided when element_id is specif
 
 (Added Bout 8, session 204. Companion to the DELETE 404 rule below.)
 
+**Except a guest's** (S439, conv. 151): keel answers a guest's out-of-view element exactly as a deleted one, so a guest's 404 joins the kept set and is never reviewed; a 404 with the role unknown waits a round. The 1.59.1 control showed the old rule's cost live: a lowered co-builder's edit opened "1 server-side delete detected... Delete locally" for an element nobody deleted (`Notes/ui-snapshots/2026-10-20-s439/control-firefox-x-stopped.png`). A known edge kept from the second gate (H3): after a raise, the copy cannot tell keel's redacted links from an owner's removal made while the member was a guest, so the member's next edit of that element puts the removed link back.
+
 When push's pre-update GET returns null (adapter caught 404 → null) OR the PATCH itself throws 404 (race between GET and PATCH), the server doesn't have the record. Naive handling: try the PATCH anyway → 404 → record as `failures` → user sees raw error message + element keeps trying every subsequent push.
 
 **The rule**: in `pushPhase` UPDATE branch, treat "server doesn't have it" symmetrically with pull-time server-delete detection. Add the element to `sync_state.server_deletes`. The same review modal that opens for pull-detected deletes also opens for push-detected ones — user picks `keep + re-push` (clears baseline, immediately pushes as CREATE) or `delete locally` (silently removes the file).

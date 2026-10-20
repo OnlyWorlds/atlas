@@ -35,7 +35,7 @@ import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { WORLD_NOT_OPEN } from './element-detail-fields';
 import { pickElement } from '../ui/element-picker-modal';
-import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
+import { isKeptHere, refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { getAssociatedMaps } from '../tabs/right/auto-open-map';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
@@ -365,7 +365,12 @@ function buildSyncDot(el: Element): HTMLElement {
     const localStamp = el.local_updated_at ?? '';
     const serverStamp = el.server_updated_at ?? '';
     const dirty = !serverStamp || localStamp > serverStamp;
-    if (dirty) {
+    if (activeId && isKeptHere(activeId, el.id)) {
+      // Kept outside this key's view (conv. 151): it no longer syncs, edited or not.
+      icon = 'cloud_off';
+      title = 'Kept here: OnlyWorlds no longer shows this to you, so it no longer syncs';
+      state = 'local';
+    } else if (dirty) {
       icon = 'cloud_upload';
       title = 'Pending sync; autosave will push within a few seconds';
       state = 'dirty';

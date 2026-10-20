@@ -126,6 +126,17 @@ describe('a new key in place', () => {
     expect(h.attachedKeys).toEqual([NEW]);
   });
 
+  it('a new key forgets the old key\'s role, and what it kept walks again from 0 (conv. 151, S439 G6)', async () => {
+    patchSlice('registry', { ...getState().registry, worlds: [entry({ member_role: 'guest' })] });
+    await store.updateSyncState(() => ({ changes_cursor: '9:x', changes_last_seq: 9, kept_outside_view: ['k1'], walked_as_role: 'guest' }));
+    await putKeyInPlace(current(), NEW, false);
+    expect(current().api!.member_role).toBeUndefined();
+    const st = await store.readSyncState();
+    expect(st.changes_cursor).toBeNull();
+    expect(st.walked_as_role).toBeUndefined();
+    expect(st.kept_outside_view).toEqual(['k1']);
+  });
+
   it('a write key opens a read-only world to edit, and a read key closes it', async () => {
     patchSlice('registry', { ...getState().registry, worlds: [entry({ read_only: true })] });
     store.setViewOnly(true);

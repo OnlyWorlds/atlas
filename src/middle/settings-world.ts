@@ -33,12 +33,14 @@ import {
   detachSyncEngine,
   getCurrentSyncEngine,
   getCurrentSyncWorldId,
+  keptCountFor,
   pullNowAndRefresh,
   reapplySyncPolicy,
   refreshElementsAfterWrite,
   requestPushIfLinked,
 } from '../sync/sync-attach';
 import { sharedRuleHolds, sharedWorldLine } from '../sync/shared-world';
+import { memberRoleLine } from '../sync/role-change';
 import { buildV2Adapter } from '../sync/make-online';
 import { keyRefusalFor, makeNewWorldKey, newKeyCures, offersMakeKey } from '../sync/world-key';
 import { keyRefusalHere, keyRefusalOf, seatRefusalLine } from '../sync/world-key-lines';
@@ -126,10 +128,15 @@ export function worldKeyHtml(world: WorldRegistryEntry): string {
   // The key's kind says what it could do; a refusal sync met says what it
   // does now (S419, #198's live walk: "reads and writes" under "Sync stopped").
   const refusal = engine?.kind === 'error' ? keyRefusalFor(world.id) : undefined;
+  // A member's write key changes only what its role allows (B12 Q2, conv. 151).
+  const member = world.api.member_role === 'guest' || world.api.member_role === 'contributor';
   const does = refusal === 'key_revoked' || refusal === 'key_unknown' ? ', and OnlyWorlds no longer takes it'
-    : world.api.read_only || refusal === 'read_only_key' ? ' and can only read' : ' and reads and writes';
+    : world.api.read_only || refusal === 'read_only_key' ? ' and can only read'
+      : member ? ' and changes only what you made' : ' and reads and writes';
+  const roleLine = memberRoleLine(world, keptCountFor(world.id));
   return `<div class="atlas-settings-key" data-role="world-key">
       <p class="atlas-settings-hint" data-role="key-line">This world's key ends in ${escapeText(tail)}${does}. A new key takes its place here, and everything in the world stays as it is.</p>
+      ${roleLine ? `<p class="atlas-settings-hint" data-role="member-role-line">${escapeText(roleLine)}</p>` : ''}
       <div class="atlas-settings-actions">
         ${offerMake ? `<button class="atlas-btn-ghost" data-action="make-new-key" ${makingKey ? 'disabled' : ''} title="Atlas makes a key from your OnlyWorlds account">${makingKey ? 'Making a key…' : 'Make a new key'}</button>` : ''}
         <button class="atlas-btn-ghost" data-action="put-new-key" title="Paste a key from the world's page on onlyworlds.com">Put in a new key</button>

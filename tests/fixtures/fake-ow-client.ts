@@ -189,6 +189,7 @@ export class FakeOwApiClient implements OwApiClient {
     // "no change", FakeOwApiClient would otherwise apply it as "clear").
     const wireBody = stripUndefined(body);
     this.calls.push({ method: 'create', type, body: { ...wireBody } });
+    if (this.strictUpdateLinks) this.throwIfDanglingOnUpdate(String(wireBody.id ?? ''), wireBody);
     // Mirror real OW: pin requires element_type whenever element_id is set.
     // Throwing here lets engine/merge tests catch regressions of this rule.
     if (type === 'pin' && wireBody.element_id && !wireBody.element_type) {
@@ -236,8 +237,9 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfMemberRefuses('element', id);
     rejectDoubleSuffix(type, wireBody, 'update');
     rejectAtlasLocalFields(type, wireBody, 'update');
+    if (this.strictUpdateLinks) this.throwIfDanglingOnUpdate(id, wireBody);
     const m = this.bucket(type);
-    const existing = m.get(id);
+    const existing = this.outOfView.has(id) ? undefined : m.get(id);
     // Mirror real OW: PATCH on a deleted/unknown id returns 404 with the
     // "X not found in this world" body. The engine treats this as a
     // server-side delete and routes via the same review modal as pull-time
@@ -274,8 +276,52 @@ export class FakeOwApiClient implements OwApiClient {
   async getElement(type: ElementType, id: string): Promise<ServerRecord | null> {
     this.throwIfAuthBlocked();
     this.calls.push({ method: 'get', type, id });
+    if (this.outOfView.has(id)) return null;
     const r = this.bucket(type).get(id);
     return r ? { ...r } : null;
+  }
+
+  /**
+   * GET /me (B12 Q2, conv. 151): the key's role, `owner` unless a test sets
+   * `keyRole`. Counted in `meReads`, apart from `calls`, so the suites that
+   * assert exact call sequences keep their meaning. `meFails`: the read fails.
+   */
+  keyRole = 'owner';
+  meReads = 0;
+  meFails = false;
+  async me(): Promise<{ role: string }> {
+    this.throwIfAuthBlocked();
+    this.meReads++;
+    if (this.meFails) throw new Error('API Error 503: OnlyWorlds is busy.');
+    return { role: this.keyRole };
+  }
+
+  /**
+   * Test seam (B12 Q2): ids this key no longer sees, as keel answers a guest
+   * (probed live S439): a read is 404 (null here) and a PATCH 404, exactly as
+   * a deleted element. The element stays in the world for everyone else.
+   */
+  outOfView = new Set<string>();
+
+  /**
+   * Test seam (conv. 20, S439): a PATCH or a single POST naming an id this
+   * key cannot read is refused as keel refuses it, 400 `invalid_link` "...
+   * does not exist" (probed live: a guest's link to an element out of its
+   * view). Off by default: the older suites write links the fake never stored.
+   */
+  strictUpdateLinks = false;
+
+  private throwIfDanglingOnUpdate(id: string, body: Record<string, unknown>): void {
+    const known = (v: string) => !this.outOfView.has(v) && [...this.byType.values()].some(m => m.has(v));
+    for (const [key, value] of Object.entries(body)) {
+      if (key === 'id' || key === 'type') continue;
+      for (const v of Array.isArray(value) ? value : [value]) {
+        if (typeof v !== 'string' || v === id || !UUID_RE.test(v) || known(v)) continue;
+        throw Object.assign(new Error(`API Error 400: ${key} references Element '${v}' which does not exist.`), {
+          status: 400, code: 'invalid_link', param: key,
+        });
+      }
+    }
   }
 
   /**

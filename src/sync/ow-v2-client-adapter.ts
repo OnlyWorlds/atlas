@@ -76,8 +76,10 @@ export class OwV2Error extends Error {
   readonly param: string | null;
   /** Parsed `Retry-After` (seconds or an HTTP date), in ms; null when absent. */
   readonly retryAfterMs: number | null;
+  /** Why keel answered so, when it says (the 409 resync_required's `role` or `view`); null when absent. */
+  readonly reason: string | null;
 
-  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null } | null, rawBody: string, retryAfter: string | null = null) {
+  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown } | null, rawBody: string, retryAfter: string | null = null) {
     const serverMsg = envelope?.message ?? (rawBody || 'request failed');
     super(`API Error ${status}: ${serverMsg}`);
     this.name = 'OwV2Error';
@@ -86,6 +88,7 @@ export class OwV2Error extends Error {
     this.errorType = envelope?.type ?? 'unknown';
     this.param = envelope?.param ?? null;
     this.retryAfterMs = parseRetryAfter(retryAfter);
+    this.reason = typeof envelope?.reason === 'string' ? envelope.reason : null;
   }
 }
 
@@ -302,10 +305,14 @@ export class OwV2ClientAdapter implements OwApiClient {
     }
     if (response.status === 204) return undefined;
     if (!response.ok) {
-      let envelope: { type?: string; code?: string; message?: string; param?: string | null } | null = null;
+      type Envelope = { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown };
+      let envelope: Envelope | null = null;
       try {
-        const parsed = JSON.parse(text) as { error?: typeof envelope };
-        envelope = parsed?.error ?? null;
+        const parsed = JSON.parse(text) as { error?: Envelope; reason?: unknown };
+        const inner: Envelope | null = parsed?.error ?? null;
+        // keel's 409 resync_required says why (role or view, Skeld h20 #8021):
+        // read inside the envelope or beside it, whichever keel sends.
+        envelope = inner && inner.reason === undefined && typeof parsed.reason === 'string' ? { ...inner, reason: parsed.reason } : inner;
       } catch { /* non-JSON error body — envelope stays null */ }
       throw new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'));
     }
@@ -337,6 +344,17 @@ export class OwV2ClientAdapter implements OwApiClient {
       throw new Error('media removal ticket: the reply was missing the ticket, key or referenced');
     }
     return r as MediaRemovalTicket;
+  }
+
+  /**
+   * GET /me — who this key is: its role (owner, co_builder, contributor,
+   * guest) is what a resync and a guest's 404 are read against (B12 Q2,
+   * conv. 151). A read key's call too.
+   */
+  async me(): Promise<{ role: string }> {
+    const response = await this.request('GET', '/me') as { role?: unknown } | undefined;
+    if (!response || typeof response.role !== 'string') throw new Error('v2 /me response missing role');
+    return { role: response.role };
   }
 
   /**

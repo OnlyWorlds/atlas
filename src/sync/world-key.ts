@@ -24,7 +24,7 @@ import { getActiveStore } from '../core/active-store';
 import { PlainError } from '../core/plain-error';
 import { saveRegistry, setPin, updateWorldEntry } from '../registry/registry';
 import type { AccountWorldRow, KeyRefusal, WorldRegistryEntry } from '../core/types';
-import { attachSyncEngine } from './sync-attach';
+import { attachSyncEngine, detachSyncEngine } from './sync-attach';
 import { buildV2Adapter } from './make-online';
 import { AccountClient } from './account-client';
 import { accountWorldsWhenFetched, mintOwnKey, sharedOpenLine, type ReadOnlyWhy } from './account-worlds';
@@ -94,7 +94,8 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
  */
 export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, readOnly: boolean): Promise<WorldRegistryEntry> {
   if (!canTakeNewKey(entry)) throw new PlainError('This world cannot take a new key here.');
-  const { read_only: _was, ...rest } = entry.api;
+  // The role belongs to the key: a new one (perhaps another account's) is read afresh (conv. 151, the S439 gate's G6).
+  const { read_only: _was, member_role: _role, ...rest } = entry.api;
   const api = { ...rest, api_key: key, ...(readOnly ? { read_only: true } : {}) };
   const next = updateWorldEntry(getState().registry, entry.id, { api });
   if (!saveRegistry(next)) {
@@ -113,6 +114,18 @@ export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, read
       console.warn('[world-key] world.json api mirror not written:', err); // raw-error-ok: a log
     }
     store.setViewOnly(readOnly);
+    // What the old key kept is the old key's view: the new key walks from 0,
+    // so what it sees syncs again and the rest stays kept (conv. 151, G6).
+    // The old engine stops first, so no round of its writes the old cursor
+    // back after the reset (the second S439 gate's H4).
+    try {
+      if (((await store.readSyncState()).kept_outside_view?.length ?? 0) > 0) {
+        if (getState().active?.worldId === entry.id) detachSyncEngine();
+        await store.updateSyncState(() => ({ changes_cursor: null, changes_last_seq: null, walked_as_role: undefined }));
+      }
+    } catch (err) {
+      console.warn('[world-key] the kept set\'s walk was not reset:', err); // raw-error-ok: a log
+    }
     // Still this world's store, and still the open world, after the write
     // (the #198 gate's G2: a switch mid-write attached A's engine over B).
     if (getState().active?.worldId === entry.id && getActiveStore() === store) {

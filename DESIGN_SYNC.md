@@ -47,13 +47,14 @@ Every round checks, in order: blocked (paused or held) returns an empty result; 
 **Push** (`pushPhase`):
 1. Take every dirty element (`listLocallyChangedSince(null)`: `local_updated_at` newer than `server_updated_at`, or never synced) and every tombstone.
 2. CREATEs (no `server_updated_at`) land before UPDATEs. Two or more creates go through `POST /bulk`: one atomic request, keel resolves in-batch links as a fixpoint including cycles, one retry of the survivors on a partial failure, then timestamp backfill (never the client clock) (conv. 23). A single create, or a client without `bulkCreate`, uses the per-element path ordered by the Kahn topo-sort.
-3. UPDATEs: a server copy newer than the baseline is a conflict, handled per policy. A 404 routes the element to the server-delete review.
+3. UPDATEs: a server copy newer than the baseline is a conflict, handled per policy. A 404 routes the element to the server-delete review, except a guest's, which keeps it (conv. 151); an element in the kept set is skipped unsent.
 4. Tombstones become DELETEs; success or a 404 clears the entry.
 5. Each success stamps `server_updated_at` passing the sent `local_updated_at`, so an edit made during the request stays dirty (conv. 96). A pin missing `element_type` is healed from its element first (conv. 19). An `invalid_link` routes the dangling peer to the server-delete review. A create refused because another world holds the id is recorded as foreign, on evidence only (conv. 108).
 6. Errors: a per-element 4xx or validation failure is recorded and the loop goes on. 401/403 bails the round and turns the engine red (conv. 22). 429, 503 or a network failure ENDS the round (`transient_blocked`), nothing pauses, and one retry is scheduled after `Retry-After` or 30 s (conv. 100).
 
 **Pull** (`pullPhase`):
 - The production path is `pullPhaseChanges`: a walk of the per-world `/changes` feed from `changes_cursor` (continuation `since=`, never `cursor=`). Deletions arrive as explicit ops and go to the server-delete review (`sync_confirm_server_deletes`, default on). An upsert revives its id. A `head` below `changes_last_seq` means a restore from backup: drop the cursor and cold-walk once. The cursor advances only together with the side effects it caused.
+- A 409 `resync_required` (a reader's view moved) walks again from 0 once per round. After a role change, what the walk does not name is kept (`kept_outside_view`), never deleted; a view-only world removes it only when keel says the view moved, or the key's role (`GET /me`) is known not to have moved (conv. 147, 151).
 - `pullPhaseFullList` is the fallback for a client without `pullChanges`: a per-type list walk with absence-inferred deletes, suppressed for any type whose walk was incomplete.
 - Per element: server moved and local did not, so apply through `applyServerRecordIfUnchanged` (the check reads the DISK stamp inside the write chain, conv. 99); both moved, so it is a conflict per policy; ids the push conflicted on this round are skipped. Wire extension fields land from the server; local-only fields are kept from the file (`ATLAS_FIELDS.md`).
 

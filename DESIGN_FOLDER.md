@@ -105,6 +105,7 @@ Per-world sync bookkeeping. The authoritative shape is `SyncState` in `src/core/
 | `last_pull_at`, `last_push_at` | round timestamps (informational) |
 | `conflicts` | conflicts persisted under pause-and-review |
 | `server_deletes` | elements the server deleted, waiting for the user's review |
+| `kept_outside_view`, `walked_as_role` | elements this world's key no longer sees, kept as they are and no longer synced, and the key's role when the folder was last walked whole (conv. 151) |
 | `meta_baseline`, `meta_server_updated_at`, `meta_conflicts` | the world-meta three-way (DESIGN_SYNC "World-meta sync") |
 | `foreign` | ids another OnlyWorlds world already holds, scoped to the api world (conv. 108) |
 | `rekeyed` | every finished re-key's old id to new id map (conv. 105) |

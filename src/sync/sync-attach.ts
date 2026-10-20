@@ -35,6 +35,8 @@ import { isSeatWorld, worldPin } from '../core/seat';
 import { keyRefusalLine, seatRefusalLine } from './world-key-lines';
 import { rosterFor } from './world-roster';
 import { rosterIsShared, worldPullsOnOpen, worldSyncPolicy, type SyncPolicy } from './shared-world';
+import { keptEditsLine, keptLine, roleChangeLine } from './role-change';
+import type { SyncResult } from '../core/types';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -140,6 +142,8 @@ export function attachSyncEngine(
           patchSlice('registry', next);
         }).catch(() => {});
       }
+      // A role that moved, and what this key no longer sees (B12 Q2, conv. 151).
+      if (currentEngine === engine) void noteRoleNews(entry.id, folder, result);
       // Someone joined or left while the world is open, or keel had not
       // answered yet: the next round runs under what the roster says now.
       if (!readOnly && !result.transient_blocked) void settle(ROUND_ROSTER_MAX_AGE_MS);
@@ -200,6 +204,7 @@ export function attachSyncEngine(
 
   // Seed the slice with the engine's initial state.
   publishSyncState(entry.id, engine.getState());
+  void refreshKeptCount(entry.id, folder);
   // Refresh conflict count from sync-state.json — engine doesn't know yet.
   void refreshConflictsCount();
 
@@ -347,6 +352,57 @@ function toastFailuresOnce(
     actions: resolveFixes(fixIds, { worldId, retry }),
     details: buildFailureDetails(failures, detailsContext()),
   });
+}
+
+/** Kept elements per world (conv. 151), for Settings and an element's sync mark: read at attach and after a round with kept news. */
+const keptSets: Record<string, ReadonlySet<string>> = {};
+/** `<world>:<element>` whose kept edit was said this session. */
+const keptEditsSaid = new Set<string>();
+
+export function keptCountFor(worldId: string): number {
+  return keptSets[worldId]?.size ?? 0;
+}
+
+/** True when this element is kept here, outside the key's view (conv. 151). */
+export function isKeptHere(worldId: string, elementId: string): boolean {
+  return keptSets[worldId]?.has(elementId) ?? false;
+}
+
+async function refreshKeptCount(worldId: string, folder: FolderStore): Promise<void> {
+  try {
+    const ids = (await folder.readSyncState()).kept_outside_view ?? [];
+    const before = keptSets[worldId];
+    if (before && before.size === ids.length && ids.every(id => before.has(id))) return;
+    keptSets[worldId] = new Set(ids);
+    patchSlice('sync', { ...getState().sync });
+  } catch { /* Settings shows no count; the next round reads again */ }
+}
+
+/**
+ * A round's role and kept news (B12 Q2, conv. 151): the key's role recorded
+ * on the entry, a move from a known role said once; elements a resync kept,
+ * said when no role line did; edits that stay here, once per element.
+ */
+async function noteRoleNews(worldId: string, folder: FolderStore, result: SyncResult): Promise<void> {
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  if (!entry?.api) return;
+  let roleSaid = false;
+  if (result.own_role !== undefined && result.own_role !== entry.api.member_role) {
+    const line = roleChangeLine(entry.name, entry.api.member_role, result.own_role, !!entry.api.read_only);
+    const next = updateWorldEntry(getState().registry, worldId, { api: { ...entry.api, member_role: result.own_role } });
+    if (saveRegistry(next)) patchSlice('registry', next);
+    if (line) {
+      toastManager.show(line, 'info', 12000);
+      roleSaid = true;
+    }
+  }
+  if (result.kept && !roleSaid) toastManager.show(keptLine(entry.name, result.kept), 'info', 10000);
+  const edits = result.kept_edit_ids ?? [];
+  if (edits.some(id => !keptEditsSaid.has(`${worldId}:${id}`))) {
+    for (const id of edits) keptEditsSaid.add(`${worldId}:${id}`);
+    toastManager.show(keptEditsLine(entry.name, edits.length), 'info', 10000);
+  }
+  if (result.kept || edits.length > 0 || result.own_role !== undefined) await refreshKeptCount(worldId, folder);
 }
 
 /**
