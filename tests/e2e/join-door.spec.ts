@@ -89,6 +89,10 @@ test('a join link: the code is gone before keel answers, the screen names the wo
   await expect(modal.locator('[data-role="world-name"]')).toHaveText('Moppetopia');
   await expect(modal.locator('[data-role="who"]')).toHaveText('Owned by Admiral Fluffington.');
   await expect(modal.locator('[data-role="role"]')).toContainText('As a contributor');
+  // An agent link says what it makes before anything is spent (the Captain's case, h58 #8512).
+  await expect(modal.locator('.atlas-join-question')).toHaveText('Open Moppetopia as an AI agent?');
+  await expect(modal.locator('[data-role="agent-note"]')).toContainText('It does not make you a member: to join as yourself, ask for an invite link for a person.');
+  await expect(modal.locator('[data-action="open"]')).toHaveText('Open as an AI agent');
   // Nothing spent until Open.
   expect(keel.joins).toHaveLength(0);
 
@@ -124,6 +128,8 @@ test('a player link (#416, keel #353): opens to read as the Character, no accoun
   await expect(modal.locator('.atlas-join-question')).toHaveText('Open Moppetopia as a player?');
   await expect(modal.locator('[data-role="role"]')).toContainText('as your Character, with no account');
   await expect(modal.locator('[data-role="character"]')).toBeHidden();
+  await expect(modal.locator('[data-role="agent-note"]')).toHaveCount(0);
+  await expect(modal.locator('[data-action="open"]')).toHaveText('Open');
   expect(keel.joins).toHaveLength(0);
 
   await modal.locator('input[name="player-name"]').fill('  Bartlett ');

@@ -69,6 +69,19 @@ export const CHANGELOG: ChangelogRelease[] = [
     ],
   },
   {
+    version: '1.62.1',
+    date: '2026-10-20',
+    theme: 'An agent link says so',
+    entries: [
+      {
+        id: 'agent-link-says-so',
+        title: 'A link for an AI agent says what it makes before you open it',
+        body: 'Opening a link made for an AI agent now asks "Open this world as an AI agent?" and says that Atlas joins as a seat the link\'s maker answers for, not as you. To join a world as yourself, ask for an invite link for a person.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.62.0',
     date: '2026-10-20',
     theme: 'Buttons by what they do',

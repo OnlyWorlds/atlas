@@ -68,7 +68,12 @@ export const JOIN_REFUSED_LINE = 'This link was already used or has expired. Ask
 export const JOIN_TAKEN_LINE = `If you did not use this link just now, look on onlyworlds.com, ${SEAT_REMOVE_WHERE}, and remove any seat you do not recognise.`;
 /** A seat made and not used (R6 waits on keel Q5, a seat retiring itself). */
 export const SPARE_SEAT_LINE = `The seat this link made is unused: remove it on onlyworlds.com, ${SEAT_REMOVE_WHERE}.`;
-export const JOIN_MALFORMED_LINE = 'This link to open a world is not complete. Ask for a new link.';
+/**
+ * An agent code says what it makes before anything is spent (the Captain's case, h58 #8512: a
+ * person opened an AI agent link in Atlas and became a seat in the inviter's name, not a member).
+ */
+export const AGENT_LINK_LINE = 'This link adds Atlas to the world as an AI agent, a seat that whoever made the link answers for. It does not make you a member: to join as yourself, ask for an invite link for a person.';
+export const JOIN_MALFORMED_LINE ='This link to open a world is not complete. Ask for a new link.';
 
 let baseOverride: string | null = null;
 /** Tests point the door at MSW; production asks keel. */
