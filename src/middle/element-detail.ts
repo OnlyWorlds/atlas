@@ -18,6 +18,7 @@
 
 import { getState, subscribe, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
+import { isKnownOf } from '../sync/known-of';
 import { onHashChange, parseHash, worldHash } from '../core/router';
 import type { Element } from '../core/types';
 import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
@@ -203,6 +204,27 @@ export function mountElementDetail(target: HTMLElement): () => void {
         wrap.appendChild(hide);
         detail.appendChild(wrap);
       }
+    }
+
+    // keel's stub (conv. 155, I6): the name, the picture and the description, and a line
+    // saying it is known of. Its other fields are unknown, not empty, so no rows show.
+    if (isKnownOf(el)) {
+      const note = document.createElement('p');
+      note.className = 'atlas-known-of-note';
+      note.dataset.role = 'known-of';
+      note.textContent = 'Known of: you know of this one, not its details.';
+      detail.appendChild(note);
+      const description = typeof el.description === 'string' ? el.description.trim() : '';
+      if (description) {
+        const text = document.createElement('p');
+        text.className = 'atlas-known-of-description';
+        text.textContent = description;
+        detail.appendChild(text);
+      }
+      const knownRefs = renderReferencedBy(el);
+      if (knownRefs) detail.appendChild(knownRefs);
+      detail.appendChild(renderFooter(el));
+      return;
     }
 
     // The element NAME is the header's click-to-edit title (convention #80) — so

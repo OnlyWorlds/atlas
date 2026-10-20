@@ -38,6 +38,7 @@ import { relationFieldsFor } from '../editor/field-schema';
 import type { ElementType } from '../core/types';
 import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from './sync-engine';
 import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue } from './world-meta-sync';
+import { isKnownOf, refuseKnownOfBody, stubShape } from './known-of';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -171,6 +172,8 @@ export function toV2WireShape(
   type: ElementType,
   op: 'create' | 'update'
 ): Record<string, unknown> {
+  // keel's stub never goes out: refused here, never stripped (conv. 155, I4; Kael h29 #8569).
+  refuseKnownOfBody(body);
   const rename = diskToSchema(type);
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
@@ -218,6 +221,8 @@ export function adaptV2Record(raw: unknown, type: ElementType): ServerRecord {
   }
   if (typeof out.id !== 'string') throw new Error('adaptV2Record: response missing string id');
   if (typeof out.updated_at !== 'string') throw new Error('adaptV2Record: response missing string updated_at');
+  // keel's stub becomes a record in its own shape here, before any compare (conv. 155, I1; gate G2).
+  if (isKnownOf(out)) return stubShape(out) as ServerRecord;
   return out as ServerRecord;
 }
 

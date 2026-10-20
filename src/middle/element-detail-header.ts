@@ -20,6 +20,7 @@
 
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
+import { isKnownOf } from '../sync/known-of';
 import { getEditorSettings, setEditorSettings, saveRegistry, setWorldFavoriteElement } from '../registry/registry';
 import {
   parseHash, navigate, homeHash, elementHash, writingHash, mapHash,
@@ -124,8 +125,8 @@ export function renderHeader(el: Element): HTMLElement {
   title.dataset.role = 'element-name';
   title.className = 'atlas-element-name';
   title.textContent = el.name || '(unnamed)';
-  // A view-only world's name is not a door (conv. 149).
-  const viewOnly = worldIsViewOnly();
+  // A view-only world's name is not a door (conv. 149), nor keel's stub's (conv. 155).
+  const viewOnly = worldIsViewOnly() || isKnownOf(el);
   if (!viewOnly) wireRename(title, el);
   header.appendChild(title);
 
@@ -585,8 +586,8 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
   const createCluster = document.createElement('div');
   createCluster.className = 'atlas-header-cluster atlas-header-create';
 
-  // A view-only world creates nothing: no +map, no +pin (conv. 149).
-  const viewOnly = worldIsViewOnly();
+  // A view-only world creates nothing: no +map, no +pin (conv. 149); nor does keel's stub's page (conv. 155).
+  const viewOnly = worldIsViewOnly() || isKnownOf(el);
   if (isLocation && !viewOnly) {
     const addMapBtn = document.createElement('button');
     addMapBtn.type = 'button';

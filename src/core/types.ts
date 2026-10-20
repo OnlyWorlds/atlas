@@ -274,6 +274,13 @@ export interface SyncState {
    */
   left_view?: string[];
   /**
+   * Ids whose whole copy was kept as last known when keel served them as a
+   * stub on a walk no `view` reset started (conv. 155, I3; B12). A later view
+   * reset never replaces them; the element arriving whole takes it out.
+   * Cleared by resetSyncBaseline.
+   */
+  kept_whole?: string[];
+  /**
    * The key's role (keel `GET /me`) when the folder was last walked whole: a
    * resync under another role is a role change, and keeps (conv. 151).
    */

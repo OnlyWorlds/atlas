@@ -28,6 +28,7 @@ import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
+import { isKnownOf } from './known-of';
 
 /** Test seam: override the OW base URL; buildV2Adapter derives its /api/v2 from it. */
 export function setMakeOnlineBaseUrl(url: string): void {
@@ -230,7 +231,8 @@ export async function mergeLocalIntoApi(
   }
 
   // 2. Plan. Nothing is written yet.
-  const plan = planMerge(await folder.listElements(), serverByType, { matchByName });
+  // keel's stubs stay out of the merge: never a create or an update (conv. 155, I4).
+  const plan = planMerge((await folder.listElements()).filter(e => !isKnownOf(e)), serverByType, { matchByName });
 
   // 3. Local ids onto the server's ids, journaled. A throw here leaves the
   // journal (the server has not been touched) and propagates.

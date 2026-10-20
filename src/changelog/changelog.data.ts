@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.64.0',
+    date: '2026-10-20',
+    theme: 'What your Character knows of',
+    entries: [
+      {
+        id: 'known-of',
+        title: 'Someone your Character only knows of shows as known of',
+        body: 'Playing a Character, you now see the people, places and things your Character points to, one step out. Those you only know of show their name, picture and description, with a line that says so, rather than a page of empty fields. Atlas never changes or sends one back, and when you come to know one fully, its whole page arrives.',
+        tags: ['world', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.63.0',
     date: '2026-10-20',
     theme: 'One link for the whole table',

@@ -28,6 +28,7 @@ import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store
 import { mergeForeignIds } from './foreign-ids';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
+import { isKnownOf, knownOfMove, stubShape } from './known-of';
 import type {
   Conflict,
   Element,
@@ -790,6 +791,11 @@ export class SyncEngine {
       }));
     };
 
+    // keel's stub is never sent (conv. 155, I4; gate G3): keeping mine takes theirs.
+    if (action === 'overwrite-mine' && isKnownOf(await this.folder.getElement(id))) {
+      console.info('[atlas:sync] resolveConflict overwrite-mine on a known-of stub: never sent, taking theirs', { id });
+      action = 'pull-theirs';
+    }
     if (action === 'overwrite-mine') {
       const local = await this.folder.getElement(id);
       if (!local) throw new Error(`element ${id} not found locally`);
@@ -2066,6 +2072,7 @@ export class SyncEngine {
     // create keel answered 404; S441 gate G1, G10) is never sent: it is not a
     // create, it is something this key may no longer see.
     const keptAtStart = new Set((await this.folder.readSyncState()).kept_outside_view ?? []);
+    // keel's stub is never pushed (conv. 155, I4): the store never lists one as changed (gate G9).
     const keptCreates = allChanged.filter(e => !e.server_updated_at && keptAtStart.has(e.id));
     const allCreates = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id));
     const updatesOnly = allChanged.filter(e => !!e.server_updated_at);
@@ -2648,6 +2655,10 @@ export class SyncEngine {
     /** Ids that left the view this round (I2, I3) and ids the feed named again (I5), in feed order. */
     const leftAdd = new Set<string>();
     const leftDel = new Set<string>();
+    /** Whole copies kept as last known against keel's stub (conv. 155, I3; gate G1): before, added, and named whole again. */
+    const keptWholeBefore = new Set(syncState.kept_whole ?? []);
+    const keptWholeAdd = new Set<string>();
+    const keptWholeDel = new Set<string>();
     /** A hidden element's copy with an edit never sent: kept, never sent again (I2). */
     const keptHidden = new Set<string>();
     let hiddenDrops = 0;
@@ -2687,7 +2698,10 @@ export class SyncEngine {
         const leftBefore = curr.left_view ?? [];
         const leftNext = [...new Set([...leftBefore.filter(id => !leftDel.has(id)), ...leftAdd])];
         const gone = new Set([...keptNext, ...leftAdd]);
+        const wholeBefore = curr.kept_whole ?? [];
+        const wholeNext = [...new Set([...wholeBefore.filter(id => !keptWholeDel.has(id)), ...keptWholeAdd])];
         return {
+          ...(wholeBefore.length > 0 || wholeNext.length > 0 ? { kept_whole: wholeNext } : {}),
           ...(walkComplete ? { last_pull_at: nowIso() } : {}),
           changes_cursor: lastAppliedCursor,
           changes_last_seq: lastAppliedSeq,
@@ -2791,9 +2805,33 @@ export class SyncEngine {
               console.info(`[atlas:sync] changes create ${op.type}/${op.id} (server: ${serverStamp})`);
               continue;
             }
+            // keel's stub (conv. 155) keeps the element's stamp, so a change of shape
+            // is read here, before the stamp test: a stub arriving whole is applied
+            // (I2); a whole copy meets a stub as rule 5 says (I3).
+            const keptWhole = keptWholeBefore.has(op.id) && !keptWholeDel.has(op.id);
+            const move = knownOfMove(local, remoteBody, resynced && resyncWhy === 'view', keptWhole);
+            if (!isKnownOf(remoteBody)) { keptWholeDel.add(op.id); keptWholeAdd.delete(op.id); }
+            if (move === 'keep') {
+              if (isKnownOf(remoteBody)) keptWholeAdd.add(op.id);
+              continue;
+            }
+            if (move === 'apply') {
+              let applied = false;
+              if (!await this.pullWrite(failures, op.id, op.type, async () => {
+                applied = await this.folder.applyServerRecordIfUnchanged(
+                  op.type, remoteBody, serverStamp, local.local_updated_at ?? null);
+              })) { heldStop = true; continue; }
+              if (applied) {
+                if (!preApply.has(op.id)) preApply.set(op.id, local);
+                updates++;
+                pulledIds.push(op.id);
+              }
+              continue;
+            }
             const baseline = local.server_updated_at ?? '';
             const serverChanged = serverStamp > baseline;
-            const localChanged = local.local_updated_at > baseline;
+            // keel's stub holds no edit of its own here, so the server always wins it (conv. 155, I5; gate G2).
+            const localChanged = !isKnownOf(local) && local.local_updated_at > baseline;
             if (!serverChanged) continue; // own echo or stale replay — idempotent skip
             if (localChanged) {
               const adopt = await this.adoptOwnCreate(failures, local, op.type, remoteBody, serverStamp);
@@ -3091,9 +3129,23 @@ export class SyncEngine {
           continue;
         }
 
+        // A change of shape (keel's stub, conv. 155) first: no reset here, so a
+        // whole copy meeting a stub is kept (I3); a stub arriving whole lands (I2).
+        const move = knownOfMove(local, remoteBody, false);
+        if (move === 'keep') continue;
+        if (move === 'apply') {
+          let applied = false;
+          if (!await this.pullWrite(failures, remote.id, type, async () => {
+            applied = await this.folder.applyServerRecordIfUnchanged(
+              type, remoteBody, remote.updated_at, local.local_updated_at ?? null);
+          })) continue;
+          if (applied) { updates++; pulledIds.push(remote.id); }
+          continue;
+        }
+
         // Local has it. Decide based on timestamps.
         const localBaseline = local.server_updated_at ?? '';
-        const localChanged = local.local_updated_at > localBaseline;
+        const localChanged = !isKnownOf(local) && local.local_updated_at > localBaseline;
         const serverChanged = remote.updated_at > localBaseline;
 
         if (!serverChanged) {
@@ -3294,7 +3346,8 @@ function stripSyncFields(elem: Element): Record<string, unknown> {
  * applyServerRecord / stampServerUpdatedAt.
  */
 function stripServerOnlyFields(record: Record<string, unknown>): Record<string, unknown> {
-  const { updated_at, ...rest } = record;
+  // keel's stub is compared and written in its own shape, its unset fields left out (conv. 155, I1; gate G2).
+  const { updated_at, ...rest } = isKnownOf(record) ? stubShape(record) : record;
   return rest;
 }
 

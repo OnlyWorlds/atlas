@@ -1717,6 +1717,10 @@ html {
 }
 
 /* The Hide empty fields switch under an element's fields (#24). */
+/* keel's stub (conv. 155): known of, its name, picture and description only. */
+.atlas-known-of-note { margin: 4px 0 10px; font-size: 12px; color: var(--atlas-text-muted); }
+.atlas-known-of-description { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--atlas-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .atlas-empty-fields-toggle {
   margin: -8px 0 18px;
   font-size: 12px;

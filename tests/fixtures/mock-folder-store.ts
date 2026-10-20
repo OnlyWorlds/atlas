@@ -11,6 +11,7 @@ import type { FolderStore, ListElementsOptions, RekeyJournal, RescanResult, Appl
 import { journalIds, RekeyPendingError } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
+import { isKnownOf, KNOWN_OF_DROPS_LOCAL, KNOWN_OF_REFUSAL, stubShape } from '../../src/sync/known-of';
 import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS, FOLDER_FORMAT_VERSION } from '../../src/core/constants';
 import { findDuplicatePin, DuplicatePinError } from '../../src/core/pin-uniqueness';
 import type {
@@ -164,6 +165,7 @@ export class MockFolderStore implements FolderStore {
     return this.writeChain.run(id, async () => {
       const existing = this.elements.get(id);
       if (!existing) return null;
+      if (isKnownOf(existing)) return structuredClone(existing);
       if (this.corruptIds.has(id)) throw new CorruptFileError(`${id}.json`, new SyntaxError('Unexpected token <'));
       await Promise.resolve(); // mirror the real store's in-chain read gap
       // Deep-clone like the real store's getElement (structuredClone) — the
@@ -189,6 +191,7 @@ export class MockFolderStore implements FolderStore {
     return this.writeChain.run(id, async () => {
       const existing = this.elements.get(id);
       if (!existing) throw new Error(`element ${id} not found`);
+      if (isKnownOf(existing)) throw new PlainError(KNOWN_OF_REFUSAL);
       // Mirror the real store's read→write I/O gap (disk read, then disk
       // write) so an UNSERIALIZED read-merge-write race manifests in vitest —
       // fakes encode real-world failure modes (convention #20).
@@ -260,6 +263,7 @@ export class MockFolderStore implements FolderStore {
     if (!opts.silent) this.assertWritable();
     // Mirrors FsFolderStore (S363 gate lens A F6).
     if (!opts.silent && journalIds(this.rekeyJournal).has(id)) throw new RekeyPendingError();
+    if (!opts.silent && isKnownOf(this.elements.get(id))) throw new PlainError(KNOWN_OF_REFUSAL);
     const result = await this.deleteElementInChain(id, opts);
     // Mirrors FsFolderStore: a UI delete removes the dead ids from every
     // referrer's links, as keel does (S362, `store/scrub-links.ts`).
@@ -495,6 +499,7 @@ export class MockFolderStore implements FolderStore {
 
   async listLocallyChangedSince(baseline: string | null): Promise<Element[]> {
     return Array.from(this.elements.values()).filter(elem => {
+      if (isKnownOf(elem)) return false;
       // Never synced → always pending.
       if (!elem.server_updated_at) return true;
       // No baseline → all of them.
@@ -625,9 +630,12 @@ export class MockFolderStore implements FolderStore {
   }
 
   private async applyServerRecordUnchained(
-    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    type: ElementType, served: Record<string, unknown>, server_updated_at: string,
     opts: ApplyServerRecordOpts = {},
   ): Promise<Element> {
+    // Mirrors FsFolderStore: keel's stub is written as a stub (conv. 155, I1, I2).
+    const stub = isKnownOf(served);
+    const record = stub ? stubShape(served) : served;
     const id = record.id as string;
     const failure = this.applyFailures.get(id);
     if (failure) {
@@ -643,10 +651,11 @@ export class MockFolderStore implements FolderStore {
     if (existing) {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
         if (opts.dropLocal?.includes(field)) continue;
+        if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset (gate G6)
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }
-      for (const field of ATLAS_WIRE_EXTENSION_FIELDS) {
+      for (const field of stub ? [] : ATLAS_WIRE_EXTENSION_FIELDS) {
         if (field in record) continue;
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;

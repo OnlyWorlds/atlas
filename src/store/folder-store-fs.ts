@@ -103,6 +103,7 @@ interface LayoutScan {
 import { PerIdWriteChain } from './write-chain';
 import { stampedBody, editStamp, dropLastWriter } from './sync-stamp';
 import { scrubReferrers } from './scrub-links';
+import { isKnownOf, KNOWN_OF_DROPS_LOCAL, KNOWN_OF_REFUSAL, stubShape } from '../sync/known-of';
 import { withoutSeatSecret } from '../core/seat';
 import {
   elementDirSegmentsIn,
@@ -1640,6 +1641,8 @@ export class FsFolderStore implements FolderStore {
     return this.writeChain.run(id, async () => {
       const existing = await this.readForWrite(id);
       if (!existing) return null;
+      // keel's stub is left as it is: never changed here, never thrown on (the rekey kernel calls this; gate G4).
+      if (isKnownOf(existing)) return existing;
       const patch = mutate(existing);
       if (patch === null || Object.keys(patch).length === 0) return existing;
       return this.applyPatchUnchained(existing, patch);
@@ -1649,6 +1652,8 @@ export class FsFolderStore implements FolderStore {
   private async updateElementUnchained(id: string, patch: Partial<Element>): Promise<Element> {
     const existing = await this.readForWrite(id);
     if (!existing) throw new Error(`element ${id} not found`);
+    // keel's stub is never changed here (conv. 155, I5).
+    if (isKnownOf(existing)) throw new PlainError(KNOWN_OF_REFUSAL);
     return this.applyPatchUnchained(existing, patch);
   }
 
@@ -1767,6 +1772,7 @@ export class FsFolderStore implements FolderStore {
     // locally) — they bypass the view-only guard; UI deletes never pass silent.
     if (!opts.silent) this.assertWritable();
     if (!opts.silent && this.rekeyPendingIds.has(id)) throw new RekeyPendingError();
+    if (!opts.silent && isKnownOf(await this.getElement(id))) throw new PlainError(KNOWN_OF_REFUSAL);
     // Same chain as updateElement: an in-flight update to this id lands (or
     // fails) before the file disappears — no "element not found" tail errors.
     const result = await this.writeChain.run(id, () => this.deleteElementUnchained(id, opts));
@@ -2099,6 +2105,7 @@ export class FsFolderStore implements FolderStore {
   async listLocallyChangedSince(baseline: string | null): Promise<Element[]> {
     const all = await this.listElements();
     return all.filter(elem => {
+      if (isKnownOf(elem)) return false; // keel's stub never waits to be sent (conv. 155, I4; gate G9)
       if (!elem.server_updated_at) return true;
       if (baseline === null) return elem.local_updated_at > elem.server_updated_at;
       return elem.local_updated_at > baseline;
@@ -2322,9 +2329,13 @@ export class FsFolderStore implements FolderStore {
   }
 
   private async applyServerRecordUnchained(
-    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    type: ElementType, served: Record<string, unknown>, server_updated_at: string,
     opts: ApplyServerRecordOpts = {},
   ): Promise<Element> {
+    // keel's stub is written as a stub, its unset fields left out (conv. 155, I1); a
+    // whole record over a stub file drops `known_of` with the rest of the old file (I2).
+    const stub = isKnownOf(served);
+    const record = stub ? stubShape(served) : served;
     const id = record.id as string;
 
     // Preserve atlas-extension fields from the existing local file per the
@@ -2344,10 +2355,12 @@ export class FsFolderStore implements FolderStore {
     if (existing) {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
         if (opts.dropLocal?.includes(field)) continue;
+        if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset (gate G6)
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }
-      for (const field of ATLAS_WIRE_EXTENSION_FIELDS) {
+      // A stub's wire fields are unknown, not kept from the whole copy (I1).
+      for (const field of stub ? [] : ATLAS_WIRE_EXTENSION_FIELDS) {
         if (field in record) continue; // server value wins when present
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
