@@ -56,6 +56,43 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.68.2',
+    date: '2026-10-21',
+    theme: 'What a world file leaves behind',
+    entries: [
+      {
+        id: 'world-file-leaves-git-env',
+        title: "A world file leaves a folder's .git and .env behind",
+        body: 'When a world\'s folder is also a git repository, or keeps .env files beside it, the world file Atlas makes now leaves them out: a repository\'s history and an env file can hold keys, and a world file is made to be sent. A template such as .env.example still travels. A world file someone sends you is read the same way.',
+        tags: ['folders'],
+      },
+      {
+        id: 'agent-mark-waits-for-members',
+        title: 'The agent mark waits for the world\'s members before it decides',
+        body: 'Since 1.68.1 the mark reads who made a change from the world\'s members. On an element opened before Atlas had read them, an agent\'s change through a door other than its own seat showed no mark. It now shows once the members are read, and a person\'s change through MCP loses the mark at the same moment.',
+        tags: ['fix'],
+      },
+      {
+        id: 'packet-bar-opaque',
+        title: 'The bar for a link to several elements is solid, and fits a phone',
+        body: 'The Previous, Next and Close bar is now on a solid surface, so the page no longer shows through it, and on a phone its buttons stay in one row.',
+        tags: ['fix'],
+      },
+      {
+        id: 'view-chip-contrast',
+        title: 'The view-only mark on a shared world reads clearly',
+        body: 'The small "view" mark beside a world you can only view is a step brighter, so it reads clearly on the open world\'s row.',
+        tags: ['fix'],
+      },
+      {
+        id: 'packet-keys-kept',
+        title: "A work packet's keys are kept for it",
+        body: 'Custom field names that start with x_packet_ are kept for the work packet other tools read, as x_identity_ is for the identity key: shown read only, never typed as a custom field.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.68.1',
     date: '2026-10-21',
     theme: 'The agent mark follows who made a change',

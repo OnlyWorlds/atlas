@@ -43,33 +43,47 @@ export function buildAgentMark(el: Element): HTMLElement | null {
   // fields from another time, and its pushes no longer land anywhere (the S415 gate).
   if (entry?.state !== 'api-linked') return null;
   const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
-  const mark = agentMarkFor(el, rosterNow(entry), nameOf);
-  if (!mark) return null;
+  const rec = el as Record<string, unknown>;
+  const roster = rosterNow(entry);
+  const mark = agentMarkFor(el, roster, nameOf);
+  // The seat decides since 1.68.1, so a write that names a membership waits for the
+  // roster before it is decided, whatever its door (S449: a `server` write by an agent
+  // stayed unmarked, since only a `seat` write ever asked; the roster is module state
+  // and repaints nothing). Ask once; then draw, rename or remove in place.
+  const ask = !roster && (typeof rec.changed_by === 'string' || rec.changed_via === 'seat');
+  if (!mark && !ask) return null;
 
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'atlas-icon-btn-sm atlas-agent-mark';
-  btn.dataset.role = 'agent-mark';
-  const glyph = document.createElement('span');
-  glyph.className = 'material-symbols-outlined';
-  glyph.textContent = 'smart_toy';
-  btn.appendChild(glyph);
   let line = '';
-  const say = (m: AgentMark): void => {
+  const button = (m: AgentMark): HTMLButtonElement => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-icon-btn-sm atlas-agent-mark';
+    btn.dataset.role = 'agent-mark';
+    const glyph = document.createElement('span');
+    glyph.className = 'material-symbols-outlined';
+    glyph.textContent = 'smart_toy';
+    btn.appendChild(glyph);
+    btn.addEventListener('click', () => toastManager.info(line));
+    say(btn, m);
+    return btn;
+  };
+  const say = (btn: HTMLElement, m: AgentMark): void => {
     line = m.line;
     btn.title = line;
     btn.setAttribute('aria-label', line);
   };
-  say(mark);
-  btn.addEventListener('click', () => toastManager.info(line));
+  // Undecided: an empty holder in the mark's place, filled when the roster answers.
+  let holder: HTMLElement = mark ? button(mark) : document.createElement('span');
+  if (!mark) holder.dataset.role = 'agent-mark-pending';
 
-  // A seat the roster can name: ask once, then rename in place (no repaint).
-  if ((el as Record<string, unknown>).changed_via === 'seat' && !rosterNow(entry)) {
+  if (ask) {
     void rosterFor(entry).then(rows => {
-      if (!rows || !btn.isConnected) return;
-      const named = agentMarkFor(el, rows, nameOf);
-      if (named) say(named);
+      if (!rows || !holder.isConnected) return;
+      const decided = agentMarkFor(el, rows, nameOf);
+      if (decided && holder.dataset.role === 'agent-mark') say(holder, decided);
+      else if (decided) { const b = button(decided); holder.replaceWith(b); holder = b; }
+      else holder.remove();
     });
   }
-  return btn;
+  return holder;
 }

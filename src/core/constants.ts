@@ -291,9 +291,11 @@ export function isExtensionField(name: string): boolean {
  * custom field. `x_identity_key` says two elements are one being (the
  * cross-world identity profile, Skeld h58 #8890): a typed "Identity key" would
  * merge two beings, and a deleted one would split one (Kael #8886). Shown
- * read-only, and never rewritten by a re-key (the profile's rule 9).
+ * read-only, and never rewritten by a re-key (the profile's rule 9). `x_packet_`
+ * is the work packet's (keel PR 148, Skeld h66 #9663): its ids are the source
+ * world's as they were when the packet was made, so a re-key never enters it.
  */
-export const PROFILE_FIELD_PREFIXES = ['x_identity_'] as const;
+export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_'] as const;
 
 export function isProfileField(name: string): boolean {
   return PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));

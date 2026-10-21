@@ -51,7 +51,22 @@ export interface CollectedFile extends WorldFileEntry {
 
 export { worldFileName };
 
-const isPortable = (path: string): boolean => !SYNC_FILES.has(path);
+/**
+ * Files that belong to the folder's place, never to the world, so a world file
+ * never carries them, whoever made it (S449, the folder spec's §4.6 read, h58
+ * #9643): a repository's `.git/` (its history can hold a key once committed) and
+ * `.env` files (a seat's key lines kept beside a world). A template
+ * (`.env.example`, `.env.sample`, `.env.template`) holds no secret and travels.
+ */
+export function isFolderPrivate(path: string): boolean {
+  const parts = path.split('/');
+  if (parts.includes('.git')) return true;
+  const base = parts[parts.length - 1].toLowerCase();
+  if (base !== '.env' && !base.startsWith('.env.')) return false;
+  return !/^\.env\.(example|sample|template)$/.test(base);
+}
+
+const isPortable = (path: string): boolean => !SYNC_FILES.has(path) && !isFolderPrivate(path);
 
 /** Every file of the portable copy, read once, each with the stamp it had when read. */
 export async function collectWorldFiles(dir: FileSystemDirectoryHandle): Promise<CollectedFile[]> {

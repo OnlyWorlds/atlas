@@ -192,8 +192,15 @@ describe('a published profile key is never a custom field (x_identity_, Skeld h5
   it('typed as "Identity key", the name is refused', () => {
     const key = normalizeCustomFieldName('Identity key');
     expect(key).toBe('x_identity_key');
-    expect(customFieldNameProblem(makeCharacter(), key)).toMatch(/identity key/i);
+    expect(customFieldNameProblem(makeCharacter(), key)).toMatch(/kept for a shared field/i);
     expect(customFieldNameProblem(makeCharacter(), 'x_identity')).toBeNull();
+  });
+
+  it('the work packet\'s keys are kept too (x_packet_, keel PR 148)', () => {
+    for (const name of ['x_packet_elements', 'x_packet_source', 'x_packet_producer']) {
+      expect(customFieldNameProblem(makeCharacter(), name)).toMatch(/x_packet_/);
+    }
+    expect(customFieldNameProblem(makeCharacter(), 'x_packet')).toBeNull();
   });
 
   it('a carried key is no editable row, shows read-only, and is never suggested', () => {

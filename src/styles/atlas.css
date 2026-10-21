@@ -1751,9 +1751,16 @@ html {
 .atlas-home-charter-link:hover, .atlas-home-charter-link:focus-visible { text-decoration: underline; }
 .atlas-home-charter-lead { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--atlas-text); overflow-wrap: anywhere; }
 /* The work packet bar: a link that named several elements (#487). */
-.atlas-packet-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 900; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--atlas-bg-panel-elevated); border: 1px solid var(--atlas-divider-strong); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); max-width: calc(100vw - 32px); flex-wrap: wrap; }
+.atlas-packet-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 900; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--atlas-bg-raised); border: 1px solid var(--atlas-divider-strong); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); max-width: calc(100vw - 32px); flex-wrap: wrap; }
 .atlas-packet-bar-count { font-size: 14px; color: var(--atlas-text); min-width: 4.5em; }
 .atlas-packet-bar-note { font-size: 12px; color: var(--atlas-text-muted); }
+.atlas-packet-bar button { white-space: nowrap; }
+@media (max-width: 520px) {
+  /* Full width at the bottom: at the top it would cover the element's name. A
+     toast (z 9999, so an error always shows) can sit over it for its few seconds. */
+  .atlas-packet-bar { left: 16px; right: 16px; transform: none; max-width: none; justify-content: space-between; }
+  .atlas-packet-bar-note { order: -1; flex-basis: 100%; }
+}
 /* A message's From and To (#526). */
 .atlas-message-parties { margin: 4px 0 12px; font-size: 14px; color: var(--atlas-text); }
 .atlas-message-parties-label { color: var(--atlas-text-muted); }
@@ -3249,7 +3256,7 @@ body.atlas-preroot .atlas-middle {
    is someone else's; the eye icon on the row carries the same message. */
 .atlas-world-state-chip.view-only {
   background: rgba(var(--atlas-ink-rgb), 0.06);
-  color: var(--atlas-text-muted);
+  color: var(--atlas-text-soft); /* F-55: muted read 4.32:1 on the active row's tint */
 }
 
 /* A browser world the browser cleared (1.17, conv. 129): the warn tokens,

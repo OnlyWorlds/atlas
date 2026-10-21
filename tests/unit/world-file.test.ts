@@ -45,6 +45,20 @@ describe('the portable copy', () => {
     expect(JSON.stringify(files.map(f => text(f.data)))).not.toContain('ow_w_secret');
   });
 
+  it('leaves out a repository and env files, keeps an env template (S449)', async () => {
+    const d = linkedWorld();
+    d.put('.git/config', '[core]');
+    d.put('.git/objects/ab/cdef', 'old key in history');
+    d.put('.env', 'OW_SEAT_KEY=ow_s_secret');
+    d.put('.env.local', 'OW_SEAT_KEY=ow_s_secret');
+    d.put('tools/.ENV', 'X=1');
+    d.put('.env.example', 'OW_SEAT_KEY=');
+    d.put('.agents/skills/world/SKILL.md', '# the world skill');
+    const paths = (await collectWorldFiles(as(d))).map(f => f.path);
+    expect(paths.filter(p => p.includes('.git') || /(^|\/)\.env/i.test(p))).toEqual(['.env.example']);
+    expect(paths).toContain('.agents/skills/world/SKILL.md');
+  });
+
   it('a world.json that will not parse is never zipped raw: the download refuses (gate F9)', async () => {
     const d = linkedWorld();
     d.put('world.json', '{ "id": "x", "api": { "api_key": "ow_w_secret" } broken');

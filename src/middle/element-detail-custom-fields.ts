@@ -117,7 +117,7 @@ export function normalizeCustomFieldName(input: string): string {
 export function customFieldNameProblem(el: Element, key: string): string | null {
   if (!key) return 'Enter a field name';
   if (input_is_atlas_namespace(key)) return 'Atlas keeps atlas_ names for itself';
-  if (isProfileField(key)) return 'That name is kept for the identity key other tools read. Pick another.';
+  if (isProfileField(key)) return 'That name is kept for a shared field other tools read (x_identity_, x_packet_). Pick another.';
   const bare = key.startsWith('x_') ? key.slice(2) : key.startsWith('shadow_') ? key.slice(7) : key;
   if (knownFieldsFor(el.type).has(bare)) {
     return `"${humanizeFieldName(bare)}" is a built-in field for this type: use that field instead`;
