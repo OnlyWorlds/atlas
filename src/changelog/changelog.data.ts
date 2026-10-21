@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.67.1',
+    date: '2026-10-21',
+    theme: 'A counted-down year that starts partway',
+    entries: [
+      {
+        id: 'down-era-midyear',
+        title: 'A counted-down era has no year zero',
+        body: 'In a calendar whose counting-down era ends partway through a year, the days just before the turn showed year 0. They now show year 1, and every year before them one higher. A date you type on the timeline still lands on the day it names. Calendars that turn on a year\'s first day are unchanged.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.67.0',
     date: '2026-10-20',
     theme: 'A copy says where it came from',
