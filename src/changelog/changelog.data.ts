@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.68.1',
+    date: '2026-10-21',
+    theme: 'The agent mark follows who made a change',
+    entries: [
+      {
+        id: 'agent-mark-by-seat',
+        title: 'The agent mark follows who made a change, not how it came in',
+        body: 'The quiet "Last changed by an agent" mark now reads who made the change from the world\'s members: a person writing through MCP with their own key is no longer marked as an agent, and an agent writing through the API now is. How the change came in is said beside it, as "through MCP" or "through the API".',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.68.0',
     date: '2026-10-21',
     theme: 'Worlds that hold messages and rules',
