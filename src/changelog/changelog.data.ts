@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.67.2',
+    date: '2026-10-21',
+    theme: 'A date its era does not hold',
+    entries: [
+      {
+        id: 'era-date-refused',
+        title: 'A typed date its era does not hold is refused',
+        body: 'When you type a date with an era on the timeline, and that era does not hold the date (a day after a counting-down era has ended, or its year 0), Atlas now says it is not a date in that era and changes nothing. Before, it moved the element to a day somewhere else. Dates Atlas shows still type back to the same day.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.67.1',
     date: '2026-10-21',
     theme: 'A counted-down year that starts partway',
