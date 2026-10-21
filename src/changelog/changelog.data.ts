@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.69.0',
+    date: '2026-10-22',
+    theme: 'A work packet, one element at a time',
+    entries: [
+      {
+        id: 'work-packet-list',
+        title: "A work item's packet lists its elements, each with its reason",
+        body: 'A work item that carries a packet (a list of elements to look at, with a reason for each, made by a person, an AI or the world check) shows that list on its page, in its order, with who made it. Step through opens the first and moves with Previous and Next, the reason for each shown in the bar. An element the world does not hold is named as not in this world.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.68.2',
     date: '2026-10-21',
     theme: 'What a world file leaves behind',

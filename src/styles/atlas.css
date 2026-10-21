@@ -1755,6 +1755,17 @@ html {
 .atlas-packet-bar-count { font-size: 14px; color: var(--atlas-text); min-width: 4.5em; }
 .atlas-packet-bar-note { font-size: 12px; color: var(--atlas-text-muted); }
 .atlas-packet-bar button { white-space: nowrap; }
+.atlas-packet-bar-reason { flex-basis: 100%; font-size: 13px; color: var(--atlas-text); overflow-wrap: anywhere; }
+.atlas-packet-bar-reason[hidden] { display: none; }
+/* A Work item's packet on its page (OW Parlor #487). */
+.atlas-work-packet { margin: 4px 0 16px; padding: 10px 12px; border: 1px solid var(--atlas-divider-strong); border-radius: 8px; }
+.atlas-work-packet-head { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--atlas-text); }
+.atlas-work-packet-meta { margin: 0 0 6px; font-size: 12px; color: var(--atlas-text-muted); }
+.atlas-work-packet-list { margin: 6px 0 10px; padding-left: 22px; font-size: 14px; color: var(--atlas-text); }
+.atlas-work-packet-list li { margin: 3px 0; overflow-wrap: anywhere; }
+.atlas-work-packet-list a { color: var(--atlas-prose-link); text-decoration: none; }
+.atlas-work-packet-list a:hover, .atlas-work-packet-list a:focus-visible { text-decoration: underline; }
+.atlas-work-packet-reason, .atlas-work-packet-missing { color: var(--atlas-text-muted); }
 @media (max-width: 520px) {
   /* Full width at the bottom: at the top it would cover the element's name. A
      toast (z 9999, so an error always shows) can sit over it for its few seconds. */

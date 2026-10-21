@@ -33,6 +33,7 @@ import { buildPictureUploadRow, buildPictureLaterRow, pictureLaterWorld, picture
 import { buildFilesSection, filesWorld } from './element-detail-files';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildMessageParties } from './element-detail-message';
+import { buildWorkPacket } from './element-detail-packet';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
@@ -210,6 +211,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // A message says who it is from and to, above its text (#526).
     const parties = buildMessageParties(el);
     if (parties) detail.appendChild(parties);
+
+    // A Work item's packet: its elements and reasons, stepped through with the packet bar (OW Parlor #487).
+    const packet = buildWorkPacket(el);
+    if (packet) detail.appendChild(packet);
 
     // keel's stub (conv. 155, I6): the name, the picture and the description, a line
     // saying it is known of, and the fields keel shares on it (PR 117) as read-only

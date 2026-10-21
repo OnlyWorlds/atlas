@@ -17,7 +17,8 @@ export function closePacketBar(): void {
   bar = null;
 }
 
-export function openPacketBar(localWorldId: string, ids: readonly string[], missing: number): void {
+/** `reasons`: a work packet's reason for each element (a Work item's packet, `core/work-packet.ts`), shown as the bar reaches it. */
+export function openPacketBar(localWorldId: string, ids: readonly string[], missing: number, reasons?: ReadonlyMap<string, string>): void {
   closePacketBar();
   if (ids.length < 2) return;
   let index = 0;
@@ -41,8 +42,16 @@ export function openPacketBar(localWorldId: string, ids: readonly string[], miss
     el.insertBefore(note, prev);
   }
 
+  const reason = document.createElement('span');
+  reason.className = 'atlas-packet-bar-reason';
+  reason.dataset.role = 'packet-reason';
+  if (reasons) el.appendChild(reason);
+
   const show = (): void => {
     label.textContent = `${index + 1} of ${ids.length}`;
+    const why = reasons?.get(ids[index]) ?? '';
+    reason.textContent = why;
+    reason.hidden = !why;
     prev.disabled = index === 0;
     next.disabled = index === ids.length - 1;
     navigate(elementHash(localWorldId, ids[index]));
