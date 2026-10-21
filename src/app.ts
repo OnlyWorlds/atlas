@@ -34,7 +34,7 @@ import { beginBootReconciliation, reconcileAtBoot } from './core/browser-home';
 import { REGISTRY_STORAGE_KEY } from './core/constants';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
 import { loadUiPrefs } from './core/ui-prefs';
-import { onHashChange, parseHash, navigate, homeHash } from './core/router';
+import { onHashChange, parseHash, navigate, homeHash, elementHash } from './core/router';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
 import { activateWorld } from './sidebar/worlds-sidebar';
 import { initAutoPullScheduler } from './sync/auto-pull-scheduler';
@@ -44,7 +44,9 @@ import type { WorldMap } from './core/types';
 import { installLiveFolder } from './core/live-folder';
 import { installWorldPrefsSync } from './core/world-prefs';
 import { captureJoinCode, hasPendingJoin } from './core/join-capture';
-import { captureOpenWorld, takePendingOpen } from './core/open-capture';
+import { captureOpenWorld, takePendingOpen, takePendingOpenElements } from './core/open-capture';
+import { clearOpenLanding, landingStep, peekOpenLanding, setOpenLanding } from './core/open-landing';
+import { openPacketBar } from './ui/open-packet-bar';
 import { installForgetPresence } from './setup/forget-browser';
 
 export interface AppHandle {
@@ -191,6 +193,33 @@ export function startApp(container: HTMLElement): AppHandle {
   let mountedWorldId: string | null = null;
   let demoWasMounted = false;
 
+  // An open link's landing (#487): once the world it names is open and loaded,
+  // move to its element (or the packet's first), once.
+  function applyOpenLanding(): void {
+    const s = getState();
+    const l = peekOpenLanding();
+    const entry = s.active ? s.registry.worlds.find(w => w.id === s.active!.worldId) : undefined;
+    // Every path of the door ends at the world's Home: land after that, never before it.
+    const route = parseHash(window.location.hash);
+    if (!s.active || route.mode !== 'home' || route.worldId !== s.active.worldId) return;
+    const step = landingStep(l, s.active, entry, s.data.loading === true, s.data.elements);
+    if (step.kind === 'wait') return;
+    clearOpenLanding();
+    if (step.kind === 'expired') return;
+    if (step.found.length === 0) {
+      toasts.info(step.missing === 1
+        ? 'The element this link names is not in this world, or not in your view of it.'
+        : 'The elements this link names are not in this world, or not in your view of it.', 10_000);
+      return;
+    }
+    if (step.found.length === 1) {
+      navigate(elementHash(step.localWorldId, step.found[0]));
+      if (step.missing > 0) toasts.info(`${step.missing} of the elements this link names ${step.missing === 1 ? 'is' : 'are'} not in this world.`, 10_000);
+      return;
+    }
+    openPacketBar(step.localWorldId, step.found, step.missing);
+  }
+
   function renderMiddle(): void {
     // #/try-demo (1.18.1): the home page's link into the demo world. It runs
     // the same door as the landing's button, once: the hash goes first, so a
@@ -215,8 +244,12 @@ export function startApp(container: HTMLElement): AppHandle {
     captureOpenWorld();
     const openId = takePendingOpen();
     if (openId !== null) {
-      void import('./setup/open-door').then(m => m.runOpenLink(openId, toasts));
+      // Where the link lands (#487): a new link replaces any landing still waiting.
+      const landOn = takePendingOpenElements();
+      if (openId) setOpenLanding(openId, landOn); else clearOpenLanding();
+      void import('./setup/open-door').then(m => m.runOpenLink(openId, toasts)).then(() => applyOpenLanding());
     }
+    applyOpenLanding();
     const linkMode = parseHash(window.location.hash).mode;
     if (linkMode === 'start' || linkMode === 'bring-in') {
       history.replaceState(history.state, '', '#/');

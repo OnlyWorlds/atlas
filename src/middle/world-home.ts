@@ -44,6 +44,7 @@ import { isCodeLoadError } from '../core/reload-offer';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
+import { charterLead, findCharter } from '../core/charter';
 import { tableauScope } from '../visualization/timeline/chart-recipe';
 import { roomOf, openElementTarget } from '../core/element-room';
 import { resolveCalendarLens } from '../core/calendar-lens';
@@ -326,6 +327,18 @@ function buildCover(
   // A copy that is one Character's view, or the public one (folder spec §4.2, R1).
   const sliceNote = partialSliceNote(meta);
   if (sliceNote) identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="slice-note">${escapeText(sliceNote)}</p>`);
+  // The world's charter, first (#526): its name links to it, its opening reads here.
+  const charter = findCharter(getState().data.elements);
+  if (charter) {
+    const lead = charterLead(charter);
+    const name = typeof charter.name === 'string' && charter.name.trim() ? charter.name.trim() : 'Charter';
+    identity.insertAdjacentHTML('beforeend', `
+      <div class="atlas-home-charter" data-role="charter">
+        <span class="atlas-home-charter-label">This world's charter</span>
+        <a class="atlas-home-charter-link" href="${escapeText(elementHash(worldId, charter.id))}">${escapeText(name)}</a>
+        ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
+      </div>`);
+  }
   cover.appendChild(identity);
 
   const nameEl = identity.querySelector<HTMLElement>('[data-edit="name"]');

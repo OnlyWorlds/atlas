@@ -32,6 +32,7 @@ import { buildMapStyleRow } from './element-detail-map-style';
 import { buildPictureUploadRow, buildPictureLaterRow, pictureLaterWorld, pictureWorld } from './element-detail-picture';
 import { buildFilesSection, filesWorld } from './element-detail-files';
 import { renderReferencedBy } from './element-detail-refs';
+import { buildMessageParties } from './element-detail-message';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
@@ -205,6 +206,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
         detail.appendChild(wrap);
       }
     }
+
+    // A message says who it is from and to, above its text (#526).
+    const parties = buildMessageParties(el);
+    if (parties) detail.appendChild(parties);
 
     // keel's stub (conv. 155, I6): the name, the picture and the description, a line
     // saying it is known of, and the fields keel shares on it (PR 117) as read-only

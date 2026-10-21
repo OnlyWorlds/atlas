@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.68.0',
+    date: '2026-10-21',
+    theme: 'Worlds that hold messages and rules',
+    entries: [
+      {
+        id: 'message-from-to',
+        title: 'A message says who it is from and to',
+        body: 'A narrative with the supertype Message now shows "From" and "To" above its text: the sender is its narrator, the recipients its characters. Each name opens that character.',
+        tags: ['world'],
+      },
+      {
+        id: 'charter-on-home',
+        title: "A world's charter comes first on Home",
+        body: "When a world has a law with the supertype Charter (what the world is for, who is in it, its house rules), Home shows it under the world's description, with its opening lines and a link to the whole of it.",
+        tags: ['world'],
+      },
+      {
+        id: 'open-link-element',
+        title: 'A link can open a world at an element',
+        body: 'A link from onlyworlds.com or another tool can name an element as well as a world: Atlas opens the world, then that element. A link that names several elements opens the first, with Previous and Next to step through the rest.',
+        tags: ['sharing'],
+      },
+    ],
+  },
+  {
     version: '1.67.2',
     date: '2026-10-21',
     theme: 'A date its era does not hold',

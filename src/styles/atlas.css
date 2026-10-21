@@ -1744,6 +1744,21 @@ html {
 /* The Hide empty fields switch under an element's fields (#24). */
 /* keel's stub (conv. 155): known of, its name, picture and description only. */
 .atlas-known-of-note { margin: 4px 0 10px; font-size: 12px; color: var(--atlas-text-muted); }
+/* A world's charter on Home (#526). */
+.atlas-home-charter { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--atlas-divider); border-radius: 6px; max-width: 680px; }
+.atlas-home-charter-label { display: block; font-size: 12px; color: var(--atlas-text-muted); margin-bottom: 2px; }
+.atlas-home-charter-link { font-size: 15px; color: var(--atlas-prose-link); text-decoration: none; }
+.atlas-home-charter-link:hover, .atlas-home-charter-link:focus-visible { text-decoration: underline; }
+.atlas-home-charter-lead { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--atlas-text); overflow-wrap: anywhere; }
+/* The work packet bar: a link that named several elements (#487). */
+.atlas-packet-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 900; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--atlas-bg-panel-elevated); border: 1px solid var(--atlas-divider-strong); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); max-width: calc(100vw - 32px); flex-wrap: wrap; }
+.atlas-packet-bar-count { font-size: 14px; color: var(--atlas-text); min-width: 4.5em; }
+.atlas-packet-bar-note { font-size: 12px; color: var(--atlas-text-muted); }
+/* A message's From and To (#526). */
+.atlas-message-parties { margin: 4px 0 12px; font-size: 14px; color: var(--atlas-text); }
+.atlas-message-parties-label { color: var(--atlas-text-muted); }
+.atlas-message-parties a { color: var(--atlas-prose-link); text-decoration: none; }
+.atlas-message-parties a:hover, .atlas-message-parties a:focus-visible { text-decoration: underline; }
 .atlas-known-of-description { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--atlas-text); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .atlas-empty-fields-toggle {
