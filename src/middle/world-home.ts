@@ -44,7 +44,8 @@ import { isCodeLoadError } from '../core/reload-offer';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
-import { charterLead, findCharter } from '../core/charter';
+import { charterLead, findCharter, rosterRoles, type RosterRoles } from '../core/charter';
+import { rosterFor, rosterNow } from '../sync/world-roster';
 import { tableauScope } from '../visualization/timeline/chart-recipe';
 import { roomOf, openElementTarget } from '../core/element-room';
 import { resolveCalendarLens } from '../core/calendar-lens';
@@ -118,7 +119,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // it is hidden; its identity moves with the elements and with the switch.
     const lore = currentLore();
     const inputs = [s.active, s.data.elements, lore, s.data.loading, s.data.loadingProgress?.done, s.registry,
-      s.ui.castAssign?.kind, savedCharts, isTourFlagActive(), waypointsVersion];
+      s.ui.castAssign?.kind, savedCharts, isTourFlagActive(), waypointsVersion, rosterVersion];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     lastInputs = inputs;
     const active = s.active;
@@ -142,7 +143,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const totalElements = Array.from(counts.values()).reduce((a, b) => a + b, 0);
 
     root.innerHTML = '';
-    root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts));
+    root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts, charterRoles(worldId)));
     if (totalElements === 0 && getState().data.loading) {
       // Empty and still-loading are different truths: during activation the
       // cache is primed async from disk, and showing onboarding meanwhile
@@ -191,6 +192,20 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   // The next-steps list reads the waypoints (#127): a step done anywhere
   // leaves the list the next time home draws.
   let waypointsVersion = 0;
+  // The charter counts a co-builder's Law only once the roster says so (D152):
+  // a synced world asks the roster once, and its answer draws Home again.
+  let rosterVersion = 0;
+  let rosterAsked: string | null = null;
+  function charterRoles(worldId: string): RosterRoles {
+    const entry = getState().registry.worlds.find(w => w.id === worldId);
+    if (!entry || entry.state !== 'api-linked') return null;
+    const rows = rosterNow(entry);
+    if (!rows && rosterAsked !== worldId) {
+      rosterAsked = worldId;
+      void rosterFor(entry).then(got => { if (got) { rosterVersion++; render(); } else rosterAsked = null; });
+    }
+    return rosterRoles(rows);
+  }
   let receiptsWorldId: string | null = null;
   const onWaypointsChanged = (): void => { waypointsVersion++; render(); };
   document.addEventListener('atlas:waypoints-changed', onWaypointsChanged);
@@ -296,6 +311,7 @@ function buildCover(
   totalElements: number,
   counts: Map<string, number>,
   toasts: ToastManager,
+  roles: RosterRoles,
 ): HTMLElement {
   const cover = document.createElement('section');
   cover.className = 'atlas-home-identity';
@@ -333,7 +349,7 @@ function buildCover(
   if (sliceNote) identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="slice-note">${escapeText(sliceNote)}</p>`);
   // The world's charter, first (#526): its name links to it, its opening reads here.
   // world.json's `charter` names it when a folder says which (§4.6 (a)).
-  const charter = findCharter(getState().data.elements, (meta as unknown as Record<string, unknown> | null | undefined)?.charter);
+  const charter = findCharter(getState().data.elements, (meta as unknown as Record<string, unknown> | null | undefined)?.charter, roles);
   if (charter) {
     const lead = charterLead(charter);
     const name = typeof charter.name === 'string' && charter.name.trim() ? charter.name.trim() : 'Charter';

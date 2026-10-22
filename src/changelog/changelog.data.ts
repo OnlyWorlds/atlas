@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.80.0',
+    date: '2026-10-22',
+    theme: "The keeper's charter",
+    entries: [
+      {
+        id: 'charter-by-keepers',
+        title: "Home shows the charter the world's keepers wrote",
+        body: "A world's charter on Home is now the one OnlyWorlds names: a Law with supertype Charter made by the owner or a co-builder, the newest one first. A Charter a guest or an AI seat writes is never shown as the world's, and editing an older Charter no longer moves it to the front.",
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.79.0',
     date: '2026-10-22',
     theme: 'Your PIN, only where it counts',
