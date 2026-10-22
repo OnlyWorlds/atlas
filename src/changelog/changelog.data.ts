@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.70.1',
+    date: '2026-10-22',
+    theme: 'Hidden, said and not counted',
+    entries: [
+      {
+        id: 'hidden-mark-kept',
+        title: 'An element hidden on OnlyWorlds no longer reads as changed',
+        body: "OnlyWorlds now tells the owner, a co-builder and its maker that an element is hidden. Atlas keeps that as OnlyWorlds' word: it never counts as a change in a review, never goes back up, and leaves the copy when the element is shown again.",
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.70.0',
     date: '2026-10-22',
     theme: 'Who made it',

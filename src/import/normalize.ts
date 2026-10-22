@@ -15,7 +15,7 @@
  */
 
 import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
-import { isExtensionField, SERVER_AUTHOR_FIELDS, SPATIAL_TYPES } from '../core/constants';
+import { isExtensionField, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SPATIAL_TYPES } from '../core/constants';
 import type { ElementType } from '../core/types';
 import type { RawRecord } from './types';
 
@@ -56,6 +56,7 @@ const STRIP_ALWAYS = new Set([
   ...SERVER_AUTHOR_FIELDS, // who wrote it in the SOURCE world (created_by,
                    // changed_by, changed_via): names nobody in the world
                    // being imported into
+  ...SERVER_MARK_FIELDS, // keel's hidden mark, about the source world's reader
   'local_updated_at',
   'server_updated_at',
   // Published-state mirror — meaningless (and misleading: it claims a slug owned

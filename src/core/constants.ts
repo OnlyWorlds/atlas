@@ -220,6 +220,16 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
  */
 export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via'] as const;
 
+/**
+ * keel's marks about an element, said only to some readers: `hidden: true`
+ * (keel #537, PR 160) on a body served to whoever sees a hidden element (the
+ * owner, a co-builder, its maker), absent otherwise. Server-said like
+ * `SERVER_AUTHOR_FIELDS` and kept the same way: on disk as received, never
+ * sent (keel ignores it in a write), never a difference anyone made, dropped
+ * on import. A pull without it removes it (an unhide).
+ */
+export const SERVER_MARK_FIELDS = ['hidden'] as const;
+
 export const ATLAS_LOCAL_ONLY_FIELDS = [
   'image_media_id',
   // Writing workspace richtext payload (DESIGN_WRITING.md §Storage model, convention #47).

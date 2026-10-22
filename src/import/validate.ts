@@ -12,7 +12,7 @@
  */
 
 import { knownFieldsFor, relationFieldsFor } from '../editor/field-schema';
-import { isExtensionField, ELEMENT_LABELS, SERVER_AUTHOR_FIELDS, SPATIAL_TYPES } from '../core/constants';
+import { isExtensionField, ELEMENT_LABELS, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SPATIAL_TYPES } from '../core/constants';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { isUuid, normName } from './normalize';
 import type { ParseResult, RawRecord, ValidationIssue } from './types';
@@ -24,7 +24,7 @@ const SPATIAL_SAFE = new Set(['x', 'y', 'z', 'order', 'element_type']);
 // world-export envelope — without it a 36-element import shows "36 things to
 // check", one per element (2026-07-23). Reconcile strips them all; the
 // validator's job is only to not cry wolf.
-const SERVER_STAMPS = new Set<string>(['created_at', 'updated_at', 'change_seq', ...SERVER_AUTHOR_FIELDS]);
+const SERVER_STAMPS = new Set<string>(['created_at', 'updated_at', 'change_seq', ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS]);
 const VALID_TYPE_LIST = ALL_ELEMENT_TYPES.map(t => cap(t)).join(', ');
 
 function cap(s: string): string {
