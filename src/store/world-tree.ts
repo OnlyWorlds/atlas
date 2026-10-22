@@ -33,9 +33,12 @@ export function worldFileName(name: string, worldId: string, now = new Date()): 
   return { file: `${slug}-${day}.zip`, dir: `${slug}-${worldId.slice(0, 8)}` };
 }
 
-/** A world file's budget: what one world in one browser can hold, uncompressed (the writer and the reader agree: S373 gate F4). */
-export const WORLD_FILE_MAX_BYTES = 1024 ** 3;
-export const WORLD_FILE_MAX_ENTRIES = 200_000;
+/**
+ * A world file's budget, uncompressed (the writer and the reader agree: S373 gate F4). The
+ * SDK's, which is Folder Format §4.7's floor that every reader accepts (OW-15: 2 GiB, 500,000
+ * entries; SDK 4.49): Atlas's own 1 GiB and 200,000 fell below it, a parallel constant behind.
+ */
+export { WORLD_FILE_MAX_BYTES, WORLD_FILE_MAX_ENTRIES } from '@onlyworlds/sdk';
 
 /** Files a world never carries anywhere: never copied, compared, zipped or unpacked. */
 export function isTransientPath(path: string): boolean {

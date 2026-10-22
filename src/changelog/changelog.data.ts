@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.71.0',
+    date: '2026-10-22',
+    theme: 'One world file for every tool',
+    entries: [
+      {
+        id: 'world-file-archive',
+        title: 'A world file follows the shared OnlyWorlds archive rules',
+        body: "Atlas now writes a world file the way every OnlyWorlds tool reads one: the same world gives the same file, and the file holds only the world's own parts (its elements, pictures and maps, and Atlas's settings), so other files kept in a world folder stay behind. Opening one, Atlas reads files up to 2 GB and says plainly why it refuses one it cannot open.",
+        tags: ['folders'],
+      },
+    ],
+  },
+  {
     version: '1.70.1',
     date: '2026-10-22',
     theme: 'Hidden, said and not counted',

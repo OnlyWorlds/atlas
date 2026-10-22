@@ -81,7 +81,8 @@ describe('downloadWorld', () => {
     expect(out.file).toBe('hollow-reach-2026-10-05.zip');
     expect(saved!.name).toBe('hollow-reach-2026-10-05.zip');
     const files = Object.keys(unzipSync(saved!.bytes)).sort();
-    expect(files.every(f => f.startsWith('hollow-reach-0192a000/'))).toBe(true);
+    // Everything under one folder, but §4.7's marker, the archive's first entry at its root (SDK 4.49).
+    expect(files.filter(f => !f.startsWith('hollow-reach-0192a000/'))).toEqual(['mimetype']);
     expect(files).toContain('hollow-reach-0192a000/world.json');
     expect(files).toContain('hollow-reach-0192a000/media/map.png');
     expect(files.some(f => f.includes('sync-state') || f.endsWith('/lock'))).toBe(false);

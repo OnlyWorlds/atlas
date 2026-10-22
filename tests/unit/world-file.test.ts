@@ -91,6 +91,24 @@ describe('round trip', () => {
     for (const f of files) expect(text(back.files.find(b => b.path === f.path)!.data)).toBe(text(f.data));
   });
 
+  it('a file Atlas writes keeps media and its sidecars and .atlas, leads with the marker, and leaves other files behind (§4.7 OW-6, OW-7; SDK 4.49)', () => {
+    const e = (path: string, s: string) => ({ path, data: strToU8(s) });
+    const zip = zipWorld([
+      e('world.json', j({ id: WID, name: 'W' })),
+      e('elements/map/m--aaaa.json', '{}'),
+      e('media/0192-el/maps/river.png', 'PNG'),
+      e('media/0192-el/maps/0193-media.meta.json', '{"id":"0193-media"}'),
+      e('.atlas/styles.json', '{}'),
+      e('README.md', 'hi'),
+      e('notes/plan.md', 'x'),
+    ], 'w');
+    expect(readWorldZip(zip).files.map(f => f.path)).toEqual([
+      '.atlas/styles.json', 'elements/map/m--aaaa.json', 'media/0192-el/maps/0193-media.meta.json', 'media/0192-el/maps/river.png', 'world.json',
+    ]);
+    // The stored marker is the archive's first entry (a local header's name starts at byte 30).
+    expect(new TextDecoder().decode(zip.slice(30, 38))).toBe('mimetype');
+  });
+
   it('a world.json at the root, without a folder, reads the same', () => {
     const zip = zipSync({ 'world.json': strToU8(j({ id: WID, name: 'Bare' })), 'elements/character/a.json': strToU8('{}') });
     expect(readWorldZip(zip).files.map(f => f.path)).toEqual(['elements/character/a.json', 'world.json']);
@@ -124,9 +142,17 @@ describe('the reader refuses before anything is written', () => {
     refuses({ 'w/world.json': strToU8(j({ name: 'no id' })) }, /not a world: it has no world\.json/);
   });
 
-  it('two worlds in one file, or loose files beside the world\'s folder', () => {
+  it('two worlds in one file; a loose file beside the world\'s folder is left out, not refused (§4.7 OW-4, SDK 4.49)', () => {
     refuses({ ...world, 'v/world.json': strToU8(j({ id: 'other', name: 'V' })) }, /more than one world/);
-    refuses({ ...world, 'stray.txt': strToU8('x') }, /more than one world/);
+    const back = readWorldZip(zipSync({ ...world, 'stray.txt': strToU8('x'), '__MACOSX/w/._world.json': strToU8('x') }));
+    expect(back.files.some(f => f.path.includes('stray') || f.path.includes('MACOSX'))).toBe(false);
+  });
+
+  it('the six refusals §4.7 adds each say why in Atlas\'s words (SDK 4.49)', () => {
+    // A marker naming another type, a duplicate path, a name §4.7 forbids: three of the six the reader can be handed by fflate.
+    refuses({ mimetype: strToU8('application/zip'), ...world }, /something other than an OnlyWorlds world/);
+    refuses({ ...world, 'w/elements/character/A.json': strToU8('{}'), 'w/elements/character/a.json': strToU8('{}') }, /differ only in capitals or accents/);
+    refuses({ ...world, 'w/elements/character/con.json': strToU8('{}') }, /names is not allowed in a world/);
   });
 
   it('a world.json at the root with another world nested inside (gate F10)', () => {

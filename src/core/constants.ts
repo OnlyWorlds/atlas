@@ -116,7 +116,7 @@ export const WORLD_META_FILE = 'world.json';
  * reader must not rewrite keys as a side effect, and an edit is not a
  * capture). Absence means pre-0.3.3 or unknown, which every reader tolerates.
  */
-export const FOLDER_FORMAT_VERSION = '0.3.12';
+export const FOLDER_FORMAT_VERSION = '0.3.13';
 export const ELEMENTS_DIR = 'elements' as const;
 export const SPATIAL_DIR = 'spatial' as const;
 export const MEDIA_DIR = 'media';

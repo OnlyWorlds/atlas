@@ -35,6 +35,16 @@ const UNSAFE_PATH = 'That file is not a world Atlas can open: one of its paths c
 const MORE_THAN_ONE = 'That file holds more than one world, or files outside the world\'s folder. Atlas opens one world at a time.';
 const TOO_BIG = 'That file is too big to open in this browser.';
 const TOO_MANY = 'That file has too many files to be a world Atlas can open.';
+// Folder Format §4.7's causes (SDK 4.49, OW Council #522).
+const DUPLICATE = 'That file is not a world Atlas can open: it holds the same file twice.';
+const COLLISION = 'That file is not a world Atlas can open: two of its file names differ only in capitals or accents.';
+const LINK = 'That file is not a world Atlas can open: it holds a link where a file should be.';
+const METHOD = 'That file is not a world Atlas can open: it is locked with a password, or packed in a way Atlas cannot read.';
+const NAME = 'That file is not a world Atlas can open: one of its file names is not allowed in a world.';
+const MARKER = 'That file says it is something other than an OnlyWorlds world.';
+// The writer refuses a name or a collision as the reader would; when Atlas writes, the names are this world's own.
+const WRITE_NAME = 'This world holds a file whose name cannot go in a world file, so no file was made.';
+const WRITE_COLLISION = 'This world holds two files whose names differ only in capitals or accents, so no file was made.';
 
 export { WORLD_FILE_MAX_BYTES, WORLD_FILE_MAX_ENTRIES };
 
@@ -56,7 +66,10 @@ export { worldFileName };
  * never carries them, whoever made it (S449, the folder spec's §4.6 read, h58
  * #9643): a repository's `.git/` (its history can hold a key once committed) and
  * `.env` files (a seat's key lines kept beside a world). A template
- * (`.env.example`, `.env.sample`, `.env.template`) holds no secret and travels.
+ * (`.env.example`, `.env.sample`, `.env.template`) holds no secret, but since
+ * SDK 4.49 the writer carries only §4.7's parts (OW-7: world.json, elements/,
+ * spatial/, media/, records/ and the `.atlas/` it is handed), so no root file
+ * travels anyway; this stays the first fence, before the writer.
  */
 export function isFolderPrivate(path: string): boolean {
   const parts = path.split('/');
@@ -141,6 +154,8 @@ export function zipWorld(files: WorldFileEntry[], topDir: string): Uint8Array {
   try {
     return writeWorldFile(files, topDir);
   } catch (err) {
+    if (err instanceof OwWorldFileError && err.reason === 'name') throw new PlainError(WRITE_NAME);
+    if (err instanceof OwWorldFileError && err.reason === 'collision') throw new PlainError(WRITE_COLLISION);
     throw new PlainError(err instanceof OwWorldFileError ? REFUSALS[err.reason] : NOT_OPENABLE);
   }
 }
@@ -153,6 +168,12 @@ const REFUSALS: Record<OwWorldFileReason, string> = {
   not_a_world: NOT_A_WORLD,
   more_than_one: MORE_THAN_ONE,
   not_openable: NOT_OPENABLE,
+  duplicate: DUPLICATE,
+  collision: COLLISION,
+  link: LINK,
+  method: METHOD,
+  name: NAME,
+  marker: MARKER,
 };
 
 export interface ReadWorld {
