@@ -7,7 +7,7 @@
  */
 
 import { OwV2Client } from '@onlyworlds/sdk';
-import { DEFAULT_V2_BASE } from './ow-v2-client-adapter';
+import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { exportedAsFromMe, type ExportedAs, type WorldSource } from '../core/provenance';
 import type { WorldRegistryEntry } from '../core/types';
@@ -16,7 +16,7 @@ import { isDemoKey } from '../core/constants';
 const ME_TIMEOUT_MS = 8_000;
 
 type MeReader = (apiKey: string) => Promise<{ role: string; character?: string | null; world?: { id?: string } }>;
-const defaultMe: MeReader = (apiKey) => new OwV2Client({ apiKey, baseUrl: devV2Base() ?? DEFAULT_V2_BASE }).me();
+const defaultMe: MeReader = (apiKey) => new OwV2Client({ apiKey, baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME }).me();
 let readMe: MeReader = defaultMe;
 export function setExportMeReaderForTests(f: MeReader | null): void { readMe = f ?? defaultMe; }
 

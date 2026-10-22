@@ -10,7 +10,7 @@
  */
 
 import { OwApiError, OwNetworkError, OwV2Client } from '@onlyworlds/sdk';
-import { DEFAULT_V2_BASE } from './ow-v2-client-adapter';
+import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { PlainError } from '../core/plain-error';
 
@@ -53,7 +53,7 @@ export async function makeInvite(
   character: string = NEW_CHARACTER,
 ): Promise<MadeInvite> {
   const name = inviterName.trim();
-  const client = new OwV2Client({ apiKey: token, baseUrl: devV2Base() ?? DEFAULT_V2_BASE });
+  const client = new OwV2Client({ apiKey: token, baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
   try {
     const made = await client.createWorldLink(worldId, inviteFor === 'player'
       ? { reader: 'player', character, days: INVITE_DAYS, ...(name ? { inviterName: name } : {}) }

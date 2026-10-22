@@ -20,7 +20,7 @@ import { FILE_EXTENSIONS, OwApiError, OwNetworkError, OwV2Client, fileKindOf, ty
 import { PlainError } from '../core/plain-error';
 import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
-import { DEFAULT_V2_BASE } from './ow-v2-client-adapter';
+import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 
 const STALE_AFTER_MS = 60_000;
@@ -35,7 +35,7 @@ export function setFileUploadOriginsForTests(origins: string[] | null): void { u
 export type FilesClient = Pick<OwV2Client, 'listFiles' | 'worldFiles' | 'me' | 'createFileTicket' | 'uploadFile' | 'fileDownloadLink' | 'removeFile'>;
 type ClientFactory = (apiKey: string, apiPin: string | undefined) => FilesClient;
 const defaultFactory: ClientFactory = (apiKey, apiPin) =>
-  new OwV2Client({ apiKey, ...(apiPin ? { apiPin } : {}), baseUrl: devV2Base() ?? DEFAULT_V2_BASE });
+  new OwV2Client({ apiKey, ...(apiPin ? { apiPin } : {}), baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
 let factory: ClientFactory = defaultFactory;
 export function setFilesClientFactoryForTests(f: ClientFactory | null): void { factory = f ?? defaultFactory; }
 

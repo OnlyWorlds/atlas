@@ -12,7 +12,7 @@
  */
 import { OwV2Client, type OwMember } from '@onlyworlds/sdk';
 import type { WorldRegistryEntry } from '../core/types';
-import { DEFAULT_V2_BASE } from './ow-v2-client-adapter';
+import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 
 const RETRY_AFTER_FAILURE_MS = 60_000;
@@ -67,6 +67,7 @@ export function rosterFor(
     apiKey: entry.api!.api_key,
     ...(opts.pin ? { apiPin: opts.pin } : {}),
     baseUrl: devV2Base() ?? DEFAULT_V2_BASE,
+    client: ATLAS_CLIENT_NAME,
   });
   // The SDK's client has no read timeout: a stalled read would hold `pending` for the session.
   let timer: ReturnType<typeof setTimeout> | undefined;

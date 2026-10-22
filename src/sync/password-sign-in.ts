@@ -10,7 +10,7 @@
 
 import { OwV2Client, OwSignInError } from '@onlyworlds/sdk';
 import { devV2Base } from './dev-api-base';
-import { DEFAULT_V2_BASE } from './ow-v2-client-adapter';
+import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
 
 /** The token's name on the site's Account tokens page: which browser holds it. */
@@ -40,7 +40,7 @@ export function passwordSignInLine(err: unknown): string {
 /** The account token for these credentials. A refusal is the SDK's OwSignInError: word it with passwordSignInLine. */
 export async function signInWithPassword(login: string, password: string): Promise<string> {
   const id = login.trim();
-  const client = new OwV2Client({ baseUrl: devV2Base() ?? DEFAULT_V2_BASE });
+  const client = new OwV2Client({ baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
   const signed = await client.signInWithPassword({
     ...(id.includes('@') ? { email: id } : { username: id }),
     password,
