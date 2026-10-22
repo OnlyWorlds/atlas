@@ -32,8 +32,9 @@ export const PROPOSAL_PENDING_TITLE = "Sent for review: this world's keeper deci
 export function proposalReviewLine(p: NonNullable<Conflict['proposal']>): string {
   const choice = 'Overwrite sends it for review again; Pull drops it.';
   if (p.outcome === 'declined') {
+    // A reason that ends its own sentence takes no second stop after the quote.
     return p.reason
-      ? `The keeper declined your change: "${p.reason}". ${choice}`
+      ? `The keeper declined your change: "${p.reason}"${/[.!?]$/.test(p.reason) ? '' : '.'} ${choice}`
       : `The keeper declined your change. ${choice}`;
   }
   if (p.outcome === 'lapsed') return `Your change waited too long for review and lapsed. ${choice}`;

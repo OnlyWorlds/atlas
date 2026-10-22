@@ -364,3 +364,11 @@ describe('the S454 gate\'s findings, each held', () => {
     expect(state.proposed ?? []).toEqual([]);
   });
 });
+
+describe('the review line (S454 live read)', () => {
+  it('a reason that ends its own sentence takes no second stop', async () => {
+    const { proposalReviewLine } = await import('../../src/sync/proposal-lines');
+    expect(proposalReviewLine({ outcome: 'declined', reason: 'Not canon here.' })).toContain('"Not canon here." Overwrite');
+    expect(proposalReviewLine({ outcome: 'declined', reason: 'Not canon' })).toContain('"Not canon". Overwrite');
+  });
+});
