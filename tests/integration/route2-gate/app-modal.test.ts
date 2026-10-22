@@ -39,6 +39,7 @@ beforeEach(async () => {
   const gate = new Promise<void>(res => { release = res; });
   mswServer.use(
     http.get(`${V2}/world`, () => HttpResponse.json({ id: 'api-w', name: 'Server World' })),
+    http.get(`${V2}/me`, () => HttpResponse.json({ role: 'owner' })),
     // The server list hangs: the merge is mid-flight, the lock held.
     http.get(`${V2}/:type`, async () => { await gate; return HttpResponse.json({ data: [], has_more: false, next_cursor: null }); }),
     http.post('http://probe.local/api/worldsync/create-world-external/', () => HttpResponse.json({ success: true, api_key: 'k2', world_id: 'api-w2', name: 'New' })),

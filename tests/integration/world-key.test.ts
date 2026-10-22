@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   revoked: [] as string[],
   store: null as unknown,
   pinAnswer: '4242' as string | null,
+  checkPin: null as null | ((key: string) => Promise<void>),
 }));
 
 vi.mock('../../src/sync/ow-v2-client-adapter', async (importOriginal) => {
@@ -30,7 +31,7 @@ vi.mock('../../src/sync/ow-v2-client-adapter', async (importOriginal) => {
 });
 vi.mock('../../src/sync/make-online', async (importOriginal) => {
   const m = await importOriginal<typeof import('../../src/sync/make-online')>();
-  return { ...m, buildV2Adapter: (key: string) => ({ getWorld: () => h.getWorld!(key) }) };
+  return { ...m, buildV2Adapter: (key: string) => ({ getWorld: () => h.getWorld!(key), checkPin: () => h.checkPin?.(key) ?? Promise.resolve() }) };
 });
 vi.mock('../../src/sync/account-client', async (importOriginal) => {
   const m = await importOriginal<typeof import('../../src/sync/account-client')>();
@@ -89,6 +90,7 @@ beforeEach(async () => {
   h.revoked.length = 0;
   h.rows = [];
   h.pinAnswer = '4242';
+  h.checkPin = null;
   h.getWorld = async () => ({ id: WORLD, name: 'Kessel' });
   h.mintAnswer = async (scope) => scope === 'read'
     ? { id: 'k-read', last4: 'cccc', scope: 'READ', key: READ }
@@ -180,6 +182,12 @@ describe('a pasted key', () => {
     await expect(checkNewKey(current(), NEW)).rejects.toThrow(/does not know that key/);
     await expect(checkNewKey(current(), '  ')).rejects.toThrow(/Paste the key/);
     await expect(checkNewKey(current(), OLD)).rejects.toThrow(/has now/);
+  });
+
+  it('a wrong PIN is told by /me, now that /world reads bare (1.79.0)', async () => {
+    h.getWorld = async () => ({ id: current().api!.world_id, name: 'Here' });
+    h.checkPin = async () => { throw refused('invalid_credentials', 401, 'API-Pin'); };
+    await expect(checkNewKey(current(), NEW)).rejects.toThrow(/did not accept your PIN/);
   });
 
   it('reads an ow_r_ key as read only', async () => {

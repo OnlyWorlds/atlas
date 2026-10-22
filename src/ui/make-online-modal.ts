@@ -475,6 +475,7 @@ export class MakeOnlineModal extends BaseModal {
       let world: { id?: string; name?: string };
       try {
         world = await client.getWorld();
+        await client.checkPin();
       } catch (err) {
         // A refused key, an unknown world or no connection, in words (A38,
         // S369: offline used to show "Failed to fetch"); the rest as it came.

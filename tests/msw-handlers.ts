@@ -626,6 +626,14 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       return HttpResponse.json(worldMetaBody());
     }),
 
+    // GET /me — who the key is; the door's PIN check since reads go bare
+    // (Atlas 1.79.0). MUST precede GET /:type, as /world does.
+    http.get(`${base}/me`, () => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      return HttpResponse.json({ role: 'owner' });
+    }),
+
     // PATCH /world — world-meta partial write (v2 tail, S262). MUST precede
     // PATCH /:type (a bare /world would match type="world"). Contract (keel dig
     // 2026-07-13): unknown-field check across ALL keys first — one stray field

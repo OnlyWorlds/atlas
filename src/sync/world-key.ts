@@ -69,11 +69,13 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
   if (!key) throw new PlainError('Paste the key first.');
   if (key === entry.api.api_key) throw new PlainError('That is the key this world has now.');
   const readOnly = isReadKey(key);
-  // keel reads a v2 key without its PIN; a legacy key wants it on every route.
+  // A read goes bare and `/me` checks the PIN; a legacy key sends it on every route.
   const pin = readOnly ? '' : (worldPin(entry, getState().registry) ?? '');
   let fetched: { id: string; name: string };
   try {
-    fetched = await buildV2Adapter(key, pin).getWorld();
+    const client = buildV2Adapter(key, pin);
+    fetched = await client.getWorld();
+    await client.checkPin();
   } catch (err) {
     const why = keyRefusalOf(err);
     if (why === 'key_revoked') throw new PlainError('That key was revoked too. Make a new one on the world\'s page on onlyworlds.com.');

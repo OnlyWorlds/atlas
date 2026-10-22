@@ -9,7 +9,7 @@
  * Notes/2026-07-12-v2-probed-facts.md for the verified contract):
  *
  *   - Paths: /api/v2/{type} and /api/v2/{type}/{id} — no trailing slash.
- *   - Auth: same API-Key / API-Pin headers as v1. Reads work key-only.
+ *   - Auth: API-Key on every call; API-Pin by keel's rule (`sendsPin`).
  *   - Relations: BARE schema names both directions ({location: "<id>"},
  *     {friends: ["<id>"]}). No `_id`/`_ids` suffixing, no nested objects.
  *   - Spatial exception is DISK-side, not wire-side: atlas stores pin/marker
@@ -44,6 +44,17 @@ import { OwProposed, proposalOf, type ProposalRow } from './proposals';
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
 export const DEFAULT_V2_BASE = 'https://www.onlyworlds.com/api/v2';
+
+/**
+ * keel's PIN rule (Skeld h29 #10663, #10734; SDK 4.59.0's own): the secret (a
+ * PIN, or a seat's `ow_s_`) goes on every write, on `GET /me`, and on every
+ * call of a legacy ten-digit key. A prefixed key's other reads go bare: each
+ * PIN sent is a verify on keel, and a read never needs one. So a wrong PIN
+ * shows on `/me` and on writes, never on a read (the link doors ask `/me`).
+ */
+export function sendsPin(method: string, path: string, apiKey: string): boolean {
+  return method !== 'GET' || path === '/me' || /^\d{10}$/.test(apiKey);
+}
 
 /** Atlas's name on every write (keel #520's `X-OW-Client`: lower case, digits, hyphens, 1 to 32). */
 export const ATLAS_CLIENT_NAME = 'atlas';
@@ -284,9 +295,9 @@ export class OwV2ClientAdapter implements OwApiClient {
     const headers: Record<string, string> = {
       'API-Key': this.apiKey,
       // Omit the PIN header entirely when there is no PIN (view-only worlds
-      // run on a READ key, S264) — reads are keyless-PIN on keel, and an
-      // empty-string header is a malformed credential, not an absent one.
-      ...(this.apiPin ? { 'API-Pin': this.apiPin } : {}),
+      // run on a READ key, S264): an empty-string header is a malformed
+      // credential, not an absent one. With one, only where keel reads it.
+      ...(this.apiPin && sendsPin(method, path, this.apiKey) ? { 'API-Pin': this.apiPin } : {}),
       ...extraHeaders,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -382,9 +393,21 @@ export class OwV2ClientAdapter implements OwApiClient {
   }
 
   /**
-   * GET /world — credential validation + world identity in one read call
+   * A door's PIN check (1.79.0): reads go bare (`sendsPin`), so `GET /world`
+   * no longer refuses a wrong PIN; `GET /me` checks whatever is sent (keel
+   * D93) and refuses it with param `API-Pin`, as before. No PIN, nothing to
+   * check; a ten-digit key's `getWorld()` already sent it.
+   */
+  async checkPin(): Promise<void> {
+    if (!this.apiPin || /^\d{10}$/.test(this.apiKey)) return;
+    await this.me();
+  }
+
+  /**
+   * GET /world — the key's validation + world identity in one read call
    * (Skeld's v2 tail, live 2026-07-12; replaced the v1 SDK worlds.get lane).
-   * Reads work key-only; a walled world wants the PIN this client carries.
+   * A prefixed key reads it bare, so it never checks a PIN: a door that holds
+   * one asks `me()` too (`checkPin`). A legacy ten-digit key sends it here.
    */
   async getWorld(): Promise<{ id: string; name: string; created_at?: string; updated_at?: string }> {
     const response = await this.request('GET', '/world') as {

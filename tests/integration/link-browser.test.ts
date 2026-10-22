@@ -7,6 +7,7 @@
  * writing on past it leaves 0-byte files and wastes the whole list).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { mswServer } from '../setup';
 import { statefulV2Handlers } from '../msw-handlers';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
@@ -81,6 +82,22 @@ const link = (over: Partial<Parameters<typeof linkExistingApiWorldInRoot>[0]> = 
   });
 
 describe('linking a world into this browser', () => {
+  it('a wrong PIN is refused at the door by /me, though /world reads bare (1.79.0)', async () => {
+    const pins: Array<string | null> = [];
+    mswServer.use(http.get(`${TEST_BASE}/me`, ({ request }) => {
+      const pin = request.headers.get('API-Pin');
+      pins.push(pin);
+      return pin === '1234'
+        ? HttpResponse.json({ role: 'owner' })
+        : HttpResponse.json({ error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } }, { status: 401 });
+    }));
+    await expect(link({ apiKey: 'ow_w_k', apiPin: '9999', knownWorld: undefined })).rejects.toThrow(/did not accept that PIN/);
+    expect(getState().registry.worlds).toEqual([]);
+    const { entry } = await link({ apiKey: 'ow_w_k', apiPin: '1234', knownWorld: undefined });
+    expect(entry.state).toBe('api-linked');
+    expect(pins).toEqual(['9999', '1234']);
+  });
+
   it('lands every element in a nonced browser directory and registers it there', async () => {
     const result = await link();
     const entry = result.entry;

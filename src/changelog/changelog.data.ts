@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.79.0',
+    date: '2026-10-22',
+    theme: 'Your PIN, only where it counts',
+    entries: [
+      {
+        id: 'pin-on-changes-only',
+        title: 'Atlas sends your PIN only when it changes something',
+        body: "Reading a world on OnlyWorlds needs only its key, so Atlas now sends your PIN when it changes the world, and once when you link a world or check its key, where a wrong PIN is still caught. An older ten-digit key sends it every time, as before.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.78.1',
     date: '2026-10-22',
     theme: 'Links kept',

@@ -998,6 +998,7 @@ export async function linkExistingApiWorldInRoot(
     const client = buildV2Adapter(apiKey, apiPin);
     try {
       world = await client.getWorld();
+      await client.checkPin();
     } catch (err) {
       throw keyCheckError(err, { readOnly });
     }

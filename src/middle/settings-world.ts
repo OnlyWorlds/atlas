@@ -449,10 +449,12 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     if (!pin) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN on the OnlyWorlds tab first.'); return; }
     testBtn.disabled = true;
     try {
-      // Test Connection via v2 GET /world (live 2026-07-12); buildV2Adapter
-      // applies any dev/staging origin override.
+      // Test Connection via v2 GET /world (live 2026-07-12), and the PIN on
+      // GET /me (reads go bare, 1.79.0); buildV2Adapter applies any
+      // dev/staging origin override.
       const client = buildV2Adapter(world.api.api_key, pin);
       const fetched = await client.getWorld();
+      await client.checkPin();
       const liveName: string | undefined = fetched?.name;
       // If the server name differs from what we cached at link time, refresh
       // both the registry's api.world_name AND world.json so the Settings →
