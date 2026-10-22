@@ -175,3 +175,39 @@ test('the same chrome is still readable in dark mode', async ({ page }) => {
   }
   expect(failures, `unreadable in DARK mode:\n${failures.join('\n')}`).toEqual([]);
 });
+
+/**
+ * F-57 (Seethe, 1.70.0): a text field in focus said so by its border alone, at half-strength
+ * cyan: 2.7:1 against its resting border in dark, 1.6:1 in light. The focused border against
+ * the resting one, both composited over the page, must reach the 3:1 UI floor in both themes.
+ */
+for (const theme of ['light', 'dark'] as const) {
+  test(`a focused text field's border reads against its resting border (${theme})`, async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+    await page.evaluate((t) => {
+      if (t === 'light') { localStorage.setItem('atlas_theme', 'light'); document.documentElement.setAttribute('data-theme', 'light'); }
+      else { localStorage.removeItem('atlas_theme'); document.documentElement.removeAttribute('data-theme'); }
+    }, theme);
+    const ratio = await page.evaluate((lumSrc) => {
+      const luminance = new Function(`return ${lumSrc}`)() as (c: string) => number;
+      const input = document.createElement('input');
+      input.className = 'atlas-input';
+      input.style.transition = 'none';
+      document.body.appendChild(input);
+      const bodyBg = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g)!.map(Number);
+      const shown = (c: string): string => {
+        const m = c.match(/[\d.]+/g)!.map(Number);
+        const a = m.length === 4 ? m[3] : 1;
+        return `rgb(${[0, 1, 2].map(i => m[i] * a + bodyBg[i] * (1 - a)).join(', ')})`;
+      };
+      const rest = shown(getComputedStyle(input).borderTopColor);
+      input.focus();
+      const focused = shown(getComputedStyle(input).borderTopColor);
+      input.remove();
+      const [hi, lo] = [luminance(rest), luminance(focused)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    }, LUMINANCE_FN);
+    expect(ratio, `focused vs resting border, ${theme}`).toBeGreaterThanOrEqual(3);
+  });
+}

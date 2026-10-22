@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: "OnlyWorlds now tells the owner, a co-builder and its maker that an element is hidden. Atlas keeps that as OnlyWorlds' word: it never counts as a change in a review, never goes back up, and leaves the copy when the element is shown again.",
         tags: ['sync', 'fix'],
       },
+      {
+        id: 'input-focus-visible',
+        title: 'A text field in focus shows it plainly',
+        body: 'The search field and every other text field now draw their focus in the full accent colour, readable against their resting edge in light and dark.',
+        tags: ['lightmode', 'fix'],
+      },
     ],
   },
   {

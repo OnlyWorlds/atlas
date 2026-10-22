@@ -1108,7 +1108,9 @@ html {
 .atlas-textarea:focus,
 .atlas-select:focus {
   outline: none;
-  border-color: var(--atlas-cyan-soft);
+  /* Full cyan, not the soft one: against the rest border the soft read 2.7:1 in dark and
+     1.6:1 in light, under 3:1 (Seethe's F-57); full reads 8.8:1 and 3.6:1. */
+  border-color: var(--atlas-cyan);
   background: var(--atlas-input-bg-focus);
 }
 
