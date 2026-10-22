@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.78.1',
+    date: '2026-10-22',
+    theme: 'Links kept',
+    entries: [
+      {
+        id: 'refused-delete-keeps-links',
+        title: 'A delete the keeper keeps also keeps its links',
+        body: "Deleting an element removes the links other elements had to it. When the keeper keeps that delete for themselves, Atlas now also takes back the link changes it had sent for review, and puts the links back here, so the keeper is never asked to cut links to something still in the world.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.78.0',
     date: '2026-10-22',
     theme: 'Sent for review',

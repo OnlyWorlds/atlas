@@ -25,6 +25,7 @@ import {
 } from '../core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS } from '../core/constants';
 import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
+import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
@@ -2582,6 +2583,13 @@ export class SyncEngine {
       }
     }
 
+    // The delete's link scrub went out first, as unlink proposals keel now
+    // holds for the keeper: withdrawn, and the links put back (the S454 gate's G3).
+    if (refusedDeletes.length > 0 && !authBlocked && !transient && !this.stopped) {
+      const withdrawn = await this.restoreRefusedLinks(new Set(refusedDeletes.map(d => d.id)), failures);
+      for (let i = proposedIds.length - 1; i >= 0; i--) if (withdrawn.has(proposedIds[i])) proposedIds.splice(i, 1);
+    }
+
     // Persist server-side deletes detected during push. Append + dedup with
     // any pre-existing entries (e.g. from a prior pull) so the review modal
     // sees the union. Symmetric with pullPhase's persistence pattern.
@@ -2681,6 +2689,63 @@ export class SyncEngine {
     for (const old of [replaced, unwrittenBefore]) {
       if (old) await this.client.withdrawProposal?.(old.type, old.element_id, old.proposal_id).catch(() => undefined);
     }
+  }
+
+  /**
+   * A delete keel refused (P6) brought its element back, but the delete's
+   * scrub (conv. 101) had already cut the links to it from every referrer,
+   * and those edits went out first, as proposals a keeper could accept for a
+   * delete that never happened (the S454 gate's G3, TC h29 #10726). For each
+   * changed element whose keel copy still links to an id in `back`: withdraw
+   * its open proposal and put the links back. A copy that then matches keel's
+   * takes keel's record (nothing left to send); one with other edits stays
+   * changed and proposes them again, without the unlink. A referrer keel's
+   * copy no longer links (an unlink already accepted) has nothing to restore.
+   * Returns the ids whose proposals were withdrawn.
+   */
+  private async restoreRefusedLinks(back: ReadonlySet<string>, failures: PerElementFailure[]): Promise<Set<string>> {
+    const withdrawn = new Set<string>();
+    const withdrawnPids = new Set<string>();
+    const pending = this.proposedNow((await this.folder.readSyncState()).proposed);
+    const changed = (await this.folder.listLocallyChangedSince(null)).filter(e => e.server_updated_at && !back.has(e.id));
+    for (const el of changed) {
+      if (this.stopped) break;
+      let remote: Awaited<ReturnType<OwApiClient['getElement']>>;
+      try {
+        remote = await this.client.getElement(el.type, el.id);
+      } catch {
+        continue; // unread: its proposal stays for the keeper, as before G3
+      }
+      if (!remote) continue;
+      const { updated_at, ...body } = remote;
+      const server = stripServerOnlyFields(remote) as unknown as Element;
+      if (!restoredLinkPatch(el, server, back)) continue;
+      const entry = pending.find(e => e.element_id === el.id);
+      if (entry) {
+        await this.client.withdrawProposal?.(entry.type, entry.element_id, entry.proposal_id).catch(() => undefined);
+        withdrawnPids.add(entry.proposal_id);
+        withdrawn.add(el.id);
+      }
+      await this.localStep(failures, el.id, el.type, 'update', async () => {
+        const restored = await this.folder.updateElementWith(el.id, onDisk => restoredLinkPatch(onDisk, server, back));
+        if (restored && sameWireContent(restored, server as unknown as Record<string, unknown>)) {
+          await this.folder.applyServerRecordIfUnchanged(el.type, body, updated_at, restored.local_updated_at ?? null);
+        }
+      });
+      console.info('[atlas:sync] push: a refused delete\'s unlink withdrawn, the link put back', { id: el.id, proposal: entry?.proposal_id });
+    }
+    if (withdrawnPids.size > 0) {
+      this.unwrittenProposals = this.unwrittenProposals.filter(e => !withdrawnPids.has(e.proposal_id));
+      try {
+        await this.folder.updateSyncState(s => ({ proposed: (s.proposed ?? []).filter(e => !withdrawnPids.has(e.proposal_id)) }));
+      } catch (err) {
+        // A held file keeps the entry; the next settle reads its row gone and
+        // reviews it, the link already back here.
+        if (!isFileBusyError(err)) throw err;
+        failures.push(failureOf('world', 'world', 'update', err));
+      }
+    }
+    return withdrawn;
   }
 
   /** The proposals a round reads: the file's entries and any still waiting to be written. */

@@ -54,6 +54,38 @@ export function deadLinkPatch(el: Element, dead: ReadonlySet<string>): Partial<E
 }
 
 /**
+ * The inverse of `deadLinkPatch` for a delete keel refused (conv. 163, P6;
+ * the S454 gate's G3): the links `server` still holds to an id in `back` that
+ * `local` dropped, put back. A multi link that differs only by those ids takes
+ * keel's list (its order); one edited here too gets them appended. A single
+ * link comes back only where it is empty here: a link changed since is a
+ * newer edit. Null when there is nothing to put back.
+ */
+export function restoredLinkPatch(local: Element, server: Element, back: ReadonlySet<string>): Partial<Element> | null {
+  const mine = local as unknown as Record<string, unknown>;
+  const theirs = server as unknown as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  for (const f of linkFields(local.type)) {
+    const s = theirs[f.diskField];
+    const l = mine[f.diskField];
+    if (s == null) continue;
+    if (Array.isArray(s)) {
+      const lost = s.filter(x => { const id = idOf(x); return id !== null && back.has(id); });
+      const here = Array.isArray(l) ? l : [];
+      const hereIds = new Set(here.map(idOf));
+      const missing = lost.filter(x => !hereIds.has(idOf(x)));
+      if (missing.length === 0) continue;
+      const rest = (list: unknown[]) => list.map(idOf).filter(id => id === null || !back.has(id)).join('\u0000');
+      patch[f.diskField] = rest(s) === rest(here) ? s : [...here, ...missing];
+    } else {
+      const id = idOf(s);
+      if (id !== null && back.has(id) && (l == null || l === '')) patch[f.diskField] = s;
+    }
+  }
+  return Object.keys(patch).length > 0 ? (patch as Partial<Element>) : null;
+}
+
+/**
  * Remove the `dead` ids from every other element's links, each referrer through
  * its own write chain (`updateElementWith` reads the file as it is on disk and
  * stamps it, so a synced referrer pushes the cleared link on its next round).

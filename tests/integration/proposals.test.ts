@@ -365,6 +365,77 @@ describe('the S454 gate\'s findings, each held', () => {
   });
 });
 
+describe('G3: a refused delete takes back the unlinks it set off (TC h29 #10726)', () => {
+  /** Ada links to a place and two species, all the owner's; then the key turns into a seat. */
+  async function linkedWorld() {
+    const loc = await folder.createElement('location', { name: 'Harbour' });
+    const sp1 = await folder.createElement('species', { name: 'Human' });
+    const sp2 = await folder.createElement('species', { name: 'Elf' });
+    const ada = await folder.createElement('character', { name: 'Ada', birthplace: loc.id, species: [sp1.id, sp2.id] });
+    await engine.syncNow();
+    client.__propose_writes(true);
+    return { loc, sp1, sp2, ada };
+  }
+  const openRows = () => client.__proposals().filter(p => p.state === 'open');
+
+  it('a single link: the unlink proposal is withdrawn, the link is back, nothing left to send', async () => {
+    const { loc, ada } = await linkedWorld();
+    await folder.deleteElement(loc.id);
+    expect((await folder.getElement(ada.id) as any).birthplace).toBeNull();
+    const r = await engine.syncNow();
+    expect(r.delete_refused?.map(d => d.id)).toEqual([loc.id]);
+    expect(r.proposed_ids).toBeUndefined();
+    expect(r.failures).toEqual([]);
+    expect(openRows()).toEqual([]);
+    const back = (await folder.getElement(ada.id))! as any;
+    expect(back.birthplace).toBe(loc.id);
+    expect(back.local_updated_at <= back.server_updated_at).toBe(true);
+    expect((await folder.readSyncState()).proposed ?? []).toEqual([]);
+    const sent = updatesSent();
+    const r2 = await engine.syncNow();
+    expect(updatesSent()).toBe(sent);
+    expect(r2.conflicts).toEqual([]);
+    expect((await folder.readSyncState()).conflicts ?? []).toEqual([]);
+  });
+
+  it('a list: the id comes back in keel\'s order', async () => {
+    const { sp1, sp2, ada } = await linkedWorld();
+    await folder.deleteElement(sp1.id);
+    await engine.syncNow();
+    expect((await folder.getElement(ada.id) as any).species).toEqual([sp1.id, sp2.id]);
+    expect(openRows()).toEqual([]);
+  });
+
+  it('a referrer edited too: the link is back and the edit goes out again, without the unlink', async () => {
+    const { loc, ada } = await linkedWorld();
+    await folder.updateElement(ada.id, { description: 'Edited by the seat.' });
+    await folder.deleteElement(loc.id);
+    await engine.syncNow();
+    expect(openRows()).toEqual([]);
+    const here = (await folder.getElement(ada.id))! as any;
+    expect(here.birthplace).toBe(loc.id);
+    expect(here.description).toBe('Edited by the seat.');
+    const r2 = await engine.syncNow();
+    expect(r2.proposed_ids).toEqual([ada.id]);
+    const rows = openRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].fields.description).toBe('Edited by the seat.');
+    expect(rows[0].fields.birthplace).toBe(loc.id);
+    expect((await folder.readSyncState()).conflicts ?? []).toEqual([]);
+  });
+
+  it('a delete that lands (the seat\'s own) leaves its unlinks going out', async () => {
+    await seatOnReviewedWorld();
+    const mine = await folder.createElement('location', { name: 'Made by the seat' });
+    const ada2 = await folder.createElement('character', { name: 'Bo', birthplace: mine.id });
+    await engine.syncNow();
+    await folder.deleteElement(mine.id);
+    const r = await engine.syncNow();
+    expect(r.delete_refused).toBeUndefined();
+    expect((await folder.getElement(ada2.id) as any).birthplace).toBeNull();
+  });
+});
+
 describe('the review line (S454 live read)', () => {
   it('a reason that ends its own sentence takes no second stop', async () => {
     const { proposalReviewLine } = await import('../../src/sync/proposal-lines');
