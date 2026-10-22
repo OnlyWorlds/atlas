@@ -91,10 +91,31 @@ export function downloadName(world: WorldRegistryEntry, now = new Date()): strin
 }
 
 /**
- * Make the world file and hand it to `target`. Refusals and a torn walk throw
- * a `PlainError`; nothing is handed over unless the two walks agree.
+ * What Atlas asks before a world file leaves records out (folder spec §4.5
+ * rule 11, §4.7 OW-8, v0.3.15): `private`, the producers whose records the
+ * file left out; `unreadable`, the records list will not read, so nothing can
+ * be left out by guess.
  */
-export async function downloadWorld(world: WorldRegistryEntry, target: SaveTarget, opts: { now?: Date; maxBytes?: number } = {}): Promise<{ file: string }> {
+export type RecordsQuestion = { kind: 'private'; producers: string[] } | { kind: 'unreadable' };
+/** Leave the private records out, include every record, or make no file (`null`). */
+export type RecordsAnswer = 'leave-out' | 'include' | null;
+export type AskRecords = (q: RecordsQuestion) => Promise<RecordsAnswer>;
+
+/** Without a person to ask: the rule's default, and no file for a list that will not read. */
+const noAsk: AskRecords = async (q) => q.kind === 'private' ? 'leave-out' : null;
+
+/**
+ * Make the world file and hand it to `target`. Refusals and a torn walk throw
+ * a `PlainError`; nothing is handed over unless the two walks agree. A world
+ * whose records a producer keeps private asks first (`ask`); `null` means the
+ * person chose no file, and nothing was handed over. `leftOut` names the
+ * producers whose records the file leaves out.
+ */
+export async function downloadWorld(
+  world: WorldRegistryEntry,
+  target: SaveTarget,
+  opts: { now?: Date; maxBytes?: number; ask?: AskRecords } = {},
+): Promise<{ file: string; leftOut: string[] } | null> {
   if (world.demo === true) throw new PlainError(TOUR_LINE);
   const active = getState().active;
   const store = getActiveStore();
@@ -118,15 +139,19 @@ export async function downloadWorld(world: WorldRegistryEntry, target: SaveTarge
     const name = (el as { name?: unknown } | null)?.name;
     return typeof name === 'string' && name.trim() ? name.trim() : undefined;
   }, opts.now ?? new Date());
+  const ask = opts.ask ?? noAsk;
+  let leftOut: string[] = [];
+  let bytes: Uint8Array = new Uint8Array(0);
+  let collected: Awaited<ReturnType<typeof ws.collectWorldFiles>> = [];
+  let question: RecordsQuestion | null = null;
   const release = engine ? await engine.hold('download') : () => {};
   try {
     await flushBeforeLeavingWorld();
     const where = await worldHandleFor(world);
     if (where.kind !== 'ok') throw new PlainError('Atlas cannot reach this world\'s files right now. Open it again from the sidebar, then download it.');
-    let bytes: Uint8Array;
     try {
       const walked = await ws.collectWorldFiles(where.handle);
-      const collected = provenance ? ws.withProvenanceLines(walked, provenance.source, provenance.exportedAs) : walked;
+      collected = provenance ? ws.withProvenanceLines(walked, provenance.source, provenance.exportedAs) : walked;
       // A file no Atlas could open again is never handed over, on any target
       // (S373 gate F4): the reader's budget is the uncompressed size.
       if (collected.reduce((n, f) => n + f.data.byteLength, 0) > (opts.maxBytes ?? WORLD_FILE_MAX_BYTES)) {
@@ -134,7 +159,18 @@ export async function downloadWorld(world: WorldRegistryEntry, target: SaveTarge
           ? 'This world is too big for one file. Move it to a folder instead.'
           : 'This world is too big to download in this browser.');
       }
-      bytes = ws.zipWorld(collected, dir);
+      // The rule's default first: the writer leaves private records out, and
+      // the file's own entries say whose (folder spec §4.7 OW-8, v0.3.15).
+      try {
+        bytes = ws.zipWorld(collected, dir);
+        leftOut = ws.leftOutRecords(collected, bytes);
+        if (leftOut.length) question = { kind: 'private', producers: leftOut };
+      } catch (err) {
+        if (!(err instanceof ws.RecordsListUnreadable)) throw err;
+        question = { kind: 'unreadable' };
+      }
+      // The snapshot is checked before the person is asked: an answer changes
+      // which of its files go in, never the files themselves.
       if (!ws.sameStamps(collected, await ws.portableStamps(where.handle))) throw new PlainError(TORN_LINE);
     } catch (err) {
       if (err instanceof PlainError) throw err;
@@ -145,12 +181,22 @@ export async function downloadWorld(world: WorldRegistryEntry, target: SaveTarge
       if (name === 'NotReadableError' || name === 'AbortError' || name === 'NotFoundError') throw new PlainError(TORN_LINE);
       throw err;
     }
-    await target.write(file, bytes);
   } finally {
     release();
   }
+  // Asked after sync lets go: the snapshot is in hand, and a person reading
+  // the question holds nothing up.
+  if (question) {
+    const answer = await ask(question);
+    if (answer === null || (answer === 'leave-out' && question.kind === 'unreadable')) return null;
+    if (answer === 'include') {
+      bytes = ws.zipWorld(collected, dir, { includePrivateRecords: true });
+      leftOut = [];
+    }
+  }
+  await target.write(file, bytes);
   const next = updateWorldEntry(getState().registry, world.id, { kept_download_at: (opts.now ?? new Date()).toISOString() });
   saveRegistry(next);
   patchSlice('registry', next);
-  return { file };
+  return { file, leftOut };
 }

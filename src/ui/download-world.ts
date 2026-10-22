@@ -10,6 +10,7 @@ import type { WorldRegistryEntry } from '../core/types';
 import { downloadName, downloadWorld, pickSaveTarget } from '../setup/world-download';
 import { showProblem } from './problem-fixes';
 import { completeWaypoint } from '../core/waypoints';
+import { PrivateRecordsModal } from './private-records-modal';
 
 export async function downloadWorldFromClick(
   world: WorldRegistryEntry,
@@ -26,11 +27,15 @@ export async function downloadWorldFromClick(
   if (!target) return null; // the user closed the save picker: nothing was tried
   busy(true);
   try {
-    const { file } = await downloadWorld(world, target);
+    // A world whose records a tool keeps private asks first (folder spec §4.5 rule 11).
+    const done = await downloadWorld(world, target, { ask: q => new PrivateRecordsModal().ask(q) });
+    if (!done) return null; // the person chose no file
+    const { file, leftOut } = done;
     completeWaypoint('keep-copy');
-    toasts.success(target.kind === 'picker'
+    const kept = target.kind === 'picker'
       ? `Saved ${file}. Keep it: it brings this world back.`
-      : `Your browser is saving ${file}. Keep the file: it brings this world back.`);
+      : `Your browser is saving ${file}. Keep the file: it brings this world back.`;
+    toasts.success(leftOut.length ? `${kept} Private records were left out.` : kept);
     return true;
   } catch (err) {
     console.warn('[download-world] failed:', err);

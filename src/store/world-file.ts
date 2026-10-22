@@ -20,6 +20,7 @@
  */
 
 import { readWorldFile, writeWorldFile, OwWorldFileError, type OwWorldFileReason } from '@onlyworlds/sdk';
+import { unzipSync } from 'fflate';
 import { PlainError } from '../core/plain-error';
 import { ATLAS_INTERNAL_DIR, FOLDER_FORMAT_VERSION } from '../core/constants';
 import { withProvenance, type ExportedAs, type WorldSource } from '../core/provenance';
@@ -149,15 +150,66 @@ export function sameStamps(collected: CollectedFile[], now: Map<string, string>)
   return collected.every(f => now.get(f.path) === f.stamp);
 }
 
-/** The zip: one top-level folder, JSON deflated, everything else stored. */
-export function zipWorld(files: WorldFileEntry[], topDir: string): Uint8Array {
+const RECORDS_MANIFEST = 'records/RECORDS.json';
+
+/**
+ * The world's records list will not read, so which records are private is
+ * unknown, and nothing is left out by guess (folder spec §4.7 OW-8, v0.3.15;
+ * Skeld h58 #10911): the caller asks the person, or makes no file.
+ */
+export class RecordsListUnreadable extends PlainError {
+  constructor() {
+    super("This world's records list (records/RECORDS.json) cannot be read, so Atlas cannot tell which records are private. No file was made.");
+  }
+}
+
+/**
+ * The zip: one top-level folder, JSON deflated, everything else stored.
+ * Records a producer marks private are left out unless `includePrivateRecords`
+ * (folder spec §4.5 rule 11, §4.7 OW-8, v0.3.15; SDK 4.63.0): the SDK decides
+ * which, and `leftOutRecords` reads its answer back from the file.
+ */
+export function zipWorld(files: WorldFileEntry[], topDir: string, opts: { includePrivateRecords?: boolean } = {}): Uint8Array {
+  const includePrivateRecords = opts.includePrivateRecords === true;
   try {
-    return writeWorldFile(files, topDir);
+    return writeWorldFile(files, topDir, { includePrivateRecords });
   } catch (err) {
+    // Atlas's options are always well formed, so the writer's TypeError is
+    // the records list it could not read (SDK 4.63.0).
+    if (err instanceof TypeError && !includePrivateRecords && files.some(f => f.path === RECORDS_MANIFEST)) throw new RecordsListUnreadable();
     if (err instanceof OwWorldFileError && err.reason === 'name') throw new PlainError(WRITE_NAME);
     if (err instanceof OwWorldFileError && err.reason === 'collision') throw new PlainError(WRITE_COLLISION);
     throw new PlainError(err instanceof OwWorldFileError ? REFUSALS[err.reason] : NOT_OPENABLE);
   }
+}
+
+/**
+ * The producers whose records the world had and the file does not: each
+ * `records/<producer>` directory, as the world names it, that held files
+ * going in and holds none in `zip`. Read from the file's own entry names
+ * (nothing inflated), so the writer stays the one authority on what is private.
+ */
+export function leftOutRecords(files: WorldFileEntry[], zip: Uint8Array): string[] {
+  const producerOf = (path: string): string | null => {
+    const segs = path.split('/');
+    return segs.length > 2 && segs[0] === 'records' ? segs[1] : null;
+  };
+  const had = new Set<string>();
+  for (const f of files) {
+    const p = producerOf(f.path);
+    if (p !== null) had.add(p);
+  }
+  if (had.size === 0) return [];
+  const kept = new Set<string>();
+  unzipSync(zip, {
+    filter: (entry) => {
+      // Every entry sits under the one top-level folder.
+      const p = producerOf(entry.name.slice(entry.name.indexOf('/') + 1));
+      if (p !== null) kept.add(p);
+      return false;
+    },
+  });
+  return [...had].filter(p => !kept.has(p)).sort();
 }
 
 /** Each of the SDK's refusals, in Atlas's words. */

@@ -6,9 +6,11 @@
  * paths, a declared-size bomb, no world, two worlds, the tour's sandbox.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { zipSync, strToU8 } from 'fflate';
+import { zipSync, strToU8, unzipSync } from 'fflate';
+import { readFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import { FakeDirHandle } from '../fixtures/fake-fs';
-import { collectWorldFiles, zipWorld, readWorldZip, worldFileName } from '../../src/store/world-file';
+import { collectWorldFiles, zipWorld, readWorldZip, worldFileName, leftOutRecords, RecordsListUnreadable } from '../../src/store/world-file';
 
 const j = (v: unknown) => JSON.stringify(v, null, 2) + '\n';
 const as = (d: FakeDirHandle) => d as unknown as FileSystemDirectoryHandle;
@@ -190,5 +192,69 @@ describe('the reader refuses before anything is written', () => {
 
   it('something that is not a zip at all', () => {
     expect(() => readWorldZip(strToU8('just some text'))).toThrow(/not a world Atlas can open/);
+  });
+});
+
+// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld h58 #10911; SDK 4.63.0):
+// a producer's records marked private stay out of a world file unless asked.
+// The two files are the standard's own (schema-dist dist.49, Quillon's case):
+// the asked side holds `records/fold/` (private) and `records/lab/` whole.
+describe('private records (§4.5 rule 11, OW-8)', () => {
+  const fixture = (name: string) => new Uint8Array(readFileSync(resolvePath(__dirname, '../fixtures/owworld', name)));
+  const entries = (zip: Uint8Array) => {
+    const out = new Map<string, string>();
+    for (const [n, d] of Object.entries(unzipSync(zip))) if (n !== 'mimetype') out.set(n, Buffer.from(d).toString('hex'));
+    return out;
+  };
+  const asked = () => readWorldZip(fixture('pass-OW-8-private-asked.owworld')).files;
+  const e = (path: string, s: string) => ({ path, data: strToU8(s) });
+  const entry = (producer: string, extra: Record<string, unknown> = {}) => ({ producer, format: 'x', version: '1', deltas: false, ...extra });
+
+  it('the default leaves fold out whole and says so; RECORDS.json and lab travel byte for byte, as the standard\'s file has them', () => {
+    const zip = zipWorld(asked(), 'abbey');
+    expect(entries(zip)).toEqual(entries(fixture('pass-OW-8-private-left-out.owworld')));
+    expect(leftOutRecords(asked(), zip)).toEqual(['fold']);
+  });
+
+  it('asked, every record travels, the private producer\'s dot-file included, and nothing is said to be left out', () => {
+    const zip = zipWorld(asked(), 'abbey', { includePrivateRecords: true });
+    expect(entries(zip)).toEqual(entries(fixture('pass-OW-8-private-asked.owworld')));
+    expect([...entries(zip).keys()]).toContain('abbey/records/fold/.head');
+    expect(leftOutRecords(asked(), zip)).toEqual([]);
+  });
+
+  it('a producer named Fold in the list is the folder fold (OW-18\'s fold, the SDK\'s match)', () => {
+    const files = [
+      e('world.json', j({ id: WID, name: 'W' })),
+      e('records/RECORDS.json', JSON.stringify([entry('Fold', { private: true })])),
+      e('records/fold/spine.jsonl', '{}'),
+    ];
+    const zip = zipWorld(files, 'w');
+    expect(leftOutRecords(files, zip)).toEqual(['fold']);
+    expect([...entries(zip).keys()]).toContain('w/records/RECORDS.json');
+  });
+
+  it('a records list that will not read leaves nothing out by guess: no file, unless every record is asked for', () => {
+    const list = (body: string) => [
+      e('world.json', j({ id: WID, name: 'W' })),
+      e('records/RECORDS.json', body),
+      e('records/fold/spine.jsonl', '{}'),
+    ];
+    // The shape before v0.3.12 (an object), not JSON, an entry private without a name.
+    for (const body of ['{"producers": []}', '{nope', '[{"private": true}]']) {
+      expect(() => zipWorld(list(body), 'w')).toThrow(RecordsListUnreadable);
+      const all = zipWorld(list(body), 'w', { includePrivateRecords: true });
+      expect([...entries(all).keys()]).toContain('w/records/fold/spine.jsonl');
+    }
+  });
+
+  it('no list, or a private entry with no folder, leaves nothing out and asks nothing', () => {
+    const none = [e('world.json', j({ id: WID, name: 'W' })), e('records/lab/ledger.bin', 'L')];
+    expect(leftOutRecords(none, zipWorld(none, 'w'))).toEqual([]);
+    const noDir = [...none, e('records/RECORDS.json', JSON.stringify([entry('fold', { private: true })]))];
+    expect(leftOutRecords(noDir, zipWorld(noDir, 'w'))).toEqual([]);
+    // The instrument can move: lab marked private is named.
+    const labPrivate = [...none, e('records/RECORDS.json', JSON.stringify([entry('lab', { private: true })]))];
+    expect(leftOutRecords(labPrivate, zipWorld(labPrivate, 'w'))).toEqual(['lab']);
   });
 });

@@ -203,3 +203,87 @@ test('Chromium with a home folder: "In this browser" keeps a new world file in t
   const where = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds[0]?.where ?? null);
   expect(where).toBe('browser');
 });
+
+// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15): a world whose records a tool
+// keeps private asks before its file is made; left out unless the person asks.
+async function seedPrivateRecords(page: Page) {
+  await page.evaluate(async () => {
+    const home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds');
+    const records = await (await home.getDirectoryHandle('alpha-0192a000-1a2b')).getDirectoryHandle('records', { create: true });
+    const write = async (d: FileSystemDirectoryHandle, file: string, body: string) => {
+      const w = await (await d.getFileHandle(file, { create: true })).createWritable();
+      await w.write(body);
+      await w.close();
+    };
+    await write(records, 'RECORDS.json', JSON.stringify([
+      { producer: 'lab', format: 'x', version: '1', deltas: false },
+      { producer: 'fold', format: 'y', version: '1', deltas: false, private: true },
+    ]));
+    await write(await records.getDirectoryHandle('fold', { create: true }), 'spine.jsonl', '{}');
+    await write(await records.getDirectoryHandle('lab', { create: true }), 'ledger.bin', 'L');
+  });
+}
+
+async function zipNames(bytes: Buffer): Promise<string[]> {
+  const { unzipSync } = await import('fflate');
+  return Object.keys(unzipSync(new Uint8Array(bytes))).map(p => p.slice(p.indexOf('/') + 1));
+}
+
+for (const engine of ['chromium', 'firefox'] as const) {
+  test(`${engine === 'firefox' ? '@firefox ' : ''}a world with private records asks first: left out by default, in when asked, no file when closed`, async ({ page }) => {
+    const chromium = engine === 'chromium';
+    await boot(page);
+    const id = await seedBrowserWorld(page);
+    await seedPrivateRecords(page);
+    expect(await activate(page, id)).toBe(true);
+    await page.evaluate((wid) => { window.location.hash = `#/w/${wid}/settings/world`; }, id);
+    const btn = page.locator('.atlas-settings [data-action="download-world"]');
+    await expect(btn).toHaveText('Download the whole world');
+    const dialog = page.locator('[data-modal="private-records"]');
+    const savedBytes = async (): Promise<Buffer> => Buffer.from(await page.evaluate(async () => {
+      const f = await (await (await navigator.storage.getDirectory()).getFileHandle('saved-world.zip')).getFile();
+      return Array.from(new Uint8Array(await f.arrayBuffer()));
+    }));
+    if (chromium) {
+      await page.evaluate(() => {
+        (window as any).showSaveFilePicker = async () => (await navigator.storage.getDirectory()).getFileHandle('saved-world.zip', { create: true });
+      });
+    }
+    // Each answer: the click, the dialog's answer, and the file (null when none is made).
+    const run = async (answer: 'leave-out' | 'include' | 'escape'): Promise<string[] | null> => {
+      const downloaded = chromium ? null : page.waitForEvent('download', { timeout: answer === 'escape' ? 1500 : 15000 }).catch(() => null);
+      await btn.click();
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText('records/fold');
+      if (answer === 'escape') await page.keyboard.press('Escape');
+      else await dialog.locator(`[data-action="${answer}"]`).click();
+      await expect(dialog).toHaveCount(0);
+      if (answer === 'escape') {
+        await expect(btn).toHaveText('Download the whole world');
+        return chromium ? null : ((await downloaded) ? [] : null);
+      }
+      // The button says Saving… until the file is written (a toast from the run before may still show).
+      await expect(btn).toHaveText('Download the whole world');
+      if (chromium) return zipNames(await savedBytes());
+      const d = await downloaded;
+      const { readFileSync } = await import('node:fs');
+      return zipNames(readFileSync((await d!.path())!));
+    };
+
+    const out = await run('leave-out');
+    expect(out).toContain('records/RECORDS.json');
+    expect(out).toContain('records/lab/ledger.bin');
+    expect(out!.some(p => p.startsWith('records/fold/'))).toBe(false);
+    await expect(page.locator('.ow-toast', { hasText: 'Private records were left out.' })).toBeVisible();
+
+    const all = await run('include');
+    expect(all).toContain('records/fold/spine.jsonl');
+
+    const before = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds[0]?.kept_download_at);
+    if (chromium) await page.evaluate(async () => { await (await navigator.storage.getDirectory()).removeEntry('saved-world.zip'); });
+    expect(await run('escape')).toBeNull();
+    // Closed: no download recorded, and in Chromium nothing written to the picked file.
+    expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds[0]?.kept_download_at)).toBe(before);
+    if (chromium) expect((await savedBytes()).length).toBe(0);
+  });
+}

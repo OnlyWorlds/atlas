@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.82.0',
+    date: '2026-10-23',
+    theme: "A tool's private records stay with you",
+    entries: [
+      {
+        id: 'private-records-left-out',
+        title: 'A world file leaves private records out unless you ask',
+        body: "Some tools keep their own records inside a world and mark them private. When you download such a world, Atlas now says so and leaves those records out unless you choose to include them, so a tool's own notes stay with you when the world is shared.",
+        tags: ['folders', 'sharing'],
+      },
+    ],
+  },
+  {
     version: '1.81.1',
     date: '2026-10-23',
     theme: 'A downloaded world keeps its now',

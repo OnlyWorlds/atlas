@@ -23,7 +23,7 @@ vi.mock('../../src/sync/sync-attach', () => ({
   }),
 }));
 
-import { downloadWorld, TORN_LINE } from '../../src/setup/world-download';
+import { downloadWorld, TORN_LINE, type RecordsAnswer, type RecordsQuestion } from '../../src/setup/world-download';
 import { setExportMeReaderForTests } from '../../src/sync/export-provenance';
 import { FOLDER_FORMAT_VERSION } from '../../src/core/constants';
 
@@ -78,7 +78,7 @@ afterEach(async () => {
 describe('downloadWorld', () => {
   it('hands over one file: the portable copy under one folder, and records when', async () => {
     const out = await downloadWorld(cur(), save, { now: new Date('2026-10-05T10:00:00Z') });
-    expect(out.file).toBe('hollow-reach-2026-10-05.zip');
+    expect(out!.file).toBe('hollow-reach-2026-10-05.zip');
     expect(saved!.name).toBe('hollow-reach-2026-10-05.zip');
     const files = Object.keys(unzipSync(saved!.bytes)).sort();
     // Everything under one folder, but §4.7's marker, the archive's first entry at its root (SDK 4.49).
@@ -160,5 +160,83 @@ describe('downloadWorld', () => {
     patchSlice('registry', { ...defaultRegistry(), worlds: [entry({ demo: true })] });
     await expect(downloadWorld(cur(), save)).rejects.toThrow(/keep it at the end of the tour/);
     expect(saved).toBeNull();
+  });
+});
+
+// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld h58 #10911; SDK 4.63.0):
+// a download leaves a producer's private records out unless the person asks.
+describe('downloadWorld and private records', () => {
+  const list = (body: unknown) => world.put('records/RECORDS.json', typeof body === 'string' ? body : JSON.stringify(body));
+  const savedPaths = () => Object.keys(unzipSync(saved!.bytes)).map(p => p.slice(p.indexOf('/') + 1));
+  let asked: RecordsQuestion[];
+  const answering = (a: RecordsAnswer) => async (q: RecordsQuestion) => { asked.push(q); sync.order.push('ask'); return a; };
+  beforeEach(() => {
+    asked = [];
+    world.put('records/fold/spine.jsonl', '{}');
+    world.put('records/fold/.head', 'h');
+    world.put('records/lab/ledger.bin', 'L');
+  });
+  const foldPrivate = () => list([
+    { producer: 'lab', format: 'x', version: '1', deltas: false },
+    { producer: 'fold', format: 'y', version: '1', deltas: false, private: true },
+  ]);
+
+  it('asks when a producer keeps its records private; left out, the file holds the list and lab, and says whose went', async () => {
+    foldPrivate();
+    const out = await downloadWorld(cur(), save, { ask: answering('leave-out') });
+    expect(asked).toEqual([{ kind: 'private', producers: ['fold'] }]);
+    expect(out).toEqual({ file: expect.any(String), leftOut: ['fold'] });
+    expect(savedPaths()).toContain('records/RECORDS.json');
+    expect(savedPaths()).toContain('records/lab/ledger.bin');
+    expect(savedPaths().some(p => p.startsWith('records/fold/'))).toBe(false);
+    expect(cur().kept_download_at).toBeTruthy();
+  });
+
+  it('asked to include them, fold travels whole, its dot-file too', async () => {
+    foldPrivate();
+    const out = await downloadWorld(cur(), save, { ask: answering('include') });
+    expect(out!.leftOut).toEqual([]);
+    expect(savedPaths()).toEqual(expect.arrayContaining(['records/fold/spine.jsonl', 'records/fold/.head', 'records/lab/ledger.bin']));
+  });
+
+  it('closing the question makes no file and records no download', async () => {
+    foldPrivate();
+    expect(await downloadWorld(cur(), save, { ask: answering(null) })).toBeNull();
+    expect(saved).toBeNull();
+    expect(cur().kept_download_at).toBeUndefined();
+  });
+
+  it('a list that will not read asks to include every record, or makes no file; it is never left out by guess', async () => {
+    list({ producers: [{ producer: 'fold', private: true }] }); // the shape before v0.3.12
+    expect(await downloadWorld(cur(), save, { ask: answering('leave-out') })).toBeNull();
+    expect(saved).toBeNull();
+    expect(asked).toEqual([{ kind: 'unreadable' }]);
+    await downloadWorld(cur(), save, { ask: answering('include') });
+    expect(savedPaths()).toEqual(expect.arrayContaining(['records/fold/spine.jsonl', 'records/RECORDS.json']));
+  });
+
+  it('without a person to ask, the rule\'s default: private records out, and no file for a list that will not read', async () => {
+    foldPrivate();
+    expect((await downloadWorld(cur(), save))!.leftOut).toEqual(['fold']);
+    saved = null;
+    list('{nope');
+    expect(await downloadWorld(cur(), save)).toBeNull();
+    expect(saved).toBeNull();
+  });
+
+  it('a world with records and nothing private asks nothing and carries them all', async () => {
+    list([{ producer: 'fold', format: 'y', version: '1', deltas: false }]);
+    const out = await downloadWorld(cur(), save, { ask: answering('leave-out') });
+    expect(asked).toEqual([]);
+    expect(out!.leftOut).toEqual([]);
+    expect(savedPaths()).toContain('records/fold/.head');
+  });
+
+  it('a linked world lets sync go before the person is asked', async () => {
+    foldPrivate();
+    patchSlice('registry', { ...defaultRegistry(), worlds: [entry({ state: 'api-linked', api: { world_id: 'srv', api_key: 'k' } })] });
+    sync.worldId = 'w1';
+    await downloadWorld(cur(), save, { ask: answering('leave-out') });
+    expect(sync.order).toEqual(['push', 'hold:download', 'release', 'ask']);
   });
 });
