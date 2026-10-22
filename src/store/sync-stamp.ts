@@ -65,6 +65,7 @@ export function dropLastWriter(next: Element): Element {
   const rec = next as Record<string, unknown>;
   delete rec.changed_by;
   delete rec.changed_via;
+  delete rec.changed_client; // keel #520: the software of that last write, the same kind of word
   return next;
 }
 

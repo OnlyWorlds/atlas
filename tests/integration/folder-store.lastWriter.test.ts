@@ -18,7 +18,7 @@ const clock = () => new Date(Date.UTC(2026, 1, 1, 0, 0, t++)).toISOString();
 const ID = '0192a000-0000-7000-8000-00000000a347';
 const SEAT = 'b1c2d3e4-0000-4000-8000-000000000001';
 const MAKER = 'b1c2d3e4-0000-4000-8000-000000000002';
-const pulled = { id: ID, type: 'character', name: 'Aldric', created_by: MAKER, changed_by: SEAT, changed_via: 'seat' };
+const pulled = { id: ID, type: 'character', name: 'Aldric', created_by: MAKER, changed_by: SEAT, changed_via: 'seat', changed_client: 'lantern' };
 
 async function realStore(): Promise<{ s: FsFolderStore; root: FakeDirHandle }> {
   const root = new FakeDirHandle('w');
@@ -51,6 +51,7 @@ describe.each(stores)('%s', (_name, make) => {
       expect(el.description).toBe('by hand');
       expect('changed_via' in el).toBe(false);
       expect('changed_by' in el).toBe(false);
+      expect('changed_client' in el).toBe(false); // keel #520: the software of the last write
       expect(el.created_by).toBe(MAKER);
     }
   });
@@ -67,6 +68,7 @@ describe.each(stores)('%s', (_name, make) => {
     const el = (await s.getElement(ID))!;
     expect(el.server_updated_at).toBe('2026-02-02T00:00:00.000Z');
     expect('changed_via' in el).toBe(false);
+    expect('changed_client' in el).toBe(false);
     expect(el.created_by).toBe(MAKER);
   });
 
@@ -74,6 +76,7 @@ describe.each(stores)('%s', (_name, make) => {
     const s = await make();
     await s.updateElementWith(ID, () => null);
     expect((await s.getElement(ID))!.changed_via).toBe('seat');
+    expect((await s.getElement(ID))!.changed_client).toBe('lantern');
   });
 });
 

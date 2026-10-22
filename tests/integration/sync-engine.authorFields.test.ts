@@ -68,4 +68,20 @@ describe('the author fields are the server\'s', () => {
     expect(onDisk.description).toBe('from a seat');
     expect(onDisk.changed_via).toBe('seat');
   });
+
+  it("the client that wrote it (keel #520) is the server's too: kept on disk, never a field anyone changed", async () => {
+    const el = await folder.createElement('character', { name: 'Rhea' });
+    await engine.syncNow();
+    await folder.updateElement(el.id, { name: 'Rhea (mine)' });
+    client.__server_mutate('character', el.id, { name: 'Rhea (theirs)', changed_via: 'api', changed_client: 'lantern' });
+    const result = await engine.syncNow();
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0].fields).toEqual(['name']);
+
+    const other = await folder.createElement('character', { name: 'Bram' });
+    await engine.syncNow();
+    client.__server_mutate('character', other.id, { description: 'from Lantern', changed_client: 'lantern' });
+    await engine.pullNow();
+    expect((await folder.getElement(other.id))!.changed_client).toBe('lantern');
+  });
 });

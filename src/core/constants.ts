@@ -217,8 +217,10 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
  * write body, `elements/serialize.py` IGNORED_READONLY_FIELDS; atlas does not
  * rely on that), never a difference anyone made, and meaningless in another
  * world, so an import drops them. One list for every site that must agree.
+ * `changed_client` (keel #520): the software that made the last write, as it
+ * named itself; the same kind of field, kept the same way.
  */
-export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via'] as const;
+export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via', 'changed_client'] as const;
 
 /**
  * keel's marks about an element, said only to some readers: `hidden: true`

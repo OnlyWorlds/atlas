@@ -8,6 +8,7 @@
  */
 import type { Element } from '../core/types';
 import { PlainError } from '../core/plain-error';
+import { SERVER_AUTHOR_FIELDS } from '../core/constants';
 
 /** The keys a stub keeps (keel PR 113; `change_seq` never lands on disk). */
 export const KNOWN_OF_KEPT_KEYS: readonly string[] = [
@@ -26,7 +27,7 @@ export function isKnownOf(el: unknown): boolean {
 }
 
 /** Who wrote it: null on every stub keel serves (the SDK's `known_of` doc), never kept on one. */
-const KNOWN_OF_AUTHOR_KEYS: readonly string[] = ['created_by', 'changed_by', 'changed_via'];
+const KNOWN_OF_AUTHOR_KEYS: readonly string[] = SERVER_AUTHOR_FIELDS;
 
 function unset(v: unknown): boolean {
   return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);

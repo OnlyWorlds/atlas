@@ -232,6 +232,15 @@ describe('OwV2ClientAdapter — created_by is read-only (keel membership phase 2
       expect('changed_via' in wire).toBe(false);
     }
   });
+
+  it("nor the client that last wrote it (keel #520: changed_client), which a pull keeps", async () => {
+    const { adaptV2Record, toV2WireShape } = await import('../../src/sync/ow-v2-client-adapter');
+    const rec = adaptV2Record({ id: uuid(), name: 'Frodo', updated_at: clock.next(), changed_via: 'api', changed_client: 'lantern' }, 'character');
+    expect(rec.changed_client).toBe('lantern');
+    for (const op of ['create', 'update'] as const) {
+      expect('changed_client' in toV2WireShape({ ...rec }, 'character', op)).toBe(false);
+    }
+  });
 });
 
 describe('OwV2ClientAdapter — LIST cursor walk', () => {

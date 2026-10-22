@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.72.1',
+    date: '2026-10-22',
+    theme: 'Ready for the app name',
+    entries: [
+      {
+        id: 'changed-client-kept',
+        title: 'Which app made a change is kept as OnlyWorlds says it',
+        body: "OnlyWorlds will soon note which app made each change to an element. Atlas keeps that note as OnlyWorlds' word: it never counts as a change in a review, never goes back up, and an edit you make in Atlas clears it until OnlyWorlds says it again.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.72.0',
     date: '2026-10-22',
     theme: 'Who made this world',

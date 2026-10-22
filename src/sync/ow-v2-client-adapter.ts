@@ -115,7 +115,7 @@ export function isOwV2Error(err: unknown): err is OwV2Error {
  * responses, so any disk file written from a server record before the
  * adaptV2Record drop below may still carry it; stripping here keeps those
  * legacy files pushable.
- * `SERVER_AUTHOR_FIELDS` (`created_by`, `changed_by`, `changed_via`) say who
+ * `SERVER_AUTHOR_FIELDS` (`created_by`, `changed_by`, `changed_via`, `changed_client`) say who
  * wrote the element. Read-only: kept on disk as received, never sent (keel
  * ignores them on writes; atlas does not rely on that). `SERVER_MARK_FIELDS`
  * (keel's `hidden`) the same.
