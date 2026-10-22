@@ -5,7 +5,7 @@
  * and a reader that refuses before anything is written: zip-slip, absolute
  * paths, a declared-size bomb, no world, two worlds, the tour's sandbox.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
 import { FakeDirHandle } from '../fixtures/fake-fs';
 import { collectWorldFiles, zipWorld, readWorldZip, worldFileName } from '../../src/store/world-file';
@@ -89,6 +89,21 @@ describe('round trip', () => {
     expect(back.worldName).toBe('Hollow Reach');
     expect(back.files.map(f => f.path)).toEqual(files.map(f => f.path));
     for (const f of files) expect(text(back.files.find(b => b.path === f.path)!.data)).toBe(text(f.data));
+  });
+
+  it('the same world gives the same bytes, whatever order its files are found in, and at any hour (#527 criterion d, §4.7)', async () => {
+    const files = await collectWorldFiles(as(linkedWorld()));
+    const first = zipWorld(files, 'hollow-reach-0192a000');
+    const again = zipWorld(await collectWorldFiles(as(linkedWorld())), 'hollow-reach-0192a000');
+    const reversed = zipWorld([...files].reverse(), 'hollow-reach-0192a000');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2031-03-04T05:06:07Z')); // a later day: no entry may carry the time it was written
+    let later: Uint8Array;
+    try { later = zipWorld(files, 'hollow-reach-0192a000'); } finally { vi.useRealTimers(); }
+    for (const z of [again, reversed, later]) expect(Buffer.from(z).equals(Buffer.from(first))).toBe(true);
+    // The instrument can move: one byte of one element changes the file.
+    const touched = files.map(f => f.path.startsWith('elements/') ? { ...f, data: strToU8('{"id":"1","name":"Anb"}') } : f);
+    expect(Buffer.from(zipWorld(touched, 'hollow-reach-0192a000')).equals(Buffer.from(first))).toBe(false);
   });
 
   it('a file Atlas writes keeps media and its sidecars and .atlas, leads with the marker, and leaves other files behind (§4.7 OW-6, OW-7; SDK 4.49)', () => {
