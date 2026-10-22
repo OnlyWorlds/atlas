@@ -338,7 +338,10 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
   if (tfe) out.time_format_equivalents = tfe;
   const tbu = str(world.time_basic_unit);
   if (tbu) out.time_basic_unit = tbu;
-  const tc = num(world.time_current);
+  // The now under either spelling (folder-format v0.3.5): the standard's
+  // `time_current` first, then keel's wire name, which the site's download
+  // carries since its world block became the World whole (Keel #516, dist.50).
+  const tc = num(world.time_current) ?? num(world.time_range_current);
   if (tc !== undefined) out.time_current = tc;
   const trmin = num(world.time_range_min);
   if (trmin !== undefined) out.time_range_min = trmin;

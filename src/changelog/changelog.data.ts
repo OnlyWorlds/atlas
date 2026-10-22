@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.81.1',
+    date: '2026-10-23',
+    theme: 'A downloaded world keeps its now',
+    entries: [
+      {
+        id: 'download-keeps-now',
+        title: 'A world downloaded from onlyworlds.com opens with its now',
+        body: "The world file onlyworlds.com gives you now carries the world's settings, its now among them. Atlas reads that now when it opens the file, so the charts' now line and the world clock start where the world was.",
+        tags: ['folders', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.81.0',
     date: '2026-10-22',
     theme: "A world's own words",

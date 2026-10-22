@@ -300,6 +300,18 @@ describe('reconcile — adversarial review regressions (session 241)', () => {
     expect(plan.worldMeta!.description).toBe('d');
   });
 
+  it("reads the site download's now under keel's spelling too (Keel #516's whole World block, dist.50)", () => {
+    const parsed = parsePayload({ World: { name: 'W', time_range_current: 453, time_range_min: 0, public_read: true, slug: 'w' }, Character: [{ name: 'A' }] });
+    const wm = reconcile(parsed, [], { genId: genIdFactory() }).worldMeta as Record<string, unknown>;
+    expect(wm.time_current).toBe(453);
+    expect(wm.time_range_min).toBe(0);
+    // A setting Atlas does not hold stays out of the folder.
+    expect('public_read' in wm || 'slug' in wm || 'time_range_current' in wm).toBe(false);
+    // The standard's spelling wins when both are there.
+    const both = parsePayload({ World: { name: 'W', time_current: 7, time_range_current: 9 }, Character: [{ name: 'A' }] });
+    expect(reconcile(both, [], { genId: genIdFactory() }).worldMeta!.time_current).toBe(7);
+  });
+
   it("keeps the World's x_ keys verbatim (the names profile's x_names, §4.1)", () => {
     const x_names = { version: 1, types: { character: { one: 'Employee', many: 'Employees' } }, extra: [1] };
     const parsed = parsePayload({ World: { name: 'Work', x_names, x_other: 'kept', y_not: 'dropped' }, Character: [{ name: 'A' }] });
