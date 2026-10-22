@@ -35,10 +35,12 @@ import type {
   ElementType,
   KeyRefusal,
   PerElementFailure,
+  ProposedEdit,
   SyncEngineState,
   SyncHoldReason,
   SyncResult,
 } from '../core/types';
+import { alreadyProposed, isOwProposed, isProposedOnly, settle, withProposed } from './proposals';
 
 // ---- Adapter shape: the minimum the engine needs from the API client ----
 
@@ -150,6 +152,10 @@ export interface OwApiClient {
   pullChanges?(since: string | null, limit?: number): Promise<ChangesPage>;
   /** GET /me: the key's role (B12 Q2, conv. 151). Absent: the role is unknown, and a resync keeps. */
   me?(): Promise<{ role: string }>;
+  /** keel #519's queue, the caller's own rows (conv. 163, P5). Absent: entries stay until it is. */
+  listProposals?(): Promise<{ rows: import('./proposals').ProposalRow[]; complete: boolean }>;
+  /** The proposer withdraws its own open row (conv. 163, P3). */
+  withdrawProposal?(type: ElementType, id: string, proposalId: string): Promise<void>;
   /**
    * Optional: report which element types' most recent listElements() walk may
    * be INCOMPLETE (cursor walk aborted / capped / not advancing). The engine
@@ -522,6 +528,12 @@ export class SyncEngine {
   private transientRetryTimer: ReturnType<typeof setTimeout> | null = null;
   /** Push rounds in a row that met a held file (S368): caps the busy retries. */
   private busyRounds = 0;
+  /**
+   * Proposals keel took whose sync-state entry could not be written (a held
+   * file; the gate's G2): kept here until a write lands, and read with the
+   * file's entries, so no retry round proposes the same version again.
+   */
+  private unwrittenProposals: ProposedEdit[] = [];
 
   /**
    * The key's role from keel's `GET /me` (B12 Q2, conv. 151): read when a
@@ -815,6 +827,16 @@ export class SyncEngine {
         await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at);
         console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
       } catch (err) {
+        // Keep mine on a reviewed world proposes again (conv. 163, P5): the
+        // conflict goes and the new proposal waits for the keeper.
+        if (isOwProposed(err) && local.server_updated_at) {
+          const entry: ProposedEdit = { element_id: id, type: local.type, proposal_id: err.proposal.id, local_updated_at: local.local_updated_at, at: nowIso() };
+          // Recorded as any proposal is, withdrawing the open row it replaces (the gate's G5).
+          await this.recordProposal(entry);
+          await this.folder.updateSyncState(s => ({ conflicts: s.conflicts.filter(c => c.element_id !== id) }));
+          console.info('[atlas:sync] resolveConflict overwrite-mine: keel took it as a proposal', { id, proposal: err.proposal.id });
+          return;
+        }
         if (local.server_updated_at && isNotFoundError(err) && await this.ownRole(true) === 'guest') {
           // A guest's 404 is out of view, not deleted (conv. 151): kept here.
           console.info('[atlas:sync] resolveConflict overwrite-mine: a guest\'s 404 — kept here', { id });
@@ -1476,6 +1498,10 @@ export class SyncEngine {
       this.settleThrownRound(err);
       throw err;
     }
+    // A refresh settles what keel decided too (conv. 163, P5): a pull-only
+    // round is how a person asks "what happened online?".
+    const settled = !pullResult.auth_blocked && !this.stopped
+      ? await this.settleProposals(pullResult.failures) : { accepted: [] as string[], refused: [] as Conflict[] };
     if (pullResult.auth_blocked) {
       this.setAuthError();
     } else {
@@ -1484,7 +1510,8 @@ export class SyncEngine {
     const result: SyncResult = {
       pushed: zero(),
       pulled: pullResult.pulled,
-      conflicts: pullResult.conflicts,
+      conflicts: [...pullResult.conflicts, ...settled.refused],
+      ...(settled.accepted.length > 0 ? { proposals_accepted: settled.accepted } : {}),
       failures: [...meta.failures, ...pullResult.failures],
       pulled_ids: pullResult.pulled_ids,
       auth_blocked: pullResult.auth_blocked,
@@ -2055,6 +2082,14 @@ export class SyncEngine {
   }
 
   private async pushPhase(): Promise<SyncResult> {
+    // keel's answer to the proposals still open (conv. 163, P5), read first
+    // in every round one is pending: an accept moves keel's stamp, and an
+    // edit made since must go out on the new baseline, not meet it as a
+    // conflict. Before the changed list, which the settle can change.
+    // Entries a held file kept in memory are written first (the gate's G2).
+    for (const e of [...this.unwrittenProposals]) if (!this.stopped) await this.recordProposal(e);
+    const settleFailures: PerElementFailure[] = [];
+    const settled = this.stopped ? { accepted: [] as string[], refused: [] as Conflict[] } : await this.settleProposals(settleFailures);
     const allChanged = await this.folder.listLocallyChangedSince(null);
     const tombstones = await this.folder.listTombstonesSince(null);
     // Partition: CREATEs (never-synced) vs UPDATEs. New elements MUST land
@@ -2071,11 +2106,17 @@ export class SyncEngine {
     // A kept id with no baseline (a hidden element's copy after a Keep, or a
     // create keel answered 404; S441 gate G1, G10) is never sent: it is not a
     // create, it is something this key may no longer see.
-    const keptAtStart = new Set((await this.folder.readSyncState()).kept_outside_view ?? []);
+    const stateAtStart = await this.folder.readSyncState();
+    const keptAtStart = new Set(stateAtStart.kept_outside_view ?? []);
     // keel's stub is never pushed (conv. 155, I4): the store never lists one as changed (gate G9).
     const keptCreates = allChanged.filter(e => !e.server_updated_at && keptAtStart.has(e.id));
     const allCreates = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id));
-    const updatesOnly = allChanged.filter(e => !!e.server_updated_at);
+    // A version keel holds as a proposal is sent once (conv. 163, P3): an edit after it is a new version.
+    // A proposal keel did not take waits in the review: its edit is not sent again on its own (P5).
+    const inProposalReview = new Set((stateAtStart.conflicts ?? []).filter(c => c.proposal).map(c => c.element_id));
+    const heldAsProposed = allChanged.filter(e => !!e.server_updated_at
+      && (alreadyProposed(this.proposedNow(stateAtStart.proposed), e.id, e.local_updated_at) || inProposalReview.has(e.id)));
+    const updatesOnly = allChanged.filter(e => !!e.server_updated_at && !heldAsProposed.includes(e));
     const useBulk = typeof this.client.bulkCreate === 'function' && allCreates.length >= 2;
     const changed = useBulk
       ? updatesOnly
@@ -2086,8 +2127,8 @@ export class SyncEngine {
     let creates = 0;
     let updates = 0;
     let deletes = 0;
-    const conflicts: Conflict[] = [];
-    const failures: PerElementFailure[] = [];
+    const conflicts: Conflict[] = [...settled.refused];
+    const failures: PerElementFailure[] = [...settleFailures];
     /**
      * Server-side deletes detected DURING push (pre-update GET returned null,
      * or PATCH returned 404). Symmetric to pullPhase server-delete detection.
@@ -2126,7 +2167,11 @@ export class SyncEngine {
     this.roundRole = null;
     const keptAdd = this.roundKeptAdd;
     const keptEdits: string[] = keptCreates.map(e => e.id);
-    done += keptCreates.length;
+    done += keptCreates.length + heldAsProposed.length;
+    /** Elements whose edit keel took as a proposal this round (conv. 163, P2), for the round's report. */
+    const proposedIds: string[] = [];
+    /** Deletes keel refused as `proposed_only`, each element back from keel (P6). */
+    const refusedDeletes: Array<{ id: string; type: ElementType; name?: string }> = [];
     /** Ids this round's 404s left for the next round: the role could not be read (the S439 gate's G5). */
     const roleUnknown: string[] = [];
     /** A 404 on an element someone else may still see: a guest keeps it, anyone else reviews it, an unknown role waits. */
@@ -2177,6 +2222,8 @@ export class SyncEngine {
       if (authBlocked || transient || this.stopped) break;
       const isCreate = !elem.server_updated_at;
       const failuresBefore = failures.length;
+      /** The version the update sent (the gate's G6): a proposal names it, not the round-start snapshot. */
+      let sentStamp = elem.local_updated_at;
       if (!isCreate && kept.has(elem.id)) {
         keptEdits.push(elem.id);
         done++;
@@ -2314,6 +2361,7 @@ export class SyncEngine {
 
           if (!skipPush) {
             const body = this.outgoing(current);
+            sentStamp = current.local_updated_at;
             const response = await this.client.updateElement(current.type, current.id, body);
             // The body sent carried `current.local_updated_at`; an edit that
             // landed while this request was in flight keeps the element dirty
@@ -2323,12 +2371,23 @@ export class SyncEngine {
           }
         }
       } catch (err) {
+        // keel took the edit as a proposal (conv. 163, P1, P2): the element did
+        // not change, nothing is stamped, and the edit stays here. Not a failure.
+        if (isOwProposed(err) && !isCreate) {
+          // Recorded the moment keel answers (the gate's G2): an auth bail or a
+          // busy sync-state later in the round must not lose it, or the next
+          // round proposes the same version again.
+          const entry: ProposedEdit = { element_id: elem.id, type: elem.type, proposal_id: err.proposal.id, local_updated_at: sentStamp, at: nowIso() };
+          proposedIds.push(elem.id);
+          await this.recordProposal(entry);
+          console.info('[atlas:sync] push: keel took the edit as a proposal', { id: elem.id, type: elem.type, proposal: err.proposal.id });
+        }
         // Auth failure (401/403): bail the round. Every subsequent element
         // would 401 with the same dead credentials; no point hammering the
         // server. Record the element as failed so the user knows the round
         // produced no progress; caller (runPushOnly/runSync) transitions
         // engine state to `error` based on the auth_blocked flag.
-        if (isAuthError(err)) {
+        else if (isAuthError(err)) {
           authBlocked = true;
           this.noteAuthBail(err);
           failures.push(failureOf(elem.id, elem.type, isCreate ? 'create' : 'update', err));
@@ -2462,8 +2521,31 @@ export class SyncEngine {
         await this.folder.clearTombstone(tomb.id);
         deletes++;
       } catch (err) {
+        // A seat on a reviewed world deletes only what it made (conv. 163, P6):
+        // keel's 403 `proposed_only` is not a dead key. The element comes back
+        // from keel and the tombstone goes.
+        if (isProposedOnly(err)) {
+          // The element comes back from keel's copy. A read that fails keeps the
+          // tombstone for the next round (the gate's G1: clearing it would leave
+          // the element on keel and gone here, with "it is back" said).
+          let remote: Awaited<ReturnType<OwApiClient['getElement']>> | undefined;
+          try { remote = await this.client.getElement(tomb.type, tomb.id); } catch { remote = undefined; }
+          if (remote === undefined) {
+            console.info('[atlas:sync] push: proposed_only, and keel\'s copy could not be read — the delete waits for the next round', { id: tomb.id });
+          } else {
+            const back = await this.localStep(failures, tomb.id, tomb.type, 'delete', async () => {
+              if (remote) {
+                const { updated_at, ...body } = remote;
+                await this.folder.applyServerRecord(tomb.type, body, updated_at);
+              }
+              await this.folder.clearTombstone(tomb.id);
+            });
+            if (back && remote) refusedDeletes.push({ id: tomb.id, type: tomb.type, ...(typeof remote.name === 'string' ? { name: remote.name } : {}) });
+            console.info('[atlas:sync] push: keel keeps this delete for the keeper (proposed_only) — the element is back', { id: tomb.id, type: tomb.type });
+          }
+        }
         // Auth failure here behaves identically to the elements loop: bail.
-        if (isAuthError(err)) {
+        else if (isAuthError(err)) {
           authBlocked = true;
           this.noteAuthBail(err);
           failures.push(failureOf(tomb.id, tomb.type, 'delete', err));
@@ -2568,7 +2650,122 @@ export class SyncEngine {
       ...(transient ? transientFields(transient) : {}),
       ...(keptEdits.length > 0 ? { kept_edit_ids: keptEdits } : {}),
       ...(roundRole !== null ? { own_role: roundRole } : {}),
+      ...(proposedIds.length > 0 ? { proposed_ids: proposedIds } : {}),
+      ...(refusedDeletes.length > 0 ? { delete_refused: refusedDeletes } : {}),
+      ...(settled.accepted.length > 0 ? { proposals_accepted: settled.accepted } : {}),
     };
+  }
+
+  /**
+   * conv. 163, P2 and P3: record one proposal's entry the moment keel answers,
+   * the newest per element, and withdraw the open row it replaces, so the
+   * keeper reviews the newest only (best effort: a decided row's 404 or 422
+   * stays). A held sync-state file keeps the entry in memory
+   * (`unwrittenProposals`) until a later round's write lands.
+   */
+  private async recordProposal(entry: ProposedEdit): Promise<void> {
+    const unwrittenBefore = this.unwrittenProposals.find(e => e.element_id === entry.element_id && e.proposal_id !== entry.proposal_id);
+    let replaced: ProposedEdit | undefined;
+    try {
+      await this.folder.updateSyncState(s => {
+        replaced = (s.proposed ?? []).find(e => e.element_id === entry.element_id && e.proposal_id !== entry.proposal_id);
+        return { proposed: withProposed(s.proposed, entry) };
+      });
+    } catch (err) {
+      if (!isFileBusyError(err)) throw err;
+      this.unwrittenProposals = withProposed(this.unwrittenProposals, entry);
+      if (unwrittenBefore) await this.client.withdrawProposal?.(unwrittenBefore.type, unwrittenBefore.element_id, unwrittenBefore.proposal_id).catch(() => undefined);
+      return;
+    }
+    this.unwrittenProposals = this.unwrittenProposals.filter(e => e.element_id !== entry.element_id);
+    for (const old of [replaced, unwrittenBefore]) {
+      if (old) await this.client.withdrawProposal?.(old.type, old.element_id, old.proposal_id).catch(() => undefined);
+    }
+  }
+
+  /** The proposals a round reads: the file's entries and any still waiting to be written. */
+  private proposedNow(fromFile: ProposedEdit[] | undefined): ProposedEdit[] {
+    return this.unwrittenProposals.reduce((list, e) => withProposed(list, e), fromFile ?? []);
+  }
+
+  /**
+   * conv. 163, P5: settle each open entry by keel's queue (the caller's own
+   * rows). Accepted: the keeper's write holds the proposal, so the copy takes
+   * the server's (or, when edited since, only its stamp: the newer edit is
+   * sent on). Declined, lapsed or withdrawn: the edit is not in the world, and
+   * it goes to the review with keel's reason, whatever the conflict policy.
+   * A queue that cannot be read leaves every entry for the next round.
+   */
+  private async settleProposals(failures: PerElementFailure[]): Promise<{ accepted: string[]; refused: Conflict[] }> {
+    const none = { accepted: [] as string[], refused: [] as Conflict[] };
+    const entries = (await this.folder.readSyncState()).proposed ?? [];
+    if (entries.length === 0 || typeof this.client.listProposals !== 'function') return none;
+    let queue: Awaited<ReturnType<NonNullable<OwApiClient['listProposals']>>>;
+    try {
+      queue = await this.client.listProposals();
+    } catch (err) {
+      console.info('[atlas:sync] proposals: the queue could not be read — entries wait for the next round', {
+        message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.info object
+      });
+      return none;
+    }
+    const accepted: string[] = [];
+    const refused: Conflict[] = [];
+    const goneOnline: import('../core/types').ServerDeleteRecord[] = [];
+    const settledPids = new Set<string>();
+    for (const entry of entries) {
+      if (this.stopped) break;
+      const outcome = settle(entry, queue.rows, queue.complete);
+      if (outcome.kind === 'open') continue;
+      const local = await this.folder.getElement(entry.element_id);
+      if (!local) { settledPids.add(entry.proposal_id); continue; }
+      let remote: Awaited<ReturnType<OwApiClient['getElement']>>;
+      try {
+        remote = await this.client.getElement(entry.type, entry.element_id);
+      } catch {
+        continue; // unreachable now: settled on a later round
+      }
+      if (!remote) {
+        // Deleted online (keel drops an element's undecided rows with it): the
+        // server-delete review, never a proposal row whose Pull would throw (the gate's G8).
+        goneOnline.push({ id: entry.element_id, type: entry.type, detected_at: nowIso(), name: local.name });
+      } else if (outcome.kind === 'accepted') {
+        const { updated_at, ...body } = remote;
+        const ok = await this.localStep(failures, entry.element_id, entry.type, 'update', async () => {
+          const landed = local.local_updated_at === entry.local_updated_at
+            && await this.folder.applyServerRecordIfUnchanged(entry.type, body, updated_at, local.local_updated_at ?? null);
+          // Edited since (before the settle, or during it): the newer edit stays
+          // and goes out on the new baseline.
+          if (!landed) await this.folder.stampServerUpdatedAt(entry.element_id, entry.type, updated_at, entry.local_updated_at);
+        });
+        if (!ok) continue;
+        accepted.push(entry.element_id);
+      } else {
+        refused.push({
+          element_id: entry.element_id,
+          type: entry.type,
+          detected_at: nowIso(),
+          local_updated_at: local.local_updated_at,
+          server_updated_at: remote.updated_at,
+          fields: diffFieldNames(local, stripServerOnlyFields(remote)),
+          proposal: outcome.proposal,
+        });
+      }
+      settledPids.add(entry.proposal_id);
+    }
+    if (settledPids.size === 0) return none;
+    await this.folder.updateSyncState(s => {
+      const refusedIds = new Set(refused.map(c => c.element_id));
+      const deleteIds = new Set((s.server_deletes ?? []).map(d => d.id));
+      const freshGone = goneOnline.filter(d => !deleteIds.has(d.id));
+      return {
+        proposed: (s.proposed ?? []).filter(e => !settledPids.has(e.proposal_id)),
+        conflicts: [...(s.conflicts ?? []).filter(c => !refusedIds.has(c.element_id)), ...refused],
+        ...(freshGone.length > 0 ? { server_deletes: [...(s.server_deletes ?? []), ...freshGone] } : {}),
+      };
+    });
+    console.info('[atlas:sync] proposals settled', { accepted: accepted.length, refused: refused.length });
+    return { accepted, refused };
   }
 
   /**
@@ -2577,6 +2774,10 @@ export class SyncEngine {
    * clients). Same SyncResult contract either way.
    */
   private async pullPhase(skipIds: Set<string> = new Set()): Promise<SyncResult> {
+    // An element keel holds as a proposal is settled by keel's queue, never by
+    // the pull (conv. 163, P5): the keeper's accept moves its stamp while the
+    // edit is still here, and that is not a conflict.
+    for (const e of this.proposedNow((await this.folder.readSyncState()).proposed)) skipIds.add(e.element_id);
     if (typeof this.client.pullChanges === 'function') {
       return this.pullPhaseChanges(skipIds);
     }
@@ -3414,14 +3615,21 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result; the latest phase's role wins. */
-function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept' | 'kept_edit_ids'> {
+function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted'> {
   const role = parts.map(p => p.own_role).filter(r => r !== undefined).pop();
   const kept = parts.reduce((n, p) => n + (p.kept ?? 0), 0);
   const edits = [...new Set(parts.flatMap(p => p.kept_edit_ids ?? []))];
+  // The round's proposal news rides the same way (conv. 163).
+  const proposed = [...new Set(parts.flatMap(p => p.proposed_ids ?? []))];
+  const refused = parts.flatMap(p => p.delete_refused ?? []);
+  const accepted = [...new Set(parts.flatMap(p => p.proposals_accepted ?? []))];
   return {
     ...(role !== undefined ? { own_role: role } : {}),
     ...(kept > 0 ? { kept } : {}),
     ...(edits.length > 0 ? { kept_edit_ids: edits } : {}),
+    ...(proposed.length > 0 ? { proposed_ids: proposed } : {}),
+    ...(refused.length > 0 ? { delete_refused: refused } : {}),
+    ...(accepted.length > 0 ? { proposals_accepted: accepted } : {}),
   };
 }
 

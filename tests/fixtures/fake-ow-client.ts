@@ -21,6 +21,7 @@
 import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from '../../src/sync/sync-engine';
 import type { ElementType } from '../../src/core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../../src/core/constants';
+import { OwProposed, type ProposalRow } from '../../src/sync/proposals';
 
 interface ServerRecord {
   id: string;
@@ -53,6 +54,14 @@ interface V2ItemError {
 
 export class FakeOwApiClient implements OwApiClient {
   private clock = () => new Date().toISOString();
+  /** keel #519 seam (`__propose_writes`): a seat on a reviewed world. */
+  private proposeWrites = false;
+  /** keel #519 calls, apart from `calls` so the exact-sequence suites keep their meaning. */
+  proposalCalls: Array<{ method: 'list' } | { method: 'withdraw'; id: string }> = [];
+  private seatMade = new Set<string>();
+  /** `__cut_proposal_walk`: the queue read stops after this many rows, newest first (keel's cursor walk cut short). */
+  private proposalWalkLimit: number | null = null;
+  private proposalRows = new Map<string, { id: string; element_type: string; element_id: string; state: string; fields: Record<string, unknown>; decline_reason: string | null }>();
   private byType = new Map<ElementType, Map<string, ServerRecord>>();
   /** Test seam: per-id-and-operation error injection. */
   private injectedFailures = new Map<string, { msg: string }>();
@@ -229,6 +238,7 @@ export class FakeOwApiClient implements OwApiClient {
     }
     const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
     this.bucket(type).set(id, record);
+    if (this.proposeWrites) this.seatMade.add(id);
     this.appendUpsert(record);
     return { ...record };
   }
@@ -253,6 +263,12 @@ export class FakeOwApiClient implements OwApiClient {
     // server-side delete and routes via the same review modal as pull-time
     // detection — see pushPhase / resolveConflict.
     if (!existing) throw new Error(`API Error 404: ${id} not found in this world.`);
+    // keel #519 (conv. 163): a seat on a reviewed world proposes; the element does not change.
+    if (this.proposeWrites) {
+      const row = { id: cryptoRandomId(), element_type: type, element_id: id, state: 'open', fields: { ...wireBody }, decline_reason: null as string | null };
+      this.proposalRows.set(row.id, row);
+      throw new OwProposed({ ...row });
+    }
     const next: ServerRecord = { ...existing, ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
     m.set(id, next);
     this.appendUpsert(next);
@@ -271,8 +287,81 @@ export class FakeOwApiClient implements OwApiClient {
     // __inject_failure instead of relying on the fake's default behavior.
     const m = this.bucket(type);
     if (!m.has(id)) return;
+    // keel #519: a seat on a reviewed world deletes only what it made (403 `proposed_only`).
+    if (this.proposeWrites && !this.seatMade.has(id)) {
+      const err = new Error("API Error 403: On this world an agent seat's writes land as proposed, and a seat deletes only what it created.") as
+        Error & { status?: number; code?: string; param?: string | null };
+      err.status = 403;
+      err.code = 'proposed_only';
+      err.param = null;
+      throw err;
+    }
     m.delete(id);
     this.appendDelete(type, id);
+  }
+
+  // ---- keel #519, the proposed change (conv. 163) ----
+
+  /** The caller's own rows, newest first (`GET /world/proposals?state=all`). */
+  async listProposals(): Promise<{ rows: ProposalRow[]; complete: boolean }> {
+    this.throwIfAuthBlocked();
+    this.proposalCalls.push({ method: 'list' });
+    const all = [...this.proposalRows.values()].reverse().map(r => ({ ...r }));
+    const limit = this.proposalWalkLimit;
+    return limit === null || all.length <= limit ? { rows: all, complete: true } : { rows: all.slice(0, limit), complete: false };
+  }
+
+  /** The proposer withdraws its own open row (204); a decided row is 422, an unknown one 404. */
+  async withdrawProposal(_type: ElementType, _id: string, proposalId: string): Promise<void> {
+    this.proposalCalls.push({ method: 'withdraw', id: proposalId });
+    const row = this.proposalRows.get(proposalId);
+    if (!row) throw new Error('API Error 404: proposal not found.');
+    if (row.state !== 'open') throw new Error('API Error 422: invalid_request: the proposal is decided.');
+    this.proposalRows.delete(proposalId);
+  }
+
+  /**
+   * Test seam (keel #519): the key is an agent seat on a world whose keeper
+   * reviews AI seats. A PATCH answers 202 with a proposal and changes nothing;
+   * a delete of an element the seat did not create is 403 `proposed_only`.
+   * Elements created after the seam is set are the seat's own.
+   */
+  __propose_writes(on: boolean): void {
+    this.proposeWrites = on;
+    this.seatMade = new Set();
+  }
+
+  /** The keeper accepts: one write of the proposed fields, the stamp moves, a feed row. */
+  __accept_proposal(proposalId: string): void {
+    const row = this.proposalRows.get(proposalId);
+    if (!row || row.state !== 'open') throw new Error(`no open proposal ${proposalId}`);
+    const m = this.bucket(row.element_type as ElementType);
+    const existing = m.get(row.element_id);
+    if (!existing) throw new Error(`no element ${row.element_id}`);
+    const next: ServerRecord = { ...existing, ...row.fields, id: row.element_id, type: row.element_type as ElementType, updated_at: this.clock() };
+    m.set(row.element_id, next);
+    this.appendUpsert(next);
+    row.state = 'accepted';
+  }
+
+  __decline_proposal(proposalId: string, reason?: string): void {
+    const row = this.proposalRows.get(proposalId);
+    if (!row || row.state !== 'open') throw new Error(`no open proposal ${proposalId}`);
+    row.state = 'declined';
+    row.decline_reason = reason ?? null;
+  }
+
+  __cut_proposal_walk(limit: number | null): void {
+    this.proposalWalkLimit = limit;
+  }
+
+  __lapse_proposal(proposalId: string): void {
+    const row = this.proposalRows.get(proposalId);
+    if (row) row.state = 'lapsed';
+  }
+
+  __proposals(): Array<{ id: string; element_id: string; state: string; fields: Record<string, unknown> }> {
+    return [...this.proposalRows.values()].map(r => ({ ...r }));
   }
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {

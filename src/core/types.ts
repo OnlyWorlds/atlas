@@ -287,6 +287,15 @@ export interface SyncState {
    */
   kept_whole?: string[];
   /**
+   * Edits keel took as proposals (keel #519, conv. 163): a seat's write on a
+   * world whose keeper reviews AI seats answers 202 and the element does not
+   * change. One entry per element, the newest proposal; the local edit stays
+   * on disk, and the version the entry names is never sent again. Settled by
+   * keel's queue: accepted takes the server's copy, declined or lapsed goes
+   * to the conflict review. Cleared by resetSyncBaseline.
+   */
+  proposed?: ProposedEdit[];
+  /**
    * The key's role (keel `GET /me`) when the folder was last walked whole: a
    * resync under another role is a role change, and keeps (conv. 151).
    */
@@ -369,6 +378,23 @@ export interface Conflict {
   server_updated_at: string;
   /** Fields that diverged between local pre-edit baseline and server. */
   fields: string[];
+  /**
+   * Set when the conflict is a proposal keel did not take (conv. 163): the
+   * keeper declined it (with their reason, when given), or it lapsed or was
+   * withdrawn. Overwrite proposes again; Pull drops the edit.
+   */
+  proposal?: { outcome: 'declined' | 'lapsed' | 'withdrawn'; reason?: string };
+}
+
+/** One edit keel holds as a proposal (conv. 163; SyncState.proposed). */
+export interface ProposedEdit {
+  element_id: string;
+  type: ElementType;
+  /** keel's proposal id. */
+  proposal_id: string;
+  /** The local version sent: an edit after it has a newer stamp and is sent again. */
+  local_updated_at: string;
+  at: string;
 }
 
 // ---- Tombstones (per-world .atlas/tombstones.json) ----
@@ -457,6 +483,12 @@ export interface SyncResult {
   kept?: number;
   /** Local edits to kept elements: they stay here, unsent (conv. 151). */
   kept_edit_ids?: string[];
+  /** Edits keel took as proposals this round (conv. 163, P2): the keeper decides. */
+  proposed_ids?: string[];
+  /** Deletes keel kept for the keeper (`proposed_only`): each element is back (conv. 163, P6). */
+  delete_refused?: Array<{ id: string; type: ElementType; name?: string }>;
+  /** Proposals the round settled (conv. 163, P5): accepted ones took the server's copy. */
+  proposals_accepted?: string[];
 }
 
 export interface PerElementFailure {

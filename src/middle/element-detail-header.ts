@@ -36,7 +36,8 @@ import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { WORLD_NOT_OPEN } from './element-detail-fields';
 import { pickElement } from '../ui/element-picker-modal';
-import { isKeptHere, refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
+import { isKeptHere, isProposedHere, refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
+import { PROPOSAL_PENDING_TITLE } from '../sync/proposal-lines';
 import { getAssociatedMaps } from '../tabs/right/auto-open-map';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
@@ -369,7 +370,12 @@ function buildSyncDot(el: Element): HTMLElement {
     const localStamp = el.local_updated_at ?? '';
     const serverStamp = el.server_updated_at ?? '';
     const dirty = !serverStamp || localStamp > serverStamp;
-    if (activeId && isKeptHere(activeId, el.id)) {
+    if (activeId && isProposedHere(activeId, el.id)) {
+      // keel holds this edit as a proposal for the world's keeper (conv. 163).
+      icon = 'rate_review';
+      title = PROPOSAL_PENDING_TITLE;
+      state = 'dirty';
+    } else if (activeId && isKeptHere(activeId, el.id)) {
       // Kept outside this key's view (conv. 151): it no longer syncs, edited or not.
       icon = 'cloud_off';
       title = 'Kept here: OnlyWorlds no longer shows this to you, so it no longer syncs';

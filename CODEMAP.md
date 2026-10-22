@@ -88,6 +88,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/sync/world-roster.ts`: a linked world's roster (`members()`), read once per world and session when the agent mark asks; a failure waits a minute (#347); sync reads it afresh at attach and again when older than five minutes (`maxAgeMs`, conv. 150).
 - `src/sync/shared-world.ts`: whether others share a world (`rosterIsShared`), the policy its engine runs (`worldSyncPolicy`), the pull on open and Settings' line (conv. 150, B12 Q1).
 - `src/sync/role-change.ts`: the words a member's role change says once, the kept lines, and Settings' role line (conv. 151, B12 Q2).
+- `src/sync/proposals.ts`: keel #519's proposals: `OwProposed` (a 202 is never an element), `isProposedOnly`, the sync-state entry helpers and `settle`, keel's queue read for one entry (conv. 163).
+- `src/sync/proposal-lines.ts`: the words for a seat's edit sent for review, accepted, a delete kept for the keeper, and the review's line for a proposal not taken (conv. 163).
 - `src/sync/invite-link.ts`: Invite someone's link (#341, 1.47): `makeInvite` on the SDK's `createWorldLink` with the account token, a person's link, keel's 7 days; every refusal worded (`INVITE_NOT_OWNER_LINE`). Nothing kept.
 - `src/sync/sharing-client.ts`: the typed client for the sharing API (SHARING_CONTRACT §4): publish/getPublic/republish/revoke/list/slug-check, error-enum mapping, `SHARING_BASE_URL`.
 - `src/sync/auto-pull-scheduler.ts`: opt-in periodic pull with visibility/error-state gates.

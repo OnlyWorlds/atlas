@@ -552,11 +552,12 @@ export class MakeOnlineModal extends BaseModal {
       });
 
       // 6. Toast.
-      const { creates, updates, skipped, downloaded, failures } = mergeResult;
+      const { creates, updates, skipped, downloaded, proposed, failures } = mergeResult;
       const failed = failures.length;
       const parts: string[] = [];
       if (creates) parts.push(`${creates} pushed`);
       if (updates) parts.push(`${updates} updated`);
+      if (proposed) parts.push(`${proposed} sent for the keeper's review`);
       if (skipped) parts.push(`${skipped} skipped`);
       if (downloaded) parts.push(`${downloaded} downloaded`);
       if (failed) parts.push(`${failed} failed`);

@@ -29,6 +29,7 @@ import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
 import { isKnownOf } from './known-of';
+import { isOwProposed, withProposed } from './proposals';
 import { slicePushRefusal } from '../core/provenance';
 
 /** Test seam: override the OW base URL; buildV2Adapter derives its /api/v2 from it. */
@@ -126,6 +127,8 @@ export interface MergeResult {
   skipped: number;
   /** Server-only elements downloaded to local. Same for both policies. */
   downloaded: number;
+  /** Matched elements keel took as proposals for the keeper (a seat on a reviewed world, conv. 163). */
+  proposed: number;
   failures: PerElementFailure[];
   /** Names left unmatched because two or more on one side share them (per type). */
   ambiguous: Array<{ type: ElementType; name: string }>;
@@ -283,7 +286,7 @@ export async function mergeLocalIntoApi(
   const total = plan.downloads.length + creates.length + matched.length;
   let done = 0;
   const tick = () => { done++; onProgress?.({ done, total, phase: 'apply' }); };
-  const counts = { creates: 0, updates: 0, skipped: 0, downloaded: 0 };
+  const counts = { creates: 0, updates: 0, skipped: 0, downloaded: 0, proposed: 0 };
   const failures: PerElementFailure[] = [];
   for (const c of plan.creates) {
     if (unreadable.has(c.local.id)) {
@@ -506,7 +509,23 @@ export async function mergeLocalIntoApi(
       if (policy === 'b' || ownUploads.has(m.id)) {
         const s = await sendable(m.id);
         if (!s) continue;
-        const response = await adapter.updateElement(m.type, m.id, s.body);
+        let response: Awaited<ReturnType<typeof adapter.updateElement>>;
+        try {
+          response = await adapter.updateElement(m.type, m.id, s.body);
+        } catch (err) {
+          if (!isOwProposed(err)) throw err;
+          // A seat on a reviewed world (conv. 163, the gate's G9): keel took the
+          // copy as a proposal and its own is unchanged. The element takes keel's
+          // stamp and stays an unsent edit, recorded so no round proposes it again.
+          await folder.stampServerUpdatedAt(m.id, m.type, m.server.updated_at, null);
+          const stamped = await folder.getElement(m.id);
+          if (stamped) {
+            const entry = { element_id: m.id, type: m.type, proposal_id: err.proposal.id, local_updated_at: stamped.local_updated_at, at: new Date().toISOString() };
+            await folder.updateSyncState(st => ({ proposed: withProposed(st.proposed, entry) }));
+          }
+          counts.proposed++;
+          continue;
+        }
         // The server's full post-PATCH record lands locally (PATCH is partial:
         // fields the local copy lacks stay on the server; the store keeps the
         // file's atlas-only fields). Guarded like every push stamp (conv. 96,

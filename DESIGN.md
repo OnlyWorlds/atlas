@@ -53,7 +53,7 @@ The rule (README): Forge/Notes decide, DESIGN docs hold. A dated decision record
 | Doc | Holds |
 |---|---|
 | `DESIGN.md` | this index: vision, the principle, world states, the map of everything else |
-| `DESIGN_LAWS.md` | the numbered Critical Conventions 1-162, grouped by area, with their guards |
+| `DESIGN_LAWS.md` | the numbered Critical Conventions 1-163, grouped by area, with their guards |
 | `DESIGN_FOLDER.md` | on-disk layout, the union read, **File naming** (the Folder Format spec source), the atlas root, every `.atlas/` file, media, the FolderStore contract |
 | `DESIGN_SYNC.md` | the SyncEngine as built, push and pull triggers, pause and hold, creating and linking worlds, Make Online, ids, the re-key kernel, account mode, world-meta sync |
 | `DESIGN_SHELL.md` | the three-pane shell, rooms, the narrow-window layer, the state shape, routes, the context pane |

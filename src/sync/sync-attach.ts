@@ -36,6 +36,7 @@ import { keyRefusalLine, seatRefusalLine } from './world-key-lines';
 import { rosterFor } from './world-roster';
 import { rosterIsShared, worldPullsOnOpen, worldSyncPolicy, type SyncPolicy } from './shared-world';
 import { keptEditsLine, keptLine, roleChangeLine } from './role-change';
+import { deleteRefusedLine, proposalAcceptedLine, proposalSentLine } from './proposal-lines';
 import type { SyncResult } from '../core/types';
 
 let currentEngine: SyncEngine | null = null;
@@ -144,6 +145,8 @@ export function attachSyncEngine(
       }
       // A role that moved, and what this key no longer sees (B12 Q2, conv. 151).
       if (currentEngine === engine) void noteRoleNews(entry.id, folder, result);
+      // What keel took as proposals, and what it settled (conv. 163).
+      if (currentEngine === engine) void noteProposalNews(entry.id, folder, result);
       // Someone joined or left while the world is open, or keel had not
       // answered yet: the next round runs under what the roster says now.
       if (!readOnly && !result.transient_blocked) void settle(ROUND_ROSTER_MAX_AGE_MS);
@@ -416,6 +419,60 @@ async function noteRoleNews(worldId: string, folder: FolderStore, result: SyncRe
     if (!roleSaid) toastManager.show(keptEditsLine(entry.name, edits.length), 'info', 10000);
   }
   if (result.kept || edits.length > 0 || result.own_role !== undefined) await refreshKeptCount(worldId, folder);
+}
+
+/** Elements keel holds as proposals, per world (conv. 163): the element page's sync mark reads it. */
+const proposedSets: Record<string, ReadonlySet<string>> = {};
+/** `<world>:<element>:<local stamp>` whose proposal was said this session: a version is said once. */
+const proposalsSaid = new Set<string>();
+
+/** True while keel holds this element's edit as a proposal (conv. 163). */
+export function isProposedHere(worldId: string, elementId: string): boolean {
+  return proposedSets[worldId]?.has(elementId) ?? false;
+}
+
+async function refreshProposedSet(worldId: string, folder: FolderStore): Promise<void> {
+  try {
+    const ids = ((await folder.readSyncState()).proposed ?? []).map(e => e.element_id);
+    const before = proposedSets[worldId];
+    if (before && before.size === ids.length && ids.every(id => before.has(id))) return;
+    proposedSets[worldId] = new Set(ids);
+    patchSlice('sync', { ...getState().sync });
+  } catch { /* no mark this time; the next round reads again */ }
+}
+
+/**
+ * A round's proposal news (conv. 163): edits sent for review, each version
+ * said once; what the keeper accepted; deletes keel kept, with the element
+ * back. A declined one goes to the review, which says why.
+ */
+async function noteProposalNews(worldId: string, folder: FolderStore, result: SyncResult): Promise<void> {
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  if (!entry?.api) return;
+  const sent = result.proposed_ids ?? [];
+  if (sent.length > 0) {
+    const elements = getState().data.elements;
+    const fresh = sent.filter(id => {
+      const key = `${worldId}:${id}:${elements.find(e => e.id === id)?.local_updated_at ?? ''}`;
+      if (proposalsSaid.has(key)) return false;
+      proposalsSaid.add(key);
+      return true;
+    });
+    if (fresh.length > 0) toastManager.show(proposalSentLine(entry.name, fresh.length), 'info', 10000);
+  }
+  const accepted = result.proposals_accepted ?? [];
+  if (accepted.length > 0) toastManager.show(proposalAcceptedLine(entry.name, accepted.length), 'success', 6000);
+  const refused = result.delete_refused ?? [];
+  if (refused.length > 0) {
+    toastManager.show(deleteRefusedLine(refused.map(r => r.name?.trim() || 'an element')), 'info', 10000);
+  }
+  if (sent.length > 0 || accepted.length > 0 || result.conflicts.some(c => c.proposal) || proposedSets[worldId] === undefined) {
+    await refreshProposedSet(worldId, folder);
+  }
+  // The elements keel gave back or settled, read from the folder (no push: nothing here is new).
+  if (accepted.length > 0 || refused.length > 0) {
+    try { patchSlice('data', { elements: await folder.listElements() }); } catch { /* the next round reads them */ }
+  }
 }
 
 /**
@@ -807,13 +864,16 @@ function emitConflictToasts(
     }));
   }
 
-  if (result.conflicts.length === 0) return;
+  // A proposal the keeper did not take is no overwrite under any policy: it
+  // waits in the review, which says why (conv. 163; the gate's G4).
+  const plain = result.conflicts.filter(c => !c.proposal);
+  if (plain.length === 0) return;
   // The engine's own policy, never the default: a shared world runs
   // pause-and-review whatever Settings names (B12 Q1).
   const policy = from.policy ?? currentEngine?.getPolicy() ?? getState().registry.sync_default_policy ?? 'local-wins';
   if (policy === 'pause-and-review') return; // badge + modal handle it
 
-  const n = result.conflicts.length;
+  const n = plain.length;
 
   // Pull-phase conflicts under local-wins: trigger an immediate push so the
   // local version actually propagates without waiting for the autosave timer.

@@ -39,6 +39,7 @@ import type { ElementType } from '../core/types';
 import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from './sync-engine';
 import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue } from './world-meta-sync';
 import { isKnownOf, refuseKnownOfBody, stubShape } from './known-of';
+import { OwProposed, proposalOf, type ProposalRow } from './proposals';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -318,6 +319,15 @@ export class OwV2ClientAdapter implements OwApiClient {
       if (timer) clearTimeout(timer);
     }
     if (response.status === 204) return undefined;
+    // keel #519 (conv. 163, P1): a seat's write on a reviewed world answers
+    // 202 with a proposal, and the element did not change. Never returned as a
+    // body, so no caller can stamp a proposal as the element.
+    if (response.status === 202) {
+      let parsed: unknown = null;
+      try { parsed = JSON.parse(text); } catch { /* not JSON: falls through to the plain body read */ }
+      const proposal = proposalOf(parsed);
+      if (proposal) throw new OwProposed(proposal);
+    }
     if (!response.ok) {
       type Envelope = { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown };
       let envelope: Envelope | null = null;
@@ -453,6 +463,31 @@ export class OwV2ClientAdapter implements OwApiClient {
   async deleteElement(type: ElementType, id: string): Promise<void> {
     // v2 DELETE is idempotent: missing id → 204, same as success.
     await this.request('DELETE', `/${type}/${id}`);
+  }
+
+  /**
+   * keel #519's queue, the caller's own rows in every state
+   * (`GET /world/proposals?state=all`, newest first; conv. 163, P5). A seat
+   * sees its own; the walk stops at `pages` pages, newest first, which holds
+   * every row an open entry can name (keel keeps 50 open per world).
+   */
+  async listProposals(pages = 5): Promise<{ rows: ProposalRow[]; complete: boolean }> {
+    const rows: ProposalRow[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < pages; i++) {
+      const q = `state=all&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+      const page = await this.request('GET', `/world/proposals?${q}`) as { data?: ProposalRow[]; has_more?: boolean; next_cursor?: string | null } | undefined;
+      rows.push(...(page?.data ?? []));
+      if (!page?.has_more || !page.next_cursor) return { rows, complete: true };
+      cursor = page.next_cursor;
+    }
+    // Cut short: a row not reached is not a row withdrawn (the gate's G7).
+    return { rows, complete: false };
+  }
+
+  /** The proposer takes back its own open row (`DELETE …/proposals/{pid}`, 204; conv. 163, P3). */
+  async withdrawProposal(type: ElementType, id: string, proposalId: string): Promise<void> {
+    await this.request('DELETE', `/${type}/${id}/proposals/${proposalId}`);
   }
 
   async getElement(type: ElementType, id: string): Promise<ServerRecord | null> {

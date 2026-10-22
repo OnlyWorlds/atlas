@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.78.0',
+    date: '2026-10-22',
+    theme: 'Sent for review',
+    entries: [
+      {
+        id: 'seat-edits-for-review',
+        title: "An AI seat's changes wait for the keeper",
+        body: "On a world whose keeper reviews changes from AI seats, an edit made in Atlas with a seat's key goes to the keeper as a proposal, and Atlas says so. Your edit stays in your copy until they decide: accepted, it is the world's; declined, it waits in the review with their reason, to send again or drop. A delete the keeper keeps for themselves puts the element back.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.77.1',
     date: '2026-10-22',
     theme: "A world's checks kept",

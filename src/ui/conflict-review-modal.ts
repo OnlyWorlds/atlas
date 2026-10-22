@@ -19,6 +19,7 @@ import { PlainError } from '../core/plain-error';
 import { patchSlice, getState } from '../core/state';
 import type { Conflict } from '../core/types';
 import { escapeText } from '../core/dom-utils';
+import { proposalReviewLine } from '../sync/proposal-lines';
 
 export class ConflictReviewModal extends BaseModal {
   private conflicts: Conflict[] = [];
@@ -138,10 +139,11 @@ export class ConflictReviewModal extends BaseModal {
         <span class="atlas-conflict-type">${escapeText(c.type)}</span>
         <span class="atlas-conflict-name">${escapeText(name)}</span>
         <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} differ${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
+        ${c.proposal ? `<span class="atlas-conflict-proposal" data-role="proposal-line">${escapeText(proposalReviewLine(c.proposal))}</span>` : ''}
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="Push local content to server">Overwrite (mine wins)</button>
-        <button class="atlas-btn-ghost" data-action="pull-theirs" title="Overwrite local with server">Pull (theirs wins)</button>
+        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="${c.proposal ? 'Send your edit for review again' : 'Push local content to server'}">Overwrite (mine wins)</button>
+        <button class="atlas-btn-ghost" data-action="pull-theirs" title="${c.proposal ? "Drop your edit and take the world's copy" : 'Overwrite local with server'}">Pull (theirs wins)</button>
       </div>
     `;
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {

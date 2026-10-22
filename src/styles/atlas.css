@@ -6279,6 +6279,14 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   text-overflow: ellipsis;
 }
 
+/* A proposal the keeper did not take says why, wrapped (conv. 163). */
+.atlas-conflict-proposal {
+  font-size: 12px;
+  color: var(--atlas-text);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .atlas-conflict-row-actions {
   display: flex;
   gap: 6px;
