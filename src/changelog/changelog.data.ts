@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'A work item that carries a packet (a list of elements to look at, with a reason for each, made by a person, an AI or the world check) shows that list on its page, in its order, with who made it. Step through opens the first and moves with Previous and Next, the reason for each shown in the bar. An element the world does not hold is named as not in this world.',
         tags: ['editor'],
       },
+      {
+        id: 'review-keys-kept',
+        title: "A review mark's keys are kept for it",
+        body: 'Custom field names that start with x_review_ are kept for the review mark other tools read (whether a new element is proposed, and when it was last checked), as x_identity_ and x_packet_ are: shown read only, never typed as a custom field.',
+        tags: ['editor'],
+      },
     ],
   },
   {

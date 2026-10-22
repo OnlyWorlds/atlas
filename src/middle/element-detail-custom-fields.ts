@@ -18,7 +18,7 @@
  */
 
 import type { Element } from '../core/types';
-import { isCustomEditableField, isPopulatedCustomValue, isProfileField } from '../core/constants';
+import { isCustomEditableField, isPopulatedCustomValue, isProfileField, PROFILE_FIELD_PREFIXES } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { worldIsViewOnly } from '../core/view-only';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
@@ -117,7 +117,8 @@ export function normalizeCustomFieldName(input: string): string {
 export function customFieldNameProblem(el: Element, key: string): string | null {
   if (!key) return 'Enter a field name';
   if (input_is_atlas_namespace(key)) return 'Atlas keeps atlas_ names for itself';
-  if (isProfileField(key)) return 'That name is kept for a shared field other tools read (x_identity_, x_packet_). Pick another.';
+  // Named from the list itself: a hand-typed copy fell a prefix behind (x_review_, S450).
+  if (isProfileField(key)) return `That name is kept for a shared field other tools read (${PROFILE_FIELD_PREFIXES.join(', ')}). Pick another.`;
   const bare = key.startsWith('x_') ? key.slice(2) : key.startsWith('shadow_') ? key.slice(7) : key;
   if (knownFieldsFor(el.type).has(bare)) {
     return `"${humanizeFieldName(bare)}" is a built-in field for this type: use that field instead`;

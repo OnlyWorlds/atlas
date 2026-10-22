@@ -203,6 +203,13 @@ describe('a published profile key is never a custom field (x_identity_, Skeld h5
     expect(customFieldNameProblem(makeCharacter(), 'x_packet')).toBeNull();
   });
 
+  it('the review profile\'s keys are kept too (x_review_, dist.37)', () => {
+    for (const name of ['x_review_proposed', 'x_review_checked']) {
+      expect(customFieldNameProblem(makeCharacter(), name)).toMatch(/x_review_/);
+    }
+    expect(customFieldNameProblem(makeCharacter(), 'x_reviews')).toBeNull();
+  });
+
   it('a carried key is no editable row, shows read-only, and is never suggested', () => {
     const el = makeCharacter({ x_identity_key: KEY, x_mood: 'grim' });
     expect(customFieldMetasFor(el).map(m => m.name)).toEqual(['x_mood']);

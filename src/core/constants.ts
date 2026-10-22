@@ -294,8 +294,10 @@ export function isExtensionField(name: string): boolean {
  * read-only, and never rewritten by a re-key (the profile's rule 9). `x_packet_`
  * is the work packet's (keel PR 148, Skeld h66 #9663): its ids are the source
  * world's as they were when the packet was made, so a re-key never enters it.
+ * `x_review_` is the review profile's (dist.37, Skeld h58 #9726): a new
+ * element's proposed mark and its last check, sent like any `x_` field.
  */
-export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_'] as const;
+export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_'] as const;
 
 export function isProfileField(name: string): boolean {
   return PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));
