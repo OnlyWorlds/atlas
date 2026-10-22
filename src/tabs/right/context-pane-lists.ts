@@ -26,6 +26,7 @@ import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { showProblem } from '../../ui/problem-fixes';
 import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink';
+import { currentLore } from '../../core/parlor-room';
 
 export interface ContextListsHandle {
   /** Visually emphasize a row whose element id matches (or clear). */
@@ -97,7 +98,8 @@ interface SuggestedRow {
  *     ancestor (book root). Reason = "in {sibling.name}".
  */
 function buildSuggested(narrative: Element, dismissed: Set<string>): SuggestedRow[] {
-  const elements = getState().data.elements;
+  // Suggestions come from the lore: the parlor's room is never offered as cast (core/parlor-room.ts).
+  const elements = currentLore();
   const byId = new Map<string, Element>();
   for (const e of elements) byId.set(e.id, e);
 

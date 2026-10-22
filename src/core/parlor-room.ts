@@ -13,6 +13,7 @@
  * case, trimmed.
  */
 import type { Element, ElementType } from './types';
+import { getState } from './state';
 
 export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> = [
   ['narrative', 'message'],
@@ -30,4 +31,34 @@ export function isRoomElement(el: Element): boolean {
   if (typeof sup !== 'string') return false;
   const s = sup.trim().toLowerCase();
   return ROOM_SUPERTYPES.some(([type, word]) => el.type === type && s === word);
+}
+
+/**
+ * The world as its whole views read it (1.76, OW Parlor #543): without the
+ * room while `ui.hideRoom` is on, which it is by default. One switch for the
+ * element list, Home, an element's references and Web, Charts and Search.
+ * A room element still opens by its id (a link, the palette with the room
+ * shown, the map). Memoised on the elements array and the switch, so a
+ * render gate keyed on the result redraws exactly when either moves, and a
+ * world with no room returns its own array.
+ */
+let loreMemo: { from: readonly Element[]; hide: boolean; out: Element[] } | null = null;
+export function loreElements(elements: Element[], hide: boolean): Element[] {
+  if (loreMemo && loreMemo.from === elements && loreMemo.hide === hide) return loreMemo.out;
+  const out = hide && elements.some(isRoomElement) ? elements.filter(el => !isRoomElement(el)) : elements;
+  loreMemo = { from: elements, hide, out };
+  return out;
+}
+
+/** The world as the whole views read it now. */
+export function currentLore(): Element[] {
+  const s = getState();
+  return loreElements(s.data.elements, s.ui.hideRoom);
+}
+
+/** How many of the room's elements the world holds, shown or not. */
+export function roomCount(elements: readonly Element[]): number {
+  let n = 0;
+  for (const el of elements) if (isRoomElement(el)) n++;
+  return n;
 }

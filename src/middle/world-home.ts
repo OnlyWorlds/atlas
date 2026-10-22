@@ -53,6 +53,7 @@ import { freezeChartBlock } from '../visualization/timeline/chart-freeze';
 import { renderChartView } from '../visualization/timeline/chart-static';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { downloadLabel, isPartialSlice, partialSliceNote } from '../core/provenance';
+import { currentLore, roomCount } from '../core/parlor-room';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -113,7 +114,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
 
   function render(): void {
     const s = getState();
-    const inputs = [s.active, s.data.elements, s.data.loading, s.data.loadingProgress?.done, s.registry,
+    // The lore (core/parlor-room.ts): the world without the parlor's room while
+    // it is hidden; its identity moves with the elements and with the switch.
+    const lore = currentLore();
+    const inputs = [s.active, s.data.elements, lore, s.data.loading, s.data.loadingProgress?.done, s.registry,
       s.ui.castAssign?.kind, savedCharts, isTourFlagActive(), waypointsVersion];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     lastInputs = inputs;
@@ -122,7 +126,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       root.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
       return;
     }
-    const elements = getState().data.elements;
+    const elements = lore;
     const meta = active.meta;
     const worldId = active.worldId;
     if (worldId !== receiptsWorldId) {
@@ -415,6 +419,29 @@ function buildCover(
       statline.appendChild(seg);
     }
     cover.appendChild(statline);
+  }
+  // The parlor's room (OW Parlor #543): said where the counts are, one click
+  // shows it in every whole view or hides it again (the list's chip is the
+  // same switch, `ui.hideRoom`).
+  const room = roomCount(getState().data.elements);
+  if (room > 0) {
+    const hidden = getState().ui.hideRoom;
+    const roomLine = document.createElement('button');
+    roomLine.type = 'button';
+    roomLine.className = 'atlas-home-statline-seg atlas-home-room';
+    roomLine.setAttribute('data-action', 'home-room');
+    roomLine.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    roomLine.title = hidden
+      ? "Show the parlor's room (its messages, board entries, work items, specs, hearts, votes, sittings and member cards) in the lists, Charts and Search"
+      : "Hide the parlor's room from the lists, Charts and Search";
+    roomLine.innerHTML = hidden
+      ? `The parlor's room, <b>${room}</b>, is hidden · Show it`
+      : `The parlor's room, <b>${room}</b>, is shown · Hide it`;
+    roomLine.addEventListener('click', () => {
+      const ui = getState().ui;
+      patchSlice('ui', { ...ui, hideRoom: !ui.hideRoom });
+    });
+    cover.appendChild(roomLine);
   }
 
   return cover;

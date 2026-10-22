@@ -35,6 +35,7 @@ import { mountContextPreview, type ContextPreviewHandle } from './context-pane-p
 import { mountContextToolbar, type ContextToolbarHandle } from './context-pane-toolbar';
 import { extractTemporalNodes } from '../../visualization/timeline/data-normalizer';
 import { rankAnchors } from '../../visualization/timeline/degree';
+import { currentLore } from '../../core/parlor-room';
 
 export interface MountContextTabOpts {
   pane: HTMLElement;
@@ -493,7 +494,9 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
 
   function maybeRender(): void {
     const route = parseHash(window.location.hash);
-    const elements = getState().data.elements;
+    // The lore's identity moves with the elements and with the room's switch
+    // (core/parlor-room.ts), so showing or hiding the room redraws the Web.
+    const elements = currentLore();
     const nextKey = routeKey(route);
     if (nextKey !== lastRouteKey || elements !== lastElementsRef) {
       lastRouteKey = nextKey;

@@ -35,6 +35,7 @@ import { navigate, elementHash } from '../../core/router';
 import { getTierForNarrative } from '../../middle/writing-helpers';
 import { escapeText } from '../../core/dom-utils';
 import { placeGraphLabels, GRAPH_LABEL_SIDES, type GraphLabelItem } from './graph-labels';
+import { currentLore, isRoomElement } from '../../core/parlor-room';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -456,7 +457,9 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
 
     // Build sim inputs.
     const state = getState();
-    const elements = state.data.elements;
+    // A lore element's web leaves the parlor's room out while it is hidden
+    // (core/parlor-room.ts); a room element's web reads the whole world.
+    const elements = isRoomElement(centerEl) ? state.data.elements : currentLore();
     const byId = new Map<string, Element>();
     for (const e of elements) byId.set(e.id, e);
 

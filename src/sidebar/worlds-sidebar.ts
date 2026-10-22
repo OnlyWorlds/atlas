@@ -724,7 +724,7 @@ async function doActivateWorld(
     resetWorldStyles();
     // knowledgeLens + castAssign cleared too — both reference the OLD world.
     // Muted types are per world (S356).
-    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null, mutedTypes: loadMutedTypes(worldId), madeBy: null, hideRoom: false });
+    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null, mutedTypes: loadMutedTypes(worldId), madeBy: null, hideRoom: true });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
       // Room-stable world switch (S256, Captain: "less jumpy"): world-agnostic

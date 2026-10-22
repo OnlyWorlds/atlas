@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.76.0',
+    date: '2026-10-22',
+    theme: 'Your lore, without the room',
+    entries: [
+      {
+        id: 'parlor-room-hidden',
+        title: "A world's parlor stays out of its lore",
+        body: "A parlor keeps its messages, votes and work items inside the world it is about. Atlas now leaves them out of the element list, Home, an element's references, Charts and Search, so your characters and stories read as they did. Home says how many the room holds, and one click shows them again.",
+        tags: ['elements'],
+      },
+    ],
+  },
+  {
     version: '1.75.0',
     date: '2026-10-22',
     theme: 'A line another tool drew',

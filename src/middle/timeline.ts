@@ -36,6 +36,7 @@ import { WorldClockModal } from '../ui/world-clock-modal';
 import { CalendarBuilderModal } from '../ui/calendar-builder-modal';
 import { narrativeKindOf } from '../core/narrative-kind';
 import { renderGate } from '../ui/render-gate';
+import { currentLore } from '../core/parlor-room';
 
 /** A sensible first "now": the LATEST recorded moment (Captain, S318 —
  *  "snap to the center of whatever elements are at the latest date"). The
@@ -81,7 +82,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // chart instead of silently nowhere (the vanish class). Default date =
     // the now when set, else the median of the dated world (same default the
     // Set-now gesture uses), else 0 on a fresh world.
-    const allNodes = extractTemporalNodes(getState().data.elements);
+    const allNodes = extractTemporalNodes(currentLore());
     const defaultDate = nowValue() ?? suggestNow(allNodes);
     // Through the shared door (S301) so a scripted charts beat can take this
     // gesture the same way the sidebar + does.
@@ -382,7 +383,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    */
   function undatedElements(): Array<{ id: string; type: ElementType; name: string }> {
     const out: Array<{ id: string; type: ElementType; name: string }> = [];
-    for (const el of getState().data.elements) {
+    for (const el of currentLore()) {
       const map = TEMPORAL_TYPE_FIELDS[el.type];
       if (!map) continue; // not a dateable type — never counts as "undated"
       // Share pages and knowledge entries are Narratives by TYPE (so they pass
@@ -492,7 +493,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   /** Dates a builder preview should demonstrate: span ends, the now, a mid. */
   function previewSamples(): number[] {
-    const allNodes = extractTemporalNodes(getState().data.elements);
+    const allNodes = extractTemporalNodes(currentLore());
     const dates = allNodes.map(n => n.startDate).sort((a, b) => a - b);
     const now = nowValue();
     const set = new Set<number>();
@@ -743,7 +744,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   /** Same, for save-chart (reads the route itself). */
   function currentScope(): ChartScope {
     const route = parseHash(window.location.hash);
-    const allNodes = extractTemporalNodes(getState().data.elements);
+    const allNodes = extractTemporalNodes(currentLore());
     return effectiveScope(allNodes, route);
   }
 
@@ -772,7 +773,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   async function saveCurrentChart(): Promise<void> {
     const store = getActiveStore();
     if (!store) { toasts.error('No world open. Pick one from the sidebar.'); return; }
-    const all = getState().data.elements;
+    const all = currentLore();
     const scope = currentScope();
     const axis = config?.axis ?? { kind: 'time' as const, direction: 'both' as const };
     const lens = activeLens();
@@ -949,7 +950,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   function render(): void {
     const wid = worldId();
     if (!wid) return;
-    const all = getState().data.elements;
+    const all = currentLore();
     const allNodes = extractTemporalNodes(all);
 
     const route = parseHash(window.location.hash);
@@ -1052,7 +1053,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   const tickGate = renderGate();
   const onTick = (): void => {
     const s = getState();
-    if (tickGate.changed([s.active, s.data, s.registry, window.location.hash])) render();
+    if (tickGate.changed([s.active, s.data, s.registry, window.location.hash, currentLore()])) render();
   };
 
   if (getState().active) onTick();

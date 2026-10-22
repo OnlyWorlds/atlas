@@ -87,24 +87,27 @@ test.describe('made by, and the room', () => {
     const agents = row.locator('[data-action="made-by-agents"]');
     await expect(agents).toHaveText('Agents 2');
     await expect(row.locator('[data-action="made-by-people"]')).toHaveText('People 2');
-    await expect(rowNames(page)).toHaveCount(4);
+    // The room is hidden as the world opens (1.76, OW Parlor #543).
+    await expect(row.locator('[data-action="hide-room"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(rowNames(page)).toHaveCount(3);
 
     await agents.click();
     await expect(agents).toHaveAttribute('aria-pressed', 'true');
-    await expect(summary).toHaveText('All types · made by agents');
-    await expect(rowNames(page)).toHaveText(['A line in the room', 'Glanton']);
-
-    // The room hidden too: the agent's line leaves, the agent's character stays.
-    await row.locator('[data-action="hide-room"]').click();
     await expect(summary).toHaveText('All types · made by agents · the room hidden');
     await expect(rowNames(page)).toHaveText(['Glanton']);
+
+    // The room shown: the agent's line joins the agent's character.
+    await row.locator('[data-action="hide-room"]').click();
+    await expect(summary).toHaveText('All types · made by agents');
+    await expect(rowNames(page)).toHaveText(['A line in the room', 'Glanton']);
 
     // People: the person's and the owner's (through MCP), never the agent's.
     await row.locator('[data-action="made-by-people"]').click();
     await expect(rowNames(page)).toHaveText(['Fort Griffin', 'Holden']);
 
-    // Off again: everyone, the room still hidden.
+    // Off again: everyone, the room hidden again.
     await row.locator('[data-action="made-by-people"]').click();
+    await row.locator('[data-action="hide-room"]').click();
     await expect(summary).toHaveText('All types · the room hidden');
     await expect(rowNames(page)).toHaveText(['Fort Griffin', 'Glanton', 'Holden']);
   });
@@ -126,5 +129,64 @@ test.describe('made by, and the room', () => {
     await pulled(page, 'character', '0192a000-0000-7000-8000-000000035013', 'Glanton', { created_by: AGENT });
     await expect(row.locator('[data-action="made-by-agents"]')).toHaveText('Agents 1');
     await expect(row.locator('[data-action="made-by-people"]')).toHaveText('People 2');
+  });
+
+  // 1.76 (OW Parlor #543, the census Notes/ui-snapshots/2026-10-22-s453/census-room.mjs): a lore
+  // world holding a parlor's room reads as lore in every whole view, and one switch shows the room.
+  test("the parlor's room is hidden from Home, a lore page, Charts and Search until shown", async ({ page }) => {
+    await setupWorld(page);
+    const HOLDEN = '0192a000-0000-7000-8000-000000035021';
+    await pulled(page, 'character', HOLDEN, 'Holden', {});
+    await pulled(page, 'event', '0192a000-0000-7000-8000-000000035022', 'The scalp war', { start_date: 3 });
+    await pulled(page, 'relation', '0192a000-0000-7000-8000-000000035023', 'Fix the age of Holden', { supertype: 'Work item', characters: [HOLDEN] });
+    await pulled(page, 'event', '0192a000-0000-7000-8000-000000035024', 'Sitting one', { supertype: 'Sitting', start_date: 5 });
+    await pulled(page, 'narrative', '0192a000-0000-7000-8000-000000035025', 'Shall we rename him', { supertype: 'Message' });
+    const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
+    const go = (hash: string) => page.evaluate((h) => { window.location.hash = h; }, hash);
+    const middle = page.locator('.atlas-middle-content');
+    const roomLine = page.locator('[data-action="home-room"]');
+    const cmdkInput = page.locator('.atlas-cmdk-input');
+
+    // Home: the counts leave the room out, and one line says it is hidden.
+    await go(`#/w/${wid}`);
+    await expect(roomLine).toHaveText("The parlor's room, 3, is hidden · Show it");
+    await expect(page.locator('.atlas-home-statline')).not.toContainText('relation');
+    // A lore page: the work item about Holden is not among his references.
+    await go(`#/w/${wid}/element/${HOLDEN}`);
+    await expect(middle).toContainText('Holden');
+    await expect(middle).not.toContainText('Fix the age of Holden');
+    await go(`#/w/${wid}/timeline`);
+    // Charts: the undated tray holds Holden, never the message (the axis is drawn, not text).
+    await expect(middle).toContainText('See your world arranged in time.');
+    await expect(middle).toContainText('Holden');
+    await expect(middle).not.toContainText('Shall we rename him');
+    // Search.
+    // The palette opens before a key is typed, holds the query, and closes again (a check
+    // against a palette that never opened passes for anything).
+    await page.keyboard.press('Control+k');
+    await expect(cmdkInput).toBeFocused();
+    await page.keyboard.type('Sitting');
+    await expect(cmdkInput).toHaveValue('Sitting');
+    await expect(page.locator('.atlas-cmdk-list')).toBeVisible();
+    await expect(page.locator('.atlas-cmdk-list')).not.toContainText('Sitting one');
+    await page.keyboard.press('Escape');
+    await expect(cmdkInput).toHaveCount(0);
+
+    // Shown, by Home's line: every view reads the room again.
+    await go(`#/w/${wid}`);
+    await roomLine.click();
+    await expect(roomLine).toHaveText("The parlor's room, 3, is shown · Hide it");
+    await expect(page.locator('[data-action="hide-room"]')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.atlas-home-statline')).toContainText('relation');
+    await go(`#/w/${wid}/timeline`);
+    await expect(middle).toContainText('Shall we rename him');
+    await page.keyboard.press('Control+k');
+    await expect(cmdkInput).toBeFocused();
+    await page.keyboard.type('Sitting');
+    await expect(page.locator('.atlas-cmdk-list')).toContainText('Sitting one');
+    await page.keyboard.press('Escape');
+    await expect(cmdkInput).toHaveCount(0);
+    await go(`#/w/${wid}/element/${HOLDEN}`);
+    await expect(middle).toContainText('Fix the age of Holden');
   });
 });

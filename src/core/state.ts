@@ -127,7 +127,7 @@ export interface UiState {
   mutedTypes: Set<ElementType>;
   /** The list's "Made by" filter (#350, core/made-by.ts): null shows everyone. Per world. */
   madeBy: MadeBy | null;
-  /** The list hides the parlor's room elements (core/parlor-room.ts). Per world. */
+  /** The whole views hide the parlor's room (core/parlor-room.ts `loreElements`): on by default (1.76), back on at a world switch. */
   hideRoom: boolean;
   search: string;
   /** Right-pane tabs (always begins with implicit map-index; additional are maps). */
@@ -225,7 +225,7 @@ let state: AppState = {
     elementFilters: new Set(),
     mutedTypes: new Set(DEFAULT_MUTED_TYPES),
     madeBy: null,
-    hideRoom: false,
+    hideRoom: true,
     search: '',
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,

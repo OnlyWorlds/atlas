@@ -31,6 +31,7 @@ import { filesWhereOf } from '../core/browser-worlds';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { Element, ElementType } from '../core/types';
 import { forPointer } from '../core/pointer';
+import { currentLore } from '../core/parlor-room';
 
 const MAX_ELEMENT_RESULTS = 12;
 const MAX_ROOM_RESULTS = 3;
@@ -207,7 +208,7 @@ class CommandPalette extends BaseModal {
 
     input.addEventListener('input', () => {
       this.query = input.value;
-      this.results = paletteRows(this.query, getState().data.elements);
+      this.results = paletteRows(this.query, currentLore());
       this.activeIndex = 0;
       this.renderList();
     });

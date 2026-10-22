@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import type { OwMember } from '@onlyworlds/sdk';
 import { madeByOf, rosterHasAgent, rosterKinds } from '../../src/core/made-by';
-import { isRoomElement } from '../../src/core/parlor-room';
+import { isRoomElement, loreElements, roomCount } from '../../src/core/parlor-room';
 import type { Element } from '../../src/core/types';
 
 const AGENT = 'a0000000-0000-4000-8000-000000000001';
@@ -81,5 +81,29 @@ describe('isRoomElement', () => {
     expect(isRoomElement(el({ supertype: 'Charter' }, 'law'))).toBe(false);
     expect(isRoomElement(el({}, 'narrative'))).toBe(false);
     expect(isRoomElement(el({ supertype: 'Messages' }, 'narrative'))).toBe(false);
+  });
+});
+
+describe('the lore (1.76, OW Parlor #543)', () => {
+  const lore = [el({ supertype: 'Story' }, 'narrative'), el({}, 'character')];
+  const room = [el({ supertype: 'Message' }, 'narrative'), el({ supertype: 'Sitting' }, 'event')];
+
+  it('leaves the room out while it is hidden, and keeps it while shown', () => {
+    const all = [...lore, ...room];
+    expect(loreElements(all, true)).toEqual(lore);
+    expect(loreElements(all, false)).toBe(all);
+    expect(roomCount(all)).toBe(2);
+  });
+
+  it('is the same array while neither the elements nor the switch moved, so a render gate holds still', () => {
+    const all = [...lore, ...room];
+    const first = loreElements(all, true);
+    expect(loreElements(all, true)).toBe(first);
+    expect(loreElements(all, false)).not.toBe(first);
+    expect(loreElements([...all], true)).not.toBe(first);
+  });
+
+  it('is the world itself when it holds no room', () => {
+    expect(loreElements(lore, true)).toBe(lore);
   });
 });
