@@ -10,38 +10,33 @@
  * carries `x_room_of`, the id of the world or sitting its room belongs to,
  * written by the parlor on everything it makes. Without the mark a Narrative
  * with supertype Message is lore (a novel's letters, the Manifest's Wire) and
- * stays in view. A pair, never a supertype alone: a Location called Board is a place. The
+ * stays in view. The rule and its pairs are the SDK's since 1.77. A pair, never a supertype alone: a Location called Board is a place. The
  * charter (a Law, supertype Charter) stays in: it is the world's own rule,
  * shown on Home, not a line said in the room (TC's list, h66 #9660, leaves it
  * out too). Member is Skeld's ruling, h66 #9721. A supertype matches in any
  * case, trimmed.
  */
 import type { Element, ElementType } from './types';
+import { ROOM_PAIRS, isRoomElement as sdkIsRoomElement } from '@onlyworlds/sdk';
 import { getState } from './state';
 
-export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> = [
-  ['narrative', 'message'],
-  ['narrative', 'board'],
-  ['relation', 'work item'],
-  ['construct', 'spec'],
-  ['relation', 'heart'],
-  ['relation', 'vote'],
-  ['event', 'sitting'],
-  ['character', 'member'],
-];
+/**
+ * The room profile's eight pairs as the SDK carries them (4.55.0, generated
+ * from schema-dist's room.fixture.json, never typed by hand: a ninth pair
+ * arrives by a repin), lower-cased for reading. Atlas's own copy is gone.
+ */
+export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> =
+  ROOM_PAIRS.map(p => [p.type, p.supertype.toLowerCase()] as const);
 
+/**
+ * The SDK's rule (4.55.0): the pair, trimmed and case-folded, AND the mark
+ * `x_room_of`. A body whose type, supertype or mark is not a string (a
+ * foreign file can hold anything) is lore here, before the SDK is asked.
+ */
 export function isRoomElement(el: Element): boolean {
-  const sup = (el as Record<string, unknown>).supertype;
-  const kind = (el as Record<string, unknown>).type;
-  const mark = (el as Record<string, unknown>).x_room_of;
-  if (typeof sup !== 'string' || typeof kind !== 'string') return false;
-  if (typeof mark !== 'string' || !mark.trim()) return false;
-  // Both sides trimmed and case-blind, as schema-dist's room profile rules
-  // (dist.45, `tests/fixtures/room.fixture.json`); this copy gives way to the
-  // SDK's export of that profile once it ships.
-  const s = sup.trim().toLowerCase();
-  const t = kind.trim().toLowerCase();
-  return ROOM_SUPERTYPES.some(([type, word]) => t === type && s === word);
+  const r = el as Record<string, unknown>;
+  if (typeof r.type !== 'string' || typeof r.supertype !== 'string' || typeof r.x_room_of !== 'string') return false;
+  return sdkIsRoomElement({ type: r.type, supertype: r.supertype, x_room_of: r.x_room_of });
 }
 
 /**

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.77.0',
+    date: '2026-10-22',
+    theme: 'Said where it came from',
+    entries: [
+      {
+        id: 'zone-shape-written',
+        title: 'A zone you draw says its shape',
+        body: "A zone you draw in Atlas now records whether it is an area or a line in OnlyWorlds' own shape field, so every other tool draws it the same way. A zone's page shows Shape in its Scope section, beside Role.",
+        tags: ['maps'],
+      },
+      {
+        id: 'writes-name-atlas',
+        title: 'OnlyWorlds knows a change came through Atlas',
+        body: "Every change Atlas sends to OnlyWorlds now says it came through Atlas, so the world's recent changes on onlyworlds.com can say which app each one came from.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.76.0',
     date: '2026-10-22',
     theme: 'Your lore, without the room',

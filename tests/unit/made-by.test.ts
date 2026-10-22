@@ -111,7 +111,7 @@ describe('the lore (1.76, OW Parlor #543)', () => {
 });
 
 // schema-dist's room profile (v0.33.0-dist.45, profiles/room.fixture.json, copied whole): the cases
-// every reader of the room answers, until the SDK's export replaces core/parlor-room.ts's copy.
+// every reader of the room answers, run against the SDK's rule (1.77): a repin that moves it goes red.
 import roomFixture from '../fixtures/room.fixture.json';
 import { ROOM_SUPERTYPES } from '../../src/core/parlor-room';
 

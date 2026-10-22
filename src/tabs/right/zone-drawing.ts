@@ -283,13 +283,17 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
   }
 
   try {
-    // Create the zone. atlas_shape locks the geometry kind; supertype +
-    // subtype are user-meaningful taxonomy fields (free text). An empty
-    // supertype takes the shape's word for other tools (the Captain's interim).
+    // Create the zone. The standard's shape (schema 00.33.00, #362, keel
+    // serves it since 2026-10-22) says polygon or line for every reader;
+    // atlas_shape says it for an Atlas before 1.75; supertype + subtype are
+    // user-meaningful taxonomy fields (free text). An empty supertype still
+    // takes the shape's word for readers that know neither (the Captain's
+    // interim, until the readers read shape).
     const zone = await store.createZone({
       name: values.name,
       supertype: supertypeForNewZone(values.supertype, draft.mode),
       subtype: values.subtype,
+      shape: draft.mode,
       atlas_shape: draft.mode,
     } as Partial<Zone>);
 

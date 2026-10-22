@@ -44,6 +44,9 @@ type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>
 
 export const DEFAULT_V2_BASE = 'https://www.onlyworlds.com/api/v2';
 
+/** Atlas's name on every write (keel #520's `X-OW-Client`: lower case, digits, hyphens, 1 to 32). */
+export const ATLAS_CLIENT_NAME = 'atlas';
+
 /** keel's media ticket (keel `media/api.py`): spend it once at `upload_url` before `exp`. */
 export interface MediaTicket {
   ticket: string;
@@ -286,6 +289,11 @@ export class OwV2ClientAdapter implements OwApiClient {
       ...extraHeaders,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
+    // keel #520 (PR 171, live 2026-10-22): a write names the app that made it,
+    // so keel's changed_client and its Recent changes page say "through atlas".
+    // keel reads it on writes only, and its CORS allow list carries it (Boss's
+    // keel-cors gate); a GET keeps the headers its preflight always asked for.
+    if (method !== 'GET') headers['X-OW-Client'] = ATLAS_CLIENT_NAME;
     const timeoutMs = method === 'GET' ? this.readTimeoutMs : null;
     const controller = timeoutMs ? new AbortController() : null;
     let timedOut = false;

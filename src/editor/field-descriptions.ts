@@ -440,6 +440,7 @@ const TRAIT: FieldMap = {
 
 const ZONE: FieldMap = {
   role: 'Functional purpose of the zone',
+  shape: 'polygon for an area, line for a path; anything else draws an area',
   start_date: 'When becomes relevant',
   end_date: 'When ceases meaning',
   phenomena: 'Affecting phenomena',
