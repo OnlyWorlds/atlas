@@ -23,7 +23,7 @@ import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType, type WorldMap } from '../core/types';
 import { ElementCreateModal } from '../ui/element-create-modal';
-import { ELEMENT_LABELS } from '../core/constants';
+import { typeName, aTypeName } from '../core/type-words';
 import { ELEMENT_ICONS, EXTENSION_FIELD_NAMESPACES, isExtensionField, isCustomEditableField } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
@@ -435,7 +435,7 @@ const LINK_CREATABLE = new Set<ElementType>([...CONTENT_ELEMENT_TYPES, 'map']);
  */
 function openCreateForLink(el: Element, meta: FieldMeta, existingIds: string[]): void {
   const target = meta.target!;
-  const label = ELEMENT_LABELS[target]?.singular ?? target;
+  const label = typeName(target);
   new ElementCreateModal(toastManager, {
     initialType: target,
     excludeTypes: [...LINK_CREATABLE].filter(t => t !== target),
@@ -480,8 +480,8 @@ function renderSingleLink(meta: FieldMeta, el: Element, readOnly: boolean): HTML
   // a notch ("there's something to connect"); none exist → the click CREATES.
   if (!raw && candidates != null && candidates > 0) pickBtn.classList.add('atlas-link-pick-ready');
   pickBtn.title = raw ? 'Change link'
-    : offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? `${meta.target}s`} yet: create one`
-    : `Pick a ${meta.target ?? 'link'}`;
+    : offerCreate ? `No ${typeName(meta.target!, { many: true })} yet: create one`
+    : `Pick ${meta.target ? aTypeName(meta.target) : 'a link'}`;
   // ALWAYS show the type-specific icon so users see at a glance what kind of
   // element this field links to — even before any link exists. Empty state
   // still uses the `atlas-link-pick-empty` class for muted styling (was a
@@ -498,7 +498,7 @@ function renderSingleLink(meta: FieldMeta, el: Element, readOnly: boolean): HTML
     const picked = await pickElement({
       restrictToType: meta.target,
       excludeIds: [...exclude],
-      title: `Pick a ${meta.target ?? 'link'} for ${humanizeFieldName(meta.name)}`,
+      title: `Pick ${meta.target ? aTypeName(meta.target) : 'a link'} for ${humanizeFieldName(meta.name)}`,
     });
     if (!picked) return;
     await persistFieldPatch(el, meta.name, picked.id);
@@ -545,8 +545,8 @@ function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLE
   addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
   if (ids.length === 0) addBtn.classList.add('atlas-link-pick-empty');
   if (ids.length === 0 && candidates != null && candidates > 0) addBtn.classList.add('atlas-link-pick-ready');
-  addBtn.title = offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? `${meta.target}s`} yet: create one`
-    : ids.length === 0 ? `Pick a ${meta.target ?? 'link'}` : `Add another ${meta.target ?? 'link'}`;
+  addBtn.title = offerCreate ? `No ${typeName(meta.target!, { many: true })} yet: create one`
+    : ids.length === 0 ? `Pick ${meta.target ? aTypeName(meta.target) : 'a link'}` : `Add another ${meta.target ? typeName(meta.target) : 'link'}`;
   // Always show the type-specific icon so users see WHICH category this
   // multi-link field targets at a glance. `margin-left: auto` keeps the
   // button anchored right past any existing chips.
@@ -559,7 +559,7 @@ function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLE
     const picked = await pickElement({
       restrictToType: meta.target,
       excludeIds: [el.id, ...ids],
-      title: `Add a ${meta.target ?? 'link'} to ${humanizeFieldName(meta.name)}`,
+      title: `Add ${meta.target ? aTypeName(meta.target) : 'a link'} to ${humanizeFieldName(meta.name)}`,
     });
     if (!picked) return;
     const next = [...ids, picked.id];
@@ -585,10 +585,10 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void) | nul
   const name = document.createElement('span');
   if (linked) {
     name.textContent = linked.name || '(unnamed)';
-    chip.title = `${linked.type} · id ${id}`;
+    chip.title = `${typeName(linked.type, { supertype: linked.supertype })} · id ${id}`;
   } else {
     name.textContent = id;
-    chip.title = `No ${meta.target ?? 'element'} with this id in this world`;
+    chip.title = `No ${meta.target ? typeName(meta.target) : 'element'} with this id in this world`;
   }
   chip.appendChild(name);
 

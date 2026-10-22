@@ -22,7 +22,7 @@
 import { getState, patchSlice } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
-import { ELEMENT_LABELS } from '../../core/constants';
+import { typeName } from '../../core/type-words';
 import { escapeText, escapeAttr, hexColourOr } from '../../core/dom-utils';
 import { getZoneShape } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
@@ -185,7 +185,7 @@ function renderChip(z: Zone, selectedId: string | null | undefined, rules: reado
   const color = hexColourOr(own, resolveStyle(rules, z).color ?? DEFAULT_ZONE_COLOR);
   const title = parts
     ? `${z.name}: drawn as the ${parts.length} zones it links to`
-    : `${ELEMENT_LABELS.zone.singular}: ${z.name}`;
+    : `${typeName('zone')}: ${z.name}`;
   return `
     <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''} ${parts ? 'is-linked' : ''}" data-zone-id="${escapeAttr(z.id)}"${parts ? ` data-parts="${escapeAttr(parts.join(' '))}"` : ''} title="${escapeAttr(title)}">
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>

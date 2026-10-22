@@ -8,6 +8,7 @@
  */
 
 import pkg from '../../package.json';
+import { typeNameStart } from './type-words';
 
 export interface WorldSource {
   server: string;
@@ -125,9 +126,14 @@ export function isPartialSlice(meta: unknown): boolean {
   return s?.kind === 'character' || s?.kind === 'public';
 }
 
-function viewOf(s: NonNullable<ReturnType<typeof sliceOf>>): string {
+function viewOf(s: NonNullable<ReturnType<typeof sliceOf>>, meta: unknown): string {
   if (s.kind === 'public') return "the world's public view";
-  return s.name ? `${s.name}'s view` : "one Character's view";
+  return s.name ? `${s.name}'s view` : `one ${characterWord(meta)}'s view`;
+}
+
+/** The Character in the world's own word (names.md), from the meta in hand. */
+function characterWord(meta: unknown): string {
+  return typeNameStart('character', { world: meta && typeof meta === 'object' ? meta : null });
 }
 
 /** An export's ISO time as a reader's date ("20 October 2026"); null when it is not a date. */
@@ -146,7 +152,7 @@ export function sliceLine(meta: unknown, formatDate: (iso: string) => string | n
   if (s.kind === 'owner') return `${from} by its owner: the whole world.`;
   if (s.kind === 'member') return `${from} by ${s.role === 'co_builder' ? 'a co-builder' : s.role === 'contributor' ? 'a contributor' : 'a member'}.`;
   if (s.kind === 'public') return `${from}: the world's public view, not the whole world.`;
-  return `${from} as ${viewOf(s)}: only what ${s.name ?? 'that Character'} knows of the world.`;
+  return `${from} as ${viewOf(s, meta)}: only what ${s.name ?? `that ${characterWord(meta)}`} knows of the world.`;
 }
 
 /** R1, Home: one line for a slice that is not the whole world. */
@@ -155,7 +161,7 @@ export function partialSliceNote(meta: unknown): string | null {
   if (!s || (s.kind !== 'character' && s.kind !== 'public')) return null;
   return s.kind === 'public'
     ? "This is the world's public view, not the whole world."
-    : `This is ${viewOf(s)} of the world, not the whole world.`;
+    : `This is ${viewOf(s, meta)} of the world, not the whole world.`;
 }
 
 /** The download button's words: a slice is not "the whole world" (the S446 gate's G8). */
@@ -167,5 +173,5 @@ export function downloadLabel(meta: unknown): string {
 export function slicePushRefusal(meta: unknown, worldName: string): string | null {
   const s = sliceOf(meta);
   if (!s || (s.kind !== 'character' && s.kind !== 'public')) return null;
-  return `This is ${viewOf(s)} of ${worldName}, not the whole world, so it can't go online as a world of its own.`;
+  return `This is ${viewOf(s, meta)} of ${worldName}, not the whole world, so it can't go online as a world of its own.`;
 }

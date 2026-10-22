@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.81.0',
+    date: '2026-10-22',
+    theme: "A world's own words",
+    entries: [
+      {
+        id: 'world-type-words',
+        title: 'A world can call its types by its own words',
+        body: "A world whose world.json names its own words for the types (OnlyWorlds' names profile: Employee for Character, Team for Institution) shows those words wherever Atlas names a type: lists, counts, pickers, the element page, an invite. Folders, links and the API keep the standard's names. A world without its own words looks exactly as before.",
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.80.0',
     date: '2026-10-22',
     theme: "The keeper's charter",

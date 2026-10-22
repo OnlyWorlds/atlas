@@ -21,7 +21,9 @@ import { findUnlinkedMentions, createdToastText } from '../core/unlinked-mention
 import { getActiveStore } from '../core/active-store';
 import { completeWaypoint } from '../core/waypoints';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName } from '../core/type-words';
+import { escapeText } from '../core/dom-utils';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { createMapDialog } from './map-create-modal';
@@ -287,7 +289,7 @@ export class ElementCreateModal extends BaseModal {
     // Render the type grid + initial input value + initial ghost state.
     const grid = body.querySelector<HTMLElement>('[data-role="type-grid"]')!;
     this.renderTypeGrid(grid);
-    this.typeInput.value = ELEMENT_LABELS[this.selected].singular;
+    this.typeInput.value = typeName(this.selected);
     this.updateGhost();
     this.updateDateLabel(body);
 
@@ -323,12 +325,12 @@ export class ElementCreateModal extends BaseModal {
       const atEnd = this.typeInput.selectionStart === this.typeInput.value.length;
       if (e.key === 'Tab' && !e.shiftKey) {
         e.preventDefault();
-        this.typeInput.value = ELEMENT_LABELS[this.selected].singular;
+        this.typeInput.value = typeName(this.selected);
         this.updateGhost();
         this.typeInput.setSelectionRange(this.typeInput.value.length, this.typeInput.value.length);
       } else if (e.key === 'ArrowRight' && atEnd) {
         e.preventDefault();
-        this.typeInput.value = ELEMENT_LABELS[this.selected].singular;
+        this.typeInput.value = typeName(this.selected);
         this.updateGhost();
       }
     });
@@ -624,7 +626,7 @@ export class ElementCreateModal extends BaseModal {
     this.nameGhostTyped.textContent = '';
     this.nameGhostSuffix.textContent = '';
     this.modeChip.hidden = false;
-    this.modeChip.textContent = `placing existing · ${ELEMENT_LABELS[match.type].singular}`;
+    this.modeChip.textContent = `placing existing · ${typeName(match.type)}`;
     this.submitBtn.textContent = 'Place';
     this.nameInput.setSelectionRange(match.name.length, match.name.length);
   }
@@ -643,7 +645,7 @@ export class ElementCreateModal extends BaseModal {
       this.ghostSuffix.textContent = '';
       return;
     }
-    const matchedName = ELEMENT_LABELS[this.selected].singular;
+    const matchedName = typeName(this.selected);
     if (matchedName.toLowerCase().startsWith(typed.toLowerCase()) && typed.length < matchedName.length) {
       // Ghost only shows when typed text is a true prefix of the suggestion.
       this.ghostTyped.textContent = typed;
@@ -666,14 +668,14 @@ export class ElementCreateModal extends BaseModal {
       const showActive = type === this.selected && !this.opts.lockAll;
       btn.className = 'atlas-create-type-btn' + (showActive ? ' active' : '');
       btn.setAttribute('data-type', type);
-      btn.title = ELEMENT_LABELS[type].singular;
+      btn.title = typeName(type);
       btn.innerHTML = `
         <span class="material-symbols-outlined">${ELEMENT_ICONS[type]}</span>
-        <span>${ELEMENT_LABELS[type].singular}</span>
+        <span>${escapeText(typeName(type))}</span>
       `;
       btn.addEventListener('click', () => {
         this.setType(type);
-        this.typeInput.value = ELEMENT_LABELS[type].singular;
+        this.typeInput.value = typeName(type);
         this.updateGhost();
         // Hand focus straight back to the name input (S264, Captain: picking
         // a category shouldn't cost a re-click before typing the name).
@@ -695,10 +697,10 @@ export class ElementCreateModal extends BaseModal {
         btn.disabled = true;
         btn.className = 'atlas-create-type-btn atlas-create-type-btn-dateless';
         btn.setAttribute('data-type', type);
-        btn.title = `${ELEMENT_LABELS[type].singular} has no date fields: create it from the elements sidebar`;
+        btn.title = `${typeName(type)} has no date fields: create it from the elements sidebar`;
         btn.innerHTML = `
           <span class="material-symbols-outlined">${ELEMENT_ICONS[type]}</span>
-          <span>${ELEMENT_LABELS[type].singular}</span>
+          <span>${escapeText(typeName(type))}</span>
         `;
         grid.appendChild(btn);
       }
@@ -717,10 +719,11 @@ function matchCategory(input: string, candidates: ElementType[] = CREATE_TYPES):
   let starts: ElementType | null = null;
   let contains: ElementType | null = null;
   for (const t of candidates) {
-    const name = ELEMENT_LABELS[t].singular.toLowerCase();
-    if (name === q) { exact = t; break; }
-    if (!starts && name.startsWith(q)) starts = t;
-    if (!contains && name.includes(q)) contains = t;
+    // The world's word and the standard's both find the type.
+    const names = [typeName(t).toLowerCase(), typeName(t, { world: null }).toLowerCase()];
+    if (names.includes(q)) { exact = t; break; }
+    if (!starts && names.some(n => n.startsWith(q))) starts = t;
+    if (!contains && names.some(n => n.includes(q))) contains = t;
   }
   return exact ?? starts ?? contains;
 }

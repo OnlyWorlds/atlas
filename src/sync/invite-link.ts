@@ -13,6 +13,7 @@ import { OwApiError, OwNetworkError, OwV2Client } from '@onlyworlds/sdk';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { PlainError } from '../core/plain-error';
+import { typeNameStart } from '../core/type-words';
 
 /**
  * Who a link is for (the sharing floor's Q1, the Captain's yes, h50 #7610):
@@ -39,7 +40,10 @@ export const INVITE_NOT_OWNER_LINE = 'Only the world\'s owner can make an invite
 
 export const INVITE_CAP_LINE = 'This world has as many open invites as it can hold, links not yet used included. Take some back on its page on onlyworlds.com, under Access, then make a new one.';
 
-export const INVITE_CHARACTER_GONE_LINE = 'That Character is not on OnlyWorlds yet, or no longer. Let the world sync, or pick another, then make the link.';
+/** The open world's Character in its own word (names.md). */
+export function inviteCharacterGoneLine(): string {
+  return `That ${typeNameStart('character')} is not on OnlyWorlds yet, or no longer. Let the world sync, or pick another, then make the link.`;
+}
 
 /**
  * A new invite link, made by the signed-in owner. Nothing about it is kept.
@@ -71,7 +75,7 @@ export async function makeInvite(
       if (err.status === 422 && !err.param) throw new PlainError(INVITE_CAP_LINE);
       // keel refuses a Character it does not hold in this world (agents.py
       // `_clean_link_character`): made here and not synced yet, or deleted there.
-      if (err.status === 422 && err.param === 'character') throw new PlainError(INVITE_CHARACTER_GONE_LINE);
+      if (err.status === 422 && err.param === 'character') throw new PlainError(inviteCharacterGoneLine());
     }
     throw new PlainError('The link was not made. Try again in a moment.');
   }

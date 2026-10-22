@@ -25,7 +25,8 @@ import type { ChartConfig, ChartScope, TimelineNode } from '../visualization/tim
 import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } from '../visualization/timeline/charts-store';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
@@ -286,7 +287,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       chip.type = 'button';
       chip.className = 'atlas-chart-type-chip' + (on ? ' active' : '');
       chip.setAttribute('aria-pressed', on ? 'true' : 'false');
-      const label = ELEMENT_LABELS[t]?.plural ?? t;
+      const label = typeName(t, { many: true });
       chip.innerHTML =
         `<span class="material-symbols-outlined">${escapeText(ELEMENT_ICONS[t] ?? 'category')}</span>` +
         `<span>${escapeText(label)}</span>`;

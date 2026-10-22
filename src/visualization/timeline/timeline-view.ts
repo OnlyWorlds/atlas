@@ -15,6 +15,7 @@
  * same element. See DESIGN_CHARTS.md.
  */
 
+import { typeName } from '../../core/type-words';
 import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { effectiveEndDate, TEMPORAL_TYPE_FIELDS } from './temporal-fields';
@@ -1768,7 +1769,7 @@ function renderCard(state: ViewState): void {
   // is the second place a date can be changed without leaving the chart.
   if (TEMPORAL_TYPE_FIELDS[node.elementType] && state.onDateElement) {
     const typeSpan = document.createElement('span');
-    typeSpan.textContent = `${node.elementType} · `;
+    typeSpan.textContent = `${typeName(node.elementType)} · `;
     meta.appendChild(typeSpan);
     const dateBtn = document.createElement('button');
     dateBtn.type = 'button';
@@ -1782,7 +1783,7 @@ function renderCard(state: ViewState): void {
     });
     meta.appendChild(dateBtn);
   } else {
-    meta.textContent = `${node.elementType} · ${dateStr}`;
+    meta.textContent = `${typeName(node.elementType)} · ${dateStr}`;
   }
   card.appendChild(meta);
 
@@ -1925,7 +1926,7 @@ function renderAmbientRail(state: ViewState): void {
     const color = ELEMENT_TYPE_COLORS[type as ElementType] ?? '#94a3b8';
     row.innerHTML =
       `<span class="material-symbols-outlined" style="color:${color}">${ELEMENT_ICONS[type as ElementType] ?? 'category'}</span>` +
-      `<span>${escapeText(type)}</span><span class="atlas-timeline-rail-legend-count">${count}</span>`;
+      `<span>${escapeText(typeName(type))}</span><span class="atlas-timeline-rail-legend-count">${count}</span>`;
     legend.appendChild(row);
   }
   card.appendChild(legend);
@@ -1983,7 +1984,7 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
     gh.className = 'atlas-timeline-rail-undated-grouphead';
     gh.innerHTML =
       `<span class="material-symbols-outlined" style="color:${color}">${ELEMENT_ICONS[type as ElementType] ?? 'category'}</span>` +
-      `<span>${escapeText(type)}</span>` +
+      `<span>${escapeText(typeName(type))}</span>` +
       `<span class="atlas-timeline-rail-undated-groupcount">${items.length}</span>`;
     group.appendChild(gh);
 
@@ -2252,10 +2253,10 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
     + (dated ? ' atlas-timeline-chip-dated' : '')
     + (dateable && !dated ? ' atlas-timeline-chip-undated' : '');
   chip.title = dated
-    ? `${link.fieldLabel}: ${link.name} (${link.type}) · on this chart`
+    ? `${link.fieldLabel}: ${link.name} (${typeName(link.type)}) · on this chart`
     : dateable
-      ? `${link.fieldLabel}: ${link.name} (${link.type}) · undated: drag onto the chart to date it`
-      : `${link.fieldLabel}: ${link.name} (${link.type})`;
+      ? `${link.fieldLabel}: ${link.name} (${typeName(link.type)}) · undated: drag onto the chart to date it`
+      : `${link.fieldLabel}: ${link.name} (${typeName(link.type)})`;
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
   chip.innerHTML =
     `<span class="material-symbols-outlined">${escapeText(icon)}</span>` +

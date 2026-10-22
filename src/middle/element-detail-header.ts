@@ -30,7 +30,8 @@ import {
 } from './writing-helpers';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import type { Element, WorldMap } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
+import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
+import { typeName } from '../core/type-words';
 import { getActiveStore } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -98,7 +99,7 @@ export function renderHeader(el: Element): HTMLElement {
     const icon = document.createElement('span');
     icon.className = 'material-symbols-outlined';
     icon.textContent = ELEMENT_ICONS[el.type] ?? 'category';
-    icon.title = ELEMENT_LABELS[el.type].singular;
+    icon.title = typeName(el.type, { supertype: el.supertype });
     return icon;
   };
   const rawImageUrl = (el as Record<string, unknown>).image_url;
@@ -110,7 +111,7 @@ export function renderHeader(el: Element): HTMLElement {
     thumb.src = imageUrl;
     thumb.alt = '';
     thumb.loading = 'lazy';
-    thumb.title = `${ELEMENT_LABELS[el.type].singular} · click to show element images`;
+    thumb.title = `${typeName(el.type, { supertype: el.supertype })} · click to show element images`;
     thumb.addEventListener('click', () => {
       const next = setEditorSettings(getState().registry, { show_element_images: true });
       saveRegistry(next);
@@ -748,7 +749,7 @@ function buildPinnedElementIcon(mapEl: Element, pinnedEl: Element, showName: boo
   btn.className = 'atlas-icon-btn-sm atlas-header-pinned-icon';
   btn.setAttribute('data-action', 'goto-pinned-element');
   btn.setAttribute('data-element-id', pinnedEl.id);
-  btn.title = `${pinnedEl.name || '(unnamed)'} (${pinnedEl.type})`;
+  btn.title = `${pinnedEl.name || '(unnamed)'} (${typeName(pinnedEl.type, { supertype: pinnedEl.supertype })})`;
   const iconHtml = `<span class="material-symbols-outlined">${ELEMENT_ICONS[pinnedEl.type] ?? 'category'}</span>`;
   if (showName) {
     btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(pinnedEl.name || '(unnamed)')}</span>`;

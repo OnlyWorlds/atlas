@@ -28,7 +28,8 @@ import { openMapTab } from '../tabs/right/map-index-tab';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName, aTypeName } from '../core/type-words';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
@@ -416,10 +417,8 @@ function buildCover(
       const seg = document.createElement('button');
       seg.type = 'button';
       seg.className = 'atlas-home-statline-seg';
-      seg.title = `Show ${type}s in the sidebar`;
-      seg.innerHTML = `<b>${count}</b> ${escapeText((count === 1
-        ? ELEMENT_LABELS[type]?.singular
-        : ELEMENT_LABELS[type]?.plural) ?? type)}`;
+      seg.title = `Show ${typeName(type, { many: true })} in the sidebar`;
+      seg.innerHTML = `<b>${count}</b> ${escapeText(typeName(type, { many: count !== 1 }))}`;
       seg.addEventListener('click', () => filterSidebarTo([type]));
       statline.appendChild(seg);
     }
@@ -429,7 +428,7 @@ function buildCover(
       seg.type = 'button';
       seg.className = 'atlas-home-statline-seg';
       seg.title = 'Show these in the sidebar';
-      const names = singles.map(e => escapeText(ELEMENT_LABELS[e.type]?.singular ?? e.type)).join(', ');
+      const names = singles.map(e => escapeText(typeName(e.type))).join(', ');
       seg.innerHTML = `<b>1</b> each: ${names}`;
       seg.addEventListener('click', () => filterSidebarTo(singles.map(e => e.type)));
       statline.appendChild(seg);
@@ -680,7 +679,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         <span class="material-symbols-outlined">${row.icon}</span>
         <span class="atlas-home-continue-verb">${row.verb}</span>
         <span class="atlas-home-continue-name">${escapeText(row.el.name || '(unnamed)')}</span>
-        <span class="atlas-home-continue-kind">${escapeText(row.el.type)}</span>
+        <span class="atlas-home-continue-kind">${escapeText(typeName(row.el.type, { supertype: row.el.supertype }))}</span>
         <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;
       btn.addEventListener('click', () => openElementTarget(row.el, worldId));
@@ -893,7 +892,7 @@ const ROOM_NAMES: Record<TourRoom, string> = {
  */
 function cardTile(card: HomeCard, worldId: string, toasts: ToastManager): HTMLButtonElement {
   const { def, done } = card;
-  const label = ELEMENT_LABELS[def.type]?.singular ?? def.type;
+  const label = typeName(def.type);
   const core = def.room === 'element';
   const tile = document.createElement('button');
   tile.type = 'button';
@@ -901,7 +900,7 @@ function cardTile(card: HomeCard, worldId: string, toasts: ToastManager): HTMLBu
     + (core && !done ? ' atlas-home-tile-core' : '')
     + (done ? ' atlas-home-tile-done' : '');
   tile.setAttribute(done ? 'data-done-type' : 'data-create-type', def.type);
-  tile.title = done ? `Open ${ROOM_NAMES[def.room]}` : `Create a ${label}`;
+  tile.title = done ? `Open ${ROOM_NAMES[def.room]}` : `Create ${aTypeName(def.type)}`;
   tile.innerHTML = `
     <span class="material-symbols-outlined">${ELEMENT_ICONS[def.type] ?? 'category'}</span>
     <span>${escapeText(label)}</span>

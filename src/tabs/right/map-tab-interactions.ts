@@ -12,6 +12,7 @@
  * inline before the extraction, so behavior is preserved by construction.
  */
 
+import { typeName } from '../../core/type-words';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
 import { worldIsViewOnly } from '../../core/view-only';
@@ -334,7 +335,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     // already refuses both, but a future drag source could bypass that —
     // gate at the drop site too so the rule lives where pins are created).
     if (payload.type === 'zone' || payload.type === 'map') {
-      toasts.info(`${payload.type}s cannot be pinned`);
+      toasts.info(`${typeName(payload.type, { many: true })} cannot be pinned`);
       return;
     }
     const lMap = manager.getMap();

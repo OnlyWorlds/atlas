@@ -10,7 +10,7 @@
 
 import type { ChartConfig, ChartScope } from './types';
 import type { Element, ElementType } from '../../core/types';
-import { ELEMENT_LABELS } from '../../core/constants';
+import { typeName, typeNameStart } from '../../core/type-words';
 
 /** Insert a chart, or replace the existing one with the same id. */
 export function upsertChart(charts: ChartConfig[], chart: ChartConfig): ChartConfig[] {
@@ -126,10 +126,9 @@ export function defaultChartName(scope: ChartScope, elements: Element[]): string
 
 function typesName(types: ElementType[]): string {
   if (types.length === 0) return 'Empty chart';
-  const labels = types.map(t => ELEMENT_LABELS[t]?.plural ?? t);
-  const joined =
-    labels.length <= 2
-      ? labels.join(' & ')
-      : `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`;
-  return joined.charAt(0).toUpperCase() + joined.slice(1);
+  // The first word capitalised as a name's start; a world's word as written.
+  const labels = types.map((t, i) => (i === 0 ? typeNameStart(t, { many: true }) : typeName(t, { many: true })));
+  return labels.length <= 2
+    ? labels.join(' & ')
+    : `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`;
 }

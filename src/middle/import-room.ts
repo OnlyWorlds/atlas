@@ -15,7 +15,8 @@
 
 import { isAtlasOnlyStorage } from '../core/browser-worlds';
 import { getActiveStore } from '../core/active-store';
-import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
+import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
+import { typeName } from '../core/type-words';
 import { escapeText } from '../core/dom-utils';
 import { getState, patchSlice, subscribe } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
@@ -695,7 +696,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const typeRow = (t: ElementType) => `
       <label class="atlas-import-type-row">
         <span class="material-symbols-outlined atlas-import-type-icon">${escapeText(ELEMENT_ICONS[t] ?? 'category')}</span>
-        <span class="atlas-import-type-name">${escapeText(ELEMENT_LABELS[t]?.plural ?? t)}</span>
+        <span class="atlas-import-type-name">${escapeText(typeName(t, { many: true, world: null }))}</span>
         <span class="atlas-import-type-count">${counts.get(t)}</span>
         <input type="checkbox" value="${t}" checked />
       </label>`;

@@ -5,6 +5,7 @@
  * Extracted from map-tab.ts. Pure: takes an Element, returns escaped HTML.
  */
 
+import { typeNameStart } from '../../core/type-words';
 import type { Element } from '../../core/types';
 import { escapeText } from '../../core/dom-utils';
 
@@ -16,7 +17,7 @@ export function buildPinTooltipHtml(el: Element): string {
   const subtype = (el as any).subtype;
   if (supertype) subBits.push(sentenceCase(String(supertype)));
   if (subtype) subBits.push(sentenceCase(String(subtype)));
-  const typeLine = subBits.length > 0 ? subBits.join(' · ') : sentenceCase(String(el.type));
+  const typeLine = subBits.length > 0 ? subBits.join(' · ') : typeNameStart(String(el.type));
   parts.push(`<div class="atlas-pin-tooltip-type">${escapeText(typeLine)}</div>`);
   const desc = typeof (el as any).description === 'string' ? (el as any).description.trim() : '';
   if (desc) {

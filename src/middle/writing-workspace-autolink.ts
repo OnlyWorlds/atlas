@@ -23,6 +23,7 @@
  * See DESIGN_WRITING.md §Autolink for the design rationale.
  */
 
+import { typeName } from '../core/type-words';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorState, Transaction } from '@tiptap/pm/state';
@@ -123,7 +124,7 @@ function buildDecorations(matches: ScanMatch[], doc: PmNode): DecorationSet {
         // they're known words from the writer's world, not misspellings.
         {
           class: 'atlas-autolink-hint',
-          title: `Tab to link as ${m.candidate.type}`,
+          title: `Tab to link as ${typeName(m.candidate.type)}`,
           spellcheck: 'false',
         },
         { candidate: m.candidate },

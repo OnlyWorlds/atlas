@@ -14,7 +14,8 @@
 import { BaseModal } from './modal-base';
 import type { ToastManager } from './toast-manager';
 import { owAccessUrl } from '../core/ow-site';
-import { escapeAttr } from '../core/dom-utils';
+import { escapeAttr, escapeText } from '../core/dom-utils';
+import { typeNameStart } from '../core/type-words';
 import { getState } from '../core/state';
 import { loadUiPrefs, setInviterNamePref } from '../core/ui-prefs';
 import { problemFor } from '../core/problems';
@@ -26,6 +27,11 @@ const FOR_WORDS: Record<InviteFor, { title: string; line: string; as: string; ne
   player: { title: 'A player', line: 'Sees only what their Character knows. No account needed.', as: 'a player', needs: 'No account needed: they open it in Lantern.' },
   guest: { title: 'A player with an account', line: 'The same, signed in to an account of their own.', as: 'a player with an account', needs: 'They need a free account.' },
 };
+
+/** A role's line, the player's Character in the world's own word ("their Employee"; names.md). */
+function forLine(r: InviteFor): string {
+  return FOR_WORDS[r].line.replace('their Character', `their ${typeNameStart('character')}`);
+}
 
 /**
  * The world's Characters a player link can name: keel holds only what has
@@ -65,7 +71,7 @@ export class InviteModal extends BaseModal {
   private renderChoose(body: HTMLElement): void {
     const choice = (r: InviteFor): string =>
       `<button type="button" class="atlas-invite-choice" data-role="${r}" aria-pressed="${r === this.inviteFor}">
-         <strong>${FOR_WORDS[r].title}</strong><span>${FOR_WORDS[r].line}</span>
+         <strong>${FOR_WORDS[r].title}</strong><span>${escapeText(forLine(r))}</span>
        </button>`;
     body.innerHTML = `
       <form data-form="invite">
@@ -92,7 +98,7 @@ export class InviteModal extends BaseModal {
     // Names are world data (conv. 93): options are built as text.
     const playsAs = body.querySelector<HTMLElement>('[data-role="plays-as"]')!;
     const playsAsSelect = body.querySelector<HTMLSelectElement>('select[name="plays-as"]')!;
-    playsAsSelect.append(new Option('A new Character for them', NEW_CHARACTER));
+    playsAsSelect.append(new Option(`A new ${typeNameStart('character')} for them`, NEW_CHARACTER));
     for (const c of playableCharacters(this.worldId)) playsAsSelect.append(new Option(c.name, c.id));
     const needs = body.querySelector<HTMLElement>('[data-role="invite-needs"]')!;
     const showChoice = (): void => {

@@ -18,6 +18,7 @@
  * for a jump tool. Unnamed elements only surface via description matches.
  */
 
+import { typeName } from '../core/type-words';
 import { BaseModal } from './modal-base';
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
@@ -142,7 +143,7 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
       id: el.id,
       name: el.name?.trim() || '(unnamed)',
       type: el.type,
-      hint: taxonomy ? `${el.type} · ${taxonomy}` : el.type,
+      hint: taxonomy ? `${typeName(el.type, { supertype: el.supertype })} · ${taxonomy}` : typeName(el.type, { supertype: el.supertype }),
       snippet: hit.snippet,
       score: hit.score,
     });

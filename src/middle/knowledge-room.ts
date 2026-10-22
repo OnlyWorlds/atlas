@@ -40,7 +40,8 @@ import {
 import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writing-workspace-derive';
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
-import { ELEMENT_ICONS, ELEMENT_LABELS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
+import { ELEMENT_ICONS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
+import { typeName } from '../core/type-words';
 import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { Element } from '../core/types';
@@ -702,7 +703,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     header.innerHTML = `
       <h1>Knowledge</h1>
       <p class="atlas-room-subtitle">
-        What your characters and collectives know about each other and the world.
+        What your ${escapeText(typeName('character', { many: true }))} and ${escapeText(typeName('collective', { many: true }))} know about each other and the world.
       </p>
     `;
     root.appendChild(header);
@@ -1076,11 +1077,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const head = document.createElement('button');
         head.type = 'button';
         head.className = 'atlas-knowledge-known-head';
-        head.title = `Open ${el.name || el.type}`;
+        head.title = `Open ${el.name || typeName(el.type, { supertype: el.supertype })}`;
         head.innerHTML = `
           <span class="material-symbols-outlined">${ELEMENT_ICONS[el.type] ?? 'category'}</span>
           <span class="atlas-knowledge-known-name">${escapeText(el.name || '(unnamed)')}</span>
-          <span class="atlas-knowledge-known-type">${escapeText(ELEMENT_LABELS[el.type]?.singular ?? el.type)}</span>
+          <span class="atlas-knowledge-known-type">${escapeText(typeName(el.type, { supertype: el.supertype }))}</span>
         `;
         head.addEventListener('click', () => navigate(elementHash(worldId, el.id)));
         card.appendChild(head);

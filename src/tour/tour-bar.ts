@@ -29,7 +29,8 @@ import { showProblem } from '../ui/problem-fixes';
 import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { confirmExitTour } from './tour-exit-modal';
 import { showTourPane, tourPaneFor } from './tour-pane';
-import { ELEMENT_ICONS, ELEMENT_LABELS, ELEMENT_TYPE_COLORS } from '../core/constants';
+import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
+import { typeName } from '../core/type-words';
 import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
@@ -307,7 +308,7 @@ function buildSentence(idx: number, step: TourStep, view: TourWorldView, bare = 
     if (fill) {
       span.classList.add('parsed');
       span.style.setProperty('--tour-word-color', ELEMENT_TYPE_COLORS[fill.type] ?? '#22d3ee');
-      span.title = `${fill.type} · jump to that step`;
+      span.title = `${typeName(fill.type)} · jump to that step`;
       span.addEventListener('click', () => { void enterStep(fill.step); });
     }
     if (activeWords.has(w)) span.classList.add('active');
@@ -332,7 +333,7 @@ function buildSentence(idx: number, step: TourStep, view: TourWorldView, bare = 
       if (lit && g.step === idx) glyph.classList.add('pop');
       glyph.textContent = ELEMENT_ICONS[g.type] ?? 'circle';
       glyph.style.setProperty('--tour-glyph-color', ELEMENT_TYPE_COLORS[g.type] ?? '#22d3ee');
-      glyph.title = g.type;
+      glyph.title = typeName(g.type);
       if (lit) glyph.addEventListener('click', () => { void enterStep(g.step); });
       sentence.appendChild(glyph);
     }
@@ -778,7 +779,7 @@ function buildPreviewStack(idx: number): HTMLElement | null {
     const icon = document.createElement('span');
     icon.className = 'material-symbols-outlined atlas-tour-create-glyph';
     icon.textContent = ELEMENT_ICONS[type as ElementType] ?? 'circle';
-    icon.title = `${name} (${type}) · up next`;
+    icon.title = `${name} (${typeName(type)}) · up next`;
     icon.style.setProperty('--tour-glyph-color', ELEMENT_TYPE_COLORS[type as ElementType] ?? '#22d3ee');
     stack.appendChild(icon);
   }
@@ -922,10 +923,10 @@ const CATEGORY_WORDS: ReadonlyMap<string, ElementType> = (() => {
   }
   const map = new Map<string, ElementType>();
   for (const t of types) {
-    const labels = ELEMENT_LABELS[t as ElementType];
-    if (!labels) continue;
-    map.set(labels.singular.toLowerCase(), t as ElementType);
-    map.set(labels.plural.toLowerCase(), t as ElementType);
+    // The tour's copy is written in the standard's words, whatever world is open.
+    if (!(t in ELEMENT_ICONS)) continue;
+    map.set(typeName(t, { world: null }).toLowerCase(), t as ElementType);
+    map.set(typeName(t, { world: null, many: true }).toLowerCase(), t as ElementType);
   }
   return map;
 })();

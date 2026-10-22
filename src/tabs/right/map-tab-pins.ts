@@ -10,7 +10,8 @@
 
 import type { Element, Pin } from '../../core/types';
 import { getState } from '../../core/state';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
+import { ELEMENT_ICONS } from '../../core/constants';
+import { typeName } from '../../core/type-words';
 import { pinVisualFor } from './pin-visuals';
 import { hasLinkedSubMap } from './auto-open-map';
 import { enablePinDrag } from './map-tab-pin-drag';
@@ -216,7 +217,7 @@ function applyLabelVisibility(
 
 /**
  * Re-render the pin-filter chip strip from the current pin set. One chip per
- * distinct element_type, in canonical ELEMENT_LABELS order. Each chip shows
+ * distinct element_type, in the order of the words the world prints. Each chip shows
  * the category icon + count. Active = type is visible (default); muted +
  * `data-hidden="true"` = type is hidden. Click toggles `hiddenPinTypes` and
  * re-syncs pins.
@@ -250,8 +251,8 @@ function refreshChipStrip(entry: MapTabCacheEntry, allMinePins: Pin[], atDate: P
   entry.chipStrip.setAttribute('data-active', 'true');
   entry.chipStrip.innerHTML = '';
   const types = [...countByType.keys()].sort((a, b) => {
-    const aL = ELEMENT_LABELS[a as keyof typeof ELEMENT_LABELS]?.singular ?? a;
-    const bL = ELEMENT_LABELS[b as keyof typeof ELEMENT_LABELS]?.singular ?? b;
+    const aL = typeName(a);
+    const bL = typeName(b);
     return aL.localeCompare(bL);
   });
   for (const type of types) {
@@ -262,10 +263,10 @@ function refreshChipStrip(entry: MapTabCacheEntry, allMinePins: Pin[], atDate: P
     chip.className = 'atlas-pin-filter-chip';
     chip.setAttribute('data-type', type);
     chip.setAttribute('data-hidden', String(hidden));
-    const label = ELEMENT_LABELS[type as keyof typeof ELEMENT_LABELS]?.singular ?? type;
+    const label = typeName(type, { many: count !== 1 });
     chip.title = hidden
-      ? `${count} ${label}${count === 1 ? '' : 's'} hidden · click to show`
-      : `${count} ${label}${count === 1 ? '' : 's'} shown · click to hide`;
+      ? `${count} ${label} hidden · click to show`
+      : `${count} ${label} shown · click to hide`;
     const iconName = ELEMENT_ICONS[type as keyof typeof ELEMENT_ICONS] ?? 'category';
     chip.innerHTML = `<span class="material-symbols-outlined">${iconName}</span><span class="atlas-pin-filter-chip-count">${count}</span>`;
     chip.addEventListener('click', (e) => {

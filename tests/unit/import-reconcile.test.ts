@@ -300,6 +300,16 @@ describe('reconcile — adversarial review regressions (session 241)', () => {
     expect(plan.worldMeta!.description).toBe('d');
   });
 
+  it("keeps the World's x_ keys verbatim (the names profile's x_names, §4.1)", () => {
+    const x_names = { version: 1, types: { character: { one: 'Employee', many: 'Employees' } }, extra: [1] };
+    const parsed = parsePayload({ World: { name: 'Work', x_names, x_other: 'kept', y_not: 'dropped' }, Character: [{ name: 'A' }] });
+    const plan = reconcile(parsed, [], { genId: genIdFactory() });
+    const wm = plan.worldMeta as Record<string, unknown>;
+    expect(wm.x_names).toEqual(x_names);
+    expect(wm.x_other).toBe('kept');
+    expect('y_not' in wm).toBe(false);
+  });
+
   it('inserts a fresh element when an incoming uuid collides with a DIFFERENT existing element', () => {
     const existing = [existingEl({ id: U.kid, type: 'character', name: 'Alice' })];
     const parsed = parsePayload({ Character: [{ id: U.kid, name: 'Bob' }] });

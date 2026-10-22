@@ -9,7 +9,7 @@
  */
 
 import { getState } from '../core/state';
-import { ELEMENT_LABELS } from '../core/constants';
+import { typeName } from '../core/type-words';
 import type { Element } from '../core/types';
 import { getRecents } from './writing-workspace-recents';
 import type { MentionSuggestionItem } from './writing-workspace-mention';
@@ -107,5 +107,5 @@ function toItem(el: Element): MentionSuggestionItem {
 function buildSubtitle(el: Element): string | undefined {
   // For v1 keep it light — just the element-type label. Disambiguation by
   // parent location / family / etc. is a polish refinement.
-  return ELEMENT_LABELS[el.type]?.singular;
+  return typeName(el.type, { supertype: el.supertype });
 }

@@ -15,7 +15,8 @@ import { worldIsViewOnly } from '../core/view-only';
 import { onHashChange, navigate, elementHash, homeHash } from '../core/router';
 import { setWorldFavoriteElement, saveRegistry, getEditorSettings } from '../registry/registry';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName, typeNameStart, aTypeName, typeWordsKey } from '../core/type-words';
 import { lensKnownSet } from '../core/knowledge';
 import { reservedRowHint } from '../core/taxonomy';
 import { styleRowHint } from '../core/world-styles';
@@ -62,12 +63,12 @@ export function filterSummary(
 ): string {
   let types: string;
   if (filters.size > 0) {
-    const shown = FILTER_TYPES_WITH_MAP.filter(t => filters.has(t)).map(t => ELEMENT_LABELS[t].plural);
+    const shown = FILTER_TYPES_WITH_MAP.filter(t => filters.has(t)).map(t => typeName(t, { many: true }));
     types = `Showing ${joinTypeNames(shown)}`;
   } else {
     const hidden = FILTER_TYPES_WITH_MAP
       .filter(t => muted.has(t) && !MUTED_TAIL_TYPES.includes(t))
-      .map(t => ELEMENT_LABELS[t].plural);
+      .map(t => typeName(t, { many: true }));
     types = hidden.length === 0 ? 'All types' : `All types except ${joinTypeNames(hidden)}`;
   }
   return types + (madeBy ? ` · made by ${madeBy}` : '') + (hideRoom ? ' · the room hidden' : '');
@@ -621,7 +622,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // Rebuilt only when it would come out different (conv. 146, S422): a
     // rebuild between a press and its release loses the click. The handlers
     // capture only their type and read the rest at the click.
-    if (!filterGate.changed([JSON.stringify([names, touring, isCoarsePointer(), hidingTypes,
+    if (!filterGate.changed([JSON.stringify([names, touring, isCoarsePointer(), hidingTypes, typeWordsKey(),
       [...filters].sort(), [...muted].sort(), [...countByType].sort()])])) return;
     strip.innerHTML = '';
     strip.dataset.names = names;
@@ -647,14 +648,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // the moment you hover) — data-tip drives a ::after pseudo; no native
       // title (its OS delay is the complaint, and doubling would ghost). A
       // named chip already says its name, so only the muted hint stays.
-      if (isMuted) btn.dataset.tip = `${ELEMENT_LABELS[type].plural} (hidden when showing all; right-click to show)`;
-      else if (!named(type)) btn.dataset.tip = ELEMENT_LABELS[type].plural;
+      if (isMuted) btn.dataset.tip = `${typeName(type, { many: true })} (hidden when showing all; right-click to show)`;
+      else if (!named(type)) btn.dataset.tip = typeName(type, { many: true });
       // ...and the SAME text as the accessible name. `data-tip` is invisible to
       // assistive tech, so with the icon ligature correctly hidden (S308) these
       // buttons would otherwise have no accessible name at all — my own
       // icon-a11y sweep created that gap and its audit caught it. A visual
       // tooltip is not a label.
-      btn.setAttribute('aria-label', ELEMENT_LABELS[type].plural);
+      btn.setAttribute('aria-label', typeName(type, { many: true }));
       // The selected state, for assistive tech as for the eye (S369).
       btn.setAttribute('aria-pressed', filters.has(type) ? 'true' : 'false');
       btn.setAttribute('data-filter-type', type);
@@ -665,11 +666,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       btn.appendChild(icon);
 
       if (named(type)) {
-        const label = ELEMENT_LABELS[type].plural;
         const name = document.createElement('span');
         name.className = 'atlas-filter-name';
         name.setAttribute('aria-hidden', 'true'); // the button's aria-label already says it
-        name.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+        name.textContent = typeNameStart(type, { many: true });
         btn.appendChild(name);
       }
 
@@ -817,8 +817,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     if (assign) {
       const isProt = assign.kind === 'protagonist';
       assignLabel.textContent = isProt
-        ? 'Click a character to set your protagonist'
-        : 'Click a location to set your home';
+        ? `Click ${aTypeName('character')} to set your protagonist`
+        : `Click ${aTypeName('location')} to set your home`;
       const icon = assignBanner.querySelector('.atlas-cast-assign-icon');
       if (icon) icon.textContent = isProt ? 'person_pin' : 'home_pin';
     }
@@ -856,6 +856,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       tourFresh: isTourFlagActive() ? [...tourFreshIds].join(',') : '',
       loading: state.data.loading,
       progress: state.data.loadingProgress?.done ?? null,
+      words: typeWordsKey(),
     };
     if (lastList && sameInputs(listInputs, lastList)) {
       if (selectedId !== lastSelectedId) {
@@ -1036,7 +1037,7 @@ function renderElementRow(
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
   const mapBadge = hasMap
-    ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="This location has at least one map">map</span>`
+    ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="This ${escapeAttr(typeName('location'))} has at least one ${escapeAttr(typeName('map'))}">map</span>`
     : '';
   // onActiveMap is set for any element with presence on the currently active
   // map (pin pointing at it, or zone with a marker on the map). Different
@@ -1079,7 +1080,7 @@ function renderElementRow(
       ${chronicleBadge}
       ${reservedBadge}
       ${styleBadge}
-      <span class="atlas-row-meta">${escapeText(el.type)}</span>
+      <span class="atlas-row-meta">${escapeText(typeName(el.type, { supertype: el.supertype }))}</span>
     </div>
   `;
 }

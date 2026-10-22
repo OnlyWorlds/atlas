@@ -24,7 +24,8 @@
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash, writingHash, knowledgeHash, knowledgeKnowerHash, shareHash } from '../core/router';
 import type { Element, ElementType } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName, typeNameStart } from '../core/type-words';
 import { getTierForNarrative, getWritingLabels, type WritingTier } from './writing-helpers';
 import { isKnowledgeNarrative, aboutIdsOf, heldByOf, knowersOfElement } from '../core/knowledge';
 import { isPageNarrative } from '../core/sharing';
@@ -167,7 +168,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
       const sources = qualified.filter(src => src.type === type);
       if (sources.length > 0) {
         // Same label style as the generic type grouping (titleCaseFirst).
-        groups.push({ label: titleCaseFirst(ELEMENT_LABELS[type]?.plural ?? type), sources });
+        groups.push({ label: typeNameStart(type, { many: true }), sources });
       }
     }
     wrap.appendChild(buildSection({
@@ -239,7 +240,7 @@ function groupNarrativesByTier(narratives: Element[]): RefGroup[] {
     const sources = buckets.get(key);
     if (!sources || sources.length === 0) continue;
     const label = key === 'other' || !labels || key === null
-      ? titleCaseFirst(ELEMENT_LABELS.narrative?.plural ?? 'narratives')
+      ? typeNameStart('narrative', { many: true })
       : pluralize(labels[key]);
     groups.push({ label, sources });
   }
@@ -256,7 +257,7 @@ function groupOthersByType(others: Element[]): RefGroup[] {
   }
   const groups: RefGroup[] = [];
   for (const [type, sources] of byType.entries()) {
-    groups.push({ label: titleCaseFirst(ELEMENT_LABELS[type]?.plural ?? type), sources });
+    groups.push({ label: typeNameStart(type, { many: true }), sources });
   }
   return groups;
 }
@@ -338,7 +339,7 @@ function buildSection(opts: SectionOpts): HTMLElement {
 function buildRefChip(src: Element, navigateTo: NavTarget): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'atlas-link-chip';
-  chip.title = `${src.type} · id ${src.id}`;
+  chip.title = `${typeName(src.type, { supertype: src.supertype })} · id ${src.id}`;
   const icon = document.createElement('span');
   icon.className = 'material-symbols-outlined atlas-link-chip-icon';
   icon.textContent = ELEMENT_ICONS[src.type];

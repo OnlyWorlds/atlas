@@ -12,7 +12,8 @@
  */
 
 import { knownFieldsFor, relationFieldsFor } from '../editor/field-schema';
-import { isExtensionField, ELEMENT_LABELS, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SPATIAL_TYPES } from '../core/constants';
+import { isExtensionField, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SPATIAL_TYPES } from '../core/constants';
+import { typeName } from '../core/type-words';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { isUuid, normName } from './normalize';
 import type { ParseResult, RawRecord, ValidationIssue } from './types';
@@ -63,7 +64,7 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
     const known = knownFieldsFor(type);
     const isSpatial = SPATIAL_TYPES.has(type);
     const relBySchemaField = new Map(relationFieldsFor(type).map(r => [r.schemaField, r]));
-    const label = ELEMENT_LABELS[type]?.singular ?? type;
+    const label = typeName(type, { world: null });
 
     records.forEach((rec, i) => {
       const path = `${cap(type)}[${i}]`;

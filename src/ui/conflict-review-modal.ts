@@ -10,6 +10,7 @@
  * row is removed from the modal. When the list empties, the modal closes.
  */
 
+import { typeName } from '../core/type-words';
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount, refreshMetaCacheNow } from '../sync/sync-attach';
@@ -136,7 +137,7 @@ export class ConflictReviewModal extends BaseModal {
     const name = lookupName(c.element_id) ?? '(unnamed)';
     row.innerHTML = `
       <div class="atlas-conflict-row-meta">
-        <span class="atlas-conflict-type">${escapeText(c.type)}</span>
+        <span class="atlas-conflict-type">${escapeText(typeName(c.type))}</span>
         <span class="atlas-conflict-name">${escapeText(name)}</span>
         <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} differ${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
         ${c.proposal ? `<span class="atlas-conflict-proposal" data-role="proposal-line">${escapeText(proposalReviewLine(c.proposal))}</span>` : ''}

@@ -8868,7 +8868,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
    an unmade tile is a Sentence-case phrase and keeps its own size (1.32.0). */
 .atlas-home-onboarding-tile span:last-child:not(.atlas-home-tile-line) {
   font-size: 11px;
-  text-transform: lowercase;
+  /* No text-transform: the type word arrives cased (a world's own word is printed as written, names.md). */
 }
 
 .atlas-home-onboarding-hint {
@@ -14542,7 +14542,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 
 .atlas-context-preview-type {
   font-size: 11px;
-  text-transform: lowercase;
+  /* No text-transform: a world's own word is printed as written (names.md). */
   letter-spacing: 0.02em;
   color: var(--atlas-text-muted);
   margin-top: 1px;

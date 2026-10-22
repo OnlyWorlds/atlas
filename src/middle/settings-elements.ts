@@ -15,7 +15,8 @@ import {
 } from '../registry/registry';
 import { ToastManager } from '../ui/toast-manager';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type TypeStripNames } from '../core/types';
-import { ELEMENT_LABELS } from '../core/constants';
+import { typeName } from '../core/type-words';
+import { escapeText } from '../core/dom-utils';
 import { loadUiPrefs, setDefaultCreateTypePref } from '../core/ui-prefs';
 
 /** Types the create modal can default to — content types plus 'map'. */
@@ -31,7 +32,7 @@ export function renderElementsTab(): string {
   const stripNames = editor.type_strip_names;
   const defaultCreateType = loadUiPrefs().defaultCreateType;
   const createTypeOptions = CREATABLE_TYPES
-    .map((t) => `<option value="${t}" ${t === defaultCreateType ? 'selected' : ''}>${ELEMENT_LABELS[t].singular}</option>`)
+    .map((t) => `<option value="${t}" ${t === defaultCreateType ? 'selected' : ''}>${escapeText(typeName(t))}</option>`)
     .join('');
   return `
     <section class="atlas-settings-section">
@@ -186,6 +187,6 @@ export function wireElementsTab(toasts: ToastManager): void {
     const t = createTypeSel.value as ElementType;
     if (!CREATABLE_TYPES.includes(t)) return;
     setDefaultCreateTypePref(t);
-    toasts.info(`Default new-element type: ${ELEMENT_LABELS[t].singular}`);
+    toasts.info(`Default new-element type: ${typeName(t)}`);
   });
 }

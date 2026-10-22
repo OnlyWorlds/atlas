@@ -22,7 +22,8 @@
  */
 
 import type { Element } from '../../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
+import { ELEMENT_ICONS } from '../../core/constants';
+import { typeName } from '../../core/type-words';
 import { getState } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
 import { getEditorSettings } from '../../registry/registry';
@@ -188,7 +189,7 @@ function buildPreview(
   appendLinkLine(body, 'atlas-context-preview-backlinks', 'Linked from', folded.story.length,
     folded.story.map(n => ({
       text: n.name || '(unnamed)',
-      title: ELEMENT_LABELS[n.type]?.singular ?? n.type,
+      title: typeName(n.type, { supertype: n.supertype }),
       navId: n.id,
     })));
   appendLinkLine(body, 'atlas-context-preview-backlinks atlas-context-preview-pins', 'Pins', folded.pins.length,
@@ -368,7 +369,7 @@ function previewTypeLabel(el: Element): string {
   const kind = narrativeKindOf(el);
   if (kind === 'knowledge') return 'knowledge entry';
   if (kind === 'page') return 'page';
-  return ELEMENT_LABELS[el.type]?.singular ?? el.type;
+  return typeName(el.type, { supertype: el.supertype });
 }
 
 function escapeRegex(s: string): string {

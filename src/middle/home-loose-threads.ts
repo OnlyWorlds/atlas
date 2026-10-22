@@ -16,6 +16,7 @@ import type { Element } from '../core/types';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { ELEMENT_ICONS } from '../core/constants';
+import { typeName } from '../core/type-words';
 import { collectReferencedIds } from './element-detail-refs';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { findDateConflicts, type DateConflict, type DatedRef } from '../core/date-continuity';
@@ -82,11 +83,11 @@ export function computeLooseThreads(elements: readonly Element[]): LooseThread[]
     { key: 'date-conflicts', icon: 'event_busy', elements: conflictEls, conflicts,
       noun: n => (n === 1 ? 'date to check' : 'dates to check') },
     { key: 'unmapped-locations', icon: ELEMENT_ICONS.location, elements: unmappedLocations,
-      noun: n => (n === 1 ? 'location not on a map' : 'locations not on a map') },
+      noun: n => `${typeName('location', { many: n !== 1 })} not on a map` },
     { key: 'undated-events', icon: ELEMENT_ICONS.event, elements: undatedEvents,
-      noun: n => (n === 1 ? 'undated event' : 'undated events') },
+      noun: n => `undated ${typeName('event', { many: n !== 1 })}` },
     { key: 'unlinked-characters', icon: ELEMENT_ICONS.character, elements: unlinkedCharacters,
-      noun: n => (n === 1 ? 'unlinked character' : 'unlinked characters') },
+      noun: n => `unlinked ${typeName('character', { many: n !== 1 })}` },
   ];
 
   return threads.filter(t => t.elements.length > 0);

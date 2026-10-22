@@ -11,7 +11,8 @@
  */
 
 import type { ElementType } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName } from '../core/type-words';
 import { escapeText } from '../core/dom-utils';
 
 export interface MentionSuggestionItem {
@@ -64,7 +65,7 @@ export function renderMentionSuggestion() {
     popover.innerHTML = items
       .map((it, i) => {
         const icon = ELEMENT_ICONS[it.type] ?? 'category';
-        const typeLabel = ELEMENT_LABELS[it.type]?.singular ?? it.type;
+        const typeLabel = typeName(it.type);
         const subtitle = it.subtitle ? ` · ${escapeText(it.subtitle)}` : '';
         return `
           <div class="atlas-mention-item${i === selectedIndex ? ' is-selected' : ''}" data-index="${i}">

@@ -16,7 +16,8 @@
 
 import { getState } from '../core/state';
 import { navigate, elementHash } from '../core/router';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 
@@ -66,7 +67,7 @@ export function createChipPreview(workspaceRoot: HTMLElement): ChipPreviewContro
       return;
     }
     const icon = ELEMENT_ICONS[el.type] ?? 'category';
-    const typeLabel = ELEMENT_LABELS[el.type]?.singular ?? fallbackType;
+    const typeLabel = el.type ? typeName(el.type, { supertype: el.supertype }) : fallbackType;
     const desc = el.description;
     const excerpt = desc ? excerptOf(desc, 220) : '';
     const imageUrl = el.image_url;

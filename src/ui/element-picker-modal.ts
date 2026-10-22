@@ -15,7 +15,8 @@ import { BaseModal } from './modal-base';
 import { getState } from '../core/state';
 import type { Element, ElementType } from '../core/types';
 import { ALL_ELEMENT_TYPES } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS } from '../core/constants';
+import { typeName, aTypeName } from '../core/type-words';
 import { escapeText } from '../core/dom-utils';
 import { currentLore } from '../core/parlor-room';
 
@@ -111,7 +112,7 @@ class ElementPickerModal extends BaseModal {
 
     const titleText = this.opts.title
       ?? (this.opts.restrictToType
-        ? `Pick a ${ELEMENT_LABELS[this.opts.restrictToType].singular}`
+        ? `Pick ${aTypeName(this.opts.restrictToType)}`
         : 'Pick an element');
 
     body.innerHTML = `
@@ -154,7 +155,7 @@ class ElementPickerModal extends BaseModal {
     ALL_ELEMENT_TYPES.forEach(t => {
       // Map artifacts aren't normally picked — same rule as the list filter.
       if (GENERIC_PICK_EXCLUDED.has(t)) return;
-      this.stripEl!.appendChild(this.typeChip(ELEMENT_LABELS[t].singular, ELEMENT_ICONS[t], t));
+      this.stripEl!.appendChild(this.typeChip(typeName(t), ELEMENT_ICONS[t], t));
     });
   }
 
@@ -221,7 +222,7 @@ class ElementPickerModal extends BaseModal {
     row.innerHTML = `
       <span class="material-symbols-outlined atlas-picker-row-icon">${ELEMENT_ICONS[el.type]}</span>
       <span class="atlas-picker-row-name">${escapeText(el.name || '(unnamed)')}</span>
-      <span class="atlas-picker-row-type">${escapeText(el.type)}</span>
+      <span class="atlas-picker-row-type">${escapeText(typeName(el.type, { supertype: el.supertype }))}</span>
     `;
     row.addEventListener('click', () => {
       this.resolved = true;

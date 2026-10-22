@@ -15,7 +15,8 @@
  * renderer that fires callbacks when chips are clicked.
  */
 
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
+import { ELEMENT_ICONS } from '../../core/constants';
+import { typeName } from '../../core/type-words';
 import type { ElementType } from '../../core/types';
 
 export interface ContextToolbarHandle {
@@ -104,8 +105,8 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
       chip.setAttribute('aria-pressed', isHidden ? 'false' : 'true');
       chip.dataset.type = t;
       chip.title = isHidden
-        ? `Show ${ELEMENT_LABELS[t]?.plural ?? t}`
-        : `Hide ${ELEMENT_LABELS[t]?.plural ?? t}`;
+        ? `Show ${typeName(t, { many: true })}`
+        : `Hide ${typeName(t, { many: true })}`;
       chip.innerHTML =
         `<span class="material-symbols-outlined">${ELEMENT_ICONS[t] ?? 'category'}</span>`;
       chip.addEventListener('click', () => onToggleType(t));
