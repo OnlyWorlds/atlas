@@ -283,8 +283,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
   // ----- Who made it, and the parlor's room (#350) -----
   // "Made by" people or agents, read from keel's created_by with the roster's
-  // kind (core/made-by.ts): only in a synced world whose roster holds an agent
-  // seat, since otherwise there is nothing to tell apart. "Hide the room" only
+  // kind (core/made-by.ts): only in a synced world where an agent seat made
+  // something, since otherwise there is nothing to tell apart. "Hide the room" only
   // when the world holds the parlor's room elements (core/parlor-room.ts). The
   // filters live in ui state, per world; one that no longer applies (the
   // roster gone, the room's last line deleted) counts as off, never strands.
@@ -311,7 +311,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       rosterAsked = entry.id;
       void rosterFor(entry).then(rows => { if (rows) render(); else rosterAsked = null; });
     }
-    const showMadeBy = rosterHasAgent(roster);
+    const hasAgent = rosterHasAgent(roster);
     const elements = state.data.elements;
     // One pass per new elements array or roster; `kinds` keeps its identity
     // between them, since the list memo compares it by reference.
@@ -321,12 +321,15 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       let room = 0;
       for (const el of elements) {
         if (isRoomElement(el)) room++;
-        if (!showMadeBy) continue;
+        if (!hasAgent) continue;
         const by = madeByOf(el, kinds);
         if (by) counts[by]++;
       }
       originMemo = { elements, roster, kinds, counts, room };
     }
+    // Offered only when an agent made something: a roster whose agent seats made nothing,
+    // or were removed before they did (W11, S451), has nothing to tell apart.
+    const showMadeBy = hasAgent && originMemo.counts.agents > 0;
     return {
       kinds: originMemo.kinds,
       madeBy: showMadeBy ? state.ui.madeBy : null,

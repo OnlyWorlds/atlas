@@ -108,4 +108,23 @@ test.describe('made by, and the room', () => {
     await expect(summary).toHaveText('All types · the room hidden');
     await expect(rowNames(page)).toHaveText(['Fort Griffin', 'Glanton', 'Holden']);
   });
+
+  test('an agent seat that made nothing offers no Made by, until an agent\'s element arrives', async ({ page }) => {
+    // W11's shape (S451): agent seats on the roster, none of the world's elements theirs.
+    await setupWorld(page);
+    await pulled(page, 'character', '0192a000-0000-7000-8000-000000035011', 'Holden', { created_by: PERSON });
+    await pulled(page, 'location', '0192a000-0000-7000-8000-000000035012', 'Fort Griffin', { created_by: null });
+    await linkWorld(page);
+    await expect(rowNames(page)).toHaveCount(2);
+    const row = page.locator('[data-role="origin-filters"]');
+    // Long enough for the routed roster to answer: the second half proves it did.
+    await page.waitForTimeout(1500);
+    await expect(row).toBeHidden();
+    await expect(row.locator('[data-action="made-by-agents"]')).toHaveCount(0);
+
+    // The control moves: a pull brings an agent's element, and the row offers it.
+    await pulled(page, 'character', '0192a000-0000-7000-8000-000000035013', 'Glanton', { created_by: AGENT });
+    await expect(row.locator('[data-action="made-by-agents"]')).toHaveText('Agents 1');
+    await expect(row.locator('[data-action="made-by-people"]')).toHaveText('People 2');
+  });
 });

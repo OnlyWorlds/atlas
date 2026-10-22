@@ -8,7 +8,8 @@ import { getState } from '../core/state';
 import { elementHash, navigate } from '../core/router';
 import { readPacket, packetHere } from '../core/work-packet';
 import { openPacketBar } from '../ui/open-packet-bar';
-import type { Element } from '../core/types';
+import type { Element, ElementType } from '../core/types';
+import { ELEMENT_LABELS } from '../core/constants';
 
 export function buildWorkPacket(el: Element): HTMLElement | null {
   const state = getState();
@@ -47,7 +48,10 @@ export function buildWorkPacket(el: Element): HTMLElement | null {
     } else {
       const gone = document.createElement('span');
       gone.className = 'atlas-work-packet-missing';
-      gone.textContent = `Not in this world${entry.type ? ` (${entry.type})` : ''}`;
+      // The type as the rest of the page says it, capitalised (Seethe's read of 1.69.0, h20 #9806).
+      const label = ELEMENT_LABELS[entry.type as ElementType]?.singular ?? entry.type;
+      const typeWord = label ? label.charAt(0).toUpperCase() + label.slice(1) : '';
+      gone.textContent = `Not in this world${typeWord ? ` (${typeWord})` : ''}`;
       li.appendChild(gone);
     }
     if (entry.reason) {

@@ -63,8 +63,14 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'made-by-filter',
         title: 'The element list shows what people made, or what agents made',
-        body: 'In a world on OnlyWorlds that has an AI agent among its members, a Made by row under the search lets you list only what people made, or only what agents made, each with its count. It reads who made each element first; who changed it last is still on its page.',
+        body: 'In a world on OnlyWorlds where an AI agent has made elements, a Made by row under the search lets you list only what people made, or only what agents made, each with its count. It reads who made each element first; who changed it last is still on its page.',
         tags: ['sidebar', 'sharing'],
+      },
+      {
+        id: 'packet-missing-type',
+        title: "A packet's missing element names its type as the page does",
+        body: 'Not in this world (Character), capitalised like every other type on the page.',
+        tags: ['fix'],
       },
       {
         id: 'hide-the-room',

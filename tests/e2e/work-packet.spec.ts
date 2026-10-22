@@ -70,7 +70,7 @@ test.describe('OW Parlor #487 a work packet', () => {
     await expect(box).toContainText('Made by onlyworlds doctor 0.12.0');
     await expect(box.locator('li')).toHaveText([
       'The Salt Coast · Its river ends inland',
-      'Not in this world (character) · Named in a story, not here',
+      'Not in this world (Character) · Named in a story, not here',
       'Ana · Lives on the coast but has no location',
     ]);
 
