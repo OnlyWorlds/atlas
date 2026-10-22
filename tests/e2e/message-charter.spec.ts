@@ -88,4 +88,22 @@ test.describe('#526 messages and the charter', () => {
     await card.getByRole('link', { name: 'Charter' }).click();
     await expect(page).toHaveURL(new RegExp(`#/w/${w}/element/${charter}$`));
   });
+
+  test("world.json's charter names which Law leads Home, through a reopen (§4.6 (a))", async ({ page }) => {
+    await setupWorld(page);
+    const rules = await createElement(page, 'law', { name: 'House rules', supertype: 'Regulation', description: 'The rules this folder names.' });
+    await createElement(page, 'law', { name: 'Charter', supertype: 'Charter', description: 'The one by supertype.' });
+    const w = await worldId(page);
+    await page.evaluate((w) => { window.location.hash = `#/w/${w}`; }, w);
+    // By supertype first: the folder names nothing yet.
+    await expect(page.locator('[data-role="charter"]').getByRole('link')).toHaveText('Charter');
+    await page.evaluate(async (id) => {
+      await (window as any).__atlasTestApi.getActiveStore().writeWorldMeta({ charter: id });
+    }, rules);
+    await page.reload();
+    await page.waitForSelector('.atlas-shell');
+    await page.evaluate((w) => { window.location.hash = `#/w/${w}`; }, w);
+    await expect(page.locator('[data-role="charter"]').getByRole('link')).toHaveText('House rules');
+    await expect(page.locator('.atlas-home-charter-lead')).toHaveText('The rules this folder names.');
+  });
 });

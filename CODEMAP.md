@@ -16,6 +16,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/made-by.ts`: `madeByOf`, who made an element first (#350): keel's `created_by` with the roster's kind, for the list's Made by filter.
 - `src/core/parlor-room.ts`: `isRoomElement`, the parlor's room as type and supertype pairs (the design sheet §1), for the list's Hide the room.
 - `src/core/agent-mark.ts`: `agentMarkFor`, the quiet agent mark's rule (#347, conv. 144): keel's door of the last write through the SDK's `isAgentDoor`, a seat named from the roster.
+- `src/core/charter.ts`: `findCharter`, the world's charter that leads Home (#526): world.json's `charter` when it names a Law the world holds (folder spec §4.6 (a), 1.74), else the Law with supertype Charter changed last, a tie by name; `charterLead`, its first paragraph for Home.
 - `src/core/hidden-mark.ts`: `hiddenMarkLine`, keel's hidden mark said on the element (keel #537, 1.73): `hidden: true` in a synced world; drawn beside the agent mark by `buildHiddenMark` (`src/middle/element-agent-mark.ts`) in the element page, Knowledge's entry and a page's header.
 - `src/core/state.ts`: the observable store.
 - `src/core/view-only.ts`: `worldIsViewOnly`, the one read of a view-only world (conv. 149); `tests/unit/view-only-ratchet.test.ts` keeps every UI writer asking it.

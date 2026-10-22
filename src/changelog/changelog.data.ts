@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.74.0',
+    date: '2026-10-22',
+    theme: 'The charter a folder names',
+    entries: [
+      {
+        id: 'charter-named',
+        title: "A world folder can name its charter",
+        body: "Home leads with a world's charter, the Law with supertype Charter. When a world folder's world.json names a Law as its charter, Home now leads with that one, which settles a world that holds two.",
+        tags: ['folders'],
+      },
+    ],
+  },
+  {
     version: '1.73.1',
     date: '2026-10-22',
     theme: 'Typing that stays',

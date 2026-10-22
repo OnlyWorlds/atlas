@@ -15,7 +15,17 @@ export function isCharter(el: Element): boolean {
   return typeof sup === 'string' && sup.trim().toLowerCase() === 'charter';
 }
 
-export function findCharter(elements: readonly Element[]): Element | null {
+/**
+ * `named` is world.json's `charter` (folder spec §4.6 (a)): a folder's shortcut
+ * and tie-break, preferred when it names a Law the world holds. It never rides
+ * the wire, so a linked world often lacks it, and anything else in it (a
+ * missing id, another type, not a string) leaves the rule by supertype.
+ */
+export function findCharter(elements: readonly Element[], named?: unknown): Element | null {
+  if (typeof named === 'string' && named) {
+    const law = elements.find(el => el.id === named && el.type === 'law');
+    if (law) return law;
+  }
   let best: Element | null = null;
   for (const el of elements) {
     if (!isCharter(el)) continue;

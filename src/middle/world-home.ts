@@ -328,7 +328,8 @@ function buildCover(
   const sliceNote = partialSliceNote(meta);
   if (sliceNote) identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="slice-note">${escapeText(sliceNote)}</p>`);
   // The world's charter, first (#526): its name links to it, its opening reads here.
-  const charter = findCharter(getState().data.elements);
+  // world.json's `charter` names it when a folder says which (§4.6 (a)).
+  const charter = findCharter(getState().data.elements, (meta as unknown as Record<string, unknown> | null | undefined)?.charter);
   if (charter) {
     const lead = charterLead(charter);
     const name = typeof charter.name === 'string' && charter.name.trim() ? charter.name.trim() : 'Charter';

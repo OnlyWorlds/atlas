@@ -62,6 +62,17 @@ describe('the charter', () => {
     expect(findCharter([place])).toBeNull();
   });
 
+  it("world.json's charter names it (§4.6 (a)): a Law it names wins, anything else leaves the rule by supertype", () => {
+    const old = law({ id: 'a', name: 'Old', supertype: 'Charter', updated_at: '2026-10-01T00:00:00Z' });
+    const fresh = law({ id: 'b', name: 'New', supertype: 'Charter', updated_at: '2026-10-21T00:00:00Z' });
+    const plain = law({ id: 'c', name: 'House rules', supertype: 'Regulation' });
+    expect(findCharter([old, fresh, place], 'a')?.id).toBe('a');       // the tie-break, against the newer one
+    expect(findCharter([old, fresh, plain], 'c')?.id).toBe('c');       // a Law it names, whatever its supertype
+    for (const named of [place.id, 'gone', '', 7, null, undefined, ['a']]) {
+      expect(findCharter([old, fresh, place], named)?.id).toBe('b'); // not a Law here, or not an id: the rule
+    }
+  });
+
   it('Home reads its first paragraph, cut at a word', () => {
     expect(charterLead(law({ description: 'What this world is.\nIt holds things.\n\nWho is here' }))).toBe('What this world is. It holds things.');
     const long = law({ description: 'word '.repeat(100) });
