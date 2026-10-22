@@ -72,6 +72,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: "Every change Atlas sends to OnlyWorlds now says it came through Atlas, so the world's recent changes on onlyworlds.com can say which app each one came from.",
         tags: ['sync'],
       },
+      {
+        id: 'pin-rows-say-why',
+        title: 'A PIN field says what it takes, and why',
+        body: "Where a world's own seat secret works in place of your PIN (Download a world, Link to existing), the field's label says so. New world and Make online say why they ask for your PIN under the field, before you sign in.",
+        tags: ['sync'],
+      },
     ],
   },
   {

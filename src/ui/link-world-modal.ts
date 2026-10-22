@@ -60,8 +60,8 @@ export class LinkWorldModal extends BaseModal {
           <input class="atlas-input" type="text" name="api-key" placeholder="From onlyworlds.com" autocomplete="off" spellcheck="false" />
         </label>
         <label class="atlas-modal-field">
-          <span>PIN</span>
-          <input class="atlas-input" type="password" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN, or a seat secret (ow_s_…)" autocomplete="off" maxlength="64" />
+          <span>PIN, or a seat secret</span>
+          <input class="atlas-input" type="password" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four digits, or ow_s_…" autocomplete="off" maxlength="64" />
         </label>
         <label class="atlas-modal-field">
           <span>Display name (optional)</span>

@@ -23,7 +23,7 @@ import { attachSyncEngine } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
-import { signInFieldsHtml, missingSignIn, signInInputs, signInFromFields } from './sign-in-fields';
+import { signInFieldsHtml, missingSignIn, signInInputs, signInFromFields, PIN_REASON_HTML } from './sign-in-fields';
 // view-only-ok: writes a new world of its own, never the active one (conv. 149).
 
 export class NewApiWorldModal extends BaseModal {
@@ -51,6 +51,7 @@ export class NewApiWorldModal extends BaseModal {
       <label class="atlas-modal-field">
         <span>PIN</span>
         <input class="atlas-input" type="password" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
+        ${PIN_REASON_HTML}
       </label>
       ${whereChoiceHtml()}
       <p class="atlas-modal-error" data-role="error" hidden></p>
@@ -118,7 +119,7 @@ export class NewApiWorldModal extends BaseModal {
         // 0. Signed out: sign in first, so the account makes the world (Keel #134).
         if (signInFields) {
           progressEl.textContent = 'Signing in to OnlyWorlds…';
-          await signInFromFields(body, 'The PIN lets Atlas upload the world\'s contents.', this.toasts);
+          await signInFromFields(body, '', this.toasts);
         }
         // 1. Persist the PIN if not already set.
         let regAfter = getState().registry;

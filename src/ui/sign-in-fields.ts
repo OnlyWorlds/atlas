@@ -36,9 +36,12 @@ export function signInFieldsHtml(prefillLogin = ''): string {
     </div>`;
 }
 
+/** Why a form that makes a world online asks a PIN, under the field before any sign-in (Seethe h20 #10346). */
+export const PIN_REASON_HTML = '<span class="atlas-modal-hint">The PIN lets Atlas upload the world\'s contents.</span>';
+
 /** The line that stands where the fields were, once signed in. */
-export function signedInLineHtml(username: string | undefined, rest: string): string {
-  return `<p class="atlas-modal-hint" data-role="signed-in">On your account${username ? `, ${escapeText(username)}` : ''}. ${rest}</p>`;
+export function signedInLineHtml(username: string | undefined, rest = ''): string {
+  return `<p class="atlas-modal-hint" data-role="signed-in">On your account${username ? `, ${escapeText(username)}` : ''}.${rest ? ` ${rest}` : ''}</p>`;
 }
 
 /** The two inputs, or null once signed in (the fields are gone). */

@@ -46,10 +46,8 @@ import {
   type MergeProgress,
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
-import { signInFieldsHtml, signedInLineHtml, missingSignIn, signInInputs, signInFromFields } from './sign-in-fields';
+import { signInFieldsHtml, signedInLineHtml, missingSignIn, signInInputs, signInFromFields, PIN_REASON_HTML } from './sign-in-fields';
 
-/** The signed-in line's second sentence on the Create new pane. */
-const PIN_REST = 'The PIN lets Atlas upload the world\'s contents.';
 import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
 import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
@@ -141,7 +139,7 @@ export class MakeOnlineModal extends BaseModal {
     // The world is made on the account (createApiWorld): signed in, the PIN alone
     // (the journey's A7 frame, S427); signed out, the form signs in first (Keel #134).
     const signedIn = Boolean(reg.account_token);
-    const accountLine = signedIn ? signedInLineHtml(reg.account_username, PIN_REST) : '';
+    const accountLine = signedIn ? signedInLineHtml(reg.account_username) : '';
     const signInFields = signedIn ? '' : signInFieldsHtml(reg.email ?? '');
 
     body.innerHTML = `
@@ -163,6 +161,7 @@ export class MakeOnlineModal extends BaseModal {
           <label class="atlas-modal-field">
             <span>PIN</span>
             <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
+            ${PIN_REASON_HTML}
           </label>
           ${accountLine}
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
@@ -184,8 +183,8 @@ export class MakeOnlineModal extends BaseModal {
             <input class="atlas-input" type="text" name="link-api-key" placeholder="From onlyworlds.com" autocomplete="off" spellcheck="false" />
           </label>
           <label class="atlas-modal-field">
-            <span>PIN</span>
-            <input class="atlas-input" type="password" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
+            <span>PIN, or a seat secret</span>
+            <input class="atlas-input" type="password" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four digits, or ow_s_…" maxlength="64" autocomplete="off" />
           </label>
           <fieldset class="atlas-modal-field atlas-policy-fieldset">
             <legend>On duplicate (same name + type)</legend>
@@ -317,7 +316,7 @@ export class MakeOnlineModal extends BaseModal {
       if (signInInputs(form)) {
         progressBox.textContent = 'Signing in to OnlyWorlds…';
         progressBox.hidden = false;
-        await signInFromFields(form, PIN_REST, this.toasts);
+        await signInFromFields(form, '', this.toasts);
       }
       // 1. Create new api world (server-side).
       progressBox.textContent = 'Creating world on onlyworlds.com…';
