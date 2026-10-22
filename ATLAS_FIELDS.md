@@ -24,7 +24,7 @@
 | `atlas_color` | Zone | fill colour (hex) | no, visual preference |
 | `atlas_opacity` | Zone | fill opacity, 0..1 | no, visual preference |
 | `atlas_label_visible` | Zone | whether the zone label renders | no, visual preference |
-| `atlas_shape` | Zone | `'polygon' \| 'line'` | **yes**: this is geometry, not a preference |
+| `atlas_shape` | Zone | `'polygon' \| 'line'` | **taken**: the standard's Zone `shape` (schema 00.33.00, #362) is read before it since 1.75; Atlas writes `shape` once keel serves it (DESIGN_ZONES "1.75, the standard's shape") |
 | `atlas_map_style` | Map | the map's style (`'ink'`, ink on parchment): its zones draw from their kinds, read from the subtype (S423, `src/core/map-ink.ts`); absent means plain | no, presentation |
 | `atlas_calendar` | Construct (supertype `calendar` by convention) | the calendar's machine config, a nested object; DETECTION keys on this field's presence, never the supertype | maybe, once calendars prove out across tools |
 

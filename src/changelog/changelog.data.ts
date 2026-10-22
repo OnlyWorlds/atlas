@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.75.0',
+    date: '2026-10-22',
+    theme: 'A line another tool drew',
+    entries: [
+      {
+        id: 'zone-shape-standard',
+        title: 'A zone says whether it is an area or a line',
+        body: "OnlyWorlds zones now have a shape field: polygon for an area, line for a path such as a river or a road. Atlas reads it first, so a line made in another tool draws as a line here, whatever its supertype says.",
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.74.0',
     date: '2026-10-22',
     theme: 'The charter a folder names',

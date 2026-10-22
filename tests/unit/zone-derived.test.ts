@@ -178,7 +178,24 @@ describe('partitionZonesAndMarkers', () => {
 });
 
 describe('getZoneShape', () => {
-  it('reads atlas_shape first', () => {
+  // Schema 00.33.00 (#362): the standard's shape is the writer's word, ahead
+  // of atlas's own extension; only the two lowercase words state a shape.
+  it("reads the standard's shape before atlas_shape", () => {
+    expect(getZoneShape(zone('z', 'z', { shape: 'line', atlas_shape: 'polygon' } as Partial<Zone>))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { shape: 'polygon', atlas_shape: 'line' } as Partial<Zone>))).toBe('polygon');
+    expect(getZoneShape(zone('z', 'z', { shape: 'line', supertype: 'Polygon' } as Partial<Zone>))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { shape: 'line' } as Partial<Zone>))).toBe('line');
+  });
+
+  it('treats any other shape value as not stated', () => {
+    expect(getZoneShape(zone('z', 'z', { shape: 'Line', atlas_shape: 'polygon' } as Partial<Zone>))).toBe('polygon');
+    expect(getZoneShape(zone('z', 'z', { shape: 'Line' } as Partial<Zone>))).toBe('polygon');
+    expect(getZoneShape(zone('z', 'z', { shape: '', atlas_shape: 'line' } as Partial<Zone>))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { shape: 'ring', supertype: 'line' } as Partial<Zone>))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { shape: null } as unknown as Partial<Zone>))).toBe('polygon');
+  });
+
+  it('reads atlas_shape when shape is not stated', () => {
     expect(getZoneShape(zone('z', 'z', { atlas_shape: 'line', supertype: 'Polygon' } as Partial<Zone>))).toBe('line');
     expect(getZoneShape(zone('z', 'z', { atlas_shape: 'polygon', supertype: 'Line' } as Partial<Zone>))).toBe('polygon');
   });

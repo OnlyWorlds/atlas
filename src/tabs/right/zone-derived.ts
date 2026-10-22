@@ -12,11 +12,13 @@ import type { Element, Marker, Zone } from '../../core/types';
 export type ZoneShape = 'polygon' | 'line';
 
 /**
- * Resolve a zone's shape (polygon vs line). Reads the local-only extension
- * field `atlas_shape` (preferred) and falls back to legacy `supertype` for
+ * Resolve a zone's shape (polygon vs line). The standard's own `shape`
+ * (schema 00.33.00, #362) comes first: exactly `polygon` or `line`, lowercase;
+ * any other value means "not stated" by the schema's definition. Not stated,
+ * atlas's wire extension `atlas_shape` answers, then legacy `supertype` for
  * zones created before ZD6 — old atlas builds stored 'polygon' / 'line'
  * directly in supertype, conflating shape with OW's free-text taxonomy.
- * Defaults to 'polygon' for anything ambiguous.
+ * Defaults to 'polygon' for anything ambiguous, as the schema says.
  *
  * NEVER use `zone.supertype` directly to decide rendering. Always go through
  * this helper so new zones (with user-meaningful supertype text) render
@@ -24,6 +26,8 @@ export type ZoneShape = 'polygon' | 'line';
  */
 export function getZoneShape(zone: Zone | undefined | null): ZoneShape {
   if (!zone) return 'polygon';
+  const stated = (zone as { shape?: unknown }).shape;
+  if (stated === 'line' || stated === 'polygon') return stated;
   const atlasShape = (zone as { atlas_shape?: string }).atlas_shape;
   if (atlasShape === 'line' || atlasShape === 'polygon') return atlasShape;
   // Legacy fallback: pre-ZD6 zones stored shape in supertype. Other writers

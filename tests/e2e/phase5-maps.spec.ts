@@ -666,6 +666,36 @@ test('the zone panel (S356): kinds group, a kind colour is a world style that su
   await expect(page.locator('.atlas-zone-visuals-section .atlas-detail-section-hint')).toHaveText('Synced');
 });
 
+test("the standard's shape (1.75, #362): a zone that says line draws open, one that says polygon closes, whatever else it carries", async ({ page }) => {
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Shape Canvas');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Shape Canvas' })).toBeVisible();
+
+  // Three marker lines each; only `shape` tells them apart from what they would draw without it.
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = api.getState().data.elements.find((e: any) => e.type === 'map' && e.name === 'Shape Canvas');
+    const zoneOf = async (fields: Record<string, unknown>, y: number) => {
+      const z = await store.createZone(fields);
+      for (const [i, x] of [100, 1000, 1900].entries()) {
+        await store.createMarker({ map_id: map.id, zone_id: z.id, x, y: y + i * 60, order: i + 1 });
+      }
+    };
+    await zoneOf({ name: 'the Long River', supertype: 'River', shape: 'line' }, 300);
+    await zoneOf({ name: 'the Old Wall', supertype: 'Line', atlas_shape: 'line', shape: 'polygon' }, 900);
+    await zoneOf({ name: 'the Unsaid', supertype: 'River', shape: 'Line' }, 1500);
+    await zoneOf({ name: 'the Short River', subtype: 'River', shape: 'line' }, 1800);
+    api.patchData(await store.listElements());
+  });
+  const container = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await expect(container.locator('.atlas-zone-label')).toHaveCount(4);
+  // Two open lines (visible + hit path each); the Old Wall and the Unsaid close.
+  // Without `shape` read first: one line (the Old Wall), so 2 paths.
+  await expect(container.locator('svg path[fill="none"]')).toHaveCount(4);
+});
+
 test('the zone panel by role (S362): rivers split by rank, a role colour paints only its role, a road drawn as its segments is listed and lights them', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Roles Canvas');
