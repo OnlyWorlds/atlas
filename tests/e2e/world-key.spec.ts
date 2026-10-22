@@ -63,6 +63,7 @@ async function mockKeel(page: Page): Promise<Keel> {
       return route.fulfill({ status: 201, json: { id: `k-${keel.mints}`, last4: key.slice(-4), scope: 'WRITE', name: '', revoked: false, key } });
     }
     const key = req.headers()['api-key'] ?? '';
+    if (path === '/me') return key === OTHER || keel.live.has(key) ? route.fulfill({ json: { role: 'owner' } }) : unknownKey(route);
     if (key === OTHER) {
       return route.fulfill({ json: { id: '99999999-0000-4000-8000-000000000000', name: 'Elsewhere', updated_at: now } });
     }

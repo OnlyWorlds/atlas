@@ -202,6 +202,7 @@ async function mockKeel(page: Page, characters: number) {
   }));
   await page.route(`${V2}/**`, async (route) => {
     const path = new URL(route.request().url()).pathname.replace('/api/v2', '');
+    if (path === '/me') return route.fulfill({ json: { role: 'owner' } });
     if (path === '/world' || path === '/world/') {
       return route.fulfill({ json: { id: SERVER_WORLD, name: 'Big World', updated_at: now } });
     }

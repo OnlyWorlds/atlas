@@ -29,6 +29,7 @@ async function mockKeel(page: Page) {
     const url = new URL(req.url());
     const parts = url.pathname.replace('/api/v2', '').split('/').filter(Boolean);
     const method = req.method();
+    if (parts[0] === 'me') return route.fulfill({ json: { role: 'owner' } });
     if (parts[0] === 'world') return route.fulfill({ json: { id: API_WORLD, name: 'Server World', updated_at: stamp() } });
     if (parts[0] === 'changes') return route.fulfill({ json: { cursor: 'c-0', changes: [], has_more: false } });
     if (parts[0] === 'bulk' && method === 'POST') {

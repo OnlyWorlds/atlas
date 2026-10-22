@@ -126,6 +126,7 @@ async function mockKeel(page: Page, characters: number) {
   await page.route(`${V2}/**`, async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace('/api/v2', '');
+    if (path === '/me') return route.fulfill({ json: { role: 'owner' } });
     if (path === '/world' || path === '/world/') {
       return route.fulfill({ json: { id: WORLD_ID, name: 'Big World', updated_at: now } });
     }

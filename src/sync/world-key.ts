@@ -71,20 +71,29 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
   const readOnly = isReadKey(key);
   // A read goes bare and `/me` checks the PIN; a legacy key sends it on every route.
   const pin = readOnly ? '' : (worldPin(entry, getState().registry) ?? '');
+  const refused = (err: unknown): unknown => {
+    const why = keyRefusalOf(err);
+    if (why === 'key_revoked') return new PlainError('That key was revoked too. Make a new one on the world\'s page on onlyworlds.com.');
+    if (why === 'key_unknown') return new PlainError('OnlyWorlds does not know that key. Copy it again from the world\'s page on onlyworlds.com.');
+    if (why === 'pin') return new PlainError('OnlyWorlds did not accept your PIN with that key. Check it on the OnlyWorlds tab.');
+    return err;
+  };
+  const client = buildV2Adapter(key, pin);
   let fetched: { id: string; name: string };
   try {
-    const client = buildV2Adapter(key, pin);
     fetched = await client.getWorld();
-    await client.checkPin();
   } catch (err) {
-    const why = keyRefusalOf(err);
-    if (why === 'key_revoked') throw new PlainError('That key was revoked too. Make a new one on the world\'s page on onlyworlds.com.');
-    if (why === 'key_unknown') throw new PlainError('OnlyWorlds does not know that key. Copy it again from the world\'s page on onlyworlds.com.');
-    if (why === 'pin') throw new PlainError('OnlyWorlds did not accept your PIN with that key. Check it on the OnlyWorlds tab.');
-    throw err;
+    throw refused(err);
   }
+  // Which world first: this world's PIN against another world's key is that
+  // world's question, and the answer here is the key, not the PIN.
   if (fetched.id !== entry.api.world_id) {
     throw new PlainError(`That key is for another world, "${fetched.name}". Copy the key from this world's page on onlyworlds.com.`);
+  }
+  try {
+    await client.checkPin();
+  } catch (err) {
+    throw refused(err);
   }
   return { readOnly };
 }

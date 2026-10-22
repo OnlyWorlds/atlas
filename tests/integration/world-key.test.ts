@@ -173,6 +173,9 @@ describe('a pasted key', () => {
   it('must name this world', async () => {
     h.getWorld = async () => ({ id: 'someone-else', name: 'Elsewhere' });
     await expect(checkNewKey(current(), NEW)).rejects.toThrow('That key is for another world, "Elsewhere"');
+    // this world's PIN against another world's key: the answer is the key, never the PIN (1.79.0)
+    h.checkPin = async () => { throw refused('invalid_credentials', 401, 'API-Pin'); };
+    await expect(checkNewKey(current(), NEW)).rejects.toThrow('That key is for another world, "Elsewhere"');
   });
 
   it('says what keel said of it', async () => {
