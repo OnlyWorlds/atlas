@@ -14,6 +14,7 @@
  */
 
 import { DEFAULT_MUTED_TYPES } from './type-mutes';
+import type { MadeBy } from './made-by';
 import { WORLD_STYLES_VERSION, type WorldStyles } from './world-styles';
 import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState, RightTabRef, AccountWorldRow } from './types';
 import { defaultRegistry } from './types';
@@ -124,6 +125,10 @@ export interface UiState {
    * when filtered to explicitly. Per world; pins + markers by default.
    */
   mutedTypes: Set<ElementType>;
+  /** The list's "Made by" filter (#350, core/made-by.ts): null shows everyone. Per world. */
+  madeBy: MadeBy | null;
+  /** The list hides the parlor's room elements (core/parlor-room.ts). Per world. */
+  hideRoom: boolean;
   search: string;
   /** Right-pane tabs (always begins with implicit map-index; additional are maps). */
   rightTabs: RightTabRef[];
@@ -219,6 +224,8 @@ let state: AppState = {
     selectedElementId: null,
     elementFilters: new Set(),
     mutedTypes: new Set(DEFAULT_MUTED_TYPES),
+    madeBy: null,
+    hideRoom: false,
     search: '',
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,

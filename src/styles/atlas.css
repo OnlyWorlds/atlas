@@ -15050,6 +15050,10 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-subfilter-chip:hover { color: var(--atlas-text); }
 .atlas-subfilter-chip.active { color: var(--atlas-accent-text); border-color: var(--atlas-cyan); }
 .atlas-subfilter-chip.sub { font-size: 9px; opacity: 0.85; }
+/* Who made it, and the parlor's room (#350): the label beside the chips, then the room's chip. */
+.atlas-origin-row { align-items: center; }
+.atlas-origin-label { color: var(--atlas-text-muted); font-size: 10px; }
+.atlas-origin-row [data-action="made-by-agents"] + [data-action="hide-room"] { margin-left: 6px; }
 
 /* ==== Bout H — home cover-page × study-desk (workplan D2, session 248) ==== */
 

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.70.0',
+    date: '2026-10-22',
+    theme: 'Who made it',
+    entries: [
+      {
+        id: 'made-by-filter',
+        title: 'The element list shows what people made, or what agents made',
+        body: 'In a world on OnlyWorlds that has an AI agent among its members, a Made by row under the search lets you list only what people made, or only what agents made, each with its count. It reads who made each element first; who changed it last is still on its page.',
+        tags: ['sidebar', 'sharing'],
+      },
+      {
+        id: 'hide-the-room',
+        title: "Hide the room: a parlor's messages leave the list",
+        body: "A world that holds a parlor's room (its messages, board entries, work items, specs, hearts, votes, sittings and member cards) offers Hide the room, so the list shows the world itself. The charter stays. Picking one of those kinds by its own chip still shows it.",
+        tags: ['sidebar'],
+      },
+    ],
+  },
+  {
     version: '1.69.0',
     date: '2026-10-22',
     theme: 'A work packet, one element at a time',

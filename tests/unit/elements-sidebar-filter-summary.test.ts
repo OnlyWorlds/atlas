@@ -29,6 +29,12 @@ describe('filterSummary', () => {
     expect(s).toBe('Showing characters, creatures, species and 3 more');
   });
 
+  it('says who made it and the room hidden after a dot (#350)', () => {
+    expect(filterSummary(set(), set(), 'agents')).toBe('All types · made by agents');
+    expect(filterSummary(set('narrative'), set(), 'people', true)).toBe('Showing narratives · made by people · the room hidden');
+    expect(filterSummary(set(), set(), null, true)).toBe('All types · the room hidden');
+  });
+
   it('has no em-dash', () => {
     expect(filterSummary(set('character', 'location'), set('map'))).not.toContain('\u2014');
   });

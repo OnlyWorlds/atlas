@@ -24,7 +24,7 @@
 ```
 
 - **Ratios**: `DEFAULT_RATIOS = { sidebar: 0.20, middle: 0.51 }` (`src/layout/app-shell.ts`), the right pane takes the rest; persisted to `localStorage.atlas_shell_ratios_v2`; a stored 0.19 sidebar (the old default) upgrades to 0.20. Pane floors: sidebar 180, middle 280, right 240 px.
-- **Sidebar**: two modes, Worlds and Elements (a toggle at the top; the footer gear is the one settings entrance). The mode is UI state, independent of the room (conv. 37). In the writing room the sidebar body shows the writing tree until the user picks another mode (conv. 40). **The type strip** over the element list (`renderFilters` in `src/sidebar/elements-sidebar.ts`) names its types by a setting (#24, h20 B8, the Captain #3143): `editor_settings.type_strip_names`, Settings, Elements, "Type names in the sidebar": `icons` (the default, names on hover), `held` (the types the world holds named with counts, first, then a break and the rest as icons) or `all` (two columns); a muted chip keeps its strike on the icon; the tour keeps icons whatever the setting.
+- **Sidebar**: two modes, Worlds and Elements (a toggle at the top; the footer gear is the one settings entrance). The mode is UI state, independent of the room (conv. 37). In the writing room the sidebar body shows the writing tree until the user picks another mode (conv. 40). **The type strip** over the element list (`renderFilters` in `src/sidebar/elements-sidebar.ts`) names its types by a setting (#24, h20 B8, the Captain #3143): `editor_settings.type_strip_names`, Settings, Elements, "Type names in the sidebar": `icons` (the default, names on hover), `held` (the types the world holds named with counts, first, then a break and the rest as icons) or `all` (two columns); a muted chip keeps its strike on the icon; the tour keeps icons whatever the setting. **Who made it, and the room** (1.70, #350): under the summary line a row offers "Made by" People or Agents, only in a synced world whose roster holds an agent seat, read from keel's `created_by` with the roster's kind, the seat and never the door (`src/core/made-by.ts`; the first write, where the element page's mark says the last); and "Hide the room" in any world that holds the parlor's room elements (`src/core/parlor-room.ts`: type and supertype pairs, the charter not among them; a supertype picked by its own chip still shows). The summary line says both after a dot; a filter that no longer applies counts as off.
 - **Middle**: a flex column of the room nav strip (40px) and the room content. Renderers target `shell.middleContent`, never `shell.middle` (conv. 3, 31).
 - **Right**: a tab bar whose first tab is the permanent Context tab, then the map index, then one closable tab per open map (Leaflet, with a lifecycle cache).
 
@@ -86,6 +86,8 @@ interface UiState {
   selectedElementId: string | null;
   elementFilters: Set<ElementType>;                       // empty = show all
   mutedTypes: Set<ElementType>;                           // out of "show all", in when filtered to; pin + marker by default
+  madeBy: 'people' | 'agents' | null;                    // the list's Made by filter (#350); per world, cleared on a switch
+  hideRoom: boolean;                                      // the list hides the parlor's room; per world, cleared on a switch
   search: string;
   rightTabs: RightTabRef[];                               // context | map-index | map; context kept at index 0 by the lifecycle
   rightActiveIndex: number;

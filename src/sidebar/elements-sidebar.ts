@@ -32,6 +32,9 @@ import { locateTargetFor } from './pin-locate';
 import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDiskNotice, setDiskShowOnly } from '../core/live-folder';
 import { isCoarsePointer } from '../core/pointer';
 import { renderGate } from '../ui/render-gate';
+import { madeByOf, rosterHasAgent, rosterKinds, type MadeBy } from '../core/made-by';
+import { isRoomElement } from '../core/parlor-room';
+import { rosterFor, rosterNow } from '../sync/world-roster';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 // Pins and markers close the strip (S356): browsable when asked for, muted
@@ -48,17 +51,26 @@ function joinTypeNames(names: string[]): string {
 /**
  * The filter strip in words (S369): "All types", "Showing characters and
  * locations". Types the user hid by right-click are named; pins and markers,
- * hidden by default, are not. Strip order. Pure; exported for unit tests.
+ * hidden by default, are not. Strip order. The made-by filter and the room's
+ * hiding follow after a dot (#350). Pure; exported for unit tests.
  */
-export function filterSummary(filters: ReadonlySet<ElementType>, muted: ReadonlySet<ElementType>): string {
+export function filterSummary(
+  filters: ReadonlySet<ElementType>,
+  muted: ReadonlySet<ElementType>,
+  madeBy: MadeBy | null = null,
+  hideRoom = false,
+): string {
+  let types: string;
   if (filters.size > 0) {
     const shown = FILTER_TYPES_WITH_MAP.filter(t => filters.has(t)).map(t => ELEMENT_LABELS[t].plural);
-    return `Showing ${joinTypeNames(shown)}`;
+    types = `Showing ${joinTypeNames(shown)}`;
+  } else {
+    const hidden = FILTER_TYPES_WITH_MAP
+      .filter(t => muted.has(t) && !MUTED_TAIL_TYPES.includes(t))
+      .map(t => ELEMENT_LABELS[t].plural);
+    types = hidden.length === 0 ? 'All types' : `All types except ${joinTypeNames(hidden)}`;
   }
-  const hidden = FILTER_TYPES_WITH_MAP
-    .filter(t => muted.has(t) && !MUTED_TAIL_TYPES.includes(t))
-    .map(t => ELEMENT_LABELS[t].plural);
-  return hidden.length === 0 ? 'All types' : `All types except ${joinTypeNames(hidden)}`;
+  return types + (madeBy ? ` · made by ${madeBy}` : '') + (hideRoom ? ' · the room hidden' : '');
 }
 
 /**
@@ -266,6 +278,106 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         });
         subFilterRow.appendChild(chip);
       }
+    }
+  }
+
+  // ----- Who made it, and the parlor's room (#350) -----
+  // "Made by" people or agents, read from keel's created_by with the roster's
+  // kind (core/made-by.ts): only in a synced world whose roster holds an agent
+  // seat, since otherwise there is nothing to tell apart. "Hide the room" only
+  // when the world holds the parlor's room elements (core/parlor-room.ts). The
+  // filters live in ui state, per world; one that no longer applies (the
+  // roster gone, the room's last line deleted) counts as off, never strands.
+  const originRow = document.createElement('div');
+  originRow.className = 'atlas-subfilter-row atlas-origin-row';
+  originRow.dataset.role = 'origin-filters';
+  originRow.hidden = true;
+  content.insertBefore(originRow, subFilterRow);
+  const originGate = renderGate();
+  let rosterAsked: string | null = null;
+  let originMemo: { elements: readonly Element[]; roster: unknown; kinds: ReturnType<typeof rosterKinds>; counts: Record<MadeBy, number>; room: number } | null = null;
+
+  interface Origin { kinds: ReturnType<typeof rosterKinds>; madeBy: MadeBy | null; hideRoom: boolean; showMadeBy: boolean; room: number; counts: Record<MadeBy, number> }
+
+  /** What the row offers and which of its filters apply now, for the list and the summary. */
+  function readOrigin(): Origin {
+    const state = getState();
+    const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
+    // A synced world only, as the agent mark (a folder opened as it is can carry another time's fields).
+    const linked = entry?.state === 'api-linked';
+    const roster = linked && entry ? rosterNow(entry) : null;
+    if (linked && entry && !roster && rosterAsked !== entry.id) {
+      // The roster is module state and repaints nothing: ask once per world, then draw.
+      rosterAsked = entry.id;
+      void rosterFor(entry).then(rows => { if (rows) render(); else rosterAsked = null; });
+    }
+    const showMadeBy = rosterHasAgent(roster);
+    const elements = state.data.elements;
+    // One pass per new elements array or roster; `kinds` keeps its identity
+    // between them, since the list memo compares it by reference.
+    if (!originMemo || originMemo.elements !== elements || originMemo.roster !== roster) {
+      const kinds = originMemo?.roster === roster ? originMemo.kinds : rosterKinds(roster);
+      const counts: Record<MadeBy, number> = { people: 0, agents: 0 };
+      let room = 0;
+      for (const el of elements) {
+        if (isRoomElement(el)) room++;
+        if (!showMadeBy) continue;
+        const by = madeByOf(el, kinds);
+        if (by) counts[by]++;
+      }
+      originMemo = { elements, roster, kinds, counts, room };
+    }
+    return {
+      kinds: originMemo.kinds,
+      madeBy: showMadeBy ? state.ui.madeBy : null,
+      hideRoom: originMemo.room > 0 && state.ui.hideRoom,
+      showMadeBy,
+      room: originMemo.room,
+      counts: originMemo.counts,
+    };
+  }
+
+  function renderOrigin(o: Origin): void {
+    const show = o.showMadeBy || o.room > 0;
+    originRow.hidden = !show;
+    // Rebuilt only when it would come out different (conv. 146: a rebuild between a press and its release loses the click).
+    if (!originGate.changed([JSON.stringify([show, o.showMadeBy, o.madeBy, o.counts, o.room, o.hideRoom])])) return;
+    originRow.replaceChildren();
+    if (!show) return;
+    const chip = (label: string, title: string, on: boolean, action: string, click: () => void): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'atlas-subfilter-chip' + (on ? ' active' : '');
+      b.textContent = label;
+      b.title = title;
+      b.dataset.action = action;
+      b.setAttribute('aria-pressed', String(on));
+      b.addEventListener('click', click);
+      return b;
+    };
+    const setMadeBy = (v: MadeBy) => {
+      const ui = getState().ui;
+      patchSlice('ui', { ...ui, madeBy: ui.madeBy === v ? null : v });
+    };
+    if (o.showMadeBy) {
+      const label = document.createElement('span');
+      label.className = 'atlas-origin-label';
+      label.textContent = 'Made by';
+      originRow.appendChild(label);
+      originRow.appendChild(chip(`People ${o.counts.people}`,
+        'Show what a person made first: the owner, a member or a player',
+        o.madeBy === 'people', 'made-by-people', () => setMadeBy('people')));
+      originRow.appendChild(chip(`Agents ${o.counts.agents}`,
+        'Show what an AI agent\'s seat made first. Who changed an element last is on its page',
+        o.madeBy === 'agents', 'made-by-agents', () => setMadeBy('agents')));
+    }
+    if (o.room > 0) {
+      originRow.appendChild(chip('Hide the room',
+        'Hide the parlor\'s room: its messages, board entries, work items, specs, hearts, votes, sittings and member cards. The charter stays',
+        o.hideRoom, 'hide-room', () => {
+          const ui = getState().ui;
+          patchSlice('ui', { ...ui, hideRoom: !ui.hideRoom });
+        }));
     }
   }
 
@@ -493,7 +605,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const countByType = new Map<ElementType, number>();
     for (const el of elements) countByType.set(el.type, (countByType.get(el.type) ?? 0) + 1);
 
-    filterSummaryLine.textContent = filterSummary(filters, muted);
+    const origin = readOrigin();
+    filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom);
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
     // audit #1, Captain-blessed 2026-07-20). Outside the tour: all types.
@@ -643,6 +756,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       filterGate.reset();
       subFilterRow.hidden = true;
       subFilterType = null; superFilter = null; subtypeFilter = null;
+      originRow.hidden = true;
+      originGate.reset();
       lensBanner.setAttribute('data-active', 'false');
       assignBanner.setAttribute('data-active', 'false');
       // Empty-state copy depends on what action the user can actually take.
@@ -664,6 +779,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     renderFilters();
     renderSubFilters();
+    const origin = readOrigin();
+    renderOrigin(origin);
 
     if (searchInput.value !== state.ui.search) searchInput.value = state.ui.search;
 
@@ -726,6 +843,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       query,
       superFilter,
       subtypeFilter,
+      madeBy: origin.madeBy,
+      kinds: origin.madeBy ? origin.kinds : null,
+      hideRoom: origin.hideRoom,
       lens: lens?.knowerId ?? null,
       activeMapId,
       flashing: [...flashingIds.keys()].join(','),
@@ -754,6 +874,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       .filter(el => filters.size === 0 || filters.has(el.type))
       .filter(el => !superFilter || String((el as Record<string, unknown>).supertype ?? '').trim() === superFilter)
       .filter(el => !subtypeFilter || String((el as Record<string, unknown>).subtype ?? '').trim() === subtypeFilter)
+      .filter(el => !origin.madeBy || madeByOf(el, origin.kinds) === origin.madeBy)
+      // The room hides when showing the world whole; a supertype picked by its chip is asked for, so it shows.
+      .filter(el => !origin.hideRoom || superFilter !== null || !isRoomElement(el))
       // Same match language as the command palette (name/alias/taxonomy/
       // description) — its "see all →" hands queries here and must never
       // under-deliver (core/element-search.ts).

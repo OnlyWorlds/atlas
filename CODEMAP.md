@@ -13,6 +13,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/date-continuity.ts`: `findDateConflicts`, the dates to check (#281; two kinds cannot be true, the rest are links across a birth), pure; Home's loose threads list them (DESIGN_HOME §6). `src/core/world-date-text.ts`: a date as the world's active calendar says it. `src/core/link-ids.ts`: `linkIdsOf`, the tolerant link reader (conv. 94).
 - `src/core/types.ts`: Element, Conflict, SyncEngineState, Registry types, `SyncResult.pulled_ids`.
 - `src/core/constants.ts`: storage keys, folder layout, `ATLAS_WIRE_EXTENSION_FIELDS` (sent) + `ATLAS_LOCAL_ONLY_FIELDS` (stripped) + `SERVER_AUTHOR_FIELDS` (who wrote it: kept, never sent, never a change; 1.47.1); see ATLAS_FIELDS.md.
+- `src/core/made-by.ts`: `madeByOf`, who made an element first (#350): keel's `created_by` with the roster's kind, for the list's Made by filter.
+- `src/core/parlor-room.ts`: `isRoomElement`, the parlor's room as type and supertype pairs (the design sheet §1), for the list's Hide the room.
 - `src/core/agent-mark.ts`: `agentMarkFor`, the quiet agent mark's rule (#347, conv. 144): keel's door of the last write through the SDK's `isAgentDoor`, a seat named from the roster.
 - `src/core/state.ts`: the observable store.
 - `src/core/view-only.ts`: `worldIsViewOnly`, the one read of a view-only world (conv. 149); `tests/unit/view-only-ratchet.test.ts` keeps every UI writer asking it.
@@ -101,7 +103,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 - `src/sidebar/sidebar.ts`: the mode toggle [Worlds | <WorldName>]; gear-as-toggle.
 - `src/sidebar/worlds-sidebar.ts`: the world list + `activateWorld` (room-stable, lock take-over); the add-world icon row + the labelled "add a world" chooser; the recoverable-root state; account worlds.
-- `src/sidebar/elements-sidebar.ts`: filter strip + search + element list + right-click refresh + flash buffer.
+- `src/sidebar/elements-sidebar.ts`: filter strip + search + the Made by and Hide the room row (#350) + element list + right-click refresh + flash buffer.
 
 ## src/middle
 
