@@ -75,7 +75,7 @@ test.describe('made by, and the room', () => {
     await pulled(page, 'character', '0192a000-0000-7000-8000-000000035002', 'Holden', { created_by: PERSON });
     // The owner's own, through MCP: the seat decides, so a person's.
     await pulled(page, 'location', '0192a000-0000-7000-8000-000000035003', 'Fort Griffin', { created_by: null, changed_via: 'mcp' });
-    await pulled(page, 'narrative', '0192a000-0000-7000-8000-000000035004', 'A line in the room', { created_by: AGENT, supertype: 'Message' });
+    await pulled(page, 'narrative', '0192a000-0000-7000-8000-000000035004', 'A line in the room', { created_by: AGENT, supertype: 'Message', x_room_of: SERVER_WORLD });
 
     const row = page.locator('[data-role="origin-filters"]');
     const summary = page.locator('[data-role="filter-summary"]');
@@ -138,9 +138,11 @@ test.describe('made by, and the room', () => {
     const HOLDEN = '0192a000-0000-7000-8000-000000035021';
     await pulled(page, 'character', HOLDEN, 'Holden', {});
     await pulled(page, 'event', '0192a000-0000-7000-8000-000000035022', 'The scalp war', { start_date: 3 });
-    await pulled(page, 'relation', '0192a000-0000-7000-8000-000000035023', 'Fix the age of Holden', { supertype: 'Work item', characters: [HOLDEN] });
-    await pulled(page, 'event', '0192a000-0000-7000-8000-000000035024', 'Sitting one', { supertype: 'Sitting', start_date: 5 });
-    await pulled(page, 'narrative', '0192a000-0000-7000-8000-000000035025', 'Shall we rename him', { supertype: 'Message' });
+    await pulled(page, 'relation', '0192a000-0000-7000-8000-000000035023', 'Fix the age of Holden', { supertype: 'Work item', characters: [HOLDEN], x_room_of: SERVER_WORLD });
+    await pulled(page, 'event', '0192a000-0000-7000-8000-000000035024', 'Sitting one', { supertype: 'Sitting', start_date: 5, x_room_of: SERVER_WORLD });
+    await pulled(page, 'narrative', '0192a000-0000-7000-8000-000000035025', 'Shall we rename him', { supertype: 'Message', x_room_of: SERVER_WORLD });
+    // A lore letter: a Message with no parlor's mark is the world's own and stays in view (dist.45).
+    await pulled(page, 'narrative', '0192a000-0000-7000-8000-000000035026', 'A letter from the judge', { supertype: 'Message' });
     const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
     const go = (hash: string) => page.evaluate((h) => { window.location.hash = h; }, hash);
     const middle = page.locator('.atlas-middle-content');
@@ -160,6 +162,7 @@ test.describe('made by, and the room', () => {
     await expect(middle).toContainText('See your world arranged in time.');
     await expect(middle).toContainText('Holden');
     await expect(middle).not.toContainText('Shall we rename him');
+    await expect(middle).toContainText('A letter from the judge');
     // Search.
     // The palette opens before a key is typed, holds the query, and closes again (a check
     // against a palette that never opened passes for anything).

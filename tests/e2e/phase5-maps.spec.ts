@@ -666,6 +666,34 @@ test('the zone panel (S356): kinds group, a kind colour is a world style that su
   await expect(page.locator('.atlas-zone-visuals-section .atlas-detail-section-hint')).toHaveText('Synced');
 });
 
+// F-60 (Seethe h20 #10346): Tab walked out of an open dialog into the page behind, where Enter
+// could open a second dialog over the first. What sits behind the topmost modal is inert.
+test('an open dialog keeps the keyboard: Tab never reaches the page behind, and closing it gives the page back (F-60)', async ({ page }) => {
+  const opener = page.locator('[data-action="new-map"]');
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  const panel = page.locator('[data-modal="create-map"]');
+  await expect(panel).toBeVisible();
+  const shellInert = () => page.evaluate(() => !!document.querySelector('.atlas-shell')?.closest('[inert]'));
+  await expect.poll(shellInert).toBe(true);
+  // More Tabs than the panel has stops: each lands in the panel, or leaves the page (never the app).
+  const outside: string[] = [];
+  for (let i = 0; i < 16; i++) {
+    await page.keyboard.press('Tab');
+    const where = await page.evaluate(() => {
+      const a = document.activeElement;
+      if (!a || a === document.body) return 'body';
+      return a.closest('[data-modal="create-map"]') ? 'panel' : (a as HTMLElement).outerHTML.slice(0, 80);
+    });
+    if (where !== 'panel' && where !== 'body') outside.push(where);
+  }
+  expect(outside).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await expect.poll(shellInert).toBe(false);
+  await expect(opener).toBeFocused();
+});
+
 test("the standard's shape (1.75, #362): a zone that says line draws open, one that says polygon closes, whatever else it carries", async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Shape Canvas');

@@ -65,14 +65,14 @@ describe('madeByOf', () => {
 
 describe('isRoomElement', () => {
   it('the parlor\'s pairs, in any case, trimmed', () => {
-    expect(isRoomElement(el({ supertype: 'Message' }, 'narrative'))).toBe(true);
-    expect(isRoomElement(el({ supertype: ' board ' }, 'narrative'))).toBe(true);
-    expect(isRoomElement(el({ supertype: 'Work item' }, 'relation'))).toBe(true);
-    expect(isRoomElement(el({ supertype: 'Spec' }, 'construct'))).toBe(true);
-    expect(isRoomElement(el({ supertype: 'Heart' }, 'relation'))).toBe(true);
-    expect(isRoomElement(el({ supertype: 'VOTE' }, 'relation'))).toBe(true);
-    expect(isRoomElement(el({ supertype: 'Sitting' }, 'event'))).toBe(true);
-    expect(isRoomElement(el({ supertype: 'Member' }, 'character'))).toBe(true);
+    expect(isRoomElement(el({ supertype: 'Message', x_room_of: 'w' }, 'narrative'))).toBe(true);
+    expect(isRoomElement(el({ supertype: ' board ', x_room_of: 'w' }, 'narrative'))).toBe(true);
+    expect(isRoomElement(el({ supertype: 'Work item', x_room_of: 'w' }, 'relation'))).toBe(true);
+    expect(isRoomElement(el({ supertype: 'Spec', x_room_of: 'w' }, 'construct'))).toBe(true);
+    expect(isRoomElement(el({ supertype: 'Heart', x_room_of: 'w' }, 'relation'))).toBe(true);
+    expect(isRoomElement(el({ supertype: 'VOTE', x_room_of: 'w' }, 'relation'))).toBe(true);
+    expect(isRoomElement(el({ supertype: 'Sitting', x_room_of: 'w' }, 'event'))).toBe(true);
+    expect(isRoomElement(el({ supertype: 'Member', x_room_of: 'w' }, 'character'))).toBe(true);
   });
 
   it('a pair, never the word alone; the charter stays; no supertype is no room', () => {
@@ -86,11 +86,13 @@ describe('isRoomElement', () => {
 
 describe('the lore (1.76, OW Parlor #543)', () => {
   const lore = [el({ supertype: 'Story' }, 'narrative'), el({}, 'character')];
-  const room = [el({ supertype: 'Message' }, 'narrative'), el({ supertype: 'Sitting' }, 'event')];
+  const room = [el({ supertype: 'Message', x_room_of: 'w' }, 'narrative'), el({ supertype: 'Sitting', x_room_of: 'w' }, 'event')];
+  // A lore world's own letter: a Message with no parlor's mark stays in the lore (dist.45).
+  const letter = el({ supertype: 'Message' }, 'narrative');
 
   it('leaves the room out while it is hidden, and keeps it while shown', () => {
-    const all = [...lore, ...room];
-    expect(loreElements(all, true)).toEqual(lore);
+    const all = [...lore, letter, ...room];
+    expect(loreElements(all, true)).toEqual([...lore, letter]);
     expect(loreElements(all, false)).toBe(all);
     expect(roomCount(all)).toBe(2);
   });
@@ -106,4 +108,21 @@ describe('the lore (1.76, OW Parlor #543)', () => {
   it('is the world itself when it holds no room', () => {
     expect(loreElements(lore, true)).toBe(lore);
   });
+});
+
+// schema-dist's room profile (v0.33.0-dist.45, profiles/room.fixture.json, copied whole): the cases
+// every reader of the room answers, until the SDK's export replaces core/parlor-room.ts's copy.
+import roomFixture from '../fixtures/room.fixture.json';
+import { ROOM_SUPERTYPES } from '../../src/core/parlor-room';
+
+describe("the room profile's cases (dist.45)", () => {
+  it('holds the profile pairs, no more, no less', () => {
+    const want = roomFixture.pairs.map(p => `${p.type}/${p.supertype.toLowerCase()}`).sort();
+    expect(ROOM_SUPERTYPES.map(([t, w]) => `${t}/${w}`).sort()).toEqual(want);
+  });
+  for (const c of roomFixture.cases) {
+    it(`${c.name}: ${c.in_room ? 'in the room' : 'lore'}`, () => {
+      expect(isRoomElement(c.element as unknown as Element)).toBe(c.in_room);
+    });
+  }
 });

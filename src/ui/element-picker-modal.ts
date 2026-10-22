@@ -17,6 +17,7 @@ import type { Element, ElementType } from '../core/types';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { escapeText } from '../core/dom-utils';
+import { currentLore } from '../core/parlor-room';
 
 export interface PickElementOptions {
   restrictToType?: ElementType;
@@ -179,7 +180,8 @@ class ElementPickerModal extends BaseModal {
   }
 
   private refreshList(): void {
-    const all = getState().data.elements;
+    // A link offers the lore (conv. 161); a picker given its ids picks from those, room or not.
+    const all = this.opts.restrictToIds ? getState().data.elements : currentLore();
     const exclude = new Set(this.opts.excludeIds ?? []);
     const restrict = this.opts.restrictToIds ? new Set(this.opts.restrictToIds) : null;
 

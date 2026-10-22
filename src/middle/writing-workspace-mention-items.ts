@@ -13,6 +13,7 @@ import { ELEMENT_LABELS } from '../core/constants';
 import type { Element } from '../core/types';
 import { getRecents } from './writing-workspace-recents';
 import type { MentionSuggestionItem } from './writing-workspace-mention';
+import { currentLore } from '../core/parlor-room';
 
 /**
  * Element types that shouldn't appear in the picker — they aren't
@@ -28,7 +29,8 @@ export function buildMentionItems(query: string): MentionSuggestionItem[] {
   if (!state.active) return [];
   const worldId = state.active.worldId;
   const q = query.toLowerCase().trim();
-  const elements = state.data.elements;
+  // Mentions offer the lore (conv. 161): a story never mentions the parlor's room by accident.
+  const elements = currentLore();
   const byId = new Map<string, Element>();
   for (const e of elements) byId.set(e.id, e);
 

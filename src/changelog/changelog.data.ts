@@ -63,8 +63,14 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'parlor-room-hidden',
         title: "A world's parlor stays out of its lore",
-        body: "A parlor keeps its messages, votes and work items inside the world it is about. Atlas now leaves them out of the element list, Home, an element's references, Charts and Search, so your characters and stories read as they did. Home says how many the room holds, and one click shows them again.",
+        body: "A parlor keeps its messages, votes and work items inside the world it is about, each marked as the room's. Atlas now leaves them out of the element list and its counts, Home, an element's references, Charts, Search, the link picker and the names that link themselves in a story, so your characters and stories read as they did. A message of your own world's, a letter in a novel, has no mark and stays. Home says how many the room holds, and one click shows them again.",
         tags: ['elements'],
+      },
+      {
+        id: 'dialog-keeps-keyboard',
+        title: 'An open dialog keeps the keyboard',
+        body: 'Tab used to walk out of an open dialog into the page behind it, where Enter could open a second dialog on top. Now the page waits behind the dialog until it closes, and the keyboard goes back where it was.',
+        tags: ['fix'],
       },
     ],
   },

@@ -51,6 +51,7 @@ import { pickElement } from '../ui/element-picker-modal';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
 import { onLeaveWorld } from '../core/leave-flush';
+import { currentLore } from '../core/parlor-room';
 
 /**
  * Public reset (was used to clear per-narrative disclosure state). Disclosures
@@ -653,9 +654,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       editorHandle.syncChipLabels((id) => byId.get(id) ?? null);
       // Refresh autolink index only when the elements array reference swaps —
       // skip the no-op tx on ticks where only e.g. UI state changed.
-      if (elements !== lastSeenElementsRef) {
-        editorHandle.refreshAutolink(elements);
-        lastSeenElementsRef = elements;
+      // The autolink index reads the lore (conv. 161); its identity moves with the room's switch too.
+      const lore = currentLore();
+      if (lore !== lastSeenElementsRef) {
+        editorHandle.refreshAutolink(lore);
+        lastSeenElementsRef = lore;
       }
     }
   }
@@ -732,7 +735,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         initialMarkdown,
         storyOutranksStaleSidecar: true,
         editable: !noWrite(),
-        autolinkSeed: { elements: getState().data.elements },
+        autolinkSeed: { elements: currentLore() },
         onUpdate: (snap) => {
           scheduleSave({ markdown: snap.markdown, json: snap.json });
           wordCount.updateIndicator(snap.wordCount);

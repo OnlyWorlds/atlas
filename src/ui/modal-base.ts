@@ -53,7 +53,36 @@ export interface ModalShellOpts {
 const openModals: BaseModal[] = [];
 let modalTitleSeq = 0;
 
+/**
+ * What sits behind the topmost open modal is `inert` (Seethe's F-60, h20
+ * #10346): `aria-modal` tells a screen reader, but Tab walked out of the
+ * panel into the page behind, where Enter on "Start a world" opened a second
+ * dialog over the first. Every child of `<body>` but the topmost modal's
+ * overlay is made inert while any modal is open (a modal below a picker
+ * included), and only what this marked is released, so an `inert` set by
+ * anything else stays. Called after every open and close.
+ */
+const MARK = 'atlasModalInert';
+function syncInertBehindModals(): void {
+    const top = [...openModals].reverse().find(m => m.overlay()?.isConnected)?.overlay() ?? null;
+    for (const child of Array.from(document.body.children)) {
+        if (!(child instanceof HTMLElement)) continue;
+        const ours = child.dataset[MARK] === '1';
+        if (top && child !== top) {
+            if (!child.inert) { child.inert = true; child.dataset[MARK] = '1'; }
+        } else if (ours) {
+            child.inert = false;
+            delete child.dataset[MARK];
+        }
+    }
+}
+
 export class BaseModal {
+    /** The overlay this modal mounted, while it is mounted. */
+    overlay(): HTMLElement | null {
+        return this.modal;
+    }
+
     protected modal: HTMLElement | null = null;
 
     /**
@@ -127,6 +156,7 @@ export class BaseModal {
             this.modal.offsetHeight;
             this.modal.classList.add('visible');
             if (!openModals.includes(this)) openModals.push(this);
+            syncInertBehindModals();
             this.attachBaseEventListeners();
         }
     }
@@ -150,6 +180,8 @@ export class BaseModal {
                 this.modal.parentNode.removeChild(this.modal);
             }
             this.modal = null;
+            // The page behind (or the modal below) takes keys again before focus goes back to it.
+            syncInertBehindModals();
             // Only when focus was inside the modal: never steal it from
             // something the user moved to meanwhile.
             const back = this.returnFocusTo;

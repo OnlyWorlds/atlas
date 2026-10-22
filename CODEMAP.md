@@ -139,7 +139,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 ## src/ui
 
-- `src/ui/modal-base.ts`: `BaseModal.buildModalShell` (every modal uses it); `dismissLocked` for long flows; topmost-only Escape via `isTopmost()`.
+- `src/ui/modal-base.ts`: `BaseModal.buildModalShell` (every modal uses it); `dismissLocked` for long flows; topmost-only Escape via `isTopmost()`; what sits behind the topmost modal is `inert` (`syncInertBehindModals`, conv. 162).
 - `src/ui/problem-fixes.ts`: `showProblem(err, {doing, retry, dedupeKey, savedLocally, folder})`: sentence + fix buttons + Details (conv. 125, 127).
 - `src/ui/toast-manager.ts`: queue, max 3, XSS-safe; opts {actions, details, sticky} + Dismiss.
 - `src/ui/where-choice.ts`: THE WHERE-QUESTION (1.17, conv. 129): the rows, `takeWhereInClick` (persist in the gesture), `readyWhere`, `askWhere` for doors without a dialog.

@@ -250,7 +250,7 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   sugBody.className = 'atlas-context-pane-list-body';
   sugCol.appendChild(sugBody);
 
-  const named = namedInText(narrative, getState().data.elements);
+  const named = namedInText(narrative, currentLore());
   for (const el of named) {
     const row = buildRow(el, {
       reason: 'in the text',

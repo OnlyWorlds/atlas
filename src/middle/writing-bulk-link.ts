@@ -26,6 +26,7 @@ import { getLiveEditorOps } from './writing-live-editor-ops';
 import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
 import { serializeDocToMarkdown } from './writing-workspace-markdown';
+import { currentLore } from '../core/parlor-room';
 // view-only-ok: reached only from the writing tree's menu, which a view-only world does not open (writing-sidebar.ts) (conv. 149).
 
 /**
@@ -74,7 +75,8 @@ export async function bulkLinkNarratives(
 ): Promise<BulkLinkSummary> {
   const folder = getActiveStore();
   if (!folder) return { changed: 0, count: 0 };
-  const index = mode === 'link' ? buildAutolinkIndex(getState().data.elements) : null;
+  // Link all links to the lore (conv. 161); a link already there to a room element is still known.
+  const index = mode === 'link' ? buildAutolinkIndex(currentLore()) : null;
   const exists = linkTargetsIn(getState().data.elements); // once per run, not per narrative
   const live = getLiveEditorOps();
 

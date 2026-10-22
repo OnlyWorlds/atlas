@@ -41,6 +41,7 @@ import { showProblem } from '../ui/problem-fixes';
 import type { ToastManager } from '../ui/toast-manager';
 import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
+import { currentLore } from '../core/parlor-room';
 
 export interface KnowledgeEditorOptions {
   /** Prose host — the editor takes over this element (already carries the prose CSS class). */
@@ -83,7 +84,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
     // changed outside (S365).
     storyOutranksStaleSidecar: opts.getEntry() !== null,
     editable: !viewOnly,
-    autolinkSeed: { elements: getState().data.elements },
+    autolinkSeed: { elements: currentLore() },
     onUpdate: (snap) => {
       opts.onSnapshot({ markdown: snap.markdown, json: snap.json });
     },
@@ -342,9 +343,11 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
   return {
     refresh(elements: Element[]): void {
       syncLabels(editorHandle, elements);
-      if (elements !== lastSeenElementsRef) {
-        editorHandle.refreshAutolink(elements);
-        lastSeenElementsRef = elements;
+      // The autolink index reads the lore (conv. 161); its identity moves with the room's switch too.
+      const lore = currentLore();
+      if (lore !== lastSeenElementsRef) {
+        editorHandle.refreshAutolink(lore);
+        lastSeenElementsRef = lore;
       }
       applySpellcheck(editorHandle);
       // A rebuilt autolink index changes the hint count, so the badge has to

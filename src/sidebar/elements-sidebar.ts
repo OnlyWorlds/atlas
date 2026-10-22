@@ -33,7 +33,7 @@ import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDisk
 import { isCoarsePointer } from '../core/pointer';
 import { renderGate } from '../ui/render-gate';
 import { madeByOf, rosterHasAgent, rosterKinds, type MadeBy } from '../core/made-by';
-import { isRoomElement } from '../core/parlor-room';
+import { currentLore, isRoomElement } from '../core/parlor-room';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
@@ -233,7 +233,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     if (subFilterType !== single) {
       subFilterType = single; superFilter = null; subtypeFilter = null;
     }
-    const supers = taxonomyValues(state.data.elements, single, 'supertype', null);
+    const supers = taxonomyValues(currentLore(), single, 'supertype', null);
     // A selected value that no longer exists in the world (last holder edited
     // away) would leave a filter active with no chip to click off — auto-clear
     // instead of stranding the user on an empty list.
@@ -242,7 +242,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       subtypeFilter = null;
     }
     if (superFilter && subtypeFilter
-      && !taxonomyValues(state.data.elements, single, 'subtype', superFilter).includes(subtypeFilter)) {
+      && !taxonomyValues(currentLore(), single, 'subtype', superFilter).includes(subtypeFilter)) {
       subtypeFilter = null;
     }
     if (supers.length === 0) {
@@ -266,7 +266,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
     // Second tier: subtypes within the chosen supertype.
     if (superFilter) {
-      for (const v of taxonomyValues(state.data.elements, single, 'subtype', superFilter).slice(0, 12)) {
+      for (const v of taxonomyValues(currentLore(), single, 'subtype', superFilter).slice(0, 12)) {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'atlas-subfilter-chip sub' + (subtypeFilter === v ? ' active' : '');
@@ -602,7 +602,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
   function renderFilters(): void {
     const state = getState();
-    const elements = state.data.elements;
+    // The type badges count the lore (conv. 161): a hidden room adds nothing to them.
+    const elements = currentLore();
     const filters = state.ui.elementFilters;
     const muted = state.ui.mutedTypes;
     const countByType = new Map<ElementType, number>();

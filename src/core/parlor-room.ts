@@ -6,7 +6,11 @@
  * whole filters the room's supertypes out": the element list's "Hide the
  * room" (#350's companion; PROGRESS NEXT 1).
  *
- * A pair, never a supertype alone: a Location called Board is a place. The
+ * The pair AND the mark (schema-dist's room profile, dist.45): a room element
+ * carries `x_room_of`, the id of the world or sitting its room belongs to,
+ * written by the parlor on everything it makes. Without the mark a Narrative
+ * with supertype Message is lore (a novel's letters, the Manifest's Wire) and
+ * stays in view. A pair, never a supertype alone: a Location called Board is a place. The
  * charter (a Law, supertype Charter) stays in: it is the world's own rule,
  * shown on Home, not a line said in the room (TC's list, h66 #9660, leaves it
  * out too). Member is Skeld's ruling, h66 #9721. A supertype matches in any
@@ -28,9 +32,16 @@ export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> = [
 
 export function isRoomElement(el: Element): boolean {
   const sup = (el as Record<string, unknown>).supertype;
-  if (typeof sup !== 'string') return false;
+  const kind = (el as Record<string, unknown>).type;
+  const mark = (el as Record<string, unknown>).x_room_of;
+  if (typeof sup !== 'string' || typeof kind !== 'string') return false;
+  if (typeof mark !== 'string' || !mark.trim()) return false;
+  // Both sides trimmed and case-blind, as schema-dist's room profile rules
+  // (dist.45, `tests/fixtures/room.fixture.json`); this copy gives way to the
+  // SDK's export of that profile once it ships.
   const s = sup.trim().toLowerCase();
-  return ROOM_SUPERTYPES.some(([type, word]) => el.type === type && s === word);
+  const t = kind.trim().toLowerCase();
+  return ROOM_SUPERTYPES.some(([type, word]) => t === type && s === word);
 }
 
 /**

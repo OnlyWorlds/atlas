@@ -308,8 +308,10 @@ export function isExtensionField(name: string): boolean {
  * world's as they were when the packet was made, so a re-key never enters it.
  * `x_review_` is the review profile's (dist.37, Skeld h58 #9726): a new
  * element's proposed mark and its last check, sent like any `x_` field.
+ * `x_room_` is the room profile's (dist.45): `x_room_of`, the parlor's mark on
+ * what its room makes (core/parlor-room.ts).
  */
-export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_'] as const;
+export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_'] as const;
 
 export function isProfileField(name: string): boolean {
   return PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));
