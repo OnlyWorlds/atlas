@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.73.0',
+    date: '2026-10-22',
+    theme: 'Hidden, said',
+    entries: [
+      {
+        id: 'hidden-mark-shown',
+        title: 'An element hidden on OnlyWorlds says so',
+        body: 'In a world on OnlyWorlds, an element its owner hid shows a small crossed-out eye after its name, on its page, in Knowledge and in Pages. Point at it or tap it: only the owner, co-builders and whoever made it can see the element.',
+        tags: ['sharing'],
+      },
+    ],
+  },
+  {
     version: '1.72.1',
     date: '2026-10-22',
     theme: 'Ready for the app name',

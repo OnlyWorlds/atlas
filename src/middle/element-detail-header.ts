@@ -46,7 +46,7 @@ import { getMapsSettings } from '../registry/registry';
 import { escapeText } from '../core/dom-utils';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { filesWhereOf } from '../core/browser-worlds';
-import { buildAgentMark } from './element-agent-mark';
+import { buildAgentMark, buildHiddenMark } from './element-agent-mark';
 
 /**
  * Pending "auto-edit on next render" signal. When set to an element id, the
@@ -133,6 +133,9 @@ export function renderHeader(el: Element): HTMLElement {
   // Last changed by an agent, said quietly (#347).
   const agentMark = buildAgentMark(el);
   if (agentMark) header.appendChild(agentMark);
+  // Hidden on OnlyWorlds, said the same quiet way (keel #537).
+  const hiddenMark = buildHiddenMark(el);
+  if (hiddenMark) header.appendChild(hiddenMark);
 
   // B3: if zone-create (or another flow) signalled an auto-edit for this
   // element, drop the user straight into rename mode with the placeholder

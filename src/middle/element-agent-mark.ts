@@ -10,6 +10,7 @@
 import { getState } from '../core/state';
 import type { Element } from '../core/types';
 import { agentMarkFor, type AgentMark } from '../core/agent-mark';
+import { hiddenMarkLine } from '../core/hidden-mark';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 import { toastManager } from '../ui/toast-manager';
 
@@ -28,12 +29,37 @@ export function mountAgentMarkSlot(): { el: HTMLElement; sync(el: Element): void
     el: slot,
     sync(el: Element): void {
       const mark = buildAgentMark(el);
-      const line = mark?.getAttribute('aria-label') ?? null;
-      if (line === shown && (mark === null) === (slot.firstChild === null)) return;
+      const hidden = buildHiddenMark(el);
+      const marks = [mark, hidden].filter((m): m is HTMLElement => m !== null);
+      const line = marks.map(m => m.getAttribute('aria-label') ?? m.dataset.role).join(' | ') || null;
+      if (line === shown && marks.length === slot.childElementCount) return;
       shown = line;
-      slot.replaceChildren(...(mark ? [mark] : []));
+      slot.replaceChildren(...marks);
     },
   };
+}
+
+/**
+ * keel's hidden mark beside the agent mark (`src/core/hidden-mark.ts`): the same
+ * quiet glyph, its line as label and tooltip, and said as a toast on a tap.
+ */
+export function buildHiddenMark(el: Element): HTMLElement | null {
+  const state = getState();
+  const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
+  const line = hiddenMarkLine(el, entry?.state);
+  if (!line) return null;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'atlas-icon-btn-sm atlas-agent-mark';
+  btn.dataset.role = 'hidden-mark';
+  const glyph = document.createElement('span');
+  glyph.className = 'material-symbols-outlined';
+  glyph.textContent = 'visibility_off';
+  btn.appendChild(glyph);
+  btn.title = line;
+  btn.setAttribute('aria-label', line);
+  btn.addEventListener('click', () => toastManager.info(line));
+  return btn;
 }
 
 export function buildAgentMark(el: Element): HTMLElement | null {
