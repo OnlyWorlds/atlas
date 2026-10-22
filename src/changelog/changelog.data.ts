@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.77.1',
+    date: '2026-10-22',
+    theme: "A world's checks kept",
+    entries: [
+      {
+        id: 'checks-name-kept',
+        title: "A world's checks are kept for the tools that read them",
+        body: "A work world's Charter can carry its rules as checks that other tools read. Atlas shows them read-only, and a custom field can no longer take their name.",
+        tags: ['elements'],
+      },
+    ],
+  },
+  {
     version: '1.77.0',
     date: '2026-10-22',
     theme: 'Said where it came from',
