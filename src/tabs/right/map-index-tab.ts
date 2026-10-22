@@ -26,7 +26,7 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-
 import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
-import { renderGate } from '../../ui/render-gate';
+import { renderGate, keepingFocus } from '../../ui/render-gate';
 
 // ---- Collapsed tree-node state ----
 
@@ -246,7 +246,12 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   const gate = renderGate();
   let rerenderSeq = 0;
 
+  // The search keeps its focus and caret through every redraw, a data tick's included (S452).
   function render(): void {
+    keepingFocus(root, 'input[data-role="map-search"]', draw);
+  }
+
+  function draw(): void {
     const state = getState();
     // A view-only world gets no New map, no drag reorder and no delete
     // (conv. 149); keyed in the gate so a key change redraws.
@@ -305,14 +310,6 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       input.addEventListener('input', () => {
         searchTerm = input.value;
         render();
-        // Preserve focus across the re-render.
-        const fresh = root.querySelector<HTMLInputElement>('input[data-role="map-search"]');
-        if (fresh) {
-          fresh.focus();
-          // Restore caret to end of value (re-render reset selection).
-          const len = fresh.value.length;
-          fresh.setSelectionRange(len, len);
-        }
       });
       searchRow.appendChild(input);
       if (searchTerm) {

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.73.1',
+    date: '2026-10-22',
+    theme: 'Typing that stays',
+    entries: [
+      {
+        id: 'typing-survives-redraw',
+        title: 'What you type stays where you type it',
+        body: "In Settings, typing in one field just after another saved could lose the text and the cursor; the second unit of a world's units was the usual victim. The Writing and Maps searches lost the cursor when a sync landed, so the next keys went to Atlas's shortcuts. Now Settings waits until you leave the field, and the searches keep your cursor.",
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.73.0',
     date: '2026-10-22',
     theme: 'Hidden, said',

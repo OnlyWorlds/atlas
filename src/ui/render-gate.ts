@@ -17,6 +17,41 @@ export interface RenderGate {
   reset(): void;
 }
 
+/**
+ * True while someone is typing in a text field inside `root`. A surface whose
+ * markup carries saved values rebuilds when a save lands, and a rebuild then
+ * replaces the field being typed in: its text and its focus go (the units race,
+ * S452: a unit's save landed while the next unit was being typed). Such a
+ * surface waits while this is true and catches up when focus leaves.
+ */
+export function typingInside(root: Element): boolean {
+  const el = document.activeElement;
+  if (!el || !root.contains(el)) return false;
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLInputElement) return !['button', 'checkbox', 'radio', 'submit', 'reset', 'file', 'range', 'color'].includes(el.type);
+  return (el as HTMLElement).isContentEditable === true;
+}
+
+/**
+ * Draw a surface that rebuilds its own search field, keeping the field's focus
+ * and caret when it had them (S452: a data tick that landed mid-typing left
+ * the writing and map searches unfocused, and the next keys went to the page).
+ * For a field whose results should follow every tick; a form whose saved
+ * values are in its markup waits instead (`typingInside`).
+ */
+export function keepingFocus(root: Element, selector: string, draw: () => void): void {
+  const before = root.querySelector<HTMLInputElement>(selector);
+  const had = !!before && document.activeElement === before;
+  const start = had ? before!.selectionStart : null;
+  const end = had ? before!.selectionEnd : null;
+  draw();
+  if (!had) return;
+  const fresh = root.querySelector<HTMLInputElement>(selector);
+  if (!fresh || document.activeElement === fresh) return;
+  fresh.focus();
+  if (start !== null) fresh.setSelectionRange(start, end ?? start);
+}
+
 export function renderGate(): RenderGate {
   let last: readonly unknown[] | null = null;
   return {

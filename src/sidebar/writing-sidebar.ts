@@ -37,7 +37,7 @@ import { bulkLinkNarratives } from '../middle/writing-bulk-link';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { isTourFlagActive } from '../tour/tour-flag';
-import { renderGate } from '../ui/render-gate';
+import { renderGate, keepingFocus } from '../ui/render-gate';
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -179,7 +179,12 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
   // tree navigates and folds, and offers no create, reorder, link or delete (conv. 149).
   let viewOnly = false;
 
+  // The search keeps its focus and caret through every redraw, a data tick's included (S452).
   function render(): void {
+    keepingFocus(root, '[data-role="writing-search"]', draw);
+  }
+
+  function draw(): void {
     const s = getState();
     if (!gate.changed([s.active, s.data, s.registry, window.location.hash, searchQuery, isTourFlagActive()])) return;
     const active = getState().active;
@@ -284,14 +289,6 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     searchInput.addEventListener('input', () => {
       searchQuery = searchInput.value;
       render();
-      // Restore focus + caret to the end after re-render (innerHTML wiped it).
-      queueMicrotask(() => {
-        const fresh = root.querySelector<HTMLInputElement>('[data-role="writing-search"]');
-        if (fresh) {
-          fresh.focus();
-          fresh.setSelectionRange(searchQuery.length, searchQuery.length);
-        }
-      });
     });
     searchRow.appendChild(searchInput);
 

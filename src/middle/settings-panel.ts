@@ -34,7 +34,7 @@ import { renderWorldTab, wireWorldTab } from './settings-world';
 import { renderWritingTab, wireWritingTab } from './settings-writing';
 import { renderContextTab, wireContextTab } from './settings-context';
 import pkg from '../../package.json';
-import { renderGate } from '../ui/render-gate';
+import { renderGate, typingInside } from '../ui/render-gate';
 
 export interface SettingsMount {
   target: HTMLElement;
@@ -80,10 +80,22 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
   }
 
   const gate = renderGate();
+  // A save that lands while the next field is being typed in waits (S452):
+  // the rebuild would replace that field. A new tab always draws.
+  let drawnTab: SettingsTab | null = null;
+  let waiting = false;
+  root.addEventListener('focusout', () => {
+    if (!waiting) return;
+    // After the focus has moved: into another text field, it waits again.
+    setTimeout(() => { if (waiting) render(); }, 0);
+  });
 
   function render(): void {
     const state = getState();
     const tab = activeTab();
+    if (tab === drawnTab && typingInside(root)) { waiting = true; return; }
+    waiting = false;
+    drawnTab = tab;
     // Keep the persisted "last visited" tab in sync with whatever the URL
     // says. Covers hash-driven nav (back/forward, direct links, etc.) — not
     // just our tab-click handler.

@@ -204,6 +204,39 @@ test('world tab: units save trimmed to world.json and print after the numbers th
   await expect.poll(() => after('height')).toEqual(['900', 'none']);
 });
 
+test('a save that lands while you type in the next field keeps your typing (the units race, S452)', async ({ page }) => {
+  // The race the units test kept losing 1 in 5: the first unit's save patches
+  // the active world, the panel's markup carries each saved value, so the
+  // panel rebuilt and replaced the input still being typed in. Made
+  // deterministic here: type, then land a state change while focus is inside.
+  await setupAtlasRoot(page);
+  await createWorld(page, 'Typing World');
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="world"]');
+  const mass = page.locator('input[name="world-mass-unit"]');
+  await mass.click();
+  await mass.pressSequentially('sto');
+  await mass.evaluate((el) => { el.dataset.typedIn = 'yes'; });
+  await page.evaluate(async () => {
+    const { getState, patchSlice } = await import('/src/core/state.ts');
+    const active = getState().active!;
+    patchSlice('active', { ...active, meta: { ...active.meta, length_unit: 'cm' } });
+  });
+  // Let the state change finish drawing before reading (a check that runs first can win the race).
+  await page.waitForTimeout(300);
+  await expect(mass).toHaveAttribute('data-typed-in', 'yes'); // the same field, not a rebuilt one
+  await expect(mass).toHaveValue('sto');
+  await expect(mass).toBeFocused();
+  await mass.pressSequentially('ne');
+  await mass.blur();
+  await expect.poll(() => page.evaluate(async () => {
+    const meta = await (window as any).__atlasTestApi.getActiveStore().readWorldMeta();
+    return meta.mass_unit ?? null;
+  })).toBe('stone');
+  // Once focus leaves, the panel catches up with what changed meanwhile.
+  await expect(page.locator('input[name="world-length-unit"]')).toHaveValue('cm');
+});
+
 test('world tab — api-linked worlds get stay-offline + refresh + unlink + test', async ({ page }) => {
   await setupAtlasRoot(page);
   await createWorld(page, 'Fake API World');
