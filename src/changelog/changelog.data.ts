@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: "The world file onlyworlds.com gives you now carries the world's settings, its now among them. Atlas reads that now when it opens the file, so the charts' now line and the world clock start where the world was.",
         tags: ['folders', 'fix'],
       },
+      {
+        id: 'home-first-steps-words',
+        title: "Home's first steps use a world's own words",
+        body: 'A new world with its own words for the types now says "Start with an Employee and a location" where it named the types by the standard words.',
+        tags: ['world', 'fix'],
+      },
     ],
   },
   {

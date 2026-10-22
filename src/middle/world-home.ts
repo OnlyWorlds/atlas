@@ -832,7 +832,7 @@ function buildTour(
   // A world started from a Start-page link was answered on onlyworlds.com:
   // it gets the first answer alone, under no question.
   if (isNewcomerAnswered(worldId) && totalElements === 0) {
-    row('nothing', 'Start here', 'A character and a location: someone, somewhere.').appendChild(grid);
+    row('nothing', 'Start here', `${escapeText(aTypeName('character', { start: true }))} and ${escapeText(aTypeName('location'))}: someone, somewhere.`).appendChild(grid);
     return section;
   }
 
@@ -840,7 +840,7 @@ function buildTour(
   // It stays, with its finished cards checked, until the core pair exists,
   // so the block does not change shape under the first create (h20 #2081).
   section.insertAdjacentHTML('beforeend', '<h2 class="atlas-home-have-title">What do you have?</h2>');
-  row('nothing', 'Nothing yet', 'Start with a character and a location.').appendChild(grid);
+  row('nothing', 'Nothing yet', `Start with ${escapeText(aTypeName('character'))} and ${escapeText(aTypeName('location'))}.`).appendChild(grid);
   const act = (action: string, label: string): string =>
     `<button type="button" class="atlas-btn-link atlas-home-have-act" data-have-action="${action}">${label}</button>`;
   // A button is one box even when inline: the closing one keeps its full
