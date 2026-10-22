@@ -1397,8 +1397,14 @@ export class FsFolderStore implements FolderStore {
       const stamp = born && patch.format_version === undefined
         ? { format_version: FOLDER_FORMAT_VERSION }
         : {};
+      // THE PRODUCER LINE (§4.2, v0.3.14): taken at birth only. After that the
+      // line the folder was born with stays, whoever writes (an import into
+      // this world, a pull, a restore): it says who made the folder, never who
+      // touched it last.
+      const { producer: offered, ...rest } = patch;
+      const producer = born && offered !== undefined ? { producer: offered } : {};
       // A seat's secret never reaches the folder (#104): the folder travels.
-      const next: WorldMeta = withoutSeatSecret({ ...current, ...stamp, ...patch });
+      const next: WorldMeta = withoutSeatSecret({ ...current, ...stamp, ...rest, ...producer });
       await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
       return next;
     });

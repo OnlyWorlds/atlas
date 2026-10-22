@@ -186,6 +186,7 @@ export function reconcile(
   if (parsed.format === 'full-world' && parsed.world) {
     plan.worldMeta = mapWorldBlock(parsed.world);
   }
+  if (parsed.envelope === true) plan.envelope = true;
 
   return plan;
 }
@@ -354,6 +355,9 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
   const lines = out as Record<string, unknown>;
   if (world.source && typeof world.source === 'object' && !Array.isArray(world.source)) lines.source = world.source;
   if (world.exported_as && typeof world.exported_as === 'object' && !Array.isArray(world.exported_as)) lines.exported_as = world.exported_as;
+  // And who made it (v0.3.14): verbatim, so a new world from keel's export
+  // says keel made it, never Atlas.
+  if (world.producer && typeof world.producer === 'object' && !Array.isArray(world.producer)) lines.producer = world.producer;
   // api_key + id intentionally dropped — never auto-arm sync (convention #85);
   // atlas generates its own WorldMeta.id.
   return out;

@@ -45,6 +45,7 @@ import { initialDownloadAll, DownloadCancelledError, type InitialDownloadProgres
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
+import { atlasProducer, importedProducer } from '../core/provenance';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { PlainError } from '../core/plain-error';
 import { browserStorageFullSentence } from '../core/problems';
@@ -728,14 +729,14 @@ export async function createWorldInRoot(
   if (inBrowser) {
     ({ store, worldUuid, subName, handleKey, make } = await scaffoldBrowserWorld(trimmed));
     try {
-      await store.writeWorldMeta({ id: worldUuid, name: trimmed });
+      await store.writeWorldMeta({ id: worldUuid, name: trimmed, producer: atlasProducer('bare') });
       await releasePriorWorld();
     } catch (err) {
       return abandonBrowserMake(store, make, err, 'creating the world');
     }
   } else {
     ({ store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(trimmed));
-    await store.writeWorldMeta({ id: worldUuid, name: trimmed });
+    await store.writeWorldMeta({ id: worldUuid, name: trimmed, producer: atlasProducer('bare') });
     // Register + activate.
     await releasePriorWorld();
   }
@@ -806,7 +807,7 @@ export async function createWorldFromImportedData(
   const { demo: _dropDemo, ...importedMeta } = plan.worldMeta ?? {};
   let applied: ApplyResult;
   try {
-    await store.writeWorldMeta({ ...importedMeta, id: worldUuid, name, ...(opts.demo ? { demo: true } : {}) });
+    await store.writeWorldMeta({ ...importedMeta, id: worldUuid, name, ...importedProducer(plan), ...(opts.demo ? { demo: true } : {}) });
     // Apply the elements BEFORE the world goes active. Into browser storage a
     // full origin is fatal to the whole import (contract §2.2).
     applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress, stopOnQuota: inBrowser });
@@ -935,6 +936,9 @@ export function linkedWorldMeta(opts: {
   return {
     id: opts.serverWorldId,
     name: opts.displayName,
+    // Atlas makes this folder from the server (spec §4.2); the store takes the
+    // line at birth only, so a later write of this block leaves it as it was.
+    producer: atlasProducer('server'),
     // Cache the server-side name so settings can show api-vs-local
     // divergence without a network fetch on reload.
     api: {

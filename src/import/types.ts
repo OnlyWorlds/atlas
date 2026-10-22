@@ -95,5 +95,7 @@ export interface ImportPlan {
   skips: Array<{ type: ElementType; id: string; name: string }>;
   /** Full-world only: world metadata to apply to a new (or target) world. */
   worldMeta?: Partial<WorldMeta>;
+  /** True when the payload was an export envelope: a copy, which never gets a producer line it did not carry (spec §4.2). */
+  envelope?: boolean;
   report: ImportReport;
 }

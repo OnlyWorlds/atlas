@@ -115,8 +115,11 @@ export class MockFolderStore implements FolderStore {
     const stamp = !this.metaBorn && patch.format_version === undefined
       ? { format_version: FOLDER_FORMAT_VERSION }
       : {};
+    // And its producer line: taken at birth only.
+    const { producer: offered, ...rest } = patch;
+    const producer = !this.metaBorn && offered !== undefined ? { producer: offered } : {};
     this.metaBorn = true;
-    this.meta = withoutSeatSecret({ ...this.meta, ...stamp, ...patch });
+    this.meta = withoutSeatSecret({ ...this.meta, ...stamp, ...rest, ...producer });
     return { ...this.meta };
   }
 

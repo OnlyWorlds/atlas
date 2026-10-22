@@ -32,6 +32,7 @@ import { buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine, diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { abandonBrowserMake, releasePriorWorld, scaffoldBrowserWorld } from './atlas-root-flow';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
+import { atlasProducer } from '../core/provenance';
 
 /**
  * The world.json id this entry was made with. Every `handle_key` is
@@ -113,7 +114,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   const { store, subName, make } = await scaffoldBrowserWorld(entry.name, ownId);
   let downloaded;
   try {
-    await store.writeWorldMeta({ id: ownId, name: entry.name, api: diskApiBlock(entry.api) });
+    await store.writeWorldMeta({ id: ownId, name: entry.name, api: diskApiBlock(entry.api), producer: atlasProducer('server') });
     downloaded = await initialDownloadAll(store, buildV2Adapter(entry.api.api_key, pin), opts.onProgress, undefined, { stopOnQuota: true });
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');

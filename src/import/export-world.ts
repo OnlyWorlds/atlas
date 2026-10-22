@@ -74,6 +74,7 @@ export async function buildWorldExport(
   const lines = meta as unknown as Record<string, unknown>;
   if (lines.source && typeof lines.source === 'object') world.source = lines.source;
   if (lines.exported_as && typeof lines.exported_as === 'object') world.exported_as = lines.exported_as;
+  if (lines.producer && typeof lines.producer === 'object') world.producer = lines.producer;
 
   // THE ENVELOPE (S354, converging on keel's `onlyworlds-world-export`, owed
   // to Skeld since S313). One shape both ways now: keel exports it, atlas

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.72.0',
+    date: '2026-10-22',
+    theme: 'Who made this world',
+    entries: [
+      {
+        id: 'producer-line',
+        title: 'A world Atlas makes says it was made in Atlas, and from what',
+        body: "A new world's world.json now records that Atlas made it, which version, and what from: an empty start, a JSON import, or a download from OnlyWorlds. A world made by another tool keeps that tool's own line, and a copy of a world keeps the line it was born with.",
+        tags: ['folders'],
+      },
+    ],
+  },
+  {
     version: '1.71.0',
     date: '2026-10-22',
     theme: 'One world file for every tool',

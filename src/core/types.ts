@@ -178,6 +178,12 @@ export interface WorldMeta {
   version?: string;
   /** Folder Format spec version the folder was written against (§4.2). Stamped at birth; see FOLDER_FORMAT_VERSION. */
   format_version?: string;
+  /**
+   * Which tool made this folder and from what (spec §4.2, v0.3.14): written at
+   * birth only, kept verbatim after; absent where no maker wrote one. See
+   * `core/provenance.ts` `atlasProducer`.
+   */
+  producer?: { tool: string; version: string; input: string };
   /** World cover image URL. Preserved on import/export round-trip (DESIGN_IMPORT.md). */
   image_url?: string;
   /**

@@ -16,6 +16,7 @@ import { setActiveStore } from '../core/active-store';
 import { createLocalWorld, setActiveWorld, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { abandonBrowserMake, scaffoldBrowserWorld, releasePriorWorld } from '../setup/atlas-root-flow';
 import { attachSyncEngine } from '../sync/sync-attach';
+import { atlasProducer } from '../core/provenance';
 import type { WorldMeta, WorldRegistryEntry } from '../core/types';
 
 export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }> {
@@ -31,6 +32,8 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
       name: w.name,
       description: w.description,
       demo: true,
+      // Born empty in Atlas, the tour fills it (spec §4.2's `bare`).
+      producer: atlasProducer('bare'),
       time_basic_unit: w.time_basic_unit,
       time_range_min: w.time_range_min,
       time_range_max: w.time_range_max,

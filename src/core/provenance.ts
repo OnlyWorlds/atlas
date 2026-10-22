@@ -7,10 +7,52 @@
  * `Forge/Notes/2026-10-20-s446-provenance-lines.md` (W1-W3, R1, P1, K1).
  */
 
+import pkg from '../../package.json';
+
 export interface WorldSource {
   server: string;
   world: string;
   at: string;
+}
+
+/**
+ * The producer line (spec §4.2, v0.3.14; Keel #477, OW Council #541): which
+ * tool made a folder and from what. Written once, by the writer that makes the
+ * folder, and carried verbatim by every copy after (the store keeps the line a
+ * world.json was born with: `writeWorldMeta`). `input` is the spec's closed
+ * list; a word Atlas does not know is data, never a refusal.
+ */
+export interface WorldProducer {
+  tool: string;
+  version: string;
+  input: string;
+}
+
+/** The inputs Atlas itself writes: born empty, loose JSON, a download from a server. */
+export type AtlasProducerInput = 'bare' | 'json' | 'server';
+
+export function atlasProducer(input: AtlasProducerInput): WorldProducer {
+  return { tool: 'atlas', version: pkg.version, input };
+}
+
+/** A producer line as a world.json or an import's world block carries it: an object, kept verbatim, or nothing. */
+export function producerLineOf(meta: unknown): Record<string, unknown> | null {
+  if (!meta || typeof meta !== 'object') return null;
+  const p = (meta as Record<string, unknown>).producer;
+  return p && typeof p === 'object' && !Array.isArray(p) ? p as Record<string, unknown> : null;
+}
+
+/**
+ * The producer line for a world made from an import. A line the file carries
+ * is kept verbatim (keel's export, another tool's); an export envelope without
+ * one stays without, since a copy never invents its maker; anything else is
+ * JSON of unknown origin (the convert-notes prompt's shape, a hand-made file),
+ * made into a folder by Atlas: `json`.
+ */
+export function importedProducer(plan: { worldMeta?: unknown; envelope?: boolean }): { producer?: WorldProducer } {
+  const carried = producerLineOf(plan.worldMeta);
+  if (carried) return { producer: carried as unknown as WorldProducer };
+  return plan.envelope ? {} : { producer: atlasProducer('json') };
 }
 
 export type SliceKind = 'owner' | 'member' | 'character' | 'public';

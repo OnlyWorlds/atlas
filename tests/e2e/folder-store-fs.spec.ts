@@ -83,11 +83,54 @@ test('world.json is born with format_version and a foreign world.json is never g
     await store2.close();
     return { born, edited, theirs };
   });
-  expect(r.born.format_version).toBe('0.3.13');
-  expect(r.edited.format_version).toBe('0.3.13');
+  expect(r.born.format_version).toBe('0.3.14');
+  expect(r.edited.format_version).toBe('0.3.14');
   expect(r.edited.name).toBe('Renamed');
   expect(r.theirs.name).toBe('Theirs, edited');
   expect(r.theirs.format_version).toBeUndefined();
+});
+
+test('the producer line is taken at birth only, and a foreign line stays as it was', async ({ page }) => {
+  // Folder-format §4.2 (v0.3.14): written once, by the writer that makes the
+  // folder; a later writer never invents one or moves it.
+  const r = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const made = { tool: 'atlas', version: '1.0.0', input: 'bare' };
+    const later = { tool: 'atlas', version: '9.9.9', input: 'server' };
+    const mine = await root.getDirectoryHandle('producer-born', { create: true });
+    const store = new api.FsFolderStore({ tabId: 'pl-tab', disableHeartbeat: true });
+    await store.open(mine);
+    await store.writeWorldMeta({ id: 'w-p', name: 'Born', producer: made });
+    await store.writeWorldMeta({ name: 'Renamed', producer: later });
+    const born = await store.readWorldMeta();
+    await store.close();
+
+    const none = await root.getDirectoryHandle('producer-none', { create: true });
+    const store2 = new api.FsFolderStore({ tabId: 'pl-tab-2', disableHeartbeat: true });
+    await store2.open(none);
+    await store2.writeWorldMeta({ id: 'w-n', name: 'No line' });
+    await store2.writeWorldMeta({ name: 'Still none', producer: later });
+    const bornWithout = await store2.readWorldMeta();
+    await store2.close();
+
+    const foreign = await root.getDirectoryHandle('producer-foreign', { create: true });
+    const fh = await foreign.getFileHandle('world.json', { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify({ id: 'w-f', name: 'Theirs', producer: { tool: 'azgaar-converter', version: '0.1.0', input: 'azgaar-map', note: 'kept' } }));
+    await w.close();
+    const store3 = new api.FsFolderStore({ tabId: 'pl-tab-3', disableHeartbeat: true });
+    await store3.open(foreign);
+    await store3.writeWorldMeta({ name: 'Theirs, edited', producer: later });
+    const theirs = await store3.readWorldMeta();
+    await store3.close();
+    return { born, bornWithout, theirs };
+  });
+  expect(r.born.name).toBe('Renamed');
+  expect(r.born.producer).toEqual({ tool: 'atlas', version: '1.0.0', input: 'bare' });
+  expect(r.bornWithout.name).toBe('Still none');
+  expect(r.bornWithout.producer).toBeUndefined();
+  expect(r.theirs.producer).toEqual({ tool: 'azgaar-converter', version: '0.1.0', input: 'azgaar-map', note: 'kept' });
 });
 
 test('a fresh world creates every element type under elements/, spatial types included', async ({ page }) => {
