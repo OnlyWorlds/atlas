@@ -4,7 +4,8 @@ These three OW worlds mirror the fixtures in `world-a.ts`, `world-b.ts`,
 `world-c.ts`. They exist for end-to-end verification once atlas's map
 foundation is wired enough to load and render API data.
 
-PIN: `2589` (default).
+The three worlds are retired: their keys no longer answer (each read 401 on
+2026-10-23), so the table keeps their names and counts only.
 
 All maps carry `image_url: https://i.imgur.com/klSYRAm.jpeg` (Captain added
 for visual debugging — not in the original fixture spec, but useful when
@@ -12,11 +13,11 @@ flipping to the live world to see the tree against a real canvas).
 
 ## Worlds
 
-| Label | World name | API key | Counts |
-|---|---|---|---|
-| A | AAARGAAAA | `4180352838` | 9 Maps, 0 Locations |
-| B | AAARGBBBB | `3657948059` | 4 Maps, 7 Locations |
-| C | AAARGCCC  | `2192349194` | 7 Maps, 4 Locations |
+| Label | World name | Counts |
+|---|---|---|
+| A | AAARGAAAA | 9 Maps, 0 Locations |
+| B | AAARGBBBB | 4 Maps, 7 Locations |
+| C | AAARGCCC  | 7 Maps, 4 Locations |
 
 ## UUIDs
 
@@ -70,7 +71,7 @@ JSON-fixture-only for now.
 
 ## Repro / cleanup
 
-Scripts at `C:/Users/Titus/Carrier/Orrery/notes/2026-05-15-atlas-maps-fixtures/`:
+Scripts at `Carrier/Orrery/notes/2026-05-15-atlas-maps-fixtures/`:
 - `build_fixtures.py` — recreate worlds (assumes empty)
 - `add_images.py` — re-PATCH image_url
 - `verify.py` — re-run tree comparison

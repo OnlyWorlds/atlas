@@ -1,0 +1,13 @@
+Atlas
+Copyright (c) 2026 OnlyWorlds
+
+The code in this repository is licensed under the MIT License (see LICENSE).
+
+The licence covers the code. It does not grant use of the OnlyWorlds name or
+logo, of Atlas as the name of an OnlyWorlds product, or of the OnlyWorlds look
+(its icons, colours and visual identity). A fork is welcome: give it its own
+name and look, and do not present it as OnlyWorlds or as Atlas from OnlyWorlds.
+
+The tour's sample world (src/demo/hyperion-world.json) is built from Dan
+Simmons's novel Hyperion. Its characters, names and events belong to their
+author and are not covered by the MIT License.

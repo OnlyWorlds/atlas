@@ -61,7 +61,7 @@ Two states. The difference is **whether sync is wired**, not where data lives.
 
 No `api-only` mode. Every world has a folder. The folder is the truth. If you want the world "online," you attach api credentials and the SyncEngine begins reconciling.
 
-**View-only worlds (S264)** are a FLAG on api-linked, not a third state: `api.read_only` (registry + world.json mirror, so root discovery restores it). Linked via the sidebar's `+eye` → ViewWorldModal with a READ key — no PIN anywhere (keel reads are keyless-PIN). The folder-first invariant holds (full local download, browsable offline); the difference is the double wall: the engine is pull-only (`readOnly` option — no push trigger survives, the meta step never PATCHes, pull-on-activate always runs) and the store blocks every UI mutation at the seam (`setViewOnly` → "This world is view-only"; the engine's own channels bypass). The sister-shares-with-her-DM flow. Details: SYNC_NOTES "Read-only engines".
+**View-only worlds (S264)** are a FLAG on api-linked, not a third state: `api.read_only` (registry + world.json mirror, so root discovery restores it). Linked via the sidebar's `+eye` → ViewWorldModal with a READ key — no PIN anywhere (keel reads are keyless-PIN). The folder-first invariant holds (full local download, browsable offline); the difference is the double wall: the engine is pull-only (`readOnly` option — no push trigger survives, the meta step never PATCHes, pull-on-activate always runs) and the store blocks every UI mutation at the seam (`setViewOnly` → "This world is view-only"; the engine's own channels bypass). The player-shares-with-their-DM flow. Details: SYNC_NOTES "Read-only engines".
 
 **Transitions**:
 - `local-only` → `api-linked`: **Make Online** flow (two routes, see Workflows).
@@ -1079,7 +1079,7 @@ Real browser, real File System Access API, real dev server, MSW intercepting API
 - W11 reopen world (handle re-permission flow)
 
 ### Smoke (manual against real OW)
-Dedicated test world (Captain provided: `5474990854`). Periodic manual runs to verify:
+Dedicated test world (Captain provided: `<retired key>`). Periodic manual runs to verify:
 - create-world-external endpoint
 - create / update / delete round-trip
 - UUID preservation
@@ -1230,7 +1230,7 @@ Atlas innovating is healthy. Atlas innovating *and* feeding learnings back to On
 - **OW SDK patterns**: `Knowledge/Technical/onlyworlds.md` (handles SDK quirks, relationship fields, schema reference).
 - **Create-world endpoint reference**: `Development/OnlyWorlds/obsidian-plugin/Commands/CreateWorldCommand.ts`.
 - **Field schema source**: SDK FIELD_SCHEMA + ELEMENT_SECTIONS.
-- **Test world for smoke**: `5474990854` (Captain's messworld).
+- **Test world for smoke**: `<retired key>` (Captain's messworld).
 
 ---
 

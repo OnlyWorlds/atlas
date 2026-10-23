@@ -1,6 +1,6 @@
 /**
  * Who a message is from and to (#526). The crew's convention, used on the
- * Manifest's Wire and in BrainBoost: a message is a Narrative with supertype
+ * Manifest's Wire and in work worlds: a message is a Narrative with supertype
  * Message, its sender the Narrator, its recipients the Characters. Atlas
  * draws that as one line above the text, so a message reads as a message and
  * not as a story with a narrator.

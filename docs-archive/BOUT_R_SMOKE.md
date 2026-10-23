@@ -86,7 +86,7 @@ Cheap to verify, low blast radius if any fails.
 
 # After all green — Cutover
 
-1. `cd C:/Users/Titus/Carrier/Forge/tools/atlas`
+1. `cd Carrier/Forge/tools/atlas`
 2. `git status` — confirm working tree state. Multiple bouts of unpushed commits ready.
 3. `git push --force origin main` — overwrites previous build on the atlas repo.
 4. Cloudflare Pages auto-redeploys (~1 min).

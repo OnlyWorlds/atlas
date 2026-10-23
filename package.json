@@ -2,7 +2,8 @@
   "name": "atlas",
   "version": "1.84.1",
   "private": true,
-  "description": "Atlas — folder-first OnlyWorlds world browser and editor with optional API sync",
+  "license": "MIT",
+  "description": "Atlas: folder-first OnlyWorlds world browser and editor with optional API sync",
   "scripts": {
     "changelog": "vite-node scripts/build-changelog.mts",
     "predev": "npm run changelog",

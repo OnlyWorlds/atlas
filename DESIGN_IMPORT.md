@@ -13,7 +13,7 @@ Grounded by the session-241 research sweep (6 read-only agents: atlas reconcile 
 
 ## Vision
 
-Atlas should ingest OnlyWorlds data from anywhere — a full world JSON exported by ow.com, or a loose pile of elements parsed from ChatGPT / OnlyWorldsBot / Claude+toolkit — and emit it back out in the same ow.com-compatible shape. Powerful, elegant, safe, error-free. The **base-tool** (`C:/Users/Titus/Development/OnlyWorlds/base-tool`) has a proven validate→reconcile→write pipeline we lift the *ideas* from while rebuilding the *core* clean for atlas.
+Atlas should ingest OnlyWorlds data from anywhere — a full world JSON exported by ow.com, or a loose pile of elements parsed from ChatGPT / OnlyWorldsBot / Claude+toolkit — and emit it back out in the same ow.com-compatible shape. Powerful, elegant, safe, error-free. The **base-tool** (`Development/OnlyWorlds/base-tool`) has a proven validate→reconcile→write pipeline we lift the *ideas* from while rebuilding the *core* clean for atlas.
 
 **Design north star:** import is **bulk local-create into the folder**. Sync is orthogonal. If the world is api-linked, the existing SyncEngine pushes the imported elements up afterward — exactly like any other local edit. One path, no special-casing per world-state.
 

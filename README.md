@@ -1,9 +1,14 @@
 # Atlas
 
-Folder-first OnlyWorlds world browser and editor with optional API sync.
+Folder-first OnlyWorlds world browser and editor with optional API sync. A world is a folder of plain files on your disk (or in your browser's storage), and Atlas reads and writes it; linking the world to an account on [onlyworlds.com](https://www.onlyworlds.com) adds sync.
 
-**Status**: **v1.0 LAUNCHED** 2026-07-24 at [atlas.onlyworlds.com](https://atlas.onlyworlds.com) (rebuild ran 2026-05-12 to 2026-07; public changelog at `/changelog.html`, drops 1.1 to 1.14 since; the newest is always the top of that page, and its one edit surface is `src/changelog/changelog.data.ts`). Post-launch work: interop with other OnlyWorlds writers (the union read, both disk link spellings, the keel export envelope) and the migration bout (`Notes/2026-09-02-migration-hops.md`). See `DESIGN.md` for architecture, `PROGRESS.md` for operational state, `src/changelog/changelog.data.ts` for releases (`CHANGELOG.md` is the pre-launch log, kept for history).
-**Legacy**: Previous IDB-cached design lives at `tools/atlas-deprecated/` — UI/UX reference only. See its `DEPRECATED.md` for what to port vs drop.
+Use it at [atlas.onlyworlds.com](https://atlas.onlyworlds.com); what changed in each release is at [atlas.onlyworlds.com/changelog.html](https://atlas.onlyworlds.com/changelog.html) (its one edit surface is `src/changelog/changelog.data.ts`; `CHANGELOG.md` is the pre-launch log, kept for history).
+
+**Who writes this repository.** Atlas is built by Temper, one of a crew of AI minds working with the OnlyWorlds founder (the Captain in these files). The design docs, `PROGRESS.md` and `Notes/` are that crew's working record, kept as they were written: session numbers (S459), room references (h20 #1234) and paths into the crew's own folders (`Forge/Notes/...`) point at records outside this repository.
+
+## Licence and contributions
+
+The code is MIT (`LICENSE`). The OnlyWorlds name, the logo and the look are not: see `NOTICE`, and give a fork its own name. Issues are welcome on this repository; pull requests are read, but merging one is not promised.
 
 ## Run
 
@@ -30,7 +35,7 @@ Full architecture: `DESIGN.md` (the index into the design docs).
 
 ## Documentation map
 
-The doc system has five live layers. **Rule: Forge/Notes decide, DESIGN docs hold** — dated decision records (in `Forge/Notes/`) get folded into the room's DESIGN doc promptly; the DESIGN doc is the living truth.
+The doc system has five live layers. **Rule: Forge/Notes decide, DESIGN docs hold**: dated decision records (in `Forge/Notes/`) get folded into the room's DESIGN doc promptly; the DESIGN doc is the living truth.
 
 | Layer | Files | Job |
 |---|---|---|

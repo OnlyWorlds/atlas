@@ -1,6 +1,6 @@
 # S319 — The final pre-launch sweep (autonomous)
 
-**2026-07-24, evening** · Captain away ~2h picking up Grainne · mandate: "one final, v1.0-readying crack at atlas — full sweep, safe/proven changes only, no major refactors or risky stuff, your discretion. Roll to the end, quench, give me a report + essential smoke checks."
+**2026-07-24, evening** · Captain away ~2h · mandate: "one final, v1.0-readying crack at atlas — full sweep, safe/proven changes only, no major refactors or risky stuff, your discretion. Roll to the end, quench, give me a report + essential smoke checks."
 
 Everything below is **uncommitted** (Captain's hand). Gates at close: **typecheck 0 · 1569 vitest · 273 e2e (count = `--list` = 273, PLAYWRIGHT_EXIT=0) · build clean**. The changelog was deliberately **NOT touched** (see the note at the end).
 

@@ -211,7 +211,7 @@ export function createProseContextMenu(deps: {
         </button>
       `);
     }
-    // Selection-scoped bulk linking (S265, Susie's gesture: select text,
+    // Selection-scoped bulk linking (S265, a tester's gesture: select text,
     // right-click, link everything in it). Counts come from the live
     // decoration set / chip nodes, so the labels are exact.
     let selLinkable = 0;

@@ -8,7 +8,7 @@
 > covering every flow.
 
 **Status**: superseded — kept as historical reference
-**Target world**: `5474990854` (Captain's messworld on production OW)
+**Target world**: `<retired key>` (Captain's messworld on production OW)
 **Goal**: surface anything MSW couldn't simulate. Pass this and we cut over.
 
 After all checks pass: see "Cutover" at the bottom.
@@ -21,7 +21,7 @@ Confirm before starting:
 
 - [ ] `npm run dev` is running on port 3045
 - [ ] You're in Chromium (the file system access API is Chromium-only)
-- [ ] You have your `5474990854` api_key + pin handy from onlyworlds.com
+- [ ] You have your `<retired key>` api_key + pin handy from onlyworlds.com
 - [ ] Atlas root is already set up (use the same folder you smoked Phase 2 with)
 
 If anything fails along the way, stop, paste what you saw, and we patch.
@@ -34,7 +34,7 @@ The "I made a world on onlyworlds.com, suck it down to disk" flow.
 
 - [ ] Sidebar header → `+ link api`
 - [ ] Modal opens. PIN should pre-fill if you saved it in settings; otherwise type it.
-- [ ] Paste the api_key for `5474990854`. Leave display name blank (we'll use the server's name).
+- [ ] Paste the api_key for `<retired key>`. Leave display name blank (we'll use the server's name).
 - [ ] Click `link`
 - [ ] Watch the progress box. Should show: "discovering character…" then "downloading N of M elements…" with the count climbing.
 - [ ] **Expected**: toast `linked <name> — N elements downloaded`. Modal closes. Sidebar shows the world with a cloud icon + `api` chip. Sync pill bottom-right shows `synced`.
@@ -180,7 +180,7 @@ Permission re-prompt UX check.
 
 When everything above looks right, cutover:
 
-1. From `C:/Users/Titus/Carrier/Forge/tools/atlas/`:
+1. From `Carrier/Forge/tools/atlas/`:
    - `git remote -v` should already point at the atlas repo (set up session 197).
    - `git status` — confirm working tree clean (commits between bouts).
 2. **Force-push**: `git push --force origin main` (overwrites legacy code).

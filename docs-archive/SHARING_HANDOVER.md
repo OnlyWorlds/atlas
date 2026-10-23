@@ -37,7 +37,7 @@ Her slice landed 2026-06-07 (83 backend tests; Captain deploying). Steps 1–3 a
 
 Remaining (the moment her API is deployed):
 
-4. Live smoke against the real backend (Captain's messworld `5474990854`): publish → curl/visit URL → republish → revoke → 410 → revive. Expect the *first* real 4xx to reveal a fake-vs-real gap — encode it in the fakes before fixing the caller.
+4. Live smoke against the real backend (Captain's messworld `<retired key>`): publish → curl/visit URL → republish → revoke → 410 → revive. Expect the *first* real 4xx to reveal a fake-vs-real gap — encode it in the fakes before fixing the caller.
 5. CF checklist (`SHARING_CF_DELIVERY.md` §5): cache HIT on second GET, purge path, Function unfurl, **CORS** (items 6–7).
 6. Wire the share room's list-reconcile if mirror-drift shows up in smoke (`listForWorld` exists on the client, unwired — `atlas_page_pub` is currently the only display source).
 7. Deploy-order note: published URLs point at `show.onlyworlds.com` — until Hangar deploys `tools/show`, verify payloads via `curl` on the API URL directly (the toast URL will 404 at the viewer, that's expected).
