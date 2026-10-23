@@ -67,7 +67,7 @@ export class LinkWorldModal extends BaseModal {
           <span>Display name (optional)</span>
           <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to the name on onlyworlds.com" autocomplete="off" />
         </label>
-        ${whereChoiceHtml()}
+        ${whereChoiceHtml({ online: true })}
         <p class="atlas-modal-hint">
           Atlas downloads every element of this world. You can keep editing while offline; changes sync back the next time you open it.
         </p>

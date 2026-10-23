@@ -255,12 +255,19 @@ async function linkLandsInBrowser(page: Page, folderMode: boolean) {
   await mockKeel(page, 30);
   await openLink(page);
   const modal = page.locator('[data-modal="link-world"]');
+  // The world stays on onlyworlds.com, so the question is one line (h20 B13).
   if (folderMode) {
+    const short = modal.locator('[data-role="where-short"]');
+    await expect(short).toContainText('Kept in this browser; the world stays on onlyworlds.com too.');
+    await expect(modal.locator('[data-role="where"]')).toBeHidden();
+    // Choose a folder instead opens the rows with the folder picked; the walk goes back to this browser.
+    await short.locator('[data-action="where-folder"]').click();
     await expect(modal.locator('.atlas-where-row strong')).toHaveText(['In a folder on your drive', 'In this browser']);
-    await expect(modal.locator('input[name="where"][value="browser"]')).toBeChecked();
+    await expect(modal.locator('input[name="where"][value="folder"]')).toBeChecked();
+    await modal.locator('input[name="where"][value="browser"]').check();
   } else {
     await expect(modal.locator('.atlas-where-row')).toHaveCount(0);
-    await expect(modal.locator('[data-role="where-browser"]')).toHaveText('It lives in this browser.');
+    await expect(modal.locator('[data-role="where-browser"]')).toHaveText('Kept in this browser; the world stays on onlyworlds.com too.');
   }
   await modal.locator('[data-action="link"]').click();
   await expect(modal).toHaveCount(0);

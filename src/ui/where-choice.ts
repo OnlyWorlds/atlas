@@ -1,7 +1,8 @@
 /**
  * The where-question (1.17, ruling 2, conv. 129; contract §1.4, §2.3, §9
  * invariant 12): every dialog that makes a world or brings one down asks it
- * the same way. With the folder picker: two rows, the folder first (pre-
+ * the same way, but for a world that stays on onlyworlds.com, which says a
+ * browser answer in one line (`online`, h20 B13). With the folder picker: two rows, the folder first (pre-
  * selected when a home folder is set, and showing its path; else the user's
  * last pick decides). Without it: one line, "It lives in this browser.", and
  * on Firefox a note about its storage prompt while nothing is persisted yet.
@@ -41,16 +42,32 @@ async function browserStorageProblem(doing: string): Promise<string | null> {
 /** Firefox's own storage prompt, explained before it appears (contract §2.3, lens C R6-c). */
 export { FIREFOX_PERSIST_NOTE };
 
-/** The question's markup: the two rows, or the browser-only line. */
-export function whereChoiceHtml(): string {
+/**
+ * A world that stays on onlyworlds.com (Download a world, View a shared
+ * world; the Captain's ✓ on h20 B13, Seethe's line h20 #10346): clearing this
+ * browser loses only what has not synced, so the question folds to one line.
+ * A world with no other copy keeps the whole question (1.17, conv. 129).
+ */
+export const WHERE_ONLINE_LINE = 'Kept in this browser; the world stays on onlyworlds.com too.';
+
+/**
+ * The question's markup: the two rows, or the browser-only line. `online`:
+ * the world stays on onlyworlds.com, so a browser answer is said in one line
+ * with "Choose a folder instead" opening the rows (`wireWhereChoice`); a
+ * folder already preselected shows the rows as before.
+ */
+export function whereChoiceHtml(opts: { online?: boolean } = {}): string {
   if (!hasFolderMode()) {
-    return `<p class="atlas-modal-hint" data-role="where-browser">${WHERE_BROWSER_ONLY_LINE}</p>
+    return `<p class="atlas-modal-hint" data-role="where-browser">${opts.online ? WHERE_ONLINE_LINE : WHERE_BROWSER_ONLY_LINE}</p>
       <p class="atlas-modal-hint" data-role="persist-note" hidden>${FIREFOX_PERSIST_NOTE}</p>`;
   }
   const root = getState().atlasRoot;
   const rootDisplay = root?.pathHint ?? root?.folderName;
   const preselect = defaultWorldWhere();
-  return `<fieldset class="atlas-where-choice" data-role="where">
+  const short = opts.online === true && preselect === 'browser';
+  return `${short ? `<p class="atlas-modal-hint" data-role="where-short">${WHERE_ONLINE_LINE}
+      <button type="button" class="atlas-btn-link" data-action="where-folder">Choose a folder instead</button></p>` : ''}
+    <fieldset class="atlas-where-choice" data-role="where"${short ? ' hidden' : ''}>
       <legend>Where should this world live?</legend>
       <label class="atlas-where-row">
         <input type="radio" name="where" value="folder" ${preselect === 'folder' ? 'checked' : ''} />
@@ -70,6 +87,17 @@ export function whereChoiceHtml(): string {
  * prompt comes with the first one).
  */
 export function wireWhereChoice(root: ParentNode): void {
+  // The one-line form: "Choose a folder instead" opens the rows with the folder picked.
+  const short = root.querySelector<HTMLElement>('[data-role="where-short"]');
+  const rows = root.querySelector<HTMLElement>('[data-role="where"]');
+  short?.querySelector<HTMLButtonElement>('[data-action="where-folder"]')?.addEventListener('click', () => {
+    const folder = rows?.querySelector<HTMLInputElement>('input[name="where"][value="folder"]');
+    if (!rows || !folder) return;
+    folder.checked = true;
+    rows.hidden = false;
+    short.hidden = true;
+    folder.focus();
+  });
   const note = root.querySelector<HTMLElement>('[data-role="persist-note"]');
   if (!note || !/firefox/i.test(navigator.userAgent)) return;
   if (keepsABrowserWorld()) return;

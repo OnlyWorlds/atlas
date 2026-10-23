@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.82.1',
+    date: '2026-10-23',
+    theme: 'A shorter question for worlds on OnlyWorlds',
+    entries: [
+      {
+        id: 'where-one-line-online',
+        title: 'Download and View say where a world lives in one line',
+        body: 'A world you download or view from OnlyWorlds stays there too, so these two dialogs now say "Kept in this browser; the world stays on onlyworlds.com too." with a link to choose a folder instead. A new world made in Atlas still asks the whole question.',
+        tags: ['layout', 'sharing'],
+      },
+    ],
+  },
+  {
     version: '1.82.0',
     date: '2026-10-23',
     theme: "A tool's private records stay with you",

@@ -55,7 +55,7 @@ export class ViewWorldModal extends BaseModal {
           <span>Display name (optional)</span>
           <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to the world's name" autocomplete="off" />
         </label>
-        ${whereChoiceHtml()}
+        ${whereChoiceHtml({ online: true })}
         <p class="atlas-modal-hint">
           The world downloads and stays current as it changes. View only: you can read everything, edit nothing. No PIN needed.
         </p>
