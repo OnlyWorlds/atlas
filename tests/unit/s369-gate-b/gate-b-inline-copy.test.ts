@@ -6,7 +6,7 @@ import { WritingCreateModal } from '../../../src/ui/writing-create-modal';
 import { isPlainError } from '../../../src/core/plain-error';
 import { patchSlice } from '../../../src/core/state';
 import { defaultRegistry } from '../../../src/core/types';
-import { AccountClient } from '../../../src/sync/account-client';
+import { OwV2Client } from '@onlyworlds/sdk';
 import { createApiWorld } from '../../../src/sync/make-online';
 
 const flush = () => new Promise(r => setTimeout(r, 0));
@@ -27,7 +27,8 @@ describe('B-6 an inline error line never promises a details block it does not ha
 describe('B-7 an account error Atlas did not expect is not passed off as a refusal', () => {
   it('createApiWorld rethrows a malformed account response as itself, not as a PlainError', async () => {
     patchSlice('registry', { ...defaultRegistry(), account_token: 'tok' } as never);
-    vi.spyOn(AccountClient.prototype, 'createWorld').mockRejectedValue(new Error('create-world response missing id or key'));
+    // An answer with no key (the SDK's create since 1.83.1) is Atlas's own check's to refuse.
+    vi.spyOn(OwV2Client.prototype, 'createAccountWorld').mockResolvedValue({ id: 'w' } as never);
     let caught: unknown = null;
     try { await createApiWorld({ name: 'W', pin: '1234' }); } catch (e) { caught = e; }
     expect(caught).not.toBeNull();

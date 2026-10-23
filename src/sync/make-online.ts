@@ -15,8 +15,9 @@
  * element has a `server_updated_at` baseline set on success).
  */
 
-import { OwV2ClientAdapter, OwV2Error } from './ow-v2-client-adapter';
-import { AccountClient, accountErrorMessage } from './account-client';
+import { OwApiError, OwV2Client } from '@onlyworlds/sdk';
+import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE, OwV2ClientAdapter } from './ow-v2-client-adapter';
+import { accountErrorMessage } from './account-client';
 import { PlainError } from '../core/plain-error';
 import { getState } from '../core/state';
 import { devV2Base } from './dev-api-base';
@@ -110,35 +111,42 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
 
   const token = getState().registry.account_token;
   if (token) {
-    const client = new AccountClient(token);
+    // The SDK's one implementation of the account's world create (Kael's
+    // createAccountWorld, SDK 4.66.0, h29 #11096); Atlas's own call retired
+    // with 1.83.1.
+    const client = new OwV2Client({ apiKey: token, baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
     // The folder's lines are a courtesy to keel, never a reason the world
     // stays offline: a line keel refuses goes once more without them (S458
     // gate G6).
     let lines = opts.lines ?? {};
     const create = async (withPin?: string) => {
+      const input = () => ({ name, ...(withPin !== undefined ? { pin: withPin } : {}), ...lines } as Parameters<OwV2Client['createAccountWorld']>[0]);
       try {
-        return await client.createWorld(name, withPin, lines);
+        return await client.createAccountWorld(input());
       } catch (err) {
-        if (!(err instanceof OwV2Error && err.status === 422 && (err.param === 'source' || err.param === 'producer'))) throw err;
+        if (!(err instanceof OwApiError && err.status === 422 && (err.param === 'source' || err.param === 'producer'))) throw err;
         console.warn('[atlas:make-online] keel refused the provenance lines; creating without them', err);
         lines = {};
-        return client.createWorld(name, withPin, lines);
+        return client.createAccountWorld(input());
       }
     };
     let created;
     try {
       created = await create();
     } catch (err) {
-      if (err instanceof OwV2Error && err.status === 422 && err.param === 'pin') {
+      if (err instanceof OwApiError && err.status === 422 && err.param === 'pin') {
         // Fresh account: the PIN is required and becomes the account PIN.
         if (!pin) throw new PlainError('Enter your PIN first. A new account sets its PIN here.');
         created = await create(pin);
       } else {
         // Only the account refusals Atlas has words for pass as refusals;
         // anything else keeps its kind and details (S369 gate B M6).
-        const coded = err instanceof OwV2Error && (err.code === 'key_revoked' || err.status === 401 || err.code === 'rate_limited');
+        const coded = err instanceof OwApiError && (err.code === 'key_revoked' || err.status === 401 || err.code === 'rate_limited');
         throw coded ? new PlainError(accountErrorMessage(err)) : err;
       }
+    }
+    if (!created || typeof created.key !== 'string' || !created.key || typeof created.id !== 'string') {
+      throw new Error('create-world response missing id or key');
     }
     return { apiKey: created.key, worldId: created.id, worldName: created.name };
   }

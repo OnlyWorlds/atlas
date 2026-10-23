@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.83.1',
+    date: '2026-10-23',
+    theme: 'Make online on the shared library',
+    entries: [
+      {
+        id: 'make-online-sdk-create',
+        title: 'Make online creates the world through the OnlyWorlds library',
+        body: 'Atlas now makes a new world on your account with the same code other OnlyWorlds tools use, instead of a copy of its own. Nothing changes in what you see.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.83.0',
     date: '2026-10-23',
     theme: "A world online keeps its own words and where it came from",

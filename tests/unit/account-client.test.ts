@@ -142,23 +142,5 @@ describe('AccountClient.mintWorldKey', () => {
   });
 });
 
-describe('AccountClient.createWorld', () => {
-  it('creates a world and returns its full WRITE key (pinless account, pin supplied)', async () => {
-    const state = mount({ accountHasPin: false });
-    const created = await new AccountClient(TOKEN).createWorld('Fresh World', '1234');
-    expect(created.id).toBeTruthy();
-    expect(created.key).toMatch(/^ow_w_/);
-    expect(state.created).toHaveLength(1);
-    expect(state.created[0].name).toBe('Fresh World');
-  });
-
-  it('rejects the pin with param=pin when the account already has one (the dance)', async () => {
-    mount({ accountHasPin: true });
-    let caught: unknown;
-    // Account has a pin; sending one trips the 422 that tells the caller to retry pinless.
-    await new AccountClient(TOKEN).createWorld('Another World', '1234').catch(err => { caught = err; });
-    expect(caught).toBeInstanceOf(OwV2Error);
-    expect((caught as OwV2Error).status).toBe(422);
-    expect((caught as OwV2Error).param).toBe('pin');
-  });
-});
+// The world create moved to the SDK's createAccountWorld (1.83.1): its dance
+// is held by createApiWorld's tests in tests/integration/account-worlds.test.ts.

@@ -32,6 +32,7 @@
  * key_revoked — distinct codes, distinct user messages).
  */
 
+import { OwApiError } from '@onlyworlds/sdk';
 import { OwV2Error, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import type { AccountWorldRow } from '../core/types';
@@ -56,15 +57,6 @@ export interface MintedWorldKey {
   key: string;
 }
 
-export interface CreatedAccountWorld {
-  id: string;
-  name: string;
-  role: 'owner';
-  public_read: boolean;
-  /** The full ow_w_ WRITE key — shown exactly once. */
-  key: string;
-}
-
 /** True when the error means "this account token is bad" (vs transient/other). */
 export function isAccountAuthError(err: unknown): boolean {
   return err instanceof OwV2Error
@@ -74,7 +66,9 @@ export function isAccountAuthError(err: unknown): boolean {
 
 /** User-facing message for a failed account call, code-aware. */
 export function accountErrorMessage(err: unknown): string {
-  if (err instanceof OwV2Error) {
+  // Atlas's own account calls throw OwV2Error; an SDK call (the world create
+  // since 1.83.1) throws the SDK's OwApiError, read the same way.
+  if (err instanceof OwV2Error || err instanceof OwApiError) {
     if (err.code === 'key_revoked') return 'This account token was revoked. Create a new one on onlyworlds.com.';
     if (err.status === 401) return 'Account token not recognized. Check it on onlyworlds.com, in Account settings under Account tokens.';
     if (err.code === 'rate_limited') return 'Too many attempts. Wait a moment and try again.';
@@ -187,26 +181,5 @@ export class AccountClient {
       role: typeof raw.role === 'string' ? raw.role : 'contributor',
     };
   }
-
-  /**
-   * Create a new api world. `pin` per the dance: omit first; on 422 param=pin
-   * the CALLER retries with the registry PIN (this method stays dumb — the
-   * dance is flow logic, not wire logic).
-   */
-  async createWorld(
-    name: string,
-    pin?: string,
-    lines?: { source?: Record<string, unknown>; producer?: Record<string, unknown> },
-  ): Promise<CreatedAccountWorld> {
-    const body: Record<string, unknown> = { name };
-    if (pin !== undefined) body.pin = pin;
-    // The folder's provenance lines, kept by keel as the world's origin (Keel #571).
-    if (lines?.source) body.source = lines.source;
-    if (lines?.producer) body.producer = lines.producer;
-    const raw = await this.request('POST', '/account/worlds', body) as CreatedAccountWorld;
-    if (!raw || typeof raw.key !== 'string' || !raw.key || typeof raw.id !== 'string') {
-      throw new Error('create-world response missing id or key');
-    }
-    return raw;
-  }
+  // The world create moved to the SDK's createAccountWorld (1.83.1, `make-online.ts`).
 }
