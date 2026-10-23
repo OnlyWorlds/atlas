@@ -76,6 +76,21 @@ export function buildProposedMark(el: Element): HTMLElement | null {
 }
 
 /**
+ * The proposed element's sentence for its page (conv. 168, Seethe h20 #11298): the
+ * header word's line, and what Atlas does and does not do with it. The roster's
+ * name when it is already here; the header's word asks for it.
+ */
+export function proposedNoteFor(el: Element): string | null {
+  const mark = proposedMarkOf(el);
+  if (!mark) return null;
+  const state = getState();
+  const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
+  const roster = entry?.state === 'api-linked' ? rosterNow(entry) : null;
+  const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
+  return `${proposedLine(mark, roster, nameOf)} It is not counted with the world's own. A keeper accepts or declines it on OnlyWorlds; a change made here is sent as any other.`;
+}
+
+/**
  * keel's hidden mark beside the agent mark (`src/core/hidden-mark.ts`): the same
  * quiet glyph, its line as label and tooltip, and said as a toast on a tap.
  */

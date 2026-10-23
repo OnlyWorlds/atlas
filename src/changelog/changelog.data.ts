@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.84.1',
+    date: '2026-10-23',
+    theme: 'A proposed element says what it means',
+    entries: [
+      {
+        id: 'proposed-says-why',
+        title: 'A proposed element\'s page says what proposed means',
+        body: 'Under its name, a sentence says who proposed it, that it is not counted with the world\'s own, and that a keeper accepts or declines it on onlyworlds.com, while a change made in Atlas is sent as any other.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.84.0',
     date: '2026-10-23',
     theme: 'Proposed, not yet reviewed',

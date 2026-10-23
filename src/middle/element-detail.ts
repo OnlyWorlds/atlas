@@ -41,6 +41,7 @@ import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-deta
 import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
+import { proposedNoteFor } from './element-agent-mark';
 
 /**
  * Per-element scroll position memory. Survives re-renders (field edits, link
@@ -173,6 +174,17 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     const detail = document.createElement('div');
     detail.className = 'atlas-detail';
+
+    // Proposed, not yet reviewed (conv. 168): said in a sentence under the name, not only
+    // in the header word's label (Seethe's read of 1.84.0, h20 #11298).
+    const proposed = proposedNoteFor(el);
+    if (proposed) {
+      const note = document.createElement('p');
+      note.className = 'atlas-proposed-note';
+      note.dataset.role = 'proposed-note';
+      note.textContent = proposed;
+      detail.appendChild(note);
+    }
     body.appendChild(detail);
 
     // The element's image, above the field sections — gated on the

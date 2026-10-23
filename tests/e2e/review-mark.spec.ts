@@ -87,6 +87,11 @@ test.describe('proposed, not yet reviewed', () => {
     const mark = page.locator('.atlas-middle-header [data-role="proposed-mark"]');
     await expect(mark).toHaveText('Proposed');
     await expect(mark).toHaveAttribute('aria-label', /^Proposed by a member and not yet reviewed: it is not part of the world until a keeper accepts it\. It lapses on 22 November 2099\.$/);
+    // 1.84.1: the same said in a sentence under the name (Seethe h20 #11298), and nothing on a settled page.
+    await expect(page.locator('[data-role="proposed-note"]')).toHaveText(/not yet reviewed.*It is not counted with the world's own\. A keeper accepts or declines it on OnlyWorlds; a change made here is sent as any other\.$/);
+    await go(`#/w/${wid}/element/0192a000-0000-7000-8000-000000056503`);
+    await expect(page.locator('.atlas-middle-header')).toContainText('Ada');
+    await expect(page.locator('[data-role="proposed-note"]')).toHaveCount(0);
     await go(`#/w/${wid}/element/${QUAY}`);
     await expect(page.locator('.atlas-middle-header [data-role="proposed-mark"]')).toHaveText('Proposed, lapsed');
 
