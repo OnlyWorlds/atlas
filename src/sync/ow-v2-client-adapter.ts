@@ -41,6 +41,7 @@ import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue, isWorldExtensio
 import { isKnownOf, refuseKnownOfBody, stubShape } from './known-of';
 import { OwProposed, proposalOf, type ProposalRow } from './proposals';
 import { PROPOSED_MARK } from '../core/review-mark';
+import { publicPageUrl } from '../core/public-page';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -414,6 +415,11 @@ export class OwV2ClientAdapter implements OwApiClient {
    * A prefixed key reads it bare, so it never checks a PIN: a door that holds
    * one asks `me()` too (`checkPin`). A legacy ten-digit key sends it here.
    */
+  /** The world's public page address, read live (`core/public-page.ts`); null when it is off. */
+  async publicPage(): Promise<string | null> {
+    return publicPageUrl(await this.request('GET', '/world') as Record<string, unknown>);
+  }
+
   async getWorld(): Promise<{ id: string; name: string; created_at?: string; updated_at?: string }> {
     const response = await this.request('GET', '/world') as {
       id?: string; name?: string; created_at?: string; updated_at?: string;

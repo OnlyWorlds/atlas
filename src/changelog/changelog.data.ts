@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.85.0',
+    date: '2026-10-23',
+    theme: 'A world\'s public page, one tap away',
+    entries: [
+      {
+        id: 'public-page-link',
+        title: 'Settings links to a world\'s public page',
+        body: 'When the owner of a world on onlyworlds.com has turned its public page on, the OnlyWorlds tab in Settings says so and offers View its public page. Atlas reads this from onlyworlds.com each time the tab opens; the page itself is turned on or off on the world\'s page there.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.84.1',
     date: '2026-10-23',
     theme: 'A proposed element says what it means',

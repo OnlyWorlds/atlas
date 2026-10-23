@@ -15,6 +15,9 @@ import { escapeText } from '../core/dom-utils';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldsRegistry, WorldRegistryEntry } from '../core/types';
 import { renderAccountTab, wireAccountTab } from './settings-account';
+import { getState } from '../core/state';
+import { worldPin } from '../core/seat';
+import { buildV2Adapter } from '../sync/make-online';
 import {
   WAYPOINTS,
   loadWaypointsState,
@@ -46,6 +49,7 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
       </p>
     </section>
     ${renderAccountTab(reg)}
+    ${activeWorld?.api ? '<section class="atlas-settings-section" data-role="public-page" hidden></section>' : ''}
     ${renderWaypointsSection(activeWorld)}
     <section class="atlas-settings-section">
       <h3>Links</h3>
@@ -161,6 +165,7 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
   }
 
   wireWaypointControls();
+  void showPublicPage(root, activeWorld);
 
   // Toast click handoff: scroll to + flash the waypoint the toast named.
   const highlight = consumePendingHighlight();
@@ -172,4 +177,30 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
       setTimeout(() => row.classList.remove('is-highlight'), 2400);
     }
   }
+}
+
+/**
+ * A linked world whose owner turned its public page on says so, with the
+ * address (Skeld h29 #11219; `core/public-page.ts`). Read live each time the
+ * tab opens, never kept: the switch is keel's. Off, unreachable or refused,
+ * the section stays hidden: it is a pointer, not a status.
+ */
+async function showPublicPage(root: HTMLElement, world: WorldRegistryEntry | undefined): Promise<void> {
+  const section = root.querySelector<HTMLElement>('[data-role="public-page"]');
+  if (!section || !world?.api) return;
+  let url: string | null = null;
+  try {
+    // A prefixed key reads bare; a ten-digit key's read takes the PIN (1.79.0).
+    url = await buildV2Adapter(world.api.api_key, worldPin(world, getState().registry) ?? '').publicPage();
+  } catch {
+    return;
+  }
+  // The tab may have been redrawn, or another world opened, while keel answered.
+  if (!url || !section.isConnected || getState().active?.worldId !== world.id) return;
+  section.innerHTML = `
+    <h3>Public page</h3>
+    <p class="atlas-settings-hint">This world has a public page on onlyworlds.com: anyone with its address can read it. Its owner turns it on or off on the world's page there.</p>
+    <div class="atlas-ow-links"><a href="${escapeText(url)}" target="_blank" rel="noopener" data-public-page>View its public page</a></div>
+  `;
+  section.hidden = false;
 }

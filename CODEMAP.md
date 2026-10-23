@@ -26,6 +26,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/type-mutes.ts`: MUTED TYPES (S356): `ui.mutedTypes`, per world in localStorage; pin + marker by default.
 - `src/core/map-camera-persist.ts`: per-map {center, zoom} restore on mount.
 - `src/core/knowledge.ts`: the knowledge model: `isKnowledgeNarrative`, `heldByOf`, `ABOUT_FIELDS` (derived), the known-view scans (`knowledgeHeldBy` / `elementsKnownAboutBy`), `lensKnownSet` (sidebar dimming).
+- `src/core/public-page.ts`: `publicPageUrl`, a linked world's public page on onlyworlds.com (Keel #471, 1.85): `/w/<slug>`, else `/w/<world id>`, only when keel's `GET /world` says `public_page.on`; read live by Settings' OnlyWorlds tab (`showPublicPage`, through the adapter's `publicPage()`), never kept in the folder.
 - `src/core/sharing.ts`: the page model (subtype 'page'): blocks heading/prose/element-card/circle; `blocksOf()` heals card + circle ids from the `atlas_page_refs` mirror; `pageBlocksPatch` keeps blocks + refs + derived story in lockstep (conv. 73-78); `pagePubOf` (the `atlas_page_pub` published-state mirror).
 - `src/core/share-payload.ts`: `buildPagePayload()`, the §5 publish payload (schema_version, disclosure tokens ref-only-when-included, `freezeCircleBlock`, `freezeMapBlock`: the ONE y-origin conversion on the publish path).
 - `src/core/narrative-kind.ts`: `narrativeKindOf`: story | knowledge | page, the three-kind seam.
