@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'When the owner of a world on onlyworlds.com has turned its public page on, the OnlyWorlds tab in Settings says so and offers View its public page. Atlas reads this from onlyworlds.com each time the tab opens; the page itself is turned on or off on the world\'s page there.',
         tags: ['world'],
       },
+      {
+        id: 'proposed-read-again',
+        title: 'A proposed element\'s page says it in fewer words',
+        body: 'Its sentence says once that it is not part of the world, or its counts, until a keeper accepts it, and that a change made here is saved, or sent when the world is linked to onlyworlds.com. A lapsed proposal\'s word in the header is Lapsed, and on a phone the header leaves the word to the sentence so the name keeps its room.',
+        tags: ['world'],
+      },
     ],
   },
   {

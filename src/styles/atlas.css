@@ -1566,6 +1566,13 @@ html {
   color: var(--atlas-text-muted);
   border-color: var(--atlas-text-muted);
 }
+/* On a phone the page's sentence under the name says it whole, so the header's
+   word steps aside and the name keeps its room (Seethe h20 #11393). */
+@media (max-width: 560px) {
+  .atlas-middle-content:has([data-role="proposed-note"]) .atlas-middle-header .atlas-proposed-mark {
+    display: none;
+  }
+}
 /* The same word on a row (the list, Search, Home's Recent). */
 .atlas-row-proposed {
   font-size: 11px;

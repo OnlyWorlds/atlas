@@ -127,7 +127,7 @@ export function proposedLine(
   const row = roster && mark.by ? roster.find(m => m.id === mark.by) ?? null : null;
   const name = row ? memberNameOf(mark.by, roster, nameOf) : null;
   const who = name ? `${name}${row?.kind === 'agent' ? ', an agent,' : ''}` : 'a member';
-  const head = `Proposed by ${who} and not yet reviewed: it is not part of the world until a keeper accepts it.`;
+  const head = `Proposed by ${who} and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it.`;
   if (!mark.expires) return head;
   return mark.lapsed
     ? `${head} The proposal lapsed on ${dayWords(mark.expires)}.`

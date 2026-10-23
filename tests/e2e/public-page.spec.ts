@@ -74,6 +74,8 @@ async function signInAndOpen(page: Page) {
     const st = (window as any).__atlasTestApi.getState();
     return st.registry.worlds.find((x: any) => x.api?.world_id === id)?.api?.api_key ?? null;
   }, WORLD_ID)).toBe(KEY);
+  // The door ends at Home (S416): wait for it, or its landing takes the address the tab was given.
+  await expect(page.getByText('What do you have?')).toBeVisible();
 }
 
 const openTab = (page: Page) =>

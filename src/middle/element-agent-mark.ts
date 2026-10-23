@@ -59,7 +59,9 @@ export function buildProposedMark(el: Element): HTMLElement | null {
   btn.type = 'button';
   btn.className = 'atlas-proposed-mark' + (mark.lapsed ? ' atlas-proposed-mark-lapsed' : '');
   btn.dataset.role = 'proposed-mark';
-  btn.textContent = proposedWord(mark);
+  // In a header the lapsed word is one word, so a phone keeps the name its room (Seethe h20
+  // #11393: "Proposed, lapsed" left a name 8 px of 68 at 390); the label carries the line.
+  btn.textContent = mark.lapsed ? 'Lapsed' : proposedWord(mark);
   let line = '';
   const say = (roster: Parameters<typeof proposedLine>[1]): void => {
     line = proposedLine(mark, roster, nameOf);
@@ -87,7 +89,9 @@ export function proposedNoteFor(el: Element): string | null {
   const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
   const roster = entry?.state === 'api-linked' ? rosterNow(entry) : null;
   const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
-  return `${proposedLine(mark, roster, nameOf)} It is not counted with the world's own. A keeper accepts or declines it on OnlyWorlds; a change made here is sent as any other.`;
+  // Only a linked world sends a change; a folder world saves it (Seethe h20 #11393).
+  const change = entry?.state === 'api-linked' ? 'sent' : 'saved';
+  return `${proposedLine(mark, roster, nameOf)} A keeper accepts or declines it on OnlyWorlds; a change made here is ${change} as any other.`;
 }
 
 /**

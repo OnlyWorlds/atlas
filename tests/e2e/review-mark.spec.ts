@@ -86,14 +86,25 @@ test.describe('proposed, not yet reviewed', () => {
     await go(`#/w/${wid}/element/${QUILL}`);
     const mark = page.locator('.atlas-middle-header [data-role="proposed-mark"]');
     await expect(mark).toHaveText('Proposed');
-    await expect(mark).toHaveAttribute('aria-label', /^Proposed by a member and not yet reviewed: it is not part of the world until a keeper accepts it\. It lapses on 22 November 2099\.$/);
+    await expect(mark).toHaveAttribute('aria-label', /^Proposed by a member and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it\. It lapses on 22 November 2099\.$/);
     // 1.84.1: the same said in a sentence under the name (Seethe h20 #11298), and nothing on a settled page.
-    await expect(page.locator('[data-role="proposed-note"]')).toHaveText(/not yet reviewed.*It is not counted with the world's own\. A keeper accepts or declines it on OnlyWorlds; a change made here is sent as any other\.$/);
+    await expect(page.locator('[data-role="proposed-note"]')).toHaveText(/not yet reviewed.*A keeper accepts or declines it on OnlyWorlds; a change made here is saved as any other\.$/);
     await go(`#/w/${wid}/element/0192a000-0000-7000-8000-000000056503`);
     await expect(page.locator('.atlas-middle-header')).toContainText('Ada');
     await expect(page.locator('[data-role="proposed-note"]')).toHaveCount(0);
     await go(`#/w/${wid}/element/${QUAY}`);
-    await expect(page.locator('.atlas-middle-header [data-role="proposed-mark"]')).toHaveText('Proposed, lapsed');
+    await expect(page.locator('.atlas-middle-header [data-role="proposed-mark"]')).toHaveText('Lapsed');
+    // A phone keeps the name its room (Seethe h20 #11393: "Proposed, lapsed" left a name 8 px of 68
+    // at 390; "Lapsed" alone still 15 px short, measured S460): the sentence under the name says it.
+    const wide = page.viewportSize()!;
+    await page.setViewportSize({ width: 390, height: 844 });
+    const name = page.locator('.atlas-middle-header [data-role="element-name"]');
+    await expect(name).toBeVisible();
+    await expect.poll(() => name.evaluate(n => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(1);
+    await expect(page.locator('.atlas-middle-header [data-role="proposed-mark"]')).toBeHidden();
+    await expect(page.locator('[data-role="proposed-note"]')).toContainText('The proposal lapsed on');
+    await page.setViewportSize(wide);
+    await expect(page.locator('.atlas-middle-header [data-role="proposed-mark"]')).toBeVisible();
 
     // Search.
     const cmdkInput = page.locator('.atlas-cmdk-input');

@@ -195,7 +195,7 @@ async function showPublicPage(root: HTMLElement, world: WorldRegistryEntry | und
   } catch {
     return;
   }
-  // The tab may have been redrawn, or another world opened, while keel answered.
+  // The tab may have been redrawn (its new section asks for itself), or another world opened.
   if (!url || !section.isConnected || getState().active?.worldId !== world.id) return;
   section.innerHTML = `
     <h3>Public page</h3>
