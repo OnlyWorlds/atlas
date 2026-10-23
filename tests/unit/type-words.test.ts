@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import namesFixture from '../fixtures/names.fixture.json';
-import { typeName, typeNameStart, aTypeName, hasOwnWord } from '../../src/core/type-words';
+import { typeName, typeNameStart, aTypeName, hasOwnWord, supertypeWord } from '../../src/core/type-words';
 import { ELEMENT_LABELS } from '../../src/core/constants';
 import { patchSlice, getState } from '../../src/core/state';
 
@@ -60,6 +60,14 @@ describe("a world's word", () => {
     expect(aTypeName('character', { world: null })).toBe('a character');
     expect(aTypeName('event', { world: null, start: true })).toBe('An event');
     expect(aTypeName('character', { world, supertype: 'Agent', start: true })).toBe('An AI agent');
+  });
+
+  it("names a supertype only when the world has a word for that supertype (Seethe h20 #11028)", () => {
+    expect(supertypeWord('character', 'Agent', { world })).toBe('AI agent');
+    expect(supertypeWord('character', 'Hero', { world })).toBeNull(); // the type's word, not the supertype's
+    expect(supertypeWord('character', 'Agent', { world: null })).toBeNull();
+    expect(supertypeWord('character', '', { world })).toBeNull();
+    expect(supertypeWord('character', undefined, { world })).toBeNull();
   });
 
   it("comes from the open world's meta when no world is given", () => {

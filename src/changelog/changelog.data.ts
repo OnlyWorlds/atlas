@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.82.2',
+    date: '2026-10-23',
+    theme: "A supertype said once, in the world's word",
+    entries: [
+      {
+        id: 'supertype-word-once',
+        title: "A world's word for a supertype is said once, and on its filter too",
+        body: 'In a world with its own words, search no longer reads "AI agent · Agent": the world\'s word for the supertype is enough. The supertype filter under a type now shows that same word.',
+        tags: ['world', 'fix'],
+      },
+      {
+        id: 'rest-api-link',
+        title: "Settings' REST API link opens the API's page again",
+        body: 'The link under Settings, OnlyWorlds pointed at an address onlyworlds.com no longer serves.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.82.1',
     date: '2026-10-23',
     theme: 'A shorter question for worlds on OnlyWorlds',

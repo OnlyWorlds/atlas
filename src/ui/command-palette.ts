@@ -18,7 +18,7 @@
  * for a jump tool. Unnamed elements only surface via description matches.
  */
 
-import { typeName } from '../core/type-words';
+import { supertypeWord, typeName } from '../core/type-words';
 import { BaseModal } from './modal-base';
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
@@ -137,7 +137,8 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     if (!hit) continue;
     const superT = String((el as Record<string, unknown>).supertype ?? '').trim();
     const subT = String((el as Record<string, unknown>).subtype ?? '').trim();
-    const taxonomy = [superT, subT].filter(Boolean).join(' · ');
+    // A world's own word for the supertype has said it: "AI agent", never "AI agent · Agent".
+    const taxonomy = [supertypeWord(el.type, superT) ? '' : superT, subT].filter(Boolean).join(' · ');
     out.push({
       kind: 'element',
       id: el.id,

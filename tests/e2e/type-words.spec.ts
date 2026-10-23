@@ -74,6 +74,20 @@ test('a work world shows its own words in the sidebar, its supertype word, and m
   expect(await page.locator('img[src="x"]').count()).toBe(0);
 });
 
+// Seethe h20 #11028: the supertype chip says the world's word as the rows do, and search says it once.
+for (const own of [true, false]) {
+  test(`the supertype chip and search's hint, ${own ? 'in the world\'s words' : 'without them'}`, async ({ page }) => {
+    await setupWorld(page);
+    await seed(page, own);
+    await page.locator('[data-filter-type="character"]').click();
+    await expect(page.locator('.atlas-subfilter-chip').first()).toHaveText(own ? 'AI agent' : 'Agent');
+    await page.keyboard.press('Control+k');
+    await page.locator('[data-role="cmdk-input"]').fill('Bot');
+    await expect(page.locator('.atlas-cmdk-row', { hasText: 'Bot' }).locator('.atlas-cmdk-rowhint').first())
+      .toHaveText(own ? 'AI agent' : 'character · Agent');
+  });
+}
+
 test('a world without its own words prints the standard names, as before', async ({ page }) => {
   await setupWorld(page);
   await seed(page, false);

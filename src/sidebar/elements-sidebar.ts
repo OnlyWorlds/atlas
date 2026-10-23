@@ -16,7 +16,7 @@ import { onHashChange, navigate, elementHash, homeHash } from '../core/router';
 import { setWorldFavoriteElement, saveRegistry, getEditorSettings } from '../registry/registry';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName, typeNameStart, aTypeName, typeWordsKey } from '../core/type-words';
+import { typeName, typeNameStart, aTypeName, typeWordsKey, supertypeWord } from '../core/type-words';
 import { lensKnownSet } from '../core/knowledge';
 import { reservedRowHint } from '../core/taxonomy';
 import { styleRowHint } from '../core/world-styles';
@@ -256,7 +256,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'atlas-subfilter-chip' + (superFilter === v ? ' active' : '');
-      chip.textContent = v;
+      // The world's word for the supertype when it has one, as its rows print it; the value stays the filter.
+      chip.textContent = supertypeWord(single, v) ?? v;
       chip.title = `Show only ${single}s with supertype "${v}"`;
       chip.addEventListener('click', () => {
         superFilter = superFilter === v ? null : v;

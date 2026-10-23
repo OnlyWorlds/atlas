@@ -46,6 +46,21 @@ export function typeName(type: string, opts: TypeNameOptions = {}): string {
   return opts.start ? capitalise(standard) : standard;
 }
 
+/**
+ * The open world's own word for a supertype of a type ("AI agent" for a
+ * Character's Agent), or null when the world names only the type, or nothing.
+ * A line that prints it has said the supertype, so the data's value is not
+ * printed beside it (Seethe h20 #11028); a filter keeps the value as its key.
+ */
+export function supertypeWord(type: string, supertype: unknown, opts: Pick<TypeNameOptions, 'many' | 'world'> = {}): string | null {
+  const sup = supertypeOf(supertype);
+  if (!sup) return null;
+  const world = opts.world === undefined ? openWorld() : opts.world;
+  const many = opts.many === true;
+  const own = typeWord(world, type, { supertype: sup, many });
+  return own !== null && own !== typeWord(world, type, { many }) ? own : null;
+}
+
 /** `typeName` at the start of a line or as a heading. */
 export function typeNameStart(type: string, opts: Omit<TypeNameOptions, 'start'> = {}): string {
   return typeName(type, { ...opts, start: true });
