@@ -17,5 +17,10 @@ export default defineConfig({
     exclude: ['tests/e2e/**', 'node_modules/**'],
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
+    // 15 s, not vitest's 5: on a shared machine the one fork stalls for
+    // seconds at moments the machine chooses (S458: gate A's file 0.9 s in one
+    // run and 8.9 s in the next, same order and neighbours, 0.8 s alone), and
+    // a 5 s line reddened a different test each night. A real hang is still red.
+    testTimeout: 15000,
   },
 });

@@ -123,6 +123,23 @@ describe('linking a world into this browser', () => {
     expect(attachSyncEngine).toHaveBeenCalledTimes(1);
   });
 
+  it("brings the world's settings, own words and origin down with it, baselines taken (S458, Keel #571)", async () => {
+    const names = { version: 1, types: { character: { one: 'Employee', many: 'Employees' } } };
+    await server.patchWorldMeta({ time_current: 1849, length_unit: 'cubit', x_names: names });
+    await link();
+    const store = getActiveStore() as unknown as MockFolderStore;
+    const meta = await store.readWorldMeta() as unknown as Record<string, unknown>;
+    expect(meta.time_current).toBe(1849);
+    expect(meta.length_unit).toBe('cubit');
+    expect(meta.x_names).toEqual(names);
+    expect(meta.origin).toEqual({ source: null, producer: null });
+    // The open world's words are the store's at once, before any round.
+    expect((getState().active?.meta as unknown as Record<string, unknown>).x_names).toEqual(names);
+    const s = await store.readSyncState();
+    expect((s.meta_baseline as Record<string, unknown>).time_current).toBe(1849);
+    expect(Object.keys(s.meta_ext_baseline ?? {})).toEqual(['x_names']);
+  });
+
   it('a view-only link lands view-only, with no PIN kept', async () => {
     const { entry } = await link({ readOnly: true, apiPin: '' });
     expect(entry.where).toBe('browser');

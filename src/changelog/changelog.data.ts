@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.83.0',
+    date: '2026-10-23',
+    theme: "A world online keeps its own words and where it came from",
+    entries: [
+      {
+        id: 'online-world-own-words',
+        title: "A world on onlyworlds.com shows its own words for the types",
+        body: "When a world online names its own words (Employee for Character, Team for Institution), Atlas now brings them down with the world's settings and shows them. A world opened from a file with its own words takes them online the same way. If both sides changed them, the conflicts to review list them with the other world settings.",
+        tags: ['world', 'sync'],
+      },
+      {
+        id: 'make-online-says-maker',
+        title: 'A world made online says which tool made it',
+        body: "Make online now tells onlyworlds.com where the world's folder came from, so the site can say it was made in Atlas, or in the tool that made the folder. A world linked from onlyworlds.com keeps that answer in its folder too.",
+        tags: ['sync', 'folders'],
+      },
+    ],
+  },
+  {
     version: '1.82.2',
     date: '2026-10-23',
     theme: "A supertype said once, in the world's word",

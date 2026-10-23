@@ -135,7 +135,8 @@ export function attachSyncEngine(
       if (reviewFirst && !result.transient_blocked && !result.auth_blocked
         && result.conflicts.length === 0 && result.failures.length === 0) {
         void folder.readSyncState().then(st => {
-          if (!reviewFirst || (st.conflicts?.length ?? 0) > 0 || currentEngine !== engine) return;
+          // A held world setting or x_ key holds the review too (S458 gate G2).
+          if (!reviewFirst || (st.conflicts?.length ?? 0) > 0 || (st.meta_conflicts?.length ?? 0) > 0 || currentEngine !== engine) return;
           reviewFirst = false;
           engine.setPolicy(policyNow());
           const next = updateWorldEntry(getState().registry, entry.id, { review_first_sync: undefined });

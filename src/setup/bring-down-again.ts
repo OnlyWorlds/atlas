@@ -27,7 +27,7 @@ import { withWorldLock } from '../core/browser-home';
 import { PlainError } from '../core/plain-error';
 import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
 import { saveRegistry, setActiveWorld, storedRegistry, updateWorldEntry } from '../registry/registry';
-import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
+import { initialDownloadAll, seedLinkedWorldMeta, type InitialDownloadProgress } from '../sync/initial-download';
 import { buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine, diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { abandonBrowserMake, releasePriorWorld, scaffoldBrowserWorld } from './atlas-root-flow';
@@ -115,7 +115,9 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   let downloaded;
   try {
     await store.writeWorldMeta({ id: ownId, name: entry.name, api: diskApiBlock(entry.api), producer: atlasProducer('server') });
-    downloaded = await initialDownloadAll(store, buildV2Adapter(entry.api.api_key, pin), opts.onProgress, undefined, { stopOnQuota: true });
+    const adapter = buildV2Adapter(entry.api.api_key, pin);
+    downloaded = await initialDownloadAll(store, adapter, opts.onProgress, undefined, { stopOnQuota: true });
+    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it (S458)
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }
@@ -149,7 +151,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   const restored = activated.worlds.find(w => w.id === worldId)!;
   if (readOnly) store.setViewOnly(true);
   setActiveStore(store);
-  patchSlice('active', { worldId, meta: { id: ownId, name: entry.name }, opened: true });
+  patchSlice('active', { worldId, meta: await store.readWorldMeta().catch(() => ({ id: ownId, name: entry.name })), opened: true });
   try {
     patchSlice('data', { elements: await store.listElements() });
   } catch (err) {

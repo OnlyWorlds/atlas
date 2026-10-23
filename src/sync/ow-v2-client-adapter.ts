@@ -37,7 +37,7 @@ import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS } fro
 import { relationFieldsFor } from '../editor/field-schema';
 import type { ElementType } from '../core/types';
 import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from './sync-engine';
-import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue } from './world-meta-sync';
+import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue, isWorldExtensionKey } from './world-meta-sync';
 import { isKnownOf, refuseKnownOfBody, stubShape } from './known-of';
 import { OwProposed, proposalOf, type ProposalRow } from './proposals';
 
@@ -450,6 +450,8 @@ export class OwV2ClientAdapter implements OwApiClient {
   async patchWorldMeta(fields: Record<string, unknown>): Promise<WorldMetaWire> {
     const wireBody: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(fields)) {
+      // A profile's key on the World goes as given, null removing it (Keel #571).
+      if (isWorldExtensionKey(k)) { wireBody[k] = v ?? null; continue; }
       const kind = META_SYNC_FIELDS[k];
       if (!kind) continue; // whitelist
       wireBody[META_WIRE_RENAME[k] ?? k] = canonicalMetaValue(kind, v);
@@ -716,7 +718,16 @@ function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
   // Names are words; a stray number in them reads as its digits.
   const words = (v: unknown): string[] => list(v).map(String);
   const int = (v: unknown): number | null => canonicalMetaValue('int', v) as number | null;
+  // A profile's keys and the world's first import, as served (Keel #571): the
+  // keys by name, never null (keel removes a key sent as null), the origin
+  // only as the object keel serves.
+  const extras: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (isWorldExtensionKey(k) && v !== null && v !== undefined) extras[k] = v;
+  }
+  if (src.origin && typeof src.origin === 'object' && !Array.isArray(src.origin)) extras.origin = src.origin;
   return {
+    ...extras,
     id: src.id as string,
     name: text(src.name),
     description: text(src.description),

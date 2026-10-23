@@ -361,6 +361,9 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
   // And who made it (v0.3.14): verbatim, so a new world from keel's export
   // says keel made it, never Atlas.
   if (world.producer && typeof world.producer === 'object' && !Array.isArray(world.producer)) lines.producer = world.producer;
+  // And where the world first came from, as the server served it (v0.3.16,
+  // Keel #571): kept, nulls and all, never derived.
+  if (world.origin && typeof world.origin === 'object' && !Array.isArray(world.origin)) lines.origin = world.origin;
   // A profile's keys on the World (`x_names`, a world's own words for the
   // types; names.md): verbatim, as §4.1 keeps every key a writer did not
   // change, so a work world opened from its file still says Employee.

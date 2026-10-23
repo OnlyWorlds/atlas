@@ -89,7 +89,7 @@ export class ConflictReviewModal extends BaseModal {
     row.innerHTML = `
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">world setting</span>
-        <span class="atlas-conflict-name">${escapeText(field)}</span>
+        <span class="atlas-conflict-name">${escapeText(field === 'x_names' ? "The world's words for the types" : field)}</span>
         <span class="atlas-conflict-fields">changed here and on the server</span>
       </div>
       <div class="atlas-conflict-row-actions">

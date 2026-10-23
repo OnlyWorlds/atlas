@@ -193,9 +193,16 @@ export class AccountClient {
    * the CALLER retries with the registry PIN (this method stays dumb — the
    * dance is flow logic, not wire logic).
    */
-  async createWorld(name: string, pin?: string): Promise<CreatedAccountWorld> {
+  async createWorld(
+    name: string,
+    pin?: string,
+    lines?: { source?: Record<string, unknown>; producer?: Record<string, unknown> },
+  ): Promise<CreatedAccountWorld> {
     const body: Record<string, unknown> = { name };
     if (pin !== undefined) body.pin = pin;
+    // The folder's provenance lines, kept by keel as the world's origin (Keel #571).
+    if (lines?.source) body.source = lines.source;
+    if (lines?.producer) body.producer = lines.producer;
     const raw = await this.request('POST', '/account/worlds', body) as CreatedAccountWorld;
     if (!raw || typeof raw.key !== 'string' || !raw.key || typeof raw.id !== 'string') {
       throw new Error('create-world response missing id or key');

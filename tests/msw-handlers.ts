@@ -11,6 +11,7 @@
 
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { ATLAS_LOCAL_EXTENSION_FIELDS, ATLAS_LOCAL_ONLY_FIELDS } from '../src/core/constants';
+import { WORLD_EXTENSION_KEY, jsonbStored } from './fixtures/fake-ow-client';
 
 const DEFAULT_BASE = 'https://www.onlyworlds.com/api/worldapi';
 /** Single source of truth list — keep in lockstep with constants.ts. */
@@ -479,6 +480,12 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       public_read: worldMeta.public_read,
       created_at: worldMeta.created_at,
       updated_at: worldMeta.updated_at,
+      // Keel #571: the world's first import, both members always served, and
+      // every extension key at the top level, as stored.
+      origin: JSON.parse(JSON.stringify(worldMeta.origin ?? { source: null, producer: null })),
+      ...Object.fromEntries(Object.entries(worldMeta)
+        .filter(([k]) => WORLD_EXTENSION_KEY.test(k))
+        .map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])),
     };
   }
 
@@ -648,16 +655,31 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const keys = Object.keys(body);
       if (keys.length === 0) return HttpResponse.json(worldMetaBody());
       for (const k of keys) {
-        if (!(k in V2_WORLD_META_WRITABLE)) {
+        if (!(k in V2_WORLD_META_WRITABLE) && !WORLD_EXTENSION_KEY.test(k) && k !== 'source' && k !== 'producer') {
           return envelope({ status: 422, code: 'invalid_request', message: `Unknown field '${k}'.`, param: k });
         }
       }
       for (const k of keys) {
+        if (WORLD_EXTENSION_KEY.test(k)) continue;
+        if (k === 'source' || k === 'producer') {
+          const v = body[k];
+          if (v !== null && (typeof v !== 'object' || Array.isArray(v))) {
+            return envelope({ status: 422, code: 'invalid_request', message: `'${k}' must be an object or null.`, param: k });
+          }
+          continue;
+        }
         const err = validateWorldMetaField(k, body[k]);
         if (err) return envelope({ status: 422, code: 'invalid_request', message: err.message, param: err.param });
       }
       for (const k of keys) {
-        worldMeta[k] = V2_WORLD_UNIT_FIELDS.has(k) ? (body[k] as string).trim() : body[k];
+        if (WORLD_EXTENSION_KEY.test(k)) {
+          if (body[k] === null) delete worldMeta[k];
+          else worldMeta[k] = jsonbStored(body[k]);
+        } else if (k === 'source' || k === 'producer') {
+          worldMeta.origin = { ...((worldMeta.origin as Record<string, unknown>) ?? { source: null, producer: null }), [k]: body[k] };
+        } else {
+          worldMeta[k] = V2_WORLD_UNIT_FIELDS.has(k) ? (body[k] as string).trim() : body[k];
+        }
       }
       worldMeta.updated_at = clock();
       return HttpResponse.json(worldMetaBody());

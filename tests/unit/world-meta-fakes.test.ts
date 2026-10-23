@@ -214,12 +214,12 @@ describe('statefulV2Handlers — GET/PATCH /world (wire names)', () => {
       body: JSON.stringify(body),
     });
 
-  it('GET returns the full 16-field body in wire names', async () => {
+  it('GET returns the full body in wire names, origin with it (Keel #571)', async () => {
     mount();
     const body = await (await getWorld()).json();
     expect(Object.keys(body).sort()).toEqual([
       'created_at', 'description', 'distance_unit', 'id', 'image_url', 'length_unit',
-      'mass_unit', 'name', 'public_read', 'time_basic_unit', 'time_format_equivalents', 'time_format_names',
+      'mass_unit', 'name', 'origin', 'public_read', 'time_basic_unit', 'time_format_equivalents', 'time_format_names',
       'time_range_current', 'time_range_max', 'time_range_min', 'updated_at',
     ]);
     expect(body).toHaveProperty('time_range_current'); // wire name
@@ -234,7 +234,7 @@ describe('statefulV2Handlers — GET/PATCH /world (wire names)', () => {
     const echo = await res.json();
     expect(echo.description).toBe('a realm');
     expect(echo.time_range_current).toBe(42);
-    expect(Object.keys(echo)).toHaveLength(16); // full body
+    expect(Object.keys(echo)).toHaveLength(17); // full body, origin included
     expect(echo.updated_at).not.toBe(before.updated_at); // bumped
     // and it persisted
     const after = await (await getWorld()).json();

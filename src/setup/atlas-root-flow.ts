@@ -41,7 +41,7 @@ import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-ut
 import { getActiveStore, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
-import { initialDownloadAll, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
+import { initialDownloadAll, seedLinkedWorldMeta, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
@@ -1107,6 +1107,8 @@ export async function linkExistingApiWorldInRoot(
     }
     throw err;
   }
+  // Its settings and own words come down with it (S458).
+  await seedLinkedWorldMeta(store, adapter);
 
   // The commit point: the download succeeded, so leave the prior world now.
   await releasePriorWorld();
@@ -1137,7 +1139,7 @@ export async function linkExistingApiWorldInRoot(
   // The store first (S364 gate lens C C9): a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
-  patchSlice('active', { worldId: entry.id, meta: { id: localWorldUuid, name: displayName }, opened: true });
+  patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: localWorldUuid, name: displayName })), opened: true });
 
   // Prime the elements cache from the newly-downloaded folder.
   try {
@@ -1180,7 +1182,9 @@ async function linkIntoBrowser(
   let downloadResult: Awaited<ReturnType<typeof initialDownloadAll>>;
   try {
     await store.writeWorldMeta(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat }));
-    downloadResult = await initialDownloadAll(store, buildV2Adapter(apiKey, apiPin), opts.onProgress, opts.shouldStop, { stopOnQuota: true });
+    const adapter = buildV2Adapter(apiKey, apiPin);
+    downloadResult = await initialDownloadAll(store, adapter, opts.onProgress, opts.shouldStop, { stopOnQuota: true });
+    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it (S458)
     await releasePriorWorld();
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');
@@ -1198,7 +1202,7 @@ async function linkIntoBrowser(
   await make.finish(() => { saveRegistry(activated); patchSlice('registry', activated); });
   if (readOnly) store.setViewOnly(true);
   setActiveStore(store);
-  patchSlice('active', { worldId: entry.id, meta: { id: serverWorldId, name: displayName }, opened: true });
+  patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: serverWorldId, name: displayName })), opened: true });
   try {
     patchSlice('data', { elements: await store.listElements() });
   } catch (err) {

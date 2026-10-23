@@ -18,7 +18,7 @@ import { getState, patchSlice } from '../core/state';
 import { saveRegistry, attachApi, setPin } from '../registry/registry';
 import { completeWaypoint } from '../core/waypoints';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
-import { createApiWorld, buildV2Adapter } from '../sync/make-online';
+import { createApiWorld, buildV2Adapter, worldOriginLines } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
 import { escapeAttr, escapeText } from '../core/dom-utils';
@@ -143,7 +143,8 @@ export class NewApiWorldModal extends BaseModal {
         }
 
         progressEl.textContent = `Creating the world on onlyworlds.com…`;
-        const created = await createApiWorld({ name: entry.name, pin });
+        const lines = worldOriginLines(await getActiveStore()?.readWorldMeta().catch(() => null));
+        const created = await createApiWorld({ name: entry.name, pin, lines });
         const apiKey = created.apiKey;
 
         // World id + name come straight from the create response (keel

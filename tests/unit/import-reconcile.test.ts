@@ -322,6 +322,16 @@ describe('reconcile — adversarial review regressions (session 241)', () => {
     expect('y_not' in wm).toBe(false);
   });
 
+  it("keeps the World's origin as served, nulls and all (folder spec 0.3.16, Keel #571)", () => {
+    const filled = { source: { server: 'https://www.onlyworlds.com', world: 'w0', at: '2026-10-01T00:00:00Z' }, producer: { tool: 'azgaar-converter', version: '2', input: 'azgaar-map' } };
+    for (const origin of [filled, { source: null, producer: null }]) {
+      const parsed = parsePayload({ World: { name: 'W', origin }, Character: [{ name: 'A' }] });
+      expect((reconcile(parsed, [], { genId: genIdFactory() }).worldMeta as Record<string, unknown>).origin).toEqual(origin);
+    }
+    const none = parsePayload({ World: { name: 'W', origin: 'not an object' }, Character: [{ name: 'A' }] });
+    expect('origin' in (reconcile(none, [], { genId: genIdFactory() }).worldMeta as Record<string, unknown>)).toBe(false);
+  });
+
   it('inserts a fresh element when an incoming uuid collides with a DIFFERENT existing element', () => {
     const existing = [existingEl({ id: U.kid, type: 'character', name: 'Alice' })];
     const parsed = parsePayload({ Character: [{ id: U.kid, name: 'Bob' }] });

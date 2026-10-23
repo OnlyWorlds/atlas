@@ -136,6 +136,8 @@ export class FakeOwApiClient implements OwApiClient {
     public_read: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
+    // keel always serves both members, null when it knows none (Keel #571).
+    origin: { source: null, producer: null },
   };
 
   // Capture of every call for assertion.
@@ -452,30 +454,57 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfMemberRefuses('world');
     const keys = Object.keys(wireBody);
     // Unknown-field pass first (whole PATCH aborts), then per-field type.
+    // Keel #571: a prefixed extension key is kept as given (null removes it),
+    // and `source`/`producer` (an object or null) set the world's origin.
     for (const k of keys) {
-      if (!(k in DISK_WORLD_META_WRITABLE)) {
+      if (!(k in DISK_WORLD_META_WRITABLE) && !WORLD_EXTENSION_KEY.test(k) && k !== 'source' && k !== 'producer') {
         throw metaError(k, `Unknown field '${k}'.`);
       }
     }
     for (const k of keys) {
+      if (WORLD_EXTENSION_KEY.test(k)) continue;
+      if (k === 'source' || k === 'producer') {
+        const v = wireBody[k];
+        if (v !== null && (typeof v !== 'object' || Array.isArray(v))) throw metaError(k, `'${k}' must be an object or null.`);
+        continue;
+      }
       const msg = validateDiskWorldMetaField(k, wireBody[k]);
       if (msg) throw metaError(k, msg);
     }
     if (keys.length === 0) return this.cloneWorldMeta(); // no bump
+    const rec = this.worldMeta as unknown as Record<string, unknown>;
+    const nextExt: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rec)) if (WORLD_EXTENSION_KEY.test(k)) nextExt[k] = v;
+    for (const k of keys) if (WORLD_EXTENSION_KEY.test(k)) {
+      if (wireBody[k] === null) delete nextExt[k];
+      else nextExt[k] = wireBody[k];
+    }
+    if (JSON.stringify(nextExt).length > 65536) throw metaError('extensions', 'Extension keys exceed 65536 bytes.');
     for (const k of keys) {
-      (this.worldMeta as unknown as Record<string, unknown>)[k] =
-        DISK_WORLD_UNIT_FIELDS.has(k) ? (wireBody[k] as string).trim() : wireBody[k];
+      if (WORLD_EXTENSION_KEY.test(k)) {
+        if (wireBody[k] === null) delete rec[k];
+        else rec[k] = jsonbStored(wireBody[k]);
+      } else if (k === 'source' || k === 'producer') {
+        this.worldMeta.origin = { ...(this.worldMeta.origin ?? {}), [k]: wireBody[k] };
+      } else {
+        rec[k] = DISK_WORLD_UNIT_FIELDS.has(k) ? (wireBody[k] as string).trim() : wireBody[k];
+      }
     }
     this.worldMeta.updated_at = this.clock();
     return this.cloneWorldMeta();
   }
 
   private cloneWorldMeta(): WorldMetaWire {
-    return {
+    const out: WorldMetaWire = {
       ...this.worldMeta,
       time_format_names: [...this.worldMeta.time_format_names],
       time_format_equivalents: [...this.worldMeta.time_format_equivalents],
     };
+    const rec = out as unknown as Record<string, unknown>;
+    for (const k of Object.keys(rec)) {
+      if (WORLD_EXTENSION_KEY.test(k) || k === 'origin') rec[k] = JSON.parse(JSON.stringify(rec[k]));
+    }
+    return out;
   }
 
   /**
@@ -778,7 +807,12 @@ export class FakeOwApiClient implements OwApiClient {
    * real server edit is trusted).
    */
   __server_mutate_world_meta(patch: Record<string, unknown>): void {
-    for (const [k, v] of Object.entries(patch)) (this.worldMeta as unknown as Record<string, unknown>)[k] = v;
+    const rec = this.worldMeta as unknown as Record<string, unknown>;
+    for (const [k, v] of Object.entries(patch)) {
+      // An extension key as keel keeps it: null removes, jsonb reorders.
+      if (WORLD_EXTENSION_KEY.test(k)) { if (v === null) delete rec[k]; else rec[k] = jsonbStored(v); }
+      else rec[k] = v;
+    }
     this.worldMeta.updated_at = this.clock();
   }
 
@@ -1002,6 +1036,26 @@ const DISK_WORLD_META_WRITABLE: Readonly<Record<string, 'text' | 'list' | 'int'>
 
 /** World units (keel core/world_api.py, Keel #146): trimmed, then capped at 64. */
 const DISK_WORLD_UNIT_FIELDS = new Set(['length_unit', 'mass_unit', 'distance_unit']);
+
+/** keel's World extension keys (Keel #571, the OpenAPI WorldPatch pattern). */
+export const WORLD_EXTENSION_KEY = /^(atlas_|shadow_|x_)/;
+
+/**
+ * A value as keel's jsonb hands it back: an object's keys in jsonb's order
+ * (shorter first, then by code point), not the order sent. Played on purpose,
+ * so a client comparing a value by its bytes goes red here as it would live.
+ */
+export function jsonbStored(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(jsonbStored);
+  if (v && typeof v === 'object') {
+    const keys = Object.keys(v as Record<string, unknown>)
+      .sort((a, b) => (a.length - b.length) || (a < b ? -1 : a > b ? 1 : 0));
+    const out: Record<string, unknown> = {};
+    for (const k of keys) out[k] = jsonbStored((v as Record<string, unknown>)[k]);
+    return out;
+  }
+  return v;
+}
 
 /** First type-validation problem for a DISK-named meta field, or null if ok. */
 function validateDiskWorldMetaField(field: string, v: unknown): string | null {

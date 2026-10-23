@@ -18,7 +18,7 @@ import { http, HttpResponse, delay } from 'msw';
 import { mswServer } from '../setup';
 import { statefulAccountHandlers } from '../msw-account-handlers';
 import { statefulOwHandlers } from '../msw-handlers';
-import { createApiWorld, setMakeOnlineBaseUrl } from '../../src/sync/make-online';
+import { createApiWorld, setMakeOnlineBaseUrl, worldOriginLines } from '../../src/sync/make-online';
 import { getState, patchSlice } from '../../src/core/state';
 import { defaultRegistry } from '../../src/core/types';
 import {
@@ -398,6 +398,49 @@ describe('createApiWorld — the signed-in v2 lane (session 260); signed out it 
     expect(result.apiKey).toMatch(/^ow_w_/);
     expect(result.worldName).toBe('Second World');
     expect(state.created).toHaveLength(1);
+  });
+
+  it('sends the folder\'s producer and source lines, which keel keeps as the world\'s origin (Keel #571)', async () => {
+    const state = mount({ accountHasPin: false });
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+    const producer = { tool: 'atlas', version: '1.83.0', input: 'bare' };
+    const source = { server: 'https://www.onlyworlds.com', world: 'w-old', at: '2026-10-20T10:00:00Z' };
+    const lines = worldOriginLines({ id: 'x', name: 'N', producer, source });
+
+    await createApiWorld({ name: 'Made Online', pin: '4242', lines });
+
+    expect(state.created).toHaveLength(1);
+    expect(state.created[0].origin).toEqual({ source, producer });
+  });
+
+  it('a folder line keel would refuse stays home, and the world still goes online', async () => {
+    const state = mount({ accountHasPin: true });
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+    const lines = worldOriginLines({ id: 'x', name: 'N', producer: { tool: 7 }, source: ['not', 'an', 'object'] });
+    expect(lines).toEqual({});
+
+    await createApiWorld({ name: 'Odd Lines', pin: '4242', lines });
+
+    expect(state.created[0].origin).toEqual({ source: null, producer: null });
+  });
+
+  it('a line keel refuses for its own reason: the world is made once more without the lines (S458 gate G6)', async () => {
+    const state = mount({ accountHasPin: true });
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+    let refused = 0;
+    mswServer.use(http.post(`${V2_BASE}/account/worlds`, async ({ request }) => {
+      const body = await request.clone().json() as Record<string, unknown>;
+      if (!('producer' in body)) return undefined; // falls through to the stateful handler
+      refused++;
+      return HttpResponse.json({ error: { type: 'invalid_request', code: 'invalid_request', message: 'producer.tool too long.', param: 'producer' } }, { status: 422 });
+    }));
+    const lines = worldOriginLines({ id: 'x', name: 'N', producer: { tool: 'atlas', version: '1.83.0', input: 'bare' } });
+
+    const result = await createApiWorld({ name: 'Plain Lines', pin: '4242', lines });
+
+    expect(refused).toBe(1);
+    expect(result.worldName).toBe('Plain Lines');
+    expect(state.created[0].origin).toEqual({ source: null, producer: null });
   });
 
   it('signed out: refuses, and the retired v1 create-world-external is never called', async () => {

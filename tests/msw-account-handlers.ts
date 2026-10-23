@@ -58,7 +58,7 @@ export interface AccountHandlerState {
    *  `name` mirrors the server: stored verbatim, "" when absent. */
   minted: Array<{ worldId: string; key: string; name: string; scope: 'READ' | 'WRITE' }>;
   /** Every world created via POST /account/worlds, in order. */
-  created: Array<{ name: string; id: string; key: string }>;
+  created: Array<{ name: string; id: string; key: string; origin?: { source: unknown; producer: unknown } }>;
   /** GET /account/worlds hit count — lets the caller assert fetch de-dup. */
   listCount: number;
   /** GET /account hit count. */
@@ -137,7 +137,16 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
     http.post(`${base}/account/worlds`, async ({ request }) => {
       const fail = authFail(request);
       if (fail) return fail;
-      const body = (await request.json().catch(() => ({}))) as { name?: string; pin?: string };
+      const body = (await request.json().catch(() => ({}))) as { name?: string; pin?: string; source?: unknown; producer?: unknown };
+      // Keel #571: a folder's provenance lines, each an object or null, its
+      // `world` / `tool` a string when present; kept as the world's origin.
+      for (const [k, inner] of [['source', 'world'], ['producer', 'tool']] as const) {
+        const v = body[k];
+        if (v === undefined || v === null) continue;
+        const bad = typeof v !== 'object' || Array.isArray(v)
+          || ((v as Record<string, unknown>)[inner] !== undefined && typeof (v as Record<string, unknown>)[inner] !== 'string');
+        if (bad) return envelope(422, 'invalid_request', `'${k}' must be an object or null.`, k);
+      }
       const hasPin = 'pin' in body && body.pin !== undefined;
       // The dance: pinned account REJECTS a sent pin; pinless account REQUIRES one.
       if (options.accountHasPin && hasPin) {
@@ -149,7 +158,7 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
       mintCounter += 1;
       const id = `srv-created-${mintCounter}`;
       const key = `ow_w_test${mintCounter}`;
-      state.created.push({ name: body.name ?? '', id, key });
+      state.created.push({ name: body.name ?? '', id, key, origin: { source: body.source ?? null, producer: body.producer ?? null } });
       return HttpResponse.json(
         { id, name: body.name ?? '', role: 'owner', public_read: false, key },
         { status: 201 },

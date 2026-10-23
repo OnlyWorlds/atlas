@@ -48,6 +48,33 @@ let overriddenBase: string | null = null;
 export interface CreateApiWorldOpts {
   name: string;
   pin: string;
+  /** The folder's provenance lines (`worldOriginLines`), kept by keel as the world's origin. */
+  lines?: WorldOriginLines;
+}
+
+export interface WorldOriginLines {
+  source?: Record<string, unknown>;
+  producer?: Record<string, unknown>;
+}
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * What a world made online from this folder tells keel about where it came
+ * from (Keel #571, folder spec 0.3.16 §4.2): the folder's own `source` and
+ * `producer` lines, as the folder holds them, which keel keeps as the world's
+ * `origin`. Only lines keel takes: an object, its `world` or `tool` a string
+ * when present (keel answers 422 otherwise, and a foreign folder's odd line
+ * must never stop a world going online). A folder with neither sends neither.
+ */
+export function worldOriginLines(meta: unknown): WorldOriginLines {
+  const out: WorldOriginLines = {};
+  if (!isPlainObject(meta)) return out;
+  const { source, producer } = meta;
+  if (isPlainObject(source) && (source.world === undefined || typeof source.world === 'string')) out.source = source;
+  if (isPlainObject(producer) && typeof producer.tool === 'string') out.producer = producer;
+  return out;
 }
 
 export interface CreateApiWorldResult {
@@ -84,14 +111,28 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
   const token = getState().registry.account_token;
   if (token) {
     const client = new AccountClient(token);
+    // The folder's lines are a courtesy to keel, never a reason the world
+    // stays offline: a line keel refuses goes once more without them (S458
+    // gate G6).
+    let lines = opts.lines ?? {};
+    const create = async (withPin?: string) => {
+      try {
+        return await client.createWorld(name, withPin, lines);
+      } catch (err) {
+        if (!(err instanceof OwV2Error && err.status === 422 && (err.param === 'source' || err.param === 'producer'))) throw err;
+        console.warn('[atlas:make-online] keel refused the provenance lines; creating without them', err);
+        lines = {};
+        return client.createWorld(name, withPin, lines);
+      }
+    };
     let created;
     try {
-      created = await client.createWorld(name);
+      created = await create();
     } catch (err) {
       if (err instanceof OwV2Error && err.status === 422 && err.param === 'pin') {
         // Fresh account: the PIN is required and becomes the account PIN.
         if (!pin) throw new PlainError('Enter your PIN first. A new account sets its PIN here.');
-        created = await client.createWorld(name, pin);
+        created = await create(pin);
       } else {
         // Only the account refusals Atlas has words for pass as refusals;
         // anything else keeps its kind and details (S369 gate B M6).

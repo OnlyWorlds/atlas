@@ -24,6 +24,14 @@ import type { OwApiClient } from './sync-engine';
 import type { ElementType, PerElementFailure } from '../core/types';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { PlainError } from '../core/plain-error';
+import {
+  META_SYNC_FIELD_NAMES,
+  canonicalExtValue,
+  isMetaEmpty,
+  isWorldExtensionKey,
+  pickExtensionBaseline,
+  pickSyncedMeta,
+} from './world-meta-sync';
 
 export interface InitialDownloadProgress {
   /** Elements written so far (success OR failure). */
@@ -59,6 +67,44 @@ export class DownloadCancelledError extends PlainError {
   constructor() {
     super('Link cancelled');
     this.name = 'DownloadCancelledError';
+  }
+}
+
+/**
+ * A linked world's settings, brought down with its elements (S458, Keel #571).
+ * Before this, a world linked from onlyworlds.com took its settings (the now,
+ * the units, its own words) only at its first sync round, which a world that
+ * pulls only when asked might not run for a while: so it opened with the
+ * standard's words and no now. This is the meta step's seed round on a fresh
+ * folder: every setting the server holds, its x_ keys and its origin written
+ * as served, and both baselines taken, so the next round has nothing to send.
+ * A failed read leaves the seed to that first round, as before.
+ */
+export async function seedLinkedWorldMeta(folder: FolderStore, adapter: OwApiClient): Promise<void> {
+  let meta;
+  try {
+    meta = await adapter.getWorldMeta();
+  } catch (err) {
+    console.warn('[atlas:link] world settings not read at download; the first sync round brings them', err);
+    return;
+  }
+  // A disk failure here never costs the download (S458 gate G3): the first
+  // round seeds again over whatever landed, equal values included.
+  try {
+    const rec = meta as unknown as Record<string, unknown>;
+    const synced = pickSyncedMeta(rec);
+    const fill: Record<string, unknown> = {};
+    for (const f of META_SYNC_FIELD_NAMES) if (!isMetaEmpty(f, synced[f])) fill[f] = synced[f];
+    for (const [k, v] of Object.entries(rec)) if (isWorldExtensionKey(k) && canonicalExtValue(v) !== null) fill[k] = v;
+    if (rec.origin && typeof rec.origin === 'object' && !Array.isArray(rec.origin)) fill.origin = rec.origin;
+    await folder.writeWorldMeta(fill, { fromSync: true });
+    await folder.updateSyncState(() => ({
+      meta_baseline: synced,
+      meta_ext_baseline: pickExtensionBaseline(rec),
+      meta_server_updated_at: meta.updated_at || null,
+    }));
+  } catch (err) {
+    console.warn('[atlas:link] world settings not written at download; the first sync round brings them', err);
   }
 }
 

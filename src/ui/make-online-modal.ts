@@ -42,6 +42,7 @@ import { SyncEngine } from '../sync/sync-engine';
 import {
   createApiWorld,
   buildV2Adapter,
+  worldOriginLines,
   type MergePolicy,
   type MergeProgress,
 } from '../sync/make-online';
@@ -321,7 +322,8 @@ export class MakeOnlineModal extends BaseModal {
       // 1. Create new api world (server-side).
       progressBox.textContent = 'Creating world on onlyworlds.com…';
       progressBox.hidden = false;
-      const created = await createApiWorld({ name, pin });
+      const lines = worldOriginLines(await getActiveStore()?.readWorldMeta().catch(() => null));
+      const created = await createApiWorld({ name, pin, lines });
       const apiKey = created.apiKey;
 
       // 2. Build the v2 adapter for element CRUD (gate 10.7: the SDK client

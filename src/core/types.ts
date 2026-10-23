@@ -184,6 +184,13 @@ export interface WorldMeta {
    * `core/provenance.ts` `atlasProducer`.
    */
   producer?: { tool: string; version: string; input: string };
+  /**
+   * Where the world first came from, as the server keeps it (spec §4.2,
+   * v0.3.16, Keel #571): `{ source, producer }`, each an object or null.
+   * Carried as served (a linked world's GET /world, a site download); never
+   * derived, never sent. Absent in a folder with no server behind it.
+   */
+  origin?: Record<string, unknown>;
   /** World cover image URL. Preserved on import/export round-trip (DESIGN_IMPORT.md). */
   image_url?: string;
   /**
@@ -321,6 +328,13 @@ export interface SyncState {
    * resolved via the conflict-review modal's world-settings rows (gate R9).
    */
   meta_conflicts?: string[];
+  /**
+   * A profile's `x_` keys on the World at the last agreement (Keel #571):
+   * key → canonical JSON (`canonicalExtValue`), absent = the key was absent.
+   * Its own map so a world linked before these keys synced seeds them once.
+   * Contested keys join `meta_conflicts` by name. Cleared by resetSyncBaseline.
+   */
+  meta_ext_baseline?: Record<string, string> | null;
   /**
    * Elements whose CREATE keel refused because the id already lives in
    * another OnlyWorlds world (a copied or imported folder, a world taken

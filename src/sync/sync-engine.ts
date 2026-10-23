@@ -12,12 +12,20 @@ import { nowIso } from '../store/folder-store';
 import {
   META_SYNC_FIELDS,
   META_SYNC_FIELD_NAMES,
+  EXT_MAX_BYTES,
+  canonicalExtValue,
   canonicalMetaValue,
   encodeMetaFieldsForPush,
+  extBytesAfter,
+  extDirty,
   isMetaEmpty,
+  isWorldExtensionKey,
   metaEquals,
   metaFieldLengthError,
+  pickExtensionBaseline,
   pickSyncedMeta,
+  setExtBaseline,
+  threeWayExtDiff,
   threeWayMetaDiff,
 } from './world-meta-sync';
 import {
@@ -93,6 +101,10 @@ export interface WorldMetaWire {
   public_read?: boolean;
   created_at?: string;
   updated_at: string;
+  /** The world's first import, as keel serves it (Keel #571): kept, never sent. */
+  origin?: Record<string, unknown>;
+  /** A profile's keys on the World (`x_names`), as served; synced key by key. */
+  [key: `x_${string}`]: unknown;
 }
 
 /** One page of the /changes feed (ops in commit order, adapted to disk shape). */
@@ -299,6 +311,8 @@ export class SyncEngine {
    * re-told on every round). A new edit changes the fields and tries again.
    */
   private metaOwnerRefusal: { sig: string; failure: PerElementFailure } | null = null;
+  /** The x_ keys' body keel last refused (or Atlas found too big), by content (S458 gate G1). */
+  private extRefusal: { sig: string; failure: PerElementFailure } | null = null;
   /** Debounce timer for `requestPush()` autosave. Reset on each write. */
   private debouncePushTimer: ReturnType<typeof setTimeout> | null = null;
   /** Debounce window for autosave pushes. ms. Configurable via setDebounceMs. */
@@ -1003,6 +1017,7 @@ export class SyncEngine {
 
   async resolveMetaConflict(field: string, choice: 'mine' | 'theirs'): Promise<void> {
     await this.assertNotHeld();
+    if (isWorldExtensionKey(field)) return this.resolveExtConflict(field, choice);
     const kind = META_SYNC_FIELDS[field];
     if (!kind) throw new Error(`resolveMetaConflict: unknown meta field '${field}'`);
     let baselineValue: unknown;
@@ -1024,6 +1039,31 @@ export class SyncEngine {
       meta_baseline: { ...(current.meta_baseline ?? {}), [field]: baselineValue },
       meta_conflicts: (current.meta_conflicts ?? []).filter(f => f !== field),
     }));
+  }
+
+  /** A contested x_ key: mine sends the folder's value (or its absence), theirs takes keel's. */
+  private async resolveExtConflict(key: string, choice: 'mine' | 'theirs'): Promise<void> {
+    let agreed: unknown;
+    if (choice === 'mine') {
+      if (this.readOnly) throw new PlainError('This world is view-only here, so its settings cannot be sent to OnlyWorlds.');
+      const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
+      const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush({ [key]: local[key] ?? null }));
+      agreed = (resp as unknown as Record<string, unknown>)[key];
+    } else {
+      const server = await this.client.getWorldMeta();
+      agreed = (server as unknown as Record<string, unknown>)[key];
+      if (this.stopped) return;
+      await this.folder.writeWorldMeta({ [key]: agreed ?? undefined }, { fromSync: true });
+    }
+    if (this.stopped) return;
+    await this.folder.updateSyncState(current => {
+      const ext = { ...(current.meta_ext_baseline ?? {}) };
+      setExtBaseline(ext, key, agreed);
+      return {
+        meta_ext_baseline: ext,
+        meta_conflicts: (current.meta_conflicts ?? []).filter(f => f !== key),
+      };
+    });
   }
 
   /**
@@ -1094,11 +1134,12 @@ export class SyncEngine {
       try {
         const syncState = await this.folder.readSyncState();
         const baseline = syncState.meta_baseline ?? null;
-        if (baseline) {
+        const extBaseline = syncState.meta_ext_baseline ?? null;
+        if (baseline && extBaseline) {
           const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
           const dirty = META_SYNC_FIELD_NAMES.some(
             f => !metaEquals(META_SYNC_FIELDS[f], local[f], baseline[f])
-          );
+          ) || extDirty(local, extBaseline);
           if (!dirty) return empty;
         }
       } catch (err) {
@@ -1138,6 +1179,14 @@ export class SyncEngine {
     }
     const syncState = await this.folder.readSyncState();
     const baseline = syncState.meta_baseline ?? null;
+    // A profile's x_ keys (Keel #571): their own three-way, beside the fields.
+    const ext = this.planExtStep(local, serverRec, syncState.meta_ext_baseline ?? null);
+    // The world's first import, kept in the folder as keel serves it (folder
+    // spec 0.3.16, §4.2): read-only on the server, so only ever pulled, and
+    // written only when it differs, so a world's folder takes it once.
+    const origin = server.origin && canonicalExtValue(server.origin) !== canonicalExtValue(local.origin)
+      ? { origin: server.origin }
+      : {};
 
     // SEED round: adopt server as baseline, fill locally-empty fields from
     // the server, PATCH nothing (gate R2 — the convergent blocker).
@@ -1149,38 +1198,52 @@ export class SyncEngine {
           pulls[field] = seeded[field];
         }
       }
+      Object.assign(pulls, ext.pullKeys);
       if (this.stopped) return empty;
-      if (Object.keys(pulls).length > 0) {
-        await this.folder.writeWorldMeta(pulls, { fromSync: true });
+      if (Object.keys(pulls).length > 0 || 'origin' in origin) {
+        await this.folder.writeWorldMeta({ ...pulls, ...origin }, { fromSync: true });
       }
       if (this.stopped) return empty;
       await this.folder.updateSyncState(() => ({
         meta_baseline: seeded,
+        meta_ext_baseline: ext.baselineNext,
         meta_server_updated_at: server.updated_at || null,
+        ...(ext.contested.length > 0 ? { meta_conflicts: ext.contested } : {}),
       }));
       return { ...empty, meta_pulled: Object.keys(pulls) };
     }
 
     const diff = threeWayMetaDiff(local, serverRec, baseline);
-    const pushFields: Record<string, unknown> = { ...diff.pushFields };
+    const pushFields: Record<string, unknown> = { ...diff.pushFields, ...ext.pushKeys };
     let contested = diff.contested;
     if (contested.length > 0 && this.policy === 'local-wins') {
       // Local wins the contested fields: push them, nothing persists.
       for (const f of contested) pushFields[f] = canonicalMetaValue(META_SYNC_FIELDS[f], local[f]);
       contested = [];
     }
+    contested = [...contested, ...ext.contested];
 
     const baselineNext = { ...baseline };
     for (const f of diff.converged) {
       baselineNext[f] = canonicalMetaValue(META_SYNC_FIELDS[f], serverRec[f]);
     }
+    const extBaselineNext = ext.baselineNext;
 
     // Pull-apply server-only changes, then advance those baselines.
-    const pulled = Object.keys(diff.pullFields);
-    if (pulled.length > 0) {
+    const pullWrites = { ...diff.pullFields, ...ext.pullKeys };
+    const pulled = Object.keys(pullWrites);
+    if (pulled.length > 0 || 'origin' in origin) {
       if (this.stopped) return empty;
-      await this.folder.writeWorldMeta(diff.pullFields, { fromSync: true });
-      for (const f of pulled) baselineNext[f] = diff.pullFields[f];
+      await this.folder.writeWorldMeta({ ...pullWrites, ...origin }, { fromSync: true });
+      for (const f of Object.keys(diff.pullFields)) baselineNext[f] = diff.pullFields[f];
+    }
+
+    // The x_ keys travel in a PATCH of their own, after the settings (S458
+    // gate G1): keel refuses a body whole, so a key it will not take (over
+    // 64 KB of keys in all) must never stop the now or a description.
+    const extPush: Record<string, unknown> = {};
+    for (const k of Object.keys(pushFields)) {
+      if (isWorldExtensionKey(k)) { extPush[k] = pushFields[k]; delete pushFields[k]; }
     }
 
     // Length guard (dig Q9: keel never length-validates; overflow raw-500s).
@@ -1201,6 +1264,17 @@ export class SyncEngine {
     // (the store guard blocks UI writes), so anything here stays unpushed.
     let pushedNames = this.readOnly ? [] : Object.keys(pushFields);
     let serverUpdatedAt = server.updated_at || null;
+    const persistOnBail = async (): Promise<void> => {
+      if (this.stopped) return;
+      await this.folder.updateSyncState(current => ({
+        meta_baseline: baselineNext,
+        meta_ext_baseline: extBaselineNext,
+        meta_server_updated_at: serverUpdatedAt,
+        meta_conflicts: this.policy === 'pause-and-review'
+          ? contested
+          : (current.meta_conflicts ?? []),
+      }));
+    };
     const pushSig = JSON.stringify(pushedNames.slice().sort().map(f => [f, pushFields[f]]));
     if (pushedNames.length > 0 && this.metaOwnerRefusal?.sig === pushSig) {
       failures.push(this.metaOwnerRefusal.failure);
@@ -1211,7 +1285,8 @@ export class SyncEngine {
         const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush(pushFields));
         const respRec = resp as unknown as Record<string, unknown>;
         for (const f of pushedNames) {
-          baselineNext[f] = canonicalMetaValue(META_SYNC_FIELDS[f], respRec[f]);
+          if (isWorldExtensionKey(f)) setExtBaseline(extBaselineNext, f, respRec[f]);
+          else baselineNext[f] = canonicalMetaValue(META_SYNC_FIELDS[f], respRec[f]);
         }
         serverUpdatedAt = resp.updated_at || serverUpdatedAt;
       } catch (err) {
@@ -1219,15 +1294,7 @@ export class SyncEngine {
           this.noteAuthBail(err);
           // Persist what the round already learned (pull-applies + converged)
           // before bailing — the pushed fields stay dirty and retry.
-          if (!this.stopped) {
-            await this.folder.updateSyncState(current => ({
-              meta_baseline: baselineNext,
-              meta_server_updated_at: serverUpdatedAt,
-              meta_conflicts: this.policy === 'pause-and-review'
-                ? contested
-                : (current.meta_conflicts ?? []),
-            }));
-          }
+          await persistOnBail();
           return { meta_pushed: [], meta_pulled: pulled, failures, auth_blocked: true };
         }
         console.warn('[atlas:sync] meta step: PATCH /world failed — fields stay dirty', err);
@@ -1254,13 +1321,93 @@ export class SyncEngine {
       }
     }
 
+    // The x_ keys' own PATCH. A body keel refused (a 4xx: too big, not this
+    // seat's to write) is remembered by its content and not sent again until
+    // the folder's keys change, as the owner-only refusal is; a body over
+    // keel's 64 KB is refused here without a round trip.
+    const extNames = this.readOnly ? [] : Object.keys(extPush).sort();
+    if (extNames.length > 0) {
+      const extSig = JSON.stringify(extNames.map(k => [k, canonicalExtValue(extPush[k])]));
+      if (this.extRefusal?.sig === extSig) {
+        failures.push(this.extRefusal.failure);
+      } else if (extBytesAfter(serverRec, extPush) > EXT_MAX_BYTES) {
+        const failure = metaFailure('update', new Error(`The world's x_ keys would pass OnlyWorlds' ${EXT_MAX_BYTES}-byte limit`));
+        failures.push(failure);
+        this.extRefusal = { sig: extSig, failure };
+      } else {
+        try {
+          const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush(extPush));
+          const respRec = resp as unknown as Record<string, unknown>;
+          for (const k of extNames) setExtBaseline(extBaselineNext, k, respRec[k]);
+          serverUpdatedAt = resp.updated_at || serverUpdatedAt;
+          pushedNames = [...pushedNames, ...extNames];
+        } catch (err) {
+          if (isAuthError(err)) {
+            this.noteAuthBail(err);
+            await persistOnBail();
+            return { meta_pushed: [...pushedNames], meta_pulled: pulled, failures, auth_blocked: true };
+          }
+          console.warn('[atlas:sync] meta step: PATCH /world of x_ keys failed — they stay dirty', err);
+          const failure = metaFailure('update', err);
+          failures.push(failure);
+          const status = (err as { status?: unknown } | null)?.status;
+          if (typeof status === 'number' && status >= 400 && status < 500) this.extRefusal = { sig: extSig, failure };
+        }
+      }
+    }
+
     if (this.stopped) return empty; // unlink raced us — never resurrect cleared state
     await this.folder.updateSyncState(() => ({
       meta_baseline: baselineNext,
+      meta_ext_baseline: extBaselineNext,
       meta_server_updated_at: serverUpdatedAt,
       meta_conflicts: this.policy === 'pause-and-review' ? contested : [],
     }));
     return { meta_pushed: [...pushedNames], meta_pulled: pulled, failures, auth_blocked: false };
+  }
+
+  /**
+   * The x_ keys' share of a meta round (Keel #571): what to send, what to
+   * write locally, what is contested, and the baseline after the pulls and
+   * the converged keys (sent keys advance from the PATCH echo). An absent
+   * baseline seeds, as the fields do: the server's keys become the baseline,
+   * a key the folder lacks comes down, nothing goes up this round.
+   */
+  private planExtStep(
+    local: Record<string, unknown>,
+    server: Record<string, unknown>,
+    baseline: Record<string, string> | null,
+  ): { pushKeys: Record<string, unknown>; pullKeys: Record<string, unknown>; contested: string[]; baselineNext: Record<string, string> } {
+    if (!baseline) {
+      const pullKeys: Record<string, unknown> = {};
+      const baselineNext = pickExtensionBaseline(server);
+      const contested: string[] = [];
+      for (const [k, v] of Object.entries(server)) {
+        if (!isWorldExtensionKey(k)) continue;
+        const s = canonicalExtValue(v);
+        const l = canonicalExtValue(local[k]);
+        if (s !== null && l === null) pullKeys[k] = v;
+        // Both sides hold the key and differ: no side is the change, so no
+        // baseline is taken for it (the S458 gate's G2: a seed to the server's
+        // value made the folder's read as an edit, pushed unasked). The next
+        // three-way sees both changed; under pause-and-review it is held now.
+        if (s !== null && l !== null && s !== l) {
+          delete baselineNext[k];
+          if (this.policy === 'pause-and-review') contested.push(k);
+        }
+      }
+      return { pushKeys: {}, pullKeys, contested, baselineNext };
+    }
+    const d = threeWayExtDiff(local, server, baseline);
+    const pushKeys = { ...d.pushKeys };
+    let contested = d.contested;
+    if (contested.length > 0 && this.policy === 'local-wins') {
+      for (const k of contested) pushKeys[k] = canonicalExtValue(local[k]) === null ? null : local[k];
+      contested = [];
+    }
+    const baselineNext = { ...baseline };
+    for (const k of [...d.converged, ...Object.keys(d.pullKeys)]) setExtBaseline(baselineNext, k, server[k]);
+    return { pushKeys, pullKeys: d.pullKeys, contested, baselineNext };
   }
 
   /**
