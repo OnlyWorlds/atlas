@@ -1783,6 +1783,8 @@ html {
 /* keel's stub (conv. 155): known of, its name, picture and description only. */
 .atlas-known-of-note { margin: 4px 0 10px; font-size: 12px; color: var(--atlas-text-muted); }
 .atlas-proposed-note { margin: 4px 0 10px; padding: 6px 10px; font-size: 12px; line-height: 1.45; color: var(--atlas-text); background: var(--atlas-warn-soft-tint); border: 1px solid var(--atlas-warn-soft-border); border-radius: 6px; max-width: 680px; }
+/* Hidden (conv. 170): a plain fact for its holder, so the neutral box, not the proposed warn tint. */
+.atlas-hidden-note { margin: 4px 0 10px; padding: 6px 10px; font-size: 12px; line-height: 1.45; color: var(--atlas-text); border: 1px solid var(--atlas-divider); border-radius: 6px; max-width: 680px; }
 /* A world's charter on Home (#526). */
 .atlas-home-charter { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--atlas-divider); border-radius: 6px; max-width: 680px; }
 .atlas-home-charter-label { display: block; font-size: 12px; color: var(--atlas-text-muted); margin-bottom: 2px; }

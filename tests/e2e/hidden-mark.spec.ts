@@ -62,9 +62,14 @@ test.describe('hidden, in a world on disk', () => {
     await expect(row('Wren').locator('[data-role="hidden-word"]')).toHaveText('Hidden');
     await expect(row('Ada').locator('[data-role="hidden-word"]')).toHaveCount(0);
 
-    // Its page: the glyph with the folder line.
+    // Its page: the folder line in a sentence under the name, and no glyph in the header,
+    // so the name keeps its room (Seethe h20 #11602); Ada's page says nothing.
     await go(`#/w/${wid}/element/${WREN}`);
-    await expect(page.locator('.atlas-middle-header [data-role="hidden-mark"]')).toHaveAttribute('aria-label', FOLDER_LINE);
+    await expect(page.locator('[data-role="hidden-note"]')).toHaveText(FOLDER_LINE);
+    await expect(page.locator('.atlas-middle-header [data-role="hidden-mark"]')).toHaveCount(0);
+    await go(`#/w/${wid}/element/${ADA}`);
+    await expect(page.locator('.atlas-middle-header [data-role="element-name"]')).toHaveText(/Ada/);
+    await expect(page.locator('[data-role="hidden-note"]')).toHaveCount(0);
 
     // Search.
     const cmdkInput = page.locator('.atlas-cmdk-input');

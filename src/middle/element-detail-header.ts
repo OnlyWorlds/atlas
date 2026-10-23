@@ -88,7 +88,12 @@ function wireRename(title: HTMLElement, el: Element): void {
   });
 }
 
-export function renderHeader(el: Element): HTMLElement {
+/**
+ * `hiddenNote`: the page says the hidden line in a sentence under the name, so the header
+ * leaves its glyph out and the name keeps its room beside a Location's map controls on a
+ * phone (Seethe's read of 1.86.0, h20 #11602). The writing workspace keeps the glyph.
+ */
+export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): HTMLElement {
   const header = document.createElement('div');
   header.className = 'atlas-middle-header';
 
@@ -139,7 +144,7 @@ export function renderHeader(el: Element): HTMLElement {
   const agentMark = buildAgentMark(el);
   if (agentMark) header.appendChild(agentMark);
   // Hidden on OnlyWorlds, said the same quiet way (keel #537).
-  const hiddenMark = buildHiddenMark(el);
+  const hiddenMark = opts.hiddenNote ? null : buildHiddenMark(el);
   if (hiddenMark) header.appendChild(hiddenMark);
 
   // B3: if zone-create (or another flow) signalled an auto-edit for this

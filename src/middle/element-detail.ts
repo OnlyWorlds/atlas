@@ -42,6 +42,7 @@ import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { proposedNoteFor } from './element-agent-mark';
+import { hiddenMarkLine } from '../core/hidden-mark';
 
 /**
  * Per-element scroll position memory. Survives re-renders (field edits, link
@@ -158,7 +159,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
   }
 
   function renderDetail(el: Element): void {
-    target.appendChild(renderHeader(el));
+    target.appendChild(renderHeader(el, { hiddenNote: true }));
 
     const body = document.createElement('div');
     body.className = 'atlas-middle-body';
@@ -183,6 +184,17 @@ export function mountElementDetail(target: HTMLElement): () => void {
       note.className = 'atlas-proposed-note';
       note.dataset.role = 'proposed-note';
       note.textContent = proposed;
+      detail.appendChild(note);
+    }
+    // Hidden (conv. 170): said in a sentence under the name too, so a hidden-only page has
+    // more than a glyph (Seethe's read of 1.86.0, h20 #11602); the header leaves the glyph out.
+    const st = getState();
+    const hiddenLine = hiddenMarkLine(el, st.registry.worlds.find(w => w.id === st.active?.worldId)?.state);
+    if (hiddenLine) {
+      const note = document.createElement('p');
+      note.className = 'atlas-hidden-note';
+      note.dataset.role = 'hidden-note';
+      note.textContent = hiddenLine;
       detail.appendChild(note);
     }
     body.appendChild(detail);

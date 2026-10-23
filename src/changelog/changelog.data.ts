@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.86.1',
+    date: '2026-10-23',
+    theme: 'A hidden element says it in a sentence',
+    entries: [
+      {
+        id: 'hidden-said-on-the-page',
+        title: 'A hidden element\'s page says so under its name',
+        body: 'The page of an element a world hides now says in a sentence who can see it, under its name, where a proposed element says what proposed means. The small eye in the header is gone from that page, so on a phone a long name keeps its room beside a location\'s map buttons.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.86.0',
     date: '2026-10-23',
     theme: 'What a world hides stays hidden',
