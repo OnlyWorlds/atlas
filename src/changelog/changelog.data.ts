@@ -67,6 +67,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['world'],
       },
       {
+        id: 'units-in-a-row',
+        title: 'Two of a world\'s settings saved in a row both stay shown',
+        body: 'Setting the length unit and then the mass unit in quick succession could leave the length field empty, and heights without their unit, until the world was opened again, although both were saved. The world\'s image and its clock had the same gap. Each now shows what was saved.',
+        tags: ['world'],
+      },
+      {
         id: 'proposed-read-again',
         title: 'A proposed element\'s page says it in fewer words',
         body: 'Its sentence says once that it is not part of the world, or its counts, until a keeper accepts it, and that a change made here is saved, or sent when the world is linked to onlyworlds.com. A lapsed proposal\'s word in the header is Lapsed, and on a phone the header leaves the word to the sentence so the name keeps its room.',

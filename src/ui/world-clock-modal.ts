@@ -17,7 +17,7 @@
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { showProblem } from './problem-fixes';
-import { getState, patchSlice } from '../core/state';
+import { getState, patchActiveMeta, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
@@ -112,7 +112,7 @@ export class WorldClockModal extends BaseModal {
     };
     try {
       await store.writeWorldMeta(patch);
-      patchSlice('active', { ...active, meta: { ...active.meta, ...patch } });
+      patchActiveMeta(active.worldId, patch);
       requestPushIfLinked();
       this.hide();
       this.toasts.success('World clock set');

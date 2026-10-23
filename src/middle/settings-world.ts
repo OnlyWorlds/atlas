@@ -6,7 +6,7 @@
  */
 
 import { typeName, aTypeName } from '../core/type-words';
-import { getState, patchSlice } from '../core/state';
+import { getState, patchActiveMeta, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { diskApiBlock, isSeatWorld, SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE, seatRoleWords, worldPin } from '../core/seat';
 import {
@@ -83,7 +83,7 @@ function renderUnitFields(viewOnly: boolean): string {
 }
 
 /** Each unit saves like the image URL: world.json, the active mirror, then the world-meta sync. */
-function wireUnitFields(world: WorldRegistryEntry, toasts: ToastManager): void {
+export function wireUnitFields(world: WorldRegistryEntry, toasts: ToastManager): void {
   document.querySelectorAll<HTMLInputElement>('.atlas-settings input[data-unit-field]').forEach((input) => {
     const field = input.dataset.unitField as WorldUnitField;
     input.addEventListener('change', () => {
@@ -96,7 +96,7 @@ function wireUnitFields(world: WorldRegistryEntry, toasts: ToastManager): void {
         if (!store || !active) { toasts.error('This world is not open. Open it from the sidebar, then try again.'); return; }
         try {
           await store.writeWorldMeta({ [field]: v });
-          patchSlice('active', { ...active, meta: { ...active.meta, [field]: v } });
+          patchActiveMeta(active.worldId, { [field]: v });
           requestPushIfLinked();
           toasts.info(v ? `${UNIT_ROWS[field].toast} saved` : `${UNIT_ROWS[field].toast} cleared`);
         } catch (err) {
@@ -375,7 +375,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       if (!store || !active) { toasts.error('This world is not open. Open it from the sidebar, then try again.'); return; }
       try {
         await store.writeWorldMeta({ image_url: v });
-        patchSlice('active', { ...active, meta: { ...active.meta, image_url: v } });
+        patchActiveMeta(active.worldId, { image_url: v });
         requestPushIfLinked();
         toasts.info(v ? 'World image saved' : 'World image cleared');
       } catch (err) {

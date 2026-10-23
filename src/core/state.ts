@@ -268,6 +268,19 @@ export function patchSlice<K extends keyof AppState>(key: K, value: AppState[K])
   notify();
 }
 
+/**
+ * Mirror a world.json write into the active world's meta, read as it stands
+ * when the write lands, never from a snapshot taken before the await: two saves
+ * in quick succession (one unit field, then the next on blur) each patched
+ * their own stale copy, and the later one dropped the earlier's value from the
+ * mirror while the disk held both (S460, the units field read empty on CI).
+ * A world opened meanwhile is left alone.
+ */
+export function patchActiveMeta(worldId: string, patch: Partial<WorldMeta>): void {
+  const now = state.active;
+  if (now?.worldId === worldId) patchSlice('active', { ...now, meta: { ...now.meta, ...patch } });
+}
+
 export function subscribe(fn: () => void): () => void {
   listeners.add(fn);
   return () => { listeners.delete(fn); };
