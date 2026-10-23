@@ -11,7 +11,7 @@ import {
   proposedMarkOf, isProposed, handsOnAsProposed, settledOf, proposedCount, keptOnCreate,
   proposedLine, proposedWord, proposedRowWord, todayDay,
 } from '../../src/core/review-mark';
-import { buildPagePayload, proposedLeftOut, proposedPageLine, type PayloadCircleBlock, type RelationToken } from '../../src/core/share-payload';
+import { buildPagePayload, proposedLeftOut, leftOutPageLine, type PayloadCircleBlock, type RelationToken } from '../../src/core/share-payload';
 import { stampedBody } from '../../src/store/sync-stamp';
 import type { Element } from '../../src/core/types';
 
@@ -126,8 +126,8 @@ describe('R4, a published page hands the world on', () => {
 
   it('the builder is told what publishing leaves out', () => {
     expect(proposedLeftOut(page(blocks), world()).sort()).toEqual(['Quill', 'the planted line']);
-    expect(proposedPageLine(page(blocks), world())).toBe('2 proposed and not yet reviewed (Quill, the planted line) are left out of the published page until a keeper accepts them.');
-    expect(proposedPageLine(page([blocks[0]]), world().filter(e => e.id !== SECRET))).toBe(null);
+    expect(leftOutPageLine(page(blocks), world())).toBe('2 proposed and not yet reviewed (Quill, the planted line) are left out of the published page until a keeper accepts them.');
+    expect(leftOutPageLine(page([blocks[0]]), world().filter(e => e.id !== SECRET))).toBe(null);
   });
 
   it('a proposed pin names the pin, never its settled element as proposed (gate F4)', () => {
@@ -140,12 +140,12 @@ describe('R4, a published page hands the world on', () => {
     ];
     const p = page([{ id: 'm', kind: 'map', mapId: MAP, pinIds: [PIN] }]);
     expect(proposedLeftOut(p, w)).toEqual(['a pin on Harbour']);
-    expect(proposedPageLine(p, w)).toBe('A pin on Harbour is proposed and not yet reviewed, so the published page leaves it out until a keeper accepts it.');
+    expect(leftOutPageLine(p, w)).toBe('A pin on Harbour is proposed and not yet reviewed, so the published page leaves it out until a keeper accepts it.');
   });
 
   it('a proposed page is not published at all, and says so (gate F3)', () => {
     const p = { ...page([blocks[0]]), x_review_proposed: MARK } as Element;
-    expect(proposedPageLine(p, world())).toBe('This page is proposed and not yet reviewed, so it can be published once a keeper accepts it.');
+    expect(leftOutPageLine(p, world())).toBe('This page is proposed and not yet reviewed, so it can be published once a keeper accepts it.');
   });
 });
 

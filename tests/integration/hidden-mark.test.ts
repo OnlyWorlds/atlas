@@ -2,8 +2,9 @@
  * keel #537 (PR 160, live 2026-10-22, Skeld h66 #9842): a body served to a reader who sees a
  * hidden element (the owner, a co-builder, its maker) carries `hidden: true` at the top level,
  * absent on every other body; echoed back in a write it is ignored. Atlas keeps it as keel's
- * word, like who wrote the element: never sent, never a difference anyone made, dropped on
- * import, and gone again when the owner unhides.
+ * word, like who wrote the element: never sent on an update, never a difference anyone made,
+ * and gone again when the owner unhides. Since 1.86 it is a folder key too (folder spec §4.8,
+ * conv. 170): kept on import and sent on a create, `tests/unit/hidden-handed-on.test.ts`.
  */
 import { describe, it, expect } from 'vitest';
 import { FakeDirHandle } from '../fixtures/fake-fs';

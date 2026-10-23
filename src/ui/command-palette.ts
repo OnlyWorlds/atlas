@@ -34,6 +34,7 @@ import type { Element, ElementType } from '../core/types';
 import { forPointer } from '../core/pointer';
 import { currentLore } from '../core/parlor-room';
 import { proposedMarkOf, proposedWord } from '../core/review-mark';
+import { hiddenMarkLine } from '../core/hidden-mark';
 
 const MAX_ELEMENT_RESULTS = 12;
 const MAX_ROOM_RESULTS = 3;
@@ -50,6 +51,8 @@ export interface PaletteResult {
   snippet?: string;
   /** "Proposed" for an element not yet reviewed (conv. 168). */
   proposed?: string;
+  /** The hidden mark's line (conv. 170), shown as the word Hidden with it as title. */
+  hidden?: string;
   score: number;
 }
 
@@ -132,6 +135,7 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     }
   }
 
+  const worldState = openWorldEntry()?.state;
   for (const el of elements) {
     // Pins/markers are map artifacts, not browse targets — the elements
     // sidebar excludes them, so the palette does too (see-all consistency).
@@ -143,8 +147,10 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     // A world's own word for the supertype has said it: "AI agent", never "AI agent · Agent".
     const taxonomy = [supertypeWord(el.type, superT) ? '' : superT, subT].filter(Boolean).join(' · ');
     const proposed = proposedMarkOf(el);
+    const hidden = hiddenMarkLine(el, worldState);
     out.push({
       ...(proposed ? { proposed: proposedWord(proposed) } : {}),
+      ...(hidden ? { hidden } : {}),
       kind: 'element',
       id: el.id,
       name: el.name?.trim() || '(unnamed)',
@@ -302,6 +308,14 @@ class CommandPalette extends BaseModal {
         word.className = 'atlas-row-proposed';
         word.dataset.role = 'proposed-word';
         word.textContent = r.proposed;
+        row.appendChild(word);
+      }
+      if (r.hidden) {
+        const word = document.createElement('span');
+        word.className = 'atlas-row-proposed atlas-row-hidden';
+        word.dataset.role = 'hidden-word';
+        word.title = r.hidden;
+        word.textContent = 'Hidden';
         row.appendChild(word);
       }
 

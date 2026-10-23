@@ -36,6 +36,7 @@ import { keyRefusalLine, seatRefusalLine } from './world-key-lines';
 import { rosterFor } from './world-roster';
 import { rosterIsShared, worldPullsOnOpen, worldSyncPolicy, type SyncPolicy } from './shared-world';
 import { keptEditsLine, keptLine, roleChangeLine } from './role-change';
+import { hiddenHeldLine, hiddenShownLine } from '../core/hidden-mark';
 import { deleteRefusedLine, proposalAcceptedLine, proposalSentLine } from './proposal-lines';
 import type { SyncResult } from '../core/types';
 
@@ -146,6 +147,8 @@ export function attachSyncEngine(
       }
       // A role that moved, and what this key no longer sees (B12 Q2, conv. 151).
       if (currentEngine === engine) void noteRoleNews(entry.id, folder, result);
+      // Hidden elements this key cannot put online, said once (conv. 170).
+      if (currentEngine === engine) noteHiddenHeld(entry.id, result);
       // What keel took as proposals, and what it settled (conv. 163).
       if (currentEngine === engine) void noteProposalNews(entry.id, folder, result);
       // Someone joined or left while the world is open, or keel had not
@@ -362,6 +365,21 @@ function toastFailuresOnce(
 const keptSets: Record<string, ReadonlySet<string>> = {};
 /** `<world>:<element>` whose kept edit was said this session. */
 const keptEditsSaid = new Set<string>();
+/** `<world>:<element>` whose hold (a hidden element this key cannot put online, conv. 170) was said this session. */
+const hiddenHeldSaid = new Set<string>();
+
+function noteHiddenHeld(worldId: string, result: SyncResult): void {
+  const name = getState().registry.worlds.find(w => w.id === worldId)?.name ?? 'this world';
+  const fresh = (ids: readonly string[], kind: string): boolean => {
+    if (!ids.some(id => !hiddenHeldSaid.has(`${worldId}:${kind}:${id}`))) return false;
+    for (const id of ids) hiddenHeldSaid.add(`${worldId}:${kind}:${id}`);
+    return true;
+  };
+  const held = result.hidden_held_ids ?? [];
+  if (fresh(held, 'held')) toastManager.show(hiddenHeldLine(name, held.length), 'info', 12000);
+  const shown = result.hidden_shown_ids ?? [];
+  if (fresh(shown, 'shown')) toastManager.show(hiddenShownLine(shown.length), 'info', 12000);
+}
 /**
  * The role a push's 404 said this session, per world, until the resync after
  * it (S440): that round's kept count is what the role line already promised

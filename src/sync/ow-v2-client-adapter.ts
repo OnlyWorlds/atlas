@@ -41,6 +41,7 @@ import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue, isWorldExtensio
 import { isKnownOf, refuseKnownOfBody, stubShape } from './known-of';
 import { OwProposed, proposalOf, type ProposalRow } from './proposals';
 import { PROPOSED_MARK } from '../core/review-mark';
+import { isHiddenMark } from '../core/hidden-mark';
 import { publicPageUrl } from '../core/public-page';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
@@ -135,7 +136,7 @@ export function isOwV2Error(err: unknown): err is OwV2Error {
  * `SERVER_AUTHOR_FIELDS` (`created_by`, `changed_by`, `changed_via`, `changed_client`) say who
  * wrote the element. Read-only: kept on disk as received, never sent (keel
  * ignores them on writes; atlas does not rely on that). `SERVER_MARK_FIELDS`
- * (keel's `hidden`) the same.
+ * (keel's `hidden`) the same on an update; a create sends it (§4.8, below).
  */
 const SERVER_MANAGED_FIELDS = new Set<string>(['type', 'world', 'created_at', 'updated_at', 'change_seq', ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS]);
 
@@ -209,6 +210,9 @@ export function toV2WireShape(
     if (op === 'update' && k === PROPOSED_MARK) continue;
     out[rename.get(k) ?? k] = v;
   }
+  // The hidden mark goes up on the create only (folder spec §4.8; keel #587 takes it there and ignores
+  // it on an update), as the boolean keel takes, so a push never publishes what the folder hides.
+  if (op === 'create' && isHiddenMark(body)) out.hidden = true;
   return out;
 }
 

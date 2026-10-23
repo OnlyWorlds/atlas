@@ -37,7 +37,7 @@ function completeKeepCopyIfBrowserWorld(): void {
 }
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine, detachSyncEngine } from '../sync/sync-attach';
-import { runRoute2, ambiguousLine, childClashLine } from '../sync/make-online-run';
+import { runRoute2, ambiguousLine, childClashLine, hiddenOnlineLine } from '../sync/make-online-run';
 import { SyncEngine } from '../sync/sync-engine';
 import {
   createApiWorld,
@@ -568,7 +568,8 @@ export class MakeOnlineModal extends BaseModal {
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
       const unmatched = ambiguousLine(mergeResult.ambiguous);
       const spatial = childClashLine(mergeResult.childClashes);
-      verb(`Linked to ${world.name || 'world'} · ${summary}${unmatched ? `. ${unmatched}` : ''}${spatial ? `. ${spatial}` : ''}${failureDetail ? `. ${failureDetail}` : ''}`);
+      const hiddenLeft = hiddenOnlineLine(mergeResult.hiddenOnline ?? []);
+      verb(`Linked to ${world.name || 'world'} · ${summary}${unmatched ? `. ${unmatched}` : ''}${spatial ? `. ${spatial}` : ''}${hiddenLeft ? `. ${hiddenLeft}` : ''}${failureDetail ? `. ${failureDetail}` : ''}`);
       // Files the id move could not open keep their old links (S367 gate B2),
       // said as the Settings re-key says it.
       if (mergeResult.unrewritten.length > 0) {

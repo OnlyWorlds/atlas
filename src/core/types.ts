@@ -287,6 +287,14 @@ export interface SyncState {
    */
   left_view?: string[];
   /**
+   * Hidden elements this key cannot put on OnlyWorlds (folder spec §4.8, conv.
+   * 170: keel #587 takes the mark on a create from the owner or a co-builder
+   * only), with what is anchored on them: never sent, and links to them stay in
+   * the copy. Worked out afresh each push round from the key's role, so a raise
+   * sends them. Cleared by resetSyncBaseline.
+   */
+  hidden_held?: string[];
+  /**
    * Ids whose whole copy was kept as last known when keel served them as a
    * stub on a walk no `view` reset started (conv. 155, I3; B12). A later view
    * reset never replaces them; the element arriving whole takes it out.
@@ -497,6 +505,10 @@ export interface SyncResult {
   kept?: number;
   /** Local edits to kept elements: they stay here, unsent (conv. 151). */
   kept_edit_ids?: string[];
+  /** Hidden elements held because the key cannot hide (conv. 170): said once per session. */
+  hidden_held_ids?: string[];
+  /** Hidden elements here whose id OnlyWorlds shows (conv. 170): nothing sent for them, said once. */
+  hidden_shown_ids?: string[];
   /** Edits keel took as proposals this round (conv. 163, P2): the keeper decides. */
   proposed_ids?: string[];
   /** Deletes keel kept for the keeper (`proposed_only`): each element is back (conv. 163, P6). */

@@ -227,6 +227,9 @@ export class FakeOwApiClient implements OwApiClient {
     // tests immediately (Convention #20). The fix is to bypass
     // prepareRelations in the adapter for these types.
     rejectDoubleSuffix(type, wireBody, 'create');
+    // keel #587, probed live S461: only the owner or a co-builder makes an element hidden; anyone
+    // else gets 403 `hidden_not_allowed` and nothing is made.
+    this.throwIfCannotHide(wireBody);
     // Real OW behavior: ignore client-sent id when assignServerIds=true.
     const id = this.assignServerIds ? cryptoRandomId() : (wireBody.id as string) ?? cryptoRandomId();
     this.throwIfInjected('create', id);
@@ -277,7 +280,9 @@ export class FakeOwApiClient implements OwApiClient {
       this.proposalRows.set(row.id, row);
       throw new OwProposed({ ...row });
     }
-    const next: ServerRecord = { ...existing, ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
+    // keel #587 (probed live S461): an update ignores `hidden` both ways; only the site's Hide moves it.
+    const { hidden: _ignored, ...patch } = wireBody;
+    const next: ServerRecord = { ...existing, ...patch, ...this.writeDoor, id, type, updated_at: this.clock() };
     m.set(id, next);
     this.appendUpsert(next);
     return { ...next };
@@ -584,6 +589,14 @@ export class FakeOwApiClient implements OwApiClient {
       if (this.outOfView.has(id)) {
         anyError = true;
         results.push({ status: 404, id, error: { code: 'not_found', message: `${it.type} '${id}' not found.`, param: null } as V2ItemError });
+        wireBodies.push(null);
+        continue;
+      }
+      // keel #587 (probed live S461): a hidden item from a key that cannot hide is 403, and an atomic
+      // batch then makes nothing.
+      if (wireBody.hidden === true && !this.canHide()) {
+        anyError = true;
+        results.push({ status: 403, id, error: { code: 'hidden_not_allowed', message: "Only the world's owner and its co-builders can create an element hidden.", param: null } as V2ItemError });
         wireBodies.push(null);
         continue;
       }
@@ -906,6 +919,21 @@ export class FakeOwApiClient implements OwApiClient {
       Error & { status?: number; code?: string; param?: string | null };
     err.status = 403;
     err.code = code;
+    err.param = null;
+    throw err;
+  }
+
+  /** keel #587: the owner (no member seat set) or a co-builder may make an element hidden. */
+  private canHide(): boolean {
+    return this.memberRole === null || this.memberRole === 'co_builder';
+  }
+
+  private throwIfCannotHide(body: Record<string, unknown>): void {
+    if (body.hidden !== true || this.canHide()) return;
+    const err = new Error("API Error 403: Only the world's owner and its co-builders can create an element hidden. Nothing was created: leave hidden out, or ask a keeper.") as
+      Error & { status?: number; code?: string; param?: string | null };
+    err.status = 403;
+    err.code = 'hidden_not_allowed';
     err.param = null;
     throw err;
   }

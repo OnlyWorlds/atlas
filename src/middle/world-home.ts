@@ -57,6 +57,7 @@ import type { ChartConfig } from '../visualization/timeline/types';
 import { downloadLabel, isPartialSlice, partialSliceNote } from '../core/provenance';
 import { currentLore, roomCount } from '../core/parlor-room';
 import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
+import { hiddenRowWord } from '../core/hidden-mark';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -686,6 +687,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   const firstElement = content.length === 1 ? content[0] : null;
 
   if (continueRows.length > 0) {
+    const worldState = getState().registry.worlds.find(w => w.id === worldId)?.state;
     const section = document.createElement('section');
     section.className = 'atlas-home-continue';
     const title = document.createElement('h2');
@@ -702,6 +704,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         <span class="atlas-home-continue-verb">${row.verb}</span>
         <span class="atlas-home-continue-name">${escapeText(row.el.name || '(unnamed)')}</span>
         ${proposedRowWord(row.el)}
+        ${hiddenRowWord(row.el, worldState)}
         <span class="atlas-home-continue-kind">${escapeText(typeName(row.el.type, { supertype: row.el.supertype }))}</span>
         <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;

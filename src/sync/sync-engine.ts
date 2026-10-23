@@ -37,6 +37,8 @@ import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store
 import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
+import { hiddenHeldOf } from './hidden-held';
+import { isHiddenMark } from '../core/hidden-mark';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
 import { isKnownOf, knownOfMove, stubShape } from './known-of';
 import type {
@@ -563,6 +565,10 @@ export class SyncEngine {
   private roundKept: ReadonlySet<string> = new Set();
   /** What the running push found out of a guest's view (a 404, a peer keel says does not exist): kept at its end. */
   private roundKeptAdd: string[] = [];
+  /** Creates keel refused with `hidden_not_allowed` this round (conv. 170): held, never a failure. */
+  private roundHiddenRefused: string[] = [];
+  /** Hidden locals whose id OnlyWorlds shows (conv. 170): not adopted, said once. */
+  private roundHiddenShown: string[] = [];
   /** The role as the running push read it, afresh once per round (S439 gates G1, H1): a lowering while open moves it. */
   private roundRole: Promise<string | null> | null = null;
 
@@ -586,6 +592,13 @@ export class SyncEngine {
   private async marksPossible(): Promise<boolean> {
     const role = await this.roundRoleNow();
     return role !== null && role !== 'owner' && role !== 'co_builder';
+  }
+
+  /** conv. 170: the never-sent elements this key cannot put online, when it cannot hide; none otherwise, or while the role is unknown (keel's 403 then says it). */
+  private async hiddenHeldNow(creates: Element[]): Promise<Set<string>> {
+    if (!creates.some(isHiddenMark)) return new Set();
+    if (!hiddenCanBeDenied(await this.roundRoleNow())) return new Set();
+    return hiddenHeldOf(creates);
   }
 
   private ownRole(fresh = false): Promise<string | null> {
@@ -977,6 +990,13 @@ export class SyncEngine {
   }
 
   private async adoptServerCopy(local: Element, remote: { updated_at: string } & Record<string, unknown>): Promise<void> {
+    // conv. 170: a hidden local whose id OnlyWorlds shows is not adopted, or its content would go up as
+    // an update onto what every member sees (the S461 gate's F2). It stays here, said once, until hidden there.
+    if (isHiddenMark(local) && !isHiddenMark(remote) && !sameWireContent(local, remote)) {
+      this.roundHiddenShown.push(local.id);
+      console.info('[atlas:sync] a hidden element here is shown online under its id — not adopted, nothing sent', { id: local.id });
+      return;
+    }
     await this.folder.stampServerUpdatedAt(
       local.id, local.type as ElementType, remote.updated_at,
       sameWireContent(local, remote) ? (local.local_updated_at as string | undefined) : null,
@@ -2083,6 +2103,13 @@ export class SyncEngine {
         // could adopt belongs to another world (re-key gate, lens 2 F3).
         foreign.push({ id, type: item.type });
       }
+      // keel would not make it hidden for this key (conv. 170): held, never a failure.
+      if (errObj.code === 'hidden_not_allowed') {
+        this.roundHiddenRefused.push(item.element.id as string);
+        console.info('[atlas:sync] bulk item hidden_not_allowed — held here', { id: item.element.id });
+        onItemDone();
+        continue;
+      }
       // A 404 item names an id hidden from this key (keel's /bulk, Skeld h29
       // #8254): kept, never sent again (S441 gate G10).
       if ((res?.status === 404 || errObj.code === 'not_found') && hiddenCanBeDenied(await this.roundRoleNow())) {
@@ -2268,11 +2295,17 @@ export class SyncEngine {
     // A kept id with no baseline (a hidden element's copy after a Keep, or a
     // create keel answered 404; S441 gate G1, G10) is never sent: it is not a
     // create, it is something this key may no longer see.
+    this.roundRole = null;
+    this.roundHiddenRefused = [];
+    this.roundHiddenShown = [];
     const stateAtStart = await this.folder.readSyncState();
     const keptAtStart = new Set(stateAtStart.kept_outside_view ?? []);
     // keel's stub is never pushed (conv. 155, I4): the store never lists one as changed (gate G9).
     const keptCreates = allChanged.filter(e => !e.server_updated_at && keptAtStart.has(e.id));
-    const allCreates = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id));
+    // A hidden element this key cannot put online (folder spec §4.8, conv. 170) is held with what is
+    // anchored on it: worked out from the key's role each round, never sent, said once.
+    const hiddenHeld = await this.hiddenHeldNow(allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id)));
+    const allCreates = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id));
     // A version keel holds as a proposal is sent once (conv. 163, P3): an edit after it is a new version.
     // A proposal keel did not take waits in the review: its edit is not sent again on its own (P5).
     const inProposalReview = new Set((stateAtStart.conflicts ?? []).filter(c => c.proposal).map(c => c.element_id));
@@ -2324,12 +2357,12 @@ export class SyncEngine {
     const pushState = await this.folder.readSyncState();
     const kept = new Set(pushState.kept_outside_view ?? []);
     this.roundKept = kept;
-    this.roundLinkHeld = linkHeld(pushState);
+    // This round's hold, not the last round's: a raise sends them now, links and all.
+    this.roundLinkHeld = linkHeld({ ...pushState, hidden_held: [...hiddenHeld] });
     this.roundKeptAdd = [];
-    this.roundRole = null;
     const keptAdd = this.roundKeptAdd;
     const keptEdits: string[] = keptCreates.map(e => e.id);
-    done += keptCreates.length + heldAsProposed.length;
+    done += keptCreates.length + heldAsProposed.length + hiddenHeld.size;
     /** Elements whose edit keel took as a proposal this round (conv. 163, P2), for the round's report. */
     const proposedIds: string[] = [];
     /** Deletes keel refused as `proposed_only`, each element back from keel (P6). */
@@ -2550,6 +2583,11 @@ export class SyncEngine {
         // server. Record the element as failed so the user knows the round
         // produced no progress; caller (runPushOnly/runSync) transitions
         // engine state to `error` based on the auth_blocked flag.
+        // keel would not make it hidden for this key (conv. 170): held here, said once, never a failure.
+        else if (isCreate && isHiddenRefusal(err)) {
+          this.roundHiddenRefused.push(elem.id);
+          console.info('[atlas:sync] push: keel will not make a hidden element for this key — held here', { id: elem.id });
+        }
         else if (isAuthError(err)) {
           authBlocked = true;
           this.noteAuthBail(err);
@@ -2785,7 +2823,9 @@ export class SyncEngine {
           const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id) && !keptIds.has(d.id));
           const deletesPart = fresh.length > 0 || existing.length !== (curr.server_deletes ?? []).length
             ? { server_deletes: [...existing, ...fresh] } : {};
-          return { last_push_at: roundNow, ...foreignNext, ...keptPart, ...deletesPart };
+          const heldNow = [...new Set([...hiddenHeld, ...this.roundHiddenRefused])];
+          const heldPart = heldNow.length > 0 || (curr.hidden_held?.length ?? 0) > 0 ? { hidden_held: heldNow } : {};
+          return { last_push_at: roundNow, ...foreignNext, ...keptPart, ...deletesPart, ...heldPart };
         });
       } catch (err) {
         // A cloud client re-uploading `.atlas/sync-state.json` each round
@@ -2819,6 +2859,8 @@ export class SyncEngine {
       auth_blocked: authBlocked || undefined,
       ...(transient ? transientFields(transient) : {}),
       ...(keptEdits.length > 0 ? { kept_edit_ids: keptEdits } : {}),
+      ...hiddenHeldReport(allChanged, hiddenHeld, this.roundHiddenRefused),
+      ...(this.roundHiddenShown.length > 0 ? { hidden_shown_ids: [...new Set(this.roundHiddenShown)] } : {}),
       ...(roundRole !== null ? { own_role: roundRole } : {}),
       ...(proposedIds.length > 0 ? { proposed_ids: proposedIds } : {}),
       ...(refusedDeletes.length > 0 ? { delete_refused: refusedDeletes } : {}),
@@ -3842,7 +3884,7 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result; the latest phase's role wins. */
-function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted'> {
+function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted' | 'hidden_held_ids' | 'hidden_shown_ids'> {
   const role = parts.map(p => p.own_role).filter(r => r !== undefined).pop();
   const kept = parts.reduce((n, p) => n + (p.kept ?? 0), 0);
   const edits = [...new Set(parts.flatMap(p => p.kept_edit_ids ?? []))];
@@ -3850,6 +3892,8 @@ function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept
   const proposed = [...new Set(parts.flatMap(p => p.proposed_ids ?? []))];
   const refused = parts.flatMap(p => p.delete_refused ?? []);
   const accepted = [...new Set(parts.flatMap(p => p.proposals_accepted ?? []))];
+  const hiddenHeld = [...new Set(parts.flatMap(p => p.hidden_held_ids ?? []))];
+  const hiddenShown = [...new Set(parts.flatMap(p => p.hidden_shown_ids ?? []))];
   return {
     ...(role !== undefined ? { own_role: role } : {}),
     ...(kept > 0 ? { kept } : {}),
@@ -3857,6 +3901,8 @@ function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept
     ...(proposed.length > 0 ? { proposed_ids: proposed } : {}),
     ...(refused.length > 0 ? { delete_refused: refused } : {}),
     ...(accepted.length > 0 ? { proposals_accepted: accepted } : {}),
+    ...(hiddenHeld.length > 0 ? { hidden_held_ids: hiddenHeld } : {}),
+    ...(hiddenShown.length > 0 ? { hidden_shown_ids: hiddenShown } : {}),
   };
 }
 
@@ -3894,9 +3940,21 @@ function hiddenCanBeDenied(role: string | null): boolean {
   return role === 'contributor' || role === 'guest';
 }
 
-/** The ids whose links stay in the copy and never go out: kept (conv. 151) and left the view (`left_view`). */
-function linkHeld(s: { kept_outside_view?: string[]; left_view?: string[] }): Set<string> {
-  return new Set([...(s.kept_outside_view ?? []), ...(s.left_view ?? [])]);
+/** The ids whose links stay in the copy and never go out: kept (conv. 151), left the view (`left_view`), and held hidden (conv. 170). */
+function linkHeld(s: { kept_outside_view?: string[]; left_view?: string[]; hidden_held?: string[] }): Set<string> {
+  return new Set([...(s.kept_outside_view ?? []), ...(s.left_view ?? []), ...(s.hidden_held ?? [])]);
+}
+
+/** keel's refusal to make an element hidden for this key (403 `hidden_not_allowed`, keel #587; conv. 170). */
+export function isHiddenRefusal(err: unknown): boolean {
+  const t = typedError(err);
+  return !!t && t.status === 403 && t.code === 'hidden_not_allowed';
+}
+
+/** The hidden elements a round held (the anchored ones ride along unsaid), for the line said once (conv. 170). */
+function hiddenHeldReport(changed: readonly Element[], held: ReadonlySet<string>, refused: readonly string[]): Pick<SyncResult, 'hidden_held_ids'> {
+  const ids = [...new Set([...changed.filter(e => held.has(e.id) && isHiddenMark(e)).map(e => e.id), ...refused])];
+  return ids.length > 0 ? { hidden_held_ids: ids } : {};
 }
 
 /**
@@ -3961,6 +4019,8 @@ export function isAuthError(err: unknown): boolean {
     // the key (#104): a contributor seat changing someone else's element, any
     // seat changing the world's details. The round goes on without it.
     if (memberRefusal(err)) return false;
+    // keel would not make one element hidden for this key (conv. 170): about the element, not the key.
+    if (t.code === 'hidden_not_allowed') return false;
     return t.status === 401 || t.status === 403
       || t.code === 'invalid_credentials' || t.code === 'key_revoked';
   }

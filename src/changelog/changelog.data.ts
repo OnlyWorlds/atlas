@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.86.0',
+    date: '2026-10-23',
+    theme: 'What a world hides stays hidden',
+    entries: [
+      {
+        id: 'hidden-in-a-folder',
+        title: 'An element a world hides says so, in every world',
+        body: 'A world file or an import can mark an element hidden: a secret a converter brought over, or one hidden on onlyworlds.com. Atlas now keeps the mark when it imports, and shows the element to you with the word Hidden in the element list, on Home and on its page, in a world on your disk or in this browser too, not only one linked to onlyworlds.com.',
+        tags: ['world'],
+      },
+      {
+        id: 'hidden-left-off-the-page',
+        title: 'A published page leaves hidden elements out',
+        body: 'Publishing a page leaves out what the world hides, from every block, as it leaves out what an agent proposed, and the page builder says how many and which. A hidden page is not published. Downloading the world keeps them: a world file is your own copy.',
+        tags: ['pages'],
+      },
+      {
+        id: 'hidden-goes-up-hidden',
+        title: 'A hidden element goes online hidden, or not at all',
+        body: 'Making a world online, or syncing a new element, sends a hidden element as hidden, so only the owner, co-builders and whoever made it see it there. onlyworlds.com lets only the owner and co-builders make one hidden, so with another key it stays here, with anything placed on it, and Atlas says so once. A hidden element that onlyworlds.com shows under the same id is left as it is until it is hidden there.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.85.0',
     date: '2026-10-23',
     theme: 'A world\'s public page, one tap away',

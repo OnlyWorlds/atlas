@@ -27,6 +27,7 @@
  */
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import type { Element, ElementType } from '../core/types';
+import { isHiddenMark } from '../core/hidden-mark';
 
 export type ServerRec = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -47,6 +48,11 @@ export interface MergePlan {
   childClashes: Array<{ type: ElementType; name: string }>;
   /** A server record whose id is a local element of ANOTHER type: never downloaded (it would overwrite that file). */
   idClashes: Array<{ id: string; localType: ElementType; serverType: ElementType }>;
+  /**
+   * Hidden locals whose id is an element OnlyWorlds shows (folder spec §4.8, conv. 170): neither sent
+   * (the content would go up shown) nor downloaded over (the folder's own copy stays).
+   */
+  hiddenOnline: Array<{ id: string; type: ElementType; name: string }>;
 }
 
 /** The name-match key: NFC, trimmed, lower-cased; inner whitespace untouched. Non-strings give ''. */
@@ -95,6 +101,7 @@ export function planMerge(
     ambiguous: [],
     childClashes: [],
     idClashes: [],
+    hiddenOnline: [],
   };
 
   // Server records in their canonical order, with a per-type id index.
@@ -120,9 +127,16 @@ export function planMerge(
   // Pass 1, id: over ALL locals before any name matching (the H10 fix).
   const localMatch = new Map<Element, ServerRec>();
   const matchedServers = new Set<ServerRec>();
+  const heldLocals = new Set<Element>();
   for (const local of locals) {
     const server = serverIdIndex.get(local.type)?.get(local.id);
     if (!server || matchedServers.has(server)) continue;
+    if (isHiddenMark(local) && !isHiddenMark(server)) {
+      plan.hiddenOnline.push({ id: local.id, type: local.type, name: typeof local.name === 'string' ? local.name.trim() : '' });
+      heldLocals.add(local);
+      matchedServers.add(server);
+      continue;
+    }
     localMatch.set(local, server);
     matchedServers.add(server);
   }
@@ -146,7 +160,8 @@ export function planMerge(
   if (opts.matchByName) {
     const localsByKey = new Map<string, Element[]>();
     for (const local of locals) {
-      if (localMatch.has(local)) continue;
+      // A hidden element is never matched by name: matched, its content would go up onto a shown one (conv. 170).
+      if (localMatch.has(local) || heldLocals.has(local) || isHiddenMark(local)) continue;
       const key = normalizeMatchName(local.name);
       if (!key) continue;
       const bucketKey = `${local.type}\u0000${key}`;
@@ -235,6 +250,7 @@ export function planMerge(
   // Local-side lists, in input order.
   const pairedServers = new Set<ServerRec>();
   for (const local of locals) {
+    if (heldLocals.has(local)) continue;
     const byId = localMatch.get(local);
     if (byId) {
       plan.sameId.push({ local, server: byId, type: local.type });

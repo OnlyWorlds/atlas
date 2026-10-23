@@ -42,8 +42,7 @@ import {
 import { renderBlockView, renderPayloadPage, populatedCardFields, setBuilderCharts } from './share-page-render';
 import { mountAgentMarkSlot } from './element-agent-mark';
 import type { ChartConfig } from '../visualization/timeline/types';
-import { buildPagePayload, proposedPageLine } from '../core/share-payload';
-import { handsOnAsProposed } from '../core/review-mark';
+import { buildPagePayload, leftOutPageLine, pageNotPublishedLine } from '../core/share-payload';
 import {
   SharingClient, SharingApiError, sharingErrorMessage,
   isValidSlug, suggestSlug, publicUrlFor, type SharedPageRow,
@@ -82,17 +81,18 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   let lastBuiltElementsRef: readonly Element[] | null = null;
   let pageTitleHandle: EditableTitleHandle | null = null;  // detail header title (sync on tick)
   let pageAgentMark: ReturnType<typeof mountAgentMarkSlot> | null = null;  // the quiet agent mark (sync on tick)
-  let proposedNote: HTMLElement | null = null;  // what publishing leaves out as proposed (conv. 168; sync on tick)
+  let proposedNote: HTMLElement | null = null;  // what publishing leaves out, proposed or hidden (conv. 168, 170; sync on tick)
   function syncProposedNote(page: Element): void {
     if (!proposedNote) return;
-    const line = proposedPageLine(page, getState().data.elements, pageCharts);
+    const line = leftOutPageLine(page, getState().data.elements, pageCharts);
     if (proposedNote.textContent !== (line ?? '')) proposedNote.textContent = line ?? '';
     proposedNote.hidden = line === null;
   }
-  /** A proposed page is not published (conv. 168, gate F3): said, and nothing sent. */
+  /** A proposed or hidden page is not published (conv. 168 gate F3, conv. 170): said, and nothing sent. */
   function refuseProposedPage(page: Element): boolean {
-    if (!handsOnAsProposed(page)) return false;
-    toasts.info(proposedPageLine(page, getState().data.elements, pageCharts) ?? '');
+    const line = pageNotPublishedLine(page);
+    if (!line) return false;
+    toasts.info(line);
     return true;
   }
   // A view-only world reads its pages: each opens in the visitor preview, with

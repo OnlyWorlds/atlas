@@ -30,6 +30,7 @@ import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
 import { isKnownOf } from './known-of';
+import { isHiddenMark } from '../core/hidden-mark';
 import { isOwProposed, withProposed } from './proposals';
 import { slicePushRefusal } from '../core/provenance';
 
@@ -189,6 +190,14 @@ export interface MergeResult {
   unrewritten: string[];
   /** Server records not downloaded because a local element of another type has the id. */
   idClashes: Array<{ id: string; localType: ElementType; serverType: ElementType }>;
+  /** Hidden here, shown online under the same id (conv. 170): left as they are, nothing sent. */
+  hiddenOnline: Array<{ id: string; type: ElementType; name: string }>;
+}
+
+/** Make online's refusal for a key that cannot hide, with hidden elements in the folder (conv. 170). */
+export function hiddenRouteRefusal(n: number): string {
+  const what = n === 1 ? 'a hidden element' : `${n} hidden elements`;
+  return `This world holds ${what}, and only the owner and co-builders of the online world can put a hidden element there. Link with the owner's key or a co-builder's, and nothing is sent until then.`;
 }
 
 export interface MergeOpts {
@@ -277,6 +286,15 @@ export async function mergeLocalIntoApi(
   const sliceRefusal = slicePushRefusal(sliceMeta, String(sliceMeta?.name ?? 'this world'));
   if (sliceRefusal) throw new MergeRefusedError(sliceRefusal);
 
+  // A hidden element goes up hidden or not at all (folder spec §4.8, conv. 170): keel makes one hidden
+  // for the owner or a co-builder only, so any other key is told before anything is sent.
+  const locals = (await folder.listElements()).filter(e => !isKnownOf(e));
+  const hiddenHere = locals.filter(isHiddenMark).length;
+  if (hiddenHere > 0 && adapter.me) {
+    const role = await adapter.me().then(r => r.role, () => null);
+    if (role === 'contributor' || role === 'guest') throw new MergeRefusedError(hiddenRouteRefusal(hiddenHere));
+  }
+
   // 1. List all server elements (one fetch per type).
   const serverByType = new Map<ElementType, ServerRec[]>();
   let serverTotalForList = 0;
@@ -289,7 +307,7 @@ export async function mergeLocalIntoApi(
 
   // 2. Plan. Nothing is written yet.
   // keel's stubs stay out of the merge: never a create or an update (conv. 155, I4).
-  const plan = planMerge((await folder.listElements()).filter(e => !isKnownOf(e)), serverByType, { matchByName });
+  const plan = planMerge(locals, serverByType, { matchByName });
 
   // 3. Local ids onto the server's ids, journaled. A throw here leaves the
   // journal (the server has not been touched) and propagates.
@@ -619,7 +637,7 @@ export async function mergeLocalIntoApi(
   // (`make-online-run.ts`): a link step that throws leaves a rerun to come.
   return {
     ...counts, failures, ambiguous: plan.ambiguous, childClashes: plan.childClashes,
-    rekeyed, unrewritten, idClashes: plan.idClashes,
+    rekeyed, unrewritten, idClashes: plan.idClashes, hiddenOnline: plan.hiddenOnline,
   };
 }
 

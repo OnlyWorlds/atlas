@@ -56,7 +56,6 @@ const STRIP_ALWAYS = new Set([
   ...SERVER_AUTHOR_FIELDS, // who wrote it in the SOURCE world (created_by,
                    // changed_by, changed_via): names nobody in the world
                    // being imported into
-  ...SERVER_MARK_FIELDS, // keel's hidden mark, about the source world's reader
   'local_updated_at',
   'server_updated_at',
   // Published-state mirror — meaningless (and misleading: it claims a slug owned
@@ -64,6 +63,9 @@ const STRIP_ALWAYS = new Set([
   // it; the imported copy is unpublished until the user publishes it here.
   'atlas_page_pub',
 ]);
+
+/** keel's hidden mark, kept on import (folder spec §4.8; `src/core/hidden-mark.ts`). */
+const HIDDEN_KEYS = new Set<string>(SERVER_MARK_FIELDS);
 
 /** Spatial fields not always present in FIELD_SCHEMA but essential to keep. */
 const SPATIAL_SAFE = new Set(['x', 'y', 'z', 'order', 'element_type']);
@@ -105,7 +107,9 @@ export function normalizeRecord(
     // round-trips them verbatim, so custom fields survive import instead of
     // being silently dropped (D9 enablement). atlas_page_pub stays stripped
     // via STRIP_ALWAYS above.
-    const keep = known.has(k) || isExtensionField(k) || (isSpatial && SPATIAL_SAFE.has(k));
+    // The hidden mark is a folder key since §4.8 (RULED 2026-10-23): what the
+    // source hid stays hidden, kept as the file wrote it, a key atlas does not own.
+    const keep = known.has(k) || isExtensionField(k) || HIDDEN_KEYS.has(k) || (isSpatial && SPATIAL_SAFE.has(k));
     if (!keep) {
       if (opts.keepUnknown) {
         record[k] = v;

@@ -36,6 +36,7 @@ import { renderGate } from '../ui/render-gate';
 import { madeByOf, rosterHasAgent, rosterKinds, type MadeBy } from '../core/made-by';
 import { currentLore, isRoomElement } from '../core/parlor-room';
 import { isProposed, proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
+import { hiddenRowWord } from '../core/hidden-mark';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
@@ -967,6 +968,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       }
     }
 
+    const worldState = state.registry.worlds.find(w => w.id === state.active?.worldId)?.state;
     listEl.innerHTML = filtered
       .map(el =>
         renderElementRow(
@@ -978,6 +980,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
           knownSet ? !knownSet.has(el.id) : false,
           tourFreshIds.has(el.id) && isTourFlagActive(),
           diskMarked.has(el.id),
+          worldState,
         ),
       )
       .join('');
@@ -1048,6 +1051,7 @@ function renderElementRow(
   lensDimmed: boolean,
   tourFresh = false,
   diskChanged = false,
+  worldState?: string,
 ): string {
   const icon = ELEMENT_ICONS[el.type] ?? 'category';
   const cls = ['atlas-row', selected ? 'selected' : '', lensDimmed ? 'atlas-row-lens-dim' : '']
@@ -1104,6 +1108,7 @@ function renderElementRow(
       ${reservedBadge}
       ${styleBadge}
       ${proposedRowWord(el)}
+      ${hiddenRowWord(el, worldState)}
       <span class="atlas-row-meta">${escapeText(typeName(el.type, { supertype: el.supertype }))}</span>
     </div>
   `;

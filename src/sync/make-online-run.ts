@@ -139,6 +139,20 @@ export function ambiguousLine(ambiguous: MergeResult['ambiguous']): string | nul
 }
 
 /**
+ * The toast's line about hidden elements whose id OnlyWorlds shows (conv. 170):
+ * left as they are, nothing sent. Same shape as `ambiguousLine`.
+ */
+export function hiddenOnlineLine(held: MergeResult['hiddenOnline']): string | null {
+  if (held.length === 0) return null;
+  const names = held.slice(0, 3).map(h => h.name || 'unnamed');
+  const rest = held.length - names.length;
+  const list = names.join(', ') + (rest > 0 ? ` and ${rest} more` : '');
+  return held.length === 1
+    ? `${list} is hidden here and shown online under the same id, so it was left as it is: hide it on OnlyWorlds first`
+    : `${held.length} hidden here are shown online under the same ids (${list}), so they were left as they are: hide them on OnlyWorlds first`;
+}
+
+/**
  * The toast's line about maps and zones left unmatched because the local and
  * the online one both have pins or markers on them (gate A4/A5, Captain's
  * ruling 2026-10-04). Same shape as `ambiguousLine`.
