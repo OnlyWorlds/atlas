@@ -52,6 +52,9 @@ interface V2ItemError {
   param: string | null;
 }
 
+/** The membership keel names in a seat's proposed mark, in the fake. */
+export const FAKE_SEAT_ID = 'seat-0001';
+
 export class FakeOwApiClient implements OwApiClient {
   private clock = () => new Date().toISOString();
   /** keel #519 seam (`__propose_writes`): a seat on a reviewed world. */
@@ -239,6 +242,9 @@ export class FakeOwApiClient implements OwApiClient {
       throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
     }
     const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
+    // keel #565, as probed live (S459): a seat's new element on a reviewed world carries the mark,
+    // and the 201 answers with it.
+    if (this.proposeWrites) record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' };
     this.bucket(type).set(id, record);
     if (this.proposeWrites) this.seatMade.add(id);
     this.appendUpsert(record);
@@ -344,6 +350,24 @@ export class FakeOwApiClient implements OwApiClient {
     m.set(row.element_id, next);
     this.appendUpsert(next);
     row.state = 'accepted';
+  }
+
+  /**
+   * keel #565's review route for a new element written as proposed: accept writes
+   * the mark null (a write, the stamp moves, a feed row); decline deletes it.
+   */
+  __review_new_element(type: ElementType, id: string, decision: 'accept' | 'decline'): void {
+    const m = this.bucket(type);
+    const existing = m.get(id);
+    if (!existing || existing.x_review_proposed == null) throw new Error(`not_proposed ${id}`);
+    if (decision === 'decline') {
+      m.delete(id);
+      this.appendDelete(type, id);
+      return;
+    }
+    const next: ServerRecord = { ...existing, x_review_proposed: null, updated_at: this.clock() };
+    m.set(id, next);
+    this.appendUpsert(next);
   }
 
   __decline_proposal(proposalId: string, reason?: string): void {
@@ -595,6 +619,8 @@ export class FakeOwApiClient implements OwApiClient {
       const type = items[i].type;
       const id = results[i].id;
       const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
+      // keel's bulk marks a seat's new element too, and its slot echoes only the time (S459 gate F1).
+      if (this.proposeWrites) { record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' }; this.seatMade.add(id); }
       this.bucket(type).set(id, record);
       this.appendUpsert(record);
       if (!this.omitBulkTimestamps) results[i].updatedAt = record.updated_at;

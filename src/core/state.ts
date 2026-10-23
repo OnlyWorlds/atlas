@@ -129,6 +129,11 @@ export interface UiState {
   madeBy: MadeBy | null;
   /** The whole views hide the parlor's room (core/parlor-room.ts `loreElements`): on by default (1.76), back on at a world switch. */
   hideRoom: boolean;
+  /**
+   * The list shows only proposed elements (core/review-mark.ts, conv. 168): the id of the world it
+   * was asked in, so it applies only there and no way of opening another world can strand it.
+   */
+  proposedOnly: string | null;
   search: string;
   /** Right-pane tabs (always begins with implicit map-index; additional are maps). */
   rightTabs: RightTabRef[];
@@ -226,6 +231,7 @@ let state: AppState = {
     mutedTypes: new Set(DEFAULT_MUTED_TYPES),
     madeBy: null,
     hideRoom: true,
+    proposedOnly: null,
     search: '',
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,

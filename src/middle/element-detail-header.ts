@@ -48,7 +48,7 @@ import { getMapsSettings } from '../registry/registry';
 import { escapeText } from '../core/dom-utils';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { filesWhereOf } from '../core/browser-worlds';
-import { buildAgentMark, buildHiddenMark } from './element-agent-mark';
+import { buildAgentMark, buildHiddenMark, buildProposedMark } from './element-agent-mark';
 
 /**
  * Pending "auto-edit on next render" signal. When set to an element id, the
@@ -132,6 +132,9 @@ export function renderHeader(el: Element): HTMLElement {
   if (!viewOnly) wireRename(title, el);
   header.appendChild(title);
 
+  // Proposed, not yet reviewed: a word, since a keeper has to see it (conv. 168).
+  const proposedMark = buildProposedMark(el);
+  if (proposedMark) header.appendChild(proposedMark);
   // Last changed by an agent, said quietly (#347).
   const agentMark = buildAgentMark(el);
   if (agentMark) header.appendChild(agentMark);

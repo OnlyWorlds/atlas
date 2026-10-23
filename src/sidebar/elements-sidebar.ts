@@ -35,6 +35,7 @@ import { isCoarsePointer } from '../core/pointer';
 import { renderGate } from '../ui/render-gate';
 import { madeByOf, rosterHasAgent, rosterKinds, type MadeBy } from '../core/made-by';
 import { currentLore, isRoomElement } from '../core/parlor-room';
+import { isProposed, proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
@@ -60,6 +61,7 @@ export function filterSummary(
   muted: ReadonlySet<ElementType>,
   madeBy: MadeBy | null = null,
   hideRoom = false,
+  proposedOnly = false,
 ): string {
   let types: string;
   if (filters.size > 0) {
@@ -71,7 +73,7 @@ export function filterSummary(
       .map(t => typeName(t, { many: true }));
     types = hidden.length === 0 ? 'All types' : `All types except ${joinTypeNames(hidden)}`;
   }
-  return types + (madeBy ? ` · made by ${madeBy}` : '') + (hideRoom ? ' · the room hidden' : '');
+  return types + (madeBy ? ` · made by ${madeBy}` : '') + (hideRoom ? ' · the room hidden' : '') + (proposedOnly ? ' · only proposed' : '');
 }
 
 /**
@@ -297,9 +299,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   content.insertBefore(originRow, subFilterRow);
   const originGate = renderGate();
   let rosterAsked: string | null = null;
-  let originMemo: { elements: readonly Element[]; roster: unknown; kinds: ReturnType<typeof rosterKinds>; counts: Record<MadeBy, number>; room: number } | null = null;
+  let proposedMemo: { from: readonly Element[] | null; n: number } = { from: null, n: 0 };
+  let originMemo: { elements: readonly Element[]; roster: unknown; kinds: ReturnType<typeof rosterKinds>; counts: Record<MadeBy, number>; room: number; proposed: number } | null = null;
 
-  interface Origin { kinds: ReturnType<typeof rosterKinds>; madeBy: MadeBy | null; hideRoom: boolean; showMadeBy: boolean; room: number; counts: Record<MadeBy, number> }
+  interface Origin { kinds: ReturnType<typeof rosterKinds>; madeBy: MadeBy | null; hideRoom: boolean; showMadeBy: boolean; room: number; counts: Record<MadeBy, number>; proposed: number; proposedOnly: boolean }
 
   /** What the row offers and which of its filters apply now, for the list and the summary. */
   function readOrigin(): Origin {
@@ -327,11 +330,15 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         const by = madeByOf(el, kinds);
         if (by) counts[by]++;
       }
-      originMemo = { elements, roster, kinds, counts, room };
+      originMemo = { elements, roster, kinds, counts, room, proposed: 0 };
     }
     // Offered only when an agent made something: a roster whose agent seats made nothing,
     // or were removed before they did (W11, S451), has nothing to tell apart.
     const showMadeBy = hasAgent && originMemo.counts.agents > 0;
+    // Proposed counts what the list can show (the lore, as Home does; the S459 gate's F6).
+    const lore = currentLore();
+    if (proposedMemo.from !== lore) proposedMemo = { from: lore, n: proposedCount(lore) };
+    originMemo.proposed = proposedMemo.n;
     return {
       kinds: originMemo.kinds,
       madeBy: showMadeBy ? state.ui.madeBy : null,
@@ -339,14 +346,16 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       showMadeBy,
       room: originMemo.room,
       counts: originMemo.counts,
+      proposed: originMemo.proposed,
+      proposedOnly: originMemo.proposed > 0 && state.ui.proposedOnly !== null && state.ui.proposedOnly === state.active?.worldId,
     };
   }
 
   function renderOrigin(o: Origin): void {
-    const show = o.showMadeBy || o.room > 0;
+    const show = o.showMadeBy || o.room > 0 || o.proposed > 0;
     originRow.hidden = !show;
     // Rebuilt only when it would come out different (conv. 146: a rebuild between a press and its release loses the click).
-    if (!originGate.changed([JSON.stringify([show, o.showMadeBy, o.madeBy, o.counts, o.room, o.hideRoom])])) return;
+    if (!originGate.changed([JSON.stringify([show, o.showMadeBy, o.madeBy, o.counts, o.room, o.hideRoom, o.proposed, o.proposedOnly])])) return;
     originRow.replaceChildren();
     if (!show) return;
     const chip = (label: string, title: string, on: boolean, action: string, click: () => void): HTMLButtonElement => {
@@ -382,6 +391,15 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         o.hideRoom, 'hide-room', () => {
           const ui = getState().ui;
           patchSlice('ui', { ...ui, hideRoom: !ui.hideRoom });
+        }));
+    }
+    if (o.proposed > 0) {
+      // Proposed, not yet reviewed (conv. 168): the keeper's way to find what waits.
+      originRow.appendChild(chip(`Proposed ${o.proposed}`,
+        'Show only what an AI seat or a member proposed and a keeper has not accepted yet',
+        o.proposedOnly, 'proposed-only', () => {
+          const ui = getState().ui;
+          patchSlice('ui', { ...ui, proposedOnly: o.proposedOnly ? null : getState().active?.worldId ?? null });
         }));
     }
   }
@@ -604,15 +622,16 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
   function renderFilters(): void {
     const state = getState();
-    // The type badges count the lore (conv. 161): a hidden room adds nothing to them.
-    const elements = currentLore();
+    // The type badges count the lore (conv. 161): a hidden room adds nothing to them,
+    // and a proposed element is not yet the world's own (conv. 168; its chip says how many).
+    const elements = settledOf(currentLore());
     const filters = state.ui.elementFilters;
     const muted = state.ui.mutedTypes;
     const countByType = new Map<ElementType, number>();
     for (const el of elements) countByType.set(el.type, (countByType.get(el.type) ?? 0) + 1);
 
     const origin = readOrigin();
-    filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom);
+    filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom, origin.proposedOnly);
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
     // audit #1, Captain-blessed 2026-07-20). Outside the tour: all types.
@@ -851,6 +870,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       madeBy: origin.madeBy,
       kinds: origin.madeBy ? origin.kinds : null,
       hideRoom: origin.hideRoom,
+      proposedOnly: origin.proposedOnly,
       lens: lens?.knowerId ?? null,
       activeMapId,
       flashing: [...flashingIds.keys()].join(','),
@@ -872,7 +892,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     const filtered = elements
       .filter(el => !diskOnly || diskMarked.has(el.id))
-      .filter(el => filters.size > 0 || !muted.has(el.type) || diskOnly)
+      // Asked for by the Proposed chip, a muted type shows too (a proposed pin; the S459 gate's F6).
+      .filter(el => filters.size > 0 || !muted.has(el.type) || diskOnly || origin.proposedOnly)
       // Tour-quiet machinery (the calendar construct) stays out of the list
       // while touring — an element appearing unannounced in the sidebar is
       // exactly the confusion the progressive build-up prevents (S316).
@@ -881,6 +902,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       .filter(el => !superFilter || String((el as Record<string, unknown>).supertype ?? '').trim() === superFilter)
       .filter(el => !subtypeFilter || String((el as Record<string, unknown>).subtype ?? '').trim() === subtypeFilter)
       .filter(el => !origin.madeBy || madeByOf(el, origin.kinds) === origin.madeBy)
+      .filter(el => !origin.proposedOnly || isProposed(el))
       // The room hides when showing the world whole; a supertype picked by its chip is asked for, so it shows.
       .filter(el => !origin.hideRoom || superFilter !== null || !isRoomElement(el))
       // Same match language as the command palette (name/alias/taxonomy/
@@ -1081,6 +1103,7 @@ function renderElementRow(
       ${chronicleBadge}
       ${reservedBadge}
       ${styleBadge}
+      ${proposedRowWord(el)}
       <span class="atlas-row-meta">${escapeText(typeName(el.type, { supertype: el.supertype }))}</span>
     </div>
   `;

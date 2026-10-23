@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.84.0',
+    date: '2026-10-23',
+    theme: 'Proposed, not yet reviewed',
+    entries: [
+      {
+        id: 'proposed-not-yet-reviewed',
+        title: 'An element an AI seat proposed says so, and is not counted as the world\'s own',
+        body: 'On a world whose keeper reviews what AI seats write, a new element from a seat stays proposed until a keeper accepts it on onlyworlds.com. Atlas now shows the word Proposed on it in the list, in Search, in Recent and on its page, leaves it out of the counts, and says on Home how many wait. The list\'s Proposed chip shows only them.',
+        tags: ['world', 'sync'],
+      },
+      {
+        id: 'proposed-left-off-pages',
+        title: 'A published page leaves proposed elements out',
+        body: 'A page you publish shows only what the world holds as settled: an element still proposed, or a piece of knowledge an AI seat proposed, is left off until a keeper accepts it, and the page\'s editor says which.',
+        tags: ['sharing'],
+      },
+    ],
+  },
+  {
     version: '1.83.1',
     date: '2026-10-23',
     theme: 'Make online on the shared library',

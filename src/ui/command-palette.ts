@@ -33,6 +33,7 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import type { Element, ElementType } from '../core/types';
 import { forPointer } from '../core/pointer';
 import { currentLore } from '../core/parlor-room';
+import { proposedMarkOf, proposedWord } from '../core/review-mark';
 
 const MAX_ELEMENT_RESULTS = 12;
 const MAX_ROOM_RESULTS = 3;
@@ -47,6 +48,8 @@ export interface PaletteResult {
   hint: string;
   /** Description context around the match (description matches only). */
   snippet?: string;
+  /** "Proposed" for an element not yet reviewed (conv. 168). */
+  proposed?: string;
   score: number;
 }
 
@@ -139,7 +142,9 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     const subT = String((el as Record<string, unknown>).subtype ?? '').trim();
     // A world's own word for the supertype has said it: "AI agent", never "AI agent · Agent".
     const taxonomy = [supertypeWord(el.type, superT) ? '' : superT, subT].filter(Boolean).join(' · ');
+    const proposed = proposedMarkOf(el);
     out.push({
+      ...(proposed ? { proposed: proposedWord(proposed) } : {}),
       kind: 'element',
       id: el.id,
       name: el.name?.trim() || '(unnamed)',
@@ -291,6 +296,14 @@ class CommandPalette extends BaseModal {
         main.appendChild(snip);
       }
       row.appendChild(main);
+
+      if (r.proposed) {
+        const word = document.createElement('span');
+        word.className = 'atlas-row-proposed';
+        word.dataset.role = 'proposed-word';
+        word.textContent = r.proposed;
+        row.appendChild(word);
+      }
 
       const hint = document.createElement('span');
       hint.className = 'atlas-cmdk-rowhint';

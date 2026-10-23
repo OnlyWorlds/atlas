@@ -40,6 +40,7 @@ import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } fr
 import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue, isWorldExtensionKey } from './world-meta-sync';
 import { isKnownOf, refuseKnownOfBody, stubShape } from './known-of';
 import { OwProposed, proposalOf, type ProposalRow } from './proposals';
+import { PROPOSED_MARK } from '../core/review-mark';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -201,6 +202,10 @@ export function toV2WireShape(
     }
     if (SERVER_MANAGED_FIELDS.has(k)) continue;
     if (STRIP_FIELDS.has(k)) continue;
+    // The review mark is keel's to settle (conv. 168, the S459 gate's F2): an update never carries it,
+    // so a copy holding a mark keel has since cleared cannot put it back. A create still does, so a
+    // folder's marks survive Make online.
+    if (op === 'update' && k === PROPOSED_MARK) continue;
     out[rename.get(k) ?? k] = v;
   }
   return out;

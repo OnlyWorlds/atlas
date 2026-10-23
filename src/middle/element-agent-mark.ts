@@ -11,6 +11,7 @@ import { getState } from '../core/state';
 import type { Element } from '../core/types';
 import { agentMarkFor, type AgentMark } from '../core/agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
+import { proposedLine, proposedMarkOf, proposedWord } from '../core/review-mark';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 import { toastManager } from '../ui/toast-manager';
 
@@ -28,15 +29,50 @@ export function mountAgentMarkSlot(): { el: HTMLElement; sync(el: Element): void
   return {
     el: slot,
     sync(el: Element): void {
+      const proposed = buildProposedMark(el);
       const mark = buildAgentMark(el);
       const hidden = buildHiddenMark(el);
-      const marks = [mark, hidden].filter((m): m is HTMLElement => m !== null);
+      const marks = [proposed, mark, hidden].filter((m): m is HTMLElement => m !== null);
       const line = marks.map(m => m.getAttribute('aria-label') ?? m.dataset.role).join(' | ') || null;
       if (line === shown && marks.length === slot.childElementCount) return;
       shown = line;
       slot.replaceChildren(...marks);
     },
   };
+}
+
+/**
+ * The review profile's proposed mark (`src/core/review-mark.ts`, conv. 168): a
+ * word, never only a glyph, since a keeper has to see it to settle it. Its line
+ * as label and tooltip, and said as a toast on a tap. In every world state: the
+ * mark is the element's own data, and travels in every export. In a synced world
+ * the proposer's name comes from the roster, asked once if it is not here yet.
+ */
+export function buildProposedMark(el: Element): HTMLElement | null {
+  const mark = proposedMarkOf(el);
+  if (!mark) return null;
+  const state = getState();
+  const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
+  const linked = entry?.state === 'api-linked';
+  const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'atlas-proposed-mark' + (mark.lapsed ? ' atlas-proposed-mark-lapsed' : '');
+  btn.dataset.role = 'proposed-mark';
+  btn.textContent = proposedWord(mark);
+  let line = '';
+  const say = (roster: Parameters<typeof proposedLine>[1]): void => {
+    line = proposedLine(mark, roster, nameOf);
+    btn.title = line;
+    btn.setAttribute('aria-label', line);
+  };
+  const roster = linked && entry ? rosterNow(entry) : null;
+  say(roster);
+  if (linked && entry && !roster && mark.by) {
+    void rosterFor(entry).then(rows => { if (rows && btn.isConnected) say(rows); });
+  }
+  btn.addEventListener('click', () => toastManager.info(line));
+  return btn;
 }
 
 /**

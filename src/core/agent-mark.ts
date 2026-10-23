@@ -47,7 +47,7 @@ export function agentMarkFor(
   else if (roster && by === null) agent = false; // the owner's own write, through any door
   else agent = isAgentDoor(via);
   if (!agent) return null;
-  const who = row && row.kind === 'agent' ? agentNameOf(by, roster, nameOf) : null;
+  const who = row && row.kind === 'agent' ? memberNameOf(by, roster, nameOf) : null;
   const door = doorWords(via);
   if (who) return { line: `Last changed by ${who}, an agent${door}` };
   return { line: `Last changed by an agent${door}` };
@@ -63,8 +63,8 @@ function doorWords(via: OwWriteDoor): string {
   }
 }
 
-/** An agent seat's name: the roster's own, else its Character's, else none. */
-function agentNameOf(
+/** A member's name: the roster's own, else its Character's, else none. */
+export function memberNameOf(
   membership: string | null,
   roster: readonly OwMember[] | null,
   nameOf: (id: string) => string | undefined,

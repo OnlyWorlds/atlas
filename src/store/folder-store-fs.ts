@@ -2219,14 +2219,14 @@ export class FsFolderStore implements FolderStore {
     await removeFile(dir, filename);
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null): Promise<void> {
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>): Promise<void> {
     // Serialize with update/delete on the same id (#79). The SyncEngine calls
     // this after a push; without the chain a concurrent local edit could land
     // between this read and write, and the stamp would revert it to a stale body.
     return this.writeChain.run(id, async () => {
       const existing = await this.readForWrite(id);
       if (!existing) return;
-      const next = stampedBody(existing, server_updated_at, sentLocalUpdatedAt);
+      const next = stampedBody(existing, server_updated_at, sentLocalUpdatedAt, kept);
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await this.dirForElement(id, existing.type);

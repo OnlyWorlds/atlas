@@ -26,11 +26,14 @@ export function stampedBody(
   existing: Element,
   serverUpdatedAt: string,
   sentLocalUpdatedAt?: string | null,
+  kept?: Readonly<Record<string, unknown>>,
 ): Element {
   // A push that landed is keel's last write, through Atlas's own door: whoever wrote the copy on
   // disk before is no longer the last writer (#347; the S415 gate: an outside edit adopted from the
   // live folder, or Make Online, pushed and stamped while the old agent mark stayed for good).
-  const next: Element = dropLastWriter({ ...existing, server_updated_at: serverUpdatedAt });
+  // `kept`: what keel wrote into the element on that write and the copy keeps with the stamp, in the
+  // same write (the review profile's mark on a seat's new element, conv. 168).
+  const next: Element = dropLastWriter({ ...existing, ...kept, server_updated_at: serverUpdatedAt });
   if (sentLocalUpdatedAt === undefined) return next;
   if (sentLocalUpdatedAt !== null && existing.local_updated_at === sentLocalUpdatedAt) return next;
   // Edited in flight. Already newer than the baseline: nothing to do.

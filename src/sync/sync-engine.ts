@@ -32,6 +32,7 @@ import {
   ALL_ELEMENT_TYPES,
 } from '../core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS } from '../core/constants';
+import { keptOnCreate } from '../core/review-mark';
 import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
@@ -578,6 +579,15 @@ export class SyncEngine {
     return withoutKeptLinks(elem.type, stripSyncFields(elem), this.roundLinkHeld);
   }
 
+  /**
+   * Whether keel may have marked this key's new elements proposed (conv. 168): a key that is not a
+   * keeper (an agent seat is a contributor). The owner's and a co-builder's writes are settled.
+   */
+  private async marksPossible(): Promise<boolean> {
+    const role = await this.roundRoleNow();
+    return role !== null && role !== 'owner' && role !== 'co_builder';
+  }
+
   private ownRole(fresh = false): Promise<string | null> {
     if (fresh || !this.roleRead) {
       const me = this.client.me?.bind(this.client);
@@ -839,7 +849,8 @@ export class SyncEngine {
         const response = local.server_updated_at
           ? await this.client.updateElement(local.type, id, body)
           : await this.client.createElement(local.type, body);
-        await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at);
+        await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at,
+          local.server_updated_at ? undefined : keptOnCreate(response));
         console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
       } catch (err) {
         // Keep mine on a reviewed world proposes again (conv. 163, P5): the
@@ -2001,6 +2012,9 @@ export class SyncEngine {
       // without the seam) falls back to the read-back backfill.
       let stamped = 0;
       const needBackfill: BulkItem[] = [];
+      // keel's /bulk slot echoes the time but not the review mark it may have written (conv. 168, the
+      // S459 gate's F1): a key that is not a keeper reads its new elements back, so the mark lands.
+      const readBack = await this.marksPossible();
       // Three held files in a row means the folder is held, not one file:
       // the rest are recorded at once rather than each waiting out its own
       // retries (S368 gate A M3: 500 creates once cost ~15 minutes). They
@@ -2009,7 +2023,7 @@ export class SyncEngine {
       for (let i = 0; i < items.length; i++) {
         if (this.stopped) break;
         const echo = result.items[i]?.updatedAt;
-        if (typeof echo === 'string' && echo) {
+        if (typeof echo === 'string' && echo && !readBack) {
           const sentId = items[i].element.id as string;
           if (heldInARow >= 3) {
             const last = failures[failures.length - 1];
@@ -2187,7 +2201,7 @@ export class SyncEngine {
         try {
           const remote = await this.client.getElement(it.type, id);
           if (!remote) throw new Error('created element missing on read-back');
-          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id));
+          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id), keptOnCreate(remote));
           stamped++;
         } catch (err) {
           if (err instanceof CorruptFileError) throw err;
@@ -2202,20 +2216,20 @@ export class SyncEngine {
       byType.get(it.type)!.push(it);
     }
     for (const [type, group] of byType) {
-      let remoteById = new Map<string, string>();
+      let remoteById = new Map<string, { id: string; updated_at: string } & Record<string, unknown>>();
       try {
         const listed = await this.client.listElements(type);
-        remoteById = new Map(listed.map(r => [r.id, r.updated_at]));
+        remoteById = new Map(listed.map(r => [r.id, r]));
       } catch (err) {
         console.warn(`[atlas:sync] bulk backfill list walk failed for ${type}:`, err);
       }
       for (const it of group) {
         if (this.stopped) break; // detach/unlink — never stamp past a reset
         const id = it.element.id as string;
-        const ts = remoteById.get(id);
-        if (ts) {
+        const remote = remoteById.get(id);
+        if (remote) {
           if (await this.localStep(failures, id, type, 'create',
-            () => this.folder.stampServerUpdatedAt(id, type, ts, sentStamps.get(id)))) {
+            () => this.folder.stampServerUpdatedAt(id, type, remote.updated_at, sentStamps.get(id), keptOnCreate(remote)))) {
             stamped++;
           }
         } else {
@@ -2445,7 +2459,8 @@ export class SyncEngine {
             });
             continue;
           }
-          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at);
+          // keel marks a seat's new element proposed on a reviewed world (conv. 168): the copy keeps it.
+          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, keptOnCreate(response));
           creates++;
         } else {
           // UPDATE path: re-fetch element from folder in case an in-loop

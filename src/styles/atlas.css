@@ -1546,6 +1546,35 @@ html {
   margin-left: 2px;
 }
 
+/* Proposed, not yet reviewed (conv. 168): a word, never only a colour. */
+.atlas-proposed-mark {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--atlas-warn);
+  background: transparent;
+  border: 1px solid var(--atlas-warn);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.atlas-proposed-mark-lapsed {
+  color: var(--atlas-text-muted);
+  border-color: var(--atlas-text-muted);
+}
+/* The same word on a row (the list, Search, Home's Recent). */
+.atlas-row-proposed {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--atlas-warn);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Empty editable title (e.g. a fresh draft) shows its placeholder muted. */
 .atlas-element-name.is-placeholder {
   color: var(--atlas-text-muted);
@@ -11858,6 +11887,18 @@ td.atlas-writing-setup-promote-count {
 
 .atlas-share-delete .material-symbols-outlined {
   font-size: 18px;
+}
+
+/* What a published page leaves out because it is proposed (conv. 168). */
+.atlas-share-proposed-note {
+  margin: 8px 16px 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--atlas-text);
+  background: var(--atlas-warn-soft-tint);
+  border: 1px solid var(--atlas-warn-soft-border);
+  border-radius: 6px;
 }
 
 .atlas-share-detail {

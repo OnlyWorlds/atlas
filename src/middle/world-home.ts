@@ -56,6 +56,7 @@ import { renderChartView } from '../visualization/timeline/chart-static';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { downloadLabel, isPartialSlice, partialSliceNote } from '../core/provenance';
 import { currentLore, roomCount } from '../core/parlor-room';
+import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -129,6 +130,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       return;
     }
     const elements = lore;
+    // What the world holds is counted without proposed elements (conv. 168):
+    // the counts, the cards and the threads read the settled world; Recent shows
+    // a proposed element with its word, and the cover says how many apart.
+    const settled = settledOf(lore);
     const meta = active.meta;
     const worldId = active.worldId;
     if (worldId !== receiptsWorldId) {
@@ -137,7 +142,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }
 
     const counts = new Map<string, number>();
-    for (const el of elements) {
+    for (const el of settled) {
       if (el.type === 'pin' || el.type === 'marker' || el.type === 'zone') continue;
       counts.set(el.type, (counts.get(el.type) ?? 0) + 1);
     }
@@ -170,13 +175,13 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }
     // The keep-safe card (1.17, contract §6.1): after the intro cards, in
     // their chrome; a world kept only in this browser asks for a copy.
-    const keep = buildKeepSafe(worldId, elements, toasts);
+    const keep = buildKeepSafe(worldId, settled, toasts);
     if (keep) root.appendChild(keep);
     if (totalElements === 0) return;
     // The chart strip (S15: the "starred chart") — the shape of the world's
     // history between the cover and the desk (timeline-mini's old slot, now
     // the real chart pipeline: first saved chart, else the recipe default).
-    const chartStrip = buildChartStrip(elements, worldId, savedCharts ?? []);
+    const chartStrip = buildChartStrip(settled, worldId, savedCharts ?? []);
     if (chartStrip) root.appendChild(chartStrip);
     const desk = buildDesk(elements, worldId);
     if (desk) root.appendChild(desk);
@@ -184,7 +189,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // (unmapped locations, undated events, unlinked characters), each expanding
     // to the exact flagged elements. Sits at the very bottom of home (Captain's
     // placement call); renders nothing when the world is fully woven.
-    const threads = buildLooseThreads(elements, worldId);
+    const threads = buildLooseThreads(settled, worldId);
     if (threads) root.appendChild(threads);
   }
 
@@ -458,6 +463,23 @@ function buildCover(
     });
     cover.appendChild(roomLine);
   }
+  // Proposed, not yet reviewed (conv. 168): said apart from the counts, and one
+  // click lists them, the keeper's way to find what waits to be settled.
+  const proposed = proposedCount(currentLore());
+  if (proposed > 0) {
+    const line = document.createElement('button');
+    line.type = 'button';
+    line.className = 'atlas-home-statline-seg atlas-home-proposed';
+    line.setAttribute('data-action', 'home-proposed');
+    line.title = 'Elements an AI seat or a member proposed, which a keeper has not accepted yet. They are not counted as the world\'s own';
+    line.innerHTML = `<b>${proposed}</b> proposed, not yet reviewed · Show them`;
+    line.addEventListener('click', () => {
+      // Only them: no type filter or search left over to hide one (the S459 gate's F6).
+      patchSlice('ui', { ...getState().ui, sidebarMode: 'elements', proposedOnly: worldId, elementFilters: new Set(), search: '' });
+      setSidebarModePref('elements');
+    });
+    cover.appendChild(line);
+  }
 
   return cover;
 }
@@ -679,6 +701,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         <span class="material-symbols-outlined">${row.icon}</span>
         <span class="atlas-home-continue-verb">${row.verb}</span>
         <span class="atlas-home-continue-name">${escapeText(row.el.name || '(unnamed)')}</span>
+        ${proposedRowWord(row.el)}
         <span class="atlas-home-continue-kind">${escapeText(typeName(row.el.type, { supertype: row.el.supertype }))}</span>
         <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;

@@ -30,6 +30,7 @@ import {
   type CollectionBlock, type MapBlock, type HeadingBlock, type ProseBlock, type PageTheme,
 } from './sharing';
 import { knowledgeHeldBy } from './knowledge';
+import { handsOnAsProposed } from './review-mark';
 // Pure shape/geometry helpers (no DOM) — one resolver for zone shape across
 // canvas, builder, and payload; the tabs/right location is historical.
 import { getZoneShape } from '../tabs/right/zone-derived';
@@ -222,7 +223,67 @@ function relationId(value: unknown): string | null {
 // The builder.
 // ---------------------------------------------------------------------------
 
+/**
+ * A published page hands the world on (the review profile's reader rule, conv.
+ * 168): an element written as proposed and not yet settled by a keeper is left
+ * out, as a missing element is, from every block (a card, a collection, a map's
+ * pins, a circle's entries, a chart, a link field's names).
+ */
 export function buildPagePayload(page: Element, elements: Element[], charts: ChartConfig[] = []): PagePayload {
+  return buildPayloadFrom(page, elements.some(handsOnAsProposed) ? elements.filter(e => !handsOnAsProposed(e)) : elements, charts);
+}
+
+/**
+ * What publishing leaves out of this page because it is proposed, for the
+ * builder's line: the elements its blocks name that are themselves proposed, a
+ * proposed pin as "a pin on <its element>", and a circle's proposed entries.
+ * A settled element whose only way onto the page was a proposed pin is never
+ * named as proposed (the S459 gate's F4). Empty when nothing on the page is.
+ */
+export function proposedLeftOut(page: Element, elements: Element[], charts: ChartConfig[] = []): string[] {
+  if (!elements.some(handsOnAsProposed)) return [];
+  const byId = new Map(elements.map(e => [e.id, e]));
+  const whole = buildPayloadFrom(page, elements, charts);
+  const handed = buildPagePayload(page, elements, charts);
+  const names = Object.entries(whole.elements)
+    .filter(([id]) => !(id in handed.elements) && handsOnAsProposed(byId.get(id)))
+    .map(([, e]) => e.name);
+  for (const b of blocksOf(page)) {
+    if (b.kind !== 'map') continue;
+    for (const pinId of b.pinIds) {
+      const pin = byId.get(pinId);
+      if (!pin || !handsOnAsProposed(pin)) continue;
+      const targetId = (pin as Record<string, unknown>).element_id;
+      const target = typeof targetId === 'string' ? byId.get(targetId) : undefined;
+      if (target && !handsOnAsProposed(target)) names.push(`a pin on ${target.name || '(unnamed)'}`);
+    }
+  }
+  const entries = (p: PagePayload) => p.blocks.flatMap(b => b.kind === 'circle' ? b.entries.map(e => e.title) : []);
+  const kept = entries(handed);
+  for (const title of entries(whole)) {
+    const at = kept.indexOf(title);
+    if (at >= 0) kept.splice(at, 1);
+    else names.push(title);
+  }
+  return names;
+}
+
+/**
+ * The builder's line about what is proposed (conv. 168), or null. A page that is
+ * itself proposed (a seat wrote it) is not published at all until a keeper
+ * accepts it (the S459 gate's F3): its own text would go out as fact.
+ */
+export function proposedPageLine(page: Element, elements: Element[], charts: ChartConfig[] = []): string | null {
+  if (handsOnAsProposed(page)) return 'This page is proposed and not yet reviewed, so it can be published once a keeper accepts it.';
+  const leftOut = proposedLeftOut(page, elements, charts);
+  if (leftOut.length === 0) return null;
+  const names = leftOut.slice(0, 3).join(', ') + (leftOut.length > 3 ? ` and ${leftOut.length - 3} more` : '');
+  return leftOut.length === 1
+    ? `${names.charAt(0).toUpperCase()}${names.slice(1)} is proposed and not yet reviewed, so the published page leaves it out until a keeper accepts it.`
+    : `${leftOut.length} proposed and not yet reviewed (${names}) are left out of the published page until a keeper accepts them.`;
+}
+
+function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfig[]): PagePayload {
   const byId = new Map(elements.map(e => [e.id, e]));
   const blocks = blocksOf(page);
 

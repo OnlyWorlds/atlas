@@ -574,10 +574,10 @@ export class MockFolderStore implements FolderStore {
     this.worldPrefs = structuredClone(prefs);
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null): Promise<void> {
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>): Promise<void> {
     const existing = this.elements.get(id);
     if (!existing) return;
-    this.elements.set(id, stampedBody(existing, server_updated_at, sentLocalUpdatedAt));
+    this.elements.set(id, stampedBody(existing, server_updated_at, sentLocalUpdatedAt, kept));
   }
 
   async clearServerBaseline(id: string): Promise<void> {

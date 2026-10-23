@@ -247,8 +247,9 @@ export interface FolderStore {
    * the file: the element was edited while the push was in flight, and it is
    * kept dirty so the edit goes out next round (S360 H1, `store/sync-stamp.ts`).
    * `null` = the server is known to hold different content: keep it dirty.
+   * `kept`: fields keel wrote on that write, kept with the stamp in the same write (conv. 168).
    */
-  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null): Promise<void>;
+  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>): Promise<void>;
 
   /**
    * Clear `server_updated_at` on a local element. Used when resolving a

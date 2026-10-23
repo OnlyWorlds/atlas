@@ -42,7 +42,8 @@ import {
 import { renderBlockView, renderPayloadPage, populatedCardFields, setBuilderCharts } from './share-page-render';
 import { mountAgentMarkSlot } from './element-agent-mark';
 import type { ChartConfig } from '../visualization/timeline/types';
-import { buildPagePayload } from '../core/share-payload';
+import { buildPagePayload, proposedPageLine } from '../core/share-payload';
+import { handsOnAsProposed } from '../core/review-mark';
 import {
   SharingClient, SharingApiError, sharingErrorMessage,
   isValidSlug, suggestSlug, publicUrlFor, type SharedPageRow,
@@ -81,6 +82,19 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   let lastBuiltElementsRef: readonly Element[] | null = null;
   let pageTitleHandle: EditableTitleHandle | null = null;  // detail header title (sync on tick)
   let pageAgentMark: ReturnType<typeof mountAgentMarkSlot> | null = null;  // the quiet agent mark (sync on tick)
+  let proposedNote: HTMLElement | null = null;  // what publishing leaves out as proposed (conv. 168; sync on tick)
+  function syncProposedNote(page: Element): void {
+    if (!proposedNote) return;
+    const line = proposedPageLine(page, getState().data.elements, pageCharts);
+    if (proposedNote.textContent !== (line ?? '')) proposedNote.textContent = line ?? '';
+    proposedNote.hidden = line === null;
+  }
+  /** A proposed page is not published (conv. 168, gate F3): said, and nothing sent. */
+  function refuseProposedPage(page: Element): boolean {
+    if (!handsOnAsProposed(page)) return false;
+    toasts.info(proposedPageLine(page, getState().data.elements, pageCharts) ?? '');
+    return true;
+  }
   // A view-only world reads its pages: each opens in the visitor preview, with
   // no new page, rename, block edit, theme, publish or delete (conv. 149).
   // Rooms remount per world, so one read at mount holds.
@@ -1456,6 +1470,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     await writeChain;
     const page = elOf(pageId);
     if (!page) return;
+    if (refuseProposedPage(page)) return;
     try {
       const res = await client.publish({
         slug,
@@ -1493,6 +1508,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     const pub = page ? pagePubOf(page) : null;
     if (!page || !pub) return;
+    if (refuseProposedPage(page)) return;
     try {
       // Mutations are slug-addressed (as-built) — pub.id stays in the mirror
       // for display/debugging but the slug is the wire address.
@@ -2182,6 +2198,15 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (!viewOnly) header.appendChild(del);
     root.appendChild(header);
 
+    // A published page hands the world on (conv. 168): what is proposed and not
+    // yet accepted stays off it, and the author is told what and why. Kept in
+    // step on every data tick (a keeper's accept arrives by a pull; gate F5).
+    proposedNote = document.createElement('p');
+    proposedNote.className = 'atlas-share-proposed-note';
+    proposedNote.dataset.role = 'share-proposed-note';
+    root.appendChild(proposedNote);
+    syncProposedNote(page);
+
     // Preview mode: the reader's view, rendered FROM THE PUBLISH PAYLOAD —
     // disclosure-true (contract §5.1). What the author sees here is exactly
     // what `GET /pages/<slug>/` will serve: non-included elements render as
@@ -2291,6 +2316,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // Sync the header title (no-op while the user is editing it).
     pageTitleHandle?.sync(page.name || '');
     pageAgentMark?.sync(page);
+    syncProposedNote(page);
 
     if (previewMode) return; // static reader view — rebuilt on toggle, not per tick
     if (editingBlockId) {
