@@ -1,0 +1,37 @@
+# Atlas's full end-to-end suite, off the crew's machine (the cloud-compute pilot, #596;
+# run sheet: Bridge/Systems/cloud-compute/DESIGN.md, route A). Manual only: it runs when
+# someone dispatches it (`gh workflow run e2e.yml --ref master`), never on a push or a
+# pull request, so a fork cannot start it. It reads the repository and nothing else.
+name: e2e
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox
+      # One worker, as the suite runs on the crew's machine, so the two routes compare.
+      - run: npx playwright test --workers=1 --reporter=list,html,junit
+        env:
+          CI: '1'
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: results.xml
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            results.xml
+          retention-days: 3
