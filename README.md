@@ -2,13 +2,13 @@
 
 Folder-first OnlyWorlds world browser and editor with optional API sync. A world is a folder of plain files on your disk (or in your browser's storage), and Atlas reads and writes it; linking the world to an account on [onlyworlds.com](https://www.onlyworlds.com) adds sync.
 
-Use it at [atlas.onlyworlds.com](https://atlas.onlyworlds.com); what changed in each release is at [atlas.onlyworlds.com/changelog.html](https://atlas.onlyworlds.com/changelog.html) (its one edit surface is `src/changelog/changelog.data.ts`; `CHANGELOG.md` is the pre-launch log, kept for history).
+Use it at [atlas.onlyworlds.com](https://atlas.onlyworlds.com); what changed in each release is at [atlas.onlyworlds.com/changelog.html](https://atlas.onlyworlds.com/changelog.html).
 
-**Who writes this repository.** Atlas is built by Temper, one of a crew of AI minds working with the OnlyWorlds founder (the Captain in these files). The design docs, `PROGRESS.md` and `Notes/` are that crew's working record, kept as they were written: session numbers (S459), room references (h20 #1234) and paths into the crew's own folders (`Forge/Notes/...`) point at records outside this repository.
+**Who writes this repository.** Atlas is built by Temper, one of a crew of AI minds working with Titus, the OnlyWorlds founder (called the Captain in these files). The design docs, `PROGRESS.md` and `Notes/` are that crew's working record, kept as they were written: session numbers (S459), room references (h20 #1234) and paths into the crew's own folders (`Forge/Notes/...`) point at records outside this repository.
 
 ## Licence and contributions
 
-The code is MIT (`LICENSE`). The OnlyWorlds name, the logo and the look are not: see `NOTICE`, and give a fork its own name. Issues are welcome: a bug, a wrong word, a thing you could not do. Pull requests are read; a small fix is usually taken as is, and a change to how the tool works is better opened as an issue first, since we may already be building it or have ruled it out. Temper reads and answers its issues and pull requests; until the crew posts from an identity of its own, those replies post from the founder's account, so a reply from `tmoosting` may be Temper's. A reply can take a few days.
+The code is MIT (`LICENSE`). The OnlyWorlds name, the logo and the look are not: see `NOTICE`, and give a fork its own name. Issues are welcome: a bug, a wrong word, a thing you could not do. Pull requests are read; a small fix is usually taken as is, and a change to how the tool works is better opened as an issue first, since we may already be building it or have ruled it out. Temper reads and answers its issues and pull requests; until the crew posts from an identity of its own, those replies post from the founder's account, so a reply from `tmoosting` may be Temper's. A reply can take a few days. What we ask at the door, and what you can expect: the [code of conduct](https://github.com/OnlyWorlds/OnlyWorlds/blob/main/CODE_OF_CONDUCT.md).
 
 ## Run
 
@@ -22,6 +22,8 @@ npm run typecheck    # tsc --noEmit
 npm run e2e          # Playwright (boots dev server)
 npm run e2e:ui       # Playwright UI mode
 ```
+
+The public changelog is generated from one edit surface, `src/changelog/changelog.data.ts` (`npm run changelog`); `CHANGELOG.md` is the pre-launch log, kept for history.
 
 ## Stack
 
