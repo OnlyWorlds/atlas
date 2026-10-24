@@ -95,9 +95,21 @@ describe('the doors without a folder picker ask before their first await', () =>
     const ask = room.indexOf('requestPersistOnFirstBrowserWorld(', room.indexOf("if (mode === 'new') {"));
     expect(ask).toBeGreaterThan(-1);
     expect(ask).toBeLessThan(room.indexOf("await import('../ui/where-choice')"));
+    // One file door for the drop and the chooser (`takeFile`, 1.88.3): a world-named file asks
+    // and opens at once; a name that says neither asks before the bytes are read (OW-1).
     const opens = [...room.matchAll(/void openWorldFileFrom\(file, toasts\)/g)].map(m => m.index!);
     expect(opens).toHaveLength(2);
-    for (const at of opens) expect(room.slice(at - 100, at)).toContain('requestPersistOnFirstBrowserWorld(');
+    expect(room.slice(opens[0] - 100, opens[0])).toContain('requestPersistOnFirstBrowserWorld(');
+    const sniff = room.indexOf('void startsLikeWorldFile(file)');
+    expect(sniff).toBeGreaterThan(-1);
+    expect(sniff).toBeLessThan(opens[1]);
+    const askBeforeSniff = room.lastIndexOf('requestPersistOnFirstBrowserWorld(', sniff);
+    // A .json is read as JSON before that ask: an import into this world never asks to keep one.
+    const jsonFirst = room.indexOf("if (/\\.json$/i.test(file.name) || file.type === 'application/json') { readJson(); return; }");
+    expect(jsonFirst).toBeGreaterThan(-1);
+    expect(askBeforeSniff).toBeGreaterThan(jsonFirst);
+    expect(room.slice(askBeforeSniff, sniff)).not.toMatch(/await|\.then\(/);
+    expect([...room.matchAll(/takeFile\(file, /g)]).toHaveLength(2);
   });
 
   it("the finale's Save it to a folder, beside Keep", () => {

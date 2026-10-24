@@ -40,7 +40,7 @@ import { ToastManager } from '../ui/toast-manager';
 import { detailsContext, showProblem } from '../ui/problem-fixes';
 import { buildFailureDetails } from '../core/problems';
 import { PlainError } from '../core/plain-error';
-import { isWorldFile, openWorldFileFrom } from '../ui/open-world-file';
+import { isWorldFile, openWorldFileFrom, startsLikeWorldFile, WORLD_FILE_ACCEPT } from '../ui/open-world-file';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { filesWhereOf } from '../core/browser-worlds';
 import { forPointer } from '../core/pointer';
@@ -204,17 +204,17 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     </div>
     <div class="atlas-import-body">
       <div class="atlas-import-panel" data-panel="in" role="tabpanel">
-        <p class="atlas-import-lead">Anything in the OnlyWorlds format comes in here: a world from onlyworlds.com, a world file Atlas saved (.zip), loose elements, or JSON an AI assistant made from your notes. ${forPointer('Drop it or paste it', 'Choose it or paste it')}; you review it before it lands.</p>
+        <p class="atlas-import-lead">Anything in the OnlyWorlds format comes in here: a world from onlyworlds.com, a world file (.owworld, or the .zip Atlas saves), loose elements, or JSON an AI assistant made from your notes. ${forPointer('Drop it or paste it', 'Choose it or paste it')}; you review it before it lands.</p>
         <div class="atlas-import-ai">
           <p class="atlas-import-ai-lead">Notes not in the format yet? <button type="button" class="atlas-btn-link" data-action="convert-prompt">Copy our prompt</button> and give it to an AI assistant with your notes, then paste the JSON it returns below. The prompt carries every field (~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens) and asks the assistant to add nothing your notes do not say. <a class="atlas-btn-link" href="${OW_AI_DOCS_URL}" target="_blank" rel="noopener">More ways to convert</a>.</p>
           ${agentLine}
         </div>
-        <div class="atlas-import-drop" data-role="drop" tabindex="0" title="Drop or click to choose a .json file, or a world file Atlas saved (.zip)">
+        <div class="atlas-import-drop" data-role="drop" tabindex="0" title="Drop or click to choose a .json file, or a world file (.owworld or .zip)">
           <span class="material-symbols-outlined">place_item</span>
-          <p class="atlas-import-drop-pointer">Drop a world or elements <b>.json</b>, or a world file <b>.zip</b>, here</p>
+          <p class="atlas-import-drop-pointer">Drop a world or elements <b>.json</b>, or a world file <b>.owworld</b> or <b>.zip</b>, here</p>
           <span class="atlas-import-drop-sub atlas-import-drop-pointer">or click to choose a file</span>
-          <p class="atlas-import-drop-touch">Tap to choose a world or elements <b>.json</b>, or a world file <b>.zip</b></p>
-          <input type="file" accept="application/json,.json,.zip,application/zip" data-role="file" hidden />
+          <p class="atlas-import-drop-touch">Tap to choose a world or elements <b>.json</b>, or a world file <b>.owworld</b> or <b>.zip</b></p>
+          <input type="file" accept="application/json,.json,${WORLD_FILE_ACCEPT}" data-role="file" hidden />
         </div>
         <textarea class="atlas-import-paste" data-role="paste" rows="6"
           placeholder="…or paste OnlyWorlds JSON: a full world export, or loose element lists"></textarea>
@@ -833,20 +833,28 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
   dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.classList.add('is-over'); });
   dropEl.addEventListener('dragleave', () => dropEl.classList.remove('is-over'));
+  // A world file opens as its own world (1.17, contract §5.2), never merged in: by its name
+  // (`.owworld`, `.zip`) at once; a `.json` is JSON; a name that says neither is decided by its
+  // first bytes (OW-1: the content decides). Every branch that may open a world asks the browser
+  // to keep it before its first await (contract §2.3, invariant 10).
+  const takeFile = (file: File, label: string, doing: string): void => {
+    const readJson = (): void => { void file.text().then(t => ingest(t, label), err => { console.error('[import] file read failed', err); showProblem(err, { doing, folder: 'picked', toasts }); }); };
+    if (isWorldFile(file)) { requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000)); void openWorldFileFrom(file, toasts); return; }
+    if (/\.json$/i.test(file.name) || file.type === 'application/json') { readJson(); return; }
+    requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
+    void startsLikeWorldFile(file).then(zip => { if (zip) void openWorldFileFrom(file, toasts); else readJson(); });
+  };
   dropEl.addEventListener('drop', e => {
     e.preventDefault();
     dropEl.classList.remove('is-over');
     const file = e.dataTransfer?.files?.[0];
-    // A world file opens as its own world (1.17, contract §5.2), never merged in.
-    if (file && isWorldFile(file)) { requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000)); void openWorldFileFrom(file, toasts); return; }
-    if (file) void file.text().then(t => ingest(t, 'The dropped file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the dropped file', folder: 'picked', toasts }); });
+    if (file) takeFile(file, 'The dropped file', 'reading the dropped file');
   });
   dropEl.addEventListener('click', () => fileInput.click());
   dropEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
-    if (file && isWorldFile(file)) { requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000)); void openWorldFileFrom(file, toasts); fileInput.value = ''; return; }
-    if (file) void file.text().then(t => ingest(t, 'The chosen file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the chosen file', folder: 'picked', toasts }); });
+    if (file) takeFile(file, 'The chosen file', 'reading the chosen file');
     fileInput.value = '';
   });
   root.querySelector<HTMLButtonElement>('[data-action="load"]')!.addEventListener('click', () => {

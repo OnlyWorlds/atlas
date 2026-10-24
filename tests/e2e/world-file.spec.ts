@@ -287,3 +287,48 @@ for (const engine of ['chromium', 'firefox'] as const) {
     if (chromium) expect((await savedBytes()).length).toBe(0);
   });
 }
+
+// Folder spec 4.7 OW-1: the content decides, never the name. A world file named
+// `.owworld` (the standard's name, what the toolkit's carry writes) opens from the
+// Data room as a world, with no type the browser knows; so does one whose name says
+// nothing, by its first bytes. Before 1.88.3 both read as JSON and failed.
+for (const engine of ['chromium', 'firefox'] as const) {
+  test(`${engine === 'firefox' ? '@firefox ' : ''}an .owworld opens from the Data room, and a world file with no telling name opens by its bytes`, async ({ page }) => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const bytes = readFileSync(join(__dirname, '..', 'fixtures', 'owworld', 'pass-OW-8-private-left-out.owworld'));
+    await boot(page);
+    const id = await seedBrowserWorld(page);
+    expect(await activate(page, id)).toBe(true);
+    await page.evaluate((wid) => { window.location.hash = `#/w/${wid}/import`; }, id);
+    const input = page.locator('[data-role="file"]');
+    await expect(input).toHaveAttribute('accept', /\.owworld/);
+
+    await input.setInputFiles({ name: 'friend.owworld', mimeType: '', buffer: bytes });
+    await expect(page.locator('.ow-toast', { hasText: 'Opened "Watabou\'s Abbey". It lives in this browser.' })).toBeVisible();
+    await expect(page.getByText('isn\'t valid JSON')).toHaveCount(0);
+
+    // The same bytes under a name that says nothing: the world opener answers, not the JSON reader.
+    const opened = await page.evaluate(() => location.hash.match(/#\/w\/([^/]+)/)?.[1] ?? null);
+    await page.evaluate((wid) => { window.location.hash = `#/w/${wid}/import`; }, opened);
+    await page.locator('[data-role="file"]').setInputFiles({ name: 'friend', mimeType: '', buffer: bytes });
+    await expect(page.locator('.ow-toast', { hasText: 'This world is already in Atlas.' })).toBeVisible();
+    await expect(page.getByText('isn\'t valid JSON')).toHaveCount(0);
+
+    // A damaged .owworld is a world file by its name: the world file's refusal, never "not JSON".
+    await page.evaluate((wid) => { window.location.hash = `#/w/${wid}/import`; }, opened);
+    await page.locator('[data-role="file"]').setInputFiles({ name: 'broken.owworld', mimeType: '', buffer: Buffer.from('not a zip at all') });
+    await expect(page.getByText('That file is not a world Atlas can open.').first()).toBeVisible();
+    await expect(page.getByText('isn\'t valid JSON')).toHaveCount(0);
+  });
+}
+
+test('the landing\'s Open a world file offers .owworld beside .zip', async ({ page }) => {
+  await boot(page);
+  await page.click('[data-action="other-ways-in"]');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.locator('[data-modal="add-world"] [data-choice="open-file"]').click(),
+  ]);
+  expect((await chooser.element().getAttribute('accept'))?.split(',')).toEqual(expect.arrayContaining(['.owworld', '.zip']));
+});

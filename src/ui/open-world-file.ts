@@ -1,6 +1,7 @@
 /**
- * The "Open a world file" door (1.17 bout 5, contract §5.2): pick a `.zip`
- * Atlas saved, open it as a world in this browser, then open the world. Every
+ * The "Open a world file" door (1.17 bout 5, contract §5.2): pick a world
+ * file (the standard's `.owworld`, or the `.zip` Atlas saves: folder spec 4.7
+ * OW-1, the same file), open it as a world in this browser, then open the world. Every
  * browser has it (a file input, no folder picker). The work, refusals and
  * restore rules are `setup/world-file-open.ts`.
  */
@@ -28,7 +29,7 @@ import { downloadingLine } from './download-progress';
 export function pickWorldFile(): Promise<File | null> {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.zip,application/zip';
+  input.accept = WORLD_FILE_ACCEPT;
   return new Promise(resolve => {
     input.addEventListener('change', () => resolve(input.files?.[0] ?? null), { once: true });
     input.addEventListener('cancel', () => resolve(null), { once: true });
@@ -36,9 +37,28 @@ export function pickWorldFile(): Promise<File | null> {
   });
 }
 
-/** A file that is a world file (a `.zip`), not a JSON export: it opens as its own world. */
+/** What a file input offers for a world file: the standard's `.owworld` and the `.zip` Atlas saves (OW-1: the same file). */
+export const WORLD_FILE_ACCEPT = '.owworld,.zip,application/zip';
+
+/** A file whose name or type says world file (`.owworld`, `.zip`): it opens as its own world, never as JSON. */
 export function isWorldFile(file: Pick<File, 'name' | 'type'>): boolean {
-  return /\.zip$/i.test(file.name) || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+  return /\.(owworld|zip)$/i.test(file.name) || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+}
+
+/**
+ * The content decides, never the name (folder spec 4.7 OW-1): a file whose
+ * first bytes are a zip's (a local file header, or an empty archive's end
+ * record) is a world file whatever it is called, so a renamed one opens as a
+ * world rather than failing as JSON. A read that fails says no.
+ */
+export async function startsLikeWorldFile(file: Pick<Blob, 'slice'>): Promise<boolean> {
+  try {
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    return head.length === 4 && head[0] === 0x50 && head[1] === 0x4b
+      && ((head[2] === 0x03 && head[3] === 0x04) || (head[2] === 0x05 && head[3] === 0x06));
+  } catch {
+    return false;
+  }
 }
 
 /** What a door that opens world-file bytes says (the file door; the demo world, #113). */

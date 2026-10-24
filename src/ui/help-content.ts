@@ -119,7 +119,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     name: 'Data',
     purpose: 'Bring OnlyWorlds data into atlas, or take your world out as a file.',
     can: [
-      { mouse: 'drop or paste JSON and review before anything lands', touch: 'choose a .json or a world file .zip, or paste JSON, and review before anything lands' },
+      { mouse: 'drop or paste JSON and review before anything lands', touch: 'choose a .json or a world file (.owworld or .zip), or paste JSON, and review before anything lands' },
       'merge into the current world or create a new one',
       'export the whole world or a subset by type',
       'copy the AI prompt (it carries your world\'s exact fields) to turn freeform notes into importable JSON',

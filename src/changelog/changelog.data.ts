@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.88.3',
+    date: '2026-10-24',
+    theme: 'A world file by any name',
+    entries: [
+      {
+        id: 'owworld-opens',
+        title: 'A world file named .owworld opens',
+        body: 'The standard names a world file .owworld, and other tools write it that way. Atlas used to open only the .zip it saves itself: an .owworld dropped in Data was read as JSON and refused, and Open a world file did not list it. Both open it now, and a world file renamed to anything opens by what it holds.',
+        tags: ['fix', 'world file', 'import'],
+      },
+    ],
+  },
+  {
     version: '1.88.2',
     date: '2026-10-24',
     theme: 'The tour stays in view',
