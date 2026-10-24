@@ -24,6 +24,7 @@ import { getActiveStore } from '../core/active-store';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
 import { signInFieldsHtml, missingSignIn, signInInputs, signInFromFields, PIN_REASON_HTML } from './sign-in-fields';
+import { wireOnlyWorldsSignIn } from './onlyworlds-sign-in-button';
 // view-only-ok: writes a new world of its own, never the active one (conv. 149).
 
 export class NewApiWorldModal extends BaseModal {
@@ -71,6 +72,7 @@ export class NewApiWorldModal extends BaseModal {
 
     cancelBtn.addEventListener('click', () => this.hide());
     wireWhereChoice(body);
+    wireOnlyWorldsSignIn(body, this.toasts, 'new-api');
 
     // The local world a failed attempt already made (S369): Create again
     // retries only the online step, rather than making a second folder.

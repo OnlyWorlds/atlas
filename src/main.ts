@@ -25,6 +25,13 @@ import { applyTheme } from './core/theme';
 import { installUnexpectedErrorReporter } from './ui/unexpected-errors';
 import { captureJoinCode } from './core/join-capture';
 import { captureOpenWorld } from './core/open-capture';
+import { isSignInCallback, startSignInCallback, dropStaleResume, type SignInOutcome } from './sync/onlyworlds-sign-in';
+
+// Sign in with OnlyWorlds' return (contract R3): the code is traded before any
+// other request Atlas makes, and the address becomes `/` plus the route the
+// person pressed from before the router reads it. Anywhere else, a resume a
+// round trip left behind goes.
+const signInReturn: Promise<SignInOutcome> | null = isSignInCallback() ? startSignInCallback() : (dropStaleResume(), null);
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -74,6 +81,11 @@ function boot(): void {
     return;
   }
   startApp(root);
+  // Back from Sign in with OnlyWorlds: the token is kept once the registry has loaded (contract R4).
+  if (signInReturn) {
+    void Promise.all([signInReturn, import('./setup/sign-in-return'), import('./ui/toast-manager')])
+      .then(([outcome, m, t]) => m.applySignInOutcome(outcome, t.toastManager));
+  }
   // A failure nothing caught says so once, with details (S369).
   installUnexpectedErrorReporter();
   // Pin-placement feedback (crosshair + map banner + Esc). State-driven, one

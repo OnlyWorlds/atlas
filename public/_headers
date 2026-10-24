@@ -8,3 +8,11 @@
 
 /sw.js
   Cache-Control: no-store
+
+# Sign in with OnlyWorlds returns here with a one-use code in the address (Keel #515):
+# no cache keeps the page, and no request from it names the address. The
+# detach drops /*'s Referrer-Policy here rather than send both values.
+/signin/callback
+  ! Referrer-Policy
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store

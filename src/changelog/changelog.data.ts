@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.87.0',
+    date: '2026-10-24',
+    theme: 'Sign in with OnlyWorlds',
+    entries: [
+      {
+        id: 'sign-in-with-onlyworlds',
+        title: 'Sign in with OnlyWorlds, no password typed into Atlas',
+        body: 'Settings, OnlyWorlds now starts with Sign in with OnlyWorlds, and so do Make online and New world on OnlyWorlds when you are signed out. Atlas saves what you were doing, onlyworlds.com asks once whether Atlas may sign in as you (after that it is a moment\'s redirect), and you come back where you were, signed in, with the dialog you left open. Atlas keeps a token for this browser, listed on your account page where you can take it back. The email and password and the account token still work as before.',
+        tags: ['sync', 'settings'],
+      },
+    ],
+  },
+  {
     version: '1.86.3',
     date: '2026-10-24',
     theme: 'File names read the same in every browser',

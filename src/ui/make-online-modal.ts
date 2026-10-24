@@ -48,6 +48,7 @@ import {
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
 import { signInFieldsHtml, signedInLineHtml, missingSignIn, signInInputs, signInFromFields, PIN_REASON_HTML } from './sign-in-fields';
+import { wireOnlyWorldsSignIn } from './onlyworlds-sign-in-button';
 
 import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
 import { filesWhereOf } from '../core/browser-worlds';
@@ -242,7 +243,8 @@ export class MakeOnlineModal extends BaseModal {
       btn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
     });
 
-    // Route 1 (create).
+    // Route 1 (create). Signed out, Sign in with OnlyWorlds comes back to this dialog (contract R6).
+    wireOnlyWorldsSignIn(body, this.toasts, 'make-online');
     const createForm = body.querySelector<HTMLFormElement>('[data-form="create-route"]')!;
     createForm.addEventListener('submit', (e) => {
       e.preventDefault();

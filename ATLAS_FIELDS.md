@@ -72,6 +72,8 @@ Atlas also reads canon fields in ways other tools cannot see:
 
 **Per browser, other localStorage keys**: `atlas_ui_prefs` (sidebar mode, default create type, where the last new world went, the name the last invite link was signed with (#341)), `atlas_shell_ratios_v2`, `atlas_right_tabs`, `atlas_map_view_defaults`, `atlas_map_view_prefs`, `atlas_map_camera_state`, `atlas_world_prefs_synced` (the world-prefs three-way base), `atlas_disk_held` (a standing big-batch question), plus small UI memories (`atlas_nav_labels`, the tour flags, drafts). Storage keys are constants in `src/core/constants.ts` or at the top of their owning module.
 
+**Per tab, sessionStorage**: `atlas-signin-resume` (Sign in with OnlyWorlds' round trip, conv. 171: the route, the open door, a held Open id or invitation code; written at the press, read once and removed on `/signin/callback`, and removed on any other boot), beside the SDK's own pending record (state and PKCE verifier) under its own key.
+
 ## Why keep this register
 
 Atlas is a primary OnlyWorlds tool, and the line between "atlas innovates" and "OnlyWorlds standardizes" should be a conscious decision. Periodically:

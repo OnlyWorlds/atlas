@@ -6,7 +6,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 const CSP = readFileSync('public/_headers', 'utf8').match(/Content-Security-Policy: (.+)/)?.[1]?.trim() ?? '';
 
 export default defineConfig({
-  base: './',
+  // Absolute: the app is served at more than the root since Sign in with
+  // OnlyWorlds (`/signin/callback`, public/_redirects), and a relative './'
+  // resolved its scripts under /signin/ there (the S465 gate's G1).
+  base: '/',
   // Staging work points at keel directly via the localStorage
   // 'atlas_dev_api_base' override (dev-api-base.ts) — keel serves CORS since
   // 2026-07-11 (P15), so the old /keel dev proxy retired.

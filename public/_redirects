@@ -1,0 +1,2 @@
+# Sign in with OnlyWorlds returns here (Keel #515): the app answers, not the 404 page.
+/signin/callback /index.html 200

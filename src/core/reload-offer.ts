@@ -12,10 +12,15 @@ import { flushBeforeLeavingWorld } from './leave-flush';
  */
 export const RELOAD_FLUSH_LIMIT_MS = 5000;
 
+/** Save the rooms' pending text, waiting at most `limitMs`: before anything that unloads the page (a reload, Sign in with OnlyWorlds). */
+export async function flushBeforeUnloading(limitMs = RELOAD_FLUSH_LIMIT_MS): Promise<void> {
+  await Promise.race([flushBeforeLeavingWorld(), new Promise<void>(r => setTimeout(r, limitMs))]);
+}
+
 /** Save the rooms' pending text, then reload (never the other way round). */
 export async function reloadAfterFlush(limitMs = RELOAD_FLUSH_LIMIT_MS): Promise<void> {
   try {
-    await Promise.race([flushBeforeLeavingWorld(), new Promise<void>(r => setTimeout(r, limitMs))]);
+    await flushBeforeUnloading(limitMs);
   } finally {
     window.location.reload();
   }

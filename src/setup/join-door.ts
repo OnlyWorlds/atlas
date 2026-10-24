@@ -314,10 +314,14 @@ export function personRoleLine(role: string): string {
 
 /**
  * A person's code waiting for its owner to sign in (in memory, as the captured
- * code is: it never reaches storage). The sign-in runs the door again.
+ * code is). The sign-in runs the door again. One exception: Sign in with
+ * OnlyWorlds unloads the page, so its resume carries the code in this tab's
+ * sessionStorage, read once and cleared on `/signin/callback` (the handoff
+ * sheet §3, D139; `sync/onlyworlds-sign-in.ts`).
  */
 let heldForSignIn: string | null = null;
 export function holdJoinForSignIn(code: string): void { heldForSignIn = code; }
+export function joinHeldForSignIn(): string | null { return heldForSignIn; }
 export function takeJoinHeldForSignIn(): string | null {
   const code = heldForSignIn;
   heldForSignIn = null;

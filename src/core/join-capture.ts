@@ -10,7 +10,7 @@
  */
 
 /** keel's join code: `ow_j_` + urlsafe characters (accounts/agents.py). */
-const JOIN_CODE_RE = /^ow_j_[\w-]{16,128}$/;
+export const JOIN_CODE_RE = /^ow_j_[\w-]{16,128}$/;
 
 /** '' = a join link whose code did not look like one (a truncated paste). */
 let pending: string | null = null;

@@ -23,10 +23,8 @@ import { classifyError, problemFor } from '../core/problems';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
 import { OW_SETTINGS_URL, noAccountYetHtml } from '../core/ow-site';
 import { signInWithPassword, passwordSignInLine } from '../sync/password-sign-in';
-import { isAtlasGrounded } from '../core/grounded';
-import { isTourFlagActive } from '../tour/tour-flag';
-import { accountWorldsWhenFetched } from '../sync/account-worlds';
-import { navigate } from '../core/router';
+import { keepSignIn } from '../sync/after-sign-in';
+import { onlyWorldsSignInButtonHtml, wireOnlyWorldsSignIn } from '../ui/onlyworlds-sign-in-button';
 
 /**
  * The sign-in error line (B6, S369). `accountErrorMessage`'s code branches
@@ -102,6 +100,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
   return `
     <div class="atlas-settings-field atlas-account-token-block" data-role="account-token-block">
       <span>Sign in to OnlyWorlds</span>
+      ${onlyWorldsSignInButtonHtml('Or with your email or username and password:')}
       <form class="atlas-account-password" data-role="account-password-form" novalidate>
         <input class="atlas-input" type="text" name="account-login" placeholder="Email or username"
                autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Email or username" />
@@ -168,6 +167,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
   const block = document.querySelector<HTMLElement>('.atlas-settings [data-role="account-token-block"]');
   if (!block) return;
 
+  wireOnlyWorldsSignIn(block, toasts);
   const signInBtn = block.querySelector<HTMLButtonElement>('[data-action="account-sign-in"]');
   const tokenInput = block.querySelector<HTMLInputElement>('input[name="account-token"]');
   const errorEl = block.querySelector<HTMLElement>('[data-role="account-token-error"]');
@@ -231,38 +231,18 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
 
   /** A token in hand, pasted or just minted: check it, keep it, and open what waited for it. */
   const completeSignIn = async (token: string, onRefused: () => void): Promise<void> => {
+    let username: string;
     try {
-      const profile = await new AccountClient(token).getProfile();
-      const next = setAccountToken(getState().registry, token, profile.username);
-      saveRegistry(next);
-      patchSlice('registry', next);
-      // The ask to sign in is answered: it goes before the door's next question (Kael, h57 #5950).
-      toasts.dismiss(WAITS_FOR_SIGN_IN);
-      toasts.success(`Signed in as ${profile.username}`);
-      // A person's invitation that waited for this sign-in opens again (#294),
-      // and so does a world page's Open in Atlas (#104). Otherwise, on a
-      // browser with no world yet, the account's worlds are on the first
-      // screen (S414): this room has no list of them. Said only once the list
-      // has come with worlds in it, and never under the tour.
-      void import('../ui/person-join-modal').then(async (m) => {
-        const door = await import('../setup/open-door');
-        // One door takes the sign-in; the other's waiting link is dropped,
-        // never left for a later sign-in (the S416 gate's F4).
-        if (await m.resumeJoinAfterSignIn(toasts)) { door.dropHeldOpen(); return; }
-        if (await door.resumeOpenAfterSignIn(toasts) || isAtlasGrounded() || isTourFlagActive()) return;
-        const rows = await accountWorldsWhenFetched(token);
-        if (!rows?.length || isAtlasGrounded() || isTourFlagActive()) return;
-        toasts.show(`Your worlds on OnlyWorlds (${rows.length}) are listed on the first screen.`, 'info', 0, {
-          actions: [{ label: 'Show them', run: () => navigate('#/') }],
-        });
-      });
-      // The settings panel re-renders from the registry patch; the block
-      // flips to the signed-in state on that pass.
+      username = (await new AccountClient(token).getProfile()).username;
     } catch (err) {
       console.warn('[settings] sign-in failed:', err);
       showError(signInErrorLine(err));
       onRefused();
+      return;
     }
+    // The settings panel re-renders from the registry patch; the block flips
+    // to the signed-in state on that pass.
+    void keepSignIn(token, username, toasts);
   };
 
   signInBtn?.addEventListener('click', () => void signIn());

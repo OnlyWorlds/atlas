@@ -14,7 +14,7 @@
  */
 
 /** keel's world ids and element ids are UUIDs. */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** A packet longer than this is cut: a link is not a bulk export. */
 export const OPEN_PACKET_MAX = 200;

@@ -85,7 +85,7 @@ export class PersonJoinModal extends BaseModal {
           holdJoinForSignIn(this.code);
           this.hide();
           navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
-          this.toasts.show('Sign in under Account with your email or username and password. The invitation opens again after that, in this tab; if you reload, open the link again.', 'info', 15_000, { dedupeKey: WAITS_FOR_SIGN_IN });
+          this.toasts.show('Sign in under Account with your OnlyWorlds account. The invitation opens again after that, in this tab; if you reload, open the link again.', 'info', 15_000, { dedupeKey: WAITS_FOR_SIGN_IN });
           return;
         }
         await this.join(say, goBtn, cancelBtn);

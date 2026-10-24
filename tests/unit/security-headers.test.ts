@@ -100,8 +100,25 @@ describe('public/_headers (#302)', () => {
   it('counts the fetch call sites (a new one checks connect-src first)', () => {
     const sites = tsFiles('src').flatMap((f) =>
       read(f).split(/\r?\n/).filter((l) => /\bfetch\(/.test(l) && !/^\s*(\*|\/\/)/.test(l)).map((l) => `${f}: ${l.trim()}`));
-    // seven today: keel v2 (adapter, account, join), the media edge twice, and
-    // the tour's own pictures twice (same origin). worldsync's left at S432.
-    expect(sites, sites.join('\n')).toHaveLength(7);
+    // eight today: keel v2 (adapter, account, join, and the sign-in exchange's
+    // timed fetch, S465), the media edge twice, and the tour's own pictures
+    // twice (same origin). worldsync's left at S432.
+    expect(sites, sites.join('\n')).toHaveLength(8);
+  });
+});
+
+describe('Sign in with OnlyWorlds return address (Keel #515, S465)', () => {
+  it('the app answers it, not the 404 page', () => {
+    const rules = read('public/_redirects').split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
+    expect(rules).toContain('/signin/callback /index.html 200');
+  });
+  it('no cache keeps it and no request from it carries its address', () => {
+    const lines = read('public/_headers').split(/\r?\n/);
+    const at = lines.indexOf('/signin/callback');
+    expect(at).toBeGreaterThan(-1);
+    const block: string[] = [];
+    for (const line of lines.slice(at + 1)) { if (!/^\s/.test(line)) break; block.push(line.trim()); }
+    // The detach first: Pages would otherwise send the policy of /* and this one together.
+    expect(block).toEqual(['! Referrer-Policy', 'Referrer-Policy: no-referrer', 'Cache-Control: no-store']);
   });
 });

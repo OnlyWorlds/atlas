@@ -19,11 +19,13 @@ import { PlainError } from '../core/plain-error';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { noAccountYetHtml } from '../core/ow-site';
 import { WAITS_FOR_SIGN_IN, type ToastManager } from './toast-manager';
+import { onlyWorldsSignInButtonHtml } from './onlyworlds-sign-in-button';
 
 /** The signed-out fields: email or username, password, and where to make an account. */
 export function signInFieldsHtml(prefillLogin = ''): string {
   return `
     <div data-role="sign-in-fields">
+      ${onlyWorldsSignInButtonHtml('Or with your OnlyWorlds email or username and password:')}
       <label class="atlas-modal-field">
         <span>Email or username</span>
         <input class="atlas-input" type="text" name="signin-login" value="${escapeAttr(prefillLogin)}" placeholder="Your OnlyWorlds account" autocomplete="username" autocapitalize="off" spellcheck="false" />

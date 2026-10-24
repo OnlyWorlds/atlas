@@ -66,6 +66,14 @@ export function startApp(container: HTMLElement): AppHandle {
     const merged = adoptStoredRegistry(getState().registry);
     if (merged) patchSlice('registry', merged);
   });
+  // A page the browser brings back from its cache (Back, past a Sign in with
+  // OnlyWorlds that finished in this tab) missed the storage events of its
+  // absence: the same merge (the S465 gate's G8).
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    const merged = adoptStoredRegistry(getState().registry);
+    if (merged) patchSlice('registry', merged);
+  });
   // Hydrate UI prefs (sidebar mode is state-driven since session 223 —
   // decoupled from URL routing; persists across reloads as a user preference).
   const prefs = loadUiPrefs();

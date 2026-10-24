@@ -143,7 +143,7 @@ test('a person code, signed out: it waits through the sign-in, then the invitati
   await page.click('[data-role="account-token-alt"] summary');
   const tokenInput = page.locator('input[name="account-token"]');
   await expect(tokenInput).toBeVisible();
-  const ask = page.locator('.ow-toast', { hasText: 'Sign in under Account with your email or username and password' });
+  const ask = page.locator('.ow-toast', { hasText: 'Sign in under Account with your OnlyWorlds account' });
   await expect(ask).toBeVisible();
   await tokenInput.fill(TOKEN);
   await page.click('[data-action="account-sign-in"]');
