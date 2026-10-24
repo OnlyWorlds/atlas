@@ -23,7 +23,9 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium firefox
       # One worker, as the suite runs on the crew's machine, so the two routes compare.
-      - run: npx playwright test --workers=1 --reporter=list,html,junit
+      # A flaky's first, failing attempt keeps its trace (the config keeps only the
+      # retry's, which passed): S461's front-door flaky left a frame and no trace (S465).
+      - run: npx playwright test --workers=1 --reporter=list,html,junit --trace retain-on-first-failure
         env:
           CI: '1'
           PLAYWRIGHT_JUNIT_OUTPUT_NAME: results.xml
