@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.88.1',
+    date: '2026-10-24',
+    theme: 'A damaged world file is refused',
+    entries: [
+      {
+        id: 'world-file-early-stream-end',
+        title: 'A world file with a damaged entry is refused, not half read',
+        body: 'A world file where one entry\'s packed data stops short of the size the file declares, with stray bytes after it, used to open as if nothing were wrong. Atlas now refuses it, as the folder standard asks, and says it is not a world Atlas can open. Files that are whole open as before.',
+        tags: ['fix', 'import'],
+      },
+    ],
+  },
+  {
     version: '1.88.0',
     date: '2026-10-24',
     theme: 'Hidden here, hidden there',

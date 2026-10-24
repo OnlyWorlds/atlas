@@ -183,6 +183,13 @@ describe('the reader refuses before anything is written', () => {
     refuses({ ...world, 'w/media/é.png': strToU8('a'), 'w/media/é.png': strToU8('b') }, /differ only in capitals or accents/);
   });
 
+  it('an entry whose deflate stream ends before its declared compressed size is refused (§4.7 OW-14, schema-dist serial 58, SDK 4.72.1)', () => {
+    // The standard's own file (dist.60, sha256 b176e92b...): the stream ends four bytes early, those
+    // bytes junk, the sizes and CRC honest; read on SDK 4.72.0.
+    const early = new Uint8Array(readFileSync(resolvePath(__dirname, '../fixtures/owworld', 'fail-OW-14-deflate-early-end.owworld')));
+    expect(() => readWorldZip(early)).toThrow(/^That file is not a world Atlas can open\.$/);
+  });
+
   it('a world.json at the root with another world nested inside (gate F10)', () => {
     refuses({ 'world.json': strToU8(j({ id: WID, name: 'W' })), 'other/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
   });
