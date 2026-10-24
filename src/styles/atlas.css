@@ -41,6 +41,17 @@ html {
   font-family: inherit;
 }
 
+/* An icon is one em wide before its font has come. The icon font is 4 MB and
+   `font-display: block`: until it loads, each icon is its ligature's word
+   ("folder_open") laid out wide and invisible, so every icon button was wider
+   and then shrank, and a click aimed in that window landed beside its target
+   (the e2e's lost Start a world clicks on a cold runner, S461 and S465). Every
+   Material Symbols glyph is one em wide, so the box is the glyph's box. */
+.material-symbols-outlined {
+  width: 1em;
+  overflow: hidden;
+}
+
 /* Open Sans — the OnlyWorlds ecosystem standard (--ow-font-sans in
    onlyworlds-base.css; council/workshop run it). Self-hosted variable woff2
    (latin subset), bundled by vite so URLs survive base:'./' deploys. */

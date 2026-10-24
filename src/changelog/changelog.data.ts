@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.87.1',
+    date: '2026-10-24',
+    theme: 'Buttons that stay where they are',
+    entries: [
+      {
+        id: 'icons-hold-their-place',
+        title: 'Buttons no longer move while Atlas loads its icons',
+        body: 'On a first visit, or a slow connection, the icon buttons were wider until their icons arrived and then shrank, which moved the rows under them: a click in that moment could land beside what you aimed at. Each icon now holds its final size from the start.',
+        tags: ['fix', 'layout'],
+      },
+    ],
+  },
+  {
     version: '1.87.0',
     date: '2026-10-24',
     theme: 'Sign in with OnlyWorlds',
