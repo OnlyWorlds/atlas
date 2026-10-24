@@ -1,0 +1,1390 @@
+<testsuites id="" name="" tests="579" failures="0" skipped="0" errors="0" time="1451.259858">
+<testsuite name="account-mode.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="21" failures="0" skipped="0" time="44.916" errors="0">
+<testcase name="signed out: settings asks for email and password, the token behind its own line, and the sidebar shows no remote section (#387)" classname="account-mode.spec.ts" time="2.372">
+</testcase>
+<testcase name="the Account section says which way to sign in and where the PIN comes from (#282)" classname="account-mode.spec.ts" time="1.46">
+</testcase>
+<testcase name="sign-in rejects a token without the ow_a_ prefix inline, without storing it" classname="account-mode.spec.ts" time="1.461">
+</testcase>
+<testcase name="offline-first: a dead seeded token shows the quiet section error and never blocks local worlds" classname="account-mode.spec.ts" time="2.173">
+</testcase>
+<testcase name="forget drops the token and the remote section disappears" classname="account-mode.spec.ts" time="1.938">
+</testcase>
+<testcase name="a contributor opens a shared world on a write key made for them, no paste (#199)" classname="account-mode.spec.ts" time="3.183">
+</testcase>
+<testcase name="a guest opens a shared world to read, with no PIN asked (#199)" classname="account-mode.spec.ts" time="2.935">
+</testcase>
+<testcase name="a member whose account has no PIN opens to read, and is never asked for one (#199, #294 walk)" classname="account-mode.spec.ts" time="2.853">
+</testcase>
+<testcase name="a member whose account has a PIN, none saved here, is asked after the key is made, and the PIN is kept" classname="account-mode.spec.ts" time="3.012">
+</testcase>
+<testcase name="a member who cancels the PIN question opens nothing, and the key made for them is taken back" classname="account-mode.spec.ts" time="2.881">
+</testcase>
+<testcase name="signed out, the first screen lists no account worlds (S414)" classname="account-mode.spec.ts" time="1.345">
+</testcase>
+<testcase name="signed in, the first screen lists the account worlds and a row opens one (S414)" classname="account-mode.spec.ts" time="2.937">
+</testcase>
+<testcase name="the list arriving repaints only its block: the landing stays the same page (S414)" classname="account-mode.spec.ts" time="2.113">
+</testcase>
+<testcase name="a notify leaves a focused row focused: the rows are not rebuilt (S414 gate H1)" classname="account-mode.spec.ts" time="2.2">
+</testcase>
+<testcase name="a token keel refuses on the first screen says so and offers Settings, not a retry; the doors stay (S414)" classname="account-mode.spec.ts" time="2.156">
+</testcase>
+<testcase name="a list that failed for another reason offers Try again, and Try again asks again (S414)" classname="account-mode.spec.ts" time="2.038">
+</testcase>
+<testcase name="signing in on a browser with no world points at the first screen, which lists the worlds (S414)" classname="account-mode.spec.ts" time="1.602">
+</testcase>
+<testcase name="signing in with an account that has no worlds promises no list (S414 gate M2)" classname="account-mode.spec.ts" time="1.692">
+</testcase>
+<testcase name="signing in where a world already is says nothing of the first screen (S414)" classname="account-mode.spec.ts" time="1.685">
+</testcase>
+<testcase name="signing in with email and password keeps a token made for this browser, never the password (#387)" classname="account-mode.spec.ts" time="1.462">
+</testcase>
+<testcase name="a wrong password says so in Atlas&apos;s words and keeps nothing (#387)" classname="account-mode.spec.ts" time="1.418">
+</testcase>
+</testsuite>
+<testsuite name="agent-mark.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="3.35" errors="0">
+<testcase name="the quiet agent mark › a synced world marks an agent&apos;s last write, not a person&apos;s; a click says it; an edit takes it away; a world on disk only marks nothing" classname="agent-mark.spec.ts" time="3.35">
+</testcase>
+</testsuite>
+<testsuite name="browser-worlds.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="8" failures="0" skipped="0" time="25.172" errors="0">
+<testcase name="a browser world opens from its path, and one whose storage is gone keeps its row" classname="browser-worlds.spec.ts" time="2.01">
+</testcase>
+<testcase name="boot re-adopts browser worlds whose registry was lost" classname="browser-worlds.spec.ts" time="1.883">
+</testcase>
+<testcase name="on Chromium the create dialog asks where, folder first, and &quot;In this browser&quot; makes a browser world" classname="browser-worlds.spec.ts" time="1.634">
+</testcase>
+<testcase name="a world brought down from OnlyWorlds lands in this browser, whole" classname="browser-worlds.spec.ts" time="2.395">
+</testcase>
+<testcase name="a cleared linked world: its row brings it down again, under the same row" classname="browser-worlds.spec.ts" time="4.28">
+</testcase>
+<testcase name="Cancel link into this browser leaves no directory and no row" classname="browser-worlds.spec.ts" time="2.113">
+</testcase>
+<testcase name="two tabs: B reloads during A&apos;s slow link into this browser, and both end with one row" classname="browser-worlds.spec.ts" time="9.114">
+</testcase>
+<testcase name="a browser world: Settings says This browser, offers one Delete, and Delete removes it from the browser" classname="browser-worlds.spec.ts" time="1.743">
+</testcase>
+</testsuite>
+<testsuite name="button-ladder.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="5.17" errors="0">
+<testcase name="front door (dark): Start a world is the one Entry, Explore Moppetopia is Standard, both in the ladder&apos;s shape" classname="button-ladder.spec.ts" time="1.064">
+</testcase>
+<testcase name="front door (light): Start a world is the one Entry, Explore Moppetopia is Standard, both in the ladder&apos;s shape" classname="button-ladder.spec.ts" time="1.159">
+</testcase>
+<testcase name="Forget everything is the danger rung, not a browser-default button (both themes)" classname="button-ladder.spec.ts" time="2.947">
+</testcase>
+</testsuite>
+<testsuite name="calendar.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="10.461" errors="0">
+<testcase name="the world clock gate flows into the builder, and the saved calendar re-labels the room" classname="calendar.spec.ts" time="2.46">
+</testcase>
+<testcase name="typed calendar-word date entry resolves and writes the raw integer" classname="calendar.spec.ts" time="2.706">
+</testcase>
+<testcase name="lens off restores bare numbers; a saved chart remembers its lens" classname="calendar.spec.ts" time="3.02">
+</testcase>
+<testcase name="the legacy-field mint offer seeds the builder and clears the fields" classname="calendar.spec.ts" time="2.275">
+</testcase>
+</testsuite>
+<testsuite name="cast-assign.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="5.54" errors="0">
+<testcase name="ghost card → banner → character click assigns the protagonist and returns home" classname="cast-assign.spec.ts" time="1.867">
+</testcase>
+<testcase name="home ghost assigns a location as the world home" classname="cast-assign.spec.ts" time="1.741">
+</testcase>
+<testcase name="banner × cancels; a mismatched-type click falls through to a normal open" classname="cast-assign.spec.ts" time="1.932">
+</testcase>
+</testsuite>
+<testsuite name="chart-touch.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="12.286" errors="0">
+<testcase name="two fingers zoom the chart, not the page, and one finger pans it" classname="chart-touch.spec.ts" time="2.386">
+</testcase>
+<testcase name="a tap peeks once; a finger slides only a dot it has tapped" classname="chart-touch.spec.ts" time="3.507">
+</testcase>
+<testcase name="a tap on a dot sends the chart no mouse events, and peeks" classname="chart-touch.spec.ts" time="1.927">
+</testcase>
+<testcase name="a tapped range stretches by its end" classname="chart-touch.spec.ts" time="2.249">
+</testcase>
+<testcase name="a finger slides the now-line" classname="chart-touch.spec.ts" time="2.217">
+</testcase>
+</testsuite>
+<testsuite name="command-palette.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="7" failures="0" skipped="0" time="14.091" errors="0">
+<testcase name="Ctrl+K opens; typing ranks; Enter jumps to the element room" classname="command-palette.spec.ts" time="1.864">
+</testcase>
+<testcase name="alias and description matches surface; room jump works" classname="command-palette.spec.ts" time="1.929">
+</testcase>
+<testcase name="`/` opens the palette; see-all hands the query to the sidebar filter" classname="command-palette.spec.ts" time="1.859">
+</testcase>
+<testcase name="Esc closes without navigating; palette needs an active world" classname="command-palette.spec.ts" time="1.772">
+</testcase>
+<testcase name="the palette routes room-owning elements to their own rooms, not the field editor" classname="command-palette.spec.ts" time="2.363">
+</testcase>
+<testcase name="see-all hands off to the sidebar, and the sidebar routes the same way (S306 gate)" classname="command-palette.spec.ts" time="2.159">
+</testcase>
+<testcase name="the room-nav search pill opens the command palette (S309)" classname="command-palette.spec.ts" time="2.145">
+</testcase>
+</testsuite>
+<testsuite name="context-pane.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="21" failures="0" skipped="0" time="40.44" errors="0">
+<testcase name="context tab is permanent leftmost on fresh boot" classname="context-pane.spec.ts" time="1.747">
+</testcase>
+<testcase name="element route: context pane shows graph + element preview" classname="context-pane.spec.ts" time="1.743">
+</testcase>
+<testcase name="element route: clicking a neighbor swaps the preview and shows &quot;open in detail&quot;" classname="context-pane.spec.ts" time="1.948">
+</testcase>
+<testcase name="home route: context pane shows empty state copy" classname="context-pane.spec.ts" time="1.559">
+</testcase>
+<testcase name="breadcrumb appears after recenter; home chip returns to subject" classname="context-pane.spec.ts" time="2.114">
+</testcase>
+<testcase name="right-click node opens action menu" classname="context-pane.spec.ts" time="1.817">
+</testcase>
+<testcase name="toolbar: type chip toggles hide that type in the graph" classname="context-pane.spec.ts" time="2.038">
+</testcase>
+<testcase name="toolbar: hop toggle 1-hop hides adjacent nodes" classname="context-pane.spec.ts" time="2.131">
+</testcase>
+<testcase name="lock layout: surviving nodes do not move when a type is hidden" classname="context-pane.spec.ts" time="2.087">
+</testcase>
+<testcase name="toolbar: hop preference persists in registry" classname="context-pane.spec.ts" time="1.787">
+</testcase>
+<testcase name="zoom: wheel reveals fit-to-view button; click resets" classname="context-pane.spec.ts" time="1.912">
+</testcase>
+<testcase name="hop: 3-hop reveals a node two rings out from the subject" classname="context-pane.spec.ts" time="2.023">
+</testcase>
+<testcase name="settings: edge coloring toggle persists and routes back to graph" classname="context-pane.spec.ts" time="1.98">
+</testcase>
+<testcase name="settings: Context tab renders and persists hop depth" classname="context-pane.spec.ts" time="1.944">
+</testcase>
+<testcase name="knowledge list: context pane anchors on the most-held entry with a caption (K7)" classname="context-pane.spec.ts" time="1.815">
+</testcase>
+<testcase name="share page: context pane anchors on the first carded element" classname="context-pane.spec.ts" time="1.937">
+</testcase>
+<testcase name="right-click &quot;Add to story&quot; appears in writing mode only" classname="context-pane.spec.ts" time="2.074">
+</testcase>
+<testcase name="the right-pane tab bar never becomes a vertical scroll container" classname="context-pane.spec.ts" time="1.759">
+</testcase>
+<testcase name="element preview lists unlinked mentions and &quot;Link all&quot; links them across narratives" classname="context-pane.spec.ts" time="2.149">
+</testcase>
+<testcase name="the create modal nudges when the new name already sits in prose" classname="context-pane.spec.ts" time="1.73">
+</testcase>
+<testcase name="Potentials: names in the text are listed, and Link chips one in the live scene, undoably (#24)" classname="context-pane.spec.ts" time="2.146">
+</testcase>
+</testsuite>
+<testsuite name="custom-fields.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="9.249" errors="0">
+<testcase name="section renders custom fields with clean labels; machinery hidden; add row present" classname="custom-fields.spec.ts" time="1.807">
+</testcase>
+<testcase name="empty state: section still renders with just the add row" classname="custom-fields.spec.ts" time="1.796">
+</testcase>
+<testcase name="add-field flow: name → x_ prefix → value editor auto-opens → save" classname="custom-fields.spec.ts" time="2.159">
+</testcase>
+<testcase name="collision with a schema field is rejected with a hint" classname="custom-fields.spec.ts" time="1.754">
+</testcase>
+<testcase name="delete: populated field asks to confirm, row disappears, null tombstone on disk" classname="custom-fields.spec.ts" time="1.733">
+</testcase>
+</testsuite>
+<testsuite name="date-continuity.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="1.915" errors="0">
+<testcase name="Home lists the dates to check, and each name opens its element (#281)" classname="date-continuity.spec.ts" time="1.915">
+</testcase>
+</testsuite>
+<testsuite name="demo.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="10.767" errors="0">
+<testcase name="the share room no longer links to the demo; #/demo still renders map, pins, and cards" classname="demo.spec.ts" time="3.385">
+</testcase>
+<testcase name="pin click opens the read-only entry modal" classname="demo.spec.ts" time="3.241">
+</testcase>
+<testcase name="the demo writes NOTHING: no registry entry, and exit returns to welcome" classname="demo.spec.ts" time="2.568">
+</testcase>
+<testcase name="Escape exits the demo" classname="demo.spec.ts" time="1.573">
+</testcase>
+</testsuite>
+<testsuite name="drag-to-date.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="7" failures="0" skipped="0" time="13.404" errors="0">
+<testcase name="dragging an undated item onto the axis writes its date and moves it out of the backlog" classname="drag-to-date.spec.ts" time="2.041">
+</testcase>
+<testcase name="a dateless chart still offers a droppable axis for the FIRST date" classname="drag-to-date.spec.ts" time="2.225">
+</testcase>
+<testcase name="dragging a placed dot re-dates it (glyph drag → popover → write)" classname="drag-to-date.spec.ts" time="1.942">
+</testcase>
+<testcase name="a range start cannot pass its recorded end (popover rejects, nothing written)" classname="drag-to-date.spec.ts" time="1.852">
+</testcase>
+<testcase name="a plain click on a dot still peeks (the drag threshold protects the click progression)" classname="drag-to-date.spec.ts" time="1.72">
+</testcase>
+<testcase name="dragging a range END cap stretches the end (S265, the other grip)" classname="drag-to-date.spec.ts" time="1.86">
+</testcase>
+<testcase name="an end-stretch cannot precede the start (popover rejects, nothing written)" classname="drag-to-date.spec.ts" time="1.764">
+</testcase>
+</testsuite>
+<testsuite name="editing-guard.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="4.156" errors="0">
+<testcase name="C3: an inline field edit keeps typing through a sync publish" classname="editing-guard.spec.ts" time="1.801">
+</testcase>
+<testcase name="C4: renaming a knower keeps typing through an elements swap" classname="editing-guard.spec.ts" time="2.355">
+</testcase>
+</testsuite>
+<testsuite name="element-files.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="10.522" errors="0">
+<testcase name="an online world&apos;s element lists its files, with the world&apos;s total and Remove only where keel would take it" classname="element-files.spec.ts" time="2.111">
+</testcase>
+<testcase name="Download asks keel for a link at the click" classname="element-files.spec.ts" time="2.359">
+</testcase>
+<testcase name="Add file: a label, a ticket with the world&apos;s PIN, the bytes with only the ticket, the row in the list" classname="element-files.spec.ts" time="2.368">
+</testcase>
+<testcase name="Remove asks first, then the row leaves" classname="element-files.spec.ts" time="2.482">
+</testcase>
+<testcase name="a local world&apos;s element has no Files card" classname="element-files.spec.ts" time="1.202">
+</testcase>
+</testsuite>
+<testsuite name="folder-conformance.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="3.559" errors="0">
+<testcase name="atlas reads the conformance fixture: every element in the answer key, nothing invented" classname="folder-conformance.spec.ts" time="0.94">
+</testcase>
+<testcase name="a bare-spelled pin keeps its spelling through an edit, and a new pin follows the folder" classname="folder-conformance.spec.ts" time="0.852">
+</testcase>
+<testcase name="a capture written with the wire spelling still has its now, and keeps its own key" classname="folder-conformance.spec.ts" time="0.864">
+</testcase>
+<testcase name="a read leaves the fixture folder byte-identical, id-less file included" classname="folder-conformance.spec.ts" time="0.903">
+</testcase>
+</testsuite>
+<testsuite name="folder-store-fs.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="30" failures="0" skipped="0" time="24.26" errors="0">
+<testcase name="opens an OPFS handle and creates the atlas folder layout" classname="folder-store-fs.spec.ts" time="0.869">
+</testcase>
+<testcase name="world.json is born with format_version and a foreign world.json is never given one" classname="folder-store-fs.spec.ts" time="0.852">
+</testcase>
+<testcase name="the producer line is taken at birth only, and a foreign line stays as it was" classname="folder-store-fs.spec.ts" time="1.017">
+</testcase>
+<testcase name="a fresh world creates every element type under elements/, spatial types included" classname="folder-store-fs.spec.ts" time="0.824">
+</testcase>
+<testcase name="round-trips a character through create / read / list" classname="folder-store-fs.spec.ts" time="0.744">
+</testcase>
+<testcase name="updateElement advances local_updated_at and persists patch fields" classname="folder-store-fs.spec.ts" time="0.745">
+</testcase>
+<testcase name="concurrent updates to the same element serialize — both fields land (convention #79)" classname="folder-store-fs.spec.ts" time="0.667">
+</testcase>
+<testcase name="reopens the same folder and reads back persisted data" classname="folder-store-fs.spec.ts" time="0.685">
+</testcase>
+<testcase name="deleteElement cascades pins referencing the deleted character" classname="folder-store-fs.spec.ts" time="0.864">
+</testcase>
+<testcase name="tombstones persist across close/reopen" classname="folder-store-fs.spec.ts" time="0.82">
+</testcase>
+<testcase name="sync state round-trips" classname="folder-store-fs.spec.ts" time="0.73">
+</testcase>
+<testcase name="lock file is written on open and removed on close" classname="folder-store-fs.spec.ts" time="0.79">
+</testcase>
+<testcase name="second tab with a live lock cannot take over" classname="folder-store-fs.spec.ts" time="0.765">
+</testcase>
+<testcase name="stale lock (older than TTL) is taken over by a new tab" classname="folder-store-fs.spec.ts" time="0.757">
+</testcase>
+<testcase name="listLocallyChangedSince finds elements without server_updated_at" classname="folder-store-fs.spec.ts" time="0.853">
+</testcase>
+<testcase name="applyServerRecord writes both timestamps from the server value" classname="folder-store-fs.spec.ts" time="0.72">
+</testcase>
+<testcase name="body cache: warm view equals cold-from-disk view after every write kind" classname="folder-store-fs.spec.ts" time="0.828">
+</testcase>
+<testcase name="body cache: returned elements are clones — caller mutation never leaks into later reads" classname="folder-store-fs.spec.ts" time="0.745">
+</testcase>
+<testcase name="listElements onProgress: cold walk reports monotonic counts ending at done === total" classname="folder-store-fs.spec.ts" time="0.805">
+</testcase>
+<testcase name="indexing stamps a missing in-body type from the directory, and never overrides a declared one" classname="folder-store-fs.spec.ts" time="0.774">
+</testcase>
+<testcase name="reads a map written to elements/map/ — the layout every other tool writes" classname="folder-store-fs.spec.ts" time="0.721">
+</testcase>
+<testcase name="still reads a legacy spatial/map/ and edits it there, while a NEW map goes to elements/" classname="folder-store-fs.spec.ts" time="0.778">
+</testcase>
+<testcase name="an id present in BOTH layouts serves one copy and deletes neither file" classname="folder-store-fs.spec.ts" time="0.763">
+</testcase>
+<testcase name="a foreign capture serves its content AND spatial elements in one list" classname="folder-store-fs.spec.ts" time="0.826">
+</testcase>
+<testcase name="a new folder is born bare: pins and markers write map and zone, not map_id and zone_id" classname="folder-store-fs.spec.ts" time="0.875">
+</testcase>
+<testcase name="a folder whose pins already use map_id keeps that spelling for a new pin" classname="folder-store-fs.spec.ts" time="0.91">
+</testcase>
+<testcase name="a field edited in the file by another tool survives an atlas update to a different field" classname="folder-store-fs.spec.ts" time="0.886">
+</testcase>
+<testcase name="unlinking keeps a field another tool edited in the file (S361)" classname="folder-store-fs.spec.ts" time="0.897">
+</testcase>
+<testcase name="an element file that will not parse is never overwritten by an atlas save (S361)" classname="folder-store-fs.spec.ts" time="0.874">
+</testcase>
+<testcase name="a corrupt world.json or styles.json is never overwritten by a save (S360)" classname="folder-store-fs.spec.ts" time="0.876">
+</testcase>
+</testsuite>
+<testsuite name="folder-store-slug.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="12" failures="0" skipped="0" time="9.978" errors="0">
+<testcase name="createElement writes &lt;slug&gt;--&lt;uuid&gt;.json" classname="folder-store-slug.spec.ts" time="0.767">
+</testcase>
+<testcase name="createElement writes bare &lt;uuid&gt;.json when name is empty" classname="folder-store-slug.spec.ts" time="0.837">
+</testcase>
+<testcase name="updateElement with a name change renames the file" classname="folder-store-slug.spec.ts" time="0.829">
+</testcase>
+<testcase name="updateElement keeps the same filename when name unchanged" classname="folder-store-slug.spec.ts" time="0.829">
+</testcase>
+<testcase name="reopen reads slug-prefixed file by id" classname="folder-store-slug.spec.ts" time="0.856">
+</testcase>
+<testcase name="duplicate files for same id are deduped on next open (rename-crash recovery)" classname="folder-store-slug.spec.ts" time="0.807">
+</testcase>
+<testcase name="a hand-made variant sharing an id is set aside in .atlas/quarantine, never deleted (S360)" classname="folder-store-slug.spec.ts" time="0.878">
+</testcase>
+<testcase name="legacy full-uuid file tidies to canonical on open; second open is a no-op" classname="folder-store-slug.spec.ts" time="0.848">
+</testcase>
+<testcase name="tidy never overwrites a readable stranger occupying the canonical name" classname="folder-store-slug.spec.ts" time="0.805">
+</testcase>
+<testcase name="tail collision at create: second element falls back to full-id; layout is reopen-stable" classname="folder-store-slug.spec.ts" time="0.905">
+</testcase>
+<testcase name="case-variant of a valid form is left in place (sticky, never &quot;corrected&quot;)" classname="folder-store-slug.spec.ts" time="0.875">
+</testcase>
+<testcase name="applyServerRecord renames when the server changes the name" classname="folder-store-slug.spec.ts" time="0.742">
+</testcase>
+</testsuite>
+<testsuite name="forget-browser.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="4.065" errors="0">
+<testcase name="forget: the world kept only here is named, another tab stops it, then the reload is a first visit" classname="forget-browser.spec.ts" time="4.065">
+</testcase>
+</testsuite>
+<testsuite name="front-door-gate.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="8" failures="0" skipped="0" time="18.298" errors="0">
+<testcase name="B1 rootless: &quot;Delete world + folder&quot; on a world opened in place never leaves the active world without a store" classname="front-door-gate.spec.ts" time="2.426">
+</testcase>
+<testcase name="B2 with a root: deleting an in-place world never deletes a same-named folder inside the root" classname="front-door-gate.spec.ts" time="2.458">
+</testcase>
+<testcase name="B3 a later root holding a same-id copy does not take over the in-place world&apos;s handle slot" classname="front-door-gate.spec.ts" time="1.853">
+</testcase>
+<testcase name="B4 rootless with a world: the example page offers &quot;back to atlas&quot;, not &quot;set up a local folder&quot;" classname="front-door-gate.spec.ts" time="4.494">
+</testcase>
+<testcase name="B6 during the tour, Ctrl+K does not offer the world doors the sidebar locks" classname="front-door-gate.spec.ts" time="1.276">
+</testcase>
+<testcase name="B7 a folder holding several world folders names what it found" classname="front-door-gate.spec.ts" time="1.882">
+</testcase>
+<testcase name="B8 Escape and an outside click on the home-folder question settle it as cancel" classname="front-door-gate.spec.ts" time="2.083">
+</testcase>
+<testcase name="B9 a double-click on &quot;add a world&quot; leaves the chooser open" classname="front-door-gate.spec.ts" time="1.826">
+</testcase>
+</testsuite>
+<testsuite name="front-door.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="25" failures="0" skipped="0" time="50.908" errors="0">
+<testcase name="first visit: &quot;open a world folder&quot; opens the world in place, no home folder asked" classname="front-door.spec.ts" time="1.516">
+</testcase>
+<testcase name="first visit: two doors, start a world and Moppetopia, then the tour, a world folder and other ways in" classname="front-door.spec.ts" time="1.516">
+</testcase>
+<testcase name="first visit, browser storage refused on Chromium: no tour, and the doors left say only what works (S374 gate F6)" classname="front-door.spec.ts" time="0.768">
+</testcase>
+<testcase name="first visit: start a world asks where, folder first, and the browser row lands a world in this browser" classname="front-door.spec.ts" time="2.076">
+</testcase>
+<testcase name="first visit: start a world in a folder, pointed at a world folder for its home, opens that world instead" classname="front-door.spec.ts" time="2.029">
+</testcase>
+<testcase name="a world opened without a home folder: a reload shows the world list, not the landing" classname="front-door.spec.ts" time="1.697">
+</testcase>
+<testcase name="the first NEW world asks where worlds live, then creates it there" classname="front-door.spec.ts" time="1.933">
+</testcase>
+<testcase name="cancelling the home-folder question creates nothing" classname="front-door.spec.ts" time="1.991">
+</testcase>
+<testcase name="a click on Start a world survives a sidebar re-render between press and release" classname="front-door.spec.ts" time="2.124">
+</testcase>
+<testcase name="a click on a world row survives a sidebar re-render between press and release" classname="front-door.spec.ts" time="2.036">
+</testcase>
+<testcase name="a click on a room in the strip survives a re-render between press and release" classname="front-door.spec.ts" time="2.832">
+</testcase>
+<testcase name="a click on the sidebar mode toggle survives a re-render between press and release" classname="front-door.spec.ts" time="2.467">
+</testcase>
+<testcase name="a click on the element page survives a re-render between press and release" classname="front-door.spec.ts" time="2.51">
+</testcase>
+<testcase name="a click on a settings tab survives a re-render between press and release" classname="front-door.spec.ts" time="2.365">
+</testcase>
+<testcase name="the OnlyWorlds tab&apos;s waypoint count moves when a waypoint lands" classname="front-door.spec.ts" time="2.037">
+</testcase>
+<testcase name="a click on a right pane tab survives a re-render between press and release" classname="front-door.spec.ts" time="2.346">
+</testcase>
+<testcase name="a click on a type in the elements filter strip survives a re-render between press and release" classname="front-door.spec.ts" time="2.494">
+</testcase>
+<testcase name="a click on a row in the writing tree survives a re-render between press and release" classname="front-door.spec.ts" time="2.368">
+</testcase>
+<testcase name="a click on a map in the map index survives a re-render between press and release" classname="front-door.spec.ts" time="2.357">
+</testcase>
+<testcase name="a click on the chart room&apos;s Set now time survives a re-render between press and release" classname="front-door.spec.ts" time="2.211">
+</testcase>
+<testcase name="the map index chevron folds a parent map" classname="front-door.spec.ts" time="1.432">
+</testcase>
+<testcase name="a click on the sync pill&apos;s conflict badge stays on the badge across a re-render" classname="front-door.spec.ts" time="2.351">
+</testcase>
+<testcase name="&quot;add a world&quot; opens the chooser; its open-a-world row opens a picked world" classname="front-door.spec.ts" time="1.783">
+</testcase>
+<testcase name="Settings can hide the add-world icons; &quot;add a world&quot; stays, across a reload" classname="front-door.spec.ts" time="2.063">
+</testcase>
+<testcase name="the open-a-world door does not switch an existing home folder" classname="front-door.spec.ts" time="1.606">
+</testcase>
+</testsuite>
+<testsuite name="frontend-craft.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="3.437" errors="0">
+<testcase name="the tab title follows the world, the room and the element" classname="frontend-craft.spec.ts" time="1.722">
+</testcase>
+<testcase name="chrome does not select, icons never copy, toasts are announced" classname="frontend-craft.spec.ts" time="1.715">
+</testcase>
+</testsuite>
+<testsuite name="hide-empty-fields.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="3.866" errors="0">
+<testcase name="Hide empty fields shows only what the element holds, and Show them brings the rest back" classname="hide-empty-fields.spec.ts" time="2.063">
+</testcase>
+<testcase name="an element with nothing filled keeps its first section whole" classname="hide-empty-fields.spec.ts" time="1.803">
+</testcase>
+</testsuite>
+<testsuite name="home-keepsafe.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="5.429" errors="0">
+<testcase name="the keep-safe card: shown past the threshold, × hides it for a week across a reload" classname="home-keepsafe.spec.ts" time="2.28">
+</testcase>
+<testcase name="the keep-safe card: below the threshold it stays away; a download from it hides it" classname="home-keepsafe.spec.ts" time="3.149">
+</testcase>
+</testsuite>
+<testsuite name="home-tour.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="6" failures="0" skipped="0" time="12.03" errors="0">
+<testcase name="empty world: &quot;What do you have?&quot; with three rows, the core pair under the first" classname="home-tour.spec.ts" time="2.136">
+</testcase>
+<testcase name="creating from a home tile stays on home; the first element row is highlighted" classname="home-tour.spec.ts" time="1.909">
+</testcase>
+<testcase name="both cores → &quot;Grow your world&quot;: done cards stay in place and open their room; × persists" classname="home-tour.spec.ts" time="2.524">
+</testcase>
+<testcase name="the Start-page links: #/start asks nothing; #/bring-in lands in the Data room" classname="home-tour.spec.ts" time="2.157">
+</testcase>
+<testcase name="desk map rows: imageless map opens its flat canvas tab (S300, was the S265 divert)" classname="home-tour.spec.ts" time="1.628">
+</testcase>
+<testcase name="desk map rows: an already-open background map tab re-activates on click (S265)" classname="home-tour.spec.ts" time="1.676">
+</testcase>
+</testsuite>
+<testsuite name="hostile-world.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="6.652" errors="0">
+<testcase name="a script-shaped element name on a pinned map draws as text and never runs" classname="hostile-world.spec.ts" time="2.183">
+</testcase>
+<testcase name="a zone colour and a marker order from a file cannot break out of the zone page" classname="hostile-world.spec.ts" time="1.937">
+</testcase>
+<testcase name="foreign shapes load: a numeric name, a pin without x/y, string coordinates, a bare-string link" classname="hostile-world.spec.ts" time="2.532">
+</testcase>
+</testsuite>
+<testsuite name="import-export.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="12" failures="0" skipped="0" time="27.496" errors="0">
+<testcase name="import full-world JSON creates a new world (Mode A)" classname="import-export.spec.ts" time="2.329">
+</testcase>
+<testcase name="import as new opens the world with its own details, not only a name (S412)" classname="import-export.spec.ts" time="3.322">
+</testcase>
+<testcase name="import as new into this browser: the where-step lands a browser world, and Cancel imports nothing" classname="import-export.spec.ts" time="2.62">
+</testcase>
+<testcase name="import loose elements merges into the current world (Mode B)" classname="import-export.spec.ts" time="1.852">
+</testcase>
+<testcase name="import the keel envelope creates a world and ADOPTS its world id (S313)" classname="import-export.spec.ts" time="2.201">
+</testcase>
+<testcase name="re-importing a world that already exists offers merge-or-new and merges without duplicating (S313)" classname="import-export.spec.ts" time="2.416">
+</testcase>
+<testcase name="validation surfaces issues and a fix prompt" classname="import-export.spec.ts" time="1.475">
+</testcase>
+<testcase name="tabs switch between bring in and take out" classname="import-export.spec.ts" time="2.069">
+</testcase>
+<testcase name="IE6: paste box shows live validity (green valid / red invalid)" classname="import-export.spec.ts" time="3.174">
+</testcase>
+<testcase name="IE3: take-out shows grouped type rows with an all/none toggle" classname="import-export.spec.ts" time="1.524">
+</testcase>
+<testcase name="export downloads an ow.com-compatible JSON" classname="import-export.spec.ts" time="2.109">
+</testcase>
+<testcase name="a loaded payload survives switching worlds in the Data room, not leaving the room" classname="import-export.spec.ts" time="2.405">
+</testcase>
+</testsuite>
+<testsuite name="invite.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="11" failures="0" skipped="0" time="34.478" errors="0">
+<testcase name="&quot;A player&quot; makes keel&apos;s no-account player link, as a new Character or one the world holds (#416)" classname="invite.spec.ts" time="3.57">
+</testcase>
+<testcase name="a Character keel no longer holds is said, not retried (#416)" classname="invite.spec.ts" time="3.115">
+</testcase>
+<testcase name="signed in, the owner makes a player&apos;s link in Atlas: shown once, Copy and a QR code (#341)" classname="invite.spec.ts" time="3.377">
+</testcase>
+<testcase name="a world only shared with the account offers no Invite someone (#341)" classname="invite.spec.ts" time="2.777">
+</testcase>
+<testcase name="with the account list loaded, a world missing from it offers no Invite someone (#341, gate M2)" classname="invite.spec.ts" time="3.033">
+</testcase>
+<testcase name="while keel makes the link nothing closes the dialog or changes what is asked, and one link is made (#341, gate H1, M3)" classname="invite.spec.ts" time="3.285">
+</testcase>
+<testcase name="a world at keel&apos;s cap of open invites is told to take some back, not to try again (#341, gate M1)" classname="invite.spec.ts" time="3.215">
+</testcase>
+<testcase name="a refused account token is said in the dialog, with where to sign in again (#341, gate M3)" classname="invite.spec.ts" time="3.183">
+</testcase>
+<testcase name="keel refusing the link (not the owner) is said in the dialog; no link shown (#341)" classname="invite.spec.ts" time="3.128">
+</testcase>
+<testcase name="no connection: the dialog says so and the button comes back (#341)" classname="invite.spec.ts" time="3.029">
+</testcase>
+<testcase name="signed out, Invite someone still opens the website&apos;s Access pane, and says signing in brings it here (#341)" classname="invite.spec.ts" time="2.766">
+</testcase>
+</testsuite>
+<testsuite name="join-door.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="6" failures="0" skipped="0" time="11.078" errors="0">
+<testcase name="a join link: the code is gone before keel answers, the screen names the world, Open joins as a seat" classname="join-door.spec.ts" time="2.04">
+</testcase>
+<testcase name="a player link (#416, keel #353): opens to read as the Character, no account, no seat, no PIN" classname="join-door.spec.ts" time="1.974">
+</testcase>
+<testcase name="a party link: pick who you are, taken ones greyed and last; a pick taken a moment ago looks again and spends nothing" classname="join-door.spec.ts" time="2.26">
+</testcase>
+<testcase name="a party link with no list asks each player&apos;s name; with every Character taken it offers no Open" classname="join-door.spec.ts" time="2.307">
+</testcase>
+<testcase name="a refused code says so once and opens nothing" classname="join-door.spec.ts" time="1.559">
+</testcase>
+<testcase name="a link opened into a running tab takes the same door, and a hostile world name stays text" classname="join-door.spec.ts" time="0.938">
+</testcase>
+</testsuite>
+<testsuite name="knowledge.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="17" failures="0" skipped="0" time="42.537" errors="0">
+<testcase name="knowledge room: nav button opens the room with an empty state" classname="knowledge.spec.ts" time="2.216">
+</testcase>
+<testcase name="draft create flow: nothing persists until &quot;create&quot;" classname="knowledge.spec.ts" time="2.358">
+<properties>
+<property name="slow" value="">
+</property>
+</properties>
+</testcase>
+<testcase name="draft persists across navigation; cancel clears the stash" classname="knowledge.spec.ts" time="2.062">
+</testcase>
+<testcase name="saved entry: rename then revert both persist (no stale baseline)" classname="knowledge.spec.ts" time="1.715">
+<properties>
+<property name="slow" value="">
+</property>
+</properties>
+</testcase>
+<testcase name="draft @-mention derives a non-removable about chip and persists as subject on create" classname="knowledge.spec.ts" time="2.152">
+</testcase>
+<testcase name="saved entry: mentions derive about-fields, but a mentioned circle is NEVER added as holder" classname="knowledge.spec.ts" time="4.092">
+</testcase>
+<testcase name="knowers tab lists holders; known-view compiles held entries per element" classname="knowledge.spec.ts" time="2.124">
+</testcase>
+<testcase name="context pane graphs an open entry: narrator + circle holders appear as neighbors" classname="knowledge.spec.ts" time="2.491">
+</testcase>
+<testcase name="unlink chip keeps prose text + field; About × is the explicit removal path" classname="knowledge.spec.ts" time="3.961">
+</testcase>
+<testcase name="in-room delete: confirm dialog, entry removed, lands on the list" classname="knowledge.spec.ts" time="1.944">
+</testcase>
+<testcase name="missing entry id renders a not-found interim, not a hijacked URL" classname="knowledge.spec.ts" time="1.779">
+</testcase>
+<testcase name="known-view lens dims unknown elements in the sidebar; banner × clears it" classname="knowledge.spec.ts" time="2.126">
+</testcase>
+<testcase name="element detail surfaces Knowledge: known by + subject of (K6)" classname="knowledge.spec.ts" time="1.725">
+</testcase>
+<testcase name="two individual knowers promote to a circle (S265, the narrator single-link dead end)" classname="knowledge.spec.ts" time="2.473">
+</testcase>
+<testcase name="saved entry: a prose save that fails is retried when you leave the entry" classname="knowledge.spec.ts" time="3.751">
+<properties>
+<property name="slow" value="">
+</property>
+</properties>
+</testcase>
+<testcase name="deleting an entry right after typing writes nothing to it" classname="knowledge.spec.ts" time="3.555">
+</testcase>
+<testcase name="the link-all pill never covers an entry&apos;s prose (S365 gate lens C M7)" classname="knowledge.spec.ts" time="2.013">
+</testcase>
+</testsuite>
+<testsuite name="known-of.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="3.179" errors="0">
+<testcase name="a stub reads as known of: name, picture, description and what keel shares, read only, no rename; a whole Character keeps its page" classname="known-of.spec.ts" time="1.714">
+</testcase>
+<testcase name="a stub with nothing shared shows no rows at all (never a first section of empty ones)" classname="known-of.spec.ts" time="1.465">
+</testcase>
+</testsuite>
+<testsuite name="light-mode-contrast.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="3.065" errors="0">
+<testcase name="floating chrome stays readable in light mode" classname="light-mode-contrast.spec.ts" time="0.783">
+</testcase>
+<testcase name="the same chrome is still readable in dark mode" classname="light-mode-contrast.spec.ts" time="0.799">
+</testcase>
+<testcase name="a focused text field&apos;s border reads against its resting border (light)" classname="light-mode-contrast.spec.ts" time="0.745">
+</testcase>
+<testcase name="a focused text field&apos;s border reads against its resting border (dark)" classname="light-mode-contrast.spec.ts" time="0.738">
+</testcase>
+</testsuite>
+<testsuite name="link-field-create.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="7.539" errors="0">
+<testcase name="a zero-candidate link field creates its target and auto-links, staying put" classname="link-field-create.spec.ts" time="2.128">
+</testcase>
+<testcase name="a multi-link field with zero candidates also routes to create" classname="link-field-create.spec.ts" time="1.884">
+</testcase>
+<testcase name="with candidates present the click opens the picker, not the create modal" classname="link-field-create.spec.ts" time="1.806">
+</testcase>
+<testcase name="clicking an empty link field BODY (not just the icon) opens the picker (S313)" classname="link-field-create.spec.ts" time="1.721">
+</testcase>
+</testsuite>
+<testsuite name="live-folder.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="10" failures="0" skipped="0" time="23.589" errors="0">
+<testcase name="an edit made outside Atlas shows in the open element and the list when the window regains focus" classname="live-folder.spec.ts" time="1.896">
+</testcase>
+<testcase name="a file created and one deleted outside Atlas appear and disappear after a pass" classname="live-folder.spec.ts" time="1.71">
+</testcase>
+<testcase name="the open scene reloads an outside edit to its story, even when Atlas keeps a rich-text copy" classname="live-folder.spec.ts" time="3.861">
+<properties>
+<property name="slow" value="">
+</property>
+</properties>
+</testcase>
+<testcase name="typing that lands during the pass wins, and the room says so" classname="live-folder.spec.ts" time="1.869">
+<properties>
+<property name="slow" value="">
+</property>
+</properties>
+</testcase>
+<testcase name="the open knowledge entry reloads an outside edit" classname="live-folder.spec.ts" time="1.627">
+<properties>
+<property name="slow" value="">
+</property>
+</properties>
+</testcase>
+<testcase name="the element list marks what changed on disk: a count, a filter, a dot until opened" classname="live-folder.spec.ts" time="1.883">
+</testcase>
+<testcase name="dismissing the notice clears the row marks, with nothing else changing" classname="live-folder.spec.ts" time="3.569">
+</testcase>
+<testcase name="&quot;reload from disk&quot; in Ctrl+K runs a pass and says what it found" classname="live-folder.spec.ts" time="1.947">
+</testcase>
+<testcase name="world notes are written to the folder, and a browser that lost them gets them back from it" classname="live-folder.spec.ts" time="3.227">
+</testcase>
+<testcase name="a scene reloaded from disk keeps the editor focused" classname="live-folder.spec.ts" time="2">
+<properties>
+<property name="slow" value="">
+</property>
+</properties>
+</testcase>
+</testsuite>
+<testsuite name="made-by.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="10.532" errors="0">
+<testcase name="made by, and the room › a synced world with an agent seat filters by who made it; the room hides; a world on disk offers no made-by" classname="made-by.spec.ts" time="3.134">
+</testcase>
+<testcase name="made by, and the room › an agent seat that made nothing offers no Made by, until an agent&apos;s element arrives" classname="made-by.spec.ts" time="4.599">
+</testcase>
+<testcase name="made by, and the room › the parlor&apos;s room is hidden from Home, a lore page, Charts and Search until shown" classname="made-by.spec.ts" time="2.799">
+</testcase>
+</testsuite>
+<testsuite name="map-dates.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="11.714" errors="0">
+<testcase name="a map shows its zones as of a date: the now by default, a slider, Now and All dates (#280)" classname="map-dates.spec.ts" time="6.514">
+</testcase>
+<testcase name="the zone panel at a date: a kind keeps its key, its eye hides it, and a date with no zone keeps the panel open (#280, the S410 gate)" classname="map-dates.spec.ts" time="1.88">
+</testcase>
+<testcase name="a map shows its pins by their element&apos;s dates: a birth on, an event inside its dates, the undated always (Q11)" classname="map-dates.spec.ts" time="3.32">
+</testcase>
+</testsuite>
+<testsuite name="map-ink.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="12" failures="0" skipped="0" time="57.823" errors="0">
+<testcase name="a plain map draws its zones as before (the control)" classname="map-ink.spec.ts" time="1.829">
+</testcase>
+<testcase name="an ink map draws each zone from its kind, and the zones stay as they are" classname="map-ink.spec.ts" time="1.798">
+</testcase>
+<testcase name="a map with a picture takes the style&apos;s ink and covers nothing" classname="map-ink.spec.ts" time="1.797">
+</testcase>
+<testcase name="back from a style to Plain, the zones keep their plain order" classname="map-ink.spec.ts" time="1.748">
+</testcase>
+<testcase name="a modern atlas map draws the same zones in its own register (S424)" classname="map-ink.spec.ts" time="1.988">
+</testcase>
+<testcase name="a hatched map draws the same zones in one sepia, the kind in the texture (S425)" classname="map-ink.spec.ts" time="1.826">
+</testcase>
+<testcase name="an island&apos;s spaced capitals never print over the pins beside them, ink (S424)" classname="map-ink.spec.ts" time="3.132">
+</testcase>
+<testcase name="a river on an ink map ends at the coast it runs out over" classname="map-ink.spec.ts" time="2.536">
+</testcase>
+<testcase name="a river&apos;s name keeps to its land, never the stretch out at sea" classname="map-ink.spec.ts" time="2.355">
+</testcase>
+<testcase name="a name along a river moves along it, clear of an area&apos;s name on its middle" classname="map-ink.spec.ts" time="2.014">
+</testcase>
+<testcase name="Trace turns one drag into a few points and does not pan the map" classname="map-ink.spec.ts" time="9.629">
+</testcase>
+<testcase name="Trace keeps a coast to its budget, a drifting click to one point, and the drag to itself" classname="map-ink.spec.ts" time="27.171">
+</testcase>
+</testsuite>
+<testsuite name="message-charter.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="5.193" errors="0">
+<testcase name="#526 messages and the charter › a message shows From and To above its text, and a story does not" classname="message-charter.spec.ts" time="1.548">
+</testcase>
+<testcase name="#526 messages and the charter › a world&apos;s charter leads Home and opens from there" classname="message-charter.spec.ts" time="1.546">
+</testcase>
+<testcase name="#526 messages and the charter › world.json&apos;s charter names which Law leads Home, through a reopen (§4.6 (a))" classname="message-charter.spec.ts" time="2.099">
+</testcase>
+</testsuite>
+<testsuite name="move-world.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="13.707" errors="0">
+<testcase name="a browser world moved to a folder: the folder holds it, the browser copy is gone, and it reopens from the folder" classname="move-world.spec.ts" time="2.252">
+</testcase>
+<testcase name="a linked world moved to a folder syncs its next edit" classname="move-world.spec.ts" time="7.997">
+</testcase>
+<testcase name="two tabs: B, opening the world while A copies it, is told it is being moved and is never offered a take-over" classname="move-world.spec.ts" time="3.458">
+</testcase>
+</testsuite>
+<testsuite name="narrow-layout.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="7" failures="0" skipped="0" time="13.144" errors="0">
+<testcase name="narrow windows › at 1024 the right pane becomes a reachable drawer" classname="narrow-layout.spec.ts" time="2.335">
+</testcase>
+<testcase name="narrow windows › at 760 both side panes are drawers and the middle keeps the window" classname="narrow-layout.spec.ts" time="2.343">
+</testcase>
+<testcase name="narrow windows › at 390 both drawer toggles stay on screen" classname="narrow-layout.spec.ts" time="1.773">
+</testcase>
+<testcase name="narrow windows › at 390 the strip is a thumb strip: finger-sized controls, the other rooms under More (#244)" classname="narrow-layout.spec.ts" time="1.967">
+</testcase>
+<testcase name="narrow windows › above the breakpoint nothing changes" classname="narrow-layout.spec.ts" time="1.837">
+</testcase>
+<testcase name="narrow windows › the tour dock fits a phone screen instead of painting over itself" classname="narrow-layout.spec.ts" time="1.172">
+</testcase>
+<testcase name="at 760 with a home folder and no world open, the sidebar is in reach" classname="narrow-layout.spec.ts" time="1.717">
+</testcase>
+</testsuite>
+<testsuite name="now-line.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="1.777" errors="0">
+<testcase name="Set now establishes time_current and toggles to a now chip; clear resets" classname="now-line.spec.ts" time="1.777">
+</testcase>
+</testsuite>
+<testsuite name="open-door.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="10.884" errors="0">
+<testcase name="signed in, a world page link opens the world after Open, and again opens the copy here (#104)" classname="open-door.spec.ts" time="4.221">
+</testcase>
+<testcase name="a world not on the signed-in account is said, and nothing is made (#104)" classname="open-door.spec.ts" time="2.129">
+</testcase>
+<testcase name="signed out, the link waits for the sign-in in Settings, then asks to open (#104)" classname="open-door.spec.ts" time="2.528">
+</testcase>
+<testcase name="a truncated link is said, and the address bar is cleared (#104)" classname="open-door.spec.ts" time="2.006">
+</testcase>
+</testsuite>
+<testsuite name="person-door.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="8.635" errors="0">
+<testcase name="a person code, signed in: Join accepts it with the account, and the world opens on a key made for the member" classname="person-door.spec.ts" time="2.005">
+</testcase>
+<testcase name="a person code, signed out: it waits through the sign-in, then the invitation opens again" classname="person-door.spec.ts" time="2.137">
+</testcase>
+<testcase name="a person code keel refuses: the refused line, and nothing opens" classname="person-door.spec.ts" time="1.691">
+</testcase>
+<testcase name="joined, then the where-question cancelled: a toast keeps the way in, and Open it opens the world" classname="person-door.spec.ts" time="2.802">
+</testcase>
+</testsuite>
+<testsuite name="phase-bout-cc.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="8.531" errors="0">
+<testcase name="Bout CC — sidebar toggle + gear + selection UX › right tab label is the active world name (not &quot;elements&quot;)" classname="phase-bout-cc.spec.ts" time="1.553">
+</testcase>
+<testcase name="Bout CC — sidebar toggle + gear + selection UX › right tab is hidden when no world is active" classname="phase-bout-cc.spec.ts" time="1.371">
+</testcase>
+<testcase name="Bout CC — sidebar toggle + gear + selection UX › gear toggles settings open and closed" classname="phase-bout-cc.spec.ts" time="1.743">
+</testcase>
+<testcase name="Bout CC — sidebar toggle + gear + selection UX › gear-close restores selected element when one was set" classname="phase-bout-cc.spec.ts" time="2.061">
+</testcase>
+<testcase name="Bout CC — sidebar toggle + gear + selection UX › right-tab click from settings only changes sidebar mode (decoupled)" classname="phase-bout-cc.spec.ts" time="1.803">
+</testcase>
+</testsuite>
+<testsuite name="phase2-ui.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="15" failures="0" skipped="0" time="25.556" errors="0">
+<testcase name="first launch shows the landing, not create-local" classname="phase2-ui.spec.ts" time="1.109">
+</testcase>
+<testcase name="set up atlas folder flips the UI into create-local mode" classname="phase2-ui.spec.ts" time="1.419">
+</testcase>
+<testcase name="setup wraps the picked folder by creating atlas-worlds/ subfolder" classname="phase2-ui.spec.ts" time="1.418">
+</testcase>
+<testcase name="re-use: picking a folder that is already an atlas root does NOT double-wrap" classname="phase2-ui.spec.ts" time="1.877">
+</testcase>
+<testcase name="create local world inside atlas root → sidebar + welcome + URL" classname="phase2-ui.spec.ts" time="1.702">
+</testcase>
+<testcase name="two worlds created in root share parent folder" classname="phase2-ui.spec.ts" time="2.031">
+</testcase>
+<testcase name="settings shows atlas folder + identity fields" classname="phase2-ui.spec.ts" time="1.796">
+</testcase>
+<testcase name="legacy &quot;atlas-worlds&quot; wrapper is detected on re-pick (no double-wrap)" classname="phase2-ui.spec.ts" time="1.411">
+</testcase>
+<testcase name="reload → atlas root + world both persist, click re-activates" classname="phase2-ui.spec.ts" time="2.318">
+</testcase>
+<testcase name="reload with world in URL hash → silent auto-activate preserves state" classname="phase2-ui.spec.ts" time="1.59">
+</testcase>
+<testcase name="forget world removes it from sidebar + nav to root, atlas root preserved" classname="phase2-ui.spec.ts" time="1.92">
+</testcase>
+<testcase name="change atlas folder swaps the root without losing existing worlds" classname="phase2-ui.spec.ts" time="1.855">
+</testcase>
+<testcase name="settings gear opens panel without an active world" classname="phase2-ui.spec.ts" time="1.457">
+</testcase>
+<testcase name="rescan: re-picking an existing root after a localStorage wipe imports worlds" classname="phase2-ui.spec.ts" time="2.346">
+</testcase>
+<testcase name="create modal cancel button closes without creating a world" classname="phase2-ui.spec.ts" time="1.307">
+</testcase>
+</testsuite>
+<testsuite name="phase3-link-api.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="9" failures="0" skipped="0" time="14.206" errors="0">
+<testcase name="+ link api button is hidden until atlas root is configured" classname="phase3-link-api.spec.ts" time="1.32">
+</testcase>
+<testcase name="+ link api opens a modal with api-key, pin, and display-name fields" classname="phase3-link-api.spec.ts" time="1.439">
+</testcase>
+<testcase name="link modal pin field is pre-filled from registry.pin" classname="phase3-link-api.spec.ts" time="1.575">
+</testcase>
+<testcase name="link modal cancel button closes without side-effects" classname="phase3-link-api.spec.ts" time="1.316">
+</testcase>
+<testcase name="link modal Escape key closes the modal" classname="phase3-link-api.spec.ts" time="1.242">
+</testcase>
+<testcase name="link modal submit with empty fields shows inline error" classname="phase3-link-api.spec.ts" time="1.432">
+</testcase>
+<testcase name="a running link ignores outside clicks and Escape, and Stop keeps what has downloaded" classname="phase3-link-api.spec.ts" time="1.778">
+</testcase>
+<testcase name="Cancel link leaves the world you were in open and writable" classname="phase3-link-api.spec.ts" time="2.217">
+</testcase>
+<testcase name="Cancel link removes the new folder and registers nothing" classname="phase3-link-api.spec.ts" time="1.887">
+</testcase>
+</testsuite>
+<testsuite name="phase3-make-online.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="7" failures="0" skipped="0" time="14.261" errors="0">
+<testcase name="Make Online button is shown in settings for a local-only world" classname="phase3-make-online.spec.ts" time="1.667">
+</testcase>
+<testcase name="Make Online modal opens with both route tabs" classname="phase3-make-online.spec.ts" time="1.878">
+</testcase>
+<testcase name="Signed in, Make online asks only the PIN and makes the world on the account" classname="phase3-make-online.spec.ts" time="2.941">
+</testcase>
+<testcase name="Tab switching toggles the active route pane" classname="phase3-make-online.spec.ts" time="1.913">
+</testcase>
+<testcase name="Cancel button closes the modal without side-effects" classname="phase3-make-online.spec.ts" time="1.808">
+</testcase>
+<testcase name="Link route requires api key and pin" classname="phase3-make-online.spec.ts" time="1.921">
+</testcase>
+<testcase name="Make Online button is hidden for an already-api-linked world" classname="phase3-make-online.spec.ts" time="2.133">
+</testcase>
+</testsuite>
+<testsuite name="phase35-settings.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="11" failures="0" skipped="0" time="34.506" errors="0">
+<testcase name="settings opens to onlyworlds tab; world tab disabled without active world" classname="phase35-settings.spec.ts" time="1.303">
+</testcase>
+<testcase name="clicking tabs updates url + visible content" classname="phase35-settings.spec.ts" time="1.599">
+</testcase>
+<testcase name="storage tab — sync toggles persist to localStorage" classname="phase35-settings.spec.ts" time="1.884">
+</testcase>
+<testcase name="world tab — rename + stay-offline toggle persist" classname="phase35-settings.spec.ts" time="1.508">
+</testcase>
+<testcase name="world tab — image URL persists to world.json and mirrors to the home cover" classname="phase35-settings.spec.ts" time="1.748">
+</testcase>
+<testcase name="world tab: units save trimmed to world.json and print after the numbers that carry them (#149)" classname="phase35-settings.spec.ts" time="16.683">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|test-results/phase35-settings-world-tab-cd951-umbers-that-carry-them-149--chromium/test-failed-1.png]]
+
+[[ATTACHMENT|test-results/phase35-settings-world-tab-cd951-umbers-that-carry-them-149--chromium/error-context.md]]
+
+[[ATTACHMENT|test-results/phase35-settings-world-tab-cd951-umbers-that-carry-them-149--chromium-retry1/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="a save that lands while you type in the next field keeps your typing (the units race, S452)" classname="phase35-settings.spec.ts" time="1.973">
+</testcase>
+<testcase name="world tab — api-linked worlds get stay-offline + refresh + unlink + test" classname="phase35-settings.spec.ts" time="2.007">
+</testcase>
+<testcase name="unlink-from-api flips state back to local-only" classname="phase35-settings.spec.ts" time="2.151">
+</testcase>
+<testcase name="general tab: theme toggle flips data-theme, persists across reload, dark restores (S315)" classname="phase35-settings.spec.ts" time="2.473">
+</testcase>
+<testcase name="general tab: a &quot;Help and feedback&quot; group, and the footer version opens the changelog (S368)" classname="phase35-settings.spec.ts" time="1.177">
+</testcase>
+</testsuite>
+<testsuite name="phase4-elements.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="15" failures="0" skipped="0" time="28.569" errors="0">
+<testcase name="right tab is hidden without an active world; worlds tab remains" classname="phase4-elements.spec.ts" time="1.148">
+</testcase>
+<testcase name="elements mode becomes enabled and toggles when a world is active" classname="phase4-elements.spec.ts" time="1.472">
+</testcase>
+<testcase name="create element from elements sidebar → row + detail view" classname="phase4-elements.spec.ts" time="1.829">
+</testcase>
+<testcase name="default new-element type from settings preselects the create modal category" classname="phase4-elements.spec.ts" time="1.928">
+</testcase>
+<testcase name="create multiple elements of different types and filter by type" classname="phase4-elements.spec.ts" time="2.431">
+</testcase>
+<testcase name="search input filters element list" classname="phase4-elements.spec.ts" time="2.357">
+</testcase>
+<testcase name="edit element name via the header title persists to FolderStore" classname="phase4-elements.spec.ts" time="2.002">
+</testcase>
+<testcase name="edit element description via field popover (textarea)" classname="phase4-elements.spec.ts" time="1.773">
+</testcase>
+<testcase name="delete element returns to home and removes the row" classname="phase4-elements.spec.ts" time="1.91">
+</testcase>
+<testcase name="reload preserves elements via FolderStore (cache rehydrates on activate)" classname="phase4-elements.spec.ts" time="2.153">
+</testcase>
+<testcase name="switching worlds resets the elements view to the new world" classname="phase4-elements.spec.ts" time="2.106">
+</testcase>
+<testcase name="muted types (S356): pins and markers close the strip greyed, stay out of &quot;show all&quot;, list when filtered to, right-click toggles and persists per world" classname="phase4-elements.spec.ts" time="1.961">
+</testcase>
+<testcase name="type names on the strip (#24, h20 B8): icons by default, the held types named, or every type" classname="phase4-elements.spec.ts" time="1.836">
+</testcase>
+<testcase name="deleting an element removes it from every link that named it (S362, keel parity)" classname="phase4-elements.spec.ts" time="1.775">
+</testcase>
+<testcase name="Settings → World offers to remove links to elements that are gone (local world)" classname="phase4-elements.spec.ts" time="1.888">
+</testcase>
+</testsuite>
+<testsuite name="phase4-schema-editor.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="10" failures="0" skipped="0" time="25.414" errors="0">
+<testcase name="schema-driven detail renders multiple sections with Base collapsible" classname="phase4-schema-editor.spec.ts" time="2.21">
+</testcase>
+<testcase name="section collapse toggle keeps state across re-renders" classname="phase4-schema-editor.spec.ts" time="1.955">
+</testcase>
+<testcase name="single-link field opens picker, persists link as chip" classname="phase4-schema-editor.spec.ts" time="2.416">
+</testcase>
+<testcase name="multi-link field — add and remove related elements" classname="phase4-schema-editor.spec.ts" time="3.13">
+</testcase>
+<testcase name="clicking a link chip navigates to the linked element" classname="phase4-schema-editor.spec.ts" time="2.693">
+</testcase>
+<testcase name="referenced-by section appears on the target after linking" classname="phase4-schema-editor.spec.ts" time="2.509">
+</testcase>
+<testcase name="picker search filters list by name" classname="phase4-schema-editor.spec.ts" time="2.909">
+</testcase>
+<testcase name="picker excludes already-linked targets in multi-link" classname="phase4-schema-editor.spec.ts" time="2.874">
+</testcase>
+<testcase name="scroll position is preserved across field link/delink re-renders" classname="phase4-schema-editor.spec.ts" time="2.492">
+</testcase>
+<testcase name="picker cancel via Escape leaves the field untouched" classname="phase4-schema-editor.spec.ts" time="2.226">
+</testcase>
+</testsuite>
+<testsuite name="phase5-maps.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="19" failures="0" skipped="0" time="44.85" errors="0">
+<testcase name="right pane shows map index tab by default with empty state" classname="phase5-maps.spec.ts" time="1.374">
+</testcase>
+<testcase name="create map via map index — adds row and opens map tab" classname="phase5-maps.spec.ts" time="2.045">
+</testcase>
+<testcase name="clicking a map row opens or focuses its tab" classname="phase5-maps.spec.ts" time="2.772">
+</testcase>
+<testcase name="close button on a map tab removes it from the bar" classname="phase5-maps.spec.ts" time="2.53">
+</testcase>
+<testcase name="map index pin-count badge updates as pins are added (via FolderStore)" classname="phase5-maps.spec.ts" time="2.367">
+</testcase>
+<testcase name="delete map cascades pins and removes the tab" classname="phase5-maps.spec.ts" time="2.108">
+</testcase>
+<testcase name="pin button appears in element detail when a map tab is active" classname="phase5-maps.spec.ts" time="2.687">
+</testcase>
+<testcase name="pin button is hidden when no map tab is active" classname="phase5-maps.spec.ts" time="2.078">
+</testcase>
+<testcase name="+pin hides once the element has a pin on the active map; a pin detail opens its map (S313)" classname="phase5-maps.spec.ts" time="2.911">
+</testcase>
+<testcase name="map create modal — location picker integration" classname="phase5-maps.spec.ts" time="2.533">
+</testcase>
+<testcase name="imageless map is first-class: flat canvas opens, pin places, zone draft starts (S300)" classname="phase5-maps.spec.ts" time="3.703">
+</testcase>
+<testcase name="deleting a map closes its right-pane tab (S306)" classname="phase5-maps.spec.ts" time="2.071">
+</testcase>
+<testcase name="the density layer (S356): a 40-pin cluster keeps its icons apart and its labels from overprinting; &quot;always&quot; shows every label" classname="phase5-maps.spec.ts" time="2.642">
+</testcase>
+<testcase name="a map prints a name once (S382, #121): a zone and the pin of the same name share one label" classname="phase5-maps.spec.ts" time="1.905">
+</testcase>
+<testcase name="the zone panel (S356): kinds group, a kind colour is a world style that survives reload, the eye hides a kind, the zone page says what it inherits" classname="phase5-maps.spec.ts" time="2.846">
+</testcase>
+<testcase name="an open dialog keeps the keyboard: Tab never reaches the page behind, and closing it gives the page back (F-60)" classname="phase5-maps.spec.ts" time="1.687">
+</testcase>
+<testcase name="the standard&apos;s shape (1.75, #362): a zone that says line draws open, one that says polygon closes, whatever else it carries" classname="phase5-maps.spec.ts" time="1.916">
+</testcase>
+<testcase name="the zone panel by role (S362): rivers split by rank, a role colour paints only its role, a road drawn as its segments is listed and lights them" classname="phase5-maps.spec.ts" time="2.102">
+</testcase>
+<testcase name="north is up: a pin by the schema&apos;s bottom-left numbers draws where the standard says, and a click stores bottom-left y (S361)" classname="phase5-maps.spec.ts" time="2.573">
+</testcase>
+</testsuite>
+<testsuite name="phase6-polish.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="6" failures="0" skipped="0" time="11.216" errors="0">
+<testcase name="timeline route renders the interactive timeline-view" classname="phase6-polish.spec.ts" time="1.675">
+</testcase>
+<testcase name="timeline canvas renders for worlds with temporal data" classname="phase6-polish.spec.ts" time="2.742">
+</testcase>
+<testcase name="sync pill shows &quot;local&quot; for a local-only world" classname="phase6-polish.spec.ts" time="1.667">
+</testcase>
+<testcase name="sync pill is hidden when no world is active" classname="phase6-polish.spec.ts" time="1.207">
+</testcase>
+<testcase name="favorite star toggles and sorts favorites to the top" classname="phase6-polish.spec.ts" time="2.03">
+</testcase>
+<testcase name="timeline + event create from timeline header" classname="phase6-polish.spec.ts" time="1.895">
+</testcase>
+</testsuite>
+<testsuite name="picture-upload.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="11.828" errors="0">
+<testcase name="an online world&apos;s element uploads a picture and sets it as the image URL" classname="picture-upload.spec.ts" time="2.107">
+</testcase>
+<testcase name="a local world&apos;s element says pictures upload once online, with Make online at hand (#282)" classname="picture-upload.spec.ts" time="1.413">
+</testcase>
+<testcase name="an uploaded picture of this world can be removed: asked first, then the image URL is cleared" classname="picture-upload.spec.ts" time="8.308">
+</testcase>
+</testsuite>
+<testsuite name="public-page.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="5.656" errors="0">
+<testcase name="a world whose page is on: the tab links to it by its slug, then by its id" classname="public-page.spec.ts" time="2.856">
+</testcase>
+<testcase name="a world whose page is off: the tab says nothing about one" classname="public-page.spec.ts" time="2.8">
+</testcase>
+</testsuite>
+<testsuite name="refresh-toast.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="4.85" errors="0">
+<testcase name="Refresh from OnlyWorlds says what came down once" classname="refresh-toast.spec.ts" time="4.85">
+</testcase>
+</testsuite>
+<testsuite name="rekey.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="7.117" errors="0">
+<testcase name="store calls on a real folder › a verbatim create keeps the old file&apos;s directory and link spelling" classname="rekey.spec.ts" time="0.818">
+</testcase>
+<testcase name="store calls on a real folder › media copies with its bytes, and removing the old directory leaves the new one whole" classname="rekey.spec.ts" time="0.942">
+</testcase>
+<testcase name="Settings → World gives foreign elements new ids, and every link follows" classname="rekey.spec.ts" time="2.878">
+</testcase>
+<testcase name="an id update interrupted by a closed tab finishes on the next open" classname="rekey.spec.ts" time="2.479">
+</testcase>
+</testsuite>
+<testsuite name="review-mark.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="2.137" errors="0">
+<testcase name="proposed, not yet reviewed › a proposed element carries its word everywhere a person meets it, and is counted apart" classname="review-mark.spec.ts" time="2.137">
+</testcase>
+</testsuite>
+<testsuite name="route2-merge.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="2.949" errors="0">
+<testcase name="linking a local world to a server world moves every link onto the server ids" classname="route2-merge.spec.ts" time="2.949">
+</testcase>
+</testsuite>
+<testsuite name="same-bytes.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="17.724" errors="0">
+<testcase name="an unchanged world, opened, visited room by room and reloaded, changes no byte on disk (#527)" classname="same-bytes.spec.ts" time="17.724">
+</testcase>
+</testsuite>
+<testsuite name="saved-charts.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="6" failures="0" skipped="0" time="11.944" errors="0">
+<testcase name="a chart saved from the default view can be reopened (the selection-scope fix)" classname="saved-charts.spec.ts" time="1.81">
+</testcase>
+<testcase name="renaming a chart renames the rail heading with it" classname="saved-charts.spec.ts" time="1.902">
+</testcase>
+<testcase name="a type-chip click releases an applied chart (the chart is a lens, not a lock)" classname="saved-charts.spec.ts" time="1.784">
+</testcase>
+<testcase name="deleting the applied chart releases its lens (S265, the ghost-scope bug)" classname="saved-charts.spec.ts" time="1.798">
+</testcase>
+<testcase name="declining the delete confirm KEEPS the chart (S306)" classname="saved-charts.spec.ts" time="2.01">
+</testcase>
+<testcase name="switching worlds inside Charts shows and keeps each world&apos;s own charts" classname="saved-charts.spec.ts" time="2.64">
+</testcase>
+</testsuite>
+<testsuite name="scroll-view.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="4.294" errors="0">
+<testcase name="the toggle swaps to the document view: cards, era seam, now seam, readout — all speaking the lens" classname="scroll-view.spec.ts" time="2.39">
+</testcase>
+<testcase name="a chart saved in scroll mode reopens in scroll mode" classname="scroll-view.spec.ts" time="1.904">
+</testcase>
+</testsuite>
+<testsuite name="selected-chip.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="7.619" errors="0">
+<testcase name="on an element page the chip&apos;s × clears the selection and it stays clear" classname="selected-chip.spec.ts" time="2.591">
+</testcase>
+<testcase name="on an element page Esc clears the selection and it stays clear (conv. 32)" classname="selected-chip.spec.ts" time="3.105">
+</testcase>
+<testcase name="in another room the chip&apos;s × clears the selection and stays in the room" classname="selected-chip.spec.ts" time="1.923">
+</testcase>
+</testsuite>
+<testsuite name="server-delete-bulk.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="3.375" errors="0">
+<testcase name="Delete all locally clears the clean copies in one step and keeps the edited one until ticked" classname="server-delete-bulk.spec.ts" time="3.375">
+</testcase>
+</testsuite>
+<testsuite name="share.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="17" failures="0" skipped="0" time="40.297" errors="0">
+<testcase name="share room: nav button opens the room with an empty state" classname="share.spec.ts" time="1.497">
+</testcase>
+<testcase name="create page → detail; rename + revert both persist; intent stays hidden but defaulted" classname="share.spec.ts" time="2.027">
+</testcase>
+<testcase name="delete page: dismiss keeps it; accept removes it and lands on the list" classname="share.spec.ts" time="1.726">
+</testcase>
+<testcase name="missing page id renders a not-found interim, not a hijacked URL" classname="share.spec.ts" time="1.926">
+</testcase>
+<testcase name="block builder: Escape commits an open heading edit (same as Enter/blur) — B-B9" classname="share.spec.ts" time="1.844">
+</testcase>
+<testcase name="block builder: heading + prose blocks compose; story mirror derives; reorder + delete work" classname="share.spec.ts" time="2.688">
+</testcase>
+<testcase name="page prose mentions render chips but NEVER write element fields (no derive)" classname="share.spec.ts" time="2.601">
+</testcase>
+<testcase name="element card: pick → compact card; full variant reveals chosen fields; preview renders the visitor view" classname="share.spec.ts" time="3.181">
+</testcase>
+<testcase name="circle block: the Knowledge bridge mints a page; compiled entries render; preview is disclosure-true" classname="share.spec.ts" time="2.26">
+</testcase>
+<testcase name="legacy /publish URL aliases into the share room" classname="share.spec.ts" time="2.53">
+</testcase>
+<testcase name="map block: a pin moved elsewhere re-renders on the open page (no re-add needed)" classname="share.spec.ts" time="2.223">
+</testcase>
+<testcase name="map block: labels follow show&apos;s rule (S382, #121): a name prints once, no label on another pin or label" classname="share.spec.ts" time="2.539">
+</testcase>
+<testcase name="map block: per-zone include-list — render, curate one off, freeze the rest" classname="share.spec.ts" time="2.607">
+</testcase>
+<testcase name="prose selection bubble: bold + link-to-existing with preserved label (alias recorded)" classname="share.spec.ts" time="2.855">
+</testcase>
+<testcase name="a dark page previews dark even while the app is in light mode" classname="share.spec.ts" time="2.513">
+</testcase>
+<testcase name="an open text block survives a charts refresh" classname="share.spec.ts" time="2.415">
+</testcase>
+<testcase name="a page that arrived with only its story opens with that text, and a new block keeps it (S437)" classname="share.spec.ts" time="2.865">
+</testcase>
+</testsuite>
+<testsuite name="smoke.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="0.688" errors="0">
+<testcase name="atlas shell boots with sidebar and middle pane" classname="smoke.spec.ts" time="0.688">
+</testcase>
+</testsuite>
+<testsuite name="speed-bout.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="5.485" errors="0">
+<testcase name="park/unpark: caches survive, writes work after revive, lock still ours" classname="speed-bout.spec.ts" time="0.877">
+</testcase>
+<testcase name="unpark refuses when another tab held the world in between" classname="speed-bout.spec.ts" time="0.862">
+</testcase>
+<testcase name="openWorldFolder registers an existing folder in place; re-open dedupes by id" classname="speed-bout.spec.ts" time="1.194">
+</testcase>
+<testcase name="object-valued extension fields render read-only, never as an editable row" classname="speed-bout.spec.ts" time="1.217">
+</testcase>
+<testcase name="character war record lists recorded battles chronologically; absent without battles" classname="speed-bout.spec.ts" time="1.335">
+</testcase>
+</testsuite>
+<testsuite name="submap-door.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="10.16" errors="0">
+<testcase name="a pin whose place has its own map opens it, and the submap leads back up, in the same tab" classname="submap-door.spec.ts" time="2.05">
+</testcase>
+<testcase name="a place with no map of its own gets no door, and leaving the selection removes it" classname="submap-door.spec.ts" time="2.311">
+</testcase>
+<testcase name="every pin&apos;s image is named by its place, never &apos;Marker&apos; (#176)" classname="submap-door.spec.ts" time="1.93">
+</testcase>
+<testcase name="the map badge says what it means on hover, and only on a location with its own map (h58 #5429)" classname="submap-door.spec.ts" time="1.94">
+</testcase>
+<testcase name="help follows a map open in the right pane, whose address stays the room&apos;s (h58 #5443)" classname="submap-door.spec.ts" time="1.929">
+</testcase>
+</testsuite>
+<testsuite name="tenure.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="1.742" errors="0">
+<testcase name="tenure and life vocabulary on the chart card, with and without a now" classname="tenure.spec.ts" time="1.742">
+</testcase>
+</testsuite>
+<testsuite name="touch-copy.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="6" failures="0" skipped="0" time="13.974" errors="0">
+<testcase name="on a touch screen › the first screen points a phone at Lantern" classname="touch-copy.spec.ts" time="1.133">
+</testcase>
+<testcase name="on a touch screen › help names no key, right-click, hover, drag or drop, and points at Lantern" classname="touch-copy.spec.ts" time="4.672">
+</testcase>
+<testcase name="on a touch screen › Writing has a Find button: a tap finds a word, and its matches can be linked (#301)" classname="touch-copy.spec.ts" time="1.852">
+</testcase>
+<testcase name="on a touch screen › Hide types: a tap on it, then on a type, keeps the type out of the full list (#301)" classname="touch-copy.spec.ts" time="2.11">
+</testcase>
+<testcase name="on a touch screen › the Data room says choose, not drop" classname="touch-copy.spec.ts" time="1.515">
+</testcase>
+<testcase name="with a mouse, help keeps its keyboard reference and says nothing of Lantern" classname="touch-copy.spec.ts" time="2.692">
+</testcase>
+</testsuite>
+<testsuite name="tour-keep.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="8" failures="0" skipped="0" time="84.417" errors="0">
+<testcase name="the finale offers Keep, Save it to a folder and Start fresh; Keep makes the tour world yours" classname="tour-keep.spec.ts" time="4.78">
+</testcase>
+<testcase name="a reload after K2 (world.json un-demoed, nothing else) finishes the keep at boot" classname="tour-keep.spec.ts" time="50.573">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|test-results/tour-keep-a-reload-after-K-e56dc-e-finishes-the-keep-at-boot-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|test-results/tour-keep-a-reload-after-K-e56dc-e-finishes-the-keep-at-boot-chromium/error-context.md]]
+
+[[ATTACHMENT|test-results/tour-keep-a-reload-after-K-e56dc-e-finishes-the-keep-at-boot-chromium-retry1/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="a reload inside K3 (a re-key journal on disk, half the ids moved) finishes it with no twins" classname="tour-keep.spec.ts" time="4.683">
+</testcase>
+<testcase name="a reload after K4 steps 1-2 (registry un-demoed, the tour key still set) lands in the kept world" classname="tour-keep.spec.ts" time="4.059">
+</testcase>
+<testcase name="after K2, a boot in a second tab that cannot take the world over changes nothing" classname="tour-keep.spec.ts" time="4.037">
+</testcase>
+<testcase name="a second tour after a keep: its ids never meet the kept world&apos;s, and Start fresh leaves the kept map&apos;s camera" classname="tour-keep.spec.ts" time="5.211">
+</testcase>
+<testcase name="Save it to a folder: a cancelled picker changes nothing, and a world folder is refused as the destination" classname="tour-keep.spec.ts" time="7.34">
+</testcase>
+<testcase name="Save it to a folder keeps the world and moves it into the home folder" classname="tour-keep.spec.ts" time="3.734">
+</testcase>
+</testsuite>
+<testsuite name="tour-narrow.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="15.607" errors="0">
+<testcase name="the tour reaches the pin beat and places the pin at 1000px" classname="tour-narrow.spec.ts" time="3.127">
+</testcase>
+<testcase name="the tour reaches the pin beat and places the pin at 800px" classname="tour-narrow.spec.ts" time="3.16">
+</testcase>
+<testcase name="at 800 the swamps map, every objects mint, back to the map, and the-rest sidebar stay in reach" classname="tour-narrow.spec.ts" time="4.589">
+</testcase>
+<testcase name="at 760 the finale’s keep lands with the sidebar in reach" classname="tour-narrow.spec.ts" time="3.02">
+</testcase>
+<testcase name="a drawer closed by hand during the tour can be reopened from its toggle" classname="tour-narrow.spec.ts" time="1.711">
+</testcase>
+</testsuite>
+<testsuite name="tour.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="22" failures="0" skipped="0" time="76.931" errors="0">
+<testcase name="the tour world mirrors its FULL meta into state, not a hand-picked subset" classname="tour.spec.ts" time="1.834">
+</testcase>
+<testcase name="relaunch after exit mounts a WORKING bar (gate R3: the render memo must not outlive unmount)" classname="tour.spec.ts" time="2.046">
+</testcase>
+<testcase name="full walk: opener → real-modal beats → maps → objects → acts → finish tears down" classname="tour.spec.ts" time="7.791">
+</testcase>
+<testcase name="the pin beat is a SOFT correction: place anywhere, Next only over the swamps (S303)" classname="tour.spec.ts" time="3.089">
+</testcase>
+<testcase name="clicking DIRECTLY on the swamps zone places the pin there (the instructed gesture, S304)" classname="tour.spec.ts" time="3.078">
+</testcase>
+<testcase name="the scripted create door: links survive, no double-mint, no dead button" classname="tour.spec.ts" time="3.884">
+</testcase>
+<testcase name="a world switch mid-tour SUSPENDS the narrator (close gate, 3-lens convergent)" classname="tour.spec.ts" time="2.291">
+</testcase>
+<testcase name="the create beats are single-route: no watch-mode Next, the gesture is the way" classname="tour.spec.ts" time="2.153">
+</testcase>
+<testcase name="resilience: the world heals user mess on step-enter, user work survives" classname="tour.spec.ts" time="4.6">
+</testcase>
+<testcase name="armed pin placement disarms on navigation — no stray second pin (S299 close gate)" classname="tour.spec.ts" time="3.659">
+</testcase>
+<testcase name="&quot;more information&quot; closes on Escape and when the step changes (S368 B5)" classname="tour.spec.ts" time="3.095">
+</testcase>
+<testcase name="the collapsed tour pill says what it does and sits below every app control (S368 B4)" classname="tour.spec.ts" time="3.143">
+</testcase>
+<testcase name="the DRAG gesture satisfies the pin gate — a dragged-in Consul adopts the bundle pin (S318)" classname="tour.spec.ts" time="3.114">
+</testcase>
+<testcase name="resume after reload lands on the same step with the world active" classname="tour.spec.ts" time="3.023">
+</testcase>
+<testcase name="exit tears down mid-tour and returns to the landing" classname="tour.spec.ts" time="2.064">
+</testcase>
+<testcase name="the tour world lives in browser-worlds/, made like any browser world, and goes with the tour (1.17)" classname="tour.spec.ts" time="2.013">
+</testcase>
+<testcase name="back-navigation does not strip links off elements that still exist (S301 gate R2)" classname="tour.spec.ts" time="4.607">
+</testcase>
+<testcase name="the residue contract covers the map UI keys, not just the world (S301)" classname="tour.spec.ts" time="3.227">
+</testcase>
+<testcase name="OPFS-only browser (Safari-shaped): app boots, tour runs, folder door honest" classname="tour.spec.ts" time="7.602">
+</testcase>
+<testcase name="the exit confirm names the rooms the tour never reached, and can be declined" classname="tour.spec.ts" time="2.434">
+</testcase>
+<testcase name="the writing beat: the sentence arrives plain, a click links it, Next waits for a chip" classname="tour.spec.ts" time="5.642">
+</testcase>
+<testcase name="replay from settings with a world open clears the stage and can be completed" classname="tour.spec.ts" time="2.542">
+</testcase>
+</testsuite>
+<testsuite name="try-demo.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="5" failures="0" skipped="0" time="14.426" errors="0">
+<testcase name="try a demo world: one click opens an editable, unlinked Moppetopia, and nothing writes to OnlyWorlds" classname="try-demo.spec.ts" time="4.303">
+</testcase>
+<testcase name="the #/try-demo link (1.18.1) opens the same copy once; a reload does not ask again" classname="try-demo.spec.ts" time="4.515">
+</testcase>
+<testcase name="with Moppetopia already linked (view only), try says how to make room for a copy and downloads nothing" classname="try-demo.spec.ts" time="1.489">
+</testcase>
+<testcase name="a demo world that does not come down whole opens nothing and leaves nothing behind" classname="try-demo.spec.ts" time="1.567">
+</testcase>
+<testcase name="once a world exists, Settings offers Explore Moppetopia above Replay the tour (h58 #5443)" classname="try-demo.spec.ts" time="2.552">
+</testcase>
+</testsuite>
+<testsuite name="type-words.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="6.799" errors="0">
+<testcase name="a work world shows its own words in the sidebar, its supertype word, and markup as text" classname="type-words.spec.ts" time="1.751">
+</testcase>
+<testcase name="the supertype chip and search&apos;s hint, in the world&apos;s words" classname="type-words.spec.ts" time="1.8">
+</testcase>
+<testcase name="the supertype chip and search&apos;s hint, without them" classname="type-words.spec.ts" time="1.69">
+</testcase>
+<testcase name="a world without its own words prints the standard names, as before" classname="type-words.spec.ts" time="1.558">
+</testcase>
+</testsuite>
+<testsuite name="typing-survives-redraw.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="3" failures="0" skipped="0" time="6.428" errors="0">
+<testcase name="the elements search keeps typing through a tick (control: built once)" classname="typing-survives-redraw.spec.ts" time="2.092">
+</testcase>
+<testcase name="the writing search keeps its focus and caret through a tick, and still filters as you type" classname="typing-survives-redraw.spec.ts" time="2.186">
+</testcase>
+<testcase name="the map search keeps its focus and caret through a tick, and still filters as you type" classname="typing-survives-redraw.spec.ts" time="2.15">
+</testcase>
+</testsuite>
+<testsuite name="waypoints.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="6.682" errors="0">
+<testcase name="creating a world completes first-world; OW page shows it lit + counted" classname="waypoints.spec.ts" time="1.62">
+</testcase>
+<testcase name="creating an element via the modal completes first-element" classname="waypoints.spec.ts" time="1.855">
+</testcase>
+<testcase name="legacy /settings/account URL aliases to the onlyworlds tab" classname="waypoints.spec.ts" time="1.603">
+</testcase>
+<testcase name="mark all as familiar stamps every waypoint" classname="waypoints.spec.ts" time="1.604">
+</testcase>
+</testsuite>
+<testsuite name="work-packet.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="1" failures="0" skipped="0" time="1.748" errors="0">
+<testcase name="OW Parlor #487 a work packet › a Work item&apos;s packet lists its elements with reasons and steps through them" classname="work-packet.spec.ts" time="1.748">
+</testcase>
+</testsuite>
+<testsuite name="work-queue.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="3.769" errors="0">
+<testcase name="the undated backlog lists dateable elements, excludes non-dateable types, and opens the editor" classname="work-queue.spec.ts" time="1.944">
+</testcase>
+<testcase name="the undated backlog excludes non-story narratives (share pages, knowledge entries) but keeps story narratives" classname="work-queue.spec.ts" time="1.825">
+</testcase>
+</testsuite>
+<testsuite name="world-file.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="4" failures="0" skipped="0" time="10.73" errors="0">
+<testcase name="a world downloaded as one file comes back whole after the site data is cleared" classname="world-file.spec.ts" time="2.517">
+</testcase>
+<testcase name="Chromium with a home folder: a new world file asks where, and the folder answer lands it there, no browser copy left" classname="world-file.spec.ts" time="3.226">
+</testcase>
+<testcase name="Chromium with a home folder: &quot;In this browser&quot; keeps a new world file in this browser" classname="world-file.spec.ts" time="2.821">
+</testcase>
+<testcase name="a world with private records asks first: left out by default, in when asked, no file when closed" classname="world-file.spec.ts" time="2.166">
+</testcase>
+</testsuite>
+<testsuite name="world-key.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="6.926" errors="0">
+<testcase name="signed in, a key keel no longer knows is replaced in place, and the waiting edit goes up on the new one (#198, P3)" classname="world-key.spec.ts" time="3.294">
+</testcase>
+<testcase name="signed out, a refused key says its cause, and Settings, This world takes a pasted one in place" classname="world-key.spec.ts" time="3.632">
+</testcase>
+</testsuite>
+<testsuite name="world-row-touch.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="2" failures="0" skipped="0" time="4.404" errors="0">
+<testcase name="a world row holds no control inside a control, and its name opens it from the keyboard" classname="world-row-touch.spec.ts" time="2.233">
+</testcase>
+<testcase name="on a phone › the update banner clears the open drawer&apos;s footer row" classname="world-row-touch.spec.ts" time="2.171">
+</testcase>
+</testsuite>
+<testsuite name="writing-workspace.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="chromium" tests="41" failures="0" skipped="0" time="100.457" errors="0">
+<testcase name="workspace mounts when a narrative is selected" classname="writing-workspace.spec.ts" time="1.918">
+</testcase>
+<testcase name="typed prose persists as markdown + richtext JSON" classname="writing-workspace.spec.ts" time="3.771">
+</testcase>
+<testcase name="@ picker inserts a chip and auto-derives the relation field" classname="writing-workspace.spec.ts" time="3.917">
+</testcase>
+<testcase name="reading mode toggle adds is-reading-mode class" classname="writing-workspace.spec.ts" time="1.93">
+</testcase>
+<testcase name="focus mode toggle hides shell chrome" classname="writing-workspace.spec.ts" time="1.984">
+</testcase>
+<testcase name="self-heal populates stale relation fields on mount" classname="writing-workspace.spec.ts" time="1.939">
+</testcase>
+<testcase name="Mentioned-in section surfaces narratives that link to an element" classname="writing-workspace.spec.ts" time="1.933">
+</testcase>
+<testcase name="session word goal — set, render progress ring, clear" classname="writing-workspace.spec.ts" time="2.085">
+</testcase>
+<testcase name="find bar: Ctrl+F opens, navigates, Esc closes" classname="writing-workspace.spec.ts" time="2.017">
+</testcase>
+<testcase name="find bar: Ctrl+H replace-all updates prose and triggers save" classname="writing-workspace.spec.ts" time="3.949">
+</testcase>
+<testcase name="font family setting applies live to the workspace" classname="writing-workspace.spec.ts" time="1.905">
+</testcase>
+<testcase name="context pane Cast shows Featured/Planned distinction by prose content" classname="writing-workspace.spec.ts" time="2.222">
+</testcase>
+<testcase name="add-to-cast with no selection inserts chip at cursor (session 230 semantic)" classname="writing-workspace.spec.ts" time="3.978">
+</testcase>
+<testcase name="inline create from selection — modal pre-fills, suppresses navigate, replaces with chip" classname="writing-workspace.spec.ts" time="4.31">
+</testcase>
+<testcase name="autolink: matching name gets a hint underline, Tab converts to chip" classname="writing-workspace.spec.ts" time="2.163">
+</testcase>
+<testcase name="autolink: ambiguous names are suppressed (no hint when 2+ matches)" classname="writing-workspace.spec.ts" time="2.23">
+</testcase>
+<testcase name="autolink: a plain CLICK on a dotted word links it (S313 click-to-link)" classname="writing-workspace.spec.ts" time="2.243">
+</testcase>
+<testcase name="autolink: HOVERING a dotted word makes Tab link THAT word, not the first (S313)" classname="writing-workspace.spec.ts" time="2.238">
+</testcase>
+<testcase name="chip preview: right-clicking a chip dismisses the hover preview so the menu is not obscured (S313)" classname="writing-workspace.spec.ts" time="2.907">
+</testcase>
+<testcase name="split: divides current narrative at cursor into a new sibling" classname="writing-workspace.spec.ts" time="2.228">
+</testcase>
+<testcase name="empty narrative shows initial empty paragraph" classname="writing-workspace.spec.ts" time="1.911">
+</testcase>
+<testcase name="link-all corner icon: counts candidates, one click chips them all (S265)" classname="writing-workspace.spec.ts" time="2.104">
+</testcase>
+<testcase name="a scene whose story changed while Atlas was closed opens the new text, not the stale copy (S365)" classname="writing-workspace.spec.ts" time="2.201">
+</testcase>
+<testcase name="link-all corner never covers the prose: no text rect under the pill (S365)" classname="writing-workspace.spec.ts" time="1.972">
+</testcase>
+<testcase name="tree bulk link: right-click a book links mentions in its closed scenes, story + sidecar + derive (S265)" classname="writing-workspace.spec.ts" time="1.92">
+</testcase>
+<testcase name="tree row hover &quot;+&quot; creates the child tier inside that row (S265)" classname="writing-workspace.spec.ts" time="2.025">
+</testcase>
+<testcase name="right-click &quot;Link to existing element&quot; chips the selection and records an alias" classname="writing-workspace.spec.ts" time="2.242">
+</testcase>
+<testcase name="writing tree: delete names the whole subtree in the user vocabulary" classname="writing-workspace.spec.ts" time="1.83">
+</testcase>
+<testcase name="writing tree: accepting deletes the subtree and leaves siblings alone" classname="writing-workspace.spec.ts" time="2.278">
+</testcase>
+<testcase name="writing tree: deleting the open narrative navigates out of the doomed subtree" classname="writing-workspace.spec.ts" time="2.398">
+</testcase>
+<testcase name="the confirm FLOOR fires even when the user turned confirmations off" classname="writing-workspace.spec.ts" time="1.998">
+</testcase>
+<testcase name="a childless narrative still honours the confirm preference being off" classname="writing-workspace.spec.ts" time="2.129">
+</testcase>
+<testcase name="the tree Delete item is HIDDEN during the tour (it would soft-lock it)" classname="writing-workspace.spec.ts" time="1.795">
+</testcase>
+<testcase name="compiled view counts the whole assembled tree, not zero" classname="writing-workspace.spec.ts" time="1.923">
+</testcase>
+<testcase name="prose typed before leaving the writing ROOM still reaches disk" classname="writing-workspace.spec.ts" time="2.29">
+</testcase>
+<testcase name="switching narratives saves the old one without polluting the new one" classname="writing-workspace.spec.ts" time="2.182">
+</testcase>
+<testcase name="find bar: &quot;Link to element&quot; links every match in a scene and records the alias" classname="writing-workspace.spec.ts" time="4.06">
+</testcase>
+<testcase name="compiled view: find searches every scene and &quot;Link to element&quot; writes them all" classname="writing-workspace.spec.ts" time="2.247">
+</testcase>
+<testcase name="find bar: Ctrl+F and Ctrl+H seed the box from the selection, and a padded term never links its spaces" classname="writing-workspace.spec.ts" time="3.688">
+</testcase>
+<testcase name="find bar: Ctrl+F still opens after switching scenes inside the room" classname="writing-workspace.spec.ts" time="2.679">
+</testcase>
+<testcase name="prose typed just before switching to another WORLD still reaches disk" classname="writing-workspace.spec.ts" time="2.718">
+</testcase>
+</testsuite>
+<testsuite name="browser-worlds.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="6" failures="0" skipped="0" time="25.38" errors="0">
+<testcase name="@firefox a browser world opens from its path, and one whose storage is gone keeps its row" classname="browser-worlds.spec.ts" time="5.211">
+</testcase>
+<testcase name="@firefox boot re-adopts browser worlds whose registry was lost" classname="browser-worlds.spec.ts" time="3.37">
+</testcase>
+<testcase name="@firefox the create dialog says the world lives in this browser, and makes it there" classname="browser-worlds.spec.ts" time="2.607">
+</testcase>
+<testcase name="@firefox a world brought down from OnlyWorlds lands in this browser, whole" classname="browser-worlds.spec.ts" time="3.763">
+</testcase>
+<testcase name="@firefox a cleared linked world: its row brings it down again, under the same row" classname="browser-worlds.spec.ts" time="7.276">
+</testcase>
+<testcase name="@firefox a browser world: Settings says This browser, offers one Delete, and Delete removes it from the browser" classname="browser-worlds.spec.ts" time="3.153">
+</testcase>
+</testsuite>
+<testsuite name="chart-touch.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="1" failures="0" skipped="0" time="3.506" errors="0">
+<testcase name="@firefox a tap on a dot sends the chart no mouse events, and peeks" classname="chart-touch.spec.ts" time="3.506">
+</testcase>
+</testsuite>
+<testsuite name="firefox.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="2" failures="0" skipped="0" time="6.704" errors="0">
+<testcase name="@firefox the landing offers the tour, and the tour builds its world in browser storage" classname="firefox.spec.ts" time="3.615">
+</testcase>
+<testcase name="@firefox the landing starts a world in this browser, and other ways in has no folder door" classname="firefox.spec.ts" time="3.089">
+</testcase>
+</testsuite>
+<testsuite name="forget-browser.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="1" failures="0" skipped="0" time="7.137" errors="0">
+<testcase name="@firefox forget: the world kept only here is named, another tab stops it, then the reload is a first visit" classname="forget-browser.spec.ts" time="7.137">
+</testcase>
+</testsuite>
+<testsuite name="open-door.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="1" failures="0" skipped="0" time="5.557" errors="0">
+<testcase name="@firefox signed in, a world page link opens the world after Open, and again opens the copy here (#104)" classname="open-door.spec.ts" time="5.557">
+</testcase>
+</testsuite>
+<testsuite name="touch-copy.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="5" failures="0" skipped="0" time="17.607" errors="0">
+<testcase name="@firefox on a touch screen › the first screen points a phone at Lantern" classname="touch-copy.spec.ts" time="2.074">
+</testcase>
+<testcase name="@firefox on a touch screen › help names no key, right-click, hover, drag or drop, and points at Lantern" classname="touch-copy.spec.ts" time="5.815">
+</testcase>
+<testcase name="@firefox on a touch screen › Writing has a Find button: a tap finds a word, and its matches can be linked (#301)" classname="touch-copy.spec.ts" time="3.511">
+</testcase>
+<testcase name="@firefox on a touch screen › Hide types: a tap on it, then on a type, keeps the type out of the full list (#301)" classname="touch-copy.spec.ts" time="3.545">
+</testcase>
+<testcase name="@firefox on a touch screen › the Data room says choose, not drop" classname="touch-copy.spec.ts" time="2.662">
+</testcase>
+</testsuite>
+<testsuite name="tour-keep.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="1" failures="0" skipped="0" time="6.319" errors="0">
+<testcase name="@firefox the finale offers Keep and Start fresh, and Keep makes the tour world yours" classname="tour-keep.spec.ts" time="6.319">
+</testcase>
+</testsuite>
+<testsuite name="try-demo.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="1" failures="0" skipped="0" time="5.827" errors="0">
+<testcase name="@firefox try a demo world: one click opens an editable, unlinked Moppetopia, and nothing writes to OnlyWorlds" classname="try-demo.spec.ts" time="5.827">
+</testcase>
+</testsuite>
+<testsuite name="world-file.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox" tests="2" failures="0" skipped="0" time="8.98" errors="0">
+<testcase name="@firefox a world downloaded as one file comes back whole after the site data is cleared" classname="world-file.spec.ts" time="4.201">
+</testcase>
+<testcase name="@firefox a world with private records asks first: left out by default, in when asked, no file when closed" classname="world-file.spec.ts" time="4.779">
+</testcase>
+</testsuite>
+<testsuite name="firefox.spec.ts" timestamp="2026-10-24T11:32:45.707Z" hostname="firefox-private" tests="1" failures="0" skipped="0" time="2.46" errors="0">
+<testcase name="@private a private window says why there is no tour, and offers no door that would stall" classname="firefox.spec.ts" time="2.46">
+</testcase>
+</testsuite>
+</testsuites>
