@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.86.2',
+    date: '2026-10-24',
+    theme: 'Hidden here only, said when it is',
+    entries: [
+      {
+        id: 'hidden-here-only',
+        title: 'An element hidden after it went online says OnlyWorlds still shows it',
+        body: 'OnlyWorlds takes the hidden mark only when an element is first put online. When an element is marked hidden in its folder after that, its page says it is hidden here only and that OnlyWorlds still shows it once Atlas sends its next change, where it used to say only its keepers could see it.',
+        tags: ['fix', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.86.1',
     date: '2026-10-23',
     theme: 'A hidden element says it in a sentence',

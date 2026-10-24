@@ -21,6 +21,7 @@
  * Pure, shared by FsFolderStore and the MockFolderStore fixture (parity).
  */
 import type { Element } from '../core/types';
+import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
 
 export function stampedBody(
   existing: Element,
@@ -34,6 +35,15 @@ export function stampedBody(
   // `kept`: what keel wrote into the element on that write and the copy keeps with the stamp, in the
   // same write (the review profile's mark on a seat's new element, conv. 168).
   const next: Element = dropLastWriter({ ...existing, ...kept, server_updated_at: serverUpdatedAt });
+  // keel's word on the hidden mark (`hiddenWordOf`): kept only while the file holds the mark and the
+  // answer showed it; an answer with no body leaves the word as it was (the S461 gate's F3).
+  // A first stamp with no answer body (a `/bulk` echo) is a create keel took, which takes the mark or
+  // refuses the create: a word left by a cleared baseline (a Keep, a reset, a re-key) never survives it
+  // (the S464 gate's M1).
+  const rec = next as Record<string, unknown>;
+  const said = kept !== undefined && HIDDEN_SHOWN_ONLINE in kept;
+  if (!said && !existing.server_updated_at) delete rec[HIDDEN_SHOWN_ONLINE];
+  if (rec[HIDDEN_SHOWN_ONLINE] !== true || !isHiddenMark(next)) delete rec[HIDDEN_SHOWN_ONLINE];
   if (sentLocalUpdatedAt === undefined) return next;
   if (sentLocalUpdatedAt !== null && existing.local_updated_at === sentLocalUpdatedAt) return next;
   // Edited in flight. Already newer than the baseline: nothing to do.

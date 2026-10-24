@@ -38,7 +38,7 @@ import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
 import { hiddenHeldOf } from './hidden-held';
-import { isHiddenMark } from '../core/hidden-mark';
+import { hiddenWordOf, HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
 import { isKnownOf, knownOfMove, stubShape } from './known-of';
 import type {
@@ -863,7 +863,7 @@ export class SyncEngine {
           ? await this.client.updateElement(local.type, id, body)
           : await this.client.createElement(local.type, body);
         await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at,
-          local.server_updated_at ? undefined : keptOnCreate(response));
+          keptFrom(response, !local.server_updated_at));
         console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
       } catch (err) {
         // Keep mine on a reviewed world proposes again (conv. 163, P5): the
@@ -1000,6 +1000,7 @@ export class SyncEngine {
     await this.folder.stampServerUpdatedAt(
       local.id, local.type as ElementType, remote.updated_at,
       sameWireContent(local, remote) ? (local.local_updated_at as string | undefined) : null,
+      hiddenWordOf(remote),
     );
   }
 
@@ -1040,7 +1041,7 @@ export class SyncEngine {
   ): Promise<'no' | 'adopted' | 'held'> {
     if (local.server_updated_at || !sameWireContent(local, remoteBody)) return 'no';
     const wrote = await this.pullWrite(failures, local.id, type, () =>
-      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at as string | undefined));
+      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at as string | undefined, hiddenWordOf(remoteBody)));
     if (!wrote) return 'held'; // the /changes walk must not pass it (gate A M1)
     console.info(`[atlas:sync] pull: ${type}/${local.id} is our own create with an unrecorded stamp; baseline adopted`);
     return 'adopted';
@@ -2228,7 +2229,7 @@ export class SyncEngine {
         try {
           const remote = await this.client.getElement(it.type, id);
           if (!remote) throw new Error('created element missing on read-back');
-          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id), keptOnCreate(remote));
+          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id), keptFrom(remote, true));
           stamped++;
         } catch (err) {
           if (err instanceof CorruptFileError) throw err;
@@ -2256,7 +2257,7 @@ export class SyncEngine {
         const remote = remoteById.get(id);
         if (remote) {
           if (await this.localStep(failures, id, type, 'create',
-            () => this.folder.stampServerUpdatedAt(id, type, remote.updated_at, sentStamps.get(id), keptOnCreate(remote)))) {
+            () => this.folder.stampServerUpdatedAt(id, type, remote.updated_at, sentStamps.get(id), keptFrom(remote, true)))) {
             stamped++;
           }
         } else {
@@ -2493,7 +2494,7 @@ export class SyncEngine {
             continue;
           }
           // keel marks a seat's new element proposed on a reviewed world (conv. 168): the copy keeps it.
-          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, keptOnCreate(response));
+          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, keptFrom(response, true));
           creates++;
         } else {
           // UPDATE path: re-fetch element from folder in case an in-loop
@@ -2562,7 +2563,8 @@ export class SyncEngine {
             // The body sent carried `current.local_updated_at`; an edit that
             // landed while this request was in flight keeps the element dirty
             // (S360 H1: it used to be stamped clean and never uploaded).
-            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at);
+            // keel takes the mark on a create only: its answer says whether it shows the element (F3).
+            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, hiddenWordOf(response));
             updates++;
           }
         }
@@ -3005,7 +3007,7 @@ export class SyncEngine {
             && await this.folder.applyServerRecordIfUnchanged(entry.type, body, updated_at, local.local_updated_at ?? null);
           // Edited since (before the settle, or during it): the newer edit stays
           // and goes out on the new baseline.
-          if (!landed) await this.folder.stampServerUpdatedAt(entry.element_id, entry.type, updated_at, entry.local_updated_at);
+          if (!landed) await this.folder.stampServerUpdatedAt(entry.element_id, entry.type, updated_at, entry.local_updated_at, hiddenWordOf(body));
         });
         if (!ok) continue;
         accepted.push(entry.element_id);
@@ -3830,6 +3832,12 @@ function stripServerOnlyFields(record: Record<string, unknown>): Record<string, 
  * ordering, and JSON.stringify is order-sensitive).
  */
 /** Same content on the wire's terms: server stamps and atlas's local-only fields do not count. */
+/** What keel's answer leaves in the copy with the stamp: a create's proposed mark (conv. 168) and keel's word on the hidden mark (conv. 170, F3). */
+function keptFrom(answer: unknown, onCreate: boolean): Record<string, unknown> | undefined {
+  const kept = { ...(onCreate ? keptOnCreate(answer) : undefined), ...hiddenWordOf(answer) };
+  return Object.keys(kept).length > 0 ? kept : undefined;
+}
+
 function sameWireContent(local: Element, remote: Record<string, unknown>): boolean {
   // Who wrote it never reaches here: diffFieldNames skips SERVER_AUTHOR_FIELDS.
   const ignore = new Set<string>(['created_at', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
@@ -3841,7 +3849,7 @@ export function diffFieldNames(local: Element, remote: Record<string, unknown>):
   // read-only: a local file that never saw a pull lacks it, and every server
   // write moves the last two, which is not a difference anyone made. keel's
   // hidden mark is said to some readers only: not a difference either.
-  const SKIP = new Set<string>(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at', ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS]);
+  const SKIP = new Set<string>(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at', HIDDEN_SHOWN_ONLINE, ...SERVER_AUTHOR_FIELDS, ...SERVER_MARK_FIELDS]);
   const keys = new Set<string>([...Object.keys(local), ...Object.keys(remote)]);
   const diff: string[] = [];
   for (const key of keys) {

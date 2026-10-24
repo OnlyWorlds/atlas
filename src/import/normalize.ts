@@ -62,6 +62,8 @@ const STRIP_ALWAYS = new Set([
   // by the SOURCE world) once a page is imported into a different world. Strip
   // it; the imported copy is unpublished until the user publishes it here.
   'atlas_page_pub',
+  // keel's word on the hidden mark in the SOURCE world (conv. 170, F3).
+  'atlas_hidden_shown_online',
 ]);
 
 /** keel's hidden mark, kept on import (folder spec §4.8; `src/core/hidden-mark.ts`). */

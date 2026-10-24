@@ -268,6 +268,11 @@ export const ATLAS_LOCAL_ONLY_FIELDS = [
   // offline. The sharing API rows are the truth; this is a display cache.
   // Never reaches the OW worldapi.
   'atlas_page_pub',
+  // keel's word on the hidden mark (conv. 170, the S461 gate's F3): true when
+  // keel's last answer to a write showed an element whose file holds the mark
+  // (keel takes the mark on a create only). Written and removed with the push
+  // stamp (`stampedBody`), dropped by every pull and on import; never sent.
+  'atlas_hidden_shown_online',
 ] as const;
 
 /**

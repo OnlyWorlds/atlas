@@ -30,7 +30,7 @@ import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
 import { isKnownOf } from './known-of';
-import { isHiddenMark } from '../core/hidden-mark';
+import { hiddenWordOf, isHiddenMark } from '../core/hidden-mark';
 import { isOwProposed, withProposed } from './proposals';
 import { slicePushRefusal } from '../core/provenance';
 
@@ -396,7 +396,7 @@ export async function mergeLocalIntoApi(
         // something to paper over with a second id move here.
         throw new Error(`the server gave it a different id (${response.id})`);
       }
-      await folder.stampServerUpdatedAt(c.local.id, c.type, response.updated_at, s.sent);
+      await folder.stampServerUpdatedAt(c.local.id, c.type, response.updated_at, s.sent, hiddenWordOf(response));
       counts.creates++;
     } catch (err) {
       failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err) });
@@ -473,7 +473,7 @@ export async function mergeLocalIntoApi(
           try {
             const remote = await adapter.getElement(b.dec.type, id);
             if (!remote) throw new Error('created element missing on read-back');
-            await folder.stampServerUpdatedAt(id, b.dec.type, remote.updated_at, b.sent);
+            await folder.stampServerUpdatedAt(id, b.dec.type, remote.updated_at, b.sent, hiddenWordOf(remote));
             counts.creates++;
           } catch (err) {
             failures.push({
@@ -584,7 +584,7 @@ export async function mergeLocalIntoApi(
           // A seat on a reviewed world (conv. 163, the gate's G9): keel took the
           // copy as a proposal and its own is unchanged. The element takes keel's
           // stamp and stays an unsent edit, recorded so no round proposes it again.
-          await folder.stampServerUpdatedAt(m.id, m.type, m.server.updated_at, null);
+          await folder.stampServerUpdatedAt(m.id, m.type, m.server.updated_at, null, hiddenWordOf(m.server));
           const stamped = await folder.getElement(m.id);
           if (stamped) {
             const entry = { element_id: m.id, type: m.type, proposal_id: err.proposal.id, local_updated_at: stamped.local_updated_at, at: new Date().toISOString() };
@@ -603,7 +603,7 @@ export async function mergeLocalIntoApi(
         // The edit that beat the response keeps its text; the baseline still
         // moves to the server's time, lifted past it (sync-stamp), so the
         // element reads dirty and the next round PATCHes the newer text.
-        if (!landed) await folder.stampServerUpdatedAt(m.id, m.type, response.updated_at, s.sent);
+        if (!landed) await folder.stampServerUpdatedAt(m.id, m.type, response.updated_at, s.sent, hiddenWordOf(response));
         counts.updates++;
       } else {
         // Policy c: the server's record wins, and the local rich text goes

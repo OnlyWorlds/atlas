@@ -32,6 +32,7 @@ import { stampedBody, editStamp, dropLastWriter } from '../../src/store/sync-sta
 import { scrubReferrers } from '../../src/store/scrub-links';
 import { CorruptFileError } from '../../src/store/fs-utils';
 import { withoutSeatSecret } from '../../src/core/seat';
+import { HIDDEN_SHOWN_ONLINE } from '../../src/core/hidden-mark';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
 const defaultSyncState: SyncState = {
@@ -654,6 +655,7 @@ export class MockFolderStore implements FolderStore {
     if (existing) {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
         if (opts.dropLocal?.includes(field)) continue;
+        if (field === HIDDEN_SHOWN_ONLINE) continue; // the record is keel's word on the mark (conv. 170, F3)
         if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset (gate G6)
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;

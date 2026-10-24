@@ -13,6 +13,7 @@ import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { toV2WireShape } from '../../src/sync/ow-v2-client-adapter';
 import { diffFieldNames } from '../../src/sync/sync-engine';
 import type { FolderStore } from '../../src/store/folder-store';
+import { HIDDEN_SHOWN_ONLINE, hiddenWordOf } from '../../src/core/hidden-mark';
 
 const ANA = '00000000-0000-4000-8000-0000000005a7';
 const STAMP = '2026-01-01T00:00:05.000Z';
@@ -41,6 +42,18 @@ describe.each([['the real store', realStore], ['the mock store', mockStore]] as 
     expect(((await s.getElement(ANA)) as unknown as Record<string, unknown>).hidden).toBe(true);
     await s.applyServerRecord('character', { id: ANA, type: 'character', name: 'Ana', updated_at: LATER }, LATER);
     expect('hidden' in ((await s.getElement(ANA)) as unknown as Record<string, unknown>)).toBe(false);
+  });
+
+  it('keeps keel\'s word that it shows a mark added here, and a pull takes the word (the S461 gate\'s F3)', async () => {
+    const s = await make();
+    await s.applyServerRecord('character', { id: ANA, type: 'character', name: 'Ana', updated_at: STAMP }, STAMP);
+    await s.updateElement(ANA, { hidden: true } as never);
+    await s.stampServerUpdatedAt(ANA, 'character', LATER, undefined, hiddenWordOf({ id: ANA, updated_at: LATER }));
+    expect(((await s.getElement(ANA)) as unknown as Record<string, unknown>)[HIDDEN_SHOWN_ONLINE]).toBe(true);
+    await s.applyServerRecord('character', { id: ANA, type: 'character', name: 'Ana', hidden: true, updated_at: '2026-01-01T00:02:05.000Z' }, '2026-01-01T00:02:05.000Z');
+    const after = (await s.getElement(ANA)) as unknown as Record<string, unknown>;
+    expect(after.hidden).toBe(true);
+    expect(HIDDEN_SHOWN_ONLINE in after).toBe(false);
   });
 });
 

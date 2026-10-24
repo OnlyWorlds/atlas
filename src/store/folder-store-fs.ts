@@ -105,6 +105,7 @@ import { stampedBody, editStamp, dropLastWriter } from './sync-stamp';
 import { scrubReferrers } from './scrub-links';
 import { isKnownOf, KNOWN_OF_DROPS_LOCAL, KNOWN_OF_REFUSAL, stubShape } from '../sync/known-of';
 import { withoutSeatSecret } from '../core/seat';
+import { HIDDEN_SHOWN_ONLINE } from '../core/hidden-mark';
 import {
   elementDirSegmentsIn,
   elementFilename,
@@ -2361,6 +2362,7 @@ export class FsFolderStore implements FolderStore {
     if (existing) {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
         if (opts.dropLocal?.includes(field)) continue;
+        if (field === HIDDEN_SHOWN_ONLINE) continue; // the record is keel's word on the mark (conv. 170, F3)
         if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset (gate G6)
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;

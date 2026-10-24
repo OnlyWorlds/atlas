@@ -13,6 +13,22 @@ import { escapeAttr } from './dom-utils';
 export const HIDDEN_MARK_LINE = 'Hidden on OnlyWorlds: only the owner, co-builders and whoever made it can see it.';
 /** Any other: a folder world, an unlinked one, or a linked element not yet sent. */
 export const HIDDEN_FOLDER_LINE = 'Hidden: shown to you here, and left out of a published page.';
+/** A linked element keel showed in its last answer, though the file holds the mark (the S461 gate's F3). */
+export const HIDDEN_HERE_ONLY_LINE = 'Hidden here only: OnlyWorlds still shows it, since it was marked hidden after it went online. A published page leaves it out.';
+
+/** keel's word on the mark, recorded with a push's stamp (`stampedBody`; ATLAS_FIELDS.md). */
+export const HIDDEN_SHOWN_ONLINE = 'atlas_hidden_shown_online';
+
+/**
+ * What keel's answer to a write (a POST or PATCH body, a read-back, an adopted
+ * copy) says about the mark, for the stamp's `kept`: keel answers `hidden: true`
+ * exactly when it hides the element (S461 probe-48, 8a and 8b). `stampedBody`
+ * keeps the key only when the file holds the mark; no answer body, no word.
+ */
+export function hiddenWordOf(answer: unknown): Record<string, unknown> | undefined {
+  if (!answer || typeof answer !== 'object') return undefined;
+  return { [HIDDEN_SHOWN_ONLINE]: !isHiddenMark(answer) };
+}
 
 /**
  * The one reading (§4.8, as SDK 4.70.0's `writeWorldFile` and Python's
@@ -27,8 +43,10 @@ export function isHiddenMark(el: unknown): boolean {
 
 export function hiddenMarkLine(el: unknown, worldState: string | undefined): string | null {
   if (!isHiddenMark(el)) return null;
-  const onServer = typeof (el as Record<string, unknown>).server_updated_at === 'string';
-  return worldState === 'api-linked' && onServer ? HIDDEN_MARK_LINE : HIDDEN_FOLDER_LINE;
+  const rec = el as Record<string, unknown>;
+  const onServer = typeof rec.server_updated_at === 'string';
+  if (worldState !== 'api-linked' || !onServer) return HIDDEN_FOLDER_LINE;
+  return rec[HIDDEN_SHOWN_ONLINE] === true ? HIDDEN_HERE_ONLY_LINE : HIDDEN_MARK_LINE;
 }
 
 /**
