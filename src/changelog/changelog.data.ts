@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.88.0',
+    date: '2026-10-24',
+    theme: 'Hidden here, hidden there',
+    entries: [
+      {
+        id: 'hidden-mark-sent-online',
+        title: 'A mark added after an element went online now hides it on OnlyWorlds too',
+        body: 'When you own the world or build it with its owner, an element marked hidden in its file after it went online is now hidden on OnlyWorlds as well, before your edit is sent, so members never see the change. An element that said Hidden here only is hidden the next time Atlas syncs the world. Taking the mark out of a file never shows an element again: unhide it on onlyworlds.com. For other members it stays as before: hidden here only.',
+        tags: ['sync', 'sharing'],
+      },
+    ],
+  },
+  {
     version: '1.87.1',
     date: '2026-10-24',
     theme: 'Buttons that stay where they are',

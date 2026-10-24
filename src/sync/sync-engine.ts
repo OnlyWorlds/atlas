@@ -38,7 +38,7 @@ import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
 import { hiddenHeldOf } from './hidden-held';
-import { hiddenWordOf, HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
+import { hiddenKeptOf, hiddenWordOf, HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
 import { isKnownOf, knownOfMove, stubShape } from './known-of';
 import type {
@@ -133,6 +133,8 @@ export interface OwApiClient {
   createElement(type: ElementType, body: Record<string, unknown>): Promise<{ id: string; updated_at: string } & Record<string, unknown>>;
   updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<{ id: string; updated_at: string } & Record<string, unknown>>;
   deleteElement(type: ElementType, id: string): Promise<void>;
+  /** keel's hide (conv. 173). Absent: a mark added after the element went online stays here only. */
+  hideElement?(type: ElementType, id: string): Promise<void>;
   listElements(type: ElementType): Promise<Array<{ id: string; updated_at: string } & Record<string, unknown>>>;
   /** Fetch single element. Used by SyncEngine pre-update conflict check. */
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
@@ -601,6 +603,63 @@ export class SyncEngine {
     return hiddenHeldOf(creates);
   }
 
+  /** Ids keel refused to hide for this key this session (conv. 173): never asked again until the role moves. */
+  private hideRefused = new Set<string>();
+  private hideRefusedRole: string | null = null;
+
+  /**
+   * conv. 173 (folder spec 4.8, Skeld h29 #12044): keel's hide for an element online that the file
+   * marks hidden, by the owner's or a co-builder's key only. `hidden` on keel's 204. `not-sent` for
+   * another role, a client without the route, keel's 403 or its 404 (the route off, or the element
+   * gone: the write after it says which): the copy keeps today's word and line. `role-unknown` when the
+   * role could not be read: the caller holds the write for the next round (the S466 gate's G2).
+   * A 401, 429, 503 or a lost network throws, as the write after it would. `role` defaults to the round's.
+   */
+  private async hideOnline(type: ElementType, id: string, role?: string | null): Promise<'hidden' | 'not-sent' | 'role-unknown'> {
+    if (typeof this.client.hideElement !== 'function') return 'not-sent';
+    const r = role === undefined ? await this.roundRoleNow() : role;
+    if (r === null) return 'role-unknown';
+    if (r !== 'owner' && r !== 'co_builder') return 'not-sent';
+    if (r !== this.hideRefusedRole) { this.hideRefused.clear(); this.hideRefusedRole = r; }
+    if (this.hideRefused.has(id)) return 'not-sent';
+    try {
+      await this.client.hideElement(type, id);
+    } catch (err) {
+      const t = typedError(err);
+      if (t?.status !== 403 && !isNotFoundError(err)) throw err;
+      if (t?.status === 403) this.hideRefused.add(id);
+      console.info('[atlas:sync] keel did not hide it for this key — it stays hidden here only', { id, type, status: t?.status });
+      return 'not-sent';
+    }
+    console.info('[atlas:sync] hidden on OnlyWorlds: the file marks it hidden', { id, type });
+    return 'hidden';
+  }
+
+  /**
+   * conv. 173, the clean copies: an element on the server that the file marks hidden, with keel's
+   * last word that it shows it (1.86.2's `atlas_hidden_shown_online`) and no edit waiting, gets the
+   * hide, then a read back; when keel's answer carries the mark the copy takes it as a pull would,
+   * which drops the word. The file is read again right before the hide (the gate's G11), an edit
+   * landing after wins and goes up next round, and a round asks at most `HIDE_SWEEP_CAP`.
+   */
+  private async hideShownCopies(skip: ReadonlySet<string>): Promise<void> {
+    const owes = (e: Element) =>
+      typeof e.server_updated_at === 'string' && isHiddenMark(e)
+      && (e as Record<string, unknown>)[HIDDEN_SHOWN_ONLINE] === true
+      && !(e.local_updated_at > e.server_updated_at) && !skip.has(e.id) && !isKnownOf(e);
+    const owed = (await this.folder.listElements()).filter(owes).slice(0, HIDE_SWEEP_CAP);
+    for (const listed of owed) {
+      if (this.stopped) return;
+      const e = await this.folder.getElement(listed.id);
+      if (!e || !owes(e)) continue;
+      if (await this.hideOnline(e.type, e.id) !== 'hidden') continue;
+      const remote = await this.client.getElement(e.type, e.id);
+      if (!remote || !isHiddenMark(remote) || this.stopped) continue;
+      await this.folder.applyServerRecordIfUnchanged(
+        e.type, withKeptLinks(e.type, stripServerOnlyFields(remote), e, this.roundLinkHeld), remote.updated_at, e.local_updated_at ?? null);
+    }
+  }
+
   private ownRole(fresh = false): Promise<string | null> {
     if (fresh || !this.roleRead) {
       const me = this.client.me?.bind(this.client);
@@ -854,6 +913,15 @@ export class SyncEngine {
         await keepHere();
         return;
       }
+      // conv. 173 (the S466 gate's G1): keeping mine sends the edit, so a mark keel does not hold goes
+      // as its hide first, by a role read now; a role that cannot be read sends nothing.
+      if (local.server_updated_at && isHiddenMark(local)) {
+        const remote = await this.client.getElement(local.type, id);
+        if (remote && !isHiddenMark(remote)
+          && await this.hideOnline(local.type, id, await this.ownRole(true)) === 'role-unknown') {
+          throw new PlainError('OnlyWorlds did not say what this key may do, so nothing was sent. Try again in a moment.');
+        }
+      }
       const body = this.outgoing(local);
       console.info(`[atlas:sync] resolveConflict overwrite-mine: pushing local to server`, {
         id, type: local.type, hasServerBaseline: !!local.server_updated_at,
@@ -989,7 +1057,15 @@ export class SyncEngine {
     }
   }
 
-  private async adoptServerCopy(local: Element, remote: { updated_at: string } & Record<string, unknown>): Promise<void> {
+  private async adoptServerCopy(local: Element, served: { updated_at: string } & Record<string, unknown>): Promise<void> {
+    // conv. 173: the owner's or a co-builder's key hides it there first, and keel's read back is the
+    // copy adopted. A failed hide sends nothing: today's way, and the next round asks again.
+    let remote = served;
+    if (isHiddenMark(local) && !isHiddenMark(served)
+      && await this.hideOnline(local.type, local.id).catch(() => 'not-sent' as const) === 'hidden') {
+      const back = await this.client.getElement(local.type, local.id).catch(() => null);
+      if (back) remote = back;
+    }
     // conv. 170: a hidden local whose id OnlyWorlds shows is not adopted, or its content would go up as
     // an update onto what every member sees (the S461 gate's F2). It stays here, said once, until hidden there.
     if (isHiddenMark(local) && !isHiddenMark(remote) && !sameWireContent(local, remote)) {
@@ -2557,14 +2633,24 @@ export class SyncEngine {
           }
 
           if (!skipPush) {
+            // conv. 173: a mark the file gained while keel shows the element goes as keel's hide FIRST,
+            // so the edit never reaches members between the two; the PATCH's answer then carries it.
+            // A role not read this round holds the edit for the next (the S466 gate's G2).
+            if (isHiddenMark(current) && !isHiddenMark(remote)
+              && await this.hideOnline(current.type, current.id) === 'role-unknown') {
+              roleUnknown.push(current.id);
+              console.info('[atlas:sync] push: a mark to send and the key\'s role unknown — left for the next round', { id: current.id });
+              continue;
+            }
             const body = this.outgoing(current);
             sentStamp = current.local_updated_at;
             const response = await this.client.updateElement(current.type, current.id, body);
             // The body sent carried `current.local_updated_at`; an edit that
             // landed while this request was in flight keeps the element dirty
             // (S360 H1: it used to be stamped clean and never uploaded).
-            // keel takes the mark on a create only: its answer says whether it shows the element (F3).
-            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, hiddenWordOf(response));
+            // keel takes the mark on a create only: its answer says whether it shows the element (F3),
+            // and a mark taken out here comes back with it, since keel keeps hiding it (conv. 173).
+            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, hiddenKeptOf(response));
             updates++;
           }
         }
@@ -2782,6 +2868,21 @@ export class SyncEngine {
       } finally {
         done++;
         this.onPushProgress(done, total);
+      }
+    }
+
+    // conv. 173: the clean copies keel still shows though the file marks them hidden, after the
+    // person's own writes (the S466 gate's G6).
+    if (!authBlocked && !transient && !this.stopped) {
+      try {
+        await this.hideShownCopies(kept);
+      } catch (err) {
+        if (isAuthError(err)) { authBlocked = true; this.noteAuthBail(err); }
+        else if (isTransientError(err)) transient = err;
+        else if (isFileBusyError(err)) failures.push({ ...failureOf('world', 'world', 'update', err), source: 'disk' });
+        else console.warn('[atlas:sync] the hide of a copy marked hidden failed — tried again next round', {
+          message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
+        });
       }
     }
 
@@ -3834,7 +3935,7 @@ function stripServerOnlyFields(record: Record<string, unknown>): Record<string, 
 /** Same content on the wire's terms: server stamps and atlas's local-only fields do not count. */
 /** What keel's answer leaves in the copy with the stamp: a create's proposed mark (conv. 168) and keel's word on the hidden mark (conv. 170, F3). */
 function keptFrom(answer: unknown, onCreate: boolean): Record<string, unknown> | undefined {
-  const kept = { ...(onCreate ? keptOnCreate(answer) : undefined), ...hiddenWordOf(answer) };
+  const kept = { ...(onCreate ? keptOnCreate(answer) : undefined), ...hiddenKeptOf(answer) };
   return Object.keys(kept).length > 0 ? kept : undefined;
 }
 
@@ -4124,6 +4225,8 @@ export function splitByRefusedLinks(
 const NOT_ON_THE_WIRE = new Set<string>(['id', 'local_updated_at', 'server_updated_at', ...ATLAS_LOCAL_ONLY_FIELDS]);
 
 const TRANSIENT_RETRY_DEFAULT_MS = 30_000;
+/** The clean copies one push round hides at most (conv. 173): a backlog spreads over rounds, never a burst. */
+const HIDE_SWEEP_CAP = 20;
 
 /**
  * A server that is busy (503 `server_busy`), rate limiting (429, e.g. a PIN

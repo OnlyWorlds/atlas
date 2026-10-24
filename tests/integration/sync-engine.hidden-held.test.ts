@@ -128,7 +128,9 @@ for (const bulk of [false, true]) {
 }
 
 describe('a hidden element here whose id OnlyWorlds shows', () => {
-  it('is never adopted, so its content never goes up; said, and the same next round', async () => {
+  it('is never adopted while the key cannot hide it there (the role unread), so its content never goes up; said, and the same next round', async () => {
+    // The owner's or a co-builder's key hides it there first and adopts (conv. 173, `sync-engine.hide-online.test.ts`).
+    client.meFails = true;
     await client.createElement('character', { id: WREN, name: 'Wren', description: 'A sailor.' });
     await folder.createElement('character', { id: WREN, name: 'Wren', description: 'The traitor.', hidden: true } as never);
     const engine = new SyncEngine({ folder, client });

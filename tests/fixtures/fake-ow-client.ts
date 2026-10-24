@@ -148,6 +148,7 @@ export class FakeOwApiClient implements OwApiClient {
     | { method: 'create'; type: ElementType; body: Record<string, unknown> }
     | { method: 'update'; type: ElementType; id: string; body: Record<string, unknown> }
     | { method: 'delete'; type: ElementType; id: string }
+    | { method: 'hide'; type: ElementType; id: string }
     | { method: 'list'; type: ElementType }
     | { method: 'get'; type: ElementType; id: string }
     | { method: 'bulk'; items: number; atomic: boolean }
@@ -286,6 +287,35 @@ export class FakeOwApiClient implements OwApiClient {
     m.set(id, next);
     this.appendUpsert(next);
     return { ...next };
+  }
+
+  /**
+   * keel's hide (`PUT /{type}/{id}/hidden`, api-v2-spec 3b; conv. 173): the owner's keys and
+   * co-builders only, anyone else 403 before the element is looked at; 204, idempotent, the
+   * element's body and `updated_at` unmoved. A reader who still sees it reads `hidden: true`.
+   */
+  async hideElement(type: ElementType, id: string): Promise<void> {
+    this.throwIfAuthBlocked();
+    this.throwIfWritePermission();
+    this.calls.push({ method: 'hide', type, id });
+    if (!this.canHide()) {
+      const err = new Error('API Error 403: Only the owner and co-builders can hide an element.') as
+        Error & { status?: number; code?: string; param?: string | null };
+      err.status = 403;
+      err.code = 'permission_error'; // keel marks/service.py's 403; Atlas reads the status, never the code (the S466 gate's G10)
+      err.param = null;
+      throw err;
+    }
+    const m = this.bucket(type);
+    const r = m.get(id);
+    if (!r || this.outOfView.has(id)) {
+      const err = new Error(`API Error 404: ${type} '${id}' not found.`) as Error & { status?: number; code?: string; param?: string | null };
+      err.status = 404;
+      err.code = 'not_found';
+      err.param = null;
+      throw err;
+    }
+    m.set(id, { ...r, hidden: true });
   }
 
   async deleteElement(type: ElementType, id: string): Promise<void> {

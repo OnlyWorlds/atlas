@@ -12,7 +12,7 @@ import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { SyncEngine } from '../../src/sync/sync-engine';
 import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
-import { HIDDEN_HERE_ONLY_LINE, HIDDEN_SHOWN_ONLINE, hiddenMarkLine } from '../../src/core/hidden-mark';
+import { HIDDEN_HERE_ONLY_LINE, HIDDEN_MARK_LINE, HIDDEN_SHOWN_ONLINE, hiddenMarkLine } from '../../src/core/hidden-mark';
 
 const TEST_BASE = 'https://test-ow.local/api/v2';
 
@@ -31,31 +31,47 @@ beforeEach(async () => {
   engine = new SyncEngine({ folder, client: adapter });
 });
 
-it('the word stays here through every push, and leaves with the mark', async () => {
+it('an owner\'s mark added after it went online hides it on keel through the adapter; taken out here, it never unhides (conv. 173)', async () => {
   const wren = await folder.createElement('character', { name: 'Wren', description: 'A sailor.' });
   expect((await engine.syncNow()).failures).toEqual([]);
   const read = async () => (await folder.getElement(wren.id)) as unknown as Record<string, unknown>;
+  const onKeel = async () => (await adapter.getElement('character', wren.id)) as unknown as Record<string, unknown>;
   expect((await read()).server_updated_at).toBeTruthy();
 
-  // Marked here after it went online: the update's answer shows it.
+  // Marked here after it went online: keel's hide, then the edit; its answer carries the mark.
   await folder.updateElement(wren.id, { hidden: true, description: 'The traitor.' } as never);
   expect((await engine.syncNow()).failures).toEqual([]);
-  expect((await read())[HIDDEN_SHOWN_ONLINE]).toBe(true);
-  expect(hiddenMarkLine(await read(), 'api-linked')).toBe(HIDDEN_HERE_ONLY_LINE);
+  expect((await onKeel()).hidden).toBe(true);
+  expect((await onKeel()).description).toBe('The traitor.');
+  expect(await read()).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
+  expect(hiddenMarkLine(await read(), 'api-linked')).toBe(HIDDEN_MARK_LINE);
 
-  // A second push of the copy holding the word: it never reaches keel.
-  await folder.updateElement(wren.id, { description: 'Still the traitor.' } as never);
-  expect((await engine.syncNow()).failures).toEqual([]);
-  const onKeel = (await adapter.getElement('character', wren.id)) as unknown as Record<string, unknown>;
-  expect(onKeel.description).toBe('Still the traitor.');
-  expect(onKeel).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
-  expect(onKeel.hidden).toBeUndefined();
-  expect((await read())[HIDDEN_SHOWN_ONLINE]).toBe(true);
-
-  // The mark taken out here: the next stamp takes the word.
+  // The mark taken out here: the edit goes, and keel keeps it hidden (an unhide is the site's).
   await folder.updateElement(wren.id, { hidden: null, description: 'A sailor again.' } as never);
   expect((await engine.syncNow()).failures).toEqual([]);
-  expect(await read()).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
+  expect((await onKeel()).description).toBe('A sailor again.');
+  expect((await onKeel()).hidden).toBe(true);
+});
+
+it('a clean copy holding 1.86.2\'s word is hidden on keel, and the word never reaches keel (conv. 173)', async () => {
+  const wren = await folder.createElement('character', { name: 'Wren', description: 'A sailor.' });
+  expect((await engine.syncNow()).failures).toEqual([]);
+  // As 1.86.2 left it: the mark and the word, stamped clean (the stamp just past the edit).
+  const marked = await folder.updateElement(wren.id, { hidden: true } as never);
+  const clean = new Date(Date.parse(marked.local_updated_at) + 1).toISOString();
+  await folder.stampServerUpdatedAt(wren.id, 'character', clean, undefined, { [HIDDEN_SHOWN_ONLINE]: true });
+  const before = (await folder.getElement(wren.id)) as unknown as Record<string, unknown>;
+  expect(before[HIDDEN_SHOWN_ONLINE]).toBe(true);
+  expect(hiddenMarkLine(before, 'api-linked')).toBe(HIDDEN_HERE_ONLY_LINE);
+
+  expect((await engine.syncNow()).failures).toEqual([]);
+  const keel = (await adapter.getElement('character', wren.id)) as unknown as Record<string, unknown>;
+  expect(keel.hidden).toBe(true);
+  expect(keel).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
+  const after = (await folder.getElement(wren.id)) as unknown as Record<string, unknown>;
+  expect(after).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
+  expect(after.hidden).toBe(true);
+  expect(hiddenMarkLine(after, 'api-linked')).toBe(HIDDEN_MARK_LINE);
 });
 
 it('a word a cleared baseline left never survives the create that follows through /bulk (the S464 gate\'s M1)', async () => {

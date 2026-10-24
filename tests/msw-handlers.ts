@@ -843,6 +843,18 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
 
     // DELETE — idempotent: 204 whether or not the id existed. Only a real
     // removal logs a delete op.
+    // PUT /:type/:id/hidden — keel's hide (api-v2-spec 3b; conv. 173): 204, idempotent, the
+    // body and updated_at unmoved; this key is the owner's, so the record says `hidden: true`.
+    http.put(`${base}/:type/:id/hidden`, ({ params }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const m = bucket(String(params.type));
+      const r = m.get(String(params.id));
+      if (!r) return envelope({ status: 404, code: 'not_found', message: 'Not found.', param: null });
+      m.set(String(params.id), { ...r, hidden: true });
+      return new HttpResponse(null, { status: 204 });
+    }),
+
     http.delete(`${base}/:type/:id`, ({ params }) => {
       const blocked = authBlocked();
       if (blocked) return blocked;

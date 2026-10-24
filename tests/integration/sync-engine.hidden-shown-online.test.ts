@@ -31,7 +31,14 @@ beforeEach(async () => {
 
 const wren = async () => (await folder.getElement(WREN)) as unknown as Record<string, unknown>;
 
-describe('a mark added here to an element OnlyWorlds already shows', () => {
+// A key that cannot hide (conv. 173: the owner's and a co-builder's key hide it there first:
+// `sync-engine.hide-online.test.ts`). The contributor's element is its own, so its edits go.
+describe('a mark added here to an element OnlyWorlds already shows, by a contributor\'s key', () => {
+  beforeEach(() => {
+    client.__as_member_seat('contributor');
+    client.keyRole = 'contributor';
+  });
+
   it('reads Hidden here only once keel answers the push, and the word never goes up', async () => {
     await client.createElement('character', { id: WREN, name: 'Wren', description: 'A sailor.' });
     const engine = new SyncEngine({ folder, client });
@@ -65,7 +72,12 @@ describe('a mark added here to an element OnlyWorlds already shows', () => {
     expect(el).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
     expect(el.hidden).toBeUndefined();
   });
-  it('an adopted copy keel shows under the same id records the word too (adoptServerCopy)', async () => {
+  it('an adopted copy keel shows under the same id records the word too (adoptServerCopy), while the role is unread', async () => {
+    // A contributor's key holds a hidden create back before it is sent (conv. 170); the adopt door
+    // meets a hidden copy keel shows only while the role could not be read.
+    client.keyRole = 'owner';
+    client.__as_member_seat(null);
+    client.meFails = true;
     await client.createElement('character', { id: WREN, name: 'Wren', description: 'A sailor.' });
     await folder.createElement('character', { id: WREN, name: 'Wren', description: 'A sailor.', hidden: true } as never);
     const r = await new SyncEngine({ folder, client }).syncNow();

@@ -270,7 +270,7 @@ export const ATLAS_LOCAL_ONLY_FIELDS = [
   'atlas_page_pub',
   // keel's word on the hidden mark (conv. 170, the S461 gate's F3): true when
   // keel's last answer to a write showed an element whose file holds the mark
-  // (keel takes the mark on a create only). Written and removed with the push
+  // (keel takes it in a write on a create only; a key that can hide sends the hide, conv. 173). Written and removed with the push
   // stamp (`stampedBody`), dropped by every pull and on import; never sent.
   'atlas_hidden_shown_online',
 ] as const;

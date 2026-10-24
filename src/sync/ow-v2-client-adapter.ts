@@ -506,6 +506,15 @@ export class OwV2ClientAdapter implements OwApiClient {
   }
 
   /**
+   * keel's hide (`PUT /{type}/{id}/hidden`, keel #421): 204, no body, idempotent; the element's
+   * body and `updated_at` do not move. The owner's keys and co-builders only, anyone else 403
+   * (folder spec 4.8, Skeld h29 #12044; conv. 173). Atlas never sends the unhide.
+   */
+  async hideElement(type: ElementType, id: string): Promise<void> {
+    await this.request('PUT', `/${type}/${id}/hidden`);
+  }
+
+  /**
    * keel #519's queue, the caller's own rows in every state
    * (`GET /world/proposals?state=all`, newest first; conv. 163, P5). A seat
    * sees its own; the walk stops at `pages` pages, newest first, which holds

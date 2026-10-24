@@ -5,7 +5,7 @@
  * shows the element with the word on it, and leaves it out of what it hands on
  * (a published page). keel serves `hidden: true` only to those who can still
  * see a hidden element (the owner, a co-builder and its maker), and takes the
- * mark on a create only (keel #587).
+ * mark in a write on a create only (keel #587); later, its hide route (conv. 173).
  */
 import { escapeAttr } from './dom-utils';
 
@@ -28,6 +28,16 @@ export const HIDDEN_SHOWN_ONLINE = 'atlas_hidden_shown_online';
 export function hiddenWordOf(answer: unknown): Record<string, unknown> | undefined {
   if (!answer || typeof answer !== 'object') return undefined;
   return { [HIDDEN_SHOWN_ONLINE]: !isHiddenMark(answer) };
+}
+
+/**
+ * keel's answer to a push, for the stamp: the word, and keel's mark when keel hides the element.
+ * A file never unhides (conv. 173, Skeld h29 #12044), so a mark taken out here comes back with
+ * the answer that shows keel still hides it; a pull would skip that answer as its own echo.
+ */
+export function hiddenKeptOf(answer: unknown): Record<string, unknown> | undefined {
+  const word = hiddenWordOf(answer);
+  return word && isHiddenMark(answer) ? { ...word, hidden: true } : word;
 }
 
 /**
