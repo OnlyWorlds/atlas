@@ -172,6 +172,17 @@ describe('the reader refuses before anything is written', () => {
     refuses({ ...world, 'w/elements/character/con.json': strToU8('{}') }, /names is not allowed in a world/);
   });
 
+  it('two file names fold by Unicode 15.1, never the runtime\'s (§4.7 OW-18, schema-dist serial 57, SDK 4.71)', () => {
+    // U+11383 and U+11382 U+113C9 are Tulu-Tigalari: Unicode 16 composes the pair,
+    // 15.1 leaves both unassigned, so the spec keeps two names (red on SDK 4.70.0 under Node 22).
+    const two = { 'w/media/\u{11383}.png': strToU8('a'), 'w/media/\u{11382}\u{113C9}.png': strToU8('b') };
+    expect(readWorldZip(zipSync({ ...world, ...two })).files.filter(f => f.path.startsWith('media/'))).toHaveLength(2);
+    const written = unzipSync(zipWorld(Object.entries({ ...world, ...two }).map(([p, data]) => ({ path: p.slice(2), data })), 'w'));
+    expect(Object.keys(written).filter(p => p.startsWith('w/media/'))).toHaveLength(2);
+    // Where both assign the code points nothing moves: é composed and decomposed stay one name.
+    refuses({ ...world, 'w/media/é.png': strToU8('a'), 'w/media/é.png': strToU8('b') }, /differ only in capitals or accents/);
+  });
+
   it('a world.json at the root with another world nested inside (gate F10)', () => {
     refuses({ 'world.json': strToU8(j({ id: WID, name: 'W' })), 'other/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
   });

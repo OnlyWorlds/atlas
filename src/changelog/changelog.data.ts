@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.86.3',
+    date: '2026-10-24',
+    theme: 'File names read the same in every browser',
+    entries: [
+      {
+        id: 'world-file-names-unicode-15-1',
+        title: 'A world file reads its file names the same in every browser',
+        body: 'When a world file is opened or made, two of its file names count as one by the rule every OnlyWorlds tool shares, never by the browser\'s own. Before, a newer browser could refuse a file holding two different names written in one of four recently added scripts (Todhri, Tulu-Tigalari, Gurung Khema and Kirat Rai), saying they differ only in accents.',
+        tags: ['fix', 'data'],
+      },
+    ],
+  },
+  {
     version: '1.86.2',
     date: '2026-10-24',
     theme: 'Hidden here only, said when it is',
