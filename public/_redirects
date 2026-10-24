@@ -1,2 +1,4 @@
 # Sign in with OnlyWorlds returns here (Keel #515): the app answers, not the 404 page.
-/signin/callback /index.html 200
+# The target is / and never /index.html: Pages 308s /index.html to /, which
+# left the path and its headers behind (Boss, h11 #12069).
+/signin/callback / 200

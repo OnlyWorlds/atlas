@@ -110,7 +110,7 @@ describe('public/_headers (#302)', () => {
 describe('Sign in with OnlyWorlds return address (Keel #515, S465)', () => {
   it('the app answers it, not the 404 page', () => {
     const rules = read('public/_redirects').split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
-    expect(rules).toContain('/signin/callback /index.html 200');
+    expect(rules).toEqual(['/signin/callback / 200']);
   });
   it('no cache keeps it and no request from it carries its address', () => {
     const lines = read('public/_headers').split(/\r?\n/);
