@@ -36,6 +36,8 @@ async function expectReachable(page: Page, loc: Locator) {
       return !!top && (top === el || el.contains(top));
     }, [cx, cy] as const);
     expect(hit, 'nothing covers it').toBe(true);
+    // The page itself never scrolls sideways (conv. 174: run 40104361183 sat 273 px left, the sidebar off-screen).
+    expect(await page.evaluate(() => document.body.scrollLeft + document.documentElement.scrollLeft), 'the page is not scrolled sideways').toBe(0);
   }).toPass({ timeout: 8_000 });
 }
 
@@ -127,6 +129,17 @@ test('at 800 the swamps map, every objects mint, back to the map, and the-rest s
   await expectReachable(page, map);           // the pin is down: the beat is about the map
   await nextStep(page, 7);
   await nextStep(page, 8);                    // objects: a creates run, pane 'sidebar'
+  // conv. 174: here the tour lets the shell overflow and a drawer parked off to the right gave the
+  // body room to scroll; a focus, a scroll into view or a test's click moved the whole page left and
+  // the open sidebar off-screen (run 40104361183, 273 px). The page must refuse every sideways scroll.
+  const pushed = await page.evaluate(() => {
+    const room = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth;
+    document.body.scrollLeft = 400;
+    document.documentElement.scrollLeft = 400;
+    return { room, body: document.body.scrollLeft, root: document.documentElement.scrollLeft };
+  });
+  expect(pushed.room, 'the shell still overflows here (else this proves nothing)').toBeGreaterThan(0);
+  expect([pushed.body, pushed.root], 'the page refuses a sideways scroll').toEqual([0, 0]);
   const plus = page.locator('[data-action="create-element"]');
   for (const phase of ['b', 'c', 'd']) {
     await expectReachable(page, plus);        // before EVERY mint, not only the first

@@ -2245,6 +2245,13 @@ body.atlas-touring .atlas-shell {
 body.atlas-touring:not(.atlas-tour-collapsed) .atlas-shell {
   overflow: visible;
 }
+/* conv. 174: with the shell unclipped, a drawer parked off to the right gave the
+   body room, and `overflow: hidden` still scrolls for a focus or a scroll into
+   view: the whole page moved 273 px left and the open sidebar off-screen (the
+   e2e run 40104361183). `clip` makes the body no scroller at all. */
+body.atlas-touring:not(.atlas-tour-collapsed) {
+  overflow: clip;
+}
 body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   height: 100vh;
 }

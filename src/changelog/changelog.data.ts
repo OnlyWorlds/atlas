@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.88.2',
+    date: '2026-10-24',
+    theme: 'The tour stays in view',
+    entries: [
+      {
+        id: 'tour-page-never-scrolls-sideways',
+        title: 'In a narrow window, the tour no longer slides the page sideways',
+        body: 'During the guided tour in a narrow window, the whole page could shift left by a few hundred pixels, leaving the open element list mostly off screen while the tour pointed at it. The page now stays put.',
+        tags: ['fix', 'tour', 'layout'],
+      },
+      {
+        id: 'settings-sign-in-label-once',
+        title: 'Sign in says it once in Settings',
+        body: 'Settings, OnlyWorlds no longer shows "Sign in to OnlyWorlds" right above the Sign in with OnlyWorlds button.',
+        tags: ['settings'],
+      },
+    ],
+  },
+  {
     version: '1.88.1',
     date: '2026-10-24',
     theme: 'A damaged world file is refused',
