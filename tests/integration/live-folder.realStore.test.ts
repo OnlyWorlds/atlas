@@ -250,3 +250,29 @@ describe('rescanDisk and sync: a compliant outside edit', () => {
     expect(JSON.parse(root.get(pathOf(root, el.id))!).description).toBe('agent');
   });
 });
+
+describe('unreadableFiles: what an open left out (conv. 176, Seethe h20 #12538)', () => {
+  it('names a cut-short file and an id-less one after the index, leaves both on disk, and drops one fixed since', async () => {
+    const root = world();
+    const id = '0192a000-0000-7000-8000-00000000b0b0';
+    root.put('elements/character/ada--0000ada0.json', j({ id: '0192a000-0000-7000-8000-00000000ada0', type: 'character', name: 'Ada' }));
+    root.put('elements/character/broken.json', '{"id": "' + id + '", "name": "Broken');
+    root.put('elements/location/no-id.json', j({ type: 'location', name: 'Nowhere' }));
+    const s = await open(root);
+    expect((await s.listElements()).map(e => e.name)).toEqual(['Ada']);
+    expect(s.unreadableFiles()).toEqual(['character/broken.json', 'location/no-id.json']);
+    expect(root.get('elements/character/broken.json')).toBe('{"id": "' + id + '", "name": "Broken');
+
+    root.put('elements/character/broken.json', j({ id, type: 'character', name: 'Mended' }));
+    expect(kinds(await s.rescanDisk())).toEqual([`created:${id}`]);
+    expect(s.unreadableFiles()).toEqual(['location/no-id.json']);
+  });
+
+  it('a world with nothing unreadable has an empty list', async () => {
+    const root = world();
+    root.put('elements/character/ada--0000ada0.json', j({ id: '0192a000-0000-7000-8000-00000000ada0', type: 'character', name: 'Ada' }));
+    const s = await open(root);
+    await s.listElements();
+    expect(s.unreadableFiles()).toEqual([]);
+  });
+});

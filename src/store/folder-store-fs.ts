@@ -902,6 +902,17 @@ export class FsFolderStore implements FolderStore {
 
   // ---- The live folder (S364) ----
 
+  /** The files the index or a rescan left out as unreadable (conv. 176): derived from `otherFileStamps`, whose id is null only for those. */
+  unreadableFiles(): string[] {
+    const out = new Set<string>();
+    for (const [key, rec] of this.otherFileStamps) {
+      if (rec.id !== null) continue;
+      const [, type, filename] = splitOtherFileKey(key);
+      out.add(`${type}/${filename}`);
+    }
+    return [...out].sort();
+  }
+
   rescanDisk(opts: { full?: boolean } = {}): Promise<RescanResult> {
     if (!this.rescanActive) {
       this.rescanActive = this.rescanOnce(!!opts.full).finally(() => { this.rescanActive = null; });

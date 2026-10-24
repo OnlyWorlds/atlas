@@ -499,6 +499,12 @@ export class MockFolderStore implements FolderStore {
     return { changes: [] };
   }
 
+  /** The mock has no files to fail; a test sets what an index would have left out. */
+  unreadable: string[] = [];
+  unreadableFiles(): string[] {
+    return [...this.unreadable];
+  }
+
   // ---- Sync-relevant reads ----
 
   async listLocallyChangedSince(baseline: string | null): Promise<Element[]> {

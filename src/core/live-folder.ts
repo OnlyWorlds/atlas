@@ -131,6 +131,17 @@ export function notSyncedNow(n: DiskNotice, elements: readonly Element[]): numbe
   return count;
 }
 
+/**
+ * The files a world's open left out as unreadable (conv. 176, Seethe h20 #12538): said in the
+ * same line as those a rescan finds, once per open, since before 1.89.0 a folder with a damaged
+ * file opened one element short and said nothing. `files` is the store's `unreadableFiles()`.
+ */
+export function noticeUnreadableAtOpen(worldId: string, files: readonly string[]): void {
+  if (files.length === 0) return;
+  const prev = notices.get(worldId) ?? emptyNotice(worldId);
+  setNotice({ ...prev, unreadable: [...new Set([...prev.unreadable, ...files])] });
+}
+
 /** "Mark all seen": clear the marks and the unreadable line. A held batch keeps waiting for its answer. */
 export function dismissDiskNotice(): void {
   const n = getDiskNotice();
@@ -327,7 +338,7 @@ async function runPass(store: FolderStore, worldId: string, full: boolean): Prom
   await refreshMetaCacheNow().catch(() => {});
 
   const applied = changes.filter(c => c.kind !== 'unreadable');
-  const unreadable = changes.filter(c => c.kind === 'unreadable').map(c => c.filename ?? c.id);
+  const unreadable = changes.filter(c => c.kind === 'unreadable').map(c => (c.filename ? `${c.type}/${c.filename}` : c.id));
   if (changes.length === 0) return { changes: [] };
 
   let elements: Element[] = getState().data.elements;

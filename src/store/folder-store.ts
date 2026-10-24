@@ -347,6 +347,14 @@ export interface FolderStore {
    * stat pass misses an overwrite that kept its mtime and size.
    */
   rescanDisk(opts?: { full?: boolean }): Promise<RescanResult>;
+
+  /**
+   * Element files the store left out because they would not read as an
+   * element (not JSON, or no `id`), as `<type>/<file name>`, sorted. They stay
+   * on disk untouched (the folder spec's rule); the list is what the last
+   * index or rescan found, so a file fixed since drops out (conv. 176).
+   */
+  unreadableFiles(): string[];
 }
 
 /** One element file that changed on disk behind Atlas's back (S364). */

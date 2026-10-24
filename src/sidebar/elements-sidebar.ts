@@ -488,7 +488,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       parts.push(`<span class="atlas-disk-notice-warn" title="${escapeAttr(tip)}">${n.removed.length} removed on disk</span>`);
     }
     if (n && n.unreadable.length > 0) {
-      const tip = `These files would not open, so Atlas shows them as they were: ${n.unreadable.join(', ')}`;
+      const tip = `Atlas cannot read these files as elements and leaves them as they are; an element it was already showing keeps its last good copy: ${n.unreadable.join(', ')}`;
       parts.push(`<span class="atlas-disk-notice-warn" title="${escapeAttr(tip)}">${n.unreadable.length} cannot be read</span>`);
     }
     const held = n?.held

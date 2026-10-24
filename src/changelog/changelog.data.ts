@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.89.0',
+    date: '2026-10-25',
+    theme: 'A damaged file is said',
+    entries: [
+      {
+        id: 'unreadable-files-said-at-open',
+        title: 'A file Atlas cannot read is named when the world opens',
+        body: 'A world folder with an element file that is damaged or has no id used to open one element short, with no word. The element list now says how many files cannot be read, and pointing at it names them. Atlas still leaves those files as they are, so fixing one brings its element back.',
+        tags: ['fix', 'folder'],
+      },
+    ],
+  },
+  {
     version: '1.88.3',
     date: '2026-10-24',
     theme: 'A world file by any name',

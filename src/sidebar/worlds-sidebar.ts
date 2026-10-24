@@ -1048,6 +1048,11 @@ async function doActivateWorld(
       },
     });
     if (stillActive()) patchSlice('data', { elements, loading: false, loadingProgress: null });
+    // Files the index left out as unreadable are said in the live folder's line (conv. 176).
+    const unreadable = store.unreadableFiles();
+    if (unreadable.length > 0 && stillActive()) {
+      void import('../core/live-folder').then(m => { if (stillActive()) m.noticeUnreadableAtOpen(worldId, unreadable); });
+    }
     // The world's style rules ride in after the elements (the map reads both).
     await loadWorldStyles(store);
   } catch (err) {
