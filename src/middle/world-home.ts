@@ -866,7 +866,11 @@ function buildTour(
   // It stays, with its finished cards checked, until the core pair exists,
   // so the block does not change shape under the first create (h20 #2081).
   section.insertAdjacentHTML('beforeend', '<h2 class="atlas-home-have-title">What do you have?</h2>');
-  row('nothing', 'Nothing yet', `Start with ${escapeText(aTypeName('character'))} and ${escapeText(aTypeName('location'))}.`).appendChild(grid);
+  // The row keeps its place, its words follow the world (F-67, Seethe h20 #12603): "Nothing yet"
+  // only in an empty world; once anything exists it names what the core pair still lacks.
+  const lacking = (['character', 'location'] as const).filter(t => (counts.get(t) ?? 0) === 0).map(t => escapeText(aTypeName(t)));
+  row('nothing', totalElements === 0 ? 'Nothing yet' : 'Next',
+    totalElements === 0 ? `Start with ${lacking.join(' and ')}.` : `Add ${lacking.join(' and ')}.`).appendChild(grid);
   const act = (action: string, label: string): string =>
     `<button type="button" class="atlas-btn-link atlas-home-have-act" data-have-action="${action}">${label}</button>`;
   // A button is one box even when inline: the closing one keeps its full

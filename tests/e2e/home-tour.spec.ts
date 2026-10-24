@@ -72,6 +72,8 @@ test('empty world: "What do you have?" with three rows, the core pair under the 
   await expect(home).toContainText('What do you have?');
   await expect(home.locator('[data-have]')).toHaveCount(3);
   const nothing = home.locator('[data-have="nothing"]');
+  await expect(nothing.locator('.atlas-home-have-label')).toHaveText('Nothing yet');
+  await expect(nothing.locator('.atlas-home-have-line')).toHaveText('Start with a character and a location.');
   await expect(nothing.locator('[data-create-type="character"].atlas-home-tile-core')).toBeVisible();
   await expect(nothing.locator('[data-create-type="location"].atlas-home-tile-core')).toBeVisible();
   await expect(nothing.locator('[data-create-any]')).toBeVisible();
@@ -107,6 +109,10 @@ test('creating from a home tile stays on home; the first element row is highligh
   await expect(page.locator('[data-create-type="character"]')).toHaveCount(0);
   await expect(page.locator('[data-create-type="location"].atlas-home-tile-core')).toBeVisible();
   expect(await cardOrder(page)).toEqual(['character+', 'location']);
+  // Its words follow the world (F-67): no "Nothing yet" over a character, only what is missing.
+  const nothing = page.locator('[data-have="nothing"]');
+  await expect(nothing.locator('.atlas-home-have-label')).toHaveText('Next');
+  await expect(nothing.locator('.atlas-home-have-line')).toHaveText('Add a location.');
 });
 
 test('both cores → "Grow your world": done cards stay in place and open their room; × persists', async ({ page }) => {

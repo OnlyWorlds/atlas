@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'A world folder with an element file that is damaged or has no id used to open one element short, with no word. The element list now says how many files cannot be read, and pointing at it names them. Atlas still leaves those files as they are, so fixing one brings its element back.',
         tags: ['fix', 'folder'],
       },
+      {
+        id: 'home-what-do-you-have-says-whats-missing',
+        title: 'Home names what a world still lacks, instead of saying it has nothing',
+        body: 'The What do you have? card said "Nothing yet. Start with a character and a location." until a world had both, even under a count of its elements. It now says that only in an empty world; otherwise it names what is missing, such as "Add a location."',
+        tags: ['fix', 'home'],
+      },
     ],
   },
   {
