@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: "Home's Choose a protagonist and Choose a home are prompts for a story. A world with a charter, the house rules a world set up for work keeps, no longer shows them. A protagonist or home you set from an element's own page still shows on Home.",
         tags: ['world'],
       },
+      {
+        id: 'phone-map-tools-finger-size',
+        title: "On a phone, a map's tools are a finger's size",
+        body: "The drawing tools above a map grow to the size of the page's other buttons on a phone screen. On a map inside another map, the way back up keeps its row and the whole name of where it goes.",
+        tags: ['maps'],
+      },
     ],
   },
   {

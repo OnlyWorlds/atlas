@@ -187,6 +187,41 @@ test.describe('narrow windows', () => {
     expect(await horizontalOverflow(page)).toBe(0);
   });
 
+  test("at 360 a map's tools are finger-sized and a submap's way up keeps its name (S471)", async ({ page }) => {
+    // The phone tier grew the room's small buttons to 40px, but the map's toolbar lives in the right
+    // drawer and stayed 22px. Grown, a submap's way up was squeezed to "Th…" (#139 names where it goes).
+    await bootThenNarrow(page, 'narrow-maptools-root', 360, 780);
+    const ids = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const top = await store.createElement('map', { name: 'The whole continent of Ostra' });
+      const sub = await store.createElement('map', { name: 'The harbour quarter of Vell', parent_map: top.id });
+      api.patchData(await store.listElements());
+      return { sub: sub.id, w: api.getState().active.worldId };
+    });
+    await page.evaluate(([w, m]) => { window.location.hash = `#/w/${w}/map/${m}`; }, [ids.w, ids.sub]);
+    await page.locator('.atlas-room-nav-drawer-btn.is-right').click();
+    await settledBox(page, '.atlas-right');
+    const bar = page.locator('.atlas-right .atlas-map-toolbar').filter({ has: page.locator('.atlas-map-up-btn') });
+    await expect(bar).toBeVisible();
+    const m = await bar.evaluate((el) => {
+      const pane = el.closest('.atlas-right')!.getBoundingClientRect();
+      const up = el.querySelector('.atlas-map-up-label') as HTMLElement;
+      const tools = [...el.querySelectorAll('.atlas-map-toolbar-btn:not(.atlas-map-up-btn)')]
+        .map((b) => b.getBoundingClientRect()).filter((r) => r.width > 0);
+      return {
+        tools: tools.length,
+        small: tools.filter((r) => r.width < 40 || r.height < 40).length,
+        past: tools.filter((r) => r.right > pane.right + 0.5).length,
+        upClipped: up.scrollWidth > up.clientWidth,
+      };
+    });
+    expect(m.tools).toBeGreaterThanOrEqual(6);
+    expect(m.small).toBe(0);
+    expect(m.past).toBe(0);
+    expect(m.upClipped).toBe(false);
+  });
+
   test('above the breakpoint nothing changes', async ({ page }) => {
     await bootThenNarrow(page, 'narrow-wide-root', 1440, 900);
 

@@ -16984,6 +16984,30 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     min-height: 40px;
   }
 
+  /* The map's toolbar in the right drawer too (S471's census: 22px there while the page's
+     own grew); the gaps close up so seven tools and their dividers fit at 360. A submap's
+     way up keeps its name on a row of its own, the tools beneath (#139). */
+  .atlas-right .atlas-map-toolbar-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .atlas-right .atlas-map-toolbar {
+    gap: 0;
+    padding: 2px 6px;
+    flex-wrap: wrap;
+  }
+
+  .atlas-right .atlas-map-up-btn {
+    flex: 1 0 100%;
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .atlas-right .atlas-map-toolbar-divider {
+    margin: 0 2px;
+  }
+
   .atlas-middle .atlas-btn-ghost,
   .atlas-middle .atlas-cal-chip,
   .atlas-middle .atlas-chart-type-chip,
