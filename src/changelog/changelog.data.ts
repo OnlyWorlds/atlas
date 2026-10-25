@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.92.2',
+    date: '2026-10-25',
+    theme: 'The whole name of a world not downloaded yet',
+    entries: [
+      {
+        id: 'held-row-whole-name',
+        title: 'A world not downloaded yet shows its whole name',
+        body: 'In your list of worlds, a world a link left not downloaded yet says so on a small line under its name. Before, a label beside the name took half the row and cut the name to a few letters.',
+        tags: ['fix', 'world'],
+      },
+    ],
+  },
+  {
     version: '1.92.1',
     date: '2026-10-25',
     theme: "A parlor's takes stay in its room",

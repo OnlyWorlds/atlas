@@ -640,8 +640,10 @@ function renderHeldRow(h: HeldSeat): string {
   return `
     <div class="atlas-row atlas-held-row" data-held-seat="${escapeAttr(h.world_id)}" title="${escapeAttr(said)}">
       <span class="material-symbols-outlined" aria-hidden="true">cloud_download</span>
-      <button type="button" class="atlas-row-main atlas-world-row-open" data-role="held-download" data-held-seat-id="${escapeAttr(h.world_id)}" aria-label="${escapeAttr(`Download ${name}. ${said}`)}">${escapeText(name)}</button>
-      <span class="atlas-world-state-chip held">not downloaded</span>
+      <span class="atlas-held-text">
+        <button type="button" class="atlas-row-main atlas-world-row-open" data-role="held-download" data-held-seat-id="${escapeAttr(h.world_id)}" aria-label="${escapeAttr(`Download ${name}. ${said}`)}">${escapeText(name)}</button>
+        <span class="atlas-held-said" aria-hidden="true">Not downloaded yet</span>
+      </span>
       <span class="atlas-inline-actions">
         <button type="button" class="atlas-icon-btn-sm" data-role="held-remove" data-held-seat-id="${escapeAttr(h.world_id)}" title="Remove from the list" aria-label="Remove ${escapeAttr(name)} from the list">
           <span class="material-symbols-outlined" aria-hidden="true">close</span>

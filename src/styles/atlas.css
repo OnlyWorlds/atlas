@@ -3337,10 +3337,18 @@ body.atlas-preroot .atlas-middle {
   font-weight: 500;
 }
 
-/* A seat a link left held (Keel #469): neutral, like a view chip; the row
-   is a world waiting to come down, not a problem. */
-.atlas-world-state-chip.held {
-  background: rgba(var(--atlas-ink-rgb), 0.06);
+/* A seat a link left held (Keel #469): the row is a world waiting to come
+   down, not a problem. Its state is a quiet line under the name, not a chip
+   beside it: a chip took half the row and cut the name a person picks by to
+   ten characters (Seethe, h20 #12863). The button's label says it too. */
+.atlas-held-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.atlas-held-said {
+  font-size: 11px;
   color: var(--atlas-text-soft);
 }
 

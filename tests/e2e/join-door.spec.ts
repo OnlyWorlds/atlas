@@ -330,7 +330,7 @@ test('a download cancelled keeps its seat in the worlds list, and Download bring
   const row = page.locator('[data-held-seat]');
   await expect(row).toHaveCount(1);
   await expect(row.locator('[data-role="held-download"]')).toHaveText('Moppetopia');
-  await expect(row.locator('.atlas-world-state-chip')).toHaveText('not downloaded');
+  await expect(row.locator('.atlas-held-said')).toHaveText('Not downloaded yet');
   expect(await row.locator('[data-world-id]').count()).toBe(0);
   // The zero-worlds start-here tag sat over the held row on 1.91.0's live walk: a held seat is not nothing.
   await expect(page.locator('.atlas-tour-tag')).toHaveCount(0);
@@ -363,16 +363,28 @@ test('a reload mid-download keeps the seat: the list offers it after the reload'
   expect(JSON.parse((await heldRecord(page))!).secret).toBe(SECRET);
 });
 
-async function seedHeld(page: Page): Promise<void> {
-  await page.evaluate(({ id, key, secret }) => {
+async function seedHeld(page: Page, name = 'Moppetopia'): Promise<void> {
+  await page.evaluate(({ id, key, secret, name }) => {
     localStorage.setItem(`atlas-held-seat:${id}`, JSON.stringify({
-      v: 1, world_id: id, world_name: 'Moppetopia', kind: 'agent', key, secret, role: 'contributor',
+      v: 1, world_id: id, world_name: name, kind: 'agent', key, secret, role: 'contributor',
       held_at: '2026-10-25T03:00:00.000Z', code_tail: 'EEEEEE',
     }));
-  }, { id: WORLD_ID, key: KEY, secret: SECRET });
+  }, { id: WORLD_ID, key: KEY, secret: SECRET, name });
   await page.evaluate(() => location.reload());
   await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
 }
+
+test('a held row gives the name its row: the state is a line under it, not a chip beside it', async ({ page }) => {
+  // Seethe's note on 1.91.1 (h20 #12863): the chip took half the row and cut the name to ten characters.
+  await freshBoot(page);
+  await mockKeel(page);
+  await seedHeld(page, 'Moppetopia Harbour Guild');
+  const name = page.locator('[data-held-seat] [data-role="held-download"]');
+  await expect(name).toHaveText('Moppetopia Harbour Guild');
+  expect(await name.evaluate(el => el.scrollWidth <= el.clientWidth), 'the whole name shows, no ellipsis').toBe(true);
+  await expect(page.locator('[data-held-seat] .atlas-held-said')).toHaveText('Not downloaded yet');
+  await expect(page.locator('[data-held-seat] .atlas-world-state-chip')).toHaveCount(0);
+});
 
 test('a held seat keel no longer takes says so before any download, and offers Remove', async ({ page }) => {
   await freshBoot(page);
