@@ -386,8 +386,9 @@ function buildCover(
   // removed S255v3: the room nav + onboarding tiles cover every one of them.)
 
   // Cast slot (D2b) — renders only when a favorite is set; assignment lives
-  // on the element-detail header (char + loc).
-  const cast = buildCastSlot(worldId);
+  // on the element-detail header (char + loc). A world with a charter is set up
+  // for work (#526): its Home never asks for a protagonist or a home place.
+  const cast = buildCastSlot(worldId, !!charter);
   if (cast) cover.appendChild(cast);
 
   // The woven stat line (replaces the count-card grid + the meta chips).
@@ -546,8 +547,12 @@ function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
   return ghost;
 }
 
-/** The cast slot: a card per set favorite, a ghost per unset one. */
-function buildCastSlot(worldId: string): HTMLElement | null {
+/**
+ * The cast slot: a card per set favorite, a ghost per unset one. The ghosts
+ * are story prompts, so a world with a charter gets none; a favorite set
+ * from an element's header still shows.
+ */
+function buildCastSlot(worldId: string, hasCharter: boolean): HTMLElement | null {
   if (getState().data.loading) return null;
   const reg = getState().registry;
   const favorites = reg.worlds.find(w => w.id === worldId)?.favorites;
@@ -575,7 +580,7 @@ function buildCastSlot(worldId: string): HTMLElement | null {
     if (el) {
       slot.appendChild(buildCastCard(el, spec, worldId));
       rendered++;
-    } else if (elements.some(e => e.type === spec.elementType)) {
+    } else if (!hasCharter && elements.some(e => e.type === spec.elementType)) {
       // Ghost only when the world HAS candidates of that type.
       slot.appendChild(buildCastGhost(spec));
       rendered++;

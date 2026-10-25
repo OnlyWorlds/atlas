@@ -89,6 +89,29 @@ test.describe('#526 messages and the charter', () => {
     await expect(page).toHaveURL(new RegExp(`#/w/${w}/element/${charter}$`));
   });
 
+  test('a world with a charter asks for no protagonist or home, and a chosen one stays', async ({ page }) => {
+    await setupWorld(page);
+    const hero = await createElement(page, 'character', { name: 'Ostana' });
+    await createElement(page, 'location', { name: 'Vell Harbor' });
+    const w = await worldId(page);
+    await page.evaluate((w) => { window.location.hash = `#/w/${w}`; }, w);
+    const ghosts = page.locator('.atlas-home-cast-ghost');
+    // A story world: both prompts, the control for the absence below.
+    await expect(ghosts).toHaveCount(2);
+
+    await createElement(page, 'law', { name: 'Charter', supertype: 'Charter', description: 'What this world is\nThe team.' });
+    await expect(page.locator('[data-role="charter"]')).toBeVisible();
+    await expect(ghosts).toHaveCount(0);
+
+    // A protagonist chosen from its own page still shows on the cover.
+    await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, hero]);
+    await page.locator('[data-action="set-cast-favorite"]').click();
+    await expect(page.locator('[data-action="set-cast-favorite"]')).toHaveClass(/active/);
+    await page.evaluate((w) => { window.location.hash = `#/w/${w}`; }, w);
+    await expect(page.locator('.atlas-home-cast-card:not(.atlas-home-cast-ghost)', { hasText: 'Ostana' })).toBeVisible();
+    await expect(ghosts).toHaveCount(0);
+  });
+
   test("world.json's charter names which Law leads Home, through a reopen (§4.6 (a))", async ({ page }) => {
     await setupWorld(page);
     const rules = await createElement(page, 'law', { name: 'House rules', supertype: 'Regulation', description: 'The rules this folder names.' });

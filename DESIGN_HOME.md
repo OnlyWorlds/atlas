@@ -80,6 +80,8 @@ Reads `state.active.meta` and renders inside `atlas-home-identity`:
 
 Two quick-action slots — **choose a protagonist** (a Character) and **choose a home** (a Location). Both render as ghost cards when unset; clicking a ghost filters the sidebar to that type so the assignment path is one hop (the actual setter lives on the element-detail header — the person-pin / home-pin, which Captain couldn't find from home, 2026-07-10). When set, the slot shows the favorite's card. Both kinds always render side by side.
 
+**A world at work gets no ghosts** (1.92.0, #526): the ghosts are story prompts, so a world whose Home shows a charter (the keepers' Law with supertype Charter by keel's D152, `src/core/charter.ts`) renders neither; a favorite set from an element's header still shows its card. The words are the Captain's ("a world for stories and games, or for work?", h5) and the setup skill's packs are the work end, each writing a charter, so the charter is the signal until a world says its kind in a field of its own. Guard: `tests/e2e/message-charter.spec.ts` (the two ghosts, then none; red with the check cut).
+
 ### 3. Woven stat line (the counts row)
 
 Element counts per type, rendered as one **woven line** (`atlas-home-statline`) — `24 events · 12 characters · …`, not a card grid. Reads `state.data.elements`, groups by `type`. Each segment is a button: click → flips sidebar to elements mode + applies that type filter. Always rendered (empty with reserved min-height at zero elements, so the first element doesn't shift the layout below). Pin/marker/zone counts excluded (map artifacts, not content).

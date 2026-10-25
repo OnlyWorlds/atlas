@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.92.0',
+    date: '2026-10-25',
+    theme: 'Home for a world at work',
+    entries: [
+      {
+        id: 'charter-no-protagonist-prompt',
+        title: 'A world with a charter no longer asks you to choose a protagonist',
+        body: "Home's Choose a protagonist and Choose a home are prompts for a story. A world with a charter, the house rules a world set up for work keeps, no longer shows them. A protagonist or home you set from an element's own page still shows on Home.",
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.91.1',
     date: '2026-10-25',
     theme: 'A link keeps its place',
