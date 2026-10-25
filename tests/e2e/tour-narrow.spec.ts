@@ -132,6 +132,11 @@ test('at 800 the swamps map, every objects mint, back to the map, and the-rest s
   // conv. 174: here the tour lets the shell overflow and a drawer parked off to the right gave the
   // body room to scroll; a focus, a scroll into view or a test's click moved the whole page left and
   // the open sidebar off-screen (run 40104361183, 273 px). The page must refuse every sideways scroll.
+  // The room appears once the step's drawers have settled: read at once it can be 0 on a fast runner
+  // (S477, run 40213694681, 94 ms after the step, 3 of 3), so wait for it before trying to scroll.
+  await expect.poll(() => page.evaluate(() =>
+    Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth),
+  { message: 'the shell still overflows here (else this proves nothing)' }).toBeGreaterThan(0);
   const pushed = await page.evaluate(() => {
     const room = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth;
     document.body.scrollLeft = 400;
