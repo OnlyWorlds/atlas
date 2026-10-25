@@ -15,7 +15,7 @@ import type { ToastManager } from './toast-manager';
 import { downloadingLine } from './download-progress';
 import { lockWhereChoice, readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { showProblem } from './problem-fixes';
-import { getState } from '../core/state';
+import { getState, patchSlice } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { completeWaypoint } from '../core/waypoints';
@@ -33,6 +33,10 @@ import {
   TABLE_GONE_LINE, tablePicks, tableTimesLine, WORLD_FULL_LINE, type JoinedPlayer, type JoinedSeat, type JoinPreview,
   type OpenJoinedOutcome,
 } from '../setup/join-door';
+import { codeTail, dropHeldSeat, heldSeat, holdSeat, spareHeldLine, withHeldSeatLock, type HeldSeat } from '../core/held-seats';
+import { worldAlreadyHere } from '../core/browser-home';
+import { adoptStoredRegistry } from '../registry/registry';
+import { OwV2Error } from '../sync/ow-v2-client-adapter';
 // view-only-ok: writes a new world of its own, never the active one (conv. 149).
 
 /** Run the door for a code `join-capture` took, once. */
@@ -67,29 +71,85 @@ export async function runPendingJoin(toasts: ToastManager): Promise<void> {
   new JoinWorldModal(toasts, code, preview).open();
 }
 
+/**
+ * Download a seat a link left held (Keel #469): the join door's own dialog at
+ * its download step, with no preview and no redeem, since the code is spent.
+ */
+export function openHeldSeat(toasts: ToastManager, worldId: string): void {
+  const held = heldSeat(worldId);
+  if (!held) return;
+  const here = worldAlreadyHere(getState().registry, worldId);
+  if (here) {
+    dropHeldSeat(worldId);
+    toasts.info(here.api?.api_key === held.key
+      ? `${here.name} is already here; open it from the sidebar.`
+      : `${here.name} is already here; open it from the sidebar. ${spareHeldLine(held)}`, 12_000);
+    return;
+  }
+  // The preview the dialog draws from, made from the record (the v2 gate's note c).
+  const preview: JoinPreview = {
+    reader: held.kind,
+    world: { name: held.world_name || 'Untitled world', description: '' },
+    invitedBy: null,
+    ownerCharacter: null,
+    role: held.role ?? 'contributor',
+    withCharacter: false,
+    expiresAt: '',
+  };
+  new JoinWorldModal(toasts, '', preview, held).open();
+}
+
+/** What a link's redeem answered, as the record that keeps it. */
+function heldRecord(code: string, seat: JoinedSeat | null, player: JoinedPlayer | null): HeldSeat {
+  const base = { v: 1 as const, held_at: new Date().toISOString(), code_tail: codeTail(code) };
+  return player
+    ? { ...base, world_id: player.world.id, world_name: player.world.name, kind: 'player', key: player.key, character: { ...player.character } }
+    : { ...base, world_id: seat!.world.id, world_name: seat!.world.name, kind: 'agent', key: seat!.key, secret: seat!.secret, role: seat!.role };
+}
+
 export class JoinWorldModal extends BaseModal {
   private seat: JoinedSeat | null = null;
   private player: JoinedPlayer | null = null;
   /** The world opened, or the cancel already said what was left behind. */
   private settled = false;
+  /** Hidden: a submit still awaiting the where-question stops there (the v2 gate's note d). */
+  private closed = false;
   private readonly asPlayer: boolean;
 
-  /** However it closes: a seat made and never used is said once (R6 waits on keel Q5). */
+  /** However it closes: a held seat stays in the list; one that could not be held is said spare (R6 waits on keel Q5). */
   protected hide(): void {
     super.hide();
+    this.closed = true;
     if ((this.seat || this.player) && !this.settled) {
       this.settled = true;
-      this.toasts.info(this.spareLine(), 12_000);
+      const held = this.heldName();
+      this.toasts.info(held ? `Closed. ${this.staysLine(held)}` : this.spareLine(), 12_000);
     }
   }
 
-  constructor(private toasts: ToastManager, private code: string, private preview: JoinPreview) {
+  constructor(private toasts: ToastManager, private code: string, private preview: JoinPreview, private held: HeldSeat | null = null) {
     super();
     this.asPlayer = preview.reader === 'player';
+    if (held?.kind === 'player') {
+      this.player = { world: { id: held.world_id, name: held.world_name }, key: held.key, character: { ...held.character! } };
+    } else if (held) {
+      this.seat = { world: { id: held.world_id, name: held.world_name }, role: held.role ?? 'contributor', key: held.key, secret: held.secret! };
+    }
   }
 
   private spareLine(): string {
     return this.asPlayer ? SPARE_PLAYER_LINE : SPARE_SEAT_LINE;
+  }
+
+  /** The world's name when this dialog's seat is held in this browser, else null. */
+  private heldName(): string | null {
+    const id = this.seat?.world.id ?? this.player?.world.id;
+    const rec = id ? heldSeat(id) : null;
+    return rec ? (rec.world_name || this.preview.world.name) : null;
+  }
+
+  private staysLine(name: string): string {
+    return `${name} stays in your list of worlds, not downloaded yet: download it from there when you want it.`;
   }
 
   open(): void {
@@ -106,11 +166,13 @@ export class JoinWorldModal extends BaseModal {
     // fresh Character. A refused pick looks again and spends nothing.
     const table = player ? p.table : undefined;
     const askName = !!table?.nameRequired;
-    const { overlay, body } = this.buildModalShell({ title: 'Open a world from OnlyWorlds', dataModal: 'join-world' });
+    const held = this.held;
+    const { overlay, body } = this.buildModalShell({ title: held ? 'Download a world from OnlyWorlds' : 'Open a world from OnlyWorlds', dataModal: 'join-world' });
     body.innerHTML = `
-      <form data-form="join-world" data-reader="${player ? 'player' : 'agent'}"${table ? ' data-table="true"' : ''}>
-        <p class="atlas-join-question">Open <strong data-role="world-name"></strong> ${player ? 'as a player' : 'as an AI agent'}?</p>
-        ${player ? '' : `<p class="atlas-modal-hint" data-role="agent-note">${AGENT_LINK_LINE}</p>`}
+      <form data-form="join-world" data-reader="${player ? 'player' : 'agent'}"${table ? ' data-table="true"' : ''}${held ? ' data-held="true"' : ''}>
+        <p class="atlas-join-question">${held ? 'Download' : 'Open'} <strong data-role="world-name"></strong> ${player ? 'as a player' : 'as an AI agent'}?</p>
+        ${held ? '<p class="atlas-modal-hint" data-role="held-note">A link you opened earlier made this seat, so nothing more is spent.</p>' : ''}
+        ${player || held ? '' : `<p class="atlas-modal-hint" data-role="agent-note">${AGENT_LINK_LINE}</p>`}
         <p class="atlas-modal-hint" data-role="who" hidden></p>
         <p class="atlas-modal-hint" data-role="role"></p>
         <p class="atlas-modal-hint" data-role="times" hidden></p>
@@ -122,7 +184,7 @@ export class JoinWorldModal extends BaseModal {
         </fieldset>
         <p class="atlas-modal-hint" data-role="picks-note">Only these names: the game master chose them.</p>
         <p class="atlas-modal-hint" data-role="all-taken" hidden>${ALL_TAKEN_LINE}</p>` : ''}
-        ${player ? `<label class="atlas-modal-field" data-role="name-field">
+        ${player && !held ? `<label class="atlas-modal-field" data-role="name-field">
           <span>${askName ? 'Your name: your Character takes it, and the game master sees it' : 'Your name, as the game master sees it'}</span>
           <input class="atlas-input" type="text" name="player-name" maxlength="80" autocomplete="nickname" placeholder="${askName ? 'Your name' : 'Optional'}" />
         </label>` : ''}
@@ -134,7 +196,8 @@ export class JoinWorldModal extends BaseModal {
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
         <div class="atlas-modal-actions" data-role="form-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="open">${player ? 'Open' : 'Open as an AI agent'}</button>
+          <button type="button" class="atlas-btn-ghost" data-action="remove-held" hidden>Remove from your list</button>
+          <button type="submit" class="atlas-btn-primary" data-action="open">${held ? 'Download' : player ? 'Open' : 'Open as an AI agent'}</button>
         </div>
         <div class="atlas-modal-actions" data-role="busy-actions" hidden>
           <button type="button" class="atlas-btn-ghost" data-action="cancel-download" title="Stop now and remove what was downloaded; nothing is kept">Cancel download</button>
@@ -154,6 +217,7 @@ export class JoinWorldModal extends BaseModal {
       who.hidden = false;
     }
     body.querySelector<HTMLElement>('[data-role="role"]')!.textContent = !player ? roleLine(p.role)
+      : held ? `You read the world as ${held.character?.name || 'your Character'}, with no account: only what they know, and Atlas opens it to read.`
       : askName ? 'You get a Character of your own and read the world as it, with no account: only what it knows, and Atlas opens it to read.'
       : table ? 'You read the world as the Character you pick, with no account: only what they know, and Atlas opens it to read.'
       : 'You read the world as your Character, with no account: only what your Character knows, and Atlas opens it to read.';
@@ -247,6 +311,14 @@ export class JoinWorldModal extends BaseModal {
     cancelDl.addEventListener('click', () => { stop = 'cancel'; cancelDl.disabled = finishBtn.disabled = true; progressBox.textContent = 'Cancelling…'; });
     finishBtn.addEventListener('click', () => { stop = 'finish'; cancelDl.disabled = finishBtn.disabled = true; progressBox.textContent = 'Stopping; keeping what has downloaded…'; });
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
+    const removeHeldBtn = body.querySelector<HTMLButtonElement>('[data-action="remove-held"]')!;
+    removeHeldBtn.addEventListener('click', () => {
+      // keel refused the seat: nothing on onlyworlds.com is left to remove.
+      dropHeldSeat((this.seat ?? this.player)!.world.id);
+      this.settled = true;
+      this.hide();
+      this.toasts.info(`${this.preview.world.name} is removed from your list.`);
+    });
 
     const say = (sentence: string) => { errorBox.textContent = sentence; errorBox.hidden = !sentence; };
     const busy = (on: boolean) => {
@@ -279,6 +351,7 @@ export class JoinWorldModal extends BaseModal {
       // Taken synchronously, inside the click, before the first await.
       const where = takeWhereInClick(form);
       const ready = await readyWhere(where, this.toasts, 'Opening a world downloads it into a new folder.');
+      if (this.closed) return;
       if (ready !== true) { say(ready || ''); return; }
 
       busy(true);
@@ -288,6 +361,10 @@ export class JoinWorldModal extends BaseModal {
         try {
           if (player) this.player = await redeemPlayerJoin(this.code, nameInput?.value ?? '', table && !askName ? picked ?? undefined : undefined);
           else this.seat = await redeemJoin(this.code);
+          // Kept the moment the answer is read, with no await between (the v2
+          // gate's G1): a tab closed or reloaded mid-download keeps the seat.
+          const { replaced } = holdSeat(heldRecord(this.code, this.seat, this.player));
+          if (replaced) this.toasts.info(spareHeldLine(replaced), 12_000);
         } catch (err) {
           busy(false);
           progressBox.hidden = true;
@@ -316,6 +393,36 @@ export class JoinWorldModal extends BaseModal {
       }
       const seat = this.seat;
       const joinedPlayer = this.player;
+      const worldId = (seat ?? joinedPlayer)!.world.id;
+      // A held seat's key is asked before any folder is made: keel may have
+      // removed the seat since (the v2 gate's note e; a 401 on the folder
+      // path would leave a half folder behind).
+      if (held) {
+        progressBox.textContent = 'Checking the seat on OnlyWorlds…';
+        progressBox.hidden = false;
+        try {
+          const { buildV2Adapter } = await import('../sync/make-online');
+          const client = buildV2Adapter(held.key, held.secret ?? '');
+          // A player's read key asks for its own Character, a call the download
+          // itself makes the like of; an agent's asks for the world (the S469
+          // code gate's 4th: no check stricter than the download).
+          if (held.kind === 'player') await client.getElement('character', held.character!.id);
+          else await client.getWorld();
+        } catch (err) {
+          busy(false);
+          progressBox.hidden = true;
+          // keel answers a removed or revoked key 401; an agent key's world gone, 404.
+          if (err instanceof OwV2Error && (err.status === 401 || (err.status === 404 && held.kind === 'agent'))) {
+            say(`OnlyWorlds no longer takes the seat kept for ${p.world.name}: it was removed on onlyworlds.com, or the world is gone. Remove it from your list.`);
+            openBtn.hidden = true;
+            removeHeldBtn.hidden = false;
+          } else {
+            say(problemFor(err, { inline: true, doing: 'checking the seat on OnlyWorlds' }).sentence);
+            openBtn.textContent = 'Retry';
+          }
+          return;
+        }
+      }
       const renderProgress = (pr: InitialDownloadProgress) => {
         if (stop) return;
         progressBox.textContent = pr.phase === 'list'
@@ -324,9 +431,16 @@ export class JoinWorldModal extends BaseModal {
         progressBox.hidden = false;
       };
       try {
-        const outcome: OpenJoinedOutcome = await enqueueActivationTask(() => joinedPlayer
-          ? openPlayerWorld({ player: joinedPlayer, where, onProgress: renderProgress, shouldStop: () => stop })
-          : openJoinedWorld({ seat: seat!, where, onProgress: renderProgress, shouldStop: () => stop }));
+        // One download of this world at a time in every tab (G6), and the
+        // registry as stored is read again just before, so a world another
+        // tab brought down meanwhile is met as already here.
+        const outcome: OpenJoinedOutcome = await withHeldSeatLock(worldId, () => enqueueActivationTask(() => {
+          const merged = adoptStoredRegistry(getState().registry);
+          if (merged) patchSlice('registry', merged);
+          return joinedPlayer
+            ? openPlayerWorld({ player: joinedPlayer, where, onProgress: renderProgress, shouldStop: () => stop })
+            : openJoinedWorld({ seat: seat!, where, onProgress: renderProgress, shouldStop: () => stop });
+        }));
         this.settled = true;
         this.hide();
         if (outcome.kind === 'downloaded') {
@@ -349,7 +463,7 @@ export class JoinWorldModal extends BaseModal {
           if (!(await activateWorld(id, this.toasts))) {
             this.toasts.info(outcome.kind === 'reconnected'
               ? `${outcome.entry.name} is connected again on the seat this link made. Open it from the sidebar.`
-              : `${outcome.entry.name} is already here; open it from the sidebar. ${this.spareLine()}`, 12_000);
+              : `${outcome.entry.name} is already here; open it from the sidebar.${outcome.kind === 'already-here' && outcome.sameSeat ? '' : ` ${this.spareLine()}`}`, 12_000);
             return;
           }
         }
@@ -370,7 +484,8 @@ export class JoinWorldModal extends BaseModal {
         if (err instanceof DownloadCancelledError) {
           this.settled = true;
           this.hide();
-          this.toasts.info(`Download cancelled. Nothing was kept. ${this.spareLine()}`, 12_000);
+          const heldName = this.heldName();
+          this.toasts.info(heldName ? `Download cancelled. ${this.staysLine(heldName)}` : `Download cancelled. Nothing was kept. ${this.spareLine()}`, 12_000);
           return;
         }
         console.warn('[join-world] open failed:', err);

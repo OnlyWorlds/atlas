@@ -21,13 +21,21 @@ async function freshBoot(page: Page) {
   await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll(); });
 }
 
-interface Keel { previews: number; joins: Array<Record<string, unknown>>; releasePreview: () => void }
+interface Keel {
+  previews: number;
+  joins: Array<Record<string, unknown>>;
+  releasePreview: () => void;
+  /** Set: keel answers the seat's key 401, as for a seat removed on onlyworlds.com. */
+  refuseKey: boolean;
+  /** Set: the element lists wait until it resolves (a download someone can cancel or reload through). */
+  listGate: Promise<void> | null;
+}
 
 const READ_KEY = 'ow_r_' + 'R'.repeat(32);
 
 async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean; player?: boolean } = {}): Promise<Keel> {
   const now = '2026-10-10T00:00:00.000Z';
-  const keel: Keel = { previews: 0, joins: [], releasePreview: () => {} };
+  const keel: Keel = { previews: 0, joins: [], releasePreview: () => {}, refuseKey: false, listGate: null };
   let release!: () => void;
   const held = new Promise<void>(r => { release = r; });
   keel.releasePreview = release;
@@ -61,9 +69,13 @@ async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean
         with_character: false, character: null, key: KEY, pin: SECRET, env: '', next: [], members: [],
       } });
     }
+    if (keel.refuseKey) {
+      return route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Invalid API key.', param: null } } });
+    }
     if (path === '/world' || path === '/world/') {
       return route.fulfill({ json: { id: WORLD_ID, name: 'Moppetopia', updated_at: now } });
     }
+    if (keel.listGate) await keel.listGate;
     const type = path.split('/').filter(Boolean)[0];
     const data = type === 'character'
       ? [{ id: 'c0000000-0000-4000-8000-000000000001', type: 'character', name: 'Admiral Fluffington', updated_at: now, created_at: now }]
@@ -279,4 +291,131 @@ test('a link opened into a running tab takes the same door, and a hostile world 
   await modal.locator('[data-action="cancel"]').click();
   await expect(modal).toHaveCount(0);
   expect(keel.joins).toHaveLength(0);
+});
+
+// Keel #469 (S469, contract `Forge/Notes/2026-10-25-s468-held-seat-contract-v2.md`):
+// a link is spent at the redeem, so its seat is held from that moment until
+// the world lands here or the person removes it.
+const heldRecord = (page: Page) => page.evaluate((id) => localStorage.getItem(`atlas-held-seat:${id}`), WORLD_ID);
+
+async function openToDownload(page: Page, keel: Keel): Promise<() => void> {
+  let release!: () => void;
+  keel.listGate = new Promise<void>(r => { release = r; });
+  keel.releasePreview();
+  await page.goto('about:blank');
+  await page.goto(`/#/join/${CODE}`);
+  const modal = page.locator('[data-modal="join-world"]');
+  await modal.locator('input[name="where"][value="browser"]').check();
+  await modal.locator('[data-action="open"]').click();
+  await expect(modal.locator('[data-action="cancel-download"]')).toBeVisible();
+  expect(keel.joins).toHaveLength(1);
+  return release;
+}
+
+test('a download cancelled keeps its seat in the worlds list, and Download brings it down on that seat, spending nothing more', async ({ page }) => {
+  await freshBoot(page);
+  const keel = await mockKeel(page);
+  const release = await openToDownload(page, keel);
+  // Held the moment the redeem answered (the v2 gate's G1), before any element came.
+  await expect.poll(() => heldRecord(page)).not.toBeNull();
+  expect(JSON.parse((await heldRecord(page))!)).toMatchObject({ world_id: WORLD_ID, kind: 'agent', key: KEY, secret: SECRET });
+  const modal = page.locator('[data-modal="join-world"]');
+  await modal.locator('[data-action="cancel-download"]').click();
+  release();
+  await expect(modal).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'Download cancelled. Moppetopia stays in your list of worlds, not downloaded yet: download it from there when you want it.' })).toBeVisible();
+  keel.listGate = null;
+
+  // A fresh browser's list is the landing now (G4), and the row is no world.
+  const row = page.locator('[data-held-seat]');
+  await expect(row).toHaveCount(1);
+  await expect(row.locator('[data-role="held-download"]')).toHaveText('Moppetopia');
+  await expect(row.locator('.atlas-world-state-chip')).toHaveText('not downloaded');
+  expect(await row.locator('[data-world-id]').count()).toBe(0);
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
+
+  await row.locator('[data-role="held-download"]').click();
+  await expect(modal.locator('.atlas-join-question')).toHaveText('Download Moppetopia as an AI agent?');
+  await expect(modal.locator('[data-role="agent-note"]')).toHaveCount(0);
+  await modal.locator('input[name="where"][value="browser"]').check();
+  await modal.locator('[data-action="open"]').click();
+  await expect(modal).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().data.elements.length)).toBe(1);
+  expect(keel.joins).toHaveLength(1);
+  const w = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds
+    .map((x: any) => ({ key: x.api?.api_key, secret: x.api?.seat_secret })));
+  expect(w).toEqual([{ key: KEY, secret: SECRET }]);
+  expect(await heldRecord(page)).toBeNull();
+  await expect(page.locator('[data-held-seat]')).toHaveCount(0);
+});
+
+test('a reload mid-download keeps the seat: the list offers it after the reload', async ({ page }) => {
+  await freshBoot(page);
+  const keel = await mockKeel(page);
+  await openToDownload(page, keel);
+  await expect.poll(() => heldRecord(page)).not.toBeNull();
+  await page.evaluate(() => location.reload());
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await expect(page.locator('[data-held-seat] [data-role="held-download"]')).toHaveText('Moppetopia');
+  expect(JSON.parse((await heldRecord(page))!).secret).toBe(SECRET);
+});
+
+async function seedHeld(page: Page): Promise<void> {
+  await page.evaluate(({ id, key, secret }) => {
+    localStorage.setItem(`atlas-held-seat:${id}`, JSON.stringify({
+      v: 1, world_id: id, world_name: 'Moppetopia', kind: 'agent', key, secret, role: 'contributor',
+      held_at: '2026-10-25T03:00:00.000Z', code_tail: 'EEEEEE',
+    }));
+  }, { id: WORLD_ID, key: KEY, secret: SECRET });
+  await page.evaluate(() => location.reload());
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+}
+
+test('a held seat keel no longer takes says so before any download, and offers Remove', async ({ page }) => {
+  await freshBoot(page);
+  const keel = await mockKeel(page);
+  await seedHeld(page);
+  keel.refuseKey = true;
+  await page.locator('[data-held-seat] [data-role="held-download"]').click();
+  const modal = page.locator('[data-modal="join-world"]');
+  await modal.locator('input[name="where"][value="browser"]').check();
+  await modal.locator('[data-action="open"]').click();
+  await expect(modal.locator('[data-role="error"]')).toContainText('OnlyWorlds no longer takes the seat kept for Moppetopia');
+  await expect(modal.locator('[data-action="open"]')).toBeHidden();
+  await modal.locator('[data-action="remove-held"]').click();
+  await expect(modal).toHaveCount(0);
+  await expect(page.locator('[data-held-seat]')).toHaveCount(0);
+  expect(await heldRecord(page)).toBeNull();
+  expect(keel.joins).toHaveLength(0);
+});
+
+test('the held world landing by another door (here, the account list\'s key) drops the record and says the seat is spare', async ({ page }) => {
+  await freshBoot(page);
+  await mockKeel(page);
+  await seedHeld(page);
+  await expect(page.locator('[data-held-seat]')).toHaveCount(1);
+  await page.evaluate((id) => {
+    const api = (window as any).__atlasTestApi;
+    const reg = api.getState().registry;
+    api.patchSlice('registry', { ...reg, worlds: [...reg.worlds, {
+      id: 'landed-1', name: 'Moppetopia', state: 'api-linked', api: { world_id: id, api_key: 'ow_w_owner' },
+      folder: { handle_key: 'browser:moppetopia-landed', folder_name: '' }, where: 'browser',
+      created_at: '2026-10-25T03:00:00.000Z', last_opened_at: '2026-10-25T03:00:00.000Z',
+    }] });
+  }, WORLD_ID);
+  await expect(page.locator('[data-held-seat]')).toHaveCount(0);
+  await expect.poll(() => heldRecord(page)).toBeNull();
+  await expect(page.locator('.ow-toast', { hasText: 'The seat an earlier link made for Moppetopia is unused now' })).toBeVisible();
+});
+
+test('Remove on a held row asks, then says the seat stays on onlyworlds.com', async ({ page }) => {
+  await freshBoot(page);
+  await mockKeel(page);
+  await seedHeld(page);
+  page.once('dialog', d => { void d.accept(); });
+  await page.locator('[data-held-seat]').hover();
+  await page.locator('[data-held-seat] [data-role="held-remove"]').click();
+  await expect(page.locator('[data-held-seat]')).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'Moppetopia is removed from your list. The seat its link made is unused' })).toBeVisible();
+  expect(await heldRecord(page)).toBeNull();
 });

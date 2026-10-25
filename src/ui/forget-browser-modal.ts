@@ -55,6 +55,11 @@ export class ForgetBrowserModal extends BaseModal {
     body.querySelector<HTMLElement>('[data-role="also"]')!.textContent = inv.seatWorlds > 0
       ? `Also removed: your PIN and sign-in, the secret of each world opened on a seat (${inv.seatWorlds === 1 ? 'it stops' : 'they stop'} syncing), the folders Atlas remembers, and every setting.`
       : 'Also removed: your PIN and sign-in, the folders Atlas remembers, and every setting.';
+    if (inv.heldSeats.length) {
+      // A held seat's secret is only here (Keel #469, the v2 gate's note b).
+      const also = body.querySelector<HTMLElement>('[data-role="also"]')!;
+      also.textContent += ` And the ${inv.heldSeats.length === 1 ? 'world' : 'worlds'} not downloaded yet: ${names(inv.heldSeats)}. ${inv.heldSeats.length === 1 ? 'Its seat stays' : 'Their seats stay'} on onlyworlds.com, unused, for the owner to remove.`;
+    }
     body.querySelector<HTMLElement>('[data-role="kept"]')!.textContent = inv.folderWorlds > 0
       ? `Never touched: your ${inv.folderWorlds === 1 ? 'world' : `${inv.folderWorlds} worlds`} in folders on your drive, and your worlds on onlyworlds.com. Open a folder again afterwards to bring ${inv.folderWorlds === 1 ? 'it' : 'them'} back.`
       : 'Never touched: folders on your drive and your worlds on onlyworlds.com.';

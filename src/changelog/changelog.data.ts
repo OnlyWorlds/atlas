@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.91.0',
+    date: '2026-10-25',
+    theme: 'A link keeps its place',
+    entries: [
+      {
+        id: 'join-link-keeps-its-seat',
+        title: 'A world from a link you did not finish downloading stays in your list',
+        body: 'A link to open a world works once. If its download was cancelled, closed or cut off by a reload, the link was used up and the world was gone from Atlas. Now the world stays in your list of worlds as not downloaded yet: select it to download it when you want it, with nothing more spent, or remove it.',
+        tags: ['new', 'sharing'],
+      },
+    ],
+  },
+  {
     version: '1.90.0',
     date: '2026-10-25',
     theme: 'Yesterday beside today',

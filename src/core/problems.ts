@@ -290,7 +290,8 @@ export function scrubForReport(text: string): string {
   // a long message would freeze the tab before the cap applied.
   let t = String(text ?? '').slice(0, REPORT_CAP * 4);
   t = t.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>');
-  t = t.replace(/\bow_[wra]_\S+/gi, '<key>');
+  // ow_s_ is a seat's secret (Keel #469's held seats keep one in this browser).
+  t = t.replace(/\bow_[wras]_\S+/gi, '<key>');
   // Paths carry folder and user names. A web address keeps its host only;
   // file:// URLs, drive, UNC and absolute paths, and any token with a slash
   // between its parts ("worlds/aldric") go entirely.

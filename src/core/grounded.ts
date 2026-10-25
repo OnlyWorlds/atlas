@@ -8,7 +8,10 @@
  */
 
 import { getState } from './state';
+import { hasHeldSeats } from './held-seats';
 
 export function isAtlasGrounded(state = getState()): boolean {
-  return !!state.atlasRoot || state.registry.worlds.some(w => !w.demo);
+  // A seat a link left held counts too (Keel #469, the v2 gate's G4): on a
+  // fresh browser the worlds list, with its Download, is the landing.
+  return !!state.atlasRoot || state.registry.worlds.some(w => !w.demo) || hasHeldSeats(state.registry);
 }

@@ -27,7 +27,7 @@ import { installContextTabLifecycle } from './tabs/right/context-tab-lifecycle';
 import { openMapTab } from './tabs/right/map-index-tab';
 import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
-import { loadRegistry, adoptStoredRegistry } from './registry/registry';
+import { loadRegistry, adoptStoredRegistry, saveRegistry } from './registry/registry';
 import { enqueueActivationTask } from './core/activation-chain';
 import { hasOpfsMode } from './core/capabilities';
 import { beginBootReconciliation, reconcileAtBoot } from './core/browser-home';
@@ -48,6 +48,10 @@ import { captureOpenWorld, takePendingOpen, takePendingOpenElements } from './co
 import { clearOpenLanding, landingStep, peekOpenLanding, setOpenLanding } from './core/open-landing';
 import { openPacketBar } from './ui/open-packet-bar';
 import { installForgetPresence } from './setup/forget-browser';
+import { dropHeldSeat, heldSeatsChanged, isHeldSeatStorageKey, settleHeldSeats, spareHeldLine } from './core/held-seats';
+import { getActiveStore } from './core/active-store';
+import { diskApiBlock } from './core/seat';
+import { attachSyncEngine } from './sync/sync-attach';
 
 export interface AppHandle {
   shell: AppShell;
@@ -62,6 +66,8 @@ export function startApp(container: HTMLElement): AppHandle {
   // gate lens A H1/H2). Without this a tab's memory went stale and its next
   // save of the same world put the old copy back.
   window.addEventListener('storage', (e) => {
+    // Another tab held or dropped a seat (Keel #469, the v2 gate's G7).
+    if (isHeldSeatStorageKey(e.key)) heldSeatsChanged();
     if (e.key !== REGISTRY_STORAGE_KEY) return;
     const merged = adoptStoredRegistry(getState().registry);
     if (merged) patchSlice('registry', merged);
@@ -128,6 +134,34 @@ export function startApp(container: HTMLElement): AppHandle {
   // Mount toast surface (uses #toast-container element from index.html)
   toastManager.init();
   const toasts = toastManager;
+
+  // A held seat (Keel #469) goes when a world of its id lands here, by any
+  // door: one settle on every registry change, so no door is missed (rule 2,
+  // G3, G5), and a seat world that lost its secret takes the record's (G2).
+  let settledFor: unknown = null;
+  const settleHeld = (): void => {
+    const reg = getState().registry;
+    if (reg === settledFor) return;
+    settledFor = reg;
+    const { next, handedOver, spare } = settleHeldSeats(reg);
+    // A record handed over goes only once the registry holding its secret is saved.
+    if (next && saveRegistry(next)) {
+      settledFor = next;
+      for (const entry of handedOver) dropHeldSeat(entry.api!.world_id);
+      patchSlice('registry', next);
+      for (const entry of handedOver) {
+        if (getState().active?.worldId !== entry.id) continue;
+        const store = getActiveStore();
+        if (!store || !entry.api) continue;
+        void store.writeWorldMeta({ api: diskApiBlock(entry.api) })
+          .catch(err => console.warn('[held-seats] could not note the key in world.json:', err)); // raw-error-ok: a console record
+        attachSyncEngine(entry, store);
+      }
+    }
+    for (const h of spare) toasts.info(spareHeldLine(h), 12_000);
+  };
+  subscribe(settleHeld);
+  settleHeld();
 
   // Wire periodic auto-pull (Phase 3.5+). Reads settings from registry;
   // reconciles every state tick. No-op when cadence is off (default).

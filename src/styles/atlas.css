@@ -3337,6 +3337,13 @@ body.atlas-preroot .atlas-middle {
   font-weight: 500;
 }
 
+/* A seat a link left held (Keel #469): neutral, like a view chip; the row
+   is a world waiting to come down, not a problem. */
+.atlas-world-state-chip.held {
+  background: rgba(var(--atlas-ink-rgb), 0.06);
+  color: var(--atlas-text-soft);
+}
+
 /* "On OnlyWorlds" — account worlds not yet on disk (account mode, S260).
    Dimmed rows below the local list; opening one downloads it and it moves up. */
 .atlas-remote-worlds {

@@ -42,7 +42,7 @@ describe('forgetInventory', () => {
         entry('Seated', { state: 'api-linked', api: { world_id: 'x', api_key: 'k', seat: {} } }),
       ],
     };
-    expect(forgetInventory(reg)).toEqual({ browserOnly: ['Lonely'], browserOnline: ['Shared'], folderWorlds: 2, seatWorlds: 1 });
+    expect(forgetInventory(reg)).toEqual({ browserOnly: ['Lonely'], browserOnline: ['Shared'], folderWorlds: 2, seatWorlds: 1, heldSeats: [] });
   });
 });
 

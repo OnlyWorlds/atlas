@@ -18,6 +18,7 @@ import { DEFAULT_V2_BASE, OwV2Error } from '../sync/ow-v2-client-adapter';
 import { devV2Base } from '../sync/dev-api-base';
 import { findLinkedWorld, findWorldByServerId, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { linkExistingApiWorldInRoot, type LinkExistingApiWorldResult } from './atlas-root-flow';
+import { dropHeldSeat } from '../core/held-seats';
 import type { InitialDownloadProgress, DownloadStop } from '../sync/initial-download';
 import type { WorldWhere } from './world-parent';
 import type { WorldRegistryEntry } from '../core/types';
@@ -262,10 +263,16 @@ export async function openPlayerWorld(opts: {
   const reg = getState().registry;
   // Already linked here (the owner trying their own link, or a second link):
   // the world stays what it is; a player key never replaces another key.
+  // The seat held at the redeem goes with every outcome but a download that
+  // never lands (the v2 gate's G1); the dialog says the spare line here.
   const linked = findLinkedWorld(reg, player.world.id);
-  if (linked) return { kind: 'already-here', entry: linked };
+  if (linked) {
+    dropHeldSeat(player.world.id);
+    // On this very key (another tab brought it down first): nothing is spare.
+    return { kind: 'already-here', entry: linked, ...(linked.api?.api_key === player.key ? { sameSeat: true } : {}) };
+  }
   const former = findWorldByServerId(reg, player.world.id);
-  if (former) return { kind: 'here-unlinked', entry: former };
+  if (former) { dropHeldSeat(player.world.id); return { kind: 'here-unlinked', entry: former }; }
   const result = await linkExistingApiWorldInRoot({
     where: opts.where,
     apiKey: player.key,
@@ -275,12 +282,15 @@ export async function openPlayerWorld(opts: {
     onProgress: opts.onProgress,
     shouldStop: opts.shouldStop,
   });
+  // Landed: the registry's settle (app.ts) has dropped it already; the door says so too.
+  dropHeldSeat(player.world.id);
   return { kind: 'downloaded', result };
 }
 
 /** The line after a player's link met a world already here. */
 export function playerAlreadyHereLine(outcome: Exclude<OpenJoinedOutcome, { kind: 'downloaded' | 'reconnected' }>): string {
   const name = outcome.entry.name;
+  if (outcome.kind === 'already-here' && outcome.sameSeat) return `${name} is already here, so Atlas opened it.`;
   return outcome.kind === 'already-here'
     ? `${name} is already here, so Atlas opened it as it is. ${SPARE_PLAYER_LINE}`
     : `${name} is already here from an earlier link, so Atlas opened it as it is. ${SPARE_PLAYER_LINE}`;
@@ -330,8 +340,8 @@ export function takeJoinHeldForSignIn(): string | null {
 
 export type OpenJoinedOutcome =
   | { kind: 'downloaded'; result: LinkExistingApiWorldResult }
-  /** Already here and syncing: opened; the new seat is spare. */
-  | { kind: 'already-here'; entry: WorldRegistryEntry }
+  /** Already here and syncing: opened; the new seat is spare, unless the world here is on it (`sameSeat`). */
+  | { kind: 'already-here'; entry: WorldRegistryEntry; sameSeat?: boolean }
   /** Already here as a seat that had lost its secret: it takes the new seat. */
   | { kind: 'reconnected'; entry: WorldRegistryEntry }
   /** Here from an earlier link, now local only: opened, nothing uploaded (R7). */
@@ -356,7 +366,13 @@ export async function openJoinedWorld(opts: {
     // account world with no PIN here, or a view-only one, stays what it is:
     // a seat put in its place would turn the owner's own world into a
     // contributor's (S386 gate, both lenses).
-    if (!isSeatWorld(linked) || linked.api?.seat_secret) return { kind: 'already-here', entry: linked };
+    if (!isSeatWorld(linked) || linked.api?.seat_secret) {
+      dropHeldSeat(seat.world.id);
+      // On this very seat (another tab, or a Retry past the commit): nothing is
+      // spare, and the line must not send anyone to remove a seat in use (the
+      // S469 code gate's must).
+      return { kind: 'already-here', entry: linked, ...(linked.api?.api_key === seat.key ? { sameSeat: true } : {}) };
+    }
     const next = updateWorldEntry(reg, linked.id, {
       api: {
         ...linked.api!,
@@ -366,11 +382,13 @@ export async function openJoinedWorld(opts: {
       },
     });
     if (!saveRegistry(next)) throw new PlainError('Atlas could not save the new seat in this browser. Try again.');
+    // Dropped once the registry holding the secret is saved, never before.
+    dropHeldSeat(seat.world.id);
     patchSlice('registry', next);
     return { kind: 'reconnected', entry: next.worlds.find(w => w.id === linked.id)! };
   }
   const former = findWorldByServerId(reg, seat.world.id);
-  if (former) return { kind: 'here-unlinked', entry: former };
+  if (former) { dropHeldSeat(seat.world.id); return { kind: 'here-unlinked', entry: former }; }
   const result = await linkExistingApiWorldInRoot({
     where: opts.where,
     apiKey: seat.key,
@@ -380,6 +398,7 @@ export async function openJoinedWorld(opts: {
     onProgress: opts.onProgress,
     shouldStop: opts.shouldStop,
   });
+  dropHeldSeat(seat.world.id);
   return { kind: 'downloaded', result };
 }
 
@@ -388,7 +407,7 @@ export function alreadyHereLine(outcome: Exclude<OpenJoinedOutcome, { kind: 'dow
   const name = outcome.entry.name;
   switch (outcome.kind) {
     case 'already-here':
-      return `${name} is already here, so Atlas opened it. ${SPARE_SEAT_LINE}`;
+      return outcome.sameSeat ? `${name} is already here, so Atlas opened it.` : `${name} is already here, so Atlas opened it. ${SPARE_SEAT_LINE}`;
     case 'reconnected':
       return `${name} is connected again, on the seat this link made.`;
     case 'here-unlinked':

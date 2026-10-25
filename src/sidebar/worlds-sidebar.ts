@@ -30,6 +30,8 @@ import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, se
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { copyChip, copyLine } from '../core/world-copy';
+import { dropHeldSeat, heldSeat, heldSeatBusy, heldSeats, type HeldSeat } from '../core/held-seats';
+import { SEAT_REMOVE_WHERE } from '../core/seat';
 import { MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
@@ -276,6 +278,19 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   installRowKeydownActivation(listEl);
   listEl.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
+    const heldDownload = target.closest<HTMLElement>('[data-role="held-download"]');
+    if (heldDownload) {
+      e.stopPropagation();
+      const id = heldDownload.getAttribute('data-held-seat-id')!;
+      void import('../ui/join-world-modal').then(({ openHeldSeat }) => openHeldSeat(toasts, id));
+      return;
+    }
+    const heldRemove = target.closest<HTMLElement>('[data-role="held-remove"]');
+    if (heldRemove) {
+      e.stopPropagation();
+      void removeHeld(heldRemove.getAttribute('data-held-seat-id')!, toasts);
+      return;
+    }
     if (target.closest('[data-role="open-file-cleared"]')) {
       // The world's own download restores it under this row (contract §5.2).
       e.stopPropagation();
@@ -386,12 +401,14 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const worlds = isTouring()
       ? state.registry.worlds.filter(w => w.demo === true)
       : state.registry.worlds;
+    // Held seats draw in every branch, the empty one too (the v2 gate's G4).
+    const held = isTouring() ? '' : heldSeats(state.registry).map(renderHeldRow).join('');
 
     if (worlds.length === 0) {
       // Silent in both pre-root and zero-worlds states (S255v2): pre-root the
       // landing is the one voice; with a root, the tour tag + hover details
       // teach — a narration line under them was redundant.
-      setHtml(listEl, '');
+      setHtml(listEl, held);
       return;
     }
 
@@ -405,7 +422,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const globalPaused = !!state.registry.sync_pause_all;
     setHtml(listEl, sorted
       .map(w => renderRow(w, w.id === activeId, route.mode === 'settings' && w.id === activeId, globalPaused))
-      .join(''));
+      .join('') + held);
   }
 
   function renderRemote(): void {
@@ -570,6 +587,55 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
       <span class="atlas-inline-actions">${syncActions}${removeCleared}
         <button type="button" class="atlas-icon-btn-sm fav-btn ${favCls}" data-role="fav-toggle" data-world-id="${escapeAttr(world.id)}" title="${world.favorite ? 'Unfavorite' : 'Favorite'}">
           <span class="material-symbols-outlined">${favIcon}</span>
+        </button>
+      </span>
+    </div>
+  `;
+}
+
+/**
+ * Remove a held seat on the person's word (rule 3): never while a download of
+ * it runs in any tab (the v2 gate's G6). The seat stays on onlyworlds.com.
+ */
+async function removeHeld(worldId: string, toasts: ToastManager): Promise<void> {
+  const h = heldSeat(worldId);
+  if (!h) return;
+  const name = h.world_name || 'Untitled world';
+  if (await heldSeatBusy(worldId)) {
+    toasts.info(`${name} is downloading now. Remove it after the download ends, or cancel the download first.`);
+    return;
+  }
+  if (!window.confirm(`Remove "${name}" from your list? It was never downloaded.`)) return;
+  // Asked again: a download may have started while the question waited.
+  if (await heldSeatBusy(worldId)) {
+    toasts.info(`${name} is downloading now. Remove it after the download ends, or cancel the download first.`);
+    return;
+  }
+  dropHeldSeat(worldId);
+  toasts.info(h.kind === 'player'
+    ? `${name} is removed from your list. The seat its link made is unused: the world's owner can remove it on onlyworlds.com, under Members.`
+    : `${name} is removed from your list. The seat its link made is unused: remove it on onlyworlds.com, ${SEAT_REMOVE_WHERE}.`, 12_000);
+}
+
+/**
+ * A seat a link left held (Keel #469, rule 5): its own row kind, below the
+ * worlds. Not a world: no activation, no settings, no counts, and no
+ * `data-world-id` anywhere in it (the v2 gate's note f), so the list's open
+ * handler never reads it as a world. The name downloads; the cross removes.
+ */
+function renderHeldRow(h: HeldSeat): string {
+  const name = h.world_name || 'Untitled world';
+  const said = h.kind === 'player' && h.character?.name
+    ? `Not downloaded yet, as ${h.character.name}. Download it when you want it.`
+    : 'Not downloaded yet. Download it when you want it.';
+  return `
+    <div class="atlas-row atlas-held-row" data-held-seat="${escapeAttr(h.world_id)}" title="${escapeAttr(said)}">
+      <span class="material-symbols-outlined" aria-hidden="true">cloud_download</span>
+      <button type="button" class="atlas-row-main atlas-world-row-open" data-role="held-download" data-held-seat-id="${escapeAttr(h.world_id)}" aria-label="${escapeAttr(`Download ${name}. ${said}`)}">${escapeText(name)}</button>
+      <span class="atlas-world-state-chip held">not downloaded</span>
+      <span class="atlas-inline-actions">
+        <button type="button" class="atlas-icon-btn-sm" data-role="held-remove" data-held-seat-id="${escapeAttr(h.world_id)}" title="Remove from the list" aria-label="Remove ${escapeAttr(name)} from the list">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>
       </span>
     </div>

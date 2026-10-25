@@ -25,6 +25,7 @@ import { HANDLE_VAULT_DB } from '../core/constants';
 import { PlainError } from '../core/plain-error';
 import { BROWSER_HOME, isBrowserWorld } from '../core/browser-worlds';
 import type { WorldsRegistry } from '../core/types';
+import { heldSeats } from '../core/held-seats';
 
 const CHANNEL = 'atlas-forget';
 /** This tab: a channel hears other channel objects in its own tab too, so messages carry who sent them. */
@@ -40,6 +41,8 @@ export interface ForgetInventory {
   folderWorlds: number;
   /** Worlds on a seat: the seat's secret goes, and they come back only through onlyworlds.com. */
   seatWorlds: number;
+  /** Seats a link left held, never downloaded (Keel #469): the record goes, the seat stays on keel. */
+  heldSeats: string[];
 }
 
 export function forgetInventory(reg: WorldsRegistry): ForgetInventory {
@@ -52,6 +55,7 @@ export function forgetInventory(reg: WorldsRegistry): ForgetInventory {
     browserOnline: inBrowser.filter(w => w.state === 'api-linked').map(w => w.name),
     folderWorlds: reg.worlds.filter(w => !isBrowserWorld(w) && w.demo !== true).length,
     seatWorlds: reg.worlds.filter(w => !!w.api?.seat).length,
+    heldSeats: heldSeats(reg).map(h => h.world_name || 'Untitled world'),
   };
 }
 
