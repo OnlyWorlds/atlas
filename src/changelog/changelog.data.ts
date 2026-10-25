@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.91.1',
+    date: '2026-10-25',
+    theme: 'A link keeps its place',
+    entries: [
+      {
+        id: 'held-row-no-start-here',
+        title: 'A world waiting to download no longer sits under the Start here tag',
+        body: 'With nothing in your list but a world from a link still to download, the Start here tag covered its name. The tag now shows only when the list is truly empty.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.91.0',
     date: '2026-10-25',
     theme: 'A link keeps its place',

@@ -35,7 +35,7 @@ import { SEAT_REMOVE_WHERE } from '../core/seat';
 import { MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
-import type { WorldRegistryEntry } from '../core/types';
+import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
@@ -135,7 +135,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         </button>
       `;
       // The zero-worlds highlight below is part of what the header shows.
-      if (headerUnchanged(`root|${state.registry.worlds.length === 0}|${html}`)) return;
+      if (headerUnchanged(`root|${nothingYet(state.registry)}|${html}`)) return;
       header.innerHTML = html;
     } else if (isTouring()) {
       // Guided tour, stage 1: the sidebar shows its TRUE
@@ -229,7 +229,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     // quiet highlight on the button; the loud half still fires once.
     // With the icon row hidden in Settings, the signal goes on "add a world" (S365 lens C M5).
     const startBtn = createBtn ?? addWorldBtn;
-    if (root && getState().registry.worlds.length === 0 && startBtn) {
+    if (root && nothingYet(getState().registry) && startBtn) {
       startBtn.classList.add('atlas-tour-target');
       if (!localStorage.getItem(TOUR_CREATE_SEEN_KEY)) {
         const tag = document.createElement('span');
@@ -591,6 +591,15 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
       </span>
     </div>
   `;
+}
+
+/**
+ * No world and no held seat: only then does the start-here signal show. A
+ * held seat is a world waiting to come down, and the tag sat over its row
+ * (1.91.0's live walk, S469).
+ */
+function nothingYet(reg: WorldsRegistry): boolean {
+  return reg.worlds.length === 0 && heldSeats(reg).length === 0;
 }
 
 /**

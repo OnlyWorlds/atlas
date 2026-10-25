@@ -332,6 +332,9 @@ test('a download cancelled keeps its seat in the worlds list, and Download bring
   await expect(row.locator('[data-role="held-download"]')).toHaveText('Moppetopia');
   await expect(row.locator('.atlas-world-state-chip')).toHaveText('not downloaded');
   expect(await row.locator('[data-world-id]').count()).toBe(0);
+  // The zero-worlds start-here tag sat over the held row on 1.91.0's live walk: a held seat is not nothing.
+  await expect(page.locator('.atlas-tour-tag')).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-target')).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
 
   await row.locator('[data-role="held-download"]').click();
