@@ -381,7 +381,9 @@ test('a held row gives the name its row: the state is a line under it, not a chi
   await seedHeld(page, 'Moppetopia Harbour Guild');
   const name = page.locator('[data-held-seat] [data-role="held-download"]');
   await expect(name).toHaveText('Moppetopia Harbour Guild');
-  expect(await name.evaluate(el => el.scrollWidth <= el.clientWidth), 'the whole name shows, no ellipsis').toBe(true);
+  // clientWidth > 0: a hidden row reads 0 <= 0 and would pass (S475's first phone walk did).
+  await expect(name).toBeVisible();
+  expect(await name.evaluate(el => el.clientWidth > 0 && el.scrollWidth <= el.clientWidth), 'the whole name shows, no ellipsis').toBe(true);
   await expect(page.locator('[data-held-seat] .atlas-held-said')).toHaveText('Not downloaded yet');
   await expect(page.locator('[data-held-seat] .atlas-world-state-chip')).toHaveCount(0);
 });
