@@ -46,9 +46,23 @@ function mergeFields(b: Record<string, unknown>, m: Record<string, unknown>, d: 
   return out;
 }
 
+/**
+ * The account token, its id and its name are one fact: taken whole from this
+ * tab if it changed any of them, else whole from storage. Per key, a tab that
+ * pasted a token while another kept a minted one wrote the paste beside the
+ * other token's id (the S475 gate's G3), and the next Forget revoked by it.
+ */
+const ACCOUNT_GROUP = ['account_token', 'account_token_id', 'account_token_id_tail', 'account_username'] as const;
+
 /** The merge behind `saveRegistry`: per entry, and per field inside an entry. Pure; exported for tests. */
 export function mergeRegistry(base: WorldsRegistry, mine: WorldsRegistry, stored: WorldsRegistry): WorldsRegistry {
   const out = mergeFields(base as unknown as Record<string, unknown>, mine as unknown as Record<string, unknown>, stored as unknown as Record<string, unknown>, 'worlds');
+  const changedHere = ACCOUNT_GROUP.some(k => !same(mine[k], base[k]));
+  for (const k of ACCOUNT_GROUP) {
+    const v = (changedHere ? mine : stored)[k];
+    if (v !== undefined) out[k] = v;
+    else delete out[k];
+  }
   const baseById = new Map(base.worlds.map(w => [w.id, w]));
   const storedById = new Map(stored.worlds.map(w => [w.id, w]));
   const mineIds = new Set(mine.worlds.map(w => w.id));
@@ -638,14 +652,35 @@ export function setEmail(reg: WorldsRegistry, email: string | undefined): Worlds
 export function setAccountToken(
   reg: WorldsRegistry,
   token: string | undefined,
-  username?: string
+  username?: string,
+  tokenId?: string | null,
 ): WorldsRegistry {
   const trimmed = token?.trim() || undefined;
+  // The id goes with the token it was minted with, never with the next one (S475).
+  const id = trimmed && isTokenId(tokenId) ? tokenId : undefined;
   return {
     ...reg,
     account_token: trimmed,
+    account_token_id: id,
+    account_token_id_tail: id ? trimmed!.slice(-8) : undefined,
     account_username: trimmed ? (username?.trim() || reg.account_username) : undefined,
   };
+}
+
+/**
+ * The id of the token Atlas holds, when Atlas minted it: only a UUID recorded
+ * beside this very token (its tail matches). Anything else reads as a pasted
+ * token, never revoked. Every revoke and every line that promises one asks this.
+ */
+export function mintedTokenId(reg: WorldsRegistry): string | null {
+  const token = reg.account_token;
+  const id = reg.account_token_id;
+  return token && isTokenId(id) && reg.account_token_id_tail === token.slice(-8) ? id : null;
+}
+
+/** keel's token ids are UUIDs; anything else is never kept or sent (the S475 gate's G9). */
+export function isTokenId(v: unknown): v is string {
+  return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 }
 
 // ---- Sync settings (Phase 3.5+) ----

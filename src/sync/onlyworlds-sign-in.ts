@@ -121,7 +121,7 @@ export async function beginOnlyWorldsSignIn(resume: SignInResume, navigate?: (ur
 }
 
 export type SignInOutcome =
-  | { ok: true; token: string; username: string; resume: SignInResume }
+  | { ok: true; token: string; tokenId: string | null; username: string; resume: SignInResume }
   | { ok: false; cancelled: boolean; error: unknown; resume: SignInResume; started: boolean };
 
 /**
@@ -145,7 +145,7 @@ export function startSignInCallback(href: string = location.href, base: string =
     : Promise.reject(new OwSignInError('state_mismatch', 'no session storage'));
   try { history.replaceState(null, '', `/${resume.hash}`); } catch { /* the address stays; the router still runs */ }
   return pending.then(
-    (r): SignInOutcome => ({ ok: true, token: r.token, username: r.account.username, resume }),
+    (r): SignInOutcome => ({ ok: true, token: r.token, tokenId: r.tokenId ?? null, username: r.account.username, resume }),
     (error: unknown): SignInOutcome => ({ ok: false, cancelled, error, resume, started }),
   );
 }

@@ -15,6 +15,7 @@ import { getState, patchSlice } from '../core/state';
 import { saveRegistry, setAccountToken } from '../registry/registry';
 import { AccountClient } from '../sync/account-client';
 import { signInWithPassword, passwordSignInLine } from '../sync/password-sign-in';
+import { revokeAtlasToken } from '../sync/token-revoke';
 import { PlainError } from '../core/plain-error';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { noAccountYetHtml } from '../core/ow-site';
@@ -70,17 +71,19 @@ export function missingSignIn(root: ParentNode): { input: HTMLInputElement; line
 export async function signInFromFields(root: ParentNode, signedInRest: string, toasts?: ToastManager): Promise<void> {
   const f = signInInputs(root);
   if (!f) return;
-  let token: string;
+  let minted: { token: string; tokenId: string } | null = null;
   let username: string;
   try {
-    token = await signInWithPassword(f.login.value, f.password.value);
-    username = (await new AccountClient(token).getProfile()).username;
+    minted = await signInWithPassword(f.login.value, f.password.value);
+    username = (await new AccountClient(minted.token).getProfile()).username;
   } catch (err) {
     console.warn('[sign-in-fields] sign-in refused');
+    // Minted and not kept: revoked at once, never left live with no one holding it (the S475 gate's G4).
+    if (minted) void revokeAtlasToken(minted.token, minted.tokenId);
     throw new PlainError(passwordSignInLine(err));
   }
   f.password.value = '';
-  const next = setAccountToken(getState().registry, token, username);
+  const next = setAccountToken(getState().registry, minted.token, username, minted.tokenId);
   saveRegistry(next);
   patchSlice('registry', next);
   toasts?.dismiss(WAITS_FOR_SIGN_IN);

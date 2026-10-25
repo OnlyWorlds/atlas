@@ -7,6 +7,7 @@
 
 import { BaseModal } from './modal-base';
 import { getState } from '../core/state';
+import { mintedTokenId } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { awaitEviction, evictParkedStore } from '../core/active-store';
 import { releasePriorWorld } from '../setup/atlas-root-flow';
@@ -59,6 +60,11 @@ export class ForgetBrowserModal extends BaseModal {
       // A held seat's secret is only here (Keel #469, the v2 gate's note b).
       const also = body.querySelector<HTMLElement>('[data-role="also"]')!;
       also.textContent += ` And the ${inv.heldSeats.length === 1 ? 'world' : 'worlds'} not downloaded yet: ${names(inv.heldSeats)}. ${inv.heldSeats.length === 1 ? 'Its seat stays' : 'Their seats stay'} on onlyworlds.com, unused, for the owner to remove.`;
+    }
+    // A token Atlas minted is revoked as the forget ends (S475): said as an ask with its remedy, since
+    // the page reloads before any answer could be said (the S475 code gate's F3).
+    if (mintedTokenId(getState().registry)) {
+      body.querySelector<HTMLElement>('[data-role="also"]')!.textContent += " Atlas asks onlyworlds.com to revoke its sign-in token; if it can't, remove it there, in Account settings under Account tokens.";
     }
     body.querySelector<HTMLElement>('[data-role="kept"]')!.textContent = inv.folderWorlds > 0
       ? `Never touched: your ${inv.folderWorlds === 1 ? 'world' : `${inv.folderWorlds} worlds`} in folders on your drive, and your worlds on onlyworlds.com. Open a folder again afterwards to bring ${inv.folderWorlds === 1 ? 'it' : 'them'} back.`

@@ -54,7 +54,16 @@ interface EraDraft {
 }
 
 interface MonthDraft { name: string; length: string; }
-interface InterDraft { name: string; after: string; everyYears: string; inWeek: boolean; }
+/**
+ * `rest`: the stored entry's keys the form does not draw (a version 2 leap
+ * rule's `except` and `offset`, SDK 4.76, or anything newer), carried back on
+ * save so an edit never strips them (the S367 K2 rule, per festival day).
+ */
+interface InterDraft { name: string; after: string; everyYears: string; inWeek: boolean; rest?: Record<string, unknown>; }
+
+const DRAWN_INTER_KEYS = new Set(['name', 'after_month', 'every_years', 'in_week']);
+/** Version 2 only on a calendar that uses its keys (the profile at serial 68). */
+const V2_INTER_KEYS = ['except', 'offset'];
 
 interface Draft {
   name: string;
@@ -119,6 +128,7 @@ export class CalendarBuilderModal extends BaseModal {
         name: ic.name, after: String(ic.after_month),
         everyYears: ic.every_years != null ? String(ic.every_years) : '',
         inWeek: ic.in_week !== false,
+        rest: Object.fromEntries(Object.entries(ic).filter(([k]) => !DRAWN_INTER_KEYS.has(k))),
       })),
       format: cfg.format ?? '',
       formatIntercalary: cfg.format_intercalary ?? '',
@@ -182,13 +192,17 @@ export class CalendarBuilderModal extends BaseModal {
       const inter = d.intercalary.filter(ic => ic.name.trim());
       if (inter.length > 0) {
         config.intercalary = inter.map(ic => {
-          const entry: CalendarIntercalary = { name: ic.name.trim(), after_month: num(ic.after || '0') };
+          const entry: CalendarIntercalary = { ...(ic.rest ?? {}), name: ic.name.trim(), after_month: num(ic.after || '0') };
           if (ic.everyYears.trim()) entry.every_years = num(ic.everyYears);
           if (!ic.inWeek) entry.in_week = false;
           return entry;
         });
       } else {
         delete config.intercalary;
+      }
+      if (config.version === 1 || config.version === 2) {
+        const usesV2 = (config.intercalary ?? []).some(ic => V2_INTER_KEYS.some(k => k in ic));
+        config.version = usesV2 ? 2 : 1;
       }
     }
 
@@ -377,6 +391,7 @@ export class CalendarBuilderModal extends BaseModal {
       }
       if (kind === 'intercalary' && this.draft.intercalary[idx]) {
         this.draft.intercalary[idx] = {
+          ...this.draft.intercalary[idx],
           name: col('name'), after: col('after'), everyYears: col('every'), inWeek: checked('inweek'),
         };
       }

@@ -35,7 +35,7 @@ async function serveAtlasAtItsOrigin(page: Page, answer: 'code' | 'cancel'): Pro
   await page.route('https://www.onlyworlds.com/api/v2/auth/token', async (route) => {
     keel.keelOrder.push('POST /api/v2/auth/token');
     keel.tokenBodies.push(JSON.parse(route.request().postData() ?? '{}'));
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'ow_a_minted465', token_type: 'bearer', account: { id: 'acc-1', username: 'wren' } }) });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'ow_a_minted465', token_id: '5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d', token_type: 'bearer', account: { id: 'acc-1', username: 'wren' } }) });
   });
   await page.route(`${ORIGIN}/**`, async (route) => {
     const url = new URL(route.request().url());
@@ -69,6 +69,7 @@ test('Settings: signed in with no password typed, back on the same route, the ex
   expect(new URL(page.url()).hash).toBe('#/settings/onlyworlds');
   const reg = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry);
   expect(reg.account_token).toBe('ow_a_minted465');
+  expect(reg.account_token_id).toBe('5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d'); // kept so Forget can revoke it (S475)
   expect(reg.account_username).toBe('wren');
   expect(keel.tokenBodies).toHaveLength(1);
   expect(keel.tokenBodies[0]).toMatchObject({ grant_type: 'authorization_code', code: 'c0de-465', client_id: 'atlas', redirect_uri: CALLBACK });

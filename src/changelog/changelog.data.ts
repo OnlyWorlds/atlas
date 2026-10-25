@@ -56,6 +56,37 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.93.0',
+    date: '2026-10-25',
+    theme: 'Signing out takes the sign-in with it',
+    entries: [
+      {
+        id: 'forget-revokes-atlas-token',
+        title: "Signing out revokes Atlas's sign-in on onlyworlds.com",
+        body: "When you sign in with OnlyWorlds or with your email and password, onlyworlds.com makes a sign-in token for Atlas. Forget in Settings, and Forget everything, now revoke that token on onlyworlds.com, so it stops working and leaves your account's list. Atlas says if onlyworlds.com could not be reached, and where to remove it. A token you pasted yourself is only forgotten here, since you may use it elsewhere. Worlds you opened keep their own keys.",
+        tags: ['sync'],
+      },
+      {
+        id: 'held-row-long-name-wraps',
+        title: 'A long world name not downloaded yet shows whole',
+        body: 'A world not downloaded yet with a long name now wraps to a second line in your list of worlds, instead of ending in "...".',
+        tags: ['fix', 'world'],
+      },
+      {
+        id: 'calendar-countdown-era-order',
+        title: 'A countdown era no longer hides the era after it',
+        body: 'An era counting down to a moment (like years before a founding) and an era starting at that moment now read right in either order. Before, listing the later era first left its dates with no era name and a year short.',
+        tags: ['fix', 'charts'],
+      },
+      {
+        id: 'calendar-leap-exceptions',
+        title: 'Calendars with leap years like ours read their dates',
+        body: 'A calendar can now say a leap day comes every 4 years, but not every 100, yet every 400, as the Gregorian calendar does, and count years from 1. Such calendars, like the ones a LegendKeeper timeline brings in, show their dates in Atlas instead of plain numbers, and editing one in the calendar builder keeps its leap rule.',
+        tags: ['charts'],
+      },
+    ],
+  },
+  {
     version: '1.92.2',
     date: '2026-10-25',
     theme: 'The whole name of a world not downloaded yet',

@@ -26,6 +26,9 @@ import { PlainError } from '../core/plain-error';
 import { BROWSER_HOME, isBrowserWorld } from '../core/browser-worlds';
 import type { WorldsRegistry } from '../core/types';
 import { heldSeats } from '../core/held-seats';
+import { getState } from '../core/state';
+import { mintedTokenId } from '../registry/registry';
+import { revokeAtlasToken } from '../sync/token-revoke';
 
 const CHANNEL = 'atlas-forget';
 /** This tab: a channel hears other channel objects in its own tab too, so messages carry who sent them. */
@@ -118,6 +121,7 @@ export async function forgetEverything(deps: {
   opfsRoot?: () => Promise<FileSystemDirectoryHandle>;
   reload?: () => void;
   wait?: (ms: number) => Promise<void>;
+  revoke?: (token: string, tokenId: string) => Promise<unknown>;
 } = {}): Promise<void> {
   // 3. OPFS first, every entry under the origin's root. The worlds' home goes
   // LAST: a failure on a stray entry then leaves every world where it was,
@@ -147,6 +151,13 @@ export async function forgetEverything(deps: {
     for (const d of (await indexedDB.databases?.()) ?? []) if (d.name) names.add(d.name);
   } catch { /* databases() missing: the vault is Atlas's one database */ }
   for (const name of names) await deleteDatabase(name).catch(err => console.warn('[forget] could not delete', name, err));
+  // 5. A token Atlas minted is revoked here, after everything that can stop
+  // the forget and right before the registry goes: a forget that stopped
+  // earlier keeps a working token, never a revoked one (the S475 gate's G2).
+  // Its outcome does not stop the forget.
+  const token = getState().registry.account_token;
+  const tokenId = mintedTokenId(getState().registry);
+  if (token && tokenId) await (deps.revoke ?? revokeAtlasToken)(token, tokenId).catch(() => {});
   localStorage.clear();
   sessionStorage.clear();
   // Closed after the post: a message already posted is still delivered, and

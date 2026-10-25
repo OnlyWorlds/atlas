@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { patchSlice } from '../../src/core/state';
 import { setActiveStore } from '../../src/core/active-store';
 import { CalendarBuilderModal } from '../../src/ui/calendar-builder-modal';
-import { validateCalendarConfig, type CalendarConfig } from '@onlyworlds/sdk';
+import { validateCalendarConfig, eraForStep, formatStep, type CalendarConfig } from '@onlyworlds/sdk';
 
 const toasts = { success: vi.fn(), error: vi.fn(), show: vi.fn() } as any;
 
@@ -84,6 +84,39 @@ describe('calendar builder edit keeps what the form cannot show (S367 critic K2)
     expect(out.bundles?.week).toEqual(MONTHFUL.bundles.week);
     expect((out as any).x_foreign).toEqual({ kept: true });
     expect(out.grain).toBe('day');
+  });
+
+  it('an up era listed before a countdown era at its pivot keeps its order and reads right (SDK 4.76, h20 #13200)', async () => {
+    const after = { name: 'After', abbrev: 'AF', start: 0 };
+    const before = { name: 'Before', abbrev: 'BF', start: 0, direction: 'down' as const };
+    const { updateElement } = setup('year', { version: 1, grain: 'year', eras: [after, before] });
+    openBuilder('cal-1');
+    await save();
+    const out = written(updateElement);
+    expect(out.eras!.map(e => e.name)).toEqual(['After', 'Before']);
+    expect(eraForStep(out, 5)?.name).toBe('After');
+    expect(formatStep(out, 5)).toContain('6 AF');
+  });
+
+  it('a version 2 leap rule keeps its except and offset through a save the form does not draw them in (SDK 4.76)', async () => {
+    const greg = {
+      version: 2, grain: 'day',
+      bundles: { months: { names: ['Jan', 'Feb', 'Mar'], lengths: [31, 28, 31] } },
+      intercalary: [{ name: 'Leap day', after_month: 2, every_years: 4, except: [100, 400], offset: 1 }],
+    };
+    const { updateElement } = setup('day', greg);
+    openBuilder('cal-1');
+    await save();
+    const out = written(updateElement) as CalendarConfig & { intercalary: Array<Record<string, unknown>> };
+    expect(out.version).toBe(2);
+    expect(out.intercalary[0]).toMatchObject({ name: 'Leap day', every_years: 4, except: [100, 400], offset: 1 });
+  });
+
+  it('a version 1 calendar stays version 1 when nothing uses except or offset', async () => {
+    const { updateElement } = setup('day', { version: 1, grain: 'day', bundles: { months: { names: ['A'], lengths: [30] } }, intercalary: [{ name: 'Rest', after_month: 1, every_years: 4 }] });
+    openBuilder('cal-1');
+    await save();
+    expect(written(updateElement).version).toBe(1);
   });
 
   it('create still stamps the world grain', async () => {

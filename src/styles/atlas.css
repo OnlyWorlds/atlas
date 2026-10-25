@@ -3351,6 +3351,12 @@ body.atlas-preroot .atlas-middle {
   font-size: 11px;
   color: var(--atlas-text-soft);
 }
+/* A long name wraps rather than ending in an ellipsis: the row has no hover
+   that names it, and the name is what a person picks by (Seethe, h20 #13193). */
+.atlas-held-text .atlas-row-main {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 
 /* "On OnlyWorlds" — account worlds not yet on disk (account mode, S260).
    Dimmed rows below the local list; opening one downloads it and it moves up. */

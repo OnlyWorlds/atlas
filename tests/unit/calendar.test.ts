@@ -458,7 +458,8 @@ describe('defensive read (wild configs fall back, never a broken axis)', () => {
   it('returns null on garbage', () => {
     expect(readCalendarConfig(null)).toBe(null);
     expect(readCalendarConfig('a string')).toBe(null);
-    expect(readCalendarConfig({ version: 2, grain: 'day' })).toBe(null);
+    // Version 2 is the profile's since serial 68 (SDK 4.76); an unknown version is refused.
+    expect(readCalendarConfig({ version: 3, grain: 'day' })).toBe(null);
     expect(readCalendarConfig({ version: 1 })).toBe(null);
     expect(readCalendarConfig({ version: 1, grain: 'day', bundles: { months: { names: ['a'], lengths: [1, 2] } } })).toBe(null);
     expect(readCalendarConfig({ version: 1, grain: 'day', eras: [{ name: 'X' }] })).toBe(null);

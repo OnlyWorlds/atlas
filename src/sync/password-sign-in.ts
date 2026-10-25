@@ -37,8 +37,12 @@ export function passwordSignInLine(err: unknown): string {
   return 'Signing in did not work. Try again in a moment.';
 }
 
-/** The account token for these credentials. A refusal is the SDK's OwSignInError: word it with passwordSignInLine. */
-export async function signInWithPassword(login: string, password: string): Promise<string> {
+/**
+ * The account token for these credentials, and keel's id for it (kept so
+ * Atlas can revoke the token when it lets it go, S475). A refusal is the
+ * SDK's OwSignInError: word it with passwordSignInLine.
+ */
+export async function signInWithPassword(login: string, password: string): Promise<{ token: string; tokenId: string }> {
   const id = login.trim();
   const client = new OwV2Client({ baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
   const signed = await client.signInWithPassword({
@@ -46,5 +50,5 @@ export async function signInWithPassword(login: string, password: string): Promi
     password,
     tokenName: tokenNameForThisBrowser(),
   });
-  return signed.token;
+  return { token: signed.token, tokenId: signed.id };
 }

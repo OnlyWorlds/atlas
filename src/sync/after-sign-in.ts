@@ -15,9 +15,13 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import { accountWorldsWhenFetched } from './account-worlds';
 import { navigate } from '../core/router';
 
-/** Keep the token, say so, and run what waited for it. Resolves once the waiting door has run. */
-export async function keepSignIn(token: string, username: string, toasts: ToastManager): Promise<void> {
-  const next = setAccountToken(getState().registry, token, username);
+/**
+ * Keep the token, say so, and run what waited for it. Resolves once the
+ * waiting door has run. `tokenId` comes with a token Atlas minted (S475), so
+ * Forget can revoke it; a pasted token has none.
+ */
+export async function keepSignIn(token: string, username: string, toasts: ToastManager, tokenId?: string | null): Promise<void> {
+  const next = setAccountToken(getState().registry, token, username, tokenId);
   saveRegistry(next);
   patchSlice('registry', next);
   // The ask to sign in is answered: it goes before the door's next question (Kael, h57 #5950).

@@ -138,6 +138,63 @@ test('forget drops the token and the remote section disappears', async ({ page }
   expect(stored).toBeNull();
 });
 
+// ---- Forget revokes a token Atlas minted (S475; contract Forge/Notes/2026-10-25-s475-atlas-token-revoke-contract.md) ----
+// keel played at /account/tokens/{id}: the DELETE goes by the recorded id with the token as its bearer;
+// 204 says revoked, a refusal says how to remove it, and a pasted token (no id) sends nothing.
+const MINTED_ID = '0f1e2d3c-4b5a-4968-8776-655443322110';
+async function seedSignedIn(page: Page, tokenId: string | null): Promise<void> {
+  await page.evaluate(({ token, tokenId }) => {
+    const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry')!);
+    reg.account_token = token;
+    reg.account_username = 'e2e-probe';
+    if (tokenId) { reg.account_token_id = tokenId; reg.account_token_id_tail = token.slice(-8); }
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  }, { token: BOGUS_TOKEN, tokenId });
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await page.click('[data-action="open-settings"]');
+}
+function playRevoke(page: Page, status: number): Array<{ url: string; auth: string | null; method: string }> {
+  const seen: Array<{ url: string; auth: string | null; method: string }> = [];
+  void page.route('https://www.onlyworlds.com/api/v2/account/tokens/**', async route => {
+    const req = route.request();
+    seen.push({ url: req.url(), auth: req.headers()['authorization'] ?? null, method: req.method() });
+    await route.fulfill({ status, body: status === 204 ? '' : JSON.stringify({ error: { code: 'server_error', message: 'x' } }) });
+  });
+  return seen;
+}
+
+test('Forget revokes a token Atlas minted, by its id, with the token as its bearer', async ({ page }) => {
+  await setupAtlasRoot(page);
+  const seen = playRevoke(page, 204);
+  await seedSignedIn(page, MINTED_ID);
+  await page.click('[data-action="account-forget"]');
+  await expect(page.locator('.ow-toast', { hasText: "Signed out. Atlas's token is revoked on OnlyWorlds." })).toBeVisible();
+  expect(seen).toEqual([{ url: `https://www.onlyworlds.com/api/v2/account/tokens/${MINTED_ID}`, auth: `Bearer ${BOGUS_TOKEN}`, method: 'DELETE' }]);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_worlds_registry')!));
+  expect(stored.account_token ?? null).toBeNull();
+  expect(stored.account_token_id ?? null).toBeNull();
+});
+
+test('Forget signs out even when keel does not revoke, and says where to remove the token', async ({ page }) => {
+  await setupAtlasRoot(page);
+  playRevoke(page, 500);
+  await seedSignedIn(page, MINTED_ID);
+  await page.click('[data-action="account-forget"]');
+  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: "Atlas could not confirm that OnlyWorlds revoked its token: check onlyworlds.com, in Account settings under Account tokens." })).toBeVisible();
+});
+
+test('Forget never revokes a pasted token (no id): it may be used elsewhere', async ({ page }) => {
+  await setupAtlasRoot(page);
+  const seen = playRevoke(page, 204);
+  await seedSignedIn(page, null);
+  await page.click('[data-action="account-forget"]');
+  await expect(page.locator('.ow-toast', { hasText: 'Account token forgotten. Opened worlds keep their own keys.' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(seen).toEqual([]);
+});
+
 // ---- A shared world opens like an owned one (#199) ----
 // keel's account routes and the world's element lists, routed: the mint follows
 // keel's rule (accounts/api.py mint_world_key, membership.mint_member_key): a

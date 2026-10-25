@@ -378,9 +378,11 @@ test('a held row gives the name its row: the state is a line under it, not a chi
   // Seethe's note on 1.91.1 (h20 #12863): the chip took half the row and cut the name to ten characters.
   await freshBoot(page);
   await mockKeel(page);
-  await seedHeld(page, 'Moppetopia Harbour Guild');
+  // 38 characters: 1.92.2 still cut a name this long at 1280 and 360 (Seethe, h20 #13193).
+  const long = 'The Moppetopia Harbour Guild of Ferries';
+  await seedHeld(page, long);
   const name = page.locator('[data-held-seat] [data-role="held-download"]');
-  await expect(name).toHaveText('Moppetopia Harbour Guild');
+  await expect(name).toHaveText(long);
   // clientWidth > 0: a hidden row reads 0 <= 0 and would pass (S475's first phone walk did).
   await expect(name).toBeVisible();
   expect(await name.evaluate(el => el.clientWidth > 0 && el.scrollWidth <= el.clientWidth), 'the whole name shows, no ellipsis').toBe(true);

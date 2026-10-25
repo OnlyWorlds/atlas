@@ -11,7 +11,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { saveRegistry, setPin, setEmail, setAccountToken } from '../registry/registry';
+import { saveRegistry, setPin, setEmail, setAccountToken, mintedTokenId } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { ToastManager, WAITS_FOR_SIGN_IN } from '../ui/toast-manager';
@@ -24,6 +24,7 @@ import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
 import { OW_SETTINGS_URL, noAccountYetHtml } from '../core/ow-site';
 import { signInWithPassword, passwordSignInLine } from '../sync/password-sign-in';
 import { keepSignIn } from '../sync/after-sign-in';
+import { revokeAtlasToken } from '../sync/token-revoke';
 import { onlyWorldsSignInButtonHtml, wireOnlyWorldsSignIn } from '../ui/onlyworlds-sign-in-button';
 
 /**
@@ -79,6 +80,11 @@ export function renderAccountTab(reg: WorldsRegistry): string {
     </section>
   `;
 }
+
+/** What Forget says (S475): a token Atlas made is revoked on onlyworlds.com; a pasted one is only forgotten here. */
+export const FORGET_REVOKED_LINE = "Signed out. Atlas's token is revoked on OnlyWorlds. Opened worlds keep their own keys.";
+export const FORGET_KEPT_LINE = "Signed out here. Atlas could not confirm that OnlyWorlds revoked its token: check onlyworlds.com, in Account settings under Account tokens.";
+export const FORGET_PASTED_LINE = 'Account token forgotten. Opened worlds keep their own keys.';
 
 function renderAccountTokenBlock(reg: WorldsRegistry): string {
   if (reg.account_token) {
@@ -197,9 +203,9 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     passwordBtn.disabled = true;
     passwordBtn.textContent = 'Signing in…';
     void (async () => {
-      let token: string;
+      let minted: { token: string; tokenId: string };
       try {
-        token = await signInWithPassword(loginInput.value, passwordInput.value);
+        minted = await signInWithPassword(loginInput.value, passwordInput.value);
       } catch (err) {
         console.warn('[settings] password sign-in refused');
         showError(passwordSignInLine(err));
@@ -208,10 +214,10 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
         return;
       }
       passwordInput.value = '';
-      await completeSignIn(token, () => {
+      await completeSignIn(minted.token, () => {
         passwordBtn.disabled = false;
         passwordBtn.textContent = 'Sign in';
-      });
+      }, minted.tokenId);
     })();
   });
 
@@ -232,20 +238,25 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     });
   };
 
-  /** A token in hand, pasted or just minted: check it, keep it, and open what waited for it. */
-  const completeSignIn = async (token: string, onRefused: () => void): Promise<void> => {
+  /**
+   * A token in hand, pasted or just minted: check it, keep it, and open what
+   * waited for it. A minted one (with its id) that is not kept is revoked at
+   * once, never left live with no one holding it (the S475 gate's G4).
+   */
+  const completeSignIn = async (token: string, onRefused: () => void, tokenId?: string): Promise<void> => {
     let username: string;
     try {
       username = (await new AccountClient(token).getProfile()).username;
     } catch (err) {
       console.warn('[settings] sign-in failed:', err);
+      if (tokenId) void revokeAtlasToken(token, tokenId);
       showError(signInErrorLine(err));
       onRefused();
       return;
     }
     // The settings panel re-renders from the registry patch; the block flips
     // to the signed-in state on that pass.
-    void keepSignIn(token, username, toasts);
+    void keepSignIn(token, username, toasts, tokenId);
   };
 
   signInBtn?.addEventListener('click', () => void signIn());
@@ -254,6 +265,9 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
   });
 
   block.querySelector<HTMLButtonElement>('[data-action="account-forget"]')?.addEventListener('click', () => {
+    // Signed out here first, offline too; the revoke runs on the copy in hand (S475, R3).
+    const token = getState().registry.account_token;
+    const tokenId = mintedTokenId(getState().registry);
     const next = setAccountToken(getState().registry, undefined);
     saveRegistry(next);
     patchSlice('registry', next);
@@ -261,6 +275,16 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     void import('../setup/open-door').then(m => m.dropHeldOpen());
     void import('../setup/join-door').then(m => { m.takeJoinHeldForSignIn(); });
     toasts.dismiss(WAITS_FOR_SIGN_IN);
-    toasts.info('Account token forgotten. Opened worlds keep their own keys.');
+    if (!token || !tokenId) {
+      // A pasted token: made somewhere else, maybe used there too, so never revoked.
+      toasts.info(FORGET_PASTED_LINE);
+      return;
+    }
+    void revokeAtlasToken(token, tokenId).then(outcome => {
+      // Signed in again while keel answered: a line about the old token would read as about the new one.
+      if (getState().registry.account_token) return;
+      if (outcome === 'revoked') toasts.info(FORGET_REVOKED_LINE);
+      else toasts.show(FORGET_KEPT_LINE, 'error', 15_000);
+    });
   });
 }

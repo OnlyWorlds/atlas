@@ -35,7 +35,7 @@ export async function applySignInOutcome(outcome: SignInOutcome, toasts: ToastMa
   if (outcome.ok) {
     // keepSignIn saves the token before its first await, so a door reopened
     // below already sees it; its follow-ups (a held door, the worlds offer) run on.
-    void keepSignIn(outcome.token, outcome.username, toasts);
+    void keepSignIn(outcome.token, outcome.username, toasts, outcome.tokenId);
   } else {
     if (!outcome.cancelled) console.warn('[sign-in] the return did not sign in:', outcome.error);
     const line = signInCallbackLine(outcome);

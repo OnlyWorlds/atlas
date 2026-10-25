@@ -891,6 +891,19 @@ export interface WorldsRegistry {
    * a bearer credential on the user's own machine.
    */
   account_token?: string;
+  /**
+   * keel's id for `account_token`, kept only when Atlas minted the token (Sign
+   * in with OnlyWorlds, or the email and password): Atlas revokes it by this id
+   * when it lets the token go (S475). A pasted token has none and is never
+   * revoked. Always written together with `account_token` (`setAccountToken`).
+   */
+  account_token_id?: string;
+  /**
+   * The last eight characters of the token `account_token_id` was recorded
+   * with: an id counts only beside that token (`mintedTokenId`). A tab still
+   * on 1.92 wrote a new token and kept the old id (the S475 code gate's F2).
+   */
+  account_token_id_tail?: string;
   /** Display cache from GET /account at sign-in ("Signed in as …"). */
   account_username?: string;
   active_world_id?: string;
