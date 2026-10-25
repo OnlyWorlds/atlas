@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.92.1',
+    date: '2026-10-25',
+    theme: "A parlor's takes stay in its room",
+    entries: [
+      {
+        id: 'parlor-take-in-room',
+        title: "A parlor's take on a work item counts as part of its room",
+        body: "When someone takes a work item in a parlor, that take is saved in the world as a Relation. Atlas now counts it with the parlor's other room records, so Hide the room hides it too, and the world's own lore never shows it. A Relation called Take that no parlor made stays in view.",
+        tags: ['fix', 'data'],
+      },
+    ],
+  },
+  {
     version: '1.92.0',
     date: '2026-10-25',
     theme: 'Home for a world at work',

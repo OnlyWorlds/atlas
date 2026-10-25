@@ -21,9 +21,10 @@ import { ROOM_PAIRS, isRoomElement as sdkIsRoomElement } from '@onlyworlds/sdk';
 import { getState } from './state';
 
 /**
- * The room profile's eight pairs as the SDK carries them (4.55.0, generated
- * from schema-dist's room.fixture.json, never typed by hand: a ninth pair
- * arrives by a repin), lower-cased for reading. Atlas's own copy is gone.
+ * The room profile's pairs as the SDK carries them (4.55.0, generated from
+ * schema-dist's room.fixture.json, never typed by hand: the ninth,
+ * relation/Take, arrived by the 4.75.0 repin), lower-cased for reading.
+ * Atlas's own copy is gone.
  */
 export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> =
   ROOM_PAIRS.map(p => [p.type, p.supertype.toLowerCase()] as const);
