@@ -80,7 +80,9 @@ export function attachSyncEngine(
   // Always detach the previous engine first — at most one active at a time.
   detachSyncEngine();
 
-  if (entry.state !== 'api-linked' || !entry.api) {
+  // A view-only copy (conv. 177) never syncs: its element ids are another
+  // world's, and keel's ids are global.
+  if (entry.state !== 'api-linked' || !entry.api || entry.copy_of) {
     return null;
   }
 

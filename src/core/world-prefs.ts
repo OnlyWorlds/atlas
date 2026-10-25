@@ -35,6 +35,7 @@ import { getState, patchSlice, subscribe } from './state';
 import { getActiveStore } from './active-store';
 import { onLeaveWorld } from './leave-flush';
 import { saveRegistry } from '../registry/registry';
+import { entryIsViewOnly } from './view-only';
 import type { WorldRegistryEntry } from './types';
 import type { FolderStore } from '../store/folder-store';
 
@@ -174,7 +175,7 @@ async function writeOut(store: FolderStore, worldId: string): Promise<void> {
   // A view-only world's store refuses every write: the prefs stay on the
   // registry entry, and the file is never tried (S380 row: no warning at
   // every open).
-  if (!entry || entry.demo || entry.api?.read_only) return;
+  if (!entry || entry.demo || entryIsViewOnly(entry)) return;
   let prefs = prefsOf(entry);
   const base = prefsSyncedFor(worldId);
   if (base !== undefined && prefsKey(prefs) !== base) {

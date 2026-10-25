@@ -33,7 +33,9 @@ import { diskApiBlock } from '../core/seat';
 
 export type OpenWorldFileOutcome =
   | { kind: 'opened' | 'restored'; worldId: string }
-  /** The same world is already in Atlas: nothing was written. */
+  /** Opened beside the world it copies, view only (`asCopy`, conv. 177). */
+  | { kind: 'copied'; worldId: string }
+  /** The same world (or, with `asCopy`, the same copy) is already in Atlas: nothing was written. */
   | { kind: 'already'; worldId: string }
   /** The where-question was cancelled: nothing was written. */
   | { kind: 'cancelled' };
@@ -48,6 +50,12 @@ export interface OpenWorldFileOpts {
   chooseWhere?: () => Promise<'browser' | 'folder' | null>;
   /** Each file written, with the count so far and the total (world.json last). */
   onWritten?: (done: number, total: number) => void;
+  /**
+   * Open the file as a view-only copy beside the world it holds (conv. 177):
+   * a fresh world id, `snapshot_of`, `writable: false`, in this browser.
+   * Never a restore, never the where-question.
+   */
+  asCopy?: boolean;
 }
 
 const REGISTRY_NOT_SAVED =
@@ -137,7 +145,60 @@ export async function openWorldFile(bytes: Uint8Array, opts: OpenWorldFileOpts =
   }
 }
 
+/** The file's world.json, parsed (the reader has already refused one that is not an object). */
+function fileMetaOf(read: { files: WorldFileEntry[] }): Record<string, unknown> {
+  return JSON.parse(new TextDecoder().decode(read.files.find(f => f.path === 'world.json')!.data)) as Record<string, unknown>;
+}
+
+/**
+ * A copy beside the world (conv. 177): the file's files under a fresh world
+ * id, its world.json by the snapshot rule (`copyWorldJson`). The same copy
+ * (same world, same time) already here is `already`; nothing else here is
+ * read or touched, the world it copies included.
+ */
+async function openCopy(read: { worldId: string; worldName: string; files: WorldFileEntry[] }, opts: OpenWorldFileOpts): Promise<OpenWorldFileOutcome> {
+  const { copyOfMeta, copyWorldJson, sameCopy } = await import('../core/world-copy');
+  const freshId = crypto.randomUUID();
+  const meta = copyWorldJson(fileMetaOf(read), freshId);
+  const copy = copyOfMeta(meta)!;
+  const sameHere = () => getState().registry.worlds.find(w => !w.cleared_at && sameCopy(w.copy_of, copy));
+  const first = sameHere();
+  if (first) return { kind: 'already', worldId: first.id };
+
+  const make = await openBrowserMake(read.worldName, freshId);
+  try {
+    await writeAll(make.handle, read.files, new TextEncoder().encode(JSON.stringify(meta, null, 2) + '\n'), opts.onWritten);
+  } catch (err) {
+    await make.abort().catch(e => console.warn('[world-file] could not remove the half-made copy', e)); // raw-error-ok: a console record
+    if (isQuotaError(err)) throw new PlainError(browserStorageFullSentence('opening the world file'));
+    throw err;
+  }
+  const now = sameHere();
+  if (now) {
+    await make.abort().catch(() => {});
+    return { kind: 'already', worldId: now.id };
+  }
+  const made = createLocalWorld(getState().registry, {
+    name: read.worldName,
+    folderName: make.dir,
+    handleKey: `world-${freshId}`,
+    pathHint: `browser storage/${make.dir}`,
+  });
+  const next = updateWorldEntry(made.next, made.entry.id, { where: 'browser', copy_of: copy });
+  try {
+    await make.finish(() => {
+      if (!saveRegistry(next)) throw new PlainError(REGISTRY_NOT_SAVED);
+      patchSlice('registry', next);
+    });
+  } catch (err) {
+    await removeBrowserWorldDir({ where: 'browser', folder: { handle_key: '', folder_name: make.dir } }).catch(() => {});
+    throw err;
+  }
+  return { kind: 'copied', worldId: made.entry.id };
+}
+
 async function openRead(read: { worldId: string; worldName: string; files: WorldFileEntry[] }, opts: OpenWorldFileOpts): Promise<OpenWorldFileOutcome> {
+  if (opts.asCopy) return openCopy(read, opts);
   const first = placeOf(getState().registry, read.worldId);
   if (first.already) return { kind: 'already', worldId: first.already.id };
   const restore = first.restore;
@@ -194,7 +255,10 @@ async function openRead(read: { worldId: string; worldName: string; files: World
       pathHint: `browser storage/${make.dir}`,
     });
     worldId = made.entry.id;
-    next = updateWorldEntry(made.next, worldId, { where: 'browser' });
+    // A file another writer marked `writable: false` opens view-only (conv. 177).
+    const { copyOfMeta } = await import('../core/world-copy');
+    const copy = copyOfMeta(fileMetaOf(read));
+    next = updateWorldEntry(made.next, worldId, { where: 'browser', ...(copy ? { copy_of: copy } : {}) });
   }
   try {
     await make.finish(() => {

@@ -75,6 +75,8 @@ interface OpenWords {
   restored: (name: string, linked: boolean) => string;
   /** The first-world and import waypoints: the file door's, never the demo's (S381 gate F6). */
   waypoints: boolean;
+  /** A world already here can open beside itself as a view-only copy (conv. 177): the file door's, never the demo's. */
+  offerCopy?: boolean;
 }
 
 const FILE_WORDS: OpenWords = {
@@ -85,6 +87,7 @@ const FILE_WORDS: OpenWords = {
   already: 'This world is already in Atlas.',
   opened: name => `Opened "${name}". It lives in this browser.`,
   restored: (name, linked) => `Restored "${name}" from the file.${linked ? ' Changes that conflict with OnlyWorlds wait for you.' : ''}`,
+  offerCopy: true,
   waypoints: true,
 };
 
@@ -217,6 +220,35 @@ async function storageReady(toasts: ToastManager, words: OpenWords): Promise<boo
  * once the world is open. `openingLine`, with the overlay, counts the files
  * as they are written.
  */
+/**
+ * The file's world, already here, opened beside itself as a view-only copy
+ * (conv. 177): always in this browser, never a restore, the world it copies
+ * untouched. The same copy already here is opened instead.
+ */
+async function openCopyBeside(bytes: Uint8Array, toasts: ToastManager): Promise<void> {
+  try {
+    const { openWorldFile } = await import('../setup/world-file-open');
+    const { activateWorld } = await import('../sidebar/worlds-sidebar');
+    const { copyLine } = await import('../core/world-copy');
+    const out = await openWorldFile(bytes, { asCopy: true });
+    if (out.kind === 'already') {
+      toasts.show('This copy is already in Atlas.', 'info', 8000, {
+        actions: [{ label: 'Open it', run: () => { void activateWorld(out.worldId, toasts); } }],
+      });
+      return;
+    }
+    if (out.kind !== 'copied') return;
+    const entry = getState().registry.worlds.find(w => w.id === out.worldId);
+    if (await activateWorld(out.worldId, toasts) && entry?.copy_of) {
+      toasts.success(`Opened ${copyLine(entry.name, entry.copy_of, false).replace(/^A copy/, 'a copy')}`);
+    }
+  } catch (err) {
+    console.warn('[open-world-file] copy failed:', err);
+    if (isCodeLoadError(err)) return;
+    showProblem(err, { doing: 'opening a copy of the world file', where: 'browser', toasts });
+  }
+}
+
 async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts: ToastManager, words: OpenWords, overlay?: LoadingOverlayHandle, openingLine?: (done: number, total: number) => string): Promise<void> {
   // On Chromium with a home folder set, a NEW world asks where (contract §5.2,
   // §1.4, invariant 12): a folder answer opens it in this browser, then moves
@@ -246,8 +278,11 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
       return;
     }
     if (out.kind === 'already') {
-      toasts.show(words.already, 'info', 8000, {
-        actions: [{ label: 'Open it', run: () => { void activateWorld(out.worldId, toasts); } }],
+      const openIt = { label: 'Open it', run: () => { void activateWorld(out.worldId, toasts); } };
+      toasts.show(words.already, 'info', words.offerCopy ? 12_000 : 8000, {
+        actions: words.offerCopy
+          ? [openIt, { label: 'Open a copy beside it', run: () => { void openCopyBeside(bytes, toasts); } }]
+          : [openIt],
       });
       return;
     }

@@ -31,6 +31,7 @@ import { reconcile } from '../import/reconcile';
 import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
 import { generateFixPrompt, validatePayload } from '../import/validate';
 import { findWorldByOwIdentity, saveRegistry, updateWorldEntry } from '../registry/registry';
+import { entryIsViewOnly } from '../core/view-only';
 import {
   createWorldFromImportedData,
   importIntoActiveWorld,
@@ -424,7 +425,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     // into it would surface as N per-element write failures (S315 gate) —
     // say it once, up front, instead.
     const mergeTargetEntry = idMatch ?? getState().registry.worlds.find(w => w.id === aw?.worldId) ?? null;
-    const mergeTargetViewOnly = mode === 'merge' && mergeTargetEntry?.api?.read_only === true;
+    const mergeTargetViewOnly = mode === 'merge' && entryIsViewOnly(mergeTargetEntry);
     const accuratePreview = mode !== 'merge' || mergeTargetIsActive;
     const issues = validatePayload(parsed, mode === 'merge' && mergeTargetIsActive ? activeElements() : []);
     const plan = buildPlan();
@@ -622,7 +623,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         // room can be driven by keyboard/state races — one clear message beats
         // N per-element write failures).
         const targetEntry = getState().registry.worlds.find(w => w.id === targetId);
-        if (targetEntry?.api?.read_only === true) {
+        if (entryIsViewOnly(targetEntry)) {
           throw new PlainError(`"${targetName}" is view-only. Import as a separate copy instead.`);
         }
         if (targetId !== activeWorld()?.worldId) {

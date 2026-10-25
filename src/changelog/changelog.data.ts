@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.90.0',
+    date: '2026-10-25',
+    theme: 'Yesterday beside today',
+    entries: [
+      {
+        id: 'world-file-copy-beside',
+        title: 'A world file of a world you already have opens beside it, as a copy to read',
+        body: 'Opening a world file of a world that is already in Atlas used to stop at "already in Atlas". Now it also offers Open a copy beside it: the file opens as a separate copy you can read but not change, named in your list with the day the file was made when it says one, so you can look at last week\'s world next to today\'s. The world itself is left as it is, and a copy never goes online.',
+        tags: ['new', 'folder'],
+      },
+      {
+        id: 'writable-false-is-view-only',
+        title: 'A world folder marked as not writable opens view only',
+        body: 'A world whose world.json says writable: false, as a frozen copy of a world does, now opens to read in Atlas, and nothing offers to edit it.',
+        tags: ['folder'],
+      },
+    ],
+  },
+  {
     version: '1.89.0',
     date: '2026-10-25',
     theme: 'A damaged file is said',

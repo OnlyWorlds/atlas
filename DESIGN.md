@@ -42,6 +42,7 @@ Two states. The difference is **whether sync is wired**, not where the data live
 There is no api-only mode. If you want a world online, you attach credentials and the engine starts reconciling.
 
 - **View-only worlds** are a FLAG on api-linked, not a third state: `api.read_only` (registry and `world.json`). Linked with a READ key and no PIN; the engine is pull-only and the store refuses every UI write. The sister-shares-with-her-DM flow.
+- **View-only copies** (conv. 177): a world file of a world already here opens beside it as a copy (a fresh id, `snapshot_of`, `writable: false`), local-only, view-only and never online; any world.json marked `writable: false` opens the same way.
 - **local-only to api-linked**: Make Online, two routes (create a new api world, or link into an existing one). DESIGN_SYNC "Make Online".
 - **api-linked to local-only**: unlink. The folder stays, sync stops, the baselines are wiped (conv. 24), and the server world id is remembered as `former_api_world_id`.
 - **Where a world comes from**: made new in the home folder, downloaded from onlyworlds.com, imported from a file, or any world folder opened in place (DESIGN_FOLDER "Opening a world folder in place"). Since 1.17 (conv. 129, contract `Forge/Notes/2026-10-04-browser-worlds-contract.md`) a world can also live in this browser's storage: the only home on a browser without the folder picker (Firefox, Safari 26+), a choice on Chromium. A world also comes back from a world file (one `.zip`), or, cleared by the browser while linked, from onlyworlds.com ("Bring it down again"). Since 1.18 the demo world (Moppetopia) comes down by its demo key as the user's own unlinked copy: a world file made in memory and opened through the world-file door (`src/setup/demo-copy.ts`). The first-visit landing has two doors, start a world and explore Moppetopia, and one line of links under them: the tour, open a world folder (Chromium), other ways in (1.19, #127; DESIGN_HOME "The newcomer flow"; 1.20 kept the home's cards in place). The deep links `#/start`, `#/bring-in` and `#/try-demo` run the matching door once.
@@ -53,7 +54,7 @@ The rule (README): Forge/Notes decide, DESIGN docs hold. A dated decision record
 | Doc | Holds |
 |---|---|
 | `DESIGN.md` | this index: vision, the principle, world states, the map of everything else |
-| `DESIGN_LAWS.md` | the numbered Critical Conventions 1-174, grouped by area, with their guards |
+| `DESIGN_LAWS.md` | the numbered Critical Conventions 1-177, grouped by area, with their guards |
 | `DESIGN_FOLDER.md` | on-disk layout, the union read, **File naming** (the Folder Format spec source), the atlas root, every `.atlas/` file, media, the FolderStore contract |
 | `DESIGN_SYNC.md` | the SyncEngine as built, push and pull triggers, pause and hold, creating and linking worlds, Make Online, ids, the re-key kernel, account mode, world-meta sync |
 | `DESIGN_SHELL.md` | the three-pane shell, rooms, the narrow-window layer, the state shape, routes, the context pane |

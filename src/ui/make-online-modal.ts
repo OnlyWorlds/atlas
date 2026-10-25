@@ -110,6 +110,12 @@ export class MakeOnlineModal extends BaseModal {
       this.toasts.info('The tour world is a sandbox until you keep it at the end of the tour.');
       return;
     }
+    // A view-only copy (conv. 177) never goes online: its element ids are the
+    // world's it copies, and keel's ids are global.
+    if (entry?.copy_of) {
+      this.toasts.info('This is a view-only copy of a world, so it does not go online. The world itself can, from your list of worlds.');
+      return;
+    }
     // One Character's view, or the public one, is not the whole world, and
     // never goes online as a world of its own (folder spec §4.2, P1).
     const sliceRefusal = slicePushRefusal(active.meta, entry?.name ?? String(active.meta?.name ?? 'this world'));

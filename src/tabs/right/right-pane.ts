@@ -33,6 +33,7 @@ import { escapeText } from '../../core/dom-utils';
 import { filesWhereOf } from '../../core/browser-worlds';
 import { SEAT_SECRET_MISSING_LINE } from '../../core/seat';
 import { renderGate } from '../../ui/render-gate';
+import { copyLine, worldIsCopiedBy } from '../../core/world-copy';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -367,6 +368,19 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   }
   const entry = state.registry.worlds.find(w => w.id === active.worldId);
   const linked = entry?.state === 'api-linked';
+  // A view-only copy (conv. 177): it says what it is, and has nothing to refresh from.
+  if (entry?.copy_of) {
+    pill.dataset.state = 'view';
+    const worldHere = state.registry.worlds.some(w => w.id !== entry.id && !w.copy_of && worldIsCopiedBy(w, entry.copy_of!));
+    pill.title = copyLine(entry.name, entry.copy_of, worldHere);
+    writePill(pill, `
+      <span class="atlas-sync-pill-dot"></span>
+      <span class="material-symbols-outlined atlas-sync-pill-eye" aria-hidden="true">visibility</span>
+      <span>Copy, view only</span>
+    `, active.worldId);
+    pill.removeAttribute('data-clickable');
+    return;
+  }
   if (!linked) {
     pill.dataset.state = 'local';
     pill.title = filesWhereOf(entry) === 'browser'

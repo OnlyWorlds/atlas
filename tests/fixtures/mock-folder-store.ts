@@ -77,8 +77,8 @@ export class MockFolderStore implements FolderStore {
 
   // View-only guard (S264) — mirrors FsFolderStore: UI mutators throw; the
   // engine's channels (applyServerRecord, silent deletes, fromSync meta) pass.
-  private viewOnly = false;
-  setViewOnly(viewOnly: boolean): void { this.viewOnly = viewOnly; }
+  private viewOnly: boolean | 'copy' = false;
+  setViewOnly(viewOnly: boolean | 'copy'): void { this.viewOnly = viewOnly; }
   private assertWritable(): void {
     if (this.viewOnly) throw new PlainError('This world is view-only, so it cannot be changed here. Make your own copy to edit it.');
   }

@@ -26,9 +26,10 @@ import {
   writingHash,
 } from '../core/router';
 import { getState, patchSlice, subscribe } from '../core/state';
-import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused } from '../registry/registry';
+import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused, updateWorldEntry } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
+import { copyChip, copyLine } from '../core/world-copy';
 import { MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
@@ -509,13 +510,18 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // one the browser cleared says so in the row, never "folder".
   const inBrowser = isBrowserWorld(world);
   const cleared = inBrowser && !!world.cleared_at && world.demo !== true;
+  // A view-only copy (conv. 177): the eye, and a chip with its day, so two
+  // rows of one name say which is the world and which the copy.
+  const copy = world.copy_of;
   const stateIcon = cleared ? 'browser_not_supported'
-    : viewOnly ? 'visibility'
+    : viewOnly || copy ? 'visibility'
     : world.state === 'api-linked'
       ? (isPaused ? 'cloud_off' : 'cloud')
       : inBrowser ? 'web' : 'folder';
   const stateChip = cleared
     ? '<span class="atlas-world-state-chip cleared" title="Cleared by this browser">cleared</span>'
+    : copy
+    ? `<span class="atlas-world-state-chip view-only" title="${escapeAttr(copyLine(world.name, copy, false))}">${escapeText(copyChip(copy))}</span>`
     : viewOnly
     ? '<span class="atlas-world-state-chip view-only">view</span>'
     : world.state === 'api-linked'
@@ -966,8 +972,19 @@ async function doActivateWorld(
     }
   }
   const meta = await store.readWorldMeta();
+  // A view-only copy (conv. 177) is what its world.json says, whoever wrote
+  // it: the registry's mirror follows the file before anything reads it.
+  {
+    const { copyOfMeta } = await import('../core/world-copy');
+    const copy = copyOfMeta(meta);
+    if (JSON.stringify(copy ?? null) !== JSON.stringify(entry.copy_of ?? null)) {
+      const next = updateWorldEntry(getState().registry, worldId, { copy_of: copy ?? undefined });
+      if (saveRegistry(next)) patchSlice('registry', next);
+      entry = next.worlds.find(w => w.id === worldId) ?? entry;
+    }
+  }
   // View-only worlds (S264): arm the store guard before the UI can reach it.
-  store.setViewOnly(!!entry.api?.read_only);
+  store.setViewOnly(entry.copy_of ? 'copy' : !!entry.api?.read_only);
   // The world's notes, cast, calendar lens and writing labels, from its
   // folder (S364). BEFORE re-key recovery: recovery remaps the registry's
   // cast ids, and the prefs sync then writes the remapped ids back out.

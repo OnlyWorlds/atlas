@@ -57,7 +57,7 @@ export interface FolderStore {
    * `writeWorldMeta` with `fromSync`). One seam, both stores, so no UI call
    * site needs to know.
    */
-  setViewOnly(viewOnly: boolean): void;
+  setViewOnly(viewOnly: boolean | 'copy'): void;
 
   // ---- World metadata ----
 

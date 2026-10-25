@@ -16,6 +16,7 @@
 
 import type { Element, WorldRegistryEntry } from '../core/types';
 import { isBrowserWorld } from '../core/browser-worlds';
+import { entryIsViewOnly } from '../core/view-only';
 
 export const KEEPSAFE_THRESHOLD = 25;
 const WEEK_MS = 7 * 86_400_000;
@@ -52,7 +53,8 @@ export function keepSafeCard(input: {
 }): KeepSafeCard | null {
   const { entry, elements, loading, now } = input;
   if (!entry || loading || !isBrowserWorld(entry) || entry.demo === true || entry.cleared_at) return null;
-  if (entry.api?.read_only) return null;
+  // A view-only copy (conv. 177) is kept safe by the world it copies.
+  if (entryIsViewOnly(entry)) return null;
   if (!worthKeeping(elements)) return null;
   const snoozed = Date.parse(entry.keep_nudge_snoozed_until ?? '');
   if (Number.isFinite(snoozed) && now < snoozed) return null;

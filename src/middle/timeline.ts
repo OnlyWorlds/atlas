@@ -11,7 +11,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { worldIsViewOnly } from '../core/view-only';
+import { entryIsViewOnly, worldIsViewOnly } from '../core/view-only';
 import { navigate, elementHash, timelineHash, parseHash, onHashChange, type Route } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -547,7 +547,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     document.querySelector('.atlas-cal-menu')?.remove(); // one at a time
     const lens = activeLens();
     const calendars = worldCalendars(getState().data.elements);
-    const viewOnly = !!registryEntry()?.api?.read_only;
+    const viewOnly = entryIsViewOnly(registryEntry());
 
     const menu = document.createElement('div');
     menu.className = 'atlas-cal-menu';
@@ -632,7 +632,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   }
 
   function writableWorld(): boolean {
-    return !registryEntry()?.api?.read_only;
+    return !entryIsViewOnly(registryEntry());
   }
 
   /** Gate 4 for api-linked worlds: the first meta round must have run. */

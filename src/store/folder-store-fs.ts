@@ -181,11 +181,11 @@ export class FsFolderStore implements FolderStore {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private opts: FsFolderStoreOptions;
   /** View-only world (S264) — UI mutations throw; sync channels bypass. */
-  private viewOnly = false;
+  private viewOnly: boolean | 'copy' = false;
   /** Between `beginMove` and `endMove` (or the close): the files are being copied to a folder. */
   private moving = false;
 
-  setViewOnly(viewOnly: boolean): void { this.viewOnly = viewOnly; }
+  setViewOnly(viewOnly: boolean | 'copy'): void { this.viewOnly = viewOnly; }
 
   /** The view-only guard. Sits on the UI-facing mutators; the engine's write
    *  channels (applyServerRecord, silent deletes, fromSync meta) skip it.
@@ -193,6 +193,8 @@ export class FsFolderStore implements FolderStore {
    *  behind the move's modal, and this is the backstop, so nothing written
    *  after the copy's verify is lost when the browser copy goes (1.17). */
   private assertWritable(): void {
+    // A copy (conv. 177) is already the person's own copy: its sentence says where the world itself is.
+    if (this.viewOnly === 'copy') throw new PlainError('This is a view-only copy, so it cannot be changed here. Edit the world itself, in your list of worlds.');
     if (this.viewOnly) throw new PlainError('This world is view-only, so it cannot be changed here. Make your own copy to edit it.');
     if (this.moving) throw new PlainError('This world is being moved to a folder. Try again when that finishes.');
   }

@@ -196,7 +196,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <p class="atlas-settings-hint" data-role="dangling-text"></p>
         <button class="atlas-btn-ghost" data-action="remove-dangling-links">Remove those links</button>
       </div>
-      ${isPartialSlice(getState().active?.meta) ? '' : `<div class="atlas-settings-actions">
+      ${isPartialSlice(getState().active?.meta) || world.copy_of ? '' : `<div class="atlas-settings-actions">
         <button class="atlas-btn-primary" data-action="make-online">Make online</button>
       </div>`}`;
   return `

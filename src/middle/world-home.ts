@@ -55,6 +55,7 @@ import { freezeChartBlock } from '../visualization/timeline/chart-freeze';
 import { renderChartView } from '../visualization/timeline/chart-static';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { downloadLabel, isPartialSlice, partialSliceNote } from '../core/provenance';
+import { copyLine, worldIsCopiedBy } from '../core/world-copy';
 import { currentLore, roomCount } from '../core/parlor-room';
 import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
@@ -169,7 +170,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // the core create pair, then the next wave / room CTAs. Renders nothing
     // for a built-out (or dismissed-out) world — and never on a VIEW-ONLY
     // world (inviting creates that can only toast is noise, not teaching).
-    const viewOnly = !!getState().registry.worlds.find(w => w.id === worldId)?.api?.read_only;
+    const viewOnly = worldIsViewOnly(worldId);
     if (!viewOnly) {
       const tour = buildTour(counts, totalElements, worldId, toasts);
       if (tour) root.appendChild(tour);
@@ -354,6 +355,13 @@ function buildCover(
   // A copy that is one Character's view, or the public one (folder spec §4.2, R1).
   const sliceNote = partialSliceNote(meta);
   if (sliceNote) identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="slice-note">${escapeText(sliceNote)}</p>`);
+  // A view-only copy (conv. 177) says what it is and where the world itself is.
+  const copyEntry = getState().registry.worlds.find(w => w.id === worldId);
+  if (copyEntry?.copy_of) {
+    const copy = copyEntry.copy_of;
+    const worldHere = getState().registry.worlds.some(w => w.id !== worldId && !w.copy_of && worldIsCopiedBy(w, copy));
+    identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="copy-note">${escapeText(copyLine(meta.name, copy, worldHere))}</p>`);
+  }
   // The world's charter, first (#526): its name links to it, its opening reads here.
   // world.json's `charter` names it when a folder says which (§4.6 (a)).
   const charter = findCharter(getState().data.elements, (meta as unknown as Record<string, unknown> | null | undefined)?.charter, roles);
@@ -765,7 +773,7 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
     <div class="atlas-home-keepsafe-actions">
       <button type="button" class="atlas-btn-primary" data-action="keepsafe-download">${downloadLabel(getState().active?.meta)}</button>
       ${hasFolderMode() ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-move">Move to a folder</button>' : ''}
-      ${entry.state !== 'api-linked' && !isPartialSlice(getState().active?.meta) ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Make online</button>' : ''}
+      ${entry.state !== 'api-linked' && !entry.copy_of && !isPartialSlice(getState().active?.meta) ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Make online</button>' : ''}
     </div>`;
   section.querySelector<HTMLElement>('.atlas-home-onboarding-copy')!.textContent = line;
   section.querySelector<HTMLButtonElement>('[data-action="keepsafe-hide"]')!.addEventListener('click', () => {

@@ -37,7 +37,7 @@ export function pictureWorld(): WorldRegistryEntry | null {
 export function pictureLaterWorld(): WorldRegistryEntry | null {
   const id = getState().active?.worldId;
   const entry = id ? getState().registry.worlds.find(w => w.id === id) : undefined;
-  return entry && entry.state !== 'api-linked' && entry.demo !== true && !isPartialSlice(getState().active?.meta) ? entry : null;
+  return entry && entry.state !== 'api-linked' && entry.demo !== true && !entry.copy_of && !isPartialSlice(getState().active?.meta) ? entry : null;
 }
 
 export function buildPictureLaterRow(toasts: ToastManager): HTMLElement {

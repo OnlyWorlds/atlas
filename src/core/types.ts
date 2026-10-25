@@ -655,6 +655,12 @@ export interface WorldRegistryEntry {
   /** Mirror of `WorldMeta.demo` — the bundled sample world. Gestures in a demo world never complete waypoints. */
   demo?: boolean;
   /**
+   * A view-only copy (conv. 177): mirror of world.json's `writable: false`
+   * with its `snapshot_of` and `snapshot_at` (`core/world-copy.ts`). Present
+   * = view-only here and never online; the activation heals it from the file.
+   */
+  copy_of?: { world_id?: string; at?: string };
+  /**
    * Where the world lives (1.17): `'browser'` = in this browser's storage,
    * under `browser-worlds/`; absent = a folder (vault handle). Top level, not
    * inside `folder`, so the two-tab registry merge carries it as one field.
