@@ -16998,6 +16998,12 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     min-height: 40px;
   }
 
+  /* The aliases dialog sits outside the middle pane, so its remove stayed 22px (#526's gap). */
+  .atlas-aliases-row .atlas-icon-btn-sm {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
   /* The map's toolbar in the right drawer too (S471's census: 22px there while the page's
      own grew); the gaps close up so seven tools and their dividers fit at 360. A submap's
      way up keeps its name on a row of its own, the tools beneath (#139). */

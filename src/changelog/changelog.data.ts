@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.93.1',
+    date: '2026-10-25',
+    theme: 'A finger-sized remove for aliases',
+    entries: [
+      {
+        id: 'aliases-remove-phone-size',
+        title: "On a phone, removing an alias is a finger's size",
+        body: "In an element's Aliases dialog, the button that removes an alias is now as big as Atlas's other buttons on a phone. Before, it stayed a small cross beside each name.",
+        tags: ['fix', 'layout'],
+      },
+    ],
+  },
+  {
     version: '1.93.0',
     date: '2026-10-25',
     theme: 'Signing out takes the sign-in with it',

@@ -222,6 +222,29 @@ test.describe('narrow windows', () => {
     expect(m.upClipped).toBe(false);
   });
 
+  test("at 390 the aliases dialog's remove is finger-sized", async ({ page }) => {
+    // The dialog is a modal outside .atlas-middle, so the phone tier's 40px missed it (22px, #526's gap).
+    await bootThenNarrow(page, 'narrow-aliases-root', 390, 780);
+    await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const el = await store.createElement('character', { name: 'Ilse Varn', atlas_aliases: ['The Grey', 'Old Ilse'] });
+      api.patchData(await store.listElements());
+      window.location.hash = `#/w/${api.getState().active.worldId}/element/${el.id}`;
+    });
+    await page.locator('.atlas-aliases-display').click();
+    const removes = page.locator('.atlas-aliases-row [data-role="remove"]');
+    await expect(removes).toHaveCount(2);
+    const sizes = await removes.evaluateAll((bs) => bs.map((b) => {
+      const r = b.getBoundingClientRect();
+      return [Math.round(r.width), Math.round(r.height)];
+    }));
+    for (const [w, h] of sizes) {
+      expect(w).toBeGreaterThanOrEqual(40);
+      expect(h).toBeGreaterThanOrEqual(40);
+    }
+  });
+
   test('above the breakpoint nothing changes', async ({ page }) => {
     await bootThenNarrow(page, 'narrow-wide-root', 1440, 900);
 
