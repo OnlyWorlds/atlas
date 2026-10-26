@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.95.1',
+    date: '2026-10-26',
+    theme: 'How a battle was decided',
+    entries: [
+      {
+        id: 'tangle-battle-verdict',
+        title: "A Tangle battle's card says how it was decided",
+        body: 'A battle Tactical Tangle awarded when time ran out now reads "held the field when time ran out, with no army broken", and one that ended when an army left in order names the side that withdrew. Before, both read as an ordinary victory.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.95.0',
     date: '2026-10-26',
     theme: 'Said as it is known',

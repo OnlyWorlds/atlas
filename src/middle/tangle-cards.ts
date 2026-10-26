@@ -21,8 +21,17 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 
 interface BattleSide { name: string; fallen: number }
 interface BattleUnit { name: string; side: string; type: string; started: number; remaining: number; outcome: string }
 
+/**
+ * How Tangle decided the winner, when not by breaking the other side:
+ * `held-the-field` was awarded at its time limit with no army broken (every
+ * unit reads 'held'), `withdrew` when an army left the field in order. Absent
+ * on an ordinary victory or a draw; an unknown word is read as absent.
+ */
+type BattleVerdict = 'held-the-field' | 'withdrew';
+
 function parseBattle(value: unknown): {
   winner: string | null;
+  verdict: BattleVerdict | null;
   sides: BattleSide[];
   units: BattleUnit[];
   seed: number | null;
@@ -54,6 +63,7 @@ function parseBattle(value: unknown): {
   }
   return {
     winner: str(v.winner),
+    verdict: v.verdict === 'held-the-field' || v.verdict === 'withdrew' ? v.verdict : null,
     sides,
     units,
     seed: num(v.seed),
@@ -73,7 +83,11 @@ const esc = (s: string): string =>
 export function battleOutcomeLine(value: unknown): string | null {
   const b = parseBattle(value);
   if (!b) return null;
-  return b.winner ? `${b.winner} held the field` : 'The armies parted without decision';
+  if (!b.winner) return 'The armies parted without decision';
+  if (b.verdict === 'held-the-field') return `${b.winner} held the field when time ran out, with no army broken`;
+  const other = b.sides.find(s => s.name !== b.winner)?.name;
+  if (b.verdict === 'withdrew' && other) return `${b.winner} held the field after ${other} withdrew in order`;
+  return `${b.winner} held the field`;
 }
 
 /** Battle card for Event.x_tangle_battle, or null when the shape surprises. */
