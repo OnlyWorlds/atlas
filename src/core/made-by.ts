@@ -1,11 +1,11 @@
 /**
  * Who made an element, for the element list's "Made by" filter (#350, the
- * rest of the ruling h58 #5779: "made by agents / made by people").
+ * rest of the ruling 2026-10-16: "made by agents / made by people").
  *
  * keel records the creating membership as `created_by` (D72): a membership id,
  * or null for the owner (`elements/serialize.py`). The roster says what each
  * membership is (`kind`: person, player, agent; a removed row stays, so its
- * elements still answer). The seat decides, never the door (Skeld h66 #9630):
+ * elements still answer). The seat decides, never the door (Skeld 2026-10-21):
  * an owner's write through MCP is the owner's.
  *
  * It describes the FIRST write. The element page's agent mark keeps saying who

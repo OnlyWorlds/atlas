@@ -8,7 +8,7 @@
  *
  * Click a row → open or focus its map tab. Delete affordance on hover.
  *
- * Disclosure (session 211 finishing bout MZ): nodes with children get a
+ * Disclosure: nodes with children get a
  * chevron prefix; click toggles. Collapsed state lives in localStorage per
  * world (key `atlas_map_tree_collapsed_v1`), independent of registry — pure
  * UI pref that doesn't merit a cross-machine sync surface.
@@ -73,7 +73,7 @@ function isNodeCollapsed(worldId: string, mapId: string): boolean {
 }
 
 /**
- * The re-key (S363) moves ids; stored state follows. Remaps a world's
+ * The re-key moves ids; stored state follows. Remaps a world's
  * collapsed map ids in the in-memory shadow AND storage, so a later toggle
  * cannot write the old ids back. Loading first makes memory the truth.
  */
@@ -239,14 +239,14 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     }
   });
 
-  // Rebuilt only when an input moved (conv. 146, S422): a rebuild between a
+  // Rebuilt only when an input moved (conv. 146): a rebuild between a
   // press and its release loses the click. The parts are the slices the index
   // reads, its search box and a count of the redraws its rows ask for (the
   // collapsed maps live outside the store).
   const gate = renderGate();
   let rerenderSeq = 0;
 
-  // The search keeps its focus and caret through every redraw, a data tick's included (S452).
+  // The search keeps its focus and caret through every redraw, a data tick's included.
   function render(): void {
     keepingFocus(root, 'input[data-role="map-search"]', draw);
   }
@@ -274,7 +274,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     if (!viewOnly) {
       const newBtn = document.createElement('button');
       // Zero maps → the + glyph glows: the affordance IS the empty-state teaching
-      // (S264 — the explainer paragraph is gone; the glow points at the action).
+      // (the explainer paragraph is gone; the glow points at the action).
       const mapCount = state.data.elements.filter(e => e.type === 'map').length;
       newBtn.className = 'atlas-create-icon-btn atlas-header-add-glyph'
         + (mapCount === 0 ? ' atlas-create-glow' : '');
@@ -642,7 +642,7 @@ export function openMapTab(m: WorldMap, preserveElementId?: string): void {
   const ui = getState().ui;
   const activeWorldId = getState().active?.worldId;
 
-  // Imageless maps open like any other since S300 — they render the sized
+  // Imageless maps open like any other — they render the sized
   // flat canvas and accept pins/zones (DESIGN_MAPS.md §4.2). The old refusal
   // + divert-to-element-detail is gone.
   const existingIndex = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === m.id);

@@ -3,7 +3,7 @@
  *
  * Verifies the modal opens from settings, has both routes (create + link),
  * tab switching works, validation surfaces inline. Full network flow runs
- * in Captain's manual smoke (Bout I); see also the make-online vitest
+ * in Titus's manual smoke (Bout I); see also the make-online vitest
  * integration tests for the underlying helpers.
  */
 
@@ -66,7 +66,7 @@ test('Make Online modal opens with both route tabs', async ({ page }) => {
   await expect(page.locator('[data-route-tab="create"]')).toHaveClass(/active/);
   await expect(page.locator('[data-route-pane="create"]')).toBeVisible();
   await expect(page.locator('[data-route-pane="link"]')).toBeHidden();
-  // No account yet (S407): where to make one and set its PIN.
+  // No account yet: where to make one and set its PIN.
   const noAccount = page.locator('[data-route-pane="create"] [data-role="no-account"]');
   await expect(noAccount.locator('a[data-link="signup"]')).toHaveAttribute('href', 'https://www.onlyworlds.com/accounts/signup/');
   await expect(noAccount.locator('a[data-link="set-pin"]')).toHaveAttribute('href', 'https://www.onlyworlds.com/account/settings/pin');
@@ -75,7 +75,7 @@ test('Make Online modal opens with both route tabs', async ({ page }) => {
   await expect(page.locator('input[name="create-name"]')).toHaveValue('Sandbox');
 });
 
-// The journey's A7 (S427): signed in, the account makes the world, so Make online
+// The journey's A7: signed in, the account makes the world, so Make online
 // asks no email and says whose account; the PIN alone goes with it.
 test('Signed in, Make online asks only the PIN and makes the world on the account', async ({ page }) => {
   const V2 = 'https://www.onlyworlds.com/api/v2';
@@ -108,7 +108,7 @@ test('Signed in, Make online asks only the PIN and makes the world on the accoun
   await expect(pane.locator('input[name="create-email"]')).toHaveCount(0);
   await expect(pane.locator('[data-role="no-account"]')).toHaveCount(0);
   await expect(pane.locator('[data-role="signed-in"]')).toContainText('e2e-member');
-  // The PIN's reason sits under its field, said once (S454, Seethe h20 #10346).
+  // The PIN's reason sits under its field, said once (Seethe 2026-10-22).
   await expect(pane.getByText("The PIN lets Atlas upload the world's contents.")).toHaveCount(1);
   await expect(page.locator('[data-route-pane="link"] label', { has: page.locator('input[name="link-pin"]') }))
     .toContainText('PIN, or a seat secret');

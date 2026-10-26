@@ -1,5 +1,5 @@
 /**
- * The narrow-window layer (S323).
+ * The narrow-window layer.
  *
  * Before this layer the three-pane shell had a ~706px hard floor of pane
  * min-widths and no media query touching it, inside containers that hide
@@ -161,7 +161,7 @@ test.describe('narrow windows', () => {
   });
 
   test('at 390 the strip is a thumb strip: finger-sized controls, the other rooms under More (#244)', async ({ page }) => {
-    // The Captain's phone (h37 #4223): "the top bar is buggy; too many things in it". Six room
+    // Titus's phone (2026-10-14): "the top bar is buggy; too many things in it". Six room
     // icons, the label expander, a selected-element chip and search at 28px each.
     await bootThenNarrow(page, 'narrow-phone-root', 390, 780);
 
@@ -187,7 +187,7 @@ test.describe('narrow windows', () => {
     expect(await horizontalOverflow(page)).toBe(0);
   });
 
-  test("at 360 a map's tools are finger-sized and a submap's way up keeps its name (S471)", async ({ page }) => {
+  test("at 360 a map's tools are finger-sized and a submap's way up keeps its name", async ({ page }) => {
     // The phone tier grew the room's small buttons to 40px, but the map's toolbar lives in the right
     // drawer and stayed 22px. Grown, a submap's way up was squeezed to "Th…" (#139 names where it goes).
     await bootThenNarrow(page, 'narrow-maptools-root', 360, 780);
@@ -314,7 +314,7 @@ test.describe('narrow windows', () => {
   });
 });
 
-// S366 (lane C B1): below 820px with no world open, the sidebar drawer held
+// Below 820px with no world open, the sidebar drawer held
 // the only thing to do and nothing opened it: the preview strip had no
 // toggle and the copy pointed at "the top left". Now the no-world screen
 // opens the drawer once, and the toggle is there for a user who closes it.

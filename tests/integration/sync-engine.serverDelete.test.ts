@@ -71,7 +71,7 @@ describe('server-side delete detection', () => {
 
   it('dedupes existing server-delete entries on subsequent pulls (full-list re-detect)', async () => {
     // /changes consumes the delete op on the first pull; the dedupe guards the
-    // full-list path's re-detection, so this case runs there (S365 lens A M4).
+    // full-list path's re-detection, so this case runs there.
     client.__enable_changes(false);
     await client.createElement('character', { id: 'c1', name: 'Alice', type: 'character' });
     await engine.syncNow();
@@ -127,7 +127,7 @@ describe('resolveServerDelete', () => {
 
 describe('server-delete detection — pagination safety', () => {
   /**
-   * Bout V (session 202) — regression for the silent-data-loss vector where
+   * Regression for the silent-data-loss vector where
    * a paginated listElements response caused page-2+ elements to be falsely
    * flagged as "vanished from server." The user, presented with the auto-open
    * review modal, could click "delete locally" → silent destruction of data

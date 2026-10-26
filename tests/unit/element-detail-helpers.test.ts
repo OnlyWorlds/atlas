@@ -22,7 +22,7 @@ describe('humanizeFieldName', () => {
     expect(humanizeFieldName('description')).toBe('Description');
   });
 
-  it('is sentence case: only the first word takes a capital (the Captain, h63 #8074; Seethe F-28)', () => {
+  it('is sentence case: only the first word takes a capital (Titus, 2026-10-20; Seethe F-28)', () => {
     expect(humanizeFieldName('birth_date')).toBe('Birth date');
     expect(humanizeFieldName('primary_power')).toBe('Primary power');
   });
@@ -36,7 +36,7 @@ describe('humanizeFieldName', () => {
     expect(humanizeFieldName('sdk_version')).toBe('SDK version');
   });
 
-  it('handles ACRONYMS additions from session 224', () => {
+  it('handles ACRONYMS additions', () => {
     // PIN and GPS were added — verify they still uppercase.
     expect(humanizeFieldName('pin_code')).toBe('PIN code');
     expect(humanizeFieldName('gps_coords')).toBe('GPS coords');
@@ -49,7 +49,7 @@ describe('humanizeFieldName', () => {
 
   it('handles already-capitalized input', () => {
     expect(humanizeFieldName('Name')).toBe('Name');
-    // A word written in capitals stays as written (SDK 4.36, Kael h63 #8201): a stat block reads STR.
+    // A word written in capitals stays as written (SDK 4.36, Kael 2026-10-20): a stat block reads STR.
     expect(humanizeFieldName('IMAGE_URL')).toBe('IMAGE URL');
     expect(humanizeFieldName('x_STR')).toBe('STR');
     expect(humanizeFieldName('x_max_HP')).toBe('Max HP');
@@ -314,7 +314,7 @@ describe('reservedValueHint (D9b reserved-value awareness)', () => {
   });
 });
 
-describe('REF_SECTION_SPLITS - Located here (S317)', () => {
+describe('REF_SECTION_SPLITS - Located here', () => {
   const mk = (id: string, type: string, name: string, extra: Record<string, unknown> = {}) =>
     ({ id, type, name, ...extra }) as unknown as Element;
 

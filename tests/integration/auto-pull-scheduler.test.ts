@@ -111,7 +111,7 @@ describe('auto-pull scheduler', () => {
     expect(__test_isRunning()).toBe(false);
   });
 
-  // After Bout T (session 205), auth-failed rounds transition the engine to
+  // Auth-failed rounds transition the engine to
   // `error` state (not `paused`). The scheduler must treat `error` the same
   // as `paused` for eligibility — otherwise it keeps ticking and burns
   // pullNow calls every cadence cycle against an engine that's internally

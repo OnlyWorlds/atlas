@@ -1,5 +1,5 @@
 /**
- * Where each Web tab label goes (#141, S387). The map rule from #121, applied
+ * Where each Web tab label goes (#141). The map rule from #121, applied
  * to the graph: labels yield, nodes never vanish. Each label takes the first
  * clear side of its node (below, right, left, above) or waits for hover.
  * "Clear" means inside the frame, off every node and off every label already

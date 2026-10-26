@@ -1,4 +1,4 @@
-// Promoted from the S364 composition gate probe `b-share-flush.probe.test.ts` (Forge/Notes/2026-09-29-s364-gate/): it asserts the fixed behaviour.
+// Promoted from a gate probe `b-share-flush.probe.test.ts`: it asserts the fixed behaviour.
 /**
  * Lens B probe: the share room's leave-flush writes the page whenever a text
  * block is open, typed or not. The live folder runs that flush on every

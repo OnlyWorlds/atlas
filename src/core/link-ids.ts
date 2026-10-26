@@ -1,4 +1,4 @@
-/** A multi-link value as ids: string arrays, `{id}` objects and a lone id string all read (S360, conv. 94). */
+/** A multi-link value as ids: string arrays, `{id}` objects and a lone id string all read (conv. 94). */
 export function linkIdsOf(raw: unknown): string[] {
   if (typeof raw === 'string') return raw ? [raw] : [];
   if (!Array.isArray(raw)) return [];

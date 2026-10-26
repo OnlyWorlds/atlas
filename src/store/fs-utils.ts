@@ -1,7 +1,7 @@
 /**
  * Filesystem utilities for the FS Access API-backed FolderStore.
  *
- * Write strategy (S368): ONE writable per write, then a read-back verify. A
+ * Write strategy: ONE writable per write, then a read-back verify. A
  * writable stream already stages into its own swap file and swaps it in on
  * `close()`, so a crash mid-write leaves the old file whole. The old
  * "write `<name>.tmp`, then write `<name>`" staging doubled the window in
@@ -206,7 +206,7 @@ export async function tryGetDir(
 
 // ---- File ops ----
 
-/** A file's stat as Atlas last saw it: what the live folder compares (S364). */
+/** A file's stat as Atlas last saw it: what the live folder compares. */
 export interface FileStamp {
   lastModified: number;
   size: number;
@@ -214,7 +214,7 @@ export interface FileStamp {
 
 /**
  * A file another program holds open, as the File System Access API reports
- * it (S368, the Discord report). On Windows the swap-in at `close()` fails
+ * it (the Discord report). On Windows the swap-in at `close()` fails
  * while OneDrive, Dropbox, antivirus or the search indexer has the file open,
  * and Chromium words every such failure as an `InvalidStateError` ("An
  * operation that depends on state cached in an interface object was made but
@@ -247,7 +247,7 @@ export async function writeJsonAtomic(
   name: string,
   value: unknown
 ): Promise<FileStamp> {
-  // Trailing newline (S354, the git hop of the migration bout): every other
+  // Trailing newline (the git hop of the migration bout): every other
   // writer of the format ends a file with one, and git shows "no newline at
   // end of file" plus a phantom last-line change for each atlas edit in a
   // world repo without it. Key order and two-space indent were already the
@@ -258,7 +258,7 @@ export async function writeJsonAtomic(
   // but content didn't actually change" — a Chromium FS Access API quirk
   // observed in the wild. Diagnostic only; doesn't change behavior on success.
   // (`return await`: a held file's read rejects in `text()`, which must land
-  // in this catch, not escape the write before its retries; S368 gate A H2.)
+  // in this catch, not escape the write before its retries.)
   const before = await (async () => {
     try {
       const h = await dir.getFileHandle(name);
@@ -348,7 +348,7 @@ export async function readJson<T = unknown>(
 }
 
 /**
- * What the user reads about a damaged file (S368): the file name and the fix,
+ * What the user reads about a damaged file: the file name and the fix,
  * never the parser's own text. Shared by the sync pill and `core/problems.ts`.
  */
 export function damagedFileSentence(fileName: string, where: 'folder' | 'browser' = 'folder'): string {
@@ -366,7 +366,7 @@ export class CorruptFileError extends Error {
 }
 
 /**
- * `readJson` for READ-MERGE-WRITE paths (S360): null when the file is missing
+ * `readJson` for READ-MERGE-WRITE paths: null when the file is missing
  * or empty, but a file that exists and will not parse THROWS. `readJson`
  * returns null for both, and a save that merged into that null wrote over the
  * damaged file (a git-conflicted world.json lost its id; tombstones and world

@@ -3,7 +3,7 @@
  * the app goes through (elements sidebar +, Ctrl+E, the Charts room's
  * + Element).
  *
- * WHY IT EXISTS (S301): the guided tour scripts creation, and it used to do so
+ * WHY IT EXISTS: the guided tour scripts creation, and it used to do so
  * by branching inside the elements-sidebar's click handler alone. DESIGN_TOUR
  * claimed "during this beat EVERY create door is scripted" while Ctrl+E and
  * the Charts room opened a free-form modal right beside the scripted one. That

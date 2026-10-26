@@ -1,5 +1,5 @@
 /**
- * Reloading after a deploy (S366, lane C B2 + B3).
+ * Reloading after a deploy (lane C B2 + B3).
  *
  * B3: a tab opened before a deploy asks for code files the deploy replaced;
  * Vite reports each failed lazy load as `vite:preloadError`, and Atlas now

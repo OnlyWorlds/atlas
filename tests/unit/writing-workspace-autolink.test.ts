@@ -16,8 +16,8 @@ describe('buildAutolinkIndex', () => {
     expect(idx.scanner).toBeNull();
   });
 
-  it('indexes element names CASE-INSENSITIVELY (S307)', () => {
-    // Captain, S307: prose that writes "the consul" should link to the
+  it('indexes element names CASE-INSENSITIVELY', () => {
+    // Titus: prose that writes "the consul" should link to the
     // element named "Consul" without anyone registering a lowercase alias.
     // Keys are folded; the writer's own casing is restored at promotion time
     // from the matched text, never from the key.
@@ -92,7 +92,7 @@ describe('buildAutolinkIndex', () => {
     ]);
     // First match scanning "Mira Halloway came" should be the longer key.
     // Scanner's own flags — restating 'g' would drop the case-insensitivity
-    // the index now depends on (S307).
+    // the index now depends on.
     const re = new RegExp(idx.scanner!.source, idx.scanner!.flags);
     const m = re.exec('Mira Halloway came home');
     expect(m).not.toBeNull();

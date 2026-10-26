@@ -145,7 +145,7 @@ describe('addFile', () => {
     expect(v.rows?.map(r => r.id)).toEqual(['f-new', 'f1']);
   });
 
-  it('the new row and the new total reach the card in one step (S435: a 20 MB row beside "0 bytes")', async () => {
+  it('the new row and the new total reach the card in one step (a 20 MB row beside "0 bytes")', async () => {
     let listed = [row('f1')];
     let used = 1000;
     const f = fake({

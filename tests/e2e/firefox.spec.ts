@@ -1,5 +1,5 @@
 /**
- * Real Firefox (S366). Until now the only non-Chromium coverage was a
+ * Real Firefox. Until now the only non-Chromium coverage was a
  * Chromium page with `showDirectoryPicker` deleted (tour.spec's
  * "Safari-shaped" boot). These run in the `firefox` and `firefox-private`
  * projects (playwright.config.ts) and nowhere else.
@@ -9,7 +9,7 @@
  *             the consul beat.
  *   @private  a private window refuses browser storage (getDirectory throws
  *             SecurityError), so the landing says so in one plain line and
- *             offers no door that would stall. Before S366 the tour started
+ *             offers no door that would stall. Before that fix the tour started
  *             and stopped at its first create with the raw error.
  */
 import { test, expect, Page } from '@playwright/test';
@@ -48,7 +48,7 @@ test('@firefox the landing starts a world in this browser, and other ways in has
   const chooser = page.locator('[data-modal="add-world"]');
   await expect(chooser.locator('[data-choice="open-file"]')).toBeVisible();
   await expect(chooser.locator('[data-choice="open-folder"]')).toHaveCount(0);
-  // Every line true for this browser (found by own eyes, S374): no folder here.
+  // Every line true for this browser (found by own eyes): no folder here.
   await expect(chooser.locator('[data-choice="create-local"] .atlas-add-world-text')).toContainText('in this browser');
   await expect(chooser.locator('[data-choice="create-local"] .atlas-add-world-text')).not.toContainText('folder');
   await page.keyboard.press('Escape');

@@ -3,7 +3,7 @@
  * SHARED active FolderStore: world activation (worlds-sidebar), the
  * link-existing download (LinkWorldModal), and the account-mode open flow.
  *
- * Why (gate R2, 2026-07-13, generalizing the session-249 activation race):
+ * Why (2026-07-13, generalizing an earlier activation race):
  * concurrent flows interleave on the shared store — a world click's
  * `prior.close()` closes a mid-flight download's just-opened store, or a
  * download's trailing `setActiveStore` clobbers the world the user just

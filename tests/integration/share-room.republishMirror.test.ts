@@ -102,7 +102,7 @@ describe('share room — republish honors the mirror write result (S9)', () => {
   });
 
   function republishButton(): HTMLButtonElement {
-    // T-S7 (session 248): Theme + Publish collapse behind the meta summary
+    // Theme + Publish collapse behind the meta summary
     // row by default — expand it first, like a user would.
     if (!host.querySelector('[data-action="republish"]')) {
       const summary = host.querySelector<HTMLButtonElement>('.atlas-share-meta-summary');

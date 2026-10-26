@@ -129,7 +129,7 @@ describe('getEffectiveMapPrefs', () => {
 
 describe('saveMapPrefsAsDefault', () => {
   it('promotes effective prefs to atlas defaults AND pins the source map via its own override', () => {
-    // Captain's rule (session 219): a map that had ANY specific settings keeps
+    // Titus's rule: a map that had ANY specific settings keeps
     // them after Save-as-default. Otherwise a future save-from-another-map
     // would silently re-pin this one. The source map's effective prefs are
     // snapshotted into its override so it stays at its current values

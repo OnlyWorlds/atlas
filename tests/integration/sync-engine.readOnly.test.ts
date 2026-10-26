@@ -1,5 +1,5 @@
 /**
- * SyncEngine read-only mode (S264 — view-only worlds linked with a READ key).
+ * SyncEngine read-only mode (view-only worlds linked with a READ key).
  *
  * The double wall: (1) the ENGINE never pushes — every trigger dies at the
  * pushOnce/requestPush boundary and the meta step never PATCHes; (2) the

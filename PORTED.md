@@ -1,13 +1,13 @@
 # Atlas — Port Log
 
-Tracks what code/conventions were ported from `tools/atlas-deprecated/` into the new atlas, and HOW.
+Tracks what code/conventions were ported from the legacy build (`atlas-deprecated`, kept outside this repository) into the new atlas, and HOW.
 Also tracks ports from other tools (e.g. zoner) where their patterns informed atlas modules.
 
 Each entry: source file, destination, treatment (verbatim, adapted, rewritten), why.
 
 ---
 
-## Zones subsystem foundation (2026-05-16 session 213)
+## Zones subsystem foundation (2026-05-16)
 
 The zone/marker subsystem is largely a fresh build for atlas — but several pure-function helpers were adapted from zoner's `canvas/ZoneCanvas.ts` (audit log captured pre-build, summarized in `DESIGN_ZONES.md` §1.1 and the zoner-audit agent report).
 
@@ -18,7 +18,7 @@ The zone/marker subsystem is largely a fresh build for atlas — but several pur
 | `zoner/src/canvas/ZoneCanvas.ts:745-754` (centroid by vertex averaging) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`polygonCentroid`) | verbatim algorithm | Simple average. Not area-weighted; matches zoner's pragmatic choice for label/handle placement. |
 | (new in atlas) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`polylineLabelAnchor`) | rewritten | Midpoint of the longest segment — chosen for line-label placement so the label has visual room. |
 | (new in atlas) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`pointInPolygon`) | rewritten | Standard ray-casting algorithm. Used for future hit-testing without Leaflet (zoner had this implicitly via L.Polygon click). |
-| (new in atlas, Captain-requested) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`snapAngleTo45`, `snapToAxis`) | new | Shift-snap math — projects a click vector onto the nearest 45° axis from anchor. Clamps to non-negative projection so the new marker is always forward-of-anchor or AT anchor. Enables perfect rectangles via 4 shift-clicks. |
+| (new in atlas, Titus-requested) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`snapAngleTo45`, `snapToAxis`) | new | Shift-snap math — projects a click vector onto the nearest 45° axis from anchor. Clamps to non-negative projection so the new marker is always forward-of-anchor or AT anchor. Enables perfect rectangles via 4 shift-clicks. |
 | `zoner/src/canvas/ZoneCanvas.ts:397-450` (DivIcon marker rendering during draw) | `src/tabs/right/zone-drawing.ts` (preview render via L.DivIcon) | adapted | Cyan circle + numbered order. CSS class `.atlas-zone-draft-marker` mirrors zoner's `.marker-number` visual. Live preview polyline rendered via `L.polyline` with `dashArray: '5, 5'`. |
 | `zoner/src/canvas/ZoneCanvas.ts:456-476` (live preview polygon/polyline) | `src/tabs/right/zone-drawing.ts` (rerenderPreview) | adapted | Same dashed-cyan visual. Polygon closes back when ≥3 markers; line stays open. |
 | `zoner/src/state/AppState.ts:332-375` (drawing state machine) | `src/tabs/right/zone-drawing.ts` (module-level singleton) | rewritten cleaner | Atlas uses a module-level singleton with `start/place/undo/finish/cancel` API rather than zoner's tangle of `activeMarkers` + `editingZoneId`. **Improvements over zoner**: batch save on Finish (not per-marker autosave), explicit cancel-via-ESC, integrates with state.ui slice. |
@@ -36,7 +36,7 @@ The zone/marker subsystem is largely a fresh build for atlas — but several pur
 
 ---
 
-## map-tab.ts split (2026-05-16 session 212 Bout SP)
+## map-tab.ts split (2026-05-16, Bout SP)
 
 Long-term-health refactor — not a port from legacy, but a restructure of new-atlas code. `map-tab.ts` had accreted to 858 lines doing 5 concerns; split into single-concern submodules so per-concern unit tests become viable in future bouts.
 
@@ -53,15 +53,15 @@ Public surface unchanged: `mountMapTab` / `disposeMapTab` / `disposeAllMapTabs` 
 
 ---
 
-## index.html inline-style reset (2026-05-12 session 199)
+## index.html inline-style reset (2026-05-12)
 
 | File | Source | Treatment | Notes |
 |---|---|---|---|
-| `tools/atlas/index.html` | `tools/atlas-deprecated/index.html` inline `<style>` block | adapted | The Phase 2 rebuild dropped the legacy inline style; restored as a single block. Critical fixes restored: (1) `html, body { margin: 0; padding: 0; height: 100%; overflow: hidden }` — without this, body's default 8px margin makes the shell overflow and leak browser-default body bg as a thin border on right/bottom. (2) System-font stack `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ...` — without this, `<h2>` elements default to Times New Roman serif. (3) `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility` — font crispness parity with legacy. Belt-and-braces also added `background: #0a0a0a` on body so any future overflow stays dark. |
+| `index.html` | `atlas-deprecated/index.html` inline `<style>` block | adapted | The Phase 2 rebuild dropped the legacy inline style; restored as a single block. Critical fixes restored: (1) `html, body { margin: 0; padding: 0; height: 100%; overflow: hidden }` — without this, body's default 8px margin makes the shell overflow and leak browser-default body bg as a thin border on right/bottom. (2) System-font stack `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ...` — without this, `<h2>` elements default to Times New Roman serif. (3) `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility` — font crispness parity with legacy. Belt-and-braces also added `background: #0a0a0a` on body so any future overflow stays dark. |
 
 This duplicates rules that the legacy got via `onlyworlds-base.css` (imported into legacy `main.ts`). The new atlas deliberately doesn't import `onlyworlds-base.css` (too many side-effects for the focused atlas surface) — only the body/font subset that matters is pulled into the inline style.
 
-## Phase 6 Bout D (Timeline + sync pill + worlds favorites, 2026-05-12 session 199)
+## Phase 6 Bout D (Timeline + sync pill + worlds favorites, 2026-05-12)
 
 | File | Source | Treatment | Notes |
 |---|---|---|---|
@@ -73,7 +73,7 @@ This duplicates rules that the legacy got via `onlyworlds-base.css` (imported in
 
 CSS additions (`src/styles/atlas.css`, ~30 lines): new state colors for the sync-pill dot (local=grey, api=cyan), tab bar layout class, welcome action row, favorite-star color states.
 
-## Phase 6 Bout C.5 (Visual polish — align components to legacy aesthetic, 2026-05-12 session 199)
+## Phase 6 Bout C.5 (Visual polish — align components to legacy aesthetic, 2026-05-12)
 
 Refactor pass — no new ports, but aligns Bout A/B/C components to use legacy CSS instead of bespoke classes.
 
@@ -87,7 +87,7 @@ Refactor pass — no new ports, but aligns Bout A/B/C components to use legacy C
 
 CSS cleanup: stripped ~270 lines of duplicate component CSS that conflicted with legacy. Bundle CSS dropped from 52.96 KB to 47.44 KB. Test selectors updated across `phase2-ui`, `phase4-elements`, `phase4-schema-editor`, `phase5-maps` to match new class structure.
 
-## Phase 5 Bout C (Map tabs + Leaflet + pin placement, 2026-05-12 session 199)
+## Phase 5 Bout C (Map tabs + Leaflet + pin placement, 2026-05-12)
 
 | File | Source | Treatment | Notes |
 |---|---|---|---|
@@ -102,7 +102,7 @@ State extensions (`src/core/state.ts`): `ui.rightTabs: RightTabRef[]` (always be
 
 CSS additions (`src/styles/atlas.css`, ~150 lines): right-pane tabs + close button + tab group wrapper, map index pane + rows + pin-count badge, map-create-modal location row, active pin button highlight.
 
-## Phase 4 Bout B (Schema-driven detail + picker + relations, 2026-05-12 session 199)
+## Phase 4 Bout B (Schema-driven detail + picker + relations, 2026-05-12)
 
 | File | Source | Treatment | Notes |
 |---|---|---|---|
@@ -113,7 +113,7 @@ CSS additions (`src/styles/atlas.css`, ~130 lines): picker panel layout, picker 
 
 Legacy `state.data.elements` was `Record<id, Element>`; new is `Element[]`. All reads via `.find(e => e.id === id)` or `.filter(...)`. No noticeable perf cost at OW worldscale.
 
-## Phase 4 Bout A (Elements sidebar + minimum detail + create modal, 2026-05-12 session 199)
+## Phase 4 Bout A (Elements sidebar + minimum detail + create modal, 2026-05-12)
 
 | File | Source | Treatment | Notes |
 |---|---|---|---|
@@ -129,7 +129,7 @@ State shape extended (`src/core/state.ts`): added `data: DataState` slice (`{ el
 
 CSS additions (`src/styles/atlas.css`, ~210 lines): mode toggle in sidebar header, elements list rows, detail field rows, generic empty state, ow-btn-ghost variant.
 
-## Phase 2 polish (Bouts 4-6 — Atlas root + refinements, 2026-05-12 session 198)
+## Phase 2 polish (Bouts 4-6 — Atlas root + refinements, 2026-05-12)
 
 | File | Source | Treatment | Notes |
 |---|---|---|---|
@@ -141,7 +141,7 @@ CSS additions (`src/styles/atlas.css`, ~210 lines): mode toggle in sidebar heade
 
 UI panels (welcome, sidebar header, settings) all switch on `state.atlasRoot` presence: no root → setup CTA, root → create-local / world list.
 
-## Phase 2 (Bout 3 — Minimal UI, 2026-05-12 session 198)
+## Phase 2 (Bout 3 — Minimal UI, 2026-05-12)
 
 | File | Source | Treatment | Notes |
 |---|---|---|---|
@@ -155,11 +155,11 @@ UI panels (welcome, sidebar header, settings) all switch on `state.atlasRoot` pr
 | `src/middle/settings-panel.ts` | new | rewritten | Identity + active-world meta + forget-world. Make-Online actions arrive in Phase 3. |
 | `src/app.ts` | new | rewritten | Smaller than legacy `app.ts`; orchestrates shell + sidebar + routed middle. |
 
-UI primitives `modal-base.ts`, `toast-manager.ts`, `field-edit-popover.ts` were already ported verbatim in Bout 9 of session 197. This bout's only modification: exported `ToastManager` class (was private) so subsystems can hold a typed reference to the singleton.
+UI primitives `modal-base.ts`, `toast-manager.ts`, `field-edit-popover.ts` were already ported verbatim in an earlier bout. This bout's only modification: exported `ToastManager` class (was private) so subsystems can hold a typed reference to the singleton.
 
 CSS additions: ~190 lines appended to `atlas.css` for Phase 2 components (sidebar worlds list, welcome panel, settings, modal fields, button primitives `.ow-btn`).
 
-## Phase 1 (Bout 2 — Real FolderStore, 2026-05-12 session 198)
+## Phase 1 (Bout 2 — Real FolderStore, 2026-05-12)
 
 The legacy had no real FolderStore — its store layer was IDB-cached, not folder-first. So these are **fresh writes**, not ports. Logged here so future-readers know what landed when.
 
@@ -173,7 +173,7 @@ The legacy had no real FolderStore — its store layer was IDB-cached, not folde
 
 **Layout decision**: pins/zones/markers stored as one file per element under `spatial/<type>/<id>.json` (not bundled per map as the legacy DESIGN suggested). Bundle-per-map was never implemented; uniform one-file-per-element is simpler and works fine for OW scale.
 
-> **SUPERSEDED 2026-07-28 (S334)**, recorded rather than rewritten because this file is a decision log. The one-file-per-element half stands and is now the format. The `spatial/` directory half was overturned: `elements/<type>/` is the Folder Format for all 22 types, atlas reads both as a union and writes `elements/` for new worlds. The split was never semantic, and it silently hid maps, pins, zones and markers in worlds written by any other tool. See DESIGN_FOLDER.md "The union read".
+> **SUPERSEDED 2026-07-28**, recorded rather than rewritten because this file is a decision log. The one-file-per-element half stands and is now the format. The `spatial/` directory half was overturned: `elements/<type>/` is the Folder Format for all 22 types, atlas reads both as a union and writes `elements/` for new worlds. The split was never semantic, and it silently hid maps, pins, zones and markers in worlds written by any other tool. See DESIGN_FOLDER.md "The union read".
 
 ---
 

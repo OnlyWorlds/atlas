@@ -114,7 +114,7 @@ describe('the role, said once (I4)', () => {
     expect(shown.filter(s => /deleted/i.test(s))).toEqual([]);
   });
 
-  it('a lowering a push finds first moves the role and the kept count at once, and the next pull says it no more (S440)', async () => {
+  it('a lowering a push finds first moves the role and the kept count at once, and the next pull says it no more', async () => {
     // Ids of its own: what was said lives for the session, across this file's tests.
     const E = '00000000-0000-4000-8000-0000000a0005';
     await client.createElement('character', { id: A, name: 'Cy' });
@@ -155,7 +155,7 @@ describe('the role, said once (I4)', () => {
     expect(shown.filter(s => /1 element of The Ferry is no longer shown to you online/.test(s))).toHaveLength(1);
   });
 
-  it('the resync after a push said the role keeps its count quiet once; later kept news is said (S440)', async () => {
+  it('the resync after a push said the role keeps its count quiet once; later kept news is said', async () => {
     const C = '00000000-0000-4000-8000-0000000a0003';
     const D = '00000000-0000-4000-8000-0000000a0004';
     for (const [id, name] of [[A, 'Cy'], [B, 'Ana'], [C, 'Bo'], [D, 'The Ferry']]) await client.createElement('character', { id, name });

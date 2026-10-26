@@ -1,5 +1,5 @@
 /**
- * A view-only world reads its writing, knowledge and pages (conv. 149, S436):
+ * A view-only world reads its writing, knowledge and pages (conv. 149):
  * the prose mounts read-only, and no surface offers a create, link, rename,
  * reorder, delete or publish the store would refuse. Each case runs on a
  * writable world too, the control: the same mount offers what the view-only
@@ -379,7 +379,7 @@ describe('the writing room', () => {
     expect(t.querySelector('.atlas-writing-landing-labels-edit')).not.toBeNull();
   });
 
-  it('the labels line reads in sentence case, its link too (Seethe h63 #8218: a plain link is a label)', () => {
+  it('the labels line reads in sentence case, its link too (Seethe 2026-10-20: a plain link is a label)', () => {
     const t = room(false, []);
     expect(t.querySelector('.atlas-writing-landing-labels')?.textContent?.trim()).toMatch(/^Labels: /);
     expect(t.querySelector('.atlas-writing-landing-labels-edit')?.textContent).toBe('Edit');
@@ -481,7 +481,7 @@ describe('the pages room', () => {
     expect(t.querySelector<HTMLElement>('.atlas-share-detail-header .atlas-element-name')!.title).toBe('');
   });
 
-  it('a page whose blocks stayed on its maker\'s machine reads its story (S437, the live walk\'s "no content yet")', () => {
+  it('a page whose blocks stayed on its maker\'s machine reads its story (the live walk\'s "no content yet")', () => {
     for (const u of unmounts) u();
     unmounts = [];
     openWorld(true, [el('pg2', 'narrative', 'Wanted poster', { subtype: 'page', story: 'The Kid, for crossing the river.' })]);

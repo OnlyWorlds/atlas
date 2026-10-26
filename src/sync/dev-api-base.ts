@@ -8,7 +8,7 @@
  *
  * The stored value is an ORIGIN (gate 10.7): atlas derives every path prefix
  * from it (`/api/v2`; nothing calls the v1 `/api/worldapi` or `/api/worldsync`
- * since create-world-external retired, Keel #134, S432). Legacy stored
+ * since create-world-external retired). Legacy stored
  * values that include a `/api/worldapi` or `/api/v2` suffix are normalized.
  *
  * Returns null in production builds unconditionally: the override cannot

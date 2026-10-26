@@ -21,7 +21,7 @@ declare global {
 }
 
 /**
- * What a cancelled pick says (S354). A cancel is usually just a cancel, but
+ * What a cancelled pick says. A cancel is usually just a cancel, but
  * Chrome also refuses to hand out the top of Desktop, Documents, Downloads
  * and the user's home folder: the dialog shows its own refusal and then
  * returns exactly like a cancel, so "Change folder" looked like it did

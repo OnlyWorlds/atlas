@@ -1,6 +1,6 @@
 /**
  * "Already up to date" only after a round that reached OnlyWorlds and moved,
- * clashed and failed nothing (S419, #198's live walk: one press said "Sync
+ * clashed and failed nothing (#198's live walk: one press said "Sync
  * paused" and "Already up to date" together, on a refused key).
  */
 import { describe, expect, it } from 'vitest';

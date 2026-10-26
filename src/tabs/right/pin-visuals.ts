@@ -21,7 +21,7 @@ const ACCENT_COLOR = '#22d3ee';
 const MUTED_COLOR = '#6b7280';
 
 /**
- * S308: this WAS a second, unrelated 22-entry palette — the one that made a
+ * This WAS a second, unrelated 22-entry palette — the one that made a
  * Character orange on the map and gold in a chart at the same moment. Its
  * semantic grouping (Agents/World/Abstract/Temporal/Spatial) was the right
  * structure and survives in `core/element-colors.ts`; its hand-picked hues did
@@ -154,8 +154,8 @@ function renderIcon(iconName: string, color: string, hasMapBadge: boolean = fals
 /**
  * Default style — JUST the icon glyph in the tint color, no background disc.
  * A wide DARK halo is painted UNDER the glyph for legibility against any
- * map background (works for both bright + dark map art). Captain feedback
- * session 219 wave 3: "make the border around the icon dark, not white."
+ * map background (works for both bright + dark map art). Titus feedback
+ * from a smoke test: "make the border around the icon dark, not white."
  */
 function drawFilledIcon(ctx: CanvasRenderingContext2D, size: number, color: string, iconName: string): void {
   const cx = size / 2;
@@ -252,7 +252,7 @@ function drawPinShape(ctx: CanvasRenderingContext2D, size: number, color: string
 
   // Dark glyph inside the round head — readable across the full type-color
   // palette (many of which are light: yellow, lime, pink). White-on-color
-  // disappeared against the lighter tints (Captain smoke session 219).
+  // disappeared against the lighter tints (Titus's smoke test).
   ctx.font = '18px "Material Symbols Outlined"';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

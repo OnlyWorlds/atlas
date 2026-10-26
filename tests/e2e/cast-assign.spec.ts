@@ -1,5 +1,5 @@
 /**
- * Cast assignment mode e2e (session 252's last wave; test-locked session 254).
+ * Cast assignment mode e2e.
  *
  * The flow: a home ghost card ("choose a protagonist" / "choose a home")
  * enters `ui.castAssign` — the elements sidebar shows the assign banner and

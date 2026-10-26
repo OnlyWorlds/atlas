@@ -1,7 +1,7 @@
 # Atlas — Writing Design
 
 **Version**: 3.3 (2026-09-04) — S355: find bar "Link to element" at both tiers, find in the compiled view, unlinked mentions in the element preview, the label law extended to read-only renders (conventions #49b, #49e). v3.2 (2026-05-24): context pane promoted to tool-global (session 231)
-**Status**: v1 + v1.5 + v2 batch all shipped (sessions 227-228). Session 229 added the writing-context pane in the right tab. Session 230 polished it (Featured/Planned, click-recenter, reading-mode redesign). Session 231 promoted the context pane to a tool-global Context tab — see `DESIGN_SHELL.md` "The context pane" section for the cross-route architecture. Writing-mode behavior in the context pane (Cast + Potentials + chip-click selection + Featured/Planned semantics) is unchanged.
+**Status**: v1 + v1.5 + v2 batch all shipped. Then the writing-context pane came to the right tab, was polished (Featured/Planned, click-recenter, reading-mode redesign), and was promoted to a tool-global Context tab — see `DESIGN_SHELL.md` "The context pane" section for the cross-route architecture. Writing-mode behavior in the context pane (Cast + Potentials + chip-click selection + Featured/Planned semantics) is unchanged.
 **Related**: `DESIGN_SHELL.md` (Rooms model, **the context pane**), `ATLAS_FIELDS.md` (atlas-specific fields), `DESIGN_HOME.md`, `DESIGN_SHARING.md`
 
 ---
@@ -126,7 +126,7 @@ The collapsibles below the prose (Details + References) keep the full schema edi
 
 ### The 10 v1 essentials
 
-1. **Reuse `element-detail-header.ts`** for the 36px band — tier badge, child-create buttons, pin/sync/delete affordances. Already extracted in session 225.
+1. **Reuse `element-detail-header.ts`** for the 36px band — tier badge, child-create buttons, pin/sync/delete affordances. Already extracted.
 2. **Inline editable title** — large, click-to-edit. Port from element-detail.
 3. **Breadcrumb** — Book › Chapter › Scene with clickable segments.
 4. **Inline date row** — `start_date` (and `end_date` if present) shown as a single tidy line.
@@ -144,7 +144,7 @@ Two fields on every Narrative:
 - **`story`** (canonical OW text-long field) — markdown serialization of the document. Source of truth for OW interop. Other OW tools see this.
 - **`atlas_richtext_json`** (atlas-local extension field, added to `ATLAS_LOCAL_EXTENSION_FIELDS` in `core/constants.ts`) — full TipTap JSON document, preserves atlas-only formatting and custom node types. Stripped on API push; persists in folder storage.
 
-**On load**: atlas reads `atlas_richtext_json` if present, unless `story` holds text it does not (DESIGN_LAWS conv. 116, S365: plain text wins); otherwise parses `story` markdown into a TipTap doc. The "no sidecar, only markdown" case is the migration path for narratives already in the world (AtlasMoppetopia, others).
+**On load**: atlas reads `atlas_richtext_json` if present, unless `story` holds text it does not (DESIGN_LAWS conv. 116: plain text wins); otherwise parses `story` markdown into a TipTap doc. The "no sidecar, only markdown" case is the migration path for narratives already in the world (AtlasMoppetopia, others).
 
 **On save** (debounced via existing sync debounce window):
 1. TipTap doc → markdown serializer → write to `story` field.
@@ -152,7 +152,7 @@ Two fields on every Narrative:
 3. Auto-derive relation fields (see below).
 4. Single `folder.updateElement` call. Sync push fires via existing `requestPushIfLinked()` pipeline.
 
-**Coherence**: the two representations are atomically updated in the same write. **Out-of-band `story` edits (RECONCILED, S364 + S365)**: made while atlas is open, the live folder reloads the scene (DESIGN_LAWS conv. 111); made while it was closed, the sidecar rule at open opens `story` (conv. 116). No fingerprint was needed: the comparison is `serialize(sidecar)` against `story`, then against the NORMALISED story, and every Atlas writer keeps the two halves equal (the bulk writers derive `story` from the sidecar). Atlas-only styling is the documented cost when `story` wins. (S260 found the shadowing; this paragraph used to say so.)
+**Coherence**: the two representations are atomically updated in the same write. **Out-of-band `story` edits (RECONCILED)**: made while atlas is open, the live folder reloads the scene (DESIGN_LAWS conv. 111); made while it was closed, the sidecar rule at open opens `story` (conv. 116). No fingerprint was needed: the comparison is `serialize(sidecar)` against `story`, then against the NORMALISED story, and every Atlas writer keeps the two halves equal (the bulk writers derive `story` from the sidecar). Atlas-only styling is the documented cost when `story` wins. (An earlier pass found the shadowing; this paragraph used to say so.)
 
 ### TipTap stack (the library decision)
 
@@ -190,7 +190,7 @@ Fallback if TipTap's markdown beta bites us: drop to raw ProseMirror + `prosemir
 1. Writer types "Drizzle did not own a calendar" — no trigger.
 2. Background tokenizer matches "Drizzle" against the element name+alias index for the active world.
 3. Atlas shows a subtle dotted underline (pointer cursor) under the word.
-4. **Promote it (S313, `writing-workspace-autolink.ts`): CLICK the dotted word (primary — works even if the editor isn't focused), or HOVER it and press Tab (hover-authoritative: the hovered word links, not "the first"), or Tab with the caret inside it, or right-click → "Link to X".** OR keep typing → suggestion fades, word stays plain text. Tab never escapes the editor while there is a hint to link. Shared plugin, so identical in the knowledge + share editors.
+4. **Promote it (`writing-workspace-autolink.ts`): CLICK the dotted word (primary — works even if the editor isn't focused), or HOVER it and press Tab (hover-authoritative: the hovered word links, not "the first"), or Tab with the caret inside it, or right-click → "Link to X".** OR keep typing → suggestion fades, word stays plain text. Tab never escapes the editor while there is a hint to link. Shared plugin, so identical in the knowledge + share editors.
 5. Once Drizzle is linked once in this narrative, atlas does NOT suggest linking subsequent mentions. First-mention rule (Loreteller's universal pattern).
 6. For ambiguous names (2+ matches), suggestion is suppressed — writer must use `@` to pick explicitly.
 
@@ -241,11 +241,11 @@ Fallback if TipTap's markdown beta bites us: drop to raw ProseMirror + `prosemir
 
 ### What v1 does NOT do (now historical — many of these shipped through 228-231; see Roadmap status below)
 
-The original v1 deferral list (hover preview, focus mode, outline view, backlinks, per-narrative notes, word goal, find/replace, inline element creation, element embeds, footnotes/callouts, bidirectional consistency, prose-first extraction, visual narrative graph, compare view, export) shipped piecemeal in sessions 227-231 OR moved to the "Still on the roadmap" / "Dropped" lists below. The unshipped items are tracked there.
+The original v1 deferral list (hover preview, focus mode, outline view, backlinks, per-narrative notes, word goal, find/replace, inline element creation, element embeds, footnotes/callouts, bidirectional consistency, prose-first extraction, visual narrative graph, compare view, export) shipped piecemeal OR moved to the "Still on the roadmap" / "Dropped" lists below. The unshipped items are tracked there.
 
 ---
 
-## Routes (v3.0 — shortened in session 227)
+## Routes (v3.0 — shortened)
 
 ```
 #/w/<id>/writing                  → writing room, no selection
@@ -254,7 +254,7 @@ The original v1 deferral list (hover preview, focus mode, outline view, backlink
 
 Ancestry is NOT encoded in the URL — it's derived at render time from the `parent_narrative` chain via `buildNarrativeIndex` + `ancestorIds`. Atlas always has the world's narratives in memory by the time the writing room mounts, so deriving on render has no real cost.
 
-**Legacy form back-compat**: URLs from before the shortening (sessions 223-226) still parse. The parser picks the deepest segment as `narrativeId` and re-emits the short form on next navigation:
+**Legacy form back-compat**: URLs from before the shortening still parse. The parser picks the deepest segment as `narrativeId` and re-emits the short form on next navigation:
 
 ```
 LEGACY: #/w/<id>/writing/book/<bId>/chapter/<cId>/scene/<sId>
@@ -268,25 +268,25 @@ The URL is the source of truth for which narrative is active (convention #46). W
 
 ---
 
-## Roadmap status (session 231 update)
+## Roadmap status
 
-### Shipped through session 231 (context pane: writing-only → tool-global)
+### Shipped (context pane: writing-only → tool-global)
 
 Big-picture context-pane work moved into `DESIGN_SHELL.md` "The context pane" — that's the authoritative architecture doc now. The writing-mode contributions to the pane (Cast + Potentials + Featured/Planned + chip-click selection + add-to-story button) stay specified here.
 
-- ✅ **Context tab** — was writing-only ephemeral in session 229, now tool-global permanent (session 231). Writing route shows Cast + Potentials; element route shows element preview; other routes show empty state.
-- ✅ **Force-directed graph** with click-recenter, recent-centers breadcrumb, mouse-back intercept, right-click menu, free zoom/pan, fit-to-view button, hover-fade, hop-depth 1-4 with per-ring caps, element-type filter chips, lock-layout mode, optional element-type edge coloring (session 231).
-- ✅ **Featured/Planned distinction** in Cast — Featured = in field AND in prose (chip or name/alias text match), Planned = in field only (sessions 229-230).
-- ✅ **Compiled view for parent narratives** — read-only assembly + clickable section markers + collapsible chevrons + tier-specific icons (sessions 229-230).
-- ✅ **Sticky bar below element header** — breadcrumb + date + focus/reading/open action icons (session 229).
-- ✅ **Ambient word-count widget** — bottom-right corner, replaces legacy footer (session 229).
-- ✅ **Reading mode redesign** — hides right pane, disables link visuals, keeps writer's font (session 230).
-- ✅ **Spellcheck toggle per world** + autolink hints always-`spellcheck=false` (session 230).
-- ✅ **Backspace-on-chip unlinks**, **right-click chip → unlink**, **right-click autolink hint → Link to {name}** (session 230).
-- ✅ **Bulk link/unlink (S265)**: corner link-all icon (one transaction, Ctrl+Z undoes) + selection right-click link/unlink + writing-tree right-click over a subtree. Kernel `src/core/prose-autolink.ts` writes BOTH halves for closed narratives, from ONE authoritative half (S365, conv. 116: the sidecar while it still holds the scene, `story` derived from it; `story` when it outranks, the stale sidecar dropped), because two halves transformed apart parted on a first mention in italics; the open narrative routes through live-editor ops (`writing-live-editor-ops.ts`). Same matching rules as the autolink plugin — the index moved to core and is shared.
-- ✅ **Unlinked mentions (S355)**: `core/unlinked-mentions.ts` counts an element's name ∪ aliases as plain prose across all narratives (whole-word, case-insensitive, links protected, cached per elements-array reference). Surfaces: the context-pane preview line "Mentioned, unlinked (N in M scenes) · Link all" (`context-pane-preview.ts`) and the create modal's toast nudge. Link all = `bulkLinkTerm` over the same terms; count and link share `findTermSpansMarkdown`.
-- ✅ **Find bar "Link to element" (S355)**: every match of the typed word becomes a chip to a picked element, in the scene (one transaction) or across a chapter/book from the compiled view (disk write over the subtree, `writing-compiled-search.ts` + `bulkLinkTerm`). Not first-mention by design (convention #49e). The compiled view gained find itself the same session.
-- ✅ **Aliases editor modal, focus mode, hover preview, find/replace, word goal, inline element creation, split-into-sibling, character cast strip, per-world font family, first-mention autolink, TipTap code-split** — see session 228 batch in archive.
+- ✅ **Context tab** — was writing-only and ephemeral at first, now tool-global and permanent. Writing route shows Cast + Potentials; element route shows element preview; other routes show empty state.
+- ✅ **Force-directed graph** with click-recenter, recent-centers breadcrumb, mouse-back intercept, right-click menu, free zoom/pan, fit-to-view button, hover-fade, hop-depth 1-4 with per-ring caps, element-type filter chips, lock-layout mode, optional element-type edge coloring.
+- ✅ **Featured/Planned distinction** in Cast — Featured = in field AND in prose (chip or name/alias text match), Planned = in field only.
+- ✅ **Compiled view for parent narratives** — read-only assembly + clickable section markers + collapsible chevrons + tier-specific icons.
+- ✅ **Sticky bar below element header** — breadcrumb + date + focus/reading/open action icons.
+- ✅ **Ambient word-count widget** — bottom-right corner, replaces legacy footer.
+- ✅ **Reading mode redesign** — hides right pane, disables link visuals, keeps writer's font.
+- ✅ **Spellcheck toggle per world** + autolink hints always-`spellcheck=false`.
+- ✅ **Backspace-on-chip unlinks**, **right-click chip → unlink**, **right-click autolink hint → Link to {name}**.
+- ✅ **Bulk link/unlink**: corner link-all icon (one transaction, Ctrl+Z undoes) + selection right-click link/unlink + writing-tree right-click over a subtree. Kernel `src/core/prose-autolink.ts` writes BOTH halves for closed narratives, from ONE authoritative half (conv. 116: the sidecar while it still holds the scene, `story` derived from it; `story` when it outranks, the stale sidecar dropped), because two halves transformed apart parted on a first mention in italics; the open narrative routes through live-editor ops (`writing-live-editor-ops.ts`). Same matching rules as the autolink plugin — the index moved to core and is shared.
+- ✅ **Unlinked mentions**: `core/unlinked-mentions.ts` counts an element's name ∪ aliases as plain prose across all narratives (whole-word, case-insensitive, links protected, cached per elements-array reference). Surfaces: the context-pane preview line "Mentioned, unlinked (N in M scenes) · Link all" (`context-pane-preview.ts`) and the create modal's toast nudge. Link all = `bulkLinkTerm` over the same terms; count and link share `findTermSpansMarkdown`.
+- ✅ **Find bar "Link to element"**: every match of the typed word becomes a chip to a picked element, in the scene (one transaction) or across a chapter/book from the compiled view (disk write over the subtree, `writing-compiled-search.ts` + `bulkLinkTerm`). Not first-mention by design (convention #49e). The compiled view gained find itself the same session.
+- ✅ **Aliases editor modal, focus mode, hover preview, find/replace, word goal, inline element creation, split-into-sibling, character cast strip, per-world font family, first-mention autolink, TipTap code-split** — the v2 batch.
 
 ### Still on the roadmap
 
@@ -332,22 +332,22 @@ Big-picture context-pane work moved into `DESIGN_SHELL.md` "The context pane" �
 - **#48**: Element references in narrative prose are stored as markdown links with the OW URL scheme: `[Display Name](ow://<element-type>/<uuid>)`. Display text is resolved dynamically from the atlas store at render time (so renames propagate). Manual display-text overrides (where `displayText !== element.name`) are preserved on save.
 
 - **#49**: Atlas elements have an optional atlas-local `atlas_aliases: string[]` field. Both the `@` picker and the first-mention auto-link tokenizer match against `name` ∪ `atlas_aliases` when resolving an element by string. Aliases are stripped on API push (atlas-local extension field).
-- **#49b — THE LABEL LAW (Captain, S307 + S309)**: creating a link NEVER changes the prose text. Every promotion of existing text (Tab, link-all, selection linking, right-click) keeps the writer's matched text verbatim as the chip label — name matches, case variants, AND genuinely different aliases. The chip's `id` resolves to the canonical element; only the visible text is sacred. One rule site: `promotionLabel` in `core/prose-autolink.ts` (the live Tab handler delegates to it). The editors' chip-label rename sync tolerates any casing of name ∪ aliases (`isValidChipLabel`, same module) — it only rewrites labels stale from an element rename. Inserting NEW content (the `@` mention picker, add-to-cast at cursor) stamps the canonical name, which is consistent: no existing text is changed. **The law reaches the READ-ONLY rendering too (Captain, S355)**: `renderProseFragment` prints the link's label, never the target's name; the compiled view, the share preview and the show viewer all show the writer's words. And the chip-label sync compares TRIMMED labels, so stray whitespace can never read as "stale". Guarded by THE GUARANTEE sweep + a link-then-unlink identity property in `prose-autolink.test.ts`, and a byte-identical prose assertion across link-all in the tour walk e2e.
+- **#49b — THE LABEL LAW (Titus)**: creating a link NEVER changes the prose text. Every promotion of existing text (Tab, link-all, selection linking, right-click) keeps the writer's matched text verbatim as the chip label — name matches, case variants, AND genuinely different aliases. The chip's `id` resolves to the canonical element; only the visible text is sacred. One rule site: `promotionLabel` in `core/prose-autolink.ts` (the live Tab handler delegates to it). The editors' chip-label rename sync tolerates any casing of name ∪ aliases (`isValidChipLabel`, same module) — it only rewrites labels stale from an element rename. Inserting NEW content (the `@` mention picker, add-to-cast at cursor) stamps the canonical name, which is consistent: no existing text is changed. **The law reaches the READ-ONLY rendering too (Titus)**: `renderProseFragment` prints the link's label, never the target's name; the compiled view, the share preview and the show viewer all show the writer's words. And the chip-label sync compares TRIMMED labels, so stray whitespace can never read as "stale". Guarded by THE GUARANTEE sweep + a link-then-unlink identity property in `prose-autolink.test.ts`, and a byte-identical prose assertion across link-all in the tour walk e2e.
 
-- **#49c — THE CONFIRM FLOOR (S310)**: a delete that CASCADES always confirms, regardless of the user's `confirm_before_delete` preference. The preference reads "Ask for confirmation before deleting **an element**" (`settings-elements.ts`), singular — so it was never an opt-out from destroying a subtree, and atlas has no undo anywhere. Verified live before the fix: deleting a Book from the writing room with the preference off destroyed 8 of 9 elements on one click with no dialog. One rule site, `decideDeleteConfirm` in `core/delete-confirm.ts`, used by the workspace header trash AND the writing-tree right-click Delete. Narratives get a tier-aware sentence in the world's own vocabulary ("2 chapters and 4 scenes"); other types keep the generic dependent count. This aligns the header with what `map-index-tab.ts:555`, `share-room.ts:166` and `writing-sidebar.ts:603` already did — it was the one cascading path still gated by a preference.
+- **#49c — THE CONFIRM FLOOR**: a delete that CASCADES always confirms, regardless of the user's `confirm_before_delete` preference. The preference reads "Ask for confirmation before deleting **an element**" (`settings-elements.ts`), singular — so it was never an opt-out from destroying a subtree, and atlas has no undo anywhere. Verified live before the fix: deleting a Book from the writing room with the preference off destroyed 8 of 9 elements on one click with no dialog. One rule site, `decideDeleteConfirm` in `core/delete-confirm.ts`, used by the workspace header trash AND the writing-tree right-click Delete. Narratives get a tier-aware sentence in the world's own vocabulary ("2 chapters and 4 scenes"); other types keep the generic dependent count. This aligns the header with what `map-index-tab.ts:555`, `share-room.ts:166` and `writing-sidebar.ts:603` already did — it was the one cascading path still gated by a preference.
 
-- **#49e — DELIBERATE LINKING GOES DENSE, AUTOMATIC LINKING STAYS SPARSE (S355)**: link-all and the autolink hints link the FIRST mention per narrative (Loreteller's rule, #53). The find bar's "Link to element" links EVERY match, because the writer typed the word and picked the target: the two gestures answer different questions and must not share a rule. Matching is the find bar's own (`buildTermScanner`: literal, optional case, optional whole word), so what is highlighted is exactly what links; text inside an existing link or chip is never entered; labels stay verbatim (#49b); the word is recorded as an alias when foreign so #53 recognises it in later scenes. In the compiled view the write goes to every descendant on disk with no undo, and the toast says so.
-- **#49d — THE COUNT MUST NAME WHAT THE CASCADE TAKES (S310)**: the confirm's counts come from `core/narrative-delete.ts`, which walks `parent_narrative` across ALL narratives — mirroring `FsFolderStore.findDependents`, **not** the writing tree. The tree (`buildNarrativeIndex`) filters to narratives whose supertype matches a tier label, so a narrative the user free-texted out of the tree is INVISIBLE there and STILL DELETED by the cascade. Those are counted and named as "N other narratives" so nothing is destroyed that the sentence never mentioned. `narrative-delete.test.ts` asserts the kernel's walk and the store's cascade return the same set — an invariant that opens both files rather than comparing the kernel to a copy of itself.
+- **#49e — DELIBERATE LINKING GOES DENSE, AUTOMATIC LINKING STAYS SPARSE**: link-all and the autolink hints link the FIRST mention per narrative (Loreteller's rule, #53). The find bar's "Link to element" links EVERY match, because the writer typed the word and picked the target: the two gestures answer different questions and must not share a rule. Matching is the find bar's own (`buildTermScanner`: literal, optional case, optional whole word), so what is highlighted is exactly what links; text inside an existing link or chip is never entered; labels stay verbatim (#49b); the word is recorded as an alias when foreign so #53 recognises it in later scenes. In the compiled view the write goes to every descendant on disk with no undo, and the toast says so.
+- **#49d — THE COUNT MUST NAME WHAT THE CASCADE TAKES**: the confirm's counts come from `core/narrative-delete.ts`, which walks `parent_narrative` across ALL narratives — mirroring `FsFolderStore.findDependents`, **not** the writing tree. The tree (`buildNarrativeIndex`) filters to narratives whose supertype matches a tier label, so a narrative the user free-texted out of the tree is INVISIBLE there and STILL DELETED by the cascade. Those are counted and named as "N other narratives" so nothing is destroyed that the sentence never mentioned. `narrative-delete.test.ts` asserts the kernel's walk and the store's cascade return the same set — an invariant that opens both files rather than comparing the kernel to a copy of itself.
 
 - **#50**: On every workspace save, the auto-derive pass scans the markdown for `ow://` links, groups UUIDs by element type, and writes the UNION of (prose-derived) ∪ (existing relation field value) into each Narrative relation field. Manual relation field entries are preserved. Single `folder.updateElement` call per save.
 
 - **#51**: The writing workspace replaces element-detail entirely as the middle-pane renderer when `route.mode === 'writing'` AND a narrative is active in the URL hierarchy. Empty-state (no active narrative) stays in `writing.ts`.
 
-- **#52** (v1.5 polish): Any override of `.material-symbols-outlined` (font-size, color, etc.) MUST be scoped under a parent class for two-class specificity (0,2,0). The package's `.material-symbols-outlined { font-size: 24px }` rule is single-class (0,1,0) and load-order decides the tie — non-deterministic. Pattern: `.atlas-foo-parent .my-icon { font-size: Npx }` (e.g. `.atlas-link-chip .atlas-link-chip-remove`). Bitten twice (session 226 room-nav chip + session 227 link-chip-remove); locking in as a hard rule.
+- **#52** (v1.5 polish): Any override of `.material-symbols-outlined` (font-size, color, etc.) MUST be scoped under a parent class for two-class specificity (0,2,0). The package's `.material-symbols-outlined { font-size: 24px }` rule is single-class (0,1,0) and load-order decides the tie — non-deterministic. Pattern: `.atlas-foo-parent .my-icon { font-size: Npx }` (e.g. `.atlas-link-chip .atlas-link-chip-remove`). Bitten twice (the room-nav chip, then link-chip-remove); locking in as a hard rule.
 
-- **#53** (v2 batch, session 228): First-mention auto-link decorations are CASE-SENSITIVE matches against a name + alias index, with `\\b...\\b` word boundaries. Suppression rules stack: minimum 3 characters per key, ambiguous names (≥2 candidates for the same key) suppressed entirely, candidate ids already chipped in the doc skipped (first-mention rule), and the `@` mention picker takes priority (decorations don't gate Tab handling while the picker is visible). The index is rebuilt only when `state.data.elements` reference swaps — no per-tick re-build. See `writing-workspace-autolink.ts` and tests/unit/writing-workspace-autolink.test.ts.
+- **#53** (v2 batch): First-mention auto-link decorations are CASE-SENSITIVE matches against a name + alias index, with `\\b...\\b` word boundaries. Suppression rules stack: minimum 3 characters per key, ambiguous names (≥2 candidates for the same key) suppressed entirely, candidate ids already chipped in the doc skipped (first-mention rule), and the `@` mention picker takes priority (decorations don't gate Tab handling while the picker is visible). The index is rebuilt only when `state.data.elements` reference swaps — no per-tick re-build. See `writing-workspace-autolink.ts` and tests/unit/writing-workspace-autolink.test.ts.
 
-## Autolink design (session 228, Bout 9)
+## Autolink design (v2 batch, Bout 9)
 
 The autolink plugin is a ProseMirror plugin that watches the prose for prose-level mentions of elements that the writer hasn't explicitly chipped yet. It is the COMPANION to the `@` picker, not its replacement — `@` remains the explicit, deliberate path for inserting a chip, with no ambiguity about intent.
 
@@ -388,7 +388,7 @@ If a world grows to tens of thousands of elements, switch to Aho-Corasick or a t
 
 ## Research foundations (informing v3.0)
 
-v3.0 incorporates findings from a 6-agent research swarm (session 226):
+v3.0 incorporates findings from a 6-agent research swarm:
 
 - **Differentiator scout** across Scrivener, Ulysses, World Anvil, NovelCrafter, Campfire, Plottr, Obsidian, Notion — confirmed three-pane shell is genre default AND genre's primary complaint surface; identified "bolted-on editor" as the trap World Anvil falls into.
 - **Reddit fiction-writer friction** — confirmed sync-state-invisibility, compile-as-black-box, setup-tax, and chrome-competes-with-page as universal pain points to avoid.

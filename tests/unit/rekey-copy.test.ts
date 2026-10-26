@@ -1,5 +1,5 @@
 /**
- * The re-key's user-visible copy (S363 gate: the singular/plural and "N more"
+ * The re-key's user-visible copy (the singular/plural and "N more"
  * cases the modal probe `c-modal` printed). Exact strings, so a drift in voice
  * is a deliberate edit here, never an accident.
  */

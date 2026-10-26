@@ -172,7 +172,7 @@ describe('buildWorldExport — ow.com shape + round-trip', () => {
     const src = await seedSource();
     const json = await buildWorldExport(src) as Record<string, unknown>;
 
-    // S354: the envelope keel writes and parse.ts reads. One shape both ways.
+    // The envelope keel writes and parse.ts reads. One shape both ways.
     expect(json.format).toBe('onlyworlds-world-export');
     expect(typeof json.schema_version).toBe('string');
     const world = json.world as Record<string, unknown>;

@@ -1,5 +1,5 @@
 /**
- * Promoted from the S367 composition gate (lens A).
+ * Promoted from the composition gate (lens A).
  * Lens A attack 1 (policy c branch): the design's crash story for the server
  * phase is "a rerun matches everything by id (a created-but-unstamped element
  * is in the server list), so nothing duplicates". True. But under policy c a

@@ -1,5 +1,5 @@
 /**
- * #141 (S387): the Web tab's label pass. A label takes the first clear side
+ * #141: the Web tab's label pass. A label takes the first clear side
  * of its node or waits for hover; the subject and the selection always print,
  * on their least crowded side. Labels yield, nodes never vanish.
  */

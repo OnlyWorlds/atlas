@@ -1,6 +1,6 @@
 /**
- * A token Atlas minted is revoked when Atlas lets it go (S475, contract
- * `Forge/Notes/2026-10-25-s475-atlas-token-revoke-contract.md` and its gate):
+ * A token Atlas minted is revoked when Atlas lets it go (the token-revoke
+ * contract and its gate):
  * the id goes with its own token only, the account fields merge as one group
  * across tabs, the revoke asks keel by the recorded id with the token as its
  * bearer and reads 404 as still live, and Forget everything revokes only

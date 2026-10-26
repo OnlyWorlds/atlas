@@ -1,5 +1,5 @@
 /**
- * THE LIVE FOLDER (S364), end to end in real Chromium over OPFS: another tool
+ * THE LIVE FOLDER, end to end in real Chromium over OPFS: another tool
  * writes the world folder while Atlas is open, and Atlas shows it when the
  * window comes back into focus. The "other tool" is a `page.evaluate` that
  * writes through the OPFS handle directly, bypassing the store, exactly as an
@@ -109,7 +109,7 @@ test('a file created and one deleted outside Atlas appear and disappear after a 
   await page.evaluate(() => (window as any).__atlasTestApi.rescanNow());
   await expect(page.locator(`.atlas-row[data-element-id="${newId}"]`)).toContainText('New Arrival');
   await expect(page.locator(`.atlas-row[data-element-id="${gone}"]`)).toHaveCount(0);
-  // Captain, S364: a removal outside Atlas is said, not silent.
+  // Titus: a removal outside Atlas is said, not silent.
   await expect(page.locator('.atlas-disk-notice')).toContainText('1 removed on disk');
   await expect(page.locator('.atlas-disk-notice .atlas-disk-notice-warn', { hasText: 'removed on disk' })).toHaveAttribute('title', /Gone Soon/);
 });
@@ -247,7 +247,7 @@ test('"reload from disk" in Ctrl+K runs a pass and says what it found', async ({
   await expect(page.locator('.ow-toast', { hasText: 'Nothing changed on disk.' })).toBeVisible();
 });
 
-// S364 bout 3: the world's notes travel in its folder.
+// The world's notes travel in its folder.
 async function prefsOnDisk(page: Page): Promise<any> {
   return page.evaluate(async () => {
     async function find(dir: FileSystemDirectoryHandle): Promise<FileSystemFileHandle | null> {
@@ -285,7 +285,7 @@ test('world notes are written to the folder, and a browser that lost them gets t
     .toBe('The ferryman owes us two silver.');
 });
 
-// S364 gate lens B B14: the reload remount keeps the writer's place.
+// The reload remount keeps the writer's place.
 test('a scene reloaded from disk keeps the editor focused', async ({ page }) => {
   test.slow();
   await setupWorld(page, 'live focus');

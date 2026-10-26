@@ -1,5 +1,5 @@
 /**
- * The re-key kernel's S367 additions, for Route 2: caller-supplied pairs (a
+ * The re-key kernel's additions for Route 2: caller-supplied pairs (a
  * local element onto the server element it matched), the stale-baseline
  * allowance, the journal's origin, and step 5b (`.atlas/world-prefs.json`
  * names elements too: lane B N3, a folder that travels opens elsewhere with
@@ -61,7 +61,7 @@ describe('startRekey with pairs', () => {
     await expect(startRekey(store, { worldId: W, pairs: new Map() })).rejects.toBeInstanceOf(RekeyRefusedError);
   });
 
-  it('a journal from before S367 reads as a plain re-key', async () => {
+  it('a journal from before pairs existed reads as a plain re-key', async () => {
     await store.writeRekeyJournal({ version: 1, world_id: W, map: {}, types: {}, stamps: {}, unrewritten: [], started_at: 'x' });
     expect(await rekeyJournalOrigin(store)).toBe('rekey');
   });

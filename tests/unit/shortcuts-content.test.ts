@@ -1,6 +1,6 @@
 /**
  * Shortcuts overlay: every hotkey part renders as a kbd chip, Mac included
- * and Escape included (S367 critic C12c).
+ * and Escape included.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { installHotkeys, uninstallHotkeys } from '../../src/core/hotkeys';

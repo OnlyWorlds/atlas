@@ -1,6 +1,6 @@
 /**
- * The S446 gate's findings on the provenance lines (folder spec §4.2; the
- * contract `Forge/Notes/2026-10-20-s446-provenance-lines.md`), each with the
+ * A gate's findings on the provenance lines (folder spec §4.2; the
+ * contract), each with the
  * case that broke it: G1 a JSON export and its import keep the lines, G2 a
  * guest's unlink records its slice, G4 a demo key asks nothing, G6 a key of
  * another world names no slice, G8 the download words, G11 a long name.

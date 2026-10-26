@@ -1,5 +1,5 @@
 /**
- * S364 gate, lens C: typing survives background re-renders everywhere, not
+ * Typing survives background re-renders everywhere, not
  * only in the element name (the bout-1 A3 fix covered that one input).
  *   C3: the element editor's INLINE field editors (Settings, Elements, inline mode).
  *   C4: renaming a knower on its knowledge page.

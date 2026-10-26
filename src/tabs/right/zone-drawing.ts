@@ -57,7 +57,7 @@ interface ActiveDraft {
   // For cleanup on cancel/finish.
   containerListeners: Array<{ el: HTMLElement; type: string; handler: EventListener }>;
   /**
-   * Trace (S423): while on, a press and drag lays a stroke instead of panning;
+   * Trace: while on, a press and drag lays a stroke instead of panning;
    * on release the stroke is simplified (`simplifyStroke`) and appended as
    * points. `endedAt` swallows the click the browser fires after the release.
    */
@@ -115,7 +115,7 @@ function ensureKeyListeners(): void {
 
 /**
  * Live indicator in the draft overlay so the user can SEE that shift is
- * registered (ZC3 — Captain couldn't tell shift-snap was active). Toggles a
+ * registered (ZC3 — Titus couldn't tell shift-snap was active). Toggles a
  * class on the overlay's hint span; CSS turns it cyan + bold when held.
  */
 function updateShiftIndicator(held: boolean): void {
@@ -135,7 +135,7 @@ export function getActiveDraft(): { mode: DrawMode; mapId: string; markerCount: 
 /**
  * Enter draft mode. Cancels any in-progress draft first (one global slot).
  * Works on imageless maps too — the flat canvas has stored width/height, so
- * marker coords anchor to a stable space (DESIGN_MAPS.md §4.2, S300).
+ * marker coords anchor to a stable space (DESIGN_MAPS.md §4.2).
  */
 export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: ToastManager): void {
   // The backstop under every door (toolbar, z and l): a view-only world
@@ -220,7 +220,7 @@ export function placeMarkerAt(rawPoint: Point, canvasWidth: number, canvasHeight
   //
   // A LINE is drawn as a sequence: a click near an earlier segment means
   // "continue the line here", never "splice a point into the middle" — the
-  // splice is exactly what made line points come out wrong-ordered (Captain's
+  // splice is exactly what made line points come out wrong-ordered (Titus's
   // launch note). Lines always append. Polygon includes the wrap segment
   // (last→first) for the threshold check ONCE an outline exists (3+ markers).
   if (active.mode === 'polygon' && active.points.length >= 2) {
@@ -287,7 +287,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
     // serves it since 2026-10-22) says polygon or line for every reader;
     // atlas_shape says it for an Atlas before 1.75; supertype + subtype are
     // user-meaningful taxonomy fields (free text). An empty supertype still
-    // takes the shape's word for readers that know neither (the Captain's
+    // takes the shape's word for readers that know neither (Titus's
     // interim, until the readers read shape).
     const zone = await store.createZone({
       name: values.name,
@@ -362,7 +362,7 @@ const TRACE_MAX_POINTS = 60;
 const TRACE_MIN_STROKE_PX = 8;
 
 /**
- * Trace on or off (S423). On: the map stops panning under a drag, and a
+ * Trace on or off. On: the map stops panning under a drag, and a
  * press-drag-release on it lays a stroke that lands as points on release.
  * Clicks still place single points; the wheel still zooms.
  */
@@ -515,7 +515,7 @@ function rerenderPreview(): void {
 
   // Render numbered marker DivIcons at each point. Draggable so the user can
   // reposition a placed marker before finishing (smoke fix 2026-05-16 session
-  // 216 — Captain expected to be able to nudge a draft marker, not have to
+  // 216 — Titus expected to be able to nudge a draft marker, not have to
   // undo + re-click). Drag-end writes back to `active.points[idx]`; the next
   // re-render keeps numbering and preview path in sync. Dragging is
   // intentionally NOT shift-snapped — shift-snap is a placement-time
@@ -583,7 +583,7 @@ function rebuildPreviewPath(): void {
 // (set as default in Leaflet2DManager init) has unreliable dashArray support
 // for polygons — works for polyline strokes but not for polygon outlines.
 // SVG renderer guarantees the dashed preview line stays dashed across all
-// rebuilds (Captain smoke session 219: "after first moving a marker, the
+// rebuilds (Titus's smoke test: "after first moving a marker, the
 // dotted lines turn whole"). One renderer instance is fine — Leaflet shares
 // it across all layers added with this `renderer` option.
 let draftSvgRenderer: L.Renderer | null = null;

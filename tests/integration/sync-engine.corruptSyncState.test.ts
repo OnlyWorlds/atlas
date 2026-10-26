@@ -1,5 +1,5 @@
 /**
- * S361 (gate F14): a sync file that exists and will not parse must stop sync
+ * A sync file that exists and will not parse must stop sync
  * LEGIBLY. A corrupt sync-state.json used to make every round replay the
  * whole world, fail at the persist, reset the pill to idle, and say nothing.
  * Now the round pauses the engine and the pill carries the file's message.

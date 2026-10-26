@@ -3,9 +3,9 @@
  * FIRST production sync round: the /changes cold walk, v2 adapter over the
  * keel-v2 MSW. After a name-match swap, a download and a local-only create
  * the round must converge: no conflicts, no server-delete prompts, no second
- * create, and a quiet second round. (S365, promoted from the orient lane A
- * probe. A GUARD: green before and after S365, so not revert-checkable against
- * it; it pins today's hand-off before the Route 2 rebuild, which adds the
+ * create, and a quiet second round. (Promoted from a probe.
+ * A GUARD: green with and without the fixes around it, so not revert-checkable against
+ * them; it pins today's hand-off before the Route 2 rebuild, which adds the
  * prose-id assertion here.)
  */
 import { describe, it, expect, beforeEach } from 'vitest';

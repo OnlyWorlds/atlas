@@ -1,6 +1,6 @@
 /**
- * S361 (gate F4 + F5). A modal that hands back a promise must settle it
- * however the user closes it. After S360 made Escape topmost-only, the element
+ * A modal that hands back a promise must settle it
+ * however the user closes it. After Escape was made topmost-only, the element
  * picker's own Escape listener ran AFTER BaseModal's, found itself no longer
  * topmost, and never resolved; its overlay `click` had the same hole behind
  * the base's pointerup close. The map-create modal copied both. The fix is the
@@ -28,7 +28,7 @@ function pressEscape(): void {
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 }
 
-/** A full outside click: press AND release on the overlay (S318 discipline). */
+/** A full outside click: press AND release on the overlay. */
 function clickOverlay(): void {
   const overlay = document.querySelector('.atlas-modal-overlay')!;
   overlay.dispatchEvent(new Event('pointerdown', { bubbles: true }));
@@ -70,7 +70,7 @@ describe('a modal promise settles however the modal closes', () => {
     expect(await settled(p)).toBeNull();
   });
 
-  it('Escape on a picker over map-create closes only the picker (S360 stays true)', async () => {
+  it('Escape on a picker over map-create closes only the picker (topmost-only Escape stays true)', async () => {
     const outer = createMapDialog(new ToastManager());
     const inner = pickElement();
     pressEscape();

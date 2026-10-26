@@ -1,7 +1,7 @@
 /**
  * A member's role moved: the copy keeps what it has, and the person is told
- * once (B12 Q2, the Captain h20 #8014; conv. 151; contract
- * `Forge/Notes/2026-10-20-s439-role-change-keeps-the-copy.md`).
+ * once (Titus 2026-10-20; conv. 151; a contract of
+ * the same day).
  *
  * keel's `GET /me` names the key's role. The engine reads it when a resync or
  * a guest's 404 needs it and reports it in the round's result; the attach
@@ -36,7 +36,7 @@ export function roleChangeLine(worldName: string, from: string | undefined, to: 
   const keeps = ' Your copy keeps everything you had.';
   switch (to) {
     case 'guest':
-      // A copy opened to read takes no edits, so it promises none (the S439 gate's G8).
+      // A copy opened to read takes no edits, so it promises none.
       return readOnly
         ? `You are now a guest in ${worldName}.${keeps} What you no longer see online stays here as it is.`
         : `You are now a guest in ${worldName}.${keeps} What you no longer see online stays here as it is, and changes you make to it stay here too.`;
@@ -74,7 +74,7 @@ export function keptLine(worldName: string, n: number): string {
 export function memberRoleLine(entry: WorldRegistryEntry, keptCount: number): string | null {
   const role = entry.api?.member_role;
   const parts: string[] = [];
-  // Under "can only read", the role alone: the copy takes no edits (the S439 gate's G8).
+  // Under "can only read", the role alone: the copy takes no edits.
   const reads = !!entry.api?.read_only;
   if (role === 'guest') parts.push(reads ? 'You are a guest in this world.' : 'You are a guest in this world: you can add to it and change what you made.');
   else if (role === 'contributor') parts.push(reads ? 'You are a contributor in this world.' : 'You are a contributor in this world: you can add to it and change what you add.');

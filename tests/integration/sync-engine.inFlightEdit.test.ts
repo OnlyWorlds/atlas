@@ -1,5 +1,5 @@
 /**
- * S360 H1 — an edit made while its push is in flight must still reach the
+ * An edit made while its push is in flight must still reach the
  * server.
  *
  * The push reads the element, sends it, then stamps `server_updated_at` from

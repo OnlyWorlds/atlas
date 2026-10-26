@@ -28,16 +28,16 @@ export function syncPins(entry: MapTabCacheEntry): void {
   const allMinePins = elements.filter((e): e is Pin =>
     e.type === 'pin' && e.map_id === entry.mapId
   );
-  // Pin filter chip strip (DESIGN_MAPS.md §3 polish, session 211 bout PF):
+  // Pin filter chip strip (DESIGN_MAPS.md §3 polish):
   // pins whose element_type is in hiddenPinTypes are treated as removed —
   // syncPins removes their markers from the manager. Toggling a chip on the
   // strip is a syncPins re-call, so add/remove flips naturally.
   // A pin without finite x/y is schema-legal (only `name` is required) but
-  // cannot be drawn; Leaflet throws on it and every later pin went missing
-  // (S360). Skip it here, as pin-locate and the share payload already do.
+  // cannot be drawn; Leaflet throws on it and every later pin went missing.
+  // Skip it here, as pin-locate and the share payload already do.
   // The date bar (Q11, 1.50) is applied after, as visibility only
   // (`applyPinDates`): a marker the date hides stays built, so a slider drag
-  // never re-creates icons and labels (the S416 gate's F4).
+  // never re-creates icons and labels.
   const byId = new Map(elements.map(e => [e.id, e] as const));
   const minePins = allMinePins.filter(p =>
     !entry.hiddenPinTypes.has(p.element_type ?? '') && Number.isFinite(p.x) && Number.isFinite(p.y));
@@ -96,12 +96,11 @@ export function syncPins(entry: MapTabCacheEntry): void {
     }
   }
 
-  // The icon-scale rule (S356): median nearest-neighbour gap of THIS pin
+  // The icon-scale rule: median nearest-neighbour gap of THIS pin
   // set in storage units, computed once per sync; applyPinScale turns it
   // into a per-zoom scale. Sparse maps measure a gap wider than the icon
   // and keep scale 1 — the rule only ever shrinks. Measured over every pin
-  // the chips show, whatever the date, so scrubbing never resizes the icons
-  // (the S416 gate's F5).
+  // the chips show, whatever the date, so scrubbing never resizes the icons.
   entry.pinSpacing = medianNearestNeighbour(minePins.map(p => ({ x: p.x, y: p.y })));
   applyPinScale(entry);
 
@@ -146,7 +145,7 @@ function applyPinDates(
   // Refresh the chip strip on every sync — type set may have changed if a
   // pin was added/removed/element type changed. Its chips come from every pin
   // here and count the ones the date shows, so a type's chip never comes and
-  // goes with the date (the zone panel's lesson, S410).
+  // goes with the date (the zone panel's lesson).
   refreshChipStrip(entry, allMinePins, allMinePins.filter(shownAt));
 
   // Apply label visibility AFTER the pin set is reconciled so we count the
@@ -181,7 +180,7 @@ export function applyPinScale(entry: MapTabCacheEntry): void {
 /**
  * Toggle per-pin label visibility per the active prefs mode.
  *
- *  - 'auto':      every label visible here, then collision-culled (S356).
+ *  - 'auto':      every label visible here, then collision-culled.
  *  - 'always':    every label visible (Leaflet default).
  *  - 'hover':     all permanent labels hidden — atlas's custom .atlas-pin-tooltip
  *                 already covers hover-time naming, so this collapses to "off"

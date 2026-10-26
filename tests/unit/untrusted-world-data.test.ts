@@ -1,5 +1,5 @@
 /**
- * S360 security bout: world data is untrusted (folders anyone can write, AI
+ * World data is untrusted (folders anyone can write, AI
  * output, imported envelopes). These lock the helpers that turn it into HTML.
  */
 import { describe, it, expect } from 'vitest';

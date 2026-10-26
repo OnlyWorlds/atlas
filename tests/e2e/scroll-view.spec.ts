@@ -1,5 +1,5 @@
 /**
- * Scroll view e2e (2C, S13 — 2026-07-14). Locks the document view's spine:
+ * Scroll view e2e (2C — 2026-07-14). Locks the document view's spine:
  * the control-bar toggle swaps the canvas for the scrolling document (cards +
  * era seams + the now seam + the sticky date readout, all speaking the lens) →
  * a chart saved in scroll mode reopens in scroll mode → clicking a card peeks
@@ -83,7 +83,7 @@ async function mintCalendar(page: Page): Promise<void> {
   await page.fill('#wc-now', '400');
   await page.click('[data-action="save-clock"]');
   // No lens selection step: this world holds exactly ONE calendar and its owner
-  // has never opened the lens menu, so the room already speaks it (S305). The
+  // has never opened the lens menu, so the room already speaks it. The
   // menu still offers an explicit "no calendar", which is why the fallback keys
   // on never-chosen rather than on falsiness.
   await expect(page.locator('.atlas-cal-chip')).toContainText('The Almanac');

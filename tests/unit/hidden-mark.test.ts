@@ -94,7 +94,7 @@ describe('the element page header', () => {
     expect(mark(renderHeader(hidden))!.getAttribute('aria-label')).toBe(HIDDEN_FOLDER_LINE);
   });
 
-  it('the element page says it in a sentence instead, so its header leaves the glyph out (Seethe h20 #11602)', () => {
+  it('the element page says it in a sentence instead, so its header leaves the glyph out (Seethe 2026-10-23)', () => {
     const hidden = el('n1', { subtype: 'story', hidden: true, ...SYNCED });
     openWorld('local-only', [hidden]);
     expect(mark(renderHeader(hidden, { hiddenNote: true }))).toBeNull();

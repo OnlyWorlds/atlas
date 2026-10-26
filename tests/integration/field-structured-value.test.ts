@@ -1,5 +1,5 @@
 /**
- * S367 critic C11: a schema text field holding an object or array (a foreign
+ * A schema text field holding an object or array (a foreign
  * folder, another tool) renders read-only. It must never seed an editor with
  * String(value) and get overwritten with "[object Object]".
  */

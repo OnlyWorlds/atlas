@@ -1,5 +1,5 @@
 /**
- * Giving foreign elements new ids from the app (S363, `sync/rekey-run.ts`):
+ * Giving foreign elements new ids from the app (`sync/rekey-run.ts`):
  * the guards only the app can check, and the one live pass after the kernel
  * (re-key gate lens 3 F5/F7/F10).
  */
@@ -62,7 +62,7 @@ describe('giveForeignElementsNewIds', () => {
   it('refuses the tour world, and a world whose zone edit is open, touching nothing', async () => {
     await expect(giveForeignElementsNewIds({ store, entry: { ...entry, demo: true } }))
       .rejects.toBeInstanceOf(RekeyRefusedError);
-    // A zone reshape marks the page (S367: the ui.zoneEditing slice was never set).
+    // A zone reshape marks the page (the ui.zoneEditing slice was never set).
     const edit = document.createElement('div');
     edit.className = 'atlas-zone-editing';
     document.body.appendChild(edit);

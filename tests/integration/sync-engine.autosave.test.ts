@@ -17,7 +17,7 @@ let engine: SyncEngine;
 let clock: MonotonicClock;
 
 // Every test file shares ONE fork (vitest.config.ts): fake timers left on
-// here froze every later file's timeouts (S367: the route2-gate files).
+// here froze every later file's timeouts (the route2-gate files).
 afterEach(() => { vi.useRealTimers(); });
 
 beforeEach(async () => {

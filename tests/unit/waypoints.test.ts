@@ -1,6 +1,6 @@
 /**
  * Waypoints state machine (Bout OW, src/core/waypoints.ts) — the contract is
- * Forge/Notes/2026-07-07-atlas-waypoint-hookmap.md.
+ * the waypoint hook map.
  *
  * Locks: once-ever stamping · the demo-gating class rule (world-data waypoints
  * gate on the ACTIVE world's demo flag; portability waypoints don't) · the
@@ -168,7 +168,7 @@ describe('the toast, after #127', () => {
     }
   });
 
-  it('a step the home did not show still toasts, home or not (the control; gate S383 A1)', async () => {
+  it('a step the home did not show still toasts, home or not (the control)', async () => {
     vi.useFakeTimers();
     addHomeReceipts(['links']);
     try {
@@ -185,7 +185,7 @@ describe('the toast, after #127', () => {
     }
   });
 
-  // S404: a tap fired the emulated mouseenter with no leave, so a finger pinned
+  // A tap fired the emulated mouseenter with no leave, so a finger pinned
   // the toast on a phone. Only a mouse holds it.
   it('a mouse holds the toast and a finger does not', async () => {
     vi.useFakeTimers();

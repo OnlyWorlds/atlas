@@ -45,9 +45,9 @@ export interface MapViewPrefs {
  */
 export const FACTORY_DEFAULTS: MapViewPrefs = {
   pin_style: 'icon',
-  // 'auto' out of the box (S356): every label that fits is shown, and a
+  // 'auto' out of the box: every label that fits is shown, and a
   // label that would overprint a higher-ranked one drops — on a sparse map
-  // this IS 'always' (S299, Captain: pins discoverable at a glance), on
+  // this IS 'always' (Titus: pins discoverable at a glance), on
   // Sikelia's 196 pins it is the difference between a map and a wall
   // (`map-label-density.ts`). Existing saved user defaults are untouched
   // (this is only the factory floor).
@@ -58,13 +58,13 @@ export const FACTORY_DEFAULTS: MapViewPrefs = {
   grid_spacing: 100,
   lock_pin_drag: false,
   zone_fill_opacity: 0.4,
-  // 'auto' (S356) = every label that fits, collision-pruned, pins ranked
+  // 'auto' = every label that fits, collision-pruned, pins ranked
   // ahead of polygons ahead of lines and bigger zones ahead of smaller.
-  // 'always' = labels always visible. 'hover' (wired session 219 via
+  // 'always' = labels always visible. 'hover' (wired via
   // ZoneOverlay) = labels fade in only when the zone is hovered. 'never' =
   // never shown.
   zone_labels: 'auto',
-  // 'below' (default, Captain S313) = the label hangs off the zone's bottom
+  // 'below' (default, Titus) = the label hangs off the zone's bottom
   // edge, so it never sits on the fill/markers and gets blocked. 'center' =
   // the old centroid placement.
   zone_label_position: 'below',
@@ -143,7 +143,7 @@ export function resetMapOverride(mapId: string): void {
 }
 
 /**
- * The re-key (S363) moves ids; stored state follows. Moves each old map id's
+ * The re-key moves ids; stored state follows. Moves each old map id's
  * override to its new id. The record is not world-scoped (map ids are uuids),
  * so `worldId` is kept for a uniform call shape and ignored.
  */
@@ -175,7 +175,7 @@ export function getEffectiveMapPrefs(mapId: string): MapViewPrefs {
  * "Save current map's effective prefs as the atlas-wide defaults."
  *
  * Reads the effective prefs for the source map and writes them to atlas
- * defaults. The source map's per-map override is RETAINED — Captain's rule:
+ * defaults. The source map's per-map override is RETAINED — Titus's rule:
  * "as soon as a map has ANY of its own settings, it can NOT be overwritten
  * this way." Even though the source map was the one we saved-from, it had
  * specific settings that motivated the save; clearing its override would

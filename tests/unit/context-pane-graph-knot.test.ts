@@ -1,5 +1,5 @@
 /**
- * #141 (S387): Admiral Fluffington's web on Moppetopia piled into one knot.
+ * #141: Admiral Fluffington's web on Moppetopia piled into one knot.
  * Two causes, each guarded here on the real neighbourhood (the fixture is
  * Moppetopia's two hops around him, names and links only):
  *  - the sim had no step limit, so two nodes passing close flung a third far
@@ -8,7 +8,7 @@
  *  - nodes were kept 56 apart where the pane draws them about 0.75 to 1, and
  *    nothing kept a place clear for the subject's own label.
  * The label pass itself is `graph-labels.test.ts`; the ink is measured in
- * Chromium and Firefox by the S387 walk.
+ * Chromium and Firefox by a live walk.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import {

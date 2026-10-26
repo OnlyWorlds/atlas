@@ -1,6 +1,6 @@
 /**
- * PROMOTED from the S365 composition gate (lens A, kernel): two tabs, one registry: the per-field merge.
- * Each asserts the fixed behaviour; red on the code before the S365 gate fixes.
+ * PROMOTED from a composition gate on the kernel: two tabs, one registry: the per-field merge.
+ * Each asserts the fixed behaviour; red on the code before the gate fixes.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {

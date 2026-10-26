@@ -1,6 +1,6 @@
 /**
- * PROMOTED from the S365 composition gate (lens A, kernel): world prefs while open: the overlay, a failing write, two tabs.
- * Each asserts the fixed behaviour; red on the code before the S365 gate fixes.
+ * World prefs while open: the overlay, a failing write, two tabs.
+ * Each asserts the fixed behaviour; red on the code before the fixes.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
@@ -56,7 +56,7 @@ describe('B1: the notes overlay is open when the write-time merge lands', () => 
   });
 });
 
-describe('the overlay merge keeps typed text verbatim (S388)', () => {
+describe('the overlay merge keeps typed text verbatim', () => {
   it("notes holding $' or $& survive a merge with notes that moved underneath", async () => {
     const s = await store();
     await openWorld(s, entry({ notes: 'base' }));

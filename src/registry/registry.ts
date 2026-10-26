@@ -17,7 +17,7 @@ import type { TypeStripNames, WorldRegistryEntry, WorldsRegistry } from '../core
 // ---- Persistence ----
 
 /**
- * TWO TABS, ONE REGISTRY (S365 lane B M2). Every tab holds the whole registry
+ * TWO TABS, ONE REGISTRY. Every tab holds the whole registry
  * in memory and every save used to write all of it, so a tab saving for world
  * V (a world switch stamps last_opened_at) put back ITS old copy of world W:
  * notes typed in the other tab, a Make Online done there. A save now merges
@@ -50,7 +50,7 @@ function mergeFields(b: Record<string, unknown>, m: Record<string, unknown>, d: 
  * The account token, its id and its name are one fact: taken whole from this
  * tab if it changed any of them, else whole from storage. Per key, a tab that
  * pasted a token while another kept a minted one wrote the paste beside the
- * other token's id (the S475 gate's G3), and the next Forget revoked by it.
+ * other token's id, and the next Forget revoked by it.
  */
 const ACCOUNT_GROUP = ['account_token', 'account_token_id', 'account_token_id_tail', 'account_username'] as const;
 
@@ -147,7 +147,7 @@ export function saveRegistry(reg: WorldsRegistry): boolean {
       const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
       // Nothing stored = nothing another tab kept: entries this tab did not
       // change are dropped with it (a save after "clear site data" must not
-      // bring the forgotten worlds back, S364's flake).
+      // bring the forgotten worlds back).
       // Stored but unreadable: write this tab's copy whole, as before.
       let readable = true;
       try { readable = !raw || Array.isArray((JSON.parse(raw) as { worlds?: unknown })?.worlds); } catch { readable = false; }
@@ -158,7 +158,7 @@ export function saveRegistry(reg: WorldsRegistry): boolean {
     return true;
   } catch (err) {
     console.error('[registry] save failed:', err);
-    // Said once per session (S369): the list of worlds lives in this
+    // Said once per session: the list of worlds lives in this
     // browser's storage, and a failed save is lost on the next reload.
     if (!registrySaveFailureSaid) {
       registrySaveFailureSaid = true;
@@ -224,7 +224,7 @@ export interface CreateApiLinkedWorldOpts {
   parentId?: string;
   /** Server-side world name from `client.worlds.get()`. Display-only. */
   apiWorldName?: string;
-  /** View-only world linked with a READ key (S264) — no PIN, engine pull-only. */
+  /** View-only world linked with a READ key — no PIN, engine pull-only. */
   readOnly?: boolean;
   /** Linked as an agent seat (#104): the marker, and its secret when this browser holds it. */
   seat?: { role?: string };
@@ -293,7 +293,7 @@ export function attachApi(
       // world is genuinely the user's now, so gestures in it count.
       // A former-link memory is stale the moment a live link exists.
       // What a roster said, and the person's switch for it, belong to the
-      // link they were learned on (B12 Q1, the S438 gate's G5).
+      // link they were learned on.
       const { demo: _clearDemo, former_api_world_id: _clearFormer, shared_with_others: _clearShared, shared_keep_policy: _clearKeep, ...rest } = w;
       return { ...rest, state: 'api-linked', api: apiBlock };
     }),
@@ -365,7 +365,7 @@ export function findWorldByServerId(
  * DISTINCT local uuid for their handle key and keep the server id in
  * `api.world_id`/`former_api_world_id`). The import room's merge-vs-copy
  * collision detection rides this; checking only the handle key let re-importing
- * an api-linked world's own export fork its identity (S315 gate HIGH).
+ * an api-linked world's own export fork its identity.
  */
 export function findWorldByOwIdentity(
   reg: WorldsRegistry,
@@ -491,7 +491,7 @@ export function setFavorite(
  * (character) or 'nexus' (the home location). Returns a NEW registry —
  * caller saves + patches state like every other setter here.
  */
-/** Persist a home-tour card dismissal (S264). Idempotent; caller saves +
+/** Persist a home-tour card dismissal. Idempotent; caller saves +
  *  patches state like every other setter here. */
 export function dismissTourCard(
   reg: WorldsRegistry,
@@ -579,7 +579,7 @@ export function toggleWritingTreeCollapsed(
 }
 
 /**
- * The re-key (S363) moves ids; stored state follows. Remaps the element ids a
+ * The re-key moves ids; stored state follows. Remaps the element ids a
  * world entry carries (favourites, calendar lens, writing-tree collapse, last
  * writing narrative). Returns the SAME registry when nothing matched; the
  * caller saves.
@@ -656,7 +656,7 @@ export function setAccountToken(
   tokenId?: string | null,
 ): WorldsRegistry {
   const trimmed = token?.trim() || undefined;
-  // The id goes with the token it was minted with, never with the next one (S475).
+  // The id goes with the token it was minted with, never with the next one.
   const id = trimmed && isTokenId(tokenId) ? tokenId : undefined;
   return {
     ...reg,
@@ -678,7 +678,7 @@ export function mintedTokenId(reg: WorldsRegistry): string | null {
   return token && isTokenId(id) && reg.account_token_id_tail === token.slice(-8) ? id : null;
 }
 
-/** keel's token ids are UUIDs; anything else is never kept or sent (the S475 gate's G9). */
+/** keel's token ids are UUIDs; anything else is never kept or sent. */
 export function isTokenId(v: unknown): v is string {
   return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 }
@@ -715,7 +715,7 @@ export function setSyncPauseAll(reg: WorldsRegistry, paused: boolean): WorldsReg
 /**
  * The one answer to "should this world's engine be paused by the user?":
  * Pause all OR the world's own Stay offline. Every pause/resume handler and
- * attach read this, so neither switch can undo the other (S367 critic C7).
+ * attach read this, so neither switch can undo the other.
  */
 export function effectiveSyncPaused(
   entry: Pick<WorldRegistryEntry, 'sync_paused'> | null | undefined,
@@ -791,7 +791,7 @@ export function getMapsSettings(reg: WorldsRegistry): {
   };
 }
 
-// ---- Editor settings (session 219 — field edit mode) ----
+// ---- Editor settings (field edit mode) ----
 
 export type FieldEditMode = 'modal' | 'inline-single' | 'inline-multi';
 

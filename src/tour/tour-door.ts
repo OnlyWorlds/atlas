@@ -7,7 +7,7 @@
  *     element is made through the app's actual dialog;
  *   - the SILENT MINT beat (`step.creates`): the app's real `+` puts the next
  *     scripted element into the world, one per click, with no dialog at all.
- *     Captain's call — the narrator narrates, the app is where you act, and
+ *     Titus's call — the narrator narrates, the app is where you act, and
  *     three modals in a row for three objects reads as paperwork.
  *
  * THE GUARD IS THE POINT (gate R8). Every one of these conditions must hold

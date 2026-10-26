@@ -27,7 +27,7 @@ const ring = Array.from({ length: 40 }, (_, i) => {
 });
 const key = (p: { x: number; y: number }) => `${p.x},${p.y}`;
 
-describe('zone kinds (Skeld h20 #6449: the subtype)', () => {
+describe('zone kinds (Skeld 2026-10-17: the subtype)', () => {
   it('reads the words case-insensitively and trimmed', () => {
     expect(zoneKindOf('Landmass')).toBe('landmass');
     expect(zoneKindOf('  RIVER ')).toBe('river');
@@ -36,7 +36,7 @@ describe('zone kinds (Skeld h20 #6449: the subtype)', () => {
     expect(zoneKindOf('Route')).toBe('road');
     expect(zoneKindOf('path')).toBe('road');
   });
-  it('reads a "Class: kind" subtype by its halves, the class first (Skeld h58 #6762)', () => {
+  it('reads a "Class: kind" subtype by its halves, the class first (Skeld 2026-10-18)', () => {
     expect(zoneKindOf('Border: treaty line')).toBe('border');
     expect(zoneKindOf('Itinerary: route')).toBe('road');
     expect(zoneKindOf('River: Forest')).toBe('river');
@@ -129,7 +129,7 @@ describe('the ink holds still', () => {
   });
 });
 
-describe('the styles (S424: ink on parchment, modern atlas)', () => {
+describe('the styles (ink on parchment, modern atlas)', () => {
   it('every style draws every kind, each under its own name', () => {
     for (const id of MAP_STYLE_IDS) {
       const p = mapStylePreset(id)!;
@@ -148,7 +148,7 @@ describe('the styles (S424: ink on parchment, modern atlas)', () => {
   it('modern atlas draws every line straight', () => {
     for (const t of Object.values(mapStylePreset('atlas')!.kinds)) expect(t.rough).toBe(0);
   });
-  it('hatched tells its kinds apart by texture, never by hue (S425)', () => {
+  it('hatched tells its kinds apart by texture, never by hue', () => {
     const sepias = new Set(['#28220f', '#3a2c1a', '#5a4a30']);
     const k = mapStylePreset('hatched')!.kinds;
     for (const t of Object.values(k)) expect(sepias.has(t.patternColor ?? t.stroke)).toBe(true);

@@ -12,7 +12,7 @@
  * use Leaflet's native fill click — no hit-overlay needed.
  *
  * Coords on input are storage-space (bottom-left origin, y grows UP, the
- * schema's; S361) — the same coord space as Marker.x / Marker.y. Conversion to Leaflet LatLng
+ * schema's) — the same coord space as Marker.x / Marker.y. Conversion to Leaflet LatLng
  * happens inside the overlay.
  */
 
@@ -35,8 +35,8 @@ const LINE_HIT_WEIGHT = 20;
 //
 // Exported so zone-edit-mode's segment overlays can use the SAME renderer —
 // putting them in the same SVG element as the polygon, which makes
-// bringToFront() actually reorder them above the polygon (Captain smoke
-// session 219 wave 6 — "hover cuts off as soon as mouse ENTERS the zone").
+// bringToFront() actually reorder them above the polygon (Titus's smoke
+// test — "hover cuts off as soon as mouse ENTERS the zone").
 const svgRendererByMap = new WeakMap<L.Map, L.Renderer>();
 export function getZoneSvgRendererForMap(map: L.Map): L.Renderer {
   let r = svgRendererByMap.get(map);
@@ -58,23 +58,23 @@ export interface ZoneShape {
    * When true, the label exists in the DOM but starts hidden; mouseover on
    * the zone outline (or hit-overlay for lines) fades it in, mouseout fades
    * it out. When false/undefined, label visibility follows the zone's normal
-   * visible state (always visible when zone visible). Captain session 219:
+   * visible state (always visible when zone visible). With this,
    * 'hover' zone_labels mode now actually does something.
    */
   labelHoverOnly?: boolean;
   /**
    * When true, the label sits just BELOW the zone (its bottom edge, centred)
-   * rather than over the centroid — the default (Captain, S313): a centred
+   * rather than over the centroid — the default (Titus): a centred
    * label sits on top of the fill and markers and gets blocked. `'center'`
    * keeps the old behaviour.
    */
   labelBelow?: boolean;
-  /** Stroke width at rest (world style rule, S356); selected/hovered add one. */
+  /** Stroke width at rest (world style rule); selected/hovered add one. */
   weight?: number;
-  /** Stroke pattern (world style rule, S356); edit mode's dash overrides. */
+  /** Stroke pattern (world style rule); edit mode's dash overrides. */
   dash?: 'solid' | 'dashed' | 'dotted';
   /**
-   * The kind's treatment on a styled map (S423, `core/map-ink.ts`): it wins
+   * The kind's treatment on a styled map (`core/map-ink.ts`): it wins
    * over colour, opacity, weight and dash. Its ink exists only on screen;
    * the stored points are drawn plain while the zone is being edited.
    */
@@ -98,7 +98,7 @@ interface ZoneEntry {
    * Implementation: L.Marker + DivIcon (HTML in markerPane), NOT L.CircleMarker
    * (SVG in overlayPane). Using the same primitive as edit-mode handles
    * ensures consistent sub-pixel rendering — circleMarker vs divIcon in
-   * different panes was visually misaligned in smoke (session 215).
+   * different panes was visually misaligned in a smoke test.
    */
   vertexDots: L.Marker[];
   /**
@@ -122,9 +122,9 @@ interface ZoneEntry {
   shape: ZoneShape;
   selected: boolean;
   visible: boolean;
-  /** Shore bands under an inked landmass (S423), non-interactive. */
+  /** Shore bands under an inked landmass, non-interactive. */
   underLayers: L.Path[];
-  /** An inked line's name along it (S423): an SVG text on the hit layer's path. */
+  /** An inked line's name along it: an SVG text on the hit layer's path. */
   labelAlong?: SVGTextElement;
 }
 
@@ -178,7 +178,7 @@ export class ZoneOverlay {
       : shape.points;
   }
 
-  /** The land and water a river is clipped by (S424): each region zone's outline as drawn now. */
+  /** The land and water a river is clipped by: each region zone's outline as drawn now. */
   private inkRegions(): { land: Point[][]; water: Point[][] } {
     const zoom = this.map.getZoom();
     const from: Array<{ shape: ZoneShape; editing: boolean }> = [];
@@ -234,7 +234,7 @@ export class ZoneOverlay {
   }
 
   /**
-   * Paint order on a styled map (S423): seas, then land and its shore, then
+   * Paint order on a styled map: seas, then land and its shore, then
    * the areas on it, then the lines; names along lines on top. Zones without
    * a kind sit between the areas and the lines.
    */
@@ -311,7 +311,7 @@ export class ZoneOverlay {
     if (pointsChanged && patch.points) {
       // Points-only change — mutate the existing SVG path in place via
       // setLatLngs. Avoids the dragend visual flicker the previous rebuild
-      // path caused (Captain smoke session 219: "in editmode, when i drag a
+      // path caused (Titus's smoke test: "in editmode, when i drag a
       // marker, the lines look a bit glitchy"). The handlers and selection
       // state stay intact since the primitive doesn't change.
       const layer = entry.visibleLayer as L.Path & {
@@ -450,13 +450,13 @@ export class ZoneOverlay {
   }
 
   /**
-   * An inked line's name along it (S424), for the density layer: its text
+   * An inked line's name along it, for the density layer: its text
    * element and the line it follows in container px, in reading order.
    */
   getAlongLabel(id: string): {
     el: SVGTextElement;
     points: Array<{ x: number; y: number }>;
-    /** A river's stretches on land, as shares of its length (S424): its name keeps to them. */
+    /** A river's stretches on land, as shares of its length: its name keeps to them. */
     land?: Array<[number, number]>;
   } | undefined {
     const entry = this.entries.get(id);
@@ -555,11 +555,11 @@ export class ZoneOverlay {
     // L.canvas() which has unreliable dashArray support for polygons —
     // edit-mode's dashed outline (applyStyle sets dashArray: '5, 5' when
     // editing) renders as solid under canvas. SVG renderer guarantees
-    // dashed strokes for both polygon AND polyline (Captain smoke
-    // session 219). One shared renderer per map.
+    // dashed strokes for both polygon AND polyline (found in
+    // Titus's smoke test). One shared renderer per map.
     const renderer = getZoneSvgRendererForMap(this.map);
 
-    // Shore bands go in first, so they sit under the land they ring (S423).
+    // Shore bands go in first, so they sit under the land they ring.
     const underLayers: L.Path[] = [];
     if (shape.mode === 'polygon' && shape.ink?.shore) {
       for (const band of shape.ink.shore) {
@@ -593,7 +593,7 @@ export class ZoneOverlay {
         weight: LINE_HIT_WEIGHT,
         opacity: 0,
         interactive: true,
-        // A name runs along this path (S424): unclipped, so its middle is
+        // A name runs along this path: unclipped, so its middle is
         // the line's middle and the density layer can say where it prints.
         noClip: alongLine(shape),
         renderer,
@@ -625,7 +625,7 @@ export class ZoneOverlay {
         L.DomEvent.stopPropagation(e);
         self.onContext?.(shape.id, e);
       });
-      // Hover events for hover-only labels (session 219). Mouseover fades the
+      // Hover events for hover-only labels. Mouseover fades the
       // label in; mouseout fades it out. Cheap — opacity on the divIcon's DOM
       // element. Wired on BOTH visible + hit layers since line zones have a
       // wider invisible hit area than the visible stroke.
@@ -669,7 +669,7 @@ export class ZoneOverlay {
   }
 
   /**
-   * An inked line's name, written along it (S423): an SVG `<textPath>` on the
+   * An inked line's name, written along it: an SVG `<textPath>` on the
    * hit layer's path, which runs left to right. Kept beside the paths in the
    * zone renderer's svg; created, renamed or removed to match `labelText`.
    */
@@ -716,7 +716,7 @@ export class ZoneOverlay {
     // Read-only vertex dots: plain cyan circles, NO inner order number.
     // Numbers are reserved for actionable states (draft + edit handles) where
     // the order matters operationally. Outside edit, they're visual noise.
-    // (Session 217 — Captain's read: "maybe DONT show the little number labels
+    // (Titus's read: "maybe DONT show the little number labels
     // when a zone is selected but not edit mode. only when editmode.")
     entry.shape.points.forEach((p) => {
       const latlng = storageToLeaflet(p, this.canvasHeight);
@@ -782,7 +782,7 @@ export class ZoneOverlay {
     const color = entry.shape.color ?? DEFAULT_COLOR;
     const opacity = entry.shape.opacity ?? DEFAULT_OPACITY;
     const showShape = entry.visible && this.layerVisible;
-    // Hover reads like a light selection (Captain, S356: "hover would
+    // Hover reads like a light selection (Titus: "hover would
     // highlight the whole road, river, chora"): selected weight, full
     // stroke opacity, a notch more fill, and the label revealed even when
     // the density layer culled it.
@@ -808,7 +808,7 @@ export class ZoneOverlay {
     }
     const ink = entry.shape.ink;
     if (ink) {
-      // A styled map: the kind's treatment draws the zone (S423). Lit adds a
+      // A styled map: the kind's treatment draws the zone. Lit adds a
       // pixel of ink, so a stroke-less forest still answers the cursor.
       style.color = ink.stroke;
       style.weight = ink.weight + (lit ? 1 : 0);
@@ -829,7 +829,7 @@ export class ZoneOverlay {
     if (entry.labelMarker) {
       const labelEl = entry.labelMarker.getElement();
       if (labelEl) {
-        // Label visibility rules (session 219):
+        // Label visibility rules:
         //   - Zone hidden / layer hidden → always 0
         //   - labelHoverOnly + not hovered → 0
         //   - Otherwise → 1
@@ -840,7 +840,7 @@ export class ZoneOverlay {
         else opacity = '1';
         (labelEl as HTMLElement).style.opacity = opacity;
         labelEl.classList.toggle('atlas-label-revealed', Boolean(entry.hovered && showShape));
-        // The chip's hairline takes the zone's colour (S356): with kinds
+        // The chip's hairline takes the zone's colour: with kinds
         // coloured, a river's name reads as a river's name.
         const span = labelEl.querySelector('span') as HTMLElement | null;
         if (span && !ink) span.style.borderColor = color;
@@ -901,7 +901,7 @@ function alongLine(shape: ZoneShape): boolean {
 }
 
 /**
- * The fill patterns a styled map uses (S423), once per zone renderer's svg.
+ * The fill patterns a styled map uses, once per zone renderer's svg.
  * `userSpaceOnUse` puts them in the renderer's layer-pixel space, which a pan
  * does not move: the hatch travels with its shape and stays the same size on
  * screen at every zoom. One per shape and colour (`inkPatternId`), made the
@@ -912,13 +912,13 @@ const PATTERN_BODY: Record<InkPattern, (c: string) => string> = {
   hatch: c => `<line x1="0" y1="0" x2="0" y2="6" stroke="${c}" stroke-width="1.1" stroke-opacity="0.75"/>`,
   stipple: c => `<circle cx="2" cy="2" r="1.1" fill="${c}"/><circle cx="6.5" cy="6" r="0.9" fill="${c}"/>`,
   marsh: c => `<line x1="1" y1="4" x2="7" y2="4" stroke="${c}" stroke-width="0.9"/><line x1="8" y1="8" x2="12" y2="8" stroke="${c}" stroke-width="0.9"/>`,
-  // Seethe's contour dots (style-atlas.html, S424)
+  // Seethe's contour dots (style-atlas.html)
   dots: c => `<circle cx="2.5" cy="2.5" r="0.9" fill="${c}" opacity="0.85"/><circle cx="7.5" cy="7.5" r="0.6" fill="${c}" opacity="0.6"/>`,
-  // Seethe's modern-atlas grids (map-atlas.ts, S424): forest dots, marsh dashes, a territory's faint hatch
+  // Seethe's modern-atlas grids (map-atlas.ts): forest dots, marsh dashes, a territory's faint hatch
   fdots: c => `<circle cx="2" cy="2" r="0.85" fill="${c}" opacity="0.8"/><circle cx="6" cy="6" r="0.6" fill="${c}" opacity="0.6"/>`,
   dashes: c => `<line x1="1" y1="3" x2="5" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/><line x1="7" y1="3" x2="11" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/>`,
   thinhatch: c => `<line x1="0" y1="0" x2="0" y2="18" stroke="${c}" stroke-width="0.4" opacity="0.14"/>`,
-  // Seethe's hatched textures (map-hatched.ts, S425): one ink, the kind in the texture
+  // Seethe's hatched textures (map-hatched.ts): one ink, the kind in the texture
   rhatch: c => `<line x1="0" y1="0" x2="0" y2="6" stroke="${c}" stroke-width="0.85" opacity="0.85"/>`,
   trees: c => `<line x1="2" y1="4" x2="2" y2="7" stroke="${c}" stroke-width="0.7" opacity="0.75"/>`
     + `<circle cx="2" cy="3.5" r="0.7" fill="none" stroke="${c}" stroke-width="0.5" opacity="0.75"/>`
@@ -973,12 +973,12 @@ function ensureInkPattern(map: L.Map, pattern: InkPattern, color: string, bg?: s
 function labelAnchorFor(shape: ZoneShape): Point {
   // A LINE always anchors at its midpoint. The `below` anchor is a bounding-box
   // bottom edge, which for a line drifts the label far under the lowest
-  // endpoint (Captain's launch note: the line label sat too far below the
+  // endpoint (Titus's launch note: the line label sat too far below the
   // line). A line has no interior to sit a label "inside", so midpoint + the
   // small CSS below-nudge keeps it reading against the line itself. Polygons
   // keep the below/centroid choice.
   if (shape.mode === 'line') return lineMidAnchor(shape.points);
-  // On a styled map an area's name is lettering inside it (S423): the point
+  // On a styled map an area's name is lettering inside it: the point
   // farthest from its outline, which a bay or a crescent cannot push outside.
   if (shape.ink) return poleOfInaccessibility(shape.points);
   if (shape.labelBelow) return bottomCenter(shape.points);
@@ -986,7 +986,7 @@ function labelAnchorFor(shape: ZoneShape): Point {
 }
 
 /** Bottom-centre of the points' bounding box. Screen-bottom = MIN storage-y
- *  (storage is bottom-left since S361: lat = y), so the label hangs off the
+ *  (storage is bottom-left: lat = y), so the label hangs off the
  *  zone's lowest edge, horizontally centred. */
 export function bottomCenter(points: Point[]): Point {
   if (points.length === 0) return { x: 0, y: 0 };

@@ -1,5 +1,5 @@
 /**
- * The density layer for the map canvas (S356).
+ * The density layer for the map canvas.
  *
  * Born on Skeld's Sikelia: 196 pins, 319 zones and their labels on one
  * 8000x5200 canvas, every label "always" on, every pin a 32px icon over a
@@ -48,14 +48,14 @@ export interface LabelCandidate {
   weight: number;
   /** Placements in preference order; the first that fits is taken. */
   boxes: readonly Box[];
-  /** A placement that is not one box (a name along a river, S424): what it
+  /** A placement that is not one box (a name along a river): what it
    *  covers, piece by piece, per placement. `boxes[i]` is then its bounds,
    *  for the screen test; collisions are tested on the pieces. */
   parts?: readonly (readonly Box[])[];
   /** The obstacle this label belongs to (its own pin icon), which it may overlap. */
   owner?: string;
   /** The text the label prints, normalised. A map prints a name once: a zone
-   *  and the pin of the same name (Moppetopia's Snack Nebula, S380) share one
+   *  and the pin of the same name (Moppetopia's Snack Nebula) share one
    *  label, and the higher-ranked candidate (the pin) carries it. */
   name?: string;
 }
@@ -64,10 +64,10 @@ export interface LabelCandidate {
  * Something a label must never cover: a pin icon. Labels are exempt from
  * their own pin (the label hangs off it by design). A label with no clear
  * placement is culled and its pin names itself on hover (the pin tooltip),
- * the rule the published page follows (show a327199). S356 let a heavy pin's
+ * the rule the published page follows (show a327199). An earlier rule let a heavy pin's
  * label cover a lighter icon as a last resort; at fit zoom on Moppetopia that
- * put Feltropolis and USS Fuzzball over their neighbours (S381 pre-smoke), and
- * the Captain's rule for the page is that labels never clash with pins.
+ * put Feltropolis and USS Fuzzball over their neighbours, and
+ * Titus's rule for the page is that labels never clash with pins.
  */
 export interface Obstacle { id: string; box: Box }
 
@@ -165,7 +165,7 @@ export function pinLabelPlacements(ink: Box, icon: Box, gap: number): Box[] {
 export const ALONG_SHARES = [0.5, 0.35, 0.65, 0.2, 0.8] as const;
 
 /**
- * The places a name written along a line may take (S424): for each share
+ * The places a name written along a line may take: for each share
  * of the line's length (the name centred there, as `startOffset` with a
  * middle anchor draws it), the pieces of screen it covers, one square per
  * `half`-sized step of its span, lifted `lift` px to the side the glyphs
@@ -312,7 +312,7 @@ interface LabelMetrics {
   /** Width of the span the offsets were calibrated on (spans centre on x). */
   calibratedW: number;
   font: string;
-  /** The face's case and spacing, which a canvas does not apply (S424: a
+  /** The face's case and spacing, which a canvas does not apply (a
    *  styled map letters a landmass in spaced capitals). */
   upper: boolean;
   spacing: number;
@@ -453,7 +453,7 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
       if (el && anchor && el.textContent?.trim()) zoneLabelEls.push({ id, el, anchor });
     }
   }
-  // Names written along lines on a styled map (S424): SVG text, no anchor.
+  // Names written along lines on a styled map: SVG text, no anchor.
   const alongEls: Array<{ id: string; el: SVGTextElement; points: Array<{ x: number; y: number }>; land?: Array<[number, number]> }> = [];
   if (entry.zoneOverlay) {
     for (const id of entry.zoneOverlay.getZoneIds()) {
@@ -486,7 +486,7 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
   const defaultMarginLeft = `${-PIN_LABEL_HALF_WIDTH}px`;
   const defaultMarginTop = `${iconHalf + gap}px`;
   let pinMetrics: LabelMetrics | null = null;
-  // Zone labels by their face (S424): on a styled map each kind letters in
+  // Zone labels by their face: on a styled map each kind letters in
   // its own, so one calibration per label class, kept per map across passes
   // (a kind whose every label was culled last pass still has its numbers).
   let zoneMetrics = zoneMetricsByEntry.get(entry);

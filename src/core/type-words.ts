@@ -1,14 +1,14 @@
 /**
  * The one place Atlas finds a type's printed name (the names profile,
- * schema-dist dist.48 `profiles/names.md`, OW Council #567; contract
- * Forge/Notes/2026-10-22-s455-names-profile-atlas-contract.md).
+ * schema-dist dist.48 `profiles/names.md`; its Atlas contract is a
+ * design note).
  *
  * A world may carry `x_names` in its world.json: its own words for the types
  * ("Employee" for character in a work world). The SDK's `typeWord` reads the
  * map by the profile's four steps; null means the standard's name, which
  * keeps Atlas's casing (lower case mid-sentence, capitalised where `start`
- * asks). A world's word is printed as written, never re-cased (Skeld h58
- * #10789 (1)).
+ * asks). A world's word is printed as written, never re-cased (Skeld,
+ * 2026-10-22).
  *
  * Only words: folders, ids, routes and the wire keep the slug.
  */
@@ -50,7 +50,7 @@ export function typeName(type: string, opts: TypeNameOptions = {}): string {
  * The open world's own word for a supertype of a type ("AI agent" for a
  * Character's Agent), or null when the world names only the type, or nothing.
  * A line that prints it has said the supertype, so the data's value is not
- * printed beside it (Seethe h20 #11028); a filter keeps the value as its key.
+ * printed beside it (Seethe 2026-10-23); a filter keeps the value as its key.
  */
 export function supertypeWord(type: string, supertype: unknown, opts: Pick<TypeNameOptions, 'many' | 'world'> = {}): string | null {
   const sup = supertypeOf(supertype);

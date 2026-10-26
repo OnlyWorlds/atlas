@@ -1,5 +1,5 @@
 /**
- * Modal close discipline (S318, Captain): a modal closes on a FULL outside
+ * Modal close discipline (Titus): a modal closes on a FULL outside
  * click only — press AND release both on the overlay. A drag that starts
  * inside the panel (text selection in an input, a slipped cursor) and ends
  * outside must NOT close it; that gesture used to eat half-typed modals via

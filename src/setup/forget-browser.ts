@@ -44,14 +44,14 @@ export interface ForgetInventory {
   folderWorlds: number;
   /** Worlds on a seat: the seat's secret goes, and they come back only through onlyworlds.com. */
   seatWorlds: number;
-  /** Seats a link left held, never downloaded (Keel #469): the record goes, the seat stays on keel. */
+  /** Seats a link left held, never downloaded: the record goes, the seat stays on keel. */
   heldSeats: string[];
 }
 
 export function forgetInventory(reg: WorldsRegistry): ForgetInventory {
   // `demo` marks the tour's world (Hyperion), which Atlas makes again; a
   // 1.16 tour world sat at the OPFS root with no `where`, so it is never
-  // counted as a folder on the drive (S386 gate).
+  // counted as a folder on the drive.
   const inBrowser = reg.worlds.filter(w => isBrowserWorld(w) && !w.cleared_at && w.demo !== true);
   return {
     browserOnly: inBrowser.filter(w => w.state !== 'api-linked').map(w => w.name),
@@ -125,7 +125,7 @@ export async function forgetEverything(deps: {
 } = {}): Promise<void> {
   // 3. OPFS first, every entry under the origin's root. The worlds' home goes
   // LAST: a failure on a stray entry then leaves every world where it was,
-  // not all of them gone with the registry still naming them (S386 gate).
+  // not all of them gone with the registry still naming them.
   // A directory a just-closed store still holds is busy for a moment: retry.
   const wait = deps.wait ?? ((ms: number) => new Promise(r => setTimeout(r, ms)));
   try {
@@ -153,7 +153,7 @@ export async function forgetEverything(deps: {
   for (const name of names) await deleteDatabase(name).catch(err => console.warn('[forget] could not delete', name, err));
   // 5. A token Atlas minted is revoked here, after everything that can stop
   // the forget and right before the registry goes: a forget that stopped
-  // earlier keeps a working token, never a revoked one (the S475 gate's G2).
+  // earlier keeps a working token, never a revoked one.
   // Its outcome does not stop the forget.
   const token = getState().registry.account_token;
   const tokenId = mintedTokenId(getState().registry);
@@ -161,7 +161,7 @@ export async function forgetEverything(deps: {
   localStorage.clear();
   sessionStorage.clear();
   // Closed after the post: a message already posted is still delivered, and
-  // an open channel left behind receives every later roll call (S388: in the
+  // an open channel left behind receives every later roll call (in the
   // one-process test run it took the next test's and threw there).
   try {
     const ch = new BroadcastChannel(CHANNEL);

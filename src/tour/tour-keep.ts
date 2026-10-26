@@ -52,7 +52,7 @@ const afterRoute = () => new Promise<void>(r => setTimeout(r, 0));
  * boot's resume and a teardown all speak the same sentences. `quiet` leaves
  * out the success toast (Save it to a folder says its own once the move ends).
  * `finishing`: world.json already reads kept (resume, a teardown), so the next
- * start does finish it; from the finale it does not (S376 lens C C11).
+ * start does finish it; from the finale it does not.
  */
 export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean; finishing?: boolean } = {}): Promise<KeepOutcome> {
   const [{ toastManager }, { showProblem }] = await Promise.all([
@@ -95,18 +95,18 @@ export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean;
   const bundle = await import('../demo/hyperion-world.json');
   const bundleIds = new Set((bundle.default as unknown as { elements: Array<{ id: string }> }).elements.map(e => e.id));
   // What K3 will move, read before K2: after a failure it tells "nothing
-  // moved" from "some moved" (S375 gate K2).
+  // moved" from "some moved".
   const toMove = (await store.listElements()).map(e => e.id).filter(id => bundleIds.has(id));
   // Whether K2 is THIS call's write. A resume finds world.json already kept
   // (K0's activation may even have finished the re-key), and undoing a K2
-  // this call never made re-demos a world whose ids all moved (S376 lens A A1).
+  // this call never made re-demos a world whose ids all moved.
   const wasDemo = (await store.readWorldMeta()).demo === true;
 
   const modal = new KeepingModal(name);
   modal.open();
   let unrewritten: string[] = [];
   try {
-    // K2. The return is the mirror (S361): never a re-listing, never a re-read.
+    // K2. The return is the mirror: never a re-listing, never a re-read.
     mirrorMeta(worldId, await store.writeWorldMeta({ demo: undefined }));
     // K3.
     const { giveTourWorldNewIds } = await import('../sync/rekey-run');
@@ -153,7 +153,7 @@ function mirrorMeta(worldId: string, meta: WorldMeta): void {
 }
 
 /**
- * Where a failed K3 left the world (S375 gate K2). A journal on disk: begun,
+ * Where a failed K3 left the world. A journal on disk: begun,
  * and resume, Keep or a teardown finishes it (world.json stays un-demoed, so
  * no step writes into it: `tourWorldIsActive`). No journal and every id still
  * there: nothing moved, so K2 is undone and the world is the sandbox again
@@ -161,7 +161,7 @@ function mirrorMeta(worldId: string, meta: WorldMeta): void {
  * left in the store: the re-key finished (in this call, or in the activation
  * that opened the world) and only what came after failed. K2 is undone only
  * when this call made it (`wasDemo`); otherwise the world stays 'kept' and
- * the next Keep, resume or teardown finishes it (S376 lens A A1).
+ * the next Keep, resume or teardown finishes it.
  */
 async function afterFailedRekey(
   store: FolderStore,

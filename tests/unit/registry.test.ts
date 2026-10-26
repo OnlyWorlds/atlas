@@ -529,7 +529,7 @@ describe('registry — maps settings (DESIGN_MAPS.md §3.5)', () => {
   });
 });
 
-// ---- Account mode (session 260): token + former-link identity ----
+// ---- Account mode: token + former-link identity ----
 
 describe('registry — setAccountToken', () => {
   it('sets a trimmed token + username', () => {
@@ -625,7 +625,7 @@ describe('registry — findWorldByOwIdentity (the import collision predicate)', 
     expect(findWorldByOwIdentity(next, 'ow-999')).toBeUndefined();
   });
 
-  it('matches an api-linked world by api.world_id even though its handle key is a local uuid (S315 gate HIGH)', () => {
+  it('matches an api-linked world by api.world_id even though its handle key is a local uuid', () => {
     // The link flow mints a DISTINCT local uuid for the handle key; the OW
     // identity lives only in api.world_id. The handle-key convention alone
     // must NOT be trusted to find this world.
@@ -646,7 +646,7 @@ describe('registry — findWorldByOwIdentity (the import collision predicate)', 
   });
 
   it('the import room rides findWorldByOwIdentity, not a bare handle-key find (source scan)', () => {
-    // An invariant about two files must open both (S305). The predicate above
+    // An invariant about two files must open both. The predicate above
     // is only a fix if the import room actually calls it — a re-inlined
     // handle-key-only find would resurrect the identity fork with these units
     // still green.
@@ -657,7 +657,7 @@ describe('registry — findWorldByOwIdentity (the import collision predicate)', 
   });
 });
 
-describe('the type strip names setting (#24, h20 B8)', () => {
+describe('the type strip names setting (#24)', () => {
   it('defaults to icons, keeps a chosen value, and reads one it does not know as the default', () => {
     const reg = defaultRegistry();
     expect(getEditorSettings(reg).type_strip_names).toBe('icons');

@@ -1,5 +1,5 @@
 /**
- * The first screen's account worlds (S414, the S413 pinch).
+ * The first screen's account worlds.
  *
  * The first-visit landing has no sidebar, so a signed-in account's worlds
  * (the sidebar's On OnlyWorlds rows) were offered nowhere on it: a person

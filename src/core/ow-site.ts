@@ -1,6 +1,6 @@
 /**
- * The onlyworlds.com pages Atlas sends people to (S407, the journey floor
- * h37 #4597): making an account, setting its PIN, and a world's Access pane,
+ * The onlyworlds.com pages Atlas sends people to (the journey floor
+ * 2026-10-14): making an account, setting its PIN, and a world's Access pane,
  * where only the website can make an invite link today (keel
  * `portal/urls.py`: invites are portal views, the v2 API has no route).
  */
@@ -19,7 +19,7 @@ export function lanternLineHtml(): string {
   return `On a phone, <a class="atlas-settings-link atlas-link-inline" data-link="lantern" href="${LANTERN_URL}" target="_blank" rel="noopener">Lantern</a> is the OnlyWorlds app made for one: it catches notes at the table and keeps your world offline.`;
 }
 
-/** A world's page on onlyworlds.com, opened at Access: its own path, kept through the site's sign-in (keel PR 90, Skeld h29 #7711). */
+/** A world's page on onlyworlds.com, opened at Access: its own path, kept through the site's sign-in (keel PR 90, Skeld 2026-10-19). */
 export function owAccessUrl(apiWorldId: string): string {
   return `https://www.onlyworlds.com/account/worlds/${encodeURIComponent(apiWorldId)}/access`;
 }
@@ -30,7 +30,7 @@ export function owAccessUrl(apiWorldId: string): string {
  * Access pane is the owner's). Without the account list, the owner is the
  * likely case, and the website says so plainly if not. With the list loaded
  * (`listLoaded`), a world missing from it is someone else's: keel makes links
- * for the owner only, so it is not offered (#341, the S414 gate's M2).
+ * for the owner only, so it is not offered (#341).
  */
 export function canOfferInvite(world: WorldRegistryEntry, accountRows: readonly AccountWorldRow[], listLoaded = false): boolean {
   const api = world.api;

@@ -1,7 +1,6 @@
 /**
- * Move to a folder (1.17 bout 4, contract §4, §9 invariants 4-8; S370 gate
- * lens A runway: the crash matrix, the token, the lock holder, 5a; lens B
- * B3-B5, B26). The REAL FsFolderStore on fake-fs: the browser home and the
+ * Move to a folder (1.17 bout 4, contract §4, §9 invariants 4-8): the crash
+ * matrix, the token, the lock holder. The REAL FsFolderStore on fake-fs: the browser home and the
  * drive are two fake trees, the world is open in this tab.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -266,7 +265,7 @@ describe('the crash matrix: a failure before the commit changes nothing (invaria
 
   // Two rows below wait out a removal's real busy backoff (100 + 250 + 500 +
   // 1000 ms, REMOVE_RETRY_MS in browser-world-move.ts and browser-worlds.ts):
-  // about 1.9 s alone, past 15 s once in a loaded full run (Boss, h11 #4238).
+  // about 1.9 s alone, past 15 s once in a loaded full run (Boss, 2026-10-14).
   // The wait is the code's own, not work, so the limit is wide.
   const BACKOFF_TIMEOUT_MS = 30_000;
 

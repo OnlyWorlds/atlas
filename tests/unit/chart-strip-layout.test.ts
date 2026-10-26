@@ -1,5 +1,5 @@
 /**
- * The home strip's layout (#121, S382). Skeld's pre-smoke on Moppetopia found
+ * The home strip's layout (#121). Skeld's pre-smoke on Moppetopia found
  * "Admiral Splashworth" printed over the next label: the old layout kept one
  * right edge per row, reserved a flipped label by a different test than the
  * one the draw used, and dropped an overflow dot on whatever row was least

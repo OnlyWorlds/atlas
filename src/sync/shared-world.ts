@@ -1,6 +1,6 @@
 /**
- * A shared world reviews before it overwrites (B12 Q1, the Captain's (a),
- * h20 #8007; contract `Forge/Notes/2026-10-20-s437-shared-world-review-default.md`).
+ * A shared world reviews before it overwrites (Titus's call,
+ * 2026-10-20).
  *
  * In a world others can write to, Local wins would put this copy's version of
  * an element over a collaborator's newer words without a word. So a shared

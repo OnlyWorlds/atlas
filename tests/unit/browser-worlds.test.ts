@@ -1,6 +1,6 @@
 /**
  * Worlds in browser storage, the guards (1.17 bout 0, conv. 129).
- * Contract: Forge/Notes/2026-10-04-browser-worlds-contract.md §1, §7.2.
+ * Design note: browser worlds, §1 and §7.2.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeDirHandle } from '../fixtures/fake-fs';
@@ -116,7 +116,7 @@ describe('removeBrowserWorldDir', () => {
   });
 });
 
-describe('pickTourEntry (S370 gate A4/B13)', () => {
+describe('pickTourEntry', () => {
   const tourBrowser = entry({ id: 'tour-b', demo: true, where: 'browser', folder: { handle_key: 'world-t', folder_name: 'hyperion-t1aaaaaa-0001' } });
   const tourLegacy = entry({ id: 'tour-l', demo: true, folder: { handle_key: 'world-l', folder_name: 'hyperion-tour-l1aaaaaa' } });
   const kept = entry({ id: 'kept', where: 'browser' });

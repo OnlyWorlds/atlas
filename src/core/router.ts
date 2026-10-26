@@ -70,7 +70,7 @@ export const SETTINGS_TAB_GROUPS: ReadonlyArray<{ scope: 'atlas' | 'world'; tabs
 ];
 
 /**
- * Legacy settings-tab keys → current keys (pre-session-232 deep links / stored
+ * Legacy settings-tab keys → current keys (older deep links / stored
  * last-tab; 'account' renamed to 'onlyworlds' in Bout OW; 'editing' split into
  * 'elements' + 'maps' 2026-07-19 — 'maps' resolves as a REAL tab now, so its
  * old alias-to-editing entry is gone).
@@ -187,7 +187,7 @@ export function parseHash(hash: string): Route {
       const knowledgeId = parts[3];
       return knowledgeId ? { worldId, mode: 'knowledge', knowledgeId } : { worldId, mode: 'knowledge' };
     }
-    // 'search' + 'templates' rooms REMOVED (session 256; dormant since 240).
+    // 'search' + 'templates' rooms REMOVED (long dormant).
     // Legacy URLs land on home — a dead link should reach somewhere alive.
     // Search returns as the Cmd+K palette (post-v1).
     if (sub === 'search' || sub === 'templates') return { worldId, mode: 'home' };

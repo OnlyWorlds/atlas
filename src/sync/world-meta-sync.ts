@@ -1,8 +1,8 @@
 /**
- * World-meta sync kernel — pure functions for the engine's meta step (S262).
+ * World-meta sync kernel — pure functions for the engine's meta step.
  *
  * The contract: keel `GET|PATCH /api/v2/world`, pinned from source 2026-07-13
- * (design + gate record: Forge/Notes/2026-07-13-worldmeta-sync-design.md).
+ * (design + gate record: a design note of 2026-07-13).
  * Everything here is pure and unit-tested; the engine's executeMetaStep and
  * the adapter's getWorldMeta/patchWorldMeta consume it.
  *
@@ -37,7 +37,7 @@ export const META_SYNC_FIELDS: Readonly<Record<string, MetaFieldKind>> = {
   time_range_min: 'int',
   time_range_max: 'int',
   time_current: 'int',
-  // World units (standard 00.31.00, Keel #146): free-text labels, "" clears.
+  // World units (standard 00.31.00): free-text labels, "" clears.
   // Keel trims them, so they compare trimmed ('label'): an untrimmed local
   // value would otherwise never match its echo and re-push every round.
   length_unit: 'label',
@@ -189,7 +189,7 @@ export function threeWayMetaDiff(
 }
 
 // ---------------------------------------------------------------------------
-// A profile's keys on the World (Keel #571, folder spec 0.3.16)
+// A profile's keys on the World (folder spec 0.3.16)
 // ---------------------------------------------------------------------------
 //
 // keel keeps any `x_` key on the World as given and serves it at the top level
@@ -210,7 +210,7 @@ export function isWorldExtensionKey(key: string): boolean {
 /**
  * Canonical JSON with object keys sorted at every depth; null for absent, and
  * for a value JSON can only write as null (a non-finite number), since that is
- * what keel receives and drops (S458 gate G5).
+ * what keel receives and drops.
  */
 export function canonicalExtValue(v: unknown): string | null {
   if (v === undefined || v === null) return null;
@@ -218,7 +218,7 @@ export function canonicalExtValue(v: unknown): string | null {
   return s === undefined || s === 'null' ? null : s;
 }
 
-/** keel's cap on a World's extension keys, as compact UTF-8 JSON (Keel #571). */
+/** keel's cap on a World's extension keys, as compact UTF-8 JSON. */
 export const EXT_MAX_BYTES = 65536;
 
 /** The bytes the server's x_ keys would take after `push` lands (null removes a key). */
@@ -317,7 +317,7 @@ export function extDirty(local: Record<string, unknown>, baseline: Record<string
  * would mean "no change" and a cleared now would resurrect, gate finding).
  * The RENAME to wire names happens in the adapter, not here — this output is
  * still disk-named so the engine and fakes reason in one vocabulary. A
- * profile's `x_` key passes as given, null removing it (Keel #571).
+ * profile's `x_` key passes as given, null removing it.
  */
 export function encodeMetaFieldsForPush(fields: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};

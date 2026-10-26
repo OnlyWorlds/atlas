@@ -1,5 +1,5 @@
 /**
- * The one sentence the sidecar rule says (S365, `story-sidecar.ts`): a scene
+ * The one sentence the sidecar rule says (`story-sidecar.ts`): a scene
  * or knowledge entry opened with text another program wrote while Atlas was
  * closed. Once per element per session: the stale copy stays on disk until
  * the next save, so the rule fires on every open until then, and a notice on

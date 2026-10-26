@@ -1,9 +1,9 @@
 /**
- * Nothing moves when the icon font arrives (S465): the font is 4 MB and
+ * Nothing moves when the icon font arrives: the font is 4 MB and
  * `font-display: block`, and before it loads each icon is its ligature's word
  * laid out invisibly. A click aimed while it loaded landed beside its target
  * (front-door's and front-door-gate's lost Start a world clicks on a cold
- * runner, S461, S465). The font is held back here, the header's and the room
+ * runner). The font is held back here, the header's and the room
  * strip's buttons measured, the font let through, and measured again.
  */
 import { test, expect } from '@playwright/test';

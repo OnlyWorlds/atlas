@@ -1,5 +1,5 @@
 /**
- * S360 — the frontend-craft systemic half (lane A of the sweep). Each check
+ * The frontend-craft systemic half of the sweep. Each check
  * reads the RENDERED result (computed style, the real tab title, the live
  * region), not the rule that should produce it.
  */

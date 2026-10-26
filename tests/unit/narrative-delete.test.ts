@@ -1,12 +1,12 @@
 /**
- * Tests for the narrative-deletion summary kernel (S310, Bout W).
+ * Tests for the narrative-deletion summary kernel (Bout W).
  *
  * The load-bearing test in this file is AGREEMENT: the kernel's descendant walk
  * must return exactly what the store's cascade actually deletes. The kernel's
  * count is a PROMISE to the user about what is about to be destroyed, and a
  * promise that drifts from its subject is worse than no promise at all — so the
  * invariant opens BOTH files rather than comparing the kernel to a copy of
- * itself (the S305 vacuous-invariant lesson).
+ * itself (the vacuous-invariant lesson).
  */
 
 import { describe, it, expect } from 'vitest';

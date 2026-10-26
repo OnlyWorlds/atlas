@@ -11,7 +11,7 @@
  * values. Escapes `& < > " '` and is TOTAL: a non-string (a number, null, an
  * object from a foreign folder) is stringified instead of throwing.
  *
- * S360: this used to escape only `& < >`, and it is used inside `attr="…"` in
+ * This used to escape only `& < >`, and it is used inside `attr="…"` in
  * dozens of places, so a world file carrying a `"` in a name, url or unit could
  * break out of the attribute (a stored XSS from a folder anyone can write). The
  * quote escapes are harmless in text context, so one helper serves both.
@@ -25,7 +25,7 @@ export function escapeText(s: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Escape for a quoted HTML attribute value. Same as `escapeText` since S360. */
+/** Escape for a quoted HTML attribute value. Same as `escapeText`. */
 export function escapeAttr(s: unknown): string {
   return escapeText(s);
 }
@@ -62,7 +62,7 @@ export function relativeTime(iso: string | null | undefined): string {
 
 /**
  * Keyboard activation for div-rows that declare `role="button" tabindex="0"`
- * (S309). The role PROMISES Enter/Space work — a promise the innerHTML list
+ * The role PROMISES Enter/Space work — a promise the innerHTML list
  * rows never kept: a keyboard user tabbed in, heard "button", pressed Enter,
  * nothing. One delegated listener per list root synthesizes the row's click
  * (which the root's existing click delegation then handles normally).
@@ -85,7 +85,7 @@ export function installRowKeydownActivation(root: HTMLElement, selector = '[role
 /**
  * A number from untrusted data (a world file): the value when it is a finite
  * number or a numeric string, else the fallback. A string `order` from a
- * foreign folder was concatenated straight into HTML before this (S360).
+ * foreign folder was concatenated straight into HTML before this.
  */
 export function finiteOr(v: unknown, fallback: number): number {
   const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;

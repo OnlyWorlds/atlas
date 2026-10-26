@@ -1,6 +1,6 @@
 /**
- * Settings → Context pane tab (session 231; extracted from settings-panel
- * session 233). Per-world prefs for the right-pane Context tab — hop depth,
+ * Settings → Context pane tab (extracted from settings-panel).
+ * Per-world prefs for the right-pane Context tab — hop depth,
  * lock-layout, edge coloring. The same controls live on the graph toolbar and
  * write to the same registry fields (convention #59: one-direction prefs flow).
  */

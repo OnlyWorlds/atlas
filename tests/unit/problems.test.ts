@@ -1,5 +1,5 @@
 /**
- * The problem classifier and the report scrubber (S368, lane X).
+ * The problem classifier and the report scrubber (lane X).
  * Every sentence is the user's: never the raw error text, never an em-dash.
  */
 import { describe, it, expect } from 'vitest';
@@ -98,7 +98,7 @@ describe('problemFor', () => {
     expect(problemFor(dom('AbortError')).quiet).toBe(true);
   });
 
-  it('says changes are safe in the folder only when the caller says so (S369)', () => {
+  it('says changes are safe in the folder only when the caller says so', () => {
     const offline = new TypeError('Failed to fetch');
     expect(problemFor(offline, { doing: 'signing in' }).sentence).not.toMatch(/saved/);
     expect(problemFor(offline, { doing: 'uploading changes', savedLocally: true }).sentence).toContain('Your changes are saved in the folder');
@@ -106,7 +106,7 @@ describe('problemFor', () => {
     expect(problemFor(busy, { doing: 'linking the world' }).sentence).not.toMatch(/saved/);
   });
 
-  it('a refused folder pick is not the open world\'s folder, and gets no Allow access (S369)', () => {
+  it('a refused folder pick is not the open world\'s folder, and gets no Allow access', () => {
     const denied = dom('NotAllowedError');
     const picked = problemFor(denied, { doing: 'choosing a folder', folder: 'picked' });
     expect(picked.sentence).toContain('did not let Atlas use that folder');
@@ -136,7 +136,7 @@ describe('scrubForReport', () => {
     expect(scrubForReport('could not write aldric-vane--1a2b3c4d.json')).toBe('could not write <file>');
   });
 
-  it('strips paths of every shape (S369: the 1.15 changelog promised it)', () => {
+  it('strips paths of every shape (the 1.15 changelog promised it)', () => {
     for (const [input, out] of [
       ['could not open C:\\Users\\titus\\Worlds\\Aldric\\world.json now', 'could not open <path> now'],
       ['could not open \\\\nas\\share\\Aldric\\world.json', 'could not open <path>'],
@@ -193,7 +193,7 @@ describe('buildDetails', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The promise (S369): the details block never carries a world or element
+// The promise: the details block never carries a world or element
 // name, a path, a key or an email, whatever the error kind. Names below are
 // planted UNQUOTED and in every place an error can carry them; only the bug
 // kind prints a message at all, and its residue is scrubbed.

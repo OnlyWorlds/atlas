@@ -1,5 +1,5 @@
 /**
- * Disk link-name spellings for pin and marker files (S354, folder-format §5).
+ * Disk link-name spellings for pin and marker files (folder-format §5).
  *
  * The Folder Format writes link fields under their SCHEMA names: a pin's map
  * is `map`, a marker's zone is `zone`. Atlas has always stored them suffixed
@@ -13,7 +13,7 @@
  * there is one spelling (atlas's), so nothing above the store changes. On
  * disk each file keeps the spelling it arrived with, so opening a foreign
  * folder never rewrites its keys as a side effect. A NEW file follows its
- * folder: bare unless the folder already speaks atlas's suffix (S359, born
+ * folder: bare unless the folder already speaks atlas's suffix (born
  * bare; an atlas older than 1.3 reads a bare pin as mapless).
  *
  * The rename table is DERIVED from `relationFieldsFor`, the one authority for

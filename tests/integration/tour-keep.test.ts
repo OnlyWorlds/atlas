@@ -107,7 +107,7 @@ afterEach(() => {
 });
 
 // Each keep re-keys the whole tour bundle through the real store: well inside
-// 5 s on a quiet machine, past it with the machine at 100% (Boss h11 #4850:
+// 5 s on a quiet machine, past it with the machine at 100% (Boss 2026-10-15:
 // three red at 728a95a and 935fc7d alike, 19 of 19 at 60 s).
 describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () => {
   beforeEach(() => setUpFinale());
@@ -161,7 +161,7 @@ describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () 
     expect(await store.hasRekeyJournal()).toBe(false);
   });
 
-  it('a re-key that fails before moving anything undoes K2: the tour world is the sandbox again (S375 gate K2)', async () => {
+  it('a re-key that fails before moving anything undoes K2: the tour world is the sandbox again', async () => {
     store.writeRekeyJournal = async () => { throw new Error('disk said no'); };
     const out = await keepTourWorldNow(W);
     expect(out.kind).toBe('refused');
@@ -172,7 +172,7 @@ describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () 
     expect((await store.listElements()).map(e => e.id)).toContain(CONSUL);
   });
 
-  it('a re-key that stops halfway (its journal on disk) stays begun, and no step writes into it (S375 gate K1, K2)', async () => {
+  it('a re-key that stops halfway (its journal on disk) stays begun, and no step writes into it', async () => {
     let made = 0;
     const real = store.createElementVerbatim.bind(store);
     store.createElementVerbatim = (async (...a: Parameters<typeof real>) => {
@@ -195,7 +195,7 @@ describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () 
     expect(ids).toHaveLength(3); // no twins
   });
 
-  it('a failure after the re-key finished goes on to the commit (S375 gate K2)', async () => {
+  it('a failure after the re-key finished goes on to the commit', async () => {
     const realClear = store.clearRekeyJournal.bind(store);
     const realList = store.listElements.bind(store);
     let armed = false;
@@ -211,7 +211,7 @@ describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () 
     expect((await realList()).map(e => e.id)).not.toContain(CONSUL);
   });
 
-  it('resume after a crash inside K3 (every id already moved) and a throw in the empty K3: the keep commits, K2 is never undone (S376 lens A A1)', async () => {
+  it('resume after a crash inside K3 (every id already moved) and a throw in the empty K3: the keep commits, K2 is never undone', async () => {
     // Boot's activation finished the journal: world.json kept, no bundle id left.
     await setUpFinale({ id: 'wid', name: 'Hyperion' });
     await store.deleteElement(CONSUL, { silent: true } as never);
@@ -234,7 +234,7 @@ describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () 
     expect((await store.listElements()).map(e => e.id).sort()).toEqual(before);
   });
 
-  it('a throw in K3 on a world this call did not un-demo never writes demo back, even with bundle ids left (S376 lens A A1)', async () => {
+  it('a throw in K3 on a world this call did not un-demo never writes demo back, even with bundle ids left', async () => {
     await setUpFinale({ id: 'wid', name: 'Hyperion' }); // K2 ran in an earlier tab
     store.writeRekeyJournal = async () => { throw new Error('disk said no'); };
     const out = await keepTourWorldNow(W);
@@ -243,7 +243,7 @@ describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () 
     expect(getState().registry.worlds[0].demo).toBe(true);
   });
 
-  it('a commit whose registry save fails stops before the tour ends: TK and the demo entry stay (S376 lens A A2)', async () => {
+  it('a commit whose registry save fails stops before the tour ends: TK and the demo entry stay', async () => {
     const realSet = Storage.prototype.setItem;
     const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
       if (k === 'atlas_worlds_registry') throw new DOMException('full', 'QuotaExceededError');
@@ -261,7 +261,7 @@ describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () 
     }
   });
 
-  it('K0 opens the world without the re-key toast, and its refusal from the finale names the button (S376 lens A A7, lens C C11)', async () => {
+  it('K0 opens the world without the re-key toast, and its refusal from the finale names the button', async () => {
     setActiveStore(null);
     patchSlice('active', null);
     const out = await keepTourWorldNow(W);
@@ -291,7 +291,7 @@ describe('teardown and resume learn "kept" (lane K headline 2, lens A A5)', () =
     expect(getState().registry.worlds[0].demo).toBe(true);
   });
 
-  it('a keep that cannot finish stops Start fresh, keeps the done key as it was, and stops a replay (S375 gate K2, K3)', async () => {
+  it('a keep that cannot finish stops Start fresh, keeps the done key as it was, and stops a replay', async () => {
     await setUpFinale({ id: 'wid', name: 'Hyperion' });
     setActiveStore(null);
     patchSlice('active', null);

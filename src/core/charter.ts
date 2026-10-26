@@ -1,10 +1,10 @@
 /**
  * A world's charter (#526): the Law with supertype Charter, by the crew's
- * convention (Skeld, h5 #9462: what this world is for, who is in it, its house
+ * convention (Skeld, 2026-10-21: what this world is for, who is in it, its house
  * rules). Home shows it first, so a person meets the rules an agent is told to
  * read before anything else.
  *
- * keel's one definition (D152, PR 182; Skeld h58 #10789, #10794), which keel's
+ * keel's one definition (D152, PR 182; Skeld 2026-10-22), which keel's
  * front door and the doctor read too: a Law counts only when the owner or a
  * co-builder made it (any member may make a Law, and a guest's or a seat's
  * own Charter must never be the one that leads), and the newest by

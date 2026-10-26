@@ -2,7 +2,7 @@
  * Making a world in browser storage (1.17 bout 2, conv. 129; contract §2.2).
  * A make holds its lock and its `.atlas/making` marker until the registry
  * save; any failure leaves no directory and no entry; a full origin is fatal
- * to the whole import and says so (S370 gate A6, B1, B8).
+ * to the whole import and says so.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchSlice, getState } from '../../src/core/state';

@@ -156,7 +156,7 @@ describe('OwV2ClientAdapter — extension field policy', () => {
 });
 
 describe('OwV2ClientAdapter — change_seq is server bookkeeping (2026-07-19 regression)', () => {
-  // Captain's live 422: a pin pulled from keel carried `change_seq` in its
+  // Titus's live 422: a pin pulled from keel carried `change_seq` in its
   // disk file; the next local edit PATCHed the full body and keel rejected
   // "change_seq is read-only" — forever, sticking the element in pending.
   // The MSW server now mirrors keel's rejection, so these tests fail with a
@@ -424,7 +424,7 @@ describe('OwV2ClientAdapter — /changes cursor pull', () => {
   });
 });
 
-describe('OwV2ClientAdapter — a read that never answers (S405, Boss h11 #4295)', () => {
+describe('OwV2ClientAdapter — a read that never answers (Boss 2026-10-14)', () => {
   // A stalled connection never fails on its own: keel is played by a handler
   // that never answers, and the adapter must give up on reads only.
   const PENDING = Symbol('pending');

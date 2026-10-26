@@ -5,7 +5,7 @@
  * DELIBERATELY STORE-FREE AND DOM-FREE. Pure functions over an element list;
  * lifts verbatim into any tool that models a parent-chained document tree.
  *
- * WHY THIS EXISTS (S310)
+ * WHY THIS EXISTS
  * ----------------------
  * Deleting a Book cascade-deletes every descendant narrative and their pins
  * (`FsFolderStore.findDependents` -> `deleteElementUnchained`, cascade defaults

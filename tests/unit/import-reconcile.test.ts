@@ -263,7 +263,7 @@ describe('reconcile — world block mapping (full-world)', () => {
   });
 });
 
-describe('reconcile — adversarial review regressions (session 241)', () => {
+describe('reconcile — adversarial review regressions', () => {
   const LOC1 = '068e5012-d77c-799d-8000-000000000111';
   const INC = '068e5012-d77c-799d-8000-000000000222';
 
@@ -300,7 +300,7 @@ describe('reconcile — adversarial review regressions (session 241)', () => {
     expect(plan.worldMeta!.description).toBe('d');
   });
 
-  it("reads the site download's now under keel's spelling too (Keel #516's whole World block, dist.50)", () => {
+  it("reads the site download's now under keel's spelling too (the whole World block, dist.50)", () => {
     const parsed = parsePayload({ World: { name: 'W', time_range_current: 453, time_range_min: 0, public_read: true, slug: 'w' }, Character: [{ name: 'A' }] });
     const wm = reconcile(parsed, [], { genId: genIdFactory() }).worldMeta as Record<string, unknown>;
     expect(wm.time_current).toBe(453);
@@ -322,7 +322,7 @@ describe('reconcile — adversarial review regressions (session 241)', () => {
     expect('y_not' in wm).toBe(false);
   });
 
-  it("keeps the World's origin as served, nulls and all (folder spec 0.3.16, Keel #571)", () => {
+  it("keeps the World's origin as served, nulls and all (folder spec 0.3.16)", () => {
     const filled = { source: { server: 'https://www.onlyworlds.com', world: 'w0', at: '2026-10-01T00:00:00Z' }, producer: { tool: 'azgaar-converter', version: '2', input: 'azgaar-map' } };
     for (const origin of [filled, { source: null, producer: null }]) {
       const parsed = parsePayload({ World: { name: 'W', origin }, Character: [{ name: 'A' }] });
@@ -448,9 +448,9 @@ describe('reconcile — adversarial review regressions (session 241)', () => {
   });
 });
 
-// ---- Unnamed spatial artifacts survive import (session 248 round-trip fix) --
+// ---- Unnamed spatial artifacts survive import (round-trip fix) --
 
-describe('unnamed pins/markers round-trip (session 248)', () => {
+describe('unnamed pins/markers round-trip', () => {
   it('keeps unnamed pins and markers as creates; empty names never name-match', () => {
     const parsed = parsePayload({
       Location: [{ id: '068e5012-d77c-799d-8000-0000000000e1', name: 'Keep' }],
@@ -478,7 +478,7 @@ describe('unnamed pins/markers round-trip (session 248)', () => {
   });
 });
 
-describe('reconcile — a renamed element in the world\'s own export (S362)', () => {
+describe('reconcile — a renamed element in the world\'s own export', () => {
   const EVT = '068e5012-d77c-799d-8000-0000000000e5';
   const payload = () => parsePayload({
     World: { name: 'W' },
@@ -502,7 +502,7 @@ describe('reconcile — a renamed element in the world\'s own export (S362)', ()
   });
 });
 
-describe('reconcile: the incoming-id remap reaches ow:// prose (S367 critic C8)', () => {
+describe('reconcile: the incoming-id remap reaches ow:// prose', () => {
   const X = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; // Dampworth in the export
   const Y = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'; // Dampworth already in this world
   const Z = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'; // a fresh id minted on collision

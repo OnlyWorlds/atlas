@@ -58,7 +58,7 @@ test('schema-driven detail renders multiple sections with Base collapsible', asy
   await createElement(page, 'character', 'Aragorn');
 
   // Detail view has section headers — the first is "Base", and it collapses
-  // like every other section (Captain, S311: it was the one hardcoded
+  // like every other section (Titus: it was the one hardcoded
   // always-expanded section).
   const sections = page.locator('.atlas-detail-section');
   await expect(sections.first()).toBeVisible();

@@ -230,7 +230,7 @@ describe('buildPagePayload', () => {
     expect(JSON.stringify(p)).not.toContain(VALLAKI);
   });
 
-  it('S367 critic C6: card field text ships no ow:// link (full-card story and pinned description)', () => {
+  it('card field text ships no ow:// link (full-card story and pinned description)', () => {
     const SCENE = 'd1000000-0000-0000-0000-000000000001';
     const elements: Element[] = [
       ...world(),
@@ -262,7 +262,7 @@ describe('buildPagePayload', () => {
     expect(JSON.stringify(pm)).not.toContain(ISMARK);
   });
 
-  it('S367 critic C12a: a circle block ships the knower id only when the knower is included', () => {
+  it('a circle block ships the knower id only when the knower is included', () => {
     const CIRCLE = 'c1000000-0000-0000-0000-000000000001';
     const elements: Element[] = [
       ...world(),
@@ -337,7 +337,7 @@ describe('buildPagePayload', () => {
     expect((p.blocks[0] as { elementId: string }).elementId).toBe(IREENA);
     expect((p.blocks[1] as { elementIds: string[] }).elementIds).toEqual([ISMARK, VALLAKI]);
     // The healed knower resolved (its name froze in); its id stays off the
-    // wire because the knower is not itself included (S367 critic C12a).
+    // wire because the knower is not itself included.
     expect((p.blocks[2] as PayloadCircleBlock).title).toBe('the party');
     expect((p.blocks[2] as PayloadCircleBlock).knowerId).toBe('');
   });
@@ -364,7 +364,7 @@ describe('buildPagePayload', () => {
     expect(frozen.title).toBe('barovia');
     expect(frozen.image_url).toBe('https://img.example/map.png');
     expect(frozen.showLabels).toBeUndefined(); // absent = labels on
-    // x: 250/1000 = 25%. y is stored BOTTOM-left (the schema's, S361) and the
+    // x: 250/1000 = 25%. y is stored BOTTOM-left (the schema's) and the
     // payload's yPct is a TOP-left CSS %: (500-125)/500 = 75%, (500-450)/500 =
     // 10%. Pinned elements are included → ref.
     expect(frozen.pins[0]).toEqual({ xPct: 25, yPct: 75, name: 'Ireena', type: 'character', ref: IREENA });

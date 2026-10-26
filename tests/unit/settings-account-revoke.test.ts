@@ -1,5 +1,5 @@
 /**
- * Settings' own email and password door (S475's conv. 179 gap): it mints a
+ * Settings' own email and password door (conv. 179 gap): it mints a
  * token, then asks keel who it belongs to. When that second call fails the
  * token is not kept, so it is revoked at once by its id; when it succeeds the
  * id goes to keepSignIn beside the token. A pasted token that fails is never

@@ -1,5 +1,5 @@
 /**
- * Into a submap and back up (#139, S387; the Captain's ask, h20 #2081).
+ * Into a submap and back up (#139; Titus's ask, 2026-10-09).
  *
  * A pin whose element is a Location with its own map (some Map names it as
  * `location`) already wears the map badge (`hasLinkedSubMap`). Clicking the
@@ -21,7 +21,7 @@ import { getAssociatedMaps } from './auto-open-map';
 import { buildMapTree, type LocationLike, type MapTreeNode } from './map-tree';
 import type { MapTabCacheEntry } from './map-tab-cache';
 
-/** Hover text on a pin that wears the map badge: the badge says what it means (the Captain, h58 #5429). */
+/** Hover text on a pin that wears the map badge: the badge says what it means (Titus, 2026-10-15). */
 export const SUBMAP_PIN_HINT = 'This location has its own map: click it, then Open';
 
 /** The maps of a Location element other than `exceptMapId`, in the tree's order (hierarchy, then name). */

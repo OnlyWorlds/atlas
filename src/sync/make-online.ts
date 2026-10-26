@@ -64,7 +64,7 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> =>
 
 /**
  * What a world made online from this folder tells keel about where it came
- * from (Keel #571, folder spec 0.3.16 §4.2): the folder's own `source` and
+ * from (folder spec 0.3.16 §4.2): the folder's own `source` and
  * `producer` lines, as the folder holds them, which keel keeps as the world's
  * `origin`. Only lines keel takes: an object, its `world` or `tool` a string
  * when present (keel answers 422 otherwise, and a foreign folder's odd line
@@ -92,7 +92,7 @@ export interface CreateApiWorldResult {
 }
 
 /**
- * Create a new api world on the signed-in account (session 260):
+ * Create a new api world on the signed-in account:
  * `POST /api/v2/account/worlds` with the PIN dance — try WITHOUT `pin` first
  * (an account that already has a PIN rejects one, even the correct value);
  * on 422 param=pin retry WITH the caller's PIN (fresh accounts require it,
@@ -100,7 +100,7 @@ export interface CreateApiWorldResult {
  * WRITE key in one round-trip.
  *
  * Signed out it refuses: the v1 `create-world-external` lane (name + email +
- * PIN) is retired (Keel #134, S432); the forms sign in first.
+ * PIN) is retired; the forms sign in first.
  *
  * Throws on validation failure, rate limit, network error — the caller
  * surfaces these as inline error messages.
@@ -113,12 +113,12 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
   const token = getState().registry.account_token;
   if (token) {
     // The SDK's one implementation of the account's world create (Kael's
-    // createAccountWorld, SDK 4.66.0, h29 #11096); Atlas's own call retired
+    // createAccountWorld, SDK 4.66.0, 2026-10-23); Atlas's own call retired
     // with 1.83.1.
     const client = new OwV2Client({ apiKey: token, baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
     // The folder's lines are a courtesy to keel, never a reason the world
-    // stays offline: a line keel refuses goes once more without them (S458
-    // gate G6).
+    // stays offline: a line keel refuses goes once more without
+    // them.
     let lines = opts.lines ?? {};
     const create = async (withPin?: string) => {
       const input = () => ({ name, ...(withPin !== undefined ? { pin: withPin } : {}), ...lines } as Parameters<OwV2Client['createAccountWorld']>[0]);
@@ -141,7 +141,7 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
         created = await create(pin);
       } else {
         // Only the account refusals Atlas has words for pass as refusals;
-        // anything else keeps its kind and details (S369 gate B M6).
+        // anything else keeps its kind and details.
         const coded = err instanceof OwApiError && (err.code === 'key_revoked' || err.status === 401 || err.code === 'rate_limited');
         throw coded ? new PlainError(accountErrorMessage(err)) : err;
       }
@@ -230,7 +230,7 @@ export class MergeRefusedError extends Error {
 
 /**
  * Bidirectional merge between a local folder and an existing api world
- * (Route 2, rebuilt S367 onto the re-key kernel). Three buckets after
+ * (Route 2, rebuilt onto the re-key kernel). Three buckets after
  * `planMerge` (per type: ids first, then unique names):
  *   - **Local-only**: CREATE on the server.
  *   - **Server-only**: DOWNLOAD into the folder.
@@ -241,8 +241,8 @@ export class MergeRefusedError extends Error {
  *     the server's story (gate A9). Atlas's own bindings (map image, aliases)
  *     survive both.
  *
- * The order is the design (`Forge/Notes/2026-09-29-s365-orient/lane-a-route2.md`
- * §3 Option A). A name match means a local element O IS server element N, so
+ * The order is the design (a design note of 2026-09-29,
+ * its Option A). A name match means a local element O IS server element N, so
  * FIRST the journaled kernel moves O onto N locally (every link, prose link,
  * chip, page block and media file), and only THEN does anything talk to the
  * server, with every decision keyed by an id that will not change again. The
@@ -332,7 +332,7 @@ export async function mergeLocalIntoApi(
   // carries the server's id.
   //
   // A file the kernel could not rewrite still names old ids; its cached body
-  // must not go up (S367 gate A6). It stays local, named in `unrewritten`.
+  // must not go up. It stays local, named in `unrewritten`.
   const unreadable = new Set(unrewritten);
   // A planned create carrying a stale baseline (a folder copied out of an api
   // world, an unlink without reset) would, if its create failed, read as
@@ -376,7 +376,7 @@ export async function mergeLocalIntoApi(
 
   // 4b. Creates before matched updates: a matched element may link to a new one.
   // Bodies are read from disk now, after the kernel rewrote their links.
-  // Read from DISK inside the element's chain (S367 gate A1): an outside
+  // Read from DISK inside the element's chain: an outside
   // write no live pass adopted (the route holds the live folder off) must be
   // what goes up, not the cached body it would silently revert.
   const sendable = async (id: string): Promise<{ body: Record<string, unknown>; sent: string } | null> => {
@@ -451,7 +451,7 @@ export async function mergeLocalIntoApi(
         const echo = result.items[i]?.updatedAt;
         if (typeof echo === 'string' && echo) {
           // A stamp that throws (a file gone corrupt) is that element's
-          // failure, never the whole merge's (S367 gate A7).
+          // failure, never the whole merge's.
           try {
             await folder.stampServerUpdatedAt(batch[i].dec.local.id, batch[i].dec.type, echo, batch[i].sent);
             counts.creates++;
@@ -613,7 +613,7 @@ export async function mergeLocalIntoApi(
         let body: Record<string, unknown> = serverBody;
         // A page's blocks are its text (`story` is compiled from them on
         // every save), so they go too, or the next save would put the local
-        // page back over the server's (gate A9, Captain's ruling 2026-10-04).
+        // page back over the server's (gate A9, Titus's ruling 2026-10-04).
         // Blocks are rebuilt only when the server's copy is a page: a local
         // page the server holds as a scene becomes that scene, with no page
         // fields left on it (gate lens B L2).

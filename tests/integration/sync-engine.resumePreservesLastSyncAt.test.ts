@@ -31,7 +31,7 @@ let folder: MockFolderStore;
 let client: FakeOwApiClient;
 let clock: MonotonicClock;
 
-// One fork for every file: fake timers must not outlive this one (S367).
+// One fork for every file: fake timers must not outlive this one.
 afterEach(() => { vi.useRealTimers(); });
 
 beforeEach(async () => {

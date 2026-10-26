@@ -49,7 +49,7 @@ export interface FolderStore {
   close(): Promise<void>;
 
   /**
-   * View-only mode (S264 — worlds linked with a READ key). When set, every
+   * View-only mode (worlds linked with a READ key). When set, every
    * UI-originated mutation throws a `PlainError` ("This world is view-only, so
    * it cannot be changed here. ..."); the sync engine's
    * legitimate write channels stay open (applyServerRecord + friends,
@@ -65,7 +65,7 @@ export interface FolderStore {
    * Tolerant by default: a world.json that will not parse reads as the empty
    * default, so a damaged world still OPENS. `strict` throws `CorruptFileError`
    * instead; every read whose result is diffed or sent to the server uses it
-   * (S361: the sync meta step read the empty default as "every field cleared"
+   * (the sync meta step read the empty default as "every field cleared"
    * and PATCHed blanks over the server's world meta).
    */
   readWorldMeta(opts?: { strict?: boolean }): Promise<WorldMeta>;
@@ -93,7 +93,7 @@ export interface FolderStore {
    * or null for "no write" (no stamp, no file touch). Returns null when the
    * element does not exist. Use whenever a patch is COMPUTED FROM current
    * state — a patch built from a pre-chain snapshot can silently revert a
-   * concurrent writer's fields (the tour heal gate's TOCTOU finding, S299).
+   * concurrent writer's fields (the tour heal gate's TOCTOU finding).
    */
   updateElementWith(
     id: string,
@@ -225,14 +225,14 @@ export interface FolderStore {
   /** Overwrite the saved chart list (whole-list write, mirrors writeSyncState). */
   writeCharts(charts: ChartConfig[]): Promise<void>;
 
-  // ---- World styles (`.atlas/styles.json`; core/world-styles.ts, S356) ----
+  // ---- World styles (`.atlas/styles.json`; core/world-styles.ts) ----
 
   /** Read the world's style rules. Empty (not an error) when the file is absent or malformed. */
   readStyles(): Promise<WorldStyles>;
   /** Overwrite the world's style rules (whole-object write, like charts). */
   writeStyles(styles: WorldStyles): Promise<void>;
   /**
-   * `.atlas/world-prefs.json` (S364): the world's notes, cast, calendar lens
+   * `.atlas/world-prefs.json`: the world's notes, cast, calendar lens
    * and writing labels, so a copied folder carries them. `null` = no file.
    * Strict: a file that will not parse throws `CorruptFileError` (never
    * replaced by a seed).
@@ -245,7 +245,7 @@ export interface FolderStore {
    * push or pull). Does NOT change `local_updated_at`, EXCEPT when
    * `sentLocalUpdatedAt` (the stamp the pushed body carried) no longer matches
    * the file: the element was edited while the push was in flight, and it is
-   * kept dirty so the edit goes out next round (S360 H1, `store/sync-stamp.ts`).
+   * kept dirty so the edit goes out next round (`store/sync-stamp.ts`).
    * `null` = the server is known to hold different content: keep it dirty.
    * `kept`: fields keel wrote on that write, kept with the stamp in the same write (conv. 168).
    */
@@ -272,7 +272,7 @@ export interface FolderStore {
   ): Promise<Element>;
   /** Pull-apply guarded INSIDE the per-id chain: writes only if the element's
    *  `local_updated_at` still equals `expectedLocalUpdatedAt` (null = absent).
-   *  Returns false when a local edit landed first (S361, lane b M1). */
+   *  Returns false when a local edit landed first (lane b M1). */
   applyServerRecordIfUnchanged(
     type: ElementType, record: Record<string, unknown>, server_updated_at: string,
     expectedLocalUpdatedAt: string | null,
@@ -304,7 +304,7 @@ export interface FolderStore {
    */
   resetSyncBaseline(): Promise<void>;
 
-  // ---- Re-key (giving elements new ids, S363; `store/rekey.ts`) ----
+  // ---- Re-key (giving elements new ids; `store/rekey.ts`) ----
 
   /**
    * Write `body` as a NEW element at `body.id`, verbatim: every field kept
@@ -335,10 +335,10 @@ export interface FolderStore {
   hasRekeyJournal(): Promise<boolean>;
   /** The id lives in BOTH element layouts (`elements/` and legacy `spatial/`):
    *  one copy is served, the other left untouched. Re-keying it would leave the
-   *  shadow behind to come back as a twin (S363 gate lens A F3). */
+   *  shadow behind to come back as a twin. */
   hasShadowCopy(id: string): boolean;
   /**
-   * THE LIVE FOLDER (S364): find element files another tool changed, created
+   * THE LIVE FOLDER: find element files another tool changed, created
    * or deleted since Atlas last read or wrote them, and serve the disk's
    * version from now on. In memory only: it writes no file and no tombstone,
    * and never invents a sync stamp. Refuses while a re-key journal exists.
@@ -357,7 +357,7 @@ export interface FolderStore {
   unreadableFiles(): string[];
 }
 
-/** One element file that changed on disk behind Atlas's back (S364). */
+/** One element file that changed on disk behind Atlas's back. */
 export interface DiskChange {
   id: string;
   type: ElementType;
@@ -376,8 +376,8 @@ export interface RescanResult {
 
 /**
  * A non-silent delete of an id an unfinished re-key names (its old or new
- * copy). Deleting either one would scrub the links that already moved to it
- * (S363 gate lens A F6): finish or discard the id update first.
+ * copy). Deleting either one would scrub the links that already moved to it:
+ * finish or discard the id update first.
  */
 export class RekeyPendingError extends PlainError {
   constructor() {
@@ -400,7 +400,7 @@ export interface ApplyServerRecordOpts {
    * record normally keeps every atlas-only field the local file had (the
    * server never knows them); Route 2's "keep the server version" policy
    * gives up the local rich text, or the editor would show local prose over
-   * the server's (S367).
+   * the server's.
    */
   dropLocal?: readonly string[];
 }
@@ -420,7 +420,7 @@ export interface RekeyJournal {
   unrewritten: string[];
   started_at: string;
   /**
-   * What started it (S367, additive: absent = 'rekey'). 'merge' is Route 2
+   * What started it (additive: absent = 'rekey'). 'merge' is Route 2
    * moving local ids onto a server world's ids before it links; the world
    * is still local-only, so the copy that speaks about an unfinished run
    * says to run Make online again rather than "not syncing".

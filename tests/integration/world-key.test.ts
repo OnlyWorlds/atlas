@@ -128,7 +128,7 @@ describe('a new key in place', () => {
     expect(h.attachedKeys).toEqual([NEW]);
   });
 
-  it('a new key forgets the old key\'s role, and what it kept walks again from 0 (conv. 151, S439 G6)', async () => {
+  it('a new key forgets the old key\'s role, and what it kept walks again from 0 (conv. 151)', async () => {
     patchSlice('registry', { ...getState().registry, worlds: [entry({ member_role: 'guest' })] });
     await store.updateSyncState(() => ({ changes_cursor: '9:x', changes_last_seq: 9, kept_outside_view: ['k1'], walked_as_role: 'guest' }));
     await putKeyInPlace(current(), NEW, false);
@@ -139,7 +139,7 @@ describe('a new key in place', () => {
     expect(st.kept_outside_view).toEqual(['k1']);
   });
 
-  it('what left the old key\'s view walks again from 0 too (S441 gate G6)', async () => {
+  it('what left the old key\'s view walks again from 0 too', async () => {
     patchSlice('registry', { ...getState().registry, worlds: [entry({ member_role: 'contributor' })] });
     await store.updateSyncState(() => ({ changes_cursor: '9:x', changes_last_seq: 9, left_view: ['h1'], walked_as_role: 'contributor' }));
     await putKeyInPlace(current(), NEW, false);

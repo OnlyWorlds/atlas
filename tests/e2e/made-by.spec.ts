@@ -87,7 +87,7 @@ test.describe('made by, and the room', () => {
     const agents = row.locator('[data-action="made-by-agents"]');
     await expect(agents).toHaveText('Agents 2');
     await expect(row.locator('[data-action="made-by-people"]')).toHaveText('People 2');
-    // The room is hidden as the world opens (1.76, OW Parlor #543).
+    // The room is hidden as the world opens (1.76).
     await expect(row.locator('[data-action="hide-room"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(rowNames(page)).toHaveCount(3);
 
@@ -113,7 +113,7 @@ test.describe('made by, and the room', () => {
   });
 
   test('an agent seat that made nothing offers no Made by, until an agent\'s element arrives', async ({ page }) => {
-    // W11's shape (S451): agent seats on the roster, none of the world's elements theirs.
+    // W11's shape: agent seats on the roster, none of the world's elements theirs.
     await setupWorld(page);
     await pulled(page, 'character', '0192a000-0000-7000-8000-000000035011', 'Holden', { created_by: PERSON });
     await pulled(page, 'location', '0192a000-0000-7000-8000-000000035012', 'Fort Griffin', { created_by: null });
@@ -131,7 +131,7 @@ test.describe('made by, and the room', () => {
     await expect(row.locator('[data-action="made-by-people"]')).toHaveText('People 2');
   });
 
-  // 1.76 (OW Parlor #543, the census Notes/ui-snapshots/2026-10-22-s453/census-room.mjs): a lore
+  // 1.76: a lore
   // world holding a parlor's room reads as lore in every whole view, and one switch shows the room.
   test("the parlor's room is hidden from Home, a lore page, Charts and Search until shown", async ({ page }) => {
     await setupWorld(page);

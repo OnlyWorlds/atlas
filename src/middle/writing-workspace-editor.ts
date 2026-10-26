@@ -47,7 +47,7 @@ export interface WorkspaceEditorOptions {
   /** Initial markdown (fallback when no JSON exists yet — e.g. legacy narratives). */
   initialMarkdown?: string;
   /**
-   * THE SIDECAR RULE AT OPEN (S365, `story-sidecar.ts`): when `initialMarkdown`
+   * THE SIDECAR RULE AT OPEN (`story-sidecar.ts`): when `initialMarkdown`
    * is the element's `story` and holds text `initialJson` (the sidecar) does
    * not, open the story. Scenes and knowledge entries pass true; a page block's
    * markdown is Atlas's own, so the share editor does not.
@@ -110,7 +110,7 @@ export interface SearchController {
   replaceAll(text: string): number;
   /**
    * Turn EVERY current match into a chip to `target` in one undoable
-   * transaction (S355, the find bar's "Link to element"). Labels are the
+   * transaction (the find bar's "Link to element"). Labels are the
    * matched text verbatim (convention #49b). Returns the count.
    */
   linkAllMatches(target: { id: string; type: string }): number;
@@ -157,7 +157,7 @@ export interface WorkspaceEditorHandle {
  */
 /**
  * Chip every match of `term` to `target` in a live editor, independent of
- * the find bar's state (S355: the tree-level term link routes the OPEN
+ * the find bar's state (the tree-level term link routes the OPEN
  * narrative here so the write is a real transaction, undoable and
  * autosaved, rather than a disk write the next autosave would revert).
  */
@@ -459,7 +459,7 @@ function syncChipLabelsImpl(
     // A chip label is "valid" if it is any casing of the canonical name OR
     // any alias (isValidChipLabel, shared with the autolink kernel). Aliases
     // like "annoying guy" for John are how writers preserve in-prose surface
-    // forms, and since S307/S309 the autolink matches case-insensitively and
+    // forms, and the autolink matches case-insensitively and
     // labels keep the writer's exact casing — so the comparison here MUST
     // fold case too, or this sync would quietly undo the writer's-text rule
     // one tick after every promotion. Only a label that matches neither name

@@ -1,10 +1,10 @@
 /**
- * A map drawn from its own zones (S423, h20 #6442; the design:
- * Forge/Notes/2026-10-17-s423-map-from-zones-design.md).
+ * A map drawn from its own zones (2026-10-17, from a design note on
+ * maps from zones).
  *
  * The stored shape is the meaning; the look is the renderer's reading of it.
  * A map may name a style (`atlas_map_style`); each zone whose subtype names a
- * known kind (Skeld's convention, h20 #6449: the kind rides the subtype, the
+ * known kind (Skeld's convention, 2026-10-17: the kind rides the subtype, the
  * supertype carries the shape) then draws with that kind's treatment: a
  * ragged coast, a hatch for a range, a name along a river. Nothing here is
  * ever written back: every point this module makes exists only on screen.
@@ -37,7 +37,7 @@ export const ZONE_KIND_WORDS = [
  * A subtype written "Class: kind" (Blood Meridian's "Border: treaty line",
  * the form Windrose reads as two fields) is tried by its halves, the part
  * before the colon first, and the first that names a kind styles the zone
- * (Skeld h58 #6762). The seed's own words never have to move.
+ * (Skeld 2026-10-18). The seed's own words never have to move.
  */
 export function zoneKindOf(subtype: unknown): InkKind | undefined {
   if (typeof subtype !== 'string') return undefined;
@@ -53,8 +53,8 @@ export function zoneKindOf(subtype: unknown): InkKind | undefined {
 
 /**
  * Pattern shapes; `fdots`, `dashes` and `thinhatch` are Seethe's modern-atlas
- * grids (S424), `rhatch`, `trees`, `hmarsh`, `grain` and `crosshatch` her
- * hatched ones (S425).
+ * grids, `rhatch`, `trees`, `hmarsh`, `grain` and `crosshatch` her
+ * hatched ones.
  */
 export type InkPattern = 'hatch' | 'stipple' | 'marsh' | 'dots' | 'fdots' | 'dashes' | 'thinhatch'
   | 'rhatch' | 'trees' | 'hmarsh' | 'grain' | 'crosshatch';
@@ -130,9 +130,9 @@ const INK_ON_PARCHMENT: MapStylePreset = {
 };
 
 /**
- * Modern atlas (S424): soft tints, clean lines, nothing jittered. Seethe's
- * table, row for row (h20 #6542, `Studio/desk/current/
- * 2026-10-17-atlas-three-styles/map-atlas.ts`); its lettering is in
+ * Modern atlas: soft tints, clean lines, nothing jittered. Seethe's
+ * table, row for row (2026-10-17, her three-styles
+ * study's map-atlas.ts); its lettering is in
  * atlas.css under `.atlas-map-style-atlas`. Not taken yet: her pin dot (a
  * pin keeps its type's icon) and the wall's one-sided ticks.
  */
@@ -160,9 +160,9 @@ const MODERN_ATLAS: MapStylePreset = {
 };
 
 /**
- * Hatched (S425): an engraver's atlas, one sepia ink on aged paper, the kinds
- * told apart by texture, never by hue. Seethe's table (h20 #6572, `Studio/desk/
- * current/2026-10-17-atlas-three-styles/map-hatched.ts`); its lettering is in
+ * Hatched: an engraver's atlas, one sepia ink on aged paper, the kinds
+ * told apart by texture, never by hue. Seethe's table (2026-10-17, her
+ * three-styles study's map-hatched.ts); its lettering is in
  * atlas.css under `.atlas-map-style-hatched`. Her double coast is drawn as two
  * shore bands, so the second line runs on the sea side 5 px out (the period's
  * water-lining) rather than inside the land. The areas take a light hand's

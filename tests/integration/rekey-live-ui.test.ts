@@ -1,6 +1,6 @@
 /**
  * The screen after ids move (`rekeyLiveUi`, `sync/rekey-run.ts`). Ported from
- * the retired `sync-attach.idSwap.test.ts` (S367: Route 2 moves ids through
+ * the retired `sync-attach.idSwap.test.ts` (Route 2 moves ids through
  * the re-key kernel now, and `handleIdSwap` went with its last caller). What
  * the old test covered on disk or in storage (camera, chart scopes,
  * favourites) is the kernel's and `rekeyPersistedState`'s, tested there.

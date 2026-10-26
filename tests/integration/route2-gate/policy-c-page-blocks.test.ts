@@ -1,5 +1,5 @@
 /**
- * S367 gate A9, after the Captain's ruling (2026-10-04).
+ * Policy c and page blocks, after Titus's ruling (2026-10-04).
  *
  * The finding: policy c ("keep the online version") gave up a page's local
  * rich text but KEPT its local blocks. A page's `story` is compiled from its

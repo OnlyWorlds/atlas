@@ -1,5 +1,5 @@
 /**
- * The error-copy ratchet (S368, lane X): user copy never carries a caught
+ * The error-copy ratchet (lane X): user copy never carries a caught
  * error's raw text, and never the vague or jargon phrases the census found.
  *
  * The rule the UI follows is `showProblem(err, { doing })` / `problemFor`:
@@ -22,7 +22,7 @@
  * A line that reads an error's text for a RECORD or a CLASSIFICATION, never
  * for a person to read (a failure's internal message, a console object, a
  * check on a known browser string), says so with a trailing
- * `// raw-error-ok: <why>` comment and is not counted (S369). The reason is
+ * `// raw-error-ok: <why>` comment and is not counted. The reason is
  * the point: an unexplained marker is a review finding.
  *
  * To lower the baseline after routing sites: run this file with

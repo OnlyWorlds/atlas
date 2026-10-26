@@ -1,5 +1,5 @@
 /**
- * Dates on element pages in the world's calendar (S369): beside a schema date
+ * Dates on element pages in the world's calendar: beside a schema date
  * field's number, read-only, only when the world has an active calendar.
  */
 import { describe, it, expect } from 'vitest';

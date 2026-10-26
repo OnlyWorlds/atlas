@@ -1,6 +1,6 @@
 /**
- * Keel #565's reader rule, the half that shows a world to its people (conv. 168;
- * contract `Forge/Notes/2026-10-23-s459-review-reader-contract.md`, R2 and R3):
+ * The review profile's reader rule, the half that shows a world to its people (conv. 168;
+ * the contract's R2 and R3):
  * an element carrying the review profile's proposed mark shows the word
  * "Proposed" in the list, Search, Home's Recent and its own header, is never
  * counted as the world's own, and Home and the list say how many apart. A world
@@ -87,15 +87,15 @@ test.describe('proposed, not yet reviewed', () => {
     const mark = page.locator('.atlas-middle-header [data-role="proposed-mark"]');
     await expect(mark).toHaveText('Proposed');
     await expect(mark).toHaveAttribute('aria-label', /^Proposed by a member and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it\. It lapses on 22 November 2099\.$/);
-    // 1.84.1: the same said in a sentence under the name (Seethe h20 #11298), and nothing on a settled page.
+    // 1.84.1: the same said in a sentence under the name (Seethe 2026-10-23), and nothing on a settled page.
     await expect(page.locator('[data-role="proposed-note"]')).toHaveText(/not yet reviewed.*A keeper accepts or declines it on OnlyWorlds; a change made here is saved as any other\.$/);
     await go(`#/w/${wid}/element/0192a000-0000-7000-8000-000000056503`);
     await expect(page.locator('.atlas-middle-header')).toContainText('Ada');
     await expect(page.locator('[data-role="proposed-note"]')).toHaveCount(0);
     await go(`#/w/${wid}/element/${QUAY}`);
     await expect(page.locator('.atlas-middle-header [data-role="proposed-mark"]')).toHaveText('Lapsed');
-    // A phone keeps the name its room (Seethe h20 #11393: "Proposed, lapsed" left a name 8 px of 68
-    // at 390; "Lapsed" alone still 15 px short, measured S460): the sentence under the name says it.
+    // A phone keeps the name its room (Seethe 2026-10-23: "Proposed, lapsed" left a name 8 px of 68
+    // at 390; "Lapsed" alone still 15 px short, measured): the sentence under the name says it.
     const wide = page.viewportSize()!;
     await page.setViewportSize({ width: 390, height: 844 });
     const name = page.locator('.atlas-middle-header [data-role="element-name"]');

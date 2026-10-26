@@ -1,5 +1,5 @@
 /**
- * Gate A (S369, atlas 1.16) probes: the held-file family on the pull side and
+ * Gate A (atlas 1.16) probes: the held-file family on the pull side and
  * the round ends. Each asserts the CORRECT behaviour: red today = a defect.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -101,7 +101,7 @@ describe('gate A: one held element file does not hold back the rest of the feed'
 });
 
 describe('gate A: a pull-side held file is retried by itself, as the copy promises', () => {
-  // BANKED S369: see PROGRESS (copy now says 'refresh to try again' / schema allow-list not built).
+  // BANKED: copy now says 'refresh to try again' / schema allow-list not built.
   it.skip('a held pull write arms a retry ("Atlas will try again in a moment")', async () => {
     const { root, store, engine } = await world();
     const a = await store.createElement('character', { name: 'Aldric', description: 'one' });

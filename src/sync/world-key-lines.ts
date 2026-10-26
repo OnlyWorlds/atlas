@@ -42,8 +42,8 @@ export function keyRefusalLine(reason: KeyRefusal | null | undefined): string {
 
 /**
  * A seat world's refusal (conv. 132): its key comes back only to the sponsor
- * who renews it (keel #355 piece 3, SeatCreated, no join link; Skeld h29
- * #6032), so no line offers a paste. A renewal reads as `key_revoked`.
+ * who renews it (keel #355 piece 3, SeatCreated, no join link; Skeld,
+ * 2026-10-16), so no line offers a paste. A renewal reads as `key_revoked`.
  */
 export function seatRefusalLine(reason: KeyRefusal | null | undefined, opts: { paused?: boolean } = { paused: true }): string {
   const lead = opts.paused ? 'Sync paused: ' : '';

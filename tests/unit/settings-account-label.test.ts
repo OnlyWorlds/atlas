@@ -1,5 +1,5 @@
 /**
- * Settings, OnlyWorlds, signed out (Seethe h20 #12348): where the Sign in with
+ * Settings, OnlyWorlds, signed out (Seethe 2026-10-24): where the Sign in with
  * OnlyWorlds button stands, no label above it says the same thing; where it does
  * not (a preview, a dev server, the tour), the email form keeps its label.
  */

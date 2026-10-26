@@ -1,6 +1,6 @@
 /**
  * #347: the quiet mark on agent-made work. Since 1.68.1 the SEAT decides, not
- * the door (Skeld h66 #9630: keel's MCP takes a person's own key): with the
+ * the door (Skeld 2026-10-21: keel's MCP takes a person's own key): with the
  * roster, the row for changed_by decides and the door is said beside it; a seat
  * and a declared client are agents by definition; only without a roster, or
  * for a membership it does not hold yet, does the door decide alone.

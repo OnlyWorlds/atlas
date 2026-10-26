@@ -1,5 +1,5 @@
 /**
- * Problems: what went wrong, in the user's words (S368, lane X stage 1).
+ * Problems: what went wrong, in the user's words (lane X stage 1).
  *
  * The rule: UI never reads `err.message`. It calls `problemFor(err, { doing })`
  * and renders the sentence and the fix buttons. Only a `PlainError` (a message
@@ -134,8 +134,8 @@ export function browserStorageFullSentence(doing: string): string {
 }
 
 function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: ProblemOpts, where: FilesWhere): string {
-  // True only where the failed step was an upload of edits already on disk
-  // (S369): "your changes are saved" is false for signing in or linking.
+  // True only where the failed step was an upload of edits already on disk:
+  // "your changes are saved" is false for signing in or linking.
   const inBrowser = where === 'browser' && opts.folder !== 'picked';
   const savedPlace = inBrowser ? 'in this browser' : 'in the folder';
   const saved = opts.savedLocally ? ` Your changes are saved ${savedPlace}.` : '';
@@ -238,8 +238,8 @@ function activeWhere(): FilesWhere {
 export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
   const doing = opts.doing?.trim() || DEFAULT_DOING;
   const classified = classifyError(err);
-  // An uncaught clipboard or storage refusal is not the open world's folder
-  // (S369 gate B M4).
+  // An uncaught clipboard or storage refusal is not the open
+  // world's folder.
   const kind: ProblemKind = opts.unexpected && classified.startsWith('disk-') ? 'bug' : classified;
   const where = opts.where ?? activeWhere();
   // Allow access asks for a folder: never for a picked folder's refusal, and
@@ -282,15 +282,15 @@ export const REPORT_CAP = 600;
  *
  * A scrubber cannot know every shape a name takes (a server message can
  * quote an element name without quotes), so the details block never relies
- * on it alone: free error text goes in only for the `bug` kind (S369), and
+ * on it alone: free error text goes in only for the `bug` kind, and
  * every other line is built from fields Atlas chose (`detailFields`).
  */
 export function scrubForReport(text: string): string {
-  // Cut first (S369 gate A L1): the patterns below are not all linear, and
+  // Cut first: the patterns below are not all linear, and
   // a long message would freeze the tab before the cap applied.
   let t = String(text ?? '').slice(0, REPORT_CAP * 4);
   t = t.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>');
-  // ow_s_ is a seat's secret (Keel #469's held seats keep one in this browser).
+  // ow_s_ is a seat's secret (held seats keep one in this browser).
   t = t.replace(/\bow_[wras]_\S+/gi, '<key>');
   // Paths carry folder and user names. A web address keeps its host only;
   // file:// URLs, drive, UNC and absolute paths, and any token with a slash
@@ -409,7 +409,7 @@ export function errorLines(err: unknown, kind: ProblemKind): string[] {
   if (kind === 'bug' && !isPlainError(err) && !REFUSAL_NAMES.has(nameOf(err))) {
     // The engine's own text up to its first quote: past it, browsers quote
     // the user's input (JSON.parse), with quotes inside that the pairwise
-    // quote scrub cannot pair (S369 gate A M6).
+    // quote scrub cannot pair.
     const unquoted = messageOf(err).split(/["'“‘]/)[0];
     const text = maskCapitalisedWords(scrubForReport(unquoted)).trim();
     if (text) lines.push(`Message: ${text}`);
@@ -434,7 +434,7 @@ const ERROR_WORDS = new Set([
  */
 function maskCapitalisedWords(text: string): string {
   // Any capital, not only ASCII (Éowyn), and no camelCase pass (McAllister,
-  // DeVries are names): only the error words stay (S369 gate A M6).
+  // DeVries are names): only the error words stay.
   return text.replace(/(?<![\p{L}\p{N}_])\p{Lu}[\p{L}\p{N}'’-]*/gu, w => (ERROR_WORDS.has(w) ? w : '<name>'));
 }
 
@@ -458,7 +458,7 @@ export function buildDetails(problem: Problem, ctx: DetailsContext = {}): string
 /**
  * The same block for a sync round's per-element failures (at most three
  * listed): type, operation and the error's class name. The failure's message
- * stays out (S369): it is server or browser text and can quote a name.
+ * stays out: it is server or browser text and can quote a name.
  */
 export function buildFailureDetails(
   failures: readonly {

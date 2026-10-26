@@ -1,6 +1,6 @@
 /**
  * UI preferences — small object persisted to localStorage, independent of the
- * registry (worlds data) and URL routes. Session 223 introduced this so the
+ * registry (worlds data) and URL routes. It was introduced so the
  * sidebar mode is no longer derived from the URL — it's a user preference.
  *
  * Currently tracks:

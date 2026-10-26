@@ -1,5 +1,5 @@
 /**
- * keel #537 (PR 160, live 2026-10-22, Skeld h66 #9842): a body served to a reader who sees a
+ * keel #537 (PR 160, live 2026-10-22, Skeld 2026-10-22): a body served to a reader who sees a
  * hidden element (the owner, a co-builder, its maker) carries `hidden: true` at the top level,
  * absent on every other body; echoed back in a write it is ignored. Atlas keeps it as keel's
  * word, like who wrote the element: never sent on an update, never a difference anyone made,
@@ -44,7 +44,7 @@ describe.each([['the real store', realStore], ['the mock store', mockStore]] as 
     expect('hidden' in ((await s.getElement(ANA)) as unknown as Record<string, unknown>)).toBe(false);
   });
 
-  it('keeps keel\'s word that it shows a mark added here, and a pull takes the word (the S461 gate\'s F3)', async () => {
+  it('keeps keel\'s word that it shows a mark added here, and a pull takes the word', async () => {
     const s = await make();
     await s.applyServerRecord('character', { id: ANA, type: 'character', name: 'Ana', updated_at: STAMP }, STAMP);
     await s.updateElement(ANA, { hidden: true } as never);

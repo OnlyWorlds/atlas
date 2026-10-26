@@ -1,10 +1,10 @@
 /**
  * What every sign-in does once it holds a token and its account's name: a
  * pasted token, the email and password in Settings, or Sign in with
- * OnlyWorlds (contract R4, S465). The token is kept, the ask to sign in is
+ * OnlyWorlds (contract R4). The token is kept, the ask to sign in is
  * answered, and what waited for it runs: a person's invitation (#294) or a
- * world page's Open in Atlas (#104), one of them (the S416 gate's F4), else
- * the account's worlds are offered on the first screen (S414).
+ * world page's Open in Atlas (#104), one of them, else
+ * the account's worlds are offered on the first screen.
  */
 
 import { getState, patchSlice } from '../core/state';
@@ -17,14 +17,14 @@ import { navigate } from '../core/router';
 
 /**
  * Keep the token, say so, and run what waited for it. Resolves once the
- * waiting door has run. `tokenId` comes with a token Atlas minted (S475), so
+ * waiting door has run. `tokenId` comes with a token Atlas minted, so
  * Forget can revoke it; a pasted token has none.
  */
 export async function keepSignIn(token: string, username: string, toasts: ToastManager, tokenId?: string | null): Promise<void> {
   const next = setAccountToken(getState().registry, token, username, tokenId);
   saveRegistry(next);
   patchSlice('registry', next);
-  // The ask to sign in is answered: it goes before the door's next question (Kael, h57 #5950).
+  // The ask to sign in is answered: it goes before the door's next question (Kael, 2026-10-16).
   toasts.dismiss(WAITS_FOR_SIGN_IN);
   toasts.success(username ? `Signed in as ${username}` : 'Signed in');
   const m = await import('../ui/person-join-modal');

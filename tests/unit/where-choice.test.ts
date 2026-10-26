@@ -52,7 +52,7 @@ describe('whereChoiceHtml', () => {
   });
 });
 
-// A world that stays on onlyworlds.com (Download, View; the Captain's ✓ on h20 B13).
+// A world that stays on onlyworlds.com (Download, View).
 describe('whereChoiceHtml for a world that stays online', () => {
   const mountOnline = () => {
     const d = document.createElement('div');

@@ -1,5 +1,5 @@
 /**
- * Is a zone draw or a zone reshape in progress on the page? (S367)
+ * Is a zone draw or a zone reshape in progress on the page?
  *
  * `ui.zoneEditing` was meant to say so (the zone-edit-mode header promised an
  * explicit slice) but nothing ever sets it, so every check that read it was

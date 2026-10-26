@@ -1,7 +1,7 @@
 /**
  * The review profile's proposed mark (conv. 168; schema-dist dist.52
- * `profiles/review.md`, Keel #565's reader rule; contract
- * `Forge/Notes/2026-10-23-s459-review-reader-contract.md`). R1 the two
+ * `profiles/review.md`, the reader rule; the
+ * review-reader contract). R1 the two
  * readings, R3 the settled world, R4 a published page leaves proposed elements
  * out, R5 a create keeps keel's mark with its stamp.
  */
@@ -16,7 +16,7 @@ import { stampedBody } from '../../src/store/sync-stamp';
 import type { Element } from '../../src/core/types';
 
 const SEAT = '19e1c2e5-5e8e-4d46-8382-e5ad445d13a0';
-// keel's own shape, as served live (S459 setup-565.mjs).
+// keel's own shape, as served live.
 const MARK = { by: SEAT, evidence: 'seat', expires: '2026-11-22' };
 const el = (id: string, name: string, extra: Record<string, unknown> = {}, type = 'character'): Element =>
   ({ id, type, name, local_updated_at: 't', ...extra }) as unknown as Element;

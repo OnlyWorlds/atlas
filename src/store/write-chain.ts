@@ -4,7 +4,7 @@
  * FolderStore.updateElement is a read-merge-write: two concurrent updates to
  * the SAME element race the read — the second call's snapshot predates the
  * first call's write, so the merge silently reverts the first patch's fields
- * (the lost-update class the share-room e2e caught, session 237). Rooms used
+ * (the lost-update class the share-room e2e caught). Rooms used
  * to defend individually (share-room's promise chain, convention #77); this
  * helper moves the guarantee to the store boundary so every caller — every
  * room, modal, popover, and future surface — gets it without remembering.

@@ -186,7 +186,7 @@ export interface WorldMeta {
   producer?: { tool: string; version: string; input: string };
   /**
    * Where the world first came from, as the server keeps it (spec §4.2,
-   * v0.3.16, Keel #571): `{ source, producer }`, each an object or null.
+   * v0.3.16): `{ source, producer }`, each an object or null.
    * Carried as served (a linked world's GET /world, a site download); never
    * derived, never sent. Absent in a folder with no server behind it.
    */
@@ -215,11 +215,11 @@ export interface WorldMeta {
      * the server world to match local.
      */
     world_name?: string;
-    /** View-only world (S264) — mirror of the registry flag so root discovery
+    /** View-only world — mirror of the registry flag so root discovery
      *  (registry wiped, folder survives) restores view-only status. */
     read_only?: boolean;
     /**
-     * Opened as an agent seat (#104, S385): its writes carry the seat's own
+     * Opened as an agent seat (#104): its writes carry the seat's own
      * secret, never the account PIN. Mirrored so discovery knows the world is
      * a seat. The secret itself is NEVER here (`WorldRegistryEntry.api.seat_secret`):
      * the folder travels, and the store strips it at every write.
@@ -272,7 +272,7 @@ export interface SyncState {
   server_deletes?: ServerDeleteRecord[];
   /**
    * Elements this world's key no longer sees online, kept here as they are
-   * (B12 Q2, the Captain h20 #8014; conv. 151): a role change never takes
+   * (B12 Q2, Titus 2026-10-20; conv. 151): a role change never takes
    * from the copy. Kept elements stop syncing; a later walk that names one
    * gives it back. Cleared by resetSyncBaseline.
    */
@@ -316,7 +316,7 @@ export interface SyncState {
    */
   walked_as_role?: string;
   /**
-   * World-meta sync baseline (S262, gate R2): a CANONICAL snapshot of the 8
+   * World-meta sync baseline (gate R2): a CANONICAL snapshot of the 8
    * synced world.json wire fields as last confirmed with the server
    * (''/[]/null empties — see META_SYNC_FIELDS in sync/world-meta-sync.ts).
    * Absent = meta never synced: the next meta step SEEDS it from GET /world
@@ -337,7 +337,7 @@ export interface SyncState {
    */
   meta_conflicts?: string[];
   /**
-   * A profile's `x_` keys on the World at the last agreement (Keel #571):
+   * A profile's `x_` keys on the World at the last agreement:
    * key → canonical JSON (`canonicalExtValue`), absent = the key was absent.
    * Its own map so a world linked before these keys synced seeds them once.
    * Contested keys join `meta_conflicts` by name. Cleared by resetSyncBaseline.
@@ -346,7 +346,7 @@ export interface SyncState {
   /**
    * Elements whose CREATE keel refused because the id already lives in
    * another OnlyWorlds world (a copied or imported folder, a world taken
-   * online twice): the re-key's worklist (S363, `sync/foreign-ids.ts`).
+   * online twice): the re-key's worklist (`sync/foreign-ids.ts`).
    * Recorded only on evidence (a /bulk `id_conflict`, or a single-create 409
    * whose read-back returned nothing), merged at the end of each round, and
    * scoped to the api world it was observed against. Readers intersect it
@@ -354,15 +354,15 @@ export interface SyncState {
    */
   foreign?: ForeignIds;
   /**
-   * Every finished re-key's map, old id → new id (S363, gate lens A F5).
+   * Every finished re-key's map, old id → new id (gate lens A F5).
    * Kept so a link inside a file that could not be read during the re-key (a
    * git conflict) can still follow once the file is repaired
    * (`repairRekeyedLinks`); without it the map died with the journal.
    */
   rekeyed?: Record<string, string>;
   /**
-   * Ids a Route 2 merge created on the server before it finished (S367 gate
-   * A3). Written before the creates go out, cleared when a merge returns. A
+   * Ids a Route 2 merge created on the server before it finished.
+   * Written before the creates go out, cleared when a merge returns. A
    * rerun that meets one of these as a same-id match knows the server copy
    * is the user's own upload, not a duplicate, so "keep the server version"
    * does not revert edits made since.
@@ -435,7 +435,7 @@ export type SyncHoldReason = 'rekey' | 'disk' | 'move' | 'download';
 export type SyncEngineState =
   | { kind: 'idle'; last_sync_at: string | null }
   | { kind: 'syncing'; phase: 'pull' | 'push'; progress?: { done: number; total: number } }
-  /** `held`: an exclusive local operation (the re-key, S363) owns the world; nothing syncs until it ends. */
+  /** `held`: an exclusive local operation (the re-key) owns the world; nothing syncs until it ends. */
   | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number; held_for?: SyncHoldReason }
   | { kind: 'error'; message: string; recoverable: boolean };
 
@@ -483,7 +483,7 @@ export interface SyncResult {
   auth_reason?: KeyRefusal;
   /**
    * The round stopped early because OnlyWorlds was busy (503 server_busy),
-   * rate limited (429, e.g. a PIN lockout) or unreachable (S361, lane b M4).
+   * rate limited (429, e.g. a PIN lockout) or unreachable (lane b M4).
    * Nothing is paused and no baseline moved; the engine retries once after
    * `retry_after_ms`. `transient_reason` picks the words the user sees.
    */
@@ -492,7 +492,7 @@ export interface SyncResult {
   retry_after_ms?: number;
   /**
    * World-meta fields (disk names) the meta step PUSHED to / PULLED from
-   * `PATCH|GET /world` this round (world-meta sync, S262). Lets the UI
+   * `PATCH|GET /world` this round (world-meta sync). Lets the UI
    * surface meta-only rounds honestly — pushed/pulled above count elements
    * only, so without these a meta-only round reads as "nothing synced"
    * (gate R7, the lying-pill class).
@@ -519,18 +519,18 @@ export interface SyncResult {
 
 export interface PerElementFailure {
   element_id: string;
-  /** `'world'` = a world-meta step failure (element_id 'world', S262). */
+  /** `'world'` = a world-meta step failure (element_id 'world'). */
   type: ElementType | 'world';
   operation: 'create' | 'update' | 'delete' | 'read';
   message: string;
   /**
-   * The thrown error's `name` when it carried one (S368): `InvalidStateError`
+   * The thrown error's `name` when it carried one: `InvalidStateError`
    * from a file another program holds reads the same in every locale, where
    * its message does not. What the toast classifies on.
    */
   error_name?: string;
   /**
-   * A server refusal's HTTP status, error code and named field (S369). The
+   * A server refusal's HTTP status, error code and named field. The
    * details block prints these instead of `message`, which is server or
    * browser text and can quote a name.
    */
@@ -586,7 +586,7 @@ export interface WorldRegistryEntry {
     /** See `WorldMeta.api.world_name` — display-only mirror of server-side name. */
     world_name?: string;
     /**
-     * View-only world (S264): linked with a READ key, no PIN anywhere. The
+     * View-only world: linked with a READ key, no PIN anywhere. The
      * engine never pushes (pull-only), and UI writes are blocked at the store
      * seam. Mirrored in `WorldMeta.api.read_only` so discovery restores it.
      */
@@ -597,7 +597,7 @@ export interface WorldRegistryEntry {
      * known role is said once; first sight is recorded silently.
      */
     member_role?: string;
-    /** An agent seat (#104, S385); mirrored in `WorldMeta.api.seat`. Read through `worldPin`. */
+    /** An agent seat (#104); mirrored in `WorldMeta.api.seat`. Read through `worldPin`. */
     seat?: { role?: string };
     /**
      * The seat's own `ow_s_` secret: this world's PIN, in this browser only
@@ -647,7 +647,7 @@ export interface WorldRegistryEntry {
   active_calendar_id?: string | null;
   /**
    * Home onboarding this world has dismissed: since 1.19 (#127) only
-   * `next-steps` (the next-steps list's ×) is read; older ids from the S264
+   * `next-steps` (the next-steps list's ×) is read; older ids from the earlier
    * cards (`create-event`, `cta-object`) linger harmlessly. Absent = nothing
    * dismissed.
    */
@@ -700,11 +700,11 @@ export interface WorldRegistryEntry {
    * A linked world restored from a world file (1.17, contract §5.2): its first
    * sync round runs as pause-and-review whatever the policy, so the file's
    * older edits never overwrite newer ones on OnlyWorlds (gate A9; Skeld's
-   * third condition, h20 #511). Cleared once a round has run.
+   * third condition, 2026-10-04). Cleared once a round has run.
    */
   review_first_sync?: boolean;
   /**
-   * What keel's roster last said (B12 Q1, the Captain's (a), h20 #8007):
+   * What keel's roster last said (B12 Q1, Titus's (a), 2026-10-20):
    * someone besides the owner can write here (an active person or agent; a
    * player's link does not count). Unset until a roster read answers. A
    * shared world syncs as pause-and-review and pulls when it opens
@@ -799,7 +799,7 @@ export interface WorldRegistryEntry {
    */
   writing_spellcheck?: boolean;
   /**
-   * @deprecated Session 231: dropped when the context tab became permanent +
+   * @deprecated Dropped when the context tab became permanent +
    * tool-global. Field is still tolerated on load for backward-compat with
    * existing registry entries but no code reads it. Safe to remove once
    * persisted registries have rolled over.
@@ -838,7 +838,7 @@ export interface WorldRegistryEntry {
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
    * survives reloads without depending on the world's folder being granted
-   * permission. Captain mentioned wanting "a random notes modal/page that is
+   * permission. Titus mentioned wanting "a random notes modal/page that is
    * persistent in app, just overlays and for random dumps" — this is it.
    */
   notes?: string;
@@ -894,14 +894,14 @@ export interface WorldsRegistry {
   /**
    * keel's id for `account_token`, kept only when Atlas minted the token (Sign
    * in with OnlyWorlds, or the email and password): Atlas revokes it by this id
-   * when it lets the token go (S475). A pasted token has none and is never
+   * when it lets the token go. A pasted token has none and is never
    * revoked. Always written together with `account_token` (`setAccountToken`).
    */
   account_token_id?: string;
   /**
    * The last eight characters of the token `account_token_id` was recorded
    * with: an id counts only beside that token (`mintedTokenId`). A tab still
-   * on 1.92 wrote a new token and kept the old id (the S475 code gate's F2).
+   * on 1.92 wrote a new token and kept the old id.
    */
   account_token_id_tail?: string;
   /** Display cache from GET /account at sign-in ("Signed in as …"). */
@@ -952,7 +952,7 @@ export interface WorldsRegistry {
   /** Master kill switch — pauses every engine if true. Default: false. */
   sync_pause_all?: boolean;
 
-  /** The Worlds list's row of add-world icons (S219). Default: shown; false leaves the labelled "add a world" button alone (S365). */
+  /** The Worlds list's row of add-world icons. Default: shown; false leaves the labelled "add a world" button alone. */
   worlds_add_icons?: boolean;
 
   /**
@@ -972,7 +972,7 @@ export interface WorldsRegistry {
    *
    * Three independent label toggles, each surfacing a different name next to
    * a glyph in the element-detail top bar. Splits originally bundled "show
-   * names" into per-context preferences (session 211 smoke).
+   * names" into per-context preferences.
    */
   maps_settings?: {
     /** Show map name next to `[map]` icons in Location element headers. */
@@ -1006,7 +1006,7 @@ export interface WorldsRegistry {
     /**
      * Render element images (image_url) in atlas chrome — detail banner +
      * context-pane thumb. Default on. The banner's × and the header's
-     * icon-thumbnail flip this same setting in place (session 239).
+     * icon-thumbnail flip this same setting in place.
      */
     show_element_images?: boolean;
     /**
@@ -1016,7 +1016,7 @@ export interface WorldsRegistry {
      */
     hide_empty_fields?: boolean;
     /**
-     * Names on the elements sidebar's type strip (#24, h20 B8, the Captain #3143: "default to
+     * Names on the elements sidebar's type strip (#24, Titus 2026-10-11: "default to
      * current, but allow b and c too"). 'icons' (A, the default): icons only, names on hover.
      * 'all' (B): every type named, two columns. 'held' (C): the types the world holds named with
      * their counts, the rest icons below.

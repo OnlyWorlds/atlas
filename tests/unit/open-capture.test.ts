@@ -1,5 +1,5 @@
 /**
- * The `#/open/<world id>` door's capture (#104, S416): the id leaves the
+ * The `#/open/<world id>` door's capture (#104): the id leaves the
  * address bar at once, a malformed one is held as '' (the door says so), and
  * any other route is left alone.
  */

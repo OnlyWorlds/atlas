@@ -102,7 +102,7 @@ export class PersonJoinModal extends BaseModal {
     if (!token) return;
     say('');
     // Nothing closes the dialog while the join is in flight: a Cancel then
-    // would still join, and say its failure into a hidden dialog (S413 gate).
+    // would still join, and say its failure into a hidden dialog.
     goBtn.disabled = cancelBtn.disabled = true;
     this.dismissLocked = true;
     goBtn.textContent = 'Joining…';
@@ -149,7 +149,7 @@ export class PersonJoinModal extends BaseModal {
  * The join is done; the open can still stop (the where-question or the PIN
  * cancelled, another open running, a download that failed and said so). The
  * person is then a member with no world here, so one toast keeps the way in
- * (the S413 gate: the first screen has no Worlds list to send them to).
+ * (the first screen has no Worlds list to send them to).
  */
 async function openUntilOpened(row: AccountWorldRow, toasts: ToastManager): Promise<void> {
   if (await openAccountWorld(row, toasts)) return;

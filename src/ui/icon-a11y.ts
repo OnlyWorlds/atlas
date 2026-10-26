@@ -6,7 +6,7 @@
  * A Material Symbols icon is rendered by putting its NAME in the element's text
  * content and letting the font ligature it into a glyph. Sighted users see an
  * icon; assistive technology reads the text. Read off the live accessibility
- * tree (S308), atlas announced its own controls as:
+ * tree, atlas announced its own controls as:
  *
  *   "add folder"        "add cloud_upload"      "add visibility"
  *   "home home"         "menu_book writing"     "wall_art pages"

@@ -37,7 +37,7 @@ export function normName(s: string): string {
  * NOT a NUL byte: a NUL makes ripgrep classify this whole file as BINARY, so
  * every content search over it silently returns nothing (while --count still
  * returns a plausible number, which is worse). Same trap as core/calendar.ts,
- * fixed S306. The key is in-memory only (reconcile.ts Map keys), never
+ * fixed there. The key is in-memory only (reconcile.ts Map keys), never
  * persisted and never sent over the wire, so the separator is free to change.
  */
 export function keyNT(type: ElementType, name: string): string {

@@ -6,7 +6,7 @@
  * TRANSIENT files never travel: the lock, the make marker, every move file,
  * the re-key journal, and the browser's swap and staging files. A move's own
  * journal riding into the copy is how a later recovery could have deleted a
- * user's folder (S370 gate A1 = B3), so `isTransientPath` is the ONE skip
+ * user's folder, so `isTransientPath` is the ONE skip
  * predicate every walker uses.
  *
  * The copy writes `.atlas/move-incoming.json` (this move's token) FIRST and
@@ -34,7 +34,7 @@ export function worldFileName(name: string, worldId: string, now = new Date()): 
 }
 
 /**
- * A world file's budget, uncompressed (the writer and the reader agree: S373 gate F4). The
+ * A world file's budget, uncompressed (the writer and the reader agree). The
  * SDK's, which is Folder Format §4.7's floor that every reader accepts (OW-15: 2 GiB, 500,000
  * entries; SDK 4.49): Atlas's own 1 GiB and 200,000 fell below it, a parallel constant behind.
  */

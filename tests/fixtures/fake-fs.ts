@@ -1,6 +1,6 @@
 /**
  * Minimal in-memory FileSystemDirectoryHandle for running the REAL FsFolderStore
- * in vitest (born as an S363 gate lens A probe harness; now the real-store
+ * in vitest (born as a probe harness for the re-key kernel; now the real-store
  * re-key tests' fixture). Writable streams commit on close (swap-file
  * semantics, like Chromium) and start EMPTY unless `keepExistingData` is set,
  * as the File System Access spec says. NotFoundError / TypeMismatchError /
@@ -12,7 +12,7 @@
 function err(name: string, msg: string): Error { const e = new Error(msg); e.name = name; return e; }
 
 /**
- * `lastModified` (S364, the live folder): a monotonic counter, bumped on every
+ * `lastModified` (the live folder): a monotonic counter, bumped on every
  * commit and every `put`, as Chromium bumps it on every `close()` even for
  * identical bytes. Monotonic rather than a clock so two writes in the same
  * millisecond still differ, which is what the real thing measured (0 of 200).
@@ -21,7 +21,7 @@ let fakeClock = 1_700_000_000_000;
 const tick = (): number => ++fakeClock;
 
 /**
- * Optional latency (S366): the real file system resolves each step after a
+ * Optional latency: the real file system resolves each step after a
  * variable delay, so two overlapping writes of one file interleave; this fake
  * resolves in microtask order and they never do. A test that is about a race
  * sets a jitter for its duration and clears it (`setFakeFsJitter(null)`).
@@ -43,7 +43,7 @@ export class FakeBlob {
 
 /**
  * Chromium's wording when the swap-in at `close()` fails because another
- * program holds the file (S368, the Discord report; `native_file_util.cc` maps
+ * program holds the file (the Discord report; `native_file_util.cc` maps
  * every failed move to FILE_ERROR_FAILED, `file_error.cc` words it so).
  */
 export const HELD_FILE_MESSAGE =
@@ -52,7 +52,7 @@ export const HELD_FILE_MESSAGE =
 export class FakeFileHandle {
   readonly kind = 'file';
   lastModified = tick();
-  /** Set by `removeEntry`: a removed file's handle throws on read, as Chromium's does (S364 gate). */
+  /** Set by `removeEntry`: a removed file's handle throws on read, as Chromium's does. */
   removed = false;
   /** Closes still to refuse while another program "holds" the file (`FakeDirHandle.hold`). */
   heldCloses = 0;
@@ -143,7 +143,7 @@ export class FakeDirHandle {
     this.fileAt(path).lastModified = tick();
   }
   /**
-   * Another program holds this file (S368): its next `closes` writable closes
+   * Another program holds this file: its next `closes` writable closes
    * fail as Chromium's do on Windows, leaving the bytes untouched. `Infinity`
    * holds until `release(path)`.
    */

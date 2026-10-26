@@ -199,7 +199,7 @@ describe('blocksOf — refs-mirror heal (id-swap correctness)', () => {
   });
 });
 
-describe('blocksOf: a page with no blocks here reads its story (S437)', () => {
+describe('blocksOf: a page with no blocks here reads its story', () => {
   // A page from the server or another device: blocks are atlas-local, so only
   // the story arrives (the walk's Handout read "no content yet" on 1.57.1).
   const pulled = el({ id: 'pg', subtype: 'page', story: '# Wanted\n\nThe Kid, for crossing the river.' });

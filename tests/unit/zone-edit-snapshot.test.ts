@@ -4,7 +4,7 @@
  *
  * Its sibling `zone-drawing.test.ts` carried a comment claiming the module was
  * "exercised by smoke". It is not: `smoke.spec.ts` contains no zone anything,
- * and no e2e drives edit mode. That comment is corrected in S307.
+ * and no e2e drives edit mode. That comment is corrected.
  *
  * These cover the DATA-LOSS trio. Each one ends with the user's committed
  * vertex drags being silently reverted later, and atlas has no undo:
@@ -61,7 +61,7 @@ describe('zone edit snapshot lifecycle', () => {
     localStorage.setItem(KEY, JSON.stringify(stored));
     const read = JSON.parse(localStorage.getItem(KEY)!);
     expect(Object.keys(read).sort()).toEqual(['world-a', 'world-b']);
-    // Clearing one leaves the other — the property the S307 fixes preserve.
+    // Clearing one leaves the other — the property the fixes preserve.
     delete read['world-a'];
     localStorage.setItem(KEY, JSON.stringify(read));
     expect(Object.keys(JSON.parse(localStorage.getItem(KEY)!))).toEqual(['world-b']);

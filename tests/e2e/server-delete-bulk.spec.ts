@@ -1,5 +1,5 @@
 /**
- * #122 (S390): the server-delete review's "Delete all locally", clicked the
+ * #122: the server-delete review's "Delete all locally", clicked the
  * way a user meets it. A linked world of four characters; the server deletes
  * three; one of the three holds an edit made here that never synced. The one
  * step deletes the two clean copies, names the edited one and keeps it until

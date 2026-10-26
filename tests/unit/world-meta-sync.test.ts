@@ -1,5 +1,5 @@
 /**
- * World-meta sync kernel tests (S262) — the pure functions under the engine's
+ * World-meta sync kernel tests — the pure functions under the engine's
  * meta step. The load-bearing locks, each tied to a gate finding:
  *  - canonical equality kills the undefined-vs-typed-empty oscillation
  *  - the encoder emits explicit null for cleared ints (resurrect fix)
@@ -179,7 +179,7 @@ describe('metaFieldLengthError (dig Q9: keel never length-validates)', () => {
   });
 });
 
-describe('a list holds whole numbers too (keel ca181a3, h29 #2723)', () => {
+describe('a list holds whole numbers too (keel ca181a3, 2026-10-10)', () => {
   it('time_format_equivalents as the standard types them survives the canonical form', () => {
     expect(canonicalMetaValue('list', [1, 7, 30, 365])).toEqual([1, 7, 30, 365]);
     expect(canonicalMetaValue('list', ['Day', 7, null, {}, Number.NaN])).toEqual(['Day', 7]);

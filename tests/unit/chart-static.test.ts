@@ -1,7 +1,7 @@
 /**
  * chart-static: the frozen chart renderer (share-builder preview + publish).
- * S367 critic K6: a zero-span block (one dated element, or all on one date)
- * must centre its nodes, as the live room does since S301, not pin them to
+ * A zero-span block (one dated element, or all on one date)
+ * must centre its nodes, as the live room does, not pin them to
  * the left padding.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -37,7 +37,7 @@ function glyphXs(els: any[]): number[] {
   return texts.filter(t => t.text === ELEMENT_ICONS.event).map(t => t.x);
 }
 
-describe('renderChartView: zero-span axis (S367 critic K6)', () => {
+describe('renderChartView: zero-span axis', () => {
   it('all nodes on one date draw centred on a 600px canvas, not at the left edge', () => {
     const xs = glyphXs([
       { id: 'e1', type: 'event', name: 'The Siege', start_date: 454 },

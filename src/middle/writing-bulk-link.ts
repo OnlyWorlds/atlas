@@ -1,5 +1,5 @@
 /**
- * Tree-level bulk link/unlink (S265) — "Link mentions in all scenes" from the
+ * Tree-level bulk link/unlink — "Link mentions in all scenes" from the
  * writing sidebar. Runs the prose-autolink kernel over a set of narratives:
  *
  *   - The narrative OPEN in the live editor goes through the registered
@@ -30,7 +30,7 @@ import { currentLore } from '../core/parlor-room';
 // view-only-ok: reached only from the writing tree's menu, which a view-only world does not open (writing-sidebar.ts) (conv. 149).
 
 /**
- * ONE HALF IS THE TRUTH (S365 gate lens A H3). Every Atlas save keeps
+ * ONE HALF IS THE TRUTH. Every Atlas save keeps
  * `story === serializeDocToMarkdown(sidecar)`, and the sidecar rule at open
  * (story-sidecar.ts) reads any other disagreement as an outside edit. These
  * writers used to transform the two halves separately, and they part ways
@@ -121,7 +121,7 @@ export async function bulkLinkNarratives(
 }
 
 /**
- * S355: link EVERY match of one term to one element across a set of
+ * Link EVERY match of one term to one element across a set of
  * narratives (the compiled view's "Link to element"). Same routing as
  * {@link bulkLinkNarratives}: the live narrative (if any) goes through the
  * editor transaction, every other one gets both halves rewritten on disk,

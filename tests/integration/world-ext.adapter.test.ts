@@ -1,5 +1,5 @@
 /**
- * The v2 adapter carries a profile's x_ keys and the world's origin (Keel #571),
+ * The v2 adapter carries a profile's x_ keys and the world's origin,
  * through the MSW stand-in for keel's GET and PATCH /world: an x_ key goes as
  * given and null removes it, origin comes back as served, and an atlas_ key
  * or a stray field never rides a PATCH.
@@ -23,7 +23,7 @@ beforeEach(() => {
   adapter = new OwV2ClientAdapter({ apiKey: 'k', apiPin: '1234', baseUrl: V2 });
 });
 
-describe('the adapter speaks Keel #571', () => {
+describe('the adapter carries x_ keys and origin', () => {
   it('reads origin as served, both members null when keel knows none', async () => {
     const meta = await adapter.getWorldMeta() as unknown as Record<string, unknown>;
     expect(meta.origin).toEqual({ source: null, producer: null });

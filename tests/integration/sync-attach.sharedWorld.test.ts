@@ -1,6 +1,6 @@
 /**
- * A shared world reviews before it overwrites (B12 Q1, the Captain's (a),
- * h20 #8007; contract `Forge/Notes/2026-10-20-s437-shared-world-review-default.md`).
+ * A shared world reviews before it overwrites (Titus's choice (a),
+ * 2026-10-20).
  *
  * In a world keel's roster says others can write to, the engine runs
  * pause-and-review and pulls when the world opens, whatever Settings names;
@@ -159,7 +159,7 @@ describe('the flush-on-attach in a shared world', () => {
     expect(order).toEqual(['push']);
   });
 
-  it('no answer from keel: the world stays under the review, whatever was learned before, and asks again on the next round (the S438 gate\'s G2)', async () => {
+  it('no answer from keel: the world stays under the review, whatever was learned before, and asks again on the next round', async () => {
     roster.mockResolvedValue(null);
     for (const learned of [true, false, undefined]) {
       detachSyncEngine();
@@ -175,7 +175,7 @@ describe('the flush-on-attach in a shared world', () => {
     await vi.waitFor(() => expect(engine.getPolicy()).toBe('local-wins'));
   });
 
-  it('a world opened paused asks nothing, and its resume pushes under the review: the co-builder\'s words stay (the S438 gate\'s G1)', async () => {
+  it('a world opened paused asks nothing, and its resume pushes under the review: the co-builder\'s words stay', async () => {
     await seedBothChanged();
     useRegistry({ ...base, sync_paused: true, shared_with_others: false });
     roster.mockResolvedValue([OWNER, CO_BUILDER]);
@@ -192,7 +192,7 @@ describe('the flush-on-attach in a shared world', () => {
     await vi.waitFor(() => expect(entryNow().shared_with_others).toBe(true));
   });
 
-  it('an element held while keel was unheard stays held when keel says the world is alone, until the person chooses (the S438 gate\'s G3)', async () => {
+  it('an element held while keel was unheard stays held when keel says the world is alone, until the person chooses', async () => {
     useRegistry(base);
     let answer!: (rows: OwMember[]) => void;
     roster.mockReturnValue(new Promise<OwMember[]>(r => { answer = r; }));
@@ -286,7 +286,7 @@ describe('nothing else turns a shared world back to Local wins', () => {
   });
 });
 
-describe('what a roster said belongs to its link (the S438 gate\'s G5)', () => {
+describe('what a roster said belongs to its link', () => {
   it('unlinking or linking again forgets it, and the person\'s switch with it', () => {
     const reg = { ...defaultRegistry(), worlds: [{ ...base, shared_with_others: true, shared_keep_policy: true }] };
     const unlinked = detachApi(reg, 'w1').worlds[0];

@@ -55,7 +55,7 @@ export class MoveBrowserWorldModal extends BaseModal {
     confirm.focus();
     cancel.addEventListener('click', () => this.hide());
     confirm.addEventListener('click', async () => {
-      // Locked from the click (S373 gate F9): readying the home folder can
+      // Locked from the click: readying the home folder can
       // take a dialog, a picker and a permission prompt, and a dialog closed
       // meanwhile must not leave a move running with nothing on screen.
       this.lock(cancel, confirm, true);
@@ -77,7 +77,7 @@ export class MoveBrowserWorldModal extends BaseModal {
     lines: { success?: string; failed?: string } = {},
   ): Promise<boolean> {
     // Already asked (the where-question): a statement, not a question, and no
-    // confirm button (S374 gate F7).
+    // confirm button.
     const { cancel, confirm, progress } = this.shell(
       `<p class="atlas-modal-hint">Atlas copies the world into your OnlyWorlds folder, <code>${escapeText(ready.hint)}</code>, checks the copy, then removes it from this browser.</p>`,
       `Moving "${this.world.name}" to your folder`);

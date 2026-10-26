@@ -2,7 +2,7 @@
  * keel's word on the hidden mark through the full stack (engine, the real
  * OwV2ClientAdapter, keel's v2 MSW): the word is local-only, so a push of a
  * copy holding it never puts it on keel, however many pushes follow; and the
- * mark taken out here takes the word with it (conv. 170, the S461 gate's F3).
+ * mark taken out here takes the word with it (conv. 170).
  * keel's MSW round-trips any `atlas_` key, so keel's stored copy is the proof.
  */
 import { it, expect, beforeEach } from 'vitest';
@@ -74,7 +74,7 @@ it('a clean copy holding 1.86.2\'s word is hidden on keel, and the word never re
   expect(hiddenMarkLine(after, 'api-linked')).toBe(HIDDEN_MARK_LINE);
 });
 
-it('a word a cleared baseline left never survives the create that follows through /bulk (the S464 gate\'s M1)', async () => {
+it('a word a cleared baseline left never survives the create that follows through /bulk', async () => {
   // The file as a Keep, a reset or a re-key leaves it: the mark, the old word, no baseline.
   const wren = await folder.createElement('character', { name: 'Wren', description: 'The traitor.', hidden: true, [HIDDEN_SHOWN_ONLINE]: true } as never);
   await folder.createElement('character', { name: 'Ada' });

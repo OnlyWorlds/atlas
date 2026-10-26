@@ -1,7 +1,7 @@
 /**
- * The view-only ratchet (conv. 149, S436): a UI module that starts a write to
+ * The view-only ratchet (conv. 149): a UI module that starts a write to
  * the world asks `worldIsViewOnly()` and offers nothing the store would refuse.
- * The S436 census found 78 such paths unguarded beside 10 guarded; the sweep
+ * A census found 78 such paths unguarded beside 10 guarded; the sweep
  * closed them, and this keeps a new one from opening quietly.
  *
  * A UI file that calls a world-writing store method (the ones behind the

@@ -1,5 +1,5 @@
 /**
- * Re-key (S363): browser-persisted state follows the id map.
+ * Re-key: browser-persisted state follows the id map.
  * One describe per remapper; each seeds the module's real storage key.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';

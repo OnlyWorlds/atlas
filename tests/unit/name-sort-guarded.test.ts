@@ -1,7 +1,7 @@
 /**
  * Every sort on `.name` must guard against an absent name.
  *
- * WHY THIS IS A SOURCE SCAN AND NOT A BEHAVIOUR TEST (S308):
+ * WHY THIS IS A SOURCE SCAN AND NOT A BEHAVIOUR TEST:
  *
  * `Element.name` is typed `string`, non-optional — which is exactly why this
  * bug shipped. A TypeScript type is a compile-time claim about data the

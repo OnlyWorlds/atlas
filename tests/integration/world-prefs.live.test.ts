@@ -1,6 +1,6 @@
 /**
  * world-prefs.json while a world stays OPEN, and the registry across tabs
- * (S365, promoted from the orient lane B probes P1-P3):
+ * (promoted from the orient lane B probes P1-P3):
  * - a pref change here must not overwrite what another machine synced into
  *   the file meanwhile (write-time three-way);
  * - a first-sync merge whose write-out fails must not grow the notes on every

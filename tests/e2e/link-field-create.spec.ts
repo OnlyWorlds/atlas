@@ -1,5 +1,5 @@
 /**
- * Create-from-link-field e2e (S264). A zero-candidate link field's click opens
+ * Create-from-link-field e2e. A zero-candidate link field's click opens
  * the create modal LOCKED to the target type; the new element auto-links into
  * the field and the user STAYS on the current element (no navigation jump).
  * With candidates present, the same click opens the ordinary picker.
@@ -108,7 +108,7 @@ test('with candidates present the click opens the picker, not the create modal',
   await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
 });
 
-test('clicking an empty link field BODY (not just the icon) opens the picker (S313)', async ({ page }) => {
+test('clicking an empty link field BODY (not just the icon) opens the picker', async ({ page }) => {
   await setupWorld(page);
   await createElement(page, 'location', { name: 'Old Harbor' });
   const galeId = await createElement(page, 'character', { name: 'Gale' });

@@ -1,6 +1,6 @@
 /**
- * Upload a picture for an element of an online world (Atlas #154, Keel #59's
- * last leg; brief `Forge/Notes/2026-10-10-s386-upload-button-brief.md`).
+ * Upload a picture for an element of an online world (Atlas #154, the
+ * last leg of keel's picture upload).
  *
  * Two requests, and the bytes never pass through keel: a one-use ticket from
  * keel (`POST /media/ticket`, the world's key and its own PIN: `worldPin`,
@@ -129,7 +129,7 @@ export async function uploadPicture(
   }
 }
 
-// --- Removing a picture (Boss's removal contract, h37 #2354; Keel #170) ------
+// --- Removing a picture (Boss's removal contract, 2026-10-10) -----------------
 
 /** Where an uploaded picture is served; its object key is the rest of the URL. */
 const MEDIA_ORIGIN = 'https://media.onlyworlds.com/';
@@ -166,7 +166,7 @@ function removalTicketSentence(err: unknown): string | null {
  * Remove one uploaded picture from OnlyWorlds. Resolves once the edge has
  * deleted it; the caller clears the image URLs that showed it (keel leaves
  * them, by contract). A removal asked the instant an upload replied can meet
- * keel before the edge's upload report does (about 600 ms, Skeld h20 #2496):
+ * keel before the edge's upload report does (about 600 ms, Skeld 2026-10-10):
  * a 404, or the coming 409 upload_pending, gets one retry after a second (or
  * the Retry-After). Rejects with a `PlainError` when the reason has its own
  * sentence, else the raw error for `showProblem`.

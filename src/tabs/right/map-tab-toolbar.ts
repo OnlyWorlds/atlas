@@ -4,7 +4,7 @@
  * `buildCanvasToolbar` builds the DOM; `wireCanvasToolbar` attaches behavior
  * to the buttons (visual-settings popover, zones/pins visibility toggles,
  * fit-to-image, draw-polygon/line) and the right-anchored zones dropdown.
- * Extracted from map-tab.ts in the session-233 re-trim — the wiring lives
+ * Extracted from map-tab.ts — the wiring lives
  * with the toolbar it drives. Button handlers look up the live cache entry by
  * mapId at click time, so wiring before the entry exists is safe.
  */
@@ -45,7 +45,7 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   const drawPolygonBtn = makeButton('hexagon', 'Draw polygon zone', 'draw-polygon');
   const drawLineBtn = makeButton('show_chart', 'Draw line zone', 'draw-line');
   // Visibility toggles show the SUBJECT (zones / pins), not an identical eye
-  // pair (Captain, 2026-07-19: "identical icons — a bit confusing"). Hidden
+  // pair (Titus, 2026-07-19: "identical icons — a bit confusing"). Hidden
   // state = a small slash-eye badge + dimmed button, wired below.
   const toggleZonesBtn = makeButton('pentagon', 'Show/hide zones', 'toggle-zones-visibility');
   const togglePinsBtn = makeButton('location_on', 'Show/hide pins', 'toggle-pins-visibility');
@@ -89,13 +89,13 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   spacer.setAttribute('aria-hidden', 'true');
 
   // Far right, past the zones dropdown: open the map ELEMENT's edit page
-  // (Captain, 2026-07-19 — the canvas had no route to the map's own editor).
+  // (Titus, 2026-07-19 — the canvas had no route to the map's own editor).
   const editMapBtn = makeButton('map', 'Open this map element', 'open-map-element');
 
-  // Order (Captain, S356): the LOOKING controls first (settings, show/hide,
+  // Order (Titus): the LOOKING controls first (settings, show/hide,
   // fit), the MAKING controls last, so the left set reads settings | view |
   // create. The dividers stay; they read well.
-  // Order (Captain, S356, twice): the left set is settings | show/hide |
+  // Order (Titus, twice): the left set is settings | show/hide |
   // create; fit-to-image is a VIEW-state control and sits on the right,
   // just left of the map element's own door. The dividers stay.
   // A view-only world has no create set (conv. 149). Read at mount: a world
@@ -230,13 +230,13 @@ function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
   const open = (): void => {
     panel.classList.add('is-open');
     btn.classList.add('is-open');
-    // The panel skips rebuilds while closed (S356); tell it to catch up.
+    // The panel skips rebuilds while closed; tell it to catch up.
     panel.dispatchEvent(new CustomEvent('atlas:zone-panel-open'));
     outsideListener = (e: MouseEvent) => {
       const t = e.target as Node;
       if (panel.contains(t) || btn.contains(t)) return;
       // The colour popover floats outside the panel; a click in it is still
-      // "in the panel" (S356).
+      // "in the panel".
       if ((t as Element).closest?.('.atlas-colour-popover')) return;
       close();
     };

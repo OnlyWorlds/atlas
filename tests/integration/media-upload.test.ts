@@ -1,8 +1,8 @@
 /**
- * The picture upload (Atlas #154, Keel #59's last leg): a ticket from keel
+ * The picture upload (Atlas #154): a ticket from keel
  * with the world's own PIN, the bytes to the edge with only the ticket, one
  * retry on a spent ticket, and keel's and the edge's refusals worded. keel
- * (`media/api.py`) and the edge (Hangar `surfaces/upload/src/worker.js`) are
+ * (`media/api.py`) and the edge (the upload worker) are
  * stood in for by MSW with their real shapes: keel's error envelope, the
  * edge's `{ error: "<code>" }`.
  */

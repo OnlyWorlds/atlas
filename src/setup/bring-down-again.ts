@@ -1,6 +1,6 @@
 /**
- * Bring it down again (1.17, conv. 129; contract §3.3; S370 gate lens B B16;
- * Skeld h20 #511): a LINKED world the browser cleared comes back from
+ * Bring it down again (1.17, conv. 129; contract §3.3;
+ * Skeld 2026-10-04): a LINKED world the browser cleared comes back from
  * onlyworlds.com under its own row.
  *
  * A named restore, not the link flow: the link would refuse (the cleared row
@@ -13,10 +13,10 @@
  * and `review_first_sync`, so its first sync reviews before it writes. Any
  * failure removes the directory and leaves the row as it was.
  *
- * S374 gate: one restore per row across tabs (a Web Lock, the stored registry
- * re-read before the commit, F4); the whole run on the activation chain (F2);
+ * One restore per row across tabs (a Web Lock, the stored registry
+ * re-read before the commit); the whole run on the activation chain;
  * and the world that was open stays open until the restored entry's save has
- * landed, so a refusal or a lost save never strands it without a store (F1).
+ * landed, so a refusal or a lost save never strands it without a store.
  */
 
 import { getState, patchSlice } from '../core/state';
@@ -38,7 +38,7 @@ import { atlasProducer } from '../core/provenance';
  * The world.json id this entry was made with. Every `handle_key` is
  * `world-<world.json id>`, read whole; the one exception is the link flows'
  * `-N` suffix on a second link of the same world, where the id is the
- * server's (S374 gate F3: never strip a suffix by its shape, since an id may
+ * server's (never strip a suffix by its shape, since an id may
  * itself end in `-7`).
  */
 export function ownWorldIdOf(entry: Pick<WorldRegistryEntry, 'folder' | 'api'>): string {
@@ -98,7 +98,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   const readOnly = !!entry.api.read_only;
   const pin = readOnly ? '' : (worldPin(entry, getState().registry) ?? '');
   // The download only reads, and keel reads a prefixed key without its PIN
-  // (keel core/auth.py rulings 1 and 2, Skeld h16 #2957, #200): the world
+  // (keel core/auth.py rulings 1 and 2, Skeld 2026-10-11): the world
   // comes back and its sync waits on the PIN. A legacy ten-digit key on a
   // private world still needs it to read.
   if (!readOnly && !pin && !readsWithoutPin(entry.api.api_key)) {
@@ -117,7 +117,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
     await store.writeWorldMeta({ id: ownId, name: entry.name, api: diskApiBlock(entry.api), producer: atlasProducer('server') });
     const adapter = buildV2Adapter(entry.api.api_key, pin);
     downloaded = await initialDownloadAll(store, adapter, opts.onProgress, undefined, { stopOnQuota: true });
-    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it (S458)
+    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }

@@ -1,5 +1,5 @@
 /**
- * Promoted from the S367 composition gate (lens A).
+ * Promoted from the composition gate (lens A).
  * Lens A attack 4: policy b's matched path is a PUSH (PATCH the local body up)
  * but it lands the response with `applyServerRecord`, which writes the
  * server's record over the file with no sent-stamp guard (conv. 96: "Any new

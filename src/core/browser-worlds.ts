@@ -7,13 +7,13 @@
  * that path every time (`worldHandleFor`), never kept in the handle vault:
  * OPFS needs no permission, and a path cannot go stale the way a stored
  * handle can (OPFS handles are path-based: a held one sees a re-created
- * same-name directory, measured S370 gate lens B M2).
+ * same-name directory, measured).
  *
  * Gone = `NotFoundError` on the derive, and nothing else (measured in
  * Chromium 148 and Firefox 150; Firefox's `UnknownError` comes only from a
  * stale handle's create and is a problem, not a cleared world).
  *
- * Contract: `Forge/Notes/2026-10-04-browser-worlds-contract.md` §1.
+ * Contract: a design note on browser worlds, §1.
  */
 
 import type { WorldRegistryEntry, WorldsRegistry } from './types';
@@ -32,7 +32,7 @@ export function isBrowserWorld(entry: Pick<WorldRegistryEntry, 'where'> | null |
  * Is this world Atlas-only storage, for the readers that care where the files
  * can be reached from (the live folder's rescans, the AI-folder line)? A
  * browser world, or the tour sandbox: a 1.16 tour entry has no `where` and
- * sits at the OPFS root, and must stay covered (S370 gate B14).
+ * sits at the OPFS root, and must stay covered.
  */
 export function isAtlasOnlyStorage(entry: Pick<WorldRegistryEntry, 'where' | 'demo'> | null | undefined): boolean {
   return isBrowserWorld(entry) || entry?.demo === true;

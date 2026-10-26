@@ -1,5 +1,5 @@
 /**
- * Light-mode contrast guard (S323).
+ * Light-mode contrast guard.
  *
  * Light mode has now shipped three separate instances of one defect class: a
  * foreground and a background that answer to DIFFERENT authorities. Either a
@@ -54,19 +54,19 @@ const PROBES: Probe[] = [
   // Ordinary light-page chrome that carried literal white foregrounds.
   { name: 'unsupported heading', chain: ['atlas-unsupported', 'h1:atlas-unsupported-h1'] },
   { name: 'demo intro heading', chain: ['atlas-demo-overlay', 'atlas-demo-intro', 'h1:demo-h1'] },
-  // Modal error box (S368): a literal pale-pink foreground on a pink wash over
+  // Modal error box: a literal pale-pink foreground on a pink wash over
   // the light theme's white panel. Body text, so the 4.5:1 floor.
   { name: 'modal error', chain: ['atlas-modal-panel', 'atlas-modal-error'], min: 4.5 },
-  // The zone draft strip over the map (S426 gate G13: a literal dark floor under themed ink).
+  // The zone draft strip over the map (a literal dark floor under themed ink).
   { name: 'zone draft strip', chain: ['atlas-zone-draft-overlay'] },
   { name: 'zone draft mode', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-mode'] },
   { name: 'zone draft button', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-btn'] },
-  // The waypoint toast keeps a dark chip in both themes (S354); its lines read the text family
-  // (S437's live frame of 1.58.1: "Your world can travel between tools." dark on dark).
+  // The waypoint toast keeps a dark chip in both themes; its lines read the text family
+  // (seen live in 1.58.1: "Your world can travel between tools." dark on dark).
   { name: 'waypoint toast line', chain: ['atlas-waypoint-toast', 'atlas-waypoint-toast-line'] },
   { name: 'waypoint toast rider', chain: ['atlas-waypoint-toast', 'atlas-waypoint-toast-rider'] },
   { name: 'waypoint toast rider button', chain: ['atlas-waypoint-toast', 'atlas-waypoint-toast-rider-btn'] },
-  // The family census (S437): the map's placement hint paints the canvas floor; its Cancel read themed ink.
+  // The family census: the map's placement hint paints the canvas floor; its Cancel read themed ink.
   { name: 'map placement hint', chain: ['atlas-map-placement-hint'] },
   { name: 'map placement hint cancel', chain: ['atlas-map-placement-hint', 'atlas-map-placement-hint-cancel'] },
 ];
@@ -128,7 +128,7 @@ async function contrastOf(page: Page, probe: Probe): Promise<number> {
     const bg = `rgb(${composite[0]}, ${composite[1]}, ${composite[2]})`;
 
     // Text drawn at an alpha shows the floor through it: composite it too, or white
-    // at 0.28 measures as white (S437: the waypoint rider read 18.41:1, about 2.3:1 in fact).
+    // at 0.28 measures as white (the waypoint rider read 18.41:1, about 2.3:1 in fact).
     const fm = fg.match(/[\d.]+/g)!;
     const fa = fm.length === 4 ? +fm[3] : 1;
     const fgShown = `rgb(${[0, 1, 2].map((i) => +fm[i] * fa + composite[i] * (1 - fa)).join(', ')})`;

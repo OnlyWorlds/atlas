@@ -1,6 +1,6 @@
 /**
- * keel's "known of" stubs (PR 113, B16; the folder spec §4.4; contract
- * `Forge/Notes/2026-10-20-s443-known-of-stubs.md`, conv. 155). A guest
+ * keel's "known of" stubs (PR 113, B16; the folder spec §4.4;
+ * conv. 155). A guest
  * playing a Character reads what its own Character points to, one step out;
  * an element reached only that way comes as a stub, `known_of: true`, with
  * every field but a few served unset. Atlas stores it as a stub, never
@@ -18,7 +18,7 @@ export const KNOWN_OF_KEPT_KEYS: readonly string[] = [
 /**
  * Atlas's own fields that mirror a wire field the stub leaves unset (the
  * story's rich text, a page's blocks): a stub does not keep them, or the
- * story's text would stay on disk and in the writing room (S443 gate G6).
+ * story's text would stay on disk and in the writing room.
  */
 export const KNOWN_OF_DROPS_LOCAL: readonly string[] = ['atlas_richtext_json', 'atlas_page_blocks', 'atlas_page_refs'];
 
@@ -39,7 +39,7 @@ function unset(v: unknown): boolean {
  * height, weight, species and reputation, from a public tag in keel's
  * schema). keel serves every other field unset, so a field with a value is one
  * keel shares: read from the wire, never from a list here that keel's schema
- * outgrows (S444: this list alone dropped PR 117's fields on live 1.64.0). The
+ * outgrows (this list alone dropped PR 117's fields on live 1.64.0). The
  * unset fields are left out, never written as `""`, `null` or `[]`.
  */
 export function stubShape(record: Record<string, unknown>): Record<string, unknown> {
@@ -59,7 +59,7 @@ export function stubShape(record: Record<string, unknown>): Record<string, unkno
  *   the walk a `view` reset started, the copy holding no edit never sent (I3);
  * - `keep`: a whole copy meeting a stub on any other walk, holding an unsent
  *   edit, or kept as last known before (`keptWhole`: a role reset kept it, and
- *   a later view reset is not the reset that brought the stub; S443 gate G1)
+ *   a later view reset is not the reset that brought the stub)
  *   (I3, B12: a member keeps what they had);
  * - `same`: no change of shape; the stamp decides as before.
  */
@@ -77,7 +77,7 @@ export function knownOfMove(
 /** I5: what the store says when a stub would be changed or deleted here. */
 export const KNOWN_OF_REFUSAL = 'This one is only known of here: you know its name and what is said of it, not the rest, so it cannot be changed.';
 
-/** I4: a body carrying `known_of` is refused before it is sent, never stripped (Kael h29 #8569). */
+/** I4: a body carrying `known_of` is refused before it is sent, never stripped (Kael 2026-10-20). */
 export function refuseKnownOfBody(body: Record<string, unknown>): void {
   if ('known_of' in body) throw new PlainError(KNOWN_OF_REFUSAL);
 }

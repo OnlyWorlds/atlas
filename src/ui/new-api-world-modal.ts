@@ -74,7 +74,7 @@ export class NewApiWorldModal extends BaseModal {
     wireWhereChoice(body);
     wireOnlyWorldsSignIn(body, this.toasts, 'new-api');
 
-    // The local world a failed attempt already made (S369): Create again
+    // The local world a failed attempt already made: Create again
     // retries only the online step, rather than making a second folder.
     let madeLocally: { id: string; name: string } | null = null;
     // Reused only while it is still the open, local-only world.
@@ -118,7 +118,7 @@ export class NewApiWorldModal extends BaseModal {
       progressEl.hidden = false;
 
       try {
-        // 0. Signed out: sign in first, so the account makes the world (Keel #134).
+        // 0. Signed out: sign in first, so the account makes the world.
         if (signInFields) {
           progressEl.textContent = 'Signing in to OnlyWorlds…';
           await signInFromFields(body, '', this.toasts);

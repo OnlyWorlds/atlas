@@ -83,7 +83,7 @@ describe('the world roster', () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
-  it('a read that never answers gives up, and is asked again after the wait (the S415 gate)', async () => {
+  it('a read that never answers gives up, and is asked again after the wait', async () => {
     vi.useFakeTimers();
     try {
       const spy = vi.spyOn(OwV2Client.prototype, 'members').mockReturnValue(new Promise<OwMember[]>(() => {}));

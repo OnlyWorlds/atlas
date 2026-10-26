@@ -1,5 +1,5 @@
 /**
- * S449: the mark waits for the roster whatever the door. Since 1.68.1 the seat
+ * The mark waits for the roster whatever the door. Since 1.68.1 the seat
  * decides, but only a `seat` write ever asked for the roster, so a `server`
  * write by an agent stayed unmarked until something else had read it (found by
  * the live walk on a work world, `walk-mark.mjs`). The roster is module state and

@@ -24,7 +24,7 @@
  *   - Leaflet native dblclick suppression (no 200ms clickTimeout dance)
  *   - Module-level edit state per world, marked on the page by the container's
  *     `atlas-zone-editing` class (`core/zone-gesture.ts` reads it; the
- *     `ui.zoneEditing` slice this line once promised was never wired, S367)
+ *     `ui.zoneEditing` slice this line once promised was never wired)
  *   - 3-way diff cancel (vs zoner's points-array overwrite) since atlas stores
  *     markers as separate entities with stable ids.
  */
@@ -56,7 +56,7 @@ interface EditSession {
   zoneId: string;
   mapId: string;
   /**
-   * The world this session BELONGS to (S307).
+   * The world this session BELONGS to.
    *
    * Without it, `exitEditMode` cleared the persisted snapshot under whatever
    * world happened to be active at exit — and the world switch sets
@@ -110,20 +110,20 @@ export function isTypingTarget(target: EventTarget | null): boolean {
  * localStorage key for in-flight edit snapshots. One slot PER WORLD so multi-
  * world edit attempts don't clobber each other.
  *
- * Captain smoke session 219: "if i refresh page in edit mode; it seems to
+ * Titus's smoke test: "if i refresh page in edit mode; it seems to
  * store the changes, instead of reverting them, after reload." Root cause:
  * autosave-during-edit + in-memory-only snapshot = refresh loses the snapshot
  * before the user can Cancel. Fix: persist the snapshot to localStorage on
  * enter, clear on exit; on world activation, replay revert if found.
  *
- * Captain session 221: keying by world means switching mid-edit doesn't
+ * Keying by world (Titus's call) means switching mid-edit doesn't
  * destroy world A's snapshot when world B starts an edit. Each world's
  * activation picks up its own pending snapshot independently.
  *
  * Schema: `Record<worldId, { zoneId, mapId, snapshot: MarkerSnapshot[] }>`.
  */
 const EDIT_SNAPSHOT_KEY = 'atlas_zone_edit_snapshot_v2';
-/** Legacy single-slot key from session 219. Migrated to per-world on read. */
+/** Legacy single-slot key. Migrated to per-world on read. */
 const EDIT_SNAPSHOT_KEY_V1 = 'atlas_zone_edit_snapshot_v1';
 
 interface PersistedSnapshot {
@@ -187,7 +187,7 @@ function readPersistedSnapshot(worldId: string): PersistedSnapshot | null {
 }
 
 /** A zone edit this world left open (replayed at activation). The re-key
- *  (S363) refuses while one exists: the snapshot names zone and marker ids. */
+ * refuses while one exists: the snapshot names zone and marker ids. */
 export function hasPendingZoneEdit(worldId: string): boolean {
   return readPersistedSnapshot(worldId) !== null;
 }
@@ -208,8 +208,8 @@ function clearPersistedSnapshot(worldId: string): void {
  * swallow click propagation), which would deselect the zone right after the
  * user finished moving a vertex.
  *
- * Captain smoke session 219 originally surfaced this for an old
- * click-anywhere-to-insert flow; session 226 removed that flow but the
+ * Titus's smoke test originally surfaced this for an old
+ * click-anywhere-to-insert flow; that flow is gone but the
  * suppression remains relevant for the deselect-on-background-click path.
  */
 let dragSuppressUntil = 0;
@@ -223,13 +223,13 @@ const DRAG_SUPPRESS_MS = 150;
  * runs BEFORE the browser commits the next paint, so any non-trivial cost
  * delays the marker's visible position. Result: marker trails cursor.
  *
- * Wave 3 (Captain "marker still lags"): move ALL work — including
+ * Wave 3 (Titus "marker still lags"): move ALL work — including
  * collectLivePointsFromHandles itself — into requestAnimationFrame. The
  * drag handler is now O(1): just sets a dirty flag and (idempotently)
  * schedules rAF. The marker's transform commits to paint immediately;
  * the outline catches up on the next frame, which is invisible at 60Hz.
  *
- * Earlier session 219 baseline ("snappier than every-event") batched
+ * An earlier baseline ("snappier than every-event") batched
  * setZonePointsLive but still ran collectLivePointsFromHandles per event.
  */
 let liveDirty = false;
@@ -279,7 +279,7 @@ function ensureEscListener(): void {
   escListenerInstalled = true;
   document.addEventListener('keydown', (e) => {
     if (!active) return;
-    // NOT WHILE TYPING (S307). The zone's element-detail panel stays mounted
+    // NOT WHILE TYPING. The zone's element-detail panel stays mounted
     // during edit mode (name, description, custom fields), so these were
     // captured from inside text inputs: retyping the zone name and pressing
     // Enter committed and exited the shape edit, and pressing Escape to
@@ -447,7 +447,7 @@ function rebuildHandles(): void {
     const b = zoneMarkers[(i + 1) % zoneMarkers.length];
     const overlay = buildSegmentOverlay(a, b, i, height);
     overlay.addTo(active.layerGroup);
-    // Hover INSIDE the polygon edge (Captain wave 5): raise the segment
+    // Hover INSIDE the polygon edge (Titus wave 5): raise the segment
     // overlay above the zone polygon in SVG render order so the polygon's
     // interactive fill doesn't intercept hover events on the inner side of
     // the edge. bringToFront() reorders within the shared SVG context in
@@ -489,7 +489,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   const latlng = storageToLeaflet({ x: marker.x, y: marker.y }, canvasHeight);
   // 1-indexed display; matches zoner muscle memory ("marker 1, 2, 3...").
   // `order` comes from a world file: a string here was concatenated into the
-  // handle's HTML below (S360). Numbers only.
+  // handle's HTML below. Numbers only.
   const displayOrder = finiteOr(marker.order, 0) + 1;
   // Tooltip via native title — surfaces the two affordances (drag-to-move /
   // drag-to-trash / right-click-delete) on hover. No layout cost, no
@@ -600,7 +600,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     // Clamp to the canvas, matching the sketch-rescale transform. CRS.Simple
     // lets a vertex be dragged well past the edge; an out-of-bounds value
     // survives until an image attach rescales+clamps it and deforms the
-    // polygon (S307, the S300 corruption class).
+    // polygon (the pin-corruption class).
     const cfg = active ? mapTabCache.get(active.mapId)?.manager.getConfig() : null;
     const dims = { w: cfg?.canvasWidth ?? Number.MAX_SAFE_INTEGER, h: cfg?.canvasHeight ?? Number.MAX_SAFE_INTEGER };
     const { x, y } = commitVertexPosition(pt, dims);
@@ -763,7 +763,7 @@ function buildSegmentOverlay(
   const bLatLng = storageToLeaflet({ x: b.x, y: b.y }, canvasHeight);
   // 18px stroke gives a ~9px hit zone on EACH SIDE of the segment centerline.
   // That covers "just inside" the polygon edge as well as just outside —
-  // Captain smoke session 219 wave 5/6.
+  // Titus's smoke test.
   //
   // Root cause of the original bug: polygon's interactive fill (fillOpacity
   // 0.4) intercepted hovers on the interior side. bringToFront alone wasn't
@@ -774,7 +774,7 @@ function buildSegmentOverlay(
   // explicitly. Now bringToFront moves segments above the polygon in the
   // shared SVG context where it actually matters for hit-testing.
   //
-  // Visible weight smaller (was 32, Captain "highlight visuals slightly
+  // Visible weight smaller (was 32, Titus "highlight visuals slightly
   // smaller"). Hover opacity bumped 0.3 → 0.4 since the stripe is thinner.
   // Share the EXACT renderer that ZoneOverlay uses for the polygon. Same SVG
   // element = bringToFront() can move segments above the polygon at the
@@ -823,7 +823,7 @@ async function insertMarkerOnSegment(segmentIndex: number): Promise<void> {
   // are planned by the kernel, which renumbers by POSITION — the old
   // index-as-order arithmetic put the vertex on the wrong segment whenever
   // orders were non-contiguous, and always appended on imported zones where
-  // every order is absent (S307).
+  // every order is absent.
   const a = zoneMarkers[segmentIndex];
   const b = zoneMarkers[(segmentIndex + 1) % zoneMarkers.length];
   if (!a || !b) return;
@@ -836,11 +836,11 @@ async function insertMarkerOnSegment(segmentIndex: number): Promise<void> {
 }
 
 /**
- * Optimistic marker insertion (session 219). Updates `state.data.elements`
+ * Optimistic marker insertion. Updates `state.data.elements`
  * synchronously so the UI shows the new marker + bumped neighbors
  * immediately, then fires the FS Access store writes in the background. With
  * 5+ siblings to renumber, the N sequential FS writes used to take ~1s of
- * visible lag — Captain: "if i place a marker for existing zone during edit,
+ * visible lag — Titus: "if i place a marker for existing zone during edit,
  * it takes a second to appear." This path makes the UI feel instant.
  *
  * Mints a client UUID for the new marker so the optimistic state and the
@@ -866,7 +866,7 @@ async function optimisticInsertMarker(args: {
   // Build the optimistic next element set from the PLAN. Each affected
   // marker gets its planned absolute order — not a blanket +1 on everything
   // at or after a number, which is what put vertices on the wrong segment
-  // when orders were non-contiguous (S307).
+  // when orders were non-contiguous.
   const plannedOrder = new Map(plan.updates.map(u => [u.id, u.order]));
   const state = getState();
   const nextElements = state.data.elements.map(e => {
@@ -975,7 +975,7 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
   active = null;
 
   // Cancel: restore from snapshot (3-way diff), THEN drop the safety net.
-  // Until S307 the clear ran immediately while `restoreFromSnapshot` was
+  // The clear once ran immediately while `restoreFromSnapshot` was
   // still awaiting its per-marker writes, so a refresh or crash mid-restore
   // left the zone half-reverted with NO recovery record — precisely the
   // failure the persisted snapshot exists to prevent.
@@ -1015,7 +1015,7 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
  * path used by Cancel. Cleared after either success or failure (failure
  * surface: console warn; refusal to retry forever).
  *
- * Captain smoke session 219: "if I refresh page in edit mode; it seems to
+ * Titus's smoke test: "if I refresh page in edit mode; it seems to
  * store the changes, instead of reverting them, after reload."
  */
 export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts?: ToastManager): Promise<boolean> {
@@ -1098,7 +1098,7 @@ async function restoreFromSnapshot(session: EditSession): Promise<void> {
     session.toasts.info('Edit cancelled');
   } catch (err) {
     console.error('[zone-edit] restore from snapshot failed:', err);
-    // No retry button (S369 gate B H2): it would run against whatever world
+    // No retry button: it would run against whatever world
     // and zone edit is open when clicked. The stored snapshot is restored at
     // the next open of this world.
     showProblem(err, { doing: 'undoing the zone edit', toasts: session.toasts });
@@ -1135,7 +1135,7 @@ export function syncEditMode(): void {
  * Hook for disposeMapTab — end the session without restoring (the map tab is
  * going away).
  *
- * S307, DATA LOSS: this used to null `active` and nothing else, orphaning the
+ * DATA LOSS, fixed: this used to null `active` and nothing else, orphaning the
  * persisted snapshot. Its caller runs on WORLD SWITCH (disposeAllMapTabs), so
  * the everyday sequence was: edit a zone, drag two vertices (each autosaved to
  * disk), switch worlds. Nothing here was a cancel — the edits were committed

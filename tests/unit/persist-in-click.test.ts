@@ -1,7 +1,7 @@
 /**
  * The browser is asked to keep worlds inside the click that makes or brings
  * one into this browser, before the click's first await (contract §2.3,
- * invariant 10; S376 gate B6, lens A A9), and a row the browser cleared is
+ * invariant 10), and a row the browser cleared is
  * not a world it keeps, so after an eviction the next make asks again.
  */
 import { readFileSync } from 'node:fs';

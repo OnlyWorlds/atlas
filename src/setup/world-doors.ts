@@ -1,5 +1,5 @@
 /**
- * THE WORLD DOORS (S365): the one place that opens a world folder the user
+ * THE WORLD DOORS: the one place that opens a world folder the user
  * picked, and the one place that asks for a home folder (the atlas root)
  * when an action needs one.
  *
@@ -42,12 +42,12 @@ type Toasts = Pick<ToastManager, 'info' | 'success' | 'error'>;
 /**
  * Open a picked world folder in place and activate it. A folder registered
  * just now whose first open fails is taken off the list again, so it does
- * not sit there unopenable (the S309 close-gate rollback, lifted here from
+ * not sit there unopenable (the rollback, lifted here from
  * the sidebar). Returns true when the world became active.
  */
 export async function openPickedWorld(picked: FileSystemDirectoryHandle, toasts: Toasts, opts: { quiet?: boolean } = {}): Promise<boolean> {
   const { worldId, already } = await openWorldFolder(picked);
-  // The WORLD's name, not the folder's (S365 gate lens C L11): it is the first
+  // The WORLD's name, not the folder's: it is the first
   // thing a toolkit arrival reads.
   const name = getState().registry.worlds.find(w => w.id === worldId)?.name || picked.name;
   if (opts.quiet) { /* the caller says what happened, once (lens C L10) */ }
@@ -107,8 +107,8 @@ export async function pickAndOpenWorldFolder(toasts: Toasts): Promise<void> {
     }
     if (await isAtlasRootFolder(picked)) {
       // A folder that keeps worlds. With a home folder already set, this door
-      // never switches it: that is Settings' deliberate "Change folder"
-      // (S365 gate lens B F9 / C M6). Without one, it becomes the home folder,
+      // never switches it: that is Settings' deliberate "Change folder".
+      // Without one, it becomes the home folder,
       // and the toast says so rather than "is set up".
       if (getState().atlasRoot) {
         toasts.info('That folder keeps worlds rather than being one. To make it your OnlyWorlds folder, use Settings, then Storage.');
@@ -121,7 +121,7 @@ export async function pickAndOpenWorldFolder(toasts: Toasts): Promise<void> {
       return;
     }
     // A folder of world folders with no home-folder marker (a toolkit user's
-    // "worlds" folder): say what is in it (S365 gate lens B F7).
+    // "worlds" folder): say what is in it.
     const inside = await countWorldFoldersIn(picked);
     if (inside > 0) {
       toasts.info(`That folder holds ${inside} world${inside === 1 ? '' : 's'}. To open one, pick its own folder.`);
@@ -131,7 +131,7 @@ export async function pickAndOpenWorldFolder(toasts: Toasts): Promise<void> {
     await openPickedWorld(picked, toasts);
   } catch (err) {
     // A refusal ("That folder is not a world") arrives as a PlainError and
-    // reads as itself; anything else is worded (S369).
+    // reads as itself; anything else is worded.
     console.warn('[world-doors] open world folder failed:', err);
     showProblem(err, { doing: 'opening the world folder', folder: 'picked', toasts: toasts as ToastManager });
   }
@@ -224,7 +224,7 @@ export async function startWorldFromLink(then: 'home' | 'bring-in', toasts: Toas
 
 /** Run one way into a world, from any surface (the icon row, the chooser, Ctrl+K). */
 export async function runAddWorldAction(action: AddWorldAction, toasts: ToastManager): Promise<void> {
-  // Backstop: the tour owns the world list while it runs (S365 gate lens B F5).
+  // Backstop: the tour owns the world list while it runs.
   if (isTourFlagActive()) {
     toasts.info('That is yours to use after the tour.');
     return;
@@ -232,7 +232,7 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
   if (action === 'open-file') {
     // The file picker opens inside this click, before any await (1.17, contract §5.2),
     // and a file that lands in this browser is a browser world: ask the browser
-    // to keep worlds while the gesture is live (§2.3, invariant 10; S374 gate F8).
+    // to keep worlds while the gesture is live (§2.3, invariant 10).
     requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
     const file = await pickWorldFile();
     if (file) await openWorldFileFrom(file, toasts);
@@ -274,14 +274,14 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
 
 /**
  * The new-world door's glyph: never a folder, since the world may live in this
- * browser (S376 lens C C6). Without the folder picker it is the browser
+ * browser. Without the folder picker it is the browser
  * world's own glyph; with it, a world.
  */
 export function newWorldGlyph(): string {
   return hasFolderMode() ? 'public' : 'web';
 }
 
-/** The chooser's rows: the icon row's five, said in words (S365). */
+/** The chooser's rows: the icon row's five, said in words. */
 const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line: string; /** Said instead without the folder picker. */ browserOnlyLine?: string }> = [
   { action: 'create-local', get icon() { return newWorldGlyph(); }, title: 'Start a world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.', browserOnlyLine: 'Plain files, in this browser. Works offline; take it online any time.' },
   { action: 'open-folder', icon: 'folder_open', title: 'Open a world folder', line: 'One you already have, from Atlas, another tool, or your AI. It opens where it is; nothing is copied.' },
@@ -294,7 +294,7 @@ const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line
 
 /**
  * The plain name of one way in: the chooser row's title, and the accessible
- * name of the sidebar icon button for the same action (S369), so a screen
+ * name of the sidebar icon button for the same action, so a screen
  * reader hears the same words the chooser shows.
  */
 export function addWorldLabel(action: AddWorldAction): string {

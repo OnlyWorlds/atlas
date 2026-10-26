@@ -52,7 +52,7 @@ const STRIP_PAD = 6;
 const LABEL_OFFSET = 0.7;
 
 /**
- * The home strip's layout (S256, rebuilt S382 for #121): the kept names
+ * The home strip's layout (rebuilt for #121): the kept names
  * (anchors, cast) first, then the rest, each group in date order, each node
  * on the nearest free row, centre-out. A node takes the first clear spot for
  * glyph plus label (each row: label right, then left), else a clear spot for
@@ -132,7 +132,7 @@ function levelFor(x: number, lastXAtLevel: Map<number, number>, maxLevel: number
   return maxLevel;
 }
 
-/** Half-width drawn around a zero-span axis; mirrors the room's S301 rule
+/** Half-width drawn around a zero-span axis; mirrors the room's rule
  *  (axis-calculator ZERO_SPAN_HALF_WINDOW), kept local so the show copy
  *  stays import-free. */
 const ZERO_SPAN_HALF = 50;
@@ -140,7 +140,7 @@ const ZERO_SPAN_HALF = 50;
 /**
  * The axis range a frozen block DRAWS. A zero span (one dated element, or all
  * on one date) is padded symmetrically so the date sits centred, as the live
- * room does since S301 (S367 critic K6: it used to pin every node to PAD_X).
+ * room does (it used to pin every node to PAD_X).
  */
 export function drawnAxis(axisMin: number, axisMax: number): { lo: number; span: number } {
   if (axisMax <= axisMin) return { lo: axisMin - ZERO_SPAN_HALF, span: 2 * ZERO_SPAN_HALF };
@@ -153,7 +153,7 @@ export interface ChartViewOptions {
   /** Canvas height in px (default 240). ADDITIVE option — the show viewer's
    *  copy of this module can lag without behavior change (re-lift discipline). */
   height?: number;
-  /** 'strip' = the home chart strip's compact layout (S256): LABEL-AWARE row
+  /** 'strip' = the home chart strip's compact layout: LABEL-AWARE row
    *  occupancy (a labelled node claims its text width, a bare dot ~20px) in
    *  pure date order, so short bands fan instead of collapsing to one midline
    *  row with label pile-ups. ADDITIVE — omitted = the classic fan, so the
@@ -202,7 +202,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
     ctx.clearRect(0, 0, cssW, height);
     // The frozen chart is a dark artifact by design (it matches the published
     // page look) — paint its own floor instead of inheriting the container,
-    // or light mode renders its white-literal labels invisible (S315).
+    // or light mode renders its white-literal labels invisible.
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, cssW, height);
 
@@ -242,7 +242,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       }
       ctx.textAlign = 'left';
     } else if (block.axisMax <= block.axisMin) {
-      // Zero span (S367 critic K6): the one date sits centred, labelled there.
+      // Zero span: the one date sits centred, labelled there.
       ctx.textAlign = 'center';
       ctx.fillText(String(block.axisMin), dateToX(block.axisMin), height - 8);
       ctx.textAlign = 'left';
@@ -257,8 +257,8 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       // Strip layout: pure date order, every node trying for a label (the
       // room's label-budget spirit: labels keep a preview from reading as a
       // monotone dot-run), rows filled centre-out by `layoutStrip`, so a short
-      // band fans instead of piling its labels on one line (Captain's
-      // home-strip shots, 2026-07-12; Skeld's pre-smoke, S381).
+      // band fans instead of piling its labels on one line (Titus's
+      // home-strip shots, 2026-07-12; Skeld's pre-smoke).
       const ordered = block.nodes
         .map((n, i) => ({ n, i }))
         .sort((a, b) => a.n.date - b.n.date || a.i - b.i);
@@ -324,7 +324,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       const size = p.cast ? ICON_ANCHOR + 3 : p.anchor ? ICON_ANCHOR : ICON;
       if (p.anchor && !p.cast) {
         // In the strip the halo stays inside its row: at size * 0.85 it
-        // reached halfway into the next row's labels (S382).
+        // reached halfway into the next row's labels.
         const halo = opts.layout === 'strip' ? Math.min(size * 0.85, Y_STEP / 2 - 1) : size * 0.85;
         ctx.beginPath();
         ctx.arc(p.x, p.y, halo, 0, Math.PI * 2);

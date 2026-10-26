@@ -60,7 +60,7 @@ describe('date continuity (#281)', () => {
     expect(findDateConflicts(clean).map(brief)).toEqual([]);
   });
 
-  it('an end that is there but not a number is unknown, never a moment (the S410 gate)', () => {
+  it('an end that is there but not a number is unknown, never a moment', () => {
     const w = [
       el('character', 'c', 'Ireena', { birth_date: 101 }),
       el('event', 'e', 'The Thaw', { start_date: 100, end_date: 'that spring', characters: ['c'] }),

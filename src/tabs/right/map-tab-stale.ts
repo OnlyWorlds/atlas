@@ -1,5 +1,5 @@
 /**
- * Stale map-tab pane — extracted from map-tab.ts (session 233 re-trim).
+ * Stale map-tab pane — extracted from map-tab.ts.
  *
  * Rendered when a map tab's mapId isn't in the current world's elements:
  * either the map was deleted, or the user switched worlds while the tab was

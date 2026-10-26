@@ -1,5 +1,5 @@
 /**
- * #24 (S390): "Named in the text" under Potentials. The context pane lists
+ * #24: "Named in the text" under Potentials. The context pane lists
  * the elements a narrative names but does not link, by the autolink kernel's
  * own first-mention pass, and links one of them alone (`only`), while the
  * full index keeps scanning so a longer name still wins its match.

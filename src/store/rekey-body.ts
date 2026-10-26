@@ -1,5 +1,5 @@
 /**
- * rekeyBody: the one reference transform for giving elements new ids (S363).
+ * rekeyBody: the one reference transform for giving elements new ids.
  *
  * Given an element body and a map old id → new id, return the body with every
  * REFERENCE to an old id replaced, and whether anything changed. Pure,

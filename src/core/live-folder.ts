@@ -1,5 +1,5 @@
 /**
- * THE LIVE FOLDER (S364): keep Atlas open while another tool writes the
+ * THE LIVE FOLDER: keep Atlas open while another tool writes the
  * world folder (an AI agent, a text editor, a git checkout) and see what it
  * wrote when you come back to the window.
  *
@@ -16,7 +16,7 @@
  * DELETE for a file removed outside Atlas. On a linked world, an outside
  * edit that follows the toolkit's rule (a fresh `local_updated_at`) uploads
  * like any edit; one that does not is shown, marked "not synced", and left
- * for the manifest design to decide (Captain's ruling, S364).
+ * for the manifest design to decide (Titus's ruling).
  */
 
 import { isAtlasOnlyStorage } from './browser-worlds';
@@ -30,9 +30,9 @@ import type { Element } from './types';
 
 /** A focus storm (alt-tab, devtools) runs one pass, not five. */
 const FOCUS_THROTTLE_MS = 5_000;
-/** Above this many outside edits that would upload, on a linked world, sync waits for the user (Captain, S364). */
+/** Above this many outside edits that would upload, on a linked world, sync waits for the user (Titus). */
 export const BIG_BATCH = 50;
-/** worldId -> count of a held batch, so the question survives leaving the world and a reload (S364 gate lens B B3). */
+/** worldId -> count of a held batch, so the question survives leaving the world and a reload. */
 const HELD_KEY = 'atlas_disk_held';
 
 export interface DiskNotice {
@@ -44,7 +44,7 @@ export interface DiskNotice {
   /** Files that would not parse (half-written, conflict markers): still served from before. */
   unreadable: string[];
   /**
-   * Names of elements whose files were removed outside Atlas (Captain, S364:
+   * Names of elements whose files were removed outside Atlas (Titus:
    * say so). Dropped from view only: never deleted on the account, and a
    * linked world's next full pull can bring them back.
    */
@@ -68,7 +68,7 @@ const listeners = new Set<() => void>();
 let lastRunAt = 0;
 /** A focus inside the throttle arms ONE trailing pass for when the window
  *  reopens, so an agent's edit made seconds after the last pass still shows
- *  without another alt-tab (S365 lane B M4). */
+ *  without another alt-tab. */
 let trailing: ReturnType<typeof setTimeout> | null = null;
 /** The pass in flight, and the store it is for (B5: a pass for another world never answers for this one). */
 let running: { store: FolderStore; full: boolean; promise: Promise<RescanOutcome> } | null = null;
@@ -118,7 +118,7 @@ export function onDiskNotice(fn: () => void): () => void {
 /**
  * The "not synced" ids that are still true: an Atlas write since (a user
  * edit, the scene's relation fix-up) stamps the element, and then it uploads
- * after all (S364 gate lens B B12).
+ * after all.
  */
 export function notSyncedNow(n: DiskNotice, elements: readonly Element[]): number {
   if (n.notSynced.size === 0) return 0;
@@ -132,7 +132,7 @@ export function notSyncedNow(n: DiskNotice, elements: readonly Element[]): numbe
 }
 
 /**
- * The files a world's open left out as unreadable (conv. 176, Seethe h20 #12538): said in the
+ * The files a world's open left out as unreadable (conv. 176, Seethe 2026-10-24): said in the
  * same line as those a rescan finds, once per open, since before 1.89.0 a folder with a damaged
  * file opened one element short and said nothing. `files` is the store's `unreadableFiles()`.
  */
@@ -157,7 +157,7 @@ export function setDiskShowOnly(on: boolean): void {
 
 /**
  * Ids moved (the re-key, Route 2): the marks follow them, or a notice would
- * count an element that is gone and miss its successor (S367 lane B N8).
+ * count an element that is gone and miss its successor.
  */
 export function remapDiskNoticeIds(worldId: string, map: ReadonlyMap<string, string>): void {
   const n = notices.get(worldId);
@@ -204,8 +204,8 @@ export async function answerHeldBatch(upload: boolean): Promise<void> {
 }
 
 /**
- * Drop a waiting big-batch question for this world without answering it
- * (S366 gate A2). Taking a world online IS the answer: the link just tried to
+ * Drop a waiting big-batch question for this world without answering it.
+ * Taking a world online IS the answer: the link just tried to
  * upload every element, so a question saved before it (a world held, then
  * unlinked, then linked again) must not come back with its old count.
  */
@@ -222,7 +222,7 @@ export function isDiskHoldPersisted(worldId: string): boolean {
 }
 
 /**
- * THE SAME QUESTION AT OPEN (S365 lane B M3, Captain's yes): more than
+ * THE SAME QUESTION AT OPEN (Titus's yes): more than
  * `BIG_BATCH` elements waiting to upload when a linked world opens (an agent
  * re-parsed the folder overnight, a branch switch while Atlas was closed)
  * wait for Upload them / Stay offline, exactly as the batch seen with the
@@ -249,7 +249,7 @@ export function adoptPersistedDiskHold(worldId: string, engine: { hold(reason: '
 }
 
 /**
- * Wait out a pass already in flight (S367, lane B N2). An id move takes the
+ * Wait out a pass already in flight (lane B N2). An id move takes the
  * re-key single-flight first, which stops every NEW pass; one that started
  * before could still land its element list over the move's. Never throws.
  */
@@ -289,7 +289,7 @@ export function rescanNow(opts: { force?: boolean; full?: boolean } = {}): Promi
   // yet; the next focus after it finishes runs the pass. A world in browser
   // storage (and the tour's sandbox) can only be written by Atlas tabs, under
   // the lock, so there is nothing outside to notice (conv. 129); asked of the
-  // ACTIVE world, not the tour flag, which is shared by every tab (S365 L1).
+  // ACTIVE world, not the tour flag, which is shared by every tab.
   const touring = isAtlasOnlyStorage(getState().registry.worlds.find(w => w.id === worldId));
   if (getState().data.loading || touring || isZoneGestureActive() || ui.pinPlacement) {
     return Promise.resolve({ changes: [], skipped: 'busy' });
@@ -357,7 +357,7 @@ async function runPass(store: FolderStore, worldId: string, full: boolean): Prom
     else marked.add(c.id);
   }
 
-  // Linked worlds (Captain's rulings, S364): an edit carrying a fresh
+  // Linked worlds (Titus's rulings): an edit carrying a fresh
   // `local_updated_at` uploads like any edit; one without is marked "not
   // synced"; more than BIG_BATCH edits that WOULD upload hold sync until the
   // user answers (B11: unstamped ones upload nothing, so they never count).
@@ -377,11 +377,11 @@ async function runPass(store: FolderStore, worldId: string, full: boolean): Prom
       if (willUpload) { pending++; notSynced.delete(c.id); }
       else notSynced.add(c.id);
     }
-    // A hold may have been taken since `prev` was read (the one at open, S365).
+    // A hold may have been taken since `prev` was read (the one at open).
     held = notices.get(worldId)?.held ?? held;
     // The question's count is what is WAITING, recounted, never a running
     // sum: the hold at open and the revive pass after it see the same edits
-    // (S365 gate lens A M3 asked about 102 changes when there were 51).
+    // (it once asked about 102 changes when there were 51).
     const waiting = async (): Promise<number> => (await store.listLocallyChangedSince(null)).length;
     if (held) {
       held = { ...held, count: await waiting() };
@@ -458,7 +458,7 @@ export function installLiveFolder(): () => void {
 }
 
 /**
- * THE SIDECAR RULE for a reload (S364): an outside tool edits `story` (the
+ * THE SIDECAR RULE for a reload: an outside tool edits `story` (the
  * schema's field) and never the atlas-only rich-text copy, and the editors
  * prefer the copy whenever it is non-empty. So when `story` changed on disk
  * and the copy did not, the copy is stale and the story is the text to load;

@@ -1,5 +1,5 @@
 /**
- * The `#/open/<world id>` door's account read (#104, S416 gate F2-F4): the
+ * The `#/open/<world id>` door's account read (#104): the
  * door reads the account's list fresh, never from what this tab fetched
  * before (a world made since, an old failure), and an id held for a sign-in
  * is dropped when another door takes that sign-in or the token is forgotten.

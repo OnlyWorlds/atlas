@@ -170,7 +170,7 @@ export function renderElementCard(block: ElementCardBlock, elements: Map<string,
 }
 
 // ---------------------------------------------------------------------------
-// Card field presentation (2026-07-12, Captain's call): published cards read
+// Card field presentation (2026-07-12, Titus's call): published cards read
 // as presentation, not database rows. Short scalar values collapse into ONE
 // inline meta line ("Settled · Polis"; the field name lives in the tooltip),
 // the description renders as unlabeled prose, and everything else (long text,
@@ -280,7 +280,7 @@ export function renderCollectionView(
     cell.className = 'atlas-share-collection-cell';
     // A cell click opens the identity modal (same surface as pins) — the old
     // show-side anchor jump did nothing unless the member was ALSO carded,
-    // which read as broken (Captain's smoke, S254).
+    // which read as broken (Titus's smoke).
     if (opts.onOpen) {
       cell.classList.add('is-openable');
       cell.setAttribute('role', 'button');
@@ -425,10 +425,10 @@ function centroidOf(points: Array<{ xPct: number; yPct: number }>): { xPct: numb
  * Where a zone's label may sit, in order: just inside its topmost vertex,
  * just inside its bottommost (each at the mean of that vertex's x and the
  * vertices' mean x), then the centroid. The centroid is where a zone's own
- * pin and its busiest places tend to be (S380: the Treaty Neutral Zone's
+ * pin and its busiest places tend to be (the Treaty Neutral Zone's
  * label sat on Feltropolis), and a label along the top edge reads like a
  * region name on a printed map. The label pass takes the first clear one.
- * LIFTED BACK FROM SHOW (a327199, S380), so the preview is the page. Kept
+ * LIFTED BACK FROM SHOW (a327199), so the preview is the page. Kept
  * local for the same store-free lift contract as `centroidOf` above.
  */
 function labelCandidatesOf(points: Array<{ xPct: number; yPct: number }>): Array<{ xPct: number; yPct: number }> {
@@ -451,7 +451,7 @@ function labelCandidatesOf(points: Array<{ xPct: number; yPct: number }>): Array
 const PIN_LABEL_SIDES = ['', 'is-below', 'is-right', 'is-left'] as const;
 
 /**
- * Keep a map's labels off the pins and off each other (S380, the Captain on
+ * Keep a map's labels off the pins and off each other (Titus on
  * Moppetopia's space map: "labels not clash with pins and other labels").
  * Runs on the laid-out frame, so it measures real ink, not percentages.
  * Pins are labelled first (the first clear side, else the label shows only on
@@ -529,7 +529,7 @@ export function renderMapView(
   img.alt = frozen.title;
   img.loading = 'lazy';
   frame.appendChild(img);
-  // Zone overlays under the pins (S299): %-space SVG stretched over the
+  // Zone overlays under the pins: %-space SVG stretched over the
   // image; hover names via <title>, click-through when the zone element is
   // included (same rule as pins).
   if (frozen.zones && frozen.zones.length > 0) {
@@ -564,7 +564,7 @@ export function renderMapView(
       }
       svg.appendChild(shapeEl);
 
-      // Always-on zone label (Captain, S308). A published page is a read-only
+      // Always-on zone label (Titus). A published page is a read-only
       // artifact: in the app you can hover a zone or click it to learn what it
       // is, but a visitor to a page has no such affordance, so an unnamed
       // region is just a coloured smear. The name was already in the payload
@@ -576,7 +576,7 @@ export function renderMapView(
       // via a counter-scaled transform... which SVG cannot express here, so it
       // rides in a sibling HTML layer instead (below), where the font is
       // simply a font.
-      // A pin of the same name already labels this place (S380, Moppetopia's
+      // A pin of the same name already labels this place (Moppetopia's
       // space map: 'Snack Nebula' printed twice), so the zone stays unlabelled.
       // Placed at the first clear candidate by the label pass below.
       if (!pinNames.has((zone.name || '').trim().toLowerCase())) {

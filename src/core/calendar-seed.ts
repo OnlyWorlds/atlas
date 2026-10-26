@@ -2,7 +2,7 @@
  * Legacy time-field seed (2B design §1): `time_format_names` /
  * `time_format_equivalents` are read ONCE to offer minting a world's first
  * calendar, then cleared on the world ("seed once" lives in the data, not in
- * client memory — Skeld's structural fix, Captain-blessed).
+ * client memory — Skeld's structural fix, Titus-blessed).
  *
  * These fields have held free-text junk for years — the OW plugin default
  * ships the same word list ("Eon".."Second") in BOTH fields. The parse is

@@ -10,7 +10,7 @@
  *   1. image_url present (non-empty string)  → { kind: 'url', url }
  *   2. image_media_id present                → { kind: 'local', mediaId }
  *   3. neither                               → { kind: 'flat' } (the sized
- *      flat canvas — imageless maps are first-class since S300)
+ *      flat canvas — imageless maps are first-class)
  */
 
 import type { WorldMap } from '../../core/types';

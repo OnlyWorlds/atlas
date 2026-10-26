@@ -1,8 +1,8 @@
 /**
- * Links to elements this key no longer sees (B12 Q2, conv. 151; the S439 gate's G3).
+ * Links to elements this key no longer sees (conv. 151).
  *
- * keel, probed live S439 (`Notes/ui-snapshots/2026-10-20-s439/probe-link.log`,
- * `probe-remerge.log`): a guest reads its own element with the links it may
+ * keel, probed live on 2026-10-20:
+ * a guest reads its own element with the links it may
  * not see left out, refuses a write that names one (400 `invalid_link`, "does
  * not exist"), and puts the hidden links back on a PATCH that leaves them out,
  * single and multi alike. So Atlas mirrors keel: a kept id never goes out in a
@@ -13,8 +13,8 @@ import { relationFieldsFor } from '../editor/field-schema';
 
 /**
  * The body to send: every kept id left out of its link field. A single link to
- * one leaves the field out of the body, keel's "no change" (the second S439
- * gate's H4: null was probed only on a Character's location, and a pin's
+ * one leaves the field out of the body, keel's "no change" (null
+ * was probed only on a Character's location, and a pin's
  * `element_id` travels with `element_type`).
  */
 export function withoutKeptLinks(type: ElementType, body: Record<string, unknown>, kept: ReadonlySet<string>): Record<string, unknown> {

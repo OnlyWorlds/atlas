@@ -5,7 +5,7 @@
  * (writes `time_basic_unit`). Beneath it, optional and clearly part of the
  * clock: the now (`time_current`) and the recorded extent
  * (`time_range_min/max`). All four are world physics — synced via the meta
- * step since S262; the write pattern is the room's setNow.
+ * step; the write pattern is the room's setNow.
  *
  * Gating rules live in the CALLER (charts room): hidden on view-only worlds;
  * on api-linked worlds it waits for the first meta round and PRE-FILLS from

@@ -91,7 +91,7 @@ interface SuggestedRow {
  * Build suggested rows: 1-hop adjacent via cast members' relations + elements
  * mentioned in sibling/parent narratives in this narrative's book.
  *
- * Heuristic only — refine after Captain's real-world usage. For v1 we surface:
+ * Heuristic only — refine after Titus's real-world usage. For v1 we surface:
  *   - For each cast member, every element they reference that ISN'T already
  *     in the cast. Reason = "linked to {castMember.name}".
  *   - Elements mentioned in narratives sharing the same `parent_narrative` or
@@ -134,7 +134,7 @@ function buildSuggested(narrative: Element, dismissed: Set<string>): SuggestedRo
   while (cursor) {
     const parentId: string | undefined = (cursor as Element & { parent_narrative?: string }).parent_narrative;
     // A parent cycle in world data would loop forever; stop at the first
-    // repeat (S367 critic C1).
+    // repeat.
     if (!parentId || parentId === narrative.id || ancestorChain.has(parentId)) break;
     ancestorChain.add(parentId);
     cursor = byId.get(parentId) ?? null;
@@ -242,7 +242,7 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   // Two kinds (#24): elements the text NAMES but does not link yet (the
   // dotted mentions in the prose, first), then elements linked to the cast
   // or to nearby narratives' casts. Before #24 only the second kind showed,
-  // and "No potentials" beside dotted names read as a contradiction (S369).
+  // and "No potentials" beside dotted names read as a contradiction.
   sugHeader.title = 'Elements the text names but does not link yet, then elements linked to your cast or to nearby parts of the story';
   sugCol.appendChild(sugHeader);
 

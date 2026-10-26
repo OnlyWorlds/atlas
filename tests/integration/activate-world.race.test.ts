@@ -1,6 +1,6 @@
 /**
  * World-activation serialization — the "world opens empty sometimes" race
- * (Captain repro, 2026-07-10).
+ * (Titus repro, 2026-07-10).
  *
  * Concurrent activations interleave on the SHARED active store: the second
  * call's `prior.close()` closes the first call's just-opened store mid-flight,

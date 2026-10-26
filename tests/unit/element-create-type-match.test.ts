@@ -1,5 +1,5 @@
 /**
- * Create modal type field (S368 B1 + B3).
+ * Create modal type field.
  *
  * B1: typing "p" best-matched Phenomenon and "plan" silently kept it, so
  * Create made a Phenomenon. Unmatched text must mean NO type: the grid

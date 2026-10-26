@@ -1,10 +1,10 @@
 /**
- * Sign in inside a create form (Keel #134, S432): signed out, making a world
+ * Sign in inside a create form: signed out, making a world
  * online asks for the OnlyWorlds email or username and password, signs in
  * as Settings does (`password-sign-in.ts`), and then makes the world on the
  * account. The classic API's create-world-external lane, which took an
  * email and a PIN, is gone: keel keeps v1 frozen, and this was its last
- * caller outside keel's tests (Skeld h29 #7492).
+ * caller outside keel's tests (Skeld 2026-10-19).
  *
  * Used by Make online's Create new pane and New world on OnlyWorlds. The
  * field names are their own (`signin-*`): Settings' sign-in block can sit
@@ -39,7 +39,7 @@ export function signInFieldsHtml(prefillLogin = ''): string {
     </div>`;
 }
 
-/** Why a form that makes a world online asks a PIN, under the field before any sign-in (Seethe h20 #10346). */
+/** Why a form that makes a world online asks a PIN, under the field before any sign-in (Seethe 2026-10-22). */
 export const PIN_REASON_HTML = '<span class="atlas-modal-hint">The PIN lets Atlas upload the world\'s contents.</span>';
 
 /** The line that stands where the fields were, once signed in. */
@@ -78,7 +78,7 @@ export async function signInFromFields(root: ParentNode, signedInRest: string, t
     username = (await new AccountClient(minted.token).getProfile()).username;
   } catch (err) {
     console.warn('[sign-in-fields] sign-in refused');
-    // Minted and not kept: revoked at once, never left live with no one holding it (the S475 gate's G4).
+    // Minted and not kept: revoked at once, never left live with no one holding it.
     if (minted) void revokeAtlasToken(minted.token, minted.tokenId);
     throw new PlainError(passwordSignInLine(err));
   }

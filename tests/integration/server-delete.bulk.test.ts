@@ -1,5 +1,5 @@
 /**
- * #122 (S390): "Delete all locally" in the server-delete review. One step
+ * #122: "Delete all locally" in the server-delete review. One step
  * clears many rows; a copy holding edits never synced is named and kept
  * unless the caller includes it; each delete is guarded by the stamp the
  * review read, inside the per-id chain, so a copy edited since is kept.

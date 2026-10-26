@@ -2,7 +2,7 @@
  * Shared UI helper: surface a useful toast (and optional deep-link) when a
  * sync action can't run because the engine isn't attached.
  *
- * Captain session 221: multiple UI sites toasted "Engine not ready" /
+ * Found by Titus: multiple UI sites toasted "Engine not ready" /
  * "Refresh is only available on API-linked worlds" when the actual problem
  * was a missing PIN on an api-linked world. Users were left guessing where
  * to fix it. This helper consolidates the diagnosis so every surface
@@ -22,7 +22,7 @@ import { isPartialSlice } from '../core/provenance';
  * True when a refresh may say "Already up to date": the round reached
  * OnlyWorlds and nothing moved, clashed or failed. A refused key, a busy or
  * unreachable OnlyWorlds and a failed write each have their own line, so a
- * round that met one is not up to date (S419: #198's live walk heard "Sync
+ * round that met one is not up to date (#198's live walk heard "Sync
  * paused" and "Already up to date" from one press).
  */
 export function upToDate(result: SyncResult): boolean {
@@ -50,12 +50,12 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
       toasts.info('No world open. Pick one from the sidebar.');
       return reason;
     case 'local-only':
-      // S307: this branch NAMED a fix and left the user to find it, while
-      // `pin-missing` two lines below has navigated to the fix since S221.
+      // This branch once NAMED a fix and left the user to find it, while
+      // `pin-missing` two lines below already navigated to the fix.
       // The file exists to stop exactly that ("users were left guessing where
       // to fix it") — the pattern was just never applied across its own switch.
       if (isPartialSlice(getState().active?.meta)) {
-        // One Character's view never goes online (folder spec §4.2; S446 gate G7).
+        // One Character's view never goes online (folder spec §4.2).
         toasts.info('This world is local: one view of a world, which can\'t go online.');
         return reason;
       }
@@ -73,7 +73,7 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
     // ('attached-but-paused' was declared in the union and handled here, but
     //  `diagnoseSyncUnavailable` never constructed it — the branch could not
     //  fire, so its toast had never once been shown. Deleted with the variant
-    //  in S307 rather than left as decoration. If pause ever needs its own
+    //  rather than left as decoration. If pause ever needs its own
     //  diagnosis, add it to the producer FIRST and this switch will fail to
     //  compile until it is handled.)
     case 'engine-not-ready':

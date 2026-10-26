@@ -1,6 +1,6 @@
 /**
- * The keep-safe card (1.17 bout 5, contract §6.1; S369 ruling 5; lens C's
- * week): shown for a world of the user's own kept in this browser once it
+ * The keep-safe card (1.17 bout 5, contract §6.1):
+ * shown for a world of the user's own kept in this browser once it
  * holds something worth keeping; hidden for a week by × or by a download,
  * and back only when the world changed since; reduced, never hidden, for a
  * world online or exported as JSON.

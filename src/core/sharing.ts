@@ -14,7 +14,7 @@
  *
  * ## The refs mirror (id-swap correctness)
  *
- * The old flat id rewrite (`rewriteIdReferences`, retired S367) walked flat
+ * The old flat id rewrite (`rewriteIdReferences`, retired) walked flat
  * string + string-array fields only — ids nested inside block OBJECTS would silently go stale when the OW
  * server assigns its own id on first push (the make-online journey: compose
  * pages locally → make online → every element id-swaps). Instead of teaching
@@ -159,8 +159,8 @@ export interface ElementCardBlock {
   /**
    * Render the element's image on this card — small avatar on compact,
    * banner on full. ABSENT = true (only an explicit false is stored, so
-   * pre-existing pages and equality tests stay untouched); per-card opt-out
-   * (session 239). When every card for an element opts out, its image_url
+   * pre-existing pages and equality tests stay untouched); per-card opt-out.
+   * When every card for an element opts out, its image_url
    * stays out of the payload too.
    */
   showImage?: boolean;
@@ -210,7 +210,7 @@ export interface MapBlock {
   /** Always-visible pin labels. ABSENT = true (only explicit false stored). */
   showLabels?: boolean;
   /**
-   * Zone overlays to render, as an INCLUDE-list mirroring `pinIds` (S299).
+   * Zone overlays to render, as an INCLUDE-list mirroring `pinIds`.
    * ABSENT = all zones on the map (the friendly default + legacy blocks that
    * predate zones); PRESENT (even empty) = exactly these zones. Initialized
    * to all the map's zones at block creation, so new zones never auto-join a
@@ -219,7 +219,7 @@ export interface MapBlock {
   zoneIds?: string[];
   /**
    * Pins opted INTO full-profile disclosure (B6, settled 2026-07-03 —
-   * supersedes the session-239 full-fields-by-default call): an included pin
+   * supersedes the earlier full-fields-by-default call): an included pin
    * ships its element as identity + description (+ image) only; pins listed
    * here ship every populated field. Subset of `pinIds`. NOT part of the refs
    * mirror — `blocksOf` rewrites entries alongside the paired `pinIds` heal,
@@ -342,7 +342,7 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
  * device's page (blocks are atlas-local, never synced): its story is the
  * page, read as one prose block (`pageBlocksFromStory`), so a reader of a
  * shared world sees the text and a first save keeps it rather than
- * compiling over it (S437; the Captain's A9 ruling for Make Online,
+ * compiling over it (Titus's A9 ruling for Make Online,
  * 2026-10-04). The block's id is fixed per page, so an edit finds it again.
  */
 export function blocksOf(el: Element): PageBlock[] {
@@ -387,7 +387,7 @@ export function blocksOf(el: Element): PageBlock[] {
         }
         refIndex++;
       }
-      // Zone include-list heals the same way (S299), after the pins. Absent =
+      // Zone include-list heals the same way, after the pins. Absent =
       // all zones, so it consumes zero refs — matching pageRefsFor.
       if (b.zoneIds) {
         for (let i = 0; i < b.zoneIds.length; i++) {
@@ -469,7 +469,7 @@ export function compilePageStory(
         if (b.markdown.trim()) parts.push(b.markdown.trim());
         break;
       case 'element-card':
-        // NOT renamed with the UI label (S308). This is the DERIVED STORY
+        // NOT renamed with the UI label. This is the DERIVED STORY
         // mirror — persisted to the page's `story` field and pushed to the
         // server, not shown in the block builder. Renaming it would rewrite
         // every existing page's story on its next write for a cosmetic reason.

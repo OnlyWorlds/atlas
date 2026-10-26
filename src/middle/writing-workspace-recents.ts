@@ -27,7 +27,7 @@ export function getRecents(worldId: string): string[] {
   }
 }
 
-/** The re-key (S363) moves ids; stored state follows. Order kept, dupes dropped. */
+/** The re-key moves ids; stored state follows. Order kept, dupes dropped. */
 export function remapRecents(worldId: string, map: ReadonlyMap<string, string>): void {
   if (!worldId) return;
   try {

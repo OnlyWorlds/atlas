@@ -1,5 +1,5 @@
 /**
- * #24 (lane U, S368): a new character was ~25 empty rows. "Hide empty fields"
+ * #24 (lane U): a new character was ~25 empty rows. "Hide empty fields"
  * shows only what an element holds; the switch sits under the fields and in
  * Settings, Elements.
  */

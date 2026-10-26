@@ -1,4 +1,4 @@
-// Promoted from the S364 composition gate probe `b-normalize-clobber.probe.test.ts` (Forge/Notes/2026-09-29-s364-gate/): it asserts the fixed behaviour.
+// Promoted from a gate probe `b-normalize-clobber.probe.test.ts`: it asserts the fixed behaviour.
 /**
  * Lens B probe: the writing room's dirty check compares the editor's
  * re-serialised markdown against the RAW story. For a story another tool

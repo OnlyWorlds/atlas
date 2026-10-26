@@ -59,8 +59,8 @@ export function buildProposedMark(el: Element): HTMLElement | null {
   btn.type = 'button';
   btn.className = 'atlas-proposed-mark' + (mark.lapsed ? ' atlas-proposed-mark-lapsed' : '');
   btn.dataset.role = 'proposed-mark';
-  // In a header the lapsed word is one word, so a phone keeps the name its room (Seethe h20
-  // #11393: "Proposed, lapsed" left a name 8 px of 68 at 390); the label carries the line.
+  // In a header the lapsed word is one word, so a phone keeps the name its room (Seethe,
+  // 2026-10-23: "Proposed, lapsed" left a name 8 px of 68 at 390); the label carries the line.
   btn.textContent = mark.lapsed ? 'Lapsed' : proposedWord(mark);
   let line = '';
   const say = (roster: Parameters<typeof proposedLine>[1]): void => {
@@ -78,7 +78,7 @@ export function buildProposedMark(el: Element): HTMLElement | null {
 }
 
 /**
- * The proposed element's sentence for its page (conv. 168, Seethe h20 #11298): the
+ * The proposed element's sentence for its page (conv. 168, Seethe 2026-10-23): the
  * header word's line, and what Atlas does and does not do with it. The roster's
  * name when it is already here; the header's word asks for it.
  */
@@ -89,7 +89,7 @@ export function proposedNoteFor(el: Element): string | null {
   const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
   const roster = entry?.state === 'api-linked' ? rosterNow(entry) : null;
   const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
-  // Only a linked world sends a change; a folder world saves it (Seethe h20 #11393).
+  // Only a linked world sends a change; a folder world saves it (Seethe 2026-10-23).
   const change = entry?.state === 'api-linked' ? 'sent' : 'saved';
   return `${proposedLine(mark, roster, nameOf)} A keeper accepts or declines it on OnlyWorlds; a change made here is ${change} as any other.`;
 }
@@ -121,14 +121,14 @@ export function buildAgentMark(el: Element): HTMLElement | null {
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
   // A synced world only: a folder opened as it is, or a world unlinked since, can carry keel's
-  // fields from another time, and its pushes no longer land anywhere (the S415 gate).
+  // fields from another time, and its pushes no longer land anywhere.
   if (entry?.state !== 'api-linked') return null;
   const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
   const rec = el as Record<string, unknown>;
   const roster = rosterNow(entry);
   const mark = agentMarkFor(el, roster, nameOf);
   // The seat decides since 1.68.1, so a write that names a membership waits for the
-  // roster before it is decided, whatever its door (S449: a `server` write by an agent
+  // roster before it is decided, whatever its door (a `server` write by an agent
   // stayed unmarked, since only a `seat` write ever asked; the roster is module state
   // and repaints nothing). Ask once; then draw, rename or remove in place.
   const ask = !roster && (typeof rec.changed_by === 'string' || rec.changed_via === 'seat');

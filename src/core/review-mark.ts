@@ -1,6 +1,6 @@
 /**
  * The review profile's proposed mark (schema-dist dist.52 `profiles/review.md`,
- * Keel #565's reader rule, Skeld h29 #11116; conv. 168). An element whose
+ * keel's reader rule, Skeld 2026-10-23; conv. 168). An element whose
  * `x_review_proposed` is an object was written as proposed (an AI seat's new
  * element on a world whose keeper reviews them) and is not canon until a keeper
  * settles it: accept writes the mark null, decline deletes the element.
@@ -32,7 +32,7 @@ export interface ProposedMark {
 
 /**
  * Today as the profile writes a day, in UTC: keel's queue reads a proposal as
- * lapsed from midnight UTC of its `expires` day (`state_of`; the S459 gate's F8),
+ * lapsed from midnight UTC of its `expires` day (`state_of`),
  * so Atlas reads it on the same day keel does.
  */
 export function todayDay(now = new Date()): string {
@@ -64,7 +64,7 @@ export function handsOnAsProposed(el: unknown): boolean {
 }
 
 /**
- * What a create keeps from keel's answer (keel #565, probed live S459): on a
+ * What a create keeps from keel's answer (probed live): on a
  * world whose keeper reviews AI seats, keel writes the mark on a seat's new
  * element and answers with it. The push stamps only keel's time, so without
  * this the copy that made the element never carries the mark (keel's stamp then

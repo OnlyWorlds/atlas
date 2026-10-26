@@ -1,8 +1,8 @@
 /**
- * S361: map coordinates are BOTTOM-left, the schema's (`keel/schema/pin.yaml`:
+ * Map coordinates are BOTTOM-left, the schema's (`keel/schema/pin.yaml`:
  * "x/y coordinate, from bottom left of the map"). Leaflet CRS.Simple is
  * bottom-left too, so a stored point IS a Leaflet point and no height enters
- * the conversion. Atlas stored y top-down until S361 and every standard world
+ * the conversion. Atlas stored y top-down until 1.8 and every standard world
  * drew mirrored.
  */
 import { describe, it, expect } from 'vitest';

@@ -1,7 +1,7 @@
 /**
  * ONE ELEMENT, ONE PIN, ONE MAP.
  *
- * Captain's rule (S306, after dragging the Consul onto a zone and then using
+ * Titus's rule (after dragging the Consul onto a zone and then using
  * [+pin] to get a second Consul pin on the same map): an element must never
  * hold two pins on one map.
  *

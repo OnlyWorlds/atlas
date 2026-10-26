@@ -28,7 +28,7 @@ import { landingAccountWorldsHtml } from './landing-account-worlds';
 import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 
 /**
- * Whether this no-world stretch already opened the sidebar drawer (S366).
+ * Whether this no-world stretch already opened the sidebar drawer.
  * Below 820px the sidebar is a drawer, and with no world open it holds the
  * only thing to do (every copy line here points at it), so the panel opens it
  * ONCE on arriving; a user who closes it is not fought on the next render.
@@ -49,16 +49,16 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
   // Active listener for the grounded state's sidebar-hover detail zone;
   // re-renders replace it, unmount clears it.
   let hoverCleanup: (() => void) | null = null;
-  // What the landing was last built from (S414): a notify that leaves it the
+  // What the landing was last built from: a notify that leaves it the
   // same (the account list loading, a row opening) repaints only the account
   // block, so the sigil does not restart and the storage probe's edits stay.
   let landingKey: string | null = null;
   // The account block as last written: compared against this string, never
-  // against innerHTML, which the browser re-serializes (the S414 gate's H1:
+  // against innerHTML, which the browser re-serializes (compared with it,
   // every notify rebuilt the rows and a focused row lost its focus).
   let lastAccountBlock = '';
 
-  // The landing's account rows (S414) open as the sidebar's do, owned or shared.
+  // The landing's account rows open as the sidebar's do, owned or shared.
   root.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     if (target.closest('[data-role="landing-worlds-retry"]')) {
@@ -84,7 +84,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
 
     // Pre-setup the splash is a BARE stage: no sidebar, no nav, no panes —
     // the same empty black the tour opens on, so starting the tour is
-    // continuous (Captain's call, 2026-07-19). The class drops the moment a
+    // continuous (Titus's call, 2026-07-19). The class drops the moment a
     // root exists, a world is active, or the tour itself is running (the
     // tour's build-up owns the chrome then).
     const grounded = isAtlasGrounded(state);
@@ -109,7 +109,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <p class="atlas-welcome-hint"><button class="atlas-btn-link" data-action="setup-atlas">Or set up a different folder</button></p>
         </div>
       `;
-      // The second door (Captain, S354): after a storage clear this screen
+      // The second door (Titus): after a storage clear this screen
       // offered ONLY the re-link, so choosing a new place meant re-linking
       // the old one first and then changing it in Settings. Settings already
       // had both doors; the welcome now matches it.
@@ -150,10 +150,10 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     }
 
     // First-launch: no home folder and no world of the user's own. The landing
-    // (session 255 minimal form; tour door added 2026-07-19, Freek's "jarring
+    // (minimal form; tour door added 2026-07-19, after a tester's "jarring
     // first screen"): the tour needs no folder, so it leads.
     if (!grounded) {
-      // Signed in: the account's worlds under the doors (S414). The fetch is
+      // Signed in: the account's worlds under the doors. The fetch is
       // token-guarded, so calling it on every render is a no-op once made.
       if (state.registry.account_token) refreshAccountWorlds();
       const accountBlock = landingAccountWorldsHtml(state);
@@ -172,18 +172,18 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // Chromium) and "other ways in" (the chooser: bring one down, view a
       // shared world, open a world file). After a full clear of site data this
       // screen is the only surface, so the world file's door must be on it.
-      // Chromium keeps "open a world folder" (S365: the toolkit sends people
+      // Chromium keeps "open a world folder" (the toolkit sends people
       // here with a world folder an AI made; it opens in place, and a folder
       // that keeps worlds becomes the home folder). "Set up a folder" is gone:
       // the home folder is asked for when a world is first made in a folder.
-      // #127 (the Captain's Q4, h37 #2015): two doors, start a world and the
+      // #127 (Titus, 2026-10-09): two doors, start a world and the
       // demo world, and one quiet line under them for the rest. The tour
-      // stays one click from the first screen (his Q5) as a link: a choice,
+      // stays one click from the first screen (his call) as a link: a choice,
       // not the first step.
       const folderMode = hasFolderMode();
       const tourDone = localStorageFlag('atlas_tour_done_v1');
-      // S301 (Captain's round): the doors lost their headings and their boxes;
-      // the compact doors kept a caption each (Captain, S302), one muted line,
+      // Titus's round: the doors lost their headings and their boxes;
+      // the compact doors kept a caption each (Titus), one muted line,
       // no time claim, tool voice.
       const choice = (action: string, cls: string, label: string, note: string): string =>
         `<span class="atlas-landing-choice" data-door="${action}">
@@ -191,7 +191,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
            <span class="atlas-landing-choice-note">${note}</span>
          </span>`;
       const doors = [
-        // OW Style's ladder (h63 #8314): Start a world is this screen's one
+        // The style ladder (2026-10-20): Start a world is this screen's one
         // Entry; the demo door is Standard, the everyday button.
         choice('start-world', 'atlas-btn-entry', 'Start a world', folderMode
           ? 'Your first world, in a folder on your drive or in this browser'
@@ -206,20 +206,20 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         folderMode ? link('open-world-folder', 'Open a world folder', 'One you already have, from Atlas, another tool or your AI') : '',
         link('other-ways-in', 'Other ways in', 'Download one from OnlyWorlds, view a shared world, open a world file'),
       ].filter(Boolean).join('<span class="atlas-landing-more-sep" aria-hidden="true">·</span>');
-      // The note names the DESKTOP part of the constraint (S323): mobile
+      // The note names the DESKTOP part of the constraint: mobile
       // Chrome has no folder picker either, so the sentence says "desktop".
       const folderNote = folderMode
         ? ''
         : 'Worlds you make here live in this browser. Folders on your drive need desktop Chrome, Edge or Brave.';
-      // (The example-page door, "see an example page" → #/demo, was removed in
-      // S368 with the other two example-page links. The #/demo route itself
+      // (The example-page door, "see an example page" → #/demo, was removed
+      // with the other two example-page links. The #/demo route itself
       // still answers, for old links.)
-      // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Captain's nod,
+      // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Titus's nod,
       // 2026-07-19): users routed here from onlyworlds.com need the mark and
       // the stated relationship to read "same universe". Bundled local copy
       // of the animated logo — local-first app, local asset.
       // The sigil is the OnlyWorlds mark and now behaves like one: clicking it
-      // opens onlyworlds.com (S301). Users arriving from there get the way
+      // opens onlyworlds.com. Users arriving from there get the way
       // back; users arriving cold get the context.
       root.innerHTML = `
         <div class="atlas-landing atlas-landing-compact">
@@ -244,7 +244,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;
       // A window that refuses browser storage (a Firefox private window), or
       // whose storage is full, says why up front rather than on a click
-      // (S366, conv. 120). Without a folder picker every door needs that
+      // (conv. 120). Without a folder picker every door needs that
       // storage, so only the line is left; on Chromium the tour goes and the
       // folder doors stay (the dialog's browser row says why when chosen).
       void opfsStatus().then((status) => {
@@ -262,7 +262,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           });
           moreRow.hidden = links.length === 0;
         }
-        // The doors that stay say only what still works here (S374 gate F6).
+        // The doors that stay say only what still works here.
         const caption = (action: string, text: string): void => {
           const note = root.querySelector(`[data-door="${action}"] .atlas-landing-choice-note`);
           if (note) note.textContent = text;
@@ -286,7 +286,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       });
       tourBtn.addEventListener('click', async () => {
         tourBtn.disabled = true;
-        // CAPTURE the rendered label rather than restating it (S310). Both
+        // CAPTURE the rendered label rather than restating it. Both
         // restores below used to hard-code a string that no longer matched
         // what the markup renders — the door says "take the tour" and this
         // said "Take the tour"; the folder door says "set up a folder" and its
@@ -321,7 +321,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     }
 
     // Atlas root set but no world active. Zero worlds = the moment after
-    // first setup — headline the ONE next step (Captain's smoke, S254: "not
+    // first setup — headline the ONE next step (Titus's smoke: "not
     // super clear what the intent is here"); with worlds, it's just a picker.
     if (!active) {
       // Not during the tour (it owns the drawers, and would use up the once),
@@ -336,7 +336,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       }
       const hasWorlds = state.registry.worlds.length > 0;
       if (!hasWorlds) {
-        // Zero worlds = the grounding beat, minimal (S255v2, Captain's call):
+        // Zero worlds = the grounding beat, minimal (Titus's call):
         // just the confirmation + path. The three sidebar + buttons are the
         // actions; HOVERING one paints its explanation into the detail zone
         // below (worlds-sidebar dispatches `atlas:worlds-path-hover`), and a
@@ -360,7 +360,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         `;
         const detail = root.querySelector<HTMLElement>('[data-role="path-detail"]')!;
         // No links in hover details — the panel only exists while the cursor
-        // sits on the sidebar button, so nothing in it is clickable (S255v2).
+        // sits on the sidebar button, so nothing in it is clickable.
         const owLine =
           `<p class="atlas-grounded-detail-ow"><img src="${import.meta.env.BASE_URL}owlogo.png" alt="" />` +
           `The OnlyWorlds icon in the footer has more info</p>`;
@@ -393,7 +393,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <p>Someone shared a read key with you? Paste it: Atlas downloads their world to browse, view only. No PIN needed.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
-          // S309: open-folder was the ONE create button with no entry here —
+          // Open-folder was the ONE create button with no entry here —
           // untaught on every input path, hover included.
           'open-folder': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">folder_open</span>
@@ -411,7 +411,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         hoverCleanup = () => window.removeEventListener('atlas:worlds-path-hover', onPathHover);
         return;
       }
-      // Worlds but no home folder (opened in place on a first visit, S365):
+      // Worlds but no home folder (opened in place on a first visit):
       // no path to show; the home folder is asked for at the first new world.
       const pathLine = atlasRoot
         ? `<p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>`

@@ -1,5 +1,5 @@
 /**
- * Deleting an element removes its id from every link that named it (S362).
+ * Deleting an element removes its id from every link that named it.
  *
  * keel does this on its side of every delete (`_scrub_cross_type`: a single
  * link becomes null, a multi link drops the id, the referrer's `updated_at`
@@ -54,8 +54,8 @@ export function deadLinkPatch(el: Element, dead: ReadonlySet<string>): Partial<E
 }
 
 /**
- * The inverse of `deadLinkPatch` for a delete keel refused (conv. 163, P6;
- * the S454 gate's G3): the links `server` still holds to an id in `back` that
+ * The inverse of `deadLinkPatch` for a delete keel refused (conv. 163, P6):
+ * the links `server` still holds to an id in `back` that
  * `local` dropped, put back. A multi link that differs only by those ids takes
  * keel's list (its order); one edited here too gets them appended. A single
  * link comes back only where it is empty here: a link changed since is a

@@ -1,6 +1,6 @@
 /**
- * An area's name on a styled map sits at the point farthest inside the shape
- * (S423): `poleOfInaccessibility`.
+ * An area's name on a styled map sits at the point farthest inside the shape:
+ * `poleOfInaccessibility`.
  */
 
 import { describe, it, expect } from 'vitest';

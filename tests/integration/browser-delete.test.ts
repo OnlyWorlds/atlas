@@ -84,7 +84,7 @@ describe('deleteBrowserWorld', () => {
     expect(home.children.has(DIR)).toBe(false);
   });
 
-  it('a removal whose list save fails says so: the row would come back as cleared (S376 lens A A2)', async () => {
+  it('a removal whose list save fails says so: the row would come back as cleared', async () => {
     const realSet = Storage.prototype.setItem;
     const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
       if (k === 'atlas_worlds_registry') throw new DOMException('full', 'QuotaExceededError');

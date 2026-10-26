@@ -1,9 +1,9 @@
 /**
- * The atlas colour popover (S356): a small anchored picker that replaces the
+ * The atlas colour popover: a small anchored picker that replaces the
  * browser's native colour dialog where a colour is a WORLD decision (the
  * zone panel's kind swatch). The native dialog commits on every drag with
  * no confirm, cannot be styled, and painted a stray white box under the
- * swatch; Captain asked for a confirm button and a look that belongs.
+ * swatch; Titus asked for a confirm button and a look that belongs.
  *
  * Presets (the four-family palette plus a cartographer's row: water,
  * forest, road, sand, stone, danger) commit on click. The hex field commits
@@ -52,8 +52,8 @@ export function openColourPopover(opts: ColourPopoverOpts): void {
   closeColourPopover();
   const { anchor } = opts;
   // `current` can arrive from styles.json via a decoded data-color attribute,
-  // and it is interpolated into style and value below: hex or the default
-  // (S360). The opts object is rebound so the handlers see the same value.
+  // and it is interpolated into style and value below: hex or the default.
+  // The opts object is rebound so the handlers see the same value.
   opts = { ...opts, current: isHex(opts.current) ? opts.current : '#22d3ee' };
   const pop = document.createElement('div');
   pop.className = 'atlas-colour-popover';

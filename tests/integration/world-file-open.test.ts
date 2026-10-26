@@ -1,6 +1,6 @@
 /**
- * Open a world file (1.17 bout 5, contract §5.2, §9 invariants 6, 14; S370
- * gate lens A A8, A9, lens B B6, B16; Skeld h20 #511). The file lands as a
+ * Open a world file (1.17 bout 5, contract §5.2, §9 invariants 6, 14;
+ * Skeld 2026-10-04). The file lands as a
  * browser world through the make protocol (fresh nonced directory, world.json
  * last, a failure removes it, a full origin is fatal); the same world already
  * here is refused; a world the browser cleared is restored under its own
@@ -98,7 +98,7 @@ describe('openWorldFile', () => {
     expect(meta).toMatchObject({ id: WID, api: { world_id: 'srv-1', api_key: 'ow_w_key' } });
   });
 
-  it('a file\'s provenance lines go when the restore puts this browser\'s link back (the S446 gate\'s G3)', async () => {
+  it('a file\'s provenance lines go when the restore puts this browser\'s link back', async () => {
     const cleared: WorldRegistryEntry = {
       id: 'w1', name: 'Hollow Reach', state: 'api-linked', where: 'browser', cleared_at: '2026-10-05T09:00:00.000Z',
       created_at: '2026-10-05T00:00:00.000Z', api: { world_id: 'srv-1', api_key: 'ow_w_key', world_name: 'Hollow Reach' },
@@ -121,7 +121,7 @@ describe('openWorldFile', () => {
     expect(meta).toMatchObject(lines);
   });
 
-  it('a cleared seat world restores its seat marker, never its secret (conv. 132, S386 gate)', async () => {
+  it('a cleared seat world restores its seat marker, never its secret (conv. 132)', async () => {
     const SECRET = 'ow_s_' + 'S'.repeat(32);
     const cleared: WorldRegistryEntry = {
       id: 'w1', name: 'Hollow Reach', state: 'api-linked', where: 'browser', cleared_at: '2026-10-05T09:00:00.000Z',

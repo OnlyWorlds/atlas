@@ -1,7 +1,7 @@
 # Atlas — Zones Subsystem Design
 
 **Version**: 1.0 (2026-05-16) — foundation design
-**Status**: All foundation + visual bouts (F0-F5, V1-V5, Z + ZC1-ZC10 + ZD1-ZD6) shipped sessions 213-218. Bout history archived to `docs-archive/PROGRESS-history.md`.
+**Status**: All foundation + visual bouts (F0-F5, V1-V5, Z + ZC1-ZC10 + ZD1-ZD6) shipped.
 **Scope**: The zone/marker subsystem — domain model (zone vs marker, OW-canonical), drawing flow, edit flow, UI surfaces, atlas-extension visual prefs, cascade rules, hit-testing, test fixtures, deferred work.
 **Companion**: `DESIGN_MAPS.md` owns map-level surfaces (canvas toolbar, visual settings popover, chip-strip docking). This doc owns zone-specific behavior. Cross-reference where needed.
 
@@ -31,7 +31,7 @@ Cramming this into the maps doc would conflate two clean models. Separate file.
 8. [Sync semantics](#8-sync-semantics)
 9. [Test world fixtures](#9-test-world-fixtures)
 10. [Out of scope](#10-out-of-scope)
-11. (Bout sequence — archived to `docs-archive/PROGRESS-history.md`)
+11. (Bout sequence — retired)
 
 ---
 
@@ -155,19 +155,19 @@ Both are pure functions over `state.data.elements`. No new store API needed beyo
 
 OW Zone schema does NOT carry a "polygon vs line" field directly. Pre-ZD6 convention (inherited from zoner) put it in `Zone.supertype`, but that conflated shape with OW's free-text taxonomy field.
 
-**As of session 218 (ZD6)** atlas stores shape in a local-only extension field `atlas_shape: 'polygon' | 'line'`. The field persists on disk so reloads see it. `Zone.supertype` is now free user-meaningful text again (e.g. "regions", "districts", "biomes"), as is `subtype` ("forest", "road", "plaza"). **The interim (1.52.1, the Captain h20 #6839):** until the schema carries a shape field (his Q1 (c), motion #362), a new zone whose supertype the user left empty gets "polygon" or "line" there, for tools that have no `atlas_shape`; a typed supertype is never touched, and Atlas itself still reads the shape from `atlas_shape` only (`src/core/zone-shape-word.ts`).
+**As of ZD6** atlas stores shape in a local-only extension field `atlas_shape: 'polygon' | 'line'`. The field persists on disk so reloads see it. `Zone.supertype` is now free user-meaningful text again (e.g. "regions", "districts", "biomes"), as is `subtype` ("forest", "road", "plaza"). **The interim (1.52.1, Titus 2026-10-18):** until the schema carries a shape field (his Q1 (c), a council motion), a new zone whose supertype the user left empty gets "polygon" or "line" there, for tools that have no `atlas_shape`; a typed supertype is never touched, and Atlas itself still reads the shape from `atlas_shape` only (`src/core/zone-shape-word.ts`).
 
-**Session 221 fix**: `atlas_shape` was originally treated as a "convention" — atlas wrote it locally, but the wire-strip set in `OwClientAdapter.toWireShape` didn't filter it. Real OW rejects unknown fields with 400, so live zone CREATEs failed silently and dependent markers FK-failed (Captain's smoke). The field is now part of `ATLAS_LOCAL_EXTENSION_FIELDS` in `src/core/constants.ts` — same machinery that strips `atlas_color`, `atlas_opacity`, `atlas_label_visible`, `image_media_id` on write and preserves them on pull. The fakes (`statefulOwHandlers` + `FakeOwApiClient`) now mirror real OW's strict-unknown-field validator so regressions of this class surface in tests.
+**Session 221 fix**: `atlas_shape` was originally treated as a "convention" — atlas wrote it locally, but the wire-strip set in `OwClientAdapter.toWireShape` didn't filter it. Real OW rejects unknown fields with 400, so live zone CREATEs failed silently and dependent markers FK-failed (Titus's smoke). The field is now part of `ATLAS_LOCAL_EXTENSION_FIELDS` in `src/core/constants.ts` — same machinery that strips `atlas_color`, `atlas_opacity`, `atlas_label_visible`, `image_media_id` on write and preserves them on pull. The fakes (`statefulOwHandlers` + `FakeOwApiClient`) now mirror real OW's strict-unknown-field validator so regressions of this class surface in tests.
 
-**Cross-tool consequence**: because `atlas_shape` doesn't reach the server, other OW tools (zoner, web app) have no way to know whether a zone is polygon vs line and will guess. A canonical OW schema field is the proper long-term fix (council motion deferred per Captain session 221). For atlas-internal rendering, this is moot — `getZoneShape(zone)` returns the correct value from the local file.
+**Cross-tool consequence**: because `atlas_shape` doesn't reach the server, other OW tools (zoner, web app) have no way to know whether a zone is polygon vs line and will guess. A canonical OW schema field is the proper long-term fix (council motion deferred per Titus). For atlas-internal rendering, this is moot — `getZoneShape(zone)` returns the correct value from the local file.
 
 > **SUPERSEDED BY v2 (keel), corrected 2026-07-26.** The two paragraphs above describe the **v1** dialect and are kept as history. Under v2 the extension list is SPLIT (`src/core/constants.ts`): `ATLAS_LOCAL_ONLY_FIELDS` are still stripped on write, but **`ATLAS_WIRE_EXTENSION_FIELDS` — `atlas_color`, `atlas_opacity`, `atlas_label_visible`, `atlas_shape` — now RIDE THE WIRE** via keel's extension passthrough, so zone visuals sync across devices and other tools CAN read the shape. Reading the v1 rule as current would build the opposite behaviour, which is why this note exists rather than a quiet edit.
 
-> **1.75, the standard's shape (schema 00.33.00, #362; the Captain's word h58 #10069, Skeld #10075).** Zone gains `shape`, a string: `polygon` or `line`, lowercase; empty, absent or any other value means not stated, and a reader draws a polygon. Atlas reads it FIRST: a stated `shape` wins over `atlas_shape` and the supertype fallback, which answer only when it is not stated. **1.77 writes it**: keel serves the field since 2026-10-22 11:0x (00.33.00, its migration 0005; before, an unknown bare field was a 422), and SDK 4.54's field schema carries it, so every zone Atlas draws carries `shape` beside `atlas_shape`, and a zone's page shows Shape in its Scope section (a text field, described as "polygon for an area, line for a path"). The interim's supertype word stays until the readers read `shape`; `atlas_shape` stays for an Atlas before 1.75.
+> **1.75, the standard's shape (schema 00.33.00; Titus's word and Skeld's, 2026-10-22).** Zone gains `shape`, a string: `polygon` or `line`, lowercase; empty, absent or any other value means not stated, and a reader draws a polygon. Atlas reads it FIRST: a stated `shape` wins over `atlas_shape` and the supertype fallback, which answer only when it is not stated. **1.77 writes it**: keel serves the field since 2026-10-22 11:0x (00.33.00, its migration 0005; before, an unknown bare field was a 422), and SDK 4.54's field schema carries it, so every zone Atlas draws carries `shape` beside `atlas_shape`, and a zone's page shows Shape in its Scope section (a text field, described as "polygon for an area, line for a path"). The interim's supertype word stays until the readers read `shape`; `atlas_shape` stays for an Atlas before 1.75.
 
 Reads go through `getZoneShape(zone)` (in `tabs/right/zone-derived.ts`) which checks the standard's `shape` first (1.75), then `atlas_shape`, and falls back to legacy `supertype` = line/polygon **in any casing** for zones created before ZD6 or by another tool. Default for ambiguous: `'polygon'`. **Never read `zone.supertype` directly to decide rendering** — go through the helper.
 
-> **S356, the other writers.** Only atlas writes `atlas_shape`. zoner writes `supertype: "line"`; Skeld's Sikelia writer wrote `supertype: "Line"` (318 rivers and routes), and atlas's case-sensitive fallback drew every one as a filled polygon. The fallback is case-folded now. The cross-tool truth stands as written above: a zone from any other tool has nothing but `supertype` to say what it is, and a canonical schema field is still the proper fix (Council motion, deferred S221). Reported to Skeld with the recommendation that writers also stamp `atlas_shape` (it rides the v2 wire) until the schema has a field.
+> **The other writers.** Only atlas writes `atlas_shape`. zoner writes `supertype: "line"`; Skeld's Sikelia writer wrote `supertype: "Line"` (318 rivers and routes), and atlas's case-sensitive fallback drew every one as a filled polygon. The fallback is case-folded now. The cross-tool truth stands as written above: a zone from any other tool has nothing but `supertype` to say what it is, and a canonical schema field is still the proper fix (Council motion, deferred). Reported to Skeld with the recommendation that writers also stamp `atlas_shape` (it rides the v2 wire) until the schema has a field.
 
 Polygons: ≥3 markers, last connects to first (visually closed).
 Lines: ≥2 markers, open path.
@@ -200,7 +200,7 @@ While `ui.zoneDrafting` is present, the canvas is in drawing mode for that map. 
 
 ### 2.2 Entry
 
-User clicks ⬡ Draw Polygon or ╱ Draw Line in the canvas toolbar (DESIGN_MAPS.md §12). Drawing works on **imageless maps too** — the no-image gate was **removed in S300** (markers anchor to the map's stored `width`/`height`, which every map now carries; see DESIGN_MAPS.md §4.2) (corrected 2026-07-22, S309).
+User clicks ⬡ Draw Polygon or ╱ Draw Line in the canvas toolbar (DESIGN_MAPS.md §12). Drawing works on **imageless maps too** — the no-image gate was **removed** (markers anchor to the map's stored `width`/`height`, which every map now carries; see DESIGN_MAPS.md §4.2) (corrected 2026-07-22).
 
 `ui.zoneDrafting = { mode, mapId, points: [] }`. The drawing overlay strip mounts (see §4.2). Cursor changes (crosshair). Toolbar buttons reflect active state.
 
@@ -219,7 +219,7 @@ Visual feedback during draw:
 
 ### 2.4 Shift-snap (perfect rectangles)
 
-Captain's request. With shift held during click:
+Titus's request. With shift held during click:
 - Compute the angle `θ` from `lastPoint` to `clickPoint`.
 - Snap `θ` to the nearest of `0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°`.
 - Project `clickPoint` onto the snapped angle ray: new point's distance from `lastPoint` is the projection of the click vector onto the snapped direction.
@@ -243,11 +243,11 @@ A small floating control strip near the top-center of the canvas (transient, mou
 - ↶ undo — pops the last marker from `points`
 - ✓ finish — gated. Disabled if `mode === 'polygon' && points.length < 3` or `mode === 'line' && points.length < 2`. Enabled otherwise.
 - ✗ cancel — ESC also.
-- Trace (1.53, #365) — a toggle: while on, a drag lays a stroke instead of panning and lands its simplified points in the draft; a click still places one point. The design: DESIGN_MAPS §15.
+- Trace (1.53) — a toggle: while on, a drag lays a stroke instead of panning and lands its simplified points in the draft; a click still places one point. The design: DESIGN_MAPS §15.
 
 ### 2.6 Finish
 
-User clicks ✓ Finish, hits Enter (ZC1), or — when the click is close to an existing edge (ZD5) — gets shape-preserving auto-insert instead of an append. As of session 217 (ZC10), Finish opens a create modal before writing:
+User clicks ✓ Finish, hits Enter (ZC1), or — when the click is close to an existing edge (ZD5) — gets shape-preserving auto-insert instead of an append. As of ZC10, Finish opens a create modal before writing:
 
 1. Compute default name: `findUniqueZoneName(mode)` — "new zone" / "new zone (2)" / "new line" / etc.
 2. Open `ZoneCreateModal` with the locked shape badge + name (auto-selected) + supertype text + subtype text. Cancel = keep draft active; submit = proceed.
@@ -386,11 +386,11 @@ When the selected element is a Marker (rare — atlas excludes pin/marker/zone f
 - Standard schema editor.
 - Plus: "Go to zone" button → selectedElementId = marker.zone_id.
 
-### 4.5 Zone chip strip → toolbar dropdown (ZC9, session 217) → the zone panel (S356)
+### 4.5 Zone chip strip → toolbar dropdown (ZC9) → the zone panel
 
-> **S356: the fold-out is the zone panel** (`tabs/right/map-zone-panel.ts`; the button and the container's look are unchanged on purpose). Kinds (world-styles `groupByKind`: one row per distinct supertype/subtype pair, "Line · River") are collapsible groups; a kind row carries the rule's **swatch** (a native colour input under a dot; change = a world style rule, §5b), an **eye** (hide the kind on this map, session-only via `entry.hiddenZoneKinds`, like `hiddenPinTypes`), the count, a **tune** button (fill opacity, line weight, stroke solid/dashed/dotted, "label first", write-into-zones, clear) and the caret to its zones. A zone row is the chip below: hover lights the zone on the map (`ZoneOverlay.setZoneHovered`), click selects + navigates + pans, right-click opens the context menu. A search box filters zones by name and opens matching kinds. One kind (a small hand-drawn world) opens itself, so the panel still reads as the flat list it was. Open/closed, search and the tune target live per map tab and survive the per-sync rebuild. **S362: roles and linked zones.** Kinds are grouped `byRole`: a (supertype, subtype) kind whose zones SHARE `role` values splits into one row per role ("Line · River · major river", a road's segments under the road's name); a kind whose roles are all distinct (14 chorai, "the territory of X") stays one row, and zones with no role keep the pre-S362 key. A zone with no marker on this map whose `linked_zones` reach zones on it (Sikelia's 13 historical roads) is listed too (`listLinkedZonesOnMap`), with a route glyph and "N parts": hover lights every part, click selects and pans to them. A kind made only of such zones shows no swatch, tune or eye (nothing of its own is drawn). The rest of this section describes the chip a row still is.
+> **The fold-out is the zone panel** (`tabs/right/map-zone-panel.ts`; the button and the container's look are unchanged on purpose). Kinds (world-styles `groupByKind`: one row per distinct supertype/subtype pair, "Line · River") are collapsible groups; a kind row carries the rule's **swatch** (a native colour input under a dot; change = a world style rule, §5b), an **eye** (hide the kind on this map, session-only via `entry.hiddenZoneKinds`, like `hiddenPinTypes`), the count, a **tune** button (fill opacity, line weight, stroke solid/dashed/dotted, "label first", write-into-zones, clear) and the caret to its zones. A zone row is the chip below: hover lights the zone on the map (`ZoneOverlay.setZoneHovered`), click selects + navigates + pans, right-click opens the context menu. A search box filters zones by name and opens matching kinds. One kind (a small hand-drawn world) opens itself, so the panel still reads as the flat list it was. Open/closed, search and the tune target live per map tab and survive the per-sync rebuild. **Roles and linked zones.** Kinds are grouped `byRole`: a (supertype, subtype) kind whose zones SHARE `role` values splits into one row per role ("Line · River · major river", a road's segments under the road's name); a kind whose roles are all distinct (14 chorai, "the territory of X") stays one row, and zones with no role keep the key they had before roles. A zone with no marker on this map whose `linked_zones` reach zones on it (Sikelia's 13 historical roads) is listed too (`listLinkedZonesOnMap`), with a route glyph and "N parts": hover lights every part, click selects and pans to them. A kind made only of such zones shows no swatch, tune or eye (nothing of its own is drawn). The rest of this section describes the chip a row still is.
 
-The bottom-of-canvas chip strip from sessions 213-216 was replaced in session 217 (ZC9) with a right-anchored dropdown on the canvas toolbar. The chip rendering is the same; only the container changed.
+The first bottom-of-canvas chip strip was replaced (ZC9) with a right-anchored dropdown on the canvas toolbar. The chip rendering is the same; only the container changed.
 
 **Toolbar trigger** (in `map-tab-toolbar.ts`): a "Zones (N)" button shows count badge + caret; click toggles a floating panel anchored top-right under the button. Hidden entirely when no zones on this map. `wireZonesDropdown` (in `map-tab.ts`) handles open/close + outside-click + Escape close.
 
@@ -406,22 +406,22 @@ DESIGN_MAPS.md §13 should be updated to match — the chip-strip docking conven
 
 Filter: only zones returned by `listZonesOnMap(activeMapId, markers, zones)`. Re-derived on every elements change.
 
-### 4.6 The date bar: zones as of a date (#280, 1.40.0, S410)
+### 4.6 The date bar: zones as of a date (1.40.0)
 
-A border that moves is several Zones, one per era, each with its own `start_date`/`end_date`, chained by `linked_zones` (Kael's card `Assembly/registry/outside/date-keyed-map-layers.md`, the cartography layer in place of Zoner). The map shows each zone as of one date. No schema change: Marker and Pin carry no dates. A pin shows by its element's dates (1.50, below), so every pin of one element shows at the same dates: a city that moves is a dated Zone per era, or a Location per era, each with its own pin.
+A border that moves is several Zones, one per era, each with its own `start_date`/`end_date`, chained by `linked_zones` (date-keyed map layers, the cartography layer in place of Zoner). The map shows each zone as of one date. No schema change: Marker and Pin carry no dates. A pin shows by its element's dates (1.50, below), so every pin of one element shows at the same dates: a city that moves is a dated Zone per era, or a Location per era, each with its own pin.
 
-- **The rule** (`src/core/zone-dates.ts`, pure, conv. 143): a zone draws at d when `start <= d` (or no start) and `d < end` (or no end): half-open, so two eras meeting at a date never both draw there (the charts' `rangeVsNow` agrees at the end; at the start it calls a span beginning at the now "future", a seam for its forward half). Skeld ruled it for every dated type (h57 #5063, the register: Orrery `product/schema/schema-roadmap.md` §3), and Windrose reads it the same way. A zone whose end is not after its start shows at its start only. A zone with no dates always shows. Dates parse through `parseTemporalValue`, the charts' one parse.
+- **The rule** (`src/core/zone-dates.ts`, pure, conv. 143): a zone draws at d when `start <= d` (or no start) and `d < end` (or no end): half-open, so two eras meeting at a date never both draw there (the charts' `rangeVsNow` agrees at the end; at the start it calls a span beginning at the now "future", a seam for its forward half). Skeld ruled it for every dated type (2026-10-15, the schema roadmap §3), and Windrose reads it the same way. A zone whose end is not after its start shows at its start only. A zone with no dates always shows. Dates parse through `parseTemporalValue`, the charts' one parse.
 - **The bar** (`src/tabs/right/map-date-bar.ts`): along the bottom of the canvas, only while a zone or a pinned element on this map is dated. Row one is the date in the world's calendar (the active lens, as the charts and the element page resolve it; its tooltip says how many zones and pins show); row two is the slider (over every zone date and pinned element's date on the map, widened to the now), Now and All dates. While it shows, the zoom control rises above it (`atlas-map-has-datebar`). Canvas chrome: the dark chip in both themes (conv. 90).
 - **The choice** is per map tab, session-only, like the zone panel's eyes (`entry.zoneDate`): Now by default, which follows `World.time_current` when the charts move it (map-tab's subscribe keys on it); with no now, Now reads as All dates and the button hides. The slider sets a date; nothing is written anywhere.
-- **What the date hides** is not drawn, not listed in the zone panel, and takes no pointer. One test serves all three: `zoneShownOnMap(entry, zone)` (`map-date-bar.ts`), which also keeps the SELECTED zone shown at any date, so its page's Edit shape and show-on-map never land on nothing. The panel groups kinds from every zone on the map and then narrows each kind to the date, so a kind's key (its eye, colour, tune) never changes with the date (the S410 gate: grouping the date's zones alone split roles differently, and the eye hid nothing). A date that hides every zone keeps the panel open with one line saying so. The slider runs `refreshZoneDates`, visibility only: a full `syncZones` per frame reset every label and the density pass flickered them. Pointer: `ZoneOverlay.applyStyle` sets `pointer-events: none` on a hidden zone's paths, which also fixed the eye's hidden kinds and the layer toggle (both drew at opacity 0 and still took clicks, so an earlier era lying over the one on show stole its click). A kind's verbs (its colour, writing it into zones) still reach every member.
-- **Pins by their element's dates** (1.50, the Captain's Q11, 2026-10-16): a pin carries no dates, so it shows by its element's span, read per type from the charts' `TEMPORAL_TYPE_FIELDS` (a Character from its birth on, a Location or an Institution from its founding, an Event from its start to its end, a Title from its grant to its revoke), half-open as a zone. An element with no date fields, or not loaded, always shows; the selected pin, or the pin of the selected element, always shows. What the date hides is taken off the map like a hidden chip type; the chip strip keeps every type and counts what the date shows. The bar shows while a zone or a pinned element is dated; its tooltip counts both ("2 of 4 zones and 3 of 5 pins show"); the world's now moving re-syncs the pins too. The date is visibility only: a hidden pin's marker stays built (`setPinVisibility`), so a drag never rebuilds icons or labels, and the icons' scale reads every pin the chips show, whatever the date. A pin the person just placed (New pin, a drop) or located (the sidebar's on-map badge, the element header's pin button) shows whatever the date until the date is moved again (`revealOnMap`), so neither lands on nothing. An Event with a start and no end shows from its start on, by the standard's rule (a missing date is an open side), where the charts draw it as a moment; ghost pins and an element's date typos (the charts' one parse) are as the charts have them. (The S416 gate: F1-F5 taken.)
+- **What the date hides** is not drawn, not listed in the zone panel, and takes no pointer. One test serves all three: `zoneShownOnMap(entry, zone)` (`map-date-bar.ts`), which also keeps the SELECTED zone shown at any date, so its page's Edit shape and show-on-map never land on nothing. The panel groups kinds from every zone on the map and then narrows each kind to the date, so a kind's key (its eye, colour, tune) never changes with the date (a release gate found that grouping the date's zones alone split roles differently, and the eye hid nothing). A date that hides every zone keeps the panel open with one line saying so. The slider runs `refreshZoneDates`, visibility only: a full `syncZones` per frame reset every label and the density pass flickered them. Pointer: `ZoneOverlay.applyStyle` sets `pointer-events: none` on a hidden zone's paths, which also fixed the eye's hidden kinds and the layer toggle (both drew at opacity 0 and still took clicks, so an earlier era lying over the one on show stole its click). A kind's verbs (its colour, writing it into zones) still reach every member.
+- **Pins by their element's dates** (1.50, Titus's Q11, 2026-10-16): a pin carries no dates, so it shows by its element's span, read per type from the charts' `TEMPORAL_TYPE_FIELDS` (a Character from its birth on, a Location or an Institution from its founding, an Event from its start to its end, a Title from its grant to its revoke), half-open as a zone. An element with no date fields, or not loaded, always shows; the selected pin, or the pin of the selected element, always shows. What the date hides is taken off the map like a hidden chip type; the chip strip keeps every type and counts what the date shows. The bar shows while a zone or a pinned element is dated; its tooltip counts both ("2 of 4 zones and 3 of 5 pins show"); the world's now moving re-syncs the pins too. The date is visibility only: a hidden pin's marker stays built (`setPinVisibility`), so a drag never rebuilds icons or labels, and the icons' scale reads every pin the chips show, whatever the date. A pin the person just placed (New pin, a drop) or located (the sidebar's on-map badge, the element header's pin button) shows whatever the date until the date is moved again (`revealOnMap`), so neither lands on nothing. An Event with a start and no end shows from its start on, by the standard's rule (a missing date is an open side), where the charts draw it as a moment; ghost pins and an element's date typos (the charts' one parse) are as the charts have them.
 - **Not here yet**: a date shared across maps, the bar remembered across a reload (a remount mid-session, such as a new map image, starts from Now again). The sidebar's "on this map" badge and the Pages room's map block read every zone and pin, whatever the map tab's date: the date is a view of the map tab, not of the world.
 
 ---
 
 ## 5. Atlas-extension visual fields
 
-> **Corrected S356**: under v2 these three fields are in `ATLAS_WIRE_EXTENSION_FIELDS` and RIDE THE WIRE (the section header in the zone page said "Local only" from the v1 era until S356; it says "Synced" now). The paragraph below is the v1 description, kept as history.
+> **Corrected**: under v2 these three fields are in `ATLAS_WIRE_EXTENSION_FIELDS` and RIDE THE WIRE (the section header in the zone page said "Local only" from the v1 era until then; it says "Synced" now). The paragraph below is the v1 description, kept as history.
 
 Zones support three atlas-extension fields, stored on disk in the element JSON but stripped from API push by the adapter (must be added to `ATLAS_LOCAL_EXTENSION_FIELDS` in `core/constants.ts`):
 
@@ -433,9 +433,9 @@ Zones support three atlas-extension fields, stored on disk in the element JSON b
 
 These are stored on the Zone element itself (single source of truth per zone), folder-only. Multiple atlas instances accessing the same api-linked world each maintain their own per-zone visuals — like image_media_id today.
 
-Map-wide defaults (DESIGN_MAPS.md §11 visual settings popover): `zone_fill_opacity`, `zone_labels` ('auto'|'always'|'hover'|'never'), **`zone_label_position` ('below'|'center', default 'below' — S313)**. A zone's `atlas_opacity` overrides the map default; if unset, map default applies. Same pattern as pin label threshold. `zone_label_position` 'below' anchors the label at the zone's bottom-centre (bounding-box max-y) so it hangs off the shape instead of sitting on the fill/markers (`ZoneOverlay.labelAnchorFor`/`bottomCenter`); it's a view pref only (never on the element).
+Map-wide defaults (DESIGN_MAPS.md §11 visual settings popover): `zone_fill_opacity`, `zone_labels` ('auto'|'always'|'hover'|'never'), **`zone_label_position` ('below'|'center', default 'below')**. A zone's `atlas_opacity` overrides the map default; if unset, map default applies. Same pattern as pin label threshold. `zone_label_position` 'below' anchors the label at the zone's bottom-centre (bounding-box max-y) so it hangs off the shape instead of sitting on the fill/markers (`ZoneOverlay.labelAnchorFor`/`bottomCenter`); it's a view pref only (never on the element).
 
-### 5b. World styles: rules per kind (S356)
+### 5b. World styles: rules per kind
 
 Born on Sikelia: 113 rivers, 192 routes and 14 chorai in one cyan, no legend. **A world style rule attaches a visual to a KIND** (a `(type, supertype, subtype)` taxonomy value) and the world carries it: `.atlas/styles.json` (`core/world-styles.ts`, `FolderStore.readStyles/writeStyles`, `state.styles`, loaded at world activation after the elements). Tool-private per the Folder Format ruling on `.<tool>/`, beside charts/tombstones/sync-state; travels with the folder and its git. Not localStorage (it is the world's, not the browser's), not per map.
 
@@ -447,8 +447,8 @@ Born on Sikelia: 113 rivers, 192 routes and 14 chorai in one cyan, no legend. **
 ] }
 ```
 
-- **The swatch's picker** is atlas's own (`ui/colour-popover.ts`, S356): fourteen presets that commit on click, a hex field that commits on Apply/Enter, Cancel/Escape/outside-click dismiss. Not the native `<input type=color>` dialog, which commits on every drag, cannot be styled, and painted a stray white box under the swatch. The zone page's per-zone colour keeps the native input (an override for one zone is a different gesture).
-- **Keys**: a rule names a `supertype`, a `subtype`, or both (then both must match), and since S362 optionally a zone `role` (the schema's "operational function or intent"; the role row's rule also names the kind it was made under). Taxonomy and role are user text: matched trimmed and case-insensitively. A rule with none is never stored. `ruleKey` gains the role only when set, so pre-S362 keys are unchanged.
+- **The swatch's picker** is atlas's own (`ui/colour-popover.ts`): fourteen presets that commit on click, a hex field that commits on Apply/Enter, Cancel/Escape/outside-click dismiss. Not the native `<input type=color>` dialog, which commits on every drag, cannot be styled, and painted a stray white box under the swatch. The zone page's per-zone colour keeps the native input (an override for one zone is a different gesture).
+- **Keys**: a rule names a `supertype`, a `subtype`, or both (then both must match), and optionally a zone `role` (the schema's "operational function or intent"; the role row's rule also names the kind it was made under). Taxonomy and role are user text: matched trimmed and case-insensitively. A rule with none is never stored. `ruleKey` gains the role only when set, so keys from before roles are unchanged.
 - **Resolution per field**: the zone's own `atlas_color`/`atlas_opacity` > the role rule > the subtype rule > the supertype rule > the map default. An atlas older than 1.9 reads a role rule as a plain rule of its kind (it drops the unknown key): harmless to draw, but an edit there would overwrite it. `resolveStyle(rules, el)` is the one reader; `syncZones` feeds the result into `ZoneShape` (`color`, `opacity`, `weight`, `dash`), and `ZoneOverlay.applyStyle` draws it (selected/hovered add one to the rest weight; edit mode's dash wins over the kind's).
 - **Fields**: `color` (stroke + fill; also the taxonomy swatch for ANY type), `fill_opacity`, `weight`, `dash` ('solid'|'dashed'|'dotted'), `label_priority` (the density layer ranks these kinds' labels with the pins instead of after every pin, DESIGN_MAPS §11).
 - **Where it shows beyond the map**: the taxonomy value lights up wherever `reservedValueHint` marks atlas's own reserved values: a swatch beside the field label in element detail (`styleValueHint`) and on sidebar rows (`styleRowHint`). The zone page's visuals section shows the inherited colour in the picker and says where it came from ("Colour from the world style for Line · River"), with "Use the kind's colour" to clear an own override (`atlas_color: null`).
@@ -522,7 +522,7 @@ Atlas's vertex visuals (read-only dots + edit handles + draft markers) all displ
 
 Earlier session-215 chronology (kept for future-me as a lesson):
 - S1: stripped `order` after first 422 from live OW.
-- S9: removed the strip thinking the server accepted it (Captain saw the field on the schema page).
+- S9: removed the strip thinking the server accepted it (Titus saw the field on the schema page).
 - S9 follow-up: live OW 422'd again → re-stripped.
 - S9 final: messaged Anchor; Anchor deployed the missing write-side migration; verified the push works without the strip → strip dropped permanently.
 
@@ -623,7 +623,7 @@ Expected: Active Map's chip strip shows only Half-Drawn (the one with a marker).
 
 ### Fixture format
 
-`tools/atlas/tests/fixtures/zone-worlds/world-{d,e,f}.json` — same pattern as map-worlds fixtures. Importable into unit tests and Skeld's API-population path.
+Zone worlds d, e and f as JSON fixtures — same pattern as the map-worlds fixtures. Importable into unit tests and Skeld's API-population path.
 
 ---
 
@@ -633,7 +633,7 @@ For v1. Parked for later consideration.
 
 - **Zone templates** (user-defined preset shape+supertype+subtype+visuals). Defer; build base UX first; revisit once usage data informs.
 - **Customizable supertype/subtype registry** across all element types (Construct-as-registry pattern). Bigger thought, separate design pass.
-- **Per-pin color**. Skipped per Captain.
+- **Per-pin color**. Skipped per Titus.
 - **Circle/ellipse zones**. No OW schema support; not in v1.
 - **Multi-select zones / box-select / bulk operations**. Defer.
 - **Undo/redo at session level**. HistoryManager exists per edit-mode session; global undo across edits is a separate concern.
@@ -650,7 +650,6 @@ For v1. Parked for later consideration.
 This doc is the source of truth for the zone subsystem foundation. Bouts execute against it. If a decision proves wrong during implementation, the doc gets updated FIRST and the code follows — never the reverse (per the maps doc's doc-first discipline).
 
 Companion files:
-- `tools/atlas/PROGRESS.md` — operational state per bout
-- `tools/atlas/tests/fixtures/zone-worlds/` — JSON fixtures (created in F1/F3)
+- the JSON zone fixtures (created in F1/F3; §9)
 
 When all bouts ship, this doc transitions from "active design" to "reference."

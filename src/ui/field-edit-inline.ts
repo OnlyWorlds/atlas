@@ -95,8 +95,7 @@ export function openFieldEditInline(opts: FieldEditInlineOptions): void {
     if (widget === 'number') {
       // Bad text FIRST: type=number reports '' for text it cannot parse, which
       // would read as a clear and write null; "1e999" parses to Infinity,
-      // which JSON writes as null. Restore the old value, write nothing
-      // (S367 critic C2).
+      // which JSON writes as null. Restore the old value, write nothing.
       const bad = editor instanceof HTMLInputElement && editor.validity.badInput;
       const n = Number(nextValue);
       if (bad || (nextValue !== '' && !Number.isFinite(n))) {

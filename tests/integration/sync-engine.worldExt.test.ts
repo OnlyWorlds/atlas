@@ -1,5 +1,5 @@
 /**
- * A profile's x_ keys on the World, synced (Keel #571, Atlas 1.83.0).
+ * A profile's x_ keys on the World, synced (Atlas 1.83.0).
  *
  * keel keeps any x_ key as given and serves it at the top level of GET /world;
  * Atlas syncs them key by key beside the settings, with their own baseline
@@ -177,7 +177,7 @@ describe('both sides changed one key', () => {
   });
 });
 
-describe("the S458 gate's cases", () => {
+describe("the gate's cases", () => {
   it('G1: a key past the 64 KB line is never sent, and the settings still land', async () => {
     const engine = makeEngine();
     await engine.syncNow();

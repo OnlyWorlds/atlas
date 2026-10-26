@@ -1,6 +1,6 @@
 /**
- * Make online's merge and the hidden mark (folder spec §4.8, conv. 170; the
- * S461 gate's F2). A hidden element goes up hidden or not at all:
+ * Make online's merge and the hidden mark (folder spec §4.8, conv. 170). A hidden
+ * element goes up hidden or not at all:
  * - a key that cannot hide (a contributor, a guest) is told before anything is
  *   sent, and nothing is;
  * - a hidden element is never matched by name: matched, policy b would put its

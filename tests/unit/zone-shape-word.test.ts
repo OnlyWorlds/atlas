@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { supertypeForNewZone } from '../../src/core/zone-shape-word';
 
-describe('a new zone\'s supertype (the Captain\'s interim until the schema has a shape field)', () => {
+describe('a new zone\'s supertype (Titus\'s interim until the schema has a shape field)', () => {
   it('takes the shape\'s word when the user left it empty', () => {
     expect(supertypeForNewZone(undefined, 'polygon')).toBe('polygon');
     expect(supertypeForNewZone('', 'line')).toBe('line');

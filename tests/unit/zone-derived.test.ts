@@ -217,7 +217,7 @@ describe('getZoneShape', () => {
   });
 });
 
-describe('listLinkedZonesOnMap (S362: a road drawn as its segments)', () => {
+describe('listLinkedZonesOnMap (a road drawn as its segments)', () => {
   it('lists a zone off the map whose linked zones are on it, with the parts that are', () => {
     const seg1 = zone('s1'); const seg2 = zone('s2'); const elsewhere = zone('far');
     const road = zone('road', 'East Coastal Road', { linked_zones: ['s1', { id: 's2' }, 'far', 'missing'] } as Partial<Zone>);

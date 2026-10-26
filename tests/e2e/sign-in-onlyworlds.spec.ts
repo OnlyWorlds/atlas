@@ -1,6 +1,6 @@
 /**
- * Sign in with OnlyWorlds end to end (Keel #515, S465; contract
- * `Forge/Notes/2026-10-24-s465-sign-in-with-onlyworlds-contract.md`). The real
+ * Sign in with OnlyWorlds end to end (the
+ * sign-in contract). The real
  * SDK runs against the production constants: Playwright serves
  * `https://atlas.onlyworlds.com` from the dev server, and plays keel's
  * answering page (a 302 back with the state the SDK sent) and its token
@@ -69,7 +69,7 @@ test('Settings: signed in with no password typed, back on the same route, the ex
   expect(new URL(page.url()).hash).toBe('#/settings/onlyworlds');
   const reg = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry);
   expect(reg.account_token).toBe('ow_a_minted465');
-  expect(reg.account_token_id).toBe('5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d'); // kept so Forget can revoke it (S475)
+  expect(reg.account_token_id).toBe('5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d'); // kept so Forget can revoke it
   expect(reg.account_username).toBe('wren');
   expect(keel.tokenBodies).toHaveLength(1);
   expect(keel.tokenBodies[0]).toMatchObject({ grant_type: 'authorization_code', code: 'c0de-465', client_id: 'atlas', redirect_uri: CALLBACK });

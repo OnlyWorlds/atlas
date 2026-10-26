@@ -1,7 +1,7 @@
 /**
  * Shared helpers for the writing system.
  *
- * The model (locked session 224):
+ * The model:
  *   - Narratives are in the writing tree iff their `supertype` matches one of
  *     the four configured labels for the world (`writing_labels.l1`–`l4`).
  *   - Tier is determined directly by supertype value (no canonical/display
@@ -95,7 +95,7 @@ export function supertypeForTier(tier: 'l1' | 'l2' | 'l3' | 'l4', worldId: strin
  */
 /**
  * Emit the writing-room URL for a specific narrative. After the URL scheme
- * shortening (session 227), this is a trivial wrapper around `writingHash`
+ * shortening, this is a trivial wrapper around `writingHash`
  * — ancestry is no longer encoded in the URL. The `elements` arg is kept on
  * the signature for caller back-compat but is unused.
  */
@@ -199,7 +199,7 @@ export function buildNarrativeIndex(elements: Element[], worldId: string): Narra
 export function ancestorIds(idx: NarrativeIndex, id: string): string[] {
   const out: string[] = [];
   // A parent cycle in world data would loop (and grow `out`) forever; stop at
-  // the first repeat (S367 critic C1).
+  // the first repeat.
   const seen = new Set<string>([id]);
   const cur = idx.byId.get(id);
   let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
@@ -222,7 +222,7 @@ export function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string
   const node = idx.byId.get(id);
   if (!node) return {};
   const chain: NarrativeNode[] = [node];
-  const seen = new Set<string>([id]); // cycle guard, S367 critic C1
+  const seen = new Set<string>([id]); // cycle guard
   let parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
   while (parentId && !seen.has(parentId)) {
     seen.add(parentId);
@@ -279,7 +279,7 @@ export function isWritingInitialized(
   // convention) are recorded ARTIFACTS, not writing structure: they arrive
   // as parent_narrative chains whose supertype can never match a writing
   // label, so without this carve one recorded battle flipped the whole
-  // writing room to the setup screen (the S265 hijack class through a new
+  // writing room to the setup screen (an old hijack class through a new
   // door; caught 2026-07-19 checking the tangle seam).
   const narratives = elements.filter(e =>
     isStoryNarrative(e) && (e as Element & { supertype?: string | null }).supertype !== 'Chronicle');
@@ -288,7 +288,7 @@ export function isWritingInitialized(
   // warrant a setup decision. A loose supertype-less narrative — e.g. the
   // home tour's create card, or any plain element-create — is not structure,
   // and judging it here hijacked the whole writing room with the setup
-  // screen the moment a book+chapter chain existed beside it (S265, Captain's
+  // screen the moment a book+chapter chain existed beside it (Titus's
   // repro). Setup still fires for genuinely foreign chained structures
   // (imported worlds whose tiers use other labels).
   const parentIds = new Set(

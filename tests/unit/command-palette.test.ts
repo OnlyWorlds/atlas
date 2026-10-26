@@ -82,12 +82,12 @@ describe('searchPalette ranking', () => {
   });
 
   /**
-   * S308 — the Data room. It is BRANDED "Data" (nav tooltip, help overlay, tour
+   * The Data room. It is BRANDED "Data" (nav tooltip, help overlay, tour
    * exit summary, waypoints) but still ROUTES on the segment `import`. The
    * palette used to key on the segment word, so the one word a user would type
    * after reading the UI found nothing.
    *
-   * A present/absent PAIR (the S301 law): asserting only that "data" works
+   * A present/absent PAIR: asserting only that "data" works
    * would go quietly green again if someone dropped the aliases and renamed the
    * label back, and asserting only "import" would not have caught the original
    * bug at all. Both halves, so a regression breaks one loudly.
@@ -113,7 +113,7 @@ describe('searchPalette ranking', () => {
   });
 });
 
-describe('searchPalette: commands (S364)', () => {
+describe('searchPalette: commands', () => {
   it('finds "reload from disk" by its name and its aliases, and not by a stray letter pair', () => {
     for (const q of ['reload', 'rel', 'rescan', 'refresh from', 'files', 'from disk']) {
       expect(searchPalette(q, []).some(r => r.kind === 'action' && r.id === 'reload-disk'), q).toBe(true);
@@ -137,7 +137,7 @@ describe('searchPalette: Sentence-case labels, lowercase queries (1.32.0)', () =
   });
 });
 
-describe('paletteRows: the create row (S369)', () => {
+describe('paletteRows: the create row', () => {
   it('offers one create row, first, when the query names nothing', () => {
     const rows = paletteRows('Zephyrine', [el({ name: 'Aldric' })]);
     expect(rows).toHaveLength(1);

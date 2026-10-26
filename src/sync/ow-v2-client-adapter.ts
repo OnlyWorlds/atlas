@@ -49,7 +49,7 @@ type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>
 export const DEFAULT_V2_BASE = 'https://www.onlyworlds.com/api/v2';
 
 /**
- * keel's PIN rule (Skeld h29 #10663, #10734; SDK 4.59.0's own): the secret (a
+ * keel's PIN rule (Skeld 2026-10-22; SDK 4.59.0's own): the secret (a
  * PIN, or a seat's `ow_s_`) goes on every write, on `GET /me`, and on every
  * call of a legacy ten-digit key. A prefixed key's other reads go bare: each
  * PIN sent is a verify on keel, and a read never needs one. So a wrong PIN
@@ -73,7 +73,7 @@ export interface MediaTicket {
   exp: number;
 }
 
-/** keel's removal ticket (Keel #170): one use, ten minutes, for the edge's `/v1/remove`. */
+/** keel's removal ticket: one use, ten minutes, for the edge's `/v1/remove`. */
 export interface MediaRemovalTicket {
   ticket: string;
   exp: string;
@@ -191,7 +191,7 @@ export function toV2WireShape(
   type: ElementType,
   op: 'create' | 'update'
 ): Record<string, unknown> {
-  // keel's stub never goes out: refused here, never stripped (conv. 155, I4; Kael h29 #8569).
+  // keel's stub never goes out: refused here, never stripped (conv. 155, I4; Kael 2026-10-20).
   refuseKnownOfBody(body);
   const rename = diskToSchema(type);
   const out: Record<string, unknown> = {};
@@ -204,7 +204,7 @@ export function toV2WireShape(
     }
     if (SERVER_MANAGED_FIELDS.has(k)) continue;
     if (STRIP_FIELDS.has(k)) continue;
-    // The review mark is keel's to settle (conv. 168, the S459 gate's F2): an update never carries it,
+    // The review mark is keel's to settle (conv. 168): an update never carries it,
     // so a copy holding a mark keel has since cleared cannot put it back. A create still does, so a
     // folder's marks survive Make online.
     if (op === 'update' && k === PROPOSED_MARK) continue;
@@ -227,7 +227,7 @@ export function toV2WireShape(
  * with an identical value, not a fill. Left in place because it is the
  * cheapest guarantee that disk bodies always carry a type, and because the
  * value is trivially known here; but do not cite it as evidence that the wire
- * omits the field. (It misled a folder-writer design in Assembly before it
+ * omits the field. (It misled a folder-writer design elsewhere before it
  * was caught.)
  */
 export function adaptV2Record(raw: unknown, type: ElementType): ServerRecord {
@@ -258,7 +258,7 @@ export interface OwV2ClientOptions {
   /** Override the /api/v2 base (dev/staging). Default: production. */
   baseUrl?: string;
   /**
-   * Give up on a read (GET) that has not finished after this long (S405). A
+   * Give up on a read (GET) that has not finished after this long. A
    * stalled connection never fails on its own, so a flow with nothing else
    * to end it (the demo copy) waits forever in silence. The give-up reads as
    * a network failure ("could not be reached"). Writes never time out here:
@@ -305,7 +305,7 @@ export class OwV2ClientAdapter implements OwApiClient {
     const headers: Record<string, string> = {
       'API-Key': this.apiKey,
       // Omit the PIN header entirely when there is no PIN (view-only worlds
-      // run on a READ key, S264): an empty-string header is a malformed
+      // run on a READ key): an empty-string header is a malformed
       // credential, not an absent one. With one, only where keel reads it.
       ...(this.apiPin && sendsPin(method, path, this.apiKey) ? { 'API-Pin': this.apiPin } : {}),
       ...extraHeaders,
@@ -355,7 +355,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       try {
         const parsed = JSON.parse(text) as { error?: Envelope; reason?: unknown };
         const inner: Envelope | null = parsed?.error ?? null;
-        // keel's 409 resync_required says why (role or view, Skeld h20 #8021):
+        // keel's 409 resync_required says why (role or view, Skeld 2026-10-20):
         // read inside the envelope or beside it, whichever keel sends.
         envelope = inner && inner.reason === undefined && typeof parsed.reason === 'string' ? { ...inner, reason: parsed.reason } : inner;
       } catch { /* non-JSON error body — envelope stays null */ }
@@ -370,7 +370,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   }
 
   /**
-   * POST /media/ticket (Keel #59, Atlas #154): a one-use, short-lived ticket
+   * POST /media/ticket (Atlas #154): a one-use, short-lived ticket
    * to put one image on the media edge for this world. Write scope: a read
    * key gets 403. The bytes never pass through keel (`sync/media-upload.ts`).
    */
@@ -440,7 +440,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   }
 
   /**
-   * GET /world in DISK names — the world-meta sync read (S262). Same request
+   * GET /world in DISK names — the world-meta sync read. Same request
    * as getWorld() but returns the full 13-field body with the one rename
    * applied (wire `time_range_current` → disk `time_current`) and every
    * synced field canonicalized ('' / [] / null) so the engine's diff never
@@ -455,7 +455,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   }
 
   /**
-   * PATCH /world — partial world-meta write (S262). `fields` arrive in DISK
+   * PATCH /world — partial world-meta write. `fields` arrive in DISK
    * names already canonicalized by the kernel; this renames to wire names
    * (disk `time_current` → wire `time_range_current`) and WHITELISTS to the
    * synced set — keel aborts the whole PATCH on one unknown field, so a
@@ -465,7 +465,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   async patchWorldMeta(fields: Record<string, unknown>): Promise<WorldMetaWire> {
     const wireBody: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(fields)) {
-      // A profile's key on the World goes as given, null removing it (Keel #571).
+      // A profile's key on the World goes as given, null removing it.
       if (isWorldExtensionKey(k)) { wireBody[k] = v ?? null; continue; }
       const kind = META_SYNC_FIELDS[k];
       if (!kind) continue; // whitelist
@@ -508,7 +508,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   /**
    * keel's hide (`PUT /{type}/{id}/hidden`, keel #421): 204, no body, idempotent; the element's
    * body and `updated_at` do not move. The owner's keys and co-builders only, anyone else 403
-   * (folder spec 4.8, Skeld h29 #12044; conv. 173). Atlas never sends the unhide.
+   * (folder spec 4.8, Skeld 2026-10-24; conv. 173). Atlas never sends the unhide.
    */
   async hideElement(type: ElementType, id: string): Promise<void> {
     await this.request('PUT', `/${type}/${id}/hidden`);
@@ -563,7 +563,7 @@ export class OwV2ClientAdapter implements OwApiClient {
 
     for (let page = 0; page < SAFETY_CAP_PAGES; page++) {
       // limit=500 asks for the wire's max page (speed bout 2026-07-19); the
-      // server honors what it allows (currently caps at 250, S265 runbook)
+      // server honors what it allows (currently caps at 250)
       // and silently ignores unknown params, so this can only shrink the
       // round-trip count vs the default 100 — never break the walk.
       const qs = `?limit=500${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
@@ -670,7 +670,7 @@ export class OwV2ClientAdapter implements OwApiClient {
    * upsert ops carry the full element (adapted to disk shape here); delete
    * ops carry `{type, id, deleted_at}` only.
    */
-  // Page size 250 (was 500, S265): Skeld's DB-side pagination sized the
+  // Page size 250 (was 500): Skeld's DB-side pagination sized the
   // launch runbook around clients walking at ≤ a few hundred — same total
   // wire cost for atlas, flatter server memory under concurrent pulls.
   async pullChanges(since: string | null, limit = 250): Promise<ChangesPage> {
@@ -742,7 +742,7 @@ function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
   // Names are words; a stray number in them reads as its digits.
   const words = (v: unknown): string[] => list(v).map(String);
   const int = (v: unknown): number | null => canonicalMetaValue('int', v) as number | null;
-  // A profile's keys and the world's first import, as served (Keel #571): the
+  // A profile's keys and the world's first import, as served: the
   // keys by name, never null (keel removes a key sent as null), the origin
   // only as the object keel serves.
   const extras: Record<string, unknown> = {};

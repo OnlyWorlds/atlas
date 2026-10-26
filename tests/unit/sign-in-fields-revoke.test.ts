@@ -1,5 +1,5 @@
 /**
- * The S475 gate's G4: the email and password door mints a token, then asks
+ * The email and password door mints a token, then asks
  * keel who it belongs to. When that second call fails the token is not kept,
  * so it is revoked at once by its id, never left live with no one holding it.
  * When it succeeds, the id is kept beside the token.

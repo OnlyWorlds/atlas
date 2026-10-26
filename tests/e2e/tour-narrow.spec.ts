@@ -1,5 +1,5 @@
 /**
- * The tour in narrow windows (S366). Below 1100px the right pane is a
+ * The tour in narrow windows. Below 1100px the right pane is a
  * drawer, below 820px the sidebar too, and both start closed. The tour was
  * written for the desktop shell and never opened a drawer (it also hid the
  * toggles), so in a narrow window step 2's "create local world" icon sat
@@ -92,7 +92,7 @@ for (const width of [1000, 800]) {
   });
 }
 
-// S366 gate B1: every step navigates, and the drawer layer closed drawers on
+// Every step navigates, and the drawer layer closed drawers on
 // hashchange, a tick AFTER the step had opened its pane, so steps 7, 8 and 14
 // sat in closed drawers while the rows above stayed green (they stop at 6).
 // The tour owns the drawers now; this walks the rest of the drawer steps.
@@ -133,7 +133,7 @@ test('at 800 the swamps map, every objects mint, back to the map, and the-rest s
   // body room to scroll; a focus, a scroll into view or a test's click moved the whole page left and
   // the open sidebar off-screen (run 40104361183, 273 px). The page must refuse every sideways scroll.
   // The room appears once the step's drawers have settled: read at once it can be 0 on a fast runner
-  // (S477, run 40213694681, 94 ms after the step, 3 of 3), so wait for it before trying to scroll.
+  // (run 40213694681, 94 ms after the step, 3 of 3), so wait for it before trying to scroll.
   await expect.poll(() => page.evaluate(() =>
     Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) - innerWidth),
   { message: 'the shell still overflows here (else this proves nothing)' }).toBeGreaterThan(0);
@@ -156,7 +156,7 @@ test('at 800 the swamps map, every objects mint, back to the map, and the-rest s
   await expectReachable(page, page.locator('.atlas-sidebar .atlas-sidebar-content')); // the-rest: route elements
 });
 
-// S366 gate B3: ending the tour at the finale landed on a screen whose only
+// Ending the tour at the finale landed on a screen whose only
 // door was the sidebar; the tour had used up the once, and the exit
 // navigation's hashchange closed what the screen opened. Since 1.17 the
 // finale's Keep lands in the kept world: the way to its elements must be in

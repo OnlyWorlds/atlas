@@ -7,7 +7,7 @@
  * browser Back button walks the focus chain and every click is a navigable step.
  * Effective scope = focus(URL id) → else the type filter → else all
  * (`scopeFromFocus`). Selecting a dot OR a card chip focuses that element
- * (unified select=focus, Captain-confirmed). See DESIGN_CHARTS.md.
+ * (unified select=focus, Titus-confirmed). See DESIGN_CHARTS.md.
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
@@ -39,7 +39,7 @@ import { narrativeKindOf } from '../core/narrative-kind';
 import { renderGate } from '../ui/render-gate';
 import { currentLore } from '../core/parlor-room';
 
-/** A sensible first "now": the LATEST recorded moment (Captain, S318 —
+/** A sensible first "now": the LATEST recorded moment (Titus —
  *  "snap to the center of whatever elements are at the latest date"). The
  *  world's present sits where its record ends: the max over start dates and
  *  recorded end dates, so the now lands ON the newest elements instead of
@@ -78,18 +78,18 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   newEventBtn.title = 'Create an element on this chart';
   newEventBtn.textContent = '+ Element';
   newEventBtn.addEventListener('click', () => {
-    // Charts-context create (S263): only dateable types are selectable and a
+    // Charts-context create: only dateable types are selectable and a
     // required Date field rides the modal, so the new element lands ON the
     // chart instead of silently nowhere (the vanish class). Default date =
     // the now when set, else the median of the dated world (same default the
     // Set-now gesture uses), else 0 on a fresh world.
     const allNodes = extractTemporalNodes(currentLore());
     const defaultDate = nowValue() ?? suggestNow(allNodes);
-    // Through the shared door (S301) so a scripted charts beat can take this
+    // Through the shared door so a scripted charts beat can take this
     // gesture the same way the sidebar + does.
     openCreateDoor(toasts, {
       initialType: 'event',
-      // Stay in the room (Captain, 2026-07-10): the chart is the workspace here.
+      // Stay in the room (Titus, 2026-07-10): the chart is the workspace here.
       suppressNavigate: true,
       temporalContext: { defaultDate },
       onCreated: (id) => {
@@ -120,7 +120,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   if (!viewOnly) actions.appendChild(saveBtn);
 
   // Saved-chart gallery — rides the actions row (right of the buttons) so a
-  // first save never reflows the layout below (S264, Captain: the appearing
+  // first save never reflows the layout below (Titus: the appearing
   // row "moved the ui"). Hidden via :empty until a chart exists.
   const gallery = document.createElement('div');
   gallery.className = 'atlas-chart-gallery';
@@ -142,19 +142,19 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   wrap.appendChild(viewMount);
 
   let handle: TimelineViewHandle | null = null;
-  // The render mode (2C, S13): the pannable canvas or the scrolling document.
+  // The render mode (2C): the pannable canvas or the scrolling document.
   // A chart property (ChartConfig.render) surfaced as a view control; the
   // mode swap is a mount swap — both views drive the same handle surface.
   let renderMode: '2d' | 'scroll' = '2d';
   let mountedMode: '2d' | 'scroll' | null = null;
   let config: ChartConfig | null = null;        // set when a saved chart loads; the save/share contract
-  // An APPLIED selection-scope chart (S264). The default tableau saves as a
+  // An APPLIED selection-scope chart. The default tableau saves as a
   // `selection` scope, and applyChart used to REFUSE that kind with an info
   // toast — the most common save produced a chart that could never reopen
-  // (Captain: "can not select them.. can not change to them"). The room now
+  // (Titus: "can not select them.. can not change to them"). The room now
   // holds the applied scope here; a chip click (new lens) clears it.
   let appliedSelection: ChartConfig | null = null;
-  // The LANDING is the TABLEAU (Captain, 2026-07-10: "no highlights, neutral
+  // The LANDING is the TABLEAU (Titus, 2026-07-10: "no highlights, neutral
   // state") — an EMPTY type filter, no chips lit. Ticking a chip narrows to
   // that type; null = every type (all chips on).
   let typeFilter: Set<ElementType> | null = new Set();
@@ -171,7 +171,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     getState().data.elements.find(e => e.id === id);
 
   // The world's "now" (Act 1) — `World.time_current`, drawn as the now-line and
-  // the forward-half seam. Synced via the world-meta step (S262): the engine's
+  // the forward-half seam. Synced via the world-meta step: the engine's
   // pull-applies land back in this slice through refreshMetaCache.
   const nowValue = (): number | null => getState().active?.meta?.time_current ?? null;
 
@@ -197,7 +197,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       console.error('[charts] now write failed:', err);
       // Writing the same value again is safe.
       // Retry only while this is still the world open and the newest now set
-      // (S369 gate B H1: a toast outlives a world switch and a newer set).
+      // (a toast outlives a world switch and a newer set).
       showProblem(err, {
         doing: "saving the world's now time", toasts,
         retry: () => { if (getActiveStore() === store && seq === nowSeq) return setNow(value); },
@@ -223,7 +223,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   function renderControlBar(allNodes: TimelineNode[], route: Route): void {
     controlBar.innerHTML = '';
-    // The bar renders UNCONDITIONALLY (Captain, S263): a dateless world still
+    // The bar renders UNCONDITIONALLY (Titus): a dateless world still
     // gets its chart — axis, strip, rail, and above all "Set now time" — so
     // the room works from element zero instead of gating on dated content.
     const present = presentTypes(allNodes);
@@ -244,12 +244,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       controlBar.appendChild(pill);
     }
 
-    // (The "Tableau: the cast and essentials" label was REMOVED S263 —
+    // (The "Tableau: the cast and essentials" label was REMOVED —
     // mechanism-naming jargon; the type chips carry the state and the help
     // overlay explains the default view's selectivity.)
 
     // THE CALENDAR CHIP IS PINNED, and it is built BEFORE the type chips so
-    // it can never be pushed around by them (Captain, S307).
+    // it can never be pushed around by them (Titus).
     //
     // The bug: minting a calendar creates a Construct element, which makes a
     // new TYPE CHIP appear in this bar — and the calendar chip used to be
@@ -339,7 +339,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       nowWrap.appendChild(chip);
     }
     // Appended into the right stack below — mode toggle above, now below
-    // (Captain's call, 2026-07-19: reads cleaner than now-above-buttons).
+    // (Titus's call, 2026-07-19: reads cleaner than now-above-buttons).
 
     // The render-mode toggle (2C): canvas ⇄ document. Same scope, same lens,
     // same saved-chart machinery — only the render surface swaps.
@@ -363,7 +363,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     mode.appendChild(modeBtn('2d', 'view_timeline', 'Canvas view: pan and zoom the chart'));
     mode.appendChild(modeBtn('scroll', 'view_agenda', 'Document view: scroll through your history'));
 
-    // Right group, ONE LINE with the toggles first (Captain, S307). The
+    // Right group, ONE LINE with the toggles first (Titus). The
     // toggles are a FIXED pair — same two buttons, same width, always. The
     // now control changes shape (a wide "set now time" button before it is
     // set, a dated chip after), so it trails: a varying-width element in the
@@ -390,13 +390,13 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // Share pages and knowledge entries are Narratives by TYPE (so they pass
       // the dateable gate above) but are non-chronological atlas constructs,
       // never timeline backlog — a page or knowledge card sitting in the work
-      // queue reads as nagging, not as datable material (Captain's launch note:
+      // queue reads as nagging, not as datable material (Titus's launch note:
       // share pages appeared here). Only STORY narratives are chronological.
       if (el.type === 'narrative' && narrativeKindOf(el) !== 'story') continue;
       if (parseTemporalValue((el as Record<string, unknown>)[map.start]) != null) continue;
       // Calendars are complete without an adoption date — a lens construct
       // sitting in the work queue forever reads as nagging, not backlog
-      // (S266 look item; datable any time via the element room's Date field).
+      // (datable any time via the element room's Date field).
       if ((el as Record<string, unknown>)['atlas_calendar'] != null) continue;
       out.push({ id: el.id, type: el.type as ElementType, name: el.name || '(unnamed)' });
     }
@@ -417,7 +417,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const mapping = TEMPORAL_TYPE_FIELDS[el.type];
     const field = edge === 'end' ? mapping?.end : mapping?.start;
     if (!field) { toasts.error('This type has no date field'); return; }
-    // Either edge respects the other as its bound (S264 ruling + the S265
+    // Either edge respects the other as its bound (a design ruling + the
     // end-stretch): the canvas drag clamps live, but the confirm popover
     // accepts free text — reject an inversion instead of writing one.
     if (edge === 'start') {
@@ -451,7 +451,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   /**
    * Confirm a just-dated element. PEEK it if it's on the chart — a gentle
    * highlight + card, never a FOCUS (focus narrows the scope and loses the
-   * user's view, Captain). If it fell outside the current tableau/filter, an
+   * user's view, Titus). If it fell outside the current tableau/filter, an
    * honest toast confirms the write instead of it silently vanishing (gate).
    */
   function showDatedElement(id: string, name: string, date: number, verb: 'Dated' | 'Created' = 'Dated'): void {
@@ -459,7 +459,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     if (lastScoped.some(n => n.id === id)) {
       peekId = id;
       handle?.setSelection(id);
-      // In scope but possibly OFF-SCREEN (S264): a popover-entered date can
+      // In scope but possibly OFF-SCREEN: a popover-entered date can
       // land outside the current window — pan it into view, never vanish it.
       handle?.revealDate(date);
       toasts.success(phrase);
@@ -586,7 +586,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
           }).open(),
         });
       }
-      // The clock sits ABOVE create (Captain's ruling): it is the prerequisite,
+      // The clock sits ABOVE create (Titus's ruling): it is the prerequisite,
       // and the order teaches it. Create greys out until the clock exists.
       const clockSet = clockIsSet();
       item(clockSet ? 'World clock' : 'World clock: set it first', {
@@ -618,10 +618,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   // ---- The legacy-field mint offer (2B §1/§5b) ------------------------------
   // `time_format_names`/`time_format_equivalents` seed a world's FIRST calendar
-  // once, then get CLEARED on the world (Captain-blessed; "seed once" must live
+  // once, then get CLEARED on the world (Titus-blessed; "seed once" must live
   // in the data or every fresh device re-offers the mint forever). Four gates:
   // fields present ∧ no calendar exists ∧ writable ∧ (api-linked → meta
-  // baseline established — pre-baseline the S262 seed rule would PULL the
+  // baseline established — pre-baseline the seed rule would PULL the
   // cleared fields back and invite a duplicate calendar).
 
   let mintDismissed = false;      // session-local "not now"
@@ -752,7 +752,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   /**
    * Every chart write is a read-modify-write of the file as it is on disk,
    * serialized within the room. The in-memory list is a display copy: writing
-   * it back whole let a stale copy (another world's, before S364; another
+   * it back whole let a stale copy (another world's, once; another
    * tab's, still) replace the file's charts.
    */
   let chartWrites: Promise<unknown> = Promise.resolve();
@@ -792,7 +792,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     try {
       await mutateCharts(store, charts => upsertChart(charts, chart));
     } catch (err) {
-      // Was an unhandled rejection: the button did nothing, silently (S369).
+      // Was an unhandled rejection: the button did nothing, silently.
       console.error('[charts] save chart failed:', err);
       showProblem(err, { doing: 'saving the chart', toasts });
       return;
@@ -826,7 +826,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       typeFilter = null;
       if (route.elementId) navigate(timelineHash(w)); else render();
     } else if (scope.kind === 'selection') {
-      // The tableau-save case (S264 fix): hold the hand-picked scope in room
+      // The tableau-save case: hold the hand-picked scope in room
       // state — the renderer has always supported it via filterNodesByScope.
       appliedSelection = chart;
       typeFilter = new Set(); // chips read unlit; the chart is the lens
@@ -855,7 +855,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // Deleting the APPLIED chart must release its lens — a stale
     // appliedSelection kept scoping the room invisibly (chips unlit), so
     // e.g. drag-to-date toasted "not in this view" against a ghost member
-    // list (S265, Captain's find).
+    // list (Titus's find).
     if (appliedSelection?.id === chart.id || config?.id === chart.id) {
       appliedSelection = null;
       config = null;
@@ -915,7 +915,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   function renderGallery(): void {
     gallery.innerHTML = '';
     if (savedCharts.length === 0) return;
-    // (No "Saved charts" label since the S264 inline move — the chips sit
+    // (No "Saved charts" label since the inline move — the chips sit
     // beside Save chart, which names them; the rail names the active one.)
     const curScope = currentScope();
     for (const chart of savedCharts) {
@@ -1014,7 +1014,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const scoped = filterNodesByScope(allNodes, scope);
     lastScoped = scoped;
     // The active saved chart, if the live scope matches one — its name becomes
-    // the rail's heading (S264: "This chart" should speak the chart's name).
+    // the rail's heading ("This chart" should speak the chart's name).
     const activeChart = savedCharts.find(c => sameScope(c.scope, scope)) ?? null;
     // Cast favorites (S4 + the cast marks): re-read each render so a toggle on
     // the element header reflects immediately.
@@ -1048,7 +1048,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   }
 
   // A store patch or a hashchange redraws only when the room's inputs moved
-  // (conv. 146, S422): a rebuild between a press and its release loses the
+  // (conv. 146): a rebuild between a press and its release loses the
   // click. The room's own controls change its closure state (the type lens,
   // the mode, the gallery) and call render() themselves, ungated.
   const tickGate = renderGate();

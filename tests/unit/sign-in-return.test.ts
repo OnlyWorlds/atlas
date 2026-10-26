@@ -1,5 +1,5 @@
 /**
- * The return from Sign in with OnlyWorlds (S465; the gate's G1, G3, G4):
+ * The return from Sign in with OnlyWorlds (the gate's G1, G3, G4):
  * the app's base stays absolute so `/signin/callback` loads its scripts; a
  * return this tab never started is left alone while signed in; a refusal
  * keeps an invitation waiting for the next sign-in.
@@ -20,7 +20,7 @@ function fakeToasts() {
 const refused = (started: boolean, reason: ConstructorParameters<typeof OwSignInError>[0] = 'state_mismatch') =>
   ({ ok: false as const, cancelled: false, started, error: new OwSignInError(reason, 'x'), resume: { hash: '#/', join: JOIN } });
 
-describe('the return (S465)', () => {
+describe('the return', () => {
   const before = getState().registry;
   afterEach(() => { patchSlice('registry', before); takeJoinHeldForSignIn(); });
 

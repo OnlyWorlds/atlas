@@ -1,5 +1,5 @@
 /**
- * An open never rejects (conv. 142, the S405 census, S406). A toast's Open it,
+ * An open never rejects (conv. 142). A toast's Open it,
  * a retry and a world row's click call `activateWorld` and forget it, so a
  * failure that escaped the open's own catches reached the unhandled-rejection
  * reporter as background work. The open says it as itself and resolves false;

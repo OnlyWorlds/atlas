@@ -4,9 +4,9 @@
  * The lost-update class: updateElement is a read-merge-write, so two
  * concurrent updates to the same element race the read — the second call's
  * snapshot predates the first call's write and the merge silently reverts
- * its fields. Found live by the share-room e2e (session 237: name blur +
- * intent change). Session 237 fixed it per-room (share-room's chain,
- * convention #77); session 238 moved the guarantee to the store boundary so
+ * its fields. Found live by the share-room e2e (name blur +
+ * intent change). It was first fixed per-room (share-room's chain,
+ * convention #77); the guarantee later moved to the store boundary so
  * every room (knowledge-room's patchEntry was still exposed) gets it free.
  *
  * The mock's updateElement carries a deliberate microtask yield between read
@@ -28,7 +28,7 @@ describe('FolderStore per-id write serialization (convention #79)', () => {
     const store = await openStore();
     const el = await store.createElement('narrative', { name: 'a page', subtype: 'page' });
 
-    // The session-237 shape: name blur + intent change fire together.
+    // The shape the e2e found: name blur + intent change fire together.
     await Promise.all([
       store.updateElement(el.id, { name: 'renamed' }),
       store.updateElement(el.id, { atlas_page_intent: 'reference' } as Record<string, unknown>),

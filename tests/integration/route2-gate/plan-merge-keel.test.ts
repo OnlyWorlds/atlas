@@ -1,6 +1,6 @@
-// Rows for pins and markers under a name-matched map or zone (gate A4/A5) were promoted to map-zone-children.test.ts after the Captain's ruling (2026-10-04).
+// Rows for pins and markers under a name-matched map or zone (gate A4/A5) were promoted to map-zone-children.test.ts after Titus's ruling (2026-10-04).
 /**
- * Promoted from the S367 composition gate (lens A).
+ * Promoted from the composition gate (lens A).
  * Lens A attack 2: `planMerge` (and its composition with the kernel) against
  * keel reality.
  *
@@ -9,7 +9,7 @@
  * unnamed (atlas creates them with no name), so they never match by name and
  * both sides' pins survive; but their MAP and ELEMENT do match by name, and
  * the kernel (verbatim, no pin guard) moves the local pin onto the server's
- * map and element. Result: one element, two pins, one map (the S306/S307 rule
+ * map and element. Result: one element, two pins, one map (the one-pin-per-map rule
  * `core/pin-uniqueness.ts`), on disk and on the server.
  */
 import { describe, it, expect } from 'vitest';

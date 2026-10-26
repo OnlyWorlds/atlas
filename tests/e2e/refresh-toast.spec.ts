@@ -1,5 +1,5 @@
 /**
- * S411 (the journey scout's gap C): Refresh from OnlyWorlds says what came
+ * Refresh from OnlyWorlds says what came
  * down once. The pull itself toasts the counts; Settings' Refresh button
  * toasted them a second time in other words ("Pulled 1 new + 0 updated" under
  * "Pulled 1 new from OnlyWorlds"). A linked world on a small keel, one new

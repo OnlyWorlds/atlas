@@ -30,8 +30,8 @@ class HelpOverlay extends BaseModal {
     const { overlay, body } = this.buildModalShell({
       title: help ? `${help.name} · help` : 'Help',
       dataModal: 'help-overlay',
-      // The content outgrew the viewport once the shortcut reference filled in
-      // (S267): the panel caps its height and the BODY scrolls, so the title
+      // The content outgrew the viewport once the shortcut reference filled in:
+      // the panel caps its height and the BODY scrolls, so the title
       // stays put and neither end is ever clipped.
       panelClass: 'atlas-help-panel',
     });
@@ -57,8 +57,8 @@ class HelpOverlay extends BaseModal {
       body.appendChild(list);
 
       // A map open in the right pane leaves the address on the room, so its
-      // help would never show there: the map's lines follow the room's (S412,
-      // the Captain h58 #5443).
+      // help would never show there: the map's lines follow the room's (Titus,
+      // 2026-10-15).
       const mapHelp = mode !== 'map' && rightPaneShowsMap() ? helpForRoom('map') : null;
       if (mapHelp) {
         const mapHead = document.createElement('h3');

@@ -1,7 +1,7 @@
 /**
  * Writing-system helpers + promote logic.
  *
- * Covers the supertype-tier model (session 224): supertype value drives tree
+ * Covers the supertype-tier model: supertype value drives tree
  * membership + tier, parent_narrative drives position, subtype is free.
  */
 
@@ -64,7 +64,7 @@ describe('isWritingInitialized', () => {
     expect(isWritingInitialized(entry, elements)).toBe(false);
   });
 
-  it('a loose supertype-less narrative beside a labeled chain does NOT trigger setup (S265)', () => {
+  it('a loose supertype-less narrative beside a labeled chain does NOT trigger setup', () => {
     const entry = {
       id: 'w', name: 'w', state: 'local-only',
       writing_labels: { l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft' },
@@ -246,7 +246,7 @@ describe('applyLabelRenameMigration', () => {
 });
 
 describe('writingHashForNarrative', () => {
-  // Session 227: URL scheme shortened to a single narrative id segment.
+  // URL scheme shortened to a single narrative id segment.
   // Ancestry is derived at render time from parent_narrative; helper is now
   // a trivial wrapper around writingHash.
   it('emits the short writing URL for a top-level book', () => {

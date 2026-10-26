@@ -33,7 +33,7 @@ export const E2E_STEP_INDEX_TO_ID: Record<number, string> = {
   3: 'the-consul',
   4: 'the-hegemony',
   5: 'the-planet',
-  6: 'the-map', // the pin beat merged in here (S317) — hands-on, place-in-zone gated
+  6: 'the-map', // the pin beat merged in here — hands-on, place-in-zone gated
   7: 'the-swamps',
   8: 'objects',
   9: 'linking',
@@ -59,7 +59,7 @@ describe('TOUR_STEPS structural invariants (the numbering tour.spec.ts trusts)',
     }
   });
 
-  it('the step count matches what tour.spec.ts assumes (16 steps since the S317 merge, 1-based)', () => {
+  it('the step count matches what tour.spec.ts assumes (16 steps since the merge, 1-based)', () => {
     expect(TOUR_STEPS.length).toBe(16);
     expect(Object.keys(E2E_STEP_INDEX_TO_ID).length).toBe(TOUR_STEPS.length);
   });
@@ -78,14 +78,14 @@ describe('TOUR_STEPS structural invariants (the numbering tour.spec.ts trusts)',
 /**
  * The half above compares TOUR_STEPS against a map TRANSCRIBED INTO THIS FILE,
  * which cannot see a change made on the OTHER side of the coupling. A test that
- * never opens the file it claims to protect cannot protect it (S305), so this
+ * never opens the file it claims to protect cannot protect it, so this
  * block reads `tour.spec.ts` off disk and checks the numbers it actually
  * drives against the real step table.
  *
  * Numbers, not prose, on purpose: a regex cannot reliably tell a step id in a
- * comment from one in a string literal (S302), but `nextStep(page, 12)` is
+ * comment from one in a string literal, but `nextStep(page, 12)` is
  * unambiguous. The failure this catches is the one that has shipped twice —
- * steps MERGED away (S306c cut 18 to 17) leaving call sites pointing past the
+ * steps MERGED away (one merge cut 18 to 17) leaving call sites pointing past the
  * end, or at a neighbour that silently means something else.
  */
 describe('tour.spec.ts numbering, read from the actual file', () => {
@@ -120,9 +120,9 @@ describe('tour.spec.ts numbering, read from the actual file', () => {
 /**
  * EVERY STRING-KEYED STEP LOOKUP IN src/tour/ MUST RESOLVE.
  *
- * This is the S308 bug's permanent guard. `tour-bar.ts` hides chrome with
- * `TOUR_STEPS.findIndex(s => s.id === 'where-it-lives')`, and when S306c merged
- * that step away `findIndex` returned -1, so `idx < -1` was false for every
+ * This is the permanent guard for a bug. `tour-bar.ts` hides chrome with
+ * `TOUR_STEPS.findIndex(s => s.id === 'where-it-lives')`, and when a merge removed
+ * that step `findIndex` returned -1, so `idx < -1` was false for every
  * step: the guard silently stopped firing and the Web tab sat visible eleven
  * steps early for three sessions. A renamed identifier does not error, it
  * quietly evaluates to "never".
@@ -133,7 +133,7 @@ describe('tour.spec.ts numbering, read from the actual file', () => {
  * numbering; this protects the app's own gates, and updating one must not be
  * able to silently satisfy the other.
  *
- * Written S310, immediately before a copy pass — the session most likely to
+ * Written immediately before a copy pass — the bout most likely to
  * rename a step.
  */
 describe('string-keyed step lookups in src/tour resolve to real steps', () => {

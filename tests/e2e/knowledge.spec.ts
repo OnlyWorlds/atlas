@@ -470,7 +470,7 @@ test('element detail surfaces Knowledge: known by + subject of (K6)', async ({ p
   await expect(page.locator('.atlas-knowledge-knower-header h2')).toContainText('the party');
 });
 
-test('two individual knowers promote to a circle (S265, the narrator single-link dead end)', async ({ page }) => {
+test('two individual knowers promote to a circle (the narrator single-link dead end)', async ({ page }) => {
   await setupWorld(page);
   const ireenaId = await createElement(page, 'character', { name: 'Ireena' });
   await createElement(page, 'character', { name: 'Bram' });
@@ -506,7 +506,7 @@ test('two individual knowers promote to a circle (S265, the narrator single-link
   }))].sort());
 });
 
-// S364 lane A4: a failed prose save was marked saved (the baseline advanced
+// A failed prose save was marked saved (the baseline advanced
 // regardless), and leaving the entry inside the room captured nothing, so the
 // text shown in the editor never reached disk. Now the baseline advances only
 // on a landed write and leaving the entry retries what did not land.
@@ -542,7 +542,7 @@ test('saved entry: a prose save that fails is retried when you leave the entry',
     .toContain('the tithe is overdue');
 });
 
-// S364 gate, lens C C1: the teardown capture (A4) must not write the typed
+// The teardown capture must not write the typed
 // text back to an entry being deleted.
 test('deleting an entry right after typing writes nothing to it', async ({ page }) => {
   await setupWorld(page);
@@ -571,7 +571,7 @@ test('deleting an entry right after typing writes nothing to it', async ({ page 
   await expect(page.locator('.ow-toast', { hasText: 'saving this knowledge entry' })).toHaveCount(0);
 });
 
-test('the link-all pill never covers an entry\'s prose (S365 gate lens C M7)', async ({ page }) => {
+test('the link-all pill never covers an entry\'s prose', async ({ page }) => {
   await setupWorld(page);
   await createElement(page, 'character', { name: 'Ireena' });
   // A first line that runs to the right edge, where the pill sits.

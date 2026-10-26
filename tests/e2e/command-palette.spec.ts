@@ -119,7 +119,7 @@ test('Esc closes without navigating; palette needs an active world', async ({ pa
 });
 
 /**
- * S306 — the palette routes to the room an element LIVES in.
+ * The palette routes to the room an element LIVES in.
  *
  * The bug this locks: every non-room result used to end in a bare
  * `navigate(elementHash(...))`, so Cmd+K on a map, a page, a knowledge entry
@@ -161,7 +161,7 @@ test('the palette routes room-owning elements to their own rooms, not the field 
 
   // The map is the sharpest case: it must go through openMapTab, because
   // navigating to a map hash cannot activate an already-open background tab
-  // (Captain's "recent map does nothing", S265). A map TAB is the evidence.
+  // (Titus's "recent map does nothing"). A map TAB is the evidence.
   await jump('Harbor Chart');
   await expect(page.locator('.atlas-right [data-tab-kind="map"]')).toHaveCount(1);
   // ...and the URL must MOVE. openMapTab alone only mutates right-pane state,
@@ -172,13 +172,13 @@ test('the palette routes room-owning elements to their own rooms, not the field 
 });
 
 /**
- * S306 close gate, HIGH: the palette's own "see all →" handoff still undid the
+ * The palette's own "see all →" handoff still undid the
  * routing. The palette and the elements sidebar deliberately share their match
  * language, so one query reached both surfaces — and clicking the SAME row in
  * the sidebar opened the generic field editor while Enter in the palette opened
  * the room. When surface A hands work to surface B, B must keep A's promise.
  */
-test('see-all hands off to the sidebar, and the sidebar routes the same way (S306 gate)', async ({ page }) => {
+test('see-all hands off to the sidebar, and the sidebar routes the same way', async ({ page }) => {
   await setupWorld(page);
   await page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;
@@ -201,14 +201,14 @@ test('see-all hands off to the sidebar, and the sidebar routes the same way (S30
 });
 
 /**
- * S309 (Captain's ask): the palette was reachable by shortcut ALONE — the
+ * Titus's ask: the palette was reachable by shortcut ALONE — the
  * app's only global search had no visible affordance. The room-nav strip now
  * carries a field-shaped search pill anchored right; clicking it opens the
  * SAME palette (one search, two doors — an inline twin could drift). Both
  * halves asserted: the pill exists when a world is active, and its click
  * opens the overlay.
  */
-test('the room-nav search pill opens the command palette (S309)', async ({ page }) => {
+test('the room-nav search pill opens the command palette', async ({ page }) => {
   await setupWorld(page);
   const pill = page.locator('.atlas-room-nav-search');
   await expect(pill).toBeVisible();

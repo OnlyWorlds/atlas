@@ -207,7 +207,7 @@ test('concurrent updates to the same element serialize — both fields land (con
 
     const created = await store.createElement('character', { name: 'Alice' });
     // Unserialized, the second read-merge-write's read predates the first's
-    // write and silently reverts its field (the session-237 lost-update class)
+    // write and silently reverts its field (the lost-update class)
     // — against the REAL store the gap is genuine disk I/O.
     await Promise.all([
       store.updateElement(created.id, { description: 'a hobbit' }),
@@ -250,7 +250,7 @@ test('deleteElement cascades pins referencing the deleted character', async ({ p
 
     const char = await store.createElement('character', { id: 'char-1', name: 'Alice' });
     const map = await store.createMap({ id: 'map-1', name: 'Atlas' });
-    // Alice on TWO maps: one element may hold only one pin per map (S307),
+    // Alice on TWO maps: one element may hold only one pin per map,
     // and crossing maps is the stronger cascade case anyway.
     const map2 = await store.createMap({ id: 'map-2', name: 'The Inn' });
     await store.createPin({ id: 'pin-1', name: 'p1', element_id: char.id, map_id: map.id, x: 0, y: 0 });
@@ -734,7 +734,7 @@ test('a foreign capture serves its content AND spatial elements in one list', as
 });
 
 /**
- * ── BORN BARE (S359, Skeld's ruling 2026-09-28) ──────────────────────────
+ * ── BORN BARE (Skeld's ruling 2026-09-28) ──────────────────────────
  *
  * A folder atlas creates writes pin/marker links under the format's bare
  * names (`map`, `zone`), the spelling every other implementation reads. In
@@ -820,10 +820,10 @@ test('a folder whose pins already use map_id keeps that spelling for a new pin',
 });
 
 /**
- * ── AN OUTSIDE EDIT SURVIVES ATLAS'S NEXT WRITE (S359) ────────────────────
+ * ── AN OUTSIDE EDIT SURVIVES ATLAS'S NEXT WRITE ────────────────────
  *
- * Atlas caches every body at open and does not watch the folder. Before
- * S359 an update merged its patch into the CACHED body, so a field another
+ * Atlas caches every body at open and does not watch the folder. An update used to merge
+ * its patch into the CACHED body, so a field another
  * tool (an AI following the toolkit's writer rules, a text editor) changed
  * in the file was overwritten the next time atlas wrote that element. The
  * write paths now merge into the body as it is on disk (`readForWrite`).
@@ -869,7 +869,7 @@ test('a field edited in the file by another tool survives an atlas update to a d
   expect(result.listedDescription).toBe('edited outside atlas');
 });
 
-test('unlinking keeps a field another tool edited in the file (S361)', async ({ page }) => {
+test('unlinking keeps a field another tool edited in the file', async ({ page }) => {
   // Lane b L1: resetSyncBaseline rewrote every synced file from the CACHE,
   // reverting outside edits made since atlas last wrote each element.
   const result = await page.evaluate(async () => {
@@ -899,7 +899,7 @@ test('unlinking keeps a field another tool edited in the file (S361)', async ({ 
   expect(result).toEqual({ description: 'edited outside atlas', baseline: null });
 });
 
-test('an element file that will not parse is never overwritten by an atlas save (S361)', async ({ page }) => {
+test('an element file that will not parse is never overwritten by an atlas save', async ({ page }) => {
   // Gate F6: `readForWrite` fell back to the CACHED body when the file would
   // not parse, and the write then replaced a git-conflicted element file with
   // atlas's copy, losing both sides of the conflict.
@@ -940,7 +940,7 @@ test('an element file that will not parse is never overwritten by an atlas save 
   expect(result.untouched).toBe(true);
 });
 
-test('a corrupt world.json or styles.json is never overwritten by a save (S360)', async ({ page }) => {
+test('a corrupt world.json or styles.json is never overwritten by a save', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;
     const root = await api.opfsRoot({ clear: true });

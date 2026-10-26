@@ -1,5 +1,5 @@
 /**
- * Live-editor operation registry (S265). The writing workspace registers its
+ * Live-editor operation registry. The writing workspace registers its
  * bulk link/unlink closures here while an editor is mounted; the tree-level
  * bulk operation consults it so the OPEN narrative runs through the live
  * TipTap transaction (undoable, autosaved) instead of a disk write the
@@ -14,7 +14,7 @@ export interface LiveEditorOps {
   linkAll(only?: string): number;
   /** Replace every chip in the live doc with its label. Returns count. */
   unlinkAll(): number;
-  /** Chip every match of `term` to `target` in the live doc (S355). Returns count. */
+  /** Chip every match of `term` to `target` in the live doc. Returns count. */
   linkTerm(term: string | readonly string[], target: TermLinkTarget, opts: TermMatchOptions): number;
 }
 

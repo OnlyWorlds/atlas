@@ -1,5 +1,5 @@
 /**
- * The shell's pane arithmetic (S323).
+ * The shell's pane arithmetic.
  *
  * The dividers clamp in FRACTIONS while `.atlas-right` clamps in PIXELS
  * (`min-width: 240px`), and the two disagree on any window narrow enough for

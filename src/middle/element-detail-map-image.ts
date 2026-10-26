@@ -1,6 +1,6 @@
 /**
  * Map-only "Local image" field row for the element editor — sits directly
- * under the schema image_url row (Captain's ask, session 253: existing maps
+ * under the schema image_url row (Titus's ask: existing maps
  * had no way to attach a local file; only the create modal offered it).
  *
  * Uses the SAME primitives as the map-create flow (addMedia 'base-image' →
@@ -92,8 +92,8 @@ export function buildMapLocalImageRow(m: WorldMap, toasts: ToastManager): HTMLEl
     // Blank-canvas → image (DESIGN_MAPS.md §4.2): the sketch's pins + zone
     // points SCALE proportionally onto the image (relative layout is the
     // meaning; absolute coords were only ever the arbitrary square). One
-    // confirm states what will happen — no options fork (Captain's call,
-    // S300b). Image→image swaps never scale (§4.1: coords are geography).
+    // confirm states what will happen — no options fork (Titus's
+    // call). Image→image swaps never scale (§4.1: coords are geography).
     const wasImageless = !m.image_url && !m.image_media_id;
     let spatialCounts: { pins: number; markers: number } | null = null;
     if (wasImageless) {

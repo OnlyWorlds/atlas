@@ -134,7 +134,7 @@ describe('initial-download', () => {
   });
 });
 
-describe('initial-download: the user stops it (S360)', () => {
+describe('initial-download: the user stops it', () => {
   async function seedFive(adapter: OwV2ClientAdapter) {
     for (const [id, name] of [['c1', 'Alice'], ['c2', 'Bob'], ['c3', 'Carol'], ['c4', 'Dan'], ['c5', 'Eve']]) {
       await adapter.createElement('character', { id, name });

@@ -1,5 +1,5 @@
 /**
- * S361 (gate F3): a CREATE whose response was lost, with an edit made while
+ * A CREATE whose response was lost, with an edit made while
  * it was in flight, must still upload the edit.
  *
  * Round N sends the element; the user edits it; the server commits the ORIGINAL
@@ -71,7 +71,7 @@ describe('adopting a create that is already on the server', () => {
   it('a read-back that fails on the network is one failure, not the end of the round (lane b L2)', async () => {
     const a = await folder.createElement('character', { name: 'Rhea' });
     loseFirstCreateResponse();
-    // Push only: a full sync's pull would adopt A already (S369, gate A L3:
+    // Push only: a full sync's pull would adopt A already (gate A L3:
     // same content on the server, never stamped = our own create).
     await engine.pushOnce(); // A committed, response lost
     await folder.createElement('character', { name: 'Ione' }); // B, never pushed
@@ -85,7 +85,7 @@ describe('adopting a create that is already on the server', () => {
     expect(client.__server_count('character')).toBe(2);
   });
 
-  it('a pull adopts our own lost create instead of reporting a conflict with ourselves (S369, gate A L3)', async () => {
+  it('a pull adopts our own lost create instead of reporting a conflict with ourselves (gate A L3)', async () => {
     const a = await folder.createElement('character', { name: 'Rhea', description: 'one' });
     loseFirstCreateResponse();
     const result = await engine.syncNow(); // push: committed, response lost; pull: same content

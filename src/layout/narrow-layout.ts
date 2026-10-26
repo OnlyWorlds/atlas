@@ -1,5 +1,5 @@
 /**
- * The narrow-window layer (S323).
+ * The narrow-window layer.
  *
  * Atlas is a three-pane desktop shell whose panes carry hard pixel floors:
  * sidebar 180 + middle 280 + right 240, plus two dividers, is a ~706px hard
@@ -138,7 +138,7 @@ export function installNarrowLayout(): void {
     const scrim = document.createElement('div');
     scrim.className = 'atlas-drawer-scrim';
     scrim.setAttribute('aria-hidden', 'true');
-    // Full outside click, matching the app-wide modal discipline (S318): a
+    // Full outside click, matching the app-wide modal discipline: a
     // drag that STARTS inside the drawer and releases on the scrim must not
     // dismiss it, or a text selection eats the panel.
     let downOnScrim = false;
@@ -152,7 +152,7 @@ export function installNarrowLayout(): void {
 
   // Escape closes a drawer, matching every other dismissible surface in the
   // app. Not capture-phase: zone edit mode captures Escape for vertex work
-  // (S307), and stealing it here would revert committed drags.
+  // and stealing it here would revert committed drags.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!isDrawerOpen('right') && !isDrawerOpen('sidebar')) return;
@@ -161,7 +161,7 @@ export function installNarrowLayout(): void {
 
   // A drawer is a view of the CURRENT room; navigating away should not leave
   // it hanging over the new one. Except during the tour, which owns the
-  // drawers (S366 gate B1): each step navigates and then opens the pane it
+  // drawers: each step navigates and then opens the pane it
   // points at (tour-pane.ts), and this close, landing a tick after the
   // navigation, shut the drawer the step had just opened.
   window.addEventListener('hashchange', () => {

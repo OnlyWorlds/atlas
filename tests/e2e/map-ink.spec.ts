@@ -1,5 +1,5 @@
 /**
- * A map drawn from its own zones (S423; `src/core/map-ink.ts`): a map's style
+ * A map drawn from its own zones (`src/core/map-ink.ts`): a map's style
  * draws each zone whose subtype names a kind from that kind (ink, patterns,
  * names along lines), the rest as before, and nothing about the zones is
  * written; and Trace turns one drag into the few points of a zone, without
@@ -158,7 +158,7 @@ test('back from a style to Plain, the zones keep their plain order', async ({ pa
   expect(order.ocean).toBeLessThan(order.kingdom);
 });
 
-test('a modern atlas map draws the same zones in its own register (S424)', async ({ page }) => {
+test('a modern atlas map draws the same zones in its own register', async ({ page }) => {
   await setupWorld(page);
   await openMap(page, await seedMap(page, 'atlas'));
   await expect.poll(async () => (await inkFacts(page)).inkLabels).toEqual(['Isle', 'Spine']);
@@ -179,7 +179,7 @@ test('a modern atlas map draws the same zones in its own register (S424)', async
   expect(f.riverName).toBe('rgb(48, 101, 133)');               // #306585
 });
 
-test('a hatched map draws the same zones in one sepia, the kind in the texture (S425)', async ({ page }) => {
+test('a hatched map draws the same zones in one sepia, the kind in the texture', async ({ page }) => {
   await setupWorld(page);
   await openMap(page, await seedMap(page, 'hatched'));
   await expect.poll(async () => (await inkFacts(page)).inkLabels).toEqual(['Isle', 'Spine']);
@@ -212,7 +212,7 @@ test('a hatched map draws the same zones in one sepia, the kind in the texture (
   expect(f.islandCase).toBe('uppercase');
 });
 
-/** An island lettered in spaced capitals, a pin either side of its middle at `dx` units (S424). */
+/** An island lettered in spaced capitals, a pin either side of its middle at `dx` units. */
 async function seedLetteredIsland(page: Page, name: string, dx: number, style = 'ink'): Promise<{ worldId: string; mapId: string }> {
   return page.evaluate(async ({ name, dx, style }) => {
     const api = (window as any).__atlasTestApi;
@@ -265,9 +265,9 @@ async function settledLettering(page: Page, name: string) {
 }
 
 // Ink only: a hatched variant hid the name with the per-face measure reverted
-// too, so it could never go red (S425).
+// too, so it could never go red.
 for (const style of ['ink']) {
-  test(`an island's spaced capitals never print over the pins beside them, ${style} (S424)`, async ({ page }) => {
+  test(`an island's spaced capitals never print over the pins beside them, ${style}`, async ({ page }) => {
     await setupWorld(page);
     // The control: pins far out, so the name has room and prints.
     await openMap(page, await seedLetteredIsland(page, 'Ostmark', 650, style));
@@ -282,7 +282,7 @@ for (const style of ['ink']) {
   });
 }
 
-/** An island with a river that runs out over its east coast, through a forest on its middle (S424). */
+/** An island with a river that runs out over its east coast, through a forest on its middle. */
 async function seedRiverMap(page: Page): Promise<{ worldId: string; mapId: string }> {
   return page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;
@@ -468,13 +468,13 @@ test('Trace turns one drag into a few points and does not pan the map', async ({
 });
 
 // gates G6, G8: a finger's drag is the stroke's (red without the touch-action),
-// and a coast full of bays keeps at most 60 points (98 without the cap, S426).
+// and a coast full of bays keeps at most 60 points (98 without the cap).
 // The drifting click is a behaviour check only: before G15's floor it also
 // landed one point, the moving average folding three samples into one.
 test('Trace keeps a coast to its budget, a drifting click to one point, and the drag to itself', async ({ page }) => {
   // Its own workload (a 1500-move coast) runs ~40 s alone, at the suite's 45 s
-  // limit, so it flipped with machine load and failed at HEAD too (S427 flaky;
-  // S429 red 5 of 5 at 45 s, green at 39.7 s with room). Time, not an assertion.
+  // limit, so it flipped with machine load and failed at HEAD too (flaky;
+  // red 5 of 5 at 45 s, green at 39.7 s with room). Time, not an assertion.
   test.setTimeout(120_000);
   await setupWorld(page);
   await openMap(page, await seedMap(page, 'ink'));

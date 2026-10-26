@@ -1,7 +1,7 @@
 /**
  * Router tests for the writing room URL scheme.
  *
- * Session 227 shortened the URL from
+ * The URL was shortened from
  *   /writing/book/<bId>[/chapter/<cId>[/scene/<sId>]]
  * to
  *   /writing/<narrativeId>

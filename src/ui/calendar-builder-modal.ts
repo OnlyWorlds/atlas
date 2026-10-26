@@ -57,7 +57,7 @@ interface MonthDraft { name: string; length: string; }
 /**
  * `rest`: the stored entry's keys the form does not draw (a version 2 leap
  * rule's `except` and `offset`, SDK 4.76, or anything newer), carried back on
- * save so an edit never strips them (the S367 K2 rule, per festival day).
+ * save so an edit never strips them (the stored-config rule, per festival day).
  */
 interface InterDraft { name: string; after: string; everyYears: string; inWeek: boolean; rest?: Record<string, unknown>; }
 
@@ -81,9 +81,9 @@ interface Draft {
 export class CalendarBuilderModal extends BaseModal {
   private draft: Draft;
   private grain: string;
-  /** The config as stored, on edit (S367 critic K2): save patches it, never rebuilds it. */
+  /** The config as stored, on edit: save patches it, never rebuilds it. */
   private stored: CalendarConfig | null = null;
-  /** Set once a new calendar is written, so Save after a later failure updates it instead of making a second (S369). */
+  /** Set once a new calendar is written, so Save after a later failure updates it instead of making a second. */
   private createdId: string | null = null;
 
   constructor(private toasts: ToastManager, private opts: CalendarBuilderOpts) {
@@ -137,8 +137,8 @@ export class CalendarBuilderModal extends BaseModal {
 
   /**
    * The draft as a CalendarConfig (or the reason it isn't one yet). On edit it
-   * starts from the STORED config and patches only the fields the form owns
-   * (S367 critic K2): sections the form does not render, a coarse
+   * starts from the STORED config and patches only the fields the form owns:
+   * sections the form does not render, a coarse
    * `bundles.year`, unknown keys and the grain all survive a save.
    */
   private buildConfig(): { config: CalendarConfig; errors: string[] } {
@@ -228,7 +228,7 @@ export class CalendarBuilderModal extends BaseModal {
   }
 
   /**
-   * Plain notes on what the form keeps but does not show (S367 critic K2): a
+   * Plain notes on what the form keeps but does not show: a
    * grain that no longer matches the world clock, and a coarse year length.
    */
   private keptNotes(): string {

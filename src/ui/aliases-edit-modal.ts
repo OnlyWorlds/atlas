@@ -142,7 +142,7 @@ export class AliasesEditModal extends BaseModal {
     } catch (err) {
       console.error('[aliases-edit] save failed', err);
       // Stay open so the user can retry without losing their edits, and say
-      // so (S369: it used to stay open with no word at all). When the caller
+      // so (it used to stay open with no word at all). When the caller
       // already toasted the reason, the line only says what it means here.
       if (!errorBox) return;
       const problem = problemFor(err, { inline: true, doing: 'saving the aliases' });

@@ -1,7 +1,5 @@
 /**
- * keel's "known of" stubs (PR 113, B16; the folder spec §4.4; conv. 155;
- * contract Forge/Notes/2026-10-20-s443-known-of-stubs.md, I1 to I6). keel
- * probed live S443 (`Notes/ui-snapshots/2026-10-20-s443/probe-stub.log`): a
+ * keel's "known of" stubs (the folder spec §4.4; conv. 155). keel probed live: a
  * stub is an upsert with `known_of: true` and every other field served unset
  * ("", null, []); it keeps the element's own `updated_at`; a stub arriving or
  * leaving answers the old cursor 409 `resync_required`, reason `view`; a
@@ -24,8 +22,7 @@ const ANA = '00000000-0000-4000-8000-0000000000b2';
 const STAMP = '2026-01-01T00:00:05.000Z';
 
 /**
- * keel's stub of a whole record, as served live since PR 117 (S444's probe,
- * `Forge/Notes/ui-snapshots/2026-10-20-s444/probe-stub.log`): the kept keys and
+ * keel's stub of a whole record, as served live: the kept keys and
  * a Character's public fields, every other field unset.
  */
 function asStub(whole: Record<string, unknown>): Record<string, unknown> {

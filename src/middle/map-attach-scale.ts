@@ -1,5 +1,5 @@
 /**
- * Apply the blank-canvas → image rescale (DESIGN_MAPS.md §4.2, S300b).
+ * Apply the blank-canvas → image rescale (DESIGN_MAPS.md §4.2).
  *
  * Shared by both image-attach paths (the element editor's Local-image row
  * and the image_url field hook). The kernel (core/map-spatial-scale.ts)

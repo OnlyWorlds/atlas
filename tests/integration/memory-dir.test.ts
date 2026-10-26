@@ -1,5 +1,5 @@
 /**
- * #126 (S387): the demo world's scratch folder lives in memory. The same
+ * #126: the demo world's scratch folder lives in memory. The same
  * FsFolderStore writes the same files there, and the world file collected
  * from it reads back whole, so the demo copy is the world it was before the
  * move, minus some three hundred OPFS writes.

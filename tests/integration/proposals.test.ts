@@ -1,9 +1,8 @@
 /**
- * keel #519, a seat's write that lands as a proposal (conv. 163; contract
- * `Forge/Notes/2026-10-22-s454-seat-proposals-contract.md`, P1 to P6).
+ * A seat's write that lands as a proposal (conv. 163).
  * The engine on FakeOwApiClient's `__propose_writes` seam, and the real
  * adapter against an MSW route that answers as keel did live (Seethe's read,
- * h29 #10600).
+ * 2026-10-22).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -276,7 +275,7 @@ describe('the adapter reads keel\'s 202 (P1)', () => {
   });
 });
 
-describe('the S454 gate\'s findings, each held', () => {
+describe('the gate\'s findings, each held', () => {
   it('G1: a refused delete whose read-back fails keeps the tombstone and says nothing; the next round brings it back', async () => {
     const el = await seatOnReviewedWorld();
     await folder.deleteElement(el.id);
@@ -365,7 +364,7 @@ describe('the S454 gate\'s findings, each held', () => {
   });
 });
 
-describe('G3: a refused delete takes back the unlinks it set off (TC h29 #10726)', () => {
+describe('G3: a refused delete takes back the unlinks it set off (TC 2026-10-22)', () => {
   /** Ada links to a place and two species, all the owner's; then the key turns into a seat. */
   async function linkedWorld() {
     const loc = await folder.createElement('location', { name: 'Harbour' });
@@ -436,7 +435,7 @@ describe('G3: a refused delete takes back the unlinks it set off (TC h29 #10726)
   });
 });
 
-describe('the review line (S454 live read)', () => {
+describe('the review line (a live read)', () => {
   it('a reason that ends its own sentence takes no second stop', async () => {
     const { proposalReviewLine } = await import('../../src/sync/proposal-lines');
     expect(proposalReviewLine({ outcome: 'declined', reason: 'Not canon here.' })).toContain('"Not canon here." Overwrite');

@@ -14,7 +14,7 @@ export function isTourFlagActive(): boolean {
 }
 
 /**
- * Machinery elements the tour never spotlights (Captain, S316): they exist so
+ * Machinery elements the tour never spotlights (Titus): they exist so
  * a surface works (markers trace the zone; the calendar construct feeds the
  * chart's axis), not as vocabulary being taught. Excluded from the preview
  * stack, the reveal flash, AND hidden from the elements sidebar while

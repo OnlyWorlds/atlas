@@ -1,6 +1,6 @@
 /**
  * The Files card on an element page (keel #393; Seethe's mock 04,
- * `Carrier/Studio/desk/current/2026-10-19-files-section-mock/`): the files
+ * 2026-10-19): the files
  * OnlyWorlds holds on this element, each with its label, kind, size, who
  * added it (AGENT when an agent did) and when, and Download and Remove; the
  * world's total against its room in the header; Add file at the foot.
@@ -72,7 +72,7 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
   input.type = 'file';
   input.accept = FILES_ACCEPT;
   input.hidden = true;
-  // Only where a file can be added: a view-only card carries no upload input (S435's read-key walk).
+  // Only where a file can be added: a view-only card carries no upload input.
   if (!readOnly) section.appendChild(input);
   input.addEventListener('change', () => {
     const file = input.files?.[0];

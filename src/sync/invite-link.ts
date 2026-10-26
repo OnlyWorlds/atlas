@@ -1,6 +1,6 @@
 /**
- * Invite links made in Atlas (#341, the night floor's B10, h58 #5524; as
- * Lantern makes them since the Captain's yes, h56 #5322). keel makes a link
+ * Invite links made in Atlas (#341, 2026-10-15; as
+ * Lantern makes them since Titus's yes, 2026-10-15). keel makes a link
  * for the world's owner only (keel C1, `POST /account/worlds/{id}/links`),
  * through the SDK's `createWorldLink` with the account token. The link is
  * shown once: keel keeps only a hash, and Atlas keeps nothing. Seeing and
@@ -16,7 +16,7 @@ import { PlainError } from '../core/plain-error';
 import { typeNameStart } from '../core/type-words';
 
 /**
- * Who a link is for (the sharing floor's Q1, the Captain's yes, h50 #7610):
+ * Who a link is for (Titus's yes, 2026-10-19):
  * `player` is keel's no-account player link (#353), a friend reading as one
  * Character; `guest` is a person's link with role guest, the same reading
  * with an account of their own; `contributor` a person's link.
@@ -71,7 +71,7 @@ export async function makeInvite(
       if (err.isAuthError) throw new PlainError('OnlyWorlds no longer takes this browser\'s sign-in. Sign in again in Settings, OnlyWorlds.');
       // keel's cap on a world's open invites (50, links not yet used counted:
       // keel accounts/agents.py, MAX_PENDING_INVITES) is a 422 naming no field;
-      // a retry never helps (the S414 gate's M1).
+      // a retry never helps.
       if (err.status === 422 && !err.param) throw new PlainError(INVITE_CAP_LINE);
       // keel refuses a Character it does not hold in this world (agents.py
       // `_clean_link_character`): made here and not synced yet, or deleted there.

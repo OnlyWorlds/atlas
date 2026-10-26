@@ -10,14 +10,14 @@
  * LOOKS right and silently lands the user in the field editor instead of the
  * room the thing belongs to.
  *
- * That is exactly what the command palette did (S306): Cmd+K is the app's only
+ * That is exactly what the command palette did: Cmd+K is the app's only
  * global jump, and searching for the page you are building, the map you drew
  * or the chapter you are writing dropped you in the generic editor — while the
  * world home, twenty lines away, resolved all four correctly. Two surfaces
  * answering the same question differently is a bug that only appears when you
  * use both, which is why it survived so long.
  *
- * Same shape as `core/element-search.ts`, and for the same reason (S258): when
+ * Same shape as `core/element-search.ts`, and for the same reason: when
  * surface A hands work to surface B, the language they share moves to core so
  * they CANNOT diverge, rather than being kept in sync by memory.
  */
@@ -52,7 +52,7 @@ export function roomOf(el: Element, worldId: string): { hash: string; label: str
  *
  *   - `openMapTab` because `navigate(mapHash)` alone cannot activate an
  *     already-open BACKGROUND tab (the open path early-returns when the tab
- *     exists), which was Captain's "recent map does nothing" (S265);
+ *     exists), which was Titus's "recent map does nothing";
  *   - `navigate` because `openMapTab` alone only mutates right-pane state and
  *     leaves the URL untouched, so on any surface where the right pane is
  *     hidden — the writing room's focus and reading modes, a tour before the
@@ -80,7 +80,7 @@ export function openElementTarget(
     //   which is always visible there, so the tab appearing is feedback enough.
     //   Pinning the URL to the map would also pin the right pane — an existing
     //   spec caught exactly that (clicking the map-index tab afterwards gets
-    //   fought back to the map, S265's re-activation test).
+    //   fought back to the map, in the re-activation test).
     //
     //   the palette (routeToMap): global, and fires from inside the writing
     //   editor where focus/reading mode hides the right pane entirely. Without

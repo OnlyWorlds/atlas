@@ -1,5 +1,5 @@
 /**
- * The preview stack's rule (S316) + the merged foot row's exclusivity.
+ * The preview stack's rule + the merged foot row's exclusivity.
  *
  * The stack on step N previews what the NEXT click of Next brings into the
  * world — step N+1's `creates` ∪ `reveal`, minus quiet machinery (markers,
@@ -18,7 +18,7 @@ import {
   TOUR_SWAMPS_ZONE_REF,
 } from '../../src/tour/tour-data';
 
-/** Index by step id — never a hand-numbered index (the S308 dead-gate class). */
+/** Index by step id — never a hand-numbered index (the dead-gate class). */
 function idx(id: string): number {
   const i = TOUR_STEPS.findIndex(s => s.id === id);
   expect(i, `step id "${id}" exists`).toBeGreaterThanOrEqual(0);
@@ -36,7 +36,7 @@ describe('previewRefsFor — the next-step rule', () => {
     });
   });
 
-  it('the consul step previews the institution and the title (Captain: "it is what you are ABOUT to create")', () => {
+  it('the consul step previews the institution and the title (Titus: "it is what you are ABOUT to create")', () => {
     expect(previewRefsFor(idx('the-consul'))).toEqual([
       'institution:The Hegemony',
       'title:Consul of the Hegemony',
@@ -74,7 +74,7 @@ describe('previewRefsFor — the next-step rule', () => {
   });
 
   it('quiet refs actually exist in the script (a renamed ref must not silently disarm the filter)', () => {
-    // The S308/S312 string-keyed-lookup class: if the calendar construct is
+    // The string-keyed-lookup class: if the calendar construct is
     // renamed in the bundle/steps, TOUR_QUIET_REFS keeps matching nothing and
     // the filter fails open. Assert every quiet REF is still referenced by
     // some step's reveal/creates.
@@ -85,6 +85,6 @@ describe('previewRefsFor — the next-step rule', () => {
   });
 });
 
-// (The S316 meta-XOR-deeper rule was RETIRED in S317: Captain's merged map
+// (The meta-XOR-deeper rule was RETIRED: Titus's merged map
 // step legitimately carries both, and the foot row renders them side by side
 // — bulb first, meta text beside it. No structural exclusivity to lock.)

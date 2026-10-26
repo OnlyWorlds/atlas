@@ -121,7 +121,7 @@ test('a dateless chart still offers a droppable axis for the FIRST date', async 
   }, eventId)).toBe(Number(snapped));
 });
 
-// ====== Glyph re-dating (S264): drag a PLACED dot to a new start date ======
+// ====== Glyph re-dating: drag a PLACED dot to a new start date ======
 
 /** Canvas position of a point node's dot: x from the fitted view (symmetric
  *  2% pad → a node at the midpoint of the dated span sits at w/2); y = the
@@ -202,7 +202,7 @@ test('a plain click on a dot still peeks (the drag threshold protects the click 
   await expect(page.locator('.atlas-edit-popover')).toHaveCount(0);
 });
 
-test('dragging a range END cap stretches the end (S265, the other grip)', async ({ page }) => {
+test('dragging a range END cap stretches the end (the other grip)', async ({ page }) => {
   await setupWorld(page);
   // TWO nodes only, far apart — three would fan into lanes on the small e2e
   // viewport and the range's y would leave the midline (failed-shot finding).

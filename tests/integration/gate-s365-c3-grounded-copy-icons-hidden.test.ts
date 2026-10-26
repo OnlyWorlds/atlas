@@ -1,5 +1,5 @@
 /**
- * PROMOTED from the S365 composition gate (lens C, consumers): the grounded welcome names "add a world" when the icons are hidden.
+ * The grounded welcome names "add a world" when the icons are hidden.
  * Each asserts the fixed behaviour; red on the code before the gate fixes.
  */
 import { describe, it, expect } from 'vitest';

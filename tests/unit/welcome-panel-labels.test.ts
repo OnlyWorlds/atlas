@@ -1,5 +1,5 @@
 /**
- * The landing doors must not RENAME themselves (S310).
+ * The landing doors must not RENAME themselves.
  *
  * Both buttons on the welcome panel swap their label to a progress string
  * ("Picking…" / "Starting…") on click and restore it in a failure/cancel path.
@@ -39,7 +39,7 @@ describe('welcome-panel label restores', () => {
     expect(source).not.toContain(`textContent = 'Take the tour'`);
   });
 
-  it('renders the door labels in sentence case (the Captain, h63 #8074: sentence case everywhere)', () => {
+  it('renders the door labels in sentence case (Titus, 2026-10-20: sentence case everywhere)', () => {
     for (const label of ["'Start a world'", "'Explore Moppetopia'", "'Open a world folder'", "'Other ways in'"]) expect(source).toContain(label);
   });
 

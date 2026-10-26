@@ -1,5 +1,5 @@
 /**
- * Flush-before-leaving-a-world (S360, the F1 data loss).
+ * Flush-before-leaving-a-world (the F1 data loss).
  *
  * The writing, knowledge and share rooms debounce their prose saves (1 s by
  * default, up to an hour by setting). A world switch used to empty the
@@ -29,7 +29,7 @@ export async function flushBeforeLeavingWorld(): Promise<void> {
   for (const r of results) {
     if (r.status !== 'rejected') continue;
     console.warn('[atlas] a pending save failed while leaving the world:', r.reason);
-    // Said, not only logged (S369): the last keystrokes did not reach the
+    // Said, not only logged: the last keystrokes did not reach the
     // folder. Loaded on demand: core does not import the UI layer statically.
     const reason = r.reason;
     void import('../ui/problem-fixes').then(({ showProblem }) => {

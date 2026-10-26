@@ -31,7 +31,7 @@ beforeEach(async () => {
 });
 
 /** Push tests focus on write methods. Pull phase issues list calls every sync,
- *  and the world-meta step (S262) issues a getWorldMeta read every round;
+ *  and the world-meta step issues a getWorldMeta read every round;
  *  filter both out so push assertions stay focused on the push surface. */
 const writeCalls = () => client.calls.filter(c => c.method !== 'list' && c.method !== 'getWorldMeta');
 
@@ -145,7 +145,7 @@ describe('SyncEngine push phase', () => {
   });
 
   /**
-   * S308 — a push-phase throw must restore idle, exactly as the pull path does.
+   * A push-phase throw must restore idle, exactly as the pull path does.
    *
    * `runPullOnly` has wrapped its phase in try/catch-and-restore-idle since it
    * was written, with a comment saying "we MUST restore idle state first or the

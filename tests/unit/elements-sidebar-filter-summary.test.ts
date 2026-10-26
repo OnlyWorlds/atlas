@@ -1,5 +1,5 @@
 /**
- * The elements sidebar's filter strip in words (S369): the strip is 22 type
+ * The elements sidebar's filter strip in words: the strip is 22 type
  * glyphs and no words, so a line under the search row says what it selects.
  */
 import { describe, it, expect } from 'vitest';

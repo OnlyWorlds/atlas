@@ -1,8 +1,8 @@
 /**
- * ONE WRITER PER FILE (S366, the park/unpark flake, lane C's mechanism).
+ * ONE WRITER PER FILE (the park/unpark flake, lane C's mechanism).
  *
  * `writeJsonAtomic` staged every write through one fixed `<name>.tmp` until
- * S368, so two writes of the same file that overlapped corrupted each other's
+ * the writer was reworked, so two writes of the same file that overlapped corrupted each other's
  * staging. With one writable per write the overlap still fails: the first
  * write's read-back verify reads the second one's bytes and throws. `park()` fired a lock write it
  * never waited for and `unpark()` wrote the same lock in the same tick, so a
@@ -11,7 +11,7 @@
  * `.atlas/` file (and the lock) runs on a chain for that file.
  *
  * Two jitter shapes, because one lines the operations up the same way every
- * run and so never meets some races (the S366 gate, lens A, found two rows of
+ * run and so never meets some races (review found two rows of
  * the first version green with the whole fix removed). Every row below was
  * revert-checked red against the store at HEAD `b3466ef`.
  */

@@ -1,6 +1,6 @@
 /**
  * Settings, Storage, "In this browser" (1.17, contract §3.4, invariants 3
- * and 9; S376 gate B4): a cleared row is not a world kept in this browser,
+ * and 9): a cleared row is not a world kept in this browser,
  * and a window whose browser storage refuses (a private window) or is full
  * says only that, never "0 worlds kept" with an Ask button.
  */

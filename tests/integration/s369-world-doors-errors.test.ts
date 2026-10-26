@@ -1,5 +1,5 @@
 /**
- * S369 sweep, builder S1: the world doors say what went wrong in words.
+ * The world doors say what went wrong in words.
  *
  * - opening a world that is no longer listed names no id and no "registry";
  * - a lost folder handle offers "Open the folder", and picking the folder
@@ -75,7 +75,7 @@ beforeEach(() => {
   window.location.hash = '#/';
 });
 
-describe('activateWorld failure copy (S369)', () => {
+describe('activateWorld failure copy', () => {
   it('a world no longer listed: no id, no "registry"', async () => {
     const said: Said[] = [];
     expect(await activateWorld('0193a5c2-dead-7aaa-8bbb-cccccccccccc', fakeToasts(said))).toBe(false);
@@ -117,7 +117,7 @@ describe('activateWorld failure copy (S369)', () => {
   });
 });
 
-describe('openWorldFolder (S369)', () => {
+describe('openWorldFolder', () => {
   it('a folder with no world.json is refused in words', async () => {
     const err = await openWorldFolder(new FakeDirHandle('notes') as never).catch(e => e);
     expect(isPlainError(err)).toBe(true);
@@ -142,7 +142,7 @@ describe('openWorldFolder (S369)', () => {
   });
 });
 
-describe('keyCheckError (S369)', () => {
+describe('keyCheckError', () => {
   const owErr = (status: number) => new OwV2Error(status, { code: 'x', message: 'raw server words' }, '');
 
   it('names a refused key, for a write key and a read key', () => {
@@ -152,7 +152,7 @@ describe('keyCheckError (S369)', () => {
     expect((keyCheckError(owErr(403), { readOnly: true }) as Error).message).toMatch(/read key/);
   });
 
-  it('names the PIN when keel refused the PIN, the key when it refused the key (S434)', () => {
+  it('names the PIN when keel refused the PIN, the key when it refused the key', () => {
     // keel's own answers, read on live 2026-10-19: param "API-Pin" for a right key with a wrong PIN.
     const pin = keyCheckError(new OwV2Error(401, { code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' }, ''));
     expect(isPlainError(pin)).toBe(true);
@@ -174,7 +174,7 @@ describe('keyCheckError (S369)', () => {
   });
 });
 
-describe('signInErrorLine (S369, B6)', () => {
+describe('signInErrorLine (B6)', () => {
   it('keeps the written branches and words the rest', () => {
     expect(signInErrorLine(new OwV2Error(401, { code: 'invalid_key' }, ''))).toMatch(/not recognized/);
     expect(signInErrorLine(new OwV2Error(400, { code: 'bad', message: 'raw server words' }, ''))).toMatch(/did not accept that account token/);
@@ -184,7 +184,7 @@ describe('signInErrorLine (S369, B6)', () => {
   });
 });
 
-describe('add-a-world icons (S369, 1g)', () => {
+describe('add-a-world icons (1g)', () => {
   it('every icon button has a title and an aria-label; the glyphs are hidden', () => {
     (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
     patchSlice('atlasRoot', { folderName: 'onlyworlds-atlas', pathHint: 'Docs/onlyworlds-atlas' });

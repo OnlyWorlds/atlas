@@ -20,7 +20,7 @@ import type { ParseResult, RawRecord, ValidationIssue } from './types';
 const SPATIAL_SAFE = new Set(['x', 'y', 'z', 'order', 'element_type']);
 // Server bookkeeping stamps. Files in an api-linked world carry these, so
 // atlas's OWN export round-trips through here — flagging them produced 45
-// bogus "unknown field" warnings on a clean export (Captain's smoke, S254).
+// bogus "unknown field" warnings on a clean export (Titus's smoke).
 // `change_seq` is the keel v2 addition, present on every element in the
 // world-export envelope — without it a 36-element import shows "36 things to
 // check", one per element (2026-07-23). Reconcile strips them all; the
@@ -72,7 +72,7 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
       // Pins and markers are UNNAMED BY DESIGN (atlas creates them with an
       // empty name) — requiring a name here silently dropped every unnamed
       // spatial artifact on re-import, breaking export→import round-trips
-      // (found via the bundled sample world, session 248).
+      // (found via the bundled sample world).
       const nameOptional = type === 'pin' || type === 'marker';
       if (!nameOptional && (typeof rec.name !== 'string' || !rec.name.trim())) {
         issues.push({

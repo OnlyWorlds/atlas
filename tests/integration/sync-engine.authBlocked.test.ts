@@ -8,7 +8,7 @@
  *   1. Stop the round immediately. Retrying every element with the same dead
  *      key is server-rude and pointless.
  *   2. Surface visibly. The pill must NOT show "synced" — that's the lying-
- *      pill bug Captain caught during Bout-S smoke.
+ *      pill bug Titus caught during Bout-S smoke.
  *   3. Stop firing pushes until recovery. The engine pauses itself so
  *      autosave debounces no-op while creds are dead.
  *
@@ -66,7 +66,7 @@ describe('isAuthError detector', () => {
 describe('SyncEngine auth-blocked rounds', () => {
   describe('push', () => {
     it('transitions to error state on dead credentials (bails at the meta read, before any element attempt)', async () => {
-      // Since the world-meta step (S262) every round opens with GET /world;
+      // Since the world-meta step every round opens with GET /world;
       // dead creds 401 THERE, so the round bails even earlier than the old
       // element-loop bail — zero element attempts, zero failure entries.
       await folder.createElement('character', { name: 'Alice' });

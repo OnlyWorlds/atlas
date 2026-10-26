@@ -109,7 +109,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
   };
   target.addEventListener('focusout', onFocusOut);
 
-  // Rebuilt only when an input moved (conv. 146, S422): a rebuild between a
+  // Rebuilt only when an input moved (conv. 146): a rebuild between a
   // press and its release loses the click, and the page subscribes to every
   // store patch (each sync step patches `sync`, which nothing here reads).
   // The parts are every slice the page and its builders read, the route, the
@@ -134,9 +134,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
       return;
     }
     if (!el) {
-      // THE INSTRUCTION HAS TO BE TRUE (S307). "Pick one from the elements
+      // THE INSTRUCTION HAS TO BE TRUE. "Pick one from the elements
       // sidebar" was false on an EMPTY world: that list deliberately renders
-      // nothing (S255v3 — the pulsing + and the home tiles carry the
+      // nothing (the pulsing + and the home tiles carry the
       // teaching), so this pane sent people to a blank pane. Two correct
       // decisions, one lie where they met.
       const isEmptyWorld = getState().data.elements.length === 0;
@@ -177,7 +177,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     detail.className = 'atlas-detail';
 
     // Proposed, not yet reviewed (conv. 168): said in a sentence under the name, not only
-    // in the header word's label (Seethe's read of 1.84.0, h20 #11298).
+    // in the header word's label (Seethe's read of 1.84.0, 2026-10-23).
     const proposed = proposedNoteFor(el);
     if (proposed) {
       const note = document.createElement('p');
@@ -187,7 +187,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       detail.appendChild(note);
     }
     // Hidden (conv. 170): said in a sentence under the name too, so a hidden-only page has
-    // more than a glyph (Seethe's read of 1.86.0, h20 #11602); the header leaves the glyph out.
+    // more than a glyph (Seethe's read of 1.86.0, 2026-10-23); the header leaves the glyph out.
     const st = getState();
     const hiddenLine = hiddenMarkLine(el, st.registry.worlds.find(w => w.id === st.active?.worldId)?.state);
     if (hiddenLine) {
@@ -202,7 +202,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // The element's image, above the field sections — gated on the
     // show_element_images setting. The banner's × flips the setting OFF in
     // place; the header's type icon becomes a clickable thumbnail that flips
-    // it back ON (session 239).
+    // it back ON.
     if (getEditorSettings(getState().registry).show_element_images) {
       const image = renderElementImage(el, 'banner');
       if (image) {
@@ -214,7 +214,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
         hide.type = 'button';
         hide.className = 'atlas-element-image-hide';
         // An eye, not a ×: it hides every element's picture (a view setting), and a × read as
-        // "remove this picture" (Seethe's phone pass, #4264).
+        // "remove this picture" (Seethe's phone pass, 2026-10-14).
         hide.title = 'Hide element images';
         hide.setAttribute('aria-label', 'Hide element images');
         const glyph = document.createElement('span');
@@ -236,7 +236,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const parties = buildMessageParties(el);
     if (parties) detail.appendChild(parties);
 
-    // A Work item's packet: its elements and reasons, stepped through with the packet bar (OW Parlor #487).
+    // A Work item's packet: its elements and reasons, stepped through with the packet bar.
     const packet = buildWorkPacket(el);
     if (packet) detail.appendChild(packet);
 
@@ -277,13 +277,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
     let sections = sectionsFor(el.type)
       .map(section => ({ ...section, fields: section.fields.filter(f => f.name !== 'name') }))
       .filter(section => section.fields.length > 0);
-    // During the tour, all-empty sections HIDE (not collapse — the Freek
-    // round, S299): a beginner's first element pages show only sections that
+    // During the tour, all-empty sections HIDE (not collapse — a tester's
+    // round): a beginner's first element pages show only sections that
     // carry content. If nothing is populated, the first section stays so the
     // page never renders fieldless.
-    // S311 (Captain): empty FIELDS hide too, not just empty sections — a
-    // beginner's element pages show only rows that carry content. S317
-    // refinement (Captain): Base shows its FULL field set only on the
+    // Then (Titus): empty FIELDS hide too, not just empty sections — a
+    // beginner's element pages show only rows that carry content. A later
+    // refinement (Titus): Base shows its FULL field set only on the
     // consul step, where the copy teaches "a set of shared base fields" —
     // the tour-bar stamps `atlas-tour-basefull` for exactly that step.
     // Every later step hides Base's empty rows like any other section.
@@ -299,7 +299,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       hiddenCount = filled.hidden;
     }
     sections.forEach((section) => {
-      // Base collapses like every other section (Captain, S311 — it was the
+      // Base collapses like every other section (Titus — it was the
       // one hardcoded always-expanded section, in tour and tool alike).
       const sectionEl = renderSection(section, el, false);
       if (sectionEl) detail.appendChild(sectionEl);
@@ -312,14 +312,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
     }
 
     // Map-specific: the "Local image" row, directly under the image_url row
-    // (folder-stored file as map background; session 253).
+    // (folder-stored file as map background).
     if (el.type === 'map') {
       // A view-only world keeps no picture of its own in a folder (conv. 149).
       const row = worldIsViewOnly() ? null : buildMapLocalImageRow(el as import('../core/types').WorldMap, toastManager);
       const urlRow = detail.querySelector('[data-field="image_url"]');
       if (row && urlRow) urlRow.insertAdjacentElement('afterend', row);
       else if (row) detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
-      // "Map style" (S423) goes under the Background colour it can stand in for.
+      // "Map style" goes under the Background colour it can stand in for.
       const styleRow = buildMapStyleRow(el as import('../core/types').WorldMap, toastManager);
       const bgRow = detail.querySelector('[data-field="background_color"]');
       if (bgRow) bgRow.insertAdjacentElement('afterend', styleRow);
@@ -355,7 +355,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // what's there, let the user add more. Always present (the add row is
     // the feature's discoverability) — EXCEPT during the tour: a beginner's
     // first pages should not offer schema extension (precision audit #2,
-    // Captain-blessed 2026-07-20). A view-only world shows only the rows it has.
+    // Titus-blessed 2026-07-20). A view-only world shows only the rows it has.
     const customFields = isTourFlagActive() ? null : buildCustomFieldsSection(el);
     if (customFields) detail.appendChild(customFields);
 
@@ -417,7 +417,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
   function renderFooter(el: Element): HTMLElement {
     const meta = document.createElement('div');
     meta.className = 'atlas-detail-meta';
-    // relativeTime (S309): the same element read "2d ago" on home and a raw
+    // relativeTime: the same element read "2d ago" on home and a raw
     // locale dump here. Tooltip keeps the exact stamp; empty/invalid fall back.
     const updatedRel = relativeTime(el.local_updated_at);
     const updated = updatedRel

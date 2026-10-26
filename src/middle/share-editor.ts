@@ -233,7 +233,7 @@ export function mountShareEditor(opts: ShareEditorOptions): ShareEditorHandle {
   roomRoot.addEventListener('contextmenu', onContextMenu);
 
   // ---- selection bubble (B / I / link — the marks worked via Ctrl+B/I all
-  // along; this makes them visible. Captain's ask, 2026-07-19) ----------------
+  // along; this makes them visible. Titus's ask, 2026-07-19) ----------------
 
   const bubble: SelectionBubbleController = mountSelectionBubble({
     getHandle: () => editorHandle,

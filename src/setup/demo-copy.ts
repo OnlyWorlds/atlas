@@ -1,5 +1,5 @@
 /**
- * Try the demo world (#113, S381): Moppetopia, brought down by its public demo
+ * Try the demo world (#113): Moppetopia, brought down by its public demo
  * key as a world of the user's own: unlinked, editable, never syncing back.
  *
  * It is a world file made in memory and opened through the world-file door
@@ -10,7 +10,7 @@
  *   1  one build at a time across tabs (a Web Lock); the scratch is a folder
  *      in memory (`store/memory-dir.ts`, 1.25.1, #126), so nothing outlives
  *      the try; the OPFS `atlas-scratch/` an interrupted try of an older
- *      version left is swept (S381 gate F5)
+ *      version left is swept
  *   2  world.json: the world's id and name, and its own fields (the calendar,
  *      the description) as the server holds them; no `api` block, no key
  *   3  every element, through the link door's download (`initialDownloadAll`;
@@ -47,9 +47,9 @@ export const DEMO_WORLD_NAME = 'Moppetopia';
 export const DEMO_WORLD_ID = '0695db52-5433-7332-8000-db7fe10da375';
 
 /**
- * A demo read that has not answered in this long is given up (S405): on a
+ * A demo read that has not answered in this long is given up: on a
  * stalled connection the try otherwise waited forever with nothing on screen
- * (Boss h11 #4295, the harness `Notes/ui-snapshots/2026-10-14-s405/demo-drop.mjs`).
+ * (Boss 2026-10-14, the harness `Notes/ui-snapshots/2026-10-14-s405/demo-drop.mjs`).
  * Moppetopia's biggest page comes down in about a second.
  */
 export const DEMO_READ_TIMEOUT_MS = 30_000;

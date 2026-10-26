@@ -1,6 +1,6 @@
 /**
  * A held file on the PULL side, a busy retry behind a pull, and a held lock
- * under the heartbeat (S369: the four items S368's gate A banked).
+ * under the heartbeat (four items a gate banked).
  *
  *   M4  a pull that meets a held element file or sync-state file records it
  *       per element and goes on; the round no longer throws. The /changes

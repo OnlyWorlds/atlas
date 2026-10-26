@@ -1,6 +1,6 @@
 /**
- * A world's public page on onlyworlds.com (Keel #471, PRs 173 and 176; D155;
- * Skeld h29 #11219): keel serves it at `/w/<slug>`, or `/w/<world id>` when the
+ * A world's public page on onlyworlds.com (keel PRs 173 and 176;
+ * Skeld 2026-10-23): keel serves it at `/w/<slug>`, or `/w/<world id>` when the
  * world has no slug, once its owner turns it on. Atlas only links to it: the
  * page is keel's, read by anyone with the address, and whether it is on is
  * keel's setting, read live from `GET /world`, never kept in the folder.

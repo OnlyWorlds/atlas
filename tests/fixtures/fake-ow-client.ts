@@ -13,7 +13,7 @@
  *     per-element createOrder tests still exercise the fallback path);
  *   - `pullChanges` implements `/changes` over an internal commit-ordered op
  *     log (every create/update/bulk/delete/__server_mutate appends an op);
- *     ON by default since S365, because production's adapter always has it and
+ *     ON by default, because production's adapter always has it and
  *     the engine dispatches its pull phase on the method's mere presence;
  *     `__enable_changes(false)` opts a test into the full-list fallback.
  */
@@ -139,7 +139,7 @@ export class FakeOwApiClient implements OwApiClient {
     public_read: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
-    // keel always serves both members, null when it knows none (Keel #571).
+    // keel always serves both members, null when it knows none.
     origin: { source: null, producer: null },
   };
 
@@ -158,7 +158,7 @@ export class FakeOwApiClient implements OwApiClient {
   /**
    * `/changes` pages served, counted apart from `calls` so the tests that
    * assert exact call sequences keep their meaning. It tells "no pull ran"
-   * from "a /changes pull ran" (S365 gate lens A M4: `list` counts alone went
+   * from "a /changes pull ran" (`list` counts alone went
    * blind when /changes became the default).
    */
   changesPulls = 0;
@@ -214,7 +214,7 @@ export class FakeOwApiClient implements OwApiClient {
       throw new Error('API Error 400: element_type must be provided when element_id is specified');
     }
     // Mirror real OW field-validator: unknown / atlas-local fields trigger
-    // 400 on the wire. Captain session 221 hit this with `atlas_shape` on
+    // 400 on the wire. A live run hit this with `atlas_shape` on
     // zone — the field was stored locally but never stripped, so live OW
     // rejected the zone CREATE and dependent markers FK-failed. Tests
     // silently passed because the prior fake spread unknown fields into
@@ -228,17 +228,17 @@ export class FakeOwApiClient implements OwApiClient {
     // tests immediately (Convention #20). The fix is to bypass
     // prepareRelations in the adapter for these types.
     rejectDoubleSuffix(type, wireBody, 'create');
-    // keel #587, probed live S461: only the owner or a co-builder makes an element hidden; anyone
+    // keel, probed live: only the owner or a co-builder makes an element hidden; anyone
     // else gets 403 `hidden_not_allowed` and nothing is made.
     this.throwIfCannotHide(wireBody);
     // Real OW behavior: ignore client-sent id when assignServerIds=true.
     const id = this.assignServerIds ? cryptoRandomId() : (wireBody.id as string) ?? cryptoRandomId();
     this.throwIfInjected('create', id);
-    // Mirror keel (convention #20, S361): a POST for an id the world already
+    // Mirror keel (convention #20): a POST for an id the world already
     // holds is 409 `id_conflict`, never a silent overwrite. The engine's
     // adopt path (gate F3) is only testable against a fake that says so.
     // An id hidden from this key: 404, nothing made, never id_conflict (keel's
-    // create read live S441, Skeld h29 #8254).
+    // create, read live 2026-10-20).
     if (!this.assignServerIds && this.outOfView.has(id)) {
       throw new Error(`API Error 404: ${type} '${id}' not found.`);
     }
@@ -246,7 +246,7 @@ export class FakeOwApiClient implements OwApiClient {
       throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
     }
     const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
-    // keel #565, as probed live (S459): a seat's new element on a reviewed world carries the mark,
+    // keel #565, as probed live: a seat's new element on a reviewed world carries the mark,
     // and the 201 answers with it.
     if (this.proposeWrites) record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' };
     this.bucket(type).set(id, record);
@@ -281,7 +281,7 @@ export class FakeOwApiClient implements OwApiClient {
       this.proposalRows.set(row.id, row);
       throw new OwProposed({ ...row });
     }
-    // keel #587 (probed live S461): an update ignores `hidden` both ways; only the site's Hide moves it.
+    // keel (probed live): an update ignores `hidden` both ways; only the site's Hide moves it.
     const { hidden: _ignored, ...patch } = wireBody;
     const next: ServerRecord = { ...existing, ...patch, ...this.writeDoor, id, type, updated_at: this.clock() };
     m.set(id, next);
@@ -302,7 +302,7 @@ export class FakeOwApiClient implements OwApiClient {
       const err = new Error('API Error 403: Only the owner and co-builders can hide an element.') as
         Error & { status?: number; code?: string; param?: string | null };
       err.status = 403;
-      err.code = 'permission_error'; // keel marks/service.py's 403; Atlas reads the status, never the code (the S466 gate's G10)
+      err.code = 'permission_error'; // keel marks/service.py's 403; Atlas reads the status, never the code
       err.param = null;
       throw err;
     }
@@ -455,14 +455,14 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
-   * Test seam (B12 Q2): ids this key no longer sees, as keel answers a guest
-   * (probed live S439): a read is 404 (null here) and a PATCH 404, exactly as
+   * Test seam: ids this key no longer sees, as keel answers a guest
+   * (probed live): a read is 404 (null here) and a PATCH 404, exactly as
    * a deleted element. The element stays in the world for everyone else.
    */
   outOfView = new Set<string>();
 
   /**
-   * Test seam (conv. 20, S439): a PATCH or a single POST naming an id this
+   * Test seam (conv. 20): a PATCH or a single POST naming an id this
    * key cannot read is refused as keel refuses it, 400 `invalid_link` "...
    * does not exist" (probed live: a guest's link to an element out of its
    * view). Off by default: the older suites write links the fake never stored.
@@ -483,7 +483,7 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
-   * GET /world — the full 13-field body in DISK names (world-meta sync, S262).
+   * GET /world — the full 13-field body in DISK names (world-meta sync).
    * A READ: succeeds under a read-only key (only writes 403). Returns a clone
    * so callers can't mutate internal state through the arrays.
    */
@@ -513,7 +513,7 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfMemberRefuses('world');
     const keys = Object.keys(wireBody);
     // Unknown-field pass first (whole PATCH aborts), then per-field type.
-    // Keel #571: a prefixed extension key is kept as given (null removes it),
+    // A prefixed extension key is kept as given (null removes it),
     // and `source`/`producer` (an object or null) set the world's origin.
     for (const k of keys) {
       if (!(k in DISK_WORLD_META_WRITABLE) && !WORLD_EXTENSION_KEY.test(k) && k !== 'source' && k !== 'producer') {
@@ -615,14 +615,14 @@ export class FakeOwApiClient implements OwApiClient {
     for (const it of items) {
       const wireBody = stripUndefined(it.element);
       const id = (wireBody.id as string) ?? cryptoRandomId();
-      // An id hidden from this key: the item is 404, nothing made (keel's /bulk, Skeld h29 #8254).
+      // An id hidden from this key: the item is 404, nothing made (keel's /bulk, Skeld 2026-10-20).
       if (this.outOfView.has(id)) {
         anyError = true;
         results.push({ status: 404, id, error: { code: 'not_found', message: `${it.type} '${id}' not found.`, param: null } as V2ItemError });
         wireBodies.push(null);
         continue;
       }
-      // keel #587 (probed live S461): a hidden item from a key that cannot hide is 403, and an atomic
+      // keel (probed live): a hidden item from a key that cannot hide is 403, and an atomic
       // batch then makes nothing.
       if (wireBody.hidden === true && !this.canHide()) {
         anyError = true;
@@ -662,7 +662,7 @@ export class FakeOwApiClient implements OwApiClient {
       const type = items[i].type;
       const id = results[i].id;
       const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
-      // keel's bulk marks a seat's new element too, and its slot echoes only the time (S459 gate F1).
+      // keel's bulk marks a seat's new element too, and its slot echoes only the time.
       if (this.proposeWrites) { record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' }; this.seatMade.add(id); }
       this.bucket(type).set(id, record);
       this.appendUpsert(record);
@@ -682,7 +682,7 @@ export class FakeOwApiClient implements OwApiClient {
 
   /**
    * GET /changes — one page of the internal commit-ordered op log. ON by
-   * default (S365): production's adapter always defines it and the engine's
+   * default: production's adapter always defines it and the engine's
    * pullPhase DISPATCHES on `typeof client.pullChanges === 'function'`, so a
    * fake without it ran every pull test through a full-list path no user ever
    * gets (25 files did). Tests of that fallback on purpose (the serverDelete
@@ -923,7 +923,7 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
-   * Keel #299: every element write records who made it and through which
+   * Every element write records who made it and through which
    * door (`changed_by`, `changed_via`), and the read hands both back. Off by
    * default (the older suites predate it); a test about the author fields
    * turns it on with the door its writes come through (atlas's own: `api`).
@@ -1118,10 +1118,10 @@ const DISK_WORLD_META_WRITABLE: Readonly<Record<string, 'text' | 'list' | 'int'>
   distance_unit: 'text',
 };
 
-/** World units (keel core/world_api.py, Keel #146): trimmed, then capped at 64. */
+/** World units (keel core/world_api.py): trimmed, then capped at 64. */
 const DISK_WORLD_UNIT_FIELDS = new Set(['length_unit', 'mass_unit', 'distance_unit']);
 
-/** keel's World extension keys (Keel #571, the OpenAPI WorldPatch pattern). */
+/** keel's World extension keys (the OpenAPI WorldPatch pattern). */
 export const WORLD_EXTENSION_KEY = /^(atlas_|shadow_|x_)/;
 
 /**
@@ -1239,7 +1239,7 @@ const ATLAS_LOCAL_REJECT = [...ATLAS_LOCAL_ONLY_FIELDS, 'local_updated_at', 'ser
  * 400. Wire-extension fields are intentionally NOT rejected (see the comment
  * on ATLAS_LOCAL_REJECT: v2 round-trips them).
  *
- * Captain session 221: zone CREATE was carrying `atlas_shape: 'polygon'` to
+ * Observed live: zone CREATE was carrying `atlas_shape: 'polygon'` to
  * the v1 server, which 400'd; markers then FK-failed against the absent zone.
  * Under v2 `atlas_shape` is a wire-extension and rides through fine; this
  * guard now catches only genuinely local fields (image_media_id, richtext,

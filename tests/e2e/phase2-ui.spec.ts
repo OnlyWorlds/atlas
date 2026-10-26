@@ -46,10 +46,10 @@ test('first launch shows the landing, not create-local', async ({ page }) => {
   await expect(page.locator('[data-action="start-world"]')).toBeVisible();
   await expect(page.locator('[data-action="create-local"]')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-mark')).toHaveText('Atlas');
-  // Tagline = Captain's copy (rewritten 2026-07-24 launch day); the assertion
+  // Tagline = Titus's copy (rewritten 2026-07-24 launch day); the assertion
   // follows his `atlas-landing-tag` text, not the other way round.
   await expect(page.locator('.atlas-middle')).toContainText('Worldbuilding on OnlyWorlds.');
-  // S301: the landing doors lost their headings and boxes; the buttons carry
+  // The landing doors lost their headings and boxes; the buttons carry
   // the label, in the tool's lowercase voice (1.17: "set up a folder" became
   // "start a world", whose dialog asks where).
   await expect(page.locator('.atlas-middle')).toContainText('Start a world');
@@ -185,7 +185,7 @@ test('two worlds created in root share parent folder', async ({ page }) => {
   // Beta is the most-recently-created so it's active.
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Beta' })).toHaveClass(/selected/);
 
-  // Switch to Alpha. Session 223 decoupling: clicking a world activates it
+  // Switch to Alpha. Clicking a world activates it
   // and navigates to its home URL, but sidebar mode is now independent state
   // (no auto-flip to elements). User stays in worlds mode and sees Alpha
   // become the selected entry in the worlds list.
@@ -441,7 +441,7 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
 
-  // The landing returns; sidebar renders nothing pre-root (S255: the
+  // The landing returns; sidebar renders nothing pre-root (the
   // middle pane is the only voice on screen before a root is set).
   await expect(page.locator('[data-action="start-world"]')).toBeVisible();
   await expect(page.locator('.atlas-sidebar .atlas-row')).toHaveCount(0);

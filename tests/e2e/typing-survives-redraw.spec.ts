@@ -1,5 +1,5 @@
 /**
- * Typing survives a redraw (S452). A data tick or a world change can land while
+ * Typing survives a redraw. A data tick or a world change can land while
  * someone types in a search; a surface that rebuilds its own search field must
  * hand the fresh field the focus and the caret, so the next key lands in it
  * (`keepingFocus`, `src/ui/render-gate.ts`). The census that found two: the

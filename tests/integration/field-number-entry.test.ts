@@ -1,5 +1,5 @@
 /**
- * S367 critic C2: a bad number entry must never clear the field (or delete a
+ * A bad number entry must never clear the field (or delete a
  * custom number field through the null tombstone).
  *
  * A real browser reports value '' plus validity.badInput for text a

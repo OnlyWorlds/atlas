@@ -52,7 +52,7 @@ function reconcileScheduler(): void {
   const engine = getCurrentSyncEngine();
   const engineState = state.sync.activeSync;
   // Treat `error` like `paused` — both indicate the engine isn't pushing or
-  // pulling against the api. After Bout T (session 205) auth failures
+  // pulling against the api. Auth failures now
   // transition the engine to `error` (not `paused`); without this guard the
   // scheduler kept ticking and each tick invoked `pullNowAndRefresh` which
   // engine.pullNow short-circuits because the engine itself is paused. No
@@ -181,7 +181,7 @@ export function initAutoPullScheduler(): void {
     window.addEventListener('online', () => {
       const engine = getCurrentSyncEngine();
       // Ask the engine, not the pill: during a re-key the pill says "held"
-      // while the network pause sits underneath it (S363 gate lens B F1).
+      // while the network pause sits underneath it.
       if (engine?.isNetworkPaused()) {
         // Came back online — resume engine. `resume()` now also fires
         // pushOnce internally so pending writes from the offline window

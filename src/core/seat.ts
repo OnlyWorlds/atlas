@@ -1,5 +1,5 @@
 /**
- * Agent seats (OW Infra #104, S385; contract `Forge/Notes/2026-10-08-s379-handoff-contract.md`).
+ * Agent seats (contract: a handoff design note, 2026-10-08).
  *
  * A world opened from onlyworlds.com joins as a SEAT: its own `ow_w_` key and
  * its own `ow_s_` secret, sent as `API-Pin` on writes. keel never accepts the

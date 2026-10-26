@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { writeAll, WRITE_CONCURRENCY } from '../../src/setup/world-file-open';
 
-// S407: a world file's files are written a few at once (Firefox paid ~40 ms
+// A world file's files are written a few at once (Firefox paid ~40 ms
 // per file, one after another), folders looked up once, world.json still last,
 // a refusal stops the rest, and the count reaches the overlay.
 

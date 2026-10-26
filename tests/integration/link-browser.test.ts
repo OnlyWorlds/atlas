@@ -3,8 +3,8 @@
  * conv. 129; contract §2.2): `linkExistingApiWorldInRoot({ where: 'browser' })`.
  * The make holds its lock and `.atlas/making` until the registry save; a
  * cancel, a server failure or a full origin leaves no directory and no entry;
- * a full origin stops the download at the first refused write (S370 gate B8:
- * writing on past it leaves 0-byte files and wastes the whole list).
+ * a full origin stops the download at the first refused write (writing on
+ * past it leaves 0-byte files and wastes the whole list).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -123,7 +123,7 @@ describe('linking a world into this browser', () => {
     expect(attachSyncEngine).toHaveBeenCalledTimes(1);
   });
 
-  it("brings the world's settings, own words and origin down with it, baselines taken (S458, Keel #571)", async () => {
+  it("brings the world's settings, own words and origin down with it, baselines taken", async () => {
     const names = { version: 1, types: { character: { one: 'Employee', many: 'Employees' } } };
     await server.patchWorldMeta({ time_current: 1849, length_unit: 'cubit', x_names: names });
     await link();

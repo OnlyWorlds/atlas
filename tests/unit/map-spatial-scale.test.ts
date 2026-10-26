@@ -1,5 +1,5 @@
 /**
- * Blank-canvas → image rescale kernel (DESIGN_MAPS.md §4.2, S300b).
+ * Blank-canvas → image rescale kernel (DESIGN_MAPS.md §4.2).
  *
  * The contract: pins + zone markers on the map scale proportionally from the
  * old canvas into the new; other maps' artifacts and non-spatial elements

@@ -65,7 +65,7 @@ export interface ElementCreateOptions {
   /**
    * Also called after a successful create, but — unlike `onCreated` — has NO
    * effect on the map inline-create delegation check. For side effects like
-   * the elements-sidebar clearing its search after a prefilled create (S255v4).
+   * the elements-sidebar clearing its search after a prefilled create.
    */
   afterCreate?: (id: string, type: ElementType) => void;
   /**
@@ -98,7 +98,7 @@ export interface ElementCreateOptions {
    */
   suppressNavigate?: boolean;
   /**
-   * Charts-context create (S263). The chart can only show DATED elements, so
+   * Charts-context create. The chart can only show DATED elements, so
    * a bare create silently never appears — the vanish class the drag-to-date
    * gate killed. With this set: (a) types without a start-date field render
    * greyed-out in the grid (visible but disabled — teaches the difference)
@@ -147,7 +147,7 @@ export class ElementCreateModal extends BaseModal {
   private nameGhostSuffix!: HTMLSpanElement;
   private modeChip!: HTMLSpanElement;
   private submitBtn!: HTMLButtonElement;
-  // B1 (S368): typed text that matches NO type used to leave the last match
+  // B1: typed text that matches NO type used to leave the last match
   // selected ("p" picked Phenomenon, "plan" kept it, Create made one). Now an
   // unmatched type field means NO type is chosen: the grid clears, a line says
   // so, and Create stays off until a type is picked.
@@ -199,7 +199,7 @@ export class ElementCreateModal extends BaseModal {
     this.modal = this.buildModal();
     this.show();
     queueMicrotask(() => {
-      // Tour lock (Captain, S318): the name is readonly and scripted, so the
+      // Tour lock (Titus): the name is readonly and scripted, so the
       // usual focus+select — a blue selection inviting typing — misleads.
       // Focus the Create button instead; Enter still advances.
       if (this.opts.lockAll) {
@@ -241,7 +241,7 @@ export class ElementCreateModal extends BaseModal {
           <input class="atlas-input" type="text" name="element-name" placeholder="Element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}"${this.opts.lockAll ? ' readonly' : ''} />
         </label>`;
 
-    // Charts-context (S263): the Date row, prefilled; its label names the
+    // Charts-context: the Date row, prefilled; its label names the
     // selected type's REAL start field and re-labels on type change.
     const dateFieldHtml = this.opts.temporalContext
       ? `<label class="atlas-modal-field" data-role="date-field">
@@ -299,7 +299,7 @@ export class ElementCreateModal extends BaseModal {
     // a real selection stays selected, a cleared one stays cleared.
     // The field shows the chosen type's name, so typing into it must replace
     // that name, not extend it ("plan" typed after "character" read as
-    // "plancharacter", S368 own eyes). Select on focus, mouse included.
+    // "plancharacter"). Select on focus, mouse included.
     this.typeInput.addEventListener('focus', () => this.typeInput.select());
     this.typeInput.addEventListener('mouseup', (e) => {
       // The click that focused the field keeps the selection; later clicks place the caret.
@@ -351,7 +351,7 @@ export class ElementCreateModal extends BaseModal {
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
 
-    // B3 (S368): the "Name is required" line used to stay up after a name was
+    // B3: the "Name is required" line used to stay up after a name was
     // typed. It goes as soon as the name field has text again.
     this.nameInput.addEventListener('input', () => {
       if (errorBox.dataset.reason === 'name' && this.nameInput.value.trim()) {
@@ -471,7 +471,7 @@ export class ElementCreateModal extends BaseModal {
           this.opts.afterCreate?.(result.map.id, 'map');
           patchSlice('ui', { ...getState().ui, selectedElementId: result.map.id });
           // suppressNavigate must hold on this path too — the home tour's map
-          // tile stays on home like every other tile (S265, Captain's smoke).
+          // tile stays on home like every other tile (Titus's smoke).
           if (!this.opts.suppressNavigate) {
             const worldId = getState().active?.worldId;
             if (worldId) navigate(elementHash(worldId, result.map.id));
@@ -487,7 +487,7 @@ export class ElementCreateModal extends BaseModal {
         const elements = await store.listElements();
         patchSlice('data', { elements });
         // Creating an element flips the sidebar to elements mode so the new
-        // row is visible (mirrors the create-world flip, S255v3). Persisted
+        // row is visible (mirrors the create-world flip). Persisted
         // as the user's preference, same as the world flow.
         if (getState().ui.sidebarMode !== 'elements') {
           patchSlice('ui', { ...getState().ui, sidebarMode: 'elements', selectedElementId: el.id });
@@ -664,7 +664,7 @@ export class ElementCreateModal extends BaseModal {
       btn.type = 'button';
       // Tour lock: the single scripted tile renders in the normal grey, not
       // the selected cyan — a locked choice needs no selection signal
-      // (Captain, S318).
+      // (Titus).
       const showActive = type === this.selected && !this.opts.lockAll;
       btn.className = 'atlas-create-type-btn' + (showActive ? ' active' : '');
       btn.setAttribute('data-type', type);
@@ -677,7 +677,7 @@ export class ElementCreateModal extends BaseModal {
         this.setType(type);
         this.typeInput.value = typeName(type);
         this.updateGhost();
-        // Hand focus straight back to the name input (S264, Captain: picking
+        // Hand focus straight back to the name input (Titus: picking
         // a category shouldn't cost a re-click before typing the name).
         this.nameInput.focus();
       });
@@ -686,7 +686,7 @@ export class ElementCreateModal extends BaseModal {
     });
 
     // Charts-context: the dateless types stay VISIBLE but disabled — showing
-    // the difference teaches it (Captain, S263). They're created from the
+    // the difference teaches it (Titus). They're created from the
     // elements sidebar, where undated is a normal state.
     if (this.opts.temporalContext) {
       const excluded = new Set(this.opts.excludeTypes ?? []);

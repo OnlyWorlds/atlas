@@ -9,7 +9,7 @@
  *   - Unlink {chip} (right-click a linked chip; also drops it from the cast
  *     field when no other mention of the element remains in the prose)
  *
- * Extracted from writing-workspace.ts (session 232). A factory that attaches
+ * Extracted from writing-workspace.ts. A factory that attaches
  * its own listeners (contextmenu on root + the inline-create / split document
  * events) and returns a `destroy()`; it reaches the live editor + active
  * narrative through accessor deps so it survives editor remounts on narrative
@@ -211,7 +211,7 @@ export function createProseContextMenu(deps: {
         </button>
       `);
     }
-    // Selection-scoped bulk linking (S265, a tester's gesture: select text,
+    // Selection-scoped bulk linking (a tester's gesture: select text,
     // right-click, link everything in it). Counts come from the live
     // decoration set / chip nodes, so the labels are exact.
     let selLinkable = 0;

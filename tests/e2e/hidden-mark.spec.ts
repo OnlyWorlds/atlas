@@ -1,6 +1,6 @@
 /**
  * Folder spec §4.8, the viewer's half and the page's (conv. 170; contract
- * `Forge/Notes/2026-10-23-s461-hidden-mark-contract.md`, H2 and H3): in a world
+ * H2 and H3): in a world
  * on disk, an element whose file carries the hidden mark shows the word Hidden
  * in the list, Home's Recent and Search, the glyph with the folder line on its
  * page, and stays counted; a page that shows it publishes without it, and the
@@ -63,7 +63,7 @@ test.describe('hidden, in a world on disk', () => {
     await expect(row('Ada').locator('[data-role="hidden-word"]')).toHaveCount(0);
 
     // Its page: the folder line in a sentence under the name, and no glyph in the header,
-    // so the name keeps its room (Seethe h20 #11602); Ada's page says nothing.
+    // so the name keeps its room (Seethe 2026-10-23); Ada's page says nothing.
     await go(`#/w/${wid}/element/${WREN}`);
     await expect(page.locator('[data-role="hidden-note"]')).toHaveText(FOLDER_LINE);
     await expect(page.locator('.atlas-middle-header [data-role="hidden-mark"]')).toHaveCount(0);

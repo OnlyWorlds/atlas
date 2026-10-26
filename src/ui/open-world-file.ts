@@ -73,7 +73,7 @@ interface OpenWords {
   already: string;
   opened: (name: string) => string;
   restored: (name: string, linked: boolean) => string;
-  /** The first-world and import waypoints: the file door's, never the demo's (S381 gate F6). */
+  /** The first-world and import waypoints: the file door's, never the demo's. */
   waypoints: boolean;
   /** A world already here can open beside itself as a view-only copy (conv. 177): the file door's, never the demo's. */
   offerCopy?: boolean;
@@ -94,7 +94,7 @@ const FILE_WORDS: OpenWords = {
 /** Open a picked world file: a new world in this browser, a cleared one restored, or the one already here offered. */
 export async function openWorldFileFrom(file: File, toasts: ToastManager): Promise<void> {
   if (!(await storageReady(toasts, FILE_WORDS))) return;
-  // Past the budget, refused before the file is read into memory (S373 gate F4).
+  // Past the budget, refused before the file is read into memory.
   if (file.size > WORLD_FILE_MAX_BYTES) {
     toasts.error('That file is too big to open in this browser.');
     return;
@@ -115,8 +115,8 @@ export async function openDemoWorld(toasts: ToastManager): Promise<void> {
   demoRunning = true;
   try {
     await openDemoWorldOnce(toasts);
-    // Moppetopia opens onto its elements, not the worlds list (the Captain,
-    // h20 #2081): the world is the thing to look at, as after start a world.
+    // Moppetopia opens onto its elements, not the worlds list (Titus,
+    // 2026-10-09): the world is the thing to look at, as after start a world.
     if (getState().active?.meta.id === DEMO_WORLD_ID) {
       patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
       setSidebarModePref('elements');
@@ -125,7 +125,7 @@ export async function openDemoWorld(toasts: ToastManager): Promise<void> {
     // The door's callers do not catch (the #/try-demo link fires it and
     // forgets), and opening a copy already here runs outside the download's
     // own catch: a failure there became "a problem it did not expect while
-    // working in the background" (S405, Boss h11 #4295). Said here, as what it is.
+    // working in the background" (Boss 2026-10-14). Said here, as what it is.
     console.warn('[open-world-file] demo failed:', err);
     if (!isCodeLoadError(err)) showProblem(err, { doing: DEMO_WORDS.doing, where: 'browser', toasts });
   } finally {
@@ -156,7 +156,7 @@ function demoHere(worldId: string): WorldRegistryEntry | null {
   return e.api || e.state === 'api-linked' || !e.cleared_at ? e : null;
 }
 
-/** Answer a demo world already here (S381 gate F1-F3); false when there is none. */
+/** Answer a demo world already here; false when there is none. */
 async function answerDemoHere(worldId: string, toasts: ToastManager): Promise<boolean> {
   const e = demoHere(worldId);
   if (!e) return false;
@@ -177,14 +177,14 @@ async function openDemoWorldOnce(toasts: ToastManager): Promise<void> {
   // with no download and no connection.
   if (await answerDemoHere(DEMO_WORLD_ID, toasts)) return;
   // The download takes seconds on a good line and longer on a weak one: a
-  // toast that left after four of them said nothing for the rest (S405, Boss
-  // h11 #4295). The overlay stays until the world is open (Boss #4385: closed
+  // toast that left after four of them said nothing for the rest (Boss
+  // 2026-10-14). The overlay stays until the world is open (Boss 2026-10-14: closed
   // at the download's end, the unpacking after it was two quiet seconds), and
   // gives way to the where-question when there is one.
   const overlay = showLoadingOverlay(`Downloading ${DEMO_WORLD_NAME}`);
   overlay.update('Asking OnlyWorlds for it…');
   // Opening counts its files: Firefox writes each in about 40 ms, so the
-  // demo's 320 sat on one quiet line for 14 s (S407, Boss h57 #4679).
+  // demo's 320 sat on one quiet line for 14 s (Boss 2026-10-14).
   let openingName = DEMO_WORLD_NAME;
   const openingLine = (done: number, total: number) => `Opening ${openingName}… ${done} of ${total} files`;
   try {
@@ -315,7 +315,7 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
     overlay?.close();
     console.warn('[open-world-file] failed:', err);
     // A code file this tab could not load already has its reload banner
-    // (conv. 121); as a problem it read "OnlyWorlds could not be reached" (S405).
+    // (conv. 121); as a problem it read "OnlyWorlds could not be reached".
     if (isCodeLoadError(err)) return;
     showProblem(err, { doing: words.doing, where: 'browser', toasts });
   }

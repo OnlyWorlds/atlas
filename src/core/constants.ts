@@ -9,7 +9,7 @@ import { ELEMENT_FAMILIES, elementColor } from './element-colors';
 /**
  * Material Symbol name per element type (re-exported from SDK with strict typing).
  * SDK 4.7.3 (dist.19) gives Marker `polyline` and Zone `pentagon`, so the local
- * Marker override is gone (S390).
+ * Marker override is gone.
  */
 export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
 
@@ -24,7 +24,7 @@ export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
  * don't appear as graph nodes in the context pane anyway.
  */
 /**
- * S308: the 22 hand-picked hues are GONE. This is now derived from the single
+ * The 22 hand-picked hues are GONE. This is now derived from the single
  * family palette in `core/element-colors.ts` — see that file for the measured
  * reason (the old set failed CVD separation: Title vs Trait were ΔE 1.3 apart
  * for deutan viewers, Object and Construct read as grey).
@@ -100,11 +100,11 @@ export const SYNC_STATE_FILE = 'sync-state.json';
 export const TOMBSTONES_FILE = 'tombstones.json';
 /** Saved chart configs — atlas-local, travels with the folder (DESIGN_CHARTS.md). */
 export const CHARTS_FILE = 'charts.json';
-/** `.atlas/rekey-journal.json`: present only while a re-key is unfinished (`store/rekey.ts`, S363). */
+/** `.atlas/rekey-journal.json`: present only while a re-key is unfinished (`store/rekey.ts`). */
 export const REKEY_JOURNAL_FILE = 'rekey-journal.json';
-/** World styles — how the world draws its kinds (core/world-styles.ts, S356). */
+/** World styles — how the world draws its kinds (core/world-styles.ts). */
 export const STYLES_FILE = 'styles.json';
-/** What the world's user wrote about it that is not an element: notes, cast, calendar lens, writing labels (core/world-prefs.ts, S364). */
+/** What the world's user wrote about it that is not an element: notes, cast, calendar lens, writing labels (core/world-prefs.ts). */
 export const WORLD_PREFS_FILE = 'world-prefs.json';
 export const LOCK_FILE = 'lock';
 export const WORLD_META_FILE = 'world.json';
@@ -190,12 +190,12 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
   // atlas_opacity is 0..1; atlas_label_visible is boolean; atlas_shape (ZD6)
   // is 'polygon' | 'line'. Synced under v2 so multi-device zone styling
   // converges. (Pre-v2 these were local-only — the old server 400'd on them,
-  // which session 221 learned the hard way.)
+  // which was learned the hard way.)
   'atlas_color',
   'atlas_opacity',
   'atlas_label_visible',
   'atlas_shape',
-  // A map's style (S423, `core/map-ink.ts`): 'ink' draws its zones from their
+  // A map's style (`core/map-ink.ts`): 'ink' draws its zones from their
   // kinds. Synced, so a collaborator opens the map in the same register.
   'atlas_map_style',
   // Calendar config (2B, design 2026-07-14): the machine structure of a
@@ -268,7 +268,7 @@ export const ATLAS_LOCAL_ONLY_FIELDS = [
   // offline. The sharing API rows are the truth; this is a display cache.
   // Never reaches the OW worldapi.
   'atlas_page_pub',
-  // keel's word on the hidden mark (conv. 170, the S461 gate's F3): true when
+  // keel's word on the hidden mark (conv. 170): true when
   // keel's last answer to a write showed an element whose file holds the mark
   // (keel takes it in a write on a create only; a key that can hide sends the hide, conv. 173). Written and removed with the push
   // stamp (`stampedBody`), dropped by every pull and on import; never sent.
@@ -306,16 +306,16 @@ export function isExtensionField(name: string): boolean {
  * Published extension profiles' keys (schema-dist `profiles/`): a meaning other
  * tools read the same way, so a person never names, edits or deletes one as a
  * custom field. `x_identity_key` says two elements are one being (the
- * cross-world identity profile, Skeld h58 #8890): a typed "Identity key" would
- * merge two beings, and a deleted one would split one (Kael #8886). Shown
+ * cross-world identity profile, Skeld 2026-10-20): a typed "Identity key" would
+ * merge two beings, and a deleted one would split one (Kael 2026-10-20). Shown
  * read-only, and never rewritten by a re-key (the profile's rule 9). `x_packet_`
- * is the work packet's (keel PR 148, Skeld h66 #9663): its ids are the source
+ * is the work packet's (keel PR 148, Skeld 2026-10-21): its ids are the source
  * world's as they were when the packet was made, so a re-key never enters it.
- * `x_review_` is the review profile's (dist.37, Skeld h58 #9726): a new
+ * `x_review_` is the review profile's (dist.37, Skeld 2026-10-22): a new
  * element's proposed mark and its last check, sent like any `x_` field.
  * `x_room_` is the room profile's (dist.45): `x_room_of`, the parlor's mark on
  * what its room makes (core/parlor-room.ts).
- * `x_checks_` is the checks profile's (dist.47, OW Council #559):
+ * `x_checks_` is the checks profile's (dist.47):
  * `x_checks_rules` on a work world's Charter, which a reader never writes.
  */
 export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_'] as const;

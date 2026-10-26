@@ -1,5 +1,5 @@
 /**
- * S387: an edit made while this device's clock is behind the server's must
+ * An edit made while this device's clock is behind the server's must
  * still read as unsynced. Found live: keel answers about 1.5 s ahead of the
  * crew's laptop, and an image URL cleared a second after a push sorted below
  * its own baseline, read clean, and never reached keel.

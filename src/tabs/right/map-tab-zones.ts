@@ -44,7 +44,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
   const present = new Set<string>();
   const prefs = getEffectiveMapPrefs(entry.mapId);
   const rules = state.styles.rules;
-  // A map drawn from its own zones (S423): the map's style gives each zone
+  // A map drawn from its own zones: the map's style gives each zone
   // whose subtype names a kind that kind's treatment; the rest draw plain.
   // Over a picture the picture is the ground: the zones keep their ink and cover nothing (gate G3).
   const thisMap = state.data.elements.find(e => e.id === entry.mapId) as WorldMap | undefined;
@@ -53,13 +53,13 @@ export function syncZones(entry: MapTabCacheEntry): void {
 
   for (const zone of onThisMap) {
     present.add(zone.id);
-    // Points without finite coordinates are skipped, not drawn (S360: one bad
+    // Points without finite coordinates are skipped, not drawn (one bad
     // marker threw inside Leaflet and the rest of the map's zones vanished).
     const points = markersForZoneOnMap(zone.id, entry.mapId, markers)
       .filter(m => Number.isFinite(m.x) && Number.isFinite(m.y))
       .map(m => ({ x: m.x, y: m.y }));
     const mode = getZoneShape(zone);
-    // World style rules (S356): the zone's own atlas_* field wins, then the
+    // World style rules: the zone's own atlas_* field wins, then the
     // kind's rule, then the map default.
     const style = resolveStyle(rules, zone);
     const opacity = zoneEffectiveOpacity(zone, style.fill_opacity ?? prefs.zone_fill_opacity);
@@ -68,7 +68,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
     //   - 'hover'  → labelText = zone.name, hover-only = true  (fade on hover)
     //   - 'never'  → labelText = undefined (no marker built)
     //   - 'auto'   → labelText = zone.name, hover-only = false; the density
-    //                pass right after culls collisions by class (S356)
+    //                pass right after culls collisions by class
     const labelMode = prefs.zone_labels;
     const labelText = labelMode === 'never' ? undefined : zone.name;
     const labelHoverOnly = labelMode === 'hover';
@@ -94,7 +94,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
   else entry.zoneOverlay.applyPlainOrder(onThisMap.map(z => z.id));
   // The pins read the style from the container (CSS: inked icons, lettered names).
   entry.container.classList.toggle('atlas-map-ink', Boolean(preset));
-  // ...and the lettering from the style's own class (S424).
+  // ...and the lettering from the style's own class.
   for (const id of MAP_STYLE_IDS) entry.container.classList.toggle(`atlas-map-style-${id}`, preset?.id === id);
 
   // Remove overlay entries that are no longer on this map. Iterate the
@@ -158,7 +158,7 @@ function zoneEffectiveOpacity(zone: Zone, mapDefault: number): number {
   return mapDefault;
 }
 
-// computeLabelText replaced inline (session 219) — label policy now sets both
+// computeLabelText replaced inline — label policy now sets both
 // labelText AND labelHoverOnly on the ZoneShape so ZoneOverlay can wire fade
 // behavior. Kept the export-shape pattern for any external callers.
 export function computeLabelText(zone: Zone, mode: 'auto' | 'always' | 'hover' | 'never'): string | undefined {
@@ -193,7 +193,7 @@ async function applyColorToZones(zones: Zone[], color: string, toasts: ToastMana
     toasts.success(`Colour written into ${zones.length} zone${zones.length === 1 ? '' : 's'}`);
   } catch (err) {
     console.error('[zone-panel] apply colour failed:', err);
-    // No retry (S369 gate B L1): an older colour would overwrite a newer one.
+    // No retry: an older colour would overwrite a newer one.
     showProblem(err, {
       doing: 'writing the colour into the zones',
       toasts,

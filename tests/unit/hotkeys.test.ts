@@ -80,8 +80,8 @@ describe('matchesBinding', () => {
   });
 });
 
-// S367 critic C12b: non-Latin layouts match modified letter bindings by e.code.
-describe('matchesBinding on a non-Latin layout (C12b)', () => {
+// Non-Latin layouts match modified letter bindings by e.code.
+describe('matchesBinding on a non-Latin layout', () => {
   const save: HotkeyBinding = {
     id: 's', description: 's', scope: 'Editor', key: 's', modifier: 'mod', action: () => {},
   };

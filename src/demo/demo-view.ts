@@ -1,6 +1,6 @@
 /**
  * The sample-world demo — a VIEW-ONLY PRESENTATION at `#/demo`, not a world
- * in the registry (session 254 decision: the old in-app sample world stranded
+ * in the registry (a design decision: the old in-app sample world stranded
  * users in a half-configured app and read as "what is this world doing here").
  *
  * Built from the share renderer's payload path (born read-only: cards, pin
@@ -8,10 +8,10 @@
  * the prize piece). Nothing is written anywhere: no registry entry, no OPFS,
  * no folder. Close it and it's gone.
  *
- * Data: `demo-page.json` (curated from Captain's Sikelia world — prose-only
+ * Data: `demo-page.json` (curated from Titus's Sikelia world — prose-only
  * descriptions, 12 carded highlights, every pin click-openable) + the bundled
  * map art webp. Both lazy-load; neither rides the main chunk. Regenerate the
- * JSON via the session-254 script in PROGRESS (source: Forge/Notes/sikelia/).
+ * JSON with the bake script, which lives outside this repository.
  */
 
 import { isAtlasGrounded } from '../core/grounded';
@@ -81,15 +81,15 @@ export function mountDemo(): void {
   // then leaves the demo — straight from "I've seen it" to "it's mine."
   const setupBtn = overlay.querySelector<HTMLButtonElement>('[data-action="demo-exit-setup"]')!;
   const backBtn = overlay.querySelector<HTMLButtonElement>('[data-action="demo-exit-back"]')!;
-  // Entry is the share room's example link now (S255): visitors with an
+  // Entry is the share room's example link now: visitors with an
   // atlas root get "back to atlas"; rootless visitors (old links, curious
   // strangers) still get the setup CTA. Show exactly one.
-  // Capability gate (S309, third instance of the class): on OPFS-only
+  // Capability gate (third instance of the class): on OPFS-only
   // browsers the folder picker does not exist, so the setup CTA would be a
   // silently dead button (its catch swallows the throw by design, for
   // user-cancel). No folder mode -> no folder CTA; the back door stays.
   // "Has worlds" is the question, not "has a home folder": a world opened in
-  // place on a first visit has no root and needs no setup offer (S365 lens B F4).
+  // place on a first visit has no root and needs no setup offer.
   if (isAtlasGrounded() || !hasFolderMode()) setupBtn.remove();
   else backBtn.remove();
   backBtn.addEventListener('click', exit);
@@ -100,7 +100,7 @@ export function mountDemo(): void {
       const result = await setupAtlasRoot();
       if (result) {
         exit();
-        // A world pick opens in place; a folder pick says what it found (S365).
+        // A world pick opens in place; a folder pick says what it found.
         const [{ finishSetupDoor }, { toastManager }] = await Promise.all([
           import('../setup/world-doors'), import('../ui/toast-manager'),
         ]);
@@ -131,7 +131,7 @@ export function mountDemo(): void {
     ]);
     if (disposed || !overlay) return;
 
-    // Counts DERIVED from the payload (S309): this copy shipped a hardcoded
+    // Counts DERIVED from the payload: this copy shipped a hardcoded
     // "586 elements" against a payload carrying 196 — a rotting number is
     // worse than none. The payload is the source; the copy reads it.
     const pinCount = data.map.pins.length;
@@ -176,13 +176,13 @@ async function mountDemoMap(
   const bounds: L.LatLngBoundsExpression = [[0, 0], [H, W]];
   L.imageOverlay(assetUrl, bounds).addTo(map);
   // Padding so the initial fit shows the WHOLE island — the bare fit clipped
-  // the northeast tip at the container edge (S255 fresh-eyes pass).
+  // the northeast tip at the container edge.
   map.fitBounds(bounds, { padding: [16, 16] });
   map.setMaxBounds([[-H * 0.15, -W * 0.15], [H * 1.15, W * 1.15]]);
 
   for (const pin of data.map.pins) {
     const entry = data.payload.elements[pin.ref];
-    // Bottom-left, like the schema and Leaflet CRS.Simple (S361: the bundled
+    // Bottom-left, like the schema and Leaflet CRS.Simple (the bundled
     // pins were flipped to the standard with this line).
     const marker = L.circleMarker([pin.y, pin.x], {
       radius: 5,
@@ -192,10 +192,10 @@ async function mountDemoMap(
       fillOpacity: 0.75,
     }).addTo(map);
     // Leaflet reads a string tooltip as HTML: escape even this bundled name,
-    // so the pattern is safe if it is ever copied onto live data (S360).
+    // so the pattern is safe if it is ever copied onto live data.
     marker.bindTooltip(escapeText(pin.name), { direction: 'top', offset: [0, -6] });
     // Close the hover tooltip before the modal opens — it otherwise lingers
-    // under the dimmed backdrop like debris (S255 fresh-eyes pass).
+    // under the dimmed backdrop like debris.
     if (entry) marker.on('click', () => { marker.closeTooltip(); openEntry(entry); });
   }
 

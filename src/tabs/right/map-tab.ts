@@ -73,7 +73,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     cached.ready.then(() => {
       cached.manager.getMap()?.invalidateSize();
       syncPins(cached);
-      // Zones too (resilience gate, S299): elements-slice changes while the
+      // Zones too (resilience gate): elements-slice changes while the
       // tab was cached (zone deleted + tour-healed, edited elsewhere) never
       // reached the overlay — pins re-synced on re-entry, zones didn't.
       syncZones(cached);
@@ -108,7 +108,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
 
   // Wire all toolbar buttons + the zones dropdown. Handlers resolve the live
   // cache entry by mapId at click time, so wiring before `entry` exists below
-  // is safe. (Extracted to map-tab-toolbar.ts in the session-233 re-trim.)
+  // is safe. (Extracted to map-tab-toolbar.ts.)
   wireCanvasToolbar(toolbarRefs, zoneStrip, mapId, toasts);
 
   pane.appendChild(wrapper);
@@ -238,7 +238,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
           saveCameraState(mapId, { center: [center.lat, center.lng], zoom });
         });
       });
-      // The density layer (S356): icons re-scale to the gap between them at
+      // The density layer: icons re-scale to the gap between them at
       // the new zoom, then labels re-contest their space. moveend follows
       // zoomend, so one settled gesture runs the label pass once.
       lMapForRestore.on('zoomend', () => applyPinScale(entry));
@@ -305,8 +305,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     }
 
     // Wire all user-input handlers (map/pin events, contextual create,
-    // hotkeys, drag-drop). Extracted to map-tab-interactions.ts in the
-    // session-233 re-trim — see that module for the handler bodies.
+    // hotkeys, drag-drop). Extracted to map-tab-interactions.ts —
+    // see that module for the handler bodies.
     wireMapInteractions({ entry, manager, container, tooltip, width, height, mapId, toasts });
 
     // Seed pins from state.
@@ -317,8 +317,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     // changing the view (preserves whatever setView resolved to).
     //
     // fit-to-canvas runs only when NO saved camera state existed at mount
-    // (session 218→219 added the always-fit to fix the half-screen-on-refresh
-    // case; session 221 W6 added camera restore — if a user has a saved view,
+    // (the always-fit was added to fix the half-screen-on-refresh
+    // case; camera restore came later — if a user has a saved view,
     // restoring it MUST win over fit-to-canvas, otherwise the restore flashes
     // briefly then gets overwritten by the fit call here).
     const lMapFinal = manager.getMap();
@@ -429,7 +429,7 @@ subscribe(() => {
   const state = getState();
   const elements = state.data.elements;
   const selected = state.ui.selectedElementId;
-  // World styles (S356) restyle every zone. (The zone panel's hide-a-kind
+  // World styles restyle every zone. (The zone panel's hide-a-kind
   // toggle calls refreshActiveMapZones itself; keying on the ui slice here
   // would re-sync 300 zones on every search keystroke.)
   const styles = state.styles;
@@ -455,7 +455,7 @@ subscribe(() => {
   // dims-flip is handled by right-pane's dispose+remount machinery (its
   // lastActiveMapDimsKey block) — refreshCachedBackgrounds excludes it, and
   // a second dispose here would race that remount into an empty pane
-  // (S300 close-gate follow-up; found by the regression e2e).
+  // (found by the regression e2e).
   for (const id of refreshCachedBackgrounds()) disposeMapTab(id);
   refreshActiveMapZones();
   syncEditMode();

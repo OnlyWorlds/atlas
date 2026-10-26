@@ -66,7 +66,7 @@ test('elements mode becomes enabled and toggles when a world is active', async (
 
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
 
-  // Session 223 decoupling: toggle clicks change sidebar mode (state), NOT
+  // Toggle clicks change sidebar mode (state), NOT
   // the URL. URL stays on the active world. Elements body renders.
   await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveClass(/active/);
   await expect(page.locator('.atlas-sidebar .atlas-list')).toBeVisible();
@@ -200,9 +200,9 @@ test('edit element name via the header title persists to FolderStore', async ({ 
   // Sidebar row reflects rename.
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'Renamed' })).toBeVisible();
 
-  // TYPED rename with a SPACE (S312 regression): the h2's activation listener
+  // TYPED rename with a SPACE (a regression): the h2's activation listener
   // used to swallow every Space typed inside the mounted rename input
-  // (preventDefault before the input saw it — Captain had to PASTE names with
+  // (preventDefault before the input saw it — Titus had to PASTE names with
   // spaces) and re-open the editor on Enter. fill() bypasses per-key handling,
   // which is exactly why the assertion above never caught it — this leg types
   // real keystrokes.
@@ -243,7 +243,7 @@ test('delete element returns to home and removes the row', async ({ page }) => {
   page.on('dialog', d => d.accept());
   await page.click('[data-action="delete-element"]');
 
-  // Row gone, URL back to home (session 223: delete navigates to home, not
+  // Row gone, URL back to home (delete navigates to home, not
   // /elements, since sidebar mode is independent of URL now).
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'Doomed' })).toHaveCount(0);
   expect(await page.evaluate(() => window.location.hash)).toMatch(/#\/w\/[0-9a-f-]+$/);
@@ -290,7 +290,7 @@ test('switching worlds resets the elements view to the new world', async ({ page
   await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element…');
 });
 
-test('muted types (S356): pins and markers close the strip greyed, stay out of "show all", list when filtered to, right-click toggles and persists per world', async ({ page }) => {
+test('muted types: pins and markers close the strip greyed, stay out of "show all", list when filtered to, right-click toggles and persists per world', async ({ page }) => {
   await setupWorldA(page);
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
 
@@ -336,7 +336,7 @@ test('muted types (S356): pins and markers close the strip greyed, stay out of "
   expect(await rowTypes()).toEqual(['map', 'marker', 'marker', 'zone']);
 });
 
-test('type names on the strip (#24, h20 B8): icons by default, the held types named, or every type', async ({ page }) => {
+test('type names on the strip (#24): icons by default, the held types named, or every type', async ({ page }) => {
   await setupWorldA(page);
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   const worldId = await page.evaluate(async () => {
@@ -402,7 +402,7 @@ async function storeField(page: Page, id: string, field: string): Promise<unknow
   }, { id, field });
 }
 
-test('deleting an element removes it from every link that named it (S362, keel parity)', async ({ page }) => {
+test('deleting an element removes it from every link that named it (keel parity)', async ({ page }) => {
   await setupWorldA(page);
   const castle = await storeCreate(page, 'location', { name: 'Castle' });
   const strahd = await storeCreate(page, 'character', { name: 'Strahd', location: castle });

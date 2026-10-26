@@ -1,5 +1,5 @@
 /**
- * The tour heal merge kernel (resilience gate, S299).
+ * The tour heal merge kernel (resilience gate).
  *
  * The rule under lock: heal repairs the bundle's own weave and never eats
  * the user's work. Removal applies ONLY to bundle-authored unrevealed ids;

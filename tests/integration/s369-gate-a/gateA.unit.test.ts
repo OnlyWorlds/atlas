@@ -1,5 +1,5 @@
 /**
- * Gate A (S369, atlas 1.16) probes: the sync-issues list, the public details
+ * Gate A (atlas 1.16) probes: the sync-issues list, the public details
  * block, the usage note's switch, the toast dedupe. Each asserts the CORRECT
  * behaviour: red today = a defect.
  */
@@ -51,7 +51,7 @@ describe('gate A: the public details block carries no names', () => {
     expect(details(err)).not.toContain('secret');
   });
 
-  // BANKED S369: see PROGRESS (copy now says 'refresh to try again' / schema allow-list not built).
+  // BANKED: copy now says 'refresh to try again' / schema allow-list not built.
   it.skip('a field name a folder carries outside the schema is not printed (non-namespaced, atlas_)', () => {
     const lines = [
       ...detailFields({ name: 'OwApiError', status: 400, code: 'validation_error', param: 'secret_lover' }),

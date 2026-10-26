@@ -1,5 +1,5 @@
 /**
- * S361 (lane b M4): a busy (503 server_busy), rate-limited (429) or
+ * A busy (503 server_busy), rate-limited (429) or
  * unreachable server ends the push round after ONE request. Before, the loop
  * went on element by element, each waiting out keel's admission gate: 150
  * pending edits could hold the pill on "Saving" for minutes, then toast a

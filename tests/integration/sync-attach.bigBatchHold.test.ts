@@ -1,5 +1,5 @@
 /**
- * The big-batch question at OPEN (S365 lane B M3, Captain's yes): more than
+ * The big-batch question at OPEN (Titus's yes): more than
  * BIG_BATCH elements waiting to upload when a linked world opens (an agent
  * re-parsed the folder while Atlas was closed) wait for Upload them / Stay
  * offline, as the same batch seen with the window open does. At or under the
@@ -51,7 +51,7 @@ describe('flush on attach, by batch size', () => {
     expect(getDiskNotice()?.held?.count).toBe(BIG_BATCH + 1);
     // The question survives a reload.
     expect(JSON.parse(localStorage.getItem('atlas_disk_held') ?? '{}')).toEqual({ w1: BIG_BATCH + 1 });
-    // "Upload them" answers it, and the upload actually runs (S365 lens C).
+    // "Upload them" answers it, and the upload actually runs.
     await answerHeldBatch(true);
     expect(getDiskNotice()?.held ?? null).toBeNull();
     expect(getState().registry.worlds[0].sync_paused).toBeFalsy();
@@ -116,7 +116,7 @@ describe('flush on attach, by batch size', () => {
     attachSyncEngine(restored, folder);
     const engine = getCurrentSyncEngine()! as unknown as { policy: string; onSyncResult: (p: string, r: unknown) => void };
     expect(engine.policy).toBe('pause-and-review');
-    // A round that compared nothing (offline, busy, a dead key) reviews nothing (S373 gate F1).
+    // A round that compared nothing (offline, busy, a dead key) reviews nothing.
     engine.onSyncResult('push', { ...noopResult, transient_blocked: true });
     engine.onSyncResult('push', { ...noopResult, auth_blocked: true });
     await settle();
@@ -139,7 +139,7 @@ describe('flush on attach, by batch size', () => {
     expect(getState().registry.worlds[0].review_first_sync).toBeUndefined();
   });
 
-  it(`a world just moved from this browser to a folder never asks either: what waits was edited in the browser (1.17, S373 gate F7)`, async () => {
+  it(`a world just moved from this browser to a folder never asks either: what waits was edited in the browser (1.17)`, async () => {
     const folder = await folderWith(BIG_BATCH + 10);
     attachSyncEngine(entry, folder, { justMoved: true });
     const engine = getCurrentSyncEngine()!;

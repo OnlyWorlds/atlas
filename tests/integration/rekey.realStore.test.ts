@@ -3,8 +3,8 @@
  * in-memory FS in `fixtures/fake-fs.ts`. The mock matrix (`rekey.test.ts`)
  * cannot see these: it has no directories, no layouts, no body cache separate
  * from disk, no loose media and no journal that exists but reads empty. Each
- * row came from an S363 gate lens A probe (`Forge/Notes/2026-09-29-s363-gate/`)
- * and asserts the FIXED behaviour; the probe ids are named per row.
+ * row came from a gate probe and asserts the FIXED behaviour; the probe ids are
+ * named per row.
  */
 import { describe, it, expect } from 'vitest';
 import { FakeDirHandle } from '../fixtures/fake-fs';

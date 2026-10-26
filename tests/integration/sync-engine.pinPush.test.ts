@@ -1,7 +1,7 @@
 /**
  * Engine pin push — regression coverage.
  *
- * Captain's smoke against `5474990854` surfaced pins not reaching the API
+ * Titus's smoke against `5474990854` surfaced pins not reaching the API
  * after fresh placement. The engine path is verified here: given a pin in the
  * folder with no server baseline, `pushOnce` MUST send it via
  * `adapter.createElement('pin', body)` with wire-shape FKs intact
@@ -93,7 +93,7 @@ describe('engine.pushOnce — pin push', () => {
   });
 
   it('self-heals a legacy pin missing element_type on first push', async () => {
-    // Legacy pins (placed by code before session 202) live on disk without
+    // Legacy pins (placed by older code) live on disk without
     // element_type. The engine resolves it from the referenced element's
     // type, writes it back, then pushes successfully — so users don't have
     // to re-place every pin to recover sync.

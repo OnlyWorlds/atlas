@@ -1,7 +1,7 @@
 /**
  * Tour heal kernel — pure array-merge semantics for the resilience pass.
  *
- * THE MERGE RULE (resilience gate, S299): healing a bundle element's array
+ * THE MERGE RULE (resilience gate): healing a bundle element's array
  * link field must repair the bundle's own weave without ever eating the
  * user's work. Three moves, in order:
  *

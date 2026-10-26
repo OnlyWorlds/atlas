@@ -1,7 +1,7 @@
 /**
- * S364 lane A1 (the read-modify-write half): even when a stale Charts room
+ * The read-modify-write half: even when a stale Charts room
  * instance writes into a world (a room carried across a world switch before
- * S364, or a second tab today), a chart save merges into the file on disk
+ * the fix, or a second tab today), a chart save merges into the file on disk
  * instead of replacing it with the room's in-memory list. The remount half is
  * locked by the e2e in saved-charts.spec.ts.
  */
@@ -45,7 +45,7 @@ describe('chart writes merge into the file on disk', () => {
     const unmount = mountTimeline(host, toasts);
     await tick();
 
-    // Swap to world B under the SAME room instance (what app.ts did before S364).
+    // Swap to world B under the SAME room instance (what app.ts used to do).
     patchSlice('data', { elements: [], loading: true, loadingProgress: null } as never);
     window.location.hash = '#/w/wb/timeline';
     setActiveStore(B as unknown as FsFolderStore);

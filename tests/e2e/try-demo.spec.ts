@@ -1,5 +1,5 @@
 /**
- * Try the demo world (#113, S381): one click on the landing brings Moppetopia
+ * Try the demo world (#113): one click on the landing brings Moppetopia
  * down by its demo key as an unlinked, editable copy in this browser, and no
  * request ever writes to OnlyWorlds. Keel is mocked; every request to it is
  * recorded, so the claim "nothing goes back" is an assertion, not a hope.
@@ -72,7 +72,7 @@ async function tryDemoOpensACopy(page: Page) {
     const left = await scratch.getDirectoryHandle('try-left-by-a-reload', { create: true });
     await (await (await left.getFileHandle('world.json', { create: true })).createWritable()).close();
   });
-  // From here on, record every folder made in browser storage (#126, S387):
+  // From here on, record every folder made in browser storage (#126):
   // the scratch lives in memory, so the try must never make `atlas-scratch`.
   await page.evaluate(() => {
     const made: string[] = [];
@@ -111,7 +111,7 @@ async function tryDemoOpensACopy(page: Page) {
   // The world's own fields came down; the link and the key did not.
   expect(state.meta).toMatchObject({ id: WORLD_ID, name: 'Moppetopia', time_current: 453, time_basic_unit: 'Year', description: 'A world of moppets.' });
   expect((state.meta as any).api).toBeUndefined();
-  // It opens onto its elements, not the worlds list (the Captain, h20 #2081).
+  // It opens onto its elements, not the worlds list (Titus, 2026-10-09).
   expect(await page.evaluate(async () => {
     const { getState } = await import('/src/core/state.ts');
     return getState().ui.sidebarMode;
@@ -131,7 +131,7 @@ async function tryDemoOpensACopy(page: Page) {
   });
   expect(after).toEqual({ mine: true, fluff: 'Mine now.' });
 
-  // The demo is not the user's first world or an import (S381 gate F6).
+  // The demo is not the user's first world or an import.
   expect(await page.evaluate(async () => {
     const { loadWaypointsState } = await import('/src/core/waypoints.ts');
     const done = loadWaypointsState().completed as Record<string, unknown>;
@@ -241,7 +241,7 @@ test('a demo world that does not come down whole opens nothing and leaves nothin
   expect(left).toEqual({ worlds: 0, dirs: [] });
 });
 
-test('once a world exists, Settings offers Explore Moppetopia above Replay the tour (h58 #5443)', async ({ page }) => {
+test('once a world exists, Settings offers Explore Moppetopia above Replay the tour (2026-10-15)', async ({ page }) => {
   await boot(page);
   const seen = await mockMoppetopia(page);
   // A world first, so the first screen's door is gone.

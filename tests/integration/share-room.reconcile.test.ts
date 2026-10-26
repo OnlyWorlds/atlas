@@ -1,5 +1,5 @@
 /**
- * S367 critic C4 + C5 regressions: the Pages room's once-per-mount mirror
+ * Regressions: the Pages room's once-per-mount mirror
  * reconcile (reconcilePubMirrors).
  *
  * C4: a world switch while world A's list call is out must not heal world B's
@@ -55,7 +55,7 @@ async function pubOf(store: MockFolderStore, id: string): Promise<Record<string,
   return (el.atlas_page_pub as Record<string, unknown> | null | undefined) ?? null;
 }
 
-describe('share room reconcile (S367 critic C4, C5)', () => {
+describe('share room reconcile', () => {
   const hosts: HTMLElement[] = [];
   const unmounts: Array<() => void> = [];
   afterEach(() => {

@@ -84,7 +84,7 @@ describe('isRoomElement', () => {
   });
 });
 
-describe('the lore (1.76, OW Parlor #543)', () => {
+describe('the lore (1.76)', () => {
   const lore = [el({ supertype: 'Story' }, 'narrative'), el({}, 'character')];
   const room = [el({ supertype: 'Message', x_room_of: 'w' }, 'narrative'), el({ supertype: 'Sitting', x_room_of: 'w' }, 'event')];
   // A lore world's own letter: a Message with no parlor's mark stays in the lore (dist.45).

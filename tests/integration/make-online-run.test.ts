@@ -1,5 +1,5 @@
 /**
- * Route 2 from the app (S367, `sync/make-online-run.ts`): what the runner owns
+ * Route 2 from the app (`sync/make-online-run.ts`): what the runner owns
  * around the merge. The old route moved the UI in its match phase, before
  * the disk (lane A H7): a failure left favourites, the URL and the element
  * list on server ids the folder never got. Now nothing moves before the

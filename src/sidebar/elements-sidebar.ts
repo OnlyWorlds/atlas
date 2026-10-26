@@ -40,7 +40,7 @@ import { hiddenRowWord } from '../core/hidden-mark';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
-// Pins and markers close the strip (S356): browsable when asked for, muted
+// Pins and markers close the strip: browsable when asked for, muted
 // by default (core/type-mutes.ts), always the last two slots.
 const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone', ...MUTED_TAIL_TYPES];
 
@@ -52,7 +52,7 @@ function joinTypeNames(names: string[]): string {
 }
 
 /**
- * The filter strip in words (S369): "All types", "Showing characters and
+ * The filter strip in words: "All types", "Showing characters and
  * locations". Types the user hid by right-click are named; pins and markers,
  * hidden by default, are not. Strip order. The made-by filter and the room's
  * hiding follow after a dot (#350). Pure; exported for unit tests.
@@ -95,7 +95,7 @@ export function filterSummary(
  */
 const flashingIds = new Map<string, ReturnType<typeof setTimeout>>();
 
-/** Tour arrivals for the current step (S317) — sticky, replaced per dispatch. */
+/** Tour arrivals for the current step — sticky, replaced per dispatch. */
 const tourFreshIds = new Set<string>();
 
 /** All currently-mounted elements bodies (re-render hooks for the flash set). */
@@ -154,10 +154,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   createBtn.title = 'New element';
   createBtn.innerHTML = '<span class="material-symbols-outlined">add</span>';
   // Whatever's typed in the search field rides into the create modal as the
-  // name (S255v3): searched-for-it-and-it's-missing flows straight into
+  // name: searched-for-it-and-it's-missing flows straight into
   // making it, and the empty-world "Create an element…" placeholder keeps
   // its promise.
-  // The tour's scripting lives in the shared door (S301), not here: this
+  // The tour's scripting lives in the shared door, not here: this
   // handler used to carry the only tour branch in the app while Ctrl+E and the
   // Charts room opened a free modal beside it.
   createBtn.addEventListener('click', () => { openNormalCreate(); });
@@ -166,13 +166,13 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     openCreateDoor(toasts, {
       initialName: searchInput.value.trim() || undefined,
       // A single active type filter carries into the modal as the preselected
-      // category (S265, Captain) — filtering to characters then hitting + means
+      // category (Titus) — filtering to characters then hitting + means
       // "another character" far more often than not.
       initialType: getState().ui.elementFilters?.size === 1
         ? [...getState().ui.elementFilters][0]
         : undefined,
       // The search text became the element's name — clear the filter so the
-      // new element isn't the only visible row (S255v4, Captain).
+      // new element isn't the only visible row (Titus).
       afterCreate: () => {
         searchInput.value = '';
         patchSlice('ui', { ...getState().ui, search: '' });
@@ -183,7 +183,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
   content.appendChild(searchRow);
 
-  // ----- What the strip is showing, in words (S369) -----
+  // ----- What the strip is showing, in words -----
   // The strip is 22 glyphs and no words; this line says what they select.
   // Under the search row, not under the strip: the strip band's height is
   // matched by the writing sidebar so the two search rows line up.
@@ -334,9 +334,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       originMemo = { elements, roster, kinds, counts, room, proposed: 0 };
     }
     // Offered only when an agent made something: a roster whose agent seats made nothing,
-    // or were removed before they did (W11, S451), has nothing to tell apart.
+    // or were removed before they did (W11), has nothing to tell apart.
     const showMadeBy = hasAgent && originMemo.counts.agents > 0;
-    // Proposed counts what the list can show (the lore, as Home does; the S459 gate's F6).
+    // Proposed counts what the list can show (the lore, as Home does).
     const lore = currentLore();
     if (proposedMemo.from !== lore) proposedMemo = { from: lore, n: proposedCount(lore) };
     originMemo.proposed = proposedMemo.n;
@@ -430,7 +430,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   // ----- Cast-assign banner (hidden unless ui.castAssign is set) -----
   // The home ghost card put the sidebar in assignment mode: the next click
   // on a matching row assigns the world's protagonist/home (one hop, no
-  // hunting for the header pin — Captain, 2026-07-10).
+  // hunting for the header pin — Titus, 2026-07-10).
   // Own class FAMILY, none shared with .atlas-lens-banner-* — the lens e2e
   // uses strict locators on those classes and a second match breaks them
   // (live finding, twice: parent AND child classes). CSS mirrors the look.
@@ -452,7 +452,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   assignBanner.appendChild(assignOff);
   content.appendChild(assignBanner);
 
-  // ----- The live folder's notice (S364): what another tool changed on disk -----
+  // ----- The live folder's notice: what another tool changed on disk -----
   // One line: "N changed on disk · show", plus what will not sync and what
   // cannot be read; a second line when a big batch holds sync for an answer.
   const diskBar = document.createElement('div');
@@ -519,7 +519,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const id = row.getAttribute('data-element-id')!;
     const worldId = getState().active?.worldId;
     if (!worldId) return;
-    // The on-map badge (the `place` glyph) is a LOCATE control (Captain's
+    // The on-map badge (the `place` glyph) is a LOCATE control (Titus's
     // launch note): click it to pan the open map to this element's pin, or a
     // zone's marker centroid, instead of routing to the element's room. The
     // badge only renders for active-map presence, so a target exists by
@@ -547,7 +547,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       }
       // Mismatched type (user cleared the filter): fall through to normal open.
     }
-    // Route to the room the element LIVES in (S306), the same answer the
+    // Route to the room the element LIVES in, the same answer the
     // palette and the home desk give. This list is the palette's OWN handoff
     // target — "see all →" hands its query straight here, and the two already
     // share their match language deliberately (see the filter above). Leaving
@@ -562,7 +562,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // A map is the one type with BOTH a canvas (a right-pane tab) and an
     // editable record. This list is the browse-and-EDIT surface: clicking a map
     // here is how you reach its element page to set the name, the parent, or
-    // the Image URL — and that last one is the real user path the S300
+    // the Image URL — and that last one is the real user path the
     // sketch-rescale hook hangs off (attaching art to a blank canvas rescales
     // its pins and zone markers). Routing map rows to the canvas instead took
     // that path away, which an existing spec caught immediately.
@@ -577,7 +577,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
     navigate(room.hash);
     // Sidebar-click no longer auto-opens an associated map (DESIGN_MAPS.md
-    // §3.6 revised session 209). Auto-open from pin-click stays; the top-bar
+    // §3.6, revised). Auto-open from pin-click stays; the top-bar
     // affordances from MW will be the explicit path from element detail.
     // Convention #32: deselection happens via Esc, NOT via re-click of the
     // selected row. Re-click would conflict with common test/UX patterns
@@ -635,12 +635,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom, origin.proposedOnly);
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
-    // audit #1, Captain-blessed 2026-07-20). Outside the tour: all types.
+    // audit #1, Titus-blessed 2026-07-20). Outside the tour: all types.
     const touring = isTourFlagActive();
-    // Names on the strip (#24, h20 B8, the Captain #3143): a setting, icons only by default; the
+    // Names on the strip (#24, Titus 2026-10-11): a setting, icons only by default; the
     // tour keeps its own icon strip whatever the setting says.
     const names = touring ? 'icons' : getEditorSettings(state.registry).type_strip_names;
-    // Rebuilt only when it would come out different (conv. 146, S422): a
+    // Rebuilt only when it would come out different (conv. 146): a
     // rebuild between a press and its release loses the click. The handlers
     // capture only their type and read the rest at the click.
     if (!filterGate.changed([JSON.stringify([names, touring, isCoarsePointer(), hidingTypes, typeWordsKey(),
@@ -665,19 +665,19 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       const btn = document.createElement('button');
       const isMuted = muted.has(type) && !filters.has(type);
       btn.className = 'atlas-filter-btn' + (filters.has(type) ? ' active' : '') + (isMuted ? ' muted' : '') + (named(type) ? ' named' : '');
-      // Instant CSS tooltip (S264, Captain: the category label should appear
+      // Instant CSS tooltip (Titus: the category label should appear
       // the moment you hover) — data-tip drives a ::after pseudo; no native
       // title (its OS delay is the complaint, and doubling would ghost). A
       // named chip already says its name, so only the muted hint stays.
       if (isMuted) btn.dataset.tip = `${typeName(type, { many: true })} (hidden when showing all; right-click to show)`;
       else if (!named(type)) btn.dataset.tip = typeName(type, { many: true });
       // ...and the SAME text as the accessible name. `data-tip` is invisible to
-      // assistive tech, so with the icon ligature correctly hidden (S308) these
+      // assistive tech, so with the icon ligature correctly hidden these
       // buttons would otherwise have no accessible name at all — my own
       // icon-a11y sweep created that gap and its audit caught it. A visual
       // tooltip is not a label.
       btn.setAttribute('aria-label', typeName(type, { many: true }));
-      // The selected state, for assistive tech as for the eye (S369).
+      // The selected state, for assistive tech as for the eye.
       btn.setAttribute('aria-pressed', filters.has(type) ? 'true' : 'false');
       btn.setAttribute('data-filter-type', type);
 
@@ -711,7 +711,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         patchSlice('ui', { ...getState().ui, elementFilters: next });
       });
 
-      // Right-click → MUTE (S356): the type drops out of "show all" and
+      // Right-click → MUTE: the type drops out of "show all" and
       // greys, one right-click brings it back. This replaced the per-type
       // "refresh from API" intent (a global pull dressed as a type action;
       // the sync pill's pull-now is the honest home for it).
@@ -760,7 +760,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     patchSlice('ui', { ...ui, mutedTypes: nextMuted, elementFilters: nextFilters });
   }
 
-  // THE LIST MEMO (S362). `render` runs on EVERY state notify and every hash
+  // THE LIST MEMO. `render` runs on EVERY state notify and every hash
   // change, and the list is one innerHTML over every unmuted element: on
   // Sikelia (12,306 elements) that is 7,752 rows, 3 MB of markup and ~180 ms
   // of layout in Chromium, paid for sync ticks, toasts and each half of a row
@@ -786,10 +786,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       lensBanner.setAttribute('data-active', 'false');
       assignBanner.setAttribute('data-active', 'false');
       // Empty-state copy depends on what action the user can actually take.
-      // (Session 221 W2 follow-up: the sidebar's old "pick one from Worlds tab"
+      // (The sidebar's old "pick one from Worlds tab"
       // message lied when there were no worlds because no atlas root existed.)
       // Pre-setup the panes stay silent — the middle pane is the only voice
-      // on first launch (S255). With a root, the copy names the real action.
+      // on first launch. With a root, the copy names the real action.
       let msg: string;
       if (!isAtlasGrounded(state)) {
         msg = '';
@@ -816,7 +816,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     // Empty world: the search field invites creating instead (typed text
     // rides into the modal as the name), and the + button pulses a few beats
-    // to spotlight where creation lives (S255v3).
+    // to spotlight where creation lives.
     // A view-only world creates nothing: no +, no invitation (conv. 149).
     const viewOnly = worldIsViewOnly();
     const worldEmpty = elements.length === 0 && !state.data.loading && !viewOnly;
@@ -846,7 +846,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     // Pins + markers are map artifacts, created from map interactions and
     // reached through their map; they used to be excluded from this list
-    // outright. Since S356 they are MUTED by default instead (hidden when
+    // outright. Now they are MUTED by default instead (hidden when
     // showing all, listed when filtered to), and any type can be muted the
     // same way: a world with 3,143 markers wants to read as 257 places.
     const muted = state.ui.mutedTypes;
@@ -893,11 +893,11 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     const filtered = elements
       .filter(el => !diskOnly || diskMarked.has(el.id))
-      // Asked for by the Proposed chip, a muted type shows too (a proposed pin; the S459 gate's F6).
+      // Asked for by the Proposed chip, a muted type shows too (a proposed pin).
       .filter(el => filters.size > 0 || !muted.has(el.type) || diskOnly || origin.proposedOnly)
       // Tour-quiet machinery (the calendar construct) stays out of the list
       // while touring — an element appearing unannounced in the sidebar is
-      // exactly the confusion the progressive build-up prevents (S316).
+      // exactly the confusion the progressive build-up prevents.
       .filter(el => !isTourFlagActive() || !isQuietRef(`${el.type}:${el.name}`))
       .filter(el => filters.size === 0 || filters.has(el.type))
       .filter(el => !superFilter || String((el as Record<string, unknown>).supertype ?? '').trim() === superFilter)
@@ -920,7 +920,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     if (filtered.length === 0) {
       // Empty ≠ loading: during activation the cache is priming from disk.
       // Empty world says nothing here — the pulsing + button and the home
-      // onboarding tiles carry it (S255v3).
+      // onboarding tiles carry it.
       const progress = state.data.loadingProgress;
       const msg = state.data.loading
         ? (progress
@@ -945,7 +945,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
 
     // Index which element ids have presence on the CURRENTLY ACTIVE map
-    // (Captain's session 215 request). Two kinds of presence:
+    // (Titus's request). Two kinds of presence:
     //   - a pin on the active map references this element → presence
     //   - this element is a zone with a marker on the active map → presence
     // Renders as a small map icon left of the row's category label,
@@ -997,7 +997,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     triggerFlashForIds(ids);
   }
   document.addEventListener('atlas:pulled-ids', handlePulledIds);
-  // Tour arrivals (S317): a SUBTLE, STICKY highlight on the step's newly
+  // Tour arrivals: a SUBTLE, STICKY highlight on the step's newly
   // revealed rows — replaced wholesale on every step-enter dispatch (an empty
   // list clears it), no timer, no animation. Distinct channel from the
   // auto-pull flash: the flash says "changed under your nose", this says
@@ -1036,7 +1036,7 @@ function locateOnActiveMap(id: string): boolean {
   if (!activeMapId) return false;
   const target = locateTargetFor(getState().data.elements, id, activeMapId);
   if (!target) return false;
-  // A located pin shows, whatever the map's date (the S416 gate's F2).
+  // A located pin shows, whatever the map's date.
   revealPinsOnMap(activeMapId, id);
   panMapTabTo(activeMapId, target.x, target.y);
   return true;
@@ -1059,7 +1059,7 @@ function renderElementRow(
   const flashAttr = (flash ? ' data-flash="true"' : '')
     + (tourFresh ? ' data-tour-fresh="true"' : '')
     + (diskChanged ? ' data-disk-changed="true"' : '');
-  // The live folder's mark (S364): changed on disk, until opened or dismissed.
+  // The live folder's mark: changed on disk, until opened or dismissed.
   const diskDot = diskChanged ? '<span class="atlas-row-disk-dot" title="Changed on disk"></span>' : '';
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
@@ -1086,7 +1086,7 @@ function renderElementRow(
   const reservedBadge = reserved
     ? `<span class="material-symbols-outlined atlas-row-reserved" title="${escapeAttr(reserved)}">auto_awesome</span>`
     : '';
-  // World-style swatch (S356): the kind's colour, when a rule names it.
+  // World-style swatch: the kind's colour, when a rule names it.
   const styled = styleRowHint(getState().styles.rules, el);
   const styleBadge = styled
     ? `<span class="atlas-row-style-swatch" style="background:${escapeAttr(styled.color)}" title="${escapeAttr(styled.title)}"></span>`

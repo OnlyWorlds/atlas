@@ -4,8 +4,8 @@
  * contributor, a player with no account, or a player with an account), the
  * Character a player reads as, the name it is signed with, then the link
  * once, with Send it (where the system share sheet exists), Copy and a QR
- * code. "A player" is keel's no-account player link (#416, the Captain's yes
- * on the sharing floor, h50 #7610); the account guest is one choice down.
+ * code. "A player" is keel's no-account player link (#416, Titus's yes
+ * on the sharing floor, 2026-10-19); the account guest is one choice down.
  * The same choices and words as Lantern's sheet
  * (`tools/lantern/src/views/invite.ts`); the link is made by
  * `makeInvite` (`src/sync/invite-link.ts`) and never kept.
@@ -121,8 +121,8 @@ export class InviteModal extends BaseModal {
     cancelBtn.addEventListener('click', () => this.hide());
     const choiceBtns = [...body.querySelectorAll<HTMLButtonElement>('.atlas-invite-choice')];
     // Everything the request is made from is locked while keel makes it: a
-    // choice tapped during the wait named a role the link did not have (S414
-    // gate H1). The role sent is the role said, and the Character too.
+    // choice tapped during the wait named a role the link did not have.
+    // The role sent is the role said, and the Character too.
     const lock = (on: boolean): void => {
       for (const el of [makeBtn, cancelBtn, nameInput, playsAsSelect, ...choiceBtns]) el.disabled = on;
     };

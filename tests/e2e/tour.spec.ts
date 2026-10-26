@@ -1,5 +1,5 @@
 /**
- * The guided Hyperion tour e2e (S303 rework — the act restructure). Locks the
+ * The guided Hyperion tour e2e (the act restructure). Locks the
  * centre-stage opener (step 0) and its hand-off into the dock, the real-modal
  * hands-on beats, the new order (maps BEFORE objects, institution+title merged),
  * the pin's SOFT correction (place anywhere, Next only over the swamps), the
@@ -24,18 +24,18 @@ async function freshBoot(page: Page) {
 }
 
 /** Click the tour bar's Next and wait for the step attribute to advance
- *  (the visible act label was cut in S298 — data-tour-step is the contract). */
+ *  (the visible act label was cut — data-tour-step is the contract). */
 async function nextStep(page: Page, expectStep: number) {
   await page.locator('.atlas-tour-controls [data-tour-control="next"]').click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', String(expectStep));
 }
 
-/** Exit goes through the confirm screen (S305): it lists the rooms the tour
+/** Exit goes through the confirm screen: it lists the rooms the tour
  *  never reached, so leaving early still leaves you with a map of the app. */
 /**
  * Leave the tour through the confirm.
  *
- * The OPENER has no Exit button (Captain, S308: one control, Start) — its way
+ * The OPENER has no Exit button (Titus: one control, Start) — its way
  * out is Escape. Every later step has the visible control. This helper takes
  * whichever route the current step actually offers, so callers do not have to
  * know which step they are on.
@@ -55,7 +55,7 @@ async function exitViaConfirm(page: Page) {
  *  clock, so the step renders no Next until the user sets one with the room's
  *  real button. Any spec that walks past this step must perform the gesture —
  *  assuming a Next exists is what hung four sibling specs when the objects run
- *  gained its gate (S302). */
+ *  gained its gate. */
 async function setNowViaButton(page: Page) {
   const setNow = page.locator('[data-action="set-now"]');
   await expect(setNow).toBeVisible();
@@ -63,15 +63,15 @@ async function setNowViaButton(page: Page) {
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'b');
 }
 
-/** The writing beat (step 11) is SINGLE ROUTE (S306): the chapter is baked as
+/** The writing beat (step 11) is SINGLE ROUTE: the chapter is baked as
  *  plain prose and Next appears only once a chip exists in it.
  *
- *  Drives the REAL gesture, S313 version: a plain CLICK on a dotted word, which
+ *  Drives the REAL gesture: a plain CLICK on a dotted word, which
  *  promotes it to a chip in one motion (`handleClick` in the autolink plugin).
  *  This replaces the old click-then-Tab pair whose "cursor inside a hint before
- *  the key arrives" precondition was the S306 documented flake — one click has
+ *  the key arrives" precondition was a documented flake — one click has
  *  no such race. Still a real click through ProseMirror's own event routing, not
- *  a dispatched synthetic (the proxy that lied green in S304).
+ *  a dispatched synthetic (the proxy that once lied green).
  *
  *  The forward gate reads the chapter's `story` from the STORE, so it waits on
  *  the workspace's ~1s save debounce; the phase assertion polls it out. */
@@ -83,7 +83,7 @@ async function linkWordViaClick(page: Page) {
   // before the heal lands is a real race that reads as "the click did nothing".
   await page.evaluate(async () => { await (window as any).__atlasTestApi.awaitTourSettled(); });
   // The step's reveal/heal must be DONE before the decorations mean anything:
-  // `data-tour-step` flips before it runs (the S301 trap), and the reveal is
+  // `data-tour-step` flips before it runs (a known trap), and the reveal is
   // what puts the linkable elements on disk. Seven is the beat's premise
   // (TOUR_WRITING_LINKABLE), so this doubles as an assertion that every surface
   // form this world can resolve is actually offered to the user.
@@ -129,7 +129,7 @@ async function openOpener(page: Page) {
   await expect(bar).toHaveAttribute('data-tour-step', '1');
   await expect(bar).toHaveClass(/is-opener/);
   await expect(page.locator('.atlas-tour-sentence')).toBeVisible();
-  // The grey book cite under the opener was cut (S306) — the opener copy
+  // The grey book cite under the opener was cut — the opener copy
   // names Hyperion and its year itself.
   await expect(page.locator('.atlas-tour-attribution')).toHaveCount(0);
   // The bare stage: no `shell` capability yet, so the shell is hidden behind
@@ -140,7 +140,7 @@ async function openOpener(page: Page) {
   // IS [data-tour-control="next"], so the absence assertion goes by TEXT here
   // — the one place the ghost-vs-live locator split does not apply.)
   await expect(page.locator('.atlas-tour-controls button:not(.atlas-tour-next-ghost)', { hasText: /^Next$/ })).toHaveCount(0);
-  // S308, Captain: the opener carries ONE control. Asserted as a PAIR with the
+  // Titus: the opener carries ONE control. Asserted as a PAIR with the
   // Escape route below, because "no Exit button" and "no way out" are one
   // character apart in the implementation and only the first is intended.
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Exit tour$/ })).toHaveCount(0);
@@ -165,7 +165,7 @@ async function createWorldViaModal(page: Page) {
   // The sidebar materialized in its full final structure: create live, the
   // four siblings greyed.
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"]')).toBeVisible();
-  // Four locked icons plus the locked "add a world" (S365); without the folder
+  // Four locked icons plus the locked "add a world"; without the folder
   // picker the open-a-world-folder icon is not there at all (1.17, conv. 129).
   const folderMode = await page.evaluate(() => 'showDirectoryPicker' in window);
   await expect(page.locator('.atlas-worlds-header .atlas-tour-locked')).toHaveCount(folderMode ? 5 : 4);
@@ -205,7 +205,7 @@ async function movePinToSwamps(page: Page) {
   });
 }
 
-/** The pin beat (merged into the MAP step, S317): the REAL +pin button on the
+/** The pin beat (merged into the MAP step): the REAL +pin button on the
  *  Consul (highlighted), a map click to place, then the pin over the swamps so
  *  the soft gate opens. */
 async function placePinViaMap(page: Page) {
@@ -224,13 +224,13 @@ async function placePinViaMap(page: Page) {
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 }
 
-/** The objects step's scripted run (step 8 since the S317 merge): three clicks of the app's real +,
+/** The objects step's scripted run (step 8 since the steps merged): three clicks of the app's real +,
  *  one element each, no dialog. Next appears only when all three exist. */
 async function mintObjectRun(page: Page) {
   const bar = page.locator('.atlas-tour-bar');
   await expect(bar).toHaveAttribute('data-tour-phase', 'a');
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
-  // The reserved slot (S311): no LIVE Next, but the invisible ghost holds its
+  // The reserved slot: no LIVE Next, but the invisible ghost holds its
   // geometry so Back and Exit never move when Next appears. Present/absent
   // pair with the live-control assertions around it.
   await expect(page.locator('.atlas-tour-controls .atlas-tour-next-ghost')).toHaveCount(1);
@@ -288,7 +288,7 @@ test('relaunch after exit mounts a WORKING bar (gate R3: the render memo must no
   await expect(page.locator('.atlas-tour-sentence')).toBeVisible();
   await expect(page.locator('.atlas-tour-body')).not.toBeEmpty();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Start$/ })).toBeVisible();
-  // The opener's exit is Escape, not a button (S308) — so the ladder is only
+  // The opener's exit is Escape, not a button — so the ladder is only
   // proven working if the ESCAPE ROUTE survived the unmount/remount too. That
   // binding is module-level state, exactly the kind R3 exists to catch: a
   // handler unbound on teardown and never rebound would leave a relaunched
@@ -315,12 +315,12 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-room-nav-strip [data-room="home"]')).toBeVisible();
   await expect(page.locator('.atlas-room-nav-strip [data-room="writing"]')).toBeHidden();
   await expect(page.locator('.atlas-right')).toBeHidden();
-  // S316 — the sidebar footer (the help icon's home) is tour-hidden here; its
+  // The sidebar footer (the help icon's home) is tour-hidden here; its
   // PRESENT half is asserted at the finale, whose copy names the help icon.
   await expect(page.locator('.atlas-sidebar-footer')).toBeHidden();
 
   // EVERY create door is scripted during the consul beat: the elements
-  // sidebar's + opens the same locked modal (Captain's catch — the free
+  // sidebar's + opens the same locked modal (Titus's catch — the free
   // modal mid-script broke the railroad).
   await page.locator('[data-action="create-element"]').click();
   const sidebarCreate = page.locator('.atlas-modal-overlay input[name="element-name"]');
@@ -336,7 +336,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(consulName).toHaveAttribute('readonly', '');
   await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
   await expect(page.locator('.atlas-element-name').first()).toContainText('The Consul');
-  // During the tour, all-empty schema sections HIDE (S299, the Freek round):
+  // During the tour, all-empty schema sections HIDE (the Freek round):
   // every rendered section carrying field rows has at least one populated one.
   const emptySectionLeak = await page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
@@ -355,7 +355,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
     return els.find((e: any) => e.name === 'The Consul')?.atlas_aliases ?? null;
   });
   expect(aliasesEarly).toBeNull();
-  // Precision staging (S300, Captain-blessed): no Custom-fields section during
+  // Precision staging (Titus-blessed): no Custom-fields section during
   // the tour, and the filter strip shows ONLY types the world holds.
   await expect(page.locator('.atlas-custom-fields-section')).toHaveCount(0);
   const stripState = await page.evaluate(() => {
@@ -373,7 +373,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-sidebar')).toContainText('The Hegemony');
   await expect(page.locator('.atlas-sidebar')).toContainText('Consul of the Hegemony');
 
-  // S316 — the narrated-field highlight: the injected style tag targets
+  // The narrated-field highlight: the injected style tag targets
   // exactly the rows this step's copy teaches (issuer/holders), and the
   // issuer row is genuinely on screen to receive it. The ABSENT half (no tag
   // on a step with no highlightFields) is asserted at the map step.
@@ -381,7 +381,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   expect(await page.locator('#atlas-tour-field-hl').textContent()).toContain('data-field="issuer"');
   await expect(page.locator('.atlas-field[data-field="issuer"]')).toBeVisible();
 
-  // S308 — the right pane arrives WITH the map, not a step early. It used to
+  // The right pane arrives WITH the map, not a step early. It used to
   // unlock at `the-planet`, so the biggest piece of chrome in the build-up slid
   // in during a pure elements beat and `the-map` then narrated "a new pane just
   // opened" about something already on screen. Asserted as a PAIR so the timing
@@ -390,12 +390,12 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(false);
   await expect(page.locator('.atlas-right')).toBeHidden();
 
-  await nextStep(page, 6); // the map — the pane opens WITH the thing it holds (pin beat merged here, S317)
+  await nextStep(page, 6); // the map — the pane opens WITH the thing it holds (pin beat merged here)
   expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(true);
   await expect(page.locator('.atlas-right')).toBeVisible();
   await expect(page).toHaveURL(/\/map\//);
   await expect(page.locator('.atlas-map-tab-wrapper path').first()).toBeVisible(); // the zone polygon
-  // S316 — zone drawing arrives WITH the map (the prezone boundary moved from
+  // Zone drawing arrives WITH the map (the prezone boundary moved from
   // the-swamps to here), while fit-to-image and hide-pins stay hidden for the
   // whole tour (the simplified toolbar).
   await expect(page.locator('[data-map-tab-toolbar] [data-action="draw-polygon"]')).toBeVisible();
@@ -414,7 +414,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await mintObjectRun(page);
   await nextStep(page, 9); // linking payoff
 
-  // S309 — the payoff must be ON SCREEN. This step's copy narrates the World
+  // The payoff must be ON SCREEN. This step's copy narrates the World
   // section and Referenced by, which sit below the tour dock at default
   // scroll; the step now scrolls the World section into view on entry
   // (scrollToSection). Assert the section's top lands ABOVE the dock's top —
@@ -431,13 +431,13 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
     expect(sectionBox!.y, 'World section top sits above the dock top').toBeLessThan(dockBox!.y);
   }).toPass({ timeout: 10_000 });
 
-  // S308 — the ABSENT half of the Web-tab pair (the PRESENT half is asserted at
+  // The ABSENT half of the Web-tab pair (the PRESENT half is asserted at
   // step 16 below). `linking`'s copy deliberately withholds the Web tab's name,
   // citing "naming a tab the user cannot see yet is a promise the chrome does
   // not keep" — so the tab must genuinely not be on screen here.
   //
   // It was. `tour-bar.ts` looked up `atlas-tour-preweb` by the step id
-  // 'where-it-lives', which S306c MERGED into 'yours-to-keep': findIndex
+  // 'where-it-lives', which a later pass MERGED into 'yours-to-keep': findIndex
   // returned -1, `idx < -1` was false for every step, the gate never applied,
   // and the tab had been visible since step 5 for three sessions. Nothing
   // caught it because only the PRESENT half was ever asserted — a rename
@@ -449,7 +449,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-right [data-tab-kind="context"]')).toBeHidden();
 
   // Writing act: the icon appears; the chapter renders the sentence verbatim
-  // as PLAIN prose (S306 — the user links it), with aliases healed in so
+  // as PLAIN prose (the user links it), with aliases healed in so
   // autolink can recognise every surface form.
   await nextStep(page, 10);
   await expect(page.locator('.atlas-room-nav-strip [data-room="writing"]')).toBeVisible();
@@ -465,7 +465,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   // Capture the chapter's exact plain text before linking.
   const proseBefore = await prose.innerText();
   await linkAllViaCorner(page);
-  // THE GUARANTEE at the surface (Captain's ruling, S309): creating links
+  // THE GUARANTEE at the surface (Titus's ruling): creating links
   // NEVER changes the text. Before the fix, link-all rewrote this very
   // sentence to "The Hegemony The Consul sat on the Spaceship Balcony of his
   // Ebony Spaceship… well-maintained The Consul's Steinway… great, green,
@@ -481,7 +481,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page).toHaveURL(/\/timeline/);
   await expect(page.locator('.atlas-room-nav-strip [data-room="timeline"]')).toBeVisible();
 
-  // S316 — the calendar construct is tour-QUIET: revealed on disk (the axis
+  // The calendar construct is tour-QUIET: revealed on disk (the axis
   // reads its eras) yet absent from the elements sidebar while touring. Both
   // halves asserted, so neither the reveal nor the hide can silently die.
   const calendarOnDisk = await page.evaluate(async () => {
@@ -494,7 +494,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   // The clock arrives unset, so the step has NO forward control until the user
   // sets it with the room's real button — the same single-route contract the
   // create beats hold. Walking past with Next is exactly what hung four sibling
-  // specs when the objects run gained its gate (S302), so the walk performs the
+  // specs when the objects run gained its gate, so the walk performs the
   // gesture instead of assuming one exists.
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
   await expect(page.locator('body')).toHaveClass(/atlas-tour-nowstep/);
@@ -507,23 +507,23 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
 
   await nextStep(page, 13); // deep time — Rachmaninov in the Old Earth era
   await nextStep(page, 14); // the sweep
-  // 15 is the MERGED close (S306): the files story + the OnlyWorlds story
+  // 15 is the MERGED close: the files story + the OnlyWorlds story
   // in one step, carrying the Web tab cameo the cut step used to own.
   await nextStep(page, 15); // yours-to-keep (web cameo rides here)
   await expect(page.locator('[data-tab-kind="context"]')).toHaveClass(/active/);
   await nextStep(page, 16); // finale
 
-  // The finale lands on the Ebony Spaceship (Captain, S318): the closing view
+  // The finale lands on the Ebony Spaceship (Titus): the closing view
   // is the sentence's grandest object with its links radiating back.
   await expect(page.locator('.atlas-room-nav-selected')).toContainText('Ebony Spaceship');
 
-  // The finale's control set, asserted POSITIVELY (S301 gate, MED): the
+  // The finale's control set, asserted POSITIVELY: the
   // early-return renders its three choices (1.17, contract §7.1) and NO Exit.
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Keep this world$/ })).toBeVisible();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Save it to a folder$/ })).toBeVisible();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Exit tour$/ })).toHaveCount(0);
 
-  // S316 — the finale's copy names the help icon in the footer, so the footer
+  // The finale's copy names the help icon in the footer, so the footer
   // must exist when the sentence does (the hidden half sits at the top of
   // this walk). Copy naming a control is a behavioural claim.
   await expect(page.locator('.atlas-sidebar-footer')).toBeVisible();
@@ -537,12 +537,12 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
     return { worlds: s.registry.worlds.length, active: !!s.active, done: localStorage.getItem('atlas_tour_done_v1') };
   });
   expect(after).toEqual({ worlds: 0, active: false, done: '1' });
-  // S301: the doors lost their headings — the button IS the label now.
+  // The doors lost their headings — the button IS the label now.
   await expect(page.locator('[data-action="start-tour"]')).toContainText('Replay the tour');
 });
 
-test('the pin beat is a SOFT correction: place anywhere, Next only over the swamps (S303)', async ({ page }) => {
-  // Captain's ruling: never refuse a placement. A drop outside the swamps shows
+test('the pin beat is a SOFT correction: place anywhere, Next only over the swamps', async ({ page }) => {
+  // Titus's ruling: never refuse a placement. A drop outside the swamps shows
   // the correction phase with no Next; dragging the pin onto the zone opens it.
   await freshBoot(page);
   await openOpener(page);
@@ -551,7 +551,7 @@ test('the pin beat is a SOFT correction: place anywhere, Next only over the swam
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map — the pin beat lives HERE now (S317)
+  await nextStep(page, 6); // map — the pin beat lives HERE now
 
   const bar = page.locator('.atlas-tour-bar');
   // Arm + place; then force the pin OUTSIDE the swamps → correction, no Next.
@@ -582,7 +582,7 @@ test('the pin beat is a SOFT correction: place anywhere, Next only over the swam
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 });
 
-test('clicking DIRECTLY on the swamps zone places the pin there (the instructed gesture, S304)', async ({ page }) => {
+test('clicking DIRECTLY on the swamps zone places the pin there (the instructed gesture)', async ({ page }) => {
   // The copy says "click the swamps below to set his balcony seat over them" —
   // so a real click ON the zone polygon must PLACE the pin, not select the zone.
   // A zone is an interactive polygon that stopPropagation's clicks; the
@@ -597,7 +597,7 @@ test('clicking DIRECTLY on the swamps zone places the pin there (the instructed 
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map (the swamps zone is drawn; pin beat merged here, S317)
+  await nextStep(page, 6); // map (the swamps zone is drawn; pin beat merged here)
 
   const zone = page.locator('.atlas-map-tab-wrapper path.leaflet-interactive').first();
   await expect(zone).toBeVisible();
@@ -645,7 +645,7 @@ test('the scripted create door: links survive, no double-mint, no dead button', 
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map — pin beat merged here (S317)
+  await nextStep(page, 6); // map — pin beat merged here
   await placePinViaMap(page);
   await nextStep(page, 7); // swamps
   await nextStep(page, 8); // objects — the scripted run
@@ -741,7 +741,7 @@ test('the create beats are single-route: no watch-mode Next, the gesture is the 
   await openOpener(page);
   await beginToWorld(page);
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '2');
-  // S301: the dock carries NO create button at all now — the app's own
+  // The dock carries NO create button at all now — the app's own
   // control is the only route, and it pulses.
   await expect(page.locator('[data-tour-action]')).toHaveCount(0);
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"].atlas-create-pulse')).toBeVisible();
@@ -776,7 +776,7 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
   // be re-linked, and the map tab is cached for the re-entry test.
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map (zone + markers live; pin beat merged, S317)
+  await nextStep(page, 6); // map (zone + markers live; pin beat merged)
   await placePinViaMap(page);
   await nextStep(page, 7); // swamps
   await nextStep(page, 8); // objects
@@ -800,7 +800,7 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
     const zone = by('Swamps');
     const planet = by('Unnamed Planet');
     const ship = by('Ebony Spaceship');
-    // the bundle ships exactly one map; matching by type survives renames (S318)
+    // the bundle ships exactly one map; matching by type survives renames
     const map = els.find((e: any) => e.type === 'map');
     const pin = els.find((e: any) => e.type === 'pin');
     await store.deleteElement(heg.id);
@@ -846,7 +846,7 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
   await expect(page.locator('.atlas-map-tab-wrapper path').first()).toBeVisible();
 });
 
-test('armed pin placement disarms on navigation — no stray second pin (S299 close gate)', async ({ page }) => {
+test('armed pin placement disarms on navigation — no stray second pin', async ({ page }) => {
   await freshBoot(page);
   await openOpener(page);
   await beginToWorld(page);
@@ -854,7 +854,7 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map — the merged hands-on pin beat (S317)
+  await nextStep(page, 6); // map — the merged hands-on pin beat
 
   // Arm placement via the real +pin button, then NAVIGATE AWAY without
   // placing (Back exists here; the unplaced beat has no Next). A leftover
@@ -862,8 +862,8 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
   await page.locator('[data-action="pin-element"]').click();
   await expect.poll(() => page.evaluate(() =>
     Boolean((window as any).__atlasTestApi.getState().ui.pinPlacement))).toBe(true);
-  // The armed cursor is a cascade OUTCOME, not a rule (S318): the crosshair
-  // rule existed since S299 and was silently beaten by the S219 default-cursor
+  // The armed cursor is a cascade OUTCOME, not a rule: the crosshair
+  // rule existed and was silently beaten by the older default-cursor
   // rule for three months. Assert the computed value, which no restatement of
   // the rule can fake.
   expect(await page.evaluate(() =>
@@ -887,7 +887,7 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
   expect(pinCount).toBe(0); // no pin placed yet, and no stray from the dead arm
 });
 
-test('"more information" closes on Escape and when the step changes (S368 B5)', async ({ page }) => {
+test('"more information" closes on Escape and when the step changes', async ({ page }) => {
   await freshBoot(page);
   await openOpener(page);
   await beginToWorld(page);
@@ -915,7 +915,7 @@ test('"more information" closes on Escape and when the step changes (S368 B5)', 
   await expect(flyout).toBeHidden();
 });
 
-test('the collapsed tour pill says what it does and sits below every app control (S368 B4)', async ({ page }) => {
+test('the collapsed tour pill says what it does and sits below every app control', async ({ page }) => {
   await freshBoot(page);
   await openOpener(page);
   await beginToWorld(page);
@@ -949,7 +949,7 @@ test('the collapsed tour pill says what it does and sits below every app control
   await expect(pill).toBeHidden();
 });
 
-test('the DRAG gesture satisfies the pin gate — a dragged-in Consul adopts the bundle pin (S318)', async ({ page }) => {
+test('the DRAG gesture satisfies the pin gate — a dragged-in Consul adopts the bundle pin', async ({ page }) => {
   // The map step's copy offers TWO gestures ("clicking the + pin icon ... or
   // dragging him in from the sidebar"). The drop path used to mint an
   // ordinary nameless pin: the gate (hasRef on the bundle pin) never opened,
@@ -1047,7 +1047,7 @@ test('the tour world lives in browser-worlds/, made like any browser world, and 
   expect(after).toEqual([]);
 });
 
-test('back-navigation does not strip links off elements that still exist (S301 gate R2)', async ({ page }) => {
+test('back-navigation does not strip links off elements that still exist', async ({ page }) => {
   await freshBoot(page);
   await openOpener(page);
   await beginToWorld(page);
@@ -1056,7 +1056,7 @@ test('back-navigation does not strip links off elements that still exist (S301 g
   // Walk to linking (objects now follow the maps act).
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map — pin beat merged here (S317)
+  await nextStep(page, 6); // map — pin beat merged here
   await placePinViaMap(page);
   await nextStep(page, 7); // swamps
   await nextStep(page, 8); // objects
@@ -1090,7 +1090,7 @@ test('back-navigation does not strip links off elements that still exist (S301 g
   expect(await possessionsAt()).toBe(atPayoff);
 });
 
-test('the residue contract covers the map UI keys, not just the world (S301)', async ({ page }) => {
+test('the residue contract covers the map UI keys, not just the world', async ({ page }) => {
   await freshBoot(page);
   await openOpener(page);
   await beginToWorld(page);
@@ -1151,13 +1151,13 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await expect(page.locator('[data-action="other-ways-in"]')).toBeVisible();
   // The note must be HONEST about the capability, not merely present. It used
   // to say "needs a Chromium browser", which is what every phone visitor on
-  // mobile Chrome was reading (S323) — the gate is the folder picker, which
+  // mobile Chrome was reading — the gate is the folder picker, which
   // is a DESKTOP capability. Assert the load-bearing word rather than the
   // whole sentence, so a copy polish does not fail this test but dropping the
   // honesty does.
   await expect(page.locator('.atlas-landing-note')).toContainText('desktop');
   await expect(page.locator('.atlas-landing-note')).toContainText('Chrome, Edge or Brave');
-  // The example-page door is gone everywhere since S368; this stays as a
+  // The example-page door is gone everywhere; this stays as a
   // guard against it coming back.
   await expect(page.locator('[data-action="see-example"]')).toHaveCount(0);
   // The tour boots and walks.
@@ -1198,7 +1198,7 @@ test('the exit confirm names the rooms the tour never reached, and can be declin
   await expect(modal).toContainText('Pages');
   await expect(modal).toContainText('Data');
   await expect(modal).toContainText('Charts');
-  // And it says plainly what leaving costs (S368).
+  // And it says plainly what leaving costs.
   await expect(modal.locator('[data-role="tour-exit-loss"]'))
     .toHaveText('Leaving deletes the tour world and everything you made in it. To keep it, go on to the end of the tour.');
 
@@ -1240,7 +1240,7 @@ test('the writing beat: the sentence arrives plain, a click links it, Next waits
   // baked surface forms, so there is a dotted word to click at all.
   await expect(prose.locator('.atlas-autolink-hint').first()).toBeVisible();
 
-  // The real gesture: click a dotted word to link it (S313).
+  // The real gesture: click a dotted word to link it.
   await linkWordViaClick(page);
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 
@@ -1273,7 +1273,7 @@ test('the writing beat: the sentence arrives plain, a click links it, Next waits
  * user takes — finishing the tour is what sets an atlas root in the first
  * place.
  *
- * Before S307 this walk failed three ways at once: the route stayed on the
+ * This walk used to fail three ways at once: the route stayed on the
  * user's settings page (so step 2 painted the dock over it), the sidebar
  * listed the user's real worlds, and — the blocker — the tour's scripted
  * create button did not exist at all, because `worlds-sidebar` tested

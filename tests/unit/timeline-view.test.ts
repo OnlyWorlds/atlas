@@ -281,7 +281,7 @@ describe('zoomWindow — resize around the cursor date (S3)', () => {
   });
 });
 
-describe('navBounds: the camera can reach a now outside history (S367 critic K7)', () => {
+describe('navBounds: the camera can reach a now outside history', () => {
   const universe = [node('a', 0), node('b', 100)];
 
   it('a now at 1000 with history 0..100 is reachable by pan and by zoom-out', () => {
@@ -314,7 +314,7 @@ describe('navBounds: the camera can reach a now outside history (S367 critic K7)
   });
 });
 
-describe('glyphDropDate — re-dating snap + range clamp (S264)', () => {
+describe('glyphDropDate — re-dating snap + range clamp', () => {
   it('rounds to whole dates', () => {
     expect(glyphDropDate(12.4, null)).toBe(12);
     expect(glyphDropDate(12.6, null)).toBe(13);
@@ -336,7 +336,7 @@ describe('glyphDropDate — re-dating snap + range clamp (S264)', () => {
     expect(glyphDropDate(-40, 8)).toBe(-40);
   });
 
-  it('an end-stretch clamps at the recorded start (S265, the other grip)', () => {
+  it('an end-stretch clamps at the recorded start (the other grip)', () => {
     expect(glyphDropDate(-5, null, 5)).toBe(5);
     expect(glyphDropDate(4.4, null, 5)).toBe(5);
     expect(glyphDropDate(20, null, 5)).toBe(20);

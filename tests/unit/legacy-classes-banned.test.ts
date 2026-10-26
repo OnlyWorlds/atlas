@@ -2,9 +2,9 @@
  * Banned legacy classes — `ow-input` and `ow-btn` must NOT appear in src/.
  *
  * Atlas standardized on `atlas-input`, `atlas-btn-primary`, `atlas-btn-ghost`
- * during session 219's modal audit. The legacy `ow-*` classes are stubs from
+ * during a modal audit. The legacy `ow-*` classes are stubs from
  * the OnlyWorlds shared library that produced visually inconsistent styling
- * when mixed with atlas-* (Captain caught this in smoke).
+ * when mixed with atlas-* (Titus caught this in smoke).
  *
  * Reintroducing them is a regression risk — this test catches it at the
  * vitest-run boundary. If a real `ow-*` styling utility appears in the future

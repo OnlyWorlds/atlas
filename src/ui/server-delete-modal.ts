@@ -33,7 +33,7 @@ import { getDiskNotice } from '../core/live-folder';
 /**
  * The review's rows, edited copies first. An outside edit that kept its edit
  * time is "not synced" to the live folder (the sidebar says so) while its
- * stamps read clean: it counts as edited here too (S390 gate F2).
+ * stamps read clean: it counts as edited here too.
  */
 function arrange(rows: ServerDeleteReviewRow[], worldId: string | null): ServerDeleteReviewRow[] {
   const notice = getDiskNotice();
@@ -187,7 +187,7 @@ export class ServerDeleteReviewModal extends BaseModal {
 
   private renderFooter(confirming = false): void {
     const footer = this.footer;
-    // A run owns the footer until it ends (S390 gate F3: a redraw mid-run
+    // A run owns the footer until it ends (a redraw mid-run
     // offered a second, concurrent Delete all).
     if (!footer || this.bulkRunning) return;
     // Focus that sat on a footer button follows the redraw instead of dropping to the page.
@@ -264,7 +264,7 @@ export class ServerDeleteReviewModal extends BaseModal {
   private async reload(): Promise<void> {
     const engine = getCurrentSyncEngine();
     if (!engine || !this.modal) return;
-    // Never show another world's rows in this world's dialog (S390 gate F7).
+    // Never show another world's rows in this world's dialog.
     if (getState().active?.worldId !== this.capturedWorldId) {
       this.hide();
       return;

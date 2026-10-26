@@ -1,5 +1,5 @@
 /**
- * App theme (S315, light-mode Phase 0). Device-local, like shell ratios: a
+ * App theme (light-mode Phase 0). Device-local, like shell ratios: a
  * plain localStorage key, never synced, never in world data. The mechanism is
  * one attribute — `<html data-theme="light">` — which atlas.css answers with
  * the ow-house-light token block; absent attribute = dark (the default, and

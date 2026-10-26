@@ -1,5 +1,5 @@
 /**
- * S361 (lane b M1): pull-apply rides the per-id write chain, and its race
+ * Pull-apply rides the per-id write chain, and its race
  * check happens INSIDE the chain slot. Before, the engine re-read the element,
  * then applied outside the chain: a save landing between the two was
  * overwritten with the server body and read as synced.

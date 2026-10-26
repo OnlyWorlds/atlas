@@ -142,7 +142,7 @@ describe('SyncEngine push resilience — per-element failures', () => {
     expect(result.failures).toHaveLength(0);
     // No list calls — pull phase didn't run.
     expect(client.calls.some(c => c.method === 'list')).toBe(false);
-    expect(client.changesPulls).toBe(0); // nor a /changes pull (S365 lens A M4)
+    expect(client.changesPulls).toBe(0); // nor a /changes pull
   });
 
   it('pushOnce honors per-element failure tolerance', async () => {
@@ -160,7 +160,7 @@ describe('SyncEngine push resilience — per-element failures', () => {
 });
 
 /**
- * S323 — a throw in the META step must not pin the engine at 'syncing'.
+ * A throw in the META step must not pin the engine at 'syncing'.
  *
  * `executeMetaStep` does real disk I/O and ran outside any try on all three
  * round entry points, while the push and pull PHASES each had an idle-restore
@@ -171,7 +171,7 @@ describe('SyncEngine push resilience — per-element failures', () => {
  * The engine's own source named this hole and deferred it before release.
  *
  * Asserted on the STATE the UI reads, not on the throw, because the stuck
- * state is the damage. This is the S308 class in its third location:
+ * state is the damage. This is the push-phase throw's class, in its third location:
  * hardening applied to one side of a symmetric surface is a defect class.
  */
 describe('meta-step failure leaves the engine usable', () => {

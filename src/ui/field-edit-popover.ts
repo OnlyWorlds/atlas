@@ -13,10 +13,10 @@
  *   - Short input: Enter = Save, Escape = Cancel
  *   - Long textarea: Ctrl/Cmd+Enter = Save, Escape = Cancel
  *   - Full click outside (press + release on backdrop): commits changed
- *     non-empty text like Enter; otherwise closes without writing (S318 —
+ *     non-empty text like Enter; otherwise closes without writing (so
  *     typed work is never lost to a stray click; Escape stays the discard)
  *
- * Save semantics (session 224): the popover closes OPTIMISTICALLY on submit —
+ * Save semantics: the popover closes OPTIMISTICALLY on submit —
  * the overlay tears down before awaiting `opts.onSave`. The rest of the UI
  * stays interactive while persistence happens in the background. On failure,
  * a toast surfaces the error. This matches the optimistic-UI pattern atlas
@@ -34,7 +34,7 @@ export interface FieldEditOptions {
   /** Field display label (shown as popover title). */
   label: string;
   /** Optional field description, rendered quietly behind the label in the
-   *  header (Captain, S318: "we have space for it, would be useful"). */
+   *  header (Titus: "we have space for it, would be useful"). */
   description?: string;
   /** Initial value (string-ified). */
   value: string;
@@ -139,7 +139,7 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   }
 
   // Bad-number line: shown instead of saving when the typed text is not a
-  // number, so the old value stays put (S367 critic C2).
+  // number, so the old value stays put.
   const errorLine = document.createElement('div');
   // Its own class: `.atlas-edit-popover-live` is the resolution hint that
   // callers (and specs) read.
@@ -206,7 +206,7 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
       // parse ("12,5", "1e"), which would read as a deliberate clear and
       // write null (deleting a custom field). Too-big numbers ("1e999")
       // parse to Infinity, which JSON writes as null. Keep the popover open
-      // and write nothing (S367 critic C2).
+      // and write nothing.
       const bad = input instanceof HTMLInputElement && input.validity.badInput;
       const n = Number(nextValue);
       if (bad || (nextValue !== '' && !Number.isFinite(n))) {
@@ -233,7 +233,7 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
     cleanup();
     void Promise.resolve(opts.onSave(nextValue)).catch((err) => {
       // A save that already said what went wrong (the element page's own
-      // field save does) is not said twice (S368).
+      // field save does) is not said twice.
       if (problemWasShown(err)) return;
       console.warn('[field-edit-popover] save failed:', err);
       showProblem(err, { doing: 'saving this field' });
@@ -243,7 +243,7 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   cancelBtn.addEventListener('click', cancel);
   saveBtn.addEventListener('click', () => { save(); });
 
-  // Click-outside discipline (Captain, S318 — "seems a risky way to have
+  // Click-outside discipline (Titus — "seems a risky way to have
   // people lose writing"). The old rule cancelled on backdrop MOUSEDOWN and
   // silently discarded whatever was typed. Now:
   //   - a full outside click (press AND release on the backdrop — the
@@ -271,7 +271,7 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
       e.stopPropagation();
       cancel();
     } else if (e.key === 'Enter') {
-      // A focused BUTTON keeps its own Enter (S361, lane a B2): Tab to
+      // A focused BUTTON keeps its own Enter (lane a B2): Tab to
       // Cancel and press Enter used to SAVE.
       if (e.target instanceof HTMLButtonElement) return;
       if (isLong) {
@@ -305,7 +305,7 @@ function positionPopover(panel: HTMLElement, anchor: HTMLElement): void {
   const MIN_WIDTH = 280;
 
   // Width = anchor width minus a small inset so the popover visually sits
-  // inside the field row instead of running edge-to-edge with it. Captain's
+  // inside the field row instead of running edge-to-edge with it. Titus's
   // smoke 2026-05-20: edge-to-edge looked "slightly too big" — 24px inset
   // gives breathing room without losing the "matches the field" effect.
   const INSET = 24;

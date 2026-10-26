@@ -33,7 +33,7 @@
  *
  * ── Where this is going ───────────────────────────────────────────────────
  *
- * Captain ruled four families (2026-07-22). Skeld is preparing
+ * Titus ruled four families (2026-07-22). Skeld is preparing
  * `ELEMENT_FAMILIES` + `FAMILY_COLORS` + `getElementColor(type, mode)` for the
  * SDK, co-signed by Kael, published post-launch. THIS FILE IS DELIBERATELY THAT
  * SHAPE so the migration is a re-export, not a rewrite: when the SDK ships,
@@ -97,7 +97,7 @@ export const FAMILY_COLORS: Record<ElementFamily, { light: string; dark: string 
   // The #009a00 lift was REFUTED by Skeld's validator (2026-07-22): ΔE 0.2
   // against Temporal amber for protan viewers, and the green is boxed in on
   // both sides (brighter -> amber collision, teal-er -> pink collision).
-  // Reverted to the validated value; the recession trade is Captain's call —
+  // Reverted to the validated value; the recession trade is Titus's call —
   // full record in the comment at the bottom of this file.
   world:    { light: '#008300', dark: '#008300' },
   abstract: { light: '#e87ba4', dark: '#d55181' },
@@ -149,7 +149,7 @@ export function elementColor(type: string, mode: 'light' | 'dark' = 'dark'): str
  * brighter moves toward amber (protan), teal-er moves toward pink (deutan).
  * REVERTED to #008300 per his recommendation. The recession finding STANDS as
  * a real, measured trade (perception vs accessibility on one value) and goes
- * to Captain: keep #008300 and let icon+label carry World forward, or brighten
- * and lose family separation for red-blind readers. Skeld's full numbers:
- * Orrery/product/schema/element-palette-measurements.md.
+ * to Titus: keep #008300 and let icon+label carry World forward, or brighten
+ * and lose family separation for red-blind readers. Skeld's full numbers
+ * are in a palette-measurements design note.
  */

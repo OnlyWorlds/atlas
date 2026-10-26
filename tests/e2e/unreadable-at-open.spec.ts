@@ -1,5 +1,5 @@
 /**
- * Conv. 176 (Seethe h20 #12538): a world whose folder holds a file that will
+ * Conv. 176 (Seethe 2026-10-24): a world whose folder holds a file that will
  * not read as an element opens without it, as before, and now says so in the
  * live folder's line ("1 cannot be read", the file named in its title). Before
  * 1.89.0 the world opened one element short with no word.

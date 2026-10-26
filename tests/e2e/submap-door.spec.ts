@@ -1,5 +1,5 @@
 /**
- * #139 (S387, the Captain's ask in h20 #2081): from a map, into the map of a
+ * #139 (Titus's ask in 2026-10-09): from a map, into the map of a
  * place pinned on it, and back up. Selecting a pin whose Location has its own
  * map shows a door beside that pin; the submap's toolbar names the way up.
  * Both swap the current map tab in place.
@@ -106,7 +106,7 @@ test("every pin's image is named by its place, never 'Marker' (#176)", async ({ 
   await expect(page.locator('.leaflet-marker-pane img[alt="Marker"]')).toHaveCount(0);
 });
 
-test('the map badge says what it means on hover, and only on a location with its own map (h58 #5429)', async ({ page }) => {
+test('the map badge says what it means on hover, and only on a location with its own map (2026-10-15)', async ({ page }) => {
   await setupWorld(page);
   const HINT = 'This location has its own map: click it, then Open';
   const titleOf = (alt: string) => page.locator(`.leaflet-marker-pane img[alt="${alt}"]`).getAttribute('title');
@@ -128,7 +128,7 @@ test('the map badge says what it means on hover, and only on a location with its
   await expect.poll(() => titleOf('Isle')).toBeFalsy();
 });
 
-test("help follows a map open in the right pane, whose address stays the room's (h58 #5443)", async ({ page }) => {
+test("help follows a map open in the right pane, whose address stays the room's (2026-10-15)", async ({ page }) => {
   await setupWorld(page);
   expect(await page.evaluate(() => window.location.hash)).not.toContain('/map/');
   await page.keyboard.press('?');

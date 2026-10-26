@@ -1,7 +1,6 @@
 /**
- * keel's word on the hidden mark, recorded where keel answers (conv. 170, the
- * S461 gate's F3; contract `Forge/Notes/2026-10-24-s464-hidden-here-only-contract.md`).
- * keel takes the mark on a create only (keel #587, probed live S461), so a mark
+ * keel's word on the hidden mark, recorded where keel answers (conv. 170).
+ * keel takes the mark on a create only (probed live), so a mark
  * added here to an element already online is never applied there: the update's
  * answer shows the element, and the page must say "Hidden here only", never
  * "Hidden on OnlyWorlds". keel answers `hidden: true` exactly when it hides the

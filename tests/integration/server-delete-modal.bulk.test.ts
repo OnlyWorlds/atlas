@@ -1,6 +1,6 @@
 /**
- * #122 (S390): the review modal's side of "Delete all locally", in jsdom.
- * Promoted from the S390 gate's probes (Forge/Notes/2026-10-11-s390-gate/):
+ * #122: the review modal's side of "Delete all locally", in jsdom.
+ * Promoted from a gate's probes:
  * F2, an outside edit the live folder calls "not synced" counts as edited
  * here too; F3, a run owns the dialog until it ends.
  */

@@ -1,5 +1,5 @@
 /**
- * PROMOTED from the S365 composition gate (lens B, front door): delete stays inside the home folder, discovery never hijacks a slot, every setup door opens a world pick, the tour keeps its doors, double-clicks keep the chooser.
+ * PROMOTED from a composition gate on the front door: delete stays inside the home folder, discovery never hijacks a slot, every setup door opens a world pick, the tour keeps its doors, double-clicks keep the chooser.
  * Each asserts the fixed behaviour; red on the code before the gate fixes.
  */
 import { test, expect, type Page } from '@playwright/test';

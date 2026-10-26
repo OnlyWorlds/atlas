@@ -23,7 +23,7 @@ export const IMAGELESS_MAP_SIZE = 2000;
 
 /**
  * Below this shorter-side pixel count a map image gets a soft "coarse
- * placement" hint at attach time (Freek's ask, S300). Never a block.
+ * placement" hint at attach time (Freek's ask). Never a block.
  */
 export const SMALL_MAP_IMAGE_MIN_SIDE = 600;
 

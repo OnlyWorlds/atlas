@@ -1,5 +1,5 @@
 /**
- * An error whose message is already written for the user (S368).
+ * An error whose message is already written for the user.
  *
  * The one class of error the UI may show verbatim: `problemFor` passes its
  * message through as the sentence. Every other error is classified and

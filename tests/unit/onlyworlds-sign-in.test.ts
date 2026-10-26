@@ -1,6 +1,6 @@
 /**
- * Sign in with OnlyWorlds, the tool's half (S465; contract
- * `Forge/Notes/2026-10-24-s465-sign-in-with-onlyworlds-contract.md`): the
+ * Sign in with OnlyWorlds, the tool's half (the sign-in
+ * contract): the
  * origin rule (R1), the exchange through the real SDK with fetch stubbed
  * (R3), the resume read back by shape (R5) and the refusal lines (R7).
  */
@@ -77,7 +77,7 @@ describe('the round trip through the SDK (R3)', () => {
   it('signed in: the token, the account and Atlas\'s resume; the address is / and the route; nothing left in the tab', async () => {
     const outcome = await pressAndReturn(s => `code=c0de&state=${s}`,
       new Response(JSON.stringify({ token: 'ow_a_minted', token_id: '0f1e2d3c-4b5a-4968-8776-655443322110', token_type: 'bearer', account: { id: 'acc', username: 'wren' } }), { status: 200 }));
-    // keel's id for the token rides along (SDK 4.73), so Forget can revoke it (S475).
+    // keel's id for the token rides along (SDK 4.73), so Forget can revoke it.
     expect(outcome).toEqual({ ok: true, token: 'ow_a_minted', tokenId: '0f1e2d3c-4b5a-4968-8776-655443322110', username: 'wren', resume: { hash: `#/w/${WORLD}/writing`, door: 'new-api', join: JOIN } });
     expect(sent).toHaveLength(1);
     expect(sent[0].url).toBe('https://www.onlyworlds.com/api/v2/auth/token');

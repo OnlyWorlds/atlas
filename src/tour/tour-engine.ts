@@ -9,7 +9,7 @@
  * if the user activates another world mid-tour, the tour pauses rather than
  * touch it.
  *
- * THE RESIDUE CONTRACT (v2, Captain's ruling; 1.17 adds the keep): the tour
+ * THE RESIDUE CONTRACT (v2, Titus's ruling; 1.17 adds the keep): the tour
  * leaves NOTHING behind unless the user keeps its world. The world is created
  * at the first hands-on step (not at boot) and torn down on a mid-tour Exit
  * or the finale's Start fresh — registry entry, handle, directory, all of it.
@@ -99,7 +99,7 @@ function writeTourState(p: TourPersist | null): void {
 }
 
 /**
- * The re-key (S363) moves ids; stored state follows. The saved return hash is
+ * The re-key moves ids; stored state follows. The saved return hash is
  * a stored URL and may name a re-keyed element; null from the router = leave.
  */
 export function remapTourReturnHash(worldId: string, map: ReadonlyMap<string, string>): void {
@@ -139,7 +139,7 @@ export function tourWorldExists(): boolean {
  * The active world is the tour's demo world (write-safety precondition). Its
  * world.json mirror must say demo too: a keep un-demoes world.json first (K2)
  * and the registry last (K4), and between them no step may write a bundle id
- * into a world whose ids are moving (S375 gate K1). An unreadable world.json
+ * into a world whose ids are moving. An unreadable world.json
  * mirrors no `demo` either, so the tour writes nothing into it.
  */
 export function tourWorldIsActive(): boolean {
@@ -201,7 +201,7 @@ function stripUnrevealed(
 /** Media assets the bundle references via `x_tour_media`.
  *  ⚠ An x_tour_media filename NOT in this map is silently skipped — when the
  *  bundle gains or renames an asset, this registry moves in the same commit
- *  (S312: the re-snapshot's new map webp was missed until the resilience e2e
+ *  (the re-snapshot's new map webp was missed until the resilience e2e
  *  caught the map healing back imageless). */
 const TOUR_MEDIA_URLS: Record<string, () => string> = {
   'unnamed-planet.webp': () => new URL('../demo/unnamed-planet.webp', import.meta.url).href,
@@ -310,7 +310,7 @@ async function healMedia(revealed: Set<string>): Promise<number> {
     try {
       const resp = await fetch(TOUR_MEDIA_URLS[asset]());
       const blob = await resp.blob();
-      // Re-check AFTER the (arbitrarily slow) fetch (gate MED, S299): a
+      // Re-check AFTER the (arbitrarily slow) fetch (gate MED): a
       // teardown from startTour/launchTour — not serialized behind the step
       // chain like exitTour — could have swapped the store while we awaited.
       // Writing to the captured, now-closed store would land on a dead world.
@@ -395,7 +395,7 @@ async function aliasesOnFor(revealed: Set<string>): Promise<boolean> {
 
 /**
  * The set of bundle ids a LINK may point at, which is NOT the same as the set
- * of elements this step creates (gate R1/R2, S301).
+ * of elements this step creates (gate R1/R2).
  *
  * Stripping exists for one reason: never render a chip pointing at something
  * that is not there. So the honest rule is **never strip a link whose target
@@ -432,7 +432,7 @@ async function revealUpTo(stepIndex: number): Promise<void> {
   const aliasesOn = await aliasesOnFor(linkable);
   const bundle = await loadBundle();
   let wrote = false;
-  // Newly-written NON-QUIET elements flash in the sidebar (Captain, S316):
+  // Newly-written NON-QUIET elements flash in the sidebar (Titus):
   // the preview stack promises them one step ahead, the flash marks their
   // arrival. Quiet machinery (markers, the calendar construct) lands silently.
   const flashIds: string[] = [];
@@ -452,7 +452,7 @@ async function revealUpTo(stepIndex: number): Promise<void> {
   // be visible on the surface the user is looking at, not next tick.
   if (wrote || healed > 0 || mediaHealed > 0) await refreshElements();
   // AFTER the refresh, so the rows exist when the highlight paints them.
-  // S317 (Captain): not the 1.4s pulse — a SUBTLE, STICKY highlight that
+  // Titus's call: not the 1.4s pulse — a SUBTLE, STICKY highlight that
   // stays on the step's new arrivals for as long as the step is live. The
   // dispatch is unconditional: a step that reveals nothing CLEARS the
   // previous step's set. The DOM event keeps the engine from importing UI
@@ -479,12 +479,12 @@ async function routeFor(step: TourStep): Promise<void> {
     else {
       const r = await resolveRef(route.ref);
       // NOT-YET-REVEALED REF → NEUTRAL SURFACE, never "leave it as it was"
-      // and never a dead element page (S307).
+      // and never a dead element page.
       //
       // Two traps here, and own-eyes caught the second one:
       //   1. The old code returned SILENTLY when a route could not be taken,
       //      leaving the PREVIOUS step's element on screen while the narrator
-      //      talked about this one — the "jumping" Captain reported.
+      //      talked about this one — the "jumping" Titus reported.
       //   2. `resolveRef` resolves against the BUNDLE, not the store, so it
       //      succeeds for every scripted element whether or not it has been
       //      revealed yet. Routing on that alone sent the hands-on consul
@@ -630,7 +630,7 @@ async function enterStepInner(index: number): Promise<void> {
   }
   writeTourState({ ...readTourState()!, step: clamped });
   // A pin placement armed on a prior step must not survive a navigation
-  // (gate MED, S299): a leftover arm + a map click on a later map step mints
+  // (gate MED): a leftover arm + a map click on a later map step mints
   // a SECOND consul pin (tourPinBake declines once the bundle pin exists).
   // Leaving the pin step disarms; re-entering it re-offers the button.
   if (getState().ui.pinPlacement) {
@@ -643,11 +643,11 @@ async function enterStepInner(index: number): Promise<void> {
   // re-renders each step (the force-render idiom, convention #2).
   patchSlice('ui', { ...getState().ui });
   // After the route's render lands, bring the step's narrated section on
-  // screen (S309: the linking payoff sat below the dock). Fire-and-forget —
+  // screen (the linking payoff sat below the dock). Fire-and-forget —
   // scrolling must never block or fail the step chain.
   const scrollTo = TOUR_STEPS[clamped].scrollToSection;
   if (scrollTo) void scrollSectionIntoView(scrollTo);
-  // The writing beat autofocuses the editor (Captain, S317): hover+Tab only
+  // The writing beat autofocuses the editor (Titus): hover+Tab only
   // works once the editor holds a selection, and asking a beginner to "click
   // in first" is exactly the confusion the beat teaches around. Tour-only —
   // app-wide autofocus would steal focus on every room switch.
@@ -662,7 +662,7 @@ async function enterStepInner(index: number): Promise<void> {
  * one immediate query would race it — a short bounded poll is the honest
  * form (no MutationObserver machinery for a one-shot cosmetic scroll).
  *
- * S312: this used a smooth `scrollIntoView` and the walk caught it landing at
+ * This used a smooth `scrollIntoView` and the walk caught it landing at
  * scrollTop 0 — a step-enter heal re-renders the pane moments later and the
  * detail's scroll-preservation memory restores the STALE saved position,
  * silently undoing the animation. Setting the scroller's scrollTop directly
@@ -769,7 +769,7 @@ export function consulCreated(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// The place-pin hands-on beat (S299): rides the app's REAL pin-placement
+// The place-pin hands-on beat: rides the app's REAL pin-placement
 // mode (ui.pinPlacement → map-click drops the pin) — the tour teaches the
 // actual gesture, not a tour-only imitation. The tour's contribution is
 // IDENTITY: the placed pin is the bundle pin (locked name + id, the
@@ -787,11 +787,11 @@ export async function tourPinBake(
   mapId: string,
 ): Promise<{ id: string; name: string } | null> {
   if (!tourWorldIsActive()) return null;
-  // Refs via the shared constants (S312): this held a hardcoded
+  // Refs via the shared constants: this held a hardcoded
   // 'map:Hyperion' literal, and when the map was renamed in the re-snapshot
   // the lookup failed OPEN — bake declined, and the pin beat minted a
   // nameless ordinary pin that could never satisfy hasRef(TOUR_PIN_REF).
-  // The S308 dead-gate class, in engine clothing; the e2e caught it.
+  // The dead-gate class, in engine clothing; the e2e caught it.
   const consul = await resolveRef('character:The Consul');
   const pin = await resolveRef(TOUR_PIN_REF);
   const map = await resolveRef(TOUR_MAP_REF);
@@ -869,7 +869,7 @@ async function mintNextCreateNow(): Promise<boolean> {
   // they cover different orders of arrival.
   const healed = await healLinks(universe, await linkableIds(universe, revealed), aliasesOn);
   if (healed > 0) await refreshElements();
-  // Open the page of what was just made (Captain, S312) — a silent mint used
+  // Open the page of what was just made (Titus) — a silent mint used
   // to leave the middle pane parked on the step's route (the Consul), so the
   // freshly created object was only visible as a sidebar row. Navigating is
   // the app's honest create behaviour, and with empty fields hidden the new
@@ -881,14 +881,14 @@ async function mintNextCreateNow(): Promise<boolean> {
   return true;
 }
 
-// (`tourPinPlaced()` was DELETED in S302's close gate: its last caller went
+// (`tourPinPlaced()` was DELETED: its last caller went
 // when the bar moved to `handsOnRefFor` + `view.hasRef`. Worse than unused, it
 // was world-BLIND — no `tourWorldIsActive()` check — so a future caller
 // reaching for the obvious-looking helper would have got a different answer
 // than the bar's predicate on the user's own world.)
 
 /**
- * The tour runs on a BARE STAGE, and until S307 `startTour` only ever
+ * The tour runs on a BARE STAGE, and at first `startTour` only ever
  * *assumed* one instead of establishing it. Every launch it had been tested
  * against — the first-launch landing, every e2e — arrived with no active
  * world, no atlas root and a `#/` route, so the assumption held by accident.
@@ -904,7 +904,7 @@ async function mintNextCreateNow(): Promise<boolean> {
  * replayer carried in.
  */
 async function clearStageForTour(): Promise<void> {
-  // The world the tour replaces may have a room save pending (S360 F1).
+  // The world the tour replaces may have a room save pending.
   await flushBeforeLeavingWorld();
   const store = getActiveStore();
   if (getState().active && store) {
@@ -941,7 +941,7 @@ async function clearStageForTour(): Promise<void> {
  */
 export async function startTour(returnHash?: string): Promise<void> {
   // A keep that began and cannot finish yet is never replaced by a new tour:
-  // its tour state stays, so the next boot finishes it (S375 gate K3).
+  // its tour state stays, so the next boot finishes it.
   if (await teardownPriorTourWorld() === 'stays') {
     throw new PlainError('The last tour world is not kept yet. Reload Atlas to finish keeping it, then replay the tour.');
   }
@@ -958,7 +958,7 @@ export async function startTour(returnHash?: string): Promise<void> {
 export async function launchTour(): Promise<void> {
   // Every door ends here (landing, Settings replay): a window that refuses
   // browser storage says so in one plain line instead of stalling at the
-  // first create with a raw SecurityError (S366). A PlainError (S369): the
+  // first create with a raw SecurityError. A PlainError: the
   // callers' showProblem shows it as its own sentence.
   const { opfsStatus, NO_BROWSER_STORAGE_LINE } = await import('../core/capabilities');
   const storage = await opfsStatus();
@@ -1039,7 +1039,7 @@ async function exitTourInner(p: TourPersist): Promise<void> {
   }
   // A keep that had begun is finished, not deleted (contract §7.2): the
   // user stays in the kept world, or at the finale when it could not finish,
-  // and then the tour is not done (S375 gate K2).
+  // and then the tour is not done.
   const outcome = await teardownPriorTourWorld();
   if (outcome === 'stays' && !wasDone) {
     try { localStorage.removeItem(TOUR_DONE_KEY); } catch { /* private mode */ }
@@ -1100,7 +1100,7 @@ export function commitTourKeep(worldId: string): boolean {
   const next = updateWorldEntry(getState().registry, worldId, { demo: undefined });
   // A save that did not land (a full localStorage) stops here, TK kept: a
   // demo entry with no tour is the state this order exists to avoid, and
-  // resume finishes the keep once the list saves (S376 lens A A2).
+  // resume finishes the keep once the list saves.
   if (!saveRegistry(next)) return false;
   try { localStorage.removeItem(TOUR_STATE_KEY); } catch { /* private mode */ }
   patchSlice('registry', next);
@@ -1165,7 +1165,7 @@ async function forgetTourMapUiState(worldId: string): Promise<void> {
 /**
  * Is this browser-storage folder a tour world? Its world.json says
  * `demo: true`, or it has none (the scaffold was interrupted before the first
- * write). Anything else is somebody's world, whatever its name (S366).
+ * write). Anything else is somebody's world, whatever its name.
  */
 export async function isTourFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
   let text: string;
@@ -1219,7 +1219,7 @@ async function entryFolderState(entry: WorldRegistryEntry): Promise<TourFolderSt
 
 /**
  * A folder with no world.json that still holds element files is not provably
- * the tour's (a world whose world.json was lost): keep it (S370, lane C row i).
+ * the tour's (a world whose world.json was lost): keep it (lane C row i).
  * A tour folder WITH its world.json saying demo is the tour's whatever it holds.
  */
 async function holdsUnclaimedElements(dir: FileSystemDirectoryHandle): Promise<boolean> {
@@ -1245,8 +1245,8 @@ async function holdsUnclaimedElements(dir: FileSystemDirectoryHandle): Promise<b
  * Remove prior tour folders from browser storage. A tour folder is named
  * `hyperion-tour-<uuid8>`, but so is a user's world called "Hyperion Tour"
  * (the same scaffold names both), so the NAME only nominates: a folder goes
- * only when `isTourFolder` says so. S366, the delete-by-name class S365's
- * gate found in "Delete world + folder".
+ * only when `isTourFolder` says so: the delete-by-name class a review
+ * found in "Delete world + folder".
  */
 export async function sweepTourFolders(opfs: FileSystemDirectoryHandle): Promise<string[]> {
   const removed: string[] = [];
@@ -1261,7 +1261,7 @@ export async function sweepTourFolders(opfs: FileSystemDirectoryHandle): Promise
 }
 
 /**
- * Which registry entry is the tour's sandbox? (S370 gate A4/B13.) The one the
+ * Which registry entry is the tour's sandbox? The one the
  * tour state names, but only while it is still demo (a kept world is not the
  * tour's to delete); else a demo world in browser storage (the scaffold-race
  * rollback runs with no tour state); else a 1.16 tour entry (no `where`, its
@@ -1291,7 +1291,7 @@ export function pickTourEntry(
  * 'unknown' deletes nothing either: the tour ends and the directory stays.
  */
 async function teardownPriorTourWorld(knownId?: string): Promise<'gone' | 'kept' | 'stays'> {
-  // Disarm any pending pin placement (gate MED scenario B, S299): a restart
+  // Disarm any pending pin placement (gate MED scenario B): a restart
   // that leaves it armed would toast "element not found" on the next run's
   // pre-consul map click.
   if (getState().ui.pinPlacement) {
@@ -1307,7 +1307,7 @@ async function teardownPriorTourWorld(knownId?: string): Promise<'gone' | 'kept'
   }
   if (entry && state === 'unknown') {
     console.warn('[tour] the tour world\'s world.json is unreadable; it is left in place', entry.folder.folder_name);
-    // Closed, not left open behind the landing (S375 gate K4).
+    // Closed, not left open behind the landing.
     const store = getActiveStore();
     if (getState().active?.worldId === entry.id && store) {
       await store.close().catch(() => {});

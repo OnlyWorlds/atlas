@@ -1,4 +1,4 @@
-// PROBE (S361): how long does atlas's own store take to open and list a world
+// PROBE: how long does atlas's own store take to open and list a world
 // of N elements? The forward critic asked because Sikelia grew to 12,306 files
 // and atlas was last verified at 4,771. Seeds a world folder into OPFS in real
 // Chromium on the running dev server's origin (it needs `__atlasTestApi`), then

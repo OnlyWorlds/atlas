@@ -1,7 +1,7 @@
 /**
  * First tests for `src/middle/room-nav.ts` (the persistent room-icon strip).
  * Zero prior test references, and two live bugs shipped from this exact file
- * in the last week (the S308 label-shortener that stranded "Data"/"import" on
+ * in the last week (the label-shortener that stranded "Data"/"import" on
  * one control, and the "known worldId" guard against a stale/dead deep link
  * rendering a stuck real nav). Both classes are covered below: the label
  * shortener (`truncateName`, exercised through the selected-element chip,

@@ -1,5 +1,5 @@
 /**
- * Find inside the COMPILED view (S355). The compiled view is a read-only
+ * Find inside the COMPILED view. The compiled view is a read-only
  * rendering of a parent narrative plus every descendant, with no editor
  * behind it, so the find bar's usual controller (a ProseMirror plugin) has
  * nothing to drive there. This controller searches the rendered DOM instead:
@@ -81,7 +81,7 @@ export function createCompiledSearch(getHost: () => HTMLElement | null): Compile
       if (spans.length === 0) continue;
       // Split from the END so earlier offsets stay valid within this node;
       // the node's marks are gathered in document order and appended after
-      // the nodes before it (own-eyes S355: an unshift here put the last
+      // the nodes before it (an unshift here once put the last
       // scene's match first, so "1 of 9" lit the wrong word).
       const nodeMarks: HTMLElement[] = [];
       let tail: Text = textNode;

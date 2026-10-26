@@ -1,9 +1,7 @@
 /**
  * What a hide takes from the copy (keel's hidden mark; one-rule §3: "a 409
  * with reason role: keep; reason view, or a delete row with reason hidden:
- * drop"). Contract: Forge/Notes/2026-10-20-s441-hidden-leaves-the-copy.md
- * (I1 to I7), and the S441 gate's G1 to G10. keel probed live S441
- * (`Notes/ui-snapshots/2026-10-20-s441/probe-hide.log`): a contributor gets
+ * drop"). keel probed live: a contributor gets
  * `{"op":"delete", ..., "reason":"hidden"}`; a write naming the hidden id is
  * 400 `invalid_link`, one leaving it out keeps it; a create with its id is
  * 404; an unhide answers the old cursor 409 `resync_required`, reason `view`,

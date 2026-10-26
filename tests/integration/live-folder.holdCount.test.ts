@@ -1,6 +1,6 @@
 /**
- * PROMOTED from the S365 composition gate (lens A, kernel): the big-batch question counted once across the hold at open and the revive pass.
- * Each asserts the fixed behaviour; red on the code before the S365 gate fixes.
+ * The big-batch question counted once across the hold at open and the revive pass.
+ * Each asserts the fixed behaviour; red on the code before the fixes.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { attachSyncEngine, detachSyncEngine, getCurrentSyncEngine } from '../../src/sync/sync-attach';

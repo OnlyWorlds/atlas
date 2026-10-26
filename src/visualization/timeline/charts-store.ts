@@ -111,7 +111,7 @@ export function defaultChartName(scope: ChartScope, elements: Element[]): string
       return typesName(scope.types);
     case 'selection': {
       // Name from the members, like focus does — "Selection (4)" read as
-      // clinical (S265, Captain). Falls back when names are missing.
+      // clinical (Titus). Falls back when names are missing.
       const names = scope.elementIds
         .map(id => elements.find(e => e.id === id)?.name?.trim())
         .filter((n): n is string => Boolean(n));

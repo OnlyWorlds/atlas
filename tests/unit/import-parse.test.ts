@@ -85,7 +85,7 @@ describe('parsePayload — bucketing', () => {
 });
 
 describe('parsePayload — keel world-export envelope (onlyworlds-world-export)', () => {
-  // The shape ow.com emits today (keel portal/views.py; canonical, Orrery
+  // The shape ow.com emits today (keel portal/views.py; canonical, the
   // spec § world-export). Lowercase `world` with id present, nested lowercase
   // `elements`, plus the format/schema_version/exported_at wrapper.
   const envelope = () => ({

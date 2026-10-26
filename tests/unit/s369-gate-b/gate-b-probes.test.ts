@@ -1,5 +1,5 @@
 /**
- * Gate lens B probes (S369, atlas 1.16). Each asserts the FIXED behaviour.
+ * Gate lens B probes (atlas 1.16). Each asserts the FIXED behaviour.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToastManager, toastManager } from '../../../src/ui/toast-manager';

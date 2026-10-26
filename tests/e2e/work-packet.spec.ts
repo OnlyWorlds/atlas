@@ -1,5 +1,5 @@
 /**
- * OW Parlor #487 e2e: a Work item's packet (x_packet_elements, dist.36) shows on
+ * Work packet e2e: a Work item's packet (x_packet_elements, dist.36) shows on
  * its page in the producer's order with each reason, and Step through opens the
  * packet bar on the first element with its reason, Next moving to the second.
  * A Relation without the profile shows no packet. The rule: tests/unit/work-packet.test.ts.
@@ -47,7 +47,7 @@ async function worldId(page: Page): Promise<string> {
   return await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
 }
 
-test.describe('OW Parlor #487 a work packet', () => {
+test.describe('a work packet', () => {
   test("a Work item's packet lists its elements with reasons and steps through them", async ({ page }) => {
     await setupWorld(page);
     const coast = await createElement(page, 'location', { name: 'The Salt Coast' });

@@ -1,5 +1,5 @@
 /**
- * JoinWorldModal: the `#/join/` door's confirm screen (OW Infra #104, S385;
+ * JoinWorldModal: the `#/join/` door's confirm screen (handoff
  * contract R5, R8; logic in `setup/join-door.ts`).
  *
  * Names the world, its owner (as their chosen Character) or the inviter
@@ -72,7 +72,7 @@ export async function runPendingJoin(toasts: ToastManager): Promise<void> {
 }
 
 /**
- * Download a seat a link left held (Keel #469): the join door's own dialog at
+ * Download a seat a link left held: the join door's own dialog at
  * its download step, with no preview and no redeem, since the code is spent.
  */
 export function openHeldSeat(toasts: ToastManager, worldId: string): void {
@@ -332,7 +332,7 @@ export class JoinWorldModal extends BaseModal {
     };
 
     // One submit at a time: a second Open while the first awaits the folder
-    // pick would redeem the code twice (S386 gate).
+    // pick would redeem the code twice.
     let submitting = false;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -404,8 +404,8 @@ export class JoinWorldModal extends BaseModal {
           const { buildV2Adapter } = await import('../sync/make-online');
           const client = buildV2Adapter(held.key, held.secret ?? '');
           // A player's read key asks for its own Character, a call the download
-          // itself makes the like of; an agent's asks for the world (the S469
-          // code gate's 4th: no check stricter than the download).
+          // itself makes the like of; an agent's asks for the world (no
+          // check stricter than the download).
           if (held.kind === 'player') await client.getElement('character', held.character!.id);
           else await client.getWorld();
         } catch (err) {
@@ -459,7 +459,7 @@ export class JoinWorldModal extends BaseModal {
         if (!wasActive) {
           const { activateWorld } = await import('../sidebar/worlds-sidebar');
           // activateWorld says its own problem and returns false (a folder
-          // whose permission prompt lost the click's gesture, S386 gate).
+          // whose permission prompt lost the click's gesture).
           if (!(await activateWorld(id, this.toasts))) {
             this.toasts.info(outcome.kind === 'reconnected'
               ? `${outcome.entry.name} is connected again on the seat this link made. Open it from the sidebar.`

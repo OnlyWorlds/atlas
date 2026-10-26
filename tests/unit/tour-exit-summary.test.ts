@@ -3,7 +3,7 @@
  * on the way out can be checked without a browser.
  *
  * The screen exists to give someone who leaves early an honest map of the app
- * (Captain, S301), so the invariants that matter are all about it NOT lying:
+ * (Titus), so the invariants that matter are all about it NOT lying:
  * never claim a room was visited before its step, never invent a room the app
  * does not have, and never let the two lists disagree with each other.
  */

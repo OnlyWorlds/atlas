@@ -33,7 +33,7 @@ import type { Element } from '../core/types';
 import { buildAutolinkIndex, promotionLabel } from '../core/prose-autolink';
 import type { AutolinkCandidate, AutolinkIndex } from '../core/prose-autolink';
 
-// Index construction moved to core/prose-autolink (S265) so the bulk
+// Index construction moved to core/prose-autolink so the bulk
 // link/unlink kernel shares one matching ruleset with this plugin.
 // Re-exported for the existing import sites.
 export { buildAutolinkIndex };
@@ -149,9 +149,9 @@ function mentionPickerVisible(): boolean {
 
 /**
  * The label a promoted chip should carry: THE WRITER'S OWN TEXT, verbatim,
- * for every match kind (Captain's ruling, S309: creating a link NEVER changes
+ * for every match kind (Titus's ruling: creating a link NEVER changes
  * the text in a writing room). Delegates to the kernel's `promotionLabel` so
- * the live Tab handler and the bulk link-all engines cannot drift — the S308
+ * the live Tab handler and the bulk link-all engines cannot drift — a
  * tour walk caught exactly that drift rewriting the flagship sentence.
  */
 function labelForPromotion(view: EditorView, from: number, to: number, candidate: AutolinkCandidate): string {
@@ -161,7 +161,7 @@ function labelForPromotion(view: EditorView, from: number, to: number, candidate
 /**
  * Promote a hint range into an ElementChip. The single write path shared by
  * Tab (cursor + hover + walk), click-to-link and the context menu — so the
- * label rule (S309, the writer's own text via `promotionLabel`) and the
+ * label rule (the writer's own text via `promotionLabel`) and the
  * replace semantics can never drift between gestures.
  */
 function promoteHint(view: EditorView, from: number, to: number, candidate: AutolinkCandidate): boolean {
@@ -177,8 +177,8 @@ function promoteHint(view: EditorView, from: number, to: number, candidate: Auto
 }
 
 /**
- * The doc position under the mouse while it rests on a dotted hint (Captain,
- * S313). Set on mouseover, cleared on mouseout. Makes Tab HOVER-AUTHORITATIVE:
+ * The doc position under the mouse while it rests on a dotted hint (Titus's
+ * ask). Set on mouseover, cleared on mouseout. Makes Tab HOVER-AUTHORITATIVE:
  * hovering a word and pressing Tab links THAT word, which is the model the copy
  * always described and the fix for "no matter which I hover it links the first
  * unlinked one". Re-resolved fresh in the handler, never trusted as a range, so
@@ -237,7 +237,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
       decorations(state) {
         return AUTOLINK_PLUGIN_KEY.getState(state)?.decorations ?? null;
       },
-      // CLICK A DOTTED WORD TO LINK IT (Captain, S313). The most reliable
+      // CLICK A DOTTED WORD TO LINK IT (Titus). The most reliable
       // gesture — one click focuses the editor and promotes in the same motion,
       // so it works "even if the page isn't selected" (the reliability ask that
       // Tab, which needs the editor already focused, could not meet). Only a
@@ -284,7 +284,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
         // Suppress while the mention picker has its own Tab handling.
         if (mentionPickerVisible()) return false;
 
-        // 1) HOVER WINS (Captain, S313). If the mouse is resting on a dotted
+        // 1) HOVER WINS (Titus). If the mouse is resting on a dotted
         // word, Tab links THAT word — the "hover a dotted word and press Tab"
         // model, and the fix for "no matter which I hover it links the first".
         // Re-resolve the candidate at the hovered position so a doc edit since
@@ -320,7 +320,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
 
         // 3) WALK. Cursor off any hint: promote the next dotted word after it
         // (wrapping to the first). Repeated Tab walks the chapter linking each
-        // in turn — and TAB MUST NOT ESCAPE while there is linking to do (S307:
+        // in turn — and TAB MUST NOT ESCAPE while there is linking to do (seen once:
         // returning false hands Tab to the browser, which lands focus on the
         // link-all corner button and reads as "Tab did something random").
         // Only an empty hint set lets Tab move focus, which is then correct.
@@ -413,7 +413,7 @@ function findHints(
 /**
  * Convert EVERY current autolink hint (or every hint fully inside `range`)
  * into a chip, in ONE transaction — a single Ctrl+Z undoes the whole batch
- * (S265, the link-all affordance). Returns the number converted. `only`: one
+ * (the link-all affordance). Returns the number converted. `only`: one
  * element's hints alone (#24, "Named in the text" under Potentials).
  */
 export function convertAllAutolinks(view: EditorView, range?: { from: number; to: number }, only?: string): number {

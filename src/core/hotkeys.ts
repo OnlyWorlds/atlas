@@ -63,7 +63,7 @@ export function isMac(): boolean {
 
 /**
  * A binding's combo as separate parts (modifiers then key), OS-appropriate.
- * The shortcuts overlay renders one chip per part (S367 critic C12c).
+ * The shortcuts overlay renders one chip per part.
  */
 export function comboParts(b: HotkeyBinding): string[] {
   const mod = isMac() ? '⌘' : 'Ctrl';
@@ -87,7 +87,7 @@ export function formatCombo(b: HotkeyBinding): string {
 export function matchesBinding(e: KeyboardEvent, b: HotkeyBinding): boolean {
   const mod = b.modifier ?? 'none';
   if (e.key.toLowerCase() !== b.key.toLowerCase()) {
-    // S367 critic C12b: on a non-Latin layout (Cyrillic, Greek) Ctrl+S reports
+    // On a non-Latin layout (Cyrillic, Greek) Ctrl+S reports
     // key 'ы'. For modified single-letter/digit bindings fall back to the
     // physical key (e.code). Unmodified bindings keep following the typed char.
     const usesMod = mod === 'mod' || mod === 'mod+shift';
@@ -283,7 +283,7 @@ export function defaultBindings(): HotkeyBinding[] {
       // writing-room navigation is owned by the URL hierarchy; Esc pulling
       // the user out of writing AND clearing their persisted global selection
       // surprised more than it helped. Writing room exits via room-nav click.
-      // Same gate for the knowledge room (session 235) and the share room
+      // Same gate for the knowledge room and the share room
       // (Sharing arc) — both have their own editing surfaces + URL-owned
       // navigation; Esc yanking the user to home mid-edit is the identical trap.
       when: () => {
@@ -297,10 +297,10 @@ export function defaultBindings(): HotkeyBinding[] {
         // shape). Their keydown listeners sit on document beside this one, so
         // stopPropagation cannot stand this down; read their DOM markers
         // instead (the draft overlay, the edit-mode container class). Kept as
-        // DOM reads so core stays free of the Leaflet modules (S367 critic C9).
+        // DOM reads so core stays free of the Leaflet modules.
         if (isZoneGestureActive()) return false;
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        // The Data room joined the list (S309): Esc navigating home there
+        // The Data room joined the list: Esc navigating home there
         // destroyed an unsaved pasted import payload — no draft, no confirm.
         if (hash.includes('/writing') || hash.includes('/knowledge') || hash.includes('/share') || hash.includes('/import')) return false;
         return true;
@@ -405,7 +405,7 @@ export interface HotkeyCallbacks {
   hasSelectedElement?: () => boolean;
   /** Clear selection + navigate to home (DESIGN convention #32). */
   deselectToHome?: () => void;
-  /** Open the per-world notes overlay (session 223). */
+  /** Open the per-world notes overlay. */
   openNotes?: () => void;
 }
 

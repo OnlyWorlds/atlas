@@ -73,7 +73,7 @@ export function accountErrorMessage(err: unknown): string {
     if (err.status === 401) return 'Account token not recognized. Check it on onlyworlds.com, in Account settings under Account tokens.';
     if (err.code === 'rate_limited') return 'Too many attempts. Wait a moment and try again.';
   }
-  // Anything else is worded, never read out (S369): the fallback used to be
+  // Anything else is worded, never read out: the fallback used to be
   // the server's or the browser's own text.
   return problemFor(err, { inline: true, doing: 'talking to your OnlyWorlds account' }).sentence;
 }
@@ -142,7 +142,7 @@ export class AccountClient {
    * unless `scope` is 'read'). The response's `key` is shown once — the caller
    * must persist it (world.json api block) before dropping it.
    * `name` labels the key in the portal ("atlas · windows") so the keys table
-   * reads honestly — Captain's named-keys condition, live 2026-07-13. Omitted
+   * reads honestly — Titus's named-keys condition, live 2026-07-13. Omitted
    * name keeps the old bare mint (server stores "").
    */
   async mintWorldKey(worldId: string, name?: string, scope: 'write' | 'read' = 'write'): Promise<MintedWorldKey> {

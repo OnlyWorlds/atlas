@@ -1,6 +1,6 @@
 /**
- * A view-only copy of a world (#527's second half, conv. 177; contract
- * `Forge/Notes/2026-10-25-s468-copy-beside-contract.md`).
+ * A view-only copy of a world (#527's second half, conv. 177;
+ * contract: a copy-beside design note).
  *
  * A world file whose world is already here can open BESIDE it as a copy, by
  * the folder spec's snapshot rule (§4.2): a fresh world id, `snapshot_of`

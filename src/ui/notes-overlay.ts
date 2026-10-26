@@ -1,7 +1,7 @@
 /**
  * Notes overlay — a freeform per-world note pad available from any room.
  *
- * Captain's request (session 223 design chat): "a random notes modal/page
+ * Titus's request: "a random notes modal/page
  * that is persistent in app, just overlays and for random dumps". Lives on
  * the registry entry (atlas-local, never synced). Accessible via:
  *   - The notepad button in the sidebar footer (everywhere)
@@ -51,7 +51,7 @@ export class NotesOverlay extends BaseModal {
     ta.value = entry.notes ?? '';
     // What the textarea last took from, or gave to, the registry. The notes
     // can move under an open overlay (the world-prefs merge folding in
-    // another machine's notes, another tab's save): S365 gate lens A M1.
+    // another machine's notes, another tab's save).
     let loaded = ta.value;
     const notesNow = (): string => getState().registry.worlds.find(w => w.id === active.worldId)?.notes ?? '';
 
@@ -65,7 +65,7 @@ export class NotesOverlay extends BaseModal {
         // Moved underneath while typing: keep both. The part this overlay
         // loaded is replaced by what was typed; anything else stays.
         // A replacer function: typed text holding `$'` or `$&` would expand
-        // as a replacement string (S388, the family of Boss's show find).
+        // as a replacement string (the family of Boss's show find).
         value = loaded && current.includes(loaded)
           ? current.replace(loaded, () => ta.value)
           : `${current}\n\nNotes from this browser:\n${ta.value}`;

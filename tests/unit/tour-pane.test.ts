@@ -1,5 +1,5 @@
 /**
- * Which pane each tour step points at (S366, `src/tour/tour-pane.ts`), as a
+ * Which pane each tour step points at (`src/tour/tour-pane.ts`), as a
  * table over the REAL steps, so a new step or a changed route has to agree
  * with this file on purpose.
  */

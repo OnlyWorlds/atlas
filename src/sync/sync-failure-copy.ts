@@ -1,5 +1,5 @@
 /**
- * What to tell the user when elements fail to sync (S360).
+ * What to tell the user when elements fail to sync.
  *
  * The old toast said "Check console or test connection in settings" for every
  * failure. For the commonest persistent ones that advice is wrong (the
@@ -16,13 +16,13 @@ import { isFileBusyError } from '../store/fs-utils';
 
 export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'not_yours' | 'other';
 
-/** Chromium's stock text for a file another program holds (S368); the name is the real signal. */
+/** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
 
 export function classifyFailure(f: PerElementFailure): FailureKind {
   const m = f.message ?? '';
   if (isFileBusyError({ name: f.error_name }) || HELD_FILE_TEXT.test(m)) return 'file_busy';
-  // Evidence only (S363): a 409 whose read-back FAILED says nothing about
+  // Evidence only: a 409 whose read-back FAILED says nothing about
   // which world holds the id, so its message no longer matches here.
   if (/already exists in another world|a copied world folder needs fresh ids/i.test(m)) return 'foreign_id';
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
@@ -60,7 +60,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   // Counted by element: the world's own sync record can report twice in one
   // round (the world step and the round's end), and it is one change.
   // An upload's held file is retried by the engine; a held file on the pull
-  // side (operation `read`) waits for the next refresh (S369 gate A M4).
+  // side (operation `read`) waits for the next refresh.
   const busyPull = [...new Set(byKind.get('file_busy')?.filter(f => f.operation === 'read').map(f => f.element_id) ?? [])];
   if (busyPull.length > 0) {
     parts.push(inBrowser
@@ -83,7 +83,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   }
   const other = byKind.get('other');
   if (other) {
-    // The cause stays out of the sentence (S368): it was raw browser or
+    // The cause stays out of the sentence: it was raw browser or
     // server text. It rides in the toast's Details instead (sync-attach).
     parts.push(`${plural(other.length, 'change', 'changes')} could not sync. Atlas will try again with your next save.`);
   }
@@ -99,12 +99,12 @@ const shownThisSession = new Set<string>();
 export function failureToastOnce(failures: readonly PerElementFailure[], where: 'folder' | 'browser' = 'folder'): string | null {
   // One round's result reaches this twice (the engine's result handler, then
   // the attach flush or Make online): the second call must not undo the
-  // quiet first busy failure (S368 gate A L1).
+  // quiet first busy failure.
   // Keyed on the failure objects, which a filtered copy of the list shares.
   const fresh = failures.filter(f => !decided.has(f));
   for (const f of fresh) decided.add(f);
   // A held file is usually let go within seconds and the engine retries on
-  // its own (S368), so an element's FIRST busy failure stays quiet; it is
+  // its own, so an element's FIRST busy failure stays quiet; it is
   // said only if that element meets a held file again.
   const toShow = fresh.filter(f => {
     if (classifyFailure(f) !== 'file_busy' || busySeen.has(f.element_id)) return true;

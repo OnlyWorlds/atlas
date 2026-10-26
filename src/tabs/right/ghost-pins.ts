@@ -24,7 +24,7 @@ import { navigate, elementHash } from '../../core/router';
 import { escapeText } from '../../core/dom-utils';
 
 /** Pixel radius for ghost ring around the source pin. Tightened in session
- * 211 smoke after Captain feedback that 70px felt "too far away" — 45 keeps
+ * 211 smoke after Titus feedback that 70px felt "too far away" — 45 keeps
  * the cluster close enough to read as a group around the source pin. */
 export const GHOST_RADIUS_PX = 45;
 /** Translucency for ghost markers. */
@@ -33,7 +33,7 @@ export const GHOST_OPACITY = 0.4;
 const GHOST_ICON_SIZE = 32;
 /** Show a name label by default when ghost count is at most this many.
  * Above this threshold, labels get noisy fast — count-only relies on hover.
- * Per session 211 smoke ("if 6 or less"). */
+ * Per Titus's smoke test ("if 6 or less"). */
 const GHOST_LABEL_THRESHOLD = 6;
 
 // ---- Eligible types (FIELD_SCHEMA-driven) ----
@@ -134,7 +134,7 @@ export function computeGhostPositions(
     const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
     out.push({
       x: sourceX + radius * Math.cos(angle),
-      // Storage Y grows UP (bottom-left, S361), so SUBTRACTING the sin term
+      // Storage Y grows UP (bottom-left), so SUBTRACTING the sin term
       // keeps the first ghost at 12 o'clock on screen and the walk clockwise.
       y: sourceY - radius * Math.sin(angle),
     });

@@ -1,8 +1,8 @@
 /**
- * Flip one map's pins and zone points top to bottom (S361).
+ * Flip one map's pins and zone points top to bottom.
  *
  * Atlas stored map y top-down until 1.8 while the schema, and every other
- * OnlyWorlds tool, counts from the BOTTOM-left. Captain ruled no migration:
+ * OnlyWorlds tool, counts from the BOTTOM-left. Titus ruled no migration:
  * old Atlas maps are few. This is the remedy a user reaches for when a map
  * placed in older Atlas shows upside down: `y = height - y` for every pin and
  * marker on the map. It is its own inverse, so pressing it again undoes it.

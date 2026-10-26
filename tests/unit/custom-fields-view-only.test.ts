@@ -1,5 +1,5 @@
 /**
- * Custom fields on a view-only world (S435's read-key walk): the store refuses
+ * Custom fields on a view-only world (seen in a read-key walk): the store refuses
  * every UI write there, so the section offers none. No "+ Add field", no ×
  * on a row or a structured record, and no section at all on an element with
  * no fields of its own. A writable world is the control: the same element

@@ -1,6 +1,6 @@
 # Sharing Backend Contract — atlas ↔ onlyworlds.com
 
-**Status**: v0.3 (2026-06-12, session 239) — **AS-BUILT**. Anchor's `ow/sharing/` Django slice is implemented (83 backend tests, adversarial self-review, awaiting Captain's deploy); this version folds in her as-built calls from the 2026-06-07 message: **slug-addressed mutations**, the **locked error enum** (+`title_too_long`/`intent_invalid`, enveloped 401), **quota 20/account**, **purge-by-URL** invalidation, base path `/api/sharing/` confirmed, empty payloads are valid pages. Atlas fakes + client synced same day (session 239).
+**Status**: v0.3 (2026-06-12) — **AS-BUILT**. Anchor's `ow/sharing/` Django slice is implemented (83 backend tests, adversarial self-review, awaiting Titus's deploy); this version folds in her as-built calls from the 2026-06-07 message: **slug-addressed mutations**, the **locked error enum** (+`title_too_long`/`intent_invalid`, enveloped 401), **quota 20/account**, **purge-by-URL** invalidation, base path `/api/sharing/` confirmed, empty payloads are valid pages. Atlas fakes + client synced the same day.
 **Owner pairing**: Temper (atlas + viewer tool) · Anchor (Django backend).
 **Context docs**: `DESIGN_SHARING.md` (the design), `core/sharing.ts` (the block model as built and tested), Anchor's feasibility review (the deployment ground truth).
 
@@ -12,12 +12,12 @@ This is the coordination artifact for Sharing Phase 2. Everything atlas-side tha
 
 Atlas users compose **pages** — ordered stacks of blocks (heading / prose / element-card; later map, collection, circle) — and publish them to a public URL: `show.onlyworlds.com/<slug>`. A published page is a **frozen snapshot** (safe: later world edits never leak to link-holders; **all of v1 is frozen-only** — see §6). Updating = republish, one button. A lightweight read-only **viewer tool** (Temper; CF Pages + a meta-injection Function) renders the payloads. Public reads are served from the **Cloudflare edge** (§7) so anonymous traffic never competes with members' API calls for PythonAnywhere workers.
 
-## 2. Decisions locked (v0.1 + Anchor review + Captain sign-off, sessions 234–238)
+## 2. Decisions locked (v0.1 + Anchor review + Titus sign-off)
 
 | Decision | Value |
 |---|---|
 | Page storage in the world | prose/composition = a Narrative `subtype: "page"`; composition config in atlas-local fields (never hits worldapi); canonical `story` = derived plain-markdown mirror |
-| Block model v1 | `heading` / `prose` / `element-card` / `circle` (added session 238 — a knower's compiled knowledge, frozen into the payload at publish; backend-opaque like all blocks) — extensible without migration |
+| Block model v1 | `heading` / `prose` / `element-card` / `circle` (added later — a knower's compiled knowledge, frozen into the payload at publish; backend-opaque like all blocks) — extensible without migration |
 | **Live pages** | **DEFERRED entirely — v1 is frozen-only** (Anchor §3.1). `is_live` stays in the schema as a reserved column, default false, unused. The "World Showcase" v1 = a frozen page you republish |
 | Slug namespace | **global** (`show.onlyworlds.com/<slug>`), uniqueness enforced at publish, **min length 4**, `[a-z0-9-]`, max 40, no leading/trailing `-` |
 | **Slug immutability** | **v1 disallows slug change after publish** (atlas D1). Renaming a page's URL = revoke + republish to a new slug; the old slug stays an owner-held tombstone. No silent release → no takeover surface. `PATCH` may change `title`/`intent`/`payload` only |
@@ -73,7 +73,7 @@ Base path: **`/api/sharing/`** on `https://www.onlyworlds.com` (confirmed as-bui
 
 ## 5. The payload (the viewer's input contract)
 
-Produced by atlas at publish time from the page's block stack (`core/sharing.ts` shapes, as built; builder function `buildPagePayload()` — session 238+). Self-contained: the viewer renders it with zero further fetches.
+Produced by atlas at publish time from the page's block stack (`core/sharing.ts` shapes, as built; builder function `buildPagePayload()`). Self-contained: the viewer renders it with zero further fetches.
 
 ### 5.1 Payload body
 
@@ -133,17 +133,17 @@ A page with one full Ireena card (fields: `description`, `birthplace`, `friends`
 }
 ```
 
-Builder guarantees (all test-locked): prose blocks ship markdown only (no TipTap JSON) · **prose + circle markdown is disclosure-SCRUBBED at build** (`ow://` links to non-included targets pre-resolve to plain labels — the payload JSON never carries undisclosed ids; session 239) · dangling relation ids are DROPPED (disclose nothing) · compact cards contribute no fields · chosen fields project only while still populated · meta/atlas-local fields never appear · card ids are healed from the refs mirror before building (id-swap safety). Atlas's visitor preview renders THIS payload — author preview ≡ served page.
+Builder guarantees (all test-locked): prose blocks ship markdown only (no TipTap JSON) · **prose + circle markdown is disclosure-SCRUBBED at build** (`ow://` links to non-included targets pre-resolve to plain labels — the payload JSON never carries undisclosed ids) · dangling relation ids are DROPPED (disclose nothing) · compact cards contribute no fields · chosen fields project only while still populated · meta/atlas-local fields never appear · card ids are healed from the refs mirror before building (id-swap safety). Atlas's visitor preview renders THIS payload — author preview ≡ served page.
 
-**Card images** (session 239): card blocks carry `showImage` (default true; per-card author opt-out). `elements[*].image_url` ships only when at least one card for that element wants it. Renderers: full card → banner image, compact card → small head avatar in place of the type icon. Older payloads without `showImage` render as true.
+**Card images**: card blocks carry `showImage` (default true; per-card author opt-out). `elements[*].image_url` ships only when at least one card for that element wants it. Renderers: full card → banner image, compact card → small head avatar in place of the type icon. Older payloads without `showImage` render as true.
 
-**Collection blocks** (session 239, S6 — backend-opaque like all blocks): `{ "id", "kind": "collection", "elementIds": [...] }` — an identity grid. Members join `elements` identity-only (name/type/image_url, empty `fields` unless they also have a full card); dangling member ids are dropped from the wire.
+**Collection blocks** (S6 — backend-opaque like all blocks): `{ "id", "kind": "collection", "elementIds": [...] }` — an identity grid. Members join `elements` identity-only (name/type/image_url, empty `fields` unless they also have a full card); dangling member ids are dropped from the wire.
 
-**Map blocks** (session 239, S7 — backend-opaque): frozen at build to `{ "id", "kind": "map", "title", "image_url", "showLabels"?, "pins": [{ xPct, yPct, name, type, ref? }] }`. Image is `image_url`-only (D3: local media never leaves the folder); pins are %-positioned (top-left origin; atlas storage is the schema's BOTTOM-left since 1.8, and `freezeMapBlock` converts once, so renderers never do); labels render by default (`showLabels: false` → hover-only); maps without a web image or dimensions drop from the wire entirely; pin/map IDs never ship. **Pinned elements are disclosed BY INCLUSION** (Captain's call, same session): each included pin's element joins `elements` with image + description + ALL populated fields (relations tokenized per the standard rule) — the pin-click modal renders from it; the per-pin checklist is the disclosure gate for maps.
+**Map blocks** (S7 — backend-opaque): frozen at build to `{ "id", "kind": "map", "title", "image_url", "showLabels"?, "pins": [{ xPct, yPct, name, type, ref? }] }`. Image is `image_url`-only (D3: local media never leaves the folder); pins are %-positioned (top-left origin; atlas storage is the schema's BOTTOM-left since 1.8, and `freezeMapBlock` converts once, so renderers never do); labels render by default (`showLabels: false` → hover-only); maps without a web image or dimensions drop from the wire entirely; pin/map IDs never ship. **Pinned elements are disclosed BY INCLUSION** (Titus's call, same session): each included pin's element joins `elements` with image + description + ALL populated fields (relations tokenized per the standard rule) — the pin-click modal renders from it; the per-pin checklist is the disclosure gate for maps.
 
-**Theme** (session 239, S3 — live): the `theme` slot carries allowlist-validated tokens only — `accent` (curated hex set) · `font` (pairing key) · `mode` (dark/light) · `density` (compact/cozy/airy) · `width` (narrow/regular/wide) · `cover` (https URL). Unknown keys/values are dropped at build AND at viewer parse (no style injection path).
+**Theme** (S3 — live): the `theme` slot carries allowlist-validated tokens only — `accent` (curated hex set) · `font` (pairing key) · `mode` (dark/light) · `density` (compact/cozy/airy) · `width` (narrow/regular/wide) · `cover` (https URL). Unknown keys/values are dropped at build AND at viewer parse (no style injection path).
 
-**Circle blocks** (session 238, atlas+viewer concern — opaque to Django): in the payload a circle block carries its compilation FROZEN at build time: `{ "id", "kind": "circle", "knowerId", "title": "<knower name>", "knowerType": "collective"|"character", "entries": [ { "title", "markdown" } ] }`. Entry markdown follows the same prose disclosure rule at render time. `knowerId` carries the knower's id only when the knower is itself included in `elements{}`, else `""` (atlas 1.14, S367: the same ref-only-when-included rule as relation tokens; the key stays a string because the viewer drops a circle block without one).
+**Circle blocks** (atlas+viewer concern — opaque to Django): in the payload a circle block carries its compilation FROZEN at build time: `{ "id", "kind": "circle", "knowerId", "title": "<knower name>", "knowerType": "collective"|"character", "entries": [ { "title", "markdown" } ] }`. Entry markdown follows the same prose disclosure rule at render time. `knowerId` carries the knower's id only when the knower is itself included in `elements{}`, else `""` (atlas 1.14: the same ref-only-when-included rule as relation tokens; the key stays a string because the viewer drops a circle block without one).
 
 ### 5.2 GET response envelope
 
@@ -165,7 +165,7 @@ v1 ships nothing live. When it lands (post-rebuild, with Redis / a real host): t
 **Confirmed 2026-06-07**: onlyworlds.com is already Cloudflare-proxied (`Server: cloudflare`, `cf-cache-status: DYNAMIC` — proxied, not yet caching). So:
 
 - **Frozen payloads are immutable between republishes** → Django sets `Cache-Control: public, max-age=<long>` + ETag on the public GET; a CF **Cache Rule** on the GET path caches it at the edge. Anonymous spike traffic (the Reddit moment) is served by Cloudflare and never reaches a PythonAnywhere worker.
-- **Invalidation (as-built, §8.2 closed): purge-by-URL.** Django holds a scoped Zone→Cache-Purge token (Captain mints it) and purges the exact public GET URL on republish/revoke; degrades to edge TTL if the token's absent. **The cache key is `https://www.onlyworlds.com/api/sharing/pages/<slug>/`** (configurable via `SHARING_API_ORIGIN`) — every payload fetcher (atlas client, viewer SPA, OG Function) must pin to that exact host or purges miss their cache entry.
+- **Invalidation (as-built, §8.2 closed): purge-by-URL.** Django holds a scoped Zone→Cache-Purge token (Titus mints it) and purges the exact public GET URL on republish/revoke; degrades to edge TTL if the token's absent. **The cache key is `https://www.onlyworlds.com/api/sharing/pages/<slug>/`** (configurable via `SHARING_API_ORIGIN`) — every payload fetcher (atlas client, viewer SPA, OG Function) must pin to that exact host or purges miss their cache entry.
 - **Viewer**: CF Pages at `show.onlyworlds.com` (same CF zone). `_redirects /* /index.html 200`; `_routes.json` excludes `/assets/*`; a Pages Function injects per-page OpenGraph meta — its server-side payload fetch rides the same edge cache.
 - **Per-IP throttle on the GET** at Django remains required (cache-miss path + cache-bypass attempts).
 - **Durability requirement**: the **public GET path + slug URLs survive the ow.com rebuild unchanged**. This is the contract's most durable line — the viewer and every shared link depend on it.
@@ -187,9 +187,9 @@ v1 ships nothing live. When it lands (post-rebuild, with Redis / a real host): t
 
 ---
 
-## Sequence (from Anchor §7, Captain-approved)
+## Sequence (from Anchor §7, Titus-approved)
 
-1. ✅ Captain decisions (defer-live · 10/account · CF-fronted reads · freeze prototype · slug immutability).
+1. ✅ Titus decisions (defer-live · 10/account · CF-fronted reads · freeze prototype · slug immutability).
 2. **Anchor builds the §3–§5 slice** (model + migration + endpoints, frozen-only, throttles, cache headers).
 3. **CF mini-design** (Temper + Anchor): Cache Rule + headers + purge — short doc, spans both sides.
 4. **Temper**: payload builder + fakes-first S4 publish flow + viewer fetch locked against §5.

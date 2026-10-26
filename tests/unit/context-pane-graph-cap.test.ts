@@ -1,5 +1,5 @@
 /**
- * S367 critic C3: the context graph's ring 1 was uncapped (a Map's backlinks
+ * The context graph's ring 1 was uncapped (a Map's backlinks
  * were every pin and marker on it; a character flood stands in since #185
  * folded those into links) and the O(iters x n^2) sim reran on every
  * elements swap, because the context tab remounts the graph on each one.
@@ -43,7 +43,7 @@ function mount(subject: Element, hiddenTypes?: ReadonlySet<ElementType>) {
   return { host, h };
 }
 
-describe('context graph ring 1 cap (S367 critic C3)', () => {
+describe('context graph ring 1 cap', () => {
   it('a Map with 800 characters on it draws the center plus 60, and says how many were left out', () => {
     const { map, elements } = worldWithHub(800);
     patchSlice('data', { elements });
@@ -73,7 +73,7 @@ describe('context graph ring 1 cap (S367 critic C3)', () => {
   });
 });
 
-describe('context graph layout memo (S367 critic C3)', () => {
+describe('context graph layout memo', () => {
   it('a remount over a new elements array with the same node and edge set does not rerun the sim', () => {
     const { map, elements } = worldWithHub(30);
     patchSlice('data', { elements });

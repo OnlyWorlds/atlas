@@ -1,5 +1,5 @@
 /**
- * The `#/join/` door (OW Infra #104, S385) through the real page: the code
+ * The `#/join/` door through the real page: the code
  * leaves the address bar before keel answers (R2), the confirm screen names
  * the world, owner and role as text (R8, conv. 93), Open joins as a seat and
  * downloads, and the seat's secret stays out of world.json and the account
@@ -101,7 +101,7 @@ test('a join link: the code is gone before keel answers, the screen names the wo
   await expect(modal.locator('[data-role="world-name"]')).toHaveText('Moppetopia');
   await expect(modal.locator('[data-role="who"]')).toHaveText('Owned by Admiral Fluffington.');
   await expect(modal.locator('[data-role="role"]')).toContainText('As a contributor');
-  // An agent link says what it makes before anything is spent (the Captain's case, h58 #8512).
+  // An agent link says what it makes before anything is spent (Titus's case, 2026-10-20).
   await expect(modal.locator('.atlas-join-question')).toHaveText('Open Moppetopia as an AI agent?');
   await expect(modal.locator('[data-role="agent-note"]')).toContainText('It does not make you a member: to join as yourself, ask for an invite link for a person.');
   await expect(modal.locator('[data-action="open"]')).toHaveText('Open as an AI agent');
@@ -293,7 +293,7 @@ test('a link opened into a running tab takes the same door, and a hostile world 
   expect(keel.joins).toHaveLength(0);
 });
 
-// Keel #469 (S469, contract `Forge/Notes/2026-10-25-s468-held-seat-contract-v2.md`):
+// The held-seat contract, v2:
 // a link is spent at the redeem, so its seat is held from that moment until
 // the world lands here or the person removes it.
 const heldRecord = (page: Page) => page.evaluate((id) => localStorage.getItem(`atlas-held-seat:${id}`), WORLD_ID);
@@ -375,15 +375,15 @@ async function seedHeld(page: Page, name = 'Moppetopia'): Promise<void> {
 }
 
 test('a held row gives the name its row: the state is a line under it, not a chip beside it', async ({ page }) => {
-  // Seethe's note on 1.91.1 (h20 #12863): the chip took half the row and cut the name to ten characters.
+  // Seethe's note on 1.91.1 (2026-10-25): the chip took half the row and cut the name to ten characters.
   await freshBoot(page);
   await mockKeel(page);
-  // 38 characters: 1.92.2 still cut a name this long at 1280 and 360 (Seethe, h20 #13193).
+  // 38 characters: 1.92.2 still cut a name this long at 1280 and 360 (Seethe, 2026-10-25).
   const long = 'The Moppetopia Harbour Guild of Ferries';
   await seedHeld(page, long);
   const name = page.locator('[data-held-seat] [data-role="held-download"]');
   await expect(name).toHaveText(long);
-  // clientWidth > 0: a hidden row reads 0 <= 0 and would pass (S475's first phone walk did).
+  // clientWidth > 0: a hidden row reads 0 <= 0 and would pass (a first phone walk did).
   await expect(name).toBeVisible();
   expect(await name.evaluate(el => el.clientWidth > 0 && el.scrollWidth <= el.clientWidth), 'the whole name shows, no ellipsis').toBe(true);
   await expect(page.locator('[data-held-seat] .atlas-held-said')).toHaveText('Not downloaded yet');

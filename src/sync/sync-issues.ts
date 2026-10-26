@@ -1,5 +1,5 @@
 /**
- * Sync issues: the place to come back to (S369, lane X stage 3).
+ * Sync issues: the place to come back to (lane X stage 3).
  *
  * A toast says a change could not sync once; this list remembers which
  * elements are still not syncing, per world, for this session. Settings →
@@ -53,7 +53,7 @@ export function noteRoundIssues(
 ): boolean {
   const prev = byWorld.get(worldId) ?? new Map<string, SyncIssue>();
   // A round that ran to its end replaces the entries of the side it retried
-  // (S369, gate A M5): a push never retries a pull's write, and a pull never
+  // (gate A M5): a push never retries a pull's write, and a pull never
   // retries an upload. A sync round does both.
   const complete = !result.auth_blocked && !result.transient_blocked;
   const replaces = (side: 'push' | 'pull'): boolean =>

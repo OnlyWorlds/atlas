@@ -1,6 +1,6 @@
 /**
  * LoadingOverlay — a minimal blocking overlay for multi-second flows that
- * would otherwise freeze silently (account-mode world open, S260 Captain
+ * would otherwise freeze silently (account-mode world open, a Titus
  * smoke finding). Glass panel, spinner, title + live status line.
  *
  * Blocking is deliberate: the flows that show this (mint + initial download)

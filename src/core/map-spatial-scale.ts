@@ -1,5 +1,5 @@
 /**
- * Blank-canvas → image spatial rescale (DESIGN_MAPS.md §4.2, S300b).
+ * Blank-canvas → image spatial rescale (DESIGN_MAPS.md §4.2).
  *
  * When an image is attached to a map that was a blank flat canvas, the
  * canvas dims change from the stamped square to the image's real size.

@@ -2,7 +2,7 @@
 
 Companion to `DESIGN_SYNC.md` (how the engine runs today). This file captures **lessons + patterns** from building the sync layer — the WHY behind decisions, the bug categories we've hit, and what to watch for. Read this before touching sync code.
 
-**⚑ DIALECT NOTE (v2 port, 2026-07-12)**: atlas element CRUD now speaks the keel **v2** dialect through `OwV2ClientAdapter` (thin fetch, no SDK). The frozen wire contract lives in `Forge/Notes/Archive/2026-07-12-v2-probed-facts.md`; the /changes pull design + its adversarial-gate resolutions in `Forge/Notes/Archive/2026-07-12-v2-changes-pull-design.md`. Sections below marked HISTORY (v1) describe the retired v1 dialect — kept because the failure PATTERNS they teach still apply.
+**⚑ DIALECT NOTE (v2 port, 2026-07-12)**: atlas element CRUD now speaks the keel **v2** dialect through `OwV2ClientAdapter` (thin fetch, no SDK). The frozen wire contract and the /changes pull design (with its adversarial-gate resolutions) were dated working notes of 2026-07-12, kept outside this repository. Sections below marked HISTORY (v1) describe the retired v1 dialect — kept because the failure PATTERNS they teach still apply.
 
 ---
 
@@ -24,7 +24,7 @@ If you ever touch the adapter, run `ow-v2-client-adapter.test.ts`.
 
 ## Server-assigned ids — DORMANT under keel (id-swap machinery kept dead-but-safe)
 
-**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. **EXCISED (cleanup bout, 2026-07-12 evening)**: the engine's create-path swap branch and the engine `onIdSwap` hook are gone (`rewriteIdReferences` survived in Route 2's merge until S367 moved Route 2 onto the re-key kernel) — a server that reassigns an id on CREATE now produces a loud per-element failure (contract violation; nothing stamped, retried next round). Route 2's name matches (same name+type, different ids across machines) remain real; since S367 they move through the re-key kernel and `rekeyLiveUi`. The legacy v1 `OwClientAdapter` and its dedicated suites were retired in the same bout (its 5 flow suites migrated to `statefulV2Handlers`/the v2 adapter); the v1 `worldsync` create-world route stays (still v1 in production).
+**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. **EXCISED (cleanup bout, 2026-07-12 evening)**: the engine's create-path swap branch and the engine `onIdSwap` hook are gone (`rewriteIdReferences` survived in Route 2's merge until Route 2 moved onto the re-key kernel) — a server that reassigns an id on CREATE now produces a loud per-element failure (contract violation; nothing stamped, retried next round). Route 2's name matches (same name+type, different ids across machines) remain real; they now move through the re-key kernel and `rekeyLiveUi`. The legacy v1 `OwClientAdapter` and its dedicated suites were retired in the same bout (its 5 flow suites migrated to `statefulV2Handlers`/the v2 adapter); the v1 `worldsync` create-world route stays (still v1 in production).
 
 HISTORY (pre-keel): the old Django server assigned its OWN UUID v7 on CREATE, overriding client v4 ids — everything below was load-bearing then.
 
@@ -68,13 +68,13 @@ If you create Location locally and link a Character to it (`birthplace`), then p
 
 `pushPhase` partitions `changed` into [no-server-baseline (CREATEs)] then [has-server-baseline (UPDATEs)]. Within each partition, iteration order doesn't matter for non-chain cases.
 
-For Route 2 merge (`mergeLocalIntoApi`), bidirectional FK between matched + new locals once required a 5-phase order ("Merge phase ordering" below, now history). Since S367 the kernel moves ids first, so the server phase is plain: downloads, creates, matched updates.
+For Route 2 merge (`mergeLocalIntoApi`), bidirectional FK between matched + new locals once required a 5-phase order ("Merge phase ordering" below, now history). Now the kernel moves ids first, so the server phase is plain: downloads, creates, matched updates.
 
 ---
 
 ## Merge phase ordering (the hardest piece)
 
-History (S367), no longer the code path: Route 2 moves name-matched locals onto their server ids with the re-key kernel BEFORE any server call ("Route 2 on the re-key kernel" below), so every server decision is same-id and no rewrite runs between phases. What follows is why the old order existed.
+History, no longer the code path: Route 2 moves name-matched locals onto their server ids with the re-key kernel BEFORE any server call ("Route 2 on the re-key kernel" below), so every server decision is same-id and no rewrite runs between phases. What follows is why the old order existed.
 
 Route 2 merge has a unique circular-FK problem:
 - Matched element (e.g. Splashworth on api) may reference new locals (Bob, Carol) via friends/rivals
@@ -131,7 +131,7 @@ The race risk: if user is mid-edit during a refresh, the cache snapshot might ov
 
 ## writeJsonAtomic — Chromium FS Access API quirks
 
-The write pattern is `one writable → close → read-back verify` (S368: the old `write tmp → verify → write final → verify` doubled the window in which a file held by another program (OneDrive, antivirus) refuses the swap at `close()`, which Chromium reports as an `InvalidStateError`; such a refusal is retried whole for about two seconds, `isFileBusyError`). Two quirks shape it:
+The write pattern is `one writable → close → read-back verify` (the old `write tmp → verify → write final → verify` doubled the window in which a file held by another program (OneDrive, antivirus) refuses the swap at `close()`, which Chromium reports as an `InvalidStateError`; such a refusal is retried whole for about two seconds, `isFileBusyError`). Two quirks shape it:
 
 1. **createWritable doesn't always truncate by default** — explicitly call `await writer.truncate(0)` before `write(json)`. Without this, shorter new content leaves trailing bytes from old content, producing malformed JSON.
 
@@ -188,7 +188,7 @@ If you see a 422, check the wire body (logged via `logWireError` on failure) and
 
 ## CREATE order: topo-sort by FK dependency (Bout U)
 
-(Added Bout U, smoke-driven post-Bout-T. Captain hit it during a fresh
+(Added Bout U, smoke-driven post-Bout-T. Titus hit it during a fresh
 Make-Online: local Character with `birthplace` pointing at a local Location.
 Character pushed first → real OW returned `400 Invalid FK: birthplace_id —
 referenced Location with id '...' does not exist`. The chain self-healed
@@ -236,7 +236,7 @@ no FK error. Verified by the `assignServerIds` test case.
 
 ## Auth-failed rounds bail + surface (Bout T)
 
-(Added Bout T, session 205. Smoke surfaced the "lying pill" case: Captain made a world online via Make-Online, then deleted it on onlyworlds.com web. Atlas's api_key became a dead reference. Subsequent edits hit 401, pill went `saving → synced`, user thought work was saved — wasn't.)
+(Added Bout T. Smoke surfaced the "lying pill" case: Titus made a world online via Make-Online, then deleted it on onlyworlds.com web. Atlas's api_key became a dead reference. Subsequent edits hit 401, pill went `saving → synced`, user thought work was saved — wasn't.)
 
 ### The trap
 
@@ -256,7 +256,7 @@ When `pushPhase` or `pullPhase` sees a 401/403:
 3. **Surface via state.** Caller (runPushOnly / runPullOnly / runSync) checks `result.auth_blocked` and calls `setAuthError()` instead of transitioning to idle. `setAuthError` sets `paused=true` AND state to `{kind: 'error', message: 'authentication failed...', recoverable: true}`. The pill maps `error` to red display.
 4. **Bail pull when push auth-blocks.** `runSync` skips the pull phase if push hit auth — same dead key would 401 there too.
 5. **Surface via toast.** `sync-attach.emitConflictToasts` (despite the name) now checks `result.auth_blocked` first and fires the dedicated "sync paused: authentication failed..." error toast pointing to settings. The conflict-handling code stays below.
-6. **Surface flush-on-attach failures.** Previously logged to console only. Now toasts "couldn't sync N pending change(s)" when post-attach push has failures with no successes. Auth case gets the dedicated toast; generic failures get the generic message. (S365: the success toast reads "Uploaded N change(s) that were waiting in the folder", neutral about who made them; above 50 changed elements the flush holds and asks instead, DESIGN_LAWS conv. 117.)
+6. **Surface flush-on-attach failures.** Previously logged to console only. Now toasts "couldn't sync N pending change(s)" when post-attach push has failures with no successes. Auth case gets the dedicated toast; generic failures get the generic message. (the success toast reads "Uploaded N change(s) that were waiting in the folder", neutral about who made them; above 50 changed elements the flush holds and asks instead, DESIGN_LAWS conv. 117.)
 
 ### Detection
 
@@ -281,7 +281,7 @@ After auth failure, the engine is paused but the SyncEngine instance is alive. T
 
 ## Clearing a field — `null` or `''`, never `undefined`
 
-(Added Bout S, post-pressure-test session 205. Closed both H1 and H2 from the audit.)
+(Added Bout S, after the pressure test. Closed both H1 and H2 from the audit.)
 
 The natural way to say "this field has been cleared" in JS is `undefined`. **Don't.** `JSON.stringify` drops `undefined` keys silently at every layer atlas writes:
 
@@ -358,7 +358,7 @@ Useful sequences:
 
 Superseded in part by the v2 split: only `ATLAS_LOCAL_ONLY_FIELDS` are preserved from the local file on pull; for `ATLAS_WIRE_EXTENSION_FIELDS` the server value wins. `ATLAS_FIELDS.md` is the register.
 
-(Added Bout V, session 202.)
+(Added Bout V.)
 
 Some fields live ONLY on local element files — the OW server has no concept of them. Today: `image_media_id`. Future: anything else atlas adds. The canonical list is `ATLAS_LOCAL_EXTENSION_FIELDS` in `src/core/constants.ts`. Two contracts depend on it:
 
@@ -373,7 +373,7 @@ This contract protects: pull-phase updates, pull-phase creates over existing (de
 
 ## Server-delete detection requires pagination awareness
 
-(Added Bout V, session 202.)
+(Added Bout V.)
 
 `pullPhase` builds `seenLocalIds` from `client.listElements(type)` returns. For any local element with `server_updated_at` set that's NOT in `seenLocalIds`, it records a server-delete and queues the auto-open review modal (default ON). Under default settings, the user is one click away from "delete locally" — a destructive action.
 
@@ -385,15 +385,15 @@ The `OwClientAdapter` maintains the paginated-types Set as part of its hot state
 
 **Full pagination support (load page 2, 3, ...) is still deferred to 3.6+**. The Bout V fix is a SAFETY guard, not a feature — atlas only sees first-page data for paginated types, but at least it doesn't actively destroy what it can't see.
 
-> **UPDATE (v2 port, 2026-07-12; noted S308):** superseded. The v2 adapter (`ow-v2-client-adapter.ts`) fully cursor-walks every page via `?cursor=`, and `getIncompleteListTypes()` suppresses server-delete detection only when a walk is genuinely incomplete. The "first-page-only" limitation above was a v1 constraint and no longer holds; a reader trusting it would re-implement pagination that already exists.
+> **UPDATE (v2 port, 2026-07-12):** superseded. The v2 adapter (`ow-v2-client-adapter.ts`) fully cursor-walks every page via `?cursor=`, and `getIncompleteListTypes()` suppresses server-delete detection only when a walk is genuinely incomplete. The "first-page-only" limitation above was a v1 constraint and no longer holds; a reader trusting it would re-implement pagination that already exists.
 
 ---
 
 ## Chain-CREATE FK gap in Route 2 merge (closed Bout V)
 
-History (S367): `applyIdSwapsToBody` is gone with the old phase order; creates now read their bodies from disk after the kernel moved every id.
+History: `applyIdSwapsToBody` is gone with the old phase order; creates now read their bodies from disk after the kernel moved every id.
 
-(Added Bout V, session 202.)
+(Added Bout V.)
 
 `mergeLocalIntoApi`'s phase 4b-2 processes all `createDecisions` sequentially. The five-phase comment claims phase 4b-3's `rewriteIdReferences` corrects any server-assigned-id mismatches before phase 4b-4's matched UPDATEs. True — but only for LOCAL files.
 
@@ -407,9 +407,9 @@ Fix: `applyIdSwapsToBody` rewrites in-memory bodies before each adapter call, us
 
 ## Pin requires `element_type` on the wire (closed Bout V.5)
 
-(Added Bout V.5, session 202.)
+(Added Bout V.5.)
 
-Real OW returns `400 — element_type must be provided when element_id is specified` on any `POST /pin/` body that has `element_id` but no `element_type`. The fakes didn't simulate this rule, so the gap was invisible until Captain's live smoke. Both fakes now enforce it (`statefulOwHandlers` + `FakeOwApiClient`).
+Real OW returns `400 — element_type must be provided when element_id is specified` on any `POST /pin/` body that has `element_id` but no `element_type`. The fakes didn't simulate this rule, so the gap was invisible until Titus's live smoke. Both fakes now enforce it (`statefulOwHandlers` + `FakeOwApiClient`).
 
 **Three things to know when touching pin code**:
 
@@ -425,9 +425,9 @@ Real OW returns `400 — element_type must be provided when element_id is specif
 
 ## UPDATE 404 means "server has lost it" — route to server_deletes (closed Bout 8)
 
-(Added Bout 8, session 204. Companion to the DELETE 404 rule below.)
+(Added Bout 8. Companion to the DELETE 404 rule below.)
 
-**Except a guest's** (S439, conv. 151): keel answers a guest's out-of-view element exactly as a deleted one, so a guest's 404 joins the kept set and is never reviewed; a 404 with the role unknown waits a round. The 1.59.1 control showed the old rule's cost live: a lowered co-builder's edit opened "1 server-side delete detected... Delete locally" for an element nobody deleted (`Notes/ui-snapshots/2026-10-20-s439/control-firefox-x-stopped.png`). A known edge kept from the second gate (H3): after a raise, the copy cannot tell keel's redacted links from an owner's removal made while the member was a guest, so the member's next edit of that element puts the removed link back.
+**Except a guest's** (conv. 151): keel answers a guest's out-of-view element exactly as a deleted one, so a guest's 404 joins the kept set and is never reviewed; a 404 with the role unknown waits a round. The 1.59.1 control showed the old rule's cost live: a lowered co-builder's edit opened "1 server-side delete detected... Delete locally" for an element nobody deleted (seen live, 2026-10-20). A known edge kept from the second gate (H3): after a raise, the copy cannot tell keel's redacted links from an owner's removal made while the member was a guest, so the member's next edit of that element puts the removed link back.
 
 When push's pre-update GET returns null (adapter caught 404 → null) OR the PATCH itself throws 404 (race between GET and PATCH), the server doesn't have the record. Naive handling: try the PATCH anyway → 404 → record as `failures` → user sees raw error message + element keeps trying every subsequent push.
 
@@ -448,9 +448,9 @@ Same fix covers `resolveConflict('overwrite-mine')` — that path also does an U
 
 ## ID-swap propagates to UI state + URL (closed Bouts 9 + 9b)
 
-History, no longer the code path. The engine has no `onIdSwap` hook, and `handleIdSwap` / `applyIdSwapToUi` were deleted in S367 with their last caller: Route 2 now moves ids through the re-key kernel and the screen follows once through `rekeyLiveUi` (`sync/rekey-run.ts`), which reloads elements from disk instead of grafting (the graft below was rejected by the re-key gate, lens 3 F7).
+History, no longer the code path. The engine has no `onIdSwap` hook, and `handleIdSwap` / `applyIdSwapToUi` were deleted with their last caller: Route 2 now moves ids through the re-key kernel and the screen follows once through `rekeyLiveUi` (`sync/rekey-run.ts`), which reloads elements from disk instead of grafting (the graft below was rejected by the re-key gate, lens 3 F7).
 
-(Added Bout 9, session 204.)
+(Added Bout 9.)
 
 When push CREATE produces a server-assigned id different from the local one (id-swap path — real OW enforces UUID v7), the engine moves the local file `old_id` → `new_id`, rewrites every ref pointing at `old_id`, and silently deletes the old file. Without UI propagation, the user's `state.ui.selectedElementId` + URL hash still reference `old_id`, and the middle pane renders atlas's own empty-state message: **"element <old_id> not found in this world."** Looks like a server error; isn't.
 
@@ -464,13 +464,13 @@ The in-memory id-substitution carries the old entry's content with the new id gr
 
 Verified by a regression test that subscribes + counts notifications (dual-patch produces 2, atomic `setState` produces 1).
 
-**Other id-swap call sites**: none since S367 (`mergeLocalIntoApi` lost `idSwaps` and `onIdSwap`; see "Route 2 on the re-key kernel"). `resolveConflict('overwrite-mine')`'s CREATE branch never id-swapped.
+**Other id-swap call sites**: none since Route 2's rebuild (`mergeLocalIntoApi` lost `idSwaps` and `onIdSwap`; see "Route 2 on the re-key kernel"). `resolveConflict('overwrite-mine')`'s CREATE branch never id-swapped.
 
 ---
 
 ## DELETE 404 means "already gone" — clear the tombstone (closed Bout W)
 
-(Added Bout W, session 203.)
+(Added Bout W.)
 
 Three vectors produce tombstones for ids the OW server never knew (or no longer knows):
 
@@ -490,7 +490,7 @@ Real OW (DRF default) returns 404 on `DELETE /element/{unknown_id}/`. Naive hand
 
 ## Cross-world push race in conflict-toast defer (closed Bout V)
 
-(Added Bout V, session 202.)
+(Added Bout V.)
 
 When pull-phase detects a conflict under `local-wins`, sync-attach defers a `pushOnce()` via `setTimeout(0)` to escape the engine's `inFlight` lock. The setTimeout callback reads `currentEngine` at fire time — so a world switch between schedule and fire would push on the new world's engine while the old world's local divergence stays unconverged.
 
@@ -500,7 +500,7 @@ Fix: capture `currentWorldId` at schedule time, compare to current at fire time.
 
 ## Known soft-edges to revisit (3.6+)
 
-Updated through session 257. Listed by surface — none are cutover blockers.
+Listed by surface — none are cutover blockers.
 
 ### v2 close-gate deferrals (2026-07-12, documented not fixed)
 - **skipIds on the /changes path is event-once**: an op for a push-conflicted id is skipped for the whole round and the cursor passes it; a genuinely newer third-party op for that id in the SAME round is never re-seen (the full-list pull re-derived it next round; the cursor path doesn't). Requires a 3-device same-round race; self-heals on any later edit to the element. Fix shape when it matters: scope the skip to ops at-or-below the conflict's seq, or drop skipIds on the changes path and rely on !serverChanged idempotence + conflict dedup.
@@ -508,10 +508,10 @@ Updated through session 257. Listed by surface — none are cutover blockers.
 - **list items missing `updated_at`** are skipped-and-marked-incomplete (defensive, mirrors the /changes hardening); whether keel's list serializer can ever omit it is an open Skeld question.
 
 ### Sync engine internals
-- ~~**Concurrent-edit race on autosave**~~ CLOSED: an edit landing while its push is in flight stays dirty (S360 H1, `store/sync-stamp.ts`, convention 96); a create adopted after a lost response compares content and stays dirty when it differs (S361, `adoptServerCopy`). Pull-apply rides the per-id chain with its race check inside the slot (S361, `applyServerRecordIfUnchanged`). Push still stamps only, never applies the response body (by design).
+- ~~**Concurrent-edit race on autosave**~~ CLOSED: an edit landing while its push is in flight stays dirty (`store/sync-stamp.ts`, convention 96); a create adopted after a lost response compares content and stays dirty when it differs (`adoptServerCopy`). Pull-apply rides the per-id chain with its race check inside the slot (`applyServerRecordIfUnchanged`). Push still stamps only, never applies the response body (by design).
 - **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from session-205 pressure-test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
 - History (pre-keel), no longer the code path. **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
-- ~~**`rewriteIdReferences` bumps `local_updated_at`**~~ GONE (S367): the function went with the old Route 2. The kernel's referrer rewrites stamp too, and the server phase then uploads them (a referrer is created or matched in the same run).
+- ~~**`rewriteIdReferences` bumps `local_updated_at`**~~ GONE: the function went with the old Route 2. The kernel's referrer rewrites stamp too, and the server phase then uploads them (a referrer is created or matched in the same run).
 
 ### Reliability edges
 - **Cascade-delete loop crash leaves inconsistent state** (pressure-test Path 10): FS Access API has no transactions. Pre-collect tombstones into one write before unlinking files would harden. Worst case today: "confusing server-delete modal on next sync."
@@ -523,7 +523,7 @@ Updated through session 257. Listed by surface — none are cutover blockers.
 - **`getElement` O(types) probe**: walks 22 directories per lookup. Cache id→type in FsFolderStore for hot-path operations. (Partly mitigated by session-220's `fileIndex` cache; cross-type cold lookups still iterate.)
 - **Conflict log review UI for resolved/historical conflicts**: today's modal handles only active conflicts.
 
-### Closed during sessions 205-207 (kept here for searchability)
+### Closed earlier (kept here for searchability)
 - **H1+H2** — field-clear propagation → fixed by Bout S (`null`/`''` sentinels, fakes encode JSON-wire semantics).
 - **T-class** — "lying pill" on auth failure → fixed by Bout T (bail-the-round + error state).
 - **U-class** — `400 Invalid FK` chain noise → fixed by Bout U (topo-sort CREATEs).
@@ -535,7 +535,7 @@ Updated through session 257. Listed by surface — none are cutover blockers.
 - **Pre-T2-smoke F1** — flush-on-attach raced pull-on-activate via shared inFlight lock, silently no-op'd → fixed by Bout BB (sequence flush BEFORE pull via single async IIFE in `attachSyncEngine`). Convention #25.
 - **M7** — `engine.resume()` reset `last_sync_at` to null, pill briefly read "never synced" → fixed by Bout BB (engine tracks `lastSyncAt` privately, `resume()` restores). Convention #26.
 
-### Closed during session 221
+### Closed later
 - **M2** — pill-click during debounced push toasted "already up to date" misleadingly → fixed by gating the toast on both `pulled.*` AND `pushed.*` counts.
 - **M3** — user edit during pull race-overwrites → fixed by re-reading element before `applyServerRecord` in `pullPhase`.
 - **M4** — stale conflicts persist after policy flip to local-wins → fixed by clearing persisted conflicts in the settings-panel policy-change handler.
@@ -546,7 +546,7 @@ Updated through session 257. Listed by surface — none are cutover blockers.
 
 ### Engine-unavailable diagnosis (Bout 6 W3)
 
-When a UI surface tries to run a sync action and `getCurrentSyncEngine()` returns null, the user needs an actionable message — generic "Engine not ready" misled Captain into thinking the bug was the api-link itself when the actual cause was a missing PIN.
+When a UI surface tries to run a sync action and `getCurrentSyncEngine()` returns null, the user needs an actionable message — generic "Engine not ready" misled Titus into thinking the bug was the api-link itself when the actual cause was a missing PIN.
 
 `diagnoseSyncUnavailable()` in `sync-attach.ts` returns a structured reason:
 - `'no-active-world'` — sidebar should pick a world
@@ -559,11 +559,11 @@ When a UI surface tries to run a sync action and `getCurrentSyncEngine()` return
 
 **Convention**: every UI surface that gates on `getCurrentSyncEngine()` should call `surfaceSyncUnavailable(toasts)` on the null path. Don't toast inline. Sites today: pill, worlds-sidebar refresh, settings refresh-from-API, conflict-review-modal open, server-delete-modal open, elements-sidebar filter-chip right-click.
 
-### Atlas-local fields must be stripped on the wire (session 221 live bug)
+### Atlas-local fields must be stripped on the wire (a live bug)
 
 History (pre-keel), no longer the code path. The v1 `OwClientAdapter` is gone, and the zone visuals now SYNC; the v2 rule is `ATLAS_FIELDS.md`. The lesson (fakes must reject what the real server rejects) stands.
 
-Captain's bug: fresh world, drew zones, made online, push failed:
+Titus's bug: fresh world, drew zones, made online, push failed:
 ```
 POST /marker/ 500 (Internal Server Error)
 Failed to create Marker: (1452, '...foreign key constraint fails (`zone_id`)...')
@@ -596,7 +596,7 @@ Atlas hits this when an element references a peer (zone, map, friend) that exist
 
 User picks `keep + re-push` → peer re-CREATEs next round → child element succeeds. Or picks `delete locally` → orphan cleaned up.
 
-HISTORY (pre-keel): the old server surfaced this as `500 (1452, 'foreign key constraint fails ...')` MySQL text; the old `parseFkConstraintError` matched that shape and went structurally dead at the keel cutover — the S256 sweep's one CONFIRMED break, fixed by this rewrite.
+HISTORY (pre-keel): the old server surfaced this as `500 (1452, 'foreign key constraint fails ...')` MySQL text; the old `parseFkConstraintError` matched that shape and went structurally dead at the keel cutover — a cutover sweep's one CONFIRMED break, fixed by this rewrite.
 
 Verified by `tests/integration/sync-engine.fkConstraint.test.ts` (4 tests, incl. the new UPDATE case).
 
@@ -613,21 +613,21 @@ Protocol (gate 10.6, rollback verified live):
 
 ## /changes cursor pull (v2) — explicit delete ops replace absence inference
 
-`pullPhase` dispatches to `pullPhaseChanges` whenever the client has `pullChanges`: a cursor walk of the per-world change feed (`{cursor, changes, has_more}`, continuation via `since=`). Deletions arrive as EXPLICIT ops — the absence-inference server-delete detection (and its incomplete-list false-positive class) doesn't exist on this path. Full design + the 3-lens gate resolutions (delete-then-recreate revival, cursor/side-effect atomicity, the stop() abort latch, single-sourced timestamps, the non-advancing-cursor trap): `Forge/Notes/2026-07-12-v2-changes-pull-design.md`. The legacy full-list pull remains as the fallback and keeps the `getIncompleteListTypes` suppression guard.
+`pullPhase` dispatches to `pullPhaseChanges` whenever the client has `pullChanges`: a cursor walk of the per-world change feed (`{cursor, changes, has_more}`, continuation via `since=`). Deletions arrive as EXPLICIT ops — the absence-inference server-delete detection (and its incomplete-list false-positive class) doesn't exist on this path. Full design + the 3-lens gate resolutions (delete-then-recreate revival, cursor/side-effect atomicity, the stop() abort latch, single-sourced timestamps, the non-advancing-cursor trap) were a dated design note of 2026-07-12, kept outside this repository. The legacy full-list pull remains as the fallback and keeps the `getIncompleteListTypes` suppression guard.
 
-**Test fakes speak /changes (S365)**: `FakeOwApiClient.pullChanges` is ON by default, because production's adapter always has it; 25 test files had been running a full-list pull no user gets. Tests of the full-list fallback opt out by name with `__enable_changes(false)` (the serverDelete pagination trio and dedupe case, one authBlocked case, the pullConflictPolicy dedupe case); they go when `pullPhaseFullList` does. `client.changesPulls` counts feed pages, so "no pull ran" is assertable without `list` calls. `__server_evict` drops a record WITHOUT a delete op (the feed never reports it).
+**Test fakes speak /changes**: `FakeOwApiClient.pullChanges` is ON by default, because production's adapter always has it; 25 test files had been running a full-list pull no user gets. Tests of the full-list fallback opt out by name with `__enable_changes(false)` (the serverDelete pagination trio and dedupe case, one authBlocked case, the pullConflictPolicy dedupe case); they go when `pullPhaseFullList` does. `client.changesPulls` counts feed pages, so "no pull ran" is assertable without `list` calls. `__server_evict` drops a record WITHOUT a delete op (the feed never reports it).
 
 ⚠ The /changes continuation param is **`since=`**, not `cursor=`. HISTORY: keel originally ignored unknown query params silently (a wrong param name replayed page 1 forever with has_more:true); since Skeld's v2 tail (2026-07-12 evening) unknown params get a loud 422 naming the param, killing the trap at the root. The adapter's advance-verification stays as belt-and-suspenders. Both fakes encode the 422.
 
 ## Rewind guard + the v1 validation-lane retirement (v2 tail, 2026-07-12)
 
-Skeld's v2 tail (all five S257 asks, live on production same day) closed the remaining v1 remnants and the last /changes soft-edge:
+Skeld's v2 tail (all five asks, live on production the same day) closed the remaining v1 remnants and the last /changes soft-edge:
 
 - **`GET /api/v2/world`** replaced the v1 SDK `worlds.get()` validation lane: all five validation sites (link modal, make-online both routes' fallbacks, new-api-world fallback, settings Test Connection, atlas-root link flow) now call `OwV2ClientAdapter.getWorld()` via `buildV2Adapter`. `buildOwClient` is deleted; the SDK survives ONLY for FIELD_SCHEMA statics. `OwV2Error` keeps the `API Error NNN:` message prefix, so the sites' status-regex error mapping was untouched.
 - **Rewind guard**: every /changes response now carries `head` (the world's current change_seq). Normal operation never rewinds (§8 law); the one legal rewind is disaster restore-from-backup. The engine persists `changes_last_seq` (highest APPLIED seq, advanced in the same lockstep as the cursor) and, when a page's `head` is strictly below it, drops cursor + seq memory and cold-walks from the epoch (retention law makes the cold walk complete-state; upserts idempotent, deletes explicit). Single-reset-per-round latch prevents a pathological head from looping. Regression: `sync-engine.changesPull.test.ts` rewind describe-block; fake seam `__rewind_op_log(maxSeq)`.
 - **Retention** is now written law (no compaction horizon) — the /changes cold-walk bootstrap for INITIAL DOWNLOAD is unblocked if we ever want it (currently initial download stays on the list walk; revisit only if it earns its keep).
 
-## Read-only engines — view-only worlds (S264)
+## Read-only engines — view-only worlds
 
 Worlds linked with a READ key (`api.read_only` in registry + world.json) run a
 pull-only engine: `readOnly` in SyncEngineOptions. The double wall:
@@ -650,9 +650,9 @@ reads are keyless-PIN; an empty header is a malformed credential). Regression:
 `sync-engine.readOnly.test.ts`. Live-verified against the fake keel: read-key
 download + edit-block + a wire log with zero writes.
 
-## World-meta sync — the meta step (S262, gated)
+## World-meta sync — the meta step (gated)
 
-`world.json`'s eight OW wire fields sync via `GET|PATCH /world` (full design + all ten gate resolutions: `Forge/Notes/2026-07-13-worldmeta-sync-design.md`; the shipped shape is summarized in DESIGN_SYNC.md "World-meta sync"). Engine-side facts a future session needs:
+`world.json`'s eight OW wire fields sync via `GET|PATCH /world` (the shipped shape is summarized in DESIGN_SYNC.md "World-meta sync"). Engine-side facts a future session needs:
 
 - **`executeMetaStep()` opens every round** (all three run paths — a setNow debounce push must carry the now). Consequence for tests: every engine round now emits ONE `getWorldMeta` call; call-log assertions filter it (`sync-engine.push.test.ts` writeCalls) and dead-creds rounds bail AT THE META READ, before any element attempt (authBlocked/bulkPush suites re-locked to that truth; the element-loop first-bail is still covered via a per-element injected 401).
 - **Baseline lives in sync-state** (`meta_baseline`, canonical snapshot; `meta_server_updated_at` informational; `meta_conflicts` under pause-and-review). Seed rule: absent baseline → adopt server + fill local-empties, NEVER PATCH that round.
@@ -662,16 +662,16 @@ download + edit-block + a wire log with zero writes.
   - *Import dirties meta with no push trigger*: import writes wire fields but doesn't requestPush — the NEXT round's diff catches it (meta step runs every round), so it's only stuck if the user imports and never edits/syncs again. Accepted.
   - *MSW read-only-key modeling*: only FakeOwApiClient models the 403 write/read split (`__inject_write_permission_error`); MSW handlers model 401 blocking only.
 
-## Extension fields carry any JSON shape verbatim (S267, source-verified)
+## Extension fields carry any JSON shape verbatim (source-verified)
 
 The 2B contract's §5b flagged that every shipped wire-extension field was a
 scalar and keel's passthrough had never been probed with a nested OBJECT
-(`atlas_calendar` is one). Resolution, S267:
+(`atlas_calendar` is one). Resolution:
 
 - **Live probe blocked**: keel-staging's `create-world-external` now 400s every
   unauthenticated payload variant (the endpoint moved under account auth
   hardening) — no disposable-world lane without real account credentials.
-- **Answered from keel source instead** (keel@e64f270, the S262 precedent):
+- **Answered from keel source instead** (keel@e64f270, as done once before):
   `elements/serialize.py` takes namespaced fields verbatim (`extensions[key] =
   value`, zero shape validation), every element model stores them in
   `extensions = models.JSONField(default=dict)`, and the read path renders
@@ -700,10 +700,10 @@ elements; cold open 18.5s → ~3s). Load-bearing rules:
   mutate cache internals; write sinks store clones (`cacheSet`).
 - The one-writer lock keeps other ATLAS tabs out; other TOOLS write the
   folder freely (an AI agent, a text editor, git), and the cache handles them
-  in three layers: since S359 their edits SURVIVE atlas's writes (every write
+  in three layers: their edits SURVIVE atlas's writes (every write
   merges into the file as it is on disk, `readForWrite`, DESIGN_LAWS conv. 92);
-  since S361 a file that will not parse is never written over
-  (`CorruptFileError`); since S364 they are SHOWN (the live folder,
+  a file that will not parse is never written over
+  (`CorruptFileError`); and they are SHOWN (the live folder,
   `rescanDisk`, conv. 111: a stat pass against the stamps atlas recorded,
   on focus, visibility, revive and Ctrl+K "reload from disk"), and a pull
   checks the disk stamp before it overwrites (`applyServerRecordIfUnchanged`).
@@ -716,9 +716,9 @@ elements; cold open 18.5s → ~3s). Load-bearing rules:
   close the way the disk path did, so a slow world's resolve would
   otherwise stomp the newly-activated world's state.
 
-## Background tidy + parked locks (2026-07-19, revises the S246 open-time tidy)
+## Background tidy + parked locks (2026-07-19, revises the earlier open-time tidy)
 
-The filename-convergence tidy no longer runs INSIDE the open path: Captain's
+The filename-convergence tidy no longer runs INSIDE the open path: Titus's
 live find — a foreign folder (script-written names, 1,669 elements, OneDrive
 disk) froze activation for its entire rename run, blocking the activation
 chain. `buildIndexFor` now indexes/caches files AS THEY ARE (filenames are
@@ -734,7 +734,7 @@ milliseconds window; a real fix needs atomic create-if-absent semantics the
 FS Access API doesn't offer — the heartbeat-mismatch check catches the
 aftermath within one beat.
 
-## Meta step precheck on push rounds (2026-07-19, revises S262 cadence)
+## Meta step precheck on push rounds (2026-07-19, revises the earlier cadence)
 
 `runPushOnly` passes `skipIfLocalClean`: when a meta_baseline exists and
 local disk meta equals it field-for-field (`metaEquals`), the round skips
@@ -748,11 +748,11 @@ full step and pushes.
 
 ---
 
-*Authored mid-session 201 (2026-05-13) after Phase 3.5 mega smoke. If you're reading this in a future chat, this is what the sync engine wanted you to know.*
+*Authored 2026-05-13 after Phase 3.5 mega smoke. If you're reading this in a future chat, this is what the sync engine wanted you to know.*
 
-## Foreign ids, the hold, and the re-key (S363, gated twice)
+## Foreign ids, the hold, and the re-key (gated twice)
 
-keel preserves client ids and refuses a create whose id lives in another world. Before S363 atlas could only say so (the S360 toast); now it records the refusal and can give the element a new id. DESIGN_LAWS conventions 105-108 hold the rules; the lessons that cost the most:
+keel preserves client ids and refuses a create whose id lives in another world. Atlas once could only say so (a toast); now it records the refusal and can give the element a new id. DESIGN_LAWS conventions 105-108 hold the rules; the lessons that cost the most:
 
 - **"Foreign" needs evidence.** A single POST 409s for a same-world id too (a create that landed while its response was lost), so a 409 is foreign only when the read-back ANSWERED "not here". The old classifier also counted a failed read-back (503, 401), and a re-key of such an element would have duplicated it on the server. /bulk upserts same-world ids, so a bulk `id_conflict` is foreign as keel says.
 - **A foreign entry expires when the id is sent and not refused again**: the other world may have freed the id, and the create can land with its backfill failing (no baseline yet). Keeping it would have offered a re-key of an element already on this server.
@@ -761,19 +761,19 @@ keel preserves client ids and refuses a create whose id lives in another world. 
 - **The mock cannot see directories.** The crash matrix passed on MockFolderStore while the real store deleted loose media, left a body-type/directory mismatch on disk, and ignored a cross-layout shadow copy. The composition gate ran the REAL FsFolderStore on an in-memory FS (`tests/fixtures/fake-fs.ts`) to find them; keep a real-store variant of any kernel test.
 - **Discard is an undo, not a forget.** Forgetting a journal left new elements naming new elements never written, and twins with nothing to say which to keep.
 
-## Route 2 on the re-key kernel (S367)
+## Route 2 on the re-key kernel
 
 The old Route 2 decided "local O is server N" from disk in a match phase, told the UI at once, and then walked a flat id rewrite between five server phases. Three lessons made the rebuild:
 
-- **A matcher that re-derives identity from disk cannot read a half-done move.** A crash between writing N and removing O left both; on the rerun the id-tail order of the two filenames decided whether O re-matched or fell to a create, so the server got a second Alice about half the time (S365 lane A H9). The fix was not a smarter matcher but an order: the journaled kernel moves O onto N BEFORE any server call, nothing matches against a world while a journal exists, and after the kernel every server decision is keyed by an id that never changes again.
-- **A one-pass matcher lets a same-named local steal an id match** (H10), and `'   '` is truthy (H11). `planMerge` runs ids over every local before names, and an empty normalised name never matches. A name shared on one side is skipped and reported, not guessed (Captain).
+- **A matcher that re-derives identity from disk cannot read a half-done move.** A crash between writing N and removing O left both; on the rerun the id-tail order of the two filenames decided whether O re-matched or fell to a create, so the server got a second Alice about half the time. The fix was not a smarter matcher but an order: the journaled kernel moves O onto N BEFORE any server call, nothing matches against a world while a journal exists, and after the kernel every server decision is keyed by an id that never changes again.
+- **A one-pass matcher lets a same-named local steal an id match** (H10), and `'   '` is truthy (H11). `planMerge` runs ids over every local before names, and an empty normalised name never matches. A name shared on one side is skipped and reported, not guessed (Titus).
 - **The UI moved before the disk** (H7): favourites, camera, URL and a grafted element on ids the folder never got when the merge then failed. Now nothing moves before the kernel; `onRekeyed` lets the screen follow the moment the disk has.
 
-The runner shares the Settings re-key's single flight (`withIdMoveLock`), which also waits out a live-folder pass already running (`settleLivePass`), and runs the link step inside the lock. A kernel failure is finished from its journal and merged again; a second failure leaves a journal whose `origin: 'merge'` makes the copy say to run Make online again. Records: design `Forge/Notes/2026-09-29-s365-orient/lane-a-route2.md`, recheck `Forge/Notes/2026-09-29-s366-orient/lane-b-route2-recheck.md`, gate `Forge/Notes/Archive/2026-09-29-s367-gate/`.
+The runner shares the Settings re-key's single flight (`withIdMoveLock`), which also waits out a live-folder pass already running (`settleLivePass`), and runs the link step inside the lock. A kernel failure is finished from its journal and merged again; a second failure leaves a journal whose `origin: 'merge'` makes the copy say to run Make online again.
 
 ---
 
-## "Edited here" compares two clocks (S392, #202)
+## "Edited here" compares two clocks
 
 The push and the server-delete review call a copy edited when its `local_updated_at` (the device's clock, at the edit) is past its `server_updated_at` (keel's clock, at the push). Two clocks, one comparison. With clocks that agree, a push always lands after the edit and the copy reads clean. With a device clock ahead of keel's by D, an element edited in the last D reads as edited again after its push and is pushed again each round until D has passed: self-healing, because every push moves the server stamp forward, but it is a quiet re-push loop on a skewed device. Not fixed; worth knowing before anyone reads repeated PATCHes in a log as a bug.
 

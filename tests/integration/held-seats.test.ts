@@ -1,6 +1,5 @@
 /**
- * Held seats (Keel #469, S469; contract
- * `Forge/Notes/2026-10-25-s468-held-seat-contract-v2.md`): a join link's seat
+ * Held seats: a join link's seat
  * kept from the redeem until a world of its id lands here, by any door, or the
  * person removes it. The store (`core/held-seats.ts`), the settle every
  * registry change runs (app.ts), and the join door's own drops, against the
@@ -254,7 +253,7 @@ describe('the join door drops what it held', () => {
     }
   });
 
-  it('already here on this very seat (another tab came first) is never said spare (the S469 code gate\'s must)', async () => {
+  it('already here on this very seat (another tab came first) is never said spare', async () => {
     serve([pass()]);
     const seat = await redeemJoin(CODE);
     setWorlds([world({ id: 'r1', state: 'api-linked', api: { world_id: WORLD_ID, api_key: seat.key, seat: {}, seat_secret: seat.secret } })]);

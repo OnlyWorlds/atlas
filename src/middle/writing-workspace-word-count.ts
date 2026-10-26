@@ -3,7 +3,7 @@
  *
  * A bottom-right corner button showing the live word count + an optional
  * session goal with a progress ring. Click → goal popover. Extracted from
- * writing-workspace.ts (session 232) as a factory that closes over the
+ * writing-workspace.ts as a factory that closes over the
  * workspace root + an editor-handle accessor, so it tracks the live editor
  * without the main file owning the render details.
  */

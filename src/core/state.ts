@@ -3,7 +3,7 @@
  *
  * Reads via `getState()`, writes via `patchSlice(key, partial)`. Every
  * subscriber fires on every patch (there are no selectors; an earlier line
- * here described a `select()` that never existed, corrected S366). A
+ * here described a `select()` that never existed, since corrected). A
  * subscriber that must not repaint on unrelated patches memoises its own
  * inputs (DESIGN_LAWS conv. 103).
  *
@@ -121,7 +121,7 @@ export interface UiState {
   /** Filter chips: empty = no filter (show all), populated = restrict to these. */
   elementFilters: Set<ElementType>;
   /**
-   * Muted types (S356, core/type-mutes.ts): hidden when showing all, shown
+   * Muted types (core/type-mutes.ts): hidden when showing all, shown
    * when filtered to explicitly. Per world; pins + markers by default.
    */
   mutedTypes: Set<ElementType>;
@@ -189,7 +189,7 @@ export interface AccountWorldsState {
    */
   fetchedWithToken?: string;
   error?: string;
-  /** What the error was: a token keel refused ('auth') needs Settings, not a retry (S414). */
+  /** What the error was: a token keel refused ('auth') needs Settings, not a retry. */
   errorKind?: 'auth' | 'other';
   /** Server world id of an open-flow currently in flight (row spinner + guard). */
   opening: string | null;
@@ -273,7 +273,7 @@ export function patchSlice<K extends keyof AppState>(key: K, value: AppState[K])
  * when the write lands, never from a snapshot taken before the await: two saves
  * in quick succession (one unit field, then the next on blur) each patched
  * their own stale copy, and the later one dropped the earlier's value from the
- * mirror while the disk held both (S460, the units field read empty on CI).
+ * mirror while the disk held both (the units field read empty on CI).
  * A world opened meanwhile is left alone.
  */
 export function patchActiveMeta(worldId: string, patch: Partial<WorldMeta>): void {

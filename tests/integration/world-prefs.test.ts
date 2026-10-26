@@ -1,5 +1,5 @@
 /**
- * THE WHOLE WORLD IN THE FOLDER (S364): a world's notes, cast, calendar lens
+ * THE WHOLE WORLD IN THE FOLDER: a world's notes, cast, calendar lens
  * and writing labels are written to `.atlas/world-prefs.json`, and read back
  * at open with a three-way against `prefs_synced` (core/world-prefs.ts).
  */

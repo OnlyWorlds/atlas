@@ -8,7 +8,7 @@
  *   - OPFS mode: origin-private file system with main-thread writes
  *     (`navigator.storage.getDirectory` + `createWritable`). Safari 26+ and
  *     Firefox 111+ have this (Safari's `createWritable` arrived in 26, not
- *     18.2 as this line once said; S366 lane A, cited from WebKit). It is
+ *     18.2 as this line once said; cited from WebKit). It is
  *     enough for worlds kept in browser storage (1.17, conv. 129): the only
  *     home on Firefox and Safari, a choice on Chromium.
  *
@@ -32,7 +32,7 @@ export function hasOpfsMode(): boolean {
 }
 
 /**
- * Can this window actually USE browser storage? (S366, lane A H4.)
+ * Can this window actually USE browser storage? (lane A H4.)
  *
  * `hasOpfsMode` checks the API's shape, never calls it, so it cannot see a
  * window where the call is refused: a Firefox private window throws
@@ -46,11 +46,11 @@ export function hasOpfsMode(): boolean {
  * and it must never read as a private window.
  *
  * `refused` is ONE error, `SecurityError` (the measured private-window
- * answer, S370 lens B M10). Any other error (two tabs probing at once, a
+ * answer). Any other error (two tabs probing at once, a
  * file the browser holds) is retried once and then reads as usable without
  * being cached: the door stays and the act itself says what went wrong, and
  * the next ask probes again. Each probe writes its own file name, so two
- * tabs booting together never race one file (S376 gate B2).
+ * tabs booting together never race one file.
  */
 export type OpfsStatus = 'ok' | 'refused' | 'full' | 'absent';
 
@@ -132,6 +132,6 @@ export function __resetOpfsStatusForTests(): void {
 export const NO_BROWSER_STORAGE_LINE =
   'This window does not allow browser storage, so no world can be kept here. If it is a private window, open Atlas in a normal one.';
 
-/** The plain line for a full origin, where no act is under way (the landing, Settings; S376 lens C C16). */
+/** The plain line for a full origin, where no act is under way (the landing, Settings). */
 export const BROWSER_STORAGE_FULL_LINE =
   "This browser's storage for Atlas is full, so no world can be made in this browser now. Free some space, then reload.";

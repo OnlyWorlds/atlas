@@ -1,7 +1,7 @@
 /**
  * World Home — the default landing room for an active world.
  *
- * Bout H rebuild (workplan D2, session 248): a COVER PAGE with a STUDY-DESK
+ * Bout H rebuild (workplan D2): a COVER PAGE with a STUDY-DESK
  * spine. The world as a book you just opened — identity hero (cover image
  * when set, name, description), quiet text-links, the cast slot (D2b
  * protagonist + home), one woven stat line — then re-entry: a "Continue"
@@ -66,7 +66,7 @@ const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'law', 'ability', 'trait', 'title', 'construct', 'relation', 'map',
 ];
 
-// `roomOf` + the desk click-through moved to `core/element-room.ts` (S306):
+// `roomOf` + the desk click-through moved to `core/element-room.ts`:
 // the command palette had re-implemented the jump WITHOUT them and dropped
 // every room-owning element into the generic editor. Shared so the two
 // surfaces cannot answer the same question differently again.
@@ -94,7 +94,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   root.className = 'atlas-world-home';
   target.appendChild(root);
 
-  // Saved charts for the home chart strip (S15) — fetched once per mount,
+  // Saved charts for the home chart strip — fetched once per mount,
   // refreshed on out-of-band changes (save/rename/delete in the Charts room,
   // id-swap migration). null = not loaded yet (strip falls back to the recipe
   // default meanwhile, which is also the no-saved-charts behavior).
@@ -111,7 +111,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }).catch(() => { savedCharts = []; });
   }
 
-  // Home rebuilds only when something it draws from moved (S362): it used to
+  // Home rebuilds only when something it draws from moved: it used to
   // rebuild the cover, cast, chart strip, desk and loose threads on every
   // state notify, ~80 ms a time at Sikelia's size, for sync ticks, toasts and
   // clicks in other panes. A new input the home reads must join this list.
@@ -166,7 +166,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       root.appendChild(loadingEl);
       return;
     }
-    // The tour (S264): tutorial-state cards computed from world contents —
+    // The tour: tutorial-state cards computed from world contents —
     // the core create pair, then the next wave / room CTAs. Renders nothing
     // for a built-out (or dismissed-out) world — and never on a VIEW-ONLY
     // world (inviting creates that can only toast is noise, not teaching).
@@ -180,7 +180,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const keep = buildKeepSafe(worldId, settled, toasts);
     if (keep) root.appendChild(keep);
     if (totalElements === 0) return;
-    // The chart strip (S15: the "starred chart") — the shape of the world's
+    // The chart strip (the "starred chart") — the shape of the world's
     // history between the cover and the desk (timeline-mini's old slot, now
     // the real chart pipeline: first saved chart, else the recipe default).
     const chartStrip = buildChartStrip(settled, worldId, savedCharts ?? []);
@@ -189,7 +189,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     if (desk) root.appendChild(desk);
     // Loose threads (2026-07-24) — a quiet band of the world's cheap gaps
     // (unmapped locations, undated events, unlinked characters), each expanding
-    // to the exact flagged elements. Sits at the very bottom of home (Captain's
+    // to the exact flagged elements. Sits at the very bottom of home (Titus's
     // placement call); renders nothing when the world is fully woven.
     const threads = buildLooseThreads(settled, worldId);
     if (threads) root.appendChild(threads);
@@ -228,12 +228,12 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   };
 }
 
-// ---- The chart strip (S15) --------------------------------------------------
+// ---- The chart strip --------------------------------------------------
 
 /**
  * A static render of the world's chart on the cover: the FIRST saved chart
  * when one exists (saving a chart is the "starring" act for v1), else the
- * TABLEAU — the same default the Charts room lands on (Captain set a home
+ * TABLEAU — the same default the Charts room lands on (Titus set a home
  * location and couldn't find it here: the old Story-recipe default could
  * never include a location). Cast rides into the freeze so protagonist/home
  * read cyan. Every node carries a ref, so a click lands in the Charts room
@@ -242,7 +242,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
 function buildChartStrip(elements: readonly Element[], worldId: string, savedCharts: ChartConfig[]): HTMLElement | null {
   const favorites = getState().registry.worlds.find(w => w.id === worldId)?.favorites;
   const cast = { protagonistId: favorites?.protagonist_id ?? null, nexusId: favorites?.nexus_id ?? null };
-  // ALWAYS the tableau (S256, Captain: "home charts feel a bit random") — the
+  // ALWAYS the tableau (Titus: "home charts feel a bit random") — the
   // strip previews exactly what the Charts room opens to. One mental model:
   // home is the zoomed-out truth, the room is the same picture with controls.
   // Saved charts no longer hijack the strip (savedCharts[0] used to replace it
@@ -334,7 +334,7 @@ function buildCover(
   }
 
   const identity = document.createElement('div');
-  // View-only worlds (S264): the empty-description INVITE is withheld (the
+  // View-only worlds: the empty-description INVITE is withheld (the
   // write would only toast); an existing description still renders plainly.
   // The name and an existing description read plainly there too (conv. 149).
   const viewOnly = worldIsViewOnly(worldId);
@@ -383,7 +383,7 @@ function buildCover(
   descEl?.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
 
   // (The old quick text-links — new element / open writing / import — were
-  // removed S255v3: the room nav + onboarding tiles cover every one of them.)
+  // removed: the room nav + onboarding tiles cover every one of them.)
 
   // Cast slot (D2b) — renders only when a favorite is set; assignment lives
   // on the element-detail header (char + loc). A world with a charter is set up
@@ -393,11 +393,11 @@ function buildCover(
 
   // The woven stat line (replaces the count-card grid + the meta chips).
   // ALWAYS rendered — empty at zero elements, with a reserved min-height, so
-  // the first element's "1 character" doesn't shift everything below (S265).
+  // the first element's "1 character" doesn't shift everything below.
   {
     const statline = document.createElement('div');
     statline.className = 'atlas-home-statline';
-    // S316 (Captain): ordered by COUNT descending (schema order said nothing
+    // Titus's call: ordered by COUNT descending (schema order said nothing
     // about this world), ties keeping schema order; and the long tail of
     // one-of types folds into a single trailing "1 each:" segment so a rich
     // world's line leads with what the world is actually made of. The
@@ -450,7 +450,7 @@ function buildCover(
     }
     cover.appendChild(statline);
   }
-  // The parlor's room (OW Parlor #543): said where the counts are, one click
+  // The parlor's room: said where the counts are, one click
   // shows it in every whole view or hides it again (the list's chip is the
   // same switch, `ui.hideRoom`).
   const room = roomCount(getState().data.elements);
@@ -484,7 +484,7 @@ function buildCover(
     line.title = 'Elements an AI seat or a member proposed, which a keeper has not accepted yet. They are not counted as the world\'s own';
     line.innerHTML = `<b>${proposed}</b> proposed, not yet reviewed · Show them`;
     line.addEventListener('click', () => {
-      // Only them: no type filter or search left over to hide one (the S459 gate's F6).
+      // Only them: no type filter or search left over to hide one.
       patchSlice('ui', { ...getState().ui, sidebarMode: 'elements', proposedOnly: worldId, elementFilters: new Set(), search: '' });
       setSidebarModePref('elements');
     });
@@ -510,9 +510,9 @@ const CAST_KINDS = [
 
 /**
  * Ghost cast card for an unset slot — the setter lives on the element-detail
- * header, which Captain couldn't find from home (2026-07-10). Clicking filters
+ * header, which Titus couldn't find from home (2026-07-10). Clicking filters
  * the sidebar to the right type so the path is one hop. Both kinds get a
- * ghost side by side (nexus beside protagonist, Captain 2026-07-10).
+ * ghost side by side (nexus beside protagonist, Titus 2026-07-10).
  */
 function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
   const ghost = document.createElement('button');
@@ -521,7 +521,7 @@ function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
   ghost.className = 'atlas-home-cast-card atlas-home-cast-ghost'
     + (assigning ? ' atlas-home-cast-assigning' : '');
   ghost.title = spec.ghostTitle;
-  // Quiet by default (S265: the "shows here on the cover" line was noise);
+  // Quiet by default (the "shows here on the cover" line was noise);
   // in assignment mode the role line becomes the instruction. The line is
   // ALWAYS rendered (nbsp when idle) so the card never changes height and
   // the layout never shifts on click.
@@ -534,7 +534,7 @@ function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
   `;
   ghost.addEventListener('click', () => {
     const ui = getState().ui;
-    // Assignment MODE (Captain, 2026-07-10): the ghost doesn't just filter —
+    // Assignment MODE (Titus, 2026-07-10): the ghost doesn't just filter —
     // the next click on a matching sidebar row assigns directly. One hop.
     patchSlice('ui', {
       ...ui,
@@ -587,8 +587,8 @@ function buildCastSlot(worldId: string, hasCharter: boolean): HTMLElement | null
     }
   }
   // Always return the slot — empty it reserves its row via CSS min-height, so
-  // the first character/location's ghost doesn't shift the page below (S265,
-  // Captain: "the cards jumped down").
+  // the first character/location's ghost doesn't shift the page below (Titus:
+  // "the cards jumped down").
   void rendered;
   return slot;
 }
@@ -653,9 +653,9 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   const lastWriting = byRecency.find(el => el.type === 'narrative' && isWritingNarrative(el, worldId));
   const lastMap = byRecency.find(el => el.type === 'map');
   const lastEdited = byRecency.find(el => el !== lastWriting && el !== lastMap);
-  // Verbs are plain (S264, Captain: "Continue editing" implied a prior
+  // Verbs are plain (Titus: "Continue editing" implied a prior
   // session that may not exist — "Edit X" is always true).
-  // `hash` was dropped from the row (S306): rows now open through
+  // `hash` was dropped from the row: rows now open through
   // `openElementTarget(el, worldId)`, which resolves the destination itself,
   // so a stored hash was written three times per render and read nowhere.
   const continueRows: { icon: string; verb: string; el: Element }[] = [];
@@ -664,13 +664,13 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   // test SUBTYPE, and subtype is free user text — so a narrative can be both
   // writing-shaped and subtype 'knowledge'. `roomOf` gives knowledge/page
   // precedence, so the pinned row's hardcoded "Write" could label a row that
-  // opens the knowledge room (close gate, S306).
+  // opens the knowledge room (close gate).
   if (lastWriting) continueRows.push({ icon: verbIconFor(lastWriting, worldId), verb: verbFor(lastWriting, worldId), el: lastWriting });
   if (lastMap) continueRows.push({ icon: 'map', verb: 'Map', el: lastMap });
   if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: verbFor(lastEdited, worldId), el: lastEdited });
 
   // The remaining recent elements join the SAME list in the SAME row style
-  // (S265, Captain's sshot: the old element rows beside the verb rows read as
+  // (Titus's sshot: the old element rows beside the verb rows read as
   // two competing designs under one heading). The verb comes from the room
   // the row opens — Write for tree narratives, Map for maps, Edit otherwise —
   // so every row speaks the identical language.
@@ -680,7 +680,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   }
 
   // A row whose element was never touched since birth says Created, not Edit
-  // ("it says edit when I only created" — Captain, 2026-07-19). Local creates
+  // ("it says edit when I only created" — Titus, 2026-07-19). Local creates
   // stamp created_at === local_updated_at from one instant; any edit breaks
   // the equality. Server-born elements carry the server's created_at, which
   // never equals a local stamp — they correctly stay on their room verb.
@@ -695,7 +695,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   continueRows.sort((a, b) =>
     (b.el.local_updated_at ?? '').localeCompare(a.el.local_updated_at ?? ''));
 
-  // The first element gets a standing highlight (S264): with exactly one
+  // The first element gets a standing highlight: with exactly one
   // content element, its row IS the tour's next step — make it unmissable.
   const firstElement = content.length === 1 ? content[0] : null;
 
@@ -722,7 +722,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;
       btn.addEventListener('click', () => openElementTarget(row.el, worldId));
-      // Drag-onto-map (S300): recent rows carry the same payload as sidebar
+      // Drag-onto-map: recent rows carry the same payload as sidebar
       // rows, so they drop onto any open map tab as a pin. Maps/zones are
       // excluded (not pinnable — the sidebar's rule, DESIGN_MAPS.md §1.4;
       // the drop site double-checks).
@@ -745,7 +745,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   return desk.childElementCount > 0 ? desk : null;
 }
 
-// ---- The home onboarding (S264 cards; #127 the question; 1.20 cards kept, done) ----
+// ---- The home onboarding (the first cards; #127 the question; 1.20 cards kept, done) ----
 
 function persistDismiss(worldId: string, cardId: string): void {
   const next = dismissTourCard(getState().registry, worldId, cardId);
@@ -812,7 +812,7 @@ function buildTour(
   toasts: ToastManager,
 ): HTMLElement | null {
   // While the GUIDED tour is running, the home onboarding stays silent: two
-  // onboardings talking at once (the S264 intersection class). Read the
+  // onboardings talking at once (an intersection bug class). Read the
   // persisted flag directly: cheap, and no tour-engine import here.
   if (isTourFlagActive()) return null;
   const home = computeHomeCards(counts);
@@ -875,11 +875,11 @@ function buildTour(
     return section;
   }
 
-  // "What do you have?" (#127, the Captain's Q1: optional, never blocking).
+  // "What do you have?" (#127, Titus's call: optional, never blocking).
   // It stays, with its finished cards checked, until the core pair exists,
-  // so the block does not change shape under the first create (h20 #2081).
+  // so the block does not change shape under the first create (2026-10-09).
   section.insertAdjacentHTML('beforeend', '<h2 class="atlas-home-have-title">What do you have?</h2>');
-  // The row keeps its place, its words follow the world (F-67, Seethe h20 #12603): "Nothing yet"
+  // The row keeps its place, its words follow the world (F-67, Seethe 2026-10-25): "Nothing yet"
   // only in an empty world; once anything exists it names what the core pair still lacks.
   const lacking = (['character', 'location'] as const).filter(t => (counts.get(t) ?? 0) === 0).map(t => escapeText(aTypeName(t)));
   row('nothing', totalElements === 0 ? 'Nothing yet' : 'Next',
@@ -929,9 +929,9 @@ const ROOM_NAMES: Record<TourRoom, string> = {
 };
 
 /**
- * One card. Not yet in the world: it creates one (staying on home, S264).
+ * One card. Not yet in the world: it creates one (staying on home).
  * Done: it stays in place, greyed and checked, and opens the room its type
- * introduces (the Captain, h20 #2081).
+ * introduces (Titus, 2026-10-09).
  */
 function cardTile(card: HomeCard, worldId: string, toasts: ToastManager): HTMLButtonElement {
   const { def, done } = card;
@@ -952,7 +952,7 @@ function cardTile(card: HomeCard, worldId: string, toasts: ToastManager): HTMLBu
   `;
   tile.addEventListener('click', () => {
     if (!done) {
-      // Stay on home (Captain, S264): the sidebar flip + the first-element
+      // Stay on home (Titus): the sidebar flip + the first-element
       // Recent highlight carry "where did it go", no jarring room jump.
       new ElementCreateModal(toasts, { initialType: def.type, suppressNavigate: true }).open();
       return;
@@ -972,7 +972,7 @@ function openCardRoom(def: CardDef, worldId: string): void {
     }
     case 'map': {
       // The map room is a right-pane tab: openMapTab activates an open one
-      // and gives an imageless map its flat canvas (S265, S300).
+      // and gives an imageless map its flat canvas.
       const map = elements.find((e): e is WorldMap => e.type === 'map');
       if (map) openMapTab(map);
       return;
@@ -1002,7 +1002,7 @@ function openIdentityEdit(
     onSave: async (next: unknown) => {
       const value = String(next ?? '').trim();
       // Refusals are PlainErrors: the popover shows them as they are, where a
-      // plain Error would be worded as an unexpected problem (S369).
+      // plain Error would be worded as an unexpected problem.
       if (field === 'name' && !value) {
         throw new PlainError('A world needs a name.');
       }
@@ -1016,7 +1016,7 @@ function openIdentityEdit(
         ...active,
         meta: { ...active.meta, [field]: value },
       });
-      // Description syncs via the world-meta step (S262); name is deliberately
+      // Description syncs via the world-meta step; name is deliberately
       // LOCAL-ONLY (D4 — the server world name is a separate identity, see
       // settings → World), so only description triggers a push.
       if (field === 'description') requestPushIfLinked();

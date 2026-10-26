@@ -1,5 +1,5 @@
 /**
- * Two rows for a view-only world (S380, built S381 for 1.18):
+ * Two rows for a view-only world (built for 1.18):
  * - opening one never tries to write its prefs file (the store refuses every
  *   write, so the try only logged "[world-prefs] not written" at every open);
  * - the element header offers no Delete (the store refused it after the confirm).

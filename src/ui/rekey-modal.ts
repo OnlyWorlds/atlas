@@ -1,5 +1,5 @@
 /**
- * "Give them new ids" (S363): confirm, then a LOCKED run with progress.
+ * "Give them new ids": confirm, then a LOCKED run with progress.
  *
  * Locked because the run must own the world (re-key gate lens 1 F1, lens 3
  * F12): no outside click, no Escape, and (composition gate lens C F1) the app
@@ -63,7 +63,7 @@ export class RekeyModal extends BaseModal {
       let settled = false;
       const settle = (v: boolean) => { if (!settled) { settled = true; resolve(v); } };
       const unlock = () => { appRoot()?.removeAttribute('inert'); };
-      // Every close path settles (S361: a modal whose promise never resolves
+      // Every close path settles (a modal whose promise never resolves
       // strands its caller) and gives the app back.
       const observer = new MutationObserver(() => {
         if (!overlay.isConnected) { observer.disconnect(); unlock(); settle(false); }

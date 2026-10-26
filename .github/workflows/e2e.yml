@@ -1,5 +1,5 @@
-# Atlas's full end-to-end suite, off the crew's machine (the cloud-compute pilot, #596;
-# run sheet: Bridge/Systems/cloud-compute/DESIGN.md, route A). Manual only: it runs when
+# Atlas's full end-to-end suite, off the maintainers' machine (#596).
+# Manual only: it runs when
 # someone dispatches it (`gh workflow run e2e.yml --ref master`), never on a push or a
 # pull request, so a fork cannot start it. It reads the repository and nothing else.
 name: e2e
@@ -22,9 +22,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium firefox
-      # One worker, as the suite runs on the crew's machine, so the two routes compare.
+      # One worker, as the suite runs on the maintainers' machine, so the two routes compare.
       # A flaky's first, failing attempt keeps its trace (the config keeps only the
-      # retry's, which passed): S461's front-door flaky left a frame and no trace (S465).
+      # retry's, which passed): a front-door flaky once left a frame and no trace.
       - run: npx playwright test --workers=1 --reporter=list,html,junit --trace retain-on-first-failure
         env:
           CI: '1'

@@ -1,5 +1,5 @@
 /**
- * A view-only world reads (conv. 149, S436): the element page's rows are not
+ * A view-only world reads (conv. 149): the element page's rows are not
  * doors there, and no create door opens. Each case runs on a writable world
  * too, the control: the same render offers what the view-only one withholds.
  */

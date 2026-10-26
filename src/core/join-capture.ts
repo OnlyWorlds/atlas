@@ -1,5 +1,5 @@
 /**
- * The `#/join/<code>` door's first step (OW Infra #104, contract R2): the code
+ * The `#/join/<code>` door's first step: the code
  * leaves the address bar before Atlas does anything else. `main.ts` calls
  * `captureJoinCode` before the app starts, and the app calls it again on every
  * render, for a link opened into a tab that was already running.

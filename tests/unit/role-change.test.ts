@@ -1,6 +1,6 @@
 /**
- * B12 Q2 (conv. 151): the words a role change says, once, and keel's 409
- * reason read off the wire. Contract: Forge/Notes/2026-10-20-s439-role-change-keeps-the-copy.md.
+ * Conv. 151: the words a role change says, once, and keel's 409
+ * reason read off the wire. Design note: a role change keeps the copy.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { keptEditsLine, keptLine, memberRoleLine, roleChangeLine } from '../../src/sync/role-change';
@@ -54,7 +54,7 @@ describe('memberRoleLine: Settings says the role, not the scope alone (I5)', () 
     expect(memberRoleLine(entry('guest'), 2)).toBe('You are a guest in this world: you can add to it and change what you made. 2 elements here are kept from before: OnlyWorlds no longer shows them to you, so they no longer sync.');
   });
 
-  it('a copy opened to read promises no edits (S439 gate G8)', () => {
+  it('a copy opened to read promises no edits', () => {
     const reads = { ...entry('guest'), api: { ...entry('guest').api!, read_only: true } } as WorldRegistryEntry;
     expect(memberRoleLine(reads, 0)).toBe('You are a guest in this world.');
     expect(roleChangeLine('Ferry', 'co_builder', 'guest', true)).not.toMatch(/changes you make/);
@@ -68,7 +68,7 @@ describe('memberRoleLine: Settings says the role, not the scope alone (I5)', () 
   });
 });
 
-describe('keel\'s 409 reason, read off the wire (Skeld h20 #8021)', () => {
+describe('keel\'s 409 reason, read off the wire (Skeld 2026-10-20)', () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
   async function refusalFor(body: unknown): Promise<unknown> {

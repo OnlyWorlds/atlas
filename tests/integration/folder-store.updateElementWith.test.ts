@@ -1,6 +1,6 @@
 /**
  * FolderStore.updateElementWith — the in-chain read-merge-write contract
- * (resilience gate HIGH-2, S299): a patch computed from current state must
+ * (resilience gate HIGH-2): a patch computed from current state must
  * see the latest committed value, so a concurrent writer's fields are never
  * reverted from a stale snapshot.
  *

@@ -1,5 +1,5 @@
 /**
- * Unlinked mentions (S355) — the count behind the context pane's
+ * Unlinked mentions — the count behind the context pane's
  * "Mentioned, unlinked (N in M scenes) · Link all" line and the create
  * modal's nudge. The count and the link share one span finder, so the
  * number shown is the number written.

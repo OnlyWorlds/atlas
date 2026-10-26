@@ -1,6 +1,6 @@
 /**
- * A world's public page address from keel's `GET /world` (Keel #471, D155;
- * Skeld h29 #11219): `/w/<slug>`, else `/w/<world id>`, only when its owner
+ * A world's public page address from keel's `GET /world` (Skeld
+ * 2026-10-23): `/w/<slug>`, else `/w/<world id>`, only when its owner
  * turned it on. keel's body as served, 2026-10-23: `public_page: { on, ... }`
  * beside `slug` (null until set).
  */

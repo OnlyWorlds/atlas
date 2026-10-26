@@ -94,7 +94,7 @@ export class LinkWorldModal extends BaseModal {
     const cancelLinkBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel-link"]')!;
     const finishBtn = body.querySelector<HTMLButtonElement>('[data-action="finish-early"]')!;
 
-    // The user's answer while the download runs (S360, Captain): polled by
+    // The user's answer while the download runs (Titus): polled by
     // the download between elements, so a large world stops within one write.
     let stop: DownloadStop = null;
     cancelLinkBtn.addEventListener('click', () => {
@@ -130,7 +130,7 @@ export class LinkWorldModal extends BaseModal {
       const displayName = (form.querySelector<HTMLInputElement>('input[name="display-name"]')!).value;
 
       // Disable the form for the duration and swap the buttons for the two
-      // honest exits (S360): Cancel link removes the new folder, Stop keeps
+      // honest exits: Cancel link removes the new folder, Stop keeps
       // what has arrived. A click outside or Escape does nothing while this
       // runs; it used to close the modal and look like a cancel while the
       // download carried on out of sight.
@@ -199,7 +199,7 @@ export class LinkWorldModal extends BaseModal {
           return;
         }
         // A refused key, an unknown world or no connection arrives worded
-        // (keyCheckError); the rest is worded here (S369).
+        // (keyCheckError); the rest is worded here.
         console.warn('[link-world] link failed:', err);
         const sentence = problemFor(err, { inline: true, doing: 'downloading the world', where }).sentence;
         errorBox.textContent = sentence;

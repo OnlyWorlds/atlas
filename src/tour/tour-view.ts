@@ -5,7 +5,7 @@
  * a plain snapshot, so the predicates that decide what the narrator says can
  * be unit-tested without a browser, a store, or a tour. Lifts verbatim.
  *
- * WHY DERIVED, NOT STORED (the load-bearing decision, S301): a phase like
+ * WHY DERIVED, NOT STORED (the load-bearing decision): a phase like
  * "the Hegemony now exists" is a FACT ABOUT THE WORLD. Storing a phase index
  * beside the step index would create a second source of truth that can
  * disagree with the world after a reload, a back-navigation, or the user
@@ -47,7 +47,7 @@ export interface TourWorldView {
   nowIsSet: boolean;
   /**
    * The pin `pinRef` sits INSIDE the polygon of zone `zoneRef` — the pin
-   * beat's soft correction (Captain's ruling: allow any placement, show Next
+   * beat's soft correction (Titus's ruling: allow any placement, show Next
    * only once the pin is over the swamps, and let a wrong drop be dragged onto
    * them rather than refused). False if either ref is absent, the pin has no
    * coordinates, or the zone has fewer than three markers. Pure over the
@@ -57,7 +57,7 @@ export interface TourWorldView {
   pinInZone(pinRef: string, zoneRef: string): boolean;
   /**
    * How many `ow://` chips the narrative `ref` currently holds in its `story`
-   * markdown — the writing beat's gate (S306).
+   * markdown — the writing beat's gate.
    *
    * Reads `story` and NOT the `atlas_richtext_json` sidecar because the
    * workspace autosave writes BOTH halves together (writing-workspace.ts:344),

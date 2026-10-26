@@ -4,7 +4,7 @@
  * browser no longer holds keeps its row (and its link), marked cleared, and
  * never hears "Your files are safe". Each case runs in Chromium and, tagged
  * @firefox, in real Firefox.
- * Contract: Forge/Notes/2026-10-04-browser-worlds-contract.md §1.3, §3.3.
+ * Design note: browser worlds, §1.3 and §3.3.
  */
 import { test, expect, Page } from '@playwright/test';
 
@@ -16,7 +16,7 @@ async function boot(page: Page) {
   await page.waitForSelector('.atlas-shell');
   // The boot reconciliation runs first on the activation chain; a seed that
   // writes browser-worlds/ raw (no make lock) while it runs gets adopted twice
-  // (S381: one Firefox run in five). A no-op task queued behind it waits it out.
+  // (one Firefox run in five). A no-op task queued behind it waits it out.
   await page.evaluate(async () => {
     const { enqueueActivationTask } = await import('/src/core/activation-chain.ts');
     await enqueueActivationTask(async () => {});
@@ -255,7 +255,7 @@ async function linkLandsInBrowser(page: Page, folderMode: boolean) {
   await mockKeel(page, 30);
   await openLink(page);
   const modal = page.locator('[data-modal="link-world"]');
-  // The world stays on onlyworlds.com, so the question is one line (h20 B13).
+  // The world stays on onlyworlds.com, so the question is one line.
   if (folderMode) {
     const short = modal.locator('[data-role="where-short"]');
     await expect(short).toContainText('Kept in this browser; the world stays on onlyworlds.com too.');

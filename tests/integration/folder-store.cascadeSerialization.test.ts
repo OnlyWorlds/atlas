@@ -1,5 +1,5 @@
 /**
- * A cascade must serialize against EACH DEPENDENT's own write chain (S310).
+ * A cascade must serialize against EACH DEPENDENT's own write chain.
  *
  * `deleteElement` serializes on the TARGET's id only. The cascade then removed
  * descendants from inside that same slot, and `PerIdWriteChain` is per-id by
@@ -18,7 +18,7 @@
  * awaiting it when you switch narrative or unmount, and a subtree delete lands
  * in that window.
  *
- * Found by the S310 integration gate. The keeper had noticed the bypass while
+ * Found by an integration gate. The keeper had noticed the bypass while
  * reading the cascade and moved on without following it — the gate's whole
  * value here was refusing to let a noticed-and-dropped thread stay dropped.
  *
@@ -32,7 +32,7 @@
  * store has. A fake cannot model it without a test-only delay hook, and a
  * concurrency guarantee proven by a hand-tuned hook proves mostly the hook.
  *
- * So the honest split (S258's law: when the repro will not fail, say the lock
+ * So the honest split (the rule: when the repro will not fail, say the lock
  * is coarse and let the fix stand on construction):
  *   - the SOURCE SCAN at the bottom is the real lock — it fails if either
  *     store stops routing dependent unlinks through a per-id chain;

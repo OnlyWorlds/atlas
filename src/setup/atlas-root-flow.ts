@@ -51,7 +51,7 @@ import { PlainError } from '../core/plain-error';
 import { browserStorageFullSentence } from '../core/problems';
 import { keyCheckError } from './key-check-errors';
 
-// The refusals below are user copy (S369): each is a `PlainError`, so the
+// The refusals below are user copy: each is a `PlainError`, so the
 // catch site shows it as its own sentence. Developer text stays a plain
 // `Error` and is worded by `problemFor` where it is caught.
 const NO_HOME_FOLDER = 'Atlas has no OnlyWorlds folder yet. Choose one in Settings, under Storage, then try again.';
@@ -74,12 +74,12 @@ export interface SetupAtlasRootResult {
   imported: number;
   /**
    * Set when the picked folder IS a world (it holds a `world.json`) rather
-   * than a place to keep worlds (S354, Captain pointed "Change folder" at
+   * than a place to keep worlds (Titus pointed "Change folder" at
    * Skeld's `sikelia-world` and expected an import). No root was created and
    * nothing was written: nesting an atlas root inside someone's world repo is
    * exactly the litter this guards against. Every door hands the handle to
    * `finishSetupDoor` (setup/world-doors.ts), which opens the world in place,
-   * with or without a root (S365).
+   * with or without a root.
    */
   worldFolder?: FileSystemDirectoryHandle;
 }
@@ -90,7 +90,7 @@ export async function setupAtlasRoot(): Promise<SetupAtlasRootResult | null> {
   return setupAtlasRootFrom(picked);
 }
 
-/** `setupAtlasRoot` for a folder already picked (the open-a-world door hands over a root it recognised, S365). */
+/** `setupAtlasRoot` for a folder already picked (the open-a-world door hands over a root it recognised). */
 export async function setupAtlasRootFrom(picked: FileSystemDirectoryHandle): Promise<SetupAtlasRootResult> {
   const granted = await ensureWritable(picked);
   if (!granted) {
@@ -203,7 +203,7 @@ export async function discoverWorldsInRoot(
     // A world with this id is already registered from ANOTHER folder (opened
     // in place on a first visit, then a copy of it found here): storing this
     // handle would overwrite that entry's vault slot and both rows would open
-    // the copy (S365 gate lens B F2). Same rule as `openWorldFolder`.
+    // the copy. Same rule as `openWorldFolder`.
     if (getState().registry.worlds.some(w => w.folder.handle_key === handleKey)) {
       console.info(`[discover] ${entry.name}: world ${meta.id} is already open from another folder; skipped`);
       alreadyTrackedCount++;
@@ -279,13 +279,13 @@ export async function openWorldFolder(
   // protects an already-registered world's handle slot from being
   // overwritten by a second folder carrying the same world id.
   const handleKey = `world-${meta.id}`;
-  // A world kept in this browser with this id (1.17, contract §5.2, S370
-  // gate B17): a LIVE one is the world, so nothing is stored and the user is
+  // A world kept in this browser with this id (1.17, contract §5.2):
+  // a LIVE one is the world, so nothing is stored and the user is
   // told where it is. A CLEARED one takes this folder as its home, its row,
   // link and settings kept, only when it holds this exact id (the file
   // door's rule, `clearedOwnTwin`); a linked one's first sync then reviews
-  // before it writes, since an unzipped copy has no sync history (S376 gate
-  // B3, Skeld's condition 3). A cleared row matched only through a former
+  // before it writes, since an unzipped copy has no sync history (Skeld's
+  // condition 3). A cleared row matched only through a former
   // link is not this world: the folder opens as its own.
   const browserTwin = worldAlreadyHere(getState().registry, meta.id);
   if (browserTwin && isBrowserWorld(browserTwin) && browserTwin.demo !== true && !browserTwin.cleared_at) {
@@ -294,8 +294,8 @@ export async function openWorldFolder(
   const restore = clearedOwnTwin(getState().registry, meta.id);
   if (restore) {
     // The link going back is this browser's own; a folder's provenance lines
-    // are about its own slice, so they go before the link does (the S446
-    // gate's G3, as the world-file door).
+    // are about its own slice, so they go before the link does (as the
+    // world-file door does).
     const lines = meta as Record<string, unknown>;
     if (restore.api && ('source' in lines || 'exported_as' in lines)) {
       const { source: _source, exported_as: _slice, ...rest } = lines;
@@ -315,7 +315,7 @@ export async function openWorldFolder(
   const existing = getState().registry.worlds.find(w => w.folder.handle_key === handleKey);
   if (existing) {
     // The entry lost its handle (cleared site data, another profile): the
-    // pick IS the reconnect, so the handle comes back (S369, the lost-access
+    // pick IS the reconnect, so the handle comes back (the lost-access
     // toast's "Open the folder"). A live handle is never replaced.
     if (!(await loadHandle(handleKey))) await storeHandle(handleKey, picked);
     return { worldId: existing.id, already: true };
@@ -345,7 +345,7 @@ export async function openWorldFolder(
       handleKey,
       pathHint: picked.name,
       // A folder the USER picked is never the tour's sandbox, whatever its
-      // world.json says: a demo world is ungrounded and hidden (S365 lens B F10).
+      // world.json says: a demo world is ungrounded and hidden.
       demo: false,
     }));
   }
@@ -400,7 +400,7 @@ export async function isWorldFolder(dir: FileSystemDirectoryHandle): Promise<boo
 /**
  * True when `dir` is an atlas root, or holds one under the current or a
  * legacy wrapper name: a place worlds are KEPT, not a world. Read-only (the
- * open-a-world door uses it to recognise a wrong-door pick, S365).
+ * open-a-world door uses it to recognise a wrong-door pick).
  */
 export async function isAtlasRootFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
   if (await hasAtlasRootMarker(dir)) return true;
@@ -504,7 +504,7 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
     console.warn('[atlas-root] recover-time discovery failed:', err);
   }
   // Worlds opened IN PLACE live outside the root, so root discovery cannot
-  // see them; their handles are still in the vault (S354). Re-adopt those.
+  // see them; their handles are still in the vault. Re-adopt those.
   try {
     imported += await readoptOrphanWorldHandles();
   } catch (err) {
@@ -523,7 +523,7 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
 
 /**
  * Re-register worlds whose folder handle survived a localStorage clear but
- * whose registry entry did not (S354). Root discovery only scans INSIDE the
+ * whose registry entry did not. Root discovery only scans INSIDE the
  * root; a world opened in place (`openWorldFolder`, the obsidian / other-tool
  * / other-machine carry-a-folder path) sits anywhere on disk and was simply
  * gone from the list after a clear, handle and all, with no way back short
@@ -601,10 +601,10 @@ export async function readoptOrphanWorldHandles(): Promise<number> {
  * (empty world) and createWorldFromImportedData (populated from an import).
  */
 /**
- * Leave the active world: save what its open rooms still hold (S360 F1), close
+ * Leave the active world: save what its open rooms still hold, close
  * its store, clear the slot. Every flow that swaps in a NEW world calls this at
  * its COMMIT point, right before the registry flip, never before its own
- * fallible work (download, import apply, meta writes). S361: the link flow
+ * fallible work (download, import apply, meta writes). The link flow
  * used to release first, so a cancelled or failed link left the UI showing
  * the prior world with no store behind it (prose dropped silently, "No active
  * store" on every edit, and the sidebar click short-circuited as already
@@ -625,7 +625,7 @@ export async function scaffoldWorldInRoot(
   parentOverride?: { handle: FileSystemDirectoryHandle; label: string },
   // Import round-trip: adopt the exported world id verbatim instead of minting
   // a fresh one, so a world re-imported into atlas keeps its identity and any
-  // cross-tool `ow://` reference resolves (Skeld's id-is-identity law, S313).
+  // cross-tool `ow://` reference resolves (Skeld's id-is-identity law).
   // The caller guarantees no local world already uses this id (collision is a
   // merge-or-new choice made upstream in the import room).
   adoptId?: string,
@@ -660,7 +660,7 @@ export async function scaffoldWorldInRoot(
   }
 
   // The prior world stays open here: the caller releases it at its commit
-  // point (`releasePriorWorld`), after its own fallible writes (S361).
+  // point (`releasePriorWorld`), after its own fallible writes.
 
   const trimmed = name.trim() || 'Untitled world';
   const worldUuid = adoptId ?? newId();
@@ -752,7 +752,7 @@ export async function createWorldInRoot(
   const activated = setActiveWorld(placed, entry.id);
   const commit = () => { saveRegistry(activated); patchSlice('registry', activated); };
   if (make) await make.finish(commit); else commit();
-  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // The store first: a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
   patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name: trimmed }, opened: true });
@@ -787,7 +787,7 @@ export async function createWorldFromImportedData(
     where?: 'folder' | 'browser';
     /** Adopt this world id (the exported envelope's) instead of minting a fresh
      *  one — a lossless round-trip. The import room passes it only when no local
-     *  world already uses it (S313). */
+     *  world already uses it. */
     adoptWorldId?: string;
   } = {},
 ): Promise<{ entry: WorldRegistryEntry; applied: ApplyResult }> {
@@ -828,11 +828,11 @@ export async function createWorldFromImportedData(
   const activated = setActiveWorld(placed, entry.id);
   const commit = () => { saveRegistry(activated); patchSlice('registry', activated); };
   if (make) await make.finish(commit); else commit();
-  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // The store first: a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
   // The whole world.json, as an ordinary open reads it: a local world has no
-  // sync round to fill in the imported description and dates later (S412).
+  // sync round to fill in the imported description and dates later.
   patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta(), opened: true });
   const elements = await store.listElements();
   patchSlice('data', { elements });
@@ -900,13 +900,13 @@ export interface LinkExistingApiWorldOpts {
    */
   seat?: { role?: string };
   /**
-   * View-only link (S264): the key is a READ key, no PIN required or stored.
+   * View-only link: the key is a READ key, no PIN required or stored.
    * The world registers with `api.read_only`, the store blocks UI writes,
    * and the engine attaches pull-only.
    */
   readOnly?: boolean;
   /**
-   * Polled during the download (S360): `finish` stops and keeps what arrived,
+   * Polled during the download: `finish` stops and keeps what arrived,
    * `cancel` abandons the link and removes the folder this call created.
    */
   shouldStop?: () => DownloadStop;
@@ -945,7 +945,7 @@ export function linkedWorldMeta(opts: {
       world_id: opts.serverWorldId,
       api_key: opts.apiKey,
       ...(opts.serverWorldName ? { world_name: opts.serverWorldName } : {}),
-      // Mirrored so root discovery restores view-only status (S264).
+      // Mirrored so root discovery restores view-only status.
       ...(opts.readOnly ? { read_only: true } : {}),
       // The marker only, so discovery knows it is a seat; never the secret.
       ...(opts.seat && !opts.readOnly ? { seat: { ...opts.seat } } : {}),
@@ -980,14 +980,14 @@ export async function linkExistingApiWorldInRoot(
   // the wire and persist it globally below (which the registry comment there
   // already says must never happen from a view-only link).
   const apiPin = readOnly ? '' : opts.apiPin.trim();
-  // View-only links run on a READ key — keel reads are keyless-PIN (S264).
+  // View-only links run on a READ key — keel reads are keyless-PIN.
   if (!apiPin && !readOnly) throw new PlainError('Enter your PIN first.');
   // A seat (#104): its secret is this world's PIN alone, kept on its entry.
   const seat = readOnly ? undefined : (opts.seat ?? (isSeatSecret(apiPin) ? {} : undefined));
 
   // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
   // lane). A refused key, an unknown world or no connection is worded by
-  // `keyCheckError` (S369); anything else is rethrown as it came, for the
+  // `keyCheckError`; anything else is rethrown as it came, for the
   // modal to word.
   // Skipped when the caller already holds the world identity (account-mode
   // list → open; gate R1b — the fresh minted key needs no re-validation).
@@ -1041,7 +1041,7 @@ export async function linkExistingApiWorldInRoot(
   }
 
   // The prior world stays open and usable through the download; it is
-  // released at the commit point below (S361: releasing it here stranded the
+  // released at the commit point below (releasing it here stranded the
   // user on Cancel link or any download error).
 
   const slug = slugify(displayName);
@@ -1107,7 +1107,7 @@ export async function linkExistingApiWorldInRoot(
     }
     throw err;
   }
-  // Its settings and own words come down with it (S458).
+  // Its settings and own words come down with it.
   await seedLinkedWorldMeta(store, adapter);
 
   // The commit point: the download succeeded, so leave the prior world now.
@@ -1136,7 +1136,7 @@ export async function linkExistingApiWorldInRoot(
   // Arm the view-only guard AFTER the setup writes above (they are this
   // flow's own, legitimate writes) and BEFORE the store reaches the UI.
   if (readOnly) store.setViewOnly(true);
-  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // The store first: a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
   patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: localWorldUuid, name: displayName })), opened: true });
@@ -1167,7 +1167,7 @@ export async function linkExistingApiWorldInRoot(
  * fresh `browser-worlds/` directory held by the make's lock. ANY failure
  * (cancel, network, a full origin) removes the directory: nothing half-made
  * stays, and a full origin is fatal to the whole download rather than a list
- * of per-element failures over 0-byte files (S370 gate B8).
+ * of per-element failures over 0-byte files.
  */
 async function linkIntoBrowser(
   opts: LinkExistingApiWorldOpts,
@@ -1184,7 +1184,7 @@ async function linkIntoBrowser(
     await store.writeWorldMeta(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat }));
     const adapter = buildV2Adapter(apiKey, apiPin);
     downloadResult = await initialDownloadAll(store, adapter, opts.onProgress, opts.shouldStop, { stopOnQuota: true });
-    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it (S458)
+    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it
     await releasePriorWorld();
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');
@@ -1235,9 +1235,9 @@ async function linkIntoBrowser(
 /**
  * Why this world's folder may NOT be deleted from here, or null when it may.
  * A delete removes `<root>/<folder_name>` BY NAME, so it is only safe when the
- * world's own folder IS that entry: a world opened in place (S365 made that
- * the first-visit path) lives outside the root, and a same-named sibling in
- * the root is a different world (S365 gate lens B F1: it deleted one).
+ * world's own folder IS that entry: a world opened in place (now the
+ * first-visit path) lives outside the root, and a same-named sibling in
+ * the root is a different world (it once deleted one).
  * Callers ask BEFORE closing anything, so a refusal leaves the world usable.
  */
 export async function whyWorldFolderNotDeletable(world: { folder: { handle_key: string; folder_name: string } }): Promise<string | null> {

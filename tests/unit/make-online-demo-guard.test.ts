@@ -1,5 +1,5 @@
 /**
- * S361 (re-key gate, lens 3): the tour world cannot go online. Exiting the
+ * The tour world cannot go online. Exiting the
  * tour deletes it, folder and all, and its ids are the live demo world's, so
  * keel would refuse every element. Make Online's one funnel refuses it.
  */

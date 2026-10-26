@@ -5,7 +5,7 @@
  * the step script and a step index, so the answer can be unit-tested without a
  * browser and the module lifts verbatim.
  *
- * WHY THIS EXISTS (Captain, S301): every beat in the reworked tour is gated on
+ * WHY THIS EXISTS (Titus): every beat in the reworked tour is gated on
  * a user action, so nobody can click through any more. That is right for
  * engagement and wrong for the person who has seen enough at minute twelve, so
  * the tour carries a permanently visible exit. His refinement was to make that

@@ -32,8 +32,8 @@ export interface MapTabCacheEntry {
   ready: Promise<void>;
   tooltip: HTMLDivElement;
   /**
-   * Trash drop-zone overlay used by pin drag-to-delete (DESIGN_MAPS.md §3.5
-   * smoke note session 211). Hidden by default; shown only while a pin is
+   * Trash drop-zone overlay used by pin drag-to-delete (DESIGN_MAPS.md §3.5).
+   * Hidden by default; shown only while a pin is
    * being dragged. Drop a pin on top → pin is deleted.
    */
   trashZone: HTMLDivElement;
@@ -67,7 +67,7 @@ export interface MapTabCacheEntry {
   zoneStrip: HTMLDivElement;
   /**
    * Median nearest-neighbour gap between this map's visible pins, in
-   * STORAGE units (S356, the density layer). Set by syncPins; read by
+   * STORAGE units (the density layer). Set by syncPins; read by
    * applyPinScale on every zoomend. Infinity when fewer than two pins.
    */
   pinSpacing?: number;

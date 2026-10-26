@@ -1,4 +1,4 @@
-// PROBE (S359): on reviving a parked world, is a stat pass over every file
+// PROBE: on reviving a parked world, is a stat pass over every file
 // (getFile().lastModified) much cheaper than simply re-reading every body?
 // Answers the revive question in Notes/2026-09-28-shared-surface-design.md §2.
 // Seeds the folder's element files into OPFS in real Chromium, then times:

@@ -1,7 +1,7 @@
 /**
  * The map's date bar (#280): a map whose zones carry dates shows them as of a
  * chosen date, and since 1.50 its pins by their element's dates (the
- * Captain's Q11). Bottom left of the canvas: the date in the world's
+ * Titus's Q11). Bottom left of the canvas: the date in the world's
  * calendar, a slider over the dates on this map, Now (the world's now, the
  * default) and All dates. Only drawn while a zone or a pinned element on this
  * map is dated; per map tab and for the session, like the zone panel's eyes.
@@ -54,7 +54,7 @@ export function pinShownOnMap(entry: MapTabCacheEntry, pin: Pin, el: Element | u
  * date: a pin just placed (New pin, a drop from the sidebar) or located (the
  * sidebar's on-map badge, the element header's pin button). Without this a
  * placed pin said "Pin placed" and drew nothing, and a locate flew to an
- * empty spot (the S416 gate's F1-F3). Per map, for the session; moving the
+ * empty spot. Per map, for the session; moving the
  * date (the slider, Now, All dates) is a new question, so it clears.
  */
 const revealed = new Map<string, Set<string>>();

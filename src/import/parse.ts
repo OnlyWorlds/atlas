@@ -5,11 +5,11 @@
  *
  *   1. keel world-export ENVELOPE — `{format:"onlyworlds-world-export",
  *      schema_version, world:{id,...}, elements:{ <type>: [...] }}`. What
- *      ow.com emits today (keel `portal/views.py`; canonical, Orrery spec
+ *      ow.com emits today (keel `portal/views.py`; canonical, Skeld's spec
  *      § world-export). Nested lowercase `elements`, world id PRESENT.
  *   2. `World`+PascalCase-at-root — `{World:{...}, Character:[...]}`. The
  *      older shape atlas's base-tool lineage used; kept for backward compat
- *      (Captain, 2026-07-23) so files from the old exporter still import.
+ *      (Titus, 2026-07-23) so files from the old exporter still import.
  *   3. loose type-keyed lists — `{Character:[...]}` (no World). AI-assistant
  *      output; targets the current world.
  *
@@ -38,7 +38,7 @@ function isExportEnvelope(obj: Record<string, unknown>): boolean {
   // Structural fallback: beyond `world` + `elements` both being objects,
   // require at least one type-keyed ARRAY inside elements — a tag-less
   // non-keel JSON that merely has those two keys used to parse as a phantom
-  // 0-element world (S315 gate LOW).
+  // 0-element world.
   return isRecord(obj.world) && isRecord(obj.elements)
     && Object.values(obj.elements).some(v => Array.isArray(v));
 }

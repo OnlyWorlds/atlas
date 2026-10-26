@@ -62,7 +62,7 @@ describe.each(stores)('%s', (_name, make) => {
     expect('changed_via' in (await s.getElement(ID))!).toBe(false);
   });
 
-  it('a push that landed is keel\'s last write, Atlas\'s own: the stamp drops them (the S415 gate)', async () => {
+  it('a push that landed is keel\'s last write, Atlas\'s own: the stamp drops them', async () => {
     const s = await make();
     await s.stampServerUpdatedAt(ID, 'character', '2026-02-02T00:00:00.000Z');
     const el = (await s.getElement(ID))!;

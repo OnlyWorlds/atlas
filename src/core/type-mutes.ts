@@ -1,5 +1,5 @@
 /**
- * Muted element types (S356): the sidebar's third filter state.
+ * Muted element types: the sidebar's third filter state.
  *
  * A filter button is off (show all), on (show only these), or MUTED: not
  * shown when showing all, still one click away. Born on Sikelia, where

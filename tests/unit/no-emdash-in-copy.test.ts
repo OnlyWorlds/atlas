@@ -1,9 +1,9 @@
 /**
  * The voice law, as a guard: user-visible copy carries ZERO em-dashes.
  *
- * Captain reads the em-dash appositive as machine writing, so the rule is
- * absolute for anything a user can read (voice profile: Orrery
- * product/voice/voice.md). It had drifted back into four places by S323,
+ * Titus reads the em-dash appositive as machine writing, so the rule is
+ * absolute for anything a user can read (the voice
+ * profile). It had drifted back into four places before,
  * including the `og:image:alt` on the social card, which is the very first
  * atlas text a stranger sees.
  *

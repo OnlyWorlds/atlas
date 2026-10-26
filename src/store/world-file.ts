@@ -1,7 +1,7 @@
 /**
  * The world file: one `.zip` that holds one whole world, and the reader that
  * opens one back (1.17 bout 5, conv. 129; contract §5; Folder Format spec
- * §4.1 "a portable copy", Skeld #507).
+ * §4.1 "a portable copy", Skeld 2026-10-04).
  *
  * THE PORTABLE COPY: every file of the world as it is on disk, except the
  * OnlyWorlds link and its key (`world.json` without `api`), the sync files
@@ -10,7 +10,7 @@
  * is deflated, media stored as it is.
  *
  * THE FORMAT is the SDK's since 4.10 (`readWorldFile`, `writeWorldFile`;
- * Kael, h37 #3348): one reader and writer for every tool. It refuses before
+ * Kael, 2026-10-11): one reader and writer for every tool. It refuses before
  * anything is written: a path that climbs out, is absolute or names a drive,
  * an empty path part, a path that is both a file and a folder, a declared size
  * or a file count past the budget, no world, more than one world or files
@@ -36,7 +36,7 @@ const UNSAFE_PATH = 'That file is not a world Atlas can open: one of its paths c
 const MORE_THAN_ONE = 'That file holds more than one world, or files outside the world\'s folder. Atlas opens one world at a time.';
 const TOO_BIG = 'That file is too big to open in this browser.';
 const TOO_MANY = 'That file has too many files to be a world Atlas can open.';
-// Folder Format §4.7's causes (SDK 4.49, OW Council #522).
+// Folder Format §4.7's causes (SDK 4.49).
 const DUPLICATE = 'That file is not a world Atlas can open: it holds the same file twice.';
 const COLLISION = 'That file is not a world Atlas can open: two of its file names differ only in capitals or accents.';
 const LINK = 'That file is not a world Atlas can open: it holds a link where a file should be.';
@@ -64,8 +64,8 @@ export { worldFileName };
 
 /**
  * Files that belong to the folder's place, never to the world, so a world file
- * never carries them, whoever made it (S449, the folder spec's §4.6 read, h58
- * #9643): a repository's `.git/` (its history can hold a key once committed) and
+ * never carries them, whoever made it (the folder spec's §4.6 read):
+ * a repository's `.git/` (its history can hold a key once committed) and
  * `.env` files (a seat's key lines kept beside a world). A template
  * (`.env.example`, `.env.sample`, `.env.template`) holds no secret, but since
  * SDK 4.49 the writer carries only §4.7's parts (OW-7: world.json, elements/,
@@ -97,8 +97,8 @@ export async function collectWorldFiles(dir: FileSystemDirectoryHandle): Promise
 
 /**
  * `world.json` without its `api` block (the link and its key never travel).
- * One that will not parse is never handed over raw: it may hold a key
- * (S373 gate F9), so the download refuses.
+ * One that will not parse is never handed over raw: it may hold a key,
+ * so the download refuses.
  */
 function withoutLink(data: Uint8Array): Uint8Array {
   let meta: unknown;
@@ -106,7 +106,7 @@ function withoutLink(data: Uint8Array): Uint8Array {
     throw new PlainError("This world's world.json will not open, so Atlas could not make a download. Fix the file, then try again.");
   }
   // A world.json that is not one object is refused the same way: it cannot be
-  // a world, and an array's nested key would never be stripped (S446 gate G10).
+  // a world, and an array's nested key would never be stripped.
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
     throw new PlainError("This world's world.json will not open, so Atlas could not make a download. Fix the file, then try again.");
   }
@@ -155,7 +155,7 @@ const RECORDS_MANIFEST = 'records/RECORDS.json';
 /**
  * The world's records list will not read, so which records are private is
  * unknown, and nothing is left out by guess (folder spec §4.7 OW-8, v0.3.15;
- * Skeld h58 #10911): the caller asks the person, or makes no file.
+ * Skeld 2026-10-22): the caller asks the person, or makes no file.
  */
 export class RecordsListUnreadable extends PlainError {
   constructor() {
@@ -243,7 +243,7 @@ export function readWorldZip(
   bytes: Uint8Array,
   opts: { maxBytes?: number; maxEntries?: number } = {},
 ): ReadWorld {
-  // The format and its refusals are the SDK's (4.10, Kael h37 #3348): one
+  // The format and its refusals are the SDK's (4.10, Kael 2026-10-11): one
   // reader for every tool. Atlas keeps its own sentences, its `.atlas/` rules
   // and the demo refusal.
   let read: ReturnType<typeof readWorldFile>;
@@ -251,7 +251,7 @@ export function readWorldZip(
     read = readWorldFile(bytes, {
       maxBytes: opts.maxBytes ?? WORLD_FILE_MAX_BYTES,
       maxEntries: opts.maxEntries ?? WORLD_FILE_MAX_ENTRIES,
-      // The portable copy, whoever made the file (S373 gate F5): no sync or
+      // The portable copy, whoever made the file: no sync or
       // transient files; the SDK already drops the link from world.json.
       skip: path => isTransientPath(path) || !isPortable(path),
     });
@@ -259,7 +259,7 @@ export function readWorldZip(
     throw new PlainError(err instanceof OwWorldFileError ? REFUSALS[err.reason] : NOT_OPENABLE);
   }
   // A path under `.atlas/` whose first part is a transient FILE's name
-  // (`.atlas/making/x`) would collide with the make's own marker (S376 gate B10).
+  // (`.atlas/making/x`) would collide with the make's own marker.
   for (const { path } of read.files) {
     if (!path.startsWith(`${ATLAS_INTERNAL_DIR}/`)) continue;
     const rest = path.slice(ATLAS_INTERNAL_DIR.length + 1);

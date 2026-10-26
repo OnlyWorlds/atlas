@@ -1,46 +1,45 @@
 # Atlas — Guided Tour Design
 
-**Version**: 3.2 (2026-07-21, S307 — the consul beat is ROUTED (its view was
+**Version**: 3.2 (2026-07-21 — the consul beat is ROUTED (its view was
 a side effect of the create, so back-navigation showed a later step's
-element); unlit glyphs are no longer rendered, completing the S306c
+element); unlit glyphs are no longer rendered, completing the 3.1
 sentence-shift decision; the finale copy no longer promises a folder picker
 that OPFS-only browsers never get; the maps step explains where a map image
 comes from. Prior 3.1 header below.)
 
-**Version**: 3.1 (2026-07-21, S306c — Captain's smoke round: the opener renders
+**Version**: 3.1 (2026-07-21 — Titus's smoke round: the opener renders
 the sentence BARE (no glyph slots on the first screen; they arrive with the
 dock), the grey book cite under it cut, Begin -> Start, sentence colours
 reassigned one word per element (The=title, Hegemony=institution, Consul stays
 character), the consul step acknowledges its own create, the false "zone you
 traced" line corrected, the Consul alias list trimmed to ['Consul'], and the old
 `where-it-lives` + `online` steps MERGED into one `yours-to-keep` close --
-**17 steps** (16 since the S317 map and pin merge). The writing beat's copy now says CLICK a dotted word (hovering
-places no cursor, so Tab could never fire -- Captain hit this live) and points
+**17 steps** (16 since the later map and pin merge). The writing beat's copy now says CLICK a dotted word (hovering
+places no cursor, so Tab could never fire -- Titus hit this live) and points
 at the prose panel's link-all corner button rather than the tree's right-click
-menu). Prior: 3.0 (S306 — THE WRITING BEAT: Chapter 1 baked as plain prose and
+menu). Prior: 3.0 (THE WRITING BEAT: Chapter 1 baked as plain prose and
 linked BY THE USER via autolink's Tab; the tier choice cut as unreachable and
 the selection bubble cut as unnecessary; `Mr. Steinway` renamed out of an
 autolink key collision; the act table, step count, bundle count, test count and
 the "STILL TO BUILD" list all corrected against the code — every one was stale,
 and STILL-TO-BUILD was naming three things that had already shipped). Prior: 2.9
-(S305 — THE CHARTS ACT: one shared event date, the now beat, deep time + two
-eras; the event-vs-narrative branch CUT by Captain in favour of a "more
+(THE CHARTS ACT: one shared event date, the now beat, deep time + two
+eras; the event-vs-narrative branch CUT by Titus in favour of a "more
 information" note, which removed the reveal-slot kernel change entirely). Prior:
-2.8 (S304 — THE ACT RESTRUCTURE: step-0 opener, maps before objects,
+2.8 (THE ACT RESTRUCTURE: step-0 opener, maps before objects,
 institution+title merged, the pin's soft correction; supersedes v2.7). Prior:
-S303 capability-class staging + landing captions; S302 phases WIRED + the
-scripted create door. The full rework this serves is Captain's dump of
-2026-07-20: plan + positions in `Notes/2026-07-20-s301-tour-rework-plan.md`,
-contract + gate amendments in `Notes/2026-07-20-s301-phase-contract.md`.
+capability-class staging + landing captions; phases WIRED + the
+scripted create door. The full rework this serves is Titus's dump of
+2026-07-20 (its plan and phase contract were dated working notes, kept outside
+this repository).
 
-**SOURCE-TEXT CHRONOLOGY** (S306, five-agent read of the whole novel):
-`Notes/2026-07-21-hyperion-source-chronology.md`. Read it before any dating or
-calendar work. Headline: the book is a RELATIVE-time novel (five absolute years
+**SOURCE-TEXT CHRONOLOGY** (five-agent read of the whole novel, 2026-07-21;
+the full chronology is a working note outside this repository). Headline: the book is a RELATIVE-time novel (five absolute years
 in 19,000 lines), the Consul's tenure is a sourced ELEVEN YEARS, the Steinway is
 "Pre-Hegira", Rachmaninov is named exactly once and never dated -- and **the
 opening scene is NOT on Hyperion** (an unnamed world; keeper-verified at L307).
 
-**Concept**: Freek + Captain, 2026-07-19. The opening sentence of *Hyperion*
+**Concept**: Titus and a tester, 2026-07-19. The opening sentence of *Hyperion*
 by Dan Simmons becomes a small linked world, step by railroaded step,
 teaching OnlyWorlds AND atlas at once — while the workspace BUILDS ITSELF
 around the user. Successor to ecosystem-explorer's sentence tutorial (linked
@@ -50,38 +49,38 @@ at the 'online' step as the deeper schema story).
 
 ## The shape
 
-- **The opener** (step 0, S304 — `data-tour-step="1"`): the tour opens on the
+- **The opener** (step 0 — `data-tour-step="1"`): the tour opens on the
   Hyperion sentence CENTRE-STAGE at vignette scale on black. The step declares
   no `unlocks`, so `body.atlas-touring:not(.atlas-tour-cap-shell)` hides the
   whole shell behind it; the bar renders with `.is-opener` (screen-centered,
   auto height, the sentence at 22px). A single "Begin" hands off into the docked
   narrator (the shell materializes on the create-world beat that follows). Begin
   is a special case in the bar because `canAdvance` is false with no active
-  world — the opener is pre-world, not suspended. Copy is Captain's shorter
+  world — the opener is pre-world, not suspended. Copy is Titus's shorter
   variant (rides his copy pass). The bare splash below is the pre-tour landing;
   the opener is the tour's own first beat.
 - **The bare splash** (`body.atlas-preroot`): pre-setup, atlas shows NO shell
   chrome at all — the Atlas mark and the doors on black: take the tour, and on
-  a folder-mode browser set up a folder and open a world folder (S365). The
+  a folder-mode browser set up a folder and open a world folder. The
   splash shows while Atlas is not grounded (DESIGN_LAWS conv. 114: no home folder
   AND no world of the user's own), no longer merely while it has no root. Settings stays live at the
   `#/settings` route. After a completed tour (`atlas_tour_done_v1`) the doors
   swap emphasis: folder primary, tour reads "Replay the tour".
-- **One narrator, ONE position** (S298 — the centered opener was retired,
-  Captain's round): a single glass panel (cyan top rail, tint), docked
-  bottom-center from the first second. FIXED height 290px (S299 — was
+- **One narrator, ONE position** (the centered opener was retired,
+  Titus's round): a single glass panel (cyan top rail, tint), docked
+  bottom-center from the first second. FIXED height 290px (was
   min-height 272; the one 4-line step grew past it, so a fixed height keeps
   the dock the exact same size on every step; drops when the copy pass evens
   body lengths). Step 1 carries its framing in the meta channel: just the
   cite "Hyperion, Dan Simmons (1989)" (the "One sentence, one world" eyebrow
-  was cut S299 — Captain: "why still this blue header"; the sentence frames
+  was cut — Titus: "why still this blue header"; the sentence frames
   itself), zero extra rows. The bare stage above it fills in on Next.
   z-index 900: a modal dialog ALWAYS outranks the narrator.
 - **The progressive build-up**: chrome appears when it is taught. The bar
   stamps CUMULATIVE capability classes on `<body>` (`atlas-tour-cap-shell` /
   `-rightpane` / `-writing` / `-charts` / `-allrooms`), declared per step via
   `TourStep.unlocks`; atlas.css hides chrome whose capability is not yet
-  present. This replaced an ordinal `data-tour-stage` number (S303) that was
+  present. This replaced an ordinal `data-tour-stage` number that was
   derived from `step.act` and would have gone non-monotonic once the act
   restructure interleaves acts — a capability, once unlocked, only grows. The sidebar footer stays
   hidden for the whole tour. On the create-world step the worlds sidebar shows its TRUE
@@ -91,7 +90,7 @@ at the 'online' step as the deeper schema story).
   subtext channel, always rendered — nbsp when a step has none — so the shape
   holds; ✦ deeper; inline links) · controls (the ACT label stays cut — the
   sentence IS the user's progress; a quiet muted "Step N of 17" counter was
-  re-added S299 as a working/collab reference at Captain's ask,
+  re-added as a working/collab reference at Titus's ask,
   `.atlas-tour-stepcount`; `data-tour-step` on the panel remains the test
   contract). The
   hairline divides material from narration; the sentence renders BRIGHT on
@@ -101,18 +100,18 @@ at the 'online' step as the deeper schema story).
   look is blessed); parsed words take their element-type color and click-jump
   to their step; every span's END word carries an inline element-type glyph,
   rendered ONLY once lit (pop-in) when its step arrives. **The sentence
-  reflows as glyphs appear, deliberately** (S307, completing the S306c
+  reflows as glyphs appear, deliberately** (completing the S306c
   decision): glyphs used to be PRE-SPACED from step 1 as invisible ghosts so
   lighting one caused zero reflow, but the reserved width is what spaced the
-  words apart for the whole tour. S306c made the opener bare and accepted the
-  shift; S307 applied that to every later step. (The finale's neutral fill of
-  connective words was CUT in S298 — only element words ever color.)
-- **"more information"** (the ✦ bulb, relabeled S298): real multi-paragraph
+  words apart for the whole tour. 3.1 made the opener bare and accepted the
+  shift; 3.2 applied that to every later step. (The finale's neutral fill of
+  connective words was CUT — only element words ever color.)
+- **"more information"** (the ✦ bulb, relabeled): real multi-paragraph
   content (`\n\n` renders as paragraphs) in a scrollable FLYOUT above the
   panel — the dock's height never changes. The extras row always renders
-  (ghost placeholder when a step has neither bulb nor link); Captain's
+  (ghost placeholder when a step has neither bulb nor link); Titus's
   Hyperion share-page link joins it on the 'online' step when it exists.
-  (The ecosystem-explorer link was cut in S298.)
+  (The ecosystem-explorer link was cut.)
 
 ## Hands-on beats (the watch/do rule)
 
@@ -126,19 +125,19 @@ throwaway world:
    "Hyperion" readonly, the folder hint replaced by the teaching line
    ("normally this becomes a folder; the tour world stays in your browser").
    Create → the shell materializes on the world's home. The sidebar's own
-   create-world icon opens the same locked modal. SINGLE ROUTE (S298): the
+   create-world icon opens the same locked modal. SINGLE ROUTE: the
    create beats carry no watch-mode Next — the locked one-click modal is the
    way; the consul step shows plain Next only after he exists. The
    create-world sidebar toggle also keeps its final geometry: a locked ghost
    segment holds the place the world name will take.
 2. **Create the Consul** (step 2): the REAL element modal, type grid locked
    to character, name "The Consul" readonly. During this beat every create
-   door is scripted — and as of S302 that sentence is finally TRUE: it was
+   door is scripted — and since the phases were wired that sentence is TRUE: it was
    written when only the elements-sidebar + carried the branch, while `Ctrl+E`
    and the Charts room opened a free-form modal right beside it. All three now
    go through `create-element-door.ts`. After the Consul exists the sandbox is
    free again.
-3. **Place the pin** (step 6 in the S304 order; S299 real-control, S304 soft
+3. **Place the pin** (step 6 in the 2.8 order; real-control, then the soft
    correction): the step routes to the combined map+element view (map open
    right, Consul selected middle) so the Consul's REAL +pin button shows; the
    `atlas-tour-pinstep` body class pulses it cyan. The user clicks that real
@@ -147,7 +146,7 @@ throwaway world:
    clicks the map; the pin lands THERE with the bundle pin's locked identity
    (name + id, via `tourPinBake`). Position is the user's to keep (heal never
    touches x/y — C3).
-   - **The soft correction (S304, Captain's ruling: never refuse a placement).**
+   - **The soft correction (Titus's ruling: never refuse a placement).**
      The pin can be dropped anywhere. `TourStep.placeInZone: {pinRef, zoneRef}`
      drives the forward gate: Next appears only once the pin sits INSIDE the
      swamps zone (`TourWorldView.pinInZone`, the zone polygon from its markers ×
@@ -169,30 +168,29 @@ throwaway world:
      Correct app-wide, not just for the tour.
    NO dock button — single-route, gated. The app-wide placement feedback lives
    in `src/tabs/right/map-placement-hint.ts` + the `[data-action="pin-element"]`
-   active style (armed = crosshair cursor, an outcome asserted in e2e since
-   S318 — the rule existed from S299 but lost the cascade to the S219 default
+   active style (armed = crosshair cursor, an outcome asserted in e2e — the rule existed early but lost the cascade to an older default
    cursor for three months); Esc-owns-placement is a skip in the
    deselect-to-home guard.
-   **BOTH copy gestures satisfy the gate (S318)**: the +pin click AND the
+   **BOTH copy gestures satisfy the gate**: the +pin click AND the
    drag-from-sidebar drop each route through `tourPinBake`, so either way the
-   placed pin IS the bundle pin. The drop path missed the bake until S318 —
+   placed pin IS the bundle pin. The drop path once missed the bake —
    a dragged-in pin was nameless, the gate never opened, and +pin (hidden
    once the element is pinned) left no retry; revert-checked e2e locks it.
 4. **Keep this world** (the finale, `data-tour-step="16"`, `handsOn:
-   'keep-world'`; 1.17, S375): Keep this world · Save it to a folder (with the
+   'keep-world'`; 1.17): Keep this world · Save it to a folder (with the
    folder picker) · Start fresh, and the meta line says which (`finaleMeta`).
    Keep makes the tour world the user's own in this browser; Save it to a
    folder keeps it, then moves it into the home folder; Start fresh tears it
    down. A 1.16 tour world still running across the upgrade offers Start fresh
    only. The keep is "Keeping the tour world" below. The finale ROUTES to `object:Ebony
-   Spaceship` (Captain, S318): the closing view is the sentence's grandest
+   Spaceship` (Titus): the closing view is the sentence's grandest
    object, links radiating back. The exit confirm carries no title and ends
    with "Replay the tour any time from the settings."
 
-## Keeping the tour world (1.17, S375)
+## Keeping the tour world (1.17)
 
 The finale's Keep (`keepTourWorld` in `tour-engine.ts`, the steps in
-`tour-keep.ts`; contract `Forge/Notes/2026-10-04-browser-worlds-contract.md`
+`tour-keep.ts`; the browser-worlds contract of 2026-10-04,
 §7) runs on the step chain and in an order where every crash point is safe:
 K0 the tour quiesced (`keeping` in `tourIsSettling`, the mint chain drained,
 pin placement disarmed) and the world open; K1 the world's home and every
@@ -222,7 +220,7 @@ returns to the launch location (`returnHash`: the landing for fresh users,
 the exact prior route for a settings replay). `atlas_tour_done_v1` survives
 as the only trace, driving the landing's emphasis swap.
 
-**Teardown is a checklist, and the checklist is the contract** (S301): the
+**Teardown is a checklist, and the checklist is the contract**: the
 first version of this clause said "registry entry, handle, OPFS folder" and
 those three were honoured, while two keys nobody had enumerated outlived the
 world — `atlas_right_tabs` kept a map tab stamped with the tour world's id,
@@ -248,9 +246,9 @@ for the pane in front of the user, storage for the next boot). E2e-locked in
 `tour.spec.ts` with a precondition assert, so the test cannot pass by never
 having created the tab.
 
-## Acts (16 steps since S317, when the map and pin steps merged; `data-tour-step` = step number below)
+## Acts (16 steps since the map and pin steps merged; `data-tour-step` = step number below)
 
-The reorder (Captain's dump): the sentence gets its own opener, the maps act
+The reorder (Titus's dump): the sentence gets its own opener, the maps act
 comes BEFORE the objects so the pin's "sat" (word 3) lights in reading order
 ahead of "balcony"/"spaceship", the institution and title merge into one step,
 and the zone reveals WITH the map (the pin's soft correction needs the region
@@ -260,10 +258,10 @@ already drawn).
 1. **Elements** (steps 2-4): create the world (opens the shell) · create the
    Consul · **Hegemony institution + title (merged)** — both reveal, the copy
    teaches the distinction, routes to the Hegemony.
-2. **Maps** (steps 5-7; the map, its zone and the pin are ONE hands-on step since S317): the **Unnamed Planet** location (right pane appears —
-   S312: the unnamed-world resolution; the opening scene is NOT on Hyperion,
-   hyperion.txt L307, so Captain rebuilt the spatial layer live and the bundle
-   adopted it) · the map "Map of Unnamed planet" (bundled art; renamed live by Captain, adopted S318) **+ the Swamps zone
+2. **Maps** (steps 5-7; the map, its zone and the pin are ONE hands-on step): the **Unnamed Planet** location (right pane appears —
+   the unnamed-world resolution; the opening scene is NOT on Hyperion,
+   hyperion.txt L307, so Titus rebuilt the spatial layer live and the bundle
+   adopted it) · the map "Map of Unnamed planet" (bundled art; renamed live by Titus, adopted) **+ the Swamps zone
    drawn on it** (zone name is now `Swamps`, 6 markers) · the balcony-seat pin
    (HANDS-ON, **soft correction**: place anywhere, Next only over the swamps) ·
    the swamps' living things (2 creatures, species, Pack of Bellowing Saurians).
@@ -272,7 +270,7 @@ already drawn).
    linking so the Consul's page carries real chips; deeper: two-way links, Web,
    Knowledge).
 4. **Writing** (step 10): Chapter 1 = the sentence VERBATIM, baked as PLAIN
-   prose with NO chips (S306). **HANDS-ON** (`link-word`): autolink underlines
+   prose with NO chips. **HANDS-ON** (`link-word`): autolink underlines
    the surface forms it can resolve and the user presses Tab to link one; Next
    appears at the first chip. Only SEVEN of the nine phrases are linkable here
    (`TOUR_WRITING_LINKABLE`) because Rachmaninov and his Prelude arrive at
@@ -283,7 +281,7 @@ already drawn).
    while they surge) · the chart = the **now beat** (HANDS-ON `set-now`; the
    bundle ships no `time_current`, so the room's real button is pressable) ·
    deep time (Rachmaninov **-270** and his Prelude **-251** in the Old Earth
-   era). **Dates are SOURCE-DERIVED since S312**: title grant_date 1 + events
+   era). **Dates are SOURCE-DERIVED**: title grant_date 1 + events
    at 12 = the Consul's sourced eleven-year tenure (L327/L3823); deep time via
    the L1130 epoch (AD 2732 = 589 P.C. → P.C. 0 ≈ AD 2143 → 1873 = -270,
    1892 = -251). The old "no Earth↔PC conversion asserted" rule is RETIRED —
@@ -298,8 +296,7 @@ already drawn).
 ## Mechanics (`src/tour/`)
 
 - **`tour-data.ts`** — sentence + step script + `capabilitiesUpTo` (the
-  cumulative capability set per step; replaced the ordinal `tourStageFor` in
-  S303). Steps reference bundle elements as `"type:Name"`; spans are word-index
+  cumulative capability set per step; replaced the ordinal `tourStageFor`). Steps reference bundle elements as `"type:Name"`; spans are word-index
   ranges + element type. Route kinds: home · elements · element · map · writing ·
   chart; flags `webTab`, `unlocks`, `creates`, `placeInZone`,
   `handsOn: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'keep-world' | 'link-word'`.
@@ -322,7 +319,7 @@ already drawn).
   the tour running" without importing the tour chunk (welcome, world-home,
   worlds-sidebar, elements-sidebar).
 
-**The resilience contract (v2.4, S299 — "pop back cheeky")**: users can mess
+**The resilience contract (v2.4 — "pop back cheeky")**: users can mess
 with the sandbox (delete, unlink, wreck fields) and the world heals on every
 step-enter. Clauses: (C1) revealed-but-absent bundle elements re-create
 (spatial included, media re-attached); (C2) link heal MERGES via the pure
@@ -351,7 +348,7 @@ targets arrive. `atlas_aliases` defer the same way until the CHAPTER reveals
 they are noise). A hands-on element only auto-reveals for steps strictly past
 its own.
 
-**TWO SETS, NOT ONE (S301, gate R1/R2 — convergent from two lenses)**: the
+**TWO SETS, NOT ONE (gate R1/R2 — convergent from two lenses)**: the
 set of elements a step CREATES is step-keyed, but the set a surviving LINK
 may point at is `step-keyed ∪ whatever is on disk` (`linkableIds`). The rule
 is **never strip a link whose target is present on disk**, because stripping
@@ -367,10 +364,10 @@ indices are hints. Two bugs die with it:
   payoff chips the user had just watched appear vanished and oscillated on
   every back/forward.
 
-## The scripted create door (S302)
+## The scripted create door
 
 A step can declare `creates: string[]` — ordered bundle refs the USER mints
-with the app's real `+`, one per click, no dialog (Captain's ruling: the
+with the app's real `+`, one per click, no dialog (Titus's ruling: the
 narrator narrates, the app is where you act, and three modals for three
 objects reads as paperwork). `advanceWhen` is implicit: **the step gates its
 own Next on all of them existing**, enforced by the bar rather than by each
@@ -380,7 +377,7 @@ run the step exists for.
 **One funnel, not one branch per door.** Every free-create entry point goes
 through `src/ui/create-element-door.ts` (elements sidebar `+`, `Ctrl+E`, the
 Charts room's `+ Element`), which asks `tour-door.ts` first and falls through
-to the ordinary modal on any decline. Before S302 the tour branch lived only
+to the ordinary modal on any decline. Before the phases were wired the tour branch lived only
 in the sidebar handler while this doc claimed "EVERY create door is scripted"
 — `Ctrl+E` and the Charts room opened a free-form modal right beside the
 locked one. Contextual creates (from-selection, for-this-link-field) stay
@@ -400,7 +397,7 @@ highlights it the way the pin beat highlights the real +pin button — the
 sidebar's own pulse only fires on an EMPTY world, so by the objects step it
 pointed at a control carrying no signal at all.
 
-## Phases (S301 kernel, S302 wired)
+## Phases (the kernel, then wired)
 
 A step's narration changes as the user acts, and its forward control appears
 only once the deed is done. **A phase is DERIVED from world state, never
@@ -421,7 +418,7 @@ tour already heals the world on every step-enter.
   they never did.
 - **Shorthand**: `data-tour-step` + `data-tour-phase` are stamped on the
   panel, so a step's second state is "4b" in conversation and in e2e.
-- **The bar subscribes to core state** (S302): phases derive from the world,
+- **The bar subscribes to core state**: phases derive from the world,
   so the panel has to hear the world change. The alternative was a bespoke
   notify call threaded into every gated beat — five couplings into rooms that
   should not know the tour exists. `notifyTourPinPlaced` was the first of
@@ -449,26 +446,26 @@ Use `__atlasTestApi.awaitTourSettled()` (mirrors `awaitTidies`).
 
 **Safety layer**: the tour world is `demo: true` (waypoint law holds); every
 engine write path re-checks `tourWorldIsActive()`. While touring, the home
-room's onboarding cards stay silent (S264 intersection class).
+room's onboarding cards stay silent (the intersection class).
 
 ## The bundle (`src/demo/hyperion-world.json` + webps)
 
 Baked from OnlyWorlds demo world (key `0000000000`), **34 elements** since the
-S312 re-snapshot (Captain's live spatial rebuild adopted wholesale: map
-"Map of Unnamed planet" (so named since his S318 live rename) with his art baked to `unnamed-planet.webp`, zone `Swamps`
+re-snapshot (Titus's live spatial rebuild adopted wholesale: map
+"Map of Unnamed planet" (so named since his live rename) with his art baked to `unnamed-planet.webp`, zone `Swamps`
 with 6 named markers, his pin; the old map/zone/9-markers are gone, and the
 LIVE world was aligned back — curly names, aliases, dates, book/chapter/
 calendar pushed, orphan zone deleted). ⚠ `TOUR_MEDIA_URLS` in tour-engine must
-name every `x_tour_media` asset or the attach silently skips (S312's e2e
-catch). ⚠ **Map y is BOTTOM-left since S361 (atlas 1.8)**: the bundle's pin and six swamp markers were flipped
+name every `x_tour_media` asset or the attach silently skips (an e2e
+catch). ⚠ **Map y is BOTTOM-left since atlas 1.8**: the bundle's pin and six swamp markers were flipped
 (`y' = 1492 - y`) with the converter, but the LIVE demo world still holds the old y-down numbers, so a
 re-bake must flip them again (or the live world is flipped first; Skeld told). No test catches a wrong
 choice (swamp containment is reflection-invariant): look at the map step. Offline; images ship as webp and attach as LOCAL media at reveal. `_bake_notes` lists every editorial
-deviation: zone-twin merge, the SHARED event date (both at 7, S305), the link
+deviation: zone-twin merge, the SHARED event date (both at 7), the link
 weave, pin rename, book+chapter mint, atlas_aliases for the sentence's surface
 forms, Rachmaninov's 1873 Earth birth_date removed (it stretched the chart axis),
-and the S306 writing-beat bake (below).
-**S306**: the character `Steinway` was renamed **`Mr. Steinway`** because the bare
+and the 3.0 writing-beat bake (below).
+**3.0**: the character `Steinway` was renamed **`Mr. Steinway`** because the bare
 key collided with the `Steinway` alias on `The Consul's Steinway`, and both
 autolink and bulk-link skip any key with 2+ candidates — that word could never
 have linked, silently. `Story of the old piano` gained `supertype: 'Draft'` so it
@@ -496,16 +493,16 @@ Windows WebKit has no OPFS at all, so real-Safari verification is owed on a
 Mac. Full Safari support = the browser-storage-worlds project (banked,
 post-launch).
 
-## The rework (S301 → S304, and what remains)
+## The rework (2.8 and after, and what remains)
 
-Captain's dump restructured the whole tour. **LANDED through S304**: the phase
-kernel (S301) + scripted `+` door (S302) + capability-class staging (S303), and
-now (S304) the ACT RESTRUCTURE — the step-0 sentence opener that hands off into
+Titus's dump restructured the whole tour. **LANDED through 2.8**: the phase
+kernel + scripted `+` door + capability-class staging, and
+now the ACT RESTRUCTURE — the step-0 sentence opener that hands off into
 the dock, the maps act moved BEFORE the objects (lighting "sat" in reading
 order), institution+title merged, the zone revealed with the map, and the pin's
 soft correction (place anywhere, Next only over the swamps, drag to fix).
 
-**LANDED S305**: the charts act — the events share ONE date (he plays WHILE they
+**LANDED in 2.9**: the charts act — the events share ONE date (he plays WHILE they
 surge), the chart step became a hands-on NOW beat (`handsOn: 'set-now'`, single
 route: the bundle ships no `time_current`, so the room's real button is
 pressable, and setting the clock both draws the gold line and gives the Consul's
@@ -529,13 +526,13 @@ them had already shipped in the very session the doc claimed to document — a d
 asserting intent as fact, which is exactly how a future session builds the wrong
 thing):
 
-- the CHARTS act, element by element — **LANDED S305** (the event-vs-narrative
-  branch was CUT by Captain in favour of a "more information" note, which removed
+- the CHARTS act, element by element — **LANDED in 2.9** (the event-vs-narrative
+  branch was CUT by Titus in favour of a "more information" note, which removed
   the reveal-slot kernel change entirely; no gate was needed)
-- the two-era Old Earth/PC calendar baked into the bundle — **LANDED S305**
-- the EXIT MODAL showing which rooms you saw — **LANDED S305**
+- the two-era Old Earth/PC calendar baked into the bundle — **LANDED in 2.9**
+- the EXIT MODAL showing which rooms you saw — **LANDED in 2.9**
   (`tour-exit-summary.ts` + `tour-exit-modal.ts`)
-- the WRITING beat — **LANDED S306**, though not as this list imagined it. The
+- the WRITING beat — **LANDED in 3.0**, though not as this list imagined it. The
   tier choice was CUT: `isWritingInitialized` (writing-helpers.ts) correctly
   suppresses the setup screen when every chain member's supertype matches a
   writing label, which the bundle's Book/Chapter do, so the screen cannot appear
@@ -544,11 +541,11 @@ thing):
   right-click as the alternate), both of which the writing room already had. No
   unlinked chapter variant was needed either — Chapter 1 itself is baked plain.
 
-Positions, rulings and open questions live in the plan note; the phase contract
-carries the engineering.
+Positions, rulings and open questions lived in the plan note, the engineering in
+the phase contract (both dated working notes, outside this repository).
 
 **STILL OPEN**: resume-after-exit (below), and the reverted chart-framing fix
-(spec in the S305 handover addendum).
+(its spec was a working note outside this repository).
 
 Standing decisions from that round:
 - Create buttons never return to the widget: the narrator narrates, the app
@@ -558,7 +555,7 @@ Standing decisions from that round:
 - The tour world still folds away on exit. RESUME is wanted, and is cheap
   because `revealUpTo` is idempotent: persist the step + a small choices
   record (pin position, branch choice, dates, tier labels) and rebuild.
-- **The share detour is CUT** (Captain, S302). It was the one beat that could
+- **The share detour is CUT** (Titus). It was the one beat that could
   not be built honestly: publishing needs an api key AND a registry PIN, and
   seeding fake ones would make the tour issue REAL authenticated requests to
   production (`reconcilePubMirrors` fires on every share-room mount; republish
@@ -571,7 +568,7 @@ Standing decisions from that round:
   the residue contract does not track.
 - Dates: one monthless calendar with two eras (**Old Earth** counting down to
   a pivot at 0, **PC** counting up from it — both in-text terms), baked into
-  the bundle rather than taught as a step (Captain, S302). `CalendarEra`
+  the bundle rather than taught as a step (Titus). `CalendarEra`
   already supports up/down eras sharing a pivot (unit-tested against a Dune
   B.G./A.G. pair), so there is nothing to build. **No conversion is ever
   asserted**: the books never state the PC epoch, so Rachmaninov sits in the
@@ -580,25 +577,25 @@ Standing decisions from that round:
   - Known gap, banked: calendar-worded date ENTRY exists only in the charts
     room's drag popover. On an element's own page a date is a raw integer.
 
-## Open work (reconciled S301)
+## Open work (reconciled 2026-07-20)
 
-- Captain's copy pass over the 17 bodies + meta lines + deeper paragraphs
-  (flag sheet `Notes/2026-07-19-s298-tour-flag-sheet.md`).
-- Captain's Hyperion share-page link on the 'online' step (URL owed).
-- Charts-step redesign (design round with Captain first — held).
+- Titus's copy pass over the 17 bodies + meta lines + deeper paragraphs
+  (from a flag sheet of 2026-07-19).
+- Titus's Hyperion share-page link on the 'online' step (URL owed).
+- Charts-step redesign (design round with Titus first — held).
 - Crimson Text bundling if the serif look is blessed (Georgia fallback now).
 - Bar polish: dodge when the right pane is the subject · reduced-height on
   small viewports (held — re-measures the fixed dock; wants copy settled).
 - Staggered reveals (held, same reason).
-- Precision-audit proposals for Captain's bless (`Notes/2026-07-20-s299-precision-audit.md`).
+- Precision-audit proposals for Titus's bless (from an audit of 2026-07-20).
 - Real-Safari smoke (needs a Mac).
-- DONE S299 (was open): resilience heal · real-control pin beat + placement
+- DONE (was open): resilience heal · real-control pin beat + placement
   feedback · precision staging (empty-section hide, zone/web chrome) · fixed
   290px dock · eyebrow cut · glyph-on-create · step counter re-added.
 
 ## Tests
 
-`tests/e2e/tour.spec.ts` (17, S306 order — count with `grep -c '^test('`, never
+`tests/e2e/tour.spec.ts` (17, the 3.0 order — count with `grep -c '^test('`, never
 from this line): the centre-stage opener + Begin hand-off · full 18-step walk
 (staged chrome, locked modals incl. the sidebar + door, the real-button pin
 placement + locked identity, alias timing, web cameo, teardown + emphasis swap) ·

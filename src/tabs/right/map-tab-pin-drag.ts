@@ -47,8 +47,8 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
   // highlights as the user passes over it; on drop, decide between delete
   // (over zone) or move (anywhere else). Also hide the hover tooltip — if
   // the user starts a drag with the tooltip showing, no mouseout fires
-  // during the drag and the tooltip would hang after delete (session 211
-  // smoke note from Captain).
+  // during the drag and the tooltip would hang after delete (a smoke
+  // note from Titus).
   marker.on('dragstart', () => {
     entry.trashZone.setAttribute('data-active', 'true');
     entry.trashZone.setAttribute('data-hover', 'false');
@@ -88,7 +88,7 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
         const elements = await refreshElementsAfterWrite(store);
         // No toast — the visual zone + the disappearance of the marker are
         // the feedback. Could surface "pin deleted" via toastManager if
-        // Captain wants extra confirmation, but the action is its own UX.
+        // Titus wants extra confirmation, but the action is its own UX.
         return;
       }
 
@@ -109,7 +109,7 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
     } catch (err) {
       console.error('[map-tab] pin drag persist failed:', err);
       // Was silent: the pin stayed where it was dropped though nothing was
-      // saved (S369).
+      // saved.
       showProblem(err, { doing: droppedOnTrash ? 'deleting the pin' : 'moving the pin' });
     }
   });

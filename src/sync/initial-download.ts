@@ -48,7 +48,7 @@ export interface InitialDownloadResult {
   totalDownloaded: number;
   failures: PerElementFailure[];
   /**
-   * Set when the user stopped early and kept what had arrived (S360). The
+   * Set when the user stopped early and kept what had arrived. The
    * folder is a valid, partial world; the first pull (a cold /changes replay
    * from the epoch) brings the rest.
    */
@@ -56,7 +56,7 @@ export interface InitialDownloadResult {
 }
 
 /**
- * The user's answer mid-download (S360): `finish` keeps what has arrived and
+ * The user's answer mid-download: `finish` keeps what has arrived and
  * registers the world; `cancel` abandons the link (the caller removes the
  * folder it created). Polled between elements and between type listings.
  */
@@ -71,7 +71,7 @@ export class DownloadCancelledError extends PlainError {
 }
 
 /**
- * A linked world's settings, brought down with its elements (S458, Keel #571).
+ * A linked world's settings, brought down with its elements.
  * Before this, a world linked from onlyworlds.com took its settings (the now,
  * the units, its own words) only at its first sync round, which a world that
  * pulls only when asked might not run for a while: so it opened with the
@@ -88,7 +88,7 @@ export async function seedLinkedWorldMeta(folder: FolderStore, adapter: OwApiCli
     console.warn('[atlas:link] world settings not read at download; the first sync round brings them', err);
     return;
   }
-  // A disk failure here never costs the download (S458 gate G3): the first
+  // A disk failure here never costs the download: the first
   // round seeds again over whatever landed, equal values included.
   try {
     const rec = meta as unknown as Record<string, unknown>;
@@ -114,8 +114,8 @@ export async function initialDownloadAll(
   onProgress?: (p: InitialDownloadProgress) => void,
   shouldStop: () => DownloadStop = () => null,
   /**
-   * Into browser storage a full origin is fatal (contract §2.2, S370 gate
-   * B8): rethrow the first `QuotaExceededError` instead of recording it and
+   * Into browser storage a full origin is fatal (contract §2.2):
+   * rethrow the first `QuotaExceededError` instead of recording it and
    * writing on over 0-byte files.
    */
   opts: { stopOnQuota?: boolean } = {},
@@ -174,7 +174,7 @@ export async function initialDownloadAll(
           type,
           operation: 'create',
           message: err instanceof Error ? err.message : String(err), // raw-error-ok: the failure record; Details print its fields, never this
-          // The name lets a browser-storage link treat a full origin as fatal (S370 gate B8).
+          // The name lets a browser-storage link treat a full origin as fatal.
           ...(typeof (err as { name?: unknown })?.name === 'string' ? { error_name: (err as { name: string }).name } : {}),
         });
       } finally {

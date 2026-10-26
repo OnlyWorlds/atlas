@@ -1,5 +1,5 @@
 /**
- * Pure kernels behind zone shape editing (S307) — the first arithmetic
+ * Pure kernels behind zone shape editing — the first arithmetic
  * coverage this subsystem has had.
  *
  * Both cases below were live defects reachable by ordinary use, in a 1000+

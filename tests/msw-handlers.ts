@@ -209,7 +209,7 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
           );
         }
       }
-      // Captain session 221: atlas-local fields (atlas_shape on zone, etc.)
+      // Atlas-local fields (atlas_shape on zone, etc.)
       // were leaking to live OW which rejects unknown fields with 400. Mirror
       // here so tests catch any new field that needs adding to
       // ATLAS_LOCAL_EXTENSION_FIELDS.
@@ -376,7 +376,7 @@ const V2_WORLD_META_WRITABLE: Readonly<Record<string, 'text' | 'list' | 'int'>> 
   distance_unit: 'text',
 };
 
-/** World units (keel core/world_api.py, Keel #146): trimmed, then capped at 64. */
+/** World units (keel core/world_api.py): trimmed, then capped at 64. */
 const V2_WORLD_UNIT_FIELDS = new Set(['length_unit', 'mass_unit', 'distance_unit']);
 
 /**
@@ -438,7 +438,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
   const cursorOffsets = new Map<string, number>();
   let seq = 0;
 
-  // World-meta state (v2 tail, S262). Seeded from worldId/worldName (defaults
+  // World-meta state (v2 tail). Seeded from worldId/worldName (defaults
   // keep older suites indifferent) + canonical empties ('' text, [] list, null
   // int); options.worldMeta overrides individual WIRE-named fields.
   const worldMeta: Record<string, unknown> = {
@@ -480,7 +480,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       public_read: worldMeta.public_read,
       created_at: worldMeta.created_at,
       updated_at: worldMeta.updated_at,
-      // Keel #571: the world's first import, both members always served, and
+      // The world's first import, both members always served, and
       // every extension key at the top level, as stored.
       origin: JSON.parse(JSON.stringify(worldMeta.origin ?? { source: null, producer: null })),
       ...Object.fromEntries(Object.entries(worldMeta)
@@ -641,7 +641,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       return HttpResponse.json({ role: 'owner' });
     }),
 
-    // PATCH /world — world-meta partial write (v2 tail, S262). MUST precede
+    // PATCH /world — world-meta partial write (v2 tail). MUST precede
     // PATCH /:type (a bare /world would match type="world"). Contract (keel dig
     // 2026-07-13): unknown-field check across ALL keys first — one stray field
     // aborts the whole PATCH — then per-field type validation, then apply +

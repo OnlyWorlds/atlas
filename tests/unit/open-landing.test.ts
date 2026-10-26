@@ -1,5 +1,5 @@
 /**
- * Where an open link lands (OW Parlor #487): the capture reads an element or a
+ * Where an open link lands: the capture reads an element or a
  * packet after the world id, and the landing waits for that world, loaded, then
  * names what it found and what it did not.
  */
