@@ -13,54 +13,31 @@
  * 4, any other value is ignored and stays a read-only custom field). Handed on
  * as proposed: any value but null (Kael's pack, `is_proposed`: a doubt leaves
  * the element out rather than handing it on as fact).
+ *
+ * Both readings are the SDK's since 4.84 (the profile's readers: `proposedMarkOf`
+ * shows, `handsOnAsProposed` hands on; trimmed by the profile's white space, so a
+ * byte order mark stays, and a `today` not shaped YYYY-MM-DD is refused).
  */
-import type { OwMember } from '@onlyworlds/sdk';
+import { handsOnAsProposed, proposedMarkOf, PROPOSED_MARK, type OwMember, type OwProposedMark } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { memberNameOf } from './agent-mark';
 import { escapeAttr, escapeText } from './dom-utils';
 
-export const PROPOSED_MARK = 'x_review_proposed';
+export { handsOnAsProposed, proposedMarkOf, PROPOSED_MARK };
 
-export interface ProposedMark {
-  /** The membership that proposed it, when the mark names one. */
-  by: string | null;
-  /** The day it lapses (YYYY-MM-DD), when the mark gives one. */
-  expires: string | null;
-  /** `expires` has come: shown as lapsed, never deleted on its own. */
-  lapsed: boolean;
-}
+export type ProposedMark = OwProposedMark;
 
 /**
  * Today as the profile writes a day, in UTC: keel's queue reads a proposal as
  * lapsed from midnight UTC of its `expires` day (`state_of`),
- * so Atlas reads it on the same day keel does.
+ * so Atlas reads it on the same day keel does (the SDK's default too).
  */
 export function todayDay(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-/** The mark as shown, or null for a settled element (absent, null, or a value that is not an object). */
-export function proposedMarkOf(el: unknown, today = todayDay()): ProposedMark | null {
-  if (!el || typeof el !== 'object') return null;
-  const v = (el as Record<string, unknown>)[PROPOSED_MARK];
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
-  const m = v as Record<string, unknown>;
-  const by = typeof m.by === 'string' && m.by.trim() ? m.by.trim() : null;
-  const expires = typeof m.expires === 'string' && DAY.test(m.expires.trim()) ? m.expires.trim() : null;
-  return { by, expires, lapsed: expires !== null && expires <= today };
-}
-
 export function isProposed(el: unknown): boolean {
   return proposedMarkOf(el) !== null;
-}
-
-/** Left out of anything Atlas hands on: the mark with any value but null. */
-export function handsOnAsProposed(el: unknown): boolean {
-  if (!el || typeof el !== 'object') return false;
-  const v = (el as Record<string, unknown>)[PROPOSED_MARK];
-  return v !== undefined && v !== null;
 }
 
 /**

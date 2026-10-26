@@ -49,6 +49,12 @@ describe('R1, the readings', () => {
     expect(todayDay(new Date('2026-11-22T04:30:00.000Z'))).toBe('2026-11-22');
   });
 
+  it('is the SDK\'s reader: the profile\'s white space trimmed, a byte order mark kept, a bad day refused', () => {
+    expect(proposedMarkOf(el('a', 'A', { x_review_proposed: { by: '  m-1\t' } }))!.by).toBe('m-1');
+    expect(proposedMarkOf(el('a', 'A', { x_review_proposed: { by: '﻿m-1' } }))!.by).toBe('﻿m-1');
+    expect(() => proposedMarkOf(el('a', 'A', { x_review_proposed: MARK }), '22 Nov')).toThrow(TypeError);
+  });
+
   it('the line names the seat from the roster, says an agent, and the day it lapses', () => {
     const roster = [{ id: SEAT, kind: 'agent', name: 'Scribe', role: 'contributor' }] as unknown as OwMember[];
     const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
