@@ -1,9 +1,9 @@
 /**
- * Settings → Account tab (extracted from settings-panel session 233). Global
+ * Settings → Account tab (extracted from settings-panel). Global
  * PIN + email, used when creating or linking online worlds. PIN changes
  * re-attach any active api-linked engine immediately (stale creds otherwise).
  *
- * Account-mode (session 260): the OnlyWorlds account token block. Paste an
+ * Account-mode: the OnlyWorlds account token block. Paste an
  * `ow_a_` token (minted at onlyworlds.com → Settings → Account tokens) →
  * validated via GET /account → stored in the registry. Signed in, atlas can
  * list your worlds in the sidebar and mint per-world keys. Forget drops the
@@ -28,7 +28,7 @@ import { revokeAtlasToken } from '../sync/token-revoke';
 import { onlyWorldsSignInButtonHtml, wireOnlyWorldsSignIn } from '../ui/onlyworlds-sign-in-button';
 
 /**
- * The sign-in error line (B6, S369). `accountErrorMessage`'s code branches
+ * The sign-in error line (B6). `accountErrorMessage`'s code branches
  * (revoked, not recognised, rate limited) are written copy and stay; its
  * fallback read out the server's or the browser's raw text, so every other
  * error is worded here.
@@ -81,7 +81,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
   `;
 }
 
-/** What Forget says (S475): a token Atlas made is revoked on onlyworlds.com; a pasted one is only forgotten here. */
+/** What Forget says: a token Atlas made is revoked on onlyworlds.com; a pasted one is only forgotten here. */
 export const FORGET_REVOKED_LINE = "Signed out. Atlas's token is revoked on OnlyWorlds. Opened worlds keep their own keys.";
 export const FORGET_KEPT_LINE = "Signed out here. Atlas could not confirm that OnlyWorlds revoked its token: check onlyworlds.com, in Account settings under Account tokens.";
 export const FORGET_PASTED_LINE = 'Account token forgotten. Opened worlds keep their own keys.';
@@ -104,7 +104,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
   // #387: email and password first, as Lantern signs in; the token paste
   // stays for whoever already made one, behind its own line. Where the
   // Sign in with OnlyWorlds button stands, the lead paragraph introduces it and
-  // a label saying the same above it goes (Seethe h20 #12348).
+  // a label saying the same above it goes (Seethe 2026-10-24).
   const owButton = onlyWorldsSignInButtonHtml('Or with your email or username and password:');
   return `
     <div class="atlas-settings-field atlas-account-token-block" data-role="account-token-block">
@@ -241,7 +241,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
   /**
    * A token in hand, pasted or just minted: check it, keep it, and open what
    * waited for it. A minted one (with its id) that is not kept is revoked at
-   * once, never left live with no one holding it (the S475 gate's G4).
+   * once, never left live with no one holding it.
    */
   const completeSignIn = async (token: string, onRefused: () => void, tokenId?: string): Promise<void> => {
     let username: string;
@@ -265,7 +265,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
   });
 
   block.querySelector<HTMLButtonElement>('[data-action="account-forget"]')?.addEventListener('click', () => {
-    // Signed out here first, offline too; the revoke runs on the copy in hand (S475, R3).
+    // Signed out here first, offline too; the revoke runs on the copy in hand (R3).
     const token = getState().registry.account_token;
     const tokenId = mintedTokenId(getState().registry);
     const next = setAccountToken(getState().registry, undefined);

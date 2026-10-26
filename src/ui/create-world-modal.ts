@@ -156,7 +156,7 @@ export class CreateWorldModal extends BaseModal {
         const link = this.link;
         const { entry } = await createWorldInRoot(name, {
           where,
-          // Before activation (gate S383 A2): a world from a Start-page link
+          // Before activation: a world from a Start-page link
           // never draws the question it was answered, not even under this dialog.
           beforeActivate: link ? markNewcomerAnswered : undefined,
         });
@@ -169,13 +169,13 @@ export class CreateWorldModal extends BaseModal {
         this.hide();
         this.onCreated?.({ entry });
         // Land in world view: sidebar flips to the elements list so the new
-        // world's (empty) contents are the visible surface (S255v3).
+        // world's (empty) contents are the visible surface.
         patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
         setSidebarModePref('elements');
         navigate(this.link?.then === 'bring-in' ? importHash(entry.id) : worldHash(entry.id));
       } catch (err) {
         // A refusal (no home folder, no permission) reads as itself; the rest
-        // is worded (S369).
+        // is worded.
         console.warn('[create-world] create failed:', err);
         this.showError(errorBox, problemFor(err, { inline: true, doing: 'creating the world', where }).sentence);
         submitBtn.disabled = false;

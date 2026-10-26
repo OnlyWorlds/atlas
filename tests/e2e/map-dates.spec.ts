@@ -136,7 +136,7 @@ test('a map shows its zones as of a date: the now by default, a slider, Now and 
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect.poll(() => page.evaluate(() => location.hash)).toContain(second);
 
-  // A right-click on the bar is the bar's, never the map's New pin (the S410 gate).
+  // A right-click on the bar is the bar's, never the map's New pin.
   await label.click({ button: 'right' });
   await page.waitForTimeout(300);
   await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
@@ -158,7 +158,7 @@ test('a map shows its zones as of a date: the now by default, a slider, Now and 
   await expect(shown('#00aa00')).toHaveCount(0);
 });
 
-test('the zone panel at a date: a kind keeps its key, its eye hides it, and a date with no zone keeps the panel open (#280, the S410 gate)', async ({ page }) => {
+test('the zone panel at a date: a kind keeps its key, its eye hides it, and a date with no zone keeps the panel open (#280)', async ({ page }) => {
   await freshBoot(page);
   await setupWorld(page);
   await page.click('[data-action="new-map"]');
@@ -282,7 +282,7 @@ test('a map shows its pins by their element\'s dates: a birth on, an event insid
   await expect(pins).toHaveCount(2);
 
   // The date only hides and shows: a slider move re-skins or rebuilds no pin
-  // (the S416 gate's F4: the full sync per frame re-set every icon).
+  // (the full sync per frame re-set every icon).
   await page.evaluate(async () => {
     const { mapTabCache } = await import('/src/tabs/right/map-tab-cache.ts');
     const w = window as any;
@@ -303,7 +303,7 @@ test('a map shows its pins by their element\'s dates: a birth on, an event insid
   await expect(pins).toHaveCount(2);
   expect(await page.evaluate(() => (window as any).__s416)).toEqual({ update: 0, add: 0 });
 
-  // New pin, placing an element by name while the date hides it (the S416 gate's F1).
+  // New pin, placing an element by name while the date hides it.
   const placeByName = async (type: string, prefix: string) => {
     await container.click({ button: 'right', position: { x: 60, y: 60 } });
     const create = page.locator('[data-modal="create-element"]');

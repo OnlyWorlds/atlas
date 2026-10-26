@@ -1,5 +1,5 @@
 /**
- * Account-mode world list + open-flow short-circuits (session 260).
+ * Account-mode world list + open-flow short-circuits.
  *
  * refreshAccountWorlds fills the `accountWorlds` state slice from
  * GET /account/worlds — token-identity-guarded, microtask-deferred, offline-
@@ -245,7 +245,7 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     expect(toasts.calls).toHaveLength(0);
   });
 
-  it('asks where the world lives first; a folder answer with no home folder asks for one; Cancel never mints (S365, 1.17)', async () => {
+  it('asks where the world lives first; a folder answer with no home folder asks for one; Cancel never mints (1.17)', async () => {
     // The picker exists and the user last chose a folder: the folder row is pre-selected.
     (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
     localStorage.setItem('atlas_ui_prefs', JSON.stringify({ sidebarMode: 'worlds', defaultCreateType: 'character', newWorldWhere: 'folder' }));
@@ -272,7 +272,7 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     localStorage.removeItem('atlas_ui_prefs');
   });
 
-  it('a second open while the first waits on the where-question does nothing (S414 gate L1)', async () => {
+  it('a second open while the first waits on the where-question does nothing', async () => {
     (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
     const state = mount();
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
@@ -371,7 +371,7 @@ describe('mintOwnKey — a shared world takes a key made for the member (#199, k
   });
 });
 
-describe('createApiWorld — the signed-in v2 lane (session 260); signed out it refuses (Keel #134, S432)', () => {
+describe('createApiWorld — the signed-in v2 lane; signed out it refuses', () => {
   const WORLDSYNC_BASE = 'https://test-ow.local/api/worldapi';
 
   it('signed in, pinless account: the PIN dance retries with the pin and returns the row + key', async () => {
@@ -401,7 +401,7 @@ describe('createApiWorld — the signed-in v2 lane (session 260); signed out it 
     expect(state.created).toHaveLength(1);
   });
 
-  it('sends the folder\'s producer and source lines, which keel keeps as the world\'s origin (Keel #571)', async () => {
+  it('sends the folder\'s producer and source lines, which keel keeps as the world\'s origin', async () => {
     const state = mount({ accountHasPin: false });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
     const producer = { tool: 'atlas', version: '1.83.0', input: 'bare' };
@@ -425,7 +425,7 @@ describe('createApiWorld — the signed-in v2 lane (session 260); signed out it 
     expect(state.created[0].origin).toEqual({ source: null, producer: null });
   });
 
-  it('a line keel refuses for its own reason: the world is made once more without the lines (S458 gate G6)', async () => {
+  it('a line keel refuses for its own reason: the world is made once more without the lines', async () => {
     const state = mount({ accountHasPin: true });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
     let refused = 0;

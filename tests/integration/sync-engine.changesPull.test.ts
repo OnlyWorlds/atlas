@@ -1,7 +1,6 @@
 /**
  * SyncEngine pullPhaseChanges — the v2 cursor-delta pull.
  *
- * Design + adversarial-gate resolutions: Forge/Notes/2026-07-12-v2-changes-pull-design.md.
  * Every gate finding gets a regression lock here:
  *   G-A  delete-then-recreate revival (upsert cancels the delete-review entry,
  *        in-round AND persisted) + stale-delete guard on cursor-overlap replay

@@ -1,7 +1,7 @@
 /**
  * Temporal field mapping — which date fields each OW element type uses.
  *
- * Verified against `@onlyworlds/sdk` FIELD_SCHEMA (session 223 scout). All
+ * Verified against `@onlyworlds/sdk` FIELD_SCHEMA. All
  * fields are stored as `number` widgets on disk; null/undefined → no temporal
  * data for that element.
  *

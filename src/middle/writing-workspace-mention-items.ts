@@ -3,7 +3,7 @@
  *
  * Powers the @-mention suggestion list: an empty query surfaces picker-recents
  * then recently-edited elements; a typed query runs alias-aware fuzzy scoring
- * across the world. Extracted from writing-workspace.ts (session 232) — it's a
+ * across the world. Extracted from writing-workspace.ts — it's a
  * pure read of global state + recents with no workspace-mount closure
  * dependencies, so it lives standalone and is independently testable.
  */

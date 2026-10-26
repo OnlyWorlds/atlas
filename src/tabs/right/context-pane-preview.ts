@@ -181,7 +181,7 @@ function buildPreview(
   }
 
   // Backlinks — every element that references this one, narratives first
-  // (S354: was narratives only). Folded summary; the count names the rest.
+  // (was narratives only). Folded summary; the count names the rest.
   // Pins and markers do not vote (#171): they get their own lines, a pin
   // named by its other end, markers one entry per zone.
   const byId = new Map(getState().data.elements.map(e => [e.id, e] as const));
@@ -203,7 +203,7 @@ function buildPreview(
       navId: f.navId,
     })));
 
-  // Unlinked mentions (S355): where the name or an alias sits in prose as
+  // Unlinked mentions: where the name or an alias sits in prose as
   // plain text. The standing home for "link every mention of this element"
   // (a Discord ask); it is on the element page you land on after creating
   // one, and on every existing element too. "Link all" writes the subtree
@@ -377,7 +377,7 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Everything that links TO this element, narratives first (S354). This used
+ * Everything that links TO this element, narratives first. This used
  * to be narratives only, read through a private copy of the graph's
  * eighteen-name multi-link list, so a title held by a character or a family
  * governing a regime never appeared here while the element page's

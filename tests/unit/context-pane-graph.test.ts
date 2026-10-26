@@ -70,7 +70,7 @@ describe('collectDirectNeighbors', () => {
   });
 });
 
-// S354: the reverse read behind the web's backlinks — who links TO an element.
+// The reverse read behind the web's backlinks — who links TO an element.
 import { buildReverseIndex, collectIncomingNeighbors } from '../../src/tabs/right/context-pane-graph';
 
 describe('buildReverseIndex / collectIncomingNeighbors', () => {
@@ -104,7 +104,7 @@ describe('buildReverseIndex / collectIncomingNeighbors', () => {
   });
 });
 
-describe('collectDirectNeighbors — multi-links outside the named list (S354)', () => {
+describe('collectDirectNeighbors — multi-links outside the named list', () => {
   it('reads an unlisted array-of-ids field like `governs`', () => {
     const n = collectDirectNeighbors(el({ governs: [ID.a, ID.b] }));
     expect(n).toEqual(expect.arrayContaining([ID.a, ID.b]));

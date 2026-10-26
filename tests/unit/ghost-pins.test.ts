@@ -129,7 +129,7 @@ describe('computeGhostCandidates — eligibility rules', () => {
   });
 
   it('Location source: uses source.id as the locId — ghosts all elements anchored to it', () => {
-    // Captain's bug from session 211 smoke: right-click on a Location pin
+    // Titus's bug, found in a smoke pass: right-click on a Location pin
     // said "no location set" because Location elements have parent_location,
     // not location. The fix: for Location sources, the locId IS the source's
     // own id (which is what other elements' `location` fields point at).
@@ -162,7 +162,7 @@ describe('computeGhostPositions — geometry', () => {
   it('places single ghost above source (12 o\'clock)', () => {
     const [p] = computeGhostPositions(100, 100, 1, 50);
     expect(p.x).toBeCloseTo(100, 5);
-    expect(p.y).toBeCloseTo(150, 5);  // Y + radius: storage y grows UP (bottom-left, S361)
+    expect(p.y).toBeCloseTo(150, 5);  // Y + radius: storage y grows UP (bottom-left)
   });
 
   it('places N ghosts at evenly-spaced angles', () => {
@@ -190,7 +190,7 @@ describe('computeGhostPositions — geometry', () => {
   });
 
   it('GHOST_RADIUS_PX is tuned to the close-around target (≤50)', () => {
-    // Session 211 smoke: Captain felt the original 70px too far. 45 is the
+    // From a smoke pass: Titus felt the original 70px too far. 45 is the
     // current target. Test sets a ceiling so future tuning past 50 has to
     // come back and update intent.
     expect(GHOST_RADIUS_PX).toBeLessThanOrEqual(50);

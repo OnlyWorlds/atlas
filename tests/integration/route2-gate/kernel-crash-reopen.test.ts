@@ -1,5 +1,5 @@
 /**
- * Promoted from the S367 composition gate (lens A).
+ * Promoted from the composition gate (lens A).
  * Lens A attack 1 (kernel branch), the shapes the keeper's matrix does not
  * build: it THROWS inside five kernel methods and recovers IN-SESSION with the
  * same store instance. Here the tab DIES (a call that never settles, before or

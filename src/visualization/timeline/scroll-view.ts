@@ -1,5 +1,5 @@
 /**
- * The scroll view (2C, S13) — the world's history as a scrolling document.
+ * The scroll view (2C) — the world's history as a scrolling document.
  * Down = later; a center spine carries the dots; cards alternate sides; era
  * seams section the document; the now is a gold seam you scroll across; a
  * sticky readout speaks the date under the viewport's center through the
@@ -9,8 +9,6 @@
  * content animated BY scrolling — no GSAP, no canvas. Implements the same
  * handle surface the room already drives (`mountTimelineView`'s), so the
  * render-mode swap is a mount swap.
- *
- * Design record: `Forge/Notes/2026-07-14-s268-scroll-design.md`.
  */
 
 import type { TimelineNode } from './types';

@@ -136,14 +136,14 @@ describe('writing-compiled / renderProseFragment', () => {
     expect(html).toContain('<hr>');
   });
 
-  it('converts ow:// links to element chips and KEEPS THE WRITER\'S LABEL (the label law, S355)', () => {
+  it('converts ow:// links to element chips and KEEPS THE WRITER\'S LABEL (the label law)', () => {
     const map = new Map<string, Element>();
     map.set('char-1', {
       id: 'char-1', type: 'character', name: 'Drizzle',
       local_updated_at: '2026-01-01T00:00:00Z',
     } as Element);
     const html = renderProseFragment('hello [annoying guy](ow://character/char-1) end', map).outerHTML;
-    // Captain, S355: a link must NEVER be shown as the element's name. The
+    // Titus: a link must NEVER be shown as the element's name. The
     // rendering used to print "Drizzle" here, so a book compiled differently
     // from the scene it contained.
     expect(html).toContain('class="atlas-element-chip"');

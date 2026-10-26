@@ -1,5 +1,5 @@
 /**
- * World styles (S356): how a world wants its KINDS drawn.
+ * World styles: how a world wants its KINDS drawn.
  *
  * A kind is a (type, supertype, subtype) taxonomy value; a rule attaches a
  * visual to one. Born for zones on Sikelia, where 113 rivers, 192 routes and
@@ -11,7 +11,7 @@
  *
  * Resolution, most specific wins per field:
  *   element's own atlas_* field  >  role rule  >  subtype rule  >  supertype rule
- * A role rule (S362) names a zone's `role` (the schema's "operational
+ * A role rule names a zone's `role` (the schema's "operational
  * function or intent"): Sikelia's rivers are one subtype in three roles
  * (major river, river, minor stream) and its route segments carry the name
  * of the road they belong to. It also names the supertype/subtype it was
@@ -39,7 +39,7 @@ export interface StyleRule {
   supertype?: string;
   /** Matched trimmed + case-insensitively; absent = the supertype-level rule. */
   subtype?: string;
-  /** Zones: the `role` value, matched like the taxonomy; absent = any role (S362). */
+  /** Zones: the `role` value, matched like the taxonomy; absent = any role. */
   role?: string;
   /** Hex colour, e.g. "#3b82f6". Zones: stroke + fill. Every type: the taxonomy swatch. */
   color?: string;
@@ -78,7 +78,7 @@ export function normKey(v: unknown): string {
 /** Identity of a rule: type + its taxonomy keys, normalised. */
 export function ruleKey(r: Pick<StyleRule, 'type' | 'supertype' | 'subtype' | 'role'>): string {
   const base = `${r.type}␟${normKey(r.supertype)}␟${normKey(r.subtype)}`;
-  // Keys without a role are unchanged, so kinds hidden or tuned before S362 keep their key.
+  // Keys without a role are unchanged, so kinds hidden or tuned before roles were keyed keep their key.
   return normKey(r.role) ? `${base}␟${normKey(r.role)}` : base;
 }
 
@@ -163,12 +163,12 @@ export interface Kind<T> {
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
 /**
- * `byRole` (zones, S362): a (supertype, subtype) group whose members SHARE
+ * `byRole` (zones): a (supertype, subtype) group whose members SHARE
  * roles splits into one kind per role, so "River" becomes major river / river
  * / minor stream and a road's segments group under the road's name. A group
  * where every role is distinct (14 chorai, each "the territory of X") stays
  * whole: a row per zone would be a list, not a kind. Members with no role
- * keep the unsplit key, so a kind hidden or tuned before S362 is the same kind.
+ * keep the unsplit key, so a kind hidden or tuned before roles were keyed is the same kind.
  */
 export function groupByKind<T extends { type: ElementType; supertype?: unknown; subtype?: unknown; role?: unknown }>(
   elements: readonly T[],
@@ -253,7 +253,7 @@ export function parseWorldStyles(raw: unknown): WorldStyles {
     if (typeof src.role === 'string') rule.role = src.role;
     if (!normKey(rule.supertype) && !normKey(rule.subtype) && !normKey(rule.role)) continue;
     // styles.json travels with the folder, so every visual is untrusted: a
-    // colour reaches `style="background:…"` and `value="…"` (S360: a CSS
+    // colour reaches `style="background:…"` and `value="…"` (a CSS
     // declaration list or a quote there was UI redress or a script breakout).
     // Keep only the shapes atlas writes; drop the rest, keep the rule.
     if (isHexColour(src.color)) rule.color = src.color;

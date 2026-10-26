@@ -1,7 +1,7 @@
 /**
  * An interrupted re-key finishes when its world is activated, on the open
  * path AND the revive (unpark) path, before the element list is primed
- * (S363, re-key gate lens 1 F3/F6). Otherwise the list shows old and new
+ * (re-key gate lens 1 F3/F6). Otherwise the list shows old and new
  * elements as twins and the user can edit either while recovery writes.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';

@@ -1,5 +1,5 @@
 /**
- * Reproduces Captain's session 221 live error: fresh world, zones + markers
+ * Reproduces a live error: fresh world, zones + markers
  * created locally, "linked online" → marker push fails with FK constraint
  * pointing at the zone that should have been pushed first.
  *
@@ -115,9 +115,9 @@ describe('SyncEngine pushPhase: zone+marker CREATE ordering', () => {
     expect(lm2).toBeDefined();
   });
 
-  it('END-TO-END: real SDK + MSW + adapter — zone+marker push (Captain session 221 repro)', async () => {
+  it('END-TO-END: real SDK + MSW + adapter — zone+marker push (live repro)', async () => {
     // Use the REAL adapter wrapping a real SDK client against MSW. This is
-    // the production path Captain's Make-Online Route 1 hits — pushPhase
+    // the production path Titus's Make-Online Route 1 hits — pushPhase
     // calling adapter.createElement which goes through prepareRelations.
     //
     // The previous tests used FakeOwApiClient directly, bypassing the adapter.
@@ -133,7 +133,7 @@ describe('SyncEngine pushPhase: zone+marker CREATE ordering', () => {
     const adapter = new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE });
     const engineE2E = new SyncEngine({ folder, client: adapter });
 
-    // Captain's smoke world shape: a map, a couple of zones, several markers
+    // Titus's smoke world shape: a map, a couple of zones, several markers
     // per zone. All never-synced.
     const map = await folder.createElement('map', { name: 'Smoke map' });
     const zoneA = await folder.createElement('zone', { name: 'Zone alpha' });
@@ -158,7 +158,7 @@ describe('SyncEngine pushPhase: zone+marker CREATE ordering', () => {
 
   it('marker push succeeds even when many zones and markers are interleaved', async () => {
     // Stress the same scenario with multiple zones + markers per zone — what
-    // Captain's smoke world looks like after drawing several zones.
+    // Titus's smoke world looks like after drawing several zones.
     const map = await folder.createElement('map', { name: 'M' });
     const zoneA = await folder.createElement('zone', { name: 'A' });
     const zoneB = await folder.createElement('zone', { name: 'B' });

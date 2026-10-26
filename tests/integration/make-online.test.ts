@@ -3,7 +3,7 @@
  *
  * Covers the two Make-Online routes (Bouts F+G):
  *   - Route 1 (`createApiWorld`): signed out it refuses and sends nothing
- *     (the v1 create-world-external lane is retired, Keel #134, S432); the
+ *     (the v1 create-world-external lane is retired); the
  *     signed-in lane is in account-worlds.test.ts.
  *   - Route 2 (`mergeLocalIntoApi`): merges local folder state into an
  *     existing api world per the chosen policy (b = overwrite-on-match,
@@ -60,7 +60,7 @@ function makeAdapter(): OwV2ClientAdapter {
 // ---------------------------------------------------------------------------
 
 describe('createApiWorld (Route 1)', () => {
-  it('signed out: refuses with a sign-in line and sends nothing (Keel #134)', async () => {
+  it('signed out: refuses with a sign-in line and sends nothing', async () => {
     const sent: string[] = [];
     const onRequest = ({ request }: { request: Request }) => { sent.push(`${request.method} ${request.url}`); };
     mswServer.events.on('request:start', onRequest);
@@ -273,7 +273,7 @@ describe('mergeLocalIntoApi (Route 2)', () => {
   });
 
   it('new local CREATE that references a name-matched element sends server id, not local id', async () => {
-    // Captain's scenario: matched char has different ids local vs server.
+    // Titus's scenario: matched char has different ids local vs server.
     // Two new local chars reference the matched one via FK (friends field).
     // After merge, server should have those new chars with friends pointing
     // at the SERVER's id of the matched char — not the stale local id.
@@ -344,7 +344,7 @@ describe('mergeLocalIntoApi (Route 2)', () => {
   });
 
   it('matched element references new local elements via FK — both directions push correctly', async () => {
-    // Captain's bug: Alice (matched by name) has friends pointing at
+    // Titus's bug: Alice (matched by name) has friends pointing at
     // locally-created Bob and Carol. The merge must CREATE Bob + Carol before
     // UPDATEing Alice, so Alice's friends reference ids the server already has
     // (else the v2 FK validator 400s the dangling link). v2 preserves client
@@ -476,12 +476,12 @@ describe('mergeLocalIntoApi (Route 2)', () => {
   });
 });
 
-// (S367) The MergeOpts.onIdSwap tests retired with the callback: Route 2 now
+// The MergeOpts.onIdSwap tests retired with the callback: Route 2 now
 // moves ids with the re-key kernel BEFORE any server call and the app follows
 // once, after (`rekeyLiveUi`). Covered by tests/integration/make-online.kernel.test.ts.
 
 // ---------------------------------------------------------------------------
-// S361 (the id census): a name-matched swap wrote the SERVER's record at the
+// The id census: a name-matched swap wrote the SERVER's record at the
 // SERVER's id, where no local file existed, so every atlas-only field was
 // dropped with the old file: the writing's rich text, page blocks and the
 // publish record, aliases, the map image binding.

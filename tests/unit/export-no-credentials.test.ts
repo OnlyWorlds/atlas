@@ -1,5 +1,5 @@
 /**
- * No API key leaves Atlas in an export (S362).
+ * No API key leaves Atlas in an export.
  *
  * The Data room's export offered "Include API key", checked by default, on both
  * Save to file and Copy JSON. Neither keel's import nor atlas's reads a key from

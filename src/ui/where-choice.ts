@@ -2,7 +2,7 @@
  * The where-question (1.17, ruling 2, conv. 129; contract §1.4, §2.3, §9
  * invariant 12): every dialog that makes a world or brings one down asks it
  * the same way, but for a world that stays on onlyworlds.com, which says a
- * browser answer in one line (`online`, h20 B13). With the folder picker: two rows, the folder first (pre-
+ * browser answer in one line (`online`). With the folder picker: two rows, the folder first (pre-
  * selected when a home folder is set, and showing its path; else the user's
  * last pick decides). Without it: one line, "It lives in this browser.", and
  * on Firefox a note about its storage prompt while nothing is persisted yet.
@@ -44,7 +44,7 @@ export { FIREFOX_PERSIST_NOTE };
 
 /**
  * A world that stays on onlyworlds.com (Download a world, View a shared
- * world; the Captain's ✓ on h20 B13, Seethe's line h20 #10346): clearing this
+ * world; Titus's call, Seethe's line 2026-10-22): clearing this
  * browser loses only what has not synced, so the question folds to one line.
  * A world with no other copy keeps the whole question (1.17, conv. 129).
  */

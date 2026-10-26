@@ -1,5 +1,5 @@
 /**
- * Account-mode world list + open flow (session 260).
+ * Account-mode world list + open flow.
  *
  * `refreshAccountWorlds` fills the `accountWorlds` state slice from
  * GET /account/worlds — token-identity-guarded so the sidebar's render can
@@ -101,8 +101,8 @@ export function refreshAccountWorlds(force = false): void {
 /**
  * The account list for this token, once it has come (or failed, or 15 s
  * passed): the rows still to open here, or null when none came. A sentence
- * that promises the list waits on this (the S414 gate's M2: an account with
- * no worlds was told they were listed).
+ * that promises the list waits on this (an account with
+ * no worlds was once told they were listed).
  */
 export function accountWorldsWhenFetched(
   token: string,
@@ -112,7 +112,7 @@ export function accountWorldsWhenFetched(
   refreshAccountWorlds(opts.fresh);
   // `fresh` waits for a fetch begun now or already running: the slice turns
   // 'loading' a microtask after the call, and until then its old answer (an
-  // old list, an old failure) is no answer (the S416 gate's F2, F3).
+  // old list, an old failure) is no answer.
   let begun = !opts.fresh || getState().accountWorlds.status === 'loading';
   return new Promise((resolve) => {
     let unsub: () => void = () => undefined;
@@ -203,7 +203,7 @@ export function sharedOpenLine(row: AccountWorldRow, why: ReadOnlyWhy | undefine
 export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManager): Promise<boolean> {
   // One open at a time from the first click: the `opening` slice is set only
   // after the where-question, so a double tap on a browser that asks nothing
-  // started two opens and made two keys (the S414 gate's L1).
+  // started two opens and made two keys.
   if (openStarted) return false;
   openStarted = true;
   try {
@@ -222,7 +222,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
   if (state.accountWorlds.opening) return false; // one open at a time
   // Without the folder picker the world lands in this browser: ask the
   // browser to keep worlds inside the click, before the first await
-  // (contract §2.3; S376 gate B6).
+  // (contract §2.3).
   if (!hasFolderMode()) requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
 
   // ---- Preconditions BEFORE the mint (gate R1: no orphaned keys) ----
@@ -267,7 +267,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
   }
 
   patchSlice('accountWorlds', { ...getState().accountWorlds, opening: row.id });
-  // Blocking progress overlay (Captain smoke, S260): the mint + download +
+  // Blocking progress overlay (Titus smoke): the mint + download +
   // first folder open take real seconds and previously froze silently.
   const overlay = showLoadingOverlay(`Opening ${row.name}`);
   try {

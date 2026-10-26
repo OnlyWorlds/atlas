@@ -1,6 +1,6 @@
 /**
  * The question a world file asks when the world holds records a tool keeps
- * private (folder spec §4.5 rule 11, §4.7 OW-8, v0.3.15; Skeld h58 #10911):
+ * private (folder spec §4.5 rule 11, §4.7 OW-8, v0.3.15; Skeld 2026-10-22):
  * a download leaves them out unless the person asks, so a tool's own notes do
  * not travel the first time a world is shared. A records list that will not
  * read leaves nothing out by guess: the person includes every record, or no

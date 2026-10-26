@@ -1,5 +1,5 @@
 /**
- * S429, Kael's collaborator walk (h57 #7224, finding 6): a co-builder's edit to
+ * Kael's collaborator walk (2026-10-18, finding 6): a co-builder's edit to
  * the world's own details is refused by keel (403 `owner_only`), stays in the
  * browser, and was re-sent and re-told on every sync round. The engine now
  * remembers the refusal for exactly those fields: the same dirty fields are
@@ -64,7 +64,7 @@ describe('a refused world-details change is sent and told once', () => {
 });
 
 /**
- * Kael h20 #7361: keel lets a co-builder send the world's now alone (keel #240,
+ * Kael 2026-10-19: keel lets a co-builder send the world's now alone (keel #240,
  * core/world_api.py patch_world) and refuses any other body whole. A round that
  * changed the description and the now together lost the now too. The fake
  * keel below holds keel's own rule for a member key.

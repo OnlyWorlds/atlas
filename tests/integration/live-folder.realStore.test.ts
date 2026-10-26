@@ -1,5 +1,5 @@
 /**
- * THE LIVE FOLDER kernel (S364): `FsFolderStore.rescanDisk()` on the REAL
+ * THE LIVE FOLDER kernel: `FsFolderStore.rescanDisk()` on the REAL
  * store over the in-memory file system (the mock store has one map and no
  * cache separate from disk, so it cannot be stale). Every "outside" write
  * below goes straight to the fake FS, the way an AI agent, a text editor or
@@ -251,7 +251,7 @@ describe('rescanDisk and sync: a compliant outside edit', () => {
   });
 });
 
-describe('unreadableFiles: what an open left out (conv. 176, Seethe h20 #12538)', () => {
+describe('unreadableFiles: what an open left out (conv. 176, Seethe 2026-10-24)', () => {
   it('names a cut-short file and an id-less one after the index, leaves both on disk, and drops one fixed since', async () => {
     const root = world();
     const id = '0192a000-0000-7000-8000-00000000b0b0';

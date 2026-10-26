@@ -1,5 +1,5 @@
 /**
- * #303, from the Captain's own phone (Boss h11 #4777, #4792): the world row
+ * #303, from Titus's own phone (Boss 2026-10-15): the world row
  * was a control (`role="button"`) holding the star and sync buttons, axe's
  * nested-interactive; and with the Worlds drawer open, the update banner
  * covered the drawer's footer row. The row's name is now its one button, and

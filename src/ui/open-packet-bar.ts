@@ -1,5 +1,5 @@
 /**
- * The work packet bar (OW Parlor #487): a link that names several elements
+ * The work packet bar: a link that names several elements
  * (a parlor work item, the doctor's list) opens the first and shows this bar,
  * "2 of 7", with Previous and Next, until it is closed or another world opens.
  * It only moves between elements; it never edits or marks anything.

@@ -4,7 +4,7 @@
  * DELIBERATELY STORE-FREE, DOM-FREE AND LEAFLET-FREE — plain arithmetic over
  * marker records. They lift verbatim.
  *
- * Extracted in S307 because `zone-edit-mode.ts` is 1000+ lines with zero test
+ * Extracted because `zone-edit-mode.ts` is 1000+ lines with zero test
  * coverage at any layer (its sibling's "exercised by smoke" comment was
  * false — no e2e drives edit mode at all), and the two defects below are pure
  * arithmetic that no DOM harness is needed to pin down.
@@ -17,11 +17,11 @@ export interface CanvasDims { w: number; h: number }
 /**
  * Where a vertex actually lands when a drag is committed.
  *
- * THE BUG THIS CLOSES (S307): the vertex-drag commit rounded and wrote
+ * THE BUG THIS CLOSES: the vertex-drag commit rounded and wrote
  * straight through with NO bounds guard, while `scaleSpatialPatches`
  * (`core/map-spatial-scale.ts`, the sketch-rescale path) clamps every
  * coordinate to `[0, max]`. Two transforms over the same coordinate space
- * disagreeing on their bounds rule is how the S300 pin-corruption class
+ * disagreeing on their bounds rule is how the pin-corruption class
  * happens: CRS.Simple happily lets a vertex be dragged well past the canvas
  * edge, so a zone could hold x = -180. Attach an image to that map later and
  * the rescale multiplies by the ratio then clamps to 0 — that one vertex
@@ -54,7 +54,7 @@ export interface InsertionPlan {
  * `segmentIndex` is an ARRAY INDEX: segment i runs from marker[i] to
  * marker[(i+1) % len].
  *
- * THE BUG THIS CLOSES (S307): the old code did `newOrder = segmentIndex + 1`
+ * THE BUG THIS CLOSES: the old code did `newOrder = segmentIndex + 1`
  * and then bumped every marker whose ORDER VALUE was >= that number. Index
  * and order are only interchangeable when the orders happen to be exactly
  * 0..n-1, which the renderer's own docstring warns is not guaranteed for

@@ -1,11 +1,8 @@
 /**
- * Route 2 on the re-key kernel (S366/S367 rebuild), on the REAL FsFolderStore
+ * Route 2 on the re-key kernel, on the REAL FsFolderStore
  * over `fixtures/fake-fs.ts` and the production v2 adapter over the stateful
- * keel-v2 MSW. Tests first: each row asserts the FIXED behaviour of the lane A
- * hazard it names (`Forge/Notes/2026-09-29-s365-orient/lane-a-route2.md` §2,
- * invariants §5; amendments in `Forge/Notes/2026-09-29-s366-orient/
- * lane-b-route2-recheck.md` §4 step 1). The probes that reproduce each hazard
- * at HEAD live beside those notes (`probes/lane-a/a-route2-losses.probe.test.ts`).
+ * keel-v2 MSW. Tests first: each row asserts the FIXED behaviour of the
+ * hazard it names.
  *
  * The contract driven here: `mergeLocalIntoApi(folder, adapter, policy, { worldId })`
  * refuses beside a re-key journal before any server write; plans with a
@@ -327,7 +324,7 @@ describe('Route 2 on the kernel: the two-pass matcher', () => {
     expect(ambiguousOf(m)).toEqual([{ type: 'character', name: 'Alice' }]);
   });
 
-  it('names compare NFC-normalised: a local "Café" in NFD bytes matches the server\'s NFC "Café" (Captain Q5)', async () => {
+  it('names compare NFC-normalised: a local "Café" in NFD bytes matches the server\'s NFC "Café" (Titus Q5)', async () => {
     const nfc = 'Café';
     const nfd = 'Café';
     expect(nfc).not.toBe(nfd);

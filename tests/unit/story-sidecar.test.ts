@@ -1,11 +1,11 @@
 /**
- * The sidecar rule at open (S365): `story` wins only when it holds text the
+ * The sidecar rule at open: `story` wins only when it holds text the
  * sidecar does not. The dangerous direction is a FALSE win (a scene nobody
  * edited outside loses its Atlas-only detail), so most cases here are
  * scenes that must keep their sidecar: Atlas's own save, cosmetic markdown
  * from another writer, and every Atlas transform that rewrites both halves.
- * (Premise measured first on the Captain's real worlds: 20 of 20 sidecars
- * serialise to their story exactly; probe in Forge Notes S365 keeper/.)
+ * (Premise measured first on Titus's real worlds: 20 of 20 sidecars
+ * serialise to their story exactly.)
  */
 import { describe, it, expect } from 'vitest';
 import type { JSONContent } from '@tiptap/core';

@@ -1,6 +1,6 @@
 /**
- * The quiet mark on agent-made work (#347; the agents page §10,
- * `Orrery/council/2026-10-15-agents-in-worlds.md`: a fact about the record,
+ * The quiet mark on agent-made work (#347; a design note on agents
+ * in worlds, §10: a fact about the record,
  * derived on read, shown in the tool's chrome, never a schema field).
  *
  * Keel records the door of every element write (#299, D104): `changed_via`
@@ -9,7 +9,7 @@
  * `changed_by` the membership (null for the owner). Atlas itself never
  * declares (it is a person's tool; Kael's stitches guard fails if it sets `agent`).
  *
- * Who decides, since 1.68.1 (Skeld's ruling, h66 #9630, on Seethe's #9592):
+ * Who decides, since 1.68.1 (Skeld's ruling, 2026-10-21, on Seethe's 2026-10-21):
  * the SEAT, not the door. keel's MCP takes a person's own key, so a door says
  * how a write came in, not who made it. With the roster readable, the row for
  * `changed_by` decides (`kind` agent marks; a person, a player or the owner,

@@ -1,6 +1,6 @@
 /**
- * Where an open link lands (OW Parlor #487): `#/open/<world id>/element/<id>`
- * opens the world by the S416 door and then the element; `/elements/<ids>`
+ * Where an open link lands: `#/open/<world id>/element/<id>`
+ * opens the world by the `#/open` door, then the element; `/elements/<ids>`
  * opens a work packet, the elements in the link's order, stepped through with
  * the packet bar (`ui/open-packet-bar.ts`).
  *

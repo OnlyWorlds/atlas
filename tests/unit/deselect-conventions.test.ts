@@ -5,7 +5,7 @@
  * navigation/state-mutation behavior is wired in app.ts and exercised by
  * Playwright e2e specs.
  *
- * (Earlier session-223 draft also had a click-already-selected-row toggle;
+ * (An earlier draft also had a click-already-selected-row toggle;
  * that was reverted because it conflicted with common UX/test patterns where
  * re-clicking a row is meant to refocus. Esc is now the canonical deselect.)
  */
@@ -27,7 +27,7 @@ describe('Convention #32 — Esc deselect-to-home', () => {
   beforeEach(() => {
     window.location.hash = '#/w/test-world/element/el-1';
     // Same for the document: a modal, a zone marker or atlas-placing left by
-    // another file stands the binding down (S367).
+    // another file stands the binding down.
     document.body.innerHTML = '';
     document.body.className = '';
   });

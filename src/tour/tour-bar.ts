@@ -1,7 +1,7 @@
 /**
  * Tour bar — the guided tour's ONE narrator component, ONE position:
  * docked bottom-center from step 1 (the centered vignette opener was retired
- * 2026-07-19, Captain's round — the dock IS the narrator from the first
+ * 2026-07-19, Titus's round — the dock IS the narrator from the first
  * second; the bare stage above it fills in on Next). min-height 272px keeps
  * the dock a single exact shape across every step; step 1 carries its
  * eyebrow + book cite in the always-rendered meta channel at zero extra rows.
@@ -14,11 +14,11 @@
  * their element-type color; every span's end word carries an inline glyph,
  * PRE-SPACED as a dim ghost and LIT (pop-in) when its step is reached — zero
  * reflow. Clicking a parsed word jumps to its step. The OPENER is the one
- * exception (S306): it renders the sentence bare, with no glyph slots at all,
+ * exception: it renders the sentence bare, with no glyph slots at all,
  * so the first screen is undamaged text; the slots arrive with the dock.
  *
  * The ✦ deeper content opens as a scrollable FLYOUT above the panel — the
- * dock's height never changes (Captain's rule).
+ * dock's height never changes (Titus's rule).
  *
  * The bar stamps <body class="atlas-tour-cap-*"> per unlocked capability —
  * atlas.css hides not-yet-earned app chrome (the progressive build-up).
@@ -81,7 +81,7 @@ let lastSignature: string | null = null;
 let flyoutOpenFor: string | null = null;
 let flyoutScrollTop = 0;
 /**
- * The dock's collapsed state (Captain, S317): the − control top-right hides
+ * The dock's collapsed state (Titus): the − control top-right hides
  * the panel to a small floating + pill so the app underneath is fully
  * visible; + brings it back. Pure CSS via a body class — the click handlers
  * toggle directly (no re-render needed), and render re-applies from this
@@ -94,11 +94,11 @@ function setDockCollapsed(v: boolean): void {
   document.body.classList.toggle('atlas-tour-collapsed', v);
 }
 
-/** The Web pane's sticky unlock (S317) — true once the writing beat has been
+/** The Web pane's sticky unlock — true once the writing beat has been
  *  reached this run; back-navigation keeps the pane. Reset on unmount. */
 let webSeen = false;
 
-/** The narrow-window pane last shown for a step (S366); applied only when it changes. Reset on unmount. */
+/** The narrow-window pane last shown for a step; applied only when it changes. Reset on unmount. */
 let lastPaneKey: string | null = null;
 
 export function ensureTourBar(container: HTMLElement): void {
@@ -107,7 +107,7 @@ export function ensureTourBar(container: HTMLElement): void {
 }
 
 /**
- * Escape closes an open "more information" flyout (S368 B5: it ignored Escape
+ * Escape closes an open "more information" flyout (it once ignored Escape
  * and sat over the page through later actions). Bound for the life of the
  * bar, but it only acts when a flyout is actually open, and it stands aside
  * whenever something else owns Escape: an open modal (its own handler closes
@@ -285,7 +285,7 @@ function glyphLit(
  * slots at all. The pre-spaced ghosts exist to keep the dock reflow-free while
  * the reader's eye is on it, which is worth it there — but on the opening
  * screen, where the sentence IS the whole composition, a row of dim marks and
- * the gaps holding them read as damage rather than as promise (Captain, S306).
+ * the gaps holding them read as damage rather than as promise (Titus).
  * The slots appear on the hand-off into the dock, where the layout is changing
  * completely anyway, so the one reflow hides inside a transition the user is
  * already watching.
@@ -315,13 +315,13 @@ function buildSentence(idx: number, step: TourStep, view: TourWorldView, bare = 
     sentence.appendChild(span);
     for (const g of bare ? [] : glyphs.get(w) ?? []) {
       // A ref-carrying glyph waits for the ELEMENT, not the step-enter — the
-      // light is the payoff of the user's gesture (banked S297 nuance,
-      // generalized to every scripted create in S301).
+      // light is the payoff of the user's gesture (a nuance first
+      // found on one create, generalized to every scripted create).
       const lit = glyphLit(g, idx, view);
-      // UNLIT GLYPHS ARE NOT RENDERED AT ALL (Captain, S307).
+      // UNLIT GLYPHS ARE NOT RENDERED AT ALL (Titus).
       //
       // They used to be emitted at opacity 0.05 so their WIDTH was reserved
-      // and lighting one caused zero reflow. S306c changed the decision —
+      // and lighting one caused zero reflow. A later round changed the decision —
       // the opener renders bare and the sentence SHIFTS as glyphs appear,
       // because the reflow hides inside the dock transition — but that round
       // only applied it to step 0. Every later step still carried the
@@ -375,13 +375,13 @@ function signatureFor(
     // The now beat's deed is a world-meta write, not an element: no ref, no
     // glyph, no `creates` progress. Carried explicitly rather than left to ride
     // on the phase id, because relying on a term moving "by coincidence" is
-    // exactly what left the hands-on gate uncovered before (close gate, S302).
+    // exactly what left the hands-on gate uncovered before (close gate).
     step.handsOn === 'set-now' ? String(view.nowIsSet) : '',
     // Same reasoning for the writing beat: each Tab-link changes only the
     // chapter's `story`, which moves no ref, no glyph and no `creates`
     // progress. Without this term the FIRST link would not repaint (no Next,
-    // no phase b) and every later link would be invisible — the S302 memo bug
-    // exactly. Carried as the count, so 1 -> 7 each repaint.
+    // no phase b) and every later link would be invisible — a memo bug
+    // seen once already. Carried as the count, so 1 -> 7 each repaint.
     step.handsOn === 'link-word' ? String(view.chipCount(TOUR_CHAPTER_REF)) : '',
     view.tourIsLive ? 'live' : 'suspended',
   ].join(',');
@@ -424,21 +424,21 @@ function render(): void {
   for (const cap of TOUR_CAPABILITIES) {
     document.body.classList.toggle(`atlas-tour-cap-${cap}`, caps.has(cap));
   }
-  // Step-scoped precision (S299): zone chrome waits for the swamps step, the
+  // Step-scoped precision: zone chrome waits for the swamps step, the
   // Web tab for yours-to-keep — an act-level marker can't distinguish steps
   // inside one act.
   //
-  // S308: this read `'where-it-lives'`, a step id S306c MERGED into
+  // This used to read `'where-it-lives'`, a step id since MERGED into
   // `yours-to-keep`. findIndex returned -1, so `idx < -1` was false for every
   // step and `atlas-tour-preweb` never applied — the Web tab has been visible
-  // from step 5 since S306c, while two copy decisions (withholding its name at
+  // from step 5 since that merge, while two copy decisions (withholding its name at
   // `linking`, introducing it here) are written on the premise it is hidden.
   // A renamed step id silently disables the gate that keys on it.
-  // Zone chrome arrives WITH the map (Captain, S316: "add zone drawing right
+  // Zone chrome arrives WITH the map (Titus: "add zone drawing right
   // away — might as well let people try it"): the prezone boundary moved from
   // the-swamps to the-map. Draw buttons show as soon as a map exists.
   const mapIdx = TOUR_STEPS.findIndex(s => s.id === 'the-map');
-  // The Web tab arrives WITH the writing room (Captain, S317) and then STAYS
+  // The Web tab arrives WITH the writing room (Titus) and then STAYS
   // for the rest of the run — including back-navigation, which is why the
   // boundary is STICKY (a bare idx comparison would re-hide the pane the
   // moment the user steps back before the writing beat). Reset on unmount.
@@ -447,11 +447,11 @@ function render(): void {
   document.body.classList.toggle('atlas-tour-prezone', idx < mapIdx);
   document.body.classList.toggle('atlas-tour-preweb', idx < webIdx && !webSeen);
   // Highlight the REAL +pin button on the Consul during the pin beat (until
-  // placed) — the "use the actual control, highlighted" flow (Captain S299).
+  // placed) — the "use the actual control, highlighted" flow (Titus).
   document.body.classList.toggle('atlas-tour-pinstep',
     step.handsOn === 'place-pin' && !handsOnDone);
   // Same flow for a scripted run: the copy says "the + above the element
-  // list", and the sidebar's own pulse only fires on an EMPTY world (S255v3),
+  // list", and the sidebar's own pulse only fires on an EMPTY world,
   // so by the objects step the button it points at carries no signal at all.
   // Found by looking at the beat, not by a test.
   document.body.classList.toggle('atlas-tour-createstep',
@@ -464,15 +464,15 @@ function render(): void {
   document.body.classList.toggle('atlas-tour-nowstep',
     step.handsOn === 'set-now' && !view.nowIsSet && view.tourIsLive);
   // The finale un-hides the sidebar footer: its copy names the help icon that
-  // lives there, and copy naming a control is a behavioural claim (S316).
+  // lives there, and copy naming a control is a behavioural claim.
   document.body.classList.toggle('atlas-tour-finalstep', idx === TOUR_STEPS.length - 1);
-  // Base shows its FULL field set only on the consul step (S317) — the copy
+  // Base shows its FULL field set only on the consul step — the copy
   // there teaches the shared base fields; element-detail reads this class.
   document.body.classList.toggle('atlas-tour-basefull', step.id === 'the-consul');
-  // Field rows the step narrates glow subtly (Captain, S316) — injected as a
+  // Field rows the step narrates glow subtly (Titus) — injected as a
   // style tag so detail re-renders can never wipe the highlight.
   applyFieldHighlights(step);
-  // A narrow window shows the pane the step points at (S366): its drawers
+  // A narrow window shows the pane the step points at: its drawers
   // start closed, so step 1's icon and the map beats were out of reach.
   const pane = tourPaneFor(step, handsOnDone, step.creates ? hasAll(step.creates)(view) : true);
   const paneKey = `${idx}|${pane}`;
@@ -487,12 +487,12 @@ function render(): void {
 
   root.innerHTML = '';
   const panel = document.createElement('div');
-  // The panel has TWO positions again (S303 rework): step 0 is the centre-stage
+  // The panel has TWO positions again: step 0 is the centre-stage
   // opener (`is-opener`) — the sentence at vignette scale on black, no shell
   // behind it — and it hands off into the docked narrator on "Begin". The dock
   // is one fixed shape for every step after. Only the FIRST docked step (step 2,
   // idx 1) reads bright (`is-fresh`); from step 3 on the sentence dims into the
-  // progress surface (Captain, S313 — the grey used to start a step too late).
+  // progress surface (Titus — the grey used to start a step too late).
   panel.className = 'atlas-tour-bar'
     + (opener ? ' is-opener' : '')
     + (idx === 1 ? ' is-fresh' : '');
@@ -513,9 +513,9 @@ function render(): void {
   renderBodyText(body, words.body);
   copy.appendChild(body);
   panel.appendChild(copy);
-  // THE FOOT SLOT (S317): "more information" and the meta line live at the
+  // THE FOOT SLOT: "more information" and the meta line live at the
   // far BOTTOM-LEFT of the dock — inside the controls row, in the flex slot
-  // the step counter used to hold (the counter is gone, Captain's cut; the
+  // the step counter used to hold (the counter is gone, Titus's cut; the
   // e2e contract stays on data-tour-step). Bulb and meta can COEXIST (the
   // merged map step carries both): bulb first, meta text beside it. Built
   // here, mounted into the controls row below; the opener renders neither.
@@ -531,7 +531,7 @@ function render(): void {
     deeper.className = 'atlas-tour-deeper';
     // Paragraph breaks (\n\n in the step data) render as real paragraphs —
     // a wall of text defeats the point of going deeper. Paragraphs get the
-    // same token pass as bodies (S312: Captain links council motions here).
+    // same token pass as bodies (Titus links council motions here).
     for (const para of words.deeper.split('\n\n')) {
       const p = document.createElement('p');
       renderBodyText(p, para);
@@ -552,14 +552,14 @@ function render(): void {
     extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
-  // Meta rides BESIDE the bulb (S317 — no more exclusivity; the opener shows
-  // neither: its copy carries the book link inline, S312).
+  // Meta rides BESIDE the bulb (no more exclusivity; the opener shows
+  // neither: its copy carries the book link inline).
   if (!opener && phase.meta) {
     const meta = document.createElement('p');
     meta.className = 'atlas-tour-meta';
     // The same token pass as bodies — the hegemony meta names *issuer* and
     // *holders*, which rendered as literal asterisks under textContent
-    // (own-eyes, S316 walk).
+    // (own-eyes).
     // The finale's line says what its buttons do, and they differ by browser
     // and by where the tour world lives (contract §7.7).
     renderBodyText(meta, step.handsOn === 'keep-world' ? finaleMeta({ folderMode: hasFolderMode(), legacy: tourWorldIsLegacy() }) : phase.meta);
@@ -575,7 +575,7 @@ function render(): void {
   // tour world — it reads as suspended). "Start" is the explicit hand-off into
   // the dock. No counter, no Back.
   //
-  // And NO EXIT (Captain, S308). Exit is "leave the thing you are inside", but
+  // And NO EXIT (Titus). Exit is "leave the thing you are inside", but
   // nobody is inside anything yet — the opener is a cover, and the way out of a
   // cover is the door you came through. Offering to exit a tour that has not
   // started reads as a mistake. One control, one decision.
@@ -598,9 +598,9 @@ function render(): void {
   // Escape binding has nothing left to serve.
   unbindOpenerEscape();
 
-  // The foot slot leads the controls row, bottom-left (S317): the deeper
+  // The foot slot leads the controls row, bottom-left: the deeper
   // bulb + meta line took the counter's spacer role. (The visible step
-  // counter was cut — Captain; data-tour-step remains the test contract.)
+  // counter was cut — Titus; data-tour-step remains the test contract.)
   controls.appendChild(extras);
 
   if (idx > 0) {
@@ -620,7 +620,7 @@ function render(): void {
   // which is either the hands-on ref existing or, for a phased step, the
   // phase's own `advanceWhen`.
   // The pin beat's soft correction: placing the pin is not enough — it has to
-  // sit over the zone (Captain's ruling). `handsOnDone` (pin exists) still
+  // sit over the zone (Titus's ruling). `handsOnDone` (pin exists) still
   // drives the +pin highlight release; this only gates whether Next appears,
   // so a wrong drop shows the correction phase with no Next until it is
   // dragged onto the swamps.
@@ -642,10 +642,10 @@ function render(): void {
       : step.handsOn === 'link-word' ? view.chipCount(TOUR_CHAPTER_REF) >= 1
       : handsOnDone)
     : true;
-  // The preview stack (Captain, S316 — the semantics flip): a right-anchored
+  // The preview stack (Titus — the semantics flip): a right-anchored
   // column of type icons showing what the NEXT click of Next brings into the
   // world (the following step's reveals and creates, quiet machinery
-  // excluded). S317 refinement (Captain): the stack renders ONLY while a
+  // excluded). Titus's refinement: the stack renders ONLY while a
   // LIVE Next exists — seeing "what Next brings" before Next can be pressed
   // read as confusion on the hands-on beats. It rides the same conditions as
   // the live forward control, so the icons and the button appear together.
@@ -653,14 +653,14 @@ function render(): void {
     && !(step.handsOn && step.handsOn !== 'keep-world' && !handsOnGate);
   const previewStack = forwardLive && !opener ? buildPreviewStack(idx) : null;
   // When a stack exists, the copy reserves the right-hand lane the icons
-  // occupy — long bodies never collide with the column (S315 gate).
+  // occupy — long bodies never collide with the column.
   panel.classList.toggle('has-create-stack', Boolean(previewStack));
   if (previewStack) panel.appendChild(previewStack);
   const mountForward = (btn: HTMLElement) => { controls.appendChild(btn); };
 
   if (step.handsOn && step.handsOn !== 'keep-world' && !handsOnGate) {
     // No LIVE forward control: the gesture is the way. But the SLOT stays —
-    // see ghostNext below (Captain, S311).
+    // see ghostNext below (Titus).
     mountForward(ghostNext());
   } else if (step.handsOn === 'keep-world') {
     // The finale (1.17, contract §7.1): Keep this world · Save it to a folder
@@ -670,7 +670,7 @@ function render(): void {
     // not reach it: every button is disabled for the run (lane K K0).
     const legacy = tourWorldIsLegacy();
     const name = tourWorldName();
-    // Back too (own eyes, S375): a Back queued behind the keep is a no-op
+    // Back too (own eyes): a Back queued behind the keep is a no-op
     // once it commits, but a live button the run will ignore is a lie.
     const lockAll = (locked: boolean) => {
       controls.querySelectorAll<HTMLButtonElement>('button').forEach(b => { b.disabled = locked; });
@@ -686,7 +686,7 @@ function render(): void {
         // Before anything else: the browser is asked to keep worlds only
         // inside the click, never awaited (contract §2.3, invariant 10).
         // Save it to a folder too: a move that fails leaves the kept world in
-        // this browser (S376 lens A A9).
+        // this browser.
         if (control === 'keep' || control === 'save') {
           requestPersistOnFirstBrowserWorld(line => { void import('../ui/toast-manager').then(({ toastManager }) => toastManager.info(line, 10_000)); });
         }
@@ -732,7 +732,7 @@ function render(): void {
 
   appendExit(controls);
   panel.appendChild(controls);
-  // The collapse control (Captain, S317): a quiet − in the dock's top-right;
+  // The collapse control (Titus): a quiet − in the dock's top-right;
   // when collapsed, the panel hides entirely and a floating + pill (on the
   // ROOT, so it survives the panel's display:none) brings it back.
   const collapse = document.createElement('button');
@@ -748,7 +748,7 @@ function render(): void {
   restore.className = 'atlas-tour-restore';
   restore.title = 'Show the tour panel';
   restore.setAttribute('aria-label', 'Show the tour panel');
-  // S368 B4: a word, not a "+" (every other + in Atlas means create).
+  // A word, not a "+" (every other + in Atlas means create).
   restore.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">expand_less</span><span>Show the tour</span>';
   restore.addEventListener('click', () => setDockCollapsed(false));
   root!.appendChild(restore);
@@ -757,7 +757,7 @@ function render(): void {
 }
 
 /**
- * The preview stack (Captain, S316): one dim type icon per element the NEXT
+ * The preview stack (Titus): one dim type icon per element the NEXT
  * step brings — `previewRefsFor` holds the rule (next step's reveals ∪
  * creates, minus markers and the calendar construct). "It is what you are
  * about to create": the icons are always the not-yet state, because the
@@ -796,7 +796,7 @@ function buildPreviewStack(idx: number): HTMLElement | null {
 const CREATE_STACK_MAX = 5;
 
 /**
- * The step's narrated-field highlight (Captain, S316). One injected style tag
+ * The step's narrated-field highlight (Titus). One injected style tag
  * keyed off the step script: `field` entries match the `data-field` attribute
  * every detail row renders; `section:` entries match a detail section by its
  * `data-section` name ("Referenced by"). A style tag rather than stamped
@@ -819,13 +819,13 @@ function applyFieldHighlights(step: TourStep): void {
     const sel = n.startsWith('section:')
       ? `body.atlas-touring .atlas-detail-section[data-section="${n.slice('section:'.length)}"]`
       : `body.atlas-touring .atlas-field[data-field="${n}"]`;
-    // Quiet: the wash alone (S317 — the left accent bar obscured row text).
+    // Quiet: the wash alone (the left accent bar obscured row text).
     return `${sel} { background: rgba(var(--atlas-accent-rgb), 0.07); border-radius: 4px; }`;
   }).join('\n');
 }
 
 /**
- * The reserved forward slot (Captain, S311). Whenever no LIVE forward control
+ * The reserved forward slot (Titus). Whenever no LIVE forward control
  * renders — a hands-on beat, a `creates` run mid-progress, an unmet
  * `advanceWhen` — an invisible Next holds the geometry, so Back and Exit
  * never move when Next comes and goes: a fast Next-Next-Next click chain
@@ -845,7 +845,7 @@ function ghostNext(): HTMLElement {
 }
 
 /**
- * The copy token pass (S311 bold; S312 italic + links), shared by phase
+ * The copy token pass (bold, italic and links), shared by phase
  * bodies and deeper paragraphs. `\n` becomes a real line break via
  * `white-space: pre-line`; `**bold**` marks the control you click; `*italic*`
  * marks a field name; `[text](url)` becomes a link. Everything is built from
@@ -903,7 +903,7 @@ function appendItalic(host: HTMLElement, text: string): void {
 }
 
 /**
- * Category words in plain copy get their FAMILY colour (Captain, S317): the
+ * Category words in plain copy get their FAMILY colour (Titus): the
  * copy teaches by naming categories, and tinting the words visually links
  * them to the preview icons and the sentence glyphs — SOME indication that
  * these are categories, in the 4-family scheme. The word list is built from
@@ -966,7 +966,7 @@ function restoreFocus(control: string | null): void {
 /**
  * Escape leaves the OPENER, and only the opener.
  *
- * Captain (S308) asked for the opener to carry a single control: Start. Doing
+ * Titus asked for the opener to carry a single control: Start. Doing
  * exactly that removes the only way off the cover screen — a visitor who clicks
  * "take the tour" from the landing to see what it is would be committed to
  * starting it. Escape restores the way out without putting chrome back on a
@@ -974,7 +974,7 @@ function restoreFocus(control: string | null): void {
  *
  * DELIBERATELY NOT GLOBAL ACROSS THE TOUR. Mid-tour there is a visible Exit
  * control, so a global handler would be pure duplication — and this app has
- * already been bitten by exactly that: S307 found a globally-captured Escape in
+ * already been bitten by exactly that: a review found a globally-captured Escape in
  * zone edit mode with no target check, which reverted every committed vertex
  * drag when a user pressed it to dismiss a field. Escape is crowded here (field
  * editors, modals, pin placement, the exit confirm itself); binding it only
@@ -1007,7 +1007,7 @@ function appendExit(controls: HTMLElement): void {
   exit.className = 'atlas-btn-ghost atlas-tour-exit';
   exit.title = 'Leave the tour and delete the tour world';
   exit.textContent = 'Exit tour';
-  // Exit goes through the confirm (Captain, S301): every beat is gated on a
+  // Exit goes through the confirm (Titus): every beat is gated on a
   // gesture, so leaving early is a legitimate move that deserves a real door —
   // and the door doubles as a map of the rooms the tour never reached. The
   // finale's Finish deliberately does NOT route through here.
@@ -1018,7 +1018,7 @@ function appendExit(controls: HTMLElement): void {
 }
 
 // (The watch-mode Next beside a hands-on primary was REMOVED 2026-07-19,
-// Captain's call: two forward buttons at the first hands-on beats read as a
+// Titus's call: two forward buttons at the first hands-on beats read as a
 // fork. The create dialogs are locked one-click affairs — the gesture IS the
 // route. Watch-mode Next survives everywhere else via the plain else-branch;
 // after the Consul exists the consul step shows plain Next to move on.)

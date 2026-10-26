@@ -122,18 +122,18 @@ test('atlas reads the conformance fixture: every element in the answer key, noth
   // Unknown extension fields survive the read.
   expect(byId.get('11111111-2222-4333-8444-555555555507')!.probe).toContain('round trip');
 
-  // A mapless pin is a legitimate app pattern (Captain's ruling, 2026-07-28):
+  // A mapless pin is a legitimate app pattern (Titus's ruling, 2026-07-28):
   // it loads, and atlas does not invent a map for it.
   expect(byId.get('11111111-2222-4333-8444-555555555505')!.pinMap).toBeNull();
 
   // A pin linked under the SPEC spelling (`map`, §5 bare link names) resolves
-  // to its map in memory (S354). Before this, a folder written by another
+  // to its map in memory. Before this, a folder written by another
   // tool opened with every pin missing and the map index reading 0.
   expect(byId.get('11111111-2222-4333-8444-555555555508')!.pinMap).toBe('11111111-2222-4333-8444-555555555503');
 });
 
 /**
- * THE LINK SPELLING IS PER FILE AND STICKY (S354, §5).
+ * THE LINK SPELLING IS PER FILE AND STICKY (§5).
  *
  * Editing a bare-spelled pin must write `map` back, not `map_id`; creating a
  * new pin in a folder whose pins are all bare must follow the folder; and an

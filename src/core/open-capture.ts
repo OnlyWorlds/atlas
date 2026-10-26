@@ -1,5 +1,5 @@
 /**
- * The `#/open/<world id>` door's first step (OW Infra #104, S416): a world
+ * The `#/open/<world id>` door's first step: a world
  * page on onlyworlds.com opens that world in Atlas by its id. The id is no
  * credential (the signed-in account is), but it leaves the address bar the
  * same way a join code does, so a reload, Back or a copied URL never opens
@@ -7,7 +7,7 @@
  * and the app calls it again on every render, for a link opened into a tab
  * that was already running. The door: `setup/open-door.ts`.
  *
- * The link can name where to land too (OW Parlor #487): `#/open/<world id>/element/<id>`
+ * The link can name where to land too: `#/open/<world id>/element/<id>`
  * for one element, `#/open/<world id>/elements/<id>,<id>,…` for a work packet (a
  * parlor work item, the doctor's list). The world opens by the same door; the
  * landing waits for it (`core/open-landing.ts`).

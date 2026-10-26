@@ -1,5 +1,5 @@
 /**
- * keel's word on the hidden mark (conv. 170, the S461 gate's F3): the pieces
+ * keel's word on the hidden mark (conv. 170): the pieces
  * the engine guards lean on. `hiddenWordOf` reads an answer, `stampedBody`
  * keeps the word only while the file holds the mark, the line says "Hidden here
  * only" on the word, an import drops it (another world's word), and a conflict
@@ -41,7 +41,7 @@ describe('stampedBody keeps the word only while the file holds the mark', () => 
     const out = stampedBody(el({ hidden: null, [HIDDEN_SHOWN_ONLINE]: true }), STAMP, base.local_updated_at, hiddenWordOf({ id: 'w' }));
     expect(out).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
   });
-  it('a first stamp with no answer body (a /bulk create) never keeps a word a cleared baseline left (the S464 gate\'s M1)', () => {
+  it('a first stamp with no answer body (a /bulk create) never keeps a word a cleared baseline left', () => {
     const unsynced = el({ hidden: true, [HIDDEN_SHOWN_ONLINE]: true, server_updated_at: undefined });
     expect(stampedBody(unsynced, STAMP, base.local_updated_at)).not.toHaveProperty(HIDDEN_SHOWN_ONLINE);
     // An adopted copy that says keel shows it still counts on a first stamp.

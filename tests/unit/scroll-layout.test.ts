@@ -1,5 +1,5 @@
 /**
- * Scroll-view layout kernel tests (2C, S13) — pacing clamp, gap seams, era
+ * Scroll-view layout kernel tests (2C) — pacing clamp, gap seams, era
  * section seams, the now seam, determinism, and the y↔date maps. Fixture
  * calendar mirrors calendar-axis.test.ts (Vessach: two eras with a gap).
  */

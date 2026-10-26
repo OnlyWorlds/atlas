@@ -1,5 +1,5 @@
 /**
- * THE LIVE FOLDER's app half (S364) on a LINKED world: the Captain's rulings.
+ * THE LIVE FOLDER's app half on a LINKED world: Titus's rulings.
  * Real FsFolderStore over the in-memory FS; the sync engine is a stub that
  * records what the pass asks of it.
  *   Q1 an outside edit carrying a fresh `local_updated_at` uploads (a push is requested).
@@ -132,7 +132,7 @@ describe('the live folder on a linked world', () => {
   });
 });
 
-describe('a held batch outlives the world switch and the reload (S364 gate lens B B3)', () => {
+describe('a held batch outlives the world switch and the reload', () => {
   it('is persisted, and a new engine is held again at attach, before its flush could push', async () => {
     const { root, ids } = await linkedWorld(BIG_BATCH + 1);
     for (const id of ids) editOutside(root, id, { description: 'x', local_updated_at: '2026-04-01T00:00:00.000Z' });

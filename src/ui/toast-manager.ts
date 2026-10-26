@@ -2,7 +2,7 @@
  * Toast Notification Manager
  * Queue-based toast system with auto-dismiss
  *
- * A toast with buttons or details (S368) stays until the user closes it: a
+ * A toast with buttons or details stays until the user closes it: a
  * fix the user has to read and act on must not race a timer. It gets a close
  * button, and at the cap the plain toasts are evicted before it.
  */
@@ -30,8 +30,7 @@ export interface ToastOptions {
   /**
    * Same key, same message: the new toast replaces the one on screen (a save
    * failing on every autosave of ONE scene). Without a key nothing is
-   * replaced: two scenes failing alike each keep their own Retry (S369 gate
-   * B M1, gate A L3).
+   * replaced: two scenes failing alike each keep their own Retry.
    */
   dedupeKey?: string;
 }
@@ -85,8 +84,8 @@ export class ToastManager {
 
     const rich = (opts.actions?.length ?? 0) > 0 || !!opts.details;
     // The same sticky problem again (a save failing on every keystroke's
-    // autosave) replaces the one on screen instead of stacking three of it
-    // (S369). The newer one wins: its buttons hold the newest retry.
+    // autosave) replaces the one on screen instead of stacking three of it.
+    // The newer one wins: its buttons hold the newest retry.
     if (opts.dedupeKey) {
       for (const t of this.toasts.filter(t => t.opts.dedupeKey === opts.dedupeKey && t.type === type && t.message === message)) this.removeToast(t.id);
     }
@@ -119,7 +118,7 @@ export class ToastManager {
   }
 
   error(message: string, duration?: number): void {
-    // Errors stay twice as long (S360): they are the ones that need reading.
+    // Errors stay twice as long: they are the ones that need reading.
     this.show(message, 'error', duration ?? 8000);
   }
 
@@ -150,7 +149,7 @@ export class ToastManager {
     const toastEl = document.createElement('div');
     toastEl.id = toast.id;
     toastEl.className = `ow-toast ow-toast-${toast.type}`;
-    // Screen readers hear toasts (S360): errors interrupt, the rest wait.
+    // Screen readers hear toasts: errors interrupt, the rest wait.
     toastEl.setAttribute('role', toast.type === 'error' ? 'alert' : 'status');
 
     const icon = document.createElement('span');
@@ -193,10 +192,10 @@ export class ToastManager {
 
     if (toast.sticky) return;
     // Auto-dismiss after duration; hovering holds the toast open (reading
-    // shouldn't race a timer — S255v2), with a short grace after leave.
+    // shouldn't race a timer), with a short grace after leave.
     // Only a mouse holds it: a tap fires the emulated mouseenter too, with no
     // mouseleave until the next tap elsewhere, so one tap pinned a toast for
-    // good (S404, Seethe's phone pass #4264). A tap dismisses instead.
+    // good (Seethe's phone pass). A tap dismisses instead.
     let timer = setTimeout(() => this.removeToast(toast.id), toast.duration);
     toastEl.addEventListener('pointerenter', (e) => {
       if (e.pointerType === 'mouse') clearTimeout(timer);

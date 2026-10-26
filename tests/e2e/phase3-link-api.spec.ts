@@ -2,7 +2,7 @@
  * Phase 3 — Link Existing API World UI surface.
  *
  * Verifies that the `+ link api` button + modal layout are wired up. The
- * actual network-driven link flow runs against the real OW API in Captain's
+ * actual network-driven link flow runs against the real OW API in Titus's
  * manual smoke (Bout I); browser-side MSW interception would need a service
  * worker installation that's deferred.
  *
@@ -58,7 +58,7 @@ test('+ link api opens a modal with api-key, pin, and display-name fields', asyn
   await expect(page.locator('input[name="api-pin"]')).toBeVisible();
   await expect(page.locator('input[name="display-name"]')).toBeVisible();
   await expect(page.locator('[data-modal="link-world"] [data-action="link"]')).toBeVisible();
-  // The busy exits show only while a link runs (S372: a class's `display`
+  // The busy exits show only while a link runs (a class's `display`
   // beat the `hidden` attribute, so they showed from the start).
   await expect(page.locator('[data-modal="link-world"] [data-action="cancel-link"]')).toBeHidden();
   await expect(page.locator('[data-modal="link-world"] [data-action="finish-early"]')).toBeHidden();
@@ -109,7 +109,7 @@ test('link modal submit with empty fields shows inline error', async ({ page }) 
 });
 
 // ---------------------------------------------------------------------------
-// S360 (Captain): a long link needs a way out that says what it does, and a
+// Titus: a long link needs a way out that says what it does, and a
 // stray click must not close it. The keel wire is mocked with page.route: one
 // big character list, everything else empty.
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ test('a running link ignores outside clicks and Escape, and Stop keeps what has 
 });
 
 test('Cancel link leaves the world you were in open and writable', async ({ page }) => {
-  // S361 (gate F1): the link flow used to close the prior world's store
+  // The link flow used to close the prior world's store
   // BEFORE downloading, so Cancel left the UI on world A with no store behind
   // it: prose dropped silently, edits toasted "No active store".
   await setupAtlasRoot(page);

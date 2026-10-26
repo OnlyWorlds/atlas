@@ -14,7 +14,7 @@ function node(id: string, elementType: string, links: { id: string; type: string
   return { id, elementType, name: id, startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links, degree: 0, contentMass: 0 };
 }
 
-// (pickDefaultChart and its ordered-recipe tests removed S256 — dead code
+// (pickDefaultChart and its ordered-recipe tests removed — dead code
 // since the tableau default; the home strip runs the same tableauScope the
 // Charts room does.)
 
@@ -98,7 +98,7 @@ describe('tableauScope — the default world view (all chips off)', () => {
     expect(ids2).toContain('l1');
   });
 
-  it('diversity first, then a dominant type may fill remaining slots (S256)', () => {
+  it('diversity first, then a dominant type may fill remaining slots', () => {
     const nodes = [
       ...Array.from({ length: 12 }, (_, i) => mk(`n${i}`, 'narrative', { degree: 12 - i })),
       mk('c1', 'character', { degree: 1 }),

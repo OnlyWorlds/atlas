@@ -1,6 +1,6 @@
 /**
- * Settings panel — orchestrator. Tabbed layout grouped by scope (session 232),
- * split into per-tab modules (session 233). This file owns the shell: the nav
+ * Settings panel — orchestrator. Tabbed layout grouped by scope,
+ * split into per-tab modules. This file owns the shell: the nav
  * rail, last-tab restore, and dispatch to each tab's render/wire pair.
  *
  * ATLAS (tool-wide, apply to every world):
@@ -80,7 +80,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
   }
 
   const gate = renderGate();
-  // A save that lands while the next field is being typed in waits (S452):
+  // A save that lands while the next field is being typed in waits:
   // the rebuild would replace that field. A new tab always draws.
   let drawnTab: SettingsTab | null = null;
   let waiting = false;
@@ -140,7 +140,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
         </section>
       </div>
     `;
-    // Rebuilt only when it would come out different (conv. 146, S422): a
+    // Rebuilt only when it would come out different (conv. 146): a
     // rebuild between a press and its release loses the click. The tabs read
     // state kept outside the store (a key being made, sync issues, the invite
     // list), so the part is the markup itself, plus the world entry the
@@ -154,15 +154,15 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
   }
 
   /**
-   * The replay chip lives in the settings NAV, not in a tab (Captain, S306):
+   * The replay chip lives in the settings NAV, not in a tab (Titus):
    * it is a quiet way out of the app, not an OnlyWorlds feature, and it used
    * to sit in the OnlyWorlds tab where its own hint already promised
    * "rebuilds the tour world from scratch" — a promise the replay path did
-   * not keep until S307 made `startTour` clear the stage it had only assumed.
+   * not keep until `startTour` learned to clear the stage it had only assumed.
    * Wired here so it works from whichever tab is open.
    */
   function wireReplayChip(): void {
-    // The demo's door once a world exists (the Captain, h58 #5443): the first
+    // The demo's door once a world exists (Titus, 2026-10-15): the first
     // screen and an empty world's Home are the only others, and both go.
     root.querySelector<HTMLButtonElement>('[data-action="explore-demo"]')?.addEventListener('click', () => {
       void import('../setup/world-doors').then(m => m.runAddWorldAction('try-demo', toasts));
@@ -200,7 +200,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
   // Waypoints live outside the store: the OnlyWorlds tab's count moves on
-  // their own event (S422; it used to wait for the next unrelated redraw).
+  // their own event (it used to wait for the next unrelated redraw).
   document.addEventListener('atlas:waypoints-changed', render);
   render();
   return () => {
@@ -216,7 +216,7 @@ function tabLabel(t: SettingsTab, activeWorld?: WorldRegistryEntry): string {
   // The right-pane graph tab is branded "Web" (2026-07-19); the settings tab
   // id stays 'context' — label and machinery diverge deliberately.
   if (t === 'context') return 'Web';
-  // The 'world' tab wears the active world's name when one is open (Captain,
+  // The 'world' tab wears the active world's name when one is open (Titus,
   // 2026-07-24) — "Sikelia" reads truer than a generic "World". Escaped (user
   // content) and length-capped so a long name can't blow out the tab row.
   if (t === 'world' && activeWorld?.name?.trim()) {

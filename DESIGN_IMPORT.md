@@ -1,11 +1,11 @@
 # Atlas — Import & Export Design
 
-**Version**: 0.1 (2026-06-18, design) — **built and shipped; see PROGRESS.md**
+**Version**: 0.1 (2026-06-18, design) — **built and shipped**
 **Status**: SHIPPED (bouts B0-B4). The room is live and branded **Data** in the
 UI (route segment stays `import`). The header below is the original pre-build
-design; treat PROGRESS.md as current for what actually shipped.
+design; the code and the changelog are current for what actually shipped.
 **Owner**: Temper
-**Relationship**: companion to `DESIGN_FOLDER.md` (folder-first model, FolderStore) and `DESIGN_SYNC.md` (SyncEngine). Import is the last main data pillar. This doc is the stable reference for the import/export subsystem; operational state goes to `PROGRESS.md`.
+**Relationship**: companion to `DESIGN_FOLDER.md` (folder-first model, FolderStore) and `DESIGN_SYNC.md` (SyncEngine). Import is the last main data pillar. This doc is the stable reference for the import/export subsystem.
 
 Grounded by the session-241 research sweep (6 read-only agents: atlas reconcile machinery · FolderStore surface · base-tool pipeline audit · validation/schema · test idioms · UI integration).
 
@@ -73,7 +73,7 @@ A full ow.com export is uniformly keep-ids (uuid-v7 throughout, bare relation na
 
 OW export content elements use **bare** relation names (`location`, `objects`, `birthplace`) — identical to atlas's on-disk content shape. **Pins and markers are stored on disk with `_id`/`_ids` suffix** (`map_id`, `zone_id`, `element_id`) per the adapter's disk-shape contract, so the importer renames the incoming bare names to disk shape (done in the reconcile core via `relationFieldsFor`'s `schemaField`→`diskField`).
 
-### keel world-export envelope (CURRENT — `keel portal/views.py:509-560`, Orrery spec § world-export)
+### keel world-export envelope (CURRENT — `keel portal/views.py:509-560`, the world-export spec)
 
 **This is what ow.com's "Export JSON" button emits today** (keel rebuild; registry `world_export`; confirmed with Skeld 2026-07-23, canonical, spec § being frozen). It SUPERSEDES the session-241 `services.py` note below, which described the retired Django backend.
 
@@ -88,11 +88,11 @@ OW export content elements use **bare** relation names (`location`, `objects`, `
 - **World id is PRESENT now** (the old backend dropped it "for security"; the rebuild keeps it so a round-trip is lossless). Element bodies come through the same `serialize` the API uses: uuid ids, **bare-name v2 relations** (`location`, `map`, `zone`, `element_id`), extension fields (`atlas_*`/`x_*`/`shadow_*`) intact, `type`/`change_seq`/timestamps present.
 - **Only types with ≥1 element appear** (unlike the old always-emit-22).
 - **Atlas reads it** (`parseEnvelope` in `parse.ts`). **World-id adoption on import is RULED (Skeld) but NOT yet wired** — atlas currently mints a fresh world id; element ids are kept verbatim (keep-ids path), so `ow://element` refs already survive. Adopting the world id (lossless world identity + same-id→same-world) is a tracked follow-up (needs the scaffold path + a collision decision).
-- **Atlas's EXPORT writes this envelope too (S354, 2026-09-02)**: `format`, `schema_version` (the SDK's `ONLYWORLDS_VERSION`), `exported_at`, `exporter: 'atlas'`, `world` WITH id, lowercase `elements` buckets (all 22 by default, the requested subset otherwise). The old `World`+PascalCase shape is read forever and written never. Q2 closed.
+- **Atlas's EXPORT writes this envelope too (2026-09-02)**: `format`, `schema_version` (the SDK's `ONLYWORLDS_VERSION`), `exported_at`, `exporter: 'atlas'`, `world` WITH id, lowercase `elements` buckets (all 22 by default, the requested subset otherwise). The old `World`+PascalCase shape is read forever and written never. Q2 closed.
 
 ### legacy ow.com export format (RETIRED backend — `django/ow/worldsync/services.py`)
 
-Kept for the record; describes the pre-keel Django backend (session 241 dig). Atlas still *reads* this `World`+PascalCase shape for backward compatibility, but ow.com no longer emits it.
+Kept for the record; describes the pre-keel Django backend. Atlas still *reads* this `World`+PascalCase shape for backward compatibility, but ow.com no longer emits it.
 
 - Top-level: one `World` block + **all 22 PascalCase element arrays always emitted** (even empty). Each element starts `{"id": "<uuid>", ...}`.
 - **World block: 11 fields, NO world id** (removed "for security" — worlds are keyed by `api_key`): `api_key`, `name`, `description`, `version`, `image_url`, `time_format_names`, `time_format_equivalents`, `time_basic_unit`, `time_current`, `time_range_min`, `time_range_max`.
@@ -191,7 +191,7 @@ Per record, error-tolerant (warn, don't block — preserves base-tool's resilien
 
 ### The ChatGPT-fix-prompt (KEEP — standout feature)
 
-Port `generateChatGPTPrompt(errors)` essentially verbatim: numbered, human-readable, per-error path/issue/expected/fix lines, "once fixed, provide the complete corrected JSON" footer. Surfaced as a **"copy fix prompt for AI"** button in the validation section. This is the escape hatch that closes the loop with the user's parsing AI — Captain explicitly wants it kept.
+Port `generateChatGPTPrompt(errors)` essentially verbatim: numbered, human-readable, per-error path/issue/expected/fix lines, "once fixed, provide the complete corrected JSON" footer. Surfaced as a **"copy fix prompt for AI"** button in the validation section. This is the escape hatch that closes the loop with the user's parsing AI — Titus explicitly wants it kept.
 
 ---
 
@@ -207,14 +207,14 @@ Map the `World` block onto `WorldMeta` (`src/core/types.ts`) via `writeWorldMeta
 | `time_format_names` / `time_format_equivalents` | same | arrays |
 | `time_basic_unit` | same | |
 | `time_current` / `time_range_min` / `time_range_max` | same | **coerce string → number** (export stores `"0"`) |
-| `image_url` | `image_url` | ✅ added to `WorldMeta` (Captain: preserve world image through round-trip) |
+| `image_url` | `image_url` | ✅ added to `WorldMeta` (Titus: preserve world image through round-trip) |
 | `api_key` | **— (DROPPED)** | see below |
 | — | `id` | **generated by atlas** — the export carries **no** world id (removed server-side "for security"; worlds keyed by api_key) |
 
 **api_key safety — the explicit decision.** Sync activation is gated *solely* by the presence of `WorldMeta.api`. Writing the export's `api_key` there would silently arm sync against a server world **with no PIN and no user consent**. So:
 
 - **Default:** import full-world as **local-only**. `WorldMeta.api` stays undefined. Safe by construction.
-- **Convenience (Captain's point 2):** if the file carries an `api_key`, **stash it** (non-activating) and surface an explicit **"link this world for sync"** action afterward that pre-fills the api_key — the user only adds their PIN (and we validate via `client.worlds.get()`, then run the existing link/merge flow). This gives the whole-world-copy convenience without auto-arming sync.
+- **Convenience (Titus's point 2):** if the file carries an `api_key`, **stash it** (non-activating) and surface an explicit **"link this world for sync"** action afterward that pre-fills the api_key — the user only adds their PIN (and we validate via `client.worlds.get()`, then run the existing link/merge flow). This gives the whole-world-copy convenience without auto-arming sync.
 - *Open:* the export contains `api_key` but likely **not** the atlas-internal `world_id` or the PIN. Linking still needs both (PIN from the user; `world_id` resolved by the link flow). Verify what ow.com's export actually includes before finalizing the "link" affordance.
 
 ---
@@ -242,7 +242,7 @@ Keep it to **one review surface**, not a multi-tab wizard (see UI).
 
 World-scoped export does not exist yet (only the page-scoped share payload). Build it as the inverse of Mode A:
 
-- **Full world:** read all types from the folder → assemble `{ World:{…}, Character:[…], … }` with **PascalCase** bucket keys (emit all 22, matching ow.com) → strip `ATLAS_LOCAL_FIELDS` + sync fields (`local_updated_at`, `server_updated_at`, atlas extension fields) → convert pin/marker disk `_id`/`_ids` back to bare names (`map_id`→`map`) → `World` block from `WorldMeta`, **no world id**; for api-linked worlds include `api_key` via an **"include credentials" checkbox, ON by default** (Captain) → download as `onlyworlds_<slug>_<date>.json`. (Round-trips through ow.com's `/store/`.)
+- **Full world:** read all types from the folder → assemble `{ World:{…}, Character:[…], … }` with **PascalCase** bucket keys (emit all 22, matching ow.com) → strip `ATLAS_LOCAL_FIELDS` + sync fields (`local_updated_at`, `server_updated_at`, atlas extension fields) → convert pin/marker disk `_id`/`_ids` back to bare names (`map_id`→`map`) → `World` block from `WorldMeta`, **no world id**; for api-linked worlds include `api_key` via an **"include credentials" checkbox, ON by default** (Titus) → download as `onlyworlds_<slug>_<date>.json`. (Round-trips through ow.com's `/store/`.)
 - **By-type subset:** type checkboxes (all on, with counts) filter which buckets are emitted.
 - **Pin/marker:** emit in the shape ow.com's own export uses (verify against a pinned world; mirror `adaptRecord`'s read shape otherwise).
 - Reuse the **Blob download** idiom (base-tool `downloadAsFile`) and the **clipboard-copy-with-fallback + pretty `JSON.stringify(_, null, 2)`** idiom (share-room payload button) for a "copy to clipboard" alternative.
@@ -263,7 +263,7 @@ The `import` room is already routed (`#/w/<id>/import`), nav-registered (downloa
 4. **Conflicts** (Mode B only) — compact list, skip/overwrite per row, dependents count.
 5. **Import** — single action button; progress; result summary (created / updated / skipped / dropped-links).
 
-**Export** lives in the **same room** as a second section ("Take out": full-world button + by-type checkboxes). Room titled e.g. **"Import & export"** (naming = Captain call; keeps the `import` route). *Alternative considered:* export in Settings → World. Recommend same-room for discoverability.
+**Export** lives in the **same room** as a second section ("Take out": full-world button + by-type checkboxes). Room titled e.g. **"Import & export"** (naming = Titus call; keeps the `import` route). *Alternative considered:* export in Settings → World. Recommend same-room for discoverability.
 
 ---
 
@@ -284,16 +284,16 @@ The `import` room is already routed (`#/w/<id>/import`), nav-registered (downloa
 - **B2 — Folder application** ✅ — `apply-import-plan.ts` (`applyImportPlan`) + `createWorldFromImportedData` (Mode A) + `importIntoActiveWorld` (Mode B), shared `scaffoldWorldInRoot`. 7 integration tests. 866 vitest green.
 - **B3 — Import room UI** ✅ — single-panel `import-room.ts`. Self-inspected via Playwright; Mode A + Mode B verified end-to-end.
 - **B4 — Export** ✅ — `export-world.ts` (`buildWorldExport`): ow.com shape, bare spatial relations, no world id, by-type subset, include-credentials. Round-trip + subset integration tests.
-- **B5 — E2e + hardening** — Playwright e2e specs for the room; full suite; smoke checklist for Captain. (next)
+- **B5 — E2e + hardening** — Playwright e2e specs for the room; full suite; smoke checklist for Titus. (next)
 - **B6 (optional, separate) — Route 2 dedup.** Route `make-online` match phase through the shared matcher, sync suite as safety net. Only if clean.
 
 ---
 
-## Resolved (session 241)
+## Resolved
 
 1. **World image:** ✅ preserve — `WorldMeta.image_url` added; mapped on import, emitted on export.
-2. **api_key on export:** include for api-linked worlds via an "include credentials" checkbox, **ON by default** (Captain).
-3. **Room naming:** one **"Import & export"** room (Captain: "sure").
+2. **api_key on export:** include for api-linked worlds via an "include credentials" checkbox, **ON by default** (Titus).
+3. **Room naming:** one **"Import & export"** room (Titus: "sure").
 4. **ow.com export format:** VERIFIED from the Django backend — see "ow.com export format (VERIFIED)" above. Key consequences baked into B1: no world id; bare relations for all types; stringified scalars; pin `element_type` is a numeric ContentType pk (B2 derives the real type from the referenced element).
 
 ---

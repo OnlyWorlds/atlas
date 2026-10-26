@@ -1,7 +1,7 @@
 /**
  * The tour’s world view + phase resolution — the pure kernel.
  *
- * These lock the decisions the S301 gate reshaped: prefix semantics over
+ * These lock the decisions a gate reshaped: prefix semantics over
  * last-match (R10), and full suspension when the tour’s world is not the
  * active one (R4).
  */
@@ -154,7 +154,7 @@ describe('countPresent — the partial-progress signature term (gate R5)', () =>
   });
 });
 
-describe('pinInZone — the pin beat soft correction (S303 rework)', () => {
+describe('pinInZone — the pin beat soft correction', () => {
   // A unit-square zone [0,0]-[10,10] as four ordered markers, plus a pin. The
   // point-in-polygon math is ZoneGeometry’s (tested there); this locks that the
   // view assembles the polygon from the right markers and reads the pin.

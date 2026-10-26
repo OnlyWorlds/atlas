@@ -1,8 +1,8 @@
 /**
- * The confirm-floor rule (S310, Bout W).
+ * The confirm-floor rule (Bout W).
  *
  * The load-bearing case in this file is `confirmPref: false` with a cascade:
- * before S310 that combination deleted an entire manuscript with no dialog at
+ * before the fix that combination deleted an entire manuscript with no dialog at
  * all (verified live — 8 of 9 elements destroyed on one click). Every other
  * test here is scaffolding around that one.
  */
@@ -169,10 +169,10 @@ describe('copy hygiene', () => {
 });
 
 /**
- * S323 — "we could not look" is not "there is nothing there".
+ * "We could not look" is not "there is nothing there".
  *
  * `findDependents` can throw. The caller swallowed it and passed an empty
- * array, which makes `cascades` false, which switches OFF the S310 confirm
+ * array, which makes `cascades` false, which switches OFF the confirm
  * floor — so with `confirm_before_delete` turned off, a failed probe deleted
  * a whole subtree with no prompt at all, while the store went on cascading by
  * default. The unknown case now always asks and says why.

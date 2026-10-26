@@ -1,5 +1,5 @@
 /**
- * The density layer's pure kernels (S356). The DOM pass is exercised by the
+ * The density layer's pure kernels. The DOM pass is exercised by the
  * maps e2e; these lock the placement rules that make a 200-pin map legible.
  */
 
@@ -63,7 +63,7 @@ describe('chooseVisibleLabels', () => {
     expect(chosen.has('other')).toBe(false);
   });
 
-  it('a heavy label never covers another pin: it takes a clear side or is culled (S382, show\'s rule)', () => {
+  it('a heavy label never covers another pin: it takes a clear side or is culled (show\'s rule)', () => {
     const icon = { id: 'p1', box: box(100, 100, 32, 32) };
     const heavy = cand('a', box(110, 110), { owner: 'x', weight: 1000, pri: 0 });
     expect(chooseVisibleLabels([heavy], VIEW, [icon]).has('a')).toBe(false);

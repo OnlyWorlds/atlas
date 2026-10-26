@@ -269,7 +269,7 @@ describe('error type', () => {
 
   // keel refuses a read key's publish with 403 permission_error, a code Atlas
   // has no case for: it reads as "this key can only read", never as an
-  // authentication failure (copy pass S391, Kael B5).
+  // authentication failure.
   it('a 403 without a known code is a read-key refusal, worded as one', async () => {
     mswServer.use(http.post(`${BASE}/pages/`, () => HttpResponse.json(
       { error: { type: 'permission_error', code: 'permission_error', message: 'Read-only key.' } }, { status: 403 },

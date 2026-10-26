@@ -48,7 +48,7 @@ function renderEntry(entry: ChangelogEntry): string {
   const body = entry.body ? `<p class="cl-entry-body">${esc(entry.body)}</p>` : '';
   const credit = entry.credit ? `<div class="cl-entry-credit">${renderCredit(entry.credit)}</div>` : '';
   // No `data-community` hook: its only consumer was the unrendered filter,
-  // removed in S323. The credit itself still renders, visibly, below.
+  // since removed. The credit itself still renders, visibly, below.
   return `
         <li class="cl-entry" id="${esc(entry.id)}">
           <div class="cl-entry-head">
@@ -109,7 +109,7 @@ const STYLE = `
   .cl-brand a { text-decoration: none; }
   .cl-brand .cl-slash { color: var(--cl-dim); font-weight: 400; margin: 0 2px; }
   .cl-brand .cl-word { color: var(--cl-cyan); }
-  /* S323: the masthead toolbar (community stat + an all/community filter
+  /* The masthead toolbar (community stat + an all/community filter
      pair) had a full set of styles, a body.cl-filtered mechanism and a
      per-entry data-community hook, and was never rendered by any code path.
      Removed rather than built: there is one credited entry in the whole log,

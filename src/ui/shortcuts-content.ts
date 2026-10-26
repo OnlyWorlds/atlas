@@ -4,7 +4,7 @@
  * Consumers: the room-aware help overlay (`help-overlay.ts`, the live `?`
  * surface) and the dormant hotkey-reference-modal. Both call
  * `buildShortcutsContent()` so a single source of truth feeds them. (The
- * old sidebar-footer `?` popover was retired in S255v4.)
+ * old sidebar-footer `?` popover was retired.)
  *
  * Content has two kinds of rows:
  *   1. **Hotkey-table bindings** (auto) — pulled from `getInstalledBindings()`
@@ -20,7 +20,7 @@ import { comboParts, getInstalledBindings } from '../core/hotkeys';
 interface Row {
   /** kbd-rendered combo or affordance label (e.g. "Ctrl+E", "Right-click pin"). */
   combo: string;
-  /** Hotkey rows: the binding's parts, each rendered as a chip (S367 critic C12c). */
+  /** Hotkey rows: the binding's parts, each rendered as a chip. */
   parts?: string[];
   /** Plain-language description shown next to the combo. */
   description: string;

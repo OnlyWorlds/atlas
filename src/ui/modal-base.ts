@@ -54,8 +54,8 @@ const openModals: BaseModal[] = [];
 let modalTitleSeq = 0;
 
 /**
- * What sits behind the topmost open modal is `inert` (Seethe's F-60, h20
- * #10346): `aria-modal` tells a screen reader, but Tab walked out of the
+ * What sits behind the topmost open modal is `inert` (found by
+ * Seethe): `aria-modal` tells a screen reader, but Tab walked out of the
  * panel into the page behind, where Enter on "Start a world" opened a second
  * dialog over the first. Every child of `<body>` but the topmost modal's
  * overlay is made inert while any modal is open (a modal below a picker
@@ -86,8 +86,8 @@ export class BaseModal {
     protected modal: HTMLElement | null = null;
 
     /**
-     * While true, an outside click and Escape do NOT close the modal (S360,
-     * Captain: a link that downloads for minutes closed on a stray click and
+     * While true, an outside click and Escape do NOT close the modal (from
+     * Titus: a link that downloads for minutes closed on a stray click and
      * looked cancelled). Set it for the duration of long work; the modal's own
      * buttons are then the only way out, and they say what they do.
      */
@@ -120,7 +120,7 @@ export class BaseModal {
         panel.className =
             'atlas-modal-panel' + (opts.panelClass ? ` ${opts.panelClass}` : '');
         if (opts.dataModal) panel.setAttribute('data-modal', opts.dataModal);
-        // A real dialog to assistive tech (S361, lane a A1): role, modality,
+        // A real dialog to assistive tech (lane a A1): role, modality,
         // and its title as the accessible name when it has one.
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-modal', 'true');
@@ -148,7 +148,7 @@ export class BaseModal {
      */
     protected show(): void {
         if (this.modal) {
-            // Focus goes back where it was when the modal closes (S361).
+            // Focus goes back where it was when the modal closes.
             const active = document.activeElement;
             this.returnFocusTo = active instanceof HTMLElement && active !== document.body ? active : null;
             document.body.appendChild(this.modal);
@@ -163,7 +163,7 @@ export class BaseModal {
 
     /** Hide and detach the modal. Idempotent. */
     protected hide(): void {
-        // The Escape listener goes with the modal, however it closed (S360: it
+        // The Escape listener goes with the modal, however it closed (it
         // used to be removed only when Escape itself closed the modal, so every
         // button-closed modal left one behind on document).
         if (this.escapeHandler) {
@@ -193,7 +193,7 @@ export class BaseModal {
     /** Base behaviors: click outside to close, ESC to close. */
     private attachBaseEventListeners(): void {
         // Close only on a FULL outside click: both the press AND the release
-        // must land on the overlay itself (Captain, S318). A `click` listener
+        // must land on the overlay itself (Titus). A `click` listener
         // alone closes on drag-out — mousedown in an input, drag past the
         // panel edge, release: the click event fires on the common ancestor
         // (the overlay) and eats the user's half-typed modal. Pointer events
@@ -205,7 +205,7 @@ export class BaseModal {
         });
         // The second press of a double-click is not a click outside: it is the
         // rest of the double-click on the button that opened this modal
-        // (S365 gate lens B F6: "add a world" opened and closed at once).
+        // ("add a world" used to open and close at once).
         // `mousedown` carries the click count; it fires after `pointerdown`.
         this.modal?.addEventListener('mousedown', (e) => {
             if (e.detail > 1) pressedOnOverlay = false;
@@ -217,7 +217,7 @@ export class BaseModal {
 
         if (this.escapeHandler) document.removeEventListener('keydown', this.escapeHandler);
         this.escapeHandler = (e: KeyboardEvent) => {
-            // Only the TOPMOST modal answers (S360: a picker opened over the
+            // Only the TOPMOST modal answers (a picker opened over the
             // map-create modal closed both, losing the half-filled form).
             if (e.key !== 'Escape' || this.dismissLocked) return;
             if (openModals[openModals.length - 1] !== this) return;

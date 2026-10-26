@@ -1,10 +1,10 @@
 /**
- * Account mode — UI surfaces (session 260).
+ * Account mode — UI surfaces.
  *
  * Covers what a network-free e2e CAN honestly assert: the settings sign-in
  * block's states, the sidebar "On OnlyWorlds" section's gating, and the
  * offline-first law (a dead token never blocks local worlds). The full
- * mint → download open flow runs against a real backend in Captain's smoke
+ * mint → download open flow runs against a real backend in Titus's smoke
  * (and ran live against a local fake keel during the build, 2026-07-13);
  * the fetch/diff logic is vitest territory (account-worlds integration).
  *
@@ -138,7 +138,7 @@ test('forget drops the token and the remote section disappears', async ({ page }
   expect(stored).toBeNull();
 });
 
-// ---- Forget revokes a token Atlas minted (S475; contract Forge/Notes/2026-10-25-s475-atlas-token-revoke-contract.md) ----
+// ---- Forget revokes a token Atlas minted ----
 // keel played at /account/tokens/{id}: the DELETE goes by the recorded id with the token as its bearer;
 // 204 says revoked, a refusal says how to remove it, and a pasted token (no id) sends nothing.
 const MINTED_ID = '0f1e2d3c-4b5a-4968-8776-655443322110';
@@ -345,7 +345,7 @@ test('a member who cancels the PIN question opens nothing, and the key made for 
   expect(await sharedEntry(page)).toMatchObject({ found: false });
 });
 
-// ---- The first screen offers a signed-in account's worlds (S414) ----
+// ---- The first screen offers a signed-in account's worlds ----
 // A browser with no world and no home folder shows the landing, which has no
 // sidebar: signed in, the account's worlds are listed under its doors.
 
@@ -360,12 +360,12 @@ async function seedTokenOnLanding(page: Page, token: string) {
   await page.waitForSelector('.atlas-landing-compact');
 }
 
-test('signed out, the first screen lists no account worlds (S414)', async ({ page }) => {
+test('signed out, the first screen lists no account worlds', async ({ page }) => {
   await expect(page.locator('.atlas-landing-compact')).toBeVisible();
   await expect(page.locator('[data-role="landing-worlds"]')).toBeHidden();
 });
 
-test('signed in, the first screen lists the account worlds and a row opens one (S414)', async ({ page }) => {
+test('signed in, the first screen lists the account worlds and a row opens one', async ({ page }) => {
   await mockSharedKeel(page, { memberRole: 'contributor', accountHasPin: true });
   await seedTokenOnLanding(page, TOKEN);
   const row = page.locator(`[data-landing-world-id="${SHARED_ID}"]`);
@@ -385,7 +385,7 @@ test('signed in, the first screen lists the account worlds and a row opens one (
   await expect(page.locator('.atlas-landing-compact')).toHaveCount(0);
 });
 
-test('the list arriving repaints only its block: the landing stays the same page (S414)', async ({ page }) => {
+test('the list arriving repaints only its block: the landing stays the same page', async ({ page }) => {
   // Mark the first screen before the list comes, then look again after: a
   // whole re-render would restart the sigil and undo the storage probe's edits.
   let release!: () => void;
@@ -404,7 +404,7 @@ test('the list arriving repaints only its block: the landing stays the same page
   expect(await page.evaluate(() => (document.querySelector('.atlas-landing-sigil') as any)?.__mark ?? null)).toBe(1);
 });
 
-test('a notify leaves a focused row focused: the rows are not rebuilt (S414 gate H1)', async ({ page }) => {
+test('a notify leaves a focused row focused: the rows are not rebuilt', async ({ page }) => {
   await mockSharedKeel(page, { memberRole: 'guest', accountHasPin: true });
   await seedTokenOnLanding(page, TOKEN);
   const row = page.locator(`[data-landing-world-id="${SHARED_ID}"]`);
@@ -416,7 +416,7 @@ test('a notify leaves a focused row focused: the rows are not rebuilt (S414 gate
   expect(await page.evaluate(() => (document.activeElement as any)?.__mark ?? null)).toBe(1);
 });
 
-test('a token keel refuses on the first screen says so and offers Settings, not a retry; the doors stay (S414)', async ({ page }) => {
+test('a token keel refuses on the first screen says so and offers Settings, not a retry; the doors stay', async ({ page }) => {
   await page.route(`${V2}/account/worlds`, route => route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Invalid token.', param: null } } }));
   await seedTokenOnLanding(page, BOGUS_TOKEN);
   await expect(page.locator('.atlas-landing-worlds-error')).toContainText('Account token not recognized');
@@ -427,7 +427,7 @@ test('a token keel refuses on the first screen says so and offers Settings, not 
   await expect(page.locator('[data-action="account-forget"]')).toBeVisible();
 });
 
-test('a list that failed for another reason offers Try again, and Try again asks again (S414)', async ({ page }) => {
+test('a list that failed for another reason offers Try again, and Try again asks again', async ({ page }) => {
   let calls = 0;
   await page.route(`${V2}/account/worlds`, (route) => {
     calls++;
@@ -451,7 +451,7 @@ async function signInFromSettings(page: Page) {
   await expect(page.locator('.ow-toast', { hasText: 'Signed in as e2e-member' })).toBeVisible();
 }
 
-test('signing in on a browser with no world points at the first screen, which lists the worlds (S414)', async ({ page }) => {
+test('signing in on a browser with no world points at the first screen, which lists the worlds', async ({ page }) => {
   await mockSharedKeel(page, { memberRole: 'guest', accountHasPin: true });
   await signInFromSettings(page);
   const toast = page.locator('.ow-toast', { hasText: 'listed on the first screen' });
@@ -460,7 +460,7 @@ test('signing in on a browser with no world points at the first screen, which li
   await expect(page.locator(`[data-landing-world-id="${SHARED_ID}"]`)).toBeVisible();
 });
 
-test('signing in with an account that has no worlds promises no list (S414 gate M2)', async ({ page }) => {
+test('signing in with an account that has no worlds promises no list', async ({ page }) => {
   await page.route(`${V2}/account/worlds`, route => route.fulfill({ json: { data: [] } }));
   await signInFromSettings(page);
   await page.waitForFunction(() => (window as any).__atlasTestApi.getState().accountWorlds.status === 'ready');
@@ -468,7 +468,7 @@ test('signing in with an account that has no worlds promises no list (S414 gate 
   await expect(page.locator('.ow-toast', { hasText: 'listed on the first screen' })).toHaveCount(0);
 });
 
-test('signing in where a world already is says nothing of the first screen (S414)', async ({ page }) => {
+test('signing in where a world already is says nothing of the first screen', async ({ page }) => {
   await setupAtlasRoot(page);
   await mockSharedKeel(page, { memberRole: 'guest', accountHasPin: true });
   await signInFromSettings(page);

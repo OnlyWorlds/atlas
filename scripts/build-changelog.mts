@@ -16,8 +16,8 @@ const outPath = fileURLToPath(new URL('../changelog.html', import.meta.url));
 const html = renderChangelog(CHANGELOG);
 writeFileSync(outPath, html, 'utf8');
 
-// The RSS feed rides public/ so Vite copies it verbatim into dist (S318;
-// Skeld's ecosystem what's-new feed shares the item shape).
+// The RSS feed rides public/ so Vite copies it verbatim into dist
+// (Skeld's ecosystem what's-new feed shares the item shape).
 const feedPath = fileURLToPath(new URL('../public/changelog-feed.xml', import.meta.url));
 writeFileSync(feedPath, renderChangelogFeed(CHANGELOG), 'utf8');
 

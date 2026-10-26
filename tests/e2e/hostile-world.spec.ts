@@ -1,5 +1,5 @@
 /**
- * S360 — a HOSTILE WORLD. World folders are written by anyone (a public repo,
+ * A HOSTILE WORLD. World folders are written by anyone (a public repo,
  * an AI agent, a converter), and atlas's origin holds every linked world's API
  * key, the PIN and the account token. Every value below arrives from a world
  * file; none of it may run as script, and none of it may break a surface.

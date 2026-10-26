@@ -1,11 +1,11 @@
 /**
- * A world's own words for the types (the names profile, 1.81.0; contract
- * Forge/Notes/2026-10-22-s455-names-profile-atlas-contract.md).
+ * A world's own words for the types (the names profile, 1.81.0; the names-profile
+ * contract).
  *
  * A work world's world.json carries x_names; the words arrive after the
  * elements (as a pull would bring them), so the sidebar's list and type strip
  * must redraw on the words alone (both were left on the standard's words
- * until the words joined their keys, S456). One word is hostile markup: it
+ * until the words joined their keys). One word is hostile markup: it
  * prints as text everywhere it shows.
  */
 
@@ -74,7 +74,7 @@ test('a work world shows its own words in the sidebar, its supertype word, and m
   expect(await page.locator('img[src="x"]').count()).toBe(0);
 });
 
-// Seethe h20 #11028: the supertype chip says the world's word as the rows do, and search says it once.
+// Seethe 2026-10-23: the supertype chip says the world's word as the rows do, and search says it once.
 for (const own of [true, false]) {
   test(`the supertype chip and search's hint, ${own ? 'in the world\'s words' : 'without them'}`, async ({ page }) => {
     await setupWorld(page);

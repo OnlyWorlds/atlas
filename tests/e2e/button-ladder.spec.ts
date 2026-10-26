@@ -1,6 +1,6 @@
 /**
- * OW Style's button ladder (1.62, Studio style/RULES.md section 8; the
- * Captain's "looks good", h63 #8314): Entry is a solid fill, one per screen;
+ * OW Style's button ladder (1.62, the style rules section 8; the
+ * Titus's "looks good", 2026-10-20): Entry is a solid fill, one per screen;
  * Standard the wash and edge; Quiet a neutral edge; a destructive action is
  * Standard in the danger colour. The front door takes the ladder's full shape
  * (studio style/control/ladder.json: 36 high, 6 round, 14px).
@@ -39,7 +39,7 @@ const LADDER = {
   },
   light: {
     entry: { bg: 'rgb(14, 116, 144)', ink: 'rgb(255, 255, 255)' },
-    // A light word on the wash is #155e75 (Seethe's corrected ladder, h63 #8801; conv. 157): #0e7490 read 4.27.
+    // A light word on the wash is #155e75 (Seethe's corrected ladder, 2026-10-20; conv. 157): #0e7490 read 4.27.
     standard: { bg: 'rgba(14, 116, 144, 0.14)', edge: 'rgba(14, 116, 144, 0.6)', ink: 'rgb(21, 94, 117)' },
   },
 } as const;

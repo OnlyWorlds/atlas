@@ -127,7 +127,7 @@ function saveDraftStash(worldId: string, draft: Draft): void {
 }
 
 /**
- * The re-key (S363) moves ids; stored state follows. Id fields by equality,
+ * The re-key moves ids; stored state follows. Id fields by equality,
  * prose and rich text through the shared re-key helpers. Writes only on change.
  */
 export function remapDraftStash(worldId: string, map: ReadonlyMap<string, string>): void {
@@ -310,7 +310,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     }
     cancelPendingSave();
     // The teardown capture (A4) must not write the text back to the entry being
-    // deleted (S364 gate, lens C C1): no baseline, nothing to capture.
+    // deleted: no baseline, nothing to capture.
     lastSavedMarkdown = null;
     navigate(knowledgeHash(worldId));
     try {
@@ -346,7 +346,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       ...relationPatch,
     });
     // Advance the baseline only for a write that LANDED, and only while this
-    // entry is still the one open (S364 lane A4): a failed save marked as
+    // entry is still the one open: a failed save marked as
     // saved made the leave/pagehide capture find nothing to retry, and a late
     // write from a closed session set the next entry's baseline.
     if (saved && editorForId === entryId) lastSavedMarkdown = snap.markdown;
@@ -355,10 +355,10 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   /**
    * Queue the editor's text when it differs from the last write that landed,
    * so a save that FAILED (or never got its debounce) is retried on the way
-   * out. The writing room's unmount capture does the same (S364 lane A4).
+   * out. The writing room's unmount capture does the same.
    * A vanished entry is safe: persistEditorSnapshot writes nothing for it;
    * the in-room delete clears the baseline first, so nothing is captured for
-   * the entry being deleted (S364 gate lens C C1).
+   * the entry being deleted.
    */
   function captureUnsaved(): void {
     if (editorMount && editorForId && editorForId !== NEW && !pendingSnapshot) {
@@ -389,7 +389,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   };
 
   /**
-   * THE LIVE FOLDER (S364): another tool changed the open entry on disk. The
+   * THE LIVE FOLDER: another tool changed the open entry on disk. The
    * pass flushed this room first; a clean editor rebuilds from the new body,
    * typing that landed during the pass wins and the room says so.
    */
@@ -422,7 +422,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   };
   root.addEventListener('focusout', onRootFocusOut);
   window.addEventListener('pagehide', onPageHide);
-  // Same flush before a world switch empties the elements this save needs (S360).
+  // Same flush before a world switch empties the elements this save needs.
   const unLeaveWorld = onLeaveWorld(onPageHide);
 
   async function createFromDraft(): Promise<void> {
@@ -459,7 +459,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       // ONLY navigate if the user is still on the draft: this function is
       // async, and its tail used to fire navigate(created) after a quick
       // back-click had already returned to the list — a stale navigation
-      // yanking the user into the entry (S268: the knowledge:94 "flake" was
+      // yanking the user into the entry (the knowledge:94 "flake" was
       // this race, reproduced 3/3 with a hash logger). The refresh stays
       // BEFORE the navigate so the entry route never renders not-found.
       const route = parseHash(window.location.hash);
@@ -548,7 +548,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     } else {
       // A second individual knower can't be stored (narrator is single-link,
       // by design — two+ knowers ARE a circle). Offer the promotion instead
-      // of dead-ending (S265, a tester's find).
+      // of dead-ending (a tester's find).
       chips.appendChild(addAffordance('+ Character', 'Add a second knower: two individuals become a circle', async () => {
         const first = ctx.heldBy().narrator;
         if (!first) return;
@@ -641,7 +641,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   }
 
   /**
-   * Promote two individual knowers to a circle (S265). The create modal IS
+   * Promote two individual knowers to a circle. The create modal IS
    * the confirm: it opens titled with the question, name prefilled from both
    * characters, members already wired via extraData. Cancel = nothing
    * changes; Create = the circle becomes the holder and narrator clears.
@@ -1358,7 +1358,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       ? (draft?.story ?? '')
       : (typeof (entryEl as Record<string, unknown> | undefined)?.story === 'string'
         ? (entryEl as Record<string, unknown>).story as string : '');
-    // A reload after an outside `story` edit skips the stale rich-text copy (S364).
+    // A reload after an outside `story` edit skips the stale rich-text copy.
     const skipSidecar = !isDraft && preferStoryFor === forId;
     preferStoryFor = null;
     const initialJson = isDraft
@@ -1394,8 +1394,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         }
       },
     });
-    // The baseline is the editor's own serialisation of what it loaded (S364
-    // gate, lens B B1 / lens C C2): an untouched entry must never write.
+    // The baseline is the editor's own serialisation of what it loaded:
+    // an untouched entry must never write.
     if (!isDraft) lastSavedMarkdown = editorMount.getMarkdown();
   }
 
@@ -1455,7 +1455,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       if (tgt === 'list') {
         if (getState().data.elements !== lastBuiltElementsRef) rebuildPreservingScroll(buildHome);
       } else if (tgt.startsWith('knower:')) {
-        // Never under a focused rename of the knower (S364 gate, lens C C4):
+        // Never under a focused rename of the knower:
         // the rebuild blurs it and the blur commits half a name. Deferred to
         // the focusout below.
         if (getState().data.elements !== lastBuiltElementsRef && isEditingIn(root)) knowerRebuildDeferred = true;

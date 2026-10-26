@@ -1,5 +1,5 @@
 /**
- * Failures nothing caught (S369, lane X stage 5).
+ * Failures nothing caught (lane X stage 5).
  *
  * A promise that rejects with no handler used to vanish into the console: the
  * button did nothing and nobody said why. This listens for those and says it

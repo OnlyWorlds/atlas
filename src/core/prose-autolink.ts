@@ -1,7 +1,7 @@
 /**
  * Prose autolink kernel — pure functions for linking element mentions in
  * narrative prose, shared by the live editor plugin (decoration scan) and the
- * bulk link/unlink operations (S265: the link-all icon, selection linking,
+ * bulk link/unlink operations (the link-all icon, selection linking,
  * tree-level "link mentions in all scenes").
  *
  * Two representations, transformed IN TANDEM for closed narratives:
@@ -42,7 +42,7 @@ export interface AutolinkIndex {
  * both `name` and `atlas_aliases` as match keys. Narratives + spatial
  * artifacts excluded — writers aren't linking pins or maps in body text.
  *
- * CASE-INSENSITIVE since S307 (Captain's ask). Keys are folded to lowercase
+ * CASE-INSENSITIVE (Titus's ask). Keys are folded to lowercase
  * and the scanner carries the `i` flag, so prose that writes "the consul"
  * mid-sentence links to the element named "Consul" without anyone having to
  * register a lowercase alias for it. Word boundaries still apply, so
@@ -101,9 +101,9 @@ function addEntry(map: Map<string, AutolinkCandidate[]>, key: string | undefined
 }
 
 /**
- * THE WRITER'S OWN TEXT IS THE LABEL — for EVERY match kind (Captain's
- * ruling, S309: "creating a link should NEVER change the text in a writing
- * room; never"). Supersedes the S307 half-rule that kept the writer's text
+ * THE WRITER'S OWN TEXT IS THE LABEL — for EVERY match kind (Titus's
+ * ruling: "creating a link should NEVER change the text in a writing
+ * room; never"). Supersedes the earlier half-rule that kept the writer's text
  * only for case variants while a genuinely different alias still snapped to
  * the canonical name — which is how link-all rewrote the tour's own sentence
  * into "The Hegemony The Consul sat on the Spaceship Balcony…".
@@ -128,13 +128,13 @@ export function promotionLabel(matched: string, cand: AutolinkCandidate): string
  * Is this chip label a legitimate surface form for the element — its name or
  * any alias, compared CASE-INSENSITIVELY? Used by the editors' chip-label
  * rename sync: only a label that fails this check is a stale pre-rename name
- * and gets updated. Case-folding matters (S309): autolink matches
+ * and gets updated. Case-folding matters: autolink matches
  * case-insensitively and labels keep the writer's casing, so "the duchess",
  * "The Duchess" and "aralia" are all valid labels the sync must not clobber.
  */
 export function isValidChipLabel(label: unknown, surface: { name: string; aliases: string[] }): boolean {
   if (typeof label !== 'string' || label.length === 0) return false;
-  // Trimmed on BOTH sides of the comparison (S355): a label carrying stray
+  // Trimmed on BOTH sides of the comparison: a label carrying stray
   // whitespace must not read as "stale" and get rewritten to the name.
   const folded = label.trim().toLowerCase();
   if (folded === surface.name.trim().toLowerCase()) return true;
@@ -149,7 +149,7 @@ function buildCombinedRegex(keys: string[]): RegExp | null {
   if (keys.length === 0) return null;
   const pattern = `\\b(?:${keys.map(escapeRegexLiteral).join('|')})\\b`;
   try {
-    // `i` pairs with the folded index keys (S307).
+    // `i` pairs with the folded index keys.
     return new RegExp(pattern, 'gi');
   } catch {
     return null;
@@ -169,7 +169,7 @@ export interface MarkdownAutolinkResult {
  * Chip the first mention of every unambiguous candidate in a markdown story.
  * Existing markdown links (label AND url halves) are protected spans; ids
  * already linked anywhere in the story count as mentioned. The inserted
- * label is the WRITER'S MATCHED TEXT verbatim (`promotionLabel`, S309) —
+ * label is the WRITER'S MATCHED TEXT verbatim (`promotionLabel`) —
  * mirrors the live Tab handler, which delegates to the same rule.
  *
  * `only` (#24, "Named in the text"): chip that one element alone. The full
@@ -295,7 +295,7 @@ export function autolinkRichtext(doc: unknown, index: AutolinkIndex, only?: stri
  * Text already inside a web link is left alone, as the markdown side leaves
  * `[text](url)` spans alone: splitting it made the two halves of a scene
  * disagree, and the sidecar rule then read Atlas's own write as an outside
- * edit (S365 gate lens A H3).
+ * edit.
  */
 function inWebLink(node: RtNode): boolean {
   return Array.isArray(node.marks) && node.marks.some(m => (m as { type?: string } | null)?.type === 'link');
@@ -361,7 +361,7 @@ export function unlinkRichtext(doc: unknown): { doc: unknown; unlinked: number }
 }
 
 // ---------------------------------------------------------------------------
-// Term linking (S355) — every match of ONE chosen word → ONE chosen element
+// Term linking — every match of ONE chosen word → ONE chosen element
 // ---------------------------------------------------------------------------
 //
 // The find bar's "Link to element" verb. Unlike the autolink transforms above
@@ -386,7 +386,7 @@ export interface TermLinkTarget {
 }
 
 /**
- * Shrink a match to its non-whitespace core (S355, Captain: a trailing space
+ * Shrink a match to its non-whitespace core (Titus: a trailing space
  * in the search term was becoming part of the chip label). The surrounding
  * whitespace stays prose; an all-whitespace match links nothing.
  */

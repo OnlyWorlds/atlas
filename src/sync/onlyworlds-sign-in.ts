@@ -1,6 +1,6 @@
 /**
- * Sign in with OnlyWorlds (Keel #515, D139; the handoff sheet, Orrery
- * `keel/signin-handoff.md` §4; contract `Forge/Notes/2026-10-24-s465-sign-in-with-onlyworlds-contract.md`).
+ * Sign in with OnlyWorlds (keel's sign-in handoff, §4 of its handoff
+ * sheet).
  * The SDK's two calls (4.46.0): `signInWithOnlyWorlds` sends the tab to
  * onlyworlds.com with a PKCE challenge, `completeSignIn` trades the code on
  * `/signin/callback`. The token is kept as every sign-in keeps it
@@ -81,7 +81,7 @@ export function takeResume(): { resume: SignInResume; found: boolean } {
   return { resume: readResume(raw), found: raw !== null };
 }
 
-/** How long the exchange may take before the person is told (the S465 gate's G6): the SDK reads an abort as offline. */
+/** How long the exchange may take before the person is told: the SDK reads an abort as offline. */
 export const SIGN_IN_EXCHANGE_LIMIT_MS = 20_000;
 
 function fetchWithin(limitMs: number): typeof fetch {

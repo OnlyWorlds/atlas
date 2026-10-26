@@ -1,5 +1,5 @@
 /**
- * Problem toasts (S368, lane X): buttons, details, sticky, eviction.
+ * Problem toasts (lane X): buttons, details, sticky, eviction.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToastManager, feedbackUrl, FEEDBACK_BASE } from '../../src/ui/toast-manager';
@@ -19,7 +19,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   // Every file shares one DOM (singleFork): a #toast-container left here let the
-  // files after this one render real toasts that waypoints.test.ts then found (S404).
+  // files after this one render real toasts that waypoints.test.ts then found.
   document.body.innerHTML = '';
 });
 
@@ -96,7 +96,7 @@ describe('toast manager', () => {
     expect(url.startsWith(FEEDBACK_BASE)).toBe(true);
   });
 
-  it('the same problem for the same key replaces the one on screen; another key keeps its own (S369)', () => {
+  it('the same problem for the same key replaces the one on screen; another key keeps its own', () => {
     const run1 = vi.fn(); const run2 = vi.fn(); const other = vi.fn();
     toasts.show('Saving failed.', 'error', 8000, { actions: [{ label: 'Retry now', run: other }], dedupeKey: 'scene:b' });
     toasts.show('Saving failed.', 'error', 8000, { actions: [{ label: 'Retry now', run: run1 }], dedupeKey: 'scene:a' });
@@ -129,7 +129,7 @@ describe('toast manager', () => {
     expect(live()[0].getAttribute('role')).toBe('alert');
   });
 
-  // S404, Seethe's phone pass (#4264): a tap fired the emulated mouseenter and
+  // Seethe's phone pass: a tap fired the emulated mouseenter and
   // nothing left, so one tap pinned a toast for good.
   const pointer = (el: HTMLElement, type: string, pointerType: string) => {
     const e = new Event(type, { bubbles: type === 'pointerup' });

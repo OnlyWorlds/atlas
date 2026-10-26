@@ -10,7 +10,7 @@
  * - `attachApi`-flipping flows (Make-Online, Link-Existing-API) after the
  *   registry state transitions.
  *
- * The PIN comes from `worldPin` (#104, S385): the account PIN
+ * The PIN comes from `worldPin` (#104): the account PIN
  * (`state.registry.pin`), or for a world opened as an agent seat, that seat's
  * own secret. If it is missing when attach is called, we log + skip engine
  * creation; the UI surfaces this via the pill state.
@@ -65,7 +65,7 @@ const ROUND_ROSTER_MAX_AGE_MS = 5 * 60_000;
  *     `local-wins` if not set).
  */
 /**
- * `justLinked` (S366): the attach Make Online itself performs. Its own failed
+ * `justLinked`: the attach Make Online itself performs. Its own failed
  * uploads are unstamped elements, which the big-batch rule would otherwise
  * report as "changed on disk" and hold for an answer, right after the user
  * clicked Link (and the foreign-id record waits on that answer). The link IS
@@ -89,7 +89,7 @@ export function attachSyncEngine(
   const reg = getState().registry;
   const readOnly = !!entry.api.read_only;
   const pin = worldPin(entry, reg);
-  // View-only worlds (S264) run on a READ key — no PIN exists or is needed
+  // View-only worlds run on a READ key — no PIN exists or is needed
   // (keel reads are keyless-PIN; the engine never writes).
   if (!pin && !readOnly) {
     console.warn('[sync-attach] PIN missing — engine not attached for', entry.name);
@@ -105,7 +105,7 @@ export function attachSyncEngine(
     baseUrl: devV2Base() ?? undefined,
   });
   // Pause if either global or per-world pause flag is set.
-  const shouldPause = effectiveSyncPaused(entry, reg); // S367 critic C7: one predicate
+  const shouldPause = effectiveSyncPaused(entry, reg); // one predicate
   // A linked world restored from a world file (1.17, contract §5.2): its
   // first round is reviewed whatever the policy, so the file's older edits
   // never overwrite newer ones on OnlyWorlds (gate A9). Then the policy.
@@ -115,8 +115,8 @@ export function attachSyncEngine(
   // overwritten: the engine runs pause-and-review, the flush below waits for
   // the answer, and an edit made meanwhile meets the review. A paused world
   // asks nothing (it stays offline), so a resume pushes under the review and
-  // its round asks (the S438 gate's G1); a world keel cannot answer for stays
-  // under the review and asks again each round (G2).
+  // its round asks; a world keel cannot answer for stays
+  // under the review and asks again each round.
   let settling = !readOnly;
   const policyNow = (): SyncPolicy => worldSyncPolicy(
     getState().registry.worlds.find(w => w.id === entry.id) ?? entry,
@@ -134,11 +134,11 @@ export function attachSyncEngine(
     onSyncResult: (phase, result) => {
       // The review ends only after a round that really compared (not offline,
       // busy or refused) and left nothing open: a held conflict stays dirty,
-      // and the next round under local-wins would push it (S373 gate F1).
+      // and the next round under local-wins would push it.
       if (reviewFirst && !result.transient_blocked && !result.auth_blocked
         && result.conflicts.length === 0 && result.failures.length === 0) {
         void folder.readSyncState().then(st => {
-          // A held world setting or x_ key holds the review too (S458 gate G2).
+          // A held world setting or x_ key holds the review too.
           if (!reviewFirst || (st.conflicts?.length ?? 0) > 0 || (st.meta_conflicts?.length ?? 0) > 0 || currentEngine !== engine) return;
           reviewFirst = false;
           engine.setPolicy(policyNow());
@@ -156,14 +156,14 @@ export function attachSyncEngine(
       // Someone joined or left while the world is open, or keel had not
       // answered yet: the next round runs under what the roster says now.
       if (!readOnly && !result.transient_blocked) void settle(ROUND_ROSTER_MAX_AGE_MS);
-      // The list Settings → World and the pill read (S369). Repaint the pill
+      // The list Settings → World and the pill read. Repaint the pill
       // when it moved: the sync slice is the pill's subscription.
       if (noteRoundIssues(entry.id, phase, result)) patchSlice('sync', { ...getState().sync });
       emitConflictToasts(phase, result, { worldId: entry.id, current: currentEngine === engine, policy: engine.getPolicy() });
     },
     // No onIdSwap hook: keel keeps client ids on CREATE (2026-07-12), and
     // Route 2 moves ids before any server call through the re-key kernel,
-    // whose screen pass is `rekeyLiveUi` (S367).
+    // whose screen pass is `rekeyLiveUi`.
   });
   // Apply persisted debounce preference if the user configured one. Engine
   // default (5000ms) stands when registry has no value.
@@ -187,7 +187,7 @@ export function attachSyncEngine(
     await movePolicy(engine, folder, policyNow());
   };
   // A batch of outside edits that was waiting for the user's answer when the
-  // world was left (or the page reloaded) keeps waiting (S364 gate lens B B3):
+  // world was left (or the page reloaded) keeps waiting:
   // the hold goes on BEFORE the flush-on-attach below, which would push it.
   // The link's own attach answers any question saved before it (gate A2).
   if (opts.justLinked) forgetPersistedDiskHold(entry.id);
@@ -293,7 +293,7 @@ async function flushPendingOnAttach(
     const pending = changed.length + tombstones.length;
     if (pending === 0) return;
     // A batch too big to upload unasked waits for the user, as it would with
-    // the window open (S365, `holdBigBatchAtOpen`). A hold already persisted
+    // the window open (`holdBigBatchAtOpen`). A hold already persisted
     // was adopted before this ran and refuses the round by itself. Never for
     // a world kept in this browser (1.17, gate B15): nothing outside Atlas can
     // write its files, so what waits is the user's own offline editing.
@@ -310,13 +310,13 @@ async function flushPendingOnAttach(
     const synced = result.pushed.creates + result.pushed.updates + result.pushed.deletes;
     if (synced > 0) {
       // Notify the user — these writes were stuck from a prior session.
-      // Neutral about WHO made them (S365 lane B M3): the user's own offline
+      // Neutral about WHO made them: the user's own offline
       // edits, or another tool's while Atlas was closed.
       toastManager.success(`Uploaded ${synced} ${synced === 1 ? 'change that was' : 'changes that were'} waiting in ${inBrowser ? 'this browser' : 'the folder'}`);
     }
     if (result.failures.length > 0) {
       console.warn('[atlas:sync] flush-on-attach: some writes failed', result.failures);
-      // Surface to user — silent failures here are how Captain hit the "lying
+      // Surface to user — silent failures here are how Titus hit the "lying
       // pill" bug: pending writes from a prior session bounced off a dead
       // world (deleted server-side / bad PIN), failures collected but never
       // shown. Auth failures get their own dedicated toast via emitRoundToasts
@@ -331,7 +331,7 @@ async function flushPendingOnAttach(
 }
 
 /**
- * The failure toast for a round (S368): the plain sentence from
+ * The failure toast for a round: the plain sentence from
  * `failureToastOnce`, a button for the fix it names (Give new ids for a
  * foreign id, Retry now for a held file), and the causes behind Details,
  * scrubbed, for Copy details and Send feedback. Nothing when this set was
@@ -384,7 +384,7 @@ function noteHiddenHeld(worldId: string, result: SyncResult): void {
 }
 /**
  * The role a push's 404 said this session, per world, until the resync after
- * it (S440): that round's kept count is what the role line already promised
+ * it: that round's kept count is what the role line already promised
  * ("what you no longer see online stays here"), so it is not said again.
  */
 const roleSaidBeforeResync: Record<string, string> = {};
@@ -436,7 +436,7 @@ async function noteRoleNews(worldId: string, folder: FolderStore, result: SyncRe
   const edits = result.kept_edit_ids ?? [];
   if (edits.some(id => !keptEditsSaid.has(`${worldId}:${id}`))) {
     for (const id of edits) keptEditsSaid.add(`${worldId}:${id}`);
-    // A role line said this round already says "changes you make to it stay here too" (S440).
+    // A role line said this round already says "changes you make to it stay here too".
     if (!roleSaid) toastManager.show(keptEditsLine(entry.name, edits.length), 'info', 10000);
   }
   if (result.kept || edits.length > 0 || result.own_role !== undefined) await refreshKeptCount(worldId, folder);
@@ -519,7 +519,7 @@ export function detachSyncEngine(): void {
  * its registry entry (B12 Q1). Resolves whether keel answered; no answer
  * (offline, refused, timed out) changes nothing. `maxAgeMs` 0 reads afresh.
  * The answer is kept only while the world is still linked with the key it
- * was read with (the S438 gate's G8: a re-link during the read).
+ * was read with (a re-link during the read).
  */
 async function learnShared(worldId: string, apiKey: string, maxAgeMs: number): Promise<boolean> {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
@@ -544,7 +544,7 @@ async function learnShared(worldId: string, apiKey: string, maxAgeMs: number): P
  * changes on its own (keel answered, someone joined or left, a first review
  * ended). Toward the review it moves at once. Away from it, only once nothing
  * is held: an element held for the person to choose stays held until they
- * have chosen (the S438 gate's G3), and the move waits for a round after.
+ * have chosen, and the move waits for a round after.
  * Only a choice the person makes in Settings clears what is held
  * (`reapplySyncPolicy`).
  */
@@ -651,7 +651,7 @@ export type SyncUnavailableReason =
   | { kind: 'pin-missing'; worldId: string }
   /** A seat world whose secret this browser no longer has (#104): opened again from onlyworlds.com. */
   | { kind: 'seat-secret-missing'; worldId: string }
-  // ('attached-but-paused' removed S307 — declared here and handled in
+  // ('attached-but-paused' removed — declared here and handled in
   //  sync-toasts, but never CONSTRUCTED by the function below, so the branch
   //  was unreachable and its toast had never fired. A definition with no
   //  producer is not a feature.)
@@ -746,7 +746,7 @@ async function maybeAutoOpenServerDeleteModal(): Promise<void> {
     const records = await currentEngine.listServerDeletes();
     if (records.length === 0) return;
     // `open()` returns once the dialog shows, so the flag alone let every pull
-    // stack another review over the first (S390 gate F1): one on screen is enough.
+    // stack another review over the first: one on screen is enough.
     if (document.querySelector('[data-modal="server-delete-review"]')) return;
     const { ServerDeleteReviewModal } = await import('../ui/server-delete-modal');
     serverDeleteModalOpen = true;
@@ -812,7 +812,7 @@ function emitConflictToasts(
   // pill carries the persistent signal; this toast is the moment-it-happened
   // notification. Skip if the round had successes (mixed-blocked is rare and
   // the engine still went to error — keep the surfacing single).
-  // Busy, rate limited or offline (S361, lane b M4): one plain sentence with
+  // Busy, rate limited or offline (lane b M4): one plain sentence with
   // the wait, instead of a wall of per-element failures.
   if (result.transient_blocked) {
     const secs = Math.max(1, Math.round((result.retry_after_ms ?? 30_000) / 1000));
@@ -861,7 +861,7 @@ function emitConflictToasts(
     result.pushed.creates + result.pushed.updates + result.pushed.deletes +
     result.pulled.creates + result.pulled.updates +
     (result.meta_pushed?.length ?? 0) + (result.meta_pulled?.length ?? 0);
-  // S360: say WHY, and say it once per distinct set. A persistent failure (an
+  // Say WHY, and say it once per distinct set. A persistent failure (an
   // id owned by another world, an oversized element) used to be silent when
   // anything else synced, and when nothing did, the advice was "test
   // connection", which passes.
@@ -964,9 +964,9 @@ async function refreshElementsCache(): Promise<void> {
 
 /**
  * Re-read world.json into `state.active.meta` after a sync round (world-meta
- * sync, S262). Without this, a pull-applied time_current/description changes
+ * sync). Without this, a pull-applied time_current/description changes
  * the DISK but every consumer keeps rendering the stale slice until reload —
- * the exact gap the S262 handover flagged. Guards: the active world must
+ * the exact gap a handover flagged. Guards: the active world must
  * still be the world this engine belongs to (world switches race idle
  * transitions), and a no-change read patches nothing (avoids spurious
  * re-renders mid-interaction).

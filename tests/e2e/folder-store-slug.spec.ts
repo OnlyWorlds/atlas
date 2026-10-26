@@ -199,7 +199,7 @@ test('duplicate files for same id are deduped on next open (rename-crash recover
   expect(result.survivorName).toBe('New');
 });
 
-test('a hand-made variant sharing an id is set aside in .atlas/quarantine, never deleted (S360)', async ({ page }) => {
+test('a hand-made variant sharing an id is set aside in .atlas/quarantine, never deleted', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const api = window.__atlasTestApi;
     const root = await api.opfsRoot();

@@ -1,5 +1,5 @@
 /**
- * Failures nothing caught (S369): said once, quietly bounded.
+ * Failures nothing caught: said once, quietly bounded.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 

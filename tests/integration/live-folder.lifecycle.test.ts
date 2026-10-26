@@ -1,4 +1,4 @@
-// Promoted from the S364 composition gate probe `b-lifecycle.probe.test.ts` (Forge/Notes/2026-09-29-s364-gate/): it asserts the fixed behaviour.
+// Promoted from a gate probe `b-lifecycle.probe.test.ts`: it asserts the fixed behaviour.
 /**
  * Lens B probes: the live folder's lifecycle across world switches.
  * Real FsFolderStore over the in-memory FS; sync-attach is a stub (as in

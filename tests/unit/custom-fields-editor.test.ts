@@ -186,7 +186,7 @@ describe('constants predicates', () => {
   });
 });
 
-describe('a published profile key is never a custom field (x_identity_, Skeld h58 #8890)', () => {
+describe('a published profile key is never a custom field (x_identity_, Skeld 2026-10-20)', () => {
   const KEY = '019a1f3c-2b4e-7d10-8c3a-6f2e9b0d4a71';
 
   it('typed as "Identity key", the name is refused', () => {

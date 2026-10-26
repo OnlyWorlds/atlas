@@ -1,5 +1,5 @@
 /**
- * S367 critic C7: two pause switches (per-world "Stay offline", Settings >
+ * Two pause switches (per-world "Stay offline", Settings >
  * Sync "Pause all") drive one engine flag. Neither handler may resume the
  * engine while the other switch still says paused; attach reads the same
  * predicate (effectiveSyncPaused).

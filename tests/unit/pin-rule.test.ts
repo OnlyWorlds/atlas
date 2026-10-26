@@ -1,6 +1,6 @@
 /**
- * keel's PIN rule in Atlas's own client (1.79.0; Skeld h29 #10663, #10734;
- * contract `Forge/Notes/2026-10-22-s455-pin-on-writes-contract.md`): the
+ * keel's PIN rule in Atlas's own client (1.79.0; Skeld 2026-10-22;
+ * the PIN-on-writes contract): the
  * secret on every write, on GET /me, and on every call of a ten-digit key; a
  * prefixed key's other reads bare. The link doors ask /me for the PIN.
  */

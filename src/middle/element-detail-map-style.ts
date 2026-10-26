@@ -1,5 +1,5 @@
 /**
- * Map-only "Map style" row (S423, a map drawn from its own zones): Plain, or
+ * Map-only "Map style" row (a map drawn from its own zones): Plain, or
  * a style that draws each zone from its kind (`core/map-ink.ts`). Writes the
  * map's `atlas_map_style` (a synced extension field; null for Plain).
  */

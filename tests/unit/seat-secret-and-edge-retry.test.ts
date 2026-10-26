@@ -1,12 +1,12 @@
 /**
- * The two S380 changes riding 1.17, guarded (S381).
+ * The two changes riding 1.17, guarded.
  *
  * - The PIN prompt takes the four-digit account PIN and names a seat secret
- *   (`ow_s_`, keel accounts/agents.py) to refuse it (S386); it refuses
+ *   (`ow_s_`, keel accounts/agents.py) to refuse it; it refuses
  *   anything else with its line.
  * - The map edge colour retries a failed http(s) read once under
  *   `atlas-pixels=1`, past the header-less copy the overlay's plain <img>
- *   cached (media.onlyworlds.com, Boss h37 #1777); other schemes never retry.
+ *   cached (media.onlyworlds.com, Boss 2026-10-09); other schemes never retry.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PinPromptModal } from '../../src/ui/pin-prompt-modal';
@@ -21,7 +21,7 @@ function submit(value: string): void {
     .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 }
 
-// S386: the prompt's one caller asks for the ACCOUNT PIN, saved for every
+// The prompt's one caller asks for the ACCOUNT PIN, saved for every
 // account world; a seat secret there became `registry.pin` (an R1 breach the
 // gate found), so the prompt now names a seat secret and refuses it.
 describe('the PIN prompt takes the account PIN, never a seat secret', () => {

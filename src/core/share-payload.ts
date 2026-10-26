@@ -94,7 +94,7 @@ export interface PayloadMapBlock {
   showLabels?: boolean;
   pins: Array<{ xPct: number; yPct: number; name: string; type: string; ref?: string }>;
   /**
-   * Zone overlays (S299, additive — old payloads/viewers unaffected):
+   * Zone overlays (additive — old payloads/viewers unaffected):
    * %-normalized polygon/line geometry compiled from the zone's markers on
    * this map. `ref` present only when the zone element is itself included
    * (the standard disclosure rule).
@@ -243,8 +243,8 @@ export function buildPagePayload(page: Element, elements: Element[], charts: Cha
  * What publishing leaves out of this page for one reason (`out`), for the
  * builder's line: the elements its blocks name that are themselves out, an
  * out pin as "a pin on <its element>", and a circle's entries that are out.
- * An element whose only way onto the page was a pin that is out is never named
- * (the S459 gate's F4). Empty when nothing on the page is.
+ * An element whose only way onto the page was a pin that is out is never named.
+ * Empty when nothing on the page is.
  */
 function leftOutBy(page: Element, elements: Element[], charts: ChartConfig[], out: (el: unknown) => boolean): string[] {
   if (!elements.some(out)) return [];
@@ -282,7 +282,7 @@ export function hiddenLeftOut(page: Element, elements: Element[], charts: ChartC
   return leftOutBy(page, elements, charts, isHiddenMark);
 }
 
-/** A page that is itself left out is not published at all (the S459 gate's F3): its own text would go out. */
+/** A page that is itself left out is not published at all: its own text would go out. */
 export function pageNotPublishedLine(page: Element): string | null {
   if (isHiddenMark(page)) return 'This page is hidden, so it is not published: a published page is read by anyone with its link.';
   if (handsOnAsProposed(page)) return 'This page is proposed and not yet reviewed, so it can be published once a keeper accepts it.';
@@ -364,7 +364,7 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
   }
 
   // Pinned elements are disclosed BY INCLUSION, identity-first (B6, settled
-  // 2026-07-03 — supersedes the session-239 full-fields default): an included
+  // 2026-07-03 — supersedes the earlier full-fields default): an included
   // pin ships its element as name/type/description (+ image); only pins the
   // author explicitly opted in via `fullPinIds` ship every populated field.
   // Fields another block (card/collection) separately disclosed still union
@@ -408,7 +408,7 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
       const frozen = freezeCircleBlock(b, elements, byId);
       return {
         ...frozen,
-        // S367 critic C12a: the knower's id ships only when the knower is
+        // The knower's id ships only when the knower is
         // itself included (the relation-token `ref` rule). Empty string, not
         // absent: the viewer's parser drops a circle block without one.
         knowerId: includedIds.has(frozen.knowerId) ? frozen.knowerId : '',
@@ -467,7 +467,7 @@ export function projectElementEntry(
     if (!isPopulatedValue(raw)) continue;
     const kind = relationKindOf(el.type, field);
     if (kind === null) {
-      // S367 critic C6: field text is public wire too. Scrub every ow:// link
+      // Field text is public wire too. Scrub every ow:// link
       // to its label (empty included set: cards render fields as plain text,
       // so no link survives, disclosed or not).
       entry.fields[field] = typeof raw === 'string' ? scrubMarkdownForPayload(raw, NO_IDS, byId) : raw;
@@ -491,11 +491,11 @@ export function projectElementEntry(
 
 /**
  * Freeze a map block: image URL + chosen pins normalized to percentages.
- * THE ONE ORIGIN CONVERSION on the publish path (S361): storage is the
+ * THE ONE ORIGIN CONVERSION on the publish path: storage is the
  * schema's BOTTOM-left, the payload's `yPct` is a TOP-left CSS percentage by
  * contract (SHARING_CONTRACT.md §5), so `yPct = (height - y) / height`. The
  * renderers (atlas preview, tools/show) apply `yPct` as `top:` and never
- * convert, which is why pages published before S361 still draw right. The
+ * convert, which is why pages published before the y-flip still draw right. The
  * map's width/height fields hold the image dimensions, auto-detected by atlas
  * when image_url is set. Returns null — block drops from the wire — when the map
  * is missing, has no published image (D3: image_url only, local media never
@@ -546,7 +546,7 @@ export function freezeMapBlock(
   };
   if (block.showLabels === false) frozen.showLabels = false;
 
-  // Zone overlays (S299): markers are the only spatial truth (a zone
+  // Zone overlays: markers are the only spatial truth (a zone
   // "appears" on a map iff its markers do — DESIGN_ZONES.md §1); geometry
   // normalizes exactly like pins. Shape resolution shares the app's one
   // helper (getZoneShape) so builder, payload, and canvas can never disagree.

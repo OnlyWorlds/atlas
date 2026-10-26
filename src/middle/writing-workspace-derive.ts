@@ -52,7 +52,7 @@ export type LinkTargetExists = (type: string, id: string) => boolean;
  * The existence check every derive caller passes, built from the world's
  * element list. A chip can outlive its element: a delete scrubs the link
  * FIELDS (conv. 101) and deliberately leaves the prose alone, so the derive
- * must not put the dead id back (S364: it did, at every scene open).
+ * must not put the dead id back (it did, at every scene open).
  */
 export function linkTargetsIn(elements: readonly Element[]): LinkTargetExists {
   const typeOf = new Map<string, string>();

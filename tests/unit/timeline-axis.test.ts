@@ -1,7 +1,7 @@
 /**
  * Timeline axis calculations — pure functions, easy to lock in.
  * Adapted from `tools/little-element-viewer/src/timeline/axis-calculator.ts`
- * (session 223). Verifies range padding, tick selection, and date→pixel mapping.
+ * Verifies range padding, tick selection, and date→pixel mapping.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -42,7 +42,7 @@ describe('timeline axis-calculator', () => {
     expect(r.max).toBeCloseTo(200 + 3.8, 4);
   });
 
-  it('calculateTimeRange CENTERS a single dated element (S301)', () => {
+  it('calculateTimeRange CENTERS a single dated element', () => {
     const r = calculateTimeRange([
       { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, dateSpec: { kind: 'exact', value: 42 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
     ]);
@@ -87,7 +87,7 @@ describe('timeline axis-calculator', () => {
     expect(ticks.length).toBeLessThan(20);
   });
 
-  it('calculateTicks keeps readable spacing on wide spans, no tick wall (S367 critic K4)', () => {
+  it('calculateTicks keeps readable spacing on wide spans, no tick wall', () => {
     // usable width 1000 - 32 - 16 = 952px
     for (const span of [20_000, 365_000, 100_000_000, 1e12]) {
       const ticks = calculateTicks({ min: 0, max: span }, 1000);
@@ -127,7 +127,7 @@ describe('timeline axis-calculator', () => {
     expect(x).toBeGreaterThan(0); // PADDING_LEFT
   });
 
-  it('createXToDate is the exact inverse of createDateToX (S318 — one padded space)', () => {
+  it('createXToDate is the exact inverse of createDateToX (one padded space)', () => {
     // The view layer used to hold an UNPADDED x↔date twin, so the now-line
     // (drawn via date→x) landed PADDING_RIGHT px right of the node rendered
     // at the same date. The round-trip through the shared pair must be
@@ -145,7 +145,7 @@ describe('timeline axis-calculator', () => {
   });
 });
 
-describe('suggestNow — the set-now default (S318)', () => {
+describe('suggestNow — the set-now default', () => {
   const node = (startDate: number, endDate: number | null = null) => ({ startDate, endDate });
 
   it('defaults to the LATEST start date (the tour: title 1, events 12+12 → 12)', () => {

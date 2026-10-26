@@ -1,5 +1,5 @@
 /**
- * rekeyBody: the reference transform behind giving elements new ids (S363).
+ * rekeyBody: the reference transform behind giving elements new ids.
  * Rows follow re-key gate lens 3's field-path table; each names the carrier
  * whose miss would let an old id come back.
  */

@@ -31,7 +31,7 @@ let saveSeq = 0;
 
 /**
  * Replace the rule list: state first (the map re-renders on the tick), then
- * disk. A failed write is said (S369: it was silent, and the colours were
+ * disk. A failed write is said (it was silent, and the colours were
  * gone on the next open). Retry writes the same rules, and only while they
  * are still the newest.
  */

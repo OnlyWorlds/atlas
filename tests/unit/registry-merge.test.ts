@@ -1,5 +1,5 @@
 /**
- * Two tabs, one registry (S365 lane B M2): a save merges per entry against
+ * Two tabs, one registry: a save merges per entry against
  * this tab's own view, so an entry this tab did not change comes from
  * storage as it is now. Each case is a way a second tab used to lose or
  * resurrect something.

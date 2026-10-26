@@ -1,5 +1,5 @@
 /**
- * S361: "flip this map", the remedy for a map placed in Atlas before 1.8
+ * "Flip this map", the remedy for a map placed in Atlas before 1.8
  * (y stored top-down). y' = height - y for every pin and marker on THAT map;
  * pressing it again restores the original.
  */

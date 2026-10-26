@@ -1,5 +1,5 @@
 /**
- * Which pane a tour step points at, so a narrow window can show it (S366).
+ * Which pane a tour step points at, so a narrow window can show it.
  *
  * Below 1100px the right pane is a drawer, below 820px the sidebar too
  * (`layout/narrow-layout.ts`). The tour was written for the desktop shell:

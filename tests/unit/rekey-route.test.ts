@@ -1,5 +1,5 @@
 /**
- * The URL after ids change (S363, `sync/rekey-route.ts`; re-key gate lens 3 F6:
+ * The URL after ids change (`sync/rekey-route.ts`; re-key gate lens 3 F6:
  * E18 map id kept, E19 timeline thrown to the element room, E20 writing left
  * on the old id, and a navigate that pushed Back onto a dead id).
  */

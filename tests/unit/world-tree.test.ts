@@ -1,6 +1,6 @@
 /**
- * The world-tree kernel (1.17 bout 4, contract §4.1, §9 invariants 4 and 6;
- * S370 gate lens A A1, A13, lens B B3): the one skip predicate, the copy that
+ * The world-tree kernel (1.17 bout 4, contract §4.1, §9 invariants 4 and 6):
+ * the one skip predicate, the copy that
  * writes its token first and world.json last, the verify that needs equal
  * path sets, and the names a folder on a drive cannot hold.
  */

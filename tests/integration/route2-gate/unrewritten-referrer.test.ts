@@ -1,5 +1,5 @@
 /**
- * Promoted from the S367 composition gate (lens A).
+ * Promoted from the composition gate (lens A).
  * Lens A: a referrer the kernel could not rewrite (its file will not parse: a
  * git conflict landed after the app listed it) is skipped and named in
  * `unrewritten` (kernel lens 1 F7). The server phase then reads bodies with

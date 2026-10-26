@@ -1,5 +1,5 @@
 /**
- * The boot reconciliation against concurrent saves (S376 gate B1, contract
+ * The boot reconciliation against concurrent saves (contract
  * §3.2): the pass decides inside each directory's lock against the registry
  * as STORED, returns deltas, and its caller applies them to the registry as
  * it is when the pass ends. Real `saveRegistry` merge, real storage events
@@ -107,7 +107,7 @@ describe('any save another tab makes during the pass survives it (gate B1 scenar
   });
 });
 
-describe('a save whose storage event has not arrived when the pass applies (S377 D2 gate F1, F2)', () => {
+describe('a save whose storage event has not arrived when the pass applies', () => {
   it('a world another tab deleted mid-pass does not come back as cleared', async () => {
     const V = browserEntry('regV', VID, 'v-0192e000-0003'); // its directory is gone: the pass queues a mark
     bootWith(regOf(W, V));
@@ -175,7 +175,7 @@ describe('every make waits for the pass (contract §3.2)', () => {
     await make.abort();
   });
 
-  it('a pass that never ends holds a make only so long (S377 D2 gate F3)', async () => {
+  it('a pass that never ends holds a make only so long', async () => {
     const root = new FakeDirHandle('opfs');
     setOpfsRootForTests(async () => root as unknown as FileSystemDirectoryHandle);
     vi.useFakeTimers();

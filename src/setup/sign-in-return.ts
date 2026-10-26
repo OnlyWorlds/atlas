@@ -23,7 +23,7 @@ export async function applySignInOutcome(outcome: SignInOutcome, toasts: ToastMa
   const { resume } = outcome;
   // Back after a finished sign-in can ask onlyworlds.com again, which answers
   // with a fresh code for a round trip this tab no longer holds: signed in
-  // already and nothing started here, there is nothing to say (the S465 gate's G3).
+  // already and nothing started here, there is nothing to say.
   if (!outcome.ok && !outcome.started && !outcome.cancelled && getState().registry.account_token
     && outcome.error instanceof OwSignInError && outcome.error.reason === 'state_mismatch') {
     console.info('[sign-in] a return this tab did not start, while signed in: left alone');

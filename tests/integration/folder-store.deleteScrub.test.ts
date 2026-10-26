@@ -1,5 +1,5 @@
 /**
- * A delete removes the dead id from every link that named it (S362), the local
+ * A delete removes the dead id from every link that named it, the local
  * mirror of keel's `_scrub_cross_type`. Before this, a deleted location stayed
  * in its characters' `location` field: the detail pane showed a raw id, and
  * once the world went online keel refused those characters with

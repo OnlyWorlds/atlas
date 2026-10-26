@@ -1,4 +1,4 @@
-// Promoted from the S364 composition gate probe `b-knowledge-norm.probe.test.ts` (Forge/Notes/2026-09-29-s364-gate/): it asserts the fixed behaviour.
+// Promoted from a gate probe `b-knowledge-norm.probe.test.ts`: it asserts the fixed behaviour.
 /** Lens B probe: the knowledge room's baseline is the RAW story too. */
 import { describe, it, expect } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';

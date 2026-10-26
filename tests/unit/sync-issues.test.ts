@@ -1,5 +1,5 @@
 /**
- * The Sync issues list (S369): what is still not syncing, per world.
+ * The Sync issues list: what is still not syncing, per world.
  * A push or sync round replaces it; a pull or a round that stopped early adds.
  */
 import { describe, it, expect, beforeEach } from 'vitest';

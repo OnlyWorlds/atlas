@@ -1,5 +1,5 @@
 /**
- * A linked world's public page (Keel #471, D155; Skeld h29 #11219): Settings'
+ * A linked world's public page (Skeld 2026-10-23): Settings'
  * OnlyWorlds tab reads keel's `GET /world` live and, when the owner turned the
  * page on, offers "View its public page" at `/w/<slug>` (else the world id).
  * Off, the tab says nothing about it. keel routed as it answers on 2026-10-23
@@ -74,7 +74,7 @@ async function signInAndOpen(page: Page) {
     const st = (window as any).__atlasTestApi.getState();
     return st.registry.worlds.find((x: any) => x.api?.world_id === id)?.api?.api_key ?? null;
   }, WORLD_ID)).toBe(KEY);
-  // The door ends at Home (S416): wait for it, or its landing takes the address the tab was given.
+  // The door ends at Home: wait for it, or its landing takes the address the tab was given.
   await expect(page.getByText('What do you have?')).toBeVisible();
 }
 

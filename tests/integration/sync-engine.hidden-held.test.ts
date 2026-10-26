@@ -1,6 +1,5 @@
 /**
- * Folder spec §4.8 on the push (conv. 170). keel #587, probed live S461
- * (`Notes/ui-snapshots/2026-10-23-s461/probe-48.log`): a create carrying
+ * Folder spec §4.8 on the push (conv. 170). keel, probed live: a create carrying
  * `hidden: true` from the owner or a co-builder makes it hidden; from anyone
  * else it is 403 `hidden_not_allowed` and nothing is made, single or as a
  * `/bulk` slot (an atomic batch then makes nothing). So:
@@ -10,7 +9,7 @@
  * - a raise sends them;
  * - keel's 403 when the role was unknown is a hold, never a dead key;
  * - a hidden element here whose id OnlyWorlds shows is never adopted, so its
- *   content never goes up onto what every member sees (the S461 gate's F2).
+ *   content never goes up onto what every member sees.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';

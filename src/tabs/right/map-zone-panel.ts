@@ -1,5 +1,5 @@
 /**
- * The zone panel (S356): the toolbar's zones fold-out, grown from a flat list
+ * The zone panel: the toolbar's zones fold-out, grown from a flat list
  * of every zone into a browser and a legend.
  *
  * Kinds (world-styles `groupByKind`: one row per distinct supertype/subtype
@@ -12,7 +12,7 @@
  * A search box filters zones by name and opens the kinds that match.
  *
  * The container (`entry.zoneStrip`, class `atlas-zones-dropdown-panel`) and
- * the toolbar button are untouched: Captain liked the feel of the button
+ * the toolbar button are untouched: Titus liked the feel of the button
  * and the style of the panel, so the panel keeps both and only grows
  * inside. Rendering is a full innerHTML rebuild per sync (cheap at 300
  * zones); open/closed kinds, the search text and the tune target live on
@@ -64,7 +64,7 @@ function ruleProbe(kind: Kind<Zone>): Pick<StyleRule, 'type' | 'supertype' | 'su
   return { type: 'zone', supertype: kind.supertype || undefined, subtype: kind.subtype || undefined, role: kind.role || undefined };
 }
 
-/** Zones split by shared role (S362): rivers by rank, route segments by their road. */
+/** Zones split by shared role: rivers by rank, route segments by their road. */
 const zoneKinds = (zones: readonly Zone[]): Kind<Zone>[] => groupByKind(zones, { byRole: true });
 
 /**
@@ -86,7 +86,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   // The date bar (#280, conv. 143): the panel lists what the map's date
   // shows. Kinds are grouped from EVERY zone and then narrowed, so a kind's
   // key (its eye, colour and tune) is the same whatever the date: grouping
-  // only the date's zones split or merged roles differently (the S410 gate).
+  // only the date's zones split or merged roles differently.
   const date = mapZoneDate(entry);
   const shownIds = new Set(zones.filter(z => zoneShownOnMap(entry, z, date)).map(z => z.id));
   if (btn) {
@@ -101,7 +101,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   if (!strip.classList.contains('is-open')) { ps.stale = true; return; }
   ps.stale = false;
   const rules = getState().styles.rules;
-  // Zones drawn as their linked zones (a road as its segments, S362) join the
+  // Zones drawn as their linked zones (a road as its segments) join the
   // panel beside the zones they link: listed, lit on hover, never drawn. A
   // road lists at its own dates, with the parts the date shows.
   const linked = listLinkedZonesOnMap(zones, partitionZonesAndMarkers(getState().data.elements).zones);
@@ -181,7 +181,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
 function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[], parts?: string[], viewOnly = false): string {
   const shapeIcon = parts ? 'route' : getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
   const own = (z as { atlas_color?: string }).atlas_color;
-  // A zone's own colour is from its file: hex only into style="" (S360).
+  // A zone's own colour is from its file: hex only into style="".
   const color = hexColourOr(own, resolveStyle(rules, z).color ?? DEFAULT_ZONE_COLOR);
   const title = parts
     ? `${z.name}: drawn as the ${parts.length} zones it links to`

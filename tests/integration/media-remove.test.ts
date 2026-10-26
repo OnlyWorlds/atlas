@@ -1,8 +1,8 @@
 /**
- * Removing an uploaded picture (Boss's removal contract, h37 #2354; Keel
- * #170; Skeld h20 #2496): a removal ticket from keel with the world's own
+ * Removing an uploaded picture (Boss's removal contract, 2026-10-10;
+ * Skeld 2026-10-10): a removal ticket from keel with the world's own
  * PIN and `{key}`, then the edge's /v1/remove with only the ticket. keel
- * (`media/api.py` remove_ticket) and the edge (Hangar `worker.js` removal)
+ * (`media/api.py` remove_ticket) and the edge (the upload worker's removal)
  * are stood in for with their real shapes.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

@@ -38,7 +38,7 @@ import { currentLore, isRoomElement } from '../core/parlor-room';
 const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
 
 /**
- * REF SECTION SPLITS (S317, Captain): named sections that pull specific
+ * REF SECTION SPLITS (Titus): named sections that pull specific
  * incoming references OUT of the generic "Referenced by" bucket and render
  * ABOVE it, nicely grouped. The first case: a location's **Located here** —
  * elements whose `location` field points at this place, which indicates
@@ -153,7 +153,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
     }));
   }
 
-  // Split sections (S317) — "Located here" and future kin — render ABOVE the
+  // Split sections — "Located here" and future kin — render ABOVE the
   // generic bucket. A qualified source leaves Referenced by unless it also
   // references the target through non-split fields.
   let remaining = others;

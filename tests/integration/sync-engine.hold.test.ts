@@ -1,5 +1,5 @@
 /**
- * The engine hold and the re-key journal gate (S363, re-key gate lens 2 R1/R2).
+ * The engine hold and the re-key journal gate (re-key gate lens 2 R1/R2).
  *
  * `pause()` was never enough for an exclusive local operation: a round in
  * flight keeps creating and stamping (it checks `stopped`, never `paused`),

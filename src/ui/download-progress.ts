@@ -3,8 +3,8 @@
  * view, an account world's open, Bring it down again). A big world coming
  * into this browser's storage says, once the count is known, that it takes a
  * while: Firefox writes browser storage slower than Chromium writes a folder,
- * and a world of thousands of elements takes minutes (contract §2.2; the
- * Captain's d-1000, built as the walk page's lean pending his ruling: S377).
+ * and a world of thousands of elements takes minutes (contract §2.2;
+ * built as a lean pending Titus's ruling).
  */
 import type { FilesWhere } from '../core/browser-worlds';
 

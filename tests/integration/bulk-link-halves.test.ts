@@ -1,5 +1,5 @@
 /**
- * The bulk writers keep ONE truth (S365 gate lens A H3). "Link mentions in
+ * The bulk writers keep ONE truth. "Link mentions in
  * all scenes" and "Link to element" used to rewrite `story` and the rich-text
  * sidecar separately; on a first mention in italics or bold, or a name inside
  * a web link, the halves parted, and the sidecar rule at open then reported
@@ -109,8 +109,7 @@ describe('a story edited outside outranks the stale sidecar', () => {
 });
 
 /**
- * The re-key kernel is a both-halves writer too (conv. 116; S366 lane B N5,
- * probe b-rekey-halves). Route 2 on the kernel makes it a routine one, so
+ * The re-key kernel is a both-halves writer too (conv. 116). Route 2 on the kernel makes it a routine one, so
  * each scene is built by the editor's own parse, re-keyed by the real kernel
  * (`startRekey`), and must still satisfy `story === serialize(sidecar)`.
  * A GUARD: green before the Route 2 rebuild and after it.

@@ -13,7 +13,7 @@ import { escapeAttr } from './dom-utils';
 export const HIDDEN_MARK_LINE = 'Hidden on OnlyWorlds: only the owner, co-builders and whoever made it can see it.';
 /** Any other: a folder world, an unlinked one, or a linked element not yet sent. */
 export const HIDDEN_FOLDER_LINE = 'Hidden: shown to you here, and left out of a published page.';
-/** A linked element keel showed in its last answer, though the file holds the mark (the S461 gate's F3). */
+/** A linked element keel showed in its last answer, though the file holds the mark. */
 export const HIDDEN_HERE_ONLY_LINE = 'Hidden here only: OnlyWorlds still shows it, since it was marked hidden after it went online. A published page leaves it out.';
 
 /** keel's word on the mark, recorded with a push's stamp (`stampedBody`; ATLAS_FIELDS.md). */
@@ -22,7 +22,7 @@ export const HIDDEN_SHOWN_ONLINE = 'atlas_hidden_shown_online';
 /**
  * What keel's answer to a write (a POST or PATCH body, a read-back, an adopted
  * copy) says about the mark, for the stamp's `kept`: keel answers `hidden: true`
- * exactly when it hides the element (S461 probe-48, 8a and 8b). `stampedBody`
+ * exactly when it hides the element. `stampedBody`
  * keeps the key only when the file holds the mark; no answer body, no word.
  */
 export function hiddenWordOf(answer: unknown): Record<string, unknown> | undefined {
@@ -32,7 +32,7 @@ export function hiddenWordOf(answer: unknown): Record<string, unknown> | undefin
 
 /**
  * keel's answer to a push, for the stamp: the word, and keel's mark when keel hides the element.
- * A file never unhides (conv. 173, Skeld h29 #12044), so a mark taken out here comes back with
+ * A file never unhides (conv. 173, Skeld 2026-10-24), so a mark taken out here comes back with
  * the answer that shows keel still hides it; a pull would skip that answer as its own echo.
  */
 export function hiddenKeptOf(answer: unknown): Record<string, unknown> | undefined {

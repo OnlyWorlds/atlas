@@ -103,7 +103,7 @@ export function buildPictureUploadRow(el: Element, entry: WorldRegistryEntry, to
   value.appendChild(btn);
 
   // An uploaded picture of this world can be removed from OnlyWorlds (Boss's
-  // removal contract, h37 #2354; Keel #170).
+  // removal contract, 2026-10-10).
   const key = uploadedPictureKey(el.image_url, entry.api?.world_id ?? '');
   if (key) {
     const remove = document.createElement('button');

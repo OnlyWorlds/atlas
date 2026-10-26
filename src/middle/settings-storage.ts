@@ -1,5 +1,5 @@
 /**
- * Settings → Storage tab (extracted from settings-panel session 233). Two
+ * Settings → Storage tab (extracted from settings-panel). Two
  * sections: "On this device" (atlas root folder) + global Sync settings
  * (pause-all, pull-on-activate, cadence, autosave debounce, conflict policy,
  * confirm-server-deletes). All sync settings are atlas-wide (every api-linked
@@ -132,7 +132,7 @@ function showBrowserStorageSection(): boolean {
 
 /**
  * The worlds this browser keeps, and the ones it cleared: a cleared row is
- * not kept, and asking the browser to keep it means nothing (S376 gate B4).
+ * not kept, and asking the browser to keep it means nothing.
  */
 function browserWorldCounts(): { kept: number; cleared: number } {
   const own = getState().registry.worlds.filter(w => isBrowserWorld(w) && w.demo !== true);
@@ -140,7 +140,7 @@ function browserWorldCounts(): { kept: number; cleared: number } {
   return { kept: own.length - cleared, cleared };
 }
 
-/** A window whose browser storage refuses or is full says only that (S376 gate B4). */
+/** A window whose browser storage refuses or is full says only that. */
 function storageStatusLine(status: OpfsStatus | null): string | null {
   if (status === 'refused') return NO_BROWSER_STORAGE_LINE;
   if (status === 'full') return BROWSER_STORAGE_FULL_LINE;
@@ -216,7 +216,7 @@ function wireBrowserStorageSection(): void {
   const note = section.querySelector<HTMLElement>('[data-role="browser-persist-note"]')!;
   const n = browserWorldCounts().kept;
   // No world kept here: nothing for the browser to keep or clear, so no
-  // line and no Ask (S377 own walk, the rest of gate B4). The first make asks.
+  // line and no Ask. The first make asks.
   if (n === 0) return;
   const them = n === 1 ? 'it' : 'them';
   const show = (kept: boolean): void => {
@@ -247,8 +247,8 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
   btn?.addEventListener('click', async () => {
     btn.disabled = true;
     try {
-      // A world pick opens in place; a folder pick says what it found (S365).
-      // "updated" only when there was one to update (S365 gate lens B F11b).
+      // A world pick opens in place; a folder pick says what it found.
+      // "updated" only when there was one to update.
       const had = !!getState().atlasRoot;
       await finishSetupDoor(await setupAtlasRoot(), toasts, had ? 'updated' : 'set up');
     } catch (err) {
@@ -355,7 +355,7 @@ function wireSyncTab(toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
     // Match the engine to the EFFECTIVE pause: turning Pause all off must not
-    // resume a world the user keeps offline (S367 critic C7).
+    // resume a world the user keeps offline.
     const engine = getCurrentSyncEngine();
     const entry = next.worlds.find(w => w.id === getCurrentSyncWorldId());
     const stillPaused = effectiveSyncPaused(entry, next);

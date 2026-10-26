@@ -21,7 +21,7 @@
  * fresh one), uuid references to that discarded id from OTHER records are
  * rewritten to the final id — otherwise they'd dangle silently. Relation fields
  * go through resolveRelations; ow:// prose, sidecar and page blocks through
- * remapProse (the re-key kernel's rekeyBody, S367 critic C8).
+ * remapProse (the re-key kernel's rekeyBody).
  */
 
 import { relationFieldsFor } from '../editor/field-schema';
@@ -83,7 +83,7 @@ export function reconcile(
       const name = typeof raw.name === 'string' ? raw.name : '';
       // Pins and markers are unnamed by design (atlas creates them with an
       // empty name) — dropping them here broke export→import round-trips
-      // for every unnamed spatial artifact (session 248, via the sample
+      // for every unnamed spatial artifact (found via the sample
       // world). Everything else still requires a name.
       const nameOptional = type === 'pin' || type === 'marker';
       if (!name.trim() && !nameOptional) {
@@ -267,7 +267,7 @@ function resolveRelations(
  * Apply the incoming-id remap to everything EXCEPT relation fields (already
  * resolved above; a second pass could chain X to Y to W): ow:// links in
  * prose, the TipTap sidecar, page blocks. The re-key kernel's transform, so
- * import and re-key agree on what a reference is (S367 critic C8).
+ * import and re-key agree on what a reference is.
  */
 function remapProse(type: ElementType, resolved: RawRecord, map: Map<string, string>): RawRecord {
   if (map.size === 0) return resolved;
@@ -340,7 +340,7 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
   if (tbu) out.time_basic_unit = tbu;
   // The now under either spelling (folder-format v0.3.5): the standard's
   // `time_current` first, then keel's wire name, which the site's download
-  // carries since its world block became the World whole (Keel #516, dist.50).
+  // carries since its world block became the World whole (dist.50).
   const tc = num(world.time_current) ?? num(world.time_range_current);
   if (tc !== undefined) out.time_current = tc;
   const trmin = num(world.time_range_min);
@@ -353,16 +353,16 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
   }
   // Where the copy came from and which slice it is (folder spec §4.2): keel's
   // one-file export is this envelope, so a Character's view imported as a new
-  // world stays one and is never offered to go online as the whole (the S446
-  // gate's G1). Kept only as objects; their parts are read defensively later.
+  // world stays one and is never offered to go online as the whole.
+  // Kept only as objects; their parts are read defensively later.
   const lines = out as Record<string, unknown>;
   if (world.source && typeof world.source === 'object' && !Array.isArray(world.source)) lines.source = world.source;
   if (world.exported_as && typeof world.exported_as === 'object' && !Array.isArray(world.exported_as)) lines.exported_as = world.exported_as;
   // And who made it (v0.3.14): verbatim, so a new world from keel's export
   // says keel made it, never Atlas.
   if (world.producer && typeof world.producer === 'object' && !Array.isArray(world.producer)) lines.producer = world.producer;
-  // And where the world first came from, as the server served it (v0.3.16,
-  // Keel #571): kept, nulls and all, never derived.
+  // And where the world first came from, as the server served it
+  // (v0.3.16): kept, nulls and all, never derived.
   if (world.origin && typeof world.origin === 'object' && !Array.isArray(world.origin)) lines.origin = world.origin;
   // A profile's keys on the World (`x_names`, a world's own words for the
   // types; names.md): verbatim, as §4.1 keeps every key a writer did not

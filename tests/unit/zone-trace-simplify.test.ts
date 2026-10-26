@@ -1,6 +1,6 @@
 /**
- * A traced stroke goes into the world as the few points that carry its shape
- * (S423): `simplifyPath`, Douglas-Peucker on an open run.
+ * A traced stroke goes into the world as the few points that carry its shape:
+ * `simplifyPath`, Douglas-Peucker on an open run.
  */
 
 import { describe, it, expect } from 'vitest';

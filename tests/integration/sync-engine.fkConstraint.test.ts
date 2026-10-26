@@ -1,7 +1,7 @@
 /**
  * SyncEngine pushPhase: dangling-link failure → server-delete routing.
  *
- * Scenario (Captain hit the v1 ancestor in session 221): atlas pushed a zone,
+ * Scenario (hit live with the v1 ancestor): atlas pushed a zone,
  * server-side action (web app / admin / another atlas) deleted that zone.
  * Atlas still has the zone locally with `server_updated_at` set, so it isn't
  * in the CREATE batch. New markers drawn locally reference the orphan zone.

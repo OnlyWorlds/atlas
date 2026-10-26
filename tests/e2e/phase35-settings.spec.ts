@@ -140,7 +140,7 @@ test('world tab — image URL persists to world.json and mirrors to the home cov
   await page.click('[data-action="open-settings"]');
   await page.click('[data-settings-tab="world"]');
 
-  // The field exists and starts empty (S311 — the one meta field that had no
+  // The field exists and starts empty (the one meta field that had no
   // edit surface anywhere in the ecosystem).
   const input = page.locator('input[name="world-image-url"]');
   await expect(input).toBeVisible();
@@ -204,7 +204,7 @@ test('world tab: units save trimmed to world.json and print after the numbers th
   await expect.poll(() => after('height')).toEqual(['900', 'none']);
 });
 
-test('a save that lands while you type in the next field keeps your typing (the units race, S452)', async ({ page }) => {
+test('a save that lands while you type in the next field keeps your typing (the units race)', async ({ page }) => {
   // The race the units test kept losing 1 in 5: the first unit's save patches
   // the active world, the panel's markup carries each saved value, so the
   // panel rebuilt and replaced the input still being typed in. Made
@@ -263,7 +263,7 @@ test('world tab — api-linked worlds get stay-offline + refresh + unlink + test
   await expect(page.locator('[data-action="unlink-from-api"]')).toBeVisible();
   // Make-online button should NOT appear for api-linked.
   await expect(page.locator('[data-action="make-online"]')).toHaveCount(0);
-  // Invite someone (S407): the world's Access pane on onlyworlds.com, a new tab.
+  // Invite someone: the world's Access pane on onlyworlds.com, a new tab.
   const invite = page.locator('[data-role="invite-line"] a[data-link="invite"]');
   await expect(invite).toBeVisible();
   await expect(invite).toHaveAttribute('href', 'https://www.onlyworlds.com/account/worlds/fake-id/access');
@@ -311,7 +311,7 @@ test('unlink-from-api flips state back to local-only', async ({ page }) => {
   expect(world.api).toBeUndefined();
 });
 
-test('general tab: theme toggle flips data-theme, persists across reload, dark restores (S315)', async ({ page }) => {
+test('general tab: theme toggle flips data-theme, persists across reload, dark restores', async ({ page }) => {
   await freshBoot(page);
   await page.goto('/#/settings/general');
   await expect(page.locator('input[name="app-theme"][value="dark"]')).toBeChecked();
@@ -332,7 +332,7 @@ test('general tab: theme toggle flips data-theme, persists across reload, dark r
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'light');
 });
 
-test('general tab: a "Help and feedback" group, and the footer version opens the changelog (S368)', async ({ page }) => {
+test('general tab: a "Help and feedback" group, and the footer version opens the changelog', async ({ page }) => {
   await page.goto('/#/settings/general');
   const group = page.locator('.atlas-settings [data-role="help-feedback"]');
   await expect(group.locator('h3')).toHaveText('Help and feedback');

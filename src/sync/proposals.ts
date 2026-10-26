@@ -1,6 +1,6 @@
 /**
- * keel #519, the proposed change (conv. 163; contract
- * `Forge/Notes/2026-10-22-s454-seat-proposals-contract.md`).
+ * keel #519, the proposed change (conv. 163; a contract of
+ * 2026-10-22).
  *
  * On a world whose keeper reviews AI seats (`agent_writes_proposed`), a seat's
  * PATCH, PUT or link edit answers 202 `{proposal}` and the element does not

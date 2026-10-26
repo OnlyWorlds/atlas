@@ -30,9 +30,9 @@ export function registerServiceWorker(): void {
       if (typeof register === 'function') {
         const updateSW = register({
           immediate: true,
-          // A new deploy is ready (registerType 'prompt', S360). Offer it;
+          // A new deploy is ready (registerType 'prompt'). Offer it;
           // never reload under the user.
-          // Reload saves the rooms' pending text first (S361, gate F9: the
+          // Reload saves the rooms' pending text first (gate F9: the
           // reload discarded a debounced scene save; pagehide is only a
           // best-effort net for async writes).
           onNeedRefresh: () => showReloadBanner('A new version of Atlas is ready.', true, () => {
@@ -42,7 +42,7 @@ export function registerServiceWorker(): void {
           // ones that said "Later" included (the old page cannot keep
           // running on the new version's files). The plugin's default is a
           // bare `location.reload()`, which dropped the other tabs' pending
-          // text (S366, lane C B2): save first, then reload.
+          // text (lane C B2): save first, then reload.
           onNeedReload: () => { void reloadAfterFlush(); },
         });
       }

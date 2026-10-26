@@ -5,16 +5,16 @@
  * DELIBERATELY STORE-FREE. Takes a host element and a view accessor; lifts
  * verbatim into any surface that mounts the workspace prose editor.
  *
- * WHY IT IS A MODULE (S310)
+ * WHY IT IS A MODULE
  * -------------------------
- * It shipped in S265 as a closure inside `writing-workspace.ts`, so the
+ * It first shipped as a closure inside `writing-workspace.ts`, so the
  * KNOWLEDGE room — which mounts the same editor, with the same autolink
  * plugin, into a host that already reuses the same
  * `.atlas-writing-workspace-prose` class — never got it. That was logged in
- * the S308 sweep as one of five instances of the session-recurring class: a
+ * a later sweep as one of five instances of a recurring class: a
  * decision applied to ONE surface.
  *
- * The affordance matters more than it looks: S306 found that copy had been
+ * The affordance matters more than it looks: a review found that copy had been
  * sending people to a right-click tree menu when there was a button with a
  * live count in the page they were already looking at, and that button is the
  * deterministic gesture the tour's own e2e now uses.
@@ -46,7 +46,7 @@ export function createLinkAllCorner(deps: {
   }
 
   function refresh(): void {
-    // Anchored INSIDE the prose panel's top-right (Captain, S265) — the panel
+    // Anchored INSIDE the prose panel's top-right (Titus) — the panel
     // is position:relative; the pill rides its background, not the surface edge.
     const host = getHost();
     if (!host) return;

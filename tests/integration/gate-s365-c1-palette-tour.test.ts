@@ -1,5 +1,5 @@
 /**
- * PROMOTED from the S365 composition gate (lens C, consumers): Ctrl+K keeps the world doors locked during the tour.
+ * Ctrl+K keeps the world doors locked during the tour.
  * Each asserts the fixed behaviour; red on the code before the gate fixes.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

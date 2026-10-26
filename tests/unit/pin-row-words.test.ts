@@ -1,5 +1,5 @@
 /**
- * S454 (Seethe h20 #10346): a PIN row that takes a seat's secret says so in its
+ * Seethe (2026-10-22): a PIN row that takes a seat's secret says so in its
  * label, and a form that makes a world online says why it asks a PIN under the
  * field, before any sign-in (the reason used to show only after it).
  */

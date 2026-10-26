@@ -5,7 +5,7 @@
  * NAMES are `<slug>-<id8>-<nonce4>`, a fresh nonce at every creation, so no
  * directory is ever made under an earlier one's name: OPFS handles are
  * path-based, and a parked store still holding the old name would write into
- * the new world (S370 gate B6).
+ * the new world.
  *
  * A MAKE (create, import, link, open a world file, the tour) holds the Web
  * Lock `atlas-world:<dir>` from before its first write to after its registry
@@ -21,7 +21,7 @@
  * as STORED (another tab's make commits before it releases that lock), and it
  * returns DELTAS that the caller applies to the registry as it is when the
  * pass ends: a save built from the snapshot it started with would revert,
- * field by field, whatever any tab saved meanwhile (S376 gate B1). Every make
+ * field by field, whatever any tab saved meanwhile. Every make
  * in this tab waits for it (`openBrowserMake`, contract §3.2).
  */
 
@@ -45,7 +45,7 @@ export function mintBrowserDirName(name: string, worldId: string): string {
 /**
  * Is this handle key the world's own: `world-<id>`, or a later link's
  * `world-<id>-N`? An exact string match: nothing in the id is stripped, so a
- * crafted id never matches another world's key (S373 gate F7).
+ * crafted id never matches another world's key.
  */
 export function isOwnHandleKey(handleKey: string, worldId: string): boolean {
   const base = `world-${worldId}`;
@@ -61,12 +61,12 @@ export function worldAlreadyHere(reg: WorldsRegistry, worldId: string): WorldReg
  * The cleared browser world a world.json of this id restores: one the browser
  * cleared, holding this EXACT world id (its own handle key, or its link's
  * server id). Never one matched only through a former link: the link goes
- * back only to the world it was made for (Skeld's second condition, S373
- * F7). The file door and the folder door both ask it (S376 gate B3).
+ * back only to the world it was made for (Skeld's second condition).
+ * The file door and the folder door both ask it.
  */
 export function clearedOwnTwin(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | null {
   // Searched by the exact rule itself, never through `worldAlreadyHere`,
-  // whose first identity match can be a row a former link names (S377 D2 gate).
+  // whose first identity match can be a row a former link names.
   return reg.worlds.find(w =>
     isBrowserWorld(w) && !!w.cleared_at && w.demo !== true
     && (isOwnHandleKey(w.folder.handle_key, worldId) || w.api?.world_id === worldId),
@@ -132,7 +132,7 @@ export interface BrowserMake {
 /**
  * The boot reconciliation's gate: settled once the pass has applied its
  * deltas. Every make awaits it, so none commits inside the pass's window
- * (contract §3.2; S376 gate B1: five makes rode outside the activation chain).
+ * (contract §3.2; five makes once rode outside the activation chain).
  */
 let reconciled: Promise<void> = Promise.resolve();
 
@@ -142,8 +142,8 @@ export const RECONCILE_WAIT_LIMIT_MS = 15_000;
 /**
  * Opens the gate; the returned function settles it. Called synchronously at
  * boot. It also settles itself after `RECONCILE_WAIT_LIMIT_MS`: a pass stuck
- * behind a blocked IndexedDB open must not hang every make with no word
- * (S377 D2 gate F3).
+ * behind a blocked IndexedDB open must not hang every make
+ * with no word.
  */
 export function beginBootReconciliation(): () => void {
   let settle: () => void = () => {};
@@ -310,7 +310,7 @@ export async function reconcileBrowserHome(
         return;
       }
       // The owner as stored NOW, not only in the snapshot: another tab's make
-      // commits before it releases this lock (S376 gate B1).
+      // commits before it releases this lock.
       const owner = views().map(v => worldAlreadyHere(v, id)).find(Boolean);
       if (owner) {
         if (!isBrowserWorld(owner)) {
@@ -375,7 +375,7 @@ export async function reconcileAtBoot(opts: { home?: FileSystemDirectoryHandle }
   });
   // Fold in what is stored first: another tab's save can land before its
   // storage event reaches this tab, and a delta re-checked against a lagging
-  // view would bring back a world that tab deleted (S377 D2 gate F1, F2).
+  // view would bring back a world that tab deleted.
   const folded = adoptStoredRegistry(getState().registry);
   if (folded) patchSlice('registry', folded);
   const current = getState().registry;

@@ -1,8 +1,8 @@
 /**
- * Saved charts e2e (S264). Locks the applyChart fix: the default view (the
+ * Saved charts e2e. Locks the applyChart fix: the default view (the
  * tableau) saves as a `selection` scope, and applying it must RESTORE that
  * scope — the old code refused selection kinds with an info toast, so the most
- * common save produced a chart that could never reopen (Captain's live find).
+ * common save produced a chart that could never reopen (Titus's live find).
  * Also locks the rail heading naming the active chart, and rename flowing
  * through to it.
  */
@@ -90,7 +90,7 @@ test('renaming a chart renames the rail heading with it', async ({ page }) => {
   await page.click('[data-action="save-chart"]');
   const chip = page.locator('.atlas-saved-chart');
   // Freshly saved from the live view → immediately active → the rail names it.
-  // Member ORDER varies on local_updated_at timestamp ties (the S265 lesson —
+  // Member ORDER varies on local_updated_at timestamp ties (an earlier lesson —
   // this assertion missed that sweep and flaked under 4-worker load).
   await expect(page.locator('.atlas-timeline-rail-head')).toHaveText(/^(Alpha & Beta|Beta & Alpha)$/);
 
@@ -121,7 +121,7 @@ test('a type-chip click releases an applied chart (the chart is a lens, not a lo
   await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('This chart');
 });
 
-test('deleting the applied chart releases its lens (S265, the ghost-scope bug)', async ({ page }) => {
+test('deleting the applied chart releases its lens (the ghost-scope bug)', async ({ page }) => {
   await setupWorld(page);
   await createElement(page, 'event', { name: 'Alpha', start_date: 10 });
   await createElement(page, 'event', { name: 'Beta', start_date: 20 });
@@ -134,7 +134,7 @@ test('deleting the applied chart releases its lens (S265, the ghost-scope bug)',
   await expect(page.locator('.atlas-timeline-rail-head')).toHaveText(savedName);
 
   await chip.hover();
-  // Deleting a saved chart now CONFIRMS first (S306): it was the only
+  // Deleting a saved chart now CONFIRMS first: it was the only
   // destructive action on a user-authored artifact with no guard, while the map
   // row and the zone chip both ask. Playwright auto-DISMISSES dialogs, so
   // without this the delete simply never happens.
@@ -146,7 +146,7 @@ test('deleting the applied chart releases its lens (S265, the ghost-scope bug)',
   await expect(page.locator('.atlas-timeline-rail-head')).not.toHaveText(savedName);
 });
 
-test('declining the delete confirm KEEPS the chart (S306)', async ({ page }) => {
+test('declining the delete confirm KEEPS the chart', async ({ page }) => {
   // The accept-side test above would stay green if the confirm were removed
   // entirely, so it cannot guard the guard. This is the other half of the pair:
   // dismiss the dialog and the chart must survive. There is no undo anywhere in
@@ -169,8 +169,8 @@ test('declining the delete confirm KEEPS the chart (S306)', async ({ page }) => 
   expect(asked, 'deleting a saved chart must ask first').toBe(true);
 });
 
-// S364 lane A1: the Charts room read charts.json once per mount and stayed
-// mounted across a world switch (room-stable switch, S256), then wrote its
+// The Charts room read charts.json once per mount and stayed
+// mounted across a world switch (room-stable switch), then wrote its
 // whole in-memory list to the NEW world: world B's charts were replaced by
 // world A's. The room now remounts per world and every chart write is a
 // read-modify-write of the file.

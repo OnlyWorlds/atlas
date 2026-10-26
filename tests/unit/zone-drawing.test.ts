@@ -3,13 +3,13 @@
  *
  * Only the pure name-resolution helper has unit coverage at this layer.
  *
- * ⚠ CORRECTED S307. This comment used to claim "module-level state +
+ * ⚠ CORRECTED. This comment used to claim "module-level state +
  * DOM/Leaflet integration are exercised by smoke". They are not:
  * `smoke.spec.ts` contains no zone anything, and no e2e drives zone EDIT
  * mode at all. The claim survived because it read like coverage — a doc
  * asserting a test that does not exist is worse than no doc, because it
  * stops the next person looking. `zone-edit-mode.ts` (1000+ lines) got its
- * first tests in S307 (`zone-edit-snapshot.test.ts`) and still needs the
+ * first tests (`zone-edit-snapshot.test.ts`) and still needs the
  * geometry kernels extracted and covered.
  */
 

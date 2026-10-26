@@ -1,6 +1,6 @@
 /**
- * Download the whole world (1.17 bout 5, contract §5.1, §9 invariant 13; S370
- * gate lens A A9, A11, lens B B9, B12): one file holding the portable copy,
+ * Download the whole world (1.17 bout 5, contract §5.1, §9 invariant 13):
+ * one file holding the portable copy,
  * refused when anything changed while it was made (two walks), refused for
  * the tour world; a linked world pushes first, then holds sync for the walk.
  */
@@ -163,7 +163,7 @@ describe('downloadWorld', () => {
   });
 });
 
-// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld h58 #10911; SDK 4.63.0):
+// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld 2026-10-22; SDK 4.63.0):
 // a download leaves a producer's private records out unless the person asks.
 describe('downloadWorld and private records', () => {
   const list = (body: unknown) => world.put('records/RECORDS.json', typeof body === 'string' ? body : JSON.stringify(body));

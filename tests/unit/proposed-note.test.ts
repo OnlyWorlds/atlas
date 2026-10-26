@@ -1,6 +1,6 @@
 /**
  * The proposed page's sentence and header word (conv. 168), after Seethe's read
- * of 1.84.1 (h20 #11393): a change is "sent" only in a linked world and "saved"
+ * of 1.84.1 (2026-10-23): a change is "sent" only in a linked world and "saved"
  * in a folder world; the counts are said once; a lapsed proposal's header word
  * is one word, so a phone keeps the name its room.
  */

@@ -98,7 +98,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
         unmountActive = null;
         closeVisualSettingsPopover();
         // Silent when no world is open — narration here competed with the
-        // welcome/landing panel, the screen's one voice (S255).
+        // welcome/landing panel, the screen's one voice.
         pane.innerHTML = '';
         lastTabKey = 'no-world';
       }
@@ -144,7 +144,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       if (lastActiveMapDimsKey !== null && newDimsKey !== null && lastActiveMapDimsKey !== newDimsKey) {
         // The saved camera targets the OLD coordinate space — restoring it
         // after the remount teleports the view somewhere meaningless on the
-        // new canvas (S300b tidy). Clear it so the remount lands fit-to-image.
+        // new canvas. Clear it so the remount lands fit-to-image.
         clearCameraState(activeTab.mapId);
         disposeMapTab(activeTab.mapId);
         lastTabKey = null;
@@ -185,7 +185,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     }
   }
 
-  // Rebuilt only when it would come out different (conv. 146, S422): a
+  // Rebuilt only when it would come out different (conv. 146): a
   // rebuild between a press and its release loses the click. The handlers
   // capture each tab and its index, which the key holds; the rest they read
   // at the click.
@@ -328,7 +328,7 @@ function closeMapTab(idx: number, mapId: string): void {
  */
 /**
  * The pill's inside is rewritten only when it would come out different (conv.
- * 146, S422): a badge rebuilt between a press and its release handed the click
+ * 146): a badge rebuilt between a press and its release handed the click
  * to the pill, which refreshed instead of opening the review. The pill itself
  * persists; the world is a part because the badges' listeners capture it.
  * Returns whether it wrote.
@@ -394,7 +394,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     return;
   }
 
-  // View-only world (S264): the pill says what this world IS — read-only —
+  // View-only world: the pill says what this world IS — read-only —
   // rather than mapping the engine's save states (nothing ever saves up).
   // Click still refreshes (pull-only).
   if (entry?.api?.read_only) {
@@ -441,7 +441,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const conflictBadge = conflictCount > 0
     ? `<span class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review">⚠ ${conflictCount}</span>`
     : '';
-  // Elements still not syncing (S369): the place to come back to after a
+  // Elements still not syncing: the place to come back to after a
   // failure toast. A first busy-file failure is left out: it usually clears
   // by itself in the next round, which is why its toast stays quiet too.
   const issueCount = issuesFor(active.worldId).filter(i => i.kind !== 'file_busy' || i.rounds > 1).length;
@@ -507,7 +507,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       return;
     }
     const cur = state.sync.activeSync;
-    // An errored pill says why in Settings → World, with the fix (S369):
+    // An errored pill says why in Settings → World, with the fix:
     // a pull cannot help a dead key or a damaged file.
     if (cur?.kind === 'error') {
       navigate(settingsHash(active.worldId, 'world'));
@@ -555,7 +555,7 @@ function mapEngineStateToPill(
 ): { dataState: string; label: string; title: string } {
   if (!engine) {
     // No engine state — distinguish "still spinning up" from "can never
-    // spin up" (Captain's find, 2026-07-19: a linked world with no PIN
+    // spin up" (Titus's find, 2026-07-19: a linked world with no PIN
     // said 'engine starting up' forever). diagnoseSyncUnavailable knows.
     const reason = diagnoseSyncUnavailable();
     if (reason?.kind === 'pin-missing') {

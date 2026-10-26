@@ -7,7 +7,7 @@
  * DELETEs for the old api world), `sync-state.json` (last_*_at + conflicts +
  * server_deletes), and `world.json.api`. Local content is preserved.
  *
- * The bug this fix closes (caught during session 206 smoke):
+ * The bug this fix closes (caught in a smoke run):
  *   1. User makes a local world online via Route 1 — elements get stamped with
  *      `server_updated_at`.
  *   2. User unlinks AND deletes the api world on onlyworlds.com.

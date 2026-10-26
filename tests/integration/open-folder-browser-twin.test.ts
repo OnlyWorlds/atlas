@@ -1,6 +1,6 @@
 /**
- * Opening a world FOLDER whose id is a browser world's (1.17, contract §5.2,
- * S370 gate B17). The path: unzip a downloaded world onto the drive, then
+ * Opening a world FOLDER whose id is a browser world's (1.17, contract §5.2).
+ * The path: unzip a downloaded world onto the drive, then
  * open the folder. A browser world the browser CLEARED takes the folder as
  * its home (its row, link and settings kept); a LIVE one refuses, says where
  * the world is, and stores nothing (the browser copy is the world).
@@ -53,7 +53,7 @@ describe('opening a world folder that is a browser world', () => {
     expect(vault.handles.get(`world-${WID}`)).toBe(dir);
   });
 
-  it('a cleared LINKED twin adopts the folder with its first sync held for review (S376 gate B3, Skeld condition 3)', async () => {
+  it('a cleared LINKED twin adopts the folder with its first sync held for review', async () => {
     const linked = browserEntry({ cleared_at: '2026-10-05T09:00:00.000Z', state: 'api-linked', api: { world_id: WID, api_key: 'k' } });
     patchSlice('registry', { ...defaultRegistry(), worlds: [linked] });
     expect(await openWorldFolder(picked())).toEqual({ worldId: 'w1', already: true });
@@ -62,7 +62,7 @@ describe('opening a world folder that is a browser world', () => {
     expect(e.review_first_sync).toBe(true);
   });
 
-  it('a cleared row matched only through a former link is not adopted: the folder opens as its own world (S376 gate B3)', async () => {
+  it('a cleared row matched only through a former link is not adopted: the folder opens as its own world', async () => {
     const former = browserEntry({
       id: 'w9', cleared_at: '2026-10-05T09:00:00.000Z', former_api_world_id: WID,
       folder: { handle_key: 'world-0192ffff-other', folder_name: 'other-0192ffff-9a9a', last_path_hint: 'browser storage/other-0192ffff-9a9a' },
@@ -76,7 +76,7 @@ describe('opening a world folder that is a browser world', () => {
     expect(vault.handles.get(`world-${WID}`)).toBeTruthy();
   });
 
-  it('the exact cleared twin is found even behind a row matched only through a former link (S377 D2 gate note)', async () => {
+  it('the exact cleared twin is found even behind a row matched only through a former link', async () => {
     const former = browserEntry({
       id: 'w9', cleared_at: '2026-10-05T09:00:00.000Z', former_api_world_id: WID,
       folder: { handle_key: 'world-0192ffff-other', folder_name: 'other-0192ffff-9a9a', last_path_hint: 'browser storage/other-0192ffff-9a9a' },

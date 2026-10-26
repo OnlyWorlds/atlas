@@ -1,5 +1,5 @@
 /**
- * The `#/open/<world id>` door (OW Infra #104, S416) through the real page: a
+ * The `#/open/<world id>` door through the real page: a
  * world page's Open in Atlas opens that world on the signed-in account, after
  * the person says Open; a copy already here opens without a second key; signed
  * out, the id waits for the sign-in in Settings; a world not on the account's
@@ -128,7 +128,7 @@ async function opensAndReopens(page: Page, folder: boolean) {
 
   if (folder) {
     // In another world, a link never moves the person out of it without
-    // their click (Kael, h37 #5811): it asks, and Open it opens.
+    // their click (Kael, 2026-10-16): it asks, and Open it opens.
     await page.click('[data-action="create-local"]');
     await page.fill('input[name="world-name"]', 'Other Desk');
     await page.click('[data-modal="create-world"] [data-action="pick"]');
@@ -186,7 +186,7 @@ test('signed out, the link waits for the sign-in in Settings, then asks to open 
   await token.fill(TOKEN);
   await page.click('[data-action="account-sign-in"]');
   await expect(page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' })).toBeVisible();
-  // The ask to sign in is answered, so it is gone (Kael's walk, h57 #5950).
+  // The ask to sign in is answered, so it is gone (Kael's walk, 2026-10-16).
   await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toHaveCount(0);
   expect(keel.mints).toBe(0);
 });

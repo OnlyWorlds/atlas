@@ -1,5 +1,5 @@
 /**
- * S367 critic C1: a parent_narrative cycle (self-parent, or A -> B -> A) in
+ * A parent_narrative cycle (self-parent, or A -> B -> A) in
  * world data must not hang the tab. Every upward walk carries a seen set.
  *
  * Bounded when red: each element is a Proxy that throws after N reads of

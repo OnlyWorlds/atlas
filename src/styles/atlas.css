@@ -10,8 +10,8 @@
  * Layered on top of onlyworlds-base.css.
  */
 
-/* Universal border-box (S268). Three content-box overflow bugs recurred in
-   S265 alone (width:100% + padding re-deriving the same overflow); every
+/* Universal border-box. Three content-box overflow bugs recurred in
+   quick succession (width:100% + padding re-deriving the same overflow); every
    deliberate box-sizing in this file was already border-box and no rule
    opted into content-box. Inherit-based form so a component CAN opt out on
    its subtree if it ever needs to. */
@@ -23,7 +23,7 @@ html {
   box-sizing: inherit;
 }
 
-/* The `hidden` attribute always hides (S372). The browser's own rule is a
+/* The `hidden` attribute always hides. The browser's own rule is a
    plain `display: none`, so any class here that sets `display` silently beat
    it: the link dialog showed "Cancel link" and "Stop and keep what's here"
    from the moment it opened (`.atlas-modal-actions { display: flex }`).
@@ -32,7 +32,7 @@ html {
   display: none !important;
 }
 
-/* A control's words are in the page's face (S446). Browsers draw a button,
+/* A control's words are in the page's face. Browsers draw a button,
    input, select and textarea in their own default (Arial on Windows), and a
    class that never named a family left it there: the Settings tabs, the
    chart chips, the filter counts, "New book". :where() keeps it at zero
@@ -45,7 +45,7 @@ html {
    `font-display: block`: until it loads, each icon is its ligature's word
    ("folder_open") laid out wide and invisible, so every icon button was wider
    and then shrank, and a click aimed in that window landed beside its target
-   (the e2e's lost Start a world clicks on a cold runner, S461 and S465). Every
+   (the e2e's lost Start a world clicks on a cold runner). Every
    Material Symbols glyph is one em wide, so the box is the glyph's box. */
 .material-symbols-outlined {
   width: 1em;
@@ -75,7 +75,7 @@ html {
   /* The app font stack lives in index.html's body rule (it must apply before
      this bundle loads); the @font-face blocks above supply Open Sans. */
 
-  /* THEME TRIPLETS (S315 light-mode Phase 0). Two RGB triplets carry the two
+  /* THEME TRIPLETS (light-mode Phase 0). Two RGB triplets carry the two
      big literal families the stylesheet is built from: INK (text, hairlines,
      surface washes — 396 sites) and ACCENT (cyan tints, rings, borders — 243
      sites). Every former `rgba(255, 255, 255, X)` is now
@@ -94,7 +94,7 @@ html {
      flip with the theme: it stays dark under light mode, and the text on it
      stays light. Its own inverse is given as a pair so neither half can be
      written as a fresh literal. Same category as shadows, above.
-     (S323: pin labels and pin tooltips used the app scrim, which flips white
+     (pin labels and pin tooltips used the app scrim, which flips white
      under light, while keeping a literal white foreground — every label on
      the map was white on white.) */
   --atlas-canvas-scrim-rgb: 0, 0, 0;
@@ -120,7 +120,7 @@ html {
   --atlas-text-muted: rgba(var(--atlas-ink-rgb), 0.48);
   /* bumped from 0.36 → 0.48 for link icons + similar accents */
   /* Muted is the quietest text: words, placeholders and icon-only controls
-     all clear AA there (F-39, Seethe h63 #8760). Ornament is for what is
+     all clear AA there (F-39, Seethe 2026-10-20). Ornament is for what is
      neither read nor clicked (a separator, a large empty-state glyph), and
      never for words. A disabled state may stay fainter (WCAG exempts it). */
   --atlas-ornament: rgba(var(--atlas-ink-rgb), 0.28);
@@ -161,9 +161,9 @@ html {
 }
 
 /* ============================================================
-   LIGHT MODE (S315 Phase 0) — the ow-house-light mapping.
-   Values from Assembly's ow-house-light APPLICATION ANNEX (atelier-cyan,
-   Captain-ruled 2026-07-23): editorial gallery white, ink #1c1b18, and THE
+   LIGHT MODE (Phase 0) — the ow-house-light mapping.
+   Values from the ow-house-light APPLICATION ANNEX (atelier-cyan,
+   Titus-ruled 2026-07-23): editorial gallery white, ink #1c1b18, and THE
    ONE RULE — accent is the darkened cyan #0e7490 for anything read as
    colour; bright #22d3ee survives only inside low-alpha washes (the accent
    triplet flips every wash to the darkened value, which is stricter than
@@ -197,8 +197,8 @@ html {
   --atlas-ornament: rgba(28, 27, 24, 0.38);
   --atlas-cyan: #0e7490;
   /* #0e7490 is a fill and an edge; as a word on its own wash it reads 4.1 to
-     4.4:1, so words take #155e75 (5.8 on the wash, 7.0 on paper; Studio
-     style/control/ladder.json lightText). */
+     4.4:1, so words take #155e75 (5.8 on the wash, 7.0 on paper; the style
+     ladder's lightText). */
   --atlas-accent-text: #155e75;
   --atlas-accent-text-soft: #155e75;
   --atlas-cyan-soft: rgba(14, 116, 144, 0.55);
@@ -397,9 +397,9 @@ html {
 
 .atlas-sidebar-content {
   flex: 1 1 auto;
-  /* S317 (measured live): without an explicit minimum this child sized past
+  /* Measured live: without an explicit minimum this child sized past
      its share of the column (797px where 780 fit) and its last ~17px of rows
-     painted BEHIND the transparent sidebar footer — Captain's "footer big,
+     painted BEHIND the transparent sidebar footer — Titus's "footer big,
      overlapping, dark" report. Convention #4's law on the height axis. */
   min-height: 0;
   overflow-y: auto;
@@ -498,7 +498,7 @@ html {
   border-right: 1px solid var(--atlas-divider);
   white-space: nowrap;
   transition: color 120ms ease, background 120ms ease;
-  /* Crowding behavior (Freek, S300): tabs compress before the bar scrolls —
+  /* Crowding behavior (Freek): tabs compress before the bar scrolls —
      labels ellipsize down to a floor that keeps ~5 characters readable
      (a 76px floor left one-letter tabs — own-eyes); scroll is the last
      resort beyond that. */
@@ -714,7 +714,7 @@ html {
   gap: 8px;
   padding: 10px 16px;
   border-radius: 8px;
-  /* Session 211 smoke: bumped bg opacity for clearer read on busy maps. */
+  /* Bumped bg opacity for clearer read on busy maps. */
   background: rgba(239, 68, 68, 0.28);
   border: 1.5px dashed rgba(239, 68, 68, 0.75);
   color: rgba(var(--atlas-ink-rgb), 0.95);
@@ -970,12 +970,12 @@ html {
 }
 
 /* ============================================================
-   Buttons: OW Style's ladder (Studio style/RULES.md section 8, the
-   Captain's "looks good", h63 #8314). Entry .atlas-btn-entry, the solid
+   Buttons: the OnlyWorlds style's ladder (its rules' section 8,
+   Titus's "looks good", 2026-10-20). Entry .atlas-btn-entry, the solid
    fill, one per screen at most, where someone begins. Standard
    .atlas-btn-primary, the wash and edge, the everyday default. Quiet
    .atlas-btn-ghost, a neutral edge, for cancel, back and toolbar actions
-   (keel's Quiet wears the same, Skeld h63 #8319). Link .atlas-btn-link.
+   (keel's Quiet wears the same, Skeld 2026-10-20). Link .atlas-btn-link.
    A destructive action is Standard in the danger colour (.atlas-btn-danger).
    Inside the rooms they keep Atlas's compact size; the front door takes
    the ladder's full shape (.atlas-landing-compact .atlas-landing-btn).
@@ -1141,7 +1141,7 @@ html {
   appearance: none;
   -webkit-appearance: none;
   /* Scrim token, not a bare dark literal: black in dark (unchanged), white in
-     light so the select reads as a light card like the text inputs. The S315
+     light so the select reads as a light card like the text inputs. The first
      light round converted the `background: rgba(0,0,0,X)` chips but missed this
      `background-color` LONGHAND form, so every dropdown stayed dark-tinted in
      light mode until the launch sweep. */
@@ -1236,13 +1236,13 @@ html {
   gap: 2px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--atlas-divider);
-  /* Break the 20 type chips into two even rows of 10 (Captain, 2026-07-10):
+  /* Break the 20 type chips into two even rows of 10 (Titus, 2026-07-10):
      10 × 25px + 9 × 2px gap + 16px padding. Narrow sidebars wrap naturally. */
   max-width: 284px;
 }
 
 .atlas-filter-btn {
-  position: relative; /* anchors the instant data-tip tooltip (S264) */
+  position: relative; /* anchors the instant data-tip tooltip */
   width: 25px;
   height: 25px;
   display: inline-flex;
@@ -1262,7 +1262,7 @@ html {
   border-color: var(--atlas-divider-strong);
 }
 
-/* Muted (S356): hidden when showing all. Greyed and struck through, still a
+/* Muted: hidden when showing all. Greyed and struck through, still a
    target; right-click restores. Only the glyph greys (to about 3:1, the floor
    for an icon control): the count and a name are text and stay at the button's
    muted ink, and the strike carries the state (F-39). */
@@ -1300,7 +1300,7 @@ html {
   position: absolute;
   top: -4px;
   /* -2px keeps the badge inside the 2px strip gap — at -4px it sat on the
-     NEIGHBOR's active border (Captain's launch-day sshot) */
+     NEIGHBOR's active border (Titus's launch-day sshot) */
   right: -2px;
   padding: 1px;
   font-size: 8px;
@@ -1317,7 +1317,7 @@ html {
   color: var(--atlas-text-muted);
 }
 
-/* Names on the strip (#24, h20 B8): a setting in Settings, Elements. 'icons' is the strip above.
+/* Names on the strip (#24): a setting in Settings, Elements. 'icons' is the strip above.
    'all' names every type in two columns; 'held' names the types the world holds, with their
    counts, and keeps the rest as icons on the rows below. A named chip carries its count inline,
    and a muted one keeps its strike on the icon, not across the name. */
@@ -1406,7 +1406,7 @@ html {
   color: inherit;
 }
 
-/* Uniform compound-icon create button family (session 219). Used by world
+/* Uniform compound-icon create button family. Used by world
    sidebar "+ new local / api / link", map index "+ new map", and any
    future "+ new X" affordance that wants the compound add+target glyph
    pattern (cf [+map] / [+pin] in element-detail headers). Slightly wider
@@ -1481,7 +1481,7 @@ html {
 
 .atlas-middle-header {
   flex: 0 0 36px !important;
-  /* session 224: dropped 64 → 48 → 46 per Captain. */
+  /* Dropped 64 → 48 → 46 per Titus. */
   height: 36px !important;
   /* belt-and-braces lock — every height
                                        channel (flex-basis, height, min, max)
@@ -1523,7 +1523,7 @@ html {
      reach them. Not hypothetical at 1280: the middle pane is ~51% of the
      window, and long names are ordinary worldbuilding data. The same header
      serves the element, knowledge and share rooms, so this one rule covers
-     all three (S323). */
+     all three. */
   min-width: 0;
   flex-shrink: 1;
   overflow: hidden;
@@ -1578,7 +1578,7 @@ html {
   border-color: var(--atlas-text-muted);
 }
 /* On a phone the page's sentence under the name says it whole, so the header's
-   word steps aside and the name keeps its room (Seethe h20 #11393). */
+   word steps aside and the name keeps its room (Seethe 2026-10-23). */
 @media (max-width: 560px) {
   .atlas-middle-content:has([data-role="proposed-note"]) .atlas-middle-header .atlas-proposed-mark {
     display: none;
@@ -1625,7 +1625,7 @@ html {
    knowledge/share entity headers append it as a direct child). The old
    descendant selector painted EVERY header icon cyan at 20px, including the
    cast-favorite toggle — which made every character's person_pin read as "this
-   is the protagonist" (Captain's S251 flag; specificity tie, later rule won).
+   is the protagonist" (Titus's flag; specificity tie, later rule won).
    Icons nested inside buttons keep their own button styling. */
 .atlas-middle-header > .material-symbols-outlined {
   font-size: 20px;
@@ -1809,7 +1809,7 @@ html {
 .atlas-packet-bar button { white-space: nowrap; }
 .atlas-packet-bar-reason { flex-basis: 100%; font-size: 13px; color: var(--atlas-text); overflow-wrap: anywhere; }
 .atlas-packet-bar-reason[hidden] { display: none; }
-/* A Work item's packet on its page (OW Parlor #487). */
+/* A Work item's packet on its page. */
 .atlas-work-packet { margin: 4px 0 16px; padding: 10px 12px; border: 1px solid var(--atlas-divider-strong); border-radius: 8px; }
 .atlas-work-packet-head { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--atlas-text); }
 .atlas-work-packet-meta { margin: 0 0 6px; font-size: 12px; color: var(--atlas-text-muted); }
@@ -1882,7 +1882,7 @@ html {
 }
 
 .atlas-detail-section-body {
-  /* Bottom tightened 14→7 (S317, Captain: dead space under the last row —
+  /* Bottom tightened 14→7 (Titus: dead space under the last row —
      Image URL in Base being the visible case, tour and tool alike). */
   padding: 10px 12px 7px;
 }
@@ -2157,9 +2157,9 @@ html {
   --tour-serif: 'Crimson Text', Georgia, 'Times New Roman', serif;
 }
 
-/* --- The opener (step 0, S303 rework): the SAME panel, screen-centered,
+/* --- The opener (step 0): the SAME panel, screen-centered,
    sentence at vignette scale. One component, two positions — the descend into
-   the dock on "Begin" is structural. (A centered opener existed before S298,
+   the dock on "Begin" is structural. (A centered opener existed earlier,
    was retired when the tour opened straight on create-world, and returns here
    as a distinct step 0 that hands off into the dock.) The `.is-opener` rules
    live just below the base `.atlas-tour-bar`. */
@@ -2169,7 +2169,7 @@ html {
   font-size: 11px;
   color: var(--atlas-accent-text);
 }
-/* (.atlas-tour-meta-opener retired S316 — the opener renders no meta row at
+/* (.atlas-tour-meta-opener retired — the opener renders no meta row at
    all since the merged foot row; its book link rides the body copy inline.) */
 /* Before the `shell` capability (step 0 only): no app behind the sentence —
    hide the shell so the opener reads as a vignette on black. */
@@ -2182,7 +2182,7 @@ body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
  * The dock's height is a VARIABLE because two things must agree on it: the
  * panel itself and the shell's reserved strip (see body.atlas-touring
  * .atlas-shell). They were hardcoded separately and drifted 126px apart,
- * which is what put app content under the narrator (S301).
+ * which is what put app content under the narrator.
  */
 :root {
   --tour-dock-h: 290px;
@@ -2196,7 +2196,7 @@ body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
   /* Below modals (z 1000): a dialog always outranks the narrator. */
   z-index: 900;
   width: min(960px, calc(100vw - 48px));
-  /* FIXED height (S299, Captain: "keep the widget exact same size ALWAYS") —
+  /* FIXED height (Titus: "keep the widget exact same size ALWAYS") —
      min-height let the one 4-line step (6, 'linking') grow to 289; a fixed
      height never resizes. Pinned to the current tallest body; when the copy
      pass evens the body lengths, this drops and the dead space shrinks with
@@ -2218,7 +2218,7 @@ body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
 }
 /* Reserve the narrator's strip so app content stays reachable above it.
  *
- * S301: this reserved 180px while the dock occupied 290 + 16 bottom = 306,
+ * Once this reserved 180px while the dock occupied 290 + 16 bottom = 306,
  * and that 126px mismatch WAS the occlusion — the Consul's fields, the
  * charts rail and the bottom of the map the user is told to click all ran
  * underneath the narrator (measured: 172px of the right pane covered on
@@ -2230,7 +2230,7 @@ body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
 body.atlas-touring .atlas-shell {
   height: calc(100vh - var(--tour-dock-h) - var(--tour-dock-gap) * 2);
 }
-/* S318 (Captain: "the element sidebar is obscured for half by the bar under
+/* (Titus: "the element sidebar is obscured for half by the bar under
  * it"): the reserve above shrinks the WHOLE shell, but the dock is a
  * centered 960px panel that never horizontally reaches the sidebar on wide
  * screens — so the sidebar was amputated by a strip that only the middle
@@ -2240,7 +2240,7 @@ body.atlas-touring .atlas-shell {
  * clip it (overflow), and on widths where the centered dock DOES reach the
  * sidebar column (< ~1600px), the list gets bottom clearance so every row
  * can still scroll out from behind the dock. Middle/right keep the reserve:
- * the map resizing instead of hiding is the S301 law and the pin/zone beats
+ * the map resizing instead of hiding is the standing law and the pin/zone beats
  * depend on it. */
 body.atlas-touring:not(.atlas-tour-collapsed) .atlas-shell {
   overflow: visible;
@@ -2300,18 +2300,18 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   font-style: italic;
   line-height: 1.9;
   color: var(--atlas-text-muted);
-  /* ONE size in the dock, always (S301, Captain: "should stay constant size").
+  /* ONE size in the dock, always (Titus: "should stay constant size").
      It used to grow on the first two steps via .is-fresh and shrink from
      step 3, which read as the panel resizing under the reader. The big
      presentation of the sentence is step 0's job (center stage); once it
-     docks it never changes size again. 15.5 -> 16.5 in S318 (Captain: +1pt,
+     docks it never changes size again. 15.5 -> 16.5 (Titus: +1pt,
      paired with the 3-line height lock below). */
   font-size: 16.5px;
   /* Was 75ch, which left ~200px of dead space to the right of the sentence
-     inside a 914px panel (measured, S301). The panel governs the width. */
+     inside a 914px panel (measured). The panel governs the width. */
   max-width: none;
 }
-/* The docked sentence area is LOCKED at three lines (Captain, S318): lit
+/* The docked sentence area is LOCKED at three lines (Titus): lit
    glyphs widen words, so the same sentence wraps to 2 or 3 lines depending
    on progress, and the whole dock used to jump ~29px when a step crossed
    that boundary (measured: 58.9 -> 88.3px at step 9). Reserving the 3-line
@@ -2330,7 +2330,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 .atlas-tour-word.parsed {
   /* The type colour used to live ONLY in the underline, so the words were
      uniformly white and the sentence became a thicket of underlines by the
-     finale — the payoff state looked worse than the opener (S301). The colour
+     finale — the payoff state looked worse than the opener. The colour
      moves into the text and the border goes: colour plus the lit glyph say
      "this word became an element" without the ink. */
   color: var(--tour-word-color, var(--atlas-cyan));
@@ -2342,7 +2342,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   color: rgb(var(--atlas-ink-rgb));
 }
 /* Ghost glyphs — pre-spaced from step 0 (zero reflow), lit when earned.
-   S301 (Captain): unlit glyphs go practically invisible rather than grey. The
+   Titus's call: unlit glyphs go practically invisible rather than grey. The
    SPACE is still reserved, so lighting one still causes zero reflow; what
    dies is Skeld's "the ghosts promise the journey" read, traded for a calmer
    sentence. A hair above zero so the shape is faintly there on a bright
@@ -2353,7 +2353,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   vertical-align: baseline;
   margin-left: 3px;
   color: rgba(var(--atlas-ink-rgb), 0.8);
-  /* No ghost state any more: unlit glyphs are not rendered (S307), so this
+  /* No ghost state any more: unlit glyphs are not rendered, so this
      rule only ever dresses a lit one. The old `opacity: 0.05` reserved the
      slot's WIDTH from step 0, which is what spaced the words apart. */
 }
@@ -2376,8 +2376,8 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   gap: 12px;
   flex-wrap: wrap;
   /* No max-width cap: it sat at 75ch (~470px), which cut the explainer off at
-     half the 960px panel while the sentence above ran full width (Captain,
-     S311 — the same fix the sentence itself got in S301). The panel governs. */
+     half the 960px panel while the sentence above ran full width (Titus,
+     the same fix the sentence itself got earlier). The panel governs. */
   /* The hairline: material (the sentence) above, narration below. */
   border-top: 1px solid rgba(var(--atlas-ink-rgb), 0.09);
   padding-top: 9px;
@@ -2386,10 +2386,10 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   color: rgba(var(--atlas-ink-rgb), 0.78);
   flex: 1 1 480px;
   min-width: 0;
-  /* Authored \n in a phase body is a real line break (Captain's multiline
-     copy, S311). Bold/italic/link spans come from the token pass in tour-bar. */
+  /* Authored \n in a phase body is a real line break (Titus's multiline
+     copy). Bold/italic/link spans come from the token pass in tour-bar. */
   white-space: pre-line;
-  /* A touch more air between wrapped lines (Captain, S312). */
+  /* A touch more air between wrapped lines (Titus). */
   line-height: 1.62;
 }
 /* Inline copy links ([text](url) token) — quiet cyan, present in body and
@@ -2401,7 +2401,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 }
 .atlas-tour-copy-link:hover { border-bottom-style: solid; }
 .atlas-tour-meta {
-  /* Lives in the controls-row foot slot since S317 — flows beside the bulb,
+  /* Lives in the controls-row foot slot — flows beside the bulb,
      wraps to two small lines at most, never pushes the buttons. */
   flex: 1 1 auto;
   min-width: 0;
@@ -2422,7 +2422,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 }
 .atlas-tour-deeper-toggle .material-symbols-outlined { font-size: 13px; }
 .atlas-tour-deeper-toggle:hover { color: var(--atlas-accent-text); }
-/* The foot slot (S317): deeper bulb + meta at the controls row's far LEFT,
+/* The foot slot: deeper bulb + meta at the controls row's far LEFT,
    in the flex-spacer role the step counter used to hold. The bulb never
    wraps; the meta text takes the remaining width. */
 .atlas-tour-extras {
@@ -2432,7 +2432,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   align-self: center;
 }
 .atlas-tour-extras .atlas-tour-deeper-toggle { flex: 0 0 auto; white-space: nowrap; }
-/* Anchor "more information" to a constant place (Captain, S308). The bulb lived
+/* Anchor "more information" to a constant place (Titus). The bulb lived
    in the copy flow right after the body, so its Y moved with every step's copy
    length — short steps put it high, the four-line step put it low. On a fixed
    dock with a constant-height sentence above and fixed rows below, the fix is
@@ -2452,7 +2452,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: stretch;
-  /* THE CONTROLS LOCK (Captain, S316): the dock is fixed-height, so copy that
+  /* THE CONTROLS LOCK (Titus): the dock is fixed-height, so copy that
      outgrows its share must never push the controls row below the panel edge
      — the copy column shrinks to the space available and the BODY scrolls
      inside itself. Copy is budgeted at ~6 lines (the agreed max); a scrollbar
@@ -2466,7 +2466,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   overflow-y: auto;
 }
 /* The deeper FLYOUT: anchors above the panel, scrolls inside itself — the
-   dock's height never changes (Captain's rule, v2.1). */
+   dock's height never changes (Titus's rule, v2.1). */
 .atlas-tour-deeper {
   position: absolute;
   bottom: calc(100% + 10px);
@@ -2488,7 +2488,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 .atlas-tour-deeper p:last-child { margin-bottom: 0; }
 .atlas-tour-controls {
   display: flex;
-  /* flex-end, not center (S312): the create-preview stack grows the forward
+  /* flex-end, not center: the create-preview stack grows the forward
      slot upward, and the buttons must stay on one bottom line when it does.
      With no stack every child is button-height, so nothing moves. */
   align-items: flex-end;
@@ -2497,8 +2497,8 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
      copy and controls, so the buttons never travel between steps. */
   margin-top: auto;
 }
-/* The preview stack (S316): a vertical column of type icons at the PANEL's
-   far right — what the next click of Next brings (Captain: "all the way on
+/* The preview stack: a vertical column of type icons at the PANEL's
+   far right — what the next click of Next brings (Titus: "all the way on
    the right, not above the next button"). Anchored to the dock itself, out
    of every flow; grows upward from just above the controls row. Icons carry
    their type colour at reduced presence — recognizable, but the sentence
@@ -2514,7 +2514,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   pointer-events: none;
 }
 /* When a stack is present, the copy reserves the right-hand lane it occupies —
-   long bodies never collide with the icon column (S315 gate). */
+   long bodies never collide with the icon column. */
 .atlas-tour-bar.has-create-stack .atlas-tour-body,
 .atlas-tour-bar.has-create-stack .atlas-tour-extras {
   padding-right: 44px;
@@ -2530,13 +2530,13 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
   color: var(--atlas-text-muted);
   font-variant-numeric: tabular-nums;
 }
-/* Category words in the copy (S317): the family colour, quiet — a tint plus a
+/* Category words in the copy: the family colour, quiet — a tint plus a
    soft glow, linking the word to the preview icons and sentence glyphs. */
 .atlas-tour-cat {
   color: var(--tour-cat-color, var(--atlas-cyan));
   text-shadow: 0 0 9px color-mix(in srgb, currentColor 35%, transparent);
 }
-/* The dock collapse (S317): − in the panel's top-right hides the whole dock;
+/* The dock collapse: − in the panel's top-right hides the whole dock;
    a floating + pill brings it back. The shell reclaims the reserved strip
    while collapsed, so the app is fully visible underneath. */
 .atlas-tour-collapse {
@@ -2553,7 +2553,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 .atlas-tour-collapse .material-symbols-outlined { font-size: 16px; }
 .atlas-tour-collapse:hover { color: var(--atlas-accent-text); }
 body.atlas-tour-collapsed .atlas-tour-bar { display: none; }
-/* The restore pill (S368 B4). It used to be a round "+" fixed bottom-RIGHT,
+/* The restore pill. It used to be a round "+" fixed bottom-RIGHT,
    which sat on the map's zoom-out control and on the writing room's word
    counter, and read as "create" like every other + in Atlas. Now it is a
    text pill, bottom-CENTRE where the dock itself lived, inside a strip the
@@ -2588,14 +2588,14 @@ body.atlas-tour-collapsed .atlas-tour-restore { display: inline-flex; }
 body.atlas-touring.atlas-tour-collapsed .atlas-shell {
   height: calc(100vh - var(--tour-restore-strip));
 }
-/* Tour arrivals (S317): a subtle STICKY tint on rows revealed by the current
+/* Tour arrivals: a subtle STICKY tint on rows revealed by the current
    step — no animation, no timer; it simply marks "these just joined" until
    the next step replaces the set. Quieter than the auto-pull flash. */
 .atlas-row[data-tour-fresh="true"] {
   background: rgba(var(--atlas-accent-rgb), 0.07);
 }
 .atlas-tour-spacer { flex: 1; min-width: 0; }
-/* (The visible step counter was cut in S317 — Captain; data-tour-step stays
+/* (The visible step counter was cut — Titus; data-tour-step stays
    as the e2e contract. The foot slot took its place in the controls row.) */
 .atlas-tour-consul-widget {
   display: inline-flex;
@@ -2607,7 +2607,7 @@ body.atlas-touring.atlas-tour-collapsed .atlas-shell {
   color: var(--atlas-text-muted);
   font-size: 11px;
 }
-/* The reserved Next slot at hands-on beats (S311): invisible, but it holds
+/* The reserved Next slot at hands-on beats: invisible, but it holds
    the geometry so Back and Exit never move when Next comes and goes — a fast
    Next-Next-Next click chain used to land on Back. */
 .atlas-tour-next-ghost { visibility: hidden; }
@@ -2617,19 +2617,19 @@ body.atlas-touring.atlas-tour-collapsed .atlas-shell {
    stamped per step by tour-bar from each step's `unlocks` (tour-data). The
    old ordinal `data-tour-stage` was derived from `step.act`, so interleaving
    acts would have flipped chrome on then off; a capability only ever grows.
-   The sidebar footer stays hidden for the WHOLE tour (Captain: the settings
+   The sidebar footer stays hidden for the WHOLE tour (Titus: the settings
    row under the narrator read as noise). */
 /* The sidebar footer (help icon lives there) stays hidden until the FINALE,
    whose copy names the help icon — copy naming a control is a behavioural
-   claim, so the control must exist when the sentence does (S316). */
+   claim, so the control must exist when the sentence does. */
 body.atlas-touring:not(.atlas-tour-finalstep) .atlas-sidebar-footer { display: none; }
-/* Tail room for scrollToSection (S312): a short element page maxes out its
+/* Tail room for scrollToSection: a short element page maxes out its
    scroll a few px shy of putting the target section at the top of the strip
    above the dock (the walk measured 6.5px short on the Consul's World
    section). Tour-only padding gives the scroll somewhere to go. */
 body.atlas-touring .atlas-detail { padding-bottom: 56px; }
 /* The element header's protagonist / sync-dot / delete controls are noise on
-   a beginner's first element pages (Captain, S311). The map/pin cluster
+   a beginner's first element pages (Titus). The map/pin cluster
    stays: the pin beat teaches with the real +pin button. */
 body.atlas-touring [data-action="delete-element"],
 body.atlas-touring [data-action="set-cast-favorite"],
@@ -2659,14 +2659,14 @@ body.atlas-touring.atlas-tour-cap-charts .atlas-room-nav-strip [data-room="timel
 body.atlas-touring.atlas-tour-cap-allrooms .atlas-room-nav-strip [data-room] {
   display: inline-flex;
 }
-/* Pin beat (S299): highlight the REAL +pin button so the user finds it and
+/* Pin beat: highlight the REAL +pin button so the user finds it and
    uses the actual control. Pulses cyan until the pin is placed. */
 body.atlas-tour-pinstep [data-action="pin-element"] {
   color: var(--atlas-accent-text) !important;
   border-color: var(--atlas-cyan-soft) !important;
   animation: atlas-tour-pulse 2.2s ease-in-out infinite;
 }
-/* Scripted create run (S301): the step's copy points the user at the elements
+/* Scripted create run: the step's copy points the user at the elements
    sidebar's real +, so it has to be findable. The sidebar's own pulse only
    fires on an empty world, which by this beat it is not. */
 body.atlas-tour-createstep [data-action="create-element"] {
@@ -2674,12 +2674,12 @@ body.atlas-tour-createstep [data-action="create-element"] {
   border-color: var(--atlas-cyan-soft) !important;
   animation: atlas-tour-pulse 2.2s ease-in-out infinite;
 }
-/* Now beat (S305): the charts act asks the user to set the world's clock, so
+/* Now beat: the charts act asks the user to set the world's clock, so
    the room's real "set now time" button is the control that has to be found.
    Same treatment as the +pin and the sidebar + before it. */
 body.atlas-tour-nowstep [data-action="set-now"] {
   /* Was a transparent cyan pulse — barely visible, and it fought the warm-gold
-     "now" the button sets (Captain, S313). A FILLED warm-gold highlight is
+     "now" the button sets (Titus). A FILLED warm-gold highlight is
      spotted at a glance and reads as "this makes the now". */
   color: rgba(var(--atlas-ink-rgb), 0.96) !important;
   background: rgba(245, 180, 90, 0.28) !important;
@@ -2696,17 +2696,17 @@ body.atlas-tour-nowstep [data-action="set-now"] {
 body.atlas-tour-nowstep .atlas-chart-mode {
   display: none !important;
 }
-/* Progressive precision (S299): tool chrome waits for its teaching step, not
+/* Progressive precision: tool chrome waits for its teaching step, not
    just its act. The bar stamps step-scoped classes alongside the stage.
-   (S316: the prezone boundary moved from the-swamps to the-map — zone drawing
-   is available as soon as a map exists, Captain's "let people try it".) */
+   (the prezone boundary moved from the-swamps to the-map — zone drawing
+   is available as soon as a map exists, Titus's "let people try it".) */
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="draw-polygon"],
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="draw-line"],
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="toggle-zones-visibility"],
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="zones-dropdown"] {
   display: none;
 }
-/* Tour map toolbar, simplified (Captain, S316): fit-to-image and hide-pins
+/* Tour map toolbar, simplified (Titus): fit-to-image and hide-pins
    are power chrome a first-timer never needs — the whole tour, not a step. */
 body.atlas-touring [data-map-tab-toolbar] [data-action="fit-to-image"],
 body.atlas-touring [data-map-tab-toolbar] [data-action="toggle-pins-visibility"] {
@@ -2720,7 +2720,7 @@ body.atlas-touring.atlas-tour-preweb .atlas-right [data-tab-kind="context"] {
 .atlas-tour-locked {
   opacity: 0.28;
   /* NOT pointer-events:none, and the buttons carry aria-disabled rather than
-     the disabled attribute (S301): Captain asked for tour-mode tooltips on
+     the disabled attribute: Titus asked for tour-mode tooltips on
      these greyed icons explaining what each will do, and a browser fires no
      hover events on a disabled control OR on a pointer-events:none one — the
      tooltip would have been written and never seen. They stay inert because
@@ -2729,7 +2729,7 @@ body.atlas-touring.atlas-tour-preweb .atlas-right [data-tab-kind="context"] {
 }
 
 /* Pre-setup: the splash is a BARE stage — nothing but the doors on black,
-   continuous into the tour's opener (Captain's ruling: the footer goes too;
+   continuous into the tour's opener (Titus's ruling: the footer goes too;
    settings stays reachable at the #/settings route). */
 body.atlas-preroot .atlas-sidebar,
 body.atlas-preroot .atlas-divider,
@@ -2752,7 +2752,7 @@ body.atlas-preroot .atlas-middle {
   justify-content: center;
   align-items: stretch;
   flex-wrap: wrap;
-  /* Breathing room between the hero stack and the doors (Captain's round). */
+  /* Breathing room between the hero stack and the doors (Titus's round). */
   margin-top: 44px;
 }
 .atlas-landing-door {
@@ -2975,7 +2975,7 @@ body.atlas-preroot .atlas-middle {
 /* Two-class specificity (0,2,0) — beats the `material-symbols` package's
    single-class `.material-symbols-outlined { font-size: 24px }` rule (0,1,0).
    Without scoping under the chip parent, load-order decides the tie. Same
-   pattern as the room-nav chip fix in session 226 (convention rationale). */
+   pattern as the room-nav chip fix (convention rationale). */
 .atlas-link-chip .atlas-link-chip-remove {
   font-size: 13px;
   line-height: 1;
@@ -3002,7 +3002,7 @@ body.atlas-preroot .atlas-middle {
   flex-wrap: wrap;
 }
 
-/* Empty link field: the whole row is a click target for the picker (S313), so
+/* Empty link field: the whole row is a click target for the picker, so
    the body reads as clickable and its pick icon brightens on row hover. */
 .atlas-link-row-clickable { cursor: pointer; }
 .atlas-link-row-clickable:hover .atlas-link-pick-empty { opacity: 1; }
@@ -3119,7 +3119,7 @@ body.atlas-preroot .atlas-middle {
   font-weight: 500;
 }
 
-/* Home recent rows drag onto maps (S300) — same carry dim as sidebar rows. */
+/* Home recent rows drag onto maps — same carry dim as sidebar rows. */
 .atlas-home-continue-row.atlas-row-dragging {
   opacity: 0.45;
 }
@@ -3322,7 +3322,7 @@ body.atlas-preroot .atlas-middle {
   color: var(--atlas-accent-text);
 }
 
-/* View-only world chip (S264, read-key link) — neutral, not cyan: the world
+/* View-only world chip (read-key link) — neutral, not cyan: the world
    is someone else's; the eye icon on the row carries the same message. */
 .atlas-world-state-chip.view-only {
   background: rgba(var(--atlas-ink-rgb), 0.06);
@@ -3337,10 +3337,10 @@ body.atlas-preroot .atlas-middle {
   font-weight: 500;
 }
 
-/* A seat a link left held (Keel #469): the row is a world waiting to come
+/* A seat a link left held: the row is a world waiting to come
    down, not a problem. Its state is a quiet line under the name, not a chip
    beside it: a chip took half the row and cut the name a person picks by to
-   ten characters (Seethe, h20 #12863). The button's label says it too. */
+   ten characters (Seethe, 2026-10-25). The button's label says it too. */
 .atlas-held-text {
   flex: 1 1 auto;
   min-width: 0;
@@ -3352,13 +3352,13 @@ body.atlas-preroot .atlas-middle {
   color: var(--atlas-text-soft);
 }
 /* A long name wraps rather than ending in an ellipsis: the row has no hover
-   that names it, and the name is what a person picks by (Seethe, h20 #13193). */
+   that names it, and the name is what a person picks by (Seethe, 2026-10-25). */
 .atlas-held-text .atlas-row-main {
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
-/* "On OnlyWorlds" — account worlds not yet on disk (account mode, S260).
+/* "On OnlyWorlds" — account worlds not yet on disk (account mode).
    Dimmed rows below the local list; opening one downloads it and it moves up. */
 .atlas-remote-worlds {
   margin-top: 10px;
@@ -3400,7 +3400,7 @@ body.atlas-preroot .atlas-middle {
   color: var(--atlas-text-muted);
 }
 
-/* Blocking progress overlay for multi-second flows (account open, S260).
+/* Blocking progress overlay for multi-second flows (account open).
    Sits above modals; the activation chain already serializes the work —
    this makes the wait visible instead of a frozen app. */
 .atlas-loading-overlay {
@@ -3501,7 +3501,7 @@ body.atlas-preroot .atlas-middle {
   cursor: crosshair !important;
 }
 
-/* The +pin button's ARMED state (S299) — clicking it enters placement mode;
+/* The +pin button's ARMED state — clicking it enters placement mode;
    the lit cyan glow is the "you're placing" feedback that was missing. The
    .active class is applied by element-detail-header when ui.pinPlacement
    targets this element. */
@@ -3512,7 +3512,7 @@ body.atlas-preroot .atlas-middle {
 }
 
 /* Placement banner — floats top-center over the active map while armed.
-   Clear but quiet (Captain: "subtle but clear"). */
+   Clear but quiet (Titus: "subtle but clear"). */
 .atlas-map-placement-hint {
   position: absolute;
   top: 12px;
@@ -3523,7 +3523,7 @@ body.atlas-preroot .atlas-middle {
   align-items: center;
   gap: 8px;
   padding: 6px 8px 6px 12px;
-  /* Canvas chrome (S354, the S324 census): it floats over the user's map
+  /* Canvas chrome: it floats over the user's map
      artwork, so it holds the dark chip in both themes like the pin chips. */
   background: rgba(var(--atlas-canvas-scrim-rgb), 0.85);
   backdrop-filter: blur(8px);
@@ -3557,7 +3557,7 @@ body.atlas-preroot .atlas-middle {
   color: var(--atlas-text);
 }
 
-/* Default map cursor is the OS arrow, not Leaflet's open hand. Captain found
+/* Default map cursor is the OS arrow, not Leaflet's open hand. Titus found
    the grab cursor over-promising — most of the canvas is for clicking pins /
    zones, not panning. Special states still override:
      - .atlas-placing → crosshair (pin placement banner active, rule above)
@@ -3565,7 +3565,7 @@ body.atlas-preroot .atlas-middle {
      - .leaflet-dragging → grabbing (Leaflet's own active-pan state stays)
    Pin hover, zone hover etc. switch to pointer via their own selectors.
 
-   Cursor saga round 3 (session 219 — empirical fix):
+   Cursor saga round 3 (empirical fix):
    `.leaflet-grab`, `.leaflet-container`, and `.leaflet-dragging` are all
    classes Leaflet adds to the SAME DOM node — the container div that atlas
    marks with `.atlas-map-canvas-container`. The earlier descendant selector
@@ -3580,12 +3580,12 @@ body.atlas-preroot .atlas-middle {
 .atlas-map-canvas-container.leaflet-grab {
   cursor: default !important;
 }
-/* Round 4 (S318, empirical again): the special states this block's comment
+/* Round 4 (empirical again): the special states this block's comment
    PROMISED still won were in fact beaten by the default rule above — equal
    specificity, both !important, and this one sits later in the sheet, so
-   "crosshair while placing" silently never showed (Captain: "should the
+   "crosshair while placing" silently never showed (Titus: "should the
    mouse be a different cursor in pin place mode?" — it always should have
-   been, and the rule existed since S299). The overrides live HERE, after the
+   been, and the rule had long existed). The overrides live HERE, after the
    default, with strictly higher specificity, so the cascade agrees with the
    comment at last. */
 body.atlas-placing .leaflet-container,
@@ -3668,7 +3668,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   pointer-events: none;
 }
 
-/* Pins on a styled map (S423): the type's icon stays (it carries the type),
+/* Pins on a styled map: the type's icon stays (it carries the type),
    printed in the map's ink; the name is lettering on the paper, not a chip. */
 .atlas-map-pane .atlas-map-ink .leaflet-marker-pane img.leaflet-marker-icon {
   filter: grayscale(1) sepia(0.5) brightness(0.45) contrast(1.4);
@@ -3702,8 +3702,8 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-weight: 500;
 }
 
-/* Type + description ride the CANVAS ink like the chip they sit in (S354,
-   the S324 census): they were on the app ink, so in light mode they went
+/* Type + description ride the CANVAS ink like the chip they sit in (the
+   light-mode census): they were on the app ink, so in light mode they went
    dark on the tooltip's dark scrim, two lines under a perfectly legible name. */
 .atlas-pin-tooltip-type {
   color: rgba(var(--atlas-canvas-ink-rgb), 0.55);
@@ -3974,7 +3974,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   background: var(--atlas-danger);
 }
 
-/* View-only world (S264): a quiet neutral pill with the eye as the signal. */
+/* View-only world: a quiet neutral pill with the eye as the signal. */
 .atlas-sync-pill[data-state="view"] .atlas-sync-pill-dot {
   background: rgba(var(--atlas-ink-rgb), 0.35);
 }
@@ -4209,7 +4209,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   gap: 10px;
   min-width: 0;
 }
-/* The field's description, quietly behind the label (S318). One line, fades
+/* The field's description, quietly behind the label. One line, fades
    at overflow — a hint, not a paragraph. */
 .atlas-edit-popover-desc {
   font-weight: 400;
@@ -4320,7 +4320,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   margin-top: 6px;
 }
 
-/* B1 (S368): "No type called ..." under the type field; tight to the grid. */
+/* B1: "No type called ..." under the type field; tight to the grid. */
 .atlas-modal-hint.atlas-create-type-hint {
   margin: 6px 0 0;
   /* full warn, not warn-soft: the soft tone is ~3.4:1 on the light panel */
@@ -4422,7 +4422,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 :root[data-theme='light'] .atlas-timeline-view {
   background: #0a0a0a;
   border-radius: 8px;
-  /* The FRAME (S354, the S324 middle option): the plot stays a dark
+  /* The FRAME (the middle option): the plot stays a dark
      instrument panel by design, and on the light page it now looks placed
      rather than unpainted: a hairline in the page's ink and a soft lift. The
      canvas palette itself is untouched (56 JS literals; a session, banked). */
@@ -4598,7 +4598,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* ============================================================
-   Scrollbars (subtle): ONE mechanism everywhere (S361, lane a A8).
+   Scrollbars (subtle): ONE mechanism everywhere (lane a A8).
    The old `.atlas-shell *::-webkit-scrollbar` block never reached modals,
    the command palette or body-mounted popovers (native fat bars), and from
    Chromium 121 any element with the standard `scrollbar-width` ignores the
@@ -4645,7 +4645,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* ============================================================
-   Landing (first launch + grounded states) — session 255.
+   Landing (first launch + grounded states).
    One voice, one action. Prose never center-wraps: the hero is
    two short lines, everything longer lives in narrow left-aligned
    columns (beats / path cards).
@@ -4656,13 +4656,13 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   flex-direction: column;
   align-items: center;
   /* Anchored at the upper third rather than free-floating center — on tall
-     windows pure centering left a dead lower half (S255 critique). */
+     windows pure centering left a dead lower half. */
   justify-content: flex-start;
   /* Top pad eased since the 240px sigil carries real height of its own. */
   padding: clamp(32px, 8vh, 80px) 48px 64px;
   text-align: center;
   /* No atmosphere gradient — its edge read as a boxy seam on the pure-black
-     shell (S255v2, Captain). Flat black is the calmer statement. */
+     shell (S255v2, Titus). Flat black is the calmer statement. */
 }
 
 .atlas-landing-hero { display: flex; flex-direction: column; align-items: center; }
@@ -4703,7 +4703,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 .atlas-landing-mark-sm { font-size: 26px; }
 
-/* The sigil is a link out to onlyworlds.com (S301). No chrome of its own —
+/* The sigil is a link out to onlyworlds.com. No chrome of its own —
    the mark is the affordance; the cursor and title carry the rest. */
 .atlas-landing-siglink {
   display: block;
@@ -4723,7 +4723,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   color: var(--atlas-text-soft);
 }
 
-/* S301 (Captain's round): the two doors lost their headings and boxes — a
+/* Titus's round: the two doors lost their headings and boxes — a
    heading repeating its own button is noise, and the panels made two small
    actions look like a weighty decision. What remains is a compact pair,
    centered, sitting directly ABOVE the tagline so the eye reads mark →
@@ -4731,19 +4731,19 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
    tool's own voice rather than a marketing hero's. */
 .atlas-landing-compact .atlas-landing-actions {
   display: flex;
-  /* Wraps (S365 gate lens C M2): three or four doors in a narrow desktop
+  /* Wraps: three or four doors in a narrow desktop
      window pushed the first one off-screen to the left. */
   flex-wrap: wrap;
   row-gap: 14px;
   gap: 22px;
   align-items: flex-start;
   justify-content: center;
-  /* BELOW the tagline (both orders were built and shot; S301): the eye reads
+  /* BELOW the tagline (both orders were built and shot): the eye reads
      mark → name → what it is → what you can do. Placed above, the buttons
      interrupt before the reader knows what Atlas is, and the tagline then
      trails the actions as an afterthought. Flip by dropping these orders. */
   order: 3;
-  /* 20 -> 34 (Captain, S318): more air between the tagline and the doors —
+  /* 20 -> 34 (Titus): more air between the tagline and the doors —
      the statement gets its beat before the actions ask for a decision. */
   margin-top: 34px;
 }
@@ -4770,7 +4770,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-landing-more-link:hover,
 .atlas-landing-more-link:focus-visible { color: var(--atlas-accent-text); }
 .atlas-landing-more-sep { color: var(--atlas-text-muted); }
-/* Signed in, the account's worlds under the doors (S414): the first screen has
+/* Signed in, the account's worlds under the doors: the first screen has
    no sidebar, so this is where its On OnlyWorlds rows are offered. Quiet rows,
    one per world, so the two doors stay the first decision. */
 .atlas-landing-worlds {
@@ -4839,7 +4839,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   color: var(--atlas-text-muted);
 }
 .atlas-landing-compact .atlas-landing-tag { order: 2; }
-/* Each door is a button over its own caption (S302). The captions balance the
+/* Each door is a button over its own caption. The captions balance the
    pair; a single line under both would favour whichever button it sat closer
    to. */
 .atlas-landing-choice {
@@ -4862,7 +4862,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   padding: 0 18px;
   font-size: 14px;
   border-radius: 6px;
-  /* ONE SHAPE for both doors (Captain, S354: the right button sat higher
+  /* ONE SHAPE for both doors (Titus: the right button sat higher
      than the left on a non-Chromium landing). The primary and ghost classes
      carry different line-heights and weights, and Firefox's default button
      line-height differs from Chromium's, so the pair drifted by a pixel or
@@ -4906,7 +4906,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* The doors' look is their rung's (Entry, Standard): this rule used to paint
    both doors one wash with a glow, so the main door and the demo door read
-   alike (Seethe's catch, h63 #8280). */
+   alike (Seethe's catch, 2026-10-20). */
 .atlas-landing-btn {
   padding: 12px 32px;
   font-size: 14px;
@@ -5011,7 +5011,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* Tour tag: the one-time "start here" label under +folder. */
 .atlas-worlds-header { position: relative; }
-/* "add a world" (S365): the labelled door under the icon row; opens the
+/* "add a world": the labelled door under the icon row; opens the
    chooser, which names the same five in words. Quiet at rest, full width, so
    it reads as a caption for the row above rather than a sixth button. */
 .atlas-worlds-add-btn {
@@ -5216,7 +5216,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* Demo-scoped Leaflet chrome: the main app runs zoomControl:false + its own
-   tooltip class, so the stock white widgets only ever appear here (S255). */
+   tooltip class, so the stock white widgets only ever appear here. */
 .atlas-demo-map .leaflet-bar {
   border: 1px solid rgba(var(--atlas-ink-rgb), 0.14);
   box-shadow: none;
@@ -5224,8 +5224,8 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* The demo map is CANVAS chrome over the bundled artwork, so these controls
    keep a dark chip in both themes. They used to mix a literal near-black
-   background with the THEMED ink, which reads as dark-on-dark in light mode
-   (S323); the canvas triplets carry both halves now. */
+   background with the THEMED ink, which reads as dark-on-dark in light mode;
+   the canvas triplets carry both halves now. */
 .atlas-demo-map .leaflet-control-zoom a {
   background: rgba(12, 14, 16, 0.88);
   color: rgba(var(--atlas-canvas-ink-rgb), 0.75);
@@ -5267,7 +5267,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* In the demo the cards fill their grid cell — the share renderer's 505px
-   card cap left the page ragged against the intro edge (S255). */
+   card cap left the page ragged against the intro edge. */
 .atlas-demo-cards .atlas-share-card { max-width: 100%; }
 
 .atlas-demo-footer {
@@ -5367,7 +5367,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   flex-shrink: 0;
 }
 
-/* Account-mode sign-in block (Settings → Account, session 260) */
+/* Account-mode sign-in block (Settings → Account) */
 .atlas-account-signed-in {
   display: flex;
   align-items: center;
@@ -5544,7 +5544,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 /* Version + link footer (replaces the old About tab) — pinned to the bottom
    of the rail. */
 /* The replay chip sits at the foot of the settings nav, above the version
-   line (Captain, S306: "a quiet centred chip"). It carries the `margin-top:
+   line (Titus: "a quiet centred chip"). It carries the `margin-top:
    auto` that used to push the version line down, so the pair travels together
    as the nav's footer. */
 .atlas-settings-replay-chip {
@@ -5568,7 +5568,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   cursor: default;
   opacity: 0.5;
 }
-/* Explore Moppetopia above Replay the tour (S412): the first chip takes the
+/* Explore Moppetopia above Replay the tour: the first chip takes the
    auto margin to the column's foot, the second sits just under it. */
 .atlas-settings-replay-chip + .atlas-settings-replay-chip {
   margin-top: 8px;
@@ -5640,7 +5640,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   margin-right: 16px;
 }
 .atlas-settings-link:hover { text-decoration: underline; }
-/* A link inside a sentence (S407): no row spacing, the sentence's own size. */
+/* A link inside a sentence: no row spacing, the sentence's own size. */
 .atlas-settings-link.atlas-link-inline { margin-right: 0; font-size: inherit; }
 .atlas-settings-radio {
   display: flex;
@@ -5862,7 +5862,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   margin-bottom: 8px;
 }
 
-/* Themed (S368): the old literal pink-on-pink foreground was unreadable on
+/* Themed: the old literal pink-on-pink foreground was unreadable on
    the light theme's white panel. Wash + border + text all answer to the
    danger family, which flips with the theme. */
 .atlas-modal-error {
@@ -5947,7 +5947,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* Modal checkbox row — matches the policy-option shape for visual coherence
    when checkbox + radios appear together. Used by make-online's
-   match-by-name toggle (session 219 polish). */
+   match-by-name toggle. */
 .atlas-modal-checkbox-row {
   display: flex;
   align-items: flex-start;
@@ -6063,7 +6063,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-picker-list {
   flex: 1;
   /* Fixed height, not content-driven: switching from a full category to a
-     two-row one must not shrink the modal under the cursor (S265). */
+     two-row one must not shrink the modal under the cursor. */
   height: 48vh;
   min-height: 200px;
   max-height: 48vh;
@@ -6199,7 +6199,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* Conflict badge inside the pill — actionable, warm-tinted. */
 .atlas-sync-pill-conflict {
-  /* Theme tokens (S369): the literal amber read pale on the light theme
+  /* Theme tokens: the literal amber read pale on the light theme
      (#c2703d on white is ~3.6:1; --atlas-warn is ~5:1 there). */
   background: var(--atlas-warn-soft-tint);
   color: var(--atlas-warn);
@@ -6622,7 +6622,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-zone-label span {
   display: inline-block;
   padding: 1px 6px;
-  /* Canvas chrome (S354, closing the S324 opener's item 1): the zone label
+  /* Canvas chrome: the zone label
      floats over the user's artwork exactly like the pin label 200px away,
      and for six weeks they were opposite in light mode: dark chip beside a
      white one. Convention #90, now applied to every chip over the map. */
@@ -6635,14 +6635,14 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transform: translate(-50%, -50%);
 }
 
-/* Below-placement (S313, default): the anchor is the zone's bottom-centre, so
+/* Below-placement (default): the anchor is the zone's bottom-centre, so
    the label hangs just under that edge instead of centring on it — centre
    placement sat on the fill and markers and got blocked. */
 .atlas-zone-label-below span {
   transform: translate(-50%, 6px);
 }
 
-/* A map drawn from its own zones (S423, core/map-ink.ts): on a styled map the
+/* A map drawn from its own zones (core/map-ink.ts): on a styled map the
    names are lettering on the drawing, not chips over it. The colours are the
    style's ink and paper, part of the picture like its patterns, so they do
    not follow the app theme (conv. 90's canvas side). */
@@ -6685,7 +6685,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   color: var(--atlas-text-muted);
 }
 
-/* Modern atlas (S424): Seethe's lettering (map-atlas.ts, h20 #6542), a plain
+/* Modern atlas: Seethe's lettering (map-atlas.ts, 2026-10-17), a plain
    sans over soft tints, her sizes on a 12.5px base; the selectors carry the
    style's class, so they win over the ink rules above. */
 .atlas-map-style-atlas .atlas-zone-label-ink span {
@@ -6754,7 +6754,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   text-shadow: 0 0 3px #f5efe0, 0 0 3px #f5efe0, 0 0 2px #f5efe0;
 }
 
-/* Hatched (S425): Seethe's lettering (map-hatched.ts, h20 #6572), small caps
+/* Hatched: Seethe's lettering (map-hatched.ts, 2026-10-17), small caps
    and italic as the two voices, one sepia, her sizes on a 12.5px base. EB
    Garamond is not bundled: a reader who has it gets it, everyone else Georgia,
    which she named as the honest fallback. */
@@ -6802,7 +6802,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   text-transform: uppercase;
 }
 /* A washed sepia, not a black stamp: at a map's own zoom a dark icon read as a cartoon over the
-   terrain (Seethe, h57 #6789). The icon still carries its type. */
+   terrain (Seethe, 2026-10-18). The icon still carries its type. */
 .atlas-map-pane .atlas-map-style-hatched .leaflet-marker-pane img.leaflet-marker-icon {
   /* invert lifts the black glyph to a grey, sepia warms it: about #5a4a30, her secondary ink */
   filter: grayscale(1) invert(0.26) sepia(1);
@@ -6816,7 +6816,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   text-shadow: 0 0 3px #f0e9cf, 0 0 3px #f0e9cf, 0 0 2px #f0e9cf;
 }
 
-/* The density layer (S356, map-label-density.ts): a pin or zone label that
+/* The density layer (map-label-density.ts): a pin or zone label that
    lost its spot to a higher-ranked neighbour at this zoom. A class, not
    inline display, so it cannot fight the mode toggle (display) or the hover
    fade (opacity) that other owners write on the same element. */
@@ -6846,7 +6846,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   overflow-y: auto;
   background: rgba(10, 10, 10, 0.94);
   backdrop-filter: blur(12px);
-  /* Squircle + neutral hairline (Freek, S300): the cyan-tinted 6px border
+  /* Squircle + neutral hairline (Freek): the cyan-tinted 6px border
      read grainy against the canvas; 12px radius + soft white edge matches
      the app's glass-panel language (modals, help overlay). */
   border: 1px solid rgba(var(--atlas-ink-rgb), 0.1);
@@ -6858,7 +6858,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   user-select: none;
 }
 
-/* Midpanel-docked variant (session 219 — Captain wanted the panel off the
+/* Midpanel-docked variant (Titus wanted the panel off the
    map canvas). Lives at document.body level with position: fixed; coords
    computed at runtime from the .atlas-middle bounding rect. Z-index higher
    so it floats above element-detail content. */
@@ -6974,7 +6974,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   letter-spacing: 0.04em;
 }
 
-/* A one-line explanation under a popover action (S361: the map flip). */
+/* A one-line explanation under a popover action (the map flip). */
 .atlas-popover-hint {
   margin: 6px 0 0;
   font-size: 11px;
@@ -6983,7 +6983,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 .atlas-popover-section-divider {
-  /* Softened (Freek, S300): the dashed cyan rule + cyan caps text shouted;
+  /* Softened (Freek): the dashed cyan rule + cyan caps text shouted;
      a solid hairline + quiet label matches the section-label voice. */
   margin-top: 4px;
   margin-bottom: 8px;
@@ -7118,7 +7118,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   display: flex;
   align-items: center;
   /* Wrap onto a second row when the map pane is narrower than the overlay's
-     intrinsic width — Captain's smoke 2026-05-20: overlay was cut off in
+     intrinsic width — Titus's smoke 2026-05-20: overlay was cut off in
      narrow panes. row-gap controls vertical spacing between wrapped rows. */
   flex-wrap: wrap;
   justify-content: center;
@@ -7129,7 +7129,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
      Without this, the overlay extends past the map container at narrow widths. */
   max-width: calc(100% - 32px);
   /* Chrome over the map: the canvas floor, dark in both themes, its ink re-pinned with
-     the islands above (conv. 90; S426 gate G13 measured 1.02:1 in light mode). */
+     the islands above (conv. 90; unpinned it measured 1.02:1 in light mode). */
   background: rgba(var(--atlas-canvas-scrim-rgb), 0.92);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.35);
@@ -7164,7 +7164,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* Hint + keys clusters must stay single-line — without nowrap the words
    "shift" / "to" / "snap" wrap into a vertical stack inside the overlay
-   (ZD3 fix: Captain's screenshot showed the hint breaking into 5 lines). */
+   (ZD3 fix: Titus's screenshot showed the hint breaking into 5 lines). */
 .atlas-zone-draft-hint,
 .atlas-zone-draft-keys {
   font-size: 10px;
@@ -7231,7 +7231,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 14px;
 }
 
-/* Trace held on (S423): it changes what a drag does, so it reads as pressed. */
+/* Trace held on: it changes what a drag does, so it reads as pressed. */
 .atlas-zone-draft-btn.is-active {
   background: rgba(var(--atlas-accent-rgb), 0.18);
   border-color: rgba(var(--atlas-accent-rgb), 0.55);
@@ -7261,7 +7261,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 /* Numbered marker DivIcon used during draft (preview only — not persisted
    until Finish). Mirrors zoner's createMarkerIcon shape (audit
    ZoneCanvas.ts:18-26). Draggable so the user can nudge a misplaced marker
-   without undo + re-click (session 216 smoke fix).
+   without undo + re-click.
 
    IMPORTANT: do NOT set `pointer-events: none` here — that was the prior bug.
    With pointer-events off, mousedown passes through to the leaflet map below
@@ -7382,9 +7382,9 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* ============================================================
-   The zone panel (S356): kinds as collapsible groups inside the same
+   The zone panel: kinds as collapsible groups inside the same
    fold-out, with the rule swatch, the eye, the tune form and a search box.
-   The container's look is unchanged on purpose (Captain: keep the feel).
+   The container's look is unchanged on purpose (Titus: keep the feel).
    ============================================================ */
 .atlas-zones-dropdown-panel {
   min-width: 260px;
@@ -7495,7 +7495,7 @@ button.atlas-zone-kind-swatch:focus-visible .atlas-zone-kind-swatch-dot {
   box-shadow: 0 0 0 2px rgba(var(--atlas-accent-rgb), 0.6);
 }
 
-/* The colour popover (ui/colour-popover.ts, S356): presets + hex + Apply,
+/* The colour popover (ui/colour-popover.ts): presets + hex + Apply,
    floating over the map beside the swatch it came from. */
 .atlas-colour-popover {
   position: absolute;
@@ -7739,7 +7739,7 @@ button.atlas-zone-kind-swatch:focus-visible .atlas-zone-kind-swatch-dot {
    ring exists to separate that colour from whatever is behind it. A themed
    ring would vanish against pale zone colours in light mode, which is the
    one job it has. Same reasoning as shadows. Documented so the next
-   light-mode audit does not re-flag it (S323). */
+   light-mode audit does not re-flag it. */
 .atlas-zone-chip-dot {
   display: inline-block;
   width: 8px;
@@ -8047,13 +8047,13 @@ svg .atlas-zone-selected {
   filter: drop-shadow(0 0 4px rgba(var(--atlas-accent-rgb), 0.85));
 }
 
-/* Hovered zone (S356): the whole road, river or chora lights up before the
+/* Hovered zone: the whole road, river or chora lights up before the
    click, a lighter glow than selection. Weight and fill ride applyStyle. */
 svg .atlas-zone-hovered {
   filter: drop-shadow(0 0 3px rgba(var(--atlas-accent-rgb), 0.6));
 }
 
-/* On a styled map (S423) a hover darkens the ink instead of glowing cyan;
+/* On a styled map a hover darkens the ink instead of glowing cyan;
    a selection keeps the accent, since it is the app speaking, not the map. */
 svg .atlas-zone-ink.atlas-zone-hovered {
   filter: drop-shadow(0 0 2px rgba(59, 42, 26, 0.55));
@@ -8073,7 +8073,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
    Leaflet's center-on-latlng positioning breaks: margin: 0 clobbers the
    margin-left: -anchor.x / margin-top: -anchor.y that centers the icon
    on the latlng, leaving the marker rendered with top-left at the latlng
-   instead. Session 215 smoke confirmed.
+   instead. Confirmed in a smoke test.
 
    `className` on the DivIcon REPLACES the default `.leaflet-div-icon`
    class entirely — no fight with leaflet defaults to win. */
@@ -8089,7 +8089,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
      transition would ANIMATE that translate over 120ms instead of snapping
      to the cursor. Result: marker trails the cursor visibly ("catching up").
      Box-shadow transition is fine since shadow doesn't move on drag.
-     Captain smoke session 219 wave 4. */
+     Found in Titus's smoke test. */
   transition: box-shadow 120ms ease;
 }
 
@@ -8205,7 +8205,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 
 /* Delete zone — same pill as Edit shape, danger tint (matches the cancel
    button's red family; red reads on both themes so no scrim needed). The one
-   VISIBLE way to delete a zone (Captain's launch note); routes through the
+   VISIBLE way to delete a zone (Titus's launch note); routes through the
    cascade-aware confirm. */
 .atlas-zone-delete-btn {
   display: inline-flex;
@@ -8231,7 +8231,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
   font-size: 14px;
 }
 
-/* Read-only vertex dots on a selected zone (DESIGN_ZONES.md §4.3, session 215).
+/* Read-only vertex dots on a selected zone (DESIGN_ZONES.md §4.3).
    L.marker + divIcon so the dots render in markerPane alongside the edit-mode
    draggable handles (which use the same primitive). This guarantees identical
    sub-pixel rendering between the two visual states — the dots "grow" cleanly
@@ -8255,7 +8255,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
   color: var(--atlas-accent-text);
   opacity: 0.9;
   margin-right: 4px;
-  /* A locate control: click to pan the open map to this element (Captain's
+  /* A locate control: click to pan the open map to this element (Titus's
      launch note). Cursor + hover lift say "clickable" without a chrome box. */
   cursor: pointer;
   transition: opacity 120ms ease, transform 120ms ease;
@@ -8268,7 +8268,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 
 /* Number labels inside vertex dots (read-only) + edit handles (interactive).
    Centered via flex on the parent (NOT position:absolute on the child) to
-   sidestep two issues seen in session 215 final smoke:
+   sidestep two issues seen in a final smoke test:
      1. position: relative !important on the parent clobbered Leaflet's
         inline position: absolute, which broke the iconAnchor-via-margin
         centering — markers ended up rendering with TOP-LEFT at the latlng
@@ -8305,7 +8305,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
    defines `.leaflet-marker-icon { display: block }`. With a single-class
    selector here we'd tie and lose source-order. Chaining `.leaflet-marker-icon`
    bumps specificity to 2 classes so our flex centering wins cleanly without
-   `!important` (S9 centering fix re-derived 2026-05-16 session 216 — Captain
+   `!important` (S9 centering fix re-derived 2026-05-16 — Titus's
    smoke caught edit handles still rendering bottom-left after the S9 pass). */
 .leaflet-marker-icon.atlas-zone-edit-handle,
 .leaflet-marker-icon.atlas-zone-vertex-dot {
@@ -8322,7 +8322,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 }
 
 /* ============================================================================
- * Session 223 — Rooms model.
+ * Rooms model.
  * Convention #31: middle pane is a flex column with [room-nav | content].
  * Convention #32: Esc + click-selected-row deselect → home.
  * See DESIGN.md "Rooms".
@@ -8447,14 +8447,14 @@ svg .atlas-zone-ink.atlas-zone-hovered {
   animation: atlas-tour-pulse 2.2s ease-in-out 3;
 }
 
-/* S264: a quiet standing glow on a create-affordance when its pane is empty —
+/* A quiet standing glow on a create-affordance when its pane is empty —
    the glow IS the empty-state teaching (maps pane +, first-run affordances). */
 .atlas-create-glow {
   color: var(--atlas-accent-text) !important;
   filter: drop-shadow(0 0 5px rgba(var(--atlas-accent-rgb), 0.55));
 }
 
-/* S264: instant tooltip on the sidebar type-filter icons — the OS-native title
+/* Instant tooltip on the sidebar type-filter icons — the OS-native title
    delay hid the category names; a data-tip ::after appears on hover at once. */
 .atlas-filter-btn[data-tip]:hover::after {
   content: attr(data-tip);
@@ -8486,8 +8486,8 @@ svg .atlas-zone-ink.atlas-zone-hovered {
    click × → clear selection. Rounded pill shape always; only gains the cyan
    border + tint when the current room IS 'element' (i.e. the chip's own
    destination is the active room — gives the always-something-highlighted
-   invariant Captain wanted). */
-/* Search affordance (S309) — a field-shaped door to the Cmd+K palette,
+   invariant Titus wanted). */
+/* Search affordance — a field-shaped door to the Cmd+K palette,
    anchored at the strip's far right. Looks like a compact input so its
    function reads at a glance; clicking opens the overlay (one search, two
    doors — never an inline twin that could drift from the palette). */
@@ -8797,7 +8797,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 .atlas-home-onboarding-grid {
   display: flex;
   gap: 8px;
-  /* One line (Captain, 2026-07-24) — the room cards fit across; a stray wrap
+  /* One line (Titus, 2026-07-24) — the room cards fit across; a stray wrap
      onto a second row read as random. Narrow panes scroll rather than wrap. */
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -8821,7 +8821,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
   transition: border-color 80ms ease, color 80ms ease, background 80ms ease;
 }
 
-/* ---- The home tour (S264) ---- */
+/* ---- The home tour ---- */
 
 /* The core pair (character/location) — the tour's only highlighted cards. */
 .atlas-home-tile-core {
@@ -8832,7 +8832,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 
 /* The home's onboarding (#127; 1.20): "What do you have?" while the core
    pair is missing, "Grow your world" after. One heading over the block, rows
-   that answer it, and one label column shared by every row (h20 #2081: the
+   that answer it, and one label column shared by every row (2026-10-09: the
    text column started at a different x on each row). */
 .atlas-home-have { container-type: inline-size; }
 .atlas-home-have-head {
@@ -8987,7 +8987,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 
 .atlas-home-recent-icon {
   /* Matches the Continue rows (17px) — the two lists sit adjacent and read
-     as one density (Captain: recent rows looked bigger, jarring). */
+     as one density (Titus: recent rows looked bigger, jarring). */
   font-size: 17px;
   color: var(--atlas-accent-text);
 }
@@ -9029,7 +9029,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 }
 
 /* Writing-tier badge + child-create buttons live in element-detail header
-   (session 224 unification). Icon-only buttons match the pin/delete affordance
+   (one unified cluster). Icon-only buttons match the pin/delete affordance
    visual weight, so the cluster lays out predictably with no overlap risk. */
 .atlas-header-cluster.atlas-header-writing {
   gap: 4px;
@@ -9052,7 +9052,7 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 
 .atlas-header-writing-create {
   flex-shrink: 0;
-  /* Weightier than sibling icon buttons (S255v3, Captain): the child-create
+  /* Weightier than sibling icon buttons (S255v3, Titus): the child-create
      verbs are the writing header's main actions now the tier pill is gone. */
   color: var(--atlas-text);
 }
@@ -9313,7 +9313,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 
 /* Cast strip / Details / References disclosures REMOVED — moved to the
-   right-pane writing-context tab (session 229). Their CSS lived here; safe
+   right-pane writing-context tab. Their CSS lived here; safe
    to delete with the corresponding render functions in writing-workspace.ts. */
 
 .atlas-writing-workspace-prose {
@@ -9324,7 +9324,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   flex: 0 0 auto;
   /* border-box: width 100% PLUS the 32px side padding overflowed the body
      by 32px on the right (content-box default) — the "prose flows onto the
-     right edge" Captain's eye caught (S265, measured: rightGap −32px). */
+     right edge" Titus's eye caught (measured: rightGap −32px). */
   box-sizing: border-box;
   max-width: var(--atlas-writing-content-width, 760px);
   width: 100%;
@@ -9336,7 +9336,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
     linear-gradient(180deg, rgba(255, 248, 235, 0.012), rgba(255, 248, 235, 0.006));
   border-radius: 4px;
   /* 34px on top is the link-all pill's lane (top 8 + ~21 tall): it sat over
-     the first line's last words (S365, measured 20px of ink under it). Always
+     the first line's last words (measured 20px of ink under it). Always
      reserved, so the text never jumps when the pill appears mid-typing. */
   padding: 34px 32px 24px;
 }
@@ -9456,7 +9456,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-accent-text);
 }
 
-/* Details / References disclosures REMOVED (session 229) — their content
+/* Details / References disclosures REMOVED — their content
    lives in the context pane (right). The selectors below are kept only for
    reading-mode and focus-mode hide rules further down the file; deleting
    them would leave dangling selectors. */
@@ -9480,7 +9480,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   pointer-events: none;
 }
 
-/* Link-all corner (S265) — gentle icon inside the prose panel's top-right,
+/* Link-all corner — gentle icon inside the prose panel's top-right,
    present only while unlinked mention candidates exist. Count badge names
    the size of the batch; click links them all in one undoable transaction. */
 .atlas-writing-workspace-prose {
@@ -9627,7 +9627,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-writing-workspace-prose .ProseMirror .atlas-autolink-hint {
   text-decoration: underline dotted rgba(var(--atlas-accent-rgb), 0.5);
   text-underline-offset: 3px;
-  /* Click-to-link (S313): the dotted word is an affordance, so a pointer reads
+  /* Click-to-link: the dotted word is an affordance, so a pointer reads
      "clickable" rather than the old `help` (which promised a tooltip, not an
      action). */
   cursor: pointer;
@@ -9647,7 +9647,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   background: rgba(var(--atlas-accent-rgb), 0.4);
   outline: 1px solid rgba(var(--atlas-accent-rgb), 0.7);
 }
-/* The compiled view marks matches in the rendered DOM (S355, no editor
+/* The compiled view marks matches in the rendered DOM (no editor
    behind it). Same look as the editor's decorations; <mark> reset so the
    browser's yellow never shows. */
 .atlas-writing-compiled mark.atlas-search-match {
@@ -9773,7 +9773,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 /* Find/replace bar — anchored to the top-right of the workspace. */
 .atlas-find-bar {
   position: absolute;
-  /* Below the 36px header AND the 32px crumb row (S355: it used to float
+  /* Below the 36px header AND the 32px crumb row (it used to float
      over the crumb's date pill), plus a hair of breathing room. */
   top: 76px;
   right: 12px;
@@ -9832,7 +9832,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   border-color: rgba(var(--atlas-accent-rgb), 0.4);
 }
 
-/* Reading mode — intermediate between normal and focus modes (session 230).
+/* Reading mode — intermediate between normal and focus modes.
    Goal: clean reading surface for the writer to absorb their own prose
    without link-system visual noise. Specifically:
      - Hides the element header
@@ -10204,7 +10204,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   font-size: 12px;
 }
 
-/* Writing sidebar body — the tree lives here (session 224 takeover).
+/* Writing sidebar body — the tree lives here.
    Bands and list are appended DIRECTLY to .atlas-sidebar-content (no
    wrapping flex div) so the shell-level overflow-y scrollbar runs the full
    sidebar height — identical to elements sidebar. Search row icons sit at
@@ -10229,7 +10229,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  /* One button now (the draft button retired, S265) — min-height keeps this
+  /* One button now (the draft button retired) — min-height keeps this
      band the exact height of the elements sidebar's two-row filter strip
      (2 × 25px + 2px gap = 52px content) so the search rows stay aligned. */
   min-height: 52px;
@@ -10268,7 +10268,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-accent-text);
 }
 
-/* Hover "+" on tree rows (S265): create the child tier inside this row.
+/* Hover "+" on tree rows: create the child tier inside this row.
    Invisible until the row is hovered — same rhythm as inline actions. */
 .atlas-writing-tree-row-add {
   flex: 0 0 auto;
@@ -10302,7 +10302,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   font-size: 18px;
 }
 
-/* Link-count badge (S313): a muted size cue at the right of each tree row.
+/* Link-count badge: a muted size cue at the right of each tree row.
    `order` keeps it rightmost regardless of DOM order, so the hover "+" sits
    just to its left rather than shoving it. */
 .atlas-writing-tree-linkcount {
@@ -10336,7 +10336,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   width: 100%;
   /* border-box: the depth indent rides inline paddingLeft — without this,
      width:100% + padding overflows right by 14px PER NESTING LEVEL, so the
-     hover "+" of a chapter sat further right than a book's (S265; same
+     hover "+" of a chapter sat further right than a book's (same
      content-box class as the prose-panel overflow). */
   box-sizing: border-box;
   display: flex;
@@ -10622,7 +10622,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   margin-top: 8px;
 }
 
-/* WR1-WR4 setup redesign (session 247): visual nest, inline labels,
+/* WR1-WR4 setup redesign: visual nest, inline labels,
    tech foldout, delta-only count table, skip consequence. */
 
 .atlas-writing-setup-lead {
@@ -11092,7 +11092,7 @@ td.atlas-writing-setup-promote-count {
   margin: 0 0 10px 0;
 }
 
-/* Holder sub-rows superseded by the single WHO-zone band (D4, session 248). */
+/* Holder sub-rows superseded by the single WHO-zone band (D4). */
 
 .atlas-knowledge-chips {
   display: flex;
@@ -11197,8 +11197,8 @@ td.atlas-writing-setup-promote-count {
   padding: 10px 14px;
 }
 
-/* The link-all pill's lane in the knowledge editor too (S365 gate lens C M7:
-   the scene host got it, this host's own padding overrode it). */
+/* The link-all pill's lane in the knowledge editor too:
+   the scene host got it, this host's own padding overrode it. */
 .atlas-writing-workspace-prose.atlas-knowledge-prose-rich { padding-top: 32px; }
 .atlas-writing-workspace-prose.atlas-knowledge-prose-rich:focus-within {
   border-color: var(--atlas-cyan-soft);
@@ -11420,7 +11420,7 @@ td.atlas-writing-setup-promote-count {
 .atlas-lens-banner-off:hover,
 .atlas-cast-assign-off:hover { color: var(--atlas-accent-text); }
 
-/* The live folder (S364): what another tool changed on disk. Same shape as
+/* The live folder: what another tool changed on disk. Same shape as
    the lens banner; its own class family (lens e2e locators are strict). */
 .atlas-disk-notice { display: none; margin: 0 8px 4px 8px; font-size: 11px; line-height: 1.3; }
 .atlas-disk-notice[data-active="true"] { display: block; }
@@ -11750,7 +11750,7 @@ td.atlas-writing-setup-promote-count {
 .atlas-import-example-sep { color: var(--atlas-ornament); font-size: 11px; }
 
 /* The way to convert notes (1.20): part of the Bring in flow, right under
-   its lead, not a box below it (the Captain, h20 #2081: "dangly"). */
+   its lead, not a box below it (Titus, 2026-10-09: "dangly"). */
 .atlas-import-ai { margin: 0 0 14px 0; }
 .atlas-import-ai-lead { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--atlas-text-muted); max-width: 640px; }
 .atlas-import-ai-lead .atlas-btn-link { font-size: inherit; padding: 0; }
@@ -12015,7 +12015,7 @@ td.atlas-writing-setup-promote-count {
   padding: 6px 88px 6px 10px; /* right space reserves the controls strip */
 }
 
-/* Published badge on list rows (session 239). */
+/* Published badge on list rows. */
 .atlas-share-row-pub {
   display: inline-flex;
   align-items: center;
@@ -12027,7 +12027,7 @@ td.atlas-writing-setup-promote-count {
 .atlas-share-row-pub .material-symbols-outlined { font-size: 13px; }
 .atlas-share-row-pub.is-revoked { color: var(--atlas-text-muted); }
 
-/* Drag-reorder states (session 239). */
+/* Drag-reorder states. */
 .atlas-share-block.is-dragging { opacity: 0.4; }
 .atlas-share-block.is-drop-above { box-shadow: 0 -2px 0 0 var(--atlas-cyan, #22d3ee); }
 .atlas-share-block.is-drop-below { box-shadow: 0 2px 0 0 var(--atlas-cyan, #22d3ee); }
@@ -12106,7 +12106,7 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   border: 1px solid rgba(var(--atlas-ink-rgb), 0.08);
 }
 
-/* Zone overlays on the published map (S299) — %-space SVG over the image,
+/* Zone overlays on the published map — %-space SVG over the image,
    under the pins. Theme accent, quiet fill; lines carry stroke only. */
 .atlas-share-map-zones {
   position: absolute;
@@ -12130,7 +12130,7 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   fill: none;
   stroke: rgba(var(--atlas-accent-rgb), 0.85);
 }
-/* S308 — Captain: "a huge weird SVG artifact, black and white, massive, over
+/* Titus: "a huge weird SVG artifact, black and white, massive, over
    the whole thing, when I CLICK it."
    An openable zone carries role=button + tabindex=0 (share-page-render) so it
    is keyboard-reachable, which also makes a MOUSE click focus it. Nothing in
@@ -12150,12 +12150,12 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 }
 .atlas-share-map-zone.is-line.is-openable:focus-visible { fill: none; }
 
-/* Always-on zone label (Captain, S308). A published page is read-only: there is
+/* Always-on zone label (Titus). A published page is read-only: there is
    no hover-to-learn and no click-to-select, so an unlabelled region is a
    coloured smear. Rendered as HTML rather than SVG <text> because the zone SVG
    uses preserveAspectRatio="none" to stretch over the image, which would
    non-uniformly scale any glyphs drawn inside it. */
-/* The zero-worlds next step (Captain, S308). The grounded pane used to be a
+/* The zero-worlds next step (Titus). The grounded pane used to be a
    receipt — a checkmark and a path — on the single highest-traffic screen for
    anyone who skipped the tour. This line names the action and points at the
    control, so the teaching does not depend on a hover that may never happen. */
@@ -12182,7 +12182,7 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 /* The inline glyph must be the SAME pair the sidebar button actually draws
    (add + folder). It used to be a single `create_new_folder` ligature, an
    icon that appears nowhere in the app, so the sentence pointed at a button
-   the user could not find by its picture (S323). */
+   the user could not find by its picture. */
 .atlas-grounded-next .atlas-grounded-next-glyph {
   display: inline-flex;
   align-items: center;
@@ -12194,7 +12194,7 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 .atlas-grounded-next .atlas-grounded-next-glyph .atlas-add-glyph-plus {
   /* !important beats the sidebar's `.atlas-add-glyph-*` sizes; margin 0 beats
      `.atlas-welcome .material-symbols-outlined`'s 16px, which made this inline
-     box 34px tall and broke the paragraph's first line (S361 own eyes). */
+     box 34px tall and broke the paragraph's first line. */
   font-size: 10px !important;
   line-height: 1;
   margin: 0 -1px 0 0;
@@ -12352,10 +12352,10 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-share-pin-modal .atlas-share-card-fields { margin-top: 12px; }
 
 /* The head's type label right-aligns (margin-left auto) — clear the
-   absolutely-positioned × or they overlap (Captain's smoke, S254). */
+   absolutely-positioned × or they overlap (Titus's smoke). */
 .atlas-share-pin-modal .atlas-share-card-head { padding-right: 34px; }
 
-/* Collection cells open the identity modal (S254). */
+/* Collection cells open the identity modal. */
 .atlas-share-collection-cell.is-openable { cursor: pointer; }
 .atlas-share-collection-cell.is-openable:hover { border-color: var(--atlas-cyan); }
 
@@ -12670,14 +12670,14 @@ a.atlas-share-map-pin { cursor: pointer; }
    a dark page previewed as light ink on the light app background, while the
    same payload rendered correctly dark in the `show` viewer. So the preview
    showed a different artifact than the one that publishes. Dark is now
-   PINNED, the way the tour root is (S323). Keep the two viewers in step:
+   PINNED, the way the tour root is. Keep the two viewers in step:
    the reference values live in show/src/styles.css. */
 /* THE DARK-ISLAND RE-PIN. Any surface that paints its own dark floor while
    the app around it may be light needs the whole token family restated, not
    just the triplets: the light block defines --atlas-text* as flat literals
    rather than deriving them from the ink triplet, so a triplet-only re-pin
    leaves card field values, type labels and close buttons at light ink on
-   black. Measured, not assumed (S323). Keep these values in step with :root.
+   black. Measured, not assumed. Keep these values in step with :root.
    Add a selector here rather than writing literals into a new island. */
 .atlas-share-page-view[data-mode='dark'],
 .atlas-share-pin-modal {
@@ -13097,7 +13097,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   touch-action: pan-y;
 }
 
-/* The docked selection card (S7; style-up S263). Hidden = display:none (JS);
+/* The docked selection card (S7; later styled up). Hidden = display:none (JS);
    shown = a CONTENT-HEIGHT elevated panel, not a full-height column — the
    old floor-to-ceiling wedge left a void between the chips and the actions
    and its dark-on-dark edge read as the strip running behind it. Depth =
@@ -13112,7 +13112,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 /* The CHIPS are the scroller — content-height until the panel hits its cap,
    then they scroll; the actions always sit directly under the content
-   (a primary action below a void is a lost action, S263). */
+   (a primary action below a void is a lost action). */
 .atlas-timeline-card .atlas-timeline-card-chips {
   flex: 0 1 auto;
   min-height: 0;
@@ -13417,7 +13417,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   gap: 4px;
   max-width: 100%;
   padding: 3px 8px 3px 6px;
-  /* S263: the BORDER is the "dated — lives on this chart" affordance; the
+  /* The BORDER is the "dated — lives on this chart" affordance; the
      base chip is borderless (transparent keeps the box size stable). */
   border: 1px solid transparent;
   border-radius: 999px;
@@ -13432,7 +13432,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   border-color: rgba(var(--atlas-accent-rgb), 0.28);
 }
 
-/* The card meta line's editable date (S263): reads as text, edits on click. */
+/* The card meta line's editable date: reads as text, edits on click. */
 .atlas-timeline-card-date {
   border: none;
   background: transparent;
@@ -13514,7 +13514,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   font-size: 15px;
 }
 
-/* S264: the gallery lives INSIDE the actions row (right of the buttons) so a
+/* The gallery lives INSIDE the actions row (right of the buttons) so a
    first save never reflows the layout below. Quieter chips: faint fill, no
    standing border — the border arrives on hover/active. */
 .atlas-chart-gallery {
@@ -13728,7 +13728,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 
 /* On and off are a step apart in ink now that off reads at muted (F-39), so
    on also fills its glyph: a second cue that is not colour (WCAG 1.4.1, Seethe
-   h63 #8760), and a filled glyph is as wide as an outlined one. The same rule
+   2026-10-20), and a filled glyph is as wide as an outlined one. The same rule
    holds for the chart mode switch and the context pane's type chips. */
 .atlas-chart-type-chip.active .material-symbols-outlined,
 .atlas-chart-mode button.active .material-symbols-outlined,
@@ -13773,7 +13773,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: rgb(var(--atlas-ink-rgb));
 }
 
-/* Charts-context create (S263): dateless types stay visible but disabled —
+/* Charts-context create: dateless types stay visible but disabled —
    the difference teaches which types can live on a chart. */
 .atlas-create-type-btn-dateless,
 .atlas-create-type-btn-dateless:hover {
@@ -13798,11 +13798,11 @@ a.atlas-share-map-pin { cursor: pointer; }
   gap: 4px;
   box-sizing: border-box;
   height: 24px; /* LOCKED equal to .atlas-chart-now-chip — toggling set/unset
-                   must never resize the bar and jump the UI below (S263) */
+                   must never resize the bar and jump the UI below */
   padding: 0 10px 0 7px;
   border: 1px solid rgba(245, 180, 90, 0.5);
   border-radius: 999px;
-  /* A subtle warm fill (S313) so the one control that sets the world clock is
+  /* A subtle warm fill so the one control that sets the world clock is
      spottable, not a ghost outline. */
   background: rgba(245, 180, 90, 0.10);
   color: rgba(245, 180, 90, 0.9);
@@ -13826,7 +13826,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   align-items: center;
   gap: 5px;
   box-sizing: border-box;
-  height: 24px; /* LOCKED equal to .atlas-chart-now-set (S263) */
+  height: 24px; /* LOCKED equal to .atlas-chart-now-set */
   padding: 0 4px 0 8px;
   border: 1px solid rgba(245, 180, 90, 0.45);
   border-radius: 999px;
@@ -13878,7 +13878,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   background: transparent;
 }
 
-/* Top strip restored in session 231 as the context toolbar — type filter
+/* Top strip restored as the context toolbar — type filter
    chips + 1/2-hop pill. Hidden when there's no subject (empty state). */
 .atlas-context-pane-toolbar-host {
   flex: 0 0 auto;
@@ -14033,8 +14033,8 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 
 /* Fit-to-view button — appears in the bottom-right of the graph host only
-   when the user has applied a non-identity zoom/pan transform (session 231
-   Bout 5). Click to reset. */
+   when the user has applied a non-identity zoom/pan transform.
+   Click to reset. */
 .atlas-context-graph-fit {
   position: absolute;
   right: 8px;
@@ -14106,7 +14106,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   border-style: dashed;
   border-color: rgba(var(--atlas-accent-rgb), 0.5);
 }
-/* Backlink nodes (S354): ring-1 elements that link TO the subject without
+/* Backlink nodes: ring-1 elements that link TO the subject without
    being linked back. The muted half of the web: ink-grey ring instead of
    accent, dimmed glyph, settled below the center by the sim. Hover restores
    full presence so the node is never second-class to interact with. */
@@ -14158,7 +14158,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   opacity: 0.4;
 }
 
-/* Recent-centers breadcrumb (session 231 — replaces the back pill).
+/* Recent-centers breadcrumb (replaces the back pill).
    Pinned to the top of the graph host as a horizontal chip strip:
    [home] › [recent] › current. Home chip + earlier stack entries are
    clickable pill chips; the current center renders as plain text. */
@@ -14223,7 +14223,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   white-space: nowrap;
 }
 
-/* Right-click context menu on a graph node (session 231). Floating; pinned
+/* Right-click context menu on a graph node. Floating; pinned
    at the cursor; clipped to viewport via JS. Items are icon + label rows. */
 .atlas-context-graph-node-menu {
   position: fixed;
@@ -14288,7 +14288,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   letter-spacing: 0.01em;
   /* scrim halo: black lifts the light label off the dark canvas; in light
      it flips to a white halo that lifts the dark label off the light canvas.
-     A fixed black halo smeared behind dark text in light mode (Captain, S315). */
+     A fixed black halo smeared behind dark text in light mode (Titus). */
   text-shadow: 0 1px 3px rgba(var(--atlas-scrim-rgb), 0.85), 0 0 6px rgba(var(--atlas-scrim-rgb), 0.6);
   max-width: 140px;
   overflow: hidden;
@@ -14657,7 +14657,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-text);
 }
 
-/* ---- shared element image (detail banner + context thumb; session 239) ---- */
+/* ---- shared element image (detail banner + context thumb) ---- */
 
 .atlas-element-image {
   display: block;
@@ -14716,7 +14716,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-element-image-hide .material-symbols-outlined { font-size: 16px; }
 .atlas-element-image-wrap:hover .atlas-element-image-hide { opacity: 1; }
 /* A touch screen has no hover to reveal it, and a tap that shows it invites the wrong reading:
-   Settings, Elements keeps the switch (Seethe's phone pass, #4264). */
+   Settings, Elements keeps the switch (Seethe's phone pass). */
 @media (hover: none) {
   .atlas-element-image-hide { display: none; }
 }
@@ -14775,7 +14775,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   text-decoration: underline;
 }
 
-/* Unlinked mentions (S355) — same voice as the backlinks line, plus the one
+/* Unlinked mentions — same voice as the backlinks line, plus the one
    action that turns the count into links. */
 .atlas-context-preview-mentions {
   font-size: 11.5px;
@@ -15155,7 +15155,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-origin-label { color: var(--atlas-text-muted); font-size: 10px; }
 .atlas-origin-row [data-action="made-by-agents"] + [data-action="hide-room"] { margin-left: 6px; }
 
-/* ==== Bout H — home cover-page × study-desk (workplan D2, session 248) ==== */
+/* ==== Bout H — home cover-page × study-desk (workplan D2) ==== */
 
 .atlas-home-cover {
   height: 160px;
@@ -15183,7 +15183,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-home-link:hover { color: var(--atlas-accent-text); }
 
-/* Section hint (S265): a quiet ?-glyph beside a section title whose instant
+/* Section hint: a quiet ?-glyph beside a section title whose instant
    tooltip explains the section's model. The ::after resets font-family —
    it lives inside a Material Symbols span and would render as tofu. */
 .atlas-section-hint {
@@ -15227,7 +15227,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   gap: 10px;
   margin-top: 18px;
   /* Reserved even when empty — the first ghost card must not shift the tour
-     below (S265). Matches the card's rendered height. */
+     below. Matches the card's rendered height. */
   min-height: 52px;
 }
 .atlas-home-cast-card {
@@ -15325,7 +15325,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   gap: 7px;
   margin-top: 18px;
   /* Reserved even when empty — the first element's count must not shift the
-     tour cards below (S265). */
+     tour cards below. */
   min-height: 17px;
   font-size: 13px;
   color: var(--atlas-text-muted);
@@ -15432,8 +15432,8 @@ a.atlas-share-map-pin { cursor: pointer; }
   vertical-align: baseline;
 }
 
-/* The chart strip (S15) — the world's history shape on the cover.
-   S256: always the tableau; saved charts ride below as chips. */
+/* The chart strip — the world's history shape on the cover.
+   Always the tableau; saved charts ride below as chips. */
 .atlas-home-charts { margin-top: 24px; }
 .atlas-home-saved-charts {
   display: flex;
@@ -15549,7 +15549,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-accent-text);
 }
 
-/* ==== Bout S — share simplification (D5/T-S7/S3, session 248) ==== */
+/* ==== Bout S — share simplification (D5/T-S7/S3) ==== */
 
 /* T-S7: the slim meta summary row (theme swatch + words + publish state). */
 .atlas-share-meta-summary {
@@ -15595,7 +15595,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-share-empty-examples {
   margin-top: 8px;
   font-size: 12px;
-  /* Illustrative, not clickable — cyan here read as dead links (S255). */
+  /* Illustrative, not clickable — cyan here read as dead links. */
   color: var(--atlas-text-muted);
   font-style: italic;
 }
@@ -15612,7 +15612,7 @@ body.atlas-share-fullpreview > * {
   padding: 40px 28px;
 }
 
-/* ==== Bout HELP — the ? overlay (D8, session 248) ==== */
+/* ==== Bout HELP — the ? overlay (D8) ==== */
 /* The help panel caps at the viewport and scrolls its body — the shortcut
    reference is tall by design, the chrome (title) stays pinned. */
 .atlas-help-panel {
@@ -15654,7 +15654,7 @@ body.atlas-share-fullpreview > * {
   margin: 14px 0;
 }
 
-/* ==== Bout OW — OnlyWorlds page + waypoints (D11, session 249) ==== */
+/* ==== Bout OW — OnlyWorlds page + waypoints (D11) ==== */
 .atlas-ow-intro .atlas-settings-hint { line-height: 1.6; }
 .atlas-ow-intro a { color: var(--atlas-accent-text); text-decoration: none; }
 .atlas-ow-intro a:hover { text-decoration: underline; }
@@ -15771,7 +15771,7 @@ body.atlas-share-fullpreview > * {
   gap: 0;
   padding: 0;
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.35);
-  /* A DELIBERATE dark chip in both themes (S354, the S324 census ruling):
+  /* A DELIBERATE dark chip in both themes (the light-mode census ruling):
      the waypoint toast is the one celebratory surface with the OW sigil and
      its own voice, so it keeps a distinct dark ground next to the themed
      toasts. It says so with the canvas tokens, the same way the tour root
@@ -15815,7 +15815,7 @@ body.atlas-share-fullpreview > * {
   border-top: 1px solid var(--atlas-divider);
   font-size: 11px;
   /* Muted, as its two buttons: dim measured 2.28:1 on the chip once the
-     contrast spec composited the text's own alpha (S437). */
+     contrast spec composited the text's own alpha. */
   color: var(--atlas-text-muted);
 }
 .atlas-waypoint-toast-rider-btn {
@@ -15849,7 +15849,7 @@ body.atlas-share-fullpreview > * {
   color: var(--atlas-accent-text);
 }
 
-/* ====== Map "Local image" row (element editor, maps only — session 253) ======
+/* ====== Map "Local image" row (element editor, maps only) ======
    Sits under the image_url field. Own class family (e2e locator contract —
    never reuse another surface's classes). */
 .atlas-map-localimage-value {
@@ -15889,7 +15889,7 @@ body.atlas-share-fullpreview > * {
   background: rgba(var(--atlas-ink-rgb), 0.04);
 }
 
-/* ====== "Upload picture" row (element editor, online worlds — #154, S386) ======
+/* ====== "Upload picture" row (element editor, online worlds — #154) ======
    Sits under the image_url field. Own class family (locator contract). */
 .atlas-picture-upload-value {
   display: flex;
@@ -15937,7 +15937,7 @@ body.atlas-share-fullpreview > * {
   align-items: center;
   gap: 5px;
   box-sizing: border-box;
-  height: 24px; /* matches the now control row (S263 no-jump lock) */
+  height: 24px; /* matches the now control row (no-jump lock) */
   padding: 0 10px 0 7px;
   border: 1px solid var(--atlas-divider);
   border-radius: 999px;
@@ -16095,7 +16095,7 @@ body.atlas-share-fullpreview > * {
 }
 
 .atlas-calbuilder-form .atlas-modal-input {
-  box-sizing: border-box; /* the content-box overflow class (S265) */
+  box-sizing: border-box; /* the content-box overflow class */
 }
 
 .atlas-calbuilder-opt {
@@ -16236,11 +16236,11 @@ body.atlas-share-fullpreview > * {
   color: var(--atlas-accent-text-soft);
   font-variant-numeric: tabular-nums;
 }
-/* The bad-number line (S367 critic C2): shown instead of saving. */
+/* The bad-number line: shown instead of saving. */
 .atlas-edit-popover-error { margin-top: 5px; font-size: 11px; color: var(--atlas-warn); }
 .atlas-edit-popover-error[data-active="false"] { display: none; }
 
-/* World clock modal layout fix (Captain's screenshot 2026-07-14: the question
+/* World clock modal layout fix (Titus's screenshot 2026-07-14: the question
    and its input were crammed on one line, placeholder truncated). Labels are
    block; inputs take the full row. */
 .atlas-worldclock-form .atlas-modal-label {
@@ -16277,7 +16277,7 @@ body.atlas-share-fullpreview > * {
   color: rgba(var(--atlas-ink-rgb), 0.28);
 }
 
-/* ==== 2C — the scroll view (S13, session 268) ============================
+/* ==== 2C — the scroll view ============================
    The world's history as a scrolling document: center spine, cards
    alternating sides, era/gap/now seams, sticky date readout. New class
    family (locator contract — never reuse another surface's classes). */
@@ -16537,11 +16537,11 @@ body.atlas-share-fullpreview > * {
 
 /* The render-mode toggle in the control bar (canvas / document). Anchored to
    the bar's right edge (margin-left: auto) so it never drifts with the chip
-   count — chips grow rightward, the toggle stays put (Captain, S268). */
+   count — chips grow rightward, the toggle stays put (Titus). */
 .atlas-chart-rightstack {
   margin-left: auto;
   display: flex;
-  /* ONE LINE, toggles first (Captain, S307 second pass). The stack was tried
+  /* ONE LINE, toggles first (Titus, second pass). The stack was tried
      and did not read well: two short rows in the bar's right corner made a
      visual block that competed with the calendar chip on the left. Back on
      one line, but keeping the flipped ORDER from the first pass — the fixed
@@ -16576,8 +16576,8 @@ body.atlas-share-fullpreview > * {
 
 .atlas-chart-mode .material-symbols-outlined { font-size: 17px; }
 
-/* ── Tour exit confirm (S305) ─────────────────────────────────────────────
-   Captain's design: leaving the tour early is legitimate, so the exit is a
+/* ── Tour exit confirm ─────────────────────────────────────────────
+   Titus's design: leaving the tour early is legitimate, so the exit is a
    real door — and the door doubles as a small map of the app, scoped to the
    nav strip's rooms. Unseen rooms lead and read at full strength; visited
    ones are quieted, because they are context rather than the offer. */
@@ -16589,14 +16589,14 @@ body.atlas-share-fullpreview > * {
   text-transform: uppercase;
   color: var(--atlas-text-muted);
 }
-/* The way back, said clearly (Captain, S318: "clear, not too grey") — brighter
+/* The way back, said clearly (Titus: "clear, not too grey") — brighter
    than the dim headings, quieter than a button. */
 .atlas-tour-exit-replay {
   margin: 14px 0 4px;
   font-size: 12.5px;
   color: rgba(var(--atlas-ink-rgb), 0.8);
 }
-/* S368: the delete line leads, at full ink; the replay line tucks under it. */
+/* The delete line leads, at full ink; the replay line tucks under it. */
 .atlas-tour-exit-loss { color: var(--atlas-text); }
 .atlas-tour-exit-loss + .atlas-tour-exit-replay { margin-top: 2px; }
 .atlas-tour-exit-rooms {
@@ -16638,7 +16638,7 @@ body.atlas-share-fullpreview > * {
   line-height: 1.5;
 }
 
-/* Recovery affordance inside an empty/not-found pane (S307). A not-found id
+/* Recovery affordance inside an empty/not-found pane. A not-found id
    used to be a text cul-de-sac; the share room's drill-in back link is the
    precedent this follows. */
 .atlas-pane-empty-action {
@@ -16653,7 +16653,7 @@ body.atlas-share-fullpreview > * {
   text-decoration: underline;
 }
 
-/* The type-chip strip owns its own wrapping (S307). Before this the chips
+/* The type-chip strip owns its own wrapping. Before this the chips
    were direct children of the control bar, so the set growing by one (which
    is exactly what minting a calendar does — it adds a Construct) displaced
    every control after it, including the calendar chip itself. */
@@ -16665,7 +16665,7 @@ body.atlas-share-fullpreview > * {
   min-width: 0;
 }
 
-/* Edited-since-publish marker on the share list (S309) — quiet warm text
+/* Edited-since-publish marker on the share list — quiet warm text
    beside the live badge; the editor's banner carries the full sentence. */
 .atlas-share-row-stale {
   font-size: 10px;
@@ -16676,7 +16676,7 @@ body.atlas-share-fullpreview > * {
 }
 
 /* ============================================================
-   THE NARROW-WINDOW LAYER (S323) — see src/layout/narrow-layout.ts
+   THE NARROW-WINDOW LAYER — see src/layout/narrow-layout.ts
 
    Atlas is a three-pane shell with hard pixel floors (180 + 280 + 240 plus
    two dividers = ~706px). Below that the row overflowed a container that
@@ -16821,7 +16821,7 @@ body.atlas-narrow .atlas-room-nav-drawer-btn.is-right { display: inline-flex; }
 body.atlas-narrow-sidebar .atlas-room-nav-drawer-btn.is-sidebar { display: inline-flex; }
 
 /* During the tour a drawer toggle shows only once the tour has revealed its
-   pane (S366). They were hidden outright, as "a door out of the script", but
+   pane. They were hidden outright, as "a door out of the script", but
    the tour then opened no drawer either, so in a narrow window step 1's icon
    and the map beats sat in closed drawers with no way to reach them. The tour
    now opens the pane each step points at (tour-pane.ts); the toggles are how
@@ -16831,7 +16831,7 @@ body.atlas-touring:not(.atlas-tour-cap-rightpane) .atlas-room-nav-drawer-btn.is-
 
 /* The toggles must never be the thing that scrolls out of reach — that would
    be this layer reintroducing its own bug. Measured at 390px: the strip
-   overflowed by 42px and parked the right toggle at x=404 (S323). Two moves:
+   overflowed by 42px and parked the right toggle at x=404. Two moves:
    pin both toggles to the strip's edges, and drop the search pill to its icon
    on the narrowest tier, where the "ctrl k" hint is meaningless anyway. */
 body.atlas-narrow .atlas-room-nav-drawer-btn.is-right {
@@ -16852,7 +16852,7 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
   display: none;
 }
 
-/* ---- The phone tier (#244, S403) ----
+/* ---- The phone tier (#244) ----
    At 560px and below the strip holds what a thumb needs: the two drawer toggles, Home, Writing,
    More (Knowledge, Charts, Pages, Data) and search, each a finger's size (40px). The label
    expander and the selected-element chip leave: an element page names its element in its own
@@ -17004,7 +17004,7 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     min-height: 40px;
   }
 
-  /* The map's toolbar in the right drawer too (S471's census: 22px there while the page's
+  /* The map's toolbar in the right drawer too (a census found 22px there while the page's
      own grew); the gaps close up so seven tools and their dividers fit at 360. A submap's
      way up keeps its name on a row of its own, the tools beneath (#139). */
   .atlas-right .atlas-map-toolbar-btn {
@@ -17036,7 +17036,7 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     min-height: 40px;
   }
 
-  /* The left drawer and its row of types at a finger's size (Seethe's phone pass, #4264: 25px
+  /* The left drawer and its row of types at a finger's size (Seethe's phone pass: 25px
      chips with the counts crammed above them, and the page's own words showing beside the
      drawer). The drawer takes more of the width and the dim behind it deepens. */
   body:not(.atlas-touring).atlas-narrow-sidebar .atlas-sidebar {
@@ -17101,7 +17101,7 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
   }
 }
 
-/* A touch screen has no keys to name and nothing to drop (Seethe's phone pass, #4264). */
+/* A touch screen has no keys to name and nothing to drop (Seethe's phone pass). */
 @media (pointer: coarse) {
   .atlas-edit-popover-hint {
     display: none;
@@ -17118,10 +17118,10 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
   }
 }
 
-/* ---- The guided tour on a narrow screen (S323) ----
+/* ---- The guided tour on a narrow screen ----
 
-   The dock is FIXED height (`--tour-dock-h`) because Captain asked for a
-   widget that never resizes as you step (S299), and the sentence carries a
+   The dock is FIXED height (`--tour-dock-h`) because Titus asked for a
+   widget that never resizes as you step, and the sentence carries a
    3-line min-height for the same reason. Both are right at desktop width.
    At 390px the sentence wraps to six lines, the copy needs its own room, and
    the fixed box cannot hold either: the children overflowed and PAINTED OVER
@@ -17154,7 +17154,7 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-controls {
 
 /* The controls row is a single line of [meta … buttons] at desktop. At 390
    the meta squeezes into a four-word column beside the buttons. Let it take
-   its own full-width line above them instead (S323). */
+   its own full-width line above them instead. */
 body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-controls {
   flex-wrap: wrap;
   row-gap: 8px;
@@ -17169,8 +17169,8 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 }
 
 /* ============================================================================
-   FRONTEND CRAFT, THE SYSTEMIC HALF (S360; lane A of the sweep,
-   Forge/Notes/2026-09-28-s360-sweep/lane-a-frontend-craft.md A2-A7).
+   FRONTEND CRAFT, THE SYSTEMIC HALF (lane A of a
+   2026-09-28 frontend sweep, A2-A7).
    Each rule closes a CLASS; local rules keep winning where they exist.
    ========================================================================== */
 
@@ -17240,7 +17240,7 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
   accent-color: var(--atlas-cyan);
 }
 
-/* The new-version offer (S360, core/offline.ts): bottom-left, clear of the
+/* The new-version offer (core/offline.ts): bottom-left, clear of the
    toasts at bottom-right. App chrome, so it follows the theme. */
 .atlas-update-banner {
   position: fixed;
@@ -17260,13 +17260,13 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 }
 
 /* With the side drawer open, its footer row (gear, help, the sync pill) sits at
-   the bottom left too: the banner rises above it (#303, the Captain's S22,
-   Boss h11 #4792). */
+   the bottom left too: the banner rises above it (#303, Titus's,
+   Boss 2026-10-15). */
 body.atlas-drawer-sidebar-open .atlas-update-banner {
   bottom: 72px;
 }
 
-/* Reduced motion (S361, lane a A9): transitions go instant and the INFINITE
+/* Reduced motion (lane a A9): transitions go instant and the INFINITE
    pulses stop. Targeted on purpose: a blanket animation kill would freeze
    the loading spinner into a static arc, which reads as broken. */
 @media (prefers-reduced-motion: reduce) {
@@ -17284,15 +17284,15 @@ body.atlas-drawer-sidebar-open .atlas-update-banner {
   }
 }
 
-/* S362: the dangling-links repair row in Settings → World sits above Make online. */
+/* The dangling-links repair row in Settings → World sits above Make online. */
 .atlas-settings-dangling { margin: 4px 0 14px; }
 .atlas-settings-dangling .atlas-settings-hint { margin-bottom: 8px; }
-/* S369: a date's reading in the world's calendar, under its number (element page). */
+/* A date's reading in the world's calendar, under its number (element page). */
 .atlas-field-value-col { min-width: 0; }
 .atlas-field-calendar-date { padding: 0 8px; }
-/* S369: the element type strip's selection, in words, under the search row. */
+/* The element type strip's selection, in words, under the search row. */
 .atlas-filter-summary { padding: 2px 10px 0; }
-/* S369: Settings → World "Not syncing": the place a failure toast and the pill's ⚠ lead to. */
+/* Settings → World "Not syncing": the place a failure toast and the pill's ⚠ lead to. */
 .atlas-settings-sync-issues { margin: 4px 0 14px; padding: 10px 12px; border: 1px solid var(--atlas-warn-soft-border); border-radius: 8px; background: var(--atlas-warn-soft-tint); }
 .atlas-settings-sync-issues h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--atlas-text); }
 .atlas-settings-issue-list { list-style: none; margin: 0 0 8px; padding: 0; max-height: 320px; overflow-y: auto; }
@@ -17303,11 +17303,11 @@ button.atlas-settings-issue-name { background: none; border: none; padding: 0; f
 button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-settings-issue-line { flex: 1 1 240px; color: var(--atlas-text-muted); min-width: 0; }
 .atlas-settings-issue [data-action="copy-issue"] { font-size: 11px; padding: 2px 8px; }
-/* S362: a zone drawn as its linked zones (a road as its segments) says how many parts it lights. */
+/* A zone drawn as its linked zones (a road as its segments) says how many parts it lights. */
 .atlas-zone-chip-parts { margin-left: auto; padding-left: 8px; font-size: 11px; color: var(--atlas-text-muted); white-space: nowrap; }
 
 /* ============================================================
-   S368 lane X: problem toasts (fix buttons, Details, close).
+   Problem toasts (fix buttons, Details, close).
    A toast with buttons or details stays until closed.
    ============================================================ */
 .ow-toast.ow-toast-rich { align-items: flex-start; }

@@ -37,7 +37,7 @@ import {
 const DOT_RADIUS = 4;             // placement radius for binning + hit-test base
 const DOT_RADIUS_HOVER = 14;      // hit-test tolerance (px) — covers the WHOLE
                                   // drawn circle incl. ring, not just the icon
-                                  // (S256, Captain: "icons a bit hard to click")
+                                  // (Titus: "icons a bit hard to click")
 // Node glyphs — type-tinted Material Symbols, sizes in px (Identity, chart #2).
 const ICON_BASE = 14;
 const ICON_HOVER = 18;
@@ -49,7 +49,7 @@ const TOP_PAD = 20;
 const AXIS_LABEL_HEIGHT = 22;
 const NODE_X_GAP = 42;           // density-fan: x-window within which nodes bloom vertically
 const NODE_Y_GAP = 34;           // density-fan: vertical step between stacked nodes (breathing room)
-// Labels write in full (Captain's launch note: "Moistened Valley Massacre"
+// Labels write in full (Titus's launch note: "Moistened Valley Massacre"
 // truncated at 24). The collision engine already sizes each label box to its
 // MEASURED width and drops any that cannot place, so a long name claims its
 // real space or is hidden — never cut mid-word. The cap is now a sanity bound
@@ -90,7 +90,7 @@ const NOW_GRAB_PX = 6;           // px tolerance to grab the now-line for draggi
 // A finger (#301) gets wider grips than a cursor.
 const TOUCH_NOW_GRAB_PX = 16;
 const TOUCH_STRIP_EDGE_GRAB = 14;
-const FUTURE_NODE_ALPHA = 0.4;   // ahead-of-now glyphs render dim/hollow (S11)
+const FUTURE_NODE_ALPHA = 0.4;   // ahead-of-now glyphs render dim/hollow
 
 export interface TimelineViewOptions {
   /**
@@ -106,7 +106,7 @@ export interface TimelineViewOptions {
   onOpenElement: (elementId: string) => void;
   /**
    * The now-line was established or dragged (Act 1). The room persists this to
-   * `World.time_current` (synced via the world-meta step since S262 — the now
+   * `World.time_current` (synced via the world-meta step — the now
    * travels between devices) and re-renders. null clears the now (removes the
    * seam; the clear syncs too, as an explicit wire null).
    */
@@ -149,7 +149,7 @@ export interface TimelineViewExtras {
    */
   focusId?: string | null;
   /**
-   * The active saved chart's name (S264) — becomes the ambient rail's heading
+   * The active saved chart's name — becomes the ambient rail's heading
    * so the open chart is named where you read it. null = no saved chart active
    * (the rail falls back to "This chart"). `undefined` leaves it untouched.
    */
@@ -170,7 +170,7 @@ export interface TimelineViewHandle {
   setNodes(nodes: TimelineNode[], universe?: TimelineNode[], extras?: TimelineViewExtras): void;
   setSelection(elementId: string | null): void;
   /** Pan the window (span preserved, animated) so `date` is on screen. No-op
-   *  when it already is (S264 — a re-date must never leave its element
+   *  when it already is (a re-date must never leave its element
    *  invisible off-window). */
   revealDate(date: number): void;
   redraw(): void;
@@ -244,16 +244,16 @@ interface ViewState {
   // The URL-focused element (Act 2A) — the chart's subject; its span draws
   // emphasized. null = broad view.
   focusId: string | null;
-  // The active saved chart's name (S264) — the ambient rail's heading.
+  // The active saved chart's name — the ambient rail's heading.
   chartLabel: string | null;
   // The active calendar lens (2B) — null = bare numbers. Every date surface
   // formats through fmtDate/fmtTick so lens switches are pure re-labels.
   calendar: CalendarConfig | null;
-  // Glyph re-dating drag (S264): a PLACED dot is being dragged along the axis
+  // Glyph re-dating drag: a PLACED dot is being dragged along the axis
   // to a new start date. Threshold-armed on mousedown over a dot; a no-move
   // mouseup falls through to the click progression (peek / re-click = focus).
   // `maxDate` clamps a range's start at its recorded end (the end is anchored:
-  // the drag reduces/extends the range, never slides it — Captain's ruling).
+  // the drag reduces/extends the range, never slides it — Titus's ruling).
   glyphDrag: { dot: PlacedDot; startX: number; startY: number; active: boolean; edge: 'start' | 'end'; maxDate: number | null; minDate: number | null } | null;
   // Drag-to-date (Bout 1.2): a rail item is being dragged onto the axis. Holds
   // the element DATA (not the DOM node — survives a mid-drag rail rebuild), the
@@ -263,7 +263,7 @@ interface ViewState {
     id: string; type: string; name: string;
     startX: number; startY: number; active: boolean; ghost: HTMLElement | null;
     /** What a NO-MOVE mouseup does: rail items open the element room; card
-     *  chips peek in place (S263 — chips drag to date too, but a click on a
+     *  chips peek in place (chips drag to date too, but a click on a
      *  chip has always meant "peek it"). */
     clickAction?: 'open' | 'select';
   } | null;
@@ -514,8 +514,8 @@ function recordedBounds(state: Pick<ViewState, 'universe' | 'baseRange'>): { min
 }
 
 /** The navigable bounds (camera + strip): recorded history widened to take
- *  in the world's now, so a now outside history can be panned to (S367
- *  critic K7). The default fit stays on history; DESIGN_CHARTS asks no more. */
+ *  in the world's now, so a now outside history can be panned to.
+ *  The default fit stays on history; DESIGN_CHARTS asks no more. */
 export function navBounds(state: Pick<ViewState, 'universe' | 'baseRange' | 'now'>): { min: number; max: number } | null {
   const rec = recordedBounds(state);
   if (!rec || state.now == null || !Number.isFinite(state.now)) return rec;
@@ -544,7 +544,7 @@ function zoomFactorOf(state: ViewState, view: TimeWindow): number {
   return span > 0 && baseSpan > 0 ? Math.max(1, baseSpan / span) : 1;
 }
 
-// ====== The now-line / forward half (Act 1, S11) ======
+// ====== The now-line / forward half (Act 1) ======
 
 /** Where a node sits relative to the world's now. Pure — the load-bearing
  *  classification for forward-half rendering (dim future glyphs, split
@@ -660,7 +660,7 @@ function axisYOf(h: number): number { return h - AXIS_LABEL_HEIGHT - STRIP_H - S
 /** Canvas x for a world date under the current on-screen window (inverse of
  *  dateAtX). null when there's no view yet.
  *  Delegates to the axis-calculator's PADDED mapping — the same one nodes and
- *  ticks draw with. An unpadded twin lived here until S318 and put the
+ *  ticks draw with. An unpadded twin once lived here and put the
  *  now-line PADDING_RIGHT px right of the events it was set to. */
 function xAtDate(state: ViewState, date: number, w: number): number | null {
   const view = currentViewRange(state);
@@ -737,7 +737,7 @@ export function computeBeeswarm(
   );
   const placed: PlacedDot[] = [];
   // Range-bearing nodes (narrative/construct/title spans) OCCUPY their whole
-  // x-span as a lane (S256, Captain on fx-2: point-events sitting exactly ON a
+  // x-span as a lane (Titus on fx-2: point-events sitting exactly ON a
   // range line read as membership, which is a coincidence of the midline rule,
   // not a fact). Later nodes whose date falls inside a placed span step off
   // that lane — near-the-line stays (related in time); on-the-line stops lying.
@@ -836,7 +836,7 @@ function draw(state: ViewState): void {
   // The now (Act 1): its canvas x, and the forward-half tint. null when unset.
   const nowX = state.now != null ? xAtDate(state, state.now, w) : null;
 
-  // The forward half (S11): everything ahead of now sits in a faint cool haze,
+  // The forward half: everything ahead of now sits in a faint cool haze,
   // so past and future read as different regions before you even see a glyph.
   if (nowX != null && nowX < w) {
     const fx = Math.max(0, nowX);
@@ -844,7 +844,7 @@ function draw(state: ViewState): void {
     ctx.fillRect(fx, TOP_PAD, w - fx, axisY - TOP_PAD);
   }
 
-  // World-edge markers (S263): the bounds of recorded time, legible when in
+  // World-edge markers: the bounds of recorded time, legible when in
   // view. Beyond each bound the plot dims back toward the page and a bracket
   // tick marks the terminal — at full zoom-out both edges read immediately.
   drawWorldEdges(ctx, state, dateToX, w, axisY);
@@ -935,7 +935,7 @@ function draw(state: ViewState): void {
   if (state.layoutSig !== layoutSig || state.layoutNodes !== state.nodes) {
     // Sparse sets (the tableau, small worlds) spread out — the default gaps
     // are tuned for dense sets, and at ~22 nodes they cram the middle while
-    // the band sits empty (Captain: "space it all out better"). Node count is
+    // the band sits empty (Titus: "space it all out better"). Node count is
     // part of layoutSig, so the gap choice re-derives with the set.
     const gaps = state.nodes.length <= 30 ? { x: 84, y: 60 } : undefined;
     state.placedDots = computeBeeswarm(state.nodes, anchorIds, dateToX, w, axisY, gaps, state.now, state.focusId);
@@ -997,7 +997,7 @@ function draw(state: ViewState): void {
   // labels its heaviest nodes up to a space-proportional budget; the remainder
   // surfaces as a clickable "+N" badge (zoom to cluster) instead of a smear.
   // LOD rung computed here because BOTH the glyph draw and the label
-  // collision boxes need it (S265: labels intruded into zoom-grown rings).
+  // collision boxes need it (labels intruded into zoom-grown rings).
   const zf = zoomFactorOf(state, view);
   const detail = zf > RUNG_CLOSE ? 2 : zf > RUNG_MID ? 1 : 0;
   drawLabels(ctx, state, placed, w, axisY, anchorIds, detail);
@@ -1018,7 +1018,7 @@ function draw(state: ViewState): void {
     const isFuture = rangeVsNow(dot.node.startDate, dot.node.endDate, state.now) === 'future'
       && !isSel && !isHover;
     // The cast outranks anchors visually — a protagonist that's hard to find
-    // defeats the whole cast system (Captain, 2026-07-10).
+    // defeats the whole cast system (Titus, 2026-07-10).
     const size = isSel ? ICON_SELECTED
       : isCast ? ICON_ANCHOR + detail + 5
       : isAnchor ? ICON_ANCHOR + detail
@@ -1039,7 +1039,7 @@ function draw(state: ViewState): void {
       ctx.stroke();
     }
     if (isSel) {
-      // Peek vs focus split (S264, Captain: both states wore the same harsh
+      // Peek vs focus split (Titus: both states wore the same harsh
       // white ring). PEEK = mellow — a soft type halo + a quiet white ring
       // (reading is free, the mark should whisper). FOCUS = the subject — the
       // full two-ring treatment, brighter and wider (the oomph lives here).
@@ -1070,7 +1070,7 @@ function draw(state: ViewState): void {
     ctx.fillStyle = isFuture ? applyAlpha(dot.node.color, FUTURE_NODE_ALPHA) : dot.node.color;
     ctx.fillText(icon, dot.x, dot.y);
 
-    // The cast signal (revised 2026-07-10, Captain: ring + corner badge were
+    // The cast signal (revised 2026-07-10, Titus: ring + corner badge were
     // "a bit much"): a modest size boost (above) + the BRIGHT CYAN LABEL do
     // the signifying — quiet, fitting the style, still unmistakable.
   }
@@ -1166,7 +1166,7 @@ function drawDropGuide(ctx: CanvasRenderingContext2D, state: ViewState, w: numbe
 }
 
 /**
- * World-edge treatment (S263, revised same day on Captain's read): beyond the
+ * World-edge treatment (revised same day on Titus's read): beyond the
  * bounds of recorded time the plot simply DIMS back toward the page — the lit
  * region IS recorded history, its edge IS the border. The first cut also drew
  * bracket lines, which read as unexplained marks when the current scope shows
@@ -1209,7 +1209,7 @@ function drawNowLine(ctx: CanvasRenderingContext2D, state: ViewState, w: number,
   ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, axisY); ctx.stroke();
 
   // The value tag riding the top of the line (clamped inside the canvas).
-  // Just the date — the warm-gold treatment IS the "now" (Captain, S263:
+  // Just the date — the warm-gold treatment IS the "now" (Titus:
   // saying "now" here and in the control chip doubled the word on screen).
   ctx.font = '600 10px system-ui, sans-serif';
   const label = fmtDate(state, state.now);
@@ -1269,7 +1269,7 @@ function seasonFill(frac: number): string {
 
 /**
  * Season wash + era bands over the plot (2B "Grid and texture"). Deliberately
- * on the loud side — the prototype Captain judges by eye; subtraction is the
+ * on the loud side — the prototype Titus judges by eye; subtraction is the
  * expected next move. Era gaps stay unshaded: absence IS the gap's rendering.
  */
 function drawCalendarTexture(
@@ -1301,7 +1301,7 @@ function drawCalendarTexture(
   // The wash exists to DIFFERENTIATE eras — the colour change at a pivot is
   // the signal. A single-era calendar has no pivot to mark, and washing its
   // whole plot lavender is a full-canvas cast with no boundary to explain it
-  // (S315 gate): seams + labels still draw, the wash gates on >= 2 eras.
+  // — so seams + labels still draw, the wash gates on >= 2 eras.
   const washEras = (cal.eras?.length ?? 0) >= 2;
   for (const band of eraBandsInRange(cal, range.min, range.max)) {
     const x0 = Math.max(0, dateToX(band.lo));
@@ -1310,8 +1310,8 @@ function drawCalendarTexture(
     // Each era carries its OWN wash (not one-shaded-one-blank): the CHANGE of
     // colour at a pivot is what shows where one era ends and the next begins,
     // so the switch reads and the O.E span's extent is legible as its own
-    // region. The first pass (S313, 0.05) was invisible — bumped so it actually
-    // reads, with a firm boundary line at the pivot (Captain: "don't see it").
+    // region. The first pass (0.05) was invisible — bumped so it actually
+    // reads, with a firm boundary line at the pivot (Titus: "don't see it").
     if (washEras) {
       ctx.fillStyle = band.index % 2 === 1
         ? 'rgba(120, 165, 245, 0.10)'   // cool blue
@@ -1352,14 +1352,14 @@ function drawStripEraBands(
   ctx.font = '9px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // Same single-era guard as the main plot (S315 gate): no pivot, no wash.
+  // Same single-era guard as the main plot: no pivot, no wash.
   const washEras = (cal.eras?.length ?? 0) >= 2;
   for (const band of eraBandsInRange(cal, scale.bounds.min, scale.bounds.max)) {
     const x0 = Math.max(capMin, scale.toX(band.lo));
     const x1 = Math.min(capMax, scale.toX(band.hi));
     if (x1 <= x0) continue;
     // Distinct washes so the eras read as different regions in the strip too
-    // (Captain, S313). Bold enough (0.30) to show THROUGH the cyan viewport
+    // (Titus). Bold enough (0.30) to show THROUGH the cyan viewport
     // band drawn over it; same hues as the main plot so a glance connects the
     // two. The seam marks the pivot even where an era is a thin sliver.
     if (washEras) {
@@ -1392,7 +1392,7 @@ function drawStrip(ctx: CanvasRenderingContext2D, state: ViewState, w: number, h
   const top = stripTop(h);
   const midY = top + STRIP_H / 2;
 
-  // The track ENDS where recorded time ends (S263, Captain's read: "the bar
+  // The track ENDS where recorded time ends (Titus's read: "the bar
   // went beyond the borders" — it must not). With real data the track runs
   // exactly capMin..capMax and everything on it clamps inside; on a dateless
   // world (synthetic range, no real bounds) it runs full width, uncapped.
@@ -1478,7 +1478,7 @@ function stripHit(
   if (my < stripTop(h)) return null;
   const scale = stripScale(state, w);
   if (!scale) return null;
-  // Same clamp as drawStrip (S263): grips are HIT where they are DRAWN — a
+  // Same clamp as drawStrip: grips are HIT where they are DRAWN — a
   // band pinned at the track terminal must grab at the terminal, not at the
   // off-track position of the unclamped view edge.
   const hasData = state.universe.length > 0 || state.nodes.length > 0;
@@ -1560,7 +1560,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   // Collision extent MIRRORS the draw math (size formula + outermost ring +
   // stroke) instead of fixed constants — the old 16/21/9 ignored selection
   // rings and LOD growth, so labels ended inside zoom-grown ring visuals
-  // (S265, Captain's sshot: a label flush against the next node's ring).
+  // (Titus's sshot: a label flush against the next node's ring).
   const glyphHalf = (d: PlacedDot): number => {
     const isSel = d.node.id === state.selectedId;
     const isCast = isCastId(d.node.id);
@@ -1609,7 +1609,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
       });
     }
     // BELOW before above — one consistent direction reads as a system where a
-    // mix reads as scatter (Captain: "labels are still random").
+    // mix reads as scatter (Titus: "labels are still random").
     const vertAttempts: Array<{ box: Box; align: CanvasTextAlign; tx: number; ty: number }> = [];
     for (const dir of [1, -1]) {
       const cy = dot.y + dir * (gh + 8);
@@ -1618,7 +1618,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
         align: 'center', tx: dot.x, ty: cy,
       });
     }
-    // Point nodes: right → below → left → above (the S256 lab sliver). A
+    // Point nodes: right → below → left → above (tested in a lab sliver). A
     // left-side label sits BETWEEN two dots and reads as ambiguous ownership;
     // below is the clearer second choice. Range nodes keep vertical-first
     // (a side label sits ON the range line and reads struck-through) — judged
@@ -1634,7 +1634,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
     // flush at the next glyph reads as one word ("Captain SnootPip", live).
     const padded = (b: Box): Box => ({ x0: b.x0 - 5, x1: b.x1 + 5, y0: b.y0, y1: b.y1 });
     // Vertical bounds keep labels INSIDE the band — an above-label near the
-    // top edge was getting clipped mid-glyph (Captain's sshot).
+    // top edge was getting clipped mid-glyph (Titus's sshot).
     const fit = attempts.find(a =>
       a.box.x0 >= 2 && a.box.x1 <= w - 2
       && a.box.y0 >= 2 && a.box.y1 <= axisY - 2
@@ -1765,7 +1765,7 @@ function renderCard(state: ViewState): void {
   const meta = document.createElement('div');
   meta.className = 'atlas-timeline-card-meta';
   // Dateable elements: the date part of the meta line is click-to-edit
-  // (S263) — same number popover + write path as drag-to-date, so the card
+  // — same number popover + write path as drag-to-date, so the card
   // is the second place a date can be changed without leaving the chart.
   if (TEMPORAL_TYPE_FIELDS[node.elementType] && state.onDateElement) {
     const typeSpan = document.createElement('span');
@@ -1778,7 +1778,7 @@ function renderCard(state: ViewState): void {
     dateBtn.title = 'Change the date';
     dateBtn.addEventListener('click', () => {
       const r = dateBtn.getBoundingClientRect();
-      // The stored value itself, unrounded, marked as current (S367 critic K3).
+      // The stored value itself, unrounded, marked as current.
       openDropDatePopover(state, node.id, node.startDate, r.left + r.width / 2, r.bottom + 4, 'start', true);
     });
     meta.appendChild(dateBtn);
@@ -1840,7 +1840,7 @@ function renderCard(state: ViewState): void {
   // inspect room. Peek (just clicking) stays free of both.
   const actions = document.createElement('div');
   actions.className = 'atlas-timeline-card-actions';
-  // Already the chart's focus? Offering Focus again is a dead verb (S263).
+  // Already the chart's focus? Offering Focus again is a dead verb.
   if (state.focusId !== node.id) {
     const focus = document.createElement('button');
     focus.type = 'button';
@@ -1881,7 +1881,7 @@ function renderAmbientRail(state: ViewState): void {
     if (undated) card.appendChild(undated);
     // No backlog either (a truly empty world): keep the SPACE (peeks must
     // never reflow the canvas) but drop the panel chrome — an empty bordered
-    // box reads as a broken widget (S263 style-up made the chrome visible).
+    // box reads as a broken widget (a style-up made the chrome visible).
     card.classList.toggle('atlas-timeline-card-blank', !undated);
     card.style.display = 'flex';
     return;
@@ -1890,7 +1890,7 @@ function renderAmbientRail(state: ViewState): void {
 
   const head = document.createElement('div');
   head.className = 'atlas-timeline-rail-head';
-  // An applied saved chart is named where you read it (S264); otherwise the
+  // An applied saved chart is named where you read it; otherwise the
   // generic heading. Renames flow through on the next room render.
   head.textContent = state.chartLabel ?? 'This chart';
   if (state.chartLabel) head.title = 'Saved chart';
@@ -1971,7 +1971,7 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
     if (arr) arr.push(u); else byType.set(u.type, [u]);
   }
   // The time-native types float to the top — you date events and narratives far
-  // more than anything else (Captain). The rest follow by count.
+  // more than anything else (Titus). The rest follow by count.
   const TYPE_PRIORITY = ['event', 'narrative'];
   const rank = (t: string): number => { const i = TYPE_PRIORITY.indexOf(t); return i === -1 ? TYPE_PRIORITY.length : i; };
   const groups = [...byType.entries()].sort((a, b) =>
@@ -2108,7 +2108,7 @@ function endDateDrag(state: ViewState): void {
 }
 
 /**
- * Snap a glyph-drag date (S264): whole numbers, clamped at the range's
+ * Snap a glyph-drag date: whole numbers, clamped at the range's
  * recorded end when one exists (the end is anchored — a start past it would
  * invert the range). Pure, exported for unit tests.
  */
@@ -2149,8 +2149,8 @@ function buildDragGhost(type: string, name: string): HTMLElement {
  *
  *  `isCurrent` = `dropDate` is the value already stored (the card's date
  *  edit), not a proposed new one: then an untouched Enter writes nothing, and
- *  a prefill the lens cannot round-trip exactly becomes the raw number
- *  (S367 critic K3). A drop leaves it false: Enter confirms the drop. */
+ *  a prefill the lens cannot round-trip exactly becomes the raw number.
+ *  A drop leaves it false: Enter confirms the drop. */
 function openDropDatePopover(
   state: ViewState, id: string, dropDate: number, cx: number, cy: number,
   edge: 'start' | 'end' = 'start', isCurrent = false,
@@ -2170,7 +2170,7 @@ function openDropDatePopover(
     const r = parseDate(cal, raw, { now: state.now });
     return isParseError(r) ? null : r.step;
   };
-  // S367 critic K3: speak the stored value through the lens only when that
+  // Speak the stored value through the lens only when that
   // text parses back to exactly the same step; else show the raw number.
   const spoken = cal ? formatStep(cal, Math.round(dropDate)) : null;
   const prefill = spoken != null && (!isCurrent || resolve(spoken) === dropDate)
@@ -2239,7 +2239,7 @@ function buildChipGroup(state: ViewState, label: string, refs: LinkedRef[]): HTM
 }
 
 /**
- * Card chips speak time (S263): a BORDER means "this element is dated — it
+ * Card chips speak time: a BORDER means "this element is dated — it
  * lives on this chart". Undated-but-dateable chips are borderless AND
  * draggable onto the axis (the rail's drag machinery; a plain click still
  * peeks). Non-dateable types are just quiet references.
@@ -2302,7 +2302,7 @@ function dotOnlyHit(state: ViewState, mx: number, my: number): PlacedDot | null 
 }
 
 /**
- * A range node's recorded END cap under the cursor (S265 end-stretch).
+ * A range node's recorded END cap under the cursor (the end-stretch).
  * Recorded ends only — openEnded fades and focus-inferred spans have no
  * value to move. The start glyph wins where the two grips overlap (the
  * caller checks hitTest first).
@@ -2326,7 +2326,7 @@ function nearNowLine(state: ViewState, mx: number, my: number, w: number, h: num
 }
 
 /** The date under a main-canvas x (uses the current on-screen window).
- *  Inverse of xAtDate via the SHARED padded mapping (S318) — drags and hover
+ *  Inverse of xAtDate via the SHARED padded mapping — drags and hover
  *  reads land on the date whose node sits under the cursor, not a few px off. */
 function dateAtX(state: ViewState, x: number, w: number): number | null {
   const view = currentViewRange(state);
@@ -2347,7 +2347,7 @@ function handleMouseMove(state: ViewState, e: Pick<MouseEvent, 'clientX' | 'clie
   state.mouseX = mx;
   state.mouseY = my;
 
-  // A glyph re-dating drag owns the mouse (S264): past the threshold, the
+  // A glyph re-dating drag owns the mouse: past the threshold, the
   // cursor drives the drop-guide seam to the element's new start date. Ranges
   // clamp at their recorded end (the end is anchored — the drag reduces or
   // extends the range, never slides it).
@@ -2497,7 +2497,7 @@ function handleMouseDown(
     }
   }
 
-  // A dot under the cursor arms a re-dating drag (S264, the S10 gesture
+  // A dot under the cursor arms a re-dating drag (the S10 gesture
   // grammar: "charts room edits time"). Threshold-gated — a no-move mouseup
   // falls through to the click progression (peek / re-click = focus), so
   // clicking is untouched. Pan from ON a dot is gone by design; the band's
@@ -2517,8 +2517,8 @@ function handleMouseDown(
     return;
   }
 
-  // A range's END CAP arms an end-stretch drag (S265, the banked v2 of the
-  // S264 ruling: the start-drag anchors the end; this is the other grip).
+  // A range's END CAP arms an end-stretch drag (the banked v2 of
+  // Titus's ruling: the start-drag anchors the end; this is the other grip).
   // Only RECORDED ends — an open tenure's fade-cap has no value to move.
   if (capHit && grips(capHit) && state.onDateElement && TEMPORAL_TYPE_FIELDS[capHit.node.elementType]?.end) {
     state.glyphDrag = {
@@ -2547,7 +2547,7 @@ function handleMouseUp(state: ViewState, e?: Pick<MouseEvent, 'clientX' | 'clien
   // A date-drag's own window mouseup handler does the drop — this canvas-level
   // one (registered first) must bail so it can't also pan/select/dismiss.
   if (state.dateDrag) return;
-  // A glyph re-dating drag (S264): a real drag opens the confirm popover at
+  // A glyph re-dating drag: a real drag opens the confirm popover at
   // the release point; a no-move mouseup replays the click progression the
   // mousedown intercepted (peek / re-click = focus / badge zoom untouched —
   // badges live in the axis gutter where no dot hit-test fires).
@@ -2596,8 +2596,8 @@ function handleMouseUp(state: ViewState, e?: Pick<MouseEvent, 'clientX' | 'clien
     if (badge) { zoomToCluster(state, badge); return; }
   }
   if (!state.dragMoved && state.hoveredDot) {
-    // Click progression (S256, revising the 2026-07-10 re-click-deselects
-    // lock — reopened by Captain's own live use, which is the lock working):
+    // Click progression (revising the 2026-07-10 re-click-deselects
+    // lock — reopened by Titus's own live use, which is the lock working):
     // click = peek · click the peeked node AGAIN = FOCUS · click empty canvas
     // (below), Esc, or the card × = dismiss.
     if (state.hoveredDot.node.id === state.selectedId) {
@@ -2609,7 +2609,7 @@ function handleMouseUp(state: ViewState, e?: Pick<MouseEvent, 'clientX' | 'clien
     // default and programmatic onSelect calls never pass through here.
     completeWaypoint('time');
   } else if (!state.dragMoved && !state.hoveredDot && state.selectedId) {
-    // Click on empty canvas → dismiss the peek (S256 — dismissal moved here
+    // Click on empty canvas → dismiss the peek (dismissal moved here
     // from the re-click, which now escalates to focus instead).
     state.onSelect('');
   }
@@ -2644,7 +2644,7 @@ function handleTouchDown(state: ViewState, e: PointerEvent): void {
   if (e.pointerType !== 'touch') return;
   // A tap would also arrive as made-up mouse events and run the click
   // progression twice (peek, then focus); a cancelled pointerdown stops them
-  // in Chromium and Firefox (measured, S411). The click event still fires,
+  // in Chromium and Firefox (measured). The click event still fires,
   // and the canvas has no click listener.
   e.preventDefault();
   try { state.canvas.setPointerCapture(e.pointerId); } catch { /* not capturable: moves still arrive over the canvas */ }

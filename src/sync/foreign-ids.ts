@@ -1,6 +1,6 @@
 /**
  * Foreign ids: elements keel will not create because their id already lives
- * in ANOTHER OnlyWorlds world (S363, the re-key's worklist).
+ * in ANOTHER OnlyWorlds world (the re-key's worklist).
  *
  * Pure. The engine merges each round's evidence with `mergeForeignIds`
  * inside its end-of-round sync-state mutator; the Settings line and the
@@ -18,7 +18,7 @@ import type { Element, ElementType, ForeignIds } from '../core/types';
  * round, and `attempted` every create the round actually sent. A carried id
  * that was sent and NOT refused as foreign again leaves: it may have landed
  * with its baseline backfill failing, and re-keying it then would leave the
- * server holding it twice (S363 gate lens B F4). Entries observed against a
+ * server holding it twice. Entries observed against a
  * different api world are discarded.
  */
 export function mergeForeignIds(

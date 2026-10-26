@@ -1,6 +1,6 @@
 /**
- * Promoted from the S367 composition gate (lens A, probe f), after the
- * Captain's ruling A4/A5 (2026-10-04).
+ * Promoted from the composition gate (lens A, probe f), after
+ * Titus's ruling A4/A5 (2026-10-04).
  *
  * The finding: a local map or zone that name-matches a server one was moved
  * onto the server's id by the kernel, and its children with it. When both

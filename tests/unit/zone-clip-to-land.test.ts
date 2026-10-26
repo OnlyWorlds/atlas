@@ -1,6 +1,6 @@
 /**
- * A river on a styled map ends at the coast (S424, Seethe's receipt h20
- * #6514): `clipLineToLand` keeps the parts of a line on land and off water.
+ * A river on a styled map ends at the coast (Seethe's receipt,
+ * 2026-10-17): `clipLineToLand` keeps the parts of a line on land and off water.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -82,7 +82,7 @@ describe('clipLineToLand', () => {
 });
 
 // gate G2: the clip walks an edge index and carries land between outlines.
-// The instrument: the S424 walk, every segment against every edge, every
+// The instrument: the walk, every segment against every edge, every
 // piece by its midpoint, run on the same jagged shapes.
 describe('clipLineToLand against the plain walk', () => {
   let seed = 7;
@@ -146,7 +146,7 @@ describe('clipLineToLand against the plain walk', () => {
     });
     const t0 = performance.now();
     for (const r of rivers) clipLineToLand(r, [coast], []);
-    // The plain walk took about 630 ms here (S426); the index takes a few.
+    // The plain walk took about 630 ms here; the index takes a few.
     expect(performance.now() - t0).toBeLessThan(150);
   }, 30000);
 });

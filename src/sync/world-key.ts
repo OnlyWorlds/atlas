@@ -1,5 +1,5 @@
 /**
- * A linked world takes a new key in place (#198, the Captain's go,
+ * A linked world takes a new key in place (#198, Titus's go,
  * 2026-10-16). Before, a revoked, unknown or read key meant Unlink, then Make
  * online, and Unlink drops the deletes not yet sent (conv. 24). Now the key is
  * swapped under the same world: same folder, same baselines, same pending
@@ -11,7 +11,7 @@
  * - made by Atlas from the account token (`makeNewWorldKey`): signed in, for
  *   a world on the account's list. Sync calls it once per world and session
  *   when keel refuses the key (`recoverRefusedKey`: a member removed and
- *   invited back, the owner rotating keys, Skeld h16 #5923); the button in
+ *   invited back, the owner rotating keys, Skeld 2026-10-16); the button in
  *   Settings calls it too.
  *
  * A seat world never takes either: its key and secret come back only through
@@ -105,7 +105,7 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
  */
 export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, readOnly: boolean): Promise<WorldRegistryEntry> {
   if (!canTakeNewKey(entry)) throw new PlainError('This world cannot take a new key here.');
-  // The role belongs to the key: a new one (perhaps another account's) is read afresh (conv. 151, the S439 gate's G6).
+  // The role belongs to the key: a new one (perhaps another account's) is read afresh (conv. 151).
   const { read_only: _was, member_role: _role, ...rest } = entry.api;
   const api = { ...rest, api_key: key, ...(readOnly ? { read_only: true } : {}) };
   const next = updateWorldEntry(getState().registry, entry.id, { api });
@@ -127,9 +127,9 @@ export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, read
     store.setViewOnly(readOnly);
     // What the old key kept, or saw leave its view, is the old key's view:
     // the new key walks from 0, so what it sees syncs again and the rest stays
-    // kept or left (conv. 151, G6; `left_view`, the S441 gate's G6).
+    // kept or left (conv. 151; `left_view`).
     // The old engine stops first, so no round of its writes the old cursor
-    // back after the reset (the second S439 gate's H4).
+    // back after the reset.
     try {
       const st = await store.readSyncState();
       if ((st.kept_outside_view?.length ?? 0) > 0 || (st.left_view?.length ?? 0) > 0) {

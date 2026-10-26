@@ -1,5 +1,5 @@
 /**
- * World styles (S356): the rule model behind `.atlas/styles.json`.
+ * World styles: the rule model behind `.atlas/styles.json`.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -88,7 +88,7 @@ describe('parseWorldStyles', () => {
   });
 });
 
-describe('role rules and role kinds (S362)', () => {
+describe('role rules and role kinds', () => {
   const ROLE_RULES: StyleRule[] = [
     ...RULES,
     { type: 'zone', supertype: 'Line', subtype: 'River', role: 'major river', weight: 5, color: '#1d4ed8' },
@@ -124,7 +124,7 @@ describe('role rules and role kinds (S362)', () => {
     expect(kinds.map(k => kindLabel(k))).toEqual([
       'Line · River', 'Line · River · major river', 'Line · River · minor stream', 'Polygon · Chora',
     ]);
-    // the no-role members keep the pre-S362 key (a kind hidden before stays hidden)
+    // the no-role members keep the earlier key (a kind hidden before stays hidden)
     expect(kinds[0].key).toBe(groupByKind(rivers)[0].key);
     expect(kinds[0].members.map(z => z.id)).toEqual(['d']);
     // without byRole nothing changes

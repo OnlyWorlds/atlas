@@ -1,8 +1,8 @@
 /**
- * THE FRONT DOOR (S365): a world folder opens on the very first visit.
+ * THE FRONT DOOR: a world folder opens on the very first visit.
  *
  * The OnlyWorlds toolkit tells people "open Atlas and pick the world folder
- * your AI made". Before S365 a first-visit pick of a world folder answered
+ * your AI made". Before the fix a first-visit pick of a world folder answered
  * with a hint naming a sidebar button that was not on screen yet. Now a world
  * folder opens in place from the landing, with no home folder; the home
  * folder is asked for when the user first makes a NEW world.
@@ -57,7 +57,7 @@ test('first visit: two doors, start a world and Moppetopia, then the tour, a wor
   // whose dialog asks where; "other ways in" is the chooser.
   await freshBoot(page);
   const doors = page.locator('.atlas-landing-actions .atlas-landing-btn');
-  // #127 (the Captain's Q4): two doors; the rest is one quiet line of links,
+  // #127 (Titus's Q4): two doors; the rest is one quiet line of links,
   // the tour one click from the first screen (his Q5).
   await expect(doors).toHaveText(['Start a world', 'Explore Moppetopia']);
   await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Take the tour', 'Open a world folder', 'Other ways in']);
@@ -70,7 +70,7 @@ test('first visit: two doors, start a world and Moppetopia, then the tour, a wor
   await expect(chooser.locator('[data-choice="try-demo"] strong')).toHaveText('Explore Moppetopia');
 });
 
-test('first visit, browser storage refused on Chromium: no tour, and the doors left say only what works (S374 gate F6)', async ({ page }) => {
+test('first visit, browser storage refused on Chromium: no tour, and the doors left say only what works', async ({ page }) => {
   await page.addInitScript(() => {
     const storage = navigator.storage as any;
     storage.getDirectory = async () => { throw Object.assign(new Error('refused'), { name: 'SecurityError' }); };
@@ -201,11 +201,11 @@ test('cancelling the home-folder question creates nothing', async ({ page }) => 
   expect(after.worlds).toBe(1); // only the world opened in place above
 });
 
-// S421: the sidebar rebuilt its add-a-world buttons on every state change and
+// The sidebar rebuilt its add-a-world buttons on every state change and
 // hashchange, so a press on the old button and a release on its twin sent the
 // click to their common ancestor, and the click was lost. A route to `#/` sets
 // off a burst of those rebuilds: the race `cancelling the home-folder
-// question` lost 5 of 20 runs to (S419). Here the rebuild lands between the
+// question` lost 5 of 20 runs to. Here the rebuild lands between the
 // press and the release on purpose.
 test('a click on Start a world survives a sidebar re-render between press and release', async ({ page }) => {
   await freshBoot(page);
@@ -270,7 +270,7 @@ async function clickAcrossRerender(page: Page, selector: string): Promise<void> 
   await page.mouse.up();
 }
 
-// The census's first two rows (Forge/Notes/2026-10-17-s421-rerender-census.md):
+// The re-render census's first two rows:
 // the room strip and the sidebar's mode toggle, both always on screen.
 test('a click on a room in the strip survives a re-render between press and release', async ({ page }) => {
   await freshBoot(page);
@@ -477,7 +477,7 @@ test('Settings can hide the add-world icons; "add a world" stays, across a reloa
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"]')).toBeVisible();
 
-  // Through the real toggle (S365 gate lens C M8: the old test patched state).
+  // Through the real toggle (the old test patched state).
   const worldId = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
   await page.evaluate((id) => { window.location.hash = `#/w/${id}/settings/general`; }, worldId);
   const toggle = page.locator('input[name="worlds-add-icons"]');

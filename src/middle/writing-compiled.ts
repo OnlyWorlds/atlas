@@ -365,7 +365,7 @@ function renderInline(
     const el = elements.get(id);
     // `label` was captured from the already-escaped string — return as-is.
     if (!el && unresolved === 'text') return label;
-    // THE LABEL LAW reaches the read-only view (Captain, S355: a link must
+    // THE LABEL LAW reaches the read-only view (Titus: a link must
     // NEVER be shown as the element's name). The writer's label is the text;
     // the chip resolves by id. `label` is already escaped (captured from the
     // escaped string), so it goes back as-is.
@@ -380,7 +380,7 @@ function renderInline(
   s = s.replace(/\[([^\]]+?)\]\(([^)\s]+?)\)/g, (_, text, url) => {
     if (!SAFE_LINK_HREF_RE.test(url)) return text;
     // `url` was captured from the already-escaped string (escapeText covers
-    // quotes since S360), so it is attribute-safe as-is; escaping it again
+    // quotes), so it is attribute-safe as-is; escaping it again
     // turned `?a=1&b=2` into `&amp;amp;` and broke the link.
     return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   });

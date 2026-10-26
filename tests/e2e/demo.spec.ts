@@ -1,15 +1,15 @@
 /**
- * The sample-world demo (#/demo) — view-only presentation, session 254.
+ * The sample-world demo (#/demo) — view-only presentation.
  *
  * The demo is NOT a world: no registry entry, no OPFS write, no folder.
  * It's an overlay built from the share renderer's payload path plus a
  * Leaflet hero. These tests lock the direct route (its in-app doors were
- * removed in S368; old links still land), the view-only surface (map + pins
+ * removed; old links still land), the view-only surface (map + pins
  * + modal + cards), and the exits.
  */
 
 import { test, expect, Page } from '@playwright/test';
-// The payload is the single source for counts (S309): the demo copy derives
+// The payload is the single source for counts: the demo copy derives
 // its numbers from it at render, and so do these assertions.
 import demoData from '../../src/demo/demo-page.json';
 const DEMO_PIN_COUNT = (demoData as { map: { pins: unknown[] } }).map.pins.length;
@@ -23,7 +23,7 @@ async function freshBoot(page: Page) {
   await page.waitForSelector('.atlas-shell');
 }
 
-// S368: the three doors into the demo (landing "see an example page", the
+// The three doors into the demo (landing "see an example page", the
 // share room's empty-state line, the settings Links entry) were removed. The
 // route stays for old links, so this test now proves both halves: no door in
 // the share room, and #/demo still renders when visited directly.

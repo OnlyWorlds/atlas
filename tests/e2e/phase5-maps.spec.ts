@@ -57,7 +57,7 @@ test('create map via map index — adds row and opens map tab', async ({ page })
   await page.click('[data-action="new-map"]');
   await expect(page.locator('[data-modal="create-map"]')).toBeVisible();
   await page.fill('input[name="map-name"]', 'Middle Earth');
-  // Image source required for auto-open-tab behavior (session 212 R3).
+  // Image source required for auto-open-tab behavior.
   await page.fill('input[name="map-image-url"]', 'https://example.com/middle-earth.png');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
@@ -72,7 +72,7 @@ test('create map via map index — adds row and opens map tab', async ({ page })
 });
 
 test('clicking a map row opens or focuses its tab', async ({ page }) => {
-  // Create two maps with image urls so tabs auto-open (session 212 R3).
+  // Create two maps with image urls so tabs auto-open.
   for (const name of ['Alpha Map', 'Beta Map']) {
     await page.click('[data-action="new-map"]');
     await page.fill('input[name="map-name"]', name);
@@ -96,7 +96,7 @@ test('clicking a map row opens or focuses its tab', async ({ page }) => {
 test('close button on a map tab removes it from the bar', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('[data-modal="create-map"] input[name="map-name"]', 'Disposable');
-  // Image source required for auto-open-tab behavior (session 212 R3).
+  // Image source required for auto-open-tab behavior.
   await page.fill('[data-modal="create-map"] input[name="map-image-url"]', 'https://example.com/disposable.png');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
@@ -167,7 +167,7 @@ test('delete map cascades pins and removes the tab', async ({ page }) => {
 test('pin button appears in element detail when a map tab is active', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Visible Map');
-  // Image source required for auto-open-tab behavior (session 212 R3).
+  // Image source required for auto-open-tab behavior.
   await page.fill('input[name="map-image-url"]', 'https://example.com/visible.png');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
   // Map tab now active in right pane.
@@ -184,7 +184,7 @@ test('pin button appears in element detail when a map tab is active', async ({ p
   await pinBtn.click();
   await expect(pinBtn).toHaveClass(/active/);
 
-  // Placement feedback (S299): the map shows a banner naming the element +
+  // Placement feedback: the map shows a banner naming the element +
   // the crosshair state on body; the armed button is lit (the .active class,
   // now styled).
   await expect(page.locator('.atlas-map-placement-hint')).toBeVisible();
@@ -214,7 +214,7 @@ test('pin button is hidden when no map tab is active', async ({ page }) => {
   await expect(page.locator('[data-action="pin-element"]')).toHaveCount(0);
 });
 
-test('+pin hides once the element has a pin on the active map; a pin detail opens its map (S313)', async ({ page }) => {
+test('+pin hides once the element has a pin on the active map; a pin detail opens its map', async ({ page }) => {
   // Map with an image auto-opens as the active right tab.
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Pin Home');
@@ -297,8 +297,8 @@ test('map create modal — location picker integration', async ({ page }) => {
   expect(stored.mapLocation).toBe(stored.shireId);
 });
 
-test('imageless map is first-class: flat canvas opens, pin places, zone draft starts (S300)', async ({ page }) => {
-  // Create WITHOUT any image source → auto-opens its tab (new S300 behavior)
+test('imageless map is first-class: flat canvas opens, pin places, zone draft starts', async ({ page }) => {
+  // Create WITHOUT any image source → auto-opens its tab (new behavior)
   // and the record carries the stamped square flat-canvas dims.
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Blank Canvas');
@@ -348,7 +348,7 @@ test('imageless map is first-class: flat canvas opens, pin places, zone draft st
 
   // A drawn zone says its shape in the standard's field (1.77, #362) and in atlas_shape; one made with
   // its supertype left empty carries the shape's word there too, for readers that know neither
-  // (the Captain's interim, h20 #6839).
+  // (Titus's interim, 2026-10-18).
   await page.click('[data-action="draw-polygon"]');
   for (const [x, y] of [[150, 330], [300, 330], [220, 430]]) await canvas.click({ position: { x, y } });
   await page.keyboard.press('Enter');
@@ -362,7 +362,7 @@ test('imageless map is first-class: flat canvas opens, pin places, zone draft st
 
   // "Add art later": attaching an image whose dims differ from the stamped
   // 2000x2000 square must REMOUNT the open tab into the image's coordinate
-  // space (S300 close gate — a background re-apply alone leaves the manager
+  // space (a background re-apply alone leaves the manager
   // converting clicks in the old space, corrupting later pin y-coords).
   const containerBefore = await page.evaluate(() =>
     document.querySelector('.atlas-map-tab-wrapper .leaflet-container')?.id ?? null);
@@ -415,7 +415,7 @@ test('imageless map is first-class: flat canvas opens, pin places, zone draft st
   // zone-draft Escape above also fired the deselect-to-home hotkey, so the
   // +pin button (element-detail top bar) left the page.
   // A SECOND element, not Sketch Marker again: one element may hold only one
-  // pin per map (S307), and Sketch Marker is already pinned on this canvas.
+  // pin per map, and Sketch Marker is already pinned on this canvas.
   // What this section actually asserts is the coordinate SPACE of a freshly
   // placed pin after the dims flip, which does not care whose pin it is.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
@@ -449,10 +449,10 @@ test('imageless map is first-class: flat canvas opens, pin places, zone draft st
   expect(newPin!.y).toBeLessThanOrEqual(200);
 });
 
-test('deleting a map closes its right-pane tab (S306)', async ({ page }) => {
+test('deleting a map closes its right-pane tab', async ({ page }) => {
   // The tab used to survive the delete and fall through to the stale card
   // ("Map from another world") — wrong on its face, since it WAS this world's,
-  // and it looked unclosable. Captain's find.
+  // and it looked unclosable. Titus's find.
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Doomed Map');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
@@ -470,7 +470,7 @@ test('deleting a map closes its right-pane tab (S306)', async ({ page }) => {
   await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
 });
 
-test('the density layer (S356): a 40-pin cluster keeps its icons apart and its labels from overprinting; "always" shows every label', async ({ page }) => {
+test('the density layer: a 40-pin cluster keeps its icons apart and its labels from overprinting; "always" shows every label', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Dense Canvas');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
@@ -485,7 +485,7 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
     const map = st.data.elements.find((e: any) => e.type === 'map' && e.name === 'Dense Canvas');
     for (let i = 0; i < 40; i++) {
       // Interior towns outweigh their neighbours (a description is weight):
-      // S356's last resort let such a label cover a lighter icon (S382).
+      // An earlier last resort let such a label cover a lighter icon.
       const heavy = [9, 18, 27, 36].includes(i);
       const loc = await store.createElement('location', { name: `Town ${i}`, ...(heavy ? { description: 'A great city. '.repeat(40) } : {}) });
       await store.createPin({ map_id: map.id, element_id: loc.id, x: 800 + (i % 8) * 50, y: 800 + Math.floor(i / 8) * 50 });
@@ -511,7 +511,7 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
     let overlaps = 0;
     for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) if (ov(labels[i], labels[j])) overlaps++;
     // A pin's icon and its label are two markers at one latlng with the same
-    // transform; any other icon under a label is another pin covered (S382).
+    // transform; any other icon under a label is another pin covered.
     const icons = Array.from(c.querySelectorAll<HTMLElement>('.leaflet-marker-icon.leaflet-interactive'));
     let onIcons = 0;
     for (const l of labelEls) for (const i of icons) {
@@ -524,7 +524,7 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
   // 'auto' (the factory default): the 50-unit gap at the mounted zoom is
   // narrower than a 32px icon, so icons shrink, and only the labels that
   // have room stay. What stays never overprints a label or another pin —
-  // measured on rendered ink (S382: a heavy pin's label no longer covers a
+  // measured on rendered ink (a heavy pin's label no longer covers a
   // lighter icon as a last resort; it waits for hover like the rest).
   const auto = await measure();
   expect(auto.iconPx).toBeLessThan(32);
@@ -544,7 +544,7 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
   await expect.poll(async () => (await measure()).visibleLabels).toBeLessThan(40);
 });
 
-test('a map prints a name once (S382, #121): a zone and the pin of the same name share one label', async ({ page }) => {
+test('a map prints a name once (#121): a zone and the pin of the same name share one label', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Name Canvas');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
@@ -580,7 +580,7 @@ test('a map prints a name once (S382, #121): a zone and the pin of the same name
   await expect.poll(shown).toEqual(['Crumblefields', 'Snack Nebula']);
 });
 
-test('the zone panel (S356): kinds group, a kind colour is a world style that survives reload, the eye hides a kind, the zone page says what it inherits', async ({ page }) => {
+test('the zone panel: kinds group, a kind colour is a world style that survives reload, the eye hides a kind, the zone page says what it inherits', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Kinds Canvas');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
@@ -632,7 +632,7 @@ test('the zone panel (S356): kinds group, a kind colour is a world style that su
   await expect(panel).toBeVisible();
   await expect(container.locator('svg path[stroke="#3b82f6"]')).toHaveCount(2);
   // State lands first and the disk write follows: poll the file, never
-  // read it on the DOM's sync point (the S323 law, again).
+  // read it on the DOM's sync point.
   await expect.poll(async () => page.evaluate(async () => (await (window as any).__atlasTestApi.getActiveStore().readStyles()).rules))
     .toEqual([{ type: 'zone', supertype: 'Line', subtype: 'River', color: '#3b82f6' }]);
 
@@ -667,7 +667,7 @@ test('the zone panel (S356): kinds group, a kind colour is a world style that su
   await expect(page.locator('.atlas-zone-visuals-section .atlas-detail-section-hint')).toHaveText('Synced');
 });
 
-// F-60 (Seethe h20 #10346): Tab walked out of an open dialog into the page behind, where Enter
+// F-60 (Seethe 2026-10-22): Tab walked out of an open dialog into the page behind, where Enter
 // could open a second dialog over the first. What sits behind the topmost modal is inert.
 test('an open dialog keeps the keyboard: Tab never reaches the page behind, and closing it gives the page back (F-60)', async ({ page }) => {
   const opener = page.locator('[data-action="new-map"]');
@@ -725,7 +725,7 @@ test("the standard's shape (1.75, #362): a zone that says line draws open, one t
   await expect(container.locator('svg path[fill="none"]')).toHaveCount(4);
 });
 
-test('the zone panel by role (S362): rivers split by rank, a role colour paints only its role, a road drawn as its segments is listed and lights them', async ({ page }) => {
+test('the zone panel by role: rivers split by rank, a role colour paints only its role, a road drawn as its segments is listed and lights them', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Roles Canvas');
   await page.click('[data-modal="create-map"] [data-action="submit"]');
@@ -779,9 +779,9 @@ test('the zone panel by role (S362): rivers split by rank, a role colour paints 
   await expect(container.locator('svg .atlas-zone-hovered')).toHaveCount(2);
 });
 
-test('north is up: a pin by the schema\'s bottom-left numbers draws where the standard says, and a click stores bottom-left y (S361)', async ({ page }) => {
+test('north is up: a pin by the schema\'s bottom-left numbers draws where the standard says, and a click stores bottom-left y', async ({ page }) => {
   // pin.yaml: "x/y coordinate, from bottom left of the map". Atlas stored y
-  // top-down until S361, so every standard world (Sikelia) drew mirrored.
+  // top-down until 1.8, so every standard world (Sikelia) drew mirrored.
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Compass Canvas');
   await page.click('[data-modal="create-map"] [data-action="submit"]');

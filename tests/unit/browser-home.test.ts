@@ -1,8 +1,7 @@
 /**
  * The browser home's reconciliation (1.17 bout 1, conv. 129; contract §3.2).
  * It must never adopt a half-made world, never delete a world of the user's
- * own, and say which worlds the browser cleared. S370 gate A3, A6, B1, B2,
- * B5, B19, B23.
+ * own, and say which worlds the browser cleared.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeDirHandle } from '../fixtures/fake-fs';

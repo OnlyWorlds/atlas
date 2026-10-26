@@ -1,6 +1,6 @@
-// Promoted from the S364 composition gate probe `a-kernel.probe.test.ts` (Forge/Notes/2026-09-29-s364-gate/): it asserts the fixed behaviour.
+// Promoted from a gate probe `a-kernel.probe.test.ts`: it asserts the fixed behaviour.
 /**
- * Gate lens A (store kernel) probes, S364. REAL FsFolderStore over fake-fs.
+ * Gate lens A (store kernel) probes. REAL FsFolderStore over fake-fs.
  * "DEFECT" cases assert the CORRECT behaviour, so a red test = a live defect.
  * "UPHELD" cases assert behaviour the lens tried to break and could not.
  * Run from tools/atlas:
@@ -244,7 +244,7 @@ describe('DEFECT F7: Atlas\'s own create, caught between its write and its index
     const charDir = await dirOf(root, 'elements', 'character');
     const reached = gate(); const hold = gate();
     // Hold at the write's read-back verify: the final file is committed and
-    // writeJsonAtomic has not returned. (Until S368 the hook was the `.tmp`
+    // writeJsonAtomic has not returned. (The hook used to be the `.tmp`
     // removal; the writer no longer stages through a `.tmp`.)
     const origGetHandle = charDir.getFileHandle.bind(charDir);
     let patched = false;
@@ -259,7 +259,7 @@ describe('DEFECT F7: Atlas\'s own create, caught between its write and its index
     };
     const c = s.createElement('character', { name: 'Nova' });
     await reached.p;                       // the final file is on disk; writeJsonAtomic has not returned
-    const pass = s.rescanDisk();           // it must wait for the create's chain slot (S364 fix)...
+    const pass = s.rescanDisk();           // it must wait for the create's chain slot...
     await new Promise(r => setTimeout(r, 20));
     hold.open();                           // ...so the create is released before the pass is awaited
     await c;

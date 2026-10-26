@@ -57,7 +57,7 @@ async function openCharts(page: Page) {
 /** Gate → builder → save: mints "The Almanac" (two 90-day months, one era). */
 async function buildCalendar(page: Page) {
   // Pre-clock, "+ new calendar" is GREYED (the clock is the prerequisite and
-  // sits above it — Captain's ruling); the world clock item names the ask.
+  // sits above it — Titus's ruling); the world clock item names the ask.
   await page.click('.atlas-cal-chip');
   await expect(page.locator('.atlas-cal-menu-item.disabled', { hasText: '+ new calendar' })).toBeVisible();
   await page.locator('.atlas-cal-menu-item', { hasText: 'World clock: set it first' }).click();
@@ -117,7 +117,7 @@ test('typed calendar-word date entry resolves and writes the raw integer', async
   await setupWorld(page);
   // Three WELL-SEPARATED events (far apart in time → all sit on the beeswarm
   // midline, no lane fan) with the target at the exact fit midpoint — the one
-  // x every pad model agrees on (the S265 geometry law).
+  // x every pad model agrees on.
   await createElement(page, 'event', { name: 'Founding', start_date: 10 });
   const eventId = await createElement(page, 'event', { name: 'Midfeast', start_date: 270 });
   await createElement(page, 'event', { name: 'The Cracking', start_date: 530 });

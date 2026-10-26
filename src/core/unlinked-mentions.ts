@@ -1,5 +1,5 @@
 /**
- * Unlinked mentions (S355): where an element's name or aliases appear as
+ * Unlinked mentions: where an element's name or aliases appear as
  * plain prose across the world's narratives, not yet linked. Answers the
  * first half of a Discord request ("if I make a new element, is there a way
  * to search for any matching words and link those all at once") for the

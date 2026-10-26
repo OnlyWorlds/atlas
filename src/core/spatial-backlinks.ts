@@ -1,5 +1,5 @@
 /**
- * Pins and markers do not vote (#171, Quillon h37 #2103, measured on the live
+ * Pins and markers do not vote (#171, Quillon 2026-10-09, measured on the live
  * demo): a map's backlinks are every pin and marker on it, so the Space Map
  * read "Linked from (118): (unnamed), (unnamed)…". 7 of 16 pins and all 131
  * markers have no name, but every pin points at an element and nearly every

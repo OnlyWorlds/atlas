@@ -1,5 +1,5 @@
 /**
- * Settings → General tab (S315). Tool-wide preferences that belong to no
+ * Settings → General tab. Tool-wide preferences that belong to no
  * feature area: appearance (the light/dark theme) and the about block.
  * First tab in the ATLAS group — the "where do I look first" surface; the
  * future public-changelog link lands here too.

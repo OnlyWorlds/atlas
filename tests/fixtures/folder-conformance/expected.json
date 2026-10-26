@@ -17,7 +17,7 @@
       "spec_version": "0.3.5",
       "elements": 8,
       "legacy_elements": 1,
-      "change": "ADDITIVE: the empty-string name and the explicit-nulls element joined elements[], and not-json.json joined skipped_files[], during the S334 session on 2026-07-28. They shipped under the UNCHANGED string 1.0.0 for three days, so 'fixture v1.0.0' named two different artifacts and any pass reported against it is ambiguous. Versioned retroactively here: a reader that found 8 ran 1.1.0. Same defect class as the stale prose count below, one layer down — the field that exists to make divergence honest was itself not maintained."
+      "change": "ADDITIVE: the empty-string name and the explicit-nulls element joined elements[], and not-json.json joined skipped_files[], on 2026-07-28. They shipped under the UNCHANGED string 1.0.0 for three days, so 'fixture v1.0.0' named two different artifacts and any pass reported against it is ambiguous. Versioned retroactively here: a reader that found 8 ran 1.1.0. Same defect class as the stale prose count below, one layer down — the field that exists to make divergence honest was itself not maintained."
     },
     {
       "version": "1.2.0",
@@ -45,7 +45,7 @@
       "id": "11111111-2222-4333-8444-555555555501",
       "name": "Only Name",
       "type": "character",
-      "note": "type is ABSENT in the body; a reader may infer it from the directory or serve it untyped, but must not invent timestamps. RECOMMENDED READING (Quillon, Armature, adopted 2026-07-29): infer from the directory but FLAG the inference rather than presenting it as a declaration, and never write it back. See README 'Where two readings are permitted'",
+      "note": "type is ABSENT in the body; a reader may infer it from the directory or serve it untyped, but must not invent timestamps. RECOMMENDED READING (Quillon, adopted 2026-07-29): infer from the directory but FLAG the inference rather than presenting it as a declaration, and never write it back. See README 'Where two readings are permitted'",
       "must_not_have": [
         "created_at",
         "local_updated_at",
@@ -107,7 +107,7 @@
       "id": "11111111-2222-4333-8444-555555555506",
       "name": "Legacy Map",
       "type": "map",
-      "note": "lives in spatial/map/ — NOT normative. A reader that covers only elements/ is conforming and reports 8; a legacy-tolerant reader (atlas) reports 9. CORRECTED 2026-07-29. The note said 6 and 7, and it was RIGHT when written: the committed fixture held 6 elements. S334 added two more (the empty-string name and the explicit nulls) and did not update the prose beneath them, so a hand-written count rotted the moment the machine-readable list grew. Caught by Quillon's independent reader, whose count matched elements[] id-for-id. Derive counts from the array or expect them to lie."
+      "note": "lives in spatial/map/ — NOT normative. A reader that covers only elements/ is conforming and reports 8; a legacy-tolerant reader (atlas) reports 9. CORRECTED 2026-07-29. The note said 6 and 7, and it was RIGHT when written: the committed fixture held 6 elements. The 2026-07-28 change added two more (the empty-string name and the explicit nulls) and did not update the prose beneath them, so a hand-written count rotted the moment the machine-readable list grew. Caught by Quillon's independent reader, whose count matched elements[] id-for-id. Derive counts from the array or expect them to lie."
     }
   ],
   "skipped_files": [

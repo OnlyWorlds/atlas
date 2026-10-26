@@ -3,7 +3,7 @@
  * chart view. See DESIGN_CHARTS.md ("a chart is a saved, configurable,
  * shareable view of the world along chosen axes").
  *
- * Adapted from `tools/little-element-viewer/src/timeline/types.ts` (session 223).
+ * Adapted from `tools/little-element-viewer/src/timeline/types.ts`.
  */
 
 import type { ElementType } from '../../core/types';
@@ -154,7 +154,7 @@ export interface ChartConfig {
   axis: ChartAxis;
   scope: ChartScope;
   /** How the chart draws: the pannable canvas or the scrolling document
-   *  (2C, S13). Widened additively — older readers never inspect this field
+   *  (2C). Widened additively — older readers never inspect this field
    *  (verified: charts-store + freeze don't read it), and an unknown value
    *  falls back to '2d' at apply time. */
   render: '2d' | 'scroll';

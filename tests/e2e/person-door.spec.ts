@@ -149,7 +149,7 @@ test('a person code, signed out: it waits through the sign-in, then the invitati
   await page.click('[data-action="account-sign-in"]');
   await expect(modal).toBeVisible();
   await expect(modal.locator('[data-action="join"]')).toBeVisible();
-  // The ask to sign in is answered, so it is gone (Kael's walk on the open door, h57 #5950).
+  // The ask to sign in is answered, so it is gone (Kael's walk on the open door, 2026-10-16).
   await expect(ask).toHaveCount(0);
   expect(keel.personJoins).toHaveLength(0);
 });

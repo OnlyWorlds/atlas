@@ -216,8 +216,8 @@ export function refreshFiles(entry: WorldRegistryEntry, type: string, id: string
 /**
  * The world's total read again (after an add or a remove). A read already in
  * flight may have left before the change, so this one follows it rather than
- * standing in for it. keel counts a stored file at once (S435
- * `total-probe.log`), so the caller reads this beside the list and the card
+ * standing in for it. keel counts a stored file at once (probed),
+ * so the caller reads this beside the list and the card
  * never shows a new row with the old total.
  */
 function rereadWorld(entry: WorldRegistryEntry): Promise<void> {

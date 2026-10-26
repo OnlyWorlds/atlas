@@ -1,5 +1,5 @@
 /**
- * Keel #134 (Skeld h29 #7492, S432): signed out, making a world online signs in
+ * Signed out (Skeld 2026-10-19), making a world online signs in
  * with the account's email or username and password, then makes the world on
  * the account (POST /api/v2/account/worlds). The classic create-world-external
  * lane is never called: its handler stays mounted as a tripwire.

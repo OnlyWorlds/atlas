@@ -1,5 +1,5 @@
 /**
- * #175 (found S387 by the #139 e2e): the selected chip's × on an element page
+ * #175 (found by the #139 e2e): the selected chip's × on an element page
  * cleared the selection, but the route still named the element and selected
  * it straight back, so the chip never left. On an element page × now leaves
  * the page the way Esc does (conv. 32, home); elsewhere it clears in place.

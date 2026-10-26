@@ -83,7 +83,7 @@ describe('elementMatchesQuery', () => {
 });
 
 /**
- * Story tier (S310, Bout D) — the writing room's prose becomes findable.
+ * Story tier (Bout D) — the writing room's prose becomes findable.
  *
  * Ranked LAST deliberately: a word buried in a chapter is the weakest signal
  * that the chapter is what you meant. These tests lock the ORDERING, because

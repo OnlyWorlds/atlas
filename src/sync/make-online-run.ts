@@ -1,5 +1,5 @@
 /**
- * Route 2 from the app (S367): link a local world to an existing api world.
+ * Route 2 from the app: link a local world to an existing api world.
  * `mergeLocalIntoApi` owns the disk and the server; this owns what needs the
  * app, in the order the re-key run taught (`sync/rekey-run.ts`):
  *
@@ -60,8 +60,8 @@ export function runRoute2(opts: Route2RunOpts): Promise<MergeResult> {
     root?.setAttribute('inert', '');
     // Set once the folder has changed (ids moved, or the server phase began):
     // from then on every exit reloads the element list, success or not, so a
-    // throw after the kernel never leaves downloads and creates off screen
-    // (S367 gate B1). Before it, a failure leaves the list untouched (inv. 8).
+    // throw after the kernel never leaves downloads and creates off screen.
+    // Before it, a failure leaves the list untouched (inv. 8).
     let diskTouched = false;
     try {
       await flushBeforeLeavingWorld();
@@ -102,7 +102,7 @@ export function runRoute2(opts: Route2RunOpts): Promise<MergeResult> {
         await rekeyLiveUi(opts.store, opts.worldId, recovered.map);
         result = await run();
         // The first run's moves, and the files it could not rewrite, are part
-        // of this link's story too (S367 gate B2).
+        // of this link's story too.
         result = {
           ...result,
           rekeyed: new Map([...recovered.map, ...result.rekeyed]),
@@ -127,7 +127,7 @@ export function runRoute2(opts: Route2RunOpts): Promise<MergeResult> {
 }
 
 /**
- * The toast's line about names left unmatched (Captain's ruling: skip and
+ * The toast's line about names left unmatched (Titus's ruling: skip and
  * say so). First three names, the rest counted; nothing persisted.
  */
 export function ambiguousLine(ambiguous: MergeResult['ambiguous']): string | null {
@@ -154,7 +154,7 @@ export function hiddenOnlineLine(held: MergeResult['hiddenOnline']): string | nu
 
 /**
  * The toast's line about maps and zones left unmatched because the local and
- * the online one both have pins or markers on them (gate A4/A5, Captain's
+ * the online one both have pins or markers on them (gate A4/A5, Titus's
  * ruling 2026-10-04). Same shape as `ambiguousLine`.
  */
 export function childClashLine(clashes: MergeResult['childClashes']): string | null {

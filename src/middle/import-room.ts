@@ -6,7 +6,7 @@
  *               → import. Full-world JSON defaults to a NEW world; loose lists
  *               (or "merge" mode) reconcile into the current world.
  *   Take out  — export the current world (or a by-type subset) as the
- *               onlyworlds.com world export (the keel envelope, S354).
+ *               onlyworlds.com world export (the keel envelope).
  *
  * The reconcile core (parse → validate → reconcile → ImportPlan) is pure and
  * lives in src/import/; this room is its surface. Mode A writes a new world
@@ -50,7 +50,7 @@ type Mode = 'new' | 'merge';
 
 /**
  * Where the ways to convert notes with an AI are written up: the docs' AI
- *  page, not the toolkit repo (the Captain, h20 #2081, #2123); the bare form, as Boss's URL contract and Kael's docs write it (Skeld, h20 #2124).
+ *  page, not the toolkit repo (Titus, 2026-10-09); the bare form, as Boss's URL contract and Kael's docs write it (Skeld, 2026-10-09).
  */
 const OW_AI_DOCS_URL = 'https://onlyworlds.github.io/docs/development/ai';
 
@@ -80,7 +80,7 @@ const EXAMPLE_JSON = `{
 /**
  * The full field whitelist, generated from the SDK FIELD_SCHEMA at runtime so
  * the prompt is schema-true forever — no URL for the assistant to (fail to)
- * fetch, no drift (S264; the schema-less prompt invited hallucinated fields
+ * fetch, no drift (the schema-less prompt invited hallucinated fields
  * like Character.age, the toolkit's top import-failure class).
  * Grammar: bare = text · #field = number · field>Type = single link (value:
  * the target's name) · field>>Type = list of links.
@@ -110,7 +110,7 @@ export function buildSchemaDigest(): string {
  * D8: a copyable prompt that teaches any AI assistant to convert freeform notes
  * into OnlyWorlds import JSON. Sibling to validate.ts's fix-prompt — same idea,
  * pointed at creation rather than repair. Carries the FULL generated field
- * whitelist (S264) so the assistant never needs a schema lookup; key rules
+ * whitelist so the assistant never needs a schema lookup; key rules
  * adapted from the OnlyWorlds toolkit's parsing skill.
  */
 export function buildConvertNotesPrompt(): string {
@@ -142,7 +142,7 @@ export function buildConvertNotesPrompt(): string {
 
 /**
  * Where a JSON.parse failure sits, as " near line 3, column 14", or "" when
- * the browser did not say (S369). Only the position is read out of the
+ * the browser did not say. Only the position is read out of the
  * engine's message (V8: "at position N", newer V8 also "(line L column C)";
  * Firefox: "at line L column C"); the message itself is never shown, since
  * its wording differs by browser and quotes the user's text.
@@ -169,16 +169,16 @@ function estimateTokens(s: string): number {
 }
 
 /**
- * A loaded payload carried across a WORLD switch (S364 gate lens C C5). Since
- * S364 the room remounts per world (DESIGN conv. 109); "load a file, then
- * click the world to merge it into" is the flow the S256 room-stable switch
+ * A loaded payload carried across a WORLD switch. The
+ * room remounts per world (DESIGN conv. 109); "load a file, then
+ * click the world to merge it into" is the flow the earlier room-stable switch
  * kept on purpose, so the payload rides across and the review re-renders for
  * the new world. Leaving for another ROOM still drops it, as it always did.
  */
 let carriedPayload: { text: string; sourceLabel: string; pasted: boolean } | null = null;
 
 export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () => void {
-  // The folder half of the AI story (S365): only where it is true, a real
+  // The folder half of the AI story: only where it is true, a real
   // folder (not a world in browser storage, which no other program can reach).
   const activeId = getState().active?.worldId;
   const inBrowser = isAtlasOnlyStorage(getState().registry.worlds.find(w => w.id === activeId));
@@ -277,9 +277,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
    * The local world (if any) that already carries the export's world id — via
    * the handle-key convention OR the api-link fields (see
    * `findWorldByOwIdentity`; checking only the handle key let re-importing an
-   * api-linked world's own export fork its identity, S315 gate HIGH). The
+   * api-linked world's own export fork its identity). The
    * match's presence turns the mode choice into merge-into-it vs
-   * import-a-separate-copy (Captain, S313); its absence lets a new import
+   * import-a-separate-copy (Titus); its absence lets a new import
    * ADOPT the id (lossless).
    */
   const idMatchWorld = () => {
@@ -422,7 +422,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const mergeTargetIsActive = idMatch ? idMatch.id === aw?.worldId : true;
     const mergeTargetName = idMatch ? idMatch.name : (aw?.meta?.name ?? 'the current world');
     // A view-only world blocks every store mutation at the seam, so a merge
-    // into it would surface as N per-element write failures (S315 gate) —
+    // into it would surface as N per-element write failures —
     // say it once, up front, instead.
     const mergeTargetEntry = idMatch ?? getState().registry.worlds.find(w => w.id === aw?.worldId) ?? null;
     const mergeTargetViewOnly = mode === 'merge' && entryIsViewOnly(mergeTargetEntry);
@@ -555,7 +555,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     let where: 'folder' | 'browser' = 'browser';
     if (mode === 'new') {
       // Without the folder picker the answer is this browser: ask the browser
-      // to keep worlds before the first await (contract §2.3; S376 gate B6).
+      // to keep worlds before the first await (contract §2.3).
       if (!hasFolderMode()) requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
       const { askWhere } = await import('../ui/where-choice');
       const asked = await askWhere({
@@ -584,7 +584,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     };
     // If the user loads ANOTHER payload while this import is still writing,
     // the completion path below must not stomp their fresh review — `parsed`
-    // identity is the guard (S315: the first import's clearLoaded() wiped a
+    // identity is the guard (the first import's clearLoaded() wiped a
     // second payload loaded mid-flight).
     const runParsed = parsed;
     const stillMine = () => parsed === runParsed;
@@ -599,7 +599,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         const { entry, applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress, adoptWorldId, where });
         // The address follows the new world, as a sidebar switch keeps the room:
         // left on the old world's, the tab named it over the new world's
-        // elements and a reload opened the old one again (S412).
+        // elements and a reload opened the old one again.
         navigate(importHash(entry.id));
         toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
         reportFailures(applied.failures, plan.report.droppedLinks.length);
@@ -669,7 +669,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   // Take out (export)
   // ---------------------------------------------------------------------------
 
-  // No API key in an export (S362). The box that offered it was on by default
+  // No API key in an export. The box that offered it was on by default
   // and said the key was "needed to re-upload to onlyworlds.com": keel's import
   // never reads it and atlas's import drops it, while a prefixed write key reads
   // a private world with no PIN, so a shared file or a pasted "Copy JSON" was a
@@ -712,7 +712,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       <p class="atlas-share-section-hint">${outInBrowser
         ? (outWholeFile
           ? "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images stay in this browser. Download the whole world keeps all of it in one file."
-          // The tour world has no whole-world download (S376 lens C C15).
+          // The tour world has no whole-world download.
           : "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images stay with the tour world. Keep it at the end of the tour to download it whole.")
         : "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images kept in the folder stay in your world folder, which is the full copy of your world."}</p>
       <div class="atlas-import-typelist">
@@ -891,7 +891,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       .catch(() => toasts.error(CLIPBOARD_BLOCKED));
   });
 
-  // ---- react to element changes (a world switch remounts the room since S364, conv. 109; the payload is carried) ----
+  // ---- react to element changes (a world switch remounts the room, conv. 109; the payload is carried) ----
   let lastWorldId = activeWorld()?.worldId ?? null;
   let lastElementsRef: readonly Element[] | null = activeElements();
   const unsub = subscribe(() => {

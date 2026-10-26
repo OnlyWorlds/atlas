@@ -62,8 +62,8 @@ async function timeCurrent(page: Page): Promise<number | null | undefined> {
 
 test('Set now establishes time_current and toggles to a now chip; clear resets', async ({ page }) => {
   await setupWorld(page);
-  // A small dated spread: the LATEST of [0,10,30] is 30 (S318 — the set-now
-  // default is the latest recorded moment, Captain's rule; was the median).
+  // A small dated spread: the LATEST of [0,10,30] is 30 (the set-now
+  // default is the latest recorded moment, Titus's rule; was the median).
   await createElement(page, 'event', { name: 'First', start_date: 0 });
   await createElement(page, 'event', { name: 'Middle', start_date: 10 });
   await createElement(page, 'event', { name: 'Last', start_date: 30 });
@@ -79,7 +79,7 @@ test('Set now establishes time_current and toggles to a now chip; clear resets',
   await setBtn.click();
   const chip = page.locator('.atlas-chart-now-chip');
   await expect(chip).toBeVisible();
-  await expect(chip).toContainText('30'); // bare date — the gold chip IS the "now" (S263)
+  await expect(chip).toContainText('30'); // bare date — the gold chip IS the "now"
   await expect(page.locator('.atlas-chart-now-set')).toHaveCount(0);
   expect(await timeCurrent(page)).toBe(30);
 

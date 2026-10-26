@@ -94,7 +94,7 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
   // right pane = the relational WEB (DESIGN_CHARTS.md). With NO focus, anchor the
   // graph on the most-significant dated node (same degree metric as the chart's
   // anchor beats) so the pane is never empty on the landing — globally-highest-
-  // degree, ignoring type chips (Captain's call, chart #2).
+  // degree, ignoring type chips (Titus's call, chart #2).
   if (route.mode === 'timeline') {
     if (route.elementId) {
       const el = elements.find(e => e.id === route.elementId) ?? null;

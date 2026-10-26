@@ -1,7 +1,6 @@
 /**
- * B12 Q2 (the Captain h20 #8014; conv. 151): a lowered or removed member
- * keeps their copy. Contract: Forge/Notes/2026-10-20-s439-role-change-keeps-the-copy.md
- * (I1 to I8). keel's answers to a lowered guest, probed live S439: `/me` says
+ * A lowered or removed member keeps their copy (Titus 2026-10-20; conv. 151).
+ * keel's answers to a lowered guest, probed live: `/me` says
  * guest, the old cursor 409s `resync_required` (no reason yet), the walk from
  * 0 names only what the guest made, and a read or PATCH of anything else 404s
  * exactly as a deleted element.
@@ -100,7 +99,7 @@ describe('a role change keeps the copy (I1, I7)', () => {
     expect(await ids()).toEqual([A, B, C]);
   });
 
-  it('an unknown role keeps (the /me read fails): the Captain\'s side of the error', async () => {
+  it('an unknown role keeps (the /me read fails): Titus\'s side of the error', async () => {
     const engine = new SyncEngine({ folder, client, readOnly: true });
     client.keyRole = 'guest';
     await worldOfThree(engine);
@@ -163,7 +162,7 @@ describe('keel\'s word that the view moved still drops in a view-only world (I6)
     expect(r.pulled.deletes).toBe(2);
   });
 
-  it('a writable world drops only on keel\'s own `view` (one-rule §3; S441 narrowed "never drops")', async () => {
+  it('a writable world drops only on keel\'s own `view` (one-rule §3, which narrowed an earlier "never drops")', async () => {
     const engine = new SyncEngine({ folder, client });
     client.keyRole = 'guest';
     await worldOfThree(engine);
@@ -236,7 +235,7 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
     expect(client.calls.filter(c => 'id' in c && c.id === B)).toEqual([]);
   });
 
-  it('a lowering while the world is open: the push reads the role afresh (S439 gate G1)', async () => {
+  it('a lowering while the world is open: the push reads the role afresh', async () => {
     const engine = new SyncEngine({ folder, client });
     client.keyRole = 'co_builder';
     await worldOfThree(engine);           // the engine has read co_builder
@@ -248,7 +247,7 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
     expect((await folder.readSyncState()).server_deletes ?? []).toEqual([]);
   });
 
-  it('the push reports the role its round read, so the attach can say it before any pull (S440)', async () => {
+  it('the push reports the role its round read, so the attach can say it before any pull', async () => {
     const engine = new SyncEngine({ folder, client });
     client.keyRole = 'co_builder';
     await worldOfThree(engine);
@@ -259,7 +258,7 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
     expect(p.own_role).toBe('guest');
   });
 
-  it('a push that never needed the role reports none and asks keel nothing (S440)', async () => {
+  it('a push that never needed the role reports none and asks keel nothing', async () => {
     const engine = new SyncEngine({ folder, client });
     client.keyRole = 'guest';
     await worldOfThree(engine);
@@ -270,7 +269,7 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
     expect(client.meReads).toBe(before);
   });
 
-  it('a round whose push and pull read different roles reports the pull\'s, the later read (S440)', async () => {
+  it('a round whose push and pull read different roles reports the pull\'s, the later read', async () => {
     const engine = new SyncEngine({ folder, client });
     client.keyRole = 'co_builder';
     await worldOfThree(engine);
@@ -295,7 +294,7 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
     client.outOfView.add(B);
     await folder.updateElement(B, { description: 'mine' });
     const p = await engine.pushOnce();
-    expect(p.own_role).toBeUndefined();       // unknown is not news (S440)
+    expect(p.own_role).toBeUndefined();       // unknown is not news
     const st = await folder.readSyncState();
     expect(st.server_deletes ?? []).toEqual([]);
     expect(st.kept_outside_view ?? []).toEqual([]);
@@ -353,7 +352,7 @@ describe('an edit to what this key no longer sees stays here (I2, I3)', () => {
   });
 });
 
-describe('links to what this key no longer sees (S439 gate G3; keel probed live)', () => {
+describe('links to what this key no longer sees (keel probed live)', () => {
   const EV = '00000000-0000-4000-8000-0000000r0004';
 
   it('a guest\'s own element goes out without the kept link, and the copy keeps it', async () => {
@@ -417,7 +416,7 @@ describe('links to what this key no longer sees (S439 gate G3; keel probed live)
   });
 });
 
-describe('the second S439 gate (H1, H2, H6)', () => {
+describe('the second gate round', () => {
   const ANA = '00000000-0000-4000-8000-00000000a0a1';
   const OWNEV = '00000000-0000-4000-8000-00000000e0e1';
   const NEWEV = '00000000-0000-4000-8000-00000000e0e2';
@@ -506,7 +505,7 @@ describe('the second S439 gate (H1, H2, H6)', () => {
   });
 });
 
-describe('a conflict on what this key no longer sees (S439 gate G2)', () => {
+describe('a conflict on what this key no longer sees', () => {
   it('a resync that keeps an element drops its conflict', async () => {
     const engine = new SyncEngine({ folder, client, policy: 'pause-and-review' });
     client.keyRole = 'co_builder';

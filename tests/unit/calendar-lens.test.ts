@@ -69,7 +69,7 @@ describe('resolveCalendarLens', () => {
     expect(resolveCalendarLens([], 'c1')).toBe(null);
   });
 
-  // S305: a world holding exactly one calendar, whose owner has never opened
+  // A world holding exactly one calendar, whose owner has never opened
   // the lens menu, should speak that calendar rather than bare numbers.
   it('falls back to the ONLY calendar when a lens was never chosen', () => {
     expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true })?.name)

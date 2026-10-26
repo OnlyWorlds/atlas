@@ -93,7 +93,7 @@ test('import full-world JSON creates a new world (Mode A)', async ({ page }) => 
   })).toBe('068e5110-a410-7cbb-8000-5168e2a14b51');
 });
 
-test('import as new opens the world with its own details, not only a name (S412)', async ({ page }) => {
+test('import as new opens the world with its own details, not only a name', async ({ page }) => {
   // The world opened on { id, name } alone until a reload: Home invited
   // "Describe your world…" over the file's description, and the map's Now
   // hid for want of time_current. A local world has no sync round to heal it.
@@ -157,7 +157,7 @@ const ENVELOPE = {
   },
 };
 
-test('import the keel envelope creates a world and ADOPTS its world id (S313)', async ({ page }) => {
+test('import the keel envelope creates a world and ADOPTS its world id', async ({ page }) => {
   await setupWorld(page);
   await openImport(page);
   await page.fill('[data-role="paste"]', JSON.stringify(ENVELOPE));
@@ -175,7 +175,7 @@ test('import the keel envelope creates a world and ADOPTS its world id (S313)', 
   )).toBe('068e012b-52a9-79bf-8000-26bb67891425');
 });
 
-test('re-importing a world that already exists offers merge-or-new and merges without duplicating (S313)', async ({ page }) => {
+test('re-importing a world that already exists offers merge-or-new and merges without duplicating', async ({ page }) => {
   await setupWorld(page);
   await openImport(page);
   // First import adopts the id, creating + activating the world.
@@ -185,7 +185,7 @@ test('re-importing a world that already exists offers merge-or-new and merges wi
   // Completion signal: the ADOPTED world is active. The old wait (elements
   // search visible) was vacuous — it is already visible from setupWorld's
   // Barovia, so the test raced on and loaded the second payload while the
-  // first import was still writing (S315 flake; the S301 sync-point class).
+  // first import was still writing (a flake; the sync-point class).
   await expect.poll(async () => page.evaluate(() =>
     (window as any).__atlasTestApi.getState().active?.meta?.id ?? null,
   )).toBe('068e012b-52a9-79bf-8000-26bb67891425');
@@ -286,9 +286,9 @@ test('export downloads an ow.com-compatible JSON', async ({ page }) => {
   expect(download.suggestedFilename()).toMatch(/^onlyworlds_.*\.json$/);
 });
 
-// S364 gate lens C C5: the Data room remounts per world since S364 (conv. 109),
+// The Data room remounts per world (conv. 109),
 // and a loaded payload rides across a WORLD switch (load a file, then click
-// the world to merge it into), as the S256 room-stable switch intended.
+// the world to merge it into), as the room-stable switch intended.
 // Leaving for another room still drops it.
 test('a loaded payload survives switching worlds in the Data room, not leaving the room', async ({ page }) => {
   await setupWorld(page, 'alpha');

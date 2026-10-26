@@ -97,7 +97,7 @@ function stripId(data: RawRecord): RawRecord {
   return rest;
 }
 
-/** The error's class name, for the details block (S369): a disk refusal reads the same in every locale. */
+/** The error's class name, for the details block: a disk refusal reads the same in every locale. */
 function errName(err: unknown): { error_name?: string; source: 'disk' } {
   const name = (err as { name?: unknown } | null)?.name;
   return typeof name === 'string' && name !== 'Error' ? { error_name: name, source: 'disk' } : { source: 'disk' };

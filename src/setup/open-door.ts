@@ -1,5 +1,5 @@
 /**
- * The `#/open/<world id>` door (OW Infra #104, S416): "Open in Atlas" on a
+ * The `#/open/<world id>` door: "Open in Atlas" on a
  * world's page on onlyworlds.com opens that world here.
  *
  * It rides the account sign-in, never a code or a key in the URL: a world
@@ -51,7 +51,7 @@ export async function resumeOpenAfterSignIn(toasts: ToastManager): Promise<boole
 export function openHeldForSignIn(): string | null { return heldForSignIn; }
 export function holdOpenForSignIn(id: string): void { heldForSignIn = id; }
 
-/** A waiting id is dropped: another door took the sign-in, or the token was forgotten (the S416 gate's F4). */
+/** A waiting id is dropped: another door took the sign-in, or the token was forgotten. */
 export function dropHeldOpen(): void {
   heldForSignIn = null;
 }
@@ -70,7 +70,7 @@ async function openWorldById(id: string, toasts: ToastManager): Promise<void> {
     heldForSignIn = id;
     navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
     // Taken down by the sign-in itself (settings-account), never left up
-    // through the Open question it leads to (Kael's walk, h57 #5950).
+    // through the Open question it leads to (Kael's walk, 2026-10-16).
     toasts.show(OPEN_SIGN_IN_LINE, 'info', 20_000, { dedupeKey: WAITS_FOR_SIGN_IN });
     return;
   }
@@ -115,7 +115,7 @@ function askToOpen(row: AccountWorldRow, token: string, toasts: ToastManager): v
  * A copy already here opens as it is. True when there was one. A route alone
  * never activates a world mid-session, so this activates it. Silently only
  * when no world is open: a link from anyone never moves a person out of the
- * world they are in without their click (Kael, h37 #5811), and a folder's
+ * world they are in without their click (Kael, 2026-10-16), and a folder's
  * permission query runs after the open world is cleared, so a refused one
  * would leave that world empty (the gate's F1). Any open that did not happen
  * asks for a click too.

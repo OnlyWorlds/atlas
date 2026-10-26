@@ -1,5 +1,5 @@
 /**
- * The `#/join/` door (OW Infra #104, S385): `core/join-capture.ts` and
+ * The `#/join/` door: `core/join-capture.ts` and
  * `setup/join-door.ts` against keel's /join and /join/preview as the MSW
  * handlers encode them (`joinV2Handlers`), and a real download into browser
  * storage through the link flow (as `link-browser.test.ts` sets it up).
@@ -191,7 +191,7 @@ describe('openJoinedWorld', () => {
     expect(getState().registry.worlds[0].api).toMatchObject({ api_key: seat.key, seat: { role: 'contributor' }, seat_secret: seat.secret });
   });
 
-  // S386 gate (both lenses): the reconnect once took over any linked world
+  // The reconnect once took over any linked world
   // this browser held no PIN for, turning the owner's own world into a
   // contributor seat for good, and a view-only world into a seat that could
   // never write.
@@ -306,7 +306,7 @@ describe('a player link', () => {
   });
 });
 
-// keel #422 PR 2 (PR 110; the sheet Orrery/keel/party-link.md §2): one player
+// keel's party link: one player
 // link for a table, each player picking a Character from the owner's list, or
 // on a table with no list naming a fresh one. A refused pick spends nothing.
 describe('a party link', () => {

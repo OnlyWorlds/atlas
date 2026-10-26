@@ -46,8 +46,8 @@ vi.mock('../../src/core/state', () => ({
 }));
 
 vi.mock('../../src/visualization/leaflet-2d/CoordinateUtils', () => ({
-  // Mirror real impl: storage is bottom-left like Leaflet, so y = lat (S361;
-  // the old mock copied the top-left flip and would have stayed green).
+  // Mirror real impl: storage is bottom-left like Leaflet, so y = lat (the old mock
+  // copied the top-left flip and would have stayed green).
   leafletToStorage: (latlng: { lat: number; lng: number }) => ({
     x: Math.round(latlng.lng),
     y: Math.round(latlng.lat),

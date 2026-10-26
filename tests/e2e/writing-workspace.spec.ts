@@ -489,7 +489,7 @@ test('context pane Cast shows Featured/Planned distinction by prose content', as
   await gotoWriting(page, narrId);
   await waitForEditor(page);
 
-  // Session 231: context tab no longer auto-opens on writing-mode entry.
+  // The context tab no longer auto-opens on writing-mode entry.
   // Click it explicitly to surface the pane.
   await page.locator('.atlas-tab[data-tab-kind="context"]').click();
 
@@ -508,7 +508,7 @@ test('context pane Cast shows Featured/Planned distinction by prose content', as
   await expect(towerRow.locator('.atlas-context-pane-row-status-planned')).toBeVisible();
 });
 
-test('add-to-cast with no selection inserts chip at cursor (session 230 semantic)', async ({ page }) => {
+test('add-to-cast with no selection inserts chip at cursor', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'wrk world');
@@ -522,7 +522,7 @@ test('add-to-cast with no selection inserts chip at cursor (session 230 semantic
   await waitForEditor(page);
 
   // Fire the add-to-cast event programmatically. With no selection, the
-  // session 230 semantic is: insert chip at cursor (no separate Planned-
+  // the semantic is: insert chip at cursor (no separate Planned-
   // only path — UNION-on-save handles the field side).
   await page.locator('.atlas-writing-workspace-prose .ProseMirror').click();
   await page.evaluate(
@@ -712,7 +712,7 @@ test('autolink: ambiguous names are suppressed (no hint when 2+ matches)', async
   await expect(page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'John' })).toHaveCount(0);
 });
 
-test('autolink: a plain CLICK on a dotted word links it (S313 click-to-link)', async ({ page }) => {
+test('autolink: a plain CLICK on a dotted word links it (click-to-link)', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'click world');
@@ -727,7 +727,7 @@ test('autolink: a plain CLICK on a dotted word links it (S313 click-to-link)', a
 
   const hint = page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Marigold' });
   await expect(hint).toBeVisible();
-  // The whole point of S313: no Tab, no cursor-in-hint precondition, no focus
+  // The whole point: no Tab, no cursor-in-hint precondition, no focus
   // dance — one click on the dotted word promotes it. This is the gesture that
   // works "even if the page isn't selected".
   await hint.click();
@@ -738,7 +738,7 @@ test('autolink: a plain CLICK on a dotted word links it (S313 click-to-link)', a
   await expect(page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Marigold' })).toHaveCount(0);
 });
 
-test('autolink: HOVERING a dotted word makes Tab link THAT word, not the first (S313)', async ({ page }) => {
+test('autolink: HOVERING a dotted word makes Tab link THAT word, not the first', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'hover world');
@@ -751,7 +751,7 @@ test('autolink: HOVERING a dotted word makes Tab link THAT word, not the first (
   const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
   await prose.click();
   // Two unambiguous names; the caret ends after "dawn", off BOTH hints — so a
-  // cursor/order-based Tab would grab the first (Alderly). The bug Captain hit.
+  // cursor/order-based Tab would grab the first (Alderly). The bug Titus hit.
   await page.keyboard.type('Alderly met Borrow at dawn');
   const hintBorrow = page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Borrow' });
   await expect(hintBorrow).toBeVisible();
@@ -771,7 +771,7 @@ test('autolink: HOVERING a dotted word makes Tab link THAT word, not the first (
   await expect(page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Alderly' })).toBeVisible();
 });
 
-test('chip preview: right-clicking a chip dismisses the hover preview so the menu is not obscured (S313)', async ({ page }) => {
+test('chip preview: right-clicking a chip dismisses the hover preview so the menu is not obscured', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'menu world');
@@ -795,7 +795,7 @@ test('chip preview: right-clicking a chip dismisses the hover preview so the men
   await expect(page.locator('.atlas-chip-preview[data-state="shown"]')).toBeVisible();
 
   // Right-click: the context menu must appear AND the preview must vanish, so
-  // the Unlink action is never hidden behind the card (Captain's report).
+  // the Unlink action is never hidden behind the card (Titus's report).
   await chip.click({ button: 'right' });
   await expect(page.locator('.atlas-prose-context-menu')).toBeVisible();
   await expect(page.locator('.atlas-chip-preview[data-state="shown"]')).toHaveCount(0);
@@ -907,7 +907,7 @@ test('empty narrative shows initial empty paragraph', async ({ page }) => {
   await expect(page.locator('.atlas-writing-workspace-wc')).toContainText('0 words');
 });
 
-test('link-all corner icon: counts candidates, one click chips them all (S265)', async ({ page }) => {
+test('link-all corner icon: counts candidates, one click chips them all', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'linkall-root');
   await createWorld(page, 'linkall world');
@@ -930,7 +930,7 @@ test('link-all corner icon: counts candidates, one click chips them all (S265)',
   await expect(corner).toBeHidden();
 });
 
-test('a scene whose story changed while Atlas was closed opens the new text, not the stale copy (S365)', async ({ page }) => {
+test('a scene whose story changed while Atlas was closed opens the new text, not the stale copy', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'sidecar-rule-root');
   await createWorld(page, 'sidecar rule world');
@@ -962,7 +962,7 @@ test('a scene whose story changed while Atlas was closed opens the new text, not
   await expect(page.locator('.ow-toast', { hasText: 'This scene changed outside Atlas' })).toBeVisible();
 });
 
-test('link-all corner never covers the prose: no text rect under the pill (S365)', async ({ page }) => {
+test('link-all corner never covers the prose: no text rect under the pill', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'linkall-ink-root');
   await createWorld(page, 'linkall ink world');
@@ -993,7 +993,7 @@ test('link-all corner never covers the prose: no text rect under the pill (S365)
   expect(hits).toBe(0);
 });
 
-test('tree bulk link: right-click a book links mentions in its closed scenes, story + sidecar + derive (S265)', async ({ page }) => {
+test('tree bulk link: right-click a book links mentions in its closed scenes, story + sidecar + derive', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'bulklink-root');
   await createWorld(page, 'bulklink world');
@@ -1027,7 +1027,7 @@ test('tree bulk link: right-click a book links mentions in its closed scenes, st
   expect(chap.characters).toContain(aralia);
 });
 
-test('tree row hover "+" creates the child tier inside that row (S265)', async ({ page }) => {
+test('tree row hover "+" creates the child tier inside that row', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'rowadd-root');
   await createWorld(page, 'rowadd world');
@@ -1103,9 +1103,9 @@ test('right-click "Link to existing element" chips the selection and records an 
 });
 
 // ===========================================================================
-// Writing-tree delete (S310, Bout W)
+// Writing-tree delete (Bout W)
 //
-// Guards a verified data-loss path: before S310, deleting a Book with the
+// Guards a verified data-loss path: before the fix, deleting a Book with the
 // confirm preference OFF destroyed its entire subtree with no dialog at all
 // (measured live: 8 of 9 elements gone on one click, no undo anywhere).
 // ===========================================================================
@@ -1376,7 +1376,7 @@ test('compiled view counts the whole assembled tree, not zero', async ({ page })
 });
 
 /**
- * S323 — the room-exit data-loss class.
+ * The room-exit data-loss class.
  *
  * `persistSnapshot` used to resolve its write target from the LIVE url and
  * bail when that disagreed with the mounted editor. Leaving the writing room
@@ -1489,7 +1489,7 @@ test('switching narratives saves the old one without polluting the new one', asy
 });
 
 /**
- * S355 — the find bar's "Link to element" (a Discord request: search the
+ * The find bar's "Link to element" (a Discord request: search the
  * text for a word and link every one of them to a chosen element). Unlike
  * link-all this is NOT first-mention: the writer named the word and picked
  * the target, so every match links, labels verbatim, in one undoable step.
@@ -1605,7 +1605,7 @@ test('compiled view: find searches every scene and "Link to element" writes them
   await expect(page.locator('.ow-toast', { hasText: 'Linked 3 mentions to Orc Chief across 2 narratives' })).toBeVisible();
   // The rendering re-drew from the written files: four chips now (three new
   // plus scene B's existing one), no matches left. Every chip shows the
-  // writer's word, never the element's name (the label law, Captain S355).
+  // writer's word, never the element's name (the label law, Titus).
   await expect(compiled.locator('.atlas-element-chip')).toHaveCount(4);
   await expect(compiled.locator('.atlas-element-chip')).toHaveText(['orc', 'orc', 'orc', 'orc']);
   await expect(compiled).not.toContainText('Orc Chief');
@@ -1697,7 +1697,7 @@ test('find bar: Ctrl+F still opens after switching scenes inside the room', asyn
 });
 
 /**
- * S360 F1: switching WORLDS while a prose save is pending. The switch used to
+ * Switching WORLDS while a prose save is pending. The switch used to
  * empty the element cache before anything flushed, the workspace found its
  * narrative gone, and the text was dropped (no undo). Every world-leaving flow
  * now awaits the rooms' leave-flush first.

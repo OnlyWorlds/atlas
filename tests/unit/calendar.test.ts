@@ -471,9 +471,9 @@ describe('defensive read (wild configs fall back, never a broken axis)', () => {
   });
 });
 
-// S367 critic K1: a hand-edited or foreign config with a bad step size used to
+// A hand-edited or foreign config with a bad step size used to
 // pass the reader and hang absoluteYear (tab freeze).
-describe('malformed step sizes (S367 critic K1)', () => {
+describe('malformed step sizes', () => {
   const base = { version: 1, grain: 'day' };
   it('the reader rejects non-positive, fractional or non-finite divisors and step sizes', () => {
     const bad: unknown[] = [
@@ -535,7 +535,7 @@ describe('malformed step sizes (S367 critic K1)', () => {
   });
 });
 
-describe('a down era with a mid-year pivot (Quillon h58 #8962)', () => {
+describe('a down era with a mid-year pivot (Quillon 2026-10-20)', () => {
   // Day grain, two 10-day months, a down era and an up era both pivoting at
   // step 5, half way through a month. What Atlas shows, typed back into the
   // timeline, must land on the same step on both sides of the pivot; SDK 4.42.2
@@ -563,9 +563,9 @@ describe('a down era with a mid-year pivot (Quillon h58 #8962)', () => {
     expect(misses).toEqual([]);
   });
 
-  it('a typed date its era does not hold is refused, not moved (Kael h58 #9314, SDK 4.42.4)', () => {
+  it('a typed date its era does not hold is refused, not moved (Kael 2026-10-21, SDK 4.42.4)', () => {
     // Year 1 BG holds only 1 to 5 Frost. 4.42.3 read "10 Thaw, 1 BG" as step 39
-    // and "3 Frost, 0 BG" as step 2 (S448's live walk); the era names the date's era.
+    // and "3 Frost, 0 BG" as step 2 (seen in a live walk); the era names the date's era.
     expect(isParseError(parseDate(MIDYEAR, '10 Thaw, 1 BG'))).toBe(true);
     expect(isParseError(parseDate(MIDYEAR, '3 Frost, 0 BG'))).toBe(true);
     const held = parseDate(MIDYEAR, '3 Frost, 1 BG');

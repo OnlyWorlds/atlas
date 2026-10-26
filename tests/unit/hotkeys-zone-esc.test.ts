@@ -1,5 +1,5 @@
 /**
- * S367 critic C9: Esc while drawing or reshaping a zone belongs to the zone
+ * Esc while drawing or reshaping a zone belongs to the zone
  * mode (cancel the draft, revert the shape). The global deselect-to-home
  * binding must stand down, or the user is also thrown to home.
  */

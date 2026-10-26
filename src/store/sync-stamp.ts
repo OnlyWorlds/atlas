@@ -1,5 +1,5 @@
 /**
- * The one rule for stamping a sync baseline onto an element (S360, H1).
+ * The one rule for stamping a sync baseline onto an element (H1).
  *
  * A push reads the element, sends it, and stamps `server_updated_at` from the
  * response. If the user edited the element WHILE the request was in flight,
@@ -14,7 +14,7 @@
  * keep the new baseline, and lift `local_updated_at` just past it so the
  * element stays dirty and the next push sends the edit.
  *
- * `null` (S361, gate F3) means the caller KNOWS the server holds different
+ * `null` (gate F3) means the caller KNOWS the server holds different
  * content (a create adopted after a lost response): keep the element dirty
  * whatever the timestamps say, so the local body goes out as an UPDATE.
  *
@@ -30,16 +30,15 @@ export function stampedBody(
   kept?: Readonly<Record<string, unknown>>,
 ): Element {
   // A push that landed is keel's last write, through Atlas's own door: whoever wrote the copy on
-  // disk before is no longer the last writer (#347; the S415 gate: an outside edit adopted from the
+  // disk before is no longer the last writer (#347: an outside edit adopted from the
   // live folder, or Make Online, pushed and stamped while the old agent mark stayed for good).
   // `kept`: what keel wrote into the element on that write and the copy keeps with the stamp, in the
   // same write (the review profile's mark on a seat's new element, conv. 168).
   const next: Element = dropLastWriter({ ...existing, ...kept, server_updated_at: serverUpdatedAt });
   // keel's word on the hidden mark (`hiddenWordOf`): kept only while the file holds the mark and the
-  // answer showed it; an answer with no body leaves the word as it was (the S461 gate's F3).
+  // answer showed it; an answer with no body leaves the word as it was.
   // A first stamp with no answer body (a `/bulk` echo) is a create keel took, which takes the mark or
-  // refuses the create: a word left by a cleared baseline (a Keep, a reset, a re-key) never survives it
-  // (the S464 gate's M1).
+  // refuses the create: a word left by a cleared baseline (a Keep, a reset, a re-key) never survives it.
   const rec = next as Record<string, unknown>;
   const said = kept !== undefined && HIDDEN_SHOWN_ONLINE in kept;
   if (!said && !existing.server_updated_at) delete rec[HIDDEN_SHOWN_ONLINE];
@@ -57,7 +56,7 @@ export function stampedBody(
 
 /**
  * The stamp of a local edit: now, or just past the element's sync baseline
- * when this device's clock is behind the server's (S387). The baseline is
+ * when this device's clock is behind the server's. The baseline is
  * the SERVER's `updated_at`, the edit's stamp this device's clock; with keel
  * measured about 1.5 s ahead of the crew's laptop, an edit made in that
  * window after a sync sorted below its own baseline, read clean, and was

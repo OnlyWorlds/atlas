@@ -3,7 +3,7 @@
  *
  * The tour turns the opening sentence of *Hyperion* by Dan Simmons into
  * OnlyWorlds elements, teaching atlas’s rooms along the way (Freek’s concept,
- * 2026-07-19; the v2 progressive build-up is Captain’s design round 2). The
+ * 2026-07-19; the v2 progressive build-up is Titus’s design round 2). The
  * world data is the baked demo bundle `src/demo/hyperion-world.json` (from
  * OnlyWorlds demo key 0000000000); steps reference bundle elements by
  * `"type:Name"` so re-bakes don’t break the script.
@@ -17,16 +17,16 @@
  *     sentence-is-the-progress-bar, ow.com vignette grammar). A span carrying
  *     a `ref` lights on that element’s EXISTENCE instead (the per-mint pop).
  *
- * Steps carry NO titles (Captain’s cut, v2.1): the act label orients, a
+ * Steps carry NO titles (Titus’s cut, v2.1): the act label orients, a
  * hairline divides sentence from explainer, the body speaks for itself.
  *
- * PHASES (S301): a step’s narration is a list of phases, and which one speaks
+ * PHASES: a step’s narration is a list of phases, and which one speaks
  * is DERIVED from the world (`src/tour/tour-view.ts`), never stored. Most steps
  * are single-phase; the scripted objects run and the pin’s soft correction use
  * b/c/d phases, and their `when` predicates are PREFIX-nested (each a
  * refinement of the one before) so `resolvePhase` never breaks early.
  *
- * Order (S303 rework; S317 merge): opener (the sentence centre-stage) ·
+ * Order: opener (the sentence centre-stage) ·
  * elements (world, consul, hegemony+title) · maps (planet, map+zone+PIN in one
  * hands-on beat, swamps) · objects & links · writing · time · yours — 16 steps.
  * Maps come before the objects so the pin’s "sat" lights in reading order and
@@ -45,8 +45,8 @@ export const TOUR_SENTENCE: readonly string[] =
 
 /** The opener’s eyebrow line (step 1 only — steps carry no titles). */
 
-/** The standard cite — book and year. (S308: the "no mortality claims"
- *  annotation was removed — it wasn’t Captain’s rule, and the opener’s own copy
+/** The standard cite — book and year. (the "no mortality claims"
+ *  annotation was removed — it wasn’t Titus’s rule, and the opener’s own copy
  *  says "the late Dan Simmons", which is correct: he died 21 Feb 2026.) */
 export const TOUR_ATTRIBUTION = 'Hyperion, Dan Simmons (1989)';
 // Percent-encoded parens: the copy link token `[text](url)` ends its URL at
@@ -127,7 +127,7 @@ export interface TourStep {
   /** Switch the right pane to the Web (context) tab on step enter. */
   webTab?: boolean;
   /**
-   * Scroll the named element-detail section into view on step enter (S309):
+   * Scroll the named element-detail section into view on step enter:
    * the linking payoff narrates the World section and Referenced by, which sit
    * BELOW the tour dock at default scroll — a step whose subject is off-screen
    * teaches nothing. Matches `.atlas-detail-section[data-section="<name>"]`.
@@ -135,7 +135,7 @@ export interface TourStep {
   scrollToSection?: string;
   /**
    * Field rows the step's copy narrates get a subtle highlight while the step
-   * is live (Captain, S316): each entry matches `.atlas-field[data-field=X]`
+   * is live (Titus): each entry matches `.atlas-field[data-field=X]`
    * — the row attribute every field renders — or, prefixed `section:`, an
    * `.atlas-detail-section[data-section=X]` (for "Referenced by", which is a
    * section, not a field). Applied via one injected style tag (tour-bar), so
@@ -145,14 +145,14 @@ export interface TourStep {
   /**
    * Hands-on steps. The create beats and `set-now` are SINGLE ROUTE: the real
    * gesture is the only way forward, and no watch-mode Next is rendered (two
-   * forward controls at a hands-on beat read as a fork — Captain, S298). Each
+   * forward controls at a hands-on beat read as a fork — Titus). Each
    * kind needs its own branch in `tour-bar`'s forward gate; a kind with no
    * bundle ref that falls through to the default is un-advanceable forever.
    */
   handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'keep-world' | 'link-word';
   /**
    * For a `place-pin` step: the forward gate ALSO requires the pin to sit
-   * inside this zone (the soft correction — Captain’s ruling). The pin can be
+   * inside this zone (the soft correction — Titus’s ruling). The pin can be
    * dropped anywhere (never refused); Next appears only once it is over the
    * zone, and a wrong drop is dragged onto it, which teaches dragging pins.
    * The phase copy narrates the correction; this drives whether Next shows.
@@ -161,8 +161,8 @@ export interface TourStep {
 }
 
 /** The pin the balcony-seat beat places, and the zone it must land inside.
- *  (S312: the spatial layer is Captain's live rebuild — zone "Swamps" — the
- *  unnamed-world resolution, hyperion.txt L307. S318: map renamed live to
+ *  (the spatial layer is Titus's live rebuild — zone "Swamps" — the
+ *  unnamed-world resolution, hyperion.txt L307. Later: map renamed live to
  *  "Map of Unnamed planet", adopted.) */
 export const TOUR_PIN_REF = "pin:The Consul’s balcony seat";
 export const TOUR_SWAMPS_ZONE_REF = 'zone:Swamps';
@@ -177,7 +177,7 @@ export const TOUR_CHAPTER_REF = 'narrative:Chapter 1';
 export { isQuietRef, TOUR_QUIET_REFS, TOUR_QUIET_TYPES } from './tour-flag';
 
 /**
- * The preview stack's refs for step `stepIndex` (Captain, S316): what the
+ * The preview stack's refs for step `stepIndex` (Titus): what the
  * NEXT click of Next brings into the world — the FOLLOWING step's `reveal`
  * and `creates` lists, minus the quiet machinery above. "It is what you are
  * about to create." Hands-on elements (the consul, the pin, the linked word)
@@ -195,7 +195,7 @@ export function previewRefsFor(stepIndex: number): string[] {
  * The sentence carries nine linkable surface forms, but `character:Rachmaninov`
  * and `construct:Rachmaninov’s Prelude` are not revealed until `deep-time`,
  * three steps later, so autolink cannot resolve them here. No step copy
- * depends on the number since S317 (the all-linked phase c was cut), but the
+ * depends on the number now (the all-linked phase c was cut), but the
  * unit test still recomputes it from the bundle + the reveal order — it locks
  * the bundle/alias/reveal consistency the writing beat rests on.
  */
@@ -204,7 +204,7 @@ export const TOUR_WRITING_LINKABLE = 7;
 /**
  * The finale's meta line, per what its buttons offer (1.17, contract §7.1,
  * §7.7). A 1.16 tour world still running across the upgrade can only be
- * ended, so its line is the old one (S368: "leaves nothing behind" was too
+ * ended, so its line is the old one ("leaves nothing behind" was too
  * soft for a delete).
  */
 export const FINALE_META = {
@@ -228,16 +228,16 @@ const CHART_TOUCH_DEEPER =
 
 export const TOUR_STEPS: readonly TourStep[] = [
   // ---------------------------------------------------------------- Opener
-  // Step 0 (S303 rework): the sentence centre-stage on black, then it hands
+  // Step 0: the sentence centre-stage on black, then it hands
   // off into the dock on "Begin". No `unlocks` at all, so
   // `:not(.atlas-tour-cap-shell)` hides the shell behind the big sentence.
-  // Copy is Captain’s shorter variant and rides his copy pass.
+  // Copy is Titus’s shorter variant and rides his copy pass.
   {
     id: 'the-sentence',
     act: 1,
     phases: [{
       id: 'a',
-      // S312: the book link is INLINE on the word (Captain's ask) — the copy
+      // The book link is INLINE on the word (Titus's ask) — the copy
       // token pass renders [text](url) safely, so the separate extras link
       // is retired.
       body:
@@ -267,10 +267,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
         body:
           'Worlds are made of elements, and this Consul seems pre-eminent.\n\nClick the highlighted **+** to create him as a character.',
         // (The "real element dialog, locked to the tour’s script this once…" meta
-        // was cut S301, Captain’s round — the dialog speaks for itself.)
+        // was cut in Titus’s round — the dialog speaks for itself.)
       },
       {
-        // The step used to keep asking for a deed already done (Captain, S306):
+        // The step used to keep asking for a deed already done (Titus):
         // after the create, Next appeared but the copy still read "Create him
         // in the sidebar". Every other hands-on beat acknowledges its gesture.
         id: 'b',
@@ -284,12 +284,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
     handsOn: 'create-consul',
-    // ROUTED, as of S307. This step used to carry no route at all: going
+    // ROUTED. This step used to carry no route at all: going
     // FORWARD it looked right only because creating an element navigates to
     // it as a side effect. Going BACK there is no create, so nothing
     // navigated and the middle pane kept showing whatever a LATER step had
     // opened — the narrator talking about the Consul over the institution’s
-    // page. Captain saw it as the tour "jumping between the Consul and home",
+    // page. Titus saw it as the tour "jumping between the Consul and home",
     // because which surface you landed on depended on the path you took.
     //
     // A step’s route is a promise about what you are looking at; it must not
@@ -297,7 +297,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     route: { kind: 'element', ref: 'character:The Consul' },
   },
   {
-    // MERGED (S303 rework): the institution and the title were two steps; a
+    // MERGED: the institution and the title were two steps; a
     // title is just a name of the institution beat here — one step reveals
     // both and teaches the distinction. Routes to the Hegemony (a rich element
     // page); the title rides the sidebar and the copy.
@@ -311,7 +311,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
 
  
     }],
-    // One word per element, in reading order (Captain, S306): "The" carries the
+    // One word per element, in reading order (Titus): "The" carries the
     // TITLE, "Hegemony" the institution, and "Consul" is left alone so the
     // character colour it earned on the previous step survives. `fillMap`
     // walks steps in order and later spans overwrite earlier ones, so a title
@@ -321,25 +321,25 @@ export const TOUR_STEPS: readonly TourStep[] = [
       { from: 1, to: 1, type: 'institution' },
     ],
     reveal: ['institution:The Hegemony', 'title:Consul of the Hegemony'],
-    // Routes to the TITLE, scrolled to its Mandate section (Captain, S311):
+    // Routes to the TITLE, scrolled to its Mandate section (Titus):
     // grant date, issuer, holders — the clearest link cluster in the young
     // world, and the copy teaches issued-by/held-by against exactly those
     // rows. (It routed to the institution before; the Hegemony's page is
     // richer prose but its links sit below the dock at default scroll.)
     route: { kind: 'element', ref: 'title:Consul of the Hegemony' },
     scrollToSection: 'Mandate',
-    // The copy teaches issued-by/held-by against exactly these rows (S316).
+    // The copy teaches issued-by/held-by against exactly these rows.
     highlightFields: ['issuer', 'holders'],
   },
   // ---------------------------------------------------------------- Act 2 (maps)
-  // Locations and the map now come BEFORE the objects (S303 rework): this lights
+  // Locations and the map now come BEFORE the objects: this lights
   // "sat" (the pin, word 3) in reading order ahead of "balcony" and "spaceship",
   // and it lets the pin beat’s soft correction land the seat over the swamps —
   // which requires the zone to already be on the map, so the zone reveals here.
   {
     id: 'the-planet',
     act: 2,
-    // `unlocks: ['rightpane']` MOVED to `the-map` (S308). It sat here, so the
+    // `unlocks: ['rightpane']` MOVED to `the-map`. It sat here, so the
     // largest single piece of chrome in the whole build-up slid in during a
     // pure elements beat with no narration, and the NEXT step then said "a new
     // pane just opened on the right" about something that had opened a step
@@ -359,13 +359,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
     reveal: ['location:Unnamed Planet'],
     route: { kind: 'element', ref: 'location:Unnamed Planet' },
     // The copy narrates the *location* assignment; the payoff is the planet's
-    // new "Located here" section — the Consul standing on it (S317).
+    // new "Located here" section — the Consul standing on it.
     highlightFields: ['section:Located here'],
   },
   {
-    // THE MERGED MAP+PIN BEAT (Captain, S317): the pin is required HERE — the
+    // THE MERGED MAP+PIN BEAT (Titus): the pin is required HERE — the
     // old separate pin step folded in. Phase a carries the whole instruction
-    // (Captain's copy names both real gestures: the +pin click and the
+    // (Titus's copy names both real gestures: the +pin click and the
     // sidebar drag — both verified live); b/c are the old soft-correction
     // phases. The step is hands-on: no Next until the pin sits in the zone.
     id: 'the-map',
@@ -417,7 +417,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // correction needs the region present to test the drop against, and the
     // geography reads as one thing. The living things stay for the-swamps.
     // Span starts at "the" (33), not "in" (32): the zone is the swamps, the
-    // preposition stays plain (Captain, S316).
+    // preposition stays plain (Titus).
     spans: [
       { from: 33, to: 34, type: 'zone' },
       { from: 3, to: 3, type: 'pin', ref: TOUR_PIN_REF },
@@ -437,11 +437,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        // "the zone you traced onto the map" was wrong (Captain, S306): the
+        // "the zone you traced onto the map" was wrong (Titus): the
         // Swamps zone is REVEALED with the map at the previous beat, the user
         // never draws it. Copy must not credit the reader with a gesture the
         // tour performed for them.
-        // S308: "all linked to the swamps zone" was false for two of the four
+        // "all linked to the swamps zone" (earlier copy) was false for two of the four
         // elements this step reveals, and schema-impossible for one — a
         // collective has no zone field, so the old copy implied a link the
         // model cannot express. Narrowed to what is true and checkable.
@@ -458,14 +458,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
     route: { kind: 'map', ref: TOUR_MAP_REF },
   },
   // ------------------------------------------------------- Act 1 (objects & links)
-  // Objects and linking now follow the maps act (S303 rework) so the pin lights
+  // Objects and linking now follow the maps act so the pin lights
   // "sat" before these light "balcony" / "spaceship".
   {
     id: 'objects',
     act: 1,
     // The first scripted RUN: the user mints these three with the app’s own +,
     // one per click, and Next waits for all of them. Copy here is provisional
-    // and rides Captain’s copy pass.
+    // and rides Titus’s copy pass.
     creates: ['object:Ebony Spaceship', 'object:Spaceship Balcony', "object:The Consul’s Steinway"],
     phases: [
       {
@@ -519,7 +519,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // his Objects fill in as each object lands.
     route: { kind: 'element', ref: 'character:The Consul' },
     // Per-mint navigation opens each new object's page; the copy teaches
-    // *parent object* there (S316).
+    // *parent object* there.
     highlightFields: ['parent_object'],
   },
   {
@@ -535,7 +535,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     reveal: [],
     route: { kind: 'element', ref: 'character:The Consul' },
     // The payoff this step narrates (World section, Referenced by) sits below
-    // the dock at default scroll — bring the subject on screen (S309).
+    // the dock at default scroll — bring the subject on screen.
     scrollToSection: 'World',
   },
   // ---------------------------------------------------------------- Act 3
@@ -543,7 +543,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'the-writing',
     act: 3,
     unlocks: ['writing'],
-    // HANDS-ON (S306): the chapter is baked as PLAIN prose (no ow:// chips) and
+    // HANDS-ON: the chapter is baked as PLAIN prose (no ow:// chips) and
     // the user links the sentence themselves. Every surface form in it carries a
     // baked alias, so autolink underlines each one it can resolve.
     //
@@ -555,8 +555,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          // "hover a dotted word" was WRONG and cost Captain a live confusion
-          // (S306): `handleKeyDown` promotes the decoration containing the
+          // "hover a dotted word" was WRONG and cost Titus a live confusion:
+          // `handleKeyDown` promotes the decoration containing the
           // CURSOR, so hovering does nothing and Tab just moves focus out of
           // the editor. The gesture is click-then-Tab.
           'The writing room is where you write and organize long-form stories.' +
@@ -572,7 +572,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
    
       },
       {
-        // ONE step forward from the first link (Captain, S317 — the old
+        // ONE step forward from the first link (Titus — the old
         // phase c waited for all seven and its body went blank under the
         // copy pass; c folded into b, Next lives from the first chip).
         id: 'b',
@@ -590,7 +590,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     handsOn: 'link-word',
     reveal: ['narrative:Hyperion', 'narrative:Chapter 1'],
     route: { kind: 'writing', ref: 'narrative:Chapter 1' },
-    // The Web pane arrives WITH the writing room (Captain, S317): shown and
+    // The Web pane arrives WITH the writing room (Titus): shown and
     // switched to on step enter, and it stays for the rest of the tour —
     // including back-navigation (the sticky preweb boundary in tour-bar).
     webTab: true,
@@ -609,7 +609,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       { from: 12, to: 12, type: 'event' },
       { from: 29, to: 31, type: 'event' },
     ],
-    // Rachmaninov and his Prelude moved OUT of this step (S305): they carry the
+    // Rachmaninov and his Prelude moved OUT of this step: they carry the
     // Old Earth dates, and revealing them here would put centuries of deep time
     // on the axis before the chart has taught what the axis is.
     reveal: ['event:The Primal Performance', 'event:The Raging of the Beasts'],
@@ -702,9 +702,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        // S318 claim fix: the trait this step reveals is Swamp Rage, which is
+        // A claim fix: the trait this step reveals is Swamp Rage, which is
         // not piano-related — the modifier was a false claim on screen
-        // (Skeld's verify round; minimal edit, flagged to Captain).
+        // (Skeld's verify round; minimal edit, flagged to Titus).
         'There is still more to the story: a piano-making character, a piano-related ability, a trait, ' +
         'a musical language, a piano-related phenomenon.'   ,
 
@@ -721,7 +721,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     route: { kind: 'elements' },
   },
   {
-    // MERGED (S306, Captain: "i do believe there are TWO final steps we can
+    // MERGED (Titus: "i do believe there are TWO final steps we can
     // remove"). `where-it-lives` and `online` were two soft beats saying
     // adjacent things — the files story and the OnlyWorlds story — right where
     // the tour should be closing. One step now carries both in a sentence
@@ -745,17 +745,17 @@ export const TOUR_STEPS: readonly TourStep[] = [
     act: 5,
     phases: [{
       id: 'a',
-      // NO UNCONDITIONAL GESTURE HERE (S307). This used to end "Pick one and
+      // NO UNCONDITIONAL GESTURE HERE. This used to end "Pick one and
       // start building, or finish here" — but the folder picker button is
       // gated on `hasFolderMode()`, and OPFS-only browsers (Safari 26+,
       // Firefox, which `main.ts` deliberately admits in tour-capable mode)
       // can complete all 17 steps and never see it. The code branched on the
       // capability; the sentence did not, so it instructed a control that was
       // not on screen. Same class as "hover a dotted word and press Tab"
-      // (S306) — copy naming a control is a behavioural claim.
+      // (above) — copy naming a control is a behavioural claim.
       // The buttons say what is available; the prose no longer guesses.
       body:
-        // S323: this used to send the finisher to "each room's help icon in
+        // This used to send the finisher to "each room's help icon in
         // the footer". A finisher without an atlas root lands on the
         // pre-root screen, where `.atlas-preroot .atlas-sidebar` is hidden —
         // footer, help icon and all. Same class as the control-naming bug the
@@ -769,7 +769,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       // version, kept so every copy scan over the steps still reads it.
       meta: FINALE_META.folder,
     }],
-    // The closing view is the ebony spaceship (Captain, S318 — "just for
+    // The closing view is the ebony spaceship (Titus — "just for
     // cools"): the tour ends looking at the sentence's grandest object, its
     // links radiating back through everything the user just built.
     route: { kind: 'element', ref: 'object:Ebony Spaceship' },
@@ -777,7 +777,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
 ];
 
-// (TOUR_ACT_NAMES was deleted S304: the visible act label was cut in the Freek
+// (TOUR_ACT_NAMES was deleted: the visible act label was cut in a tester's
 // round and nothing consumed the map since. The reorder also broke its premise
 // — act:1 steps like objects/linking now sit physically after the act:2 maps —
 // so a revived consumer would render acts out of order. The `act` field on each

@@ -1,5 +1,5 @@
 /**
- * The keep-safe card (1.17 bout 5, contract §6.1; S369 ruling 5): a world of
+ * The keep-safe card (1.17 bout 5, contract §6.1): a world of
  * the user's own that lives only in this browser asks for a copy before it
  * matters. Pure: the home renders what this answers.
  *

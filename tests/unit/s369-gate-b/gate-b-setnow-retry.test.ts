@@ -1,5 +1,5 @@
 /**
- * Gate lens B probe B-5 (S369): "Retry now" on a failed now-time save must
+ * Gate lens B probe B-5: "Retry now" on a failed now-time save must
  * never write into a world opened since. Asserts the FIXED behaviour.
  */
 import { describe, it, expect, vi } from 'vitest';

@@ -28,7 +28,7 @@ export type BrowserDeleteResult =
   /**
    * `listSaved: false`: the directory is gone but the list of worlds could
    * not be saved (a full localStorage), so after a reload the row comes back
-   * as cleared by this browser (S376 lens A A2).
+   * as cleared by this browser.
    */
   | { ok: true; listSaved: boolean }
   /** Nothing was removed; the entry is kept. `wasActive`: reopen it. */

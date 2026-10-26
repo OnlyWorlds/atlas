@@ -80,7 +80,7 @@ describe('renderChangelog — credit + escaping contract', () => {
   });
 });
 
-describe('renderChangelogFeed — the RSS half (S318)', () => {
+describe('renderChangelogFeed — the RSS half', () => {
   const feed = renderChangelogFeed(CHANGELOG);
 
   it('is RSS 2.0 with one item per entry, permalink guids', () => {
@@ -112,9 +112,9 @@ describe('renderChangelogFeed — the RSS half (S318)', () => {
   });
 
   it('keeps the launch block intact at the bottom of the log', () => {
-    // Captain's S318 ruling seeded ONE clean v1.0 block, and this test used to
+    // Titus's ruling seeded ONE clean v1.0 block, and this test used to
     // pin the count at 1 as a tripwire: "a second release reappearing here
-    // should be a conscious act." S323 is that conscious act (the first
+    // should be a conscious act." This is that conscious act (the first
     // post-launch sweep shipped as 1.1), so the assertion moves from "there is
     // only one" to what actually has to stay true: v1.0 is the oldest entry,
     // still dated launch day, and releases run newest-first.

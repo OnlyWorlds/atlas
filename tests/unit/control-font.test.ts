@@ -1,5 +1,5 @@
 /**
- * A control's words are in the page's face (S446). A browser draws a button,
+ * A control's words are in the page's face. A browser draws a button,
  * input, select and textarea in its own default face, so any class that never
  * named a family drew its words in Arial (the Settings tabs, the chart chips,
  * the filter counts). One zero-specificity rule at the top of atlas.css hands

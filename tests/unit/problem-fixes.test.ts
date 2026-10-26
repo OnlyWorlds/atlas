@@ -1,5 +1,5 @@
 /**
- * showProblem: the sentence, the fix buttons, and details only when worth reporting (S368).
+ * showProblem: the sentence, the fix buttons, and details only when worth reporting.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ToastManager } from '../../src/ui/toast-manager';

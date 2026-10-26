@@ -1,5 +1,5 @@
 /**
- * S369 error-copy sweep, builder S3 (writing, knowledge, pages, charts,
+ * The error-copy sweep (writing, knowledge, pages, charts,
  * import, context pane): the behaviour changes that are more than wording.
  *
  *   - pasted JSON says WHERE it broke, never the engine's message;

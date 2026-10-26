@@ -4,7 +4,7 @@
  * is. Atlas writes both into the world file of a linked world, says the slice
  * wherever it shows a world that carries one, and refuses to put a slice that
  * is not the whole world online as a world of its own. The contract:
- * `Forge/Notes/2026-10-20-s446-provenance-lines.md` (W1-W3, R1, P1, K1).
+ * a design note on provenance lines (2026-10-20).
  */
 
 import pkg from '../../package.json';
@@ -17,7 +17,7 @@ export interface WorldSource {
 }
 
 /**
- * The producer line (spec §4.2, v0.3.14; Keel #477, OW Council #541): which
+ * The producer line (spec §4.2, v0.3.14): which
  * tool made a folder and from what. Written once, by the writer that makes the
  * folder, and carried verbatim by every copy after (the store keeps the line a
  * world.json was born with: `writeWorldMeta`). `input` is the spec's closed
@@ -164,7 +164,7 @@ export function partialSliceNote(meta: unknown): string | null {
     : `This is ${viewOf(s, meta)} of the world, not the whole world.`;
 }
 
-/** The download button's words: a slice is not "the whole world" (the S446 gate's G8). */
+/** The download button's words: a slice is not "the whole world". */
 export function downloadLabel(meta: unknown): string {
   return isPartialSlice(meta) ? 'Download this world' : 'Download the whole world';
 }

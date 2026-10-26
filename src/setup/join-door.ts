@@ -1,8 +1,7 @@
 /**
- * The `#/join/` door (OW Infra #104, S385): a world opened from onlyworlds.com
+ * The `#/join/` door: a world opened from onlyworlds.com
  * joins Atlas as an agent seat and comes down like any linked world.
- * Contract: `Forge/Notes/2026-10-08-s379-handoff-contract.md` (R1-R9);
- * design: `Forge/Notes/2026-10-10-s385-join-door-design.md`.
+ * R1-R9 below cite the rules of the handoff contract (a design note).
  *
  * Order: `core/join-capture.ts` took the code out of the address bar (R2);
  * `runPendingJoin` previews it (the only call before the person agrees), the
@@ -41,8 +40,8 @@ export interface JoinPreview {
 }
 
 /**
- * A party link's table, from the preview (keel `table_preview`, the sheet
- * `Orrery/keel/party-link.md` §2): how often it works, how many places are
+ * A party link's table, from the preview (keel's `table_preview`):
+ * how often it works, how many places are
  * left, and the Characters the owner listed, in the owner's order. An empty
  * list means each player names a fresh Character (`nameRequired`).
  */
@@ -70,7 +69,7 @@ export const JOIN_TAKEN_LINE = `If you did not use this link just now, look on o
 /** A seat made and not used (R6 waits on keel Q5, a seat retiring itself). */
 export const SPARE_SEAT_LINE = `The seat this link made is unused: remove it on onlyworlds.com, ${SEAT_REMOVE_WHERE}.`;
 /**
- * An agent code says what it makes before anything is spent (the Captain's case, h58 #8512: a
+ * An agent code says what it makes before anything is spent (Titus's case, 2026-10-20: a
  * person opened an AI agent link in Atlas and became a seat in the inviter's name, not a member).
  */
 export const AGENT_LINK_LINE = 'This link adds Atlas to the world as an AI agent, a seat that whoever made the link answers for. It does not make you a member: to join as yourself, ask for an invite link for a person.';
@@ -137,7 +136,7 @@ export async function previewJoin(code: string): Promise<JoinPreview> {
   const world = (r.world ?? {}) as Record<string, unknown>;
   return {
     // A keel without the field made agent codes only; a value this Atlas does
-    // not know goes to neither route (S413 gate).
+    // not know goes to neither route.
     reader: r.reader === undefined || r.reader === 'agent' ? 'agent'
       : r.reader === 'person' || r.reader === 'player' ? r.reader : 'unknown',
     world: { name: str(world.name) || 'Untitled world', description: str(world.description) },
@@ -249,7 +248,7 @@ export async function redeemPlayerJoin(code: string, name = '', pick?: string): 
 
 /**
  * Bring a player's world down to read, or open the copy already here. The
- * read key goes on a view-only link (S264's flag: no PIN, pull-only, every UI
+ * read key goes on a view-only link (the view-only flag: no PIN, pull-only, every UI
  * write refused); keel answers it with what the Character knows, so the slice
  * is the server's, never computed here. Runs on the activation chain.
  */
@@ -365,12 +364,11 @@ export async function openJoinedWorld(opts: {
     // Only a seat world whose secret this browser lost takes the new seat. An
     // account world with no PIN here, or a view-only one, stays what it is:
     // a seat put in its place would turn the owner's own world into a
-    // contributor's (S386 gate, both lenses).
+    // contributor's.
     if (!isSeatWorld(linked) || linked.api?.seat_secret) {
       dropHeldSeat(seat.world.id);
       // On this very seat (another tab, or a Retry past the commit): nothing is
-      // spare, and the line must not send anyone to remove a seat in use (the
-      // S469 code gate's must).
+      // spare, and the line must not send anyone to remove a seat in use.
       return { kind: 'already-here', entry: linked, ...(linked.api?.api_key === seat.key ? { sameSeat: true } : {}) };
     }
     const next = updateWorldEntry(reg, linked.id, {

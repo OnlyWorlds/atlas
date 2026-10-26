@@ -35,7 +35,7 @@ test('a stub reads as known of: name, picture, description and what keel shares,
     const api = (window as any).__atlasTestApi;
     const store = api.getActiveStore();
     const at = '2026-10-20T11:54:07.533243+00:00';
-    // As keel serves it live since PR 117 (S444 probe-stub.log): the public fields kept, every other field unset.
+    // As keel serves it live since PR 117: the public fields kept, every other field unset.
     await store.applyServerRecord('character', {
       id: ANA, type: 'character', name: 'Ana', description: 'Sells mules.', supertype: '', subtype: '', image_url: '',
       reputation: 'Honest', physicality: 'Tall', mentality: '', height: null, friends: [], location: null, created_at: at, updated_at: at, known_of: true,

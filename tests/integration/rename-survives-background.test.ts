@@ -1,5 +1,5 @@
 /**
- * S364 lane A3: a background tick (a sync publish, the writing room's own
+ * A background tick (a sync publish, the writing room's own
  * prose save) rebuilt the header under a focused rename input. Chromium blurs
  * a removed focused input and the blur commits, so "Strahd von Zarovich"
  * saved as "Strahd von" mid-word. jsdom does not fire that removal blur, so

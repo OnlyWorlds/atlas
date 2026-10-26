@@ -5,7 +5,7 @@
  * front: name (auto-selected), supertype (free text — OW taxonomy), subtype
  * (free text — OW taxonomy). Shape (polygon vs line) is LOCKED from the
  * draft mode — not user-pickable here — and stored in the atlas-local
- * `atlas_shape` field. Captain's call: shape choice in a modal felt messy,
+ * `atlas_shape` field. Titus's call: shape choice in a modal felt messy,
  * supertype/subtype should be free text for user-meaningful taxonomy
  * instead of being misused for shape.
  *
@@ -15,7 +15,7 @@
 
 import { BaseModal } from './modal-base';
 import { escapeAttr } from '../core/dom-utils';
-// The kinds a styled map draws (S423): offered, never required.
+// The kinds a styled map draws: offered, never required.
 import { ZONE_KIND_WORDS } from '../core/map-ink';
 
 export type ZoneShape = 'polygon' | 'line';
@@ -104,7 +104,7 @@ class ZoneCreateModal extends BaseModal {
       const subtypeInput = body.querySelector<HTMLInputElement>('[data-role="zone-create-subtype"]')!;
       const errorBox = body.querySelector<HTMLElement>('[data-role="zone-create-error"]')!;
 
-      // B6 (S368): an empty name used to do nothing at all. Same rule and
+      // B6: an empty name used to do nothing at all. Same rule and
       // same words as the element create modal: say it, clear it on typing.
       nameInput.addEventListener('input', () => {
         if (nameInput.value.trim()) errorBox.hidden = true;

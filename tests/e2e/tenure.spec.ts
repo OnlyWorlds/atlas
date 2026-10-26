@@ -55,8 +55,8 @@ async function focusInCharts(page: Page, elementId: string) {
 
 test('tenure and life vocabulary on the chart card, with and without a now', async ({ page }) => {
   await setupWorld(page);
-  // Dated spread: the set-now default is the LATEST recorded moment (S318,
-  // Captain's rule — was the median): max over starts [5,12,28,38,38,48] and
+  // Dated spread: the set-now default is the LATEST recorded moment (Titus's
+  // rule — was the median): max over starts [5,12,28,38,38,48] and
   // the recorded revoke 31 is 48, so the real gesture lands the now there.
   const revoked = await createElement(page, 'title', { name: 'Warden', grant_date: 12, revoke_date: 31 });
   const ongoing = await createElement(page, 'title', { name: 'Chronicler', grant_date: 28 });
@@ -76,7 +76,7 @@ test('tenure and life vocabulary on the chart card, with and without a now', asy
 
   // Establish the now via the real control (latest of the spread = 48).
   await page.locator('.atlas-chart-now-set').click();
-  await expect(page.locator('.atlas-chart-now-chip')).toContainText('48'); // bare date (S263)
+  await expect(page.locator('.atlas-chart-now-chip')).toContainText('48'); // bare date
 
   // Ongoing tenure: held to the now. Closed tenure: recorded ends win, the now
   // is irrelevant. Character: age against the now.

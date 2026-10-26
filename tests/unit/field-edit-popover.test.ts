@@ -1,5 +1,5 @@
 /**
- * Field-edit popover close discipline (S318, Captain: "seems a risky way to
+ * Field-edit popover close discipline (Titus: "seems a risky way to
  * have people lose writing") — the backdrop used to CANCEL on mousedown and
  * silently discard typed text. The contract now:
  *   - full outside click (press + release on backdrop) with CHANGED,

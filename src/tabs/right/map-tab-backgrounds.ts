@@ -31,14 +31,13 @@ export function sourceKey(map: WorldMap): string {
   // Dims are part of the image-render contract (they set the overlay bounds),
   // so a dims write must drift the key. Without this, adding image_url to a
   // dims-stamped imageless map painted the image stretched into the old
-  // square and the later autoUpdateMapDims persist never re-applied (S300
-  // close-gate MED).
+  // square and the later autoUpdateMapDims persist never re-applied.
   const dims = `${typeof map.width === 'number' ? map.width : ''}x${typeof map.height === 'number' ? map.height : ''}`;
   if (s.kind === 'url') return `url:${s.url}:${dims}`;
   if (s.kind === 'local') return `local:${s.mediaId}:${dims}`;
   // Flat canvas: background_color is part of the render, so an edit to it
   // must drift the key (the subscriber re-applies live).
-  // The map's style paints the sea when it has no colour of its own (S423).
+  // The map's style paints the sea when it has no colour of its own.
   return `flat:${typeof map.background_color === 'string' ? map.background_color : ''}:${mapStyleOf(map)?.id ?? ''}`;
 }
 
@@ -46,8 +45,8 @@ export function sourceKey(map: WorldMap): string {
  * Guarded fire-and-forget elements refresh after a background-path dims
  * persist: only patch state when the SAME world is still active (a fast
  * world switch parks the old store, whose listElements would otherwise
- * stomp the new world's elements — the S295 superseded-activation class,
- * re-found by the S300 close gate).
+ * stomp the new world's elements — the superseded-activation class,
+ * found twice).
  */
 async function refreshElementsIfStillActive(store: NonNullable<ReturnType<typeof getActiveStore>>, worldId: string): Promise<void> {
   const elements = await store.listElements();
@@ -79,7 +78,7 @@ export async function applyMapBackground(
   // background_color when set, quiet default otherwise, app-dark surround —
   // Leaflet's default container background is near-white (#ddd) and image
   // maps always mask it via edge-color, so every non-image path must set
-  // the surround itself (own-eyes, S300).
+  // the surround itself (own-eyes).
   const applyFlat = () => {
     const bg = typeof map.background_color === 'string' && map.background_color.trim()
       ? map.background_color.trim()
@@ -95,7 +94,7 @@ export async function applyMapBackground(
   const applyImage = (url: string, dims: { w: number; h: number }) => {
     manager.setBackgroundImage(url, dims.w, dims.h, () => {
       // Load failed (404, CORS, dead host): fall back to the flat canvas
-      // with an honest chip instead of Leaflet's broken-image void (S300b).
+      // with an honest chip instead of Leaflet's broken-image void.
       // The stored dims keep the coordinate space; pins stay where they are.
       applyFlat();
       const hint = document.createElement('div');
@@ -114,7 +113,7 @@ export async function applyMapBackground(
     const lMap = manager.getMap();
     if (lMap) {
       const bounds = L.latLngBounds(L.latLng(0, 0), L.latLng(dims.h, dims.w));
-      // Padded like the construction-time bounds (S316): exact-rect bounds +
+      // Padded like the construction-time bounds: exact-rect bounds +
       // solid viscosity would pin a small image immovably; the pad restores
       // breathing room while the edge stays firm. Fit still targets the
       // UNPADDED image rect so the landing view is the image, not the margin.
@@ -179,7 +178,7 @@ export async function applyMapBackground(
     // Durable coordinate space: legacy imageless maps predate the stored-dims
     // contract — persist the runtime default ONCE so future renders can't
     // drift (new imageless maps get dims stamped at create). LOCAL-ONLY
-    // worlds only (S300 close gate): on api-linked worlds a mere tab open
+    // worlds only: on api-linked worlds a mere tab open
     // would dirty the element (phantom push to other devices) and on
     // view-only worlds the write throws — there, the deterministic
     // IMAGELESS_MAP_SIZE runtime fallback carries the space instead, which
@@ -188,7 +187,7 @@ export async function applyMapBackground(
       const store = getActiveStore();
       const worldId = getState().active?.worldId;
       // Memory, not storage: `loadRegistry` re-bases the two-tab merge and is
-      // boot-only (S365 gate lens A L1).
+      // boot-only.
       const entryReg = worldId ? findWorld(getState().registry, worldId) : undefined;
       if (store && worldId && entryReg && !entryReg.api) {
         store.updateMap(map.id, { width: defaultWidth, height: defaultHeight })
@@ -215,7 +214,7 @@ export async function applyMapBackground(
  * deliberately excluded: right-pane's dims-flip machinery (its
  * lastActiveMapDimsKey block) already disposes + remounts it on the same
  * tick, and a second dispose here races that remount into an empty pane.
- * (S300 close gate; the background-tab leg predates S300 but the imageless
+ * (The background-tab leg is older, but the imageless
  * "place pins now, add art later" flow made it common.)
  */
 export function refreshCachedBackgrounds(): string[] {

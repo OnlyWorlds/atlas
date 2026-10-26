@@ -47,7 +47,7 @@ describe('SyncEngine.pullNow', () => {
     // Did NOT push the local element.
     expect(result.pushed.creates).toBe(0);
     const newCalls = client.calls.slice(callsBefore);
-    // Only reads (list + the S262 world-meta GET), no create/update.
+    // Only reads (list + the world-meta GET), no create/update.
     expect(newCalls.every(c => c.method === 'list' || c.method === 'getWorldMeta')).toBe(true);
     // ...and the pull really ran, through the /changes feed production uses.
     expect(client.changesPulls).toBeGreaterThan(pullsBefore);

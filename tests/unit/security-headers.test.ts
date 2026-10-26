@@ -1,5 +1,5 @@
 /**
- * The host's security headers (#302, Boss h57 #4741).
+ * The host's security headers (#302, Boss 2026-10-15).
  *
  * `public/_headers` is the one home of the production policy: Cloudflare Pages
  * serves it, and `vite preview` serves its CSP line so a walk runs under it.
@@ -63,15 +63,15 @@ describe('public/_headers (#302)', () => {
     expect(all.has('x-robots-tag')).toBe(false);
   });
 
-  it('never lets a cache hold the service worker (Boss h11 #4978: the zone rewrote it to max-age=14400)', () => {
+  it('never lets a cache hold the service worker (Boss 2026-10-15: the zone rewrote it to max-age=14400)', () => {
     expect(headerBlock('/sw.js').get('cache-control')).toBe('no-store');
   });
 
   it('draws a picture at any address, http included', () => {
     // A world's image_url can be any address. Firefox draws an http one on
     // today's page (it upgrades the request), but under `img-src https:` it
-    // refuses it before the upgrade; Chromium upgrades first (S409 probe,
-    // Notes/ui-snapshots/2026-10-15-s409/http-img-live.mjs, against live
+    // refuses it before the upgrade; Chromium upgrades first (probed against
+    // live
     // Lantern's header).
     expect(csp.get('img-src')).toEqual(expect.arrayContaining(["'self'", 'data:', 'blob:', 'https:', 'http:']));
   });
@@ -80,7 +80,7 @@ describe('public/_headers (#302)', () => {
     const origins = [
       new URL(DEFAULT_V2_BASE).origin,
       // The media edge keeps its constant private: read it from the source.
-      // (make-online's create-world-external retired, Keel #134, S432.)
+      // (make-online's create-world-external retired.)
       ...[...read('src/sync/media-upload.ts').matchAll(/EDGE_ORIGINS = \[([^\]]+)\]/g)]
         .flatMap((m) => [...m[1].matchAll(/'([^']+)'/g)].map((s) => s[1])),
     ];
@@ -101,13 +101,13 @@ describe('public/_headers (#302)', () => {
     const sites = tsFiles('src').flatMap((f) =>
       read(f).split(/\r?\n/).filter((l) => /\bfetch\(/.test(l) && !/^\s*(\*|\/\/)/.test(l)).map((l) => `${f}: ${l.trim()}`));
     // eight today: keel v2 (adapter, account, join, and the sign-in exchange's
-    // timed fetch, S465), the media edge twice, and the tour's own pictures
-    // twice (same origin). worldsync's left at S432.
+    // timed fetch), the media edge twice, and the tour's own pictures
+    // twice (same origin). worldsync's has since left.
     expect(sites, sites.join('\n')).toHaveLength(8);
   });
 });
 
-describe('Sign in with OnlyWorlds return address (Keel #515, S465)', () => {
+describe('Sign in with OnlyWorlds return address', () => {
   it('the app answers it, not the 404 page', () => {
     const rules = read('public/_redirects').split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
     expect(rules).toEqual(['/signin/callback / 200']);

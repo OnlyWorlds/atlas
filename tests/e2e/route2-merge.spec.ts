@@ -1,5 +1,5 @@
 /**
- * Route 2 end to end (S367): the Make Online modal's "link existing" on a
+ * Route 2 end to end: the Make Online modal's "link existing" on a
  * local world, against an in-memory keel fake behind page.route. Until now no
  * e2e ran a merge (phase3-make-online checks the form only), so the path a
  * user actually clicks (modal → runner → kernel → server phase → link →

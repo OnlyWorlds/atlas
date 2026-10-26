@@ -49,7 +49,7 @@ export class ForgetBrowserModal extends BaseModal {
     const online = body.querySelector<HTMLElement>('[data-role="online"]')!;
     if (inv.browserOnline.length) {
       // Kept online is only what reached it: a paused, offline or held change
-      // has not (S386 gate).
+      // has not.
       online.textContent = `Removed here, and onlyworlds.com keeps what reached it: ${names(inv.browserOnline)}. Changes not yet synced there are lost.`;
       online.hidden = false;
     }
@@ -57,12 +57,12 @@ export class ForgetBrowserModal extends BaseModal {
       ? `Also removed: your PIN and sign-in, the secret of each world opened on a seat (${inv.seatWorlds === 1 ? 'it stops' : 'they stop'} syncing), the folders Atlas remembers, and every setting.`
       : 'Also removed: your PIN and sign-in, the folders Atlas remembers, and every setting.';
     if (inv.heldSeats.length) {
-      // A held seat's secret is only here (Keel #469, the v2 gate's note b).
+      // A held seat's secret is only here.
       const also = body.querySelector<HTMLElement>('[data-role="also"]')!;
       also.textContent += ` And the ${inv.heldSeats.length === 1 ? 'world' : 'worlds'} not downloaded yet: ${names(inv.heldSeats)}. ${inv.heldSeats.length === 1 ? 'Its seat stays' : 'Their seats stay'} on onlyworlds.com, unused, for the owner to remove.`;
     }
-    // A token Atlas minted is revoked as the forget ends (S475): said as an ask with its remedy, since
-    // the page reloads before any answer could be said (the S475 code gate's F3).
+    // A token Atlas minted is revoked as the forget ends: said as an ask with its remedy, since
+    // the page reloads before any answer could be said.
     if (mintedTokenId(getState().registry)) {
       body.querySelector<HTMLElement>('[data-role="also"]')!.textContent += " Atlas asks onlyworlds.com to revoke its sign-in token; if it can't, remove it there, in Account settings under Account tokens.";
     }
@@ -92,7 +92,7 @@ export class ForgetBrowserModal extends BaseModal {
       let left = false;
       try {
         // On the activation chain, roll call included: a tab opened while a
-        // long download held the chain is still asked (S386 gate).
+        // long download held the chain is still asked.
         const others = await enqueueActivationTask(async () => {
           const n = await otherAtlasTabs();
           if (n > 0) return n;
@@ -116,7 +116,7 @@ export class ForgetBrowserModal extends BaseModal {
         say(isPlainError(err) ? err.message : 'Atlas could not finish forgetting. Reload the page and try again.');
         if (left) {
           // The open world was already closed: this page has no store behind
-          // it now, so the one way on is a reload (S386 gate).
+          // it now, so the one way on is a reload.
           go.hidden = true;
           cancel.disabled = false;
           cancel.textContent = 'Reload';

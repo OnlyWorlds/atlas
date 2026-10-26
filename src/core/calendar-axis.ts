@@ -7,7 +7,7 @@
  * month starts, or day strides, chosen by zoom. Era domain boundaries are
  * landmark ticks that always survive pruning.
  *
- * Label rungs (the S266 look item: full formats walled the axis at ~2 labels):
+ * Label rungs (full formats walled the axis at ~2 labels):
  *   era   → "1 FT"            (formatYearLabel at the boundary)
  *   year  → "450 KR"          (formatYearLabel)
  *   month → "Greening"        (name alone; year context = the year ticks)
@@ -58,7 +58,7 @@ const MAX_TICKS = 400;
 
 /**
  * The i-th rung of the year-stride ladder: YEAR_STRIDES, then continuing its
- * 1, 2.5, 5 x 10^k pattern without bound (S367 critic K4: deep-time spans ran
+ * 1, 2.5, 5 x 10^k pattern without bound (deep-time spans ran
  * out of strides at 50,000 and the tick cap cut the axis short).
  */
 function yearStrideAt(i: number): number {
@@ -129,7 +129,7 @@ function yearTicksInRegion(
   const d2 = dispAt(region.hi - 1);
   const dLo = Math.min(d1, d2);
   const dHi = Math.max(d1, d2);
-  // Cap by stepping the stride up, never by truncating (S367 critic K4).
+  // Cap by stepping the stride up, never by truncating.
   if ((dHi - dLo) / stride > MAX_TICKS) stride = yearStrideAtLeast((dHi - dLo) / MAX_TICKS);
   const first = Math.ceil(dLo / stride) * stride;
   let emitted = 0;

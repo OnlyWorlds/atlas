@@ -1,6 +1,6 @@
 /**
  * A directory that lives only in memory, shaped like the File System Access
- * handles the FolderStore and the world file use (#126, S387).
+ * handles the FolderStore and the world file use (#126).
  *
  * The demo world is built as a world file: downloaded into a FolderStore,
  * collected, zipped, then opened through the world-file door. Its first

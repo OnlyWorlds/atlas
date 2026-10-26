@@ -1,5 +1,5 @@
 /**
- * THE WHOLE WORLD IN THE FOLDER (S364). A world's notes, its cast (the home
+ * THE WHOLE WORLD IN THE FOLDER. A world's notes, its cast (the home
  * protagonist and home), its calendar lens and its writing labels are things
  * the user wrote ABOUT the world, and they lived only in this browser's
  * localStorage registry: copying the folder, opening it on another machine,
@@ -12,13 +12,13 @@
  *     a three-way against the JSON this browser last wrote to the file, kept
  *     in its OWN localStorage key, never on the registry entry: recording it
  *     must not re-save the whole registry (a background registry save after a
- *     "clear site data" brought the forgotten worlds back, S364's own flake).
+ *     "clear site data" brought the forgotten worlds back, in a flaky test).
  *       file absent            -> seed it from the registry (the migration)
  *       no base yet, file here -> this browser's first sync of a folder another
  *                                 one seeded: MERGE (the file's keys win, keys
  *                                 it lacks keep this browser's value, and two
  *                                 different notes are both kept), then write
- *                                 the merge out (S364 gate lens B B6)
+ *                                 the merge out
  *       file === base          -> only this browser changed things (or none):
  *                                 the registry wins and is written out
  *       file !== base          -> the folder changed elsewhere since this
@@ -28,7 +28,7 @@
  *     from: the notes overlay, the cast pin, a re-key or an id swap remapping
  *     the cast, the calendar chip.
  * Read-both-write-new: nothing is removed from the registry, so an older
- * Atlas keeps working from its copy (Captain, S364).
+ * Atlas keeps working from its copy (Titus).
  */
 
 import { getState, patchSlice, subscribe } from './state';
@@ -109,7 +109,7 @@ function mergePrefs(entry: WorldRegistryEntry, file: Record<string, unknown>): W
   } else if (mine && (!theirs || mine.includes(theirs))) {
     // Ours already holds theirs: the merge done at an earlier open whose
     // write-out failed (a view-only world). It re-runs at every open and
-    // must neither grow nor shrink (S365 lane B L2).
+    // must neither grow nor shrink.
     next.notes = entry.notes;
   }
   return next as unknown as WorldRegistryEntry;
@@ -150,7 +150,7 @@ function fromKey(key: string): Record<string, unknown> | null {
  * The file moved since this browser last synced it while the world stayed
  * open (another machine through Dropbox or git): per key, a pref this browser
  * changed since the base is ours, any other is the file's; two different new
- * notes are both kept, the file's first (S365 lane B M1).
+ * notes are both kept, the file's first.
  */
 function threeWay(base: Record<string, unknown>, mine: Record<string, unknown>, file: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...file };
@@ -173,7 +173,7 @@ function threeWay(base: Record<string, unknown>, mine: Record<string, unknown>, 
 async function writeOut(store: FolderStore, worldId: string): Promise<void> {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
   // A view-only world's store refuses every write: the prefs stay on the
-  // registry entry, and the file is never tried (S380 row: no warning at
+  // registry entry, and the file is never tried (no warning at
   // every open).
   if (!entry || entry.demo || entryIsViewOnly(entry)) return;
   let prefs = prefsOf(entry);
@@ -186,7 +186,7 @@ async function writeOut(store: FolderStore, worldId: string): Promise<void> {
       const merged = threeWay(baseObj, prefs, file);
       // The file is folded in now, so it is the base: a write that then fails
       // (view-only, permission dropped, a synced file locked) must not merge
-      // the same file again at every later pref change (S365 gate lens A M2).
+      // the same file again at every later pref change.
       setPrefsSynced(worldId, prefsKey(file));
       lastSeen.set(worldId, prefsKey({ ...prefsOf(entry), ...merged }));
       patchEntry(worldId, e => withFilePrefs(e, merged));
@@ -271,7 +271,7 @@ export function installWorldPrefsSync(): () => void {
       const store = getActiveStore();
       if (store && !reconciling.has(worldId)) {
         reconciling.add(worldId);
-        // Fired and forgotten (the S405 census): a failure here keeps the registry's
+        // Fired and forgotten: a failure here keeps the registry's
         // prefs, so it is logged, never thrown at the background-error reporter.
         void loadWorldPrefs(store, worldId)
           .catch(err => console.warn('[atlas] world prefs did not reconcile:', err))

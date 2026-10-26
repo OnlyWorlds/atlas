@@ -1,5 +1,5 @@
 /**
- * Problem toasts with their fix buttons (S368, lane X).
+ * Problem toasts with their fix buttons (lane X).
  *
  * `showProblem(err, { doing, retry })` is what a catch block calls instead of
  * toasting `err.message`: `core/problems.ts` words it, this file turns its
@@ -86,7 +86,7 @@ export function resolveFixes(ids: readonly FixId[], ctx: FixContext = {}): Toast
         if (worldId) out.push({ label: 'Open settings', run: () => navigate(settingsHash(worldId, 'onlyworlds')) });
         break;
       case 'sync-issues':
-        // Settings → World lists what is still not syncing, with the fixes (S369).
+        // Settings → World lists what is still not syncing, with the fixes.
         if (worldId) out.push({ label: 'See what is not syncing', run: () => navigate(settingsHash(worldId, 'world')) });
         break;
       case 'reload-from-disk':

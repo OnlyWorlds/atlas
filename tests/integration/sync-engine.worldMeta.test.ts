@@ -1,6 +1,5 @@
 /**
- * SyncEngine world-meta step (S262 — design + gate record:
- * Forge/Notes/2026-07-13-worldmeta-sync-design.md).
+ * SyncEngine world-meta step.
  *
  * Locks every gate resolution that is testable at the engine seam:
  *  R2 seed rule (absent baseline → adopt server, fill empties, NEVER PATCH)
@@ -283,7 +282,7 @@ describe('stopped latch (gate R6 — unlink must not be resurrected)', () => {
   });
 });
 
-describe('a world.json that will not parse (S361, gate F2)', () => {
+describe('a world.json that will not parse (gate F2)', () => {
   async function establishedBaseline(): Promise<SyncEngine> {
     client.__server_mutate_world_meta({ description: 'server desc', time_basic_unit: 'Year', time_current: 42 });
     const engine = makeEngine();

@@ -1,5 +1,5 @@
 /**
- * The home onboarding e2e (S264 cards; #127 the question; 1.20 cards kept,
+ * The home onboarding e2e (the cards; #127 the question; 1.20 cards kept,
  * done). Drives the real flow: an empty world asks "What do you have?" (three
  * quiet rows, nothing blocking) → stay-on-home create → the made card stays,
  * done, and the question with it → after both cores, "Grow your world": more
@@ -102,7 +102,7 @@ test('creating from a home tile stays on home; the first element row is highligh
   await expect(first).toBeVisible();
   await expect(first).toContainText('Gale');
   await expect(first).toContainText('your first element');
-  // The block holds its shape (h20 #2081): the question stays, the character
+  // The block holds its shape (2026-10-09): the question stays, the character
   // card stays in its place, done; location still shows highlighted.
   await expect(page.locator('.atlas-home-have-title')).toHaveText('What do you have?');
   await expect(page.locator('[data-done-type="character"].atlas-home-tile-done')).toBeVisible();
@@ -176,7 +176,7 @@ test('the Start-page links: #/start asks nothing; #/bring-in lands in the Data r
   // The hash went first: a reload does not ask again.
   expect(await page.evaluate(() => window.location.hash)).toBe('#/');
   // Count every moment the question is in the page, not just the end state
-  // (gate S383 A2: it drew once under the dialog before the mark landed).
+  // (it drew once under the dialog before the mark landed).
   await page.evaluate(() => {
     (window as any).__sawQuestion = 0;
     new MutationObserver(() => {
@@ -204,7 +204,7 @@ test('the Start-page links: #/start asks nothing; #/bring-in lands in the Data r
   await expect(page.locator('.atlas-import-ai')).toContainText('add nothing your notes do not say');
 });
 
-test('desk map rows: imageless map opens its flat canvas tab (S300, was the S265 divert)', async ({ page }) => {
+test('desk map rows: imageless map opens its flat canvas tab (was a divert)', async ({ page }) => {
   await setupWorld(page);
   await createViaStore(page, 'map', { name: 'Blank Atlas' });
   const mapRow = page.locator('.atlas-home-continue-row', { hasText: 'Blank Atlas' });
@@ -216,7 +216,7 @@ test('desk map rows: imageless map opens its flat canvas tab (S300, was the S265
   await expect(page.locator('.ow-toast', { hasText: 'set a map image' })).toHaveCount(0);
 });
 
-test('desk map rows: an already-open background map tab re-activates on click (S265)', async ({ page }) => {
+test('desk map rows: an already-open background map tab re-activates on click', async ({ page }) => {
   await setupWorld(page);
   await createViaStore(page, 'map', { name: 'Alpha Map', image_url: 'https://example.invalid/a.png' });
   const mapRow = page.locator('.atlas-home-continue-row', { hasText: 'Alpha Map' });

@@ -8,7 +8,7 @@
  *
  * Invariants enforced on load:
  *   - At most one `context` tab; if missing, prepended at index 0.
- *   - Legacy `writing-context` entries (ephemeral before session 231) are
+ *   - Legacy `writing-context` entries (once ephemeral) are
  *     dropped silently — context is now permanent and route-driven, so any
  *     persisted narrativeId is meaningless.
  *
@@ -124,7 +124,7 @@ export function dropPersistedTabsForWorld(worldId: string): void {
 }
 
 /**
- * The re-key (S363) moves ids; stored state follows. Rewrites the `mapId` of
+ * The re-key moves ids; stored state follows. Rewrites the `mapId` of
  * persisted map tabs of one world (a tab with no worldId is legacy and
  * follows too; map ids are uuids). Raw read/write so nothing else in the
  * snapshot is normalised. No-op when nothing matches.

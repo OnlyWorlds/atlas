@@ -1,5 +1,5 @@
 /**
- * Giving elements new ids (S363) on the REAL folder store (OPFS), and from
+ * Giving elements new ids on the REAL folder store (OPFS), and from
  * the app: the store calls the mock cannot prove (directory enumeration,
  * file binding, media on disk), the Settings flow, and recovery after a
  * crash on the next open.

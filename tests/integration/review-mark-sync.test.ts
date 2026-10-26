@@ -3,7 +3,7 @@
  * element comes back from keel marked proposed, and the copy that made it keeps
  * the mark with its stamp; a keeper's accept (the mark null) and decline (the
  * element deleted) reach the copy on a pull. FakeOwApiClient plays keel's shape
- * as probed live (S459 `setup-565.mjs`).
+ * as probed live.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';

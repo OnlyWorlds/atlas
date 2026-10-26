@@ -1,6 +1,6 @@
 /**
- * The attach Make Online performs does not ask "changed on disk" (S366,
- * promoted from lane B's probe a).
+ * The attach Make Online performs does not ask "changed on disk" (promoted
+ * from a probe).
  *
  * After a Route 2 whose creates FAILED (a /bulk network error here; a copied
  * folder's id_conflict does the same), every never-stamped element counts as
@@ -67,7 +67,7 @@ describe('the attach after Make Online', () => {
   });
 
   it('a question saved before the link (held, unlinked, linked again) does not come back', async () => {
-    // S366 gate A2: the persisted hold was adopted before the flush, so the
+    // The persisted hold was adopted before the flush, so the
     // link's own attach still asked "Upload them / Stay offline" with the old
     // count and refused the retry.
     const folder = await failedMerge(BIG_BATCH + 1);

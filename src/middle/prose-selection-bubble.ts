@@ -4,7 +4,7 @@
  * already supports (StarterKit marks, so far invisible: Ctrl+B/I worked,
  * nothing advertised it) plus "link to existing element".
  *
- * Born for the share-page prose block (Captain's ask, 2026-07-19: bold /
+ * Born for the share-page prose block (Titus's ask, 2026-07-19: bold /
  * italic "and maybe a little link icon when selected"). Component-neutral:
  * mount it over any WorkspaceEditorHandle.
  *

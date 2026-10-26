@@ -43,7 +43,7 @@ export class DeleteBrowserWorldModal extends BaseModal {
         deleteBtn.disabled = on;
         downloadBtn.textContent = on ? 'Saving…' : 'Download it first';
       }).then(ok => {
-        // Said here, beside Delete, not only in a toast (S373 gate F8).
+        // Said here, beside Delete, not only in a toast.
         if (ok === false && this.modal?.isConnected) {
           errorBox.textContent = 'The download did not finish, so no copy was saved. Deleting now removes the world for good.';
           errorBox.hidden = false;

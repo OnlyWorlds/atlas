@@ -1,6 +1,6 @@
 /**
- * Take back an account token Atlas minted, when Atlas lets it go (S475,
- * contract `Forge/Notes/2026-10-25-s475-atlas-token-revoke-contract.md`):
+ * Take back an account token Atlas minted, when Atlas lets it go (a
+ * contract of 2026-10-25):
  * `DELETE /account/tokens/{id}` by the id recorded at the mint, with the token
  * itself as the bearer (keel asks no PIN here). Never a lookup by last four or
  * name: a delete runs only on an id Atlas made and recorded.

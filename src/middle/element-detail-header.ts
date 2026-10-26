@@ -75,9 +75,9 @@ function wireRename(title: HTMLElement, el: Element): void {
   title.addEventListener('click', () => startInlineNameEdit(title, el));
   title.addEventListener('keydown', (e) => {
     // Only the title itself opens edit mode (the guard editable-title.ts has
-    // always had, missing here until S312): while the rename input is mounted
+    // always had, once missing here): while the rename input is mounted
     // INSIDE this h2, its keys bubble up — without this check every Space was
-    // preventDefault'ed (unable to type a space; Captain pasted names instead)
+    // preventDefault'ed (unable to type a space; Titus pasted names instead)
     // and Enter committed then instantly reopened the editor with the stale
     // name, so Enter "did not work".
     if (e.target !== title) return;
@@ -91,7 +91,7 @@ function wireRename(title: HTMLElement, el: Element): void {
 /**
  * `hiddenNote`: the page says the hidden line in a sentence under the name, so the header
  * leaves its glyph out and the name keeps its room beside a Location's map controls on a
- * phone (Seethe's read of 1.86.0, h20 #11602). The writing workspace keeps the glyph.
+ * phone (Seethe's read of 1.86.0, 2026-10-23). The writing workspace keeps the glyph.
  */
 export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): HTMLElement {
   const header = document.createElement('div');
@@ -99,7 +99,7 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
 
   // Type icon — or, when element images are hidden AND this element has one,
   // a mini-thumbnail of the image. Clicking the thumbnail re-enables element
-  // images (the inverse of the detail banner's ×; session 239).
+  // images (the inverse of the detail banner's ×).
   const buildTypeIcon = (): HTMLElement => {
     const icon = document.createElement('span');
     icon.className = 'material-symbols-outlined';
@@ -159,7 +159,7 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
   spacer.className = 'atlas-middle-spacer';
   header.appendChild(spacer);
 
-  // Writing-tier badge + child-create buttons (session 224 header unification).
+  // Writing-tier badge + child-create buttons (the header unification).
   // For narratives that belong to the writing tree, show a small tier pill
   // (Book / Chapter / Scene / Draft) and the relevant "+ new child" buttons
   // here in the header — so the writing-mode editor uses the same header as
@@ -185,7 +185,7 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
   header.appendChild(buildSyncDot(el));
 
   // A view-only world offers no Delete: the store would refuse it after the
-  // confirm (S380 row).
+  // confirm.
   if (!viewOnly) {
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
@@ -214,8 +214,8 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
 /**
  * Is someone typing in a text control inside `root`? A render that replaces
  * a focused input removes it, Chromium fires `blur` on the removal, and the
- * blur COMMITS: a name saved half-typed (S364 lane A3, "Strahd von"), and
- * the inline field editors the same way (S364 gate, lens C C3). Every surface
+ * blur COMMITS: a name saved half-typed ("Strahd von"), and
+ * the inline field editors the same way. Every surface
  * that rebuilds on a background tick asks this first and defers the rebuild
  * until focus leaves (the commit re-renders anyway). Same rule as
  * editable-title's sync().
@@ -227,7 +227,7 @@ export function isEditingIn(root: ParentNode): boolean {
 }
 
 /**
- * "Retry now" on a failed rename (S369): writes the same name again, but only
+ * "Retry now" on a failed rename: writes the same name again, but only
  * while the element still carries the name it had before, so a later rename
  * is never written over.
  */
@@ -432,7 +432,7 @@ function renderWritingTierActions(el: Element, header: HTMLElement): void {
   const cluster = document.createElement('div');
   cluster.className = 'atlas-header-cluster atlas-header-writing';
 
-  // The tier badge ("Book"/"Chapter" pill) was dropped S255v3 (Captain): the
+  // The tier badge ("Book"/"Chapter" pill) was dropped (Titus): the
   // sidebar tree already names the tier, and the label diluted the create
   // buttons it sat beside. tierLabel still drives the button tooltips below.
   void tierLabel;
@@ -527,7 +527,7 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
     return;
   }
 
-  // Pin / marker detail (Captain, S313): surface the MAP this artifact lives on,
+  // Pin / marker detail (Titus): surface the MAP this artifact lives on,
   // clickable to open (and pan to it). Before this a pin's own page showed no
   // way to reach its map. Pins and markers are spatial artifacts, not pin
   // TARGETS, so they get no existing-pins cluster and — critically — no +pin
@@ -638,7 +638,7 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
   // zones are constructed via markers, DESIGN_MAPS §1.4), and never once this
   // element already has a pin on the ACTIVE map. Double-pin is blocked at the
   // store (uniqueness is per element+map), so a second +pin would only error —
-  // hiding it is the honest affordance (Captain, S313). pinsForElement holds
+  // hiding it is the honest affordance (Titus). pinsForElement holds
   // this element's pins across every map.
   const alreadyPinnedHere = !!activeMapId
     && pinsForElement.some(p => (p as Record<string, unknown>).map_id === activeMapId);
@@ -792,7 +792,7 @@ function navigateToPinnedElement(mapEl: Element, pinnedEl: Element): void {
       && (e as Record<string, unknown>).element_id === pinnedEl.id,
   );
   if (pin) {
-    // A located pin shows, whatever the map's date (the S416 gate's F3).
+    // A located pin shows, whatever the map's date.
     revealPinsOnMap(mapEl.id, pinnedEl.id);
     panMapTabTo(mapEl.id, pin.x, pin.y);
   }
@@ -848,7 +848,7 @@ function buildMapAffordance(
   btn.addEventListener('click', () => {
     openMapTab(m, sourceElementId);
     // Zone case: pan to the zone's centroid (average of its markers on
-    // this map). Captain's request session 215 — clicking a zone's map
+    // this map). Titus's request: clicking a zone's map
     // icon should center-view the zone.
     if (panToZoneId) {
       const state = getState();
@@ -874,7 +874,7 @@ function buildMapAffordance(
 
 /**
  * "Open the map this pin/marker lives on" — used on a pin/marker's OWN detail
- * page (S313). Opens the map in the right pane, chains the artifact's id so the
+ * page. Opens the map in the right pane, chains the artifact's id so the
  * middle pane keeps element-detail mounted, and pans to the artifact's point.
  */
 function buildOpenMapButton(
@@ -975,7 +975,7 @@ async function onDelete(el: Element): Promise<void> {
   const store = getActiveStore();
   if (!store) return;
   // Confirmation is gated by the Editing setting (default on) — EXCEPT when the
-  // delete cascades, which always confirms (S310). See `decideDeleteConfirm`:
+  // delete cascades, which always confirms. See `decideDeleteConfirm`:
   // the setting says "before deleting an element", singular, so a delete that
   // destroys a whole subtree was never inside its opt-out, and atlas has no
   // undo. Verified live: a Book delete with the preference off silently
@@ -992,7 +992,7 @@ async function onDelete(el: Element): Promise<void> {
     // A failed probe must not BLOCK the delete, but it must not be read as
     // "nothing depends on this" either: an empty list switches off the
     // cascade confirm floor, so a thrown probe used to make a subtree delete
-    // silent whenever the confirm preference was off (S323).
+    // silent whenever the confirm preference was off.
     console.error('[element-detail-header] dependents probe failed', probeErr);
     dependentsUnknown = true;
   }
@@ -1009,7 +1009,7 @@ async function onDelete(el: Element): Promise<void> {
     await store.deleteElement(el.id);
     const elements = await store.listElements();
     patchSlice('data', { elements });
-    // Deleting a MAP has to take its right-pane tab with it (Captain, S306):
+    // Deleting a MAP has to take its right-pane tab with it (Titus):
     // the tab survived the delete and fell through to the stale card reading
     // "Map from another world", which is both wrong (it was this world's) and
     // unclosable-looking. Land on the map index instead — the room that lists

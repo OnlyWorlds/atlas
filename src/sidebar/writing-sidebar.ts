@@ -135,12 +135,12 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     // Write new sequential order to every sibling whose value actually changes.
     // Sequential integers (0..N-1) keep the order field clean — no fractions.
     //
-    // WRAPPED (S307). This loop writes to N elements in sequence and had no
+    // WRAPPED. This loop writes to N elements in sequence and had no
     // error handling at all, while its only call site invokes it as a bare
     // `void reorderSiblings(...)`. A failure partway through (lock conflict,
     // disk error, a rejected write) left the tree PARTIALLY reordered and
     // produced an unhandled rejection: no toast, not even a console line.
-    // Same class as the `void setNow(...)` silence fixed in S306 — a write
+    // Same class as the `void setNow(...)` silence fixed earlier — a write
     // the user can see the result of must never fail invisibly.
     try {
       for (let i = 0; i < siblings.length; i++) {
@@ -171,7 +171,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
   // (O(N·depth) — the same prose was rescanned by every ancestor).
   let subtreeLinkMemo = new Map<string, number>();
 
-  // Rebuilt only when an input moved (conv. 146, S422): a rebuild between a
+  // Rebuilt only when an input moved (conv. 146): a rebuild between a
   // press and its release loses the click. The parts are the slices the tree
   // reads, the route (the open narrative) and its own search box.
   const gate = renderGate();
@@ -179,7 +179,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
   // tree navigates and folds, and offers no create, reorder, link or delete (conv. 149).
   let viewOnly = false;
 
-  // The search keeps its focus and caret through every redraw, a data tick's included (S452).
+  // The search keeps its focus and caret through every redraw, a data tick's included.
   function render(): void {
     keepingFocus(root, '[data-role="writing-search"]', draw);
   }
@@ -265,7 +265,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     });
     createRow.appendChild(newBookBtn);
 
-    // The "new draft" button is gone (S265, Captain: two parentless create
+    // The "new draft" button is gone (Titus: two parentless create
     // buttons read as two competing entry points). Drafts (l4) stay a working
     // tier — existing ones render and behave — they're just no longer pushed.
     // Chapters and scenes create from their PARENT row's hover "+" instead.
@@ -298,9 +298,9 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     globalSearchBtn.title = 'Search everywhere (all elements)';
     globalSearchBtn.innerHTML = '<span class="material-symbols-outlined">search</span>';
     globalSearchBtn.addEventListener('click', () => {
-      // Search room removed (session 256): "search everywhere" hands the query
+      // Search room removed: "search everywhere" hands the query
       // to the elements-sidebar filter — the interim search surface until the
-      // Cmd+K palette. Sidebar mode is pure state (session 223 decoupling).
+      // Cmd+K palette. Sidebar mode is pure state.
       patchSlice('ui', { ...getState().ui, sidebarMode: 'elements', search: searchQuery, sidebarWritingOverride: true });
       queueMicrotask(() => {
         const input = document.querySelector<HTMLInputElement>('input[data-role="elements-search"]');
@@ -420,7 +420,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     if (node.el.id === activeId) row.classList.add('active');
     row.style.paddingLeft = `${node.depth * 14 + 4}px`;
 
-    // Drag-and-drop for sibling reorder (session 224). Each row is draggable;
+    // Drag-and-drop for sibling reorder. Each row is draggable;
     // dragover/drop on a sibling row inserts above or below based on mouse y.
     // Same parent_narrative only — re-parenting deferred.
     // Not on a view-only world: no drag starts, so no drop reorders (conv. 149).
@@ -513,7 +513,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     });
     row.appendChild(body);
 
-    // Link-count badge (Captain, S313): a small right-aligned number = how many
+    // Link-count badge (Titus): a small right-aligned number = how many
     // links live in this narrative and everything under it — a size cue at a
     // glance. Hidden at zero so an empty tree stays clean.
     const linkCount = subtreeLinkCount(node);
@@ -527,7 +527,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       row.appendChild(badge);
     }
 
-    // Hover "+" (S265): create the child tier INSIDE this row — a book row
+    // Hover "+": create the child tier INSIDE this row — a book row
     // makes a chapter, a chapter row a scene. The container question answers
     // itself: it's the row you clicked. Scenes and drafts get no button.
     const childTier = node.tier === 'l1' ? 'l2' as const : node.tier === 'l2' ? 'l3' as const : null;
@@ -560,7 +560,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       row.appendChild(addBtn);
     }
 
-    // Right-click → bulk link/unlink over this node + descendants (S265).
+    // Right-click → bulk link/unlink over this node + descendants.
     // Every item writes; a view-only world keeps the browser's menu (conv. 149).
     if (!viewOnly) row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -593,7 +593,7 @@ function pluralize(word: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Tree context menu — bulk link/unlink over a node + its descendants (S265)
+// Tree context menu — bulk link/unlink over a node + its descendants
 // ---------------------------------------------------------------------------
 
 function collectSubtreeIds(node: NarrativeNode): string[] {
@@ -641,7 +641,7 @@ function openTreeContextMenu(
     </button>
   `;
 
-  // NOT DURING THE TOUR (S310, integration gate).
+  // NOT DURING THE TOUR (integration gate).
   //
   // The tour's `the-writing` step reveals the Hyperion book and its Chapter 1
   // and gates advance on the chip count inside that chapter's story. The
@@ -672,7 +672,7 @@ function openTreeContextMenu(
 
   menu.querySelector<HTMLElement>('[data-role="bulk-link"]')?.addEventListener('click', () => {
     dismissTreeMenu();
-    // Multi-narrative writes touch closed docs — one confirm line (Captain's
+    // Multi-narrative writes touch closed docs — one confirm line (Titus's
     // ruling); a single narrative applies immediately like the corner icon.
     if (ids.length > 1 && !confirm(`Link element mentions across ${ids.length} narratives?`)) return;
     void bulkLinkNarratives(ids, 'link').then(({ changed, count }) => {
@@ -705,7 +705,7 @@ function openTreeContextMenu(
 
 /**
  * Delete a narrative and everything beneath it, from the tree's right-click
- * menu (S310).
+ * menu.
  *
  * Routed through `decideDeleteConfirm` so this gesture and the workspace
  * header trash cannot drift apart — they are the same destructive act reached

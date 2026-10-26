@@ -1,12 +1,12 @@
 /**
- * The reload offer (S366): one quiet banner, and a reload that saves first.
+ * The reload offer: one quiet banner, and a reload that saves first.
  * Split out of offline.ts so it carries no build-time virtual import.
  */
 
 import { flushBeforeLeavingWorld } from './leave-flush';
 
 /**
- * How long a reload waits for the rooms' saves (S366 gate A4). A save that
+ * How long a reload waits for the rooms' saves. A save that
  * never settles must not leave the page running old code forever, which the
  * plugin's bare reload never could; past this, the reload goes ahead.
  */
@@ -27,8 +27,8 @@ export async function reloadAfterFlush(limitMs = RELOAD_FLUSH_LIMIT_MS): Promise
 }
 
 /**
- * A tab opened before a deploy asks for code files the deploy replaced (S366,
- * lane C B3). Every lazy part of Atlas (the Writing room, the editors, help,
+ * A tab opened before a deploy asks for code files the deploy replaced.
+ * Every lazy part of Atlas (the Writing room, the editors, help,
  * Ctrl+K, the tour) is such a file, so after any deploy an old tab failed each
  * one with a raw "Failed to fetch dynamically imported module". Vite reports
  * every failed lazy load as `vite:preloadError`; answer it with one plain
@@ -37,7 +37,7 @@ export async function reloadAfterFlush(limitMs = RELOAD_FLUSH_LIMIT_MS): Promise
  */
 export function installStaleCodeRecovery(): void {
   window.addEventListener('vite:preloadError', () => {
-    // A lazy load also fails with no network at all (S366 gate A6), and then
+    // A lazy load also fails with no network at all, and then
     // "Atlas was updated" is not true.
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     showReloadBanner(offline

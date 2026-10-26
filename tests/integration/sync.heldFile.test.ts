@@ -1,5 +1,5 @@
 /**
- * A FILE ANOTHER PROGRAM HOLDS (S368, the Discord report).
+ * A FILE ANOTHER PROGRAM HOLDS (the Discord report).
  *
  * A user adding characters to a linked world kept getting "1 change could not
  * sync (An operation that depends on state cached in an interface object was
@@ -11,7 +11,6 @@
  *
  * The real FsFolderStore, SyncEngine and v2 adapter run here against the MSW
  * keel; `fake-fs` refuses closes on a held file as Chromium does.
- * (Investigation: `Forge/Notes/2026-10-04-s368-orient/lane-e/report.md`.)
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mswServer } from '../setup';
@@ -58,7 +57,7 @@ async function world() {
 const charFile = (root: FakeDirHandle) =>
   root.list().find(p => p.startsWith('elements/character/') && !p.endsWith('.keep'))!;
 
-describe('the file writer and a held file (S368)', () => {
+describe('the file writer and a held file', () => {
   it('waits out a short hold and writes once, leaving no .tmp', async () => {
     const root = new FakeDirHandle('w');
     root.put('a.json', j({ v: 1 }));
@@ -112,7 +111,7 @@ describe('the file writer and a held file (S368)', () => {
   });
 });
 
-describe('a push while a new character is held (S368)', () => {
+describe('a push while a new character is held', () => {
   it('records the hold against the element, keeps the round alive, and heals once released', async () => {
     const { root, store, engine } = await world();
     const el = await store.createElement('character', { name: 'Aldric Vane' });
@@ -128,7 +127,7 @@ describe('a push while a new character is held (S368)', () => {
     expect(failureToastOnce(r1.failures)).toBeNull(); // the first hold stays quiet
 
     // Round 2, still held: the re-POST answers 409 and the adopt's stamp is
-    // refused again. Before S368 that escaped the loop and the round threw.
+    // refused again. That once escaped the loop and the round threw.
     const r2 = await engine.pushOnce();
     expect(r2.failures).toEqual([expect.objectContaining({ element_id: el.id, error_name: 'InvalidStateError' })]);
     const toast = failureToastOnce(r2.failures);

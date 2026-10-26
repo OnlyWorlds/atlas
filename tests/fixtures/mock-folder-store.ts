@@ -75,7 +75,7 @@ export class MockFolderStore implements FolderStore {
   private clock: () => string = nowIso;
   setClock(fn: () => string): void { this.clock = fn; }
 
-  // View-only guard (S264) — mirrors FsFolderStore: UI mutators throw; the
+  // View-only guard — mirrors FsFolderStore: UI mutators throw; the
   // engine's channels (applyServerRecord, silent deletes, fromSync meta) pass.
   private viewOnly: boolean | 'copy' = false;
   setViewOnly(viewOnly: boolean | 'copy'): void { this.viewOnly = viewOnly; }
@@ -111,7 +111,7 @@ export class MockFolderStore implements FolderStore {
   async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {
     if (!opts?.fromSync) this.assertWritable();
     if (this.worldMetaCorrupt) throw new CorruptFileError('world.json', new SyntaxError('Unexpected token <'));
-    // Mirrors FsFolderStore's birth stamp (folder-format §4.2, S355): the
+    // Mirrors FsFolderStore's birth stamp (folder-format §4.2): the
     // first write to a store that has no meta yet records the spec version.
     const stamp = !this.metaBorn && patch.format_version === undefined
       ? { format_version: FOLDER_FORMAT_VERSION }
@@ -141,7 +141,7 @@ export class MockFolderStore implements FolderStore {
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
     const id = (data.id as string) ?? newId();
-    // Mirrors FsFolderStore's pin-uniqueness guard (S307). Convention 20: a
+    // Mirrors FsFolderStore's pin-uniqueness guard. Convention 20: a
     // fake that accepts what production rejects produces confident-wrong
     // tests. Both stores read the SAME predicate so they cannot drift.
     if (type === 'pin') {
@@ -265,12 +265,12 @@ export class MockFolderStore implements FolderStore {
 
   async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
     if (!opts.silent) this.assertWritable();
-    // Mirrors FsFolderStore (S363 gate lens A F6).
+    // Mirrors FsFolderStore.
     if (!opts.silent && journalIds(this.rekeyJournal).has(id)) throw new RekeyPendingError();
     if (!opts.silent && isKnownOf(this.elements.get(id))) throw new PlainError(KNOWN_OF_REFUSAL);
     const result = await this.deleteElementInChain(id, opts);
     // Mirrors FsFolderStore: a UI delete removes the dead ids from every
-    // referrer's links, as keel does (S362, `store/scrub-links.ts`).
+    // referrer's links, as keel does (`store/scrub-links.ts`).
     if (!opts.silent) await scrubReferrers(this, new Set(result.tombstones.map(t => t.id)));
     return result;
   }
@@ -316,7 +316,7 @@ export class MockFolderStore implements FolderStore {
           // Fakes encode real I/O gaps (convention #20).
           await Promise.resolve();
           // Each dependent goes through ITS OWN write chain, mirroring
-          // FsFolderStore (S310) — deleting inside the TARGET's slot leaves a
+          // FsFolderStore — deleting inside the TARGET's slot leaves a
           // concurrent update to the dependent unserialized, and its write can
           // land after the delete and resurrect the element.
           if (dep.id === id) {
@@ -614,7 +614,7 @@ export class MockFolderStore implements FolderStore {
     this.meta = metaRest as WorldMeta;
   }
 
-  // Parity with FsFolderStore (S361): pull-apply rides the per-id chain, and
+  // Parity with FsFolderStore: pull-apply rides the per-id chain, and
   // the guarded variant checks the local stamp inside the same slot.
   async applyServerRecord(
     type: ElementType, record: Record<string, unknown>, server_updated_at: string,

@@ -1,5 +1,5 @@
 /**
- * Gate lens B probes B-6, B-7 (S369). Assert the FIXED behaviour.
+ * Gate lens B probes B-6, B-7. Assert the FIXED behaviour.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WritingCreateModal } from '../../../src/ui/writing-create-modal';

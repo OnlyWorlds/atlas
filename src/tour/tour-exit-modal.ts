@@ -1,7 +1,7 @@
 /**
  * The exit confirm — what you saw, what you did not, and a way back.
  *
- * Captain's design (S301): the reworked tour gates every beat on a user action,
+ * Titus's design: the reworked tour gates every beat on a user action,
  * so the exit has to be a real door rather than a trapdoor. Rather than a bare
  * "are you sure", leaving shows a small summary of the app scoped to rooms, so
  * someone who bails at minute twelve still walks away knowing what the tool
@@ -32,7 +32,7 @@ function roomRow(room: TourRoom, seen: boolean): string {
 
 class TourExitModal extends BaseModal {
   open(stepIndex: number, onConfirm: () => void): void {
-    // No title (Captain, S318): the room summary IS the screen; a "leave the
+    // No title (Titus): the room summary IS the screen; a "leave the
     // tour" heading above it duplicated the confirm button's own label.
     const { overlay, body } = this.buildModalShell({
       dataModal: 'tour-exit',

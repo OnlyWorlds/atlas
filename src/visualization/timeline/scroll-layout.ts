@@ -1,11 +1,11 @@
 /**
- * Scroll-view layout kernel (2C, S13) — pure: dated nodes → vertically
+ * Scroll-view layout kernel (2C) — pure: dated nodes → vertically
  * positioned document items. Down = later. Content-paced with honest seams:
  * consecutive spacing derives from the time gap but clamps to a readable band,
  * and when real time vastly exceeds what the clamp can show, an explicit gap
  * seam names the skipped span instead of rendering (or hiding) the void.
  *
- * Design record: `Forge/Notes/2026-07-14-s268-scroll-design.md` (C4/C5/C6).
+ * Its design record (C4/C5/C6, cited below) is a design note.
  * No DOM, no store — unit-tested in tests/unit/scroll-layout.test.ts.
  */
 

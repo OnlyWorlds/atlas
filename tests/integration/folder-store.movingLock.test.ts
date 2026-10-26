@@ -1,6 +1,6 @@
 /**
  * The move keeps the source's lock (1.17 bout 4, contract §4.2 step 3, §4.4,
- * §9 invariant 7; S370 gate lens A A2 / M1-M2, lens B B4). Closing the source
+ * §9 invariant 7). Closing the source
  * store removed its lock, and another tab then opened the browser copy
  * mid-copy with no prompt: its edits were lost at the removal, or the removal
  * failed with its writable open. So the mover keeps the lock, heartbeating,

@@ -1,5 +1,5 @@
 /**
- * Zone create modal, empty name (S368 B6): Create with an empty name used to
+ * Zone create modal, empty name: Create with an empty name used to
  * do nothing and say nothing. It now says "Name is required", the same rule
  * and words as the element create modal, and the line clears on typing.
  */

@@ -6,7 +6,7 @@
  *
  * Breadcrumb (ancestor chain) + optional date pill on the left; view-mode
  * toggle (when the narrative has children) + focus / reading / open-as-element
- * actions on the right. Extracted from writing-workspace.ts (session 232) as a
+ * actions on the right. Extracted from writing-workspace.ts as a
  * factory closing over the workspace root + view-mode accessors — the focus /
  * reading toggles only touch `root` and dispatch document events, so they live
  * here entirely; view-mode switching defers to the main file via callback
@@ -48,7 +48,7 @@ export function createStickyBar(deps: {
     const worldId = state.active!.worldId;
     const idx = buildNarrativeIndex(state.data.elements, worldId);
     // ancestorIds walks child->root (nearest first); a breadcrumb reads
-    // root->current, so reverse (S265 -- the crumb showed "chapter > book").
+    // root->current, so reverse (the crumb showed "chapter > book").
     const chain = [...ancestorIds(idx, el.id)].reverse();
 
     const left = document.createElement('div');
@@ -198,7 +198,7 @@ export function createStickyBar(deps: {
     openBtn.title = 'Open as element';
     // elementHash already returns '#/w/...' — prefixing '#' again made
     // '##/w/...', so ctrl/middle-click opened a new tab on the welcome
-    // screen (S309, last of the two S308-found sites).
+    // screen (the last of two such sites).
     openBtn.href = elementHash(worldId, el.id);
     openBtn.innerHTML = '<span class="material-symbols-outlined">open_in_new</span>';
     openBtn.addEventListener('click', (e) => {
@@ -213,7 +213,7 @@ export function createStickyBar(deps: {
   }
 
   function buildCrumbHash(worldId: string, narrativeId: string): string {
-    // After URL-scheme shortening (session 227), each crumb segment is just a
+    // After URL-scheme shortening, each crumb segment is just a
     // direct writing-room URL for that narrative. Ancestry is derived from
     // parent_narrative at render time.
     return writingHash(worldId, narrativeId);

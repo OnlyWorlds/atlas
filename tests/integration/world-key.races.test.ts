@@ -1,5 +1,5 @@
 /**
- * #198's gate (S418) ran these three and saw each go wrong; they stand as
+ * #198's gate ran these three and saw each go wrong; they stand as
  * guards now:
  * - G1: world A's refused round, landing after the switch to B, made a key
  *   for B and swapped B's working key. A stopped engine's refusal is now

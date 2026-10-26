@@ -135,7 +135,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const rowRaw = (el as Record<string, unknown>)[meta.name];
   const rowEmpty = Array.isArray(rowRaw) ? rowRaw.length === 0 : !formatValue(rowRaw);
   if (rowEmpty) wrap.classList.add('atlas-field-empty-row');
-  // Link-field candidate awareness (S264): an empty link field whose target
+  // Link-field candidate awareness: an empty link field whose target
   // type has ZERO elements in the world is marked apart (there is nothing to
   // pick — clicking it offers creation instead); an empty link field WITH
   // candidates keeps the brighter baseline so "there's something to connect
@@ -173,7 +173,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
     mark.title = reserved;
     label.appendChild(mark);
   }
-  // World-style awareness (S356): the same quiet mark, as a swatch, when a
+  // World-style awareness: the same quiet mark, as a swatch, when a
   // taxonomy value carries a colour in `.atlas/styles.json` (the kinds the
   // zone panel coloured light up here too, and for any type a rule names).
   if (meta.name === 'supertype' || meta.name === 'subtype') {
@@ -212,7 +212,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   }
   if (meta.name === 'atlas_aliases') {
     // Custom widget — chip strip + dedicated modal (one row per alias).
-    // The CSV-in-a-text-input approach was unintuitive (Captain feedback).
+    // The CSV-in-a-text-input approach was unintuitive (Titus feedback).
     wrap.appendChild(renderAliasesRow(el, readOnly));
     return wrap;
   }
@@ -221,7 +221,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   // A structured (object or array) value in a scalar field, written by
   // another tool or a hand edit: show it read-only. Seeding an editor with
   // String(raw) would overwrite it with "[object Object]" on the next save
-  // (S367 critic C11; custom fields got the same guard at S360 gate A13).
+  // (custom fields have the same guard).
   if (raw !== null && typeof raw === 'object') {
     const pre = document.createElement('pre');
     pre.className = 'atlas-custom-structured-value atlas-field-structured';
@@ -293,7 +293,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
       const focusIn = sel.focusNode && valueEl.contains(sel.focusNode);
       if (anchorIn || focusIn) return;
     }
-    // Resolve dispatch mode from registry editor settings (session 219).
+    // Resolve dispatch mode from registry editor settings.
     // Default is 'modal' (back-compat with everything that shipped before).
     const editorSettings = getEditorSettings(getState().registry);
     const mode = editorSettings.field_edit_mode;
@@ -342,7 +342,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
 }
 
 /**
- * A date with a calendar (S369): the number stays the editable value; the
+ * A date with a calendar: the number stays the editable value; the
  * calendar's reading sits under it, read-only, in the same column. Outside
  * the value element, so editing and copying the number never touch it.
  */
@@ -429,7 +429,7 @@ function candidateCountFor(el: Element, target: ElementType | undefined): number
 const LINK_CREATABLE = new Set<ElementType>([...CONTENT_ELEMENT_TYPES, 'map']);
 
 /**
- * Create-from-link-field (S264): a zero-candidate link field's click opens the
+ * Create-from-link-field: a zero-candidate link field's click opens the
  * create modal LOCKED to the target type; the new element auto-links into the
  * field, and the user stays on this element (no navigation jump).
  */
@@ -453,7 +453,7 @@ function renderSingleLink(meta: FieldMeta, el: Element, readOnly: boolean): HTML
   const row = document.createElement('div');
   row.className = 'atlas-link-row';
   // A single link another tool wrote as `{id, name}` (or a one-item list)
-  // reads as its id, not "[object Object]" (S360).
+  // reads as its id, not "[object Object]".
   const rawValue = (el as Record<string, unknown>)[meta.name];
   const raw = typeof rawValue === 'string' ? rawValue : (linkIdsOf(rawValue)[0] ?? null);
   const candidates = candidateCountFor(el, meta.target);
@@ -476,7 +476,7 @@ function renderSingleLink(meta: FieldMeta, el: Element, readOnly: boolean): HTML
   pickBtn.type = 'button';
   pickBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
   if (!raw) pickBtn.classList.add('atlas-link-pick-empty');
-  // Candidate-aware affordance (S264): candidates exist → the pick icon lifts
+  // Candidate-aware affordance: candidates exist → the pick icon lifts
   // a notch ("there's something to connect"); none exist → the click CREATES.
   if (!raw && candidates != null && candidates > 0) pickBtn.classList.add('atlas-link-pick-ready');
   pickBtn.title = raw ? 'Change link'
@@ -506,7 +506,7 @@ function renderSingleLink(meta: FieldMeta, el: Element, readOnly: boolean): HTML
   pickBtn.addEventListener('click', (e) => { e.stopPropagation(); void runPick(); });
   row.appendChild(pickBtn);
   // Empty link field: clicking anywhere in the row body opens the picker, not
-  // only the icon (Captain, S313 — "link into empty fields by clicking the
+  // only the icon (Titus — "link into empty fields by clicking the
   // body"). The button stops propagation so it never double-fires.
   if (!raw) {
     row.classList.add('atlas-link-row-clickable');
@@ -520,7 +520,7 @@ function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLE
   wrap.className = 'atlas-link-row';
 
   const raw = (el as Record<string, unknown>)[meta.name];
-  // Read the link list the way other writers store it (S360): a bare id string
+  // Read the link list the way other writers store it: a bare id string
   // or expanded `{id, name}` objects used to render empty or as
   // "[object Object]", and the next add/remove persisted THAT over the real
   // links. Normalised to ids here, so an edit writes the schema's shape with
@@ -567,8 +567,8 @@ function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLE
   };
   addBtn.addEventListener('click', (e) => { e.stopPropagation(); void runAdd(); });
   wrap.appendChild(addBtn);
-  // Empty multi-link: clicking the row body opens the picker too (Captain,
-  // S313). Only when empty — once chips exist, row clicks belong to them.
+  // Empty multi-link: clicking the row body opens the picker too (Titus's
+  // ask). Only when empty — once chips exist, row clicks belong to them.
   if (ids.length === 0) {
     wrap.classList.add('atlas-link-row-clickable');
     wrap.addEventListener('click', () => { void runAdd(); });
@@ -619,12 +619,12 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void) | nul
 
 /**
  * Said when an edit lands while no world store is open (a world closing under
- * the page). Shared by the element page's writers (S369).
+ * the page). Shared by the element page's writers.
  */
 export const WORLD_NOT_OPEN = 'This world is not open. Open it from the sidebar, then try again.';
 
 /**
- * The latest save started per element field (S368): "Retry now" on a failed
+ * The latest save started per element field: "Retry now" on a failed
  * save runs only while no later save of that field has started, so it never
  * writes an older value over a newer one.
  */
@@ -642,7 +642,7 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
   }
   // Never persist Infinity or NaN: JSON writes both as null, which clears the
   // field (and deletes a custom one). The editors refuse them first; this is
-  // the backstop (S367 critic C2).
+  // the backstop.
   if (typeof nextValue === 'number' && !Number.isFinite(nextValue)) return;
   // atlas_aliases edit comes in as a CSV string from the popover; parse to
   // string[] before persisting so the on-disk shape matches the type contract.
@@ -697,7 +697,7 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
       completeWaypoint('links');
     }
 
-    // Map.image_url auto-detect (DESIGN_MAPS.md §4 + session 211 bout ID):
+    // Map.image_url auto-detect (DESIGN_MAPS.md §4):
     // when a Map element's image_url changes to a non-empty value, fetch
     // the image's natural dims and update the map's width/height so the
     // canvas matches the new image. Without this, the stored dims stay
@@ -722,7 +722,7 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
     }
   } catch (err) {
     console.error('[element-detail] update failed:', err);
-    // This toast is the one (S368): the field popover sees the error as shown
+    // This toast is the one: the field popover sees the error as shown
     // and stays quiet. Callers still get the rejection.
     showProblem(err, {
       doing: 'saving this field',
@@ -773,7 +773,7 @@ async function autoUpdateMapDims(
 // ====== Pure helpers (exported for unit testing) ======
 
 /**
- * The schema's date fields (S369): integer fields named `date` or `*_date`
+ * The schema's date fields: integer fields named `date` or `*_date`
  * (birth_date, founding_date, start_date, grant_date...). Custom fields are
  * not schema dates, whatever their name.
  */
@@ -783,7 +783,7 @@ export function isSchemaDateField(meta: Pick<FieldMeta, 'name' | 'widget'>): boo
 }
 
 /**
- * A stored date as the world's calendar says it (S369), shown beside the
+ * A stored date as the world's calendar says it, shown beside the
  * number, read-only: the stored integer never changes. Null when there is no
  * calendar, the field is not a date, or the value is not a whole number.
  */
@@ -814,9 +814,9 @@ export function humanizeFieldName(name: string): string {
   const ns = EXTENSION_FIELD_NAMESPACES.find(p => name.startsWith(p));
   const cleaned = ns ? name.slice(ns.length) : name;
   // Sentence case, acronyms kept ("Birth date", "Image URL"): the house rule
-  // (the Captain, h63 #8074), one copy for every tool since SDK 4.34
-  // (seeded from this function, Kael h63 #8126); a word in capitals is
-  // kept as written since 4.36 ("STR", Kael h63 #8201).
+  // (Titus, 2026-10-20), one copy for every tool since SDK 4.34
+  // (seeded from this function, Kael 2026-10-20); a word in capitals is
+  // kept as written since 4.36 ("STR", Kael 2026-10-20).
   return fieldLabel(cleaned);
 }
 

@@ -1,6 +1,6 @@
 /**
- * Promoted from the S367 composition gate (lens B).
- * S367 gate lens B, modal level. RED today = finding reproduced.
+ * Promoted from the composition gate (lens B).
+ * Gate lens B, modal level. RED today = finding reproduced.
  *
  * B5: while Route 2 runs (the id-move lock held, the app inert), the modal
  * itself is NOT inert: its "Create new" tab and the Route 1 form stay live,

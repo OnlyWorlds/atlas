@@ -1,5 +1,5 @@
 /**
- * A failed key check, in words (S369 sweep).
+ * A failed key check, in words.
  *
  * Three flows ask OnlyWorlds "is this key good?" before they touch a folder:
  * link a world, view a shared world (`linkExistingApiWorldInRoot`) and Make
@@ -33,7 +33,7 @@ export function keyCheckError(err: unknown, opts: { readOnly?: boolean } = {}): 
   const status = statusOf(err);
   // keel names the half it refused: a right key with a wrong PIN is
   // invalid_credentials with param "API-Pin" ("Incorrect PIN."), a wrong key
-  // has none (S434, #417's live walk: a wrong PIN was told as a wrong key).
+  // has none (#417's live walk: a wrong PIN was told as a wrong key).
   const param = (err as { param?: unknown } | null)?.param;
   if (status === 401 && !opts.readOnly && typeof param === 'string' && param.toLowerCase() === 'api-pin') {
     return new PlainError('OnlyWorlds did not accept that PIN. Check it, then try again.');

@@ -1,7 +1,7 @@
 /**
  * Command palette (Ctrl/Cmd+K or `/`) — search everywhere, jump anywhere.
  *
- * The search room's replacement (deleted S256): a lazy overlay summonable
+ * The search room's replacement (that room is gone): a lazy overlay summonable
  * from any room. One input, ranked results across two kinds:
  *
  *   - elements — matched on name (prefix > substring), atlas_aliases,
@@ -61,17 +61,17 @@ export interface PaletteResult {
  *
  * `aliases` exist because a room's LABEL and its ROUTE SEGMENT can diverge:
  * the Data room still routes on `import`, and "import"/"export" are what a user
- * actually types. Before S308 this list keyed on the segment word, so the room
+ * actually types. This list once keyed on the segment word, so the room
  * was branded "Data" everywhere else and searching "data" here found nothing.
  */
 /**
- * Commands reachable by name (S364: the palette's first). `id` is what
+ * Commands reachable by name (the palette's first). `id` is what
  * `activate` switches on.
  */
 const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[]; folderOnly?: boolean; door?: boolean; diskOnly?: boolean; browserStorage?: boolean; makesWorld?: boolean }> = [
   // A world kept in this browser has no folder to rescan, so it hides this.
   { label: 'Reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'], diskOnly: true },
-  // The world doors (S365): the same runner as the Worlds list's buttons.
+  // The world doors: the same runner as the Worlds list's buttons.
   { label: 'Add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], door: true, makesWorld: true },
   { label: 'Open a world folder', id: 'open-world-folder', icon: 'folder_open', aliases: ['open folder', 'open world'], folderOnly: true, door: true },
   // 1.17 (contract §8): a world file opens wherever browser storage works.
@@ -118,8 +118,7 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
   }
 
   for (const action of ACTIONS) {
-    // The world doors are locked during the tour, as its sidebar locks them
-    // (S365 gate lens B F5 / C M3).
+    // The world doors are locked during the tour, as its sidebar locks them.
     if (action.folderOnly && !hasFolderMode()) continue;
     // A door that needs browser storage asks the probe (conv. 120); a world
     // can be made where either a folder or browser storage works.
@@ -170,7 +169,7 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
 }
 
 /**
- * The rows the palette shows (S369): the search, plus one "Create "<query>"
+ * The rows the palette shows: the search, plus one "Create "<query>"
  * as…" row when the query names no element. It sits after any room or command
  * matches, so with nothing else matched it is the first row and Enter runs
  * it. `id` carries the name to prefill. Not offered during the tour.
@@ -382,7 +381,7 @@ class CommandPalette extends BaseModal {
       void openCreateWithName(r.id);
       return;
     }
-    // Route to the room the element actually LIVES in (S306). This used to be
+    // Route to the room the element actually LIVES in. This used to be
     // a bare `navigate(elementHash(...))` for every non-room result, so Cmd+K
     // on a map, a page, a knowledge entry or a chapter landed in the generic
     // field editor instead of the room that owns it — the palette is the app's
@@ -416,7 +415,7 @@ export function openCommandPalette(): void {
 }
 
 /**
- * Ctrl+K's create row (S369): the shared create door (so the tour's scripting
+ * Ctrl+K's create row: the shared create door (so the tour's scripting
  * still holds), the name prefilled and the type left to the modal.
  */
 async function openCreateWithName(name: string): Promise<void> {
@@ -426,7 +425,7 @@ async function openCreateWithName(name: string): Promise<void> {
   openCreateDoor(toastManager, { initialName: name });
 }
 
-/** Ctrl+K's world doors (S365): the same runner as the Worlds list's buttons. */
+/** Ctrl+K's world doors: the same runner as the Worlds list's buttons. */
 async function openWorldDoor(id: 'add-world' | 'open-world-folder' | 'open-world-file'): Promise<void> {
   const [{ openAddWorldChooser, runAddWorldAction }, { toastManager }] = await Promise.all([
     import('../setup/world-doors'), import('./toast-manager'),
@@ -436,7 +435,7 @@ async function openWorldDoor(id: 'add-world' | 'open-world-folder' | 'open-world
 }
 
 /**
- * "Reload from disk" (S364): a FULL live-folder pass, every file confirmed by
+ * "Reload from disk": a FULL live-folder pass, every file confirmed by
  * content. Says what it found, including nothing.
  */
 export async function reloadFromDisk(): Promise<void> {
@@ -454,7 +453,7 @@ export async function reloadFromDisk(): Promise<void> {
   }
   const { changes, skipped } = scan;
   if (skipped) {
-    // Never "nothing changed" when it did not look (S364 gate lens B B10).
+    // Never "nothing changed" when it did not look.
     const why = skipped === 'rekey' ? 'ids are being updated' : skipped === 'busy' ? 'the world is busy (loading, the tour, or a map edit)' : 'no world is open';
     toastManager.info(`Atlas could not check the folder just now: ${why}.`);
     return;

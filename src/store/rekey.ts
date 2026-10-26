@@ -1,7 +1,6 @@
 /**
- * THE RE-KEY KERNEL (S363): give elements new ids, and move every link with
- * them. Design contract + gates: `Forge/Notes/2026-09-28-s361-rekey-design.md`
- * (§7 amendments rule) and the composition gate `Forge/Notes/2026-09-29-s363-gate/`.
+ * THE RE-KEY KERNEL: give elements new ids, and move every link with
+ * them.
  *
  * Why: keel preserves client ids and refuses a create whose id already lives
  * in ANOTHER OnlyWorlds world. A copied or imported folder, or a world taken
@@ -18,7 +17,7 @@
  *   3  media        everything under media/O copied to media/N, blobs before sidecars
  *   4  referrers    every other element, pre-filtered in memory, rewritten in its own chain
  *   5  charts       .atlas/charts.json scopes
- *   5b prefs        .atlas/world-prefs.json cast + calendar lens (S367)
+ *   5b prefs        .atlas/world-prefs.json cast + calendar lens
  *   6p browser      persisted UI state (a caller hook), BEFORE O disappears
  *   6  remove O     silent (O never reached this server), then media/O; O leaves `foreign`
  *                   and joins `rekeyed` (the finished map, so links in files that could not
@@ -82,7 +81,7 @@ export interface StartRekeyOpts {
   /** Mint a fresh id for each (the Settings re-key of foreign elements). */
   ids?: readonly string[];
   /**
-   * Or move each old id onto a GIVEN new id (Route 2, S367: a local element
+   * Or move each old id onto a GIVEN new id (Route 2: a local element
    * onto the server element it matched by name). A new id must not exist
    * locally; the caller's plan guarantees it and the kernel re-checks.
    */
@@ -385,7 +384,7 @@ export async function rollbackRekey(store: FolderStore, hooks: RekeyHooks = {}):
   return { restored: back.size, kept: finished.size };
 }
 
-/** What started the unfinished run on disk, if any ('rekey' for a journal from before S367). Never throws. */
+/** What started the unfinished run on disk, if any ('rekey' for a journal an older Atlas wrote). Never throws. */
 export async function rekeyJournalOrigin(store: FolderStore): Promise<'rekey' | 'merge' | null> {
   try {
     const j = await store.readRekeyJournal();

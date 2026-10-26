@@ -1,5 +1,5 @@
 /**
- * Pin-placement feedback (S299, Captain: "if I click that pinplace icon it
+ * Pin-placement feedback (Titus: "if I click that pinplace icon it
  * doesn't light up... visual feedback for that state").
  *
  * When `ui.pinPlacement` is armed the app is waiting for a map click. Three
@@ -75,7 +75,7 @@ export function installPlacementHintWatcher(): void {
       const name = armedElementName();
       if (name) renderBanner(name);
       // The next click belongs on the map, and below 1100px the map is in
-      // the right drawer (S366): open it, or the armed pin has nowhere to go.
+      // the right drawer: open it, or the armed pin has nowhere to go.
       if (isNarrow()) openDrawer('right');
     } else {
       document.body.classList.remove('atlas-placing');

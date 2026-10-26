@@ -26,7 +26,7 @@ export const mswServer = setupServer(
 beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => mswServer.resetHandlers());
 // The registry's two-tab merge base is module state: a base left by one
-// test must not shape the next test's saves (S365 gate lens A L2).
+// test must not shape the next test's saves.
 beforeEach(() => __setRegistryTabBaseForTests(null));
 afterAll(() => mswServer.close());
 

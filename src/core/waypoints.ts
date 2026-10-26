@@ -9,7 +9,7 @@
  * a waypoint because no hook exists on those paths.
  *
  * THE CONTRACT (hook table, gating class rule, demo-flag lifecycle):
- *   Forge/Notes/2026-07-07-atlas-waypoint-hookmap.md (v2, gate-settled)
+ *   a design note, the waypoint hookmap (v2, settled)
  *
  * Gating class rule:
  * - World-data waypoints (first-element, taxonomy, links, maps, time, story,
@@ -75,7 +75,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     concept: 'Your world is plain files in an open format, no account needed: in a folder on your drive any tool can read it, and a world in this browser can leave as one file any time.',
     action: 'Start your first world.',
     toast: 'Your world is plain files, and it can always leave.',
-    glyph: 'description', // plain files, wherever they live: never a folder (S376 lens C C6)
+    glyph: 'description', // plain files, wherever they live: never a folder
     link: () => '#/',
   },
   {
@@ -401,7 +401,7 @@ function drain(): void {
   if (suppressed()) return;
   // A step the world home showed is its own receipt (#127): no toast on top
   // of the list (or the core pair) that just ticked it off. Everything else
-  // still toasts, wherever it was earned (gate S383 A1: a guess from the
+  // still toasts, wherever it was earned (a guess from the
   // route dropped toasts earned in a dialog that then landed on the home).
   while (queue.length > 0 && homeReceipts.has(queue[0])) queue.shift();
   if (queue.length === 0) return;
@@ -474,10 +474,10 @@ function renderWaypointToast(id: WaypointId): void {
 
   let dismissed = false;
   let timer = setTimeout(() => dismiss(), TOAST_MS);
-  // Hover holds the toast open (S255v2, Captain): reading shouldn't race a
+  // Hover holds the toast open (S255v2, Titus): reading shouldn't race a
   // timer. The countdown restarts with a short grace when the cursor leaves.
   // Only a mouse holds it: a tap fires the emulated mouseenter with no leave,
-  // which pinned the toast on a phone (S404, the toast manager's twin).
+  // which pinned the toast on a phone (the toast manager's twin).
   el.addEventListener('pointerenter', (e) => {
     if (e.pointerType === 'mouse') clearTimeout(timer);
   });

@@ -1,6 +1,6 @@
 /**
- * Promoted from the S367 composition gate (lens B).
- * S367 gate lens B: attacks that did NOT break (GREEN = contract upheld).
+ * Promoted from the composition gate (lens B).
+ * Gate lens B: attacks that did NOT break (GREEN = contract upheld).
  * Tests the keeper did not construct: whole-localStorage invariant 8, the
  * settleLivePass window (invariant 16), a live pass started mid-route, the
  * journal refusal touching nothing, and recovery + rerun not re-planning.

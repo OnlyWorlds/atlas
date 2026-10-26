@@ -62,7 +62,7 @@ function boot(): void {
   // A `#/join/` link's code leaves the address bar before anything else runs
   // (#104, contract R2); the app's render runs the door with it.
   captureJoinCode();
-  // A `#/open/<world id>` link (#104, S416) leaves the address bar the same way.
+  // A `#/open/<world id>` link (#104) leaves the address bar the same way.
   captureOpenWorld();
   // Re-assert the theme (index.html's pre-paint script stamped it; this keeps
   // the meta theme-color in sync and covers any embed that skipped the inline
@@ -86,7 +86,7 @@ function boot(): void {
     void Promise.all([signInReturn, import('./setup/sign-in-return'), import('./ui/toast-manager')])
       .then(([outcome, m, t]) => m.applySignInOutcome(outcome, t.toastManager));
   }
-  // A failure nothing caught says so once, with details (S369).
+  // A failure nothing caught says so once, with details.
   installUnexpectedErrorReporter();
   // Pin-placement feedback (crosshair + map banner + Esc). State-driven, one
   // subscriber; safe to install once here after the app mounts.
@@ -96,7 +96,7 @@ function boot(): void {
   // no shared icon helper to fix at — so the boundary is one observer. See
   // ui/icon-a11y.ts for the demolition plan.
   installIconA11y();
-  // The tab title follows the route; clipped names show whole on hover (S360).
+  // The tab title follows the route; clipped names show whole on hover.
   installDocumentTitle();
   installTruncationTitles();
 }
@@ -111,7 +111,7 @@ if (document.readyState === 'loading') {
 // emits a no-op SW in dev unless explicitly enabled). The SW precaches the
 // app shell so atlas works offline after first load.
 registerServiceWorker();
-// A tab from before a deploy asks for code files the deploy replaced (S366).
+// A tab from before a deploy asks for code files the deploy replaced.
 installStaleCodeRecovery();
 
 // ---- Dev-only test harness ----
@@ -152,7 +152,7 @@ if (import.meta.env.DEV) {
      * Wait until any in-flight guided-tour step has finished revealing,
      * healing and routing. The `data-tour-step` attribute flips before that
      * work runs, so it is not a valid sync point for anything that inspects
-     * the world after a step change (S301).
+     * the world after a step change.
      */
     async awaitTourSettled(): Promise<void> {
       const { awaitTourSettled } = await import('./tour/tour-engine');
@@ -215,7 +215,7 @@ if (import.meta.env.DEV) {
     /** Generic slice patch — tests that write world meta directly to the store
      *  mirror it here (the room reads the slice, not the disk). */
     patchSlice: (slice: string, value: unknown) => _patchSlice(slice as never, value as never),
-    /** The live folder (S364): one pass now, no throttle; resolves with the changes it applied. */
+    /** The live folder: one pass now, no throttle; resolves with the changes it applied. */
     async rescanNow(): Promise<unknown> {
       const { rescanNow } = await import('./core/live-folder');
       return rescanNow({ force: true });

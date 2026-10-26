@@ -1,5 +1,5 @@
 /**
- * The A4/A5 ruling's children (S368 gate, lens B, probes promoted).
+ * The A4/A5 ruling's children (gate lens B, probes promoted).
  *
  * A map or zone both sides have children on stays unmatched. Its CHILDREN must
  * stay with their side too: converter and Sikelia-style worlds name every

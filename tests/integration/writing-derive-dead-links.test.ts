@@ -1,5 +1,5 @@
 /**
- * S364 lane A2: the 1.9 delete scrub (conv. 101) empties a scene's link
+ * The 1.9 delete scrub (conv. 101) empties a scene's link
  * fields and deliberately leaves its prose chips alone. Opening the scene ran
  * the prose derive (conv. 50) as a self-heal, which unioned every chip's id
  * back into the fields with no existence check: the deleted character came

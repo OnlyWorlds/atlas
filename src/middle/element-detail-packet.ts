@@ -1,5 +1,5 @@
 /**
- * A Work item's packet on its page (OW Parlor #487; the rule is `src/core/work-packet.ts`):
+ * A Work item's packet on its page (the rule is `src/core/work-packet.ts`):
  * the elements it names in the producer's order, each with its reason, and one
  * button that steps through them with the packet bar. A reading aid, never an
  * editor, so it is the same in a view-only world.
@@ -48,7 +48,7 @@ export function buildWorkPacket(el: Element): HTMLElement | null {
     } else {
       const gone = document.createElement('span');
       gone.className = 'atlas-work-packet-missing';
-      // The type as the rest of the page says it, capitalised (Seethe's read of 1.69.0, h20 #9806).
+      // The type as the rest of the page says it, capitalised (Seethe's read of 1.69.0, 2026-10-22).
       const typeWord = entry.type ? typeNameStart(entry.type) : '';
       gone.textContent = `Not in this world${typeWord ? ` (${typeWord})` : ''}`;
       li.appendChild(gone);

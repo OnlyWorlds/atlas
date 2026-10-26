@@ -1,5 +1,5 @@
 /**
- * Agent seats (#104, S385): the per-world PIN and the secret that never
+ * Agent seats (#104): the per-world PIN and the secret that never
  * reaches the folder. `src/core/seat.ts`; the store half runs the real
  * FsFolderStore on fake-fs and the mock, which must agree.
  */

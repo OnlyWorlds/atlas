@@ -1,6 +1,6 @@
 /**
- * Bring it down again (1.17, conv. 129; contract §3.3, S370 gate lens B B16,
- * Skeld h20 #511): a linked world the browser cleared comes back from
+ * Bring it down again (1.17, conv. 129; contract §3.3,
+ * Skeld 2026-10-04): a linked world the browser cleared comes back from
  * onlyworlds.com as a NAMED RESTORE, not the link flow. It downloads into a
  * FRESH nonced directory (gate B6), writes world.json with the entry's OWN
  * world id and its `api` block (a made-online world keeps its local id while
@@ -139,7 +139,7 @@ describe('bring it down again', () => {
     expect([...home()!.children.keys()]).toEqual([]);
   });
 
-  it('a refusal or a lost save leaves the world that was open still open, its store unclosed (S374 gate F1)', async () => {
+  it('a refusal or a lost save leaves the world that was open still open, its store unclosed', async () => {
     const prior = new PriorStore();
     let closed = false;
     prior.close = async () => { closed = true; };
@@ -174,7 +174,7 @@ describe('bring it down again', () => {
     expect([...home()!.children.keys()]).toEqual([e.folder.folder_name]);
   });
 
-  it('another TAB bringing the same row down holds it: this one waits, sees it restored, writes nothing (S374 gate F4)', async () => {
+  it('another TAB bringing the same row down holds it: this one waits, sees it restored, writes nothing', async () => {
     const { locks, uninstall } = installFakeLocks();
     try {
       const release = await locks.hold('atlas-world:bring-w1');   // tab B is mid-restore
@@ -188,7 +188,7 @@ describe('bring it down again', () => {
     } finally { uninstall(); }
   });
 
-  it("the own id is the handle key's, read whole, except a link's -N suffix on the server id (S374 gate F3)", () => {
+  it("the own id is the handle key's, read whole, except a link's -N suffix on the server id", () => {
     const f = (handle_key: string, world_id?: string) => ownWorldIdOf({ folder: { handle_key, folder_name: 'x' }, api: world_id ? { world_id, api_key: 'k' } : undefined } as WorldRegistryEntry);
     expect(f(`world-${LOCAL_ID}`, SERVER_WORLD)).toBe(LOCAL_ID);
     expect(f(`world-${SERVER_WORLD}-2`, SERVER_WORLD)).toBe(SERVER_WORLD);

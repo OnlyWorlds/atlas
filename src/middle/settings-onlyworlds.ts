@@ -4,7 +4,7 @@
  * waypoints learning track, essential links, and a developers corner.
  *
  * Waypoint defs + state live in src/core/waypoints.ts; the contract (hook
- * table, gating, toast rules) is Forge/Notes/2026-07-07-atlas-waypoint-hookmap.md.
+ * table, gating, toast rules) is a design note of 2026-07-07.
  * The unmet rows ARE the self-paced tour: concept line + action line + a deep
  * link that opens the feature. No tour machinery.
  */
@@ -81,7 +81,7 @@ function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): st
     const met = !!state.completed[w.id];
     const link = w.id === 'council' ? OW_COUNCIL_URL : w.link(activeWorld?.id ?? null);
     // Unmet cards carry a quiet arrow in the bottom-right corner that opens
-    // the feature (Captain's call: an arrow reads more elegant than a text link).
+    // the feature (Titus's call: an arrow reads more elegant than a text link).
     const arrow = met || !link
       ? ''
       : w.id === 'council'
@@ -121,7 +121,7 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
   const root = document.querySelector<HTMLElement>('.atlas-settings');
   if (!root) return;
 
-  // (The replay control moved to the settings NAV chip in S307 — see
+  // (The replay control moved to the settings NAV chip — see
   // `wireReplayChip` in settings-panel.ts. It is not an OnlyWorlds feature.)
 
   function refreshSection(): void {
@@ -181,7 +181,7 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
 
 /**
  * A linked world whose owner turned its public page on says so, with the
- * address (Skeld h29 #11219; `core/public-page.ts`). Read live each time the
+ * address (Skeld 2026-10-23; `core/public-page.ts`). Read live each time the
  * tab opens, never kept: the switch is keel's. Off, unreachable or refused,
  * the section stays hidden: it is a pointer, not a status.
  */

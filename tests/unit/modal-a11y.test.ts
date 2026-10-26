@@ -1,5 +1,5 @@
 /**
- * S361 (lane a A1/B2): modals are real dialogs to assistive tech and hand
+ * Modals are real dialogs to assistive tech and hand
  * focus back when they close; the field popover leaves Enter to a focused
  * button (Tab to Cancel + Enter used to SAVE).
  */

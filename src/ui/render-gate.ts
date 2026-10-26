@@ -1,5 +1,5 @@
 /**
- * A rebuild gate (conv. 146, S422). A surface that rebuilds its clickable
+ * A rebuild gate (conv. 146). A surface that rebuilds its clickable
  * nodes on every store change or hashchange loses any click whose press and
  * release straddle a rebuild: the click goes to the old and new nodes' common
  * ancestor, or nowhere. The gate lets a render run only when its inputs moved.
@@ -20,8 +20,8 @@ export interface RenderGate {
 /**
  * True while someone is typing in a text field inside `root`. A surface whose
  * markup carries saved values rebuilds when a save lands, and a rebuild then
- * replaces the field being typed in: its text and its focus go (the units race,
- * S452: a unit's save landed while the next unit was being typed). Such a
+ * replaces the field being typed in: its text and its focus go (the units race:
+ * a unit's save landed while the next unit was being typed). Such a
  * surface waits while this is true and catches up when focus leaves.
  */
 export function typingInside(root: Element): boolean {
@@ -34,7 +34,7 @@ export function typingInside(root: Element): boolean {
 
 /**
  * Draw a surface that rebuilds its own search field, keeping the field's focus
- * and caret when it had them (S452: a data tick that landed mid-typing left
+ * and caret when it had them (a data tick that landed mid-typing left
  * the writing and map searches unfocused, and the next keys went to the page).
  * For a field whose results should follow every tick; a form whose saved
  * values are in its markup waits instead (`typingInside`).

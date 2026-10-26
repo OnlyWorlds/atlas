@@ -1,6 +1,6 @@
 /**
  * Download the whole world as one file (1.17 bout 5, conv. 129; contract
- * §5.1, §9 invariant 13; S370 gate lens A A9, A11, lens B B9, B12).
+ * §5.1, §9 invariant 13).
  *
  * The file is the portable copy (`store/world-file.ts`): every file of the
  * world except the OnlyWorlds link and its key, the sync files and anything
@@ -152,8 +152,8 @@ export async function downloadWorld(
     try {
       const walked = await ws.collectWorldFiles(where.handle);
       collected = provenance ? ws.withProvenanceLines(walked, provenance.source, provenance.exportedAs) : walked;
-      // A file no Atlas could open again is never handed over, on any target
-      // (S373 gate F4): the reader's budget is the uncompressed size.
+      // A file no Atlas could open again is never handed over, on any target:
+      // the reader's budget is the uncompressed size.
       if (collected.reduce((n, f) => n + f.data.byteLength, 0) > (opts.maxBytes ?? WORLD_FILE_MAX_BYTES)) {
         throw new PlainError(hasFolderMode()
           ? 'This world is too big for one file. Move it to a folder instead.'

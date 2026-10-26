@@ -7,7 +7,7 @@ foundation is wired enough to load and render API data.
 The three worlds are retired: their keys no longer answer (each read 401 on
 2026-10-23), so the table keeps their names and counts only.
 
-All maps carry `image_url: https://i.imgur.com/klSYRAm.jpeg` (Captain added
+All maps carry `image_url: https://i.imgur.com/klSYRAm.jpeg` (Titus added
 for visual debugging — not in the original fixture spec, but useful when
 flipping to the live world to see the tree against a real canvas).
 
@@ -71,7 +71,7 @@ JSON-fixture-only for now.
 
 ## Repro / cleanup
 
-Scripts at `Carrier/Orrery/notes/2026-05-15-atlas-maps-fixtures/`:
+The scripts that built these worlds:
 - `build_fixtures.py` — recreate worlds (assumes empty)
 - `add_images.py` — re-PATCH image_url
 - `verify.py` — re-run tree comparison

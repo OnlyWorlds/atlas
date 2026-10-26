@@ -1,7 +1,7 @@
 /**
  * folder-store applyServerRecord — atlas-local field preservation.
  *
- * Regression test for the silent-data-loss vector verified in Bout V (session 202):
+ * Regression test for the silent-data-loss vector verified in a smoke run:
  * `applyServerRecord` used to overlay the server record without consulting the
  * existing local file, so atlas-extension fields (image_media_id and any future
  * additions in ATLAS_LOCAL_EXTENSION_FIELDS) were destroyed on every pull that

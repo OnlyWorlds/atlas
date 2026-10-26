@@ -1,6 +1,6 @@
 /**
- * The world file (1.17 bout 5, contract §5, §9 invariants 13 and 14; S370
- * gate lens A A1, A11, lens B B12): one `.zip` holding one world as the
+ * The world file (1.17 bout 5, contract §5, §9 invariants 13 and 14):
+ * one `.zip` holding one world as the
  * portable copy (no `api`, no sync-state, no tombstones, no transient file),
  * and a reader that refuses before anything is written: zip-slip, absolute
  * paths, a declared-size bomb, no world, two worlds, the tour's sandbox.
@@ -47,7 +47,7 @@ describe('the portable copy', () => {
     expect(JSON.stringify(files.map(f => text(f.data)))).not.toContain('ow_w_secret');
   });
 
-  it('leaves out a repository and env files, keeps an env template (S449)', async () => {
+  it('leaves out a repository and env files, keeps an env template', async () => {
     const d = linkedWorld();
     d.put('.git/config', '[core]');
     d.put('.git/objects/ab/cdef', 'old key in history');
@@ -67,7 +67,7 @@ describe('the portable copy', () => {
     await expect(collectWorldFiles(as(d))).rejects.toThrow(/world\.json/);
   });
 
-  it('a world.json that is not one object is refused too (the S446 gate\'s G10)', async () => {
+  it('a world.json that is not one object is refused too', async () => {
     for (const body of ['null', '[]', '[{"api":{"api_key":"ow_w_secret"}}]', '"a world"']) {
       const d = new FakeDirHandle('w');
       d.put('world.json', body);
@@ -194,12 +194,12 @@ describe('the reader refuses before anything is written', () => {
     refuses({ 'world.json': strToU8(j({ id: WID, name: 'W' })), 'other/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
   });
 
-  it('a world in its one folder with another world nested inside, or a world.json under .atlas (S376 gate B10)', () => {
+  it('a world in its one folder with another world nested inside, or a world.json under .atlas', () => {
     refuses({ ...world, 'w/inner/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
     refuses({ ...world, 'w/.atlas/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
   });
 
-  it('a path under .atlas whose first part is a transient file\'s name (S376 gate B10)', () => {
+  it('a path under .atlas whose first part is a transient file\'s name', () => {
     refuses({ ...world, 'w/.atlas/making/x': strToU8('x') }, /not a world Atlas can open|cannot be opened safely/);
     refuses({ ...world, 'w/.atlas/lock/x': strToU8('x') }, /not a world Atlas can open|cannot be opened safely/);
   });
@@ -213,7 +213,7 @@ describe('the reader refuses before anything is written', () => {
   });
 });
 
-// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld h58 #10911; SDK 4.63.0):
+// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld 2026-10-22; SDK 4.63.0):
 // a producer's records marked private stay out of a world file unless asked.
 // The two files are the standard's own (schema-dist dist.49, Quillon's case):
 // the asked side holds `records/fold/` (private) and `records/lab/` whole.

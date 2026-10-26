@@ -39,7 +39,7 @@ export class PinPromptModal extends BaseModal {
           </div>
         </form>
       `;
-      // TEXT, never markup (S361, gate F5): `context` carries a world name from
+      // TEXT, never markup (gate F5): `context` carries a world name from
       // the account API, and this is the one modal that collects the PIN. A
       // name holding a <form action> would re-parent the PIN input off-origin;
       // the CSP has no form-action to stop it.
@@ -52,7 +52,7 @@ export class PinPromptModal extends BaseModal {
         const pin = input.value.trim();
         // The account PIN, four digits: it is saved for every account world.
         // A seat secret (ow_s_) opens one world and never becomes the account
-        // PIN (conv. 132, R1; S386 gate).
+        // PIN (conv. 132, R1).
         if (isSeatSecret(pin)) {
           errorEl.textContent = 'That is a seat secret, which opens one world. Here Atlas needs your account PIN: four digits.';
           errorEl.hidden = false;

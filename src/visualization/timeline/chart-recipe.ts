@@ -13,8 +13,8 @@
 import type { ElementType } from '../../core/types';
 import type { ChartScope, TimelineNode } from './types';
 
-// (pickDefaultChart — the ordered-recipe engine — deleted S256: dead code
-// since the tableau became the room default (S248/S251), and the home strip
+// (pickDefaultChart — the ordered-recipe engine — deleted: dead code
+// since the tableau became the room default, and the home strip
 // now runs the same tableauScope. Its dated-neighbourhood ranking lesson
 // lives on in degree.ts's dated-bidirectional counting.)
 
@@ -24,7 +24,7 @@ function nodeWeight(n: TimelineNode): number {
 }
 
 /**
- * The TABLEAU (Captain, 2026-07-10) — the world's default view when no type
+ * The TABLEAU (Titus, 2026-07-10) — the world's default view when no type
  * filter is active: cast-centered essentials across categories, deliberately
  * not-crowded. Protagonist + nexus when set (and dated); otherwise the most
  * weighted character and location stand in; then the top-weighted nodes fill
@@ -33,7 +33,7 @@ function nodeWeight(n: TimelineNode): number {
  */
 export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): ChartScope {
   const TOTAL_CAP = 22;
-  const PER_TYPE_CAP = 4; // diversity-pass cap only — the overflow pass relaxes it (S256)
+  const PER_TYPE_CAP = 4; // diversity-pass cap only — the overflow pass relaxes it
   const picked = new Set<string>();
   const typeCounts = new Map<string, number>();
   const take = (n: TimelineNode): void => {
@@ -54,7 +54,7 @@ export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): Char
     const best = nodes.filter(n => n.elementType === t).sort(byWeight)[0];
     if (best) take(best);
   }
-  // 3. Type fairness (S256, charts lab fx-6: institutions got ZERO slots while
+  // 3. Type fairness (charts lab fx-6: institutions got ZERO slots while
   //    peers held duplicates): every type present seats its best node before
   //    any type doubles up. Alphabetical type order for determinism.
   for (const t of [...new Set(nodes.map(n => n.elementType))].sort()) {
@@ -72,7 +72,7 @@ export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): Char
     if ((typeCounts.get(n.elementType) ?? 0) >= PER_TYPE_CAP) continue;
     take(n);
   }
-  // 5. Overflow (S256, charts lab fx-4: 63 dated elements opened as SEVEN dots
+  // 5. Overflow (charts lab fx-4: 63 dated elements opened as SEVEN dots
   //    because the per-type cap strangled the dominant type): remaining slots
   //    fill by weight regardless of type. In a world that is mostly events,
   //    events ARE the world — TOTAL_CAP alone guards against the wall.

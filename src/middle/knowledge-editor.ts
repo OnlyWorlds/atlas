@@ -81,7 +81,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
     initialJson: opts.initialJson,
     initialMarkdown: opts.initialMarkdown,
     // Drafts are Atlas's own two halves; a saved entry's `story` can have
-    // changed outside (S365).
+    // changed outside.
     storyOutranksStaleSidecar: opts.getEntry() !== null,
     editable: !viewOnly,
     autolinkSeed: { elements: currentLore() },
@@ -323,10 +323,10 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
 
   let lastSeenElementsRef: Element[] | null = getState().data.elements;
 
-  // The link-all corner (S310). The knowledge room mounts the same editor with
+  // The link-all corner. The knowledge room mounts the same editor with
   // the same autolink plugin into a host that already carries the writing
   // prose class, so it earns the same one-click affordance the writing room
-  // has had since S265 — it was simply never lifted here (the S308 sweep's
+  // has always had — it was simply never lifted here (the
   // "decision applied to ONE surface" class).
   const openedEntry = opts.getEntry();
   if (editorHandle.openedFromStory && openedEntry) noteOpenedFromStory(openedEntry.id, 'entry');

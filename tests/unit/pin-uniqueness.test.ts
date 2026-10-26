@@ -1,7 +1,7 @@
 /**
- * ONE ELEMENT, ONE PIN, ONE MAP (S307).
+ * ONE ELEMENT, ONE PIN, ONE MAP.
  *
- * The rule Captain reported broken: drag a character onto a map, then use
+ * The rule Titus reported broken: drag a character onto a map, then use
  * [+pin], and you got a SECOND pin for the same character on the same map.
  * Nothing anywhere enforced it — four UI paths and the import applier all
  * created pins with no dedupe.

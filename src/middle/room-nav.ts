@@ -44,21 +44,21 @@ const ROOMS: RoomDef[] = [
   // Home matches 'home', 'elements' (legacy sidebar-mode URL, now middle=home),
   // and 'welcome' (no-world case never reaches room nav, but defensive).
   { id: 'home',      label: 'Home',      icon: 'home',           hashFor: homeHash,      matches: ['home', 'elements'] },
-  // Icon pass 2026-07-10 (Captain): writing takes the book; knowledge/charts/
+  // Icon pass 2026-07-10 (Titus): writing takes the book; knowledge/charts/
   // share candidates screenshotted for his pick (icons-variant-{a,b}.png).
   { id: 'writing',   label: 'Writing',   icon: 'menu_book',      hashFor: writingHash,   matches: ['writing'] },
   { id: 'knowledge', label: 'Knowledge', icon: 'psychology',     hashFor: knowledgeHash, matches: ['knowledge'] },
   { id: 'timeline',  label: 'Charts',    icon: 'insights',       hashFor: timelineHash,  matches: ['timeline'] },
-  // Search room DELETED (session 256; nav-hidden since 240) — the elements-
+  // Search room DELETED (nav-hidden before that) — the elements-
   // sidebar name filter is the interim search surface; the real replacement
   // is the Cmd+K command palette (see DESIGN.md "Search").
-  // Icon: `wall_art` (S255v3, Captain's ask: not a globe, not a share-sheet —
+  // Icon: `wall_art` (Titus's ask: not a globe, not a share-sheet —
   // the room is about showing off, publishing, displaying; a framed piece on
   // a wall is the exhibit).
   { id: 'share',     label: 'Pages',          icon: 'wall_art',       hashFor: (w) => shareHash(w), matches: ['share'] },
   { id: 'import',    label: 'Data',            icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
-  // Templates room DELETED (session 256; never built past a stub).
-  // Settings dropped from the strip S255v4 (Captain): the sidebar footer gear
+  // Templates room DELETED (never built past a stub).
+  // Settings dropped from the strip (Titus): the sidebar footer gear
   // is the one settings entrance. Route + gear-as-toggle unaffected.
 ];
 
@@ -75,7 +75,7 @@ async function openPalette(): Promise<void> {
 /** Rooms shown in the labeled onboarding preview (settings joins later). */
 const PREVIEW_ROOM_IDS = new Set(['home', 'writing', 'knowledge', 'timeline', 'share', 'import']);
 
-/** Persistent labels-on preference — the ghost expander toggles it (S255v3). */
+/** Persistent labels-on preference — the ghost expander toggles it. */
 const NAV_LABELS_KEY = 'atlas_nav_labels';
 
 /** Rooms that fold into "More" at the phone width (#244); Home and Writing stay on the strip. */
@@ -163,11 +163,11 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
 
   // Tracks the preview→real transition: when the first world activates, one
   // render keeps the labels in the DOM and collapses them (max-width → 0),
-  // so the icons visibly slide into their real nav positions (S255v2).
+  // so the icons visibly slide into their real nav positions.
   let wasPreview = false;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
-  // The strip is rebuilt only when it would come out different (conv. 146,
-  // S421): a rebuild between a press and its release loses the click. The key
+  // The strip is rebuilt only when it would come out different (conv. 146):
+  // a rebuild between a press and its release loses the click. The key
   // holds everything the strip draws and everything its handlers capture at
   // render (the world, the selected element); the rest is read at the click.
   const stripGate = renderGate();
@@ -176,7 +176,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     if (!stripGate.changed([`preview|${isDrawerOpen('sidebar')}`])) return;
     strip.innerHTML = '';
     strip.classList.add('is-preview');
-    // The sidebar toggle belongs here too (S366): with no world open the
+    // The sidebar toggle belongs here too: with no world open the
     // worlds sidebar is the ONLY way in, and below 820px it is a drawer. The
     // preview strip used to carry no toggle, so a narrow window with no world
     // (the first visit, or after "set up a folder") had no way to reach it.
@@ -186,7 +186,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-room-nav-btn atlas-room-nav-preview-btn';
-      // aria-disabled, NOT native disabled (S309 — finishing the S301 call):
+      // aria-disabled, NOT native disabled:
       // a disabled control fires no hover, so no tooltip can ever explain it.
       // These have no click handler, so removing `disabled` changes nothing
       // except that hover/focus now teach what the room will be.
@@ -194,7 +194,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       btn.title = `${room.label} · opens once a world exists`;
       btn.innerHTML =
         `<span class="material-symbols-outlined">${room.icon}</span>` +
-        // S308: this carried `room.id === 'import' ? 'import' : ...`, a
+        // This once carried `room.id === 'import' ? 'import' : ...`, a
         // shortener written when the label was "Import & export" and stranded
         // by the rename to "Data" — so the tooltip said Data and the label
         // underneath said import, on one control.
@@ -214,7 +214,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     const worldId = route.worldId ?? getState().active?.worldId ?? null;
     // A worldId the registry doesn't know (stale URL hash surviving a
     // clear-site-data, dead deep link) must not paint the real nav — it was
-    // rendering a stuck icon-only strip full of dead routes (S255v4).
+    // rendering a stuck icon-only strip full of dead routes.
     const known = worldId != null && (
       getState().active?.worldId === worldId ||
       getState().registry.worlds.some(w => w.id === worldId)
@@ -234,7 +234,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     strip.innerHTML = '';
     strip.classList.remove('is-preview');
 
-    // Narrow-window drawer toggles (S323). Rendered ALWAYS and hidden by CSS
+    // Narrow-window drawer toggles. Rendered ALWAYS and hidden by CSS
     // above the breakpoints, so the strip's markup does not change shape when
     // a window is resized across one — a re-render race on a resize is the
     // kind of thing that leaves a control missing until the next navigation.
@@ -284,8 +284,8 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       strip.appendChild(btn);
     }
 
-    // Ghost expander: re-shows / hides the room labels at will (S255v3 —
-    // Captain wanted the settle-in re-showable; a persistent labels mode
+    // Ghost expander: re-shows / hides the room labels at will (Titus
+    // wanted the settle-in re-showable; a persistent labels mode
     // beats a one-shot replay). Dim chevron at the end of the icon run.
     const expander = document.createElement('button');
     expander.type = 'button';
@@ -371,15 +371,15 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       }
     }
 
-    // Search affordance (Captain, S309): the command palette is the app's only
+    // Search affordance (Titus): the command palette is the app's only
     // global search and was reachable by shortcut alone. One field-shaped
     // control anchored at the strip's far right opens the SAME palette —
     // one search, two doors; an inline twin would be a second search surface
     // that can drift from the first.
     //
-    // The spacer renders UNCONDITIONALLY (S312): it used to be skipped when an
+    // The spacer renders UNCONDITIONALLY: it used to be skipped when an
     // element chip was present, which parked the search pill immediately after
-    // the chip — mid-strip on prod, exactly where Captain found it. The pill's
+    // the chip — mid-strip on prod, exactly where Titus found it. The pill's
     // anchor is the strip's right edge, chip or no chip.
     const spacer = document.createElement('div');
     spacer.className = 'atlas-room-nav-spacer';

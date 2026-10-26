@@ -138,7 +138,7 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
       const fail = authFail(request);
       if (fail) return fail;
       const body = (await request.json().catch(() => ({}))) as { name?: string; pin?: string; source?: unknown; producer?: unknown };
-      // Keel #571: a folder's provenance lines, each an object or null, its
+      // A folder's provenance lines, each an object or null, its
       // `world` / `tool` a string when present; kept as the world's origin.
       for (const [k, inner] of [['source', 'world'], ['producer', 'tool']] as const) {
         const v = body[k];

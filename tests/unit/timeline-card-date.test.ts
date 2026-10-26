@@ -1,5 +1,5 @@
 /**
- * The docked card's click-to-edit date (S367 critic K3): Enter on the
+ * The docked card's click-to-edit date: Enter on the
  * untouched prefill must write nothing, and a lens that cannot round-trip the
  * stored value exactly must prefill the raw stored number, not a lossy form.
  */
@@ -45,7 +45,7 @@ function openAndEnter(n: TimelineNode, calendar: CalendarConfig | null, typed?: 
 
 const MONTHS = { names: ['Frostwane', 'Greening'], lengths: [30, 30] };
 
-describe('card date popover: a no-op Enter never moves the date (S367 critic K3)', () => {
+describe('card date popover: a no-op Enter never moves the date', () => {
   it('lossy lens ("{month} {year}"): prefills the raw step and writes nothing', () => {
     const cal: CalendarConfig = { version: 1, grain: 'day', bundles: { months: MONTHS }, format: '{month} {year}' };
     const r = openAndEnter(node('e1', 60 * 454 + 11), cal);

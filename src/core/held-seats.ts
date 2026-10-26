@@ -1,6 +1,6 @@
 /**
- * Held seats (Keel #469, S469; contract
- * `Forge/Notes/2026-10-25-s468-held-seat-contract-v2.md`): a join link's seat
+ * Held seats (keel's join route; the contract is a
+ * design note): a join link's seat
  * kept in this browser from the moment its redeem answers until a world of
  * that id lands here, by any door, or the person removes it. A link is spent
  * at the redeem, so a download cancelled, closed or cut off by a reload would

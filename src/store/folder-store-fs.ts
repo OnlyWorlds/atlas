@@ -25,7 +25,7 @@
  * checks the lock: missing or older than LOCK_STALE_MS → take it. Otherwise
  * `open()` throws `ELockHeld` and the caller offers a consented take-over
  * (`forceTakeLock`); there is no read-only mode (an earlier line here said
- * so; corrected S366, DESIGN_LAWS conv. 13). Every lock write runs on one
+ * so; DESIGN_LAWS conv. 13). Every lock write runs on one
  * chain (conv. 118).
  */
 
@@ -74,7 +74,7 @@ import { normalizeDiskLinks, denormalizeDiskLinks, type LinkSpelling } from './d
 
 /**
  * One file's binding: where it lives and how its link fields are spelled
- * there (S354). `spelling` is per FILE, never per world: a folder can hold
+ * there. `spelling` is per FILE, never per world: a folder can hold
  * pins from two writers, and each file keeps its own.
  */
 interface IndexEntry {
@@ -180,7 +180,7 @@ export class FsFolderStore implements FolderStore {
   private tabId: string;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private opts: FsFolderStoreOptions;
-  /** View-only world (S264) — UI mutations throw; sync channels bypass. */
+  /** View-only world — UI mutations throw; sync channels bypass. */
   private viewOnly: boolean | 'copy' = false;
   /** Between `beginMove` and `endMove` (or the close): the files are being copied to a folder. */
   private moving = false;
@@ -216,8 +216,8 @@ export class FsFolderStore implements FolderStore {
    */
   private fileIndex: Map<string, IndexEntry> = new Map();
   /**
-   * Types whose files in THIS folder all use the bare (schema) link spelling
-   * (S354). A NEW file of such a type is written bare too, so a folder another
+   * Types whose files in THIS folder all use the bare (schema) link spelling.
+   * A NEW file of such a type is written bare too, so a folder another
    * tool made stays one dialect after atlas adds a pin to it. Any other
    * folder (mixed, empty, atlas-made) gets atlas's spelling for new files.
    * Detected per type at index time; cleared in close().
@@ -241,10 +241,10 @@ export class FsFolderStore implements FolderStore {
    * fresh-objects-per-read semantics. Cleared in close().
    */
   private bodyCache: Map<string, Element> = new Map();
-  /** Ids found in BOTH element layouts at index time: one copy served, the other untouched (S363: the re-key refuses them). */
+  /** Ids found in BOTH element layouts at index time: one copy served, the other untouched (the re-key refuses them). */
   private shadowedIds = new Set<string>();
   /**
-   * THE LIVE FOLDER (S364): each served element's file as Atlas last saw it,
+   * THE LIVE FOLDER: each served element's file as Atlas last saw it,
    * from the index read or from Atlas's own write (`writeJsonAtomic` returns
    * the verified file's stamp). A stat that differs means someone else wrote
    * the file. EQUALITY, never "newer than": clock skew cannot fool it.
@@ -262,7 +262,7 @@ export class FsFolderStore implements FolderStore {
    * Bodies adopted from disk OUTSIDE a pass (`readForWrite`: an Atlas write,
    * or a pull that backed off from an outside edit), id -> the body served
    * before. The cache already holds the new body, so no stat will show it
-   * again: the next pass reports these (S364 gate lens A F5).
+   * again: the next pass reports these.
    */
   private pendingAdoptions = new Map<string, Element>();
   /** Single-flight rescans: the run in progress, and at most one queued after it. */
@@ -330,9 +330,9 @@ export class FsFolderStore implements FolderStore {
     return next;
   }
   /**
-   * ONE WRITER PER FILE (S366). Two overlapping writes of the same file fail
+   * ONE WRITER PER FILE. Two overlapping writes of the same file fail
    * each other: the first write's read-back verify reads the second's bytes
-   * and throws (the `.tmp` staging that made it worse is gone since S368). The lock had four writers (claim,
+   * and throws (the `.tmp` staging that made it worse is gone). The lock had four writers (claim,
    * heartbeat, park's staling, unpark) and park never waited for its own:
    * a tab switch under load came back "not revived" (lane C: 21 of 320).
    * Every lock read-modify-write runs here, in call order.
@@ -418,7 +418,7 @@ export class FsFolderStore implements FolderStore {
     // scary "open in another tab — take over?" prompt for worlds no tab is
     // using. Parked = takeable instantly; unpark still verifies tab_id, so
     // a takeover is detected and forces the cold reopen. Best-effort.
-    // On the lock chain (S366): an unpark() right behind this waits for it,
+    // On the lock chain: an unpark() right behind this waits for it,
     // instead of writing the same file through the same tmp at once.
     void this.runLockOp(async () => {
       try {
@@ -547,7 +547,7 @@ export class FsFolderStore implements FolderStore {
       const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
       // A lock another program holds for a moment (OneDrive, antivirus) is
       // not a lock another TAB took: skip this beat and try the next one
-      // (S368 gate A L5; a plain readJson read the held file as absent and
+      // (a plain readJson read the held file as absent and
       // stopped the heartbeat for good, so the world read as stale in 90 s).
       let existing: LockPayload | null;
       try {
@@ -634,7 +634,7 @@ export class FsFolderStore implements FolderStore {
     // stamps nothing and would lose to any old stamped copy), and the shadowed
     // copy is named in a warning so the state is discoverable rather than
     // mysterious.
-    // New-file spelling for this type (S354, BORN BARE since S359): a new
+    // New-file spelling for this type (BORN BARE): a new
     // file takes the format's bare `map`/`zone` unless some file of this
     // type already declares atlas's suffixed spelling, in which case the
     // folder keeps its dialect (sticky, like layouts and filenames). So a
@@ -772,7 +772,7 @@ export class FsFolderStore implements FolderStore {
         body.type = type;
       }
       coerceForeignShapes(body);
-      // LINK SPELLING (S354, §5): a pin written by the format carries `map`;
+      // LINK SPELLING (§5): a pin written by the format carries `map`;
       // atlas keys on `map_id`. Normalise in memory and remember which
       // spelling the FILE used, so a write goes back the way it came.
       spellings[i] = normalizeDiskLinks(body);
@@ -794,7 +794,7 @@ export class FsFolderStore implements FolderStore {
         // A rename-crash twin carries the same content, and is safe to drop.
         // A file that merely SHARES the id (someone copied `aldric.json` to
         // `aldric-variant.json` and edited it) is somebody's work: it moves
-        // to `.atlas/quarantine/<type>/` instead of being deleted (S360; it
+        // to `.atlas/quarantine/<type>/` instead of being deleted (it
         // used to be unlinked on open, with only a console line).
         if (sameContentIgnoringStamps(loser.body, survivor.body)) {
           await removeFile(dir, loser.filename).catch(() => {});
@@ -817,7 +817,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * Background filename-convergence pass (the S246 lazy tidy, deferred OUT
+   * Background filename-convergence pass (the lazy tidy, deferred OUT
    * of the open path 2026-07-19). Same contract as always: FULL occupancy
    * view before any write, lowercase equivalence (case-folding
    * filesystems), id-sorted so two machines converge identically, full-id
@@ -902,7 +902,7 @@ export class FsFolderStore implements FolderStore {
     }
   }
 
-  // ---- The live folder (S364) ----
+  // ---- The live folder ----
 
   /** The files the index or a rescan left out as unreadable (conv. 176): derived from `otherFileStamps`, whose id is null only for those. */
   unreadableFiles(): string[] {
@@ -939,7 +939,7 @@ export class FsFolderStore implements FolderStore {
    * save, a sync stamp, a pull-apply or a tidy rename on the same id runs
    * wholly before or wholly after it, and a stamp that now matches (Atlas
    * wrote meanwhile) drops the candidate. Everything a slot decides on is
-   * re-read INSIDE the slot (S364 gate lens A F1): a decision taken on the
+   * re-read INSIDE the slot: a decision taken on the
    * walk's snapshot raced Atlas's own renames. Only types already indexed are
    * scanned: a type nobody has listed yet is read fresh when it is. One file
    * that throws never sinks the pass (F6): its id is left for the next one.
@@ -1292,13 +1292,13 @@ export class FsFolderStore implements FolderStore {
     return total;
   }
 
-  /** Link spelling for a NEW file of `type` in this folder (S354). */
+  /** Link spelling for a NEW file of `type` in this folder. */
   private writeSpellingFor(type: ElementType): LinkSpelling {
     return this.bareSpellingTypes.has(type) ? 'bare' : 'atlas';
   }
 
   /**
-   * THE ONE ELEMENT-FILE WRITE (S354). Every element body reaches disk
+   * THE ONE ELEMENT-FILE WRITE. Every element body reaches disk
    * through here so the file's own link spelling is honoured: an existing
    * file keeps the spelling it was read with, a new file takes the folder's.
    * The cache keeps the in-memory spelling; only the bytes on disk differ.
@@ -1315,7 +1315,7 @@ export class FsFolderStore implements FolderStore {
    * write of this element does not silently change its dialect.
    */
   private adoptDiskBody(id: string, elem: Element): void {
-    coerceForeignShapes(elem); // every disk read path passes here (S360)
+    coerceForeignShapes(elem); // every disk read path passes here
     const spelling = normalizeDiskLinks(elem);
     const entry = this.fileIndex.get(id);
     if (spelling && entry && entry.spelling !== spelling) this.fileIndex.set(id, { ...entry, spelling });
@@ -1394,17 +1394,17 @@ export class FsFolderStore implements FolderStore {
   }
 
   async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {
-    if (!opts?.fromSync) this.assertWritable(); // engine pull-apply bypasses (S264)
+    if (!opts?.fromSync) this.assertWritable(); // engine pull-apply bypasses
     // Serialized read-merge-write (world-meta gate R4): the read and the
     // write happen atomically relative to every other meta writer, so a
     // background pull-apply can never erase a concurrent user edit.
     return this.runWorldMetaOp(async () => {
       // Strict: a world.json that exists but will not parse must stop this
       // write, or the merge below starts from nothing and the world loses its
-      // id (S360: a git conflict in world.json was one save from that).
+      // id (a git conflict in world.json was one save from that).
       const born = (await readJsonStrict<WorldMeta>(this.requireRoot(), WORLD_META_FILE)) === null;
       const current = await this.readWorldMeta();
-      // THE BIRTH STAMP (folder-format §4.2, S355): a folder atlas creates
+      // THE BIRTH STAMP (folder-format §4.2): a folder atlas creates
       // records the spec version it was written against. Only when no
       // world.json existed yet; a folder from another tool keeps whatever it
       // carries, absent included (opening or editing is not capturing).
@@ -1519,7 +1519,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * THE READ BEFORE A READ-MODIFY-WRITE (S359): the element as it is ON
+   * THE READ BEFORE A READ-MODIFY-WRITE: the element as it is ON
    * DISK now, not as it was cached. Every chained write path (update,
    * updateWith, the sync stamps) merges into this, so a field another tool
    * edited in the file while atlas held the world survives atlas's next
@@ -1528,8 +1528,8 @@ export class FsFolderStore implements FolderStore {
    * filled at open and atlas does not watch the folder, so before this every
    * atlas edit wrote its stale copy over an outside edit to the same
    * element. One file read per write; a file that vanished falls back to the
-   * cache (the pre-S359 behaviour), and a file that will not parse throws
-   * `CorruptFileError` (S361, conv. 99): it is never written over.
+   * cache (the earlier behaviour), and a file that will not parse throws
+   * `CorruptFileError` (conv. 99): it is never written over.
    * Seeing outside edits WITHOUT an atlas write (lists, the open element) is
    * a separate question: the reopen/revive bout.
    */
@@ -1540,9 +1540,9 @@ export class FsFolderStore implements FolderStore {
     if (!entry) return cached;
     try {
       const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(entry.layout, entry.type));
-      // STRICT (S361, gate F6): a file that exists and will not parse (git
+      // STRICT (gate F6): a file that exists and will not parse (git
       // conflict markers) must stop the write. Falling back to the cache here
-      // wrote atlas's copy over it, the one damaged-file case S360 left open.
+      // wrote atlas's copy over it, the one damaged-file case an earlier fix left open.
       const disk = dir ? await readJsonStrict<Element>(dir, entry.filename) : null;
       if (!disk || disk.id !== id) return cached;
       // Same fill as the scan: a foreign writer may omit `type`.
@@ -1565,7 +1565,7 @@ export class FsFolderStore implements FolderStore {
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
     const id = (data.id as string) ?? newId();
-    // ONE ELEMENT, ONE PIN, ONE MAP (S307). Guarded HERE and not in
+    // ONE ELEMENT, ONE PIN, ONE MAP. Guarded HERE and not in
     // `createPin`, because the import applier bypasses that wrapper. Reads
     // the in-memory bodies rather than re-listing: a positive match is proof
     // the duplicate exists, so this cannot reject a legitimate create, and an
@@ -1591,7 +1591,7 @@ export class FsFolderStore implements FolderStore {
       local_updated_at: now,
     };
     await this.ensureIndexFor(type);
-    // In the id's chain (S364 gate lens A F7): a live-folder pass that finds
+    // In the id's chain: a live-folder pass that finds
     // the new file between its write and its index entry waits for both.
     return this.writeChain.run(id, async () => {
       const layout = ELEMENTS_DIR;
@@ -1683,7 +1683,7 @@ export class FsFolderStore implements FolderStore {
       ...patch,
       id: existing.id,
       type: existing.type,
-      // An edit sorts past the baseline it was made on, whatever this clock says (S387).
+      // An edit sorts past the baseline it was made on, whatever this clock says.
       local_updated_at: editStamp(this.clock(), patch.server_updated_at ?? existing.server_updated_at),
       server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
     });
@@ -1797,7 +1797,7 @@ export class FsFolderStore implements FolderStore {
     // fails) before the file disappears — no "element not found" tail errors.
     const result = await this.writeChain.run(id, () => this.deleteElementUnchained(id, opts));
     // Links to what just died are removed from every other element, as keel
-    // does (S362, `store/scrub-links.ts`). Outside the target's slot: each
+    // does (`store/scrub-links.ts`). Outside the target's slot: each
     // referrer goes through its own chain. Silent deletes are the engine's
     // and Route 2's channel (the server already scrubbed, or the id is being
     // swapped), so they never scrub.
@@ -1831,7 +1831,7 @@ export class FsFolderStore implements FolderStore {
       const deps = await this.findDependents(id);
       for (const dep of deps) {
         const tomb: Tombstone = { id: dep.id, type: dep.type, deleted_at: this.clock() };
-        // EACH DEPENDENT GOES THROUGH ITS OWN WRITE CHAIN (S310).
+        // EACH DEPENDENT GOES THROUGH ITS OWN WRITE CHAIN.
         //
         // `deleteElement` serializes on the TARGET's id only. The cascade used
         // to unlink descendants directly from inside that slot, and
@@ -1849,7 +1849,7 @@ export class FsFolderStore implements FolderStore {
         // Realistic trigger: the writing workspace flushes a debounced save
         // for the narrative you just switched away from (`flushPendingSave` is
         // fired-and-forgotten on switch and unmount), and a subtree delete
-        // lands in that window. Found by the S310 integration gate — the
+        // lands in that window. Found by an integration review — the
         // keeper had noticed the bypass and moved on without following it.
         //
         // The guard below matters: we are already INSIDE `run(id, ...)`, so
@@ -1879,7 +1879,7 @@ export class FsFolderStore implements FolderStore {
     // The DIRECTORY the file was found in, never the type its body declares:
     // a body saying "location" inside elements/character/ used to be "deleted"
     // from elements/location/ (not found = success) and came back on the next
-    // open (S363 gate lens A F2).
+    // open.
     const dirType = entry?.type ?? elem.type;
     const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(this.layoutOf(elem.id, dirType), dirType));
     if (!dir) return;
@@ -2033,7 +2033,7 @@ export class FsFolderStore implements FolderStore {
     this.assertWritable();
     const fromDir = await tryGetDir(this.requireRoot(), [MEDIA_DIR, fromElementId]);
     if (!fromDir) return 0;
-    // EVERYTHING under media/<from>/, at any depth (S363 gate lens A F1): the
+    // EVERYTHING under media/<from>/, at any depth: the
     // old directory is removed whole afterwards, so a file this copy skips is
     // a file deleted. Atlas writes media/<id>/<folder>/<file>, but a copied
     // or imported folder may hold loose files or deeper folders.
@@ -2158,7 +2158,7 @@ export class FsFolderStore implements FolderStore {
 
   async updateSyncState(mutate: (current: SyncState) => Partial<SyncState>): Promise<SyncState> {
     return this.runSyncStateOp(async () => {
-      // Strict on the write path (S360): merging into a corrupt file's null
+      // Strict on the write path: merging into a corrupt file's null
       // would reset the cursor, conflicts and pending server deletes.
       const atlasDirR = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
       const current = (await readJsonStrict<SyncState>(atlasDirR, SYNC_STATE_FILE)) ?? { ...DEFAULT_SYNC_STATE };
@@ -2180,7 +2180,7 @@ export class FsFolderStore implements FolderStore {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
     await this.atlasFileChain.run(CHARTS_FILE, async () => {
       // The caller's list came from a tolerant read; a corrupt file read as
-      // "no charts" must not be replaced by it (S360).
+      // "no charts" must not be replaced by it.
       await readJsonStrict(atlasDir, CHARTS_FILE);
       await writeJsonAtomic(atlasDir, CHARTS_FILE, { charts });
     });
@@ -2195,7 +2195,7 @@ export class FsFolderStore implements FolderStore {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
     await this.atlasFileChain.run(STYLES_FILE, async () => {
-      // Same guard as writeCharts: never replace a file we could not read (S360).
+      // Same guard as writeCharts: never replace a file we could not read.
       await readJsonStrict(atlasDir, STYLES_FILE);
       await writeJsonAtomic(atlasDir, STYLES_FILE, styles);
     });
@@ -2268,7 +2268,7 @@ export class FsFolderStore implements FolderStore {
     //    on never-synced folders. Iteration is sequential — atomic writes per
     //    file matter more than parallelism here.
     //    Each clear rides the per-id chain and merges into the file AS IT IS
-    //    ON DISK (S361, lane b L1: rewriting from the cache reverted outside
+    //    ON DISK (lane b L1: rewriting from the cache reverted outside
     //    edits and raced a save landing during the unlink).
     const all = await this.listElements();
     let cleared = 0;
@@ -2278,12 +2278,12 @@ export class FsFolderStore implements FolderStore {
       cleared++;
     }
     // 2. Drop every tombstone — they target ids on the now-defunct api world.
-    //    On the tombstone chain (S366): a delete appending at this moment
+    //    On the tombstone chain: a delete appending at this moment
     //    must not race this write through the same tmp.
     await this.runTombstoneOp(() => this.writeTombstoneList([]));
     // 3. Reset sync-state.json to the default empty-history shape. This also
     //    clears any persisted conflicts + server_deletes from the old world.
-    //    On the sync-state chain (S366): a round recording state right now
+    //    On the sync-state chain: a round recording state right now
     //    otherwise overlaps this write (one tmp, two writers).
     await this.runSyncStateOp(async () => {
       const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
@@ -2295,7 +2295,7 @@ export class FsFolderStore implements FolderStore {
     //    it rewrites the same file writeWorldMeta serializes (gate R4).
     let hadApi = false;
     await this.runWorldMetaOp(async () => {
-      // Strict (S361): a world.json that will not parse must not be replaced
+      // Strict: a world.json that will not parse must not be replaced
       // by the empty default minus its api block.
       const meta = await this.readWorldMeta({ strict: true });
       hadApi = !!meta.api;
@@ -2309,7 +2309,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * Pull-apply rides the per-id write chain (S361, lane b M1): it used to be
+   * Pull-apply rides the per-id write chain (lane b M1): it used to be
    * the one element write outside it, so a user save landing between the
    * engine's race check and this write was overwritten and read as synced.
    */
@@ -2335,7 +2335,7 @@ export class FsFolderStore implements FolderStore {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
     return this.writeChain.run(id, async () => {
-      // The file AS IT IS ON DISK (S364): an outside edit that followed the
+      // The file AS IT IS ON DISK: an outside edit that followed the
       // toolkit's rule (a fresh `local_updated_at`) moved the stamp the engine
       // decided on, so the pull backs off instead of overwriting it, even
       // when no live-folder pass has adopted the edit yet. `readForWrite`
@@ -2441,7 +2441,7 @@ export class FsFolderStore implements FolderStore {
 
   private async readTombstoneList(): Promise<Tombstone[]> {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    // Strict (S360): every append/clear writes this list back whole, so a
+    // Strict: every append/clear writes this list back whole, so a
     // corrupt file read as empty would silently drop every pending delete.
     const payload = await readJsonStrict<{ deletions: Tombstone[] }>(atlasDir, TOMBSTONES_FILE);
     return payload?.deletions ?? [];
@@ -2510,7 +2510,7 @@ function getOrCreateTabId(): string {
   }
 }
 
-/** The live folder's key for an element file Atlas does not serve (S364). */
+/** The live folder's key for an element file Atlas does not serve. */
 function otherFileKey(type: ElementType, layout: LayoutDir, filename: string): string {
   return `${layout}|${type}|${filename}`;
 }
@@ -2534,7 +2534,7 @@ function sameContentIgnoringStamps(a: Element, b: Element): boolean {
     // Top-level keys sorted; nested values stringified whole. (A replacer
     // ARRAY would also filter nested keys and call differing bodies equal.)
     // A key holding `undefined` is dropped, as JSON drops it on disk: a body
-    // Atlas wrote with one looked "changed" against its own file (S364 F9).
+    // Atlas wrote with one looked "changed" against its own file.
     const keys = Object.keys(rest).filter(k => (rest as Record<string, unknown>)[k] !== undefined).sort();
     return JSON.stringify(keys.map(k => [k, (rest as Record<string, unknown>)[k]]));
   };
@@ -2542,7 +2542,7 @@ function sameContentIgnoringStamps(a: Element, b: Element): boolean {
 }
 
 /**
- * SHAPE FALLBACK (S360), the sibling of the type fallback above: a foreign
+ * SHAPE FALLBACK, the sibling of the type fallback above: a foreign
  * writer can put a number where the schema says string, or a numeric string
  * where it says number. Coerce the few fields atlas's own code assumes, in
  * memory, so one converter's `"name": 1453` does not blank the element list

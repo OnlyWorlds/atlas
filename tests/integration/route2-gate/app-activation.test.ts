@@ -1,6 +1,6 @@
 /**
- * Promoted from the S367 composition gate (lens B).
- * S367 gate lens B, activation recovery for a Route 2 journal. RED today =
+ * Promoted from the composition gate (lens B).
+ * Gate lens B, activation recovery for a Route 2 journal. RED today =
  * finding reproduced.
  *
  * B6: the boot path activates the URL's world SILENTLY (app.ts

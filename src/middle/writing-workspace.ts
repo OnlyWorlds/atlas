@@ -99,7 +99,7 @@ const PROSE_FONT_STACKS: Record<'sans' | 'serif' | 'slab' | 'mono', string> = {
  * `baseline` is what was last known saved for THAT narrative — both captured
  * when the save was scheduled, never re-derived later. The route, the mounted
  * editor and the workspace itself may all have moved on by the time this
- * lands; none of them are consulted (S323).
+ * lands; none of them are consulted.
  */
 type PendingWrite = {
   id: string;
@@ -117,7 +117,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // read-only and every save path below stands down (conv. 149). Rooms remount
   // on a world switch, so one read at mount holds.
   const viewOnly = worldIsViewOnly();
-  // keel's stub of a narrative (conv. 155, I5; S443 gate G5) reads the same way: the
+  // keel's stub of a narrative (conv. 155, I5) reads the same way: the
   // narrative mounted now is never written here, in any world.
   let stubMounted = false;
   const noWrite = (): boolean => viewOnly || stubMounted;
@@ -133,10 +133,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * The pending write carries the id of the narrative the text CAME FROM, and
    * the baseline it was typed against. Both are captured at schedule time, so
    * a flush that runs after the route has already moved still writes to the
-   * right element (S323 — the room-exit data-loss class; see persistSnapshot).
+   * right element (the room-exit data-loss class; see persistSnapshot).
    */
   let pendingSnapshot: PendingWrite | null = null;
-  // The latest save started per narrative (S368): "Retry now" on a failed
+  // The latest save started per narrative: "Retry now" on a failed
   // save runs only while no later save of that narrative has started, so an
   // older text never overwrites a newer one.
   const latestSave = new Map<string, number>();
@@ -190,7 +190,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     getActiveNarrative,
   });
 
-  // Find in the COMPILED view (S355): a DOM-marking controller over the
+  // Find in the COMPILED view: a DOM-marking controller over the
   // read-only rendering, so Ctrl+F and "Link to element" work at chapter and
   // book level, not only in scenes.
   const compiledSearch = createCompiledSearch(
@@ -218,7 +218,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   };
 
   /**
-   * "Link to element…" from the find bar (S355). One picker, then:
+   * "Link to element…" from the find bar. One picker, then:
    *   - this-level: every match in the live doc becomes a chip in one
    *     undoable transaction;
    *   - compiled: every match across the narrative AND its descendants is
@@ -240,7 +240,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     // Alias FIRST, chips second: the chip-label sync runs on the next state
     // tick and rewrites any label that is not yet the name or an alias, so
-    // recording after linking is a race the writer loses (Captain saw it).
+    // recording after linking is a race the writer loses (Titus saw it).
     const term = info.query.trim();
     if (editorHandle) {
       await recordAliasIfForeign(picked, term);
@@ -306,7 +306,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * The DOM selection is what the writer SEES and is read first: ProseMirror
    * syncs its own selection from the DOM on a later tick, so a shortcut
    * pressed right after a keyboard selection can find the editor state one
-   * step behind (own-eyes at S355: two of three runs). The editor state is
+   * step behind (seen in two of three runs). The editor state is
    * the fallback, for a selection made programmatically.
    */
   function currentSelectionText(): string {
@@ -328,8 +328,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   const onWorkspaceHotkey = (e: KeyboardEvent): void => {
     const isMeta = e.ctrlKey || e.metaKey;
     // Shift combos belong to the global dispatcher: Ctrl+Shift+F is focus
-    // mode and used to open Find as well, pulling the caret out of the prose
-    // (S367 critic C10). Same rule for H.
+    // mode and used to open Find as well, pulling the caret out of the prose.
+    // Same rule for H.
     if (!isMeta || e.shiftKey) return;
     if (e.key === 'f' || e.key === 'F') {
       e.preventDefault();
@@ -487,11 +487,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     return flushPendingSave();
   }
   window.addEventListener('pagehide', onPageHide);
-  // Same flush before a world switch empties the elements this save needs (S360).
+  // Same flush before a world switch empties the elements this save needs.
   const unLeaveWorld = onLeaveWorld(onPageHide);
 
   /**
-   * THE LIVE FOLDER (S364): another tool changed the open scene on disk.
+   * THE LIVE FOLDER: another tool changed the open scene on disk.
    * The pass flushed this room first, so a clean editor has nothing unsaved:
    * remount it from the new body (the sidecar rule decides which text).
    * Typing that landed during the pass wins, and the room says so; its save
@@ -508,7 +508,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
     const el = getState().data.elements.find(e => e.id === mountedForId);
     if (!el) return;
-    // Keep the reader's place (S364 gate lens B B14): a writer coming back to
+    // Keep the reader's place: a writer coming back to
     // the window with the caret in the scene keeps focus there (never on the
     // page body, where single keys are hotkeys) and keeps the scroll.
     const hadFocus = root.contains(document.activeElement);
@@ -549,7 +549,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * narrative id, so the lookup returned null and the guard dropped the write
    * — and `flushPendingSave` had already cleared `pendingSnapshot`, so the
    * text was gone from the editor, from state and from disk, silently. Atlas
-   * has no undo. (S323, reproduced live: type, then click another room inside
+   * has no undo. (reproduced live: type, then click another room inside
    * the debounce window.)
    *
    * The write is now addressed by the id captured at schedule time, so the
@@ -631,7 +631,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // The compiled view is a rendering of OTHER narratives too, so it goes
     // stale whenever the elements array swaps (a sync pull, a link from the
     // context pane, a scene edited elsewhere). Re-render it on that tick
-    // (S355; before this it only redrew on narrative switch).
+    // (before this it only redrew on narrative switch).
     if (!editorHandle && compiledCountFor) {
       const elements = getState().data.elements;
       if (elements !== lastSeenElementsRef) {
@@ -701,7 +701,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     root.appendChild(body);
 
     // Cast strip / Details disclosure / References disclosure moved to the
-    // right-pane writing-context tab (session 229). The writing room is now
+    // right-pane writing-context tab. The writing room is now
     // prose-pure: sticky bar above, prose, ambient word count. Anything else
     // lives in the context pane (right) or element-detail (open-as-element).
 
@@ -725,7 +725,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       proseHost.tabIndex = -1;
     } else {
       compiledCountFor = null;
-      // A reload after an outside `story` edit skips the stale rich-text copy (S364).
+      // A reload after an outside `story` edit skips the stale rich-text copy.
       const initialJson = opts.preferStory ? null : parseRichtextJson(el.atlas_richtext_json);
       const initialMarkdown = typeof el.story === 'string' ? el.story : '';
 
@@ -762,13 +762,13 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         },
       });
       // The "unsaved?" baseline is the EDITOR's serialisation of what it
-      // loaded, not the raw `story` (S364 gate, lens B B1 / lens C C2): TipTap
+      // loaded, not the raw `story`: TipTap
       // re-serialises (a trailing newline, `*` bullets), so an untouched scene
       // read as dirty and every flush, now run before each live-folder pass,
       // wrote Atlas's stale text over the outside edit it was about to show.
       lastSavedMarkdown = editorHandle.getMarkdown();
       // `story` changed while Atlas was closed and outranked the stale
-      // rich-text copy (S365): say so, once per scene per session.
+      // rich-text copy: say so, once per scene per session.
       if (editorHandle.openedFromStory) noteOpenedFromStory(el.id, 'scene');
 
       // Sync chip labels to current element names immediately on mount —
@@ -787,7 +787,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       // Apply per-world spellcheck preference to the contenteditable.
       applySpellcheck();
 
-      // Link-all corner affordance (S265): a gentle icon at the prose
+      // Link-all corner affordance: a gentle icon at the prose
       // surface's top-right, visible only while unlinked mention candidates
       // exist. Click converts every hint in one transaction (one Ctrl+Z
       // undoes the batch). Refreshed on every editor transaction — the
@@ -852,7 +852,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     // Replace header (cheap — the renderHeader function is the same one
     // element-detail uses; works fine to re-render on every state change).
-    // Never under a focused rename (S364 lane A3): the replace would blur and
+    // Never under a focused rename: the replace would blur and
     // commit the half-typed name. The rename's commit swaps the elements
     // array, which brings this refresh back with the new name.
     const oldHeader = root.querySelector<HTMLElement>('.atlas-middle-header');
@@ -874,10 +874,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   }
 
   /**
-   * The link-all corner button. Lifted to `prose-linkall-corner.ts` in S310 so
+   * The link-all corner button. Lifted to `prose-linkall-corner.ts` so
    * the KNOWLEDGE room can mount the same affordance — it mounts the same
    * editor into a host carrying the same prose class and had been missing this
-   * button since S265. Behavior here is unchanged.
+   * button from the start. Behavior here is unchanged.
    */
   const linkAllCorner = createLinkAllCorner({
     getHost: () => root.querySelector<HTMLElement>('.atlas-writing-workspace-prose'),
@@ -970,8 +970,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // onUpdate has not run for the latest transaction), then tear down. The
     // write carries its own target id and baseline, so it completes correctly
     // after teardown has nulled `mountedForId` and after the route has already
-    // moved to another room — which is exactly the case that used to lose it
-    // (S323). This comment previously claimed the pre-await guard made the
+    // moved to another room — which is exactly the case that used to lose it.
+    // This comment previously claimed the pre-await guard made the
     // in-flight write safe; it did not, because the other half of that guard
     // read the live url. Addressing the write fixed it; the claim is now true.
     if (editorHandle && mountedForId !== null && !pendingSnapshot) {

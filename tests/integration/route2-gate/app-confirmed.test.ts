@@ -1,7 +1,7 @@
 // B1's probe no longer reaches its throw (the A7 fix catches it); B1 is covered in tests/integration/make-online-run.test.ts. B4 was fixed by wording, not by the count the probe asserted.
 /**
- * Promoted from the S367 composition gate (lens B).
- * S367 gate lens B (app side of Route 2). Each test asserts the FIXED
+ * Promoted from the composition gate (lens B).
+ * Gate lens B (app side of Route 2). Each test asserts the FIXED
  * behaviour: RED today = the finding reproduced. Promote by moving into
  * tests/integration/make-online-run.test.ts once the keeper fixes it.
  *

@@ -1,5 +1,5 @@
 /**
- * The producer line (folder spec §4.2, v0.3.14; Keel #477, OW Council #541):
+ * The producer line (folder spec §4.2, v0.3.14):
  * which tool made a folder and from what. Atlas writes it once, at a world's
  * birth: `bare` for a world made empty (New world, the tour), `json` for a
  * world made from loose JSON, `server` for a world downloaded from

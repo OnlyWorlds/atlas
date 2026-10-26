@@ -92,9 +92,9 @@ describe('pull-time conflict — pause-and-review policy', () => {
   it('repeated pull does NOT duplicate the same conflict in sync-state (full-list re-detect)', async () => {
     // The dedupe guards a pull that re-detects the same conflict: the full
     // list does, the /changes cursor moves past it, so this case runs on the
-    // full-list path on purpose (S365 gate lens A M4).
+    // full-list path on purpose.
     client.__enable_changes(false);
-    // Regression for the bug Captain caught: refreshing 3 times showed 3 of
+    // Regression for the bug Titus caught: refreshing 3 times showed 3 of
     // the same conflict. persistConflicts deduped on push-phase but pullPhase
     // wrote `[...currentState.conflicts, ...conflicts]` without dedup.
     await seedDualEdit('c1');

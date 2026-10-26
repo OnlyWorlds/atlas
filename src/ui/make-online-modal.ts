@@ -5,7 +5,7 @@
  *
  *   - Route 1, "create new": `createApiWorld` (`sync/make-online.ts`),
  *       `POST /api/v2/account/worlds` on the account; signed out, the pane
- *       signs in first (`sign-in-fields.ts`, Keel #134). Then every local
+ *       signs in first (`sign-in-fields.ts`). Then every local
  *       element uploads through `pushOnce` on a transient engine.
  *
  *   - Route 2, "link existing": validate with `getWorld()` on the v2
@@ -15,7 +15,7 @@
  *       lands locally. Server-only elements download.
  *
  * Either way: registry to api-linked, world.json gets the api block, and the
- * long-running SyncEngine attaches with `justLinked` (S366: its own failed
+ * long-running SyncEngine attaches with `justLinked` (its own failed
  * uploads are retried, never asked about). DESIGN_SYNC "Make Online".
  *
  * Trigger: settings panel "Make Online" button (only shown for local-only
@@ -74,7 +74,7 @@ export class MakeOnlineModal extends BaseModal {
   private toasts: ToastManager;
   private route: Route = 'create';
   /**
-   * A route is running (S367 gate B5). The runner makes the app behind the
+   * A route is running. The runner makes the app behind the
    * modal inert, but the modal is outside it: without this the other tab's
    * form could start a second route on the same folder mid-run.
    */
@@ -102,7 +102,7 @@ export class MakeOnlineModal extends BaseModal {
       this.toasts.info('World is already online');
       return;
     }
-    // The tour world is a sandbox (S361, re-key gate lens 3): until it is kept
+    // The tour world is a sandbox (re-key gate lens 3): until it is kept
     // its ids are the live demo world's, so keel refuses every element, and
     // Start fresh deletes it. Keeping it (1.17) gives it ids of its own and
     // ends the sandbox; then it goes online like any world.
@@ -145,7 +145,7 @@ export class MakeOnlineModal extends BaseModal {
     const defaultName = active.meta.name || 'Untitled world';
     const prefilledPin = reg.pin ?? '';
     // The world is made on the account (createApiWorld): signed in, the PIN alone
-    // (the journey's A7 frame, S427); signed out, the form signs in first (Keel #134).
+    // (the journey's A7 frame); signed out, the form signs in first.
     const signedIn = Boolean(reg.account_token);
     const accountLine = signedIn ? signedInLineHtml(reg.account_username) : '';
     const signInFields = signedIn ? '' : signInFieldsHtml(reg.email ?? '');
@@ -228,7 +228,7 @@ export class MakeOnlineModal extends BaseModal {
       </div>
     `;
 
-    // Tab switching. Refused while a route runs (S367 gate B5).
+    // Tab switching. Refused while a route runs.
     body.querySelectorAll<HTMLButtonElement>('[data-route-tab]').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (this.busy) return;
@@ -316,12 +316,12 @@ export class MakeOnlineModal extends BaseModal {
       ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
       .forEach((b) => (b.hidden = true));
     // No outside-click or Escape close while the upload runs: closing looked
-    // like a cancel and was not, the work carried on unseen (S360).
+    // like a cancel and was not, the work carried on unseen.
     this.dismissLocked = true;
     this.setBusy(true);
 
     try {
-      // 0. Signed out: sign in first, so the account makes the world (Keel #134).
+      // 0. Signed out: sign in first, so the account makes the world.
       if (signInInputs(form)) {
         progressBox.textContent = 'Signing in to OnlyWorlds…';
         progressBox.hidden = false;
@@ -406,7 +406,7 @@ export class MakeOnlineModal extends BaseModal {
       // 8. Toast + close.
       const failures = pushResult.failures.length;
       if (failures > 0) {
-        // Say why (S360): "will retry" was false for the commonest cause, an
+        // Say why: "will retry" was false for the commonest cause, an
         // id another world already holds, which fails every retry.
         // Registered as shown (re-key gate lens 2 F11): the flush-on-attach
         // round re-sends the same failing set a moment later and must not
@@ -473,7 +473,7 @@ export class MakeOnlineModal extends BaseModal {
       ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
       .forEach((b) => (b.hidden = true));
     // No outside-click or Escape close while the upload runs: closing looked
-    // like a cancel and was not, the work carried on unseen (S360).
+    // like a cancel and was not, the work carried on unseen.
     this.dismissLocked = true;
     this.setBusy(true);
 
@@ -487,8 +487,8 @@ export class MakeOnlineModal extends BaseModal {
         world = await client.getWorld();
         await client.checkPin();
       } catch (err) {
-        // A refused key, an unknown world or no connection, in words (A38,
-        // S369: offline used to show "Failed to fetch"); the rest as it came.
+        // A refused key, an unknown world or no connection, in words (A38;
+        // offline used to show "Failed to fetch"); the rest as it came.
         throw keyCheckError(err);
       }
       if (!world.id) throw new Error('Server returned no world ID');
@@ -501,7 +501,7 @@ export class MakeOnlineModal extends BaseModal {
         throw new PlainError(alreadyLinkedLine(dupe0.name));
       }
 
-      // 2. The merge, through the Route 2 runner (S367): the id-move lock, the
+      // 2. The merge, through the Route 2 runner: the id-move lock, the
       //    app inert, rooms flushed, local ids moved onto the server's with
       //    the journaled kernel BEFORE any server call, the screen following
       //    the disk, then the server phase. The link step runs inside the
@@ -514,7 +514,7 @@ export class MakeOnlineModal extends BaseModal {
         progressBox.textContent = p.phase === 'list'
           ? 'Reading server elements…'
           : p.phase === 'ids'
-            // The kernel's count is file writes, not elements (S367 gate B4).
+            // The kernel's count is file writes, not elements.
             ? `Moving links to the online ids: ${p.done} of ${p.total}…`
             : `Merging ${p.done} of ${p.total} elements…`;
       };
@@ -527,7 +527,7 @@ export class MakeOnlineModal extends BaseModal {
         matchByName,
         onProgress: renderProgress,
         link: async (result) => {
-          // The double-link check again (S367 gate B11): another tab may have
+          // The double-link check again: another tab may have
           // linked a different local world to this api world during the merge.
           const dupe = findLinkedWorld(getState().registry, world.id!, worldId);
           if (dupe) {
@@ -551,7 +551,7 @@ export class MakeOnlineModal extends BaseModal {
           });
 
           // 5. Attach SyncEngine for ongoing sync. The merge's failure set is
-          // registered as shown FIRST (S366 gate A3, as Route 1 does): the
+          // registered as shown FIRST (as Route 1 does): the
           // attach's flush retries the same set a moment later and must not
           // toast the same paragraph a second time.
           failureDetail = result.failures.length > 0
@@ -578,7 +578,7 @@ export class MakeOnlineModal extends BaseModal {
       const spatial = childClashLine(mergeResult.childClashes);
       const hiddenLeft = hiddenOnlineLine(mergeResult.hiddenOnline ?? []);
       verb(`Linked to ${world.name || 'world'} · ${summary}${unmatched ? `. ${unmatched}` : ''}${spatial ? `. ${spatial}` : ''}${hiddenLeft ? `. ${hiddenLeft}` : ''}${failureDetail ? `. ${failureDetail}` : ''}`);
-      // Files the id move could not open keep their old links (S367 gate B2),
+      // Files the id move could not open keep their old links,
       // said as the Settings re-key says it.
       if (mergeResult.unrewritten.length > 0) {
         const { unrewrittenMessage } = await import('./rekey-modal');
@@ -589,8 +589,8 @@ export class MakeOnlineModal extends BaseModal {
       this.hide();
     } catch (err) {
       // A twice-stopped id move arrives already worded (the runner's
-      // LINK_STOPPED_LINE, S367 gate B3, a MergeRefusedError): problemFor
-      // passes refusals through and words the rest (S369).
+      // LINK_STOPPED_LINE, a MergeRefusedError): problemFor
+      // passes refusals through and words the rest.
       console.warn('[make-online] link route failed:', err);
       const sentence = problemFor(err, { inline: true, doing: 'linking this world' }).sentence;
       errorBox.textContent = sentence;

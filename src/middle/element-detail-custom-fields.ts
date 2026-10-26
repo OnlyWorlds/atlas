@@ -117,7 +117,7 @@ export function normalizeCustomFieldName(input: string): string {
 export function customFieldNameProblem(el: Element, key: string): string | null {
   if (!key) return 'Enter a field name';
   if (input_is_atlas_namespace(key)) return 'Atlas keeps atlas_ names for itself';
-  // Named from the list itself: a hand-typed copy fell a prefix behind (x_review_, S450).
+  // Named from the list itself: a hand-typed copy fell a prefix behind (x_review_).
   if (isProfileField(key)) return `That name is kept for a shared field other tools read (${PROFILE_FIELD_PREFIXES.join(', ')}). Pick another.`;
   const bare = key.startsWith('x_') ? key.slice(2) : key.startsWith('shadow_') ? key.slice(7) : key;
   if (knownFieldsFor(el.type).has(bare)) {
@@ -140,8 +140,8 @@ function input_is_atlas_namespace(key: string): boolean {
  * Returns the section element; re-renders happen through the normal
  * element-detail subscription (persist → new elements array → render).
  * A view-only world gets the rows alone: no add row, no ×, and no section at
- * all when the element has none (the store would refuse the write; S435's
- * read-key walk). Null then.
+ * all when the element has none (the store would refuse the write).
+ * Null then.
  */
 export function buildCustomFieldsSection(el: Element): HTMLElement | null {
   const viewOnly = worldIsViewOnly();
@@ -157,7 +157,7 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
   if (!section) return null;
   section.classList.add('atlas-custom-fields-section');
 
-  // Concise how-it-works on hover (Captain's ask, 2026-07-12). Voice: plain
+  // Concise how-it-works on hover (Titus's ask, 2026-07-12). Voice: plain
   // statements, no em-dashes.
   const headerLabel = section.querySelector<HTMLElement>('.atlas-detail-section-header span');
   if (headerLabel) {
@@ -225,7 +225,7 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
   // Timing matters: element-detail restores the pane's scrollTop in a
   // queueMicrotask AFTER this section is built — a microtask click here
   // would measure the anchor's rect against the UNSCROLLED layout and the
-  // popover would land at the bottom of the page (Captain's live find,
+  // popover would land at the bottom of the page (Titus's live find,
   // 2026-07-12). rAF runs after all microtasks (scroll restored) and before
   // paint; scrollIntoView pins the row on-screen so the anchor rect is real.
   if (pendingEdit && pendingEdit.elementId === el.id) {

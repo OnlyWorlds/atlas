@@ -1,5 +1,5 @@
 /**
- * Giving elements new ids, from the app (S363). The kernel (`store/rekey.ts`)
+ * Giving elements new ids, from the app. The kernel (`store/rekey.ts`)
  * owns the disk; this owns everything around it that needs the app:
  *
  *   hold the engine (nothing syncs, a round in flight finishes first)
@@ -37,7 +37,7 @@ import { remapDraftStash } from '../middle/knowledge-room';
 export { RekeyRefusedError };
 
 /**
- * One id update at a time, app-wide (S363 gate lens C F1): the locked modal
+ * One id update at a time, app-wide: the locked modal
  * stops the mouse, not a keyboard Enter on a button behind it, a hash change
  * that re-activates the world (whose recovery would then run beside the live
  * run), or Finish/Discard on a Settings row re-rendered mid-run.
@@ -48,13 +48,13 @@ async function singleFlight<T>(work: () => Promise<T>): Promise<T> {
   running = true;
   try {
     // Taking the flag stops every new live-folder pass; one already running
-    // could still land a pre-move element list over ours (S367, lane B N2).
+    // could still land a pre-move element list over ours (lane B N2).
     await settleLivePass();
     return await work();
   } finally {
     running = false;
     // Surfaces that hid "did not finish" while the run owned the journal
-    // re-read it now (S367 gate B3: Settings' row).
+    // re-read it now (Settings' row among them).
     window.dispatchEvent(new CustomEvent(ID_MOVE_SETTLED_EVENT));
   }
 }
@@ -215,7 +215,7 @@ export function giveTourWorldNewIds(opts: {
   /**
    * Told the files that kept old links as soon as the journal is done, before
    * the screen pass: a throw after that point still reaches the caller's
-   * toast (S376 lens A A1).
+   * toast.
    */
   onRekeyed?: (result: RekeyResult) => void;
 }): Promise<RekeyResult> {

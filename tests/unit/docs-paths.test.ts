@@ -1,5 +1,5 @@
 /**
- * The docs name real files (S366 docs split).
+ * The docs name real files.
  *
  * The pre-split DESIGN.md carried paths to modules that had been renamed or
  * deleted (`ow-client-adapter`, `settings-account` as a leftover, a smoke log

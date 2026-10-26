@@ -17,7 +17,7 @@
  * a RULE resolved against the LIVE elements at every publish/republish: a
  * `types`/`all` chart re-snapshots current membership (an element added later
  * JOINS a republished chart), and a `focus` chart discloses the focus element's
- * whole dated neighbourhood. **Captain confirmed (Bout 3): freeze-at-publish +
+ * whole dated neighbourhood. **Titus confirmed (Bout 3): freeze-at-publish +
  * re-snapshot-on-republish IS the intended model — exactly how every share block
  * updates (publish = snapshot now; republish = refresh to current state),
  * consistent with the circle block.** Authors should still know republish can

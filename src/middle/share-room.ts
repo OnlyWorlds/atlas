@@ -66,7 +66,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   root.className = 'atlas-share-room';
   target.appendChild(root);
 
-  let disposed = false;                          // S367 critic C4: set on unmount
+  let disposed = false;                          // set on unmount
   let mountedView: string | null = null;        // 'list' | '<pageId>' | null
   // Whether the mounted view found its target — false = not-found interim;
   // same-view ticks retry a full build (resolves load/id-swap transients).
@@ -115,7 +115,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // Chart blocks freeze from pageCharts — force a block rebuild once warm so a
     // page opened directly (URL) with a chart block doesn't stay "chart not
     // found". renderBlocks bypasses render()'s same-elements skip-optimization.
-    // Never under an open prose block (S364 lane A5): renderBlocks wipes the
+    // Never under an open prose block: renderBlocks wipes the
     // host and remounts the editor from the in-memory block, which does not
     // hold the pending snapshot yet. Closing the editor re-renders the blocks.
     if (mountedView && mountedView !== 'list' && !editingBlockId) renderBlocks(mountedView);
@@ -143,7 +143,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // Every page write funnels here; a view-only world's store refuses them all (conv. 149).
     if (viewOnly) return Promise.resolve(false);
     const step = writeChain.then(async () => {
-      // S367 critic C4: a caller that captured its store before an await
+      // A caller that captured its store before an await
       // writes through THAT store, and only while it is still the active one
       // (a write-then-refresh into another world would clobber its elements).
       const folder = store ?? getActiveStore();
@@ -174,7 +174,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   /**
    * A page created this moment: its detail view opens with the title already
    * in edit mode, so the page gets a real name at once instead of sitting in
-   * the element list as "new page" (S369). Consumed by the first build.
+   * the element list as "new page". Consumed by the first build.
    */
   let renameOnOpen: string | null = null;
 
@@ -285,7 +285,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   let proseForBlockId: string | null = null;
   /**
    * The open text block's markdown as the EDITOR serialised it at mount, then
-   * after each landed save (S364 gate, lens B B2): the leave-flush, now run
+   * after each landed save: the leave-flush, now run
    * before every live-folder pass, writes only when the block really changed.
    */
   let proseBaseline: string | null = null;
@@ -402,7 +402,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // idiom as the knowledge room. The mountedView IS the pageId in detail view.
     if (!mountedView || mountedView === 'list') return;
     if (proseMount && proseForBlockId) {
-      // Only what changed (S364 gate, lens B B2): an open, untouched block
+      // Only what changed: an open, untouched block
       // used to rewrite the page on every flush.
       const markdown = proseMount.getMarkdown();
       if (!pendingProseSnap && markdown === proseBaseline) return;
@@ -412,10 +412,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     return captureHeadingEdit(mountedView, { onlyIfChanged: true }) ?? undefined; // best-effort, same as prose
   };
   window.addEventListener('pagehide', onPageHide);
-  // Same flush before a world switch empties the page this save needs (S360).
+  // Same flush before a world switch empties the page this save needs.
   const unLeaveWorld = onLeaveWorld(onPageHide);
 
-  // THE LIVE FOLDER (S364): an element swap already rebuilds the open page's
+  // THE LIVE FOLDER: an element swap already rebuilds the open page's
   // blocks from the new body, except under an open block (refreshDetailData's
   // editingBlockId guard). That one case says so: closing the block saves the
   // page's blocks as this room holds them.
@@ -451,7 +451,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     if (!page) return;
     // Default = full + description: a bare identity row surprised the first
-    // real publisher ("only shows pic and name?", Captain's smoke S254).
+    // real publisher ("only shows pic and name?", Titus's smoke test).
     // The editor's field picker narrows from here; compact stays available.
     const block: PageBlock = {
       id: newBlockId(), kind: 'element-card', elementId: picked.id, variant: 'full', fields: ['description'],
@@ -963,7 +963,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     labelsRow.appendChild(labelsText);
     wrap.appendChild(labelsRow);
 
-    // Zone checklist (S299) — per-zone include-list, mirroring the pin
+    // Zone checklist — per-zone include-list, mirroring the pin
     // checklist. A zone "on this map" is one a marker on this map references.
     // block.zoneIds absent = all shown (legacy/friendly default); the first
     // toggle materializes the explicit list. Only rendered when the map
@@ -1029,7 +1029,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       labelRow.textContent = 'Visible pins';
       labelRow.title = 'Included pins share their element\'s name, type, description and image on the published page. Turn on Full for a pin to share every populated field of that element.';
       // Visible, not tooltip-only: the full toggle went unfound in the
-      // release smoke (Captain, S254). One line states the disclosure rule.
+      // release smoke (Titus). One line states the disclosure rule.
       const disclosureHint = document.createElement('p');
       disclosureHint.className = 'atlas-share-hint atlas-share-map-disclosure-hint';
       disclosureHint.textContent = 'Checked pins share name, type, description and image. Click Full on a pin to share its whole profile.';
@@ -1707,14 +1707,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const hint = document.createElement('p');
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
       if (isPartialSlice(getState().active?.meta)) {
-        // One Character's view never goes online (folder spec §4.2), so there is no Make online to point at (S446 gate G7).
+        // One Character's view never goes online (folder spec §4.2), so there is no Make online to point at.
         hint.append('Publishing to a public URL needs an online world, and this copy is one view of a world, which can\'t go online.');
       } else {
         hint.append('Publishing to a public URL needs an online world. Use ');
         // Not "Settings → World": that tab wears the WORLD'S OWN NAME in the
-        // settings nav (Captain, 2026-07-24), so the label named a tab nobody
+        // settings nav (Titus, 2026-07-24), so the label named a tab nobody
         // can see. Describe the destination instead of restating a label that
-        // is computed elsewhere (S323).
+        // is computed elsewhere.
         hint.appendChild(settingsLink(worldId, 'world', '"Make online" in this world\'s settings'));
         hint.append(' first.');
       }
@@ -1889,7 +1889,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   async function reconcilePubMirrors(worldId: string): Promise<void> {
     const client = sharingClientForActiveWorld();
     if (!client) return;
-    // S367 critic C4: capture the world's store before the await; bail if the
+    // Capture the world's store before the await; bail if the
     // room unmounted or the world changed while the list call was out.
     const store = getActiveStore();
     // A view-only world's store refuses the heal, and its refusal toasted on room entry (conv. 149).
@@ -1918,7 +1918,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         if (await patchPage(page.id, { atlas_page_pub: null }, store)) healed++;
         continue;
       }
-      // S367 critic C5: heal only on a field that means something. The
+      // Heal only on a field that means something. The
       // publish mirror stamps LOCAL times (PublishResult has none), so a
       // timestamp-only difference is the normal state after every publish.
       // The mirror stores no title or intent, so revoked + slug are the set.
@@ -2021,7 +2021,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     for (const page of pages) {
       const blocks = blocksOf(page);
       const pub = pagePubOf(page);
-      // Edited-since-publish, ON THE LIST (S309): the signal was computed and
+      // Edited-since-publish, ON THE LIST: the signal was computed and
       // shown only after opening the page — the list is where you scan for it.
       // Same sig comparison as the editor banner; string-concatenated because
       // pubBadge is an HTML string (escapeText, never appendChild here).
@@ -2077,7 +2077,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     picon.title = 'Page';
     header.appendChild(picon);
 
-    // A page made this moment opens on its name (S369), once.
+    // A page made this moment opens on its name, once.
     const autoEdit = renameOnOpen === pageId;
     if (autoEdit) renameOnOpen = null;
     pageTitleHandle = makeEditableTitle({
@@ -2167,7 +2167,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     });
     header.appendChild(copyPayload);
     // The publish action, headlined. The T-S7 collapse buried publishing so
-    // well its own designer hunted for it (Captain's smoke, S254) — the verb
+    // well its own designer hunted for it (Titus's smoke) — the verb
     // belongs in the header; the button expands the meta and lands you there.
     const publishBtn = document.createElement('button');
     publishBtn.type = 'button';
@@ -2327,7 +2327,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // members, collection names), not only from the page's own block stack —
     // so every element-data tick re-renders them. Before 2026-07-19 this
     // gated on the block-stack JSON alone, and a pin dragged on the map tab
-    // never moved on an open page's map block (Captain's live find). This
+    // never moved on an open page's map block (Titus's live find). This
     // branch only runs when data.elements got a new reference, so the
     // rebuild cost rides real writes, never idle ticks.
     renderBlocks(pageId);

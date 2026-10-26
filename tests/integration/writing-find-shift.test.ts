@@ -1,5 +1,5 @@
 /**
- * S367 critic C10: Ctrl+Shift+F in the Writing room is focus mode only. The
+ * Ctrl+Shift+F in the Writing room is focus mode only. The
  * workspace's own Find handler (Ctrl+F / Ctrl+H) must ignore Shift combos,
  * or Find opens too and the caret leaves the prose.
  */

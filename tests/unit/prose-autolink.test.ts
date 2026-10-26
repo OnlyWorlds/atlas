@@ -1,5 +1,5 @@
 /**
- * Prose autolink kernel (S265) — the pure transforms behind the link-all
+ * Prose autolink kernel — the pure transforms behind the link-all
  * icon, selection linking, and the tree-level bulk over closed narratives.
  * The markdown and richtext halves are tested against the same rules the
  * live plugin enforces: first mention only, ambiguity skipped, case-sensitive
@@ -35,9 +35,9 @@ describe('autolinkMarkdown', () => {
     expect(r.linked.map(c => c.id)).toEqual(['c1']);
   });
 
-  it('matches aliases and KEEPS THE WRITER\'S TEXT as the label (S309)', () => {
-    // Captain's ruling, S309: creating a link NEVER changes the text in a
-    // writing room — for every match kind. The S307 half-rule (case variants
+  it('matches aliases and KEEPS THE WRITER\'S TEXT as the label', () => {
+    // Titus's ruling: creating a link NEVER changes the text in a
+    // writing room — for every match kind. The half-rule (case variants
     // keep the writer's text, different aliases snap to the canonical name)
     // is superseded: link-all rewrote the tour's own sentence with it.
     const index = buildAutolinkIndex(WORLD);
@@ -45,8 +45,8 @@ describe('autolinkMarkdown', () => {
     expect(r.story).toBe('They bowed to [the duchess](ow://character/c1).');
   });
 
-  it("a CASE-VARIANT alias keeps the writer own casing (S307)", () => {
-    // Captain, S307: do not change capitalization when linking in the writing
+  it("a CASE-VARIANT alias keeps the writer own casing", () => {
+    // Titus: do not change capitalization when linking in the writing
     // room. A link is a relationship, not a spelling correction.
     const world = [el('c9', 'character', 'Consul', ['consul'])];
     const index = buildAutolinkIndex(world);
@@ -55,7 +55,7 @@ describe('autolinkMarkdown', () => {
   });
 
   it("a GENUINELY different alias keeps its text AND resolves to the canonical ELEMENT", () => {
-    // The boundary, restated for the S309 rule: the writer's text is the
+    // The boundary, restated for the rule: the writer's text is the
     // LABEL, the canonical element is the TARGET. Widening the writer's-text
     // rule must never drift into linking the wrong element — "the duchess"
     // still points at Aralia's id, it just keeps saying "the duchess".
@@ -67,7 +67,7 @@ describe('autolinkMarkdown', () => {
   });
 
   it("THE GUARANTEE: linking never edits the writer text, in any form", () => {
-    // Captain, S307 then S309, named as the highest-priority property of this
+    // Titus named as the highest-priority property of this
     // feature: creating a link NEVER changes the text. Case variants AND
     // aliases — every surface form survives promotion verbatim.
     //
@@ -103,7 +103,7 @@ describe('autolinkMarkdown', () => {
 
   it("THE GUARANTEE holds for the richtext path too, not just markdown", () => {
     // Two engines share the index but have separate promotion sites; a fix
-    // applied to one is exactly the asymmetry the S257 law warns about.
+    // applied to one is exactly the asymmetry to avoid.
     const index = buildAutolinkIndex(WORLD);
     const doc = { type: 'doc', content: [{ type: 'paragraph', content: [
       { type: 'text', text: 'Then aralia spoke.' },
@@ -115,7 +115,7 @@ describe('autolinkMarkdown', () => {
     expect(chip!.attrs.label, 'and kept the writer casing').toBe('aralia');
   });
 
-  it("THE GUARANTEE holds for ALIASES in richtext (S309)", () => {
+  it("THE GUARANTEE holds for ALIASES in richtext", () => {
     const index = buildAutolinkIndex(WORLD);
     const doc = { type: 'doc', content: [{ type: 'paragraph', content: [
       { type: 'text', text: 'They bowed to the duchess.' },
@@ -146,9 +146,9 @@ describe('autolinkMarkdown', () => {
     );
   });
 
-  it('is CASE-INSENSITIVE but still word-bounded (S307)', () => {
+  it('is CASE-INSENSITIVE but still word-bounded', () => {
     const index = buildAutolinkIndex(WORLD);
-    // Lowercase now links (Captain's ask) ...
+    // Lowercase now links (Titus's ask) ...
     const lower = autolinkMarkdown('aralia walked home.', index);
     expect(lower.linked.map(c => c.id)).toEqual(['c1']);
     // ... and the writer's casing SURVIVES it. This is the guarantee the
@@ -224,14 +224,14 @@ describe('autolinkRichtext', () => {
 });
 
 describe('isValidChipLabel (the chip-label sync predicate)', () => {
-  it('ignores stray whitespace on the label (S355: a padded label was being "corrected" to the name)', () => {
+  it('ignores stray whitespace on the label (a padded label was being "corrected" to the name)', () => {
     expect(isValidChipLabel('orc ', { name: 'Orc Chief', aliases: ['orc'] })).toBe(true);
     expect(isValidChipLabel(' Orc Chief', { name: 'Orc Chief', aliases: [] })).toBe(true);
   });
 
   // The editors' rename sync rewrites any label that fails this check. It
   // MUST fold case, or one tick after a promotion it would quietly undo the
-  // writer's-text rule the tests above lock in (the S309 pairing: promotion
+  // writer's-text rule the tests above lock in (the pairing: promotion
   // preserves, sync tolerates — two halves of one decision).
   const surface = { name: 'Aralia', aliases: ['the duchess'] };
 
@@ -280,7 +280,7 @@ describe('unlinkRichtext', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Term linking (S355): the find bar's "Link to element" — every match, one
+// Term linking: the find bar's "Link to element" — every match, one
 // chosen target, the writer's text as label, links and chips never entered.
 // ---------------------------------------------------------------------------
 
@@ -326,7 +326,7 @@ describe('linkTermMarkdown', () => {
   });
 
   it('never lets whitespace into a label: a padded term links its core and leaves the spaces as prose', () => {
-    // Captain, S355: "orc " typed into the find box was becoming the chip.
+    // Titus: "orc " typed into the find box was becoming the chip.
     const r = linkTermMarkdown('an orc came; an orc.', 'orc ', target);
     expect(r.linked).toBe(1); // only "orc " (with the trailing space) matches; "orc." does not
     expect(r.story).toBe('an [orc](ow://character/c2) came; an orc.');

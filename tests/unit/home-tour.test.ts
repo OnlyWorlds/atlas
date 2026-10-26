@@ -1,5 +1,5 @@
 /**
- * The home's onboarding kernel (S264 cards; #127; 1.20 cards kept, done), pure.
+ * The home's onboarding kernel (the cards; #127; 1.20 cards kept, done), pure.
  * Locks the core gate (the pair before the grow wave), that a done card stays
  * in place marked done (the layout holds still), and that the block goes only
  * when every card is done.

@@ -1,5 +1,5 @@
 /**
- * Promoted from the S367 composition gate (lens A).
+ * Promoted from the composition gate (lens A).
  * Lens A attack 6: stale `server_updated_at` in a LOCAL-ONLY world (the reason
  * `allowStaleBaseline` exists: a folder copied out of an api world, a world
  * unlinked without a reset). Route 2 plans every such element as a CREATE
@@ -7,7 +7,7 @@
  * error, a transient 5xx, a validation refusal), the element keeps its stale
  * baseline. If it was clean under that baseline, the engine after linking
  * reads it as synced: it is never pushed, the /changes round never mentions
- * it, and the toast's "sync retries" (lane B Captain Q1 default) does not hold.
+ * it, and the toast's "sync retries" (lane B Titus Q1 default) does not hold.
  *
  * Asserts the FIXED behaviour: after the failed create, linking and one sync
  * round, the element is on the server (or at the very least reads as not

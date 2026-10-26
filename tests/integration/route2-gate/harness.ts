@@ -1,5 +1,5 @@
 /**
- * S367 gate lens A harness: the REAL FsFolderStore over fake-fs, the production
+ * Gate lens A harness: the REAL FsFolderStore over fake-fs, the production
  * v2 adapter over the stateful keel-v2 MSW (the make-online.kernel.test.ts
  * pattern), plus a "tab closed here" crash model: a wrapped call that never
  * settles, either BEFORE the real call runs or AFTER it (the server committed,

@@ -1,6 +1,6 @@
 /**
- * Settings → Writing tab (DESIGN_WRITING.md; extracted from settings-panel
- * session 233). Tier labels (l1-l4, which ARE the supertype storage value —
+ * Settings → Writing tab (DESIGN_WRITING.md; extracted from settings-panel).
+ * Tier labels (l1-l4, which ARE the supertype storage value —
  * renaming migrates existing narratives), prose font size/family, spellcheck.
  */
 

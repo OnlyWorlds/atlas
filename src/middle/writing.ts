@@ -1,7 +1,7 @@
 /**
  * Writing room — single-pane editor surface.
  *
- * Session 224 sidebar-takeover: the writing tree moved to the sidebar (see
+ * Sidebar takeover: the writing tree moved to the sidebar (see
  * `src/sidebar/writing-sidebar.ts`). The middle pane is now a single-column
  * surface showing the selected narrative's element-detail with a contextual
  * "+ new child" toolbar above it. When no narrative is selected, an empty
@@ -142,7 +142,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
   container.appendChild(root);
 
   // Tier badge + child-create buttons now live in element-detail's own header
-  // (session 224 header unification). The writing editor is just the detail
+  // (the header unification). The writing editor is just the detail
   // slot — single column, no separate toolbar above.
   const detailSlot = document.createElement('div');
   detailSlot.className = 'atlas-writing-editor-detail-slot';
@@ -254,7 +254,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       return;
     }
 
-    // NOTE (decoupling, session 226): we deliberately do NOT mirror the
+    // NOTE (decoupling): we deliberately do NOT mirror the
     // active narrative into state.ui.selectedElementId. element-detail
     // derives its target element from URL segments when route.mode ===
     // 'writing', so the global selection persists across writing visits.
@@ -280,7 +280,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
     }
 
     // --- Writing workspace (code-split) ---
-    // v3.0 redesign (session 227+): the workspace replaces the schema-driven
+    // v3.0 redesign: the workspace replaces the schema-driven
     // element-detail entirely for active narratives in writing mode
     // (convention #51).
     //

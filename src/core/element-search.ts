@@ -16,7 +16,7 @@
  * because "find the scene where I wrote about the swamps" is a real thing
  * writers need and nothing else in atlas answers it.
  *
- * PERF (measured, S310, not assumed): on a worst-case 588-element world
+ * PERF (measured, not assumed): on a worst-case 588-element world
  * carrying 2 MB of prose, adding this tier moved a full-world query from
  * 0.090 ms to 0.705 ms. That is 7.8x relative and irrelevant absolute — a
  * keystroke has ~16 ms before it drops a frame, so this spends 4% of the

@@ -53,7 +53,7 @@ export function createMapDialog(
   return new Promise((resolve) => {
     const modal = new MapCreateModal(toasts, (result) => {
       // Auto-open the new map's tab — the create flow is "name (+ image) →
-      // see it." Imageless maps open too since S300: their flat canvas is a
+      // see it." Imageless maps open too: their flat canvas is a
       // real working surface (place pins now, add art later).
       if (result?.map) openMapTab(result.map);
       resolve(result);
@@ -148,14 +148,14 @@ class MapCreateModal extends BaseModal {
       input.setSelectionRange(len, len);
     });
     // Escape and the full outside click are BaseModal's; `hide` below
-    // settles the promise however the modal closed (S361, gate F4).
+    // settles the promise however the modal closed (gate F4).
   }
 
   private cancel(): void {
     this.hide();
   }
 
-  /** Every close path settles `createMapDialog()` (S361, gate F4: Escape and
+  /** Every close path settles `createMapDialog()` (gate F4: Escape and
    *  the overlay click both left it pending; the pin-prompt idiom). */
   protected override hide(): void {
     super.hide();
@@ -372,7 +372,7 @@ class MapCreateModal extends BaseModal {
           map = await store.updateMap(this.opts.existingMapId, patch);
         } else if (createdMapId) {
           // A later step failed after the create last time: finish that map
-          // rather than make a second one (S369).
+          // rather than make a second one.
           map = await store.updateMap(createdMapId, patch);
         } else {
           map = await store.createMap(patch);

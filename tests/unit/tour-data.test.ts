@@ -135,7 +135,7 @@ describe('TOUR_STEPS structure', () => {
     }
   });
 
-  it("a place-pin step’s zone is revealed no later than the pin step (S303)", () => {
+  it("a place-pin step’s zone is revealed no later than the pin step", () => {
     // The soft correction (pinInZone) needs the zone’s markers on disk when the
     // pin beat runs. A reorder that revealed the swamps AFTER the pin would make
     // Next unreachable (no polygon to test the drop against) — a dead-end no e2e
@@ -150,7 +150,7 @@ describe('TOUR_STEPS structure', () => {
   });
 });
 
-describe('the pin beat geometry (S303 soft correction)', () => {
+describe('the pin beat geometry (soft correction)', () => {
   it('the baked balcony pin sits inside the baked swamps zone', () => {
     // On watch-mode Next or resume the pin is created from the bundle at its
     // baked coordinates (a real placement uses the user’s click). Those baked
@@ -172,7 +172,7 @@ describe('the pin beat geometry (S303 soft correction)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The charts act (S305). Every invariant here is a way a re-bake or a content
+// The charts act. Every invariant here is a way a re-bake or a content
 // edit can silently break the beat while the e2e still walks a compliant
 // script — the same class as the pin-geometry guard above.
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ function bundleElement(name: string): Record<string, unknown> {
   return el!;
 }
 
-describe('the charts act (S305)', () => {
+describe('the charts act', () => {
   it('the world ships with NO now, or the set-now beat has no button to press', () => {
     // The step’s forward control is gated on the clock being set by the USER.
     // A baked `time_current` renders the chip instead of the button, so the
@@ -261,7 +261,7 @@ describe('the charts act (S305)', () => {
     // hardcoded list in this file — which is a closed TypeScript union checked
     // against a copy of itself. Deleting the `set-now` branch from tour-bar’s
     // gate left it green while the step became permanently un-advanceable
-    // (found by the S305 close gate). So read the SOURCE of the gate instead:
+    // (found by a close gate). So read the SOURCE of the gate instead:
     // a kind with no bundle ref that falls through to the default `handsOnDone`
     // is false forever, and the step renders no forward control at all.
     const bar = readFileSync(
@@ -279,7 +279,7 @@ describe('the charts act (S305)', () => {
 
   it('deep-time actually reveals the elements the step exists for', () => {
     // Ordering was locked but CONTENTS were not: deleting the reveal list left
-    // the whole suite green while the step showed nothing (S305 close gate).
+    // the whole suite green while the step showed nothing.
     const deep = TOUR_STEPS.find(s => s.id === 'deep-time');
     expect(deep, 'the deep-time step').toBeDefined();
     expect(deep!.reveal ?? []).toContain('character:Rachmaninov');
@@ -289,7 +289,7 @@ describe('the charts act (S305)', () => {
   });
 });
 
-describe('the writing beat (S306)', () => {
+describe('the writing beat', () => {
   const chapterName = TOUR_CHAPTER_REF.slice(TOUR_CHAPTER_REF.indexOf(':') + 1);
 
   /** Elements on disk when a given step is ENTERED: everything revealed, created
@@ -338,7 +338,7 @@ describe('the writing beat (S306)', () => {
     const chapter = bundleElement(chapterName);
     const index = buildAutolinkIndex(bundle.elements as unknown as Element[]);
     expect(index.scanner).not.toBeNull();
-    // Mirror the REAL matcher: its own flags (case-insensitive since S307)
+    // Mirror the REAL matcher: its own flags (case-insensitive)
     // and a folded key lookup. Restating 'g' here measured a matcher the app
     // no longer has.
     const scanner = new RegExp(index.scanner!.source, index.scanner!.flags);
@@ -365,7 +365,7 @@ describe('the writing beat (S306)', () => {
     const chapter = bundleElement(chapterName);
     const index = buildAutolinkIndex(present);
     expect(index.scanner).not.toBeNull();
-    // Mirror the REAL matcher: its own flags (case-insensitive since S307)
+    // Mirror the REAL matcher: its own flags (case-insensitive)
     // and a folded key lookup. Restating 'g' here measured a matcher the app
     // no longer has.
     const scanner = new RegExp(index.scanner!.source, index.scanner!.flags);
@@ -392,12 +392,12 @@ describe('the writing beat (S306)', () => {
   });
 });
 
-describe('a step\'s view is a function of the STEP (S307)', () => {
+describe('a step\'s view is a function of the STEP', () => {
   it('every step that NAMES an element in its copy routes to something', () => {
     // The consul beat carried no `route` and looked correct only because
     // creating an element navigates to it as a SIDE EFFECT. Going back there
     // is no create, so the middle pane kept showing a LATER step’s element
-    // while the narrator talked about the Consul — Captain saw it as the tour
+    // while the narrator talked about the Consul — Titus saw it as the tour
     // "jumping between the Consul and home".
     //
     // The invariant: a hands-on step that mints a named element must route,

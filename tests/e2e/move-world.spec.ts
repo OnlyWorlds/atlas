@@ -14,7 +14,7 @@ async function boot(page: Page) {
   await page.waitForSelector('.atlas-shell');
   // The boot reconciliation runs first on the activation chain; a seed that
   // writes browser-worlds/ raw (no make lock) while it runs gets adopted twice
-  // (S381: one Firefox run in five). A no-op task queued behind it waits it out.
+  // (one Firefox run in five). A no-op task queued behind it waits it out.
   await page.evaluate(async () => {
     const { enqueueActivationTask } = await import('/src/core/activation-chain.ts');
     await enqueueActivationTask(async () => {});
@@ -227,8 +227,7 @@ test('two tabs: B, opening the world while A copies it, is told it is being move
   expect(dialogs).toBe(0);
 
   // A DUPLICATED tab shares A's tab id (Duplicate copies sessionStorage), so
-  // the lock file reads as its own: the world's Web Lock is what refuses it
-  // (S373 gate F2).
+  // the lock file reads as its own: the world's Web Lock is what refuses it.
   const aId = await page.evaluate(() => sessionStorage.getItem('atlas_tab_id'));
   expect(aId).toBeTruthy();
   const dup = await page.context().newPage();

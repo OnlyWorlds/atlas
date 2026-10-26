@@ -112,7 +112,7 @@ export function renderElementsTab(): string {
 }
 
 export function wireElementsTab(toasts: ToastManager): void {
-  // Field edit mode radio (session 219). Persists to registry.editor_settings.
+  // Field edit mode radio. Persists to registry.editor_settings.
   // The element-detail click handler reads this on every click — no reload
   // needed; the next field click uses the new mode immediately.
   const editModeInputs = document.querySelectorAll<HTMLInputElement>(
@@ -167,7 +167,7 @@ export function wireElementsTab(toasts: ToastManager): void {
     toasts.info(`Empty fields ${hideEmptyToggle.checked ? 'hidden' : 'shown'}`);
   });
 
-  // Names on the sidebar's type strip (#24, h20 B8). The sidebar reads the registry on every
+  // Names on the sidebar's type strip (#24). The sidebar reads the registry on every
   // render, so the strip changes the moment the radio does.
   document.querySelectorAll<HTMLInputElement>('.atlas-settings input[name="type-strip-names"]').forEach((inp) => {
     inp.addEventListener('change', () => {

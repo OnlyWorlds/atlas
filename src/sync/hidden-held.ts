@@ -1,11 +1,11 @@
 /**
  * What a key that cannot hide holds back (folder spec §4.8, conv. 170). keel
  * takes `hidden: true` on a create from the owner or a co-builder only (keel
- * #587; probed live S461: anyone else gets 403 `hidden_not_allowed` and
+ * #587; probed live: anyone else gets 403 `hidden_not_allowed` and
  * nothing is made). So for a contributor or a guest a hidden element that was
  * never sent stays in the folder, and so does whatever is anchored on it: a
  * pin, marker or zone whose link would otherwise go up stripped, a loose
- * visible thing named after the hidden one (the S461 gate's F5). Links from
+ * visible thing named after the hidden one. Links from
  * other elements stay in the copy and never go out (`linkHeld`). Pure.
  */
 import type { Element } from '../core/types';

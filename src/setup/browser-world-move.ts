@@ -1,13 +1,12 @@
 /**
  * Move a world kept in this browser to a folder on the drive (1.17 bout 4,
- * conv. 129; contract §4, §9 invariants 4-8; S370 gate lens A A1-A3, A7, A10,
- * A13, lens B B3-B5, B26; S373 move gate F1-F10). Chromium only: the
+ * conv. 129; contract §4, §9 invariants 4-8). Chromium only: the
  * destination is the home folder.
  *
  * ONE COPY IS THE WORLD AT EVERY INSTANT, and the registry says which. The
  * whole move holds the world's Web Lock `atlas-world:<dir>` (the one a make
  * holds), so no other tab's recovery, reconciliation or open acts on the
- * world while it moves (S373 gate F1, F2, F8):
+ * world while it moves:
  *
  *   2  journal: `move` on the entry (its id and the folder name), saved and
  *      read back BEFORE the folder exists on the drive

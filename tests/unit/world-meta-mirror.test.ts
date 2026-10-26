@@ -1,6 +1,6 @@
 /**
- * Two world.json saves in quick succession keep both in the active mirror
- * (S460): the units' fields each patched a snapshot of the active world taken
+ * Two world.json saves in quick succession keep both in the active mirror:
+ * the units' fields each patched a snapshot of the active world taken
  * before their write's await, so Length then Mass on blur left Mass alone in
  * the mirror while the disk held both. CI's full e2e caught it as a "flaky"
  * units test (run 39944009185, phase35-settings:185, the field read "").

@@ -1,7 +1,6 @@
 /**
  * Open a world file (1.17 bout 5, conv. 129; contract §5.2, §9 invariants 6
- * and 14; S370 gate lens A A8, A9, lens B B6, B16; Skeld h20 #511; S373
- * world-file gate F2, F5-F7).
+ * and 14; Skeld 2026-10-04).
  *
  * The reader (`store/world-file.ts`) refuses an unsafe or foreign file before
  * anything is written, and hands over the portable copy whoever made the file
@@ -77,7 +76,7 @@ function placeOf(reg: WorldsRegistry, worldId: string): { restore: WorldRegistry
 
 /**
  * Files written at once. One at a time, Firefox's browser storage took 16 s
- * for Moppetopia's 320 files against Chromium's 1.2 s (S407, Boss h57 #4679);
+ * for Moppetopia's 320 files against Chromium's 1.2 s (Boss 2026-10-14);
  * each file's lookups and writer cost it about 50 ms, and they overlap.
  */
 export const WRITE_CONCURRENCY = 8;
@@ -208,7 +207,7 @@ async function openRead(read: { worldId: string; worldName: string; files: World
   if (restore?.api) {
     // The link goes back from this browser's registry, never from the file.
     // A file's provenance lines are about the file's slice; the link going back
-    // is this browser's own, so they go (the S446 gate's G3: a guest's file
+    // is this browser's own, so they go (a guest's file
     // would otherwise call the owner's world one Character's view for good).
     const { source: _source, exported_as: _slice, ...meta } = JSON.parse(new TextDecoder().decode(worldJson)) as Record<string, unknown>;
     // diskApiBlock: the mirrored flags, never a seat's secret (conv. 132);

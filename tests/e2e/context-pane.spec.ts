@@ -1,6 +1,6 @@
 /**
- * Context pane e2e — locks in the tool-global behavior introduced in
- * session 231:
+ * Context pane e2e — locks in the tool-global behavior
+ * of the pane:
  *   - Context tab is permanent + leftmost on fresh boot.
  *   - Element route → graph + preview, no lists, "open in detail" hidden
  *     when previewing the subject (already on its detail page).
@@ -611,7 +611,7 @@ test('the right-pane tab bar never becomes a vertical scroll container', async (
 });
 
 /**
- * S355 — unlinked mentions in the element preview (a Discord ask: "if I make
+ * Unlinked mentions in the element preview (a Discord ask: "if I make
  * a new element, is there a way to search for matching words and link those
  * all at once"). The preview line is the standing home; "Link all" writes
  * every listed narrative on disk and the card rebuilds.

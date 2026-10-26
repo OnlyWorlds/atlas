@@ -1,7 +1,7 @@
 /**
  * What a linked world's world file says about where it came from and which
- * slice it is (folder spec §4.2; contract W2, W3 in
- * `Forge/Notes/2026-10-20-s446-provenance-lines.md`). `/me` is asked with the
+ * slice it is (folder spec §4.2; contract W2, W3 of a
+ * design note, 2026-10-20). `/me` is asked with the
  * world's own key at the moment of the export; when it cannot be asked the
  * file carries `source` alone.
  */
@@ -29,7 +29,7 @@ export function serverOrigin(): string {
  * Unlink of a world whose key reads as a guest (a person, an agent seat or a
  * player): its folder holds only that Character's view, and once the link is
  * gone nothing else says so. Recorded before the link is stripped, so Make
- * online is never offered to it as the whole world (the S446 gate's G2). The
+ * online is never offered to it as the whole world. The
  * kind is known from the recorded role; the Character itself is not, so it
  * stays null (never guessed). Null for any other world.
  */
@@ -55,7 +55,7 @@ export async function exportProvenance(
   let exportedAs: ExportedAs | null = null;
   const online = typeof navigator === 'undefined' || navigator.onLine !== false;
   // A demo key reads a shared demo world: keel answers its /me as the owner, and
-  // its slice is none of the four (the S446 gate's G4).
+  // its slice is none of the four.
   if (api.api_key && online && !isDemoKey(api.api_key)) {
     try {
       let timer: ReturnType<typeof setTimeout> | undefined;

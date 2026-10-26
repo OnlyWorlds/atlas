@@ -2,7 +2,7 @@
  * Time axis calculation — range, ticks, and date-to-pixel mapping.
  *
  * Adapted nearly verbatim from
- * `tools/little-element-viewer/src/timeline/axis-calculator.ts` (session 223).
+ * `tools/little-element-viewer/src/timeline/axis-calculator.ts`.
  * Pure functions — easy to unit-test.
  */
 
@@ -14,7 +14,7 @@ const TIME_RANGE_PADDING = 0.02;
 /** Half-width of the window drawn around a zero-span range (see below). */
 const ZERO_SPAN_HALF_WINDOW = 50;
 /** Nice-interval mantissas: the ladder is 1, 2, 5 x 10^k, unbounded above
- *  (S367 critic K4: it used to stop at 2000, so wide spans drew a tick wall). */
+ *  (it used to stop at 2000, so wide spans drew a tick wall). */
 const TICK_MANTISSAS = [1, 2, 5];
 const IDEAL_TICK_PX = 100;
 /** Hard cap on ticks computed per redraw (the axis redraws on every mousemove). */
@@ -45,7 +45,7 @@ export function calculateTimeRange(nodes: TimelineNode[]): TimeRange {
   //
   // This used to read `max = min + 100`, which with the 2% padding put the
   // only dot at ~1.9% across — jammed against the left edge with the whole
-  // width empty to its right (S301). Every young world hits this: the moment
+  // width empty to its right. Every young world hits this: the moment
   // you date your first element the chart looks broken, and the guided tour
   // builds a chart up one element at a time, so it would hit it twice before
   // anything read correctly. A zero-span range has no information about
@@ -123,7 +123,7 @@ export function createDateToX(range: TimeRange, canvasWidth: number): (date: num
  * Inverse of `createDateToX` — the ONE place the padded x→date math lives.
  * The view layer used to hold its own unpadded `(x / w) * span` twin, which
  * drew the now-line (and read drag/hover dates) PADDING_RIGHT px away from
- * where the same date's node renders — the S318 "now not on the events" gap.
+ * where the same date's node renders — the old "now not on the events" gap.
  * Paired functions share code, never parallel constants.
  */
 export function createXToDate(range: TimeRange, canvasWidth: number): (x: number) => number {

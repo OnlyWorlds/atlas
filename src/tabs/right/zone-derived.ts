@@ -33,7 +33,7 @@ export function getZoneShape(zone: Zone | undefined | null): ZoneShape {
   // Legacy fallback: pre-ZD6 zones stored shape in supertype. Other writers
   // still do — zoner writes `line`, Skeld's Sikelia writer `Line` — and only
   // atlas carries `atlas_shape`, so a zone that arrives from any other tool
-  // has nothing else to say what it is. Case-folded (S356: 318 Sikelia
+  // has nothing else to say what it is. Case-folded (318 Sikelia
   // rivers and routes drew as filled polygons on `Line`).
   const legacy = (zone as { supertype?: string }).supertype;
   if (typeof legacy === 'string' && legacy.trim().toLowerCase() === 'line') return 'line';
@@ -121,7 +121,7 @@ export function partitionZonesAndMarkers(elements: Element[]): {
 }
 
 /**
- * Zones drawn AS their linked zones (S362): a zone with no marker on this map
+ * Zones drawn AS their linked zones: a zone with no marker on this map
  * whose `linked_zones` reach zones that are on it. Sikelia models each of its
  * 13 historical roads this way (a markerless Road zone linking its Route
  * segments), and before this they were invisible in atlas: not drawn, since

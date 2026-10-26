@@ -1,6 +1,6 @@
 /**
- * The folder format's provenance lines (spec §4.2, v0.3.9; the contract
- * `Forge/Notes/2026-10-20-s446-provenance-lines.md`): a linked world's world
+ * The folder format's provenance lines (spec §4.2, v0.3.9; the provenance-lines
+ * contract): a linked world's world
  * file says where it came from (`source`) and which slice it is
  * (`exported_as`, from /me, never guessed); Atlas says the slice; a slice that
  * is not the whole world never goes online as a world of its own.

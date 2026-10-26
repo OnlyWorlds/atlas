@@ -9,7 +9,7 @@
  * GROUNDING RULE: entries describe what actually shipped; credits name only
  * real, confirmed contributors. Reddit/community credits carry a `threadUrl`
  * that links the REQUEST THREAD, never a person's profile. AI-collaborator and
- * broader credits are Captain's call to add (design Q3 left open) — seeded
+ * broader credits are Titus's call to add (design Q3 left open) — seeded
  * conservatively below.
  */
 
@@ -48,7 +48,7 @@ export interface ChangelogRelease {
 /**
  * Newest release first.
  *
- * v1 RESET (Captain, S318 launch day): the page opens as ONE clean v1.0
+ * v1 RESET (Titus, launch day): the page opens as ONE clean v1.0
  * block — the launch state, dated launch day — ready to changelog on top of.
  * The pre-launch drops (the old 1.0 of 2026-07-19 and the 1.1 polish set)
  * were folded in: nothing had shipped publicly yet, so a history of drops
@@ -2346,8 +2346,8 @@ export const CHANGELOG: ChangelogRelease[] = [
     theme: 'a seat of its own',
     entries: [
       // The #/join/ door ships in this release too, unannounced: no page can
-      // make its link until keel's Open in Atlas button is live (Skeld, h37
-      // #2286). Its entry lands with that button.
+      // make its link until keel's Open in Atlas button is live (Skeld,
+      // 2026-10-10). Its entry lands with that button.
       {
         id: 'seat-worlds',
         title: 'A world on a seat keeps its own secret',

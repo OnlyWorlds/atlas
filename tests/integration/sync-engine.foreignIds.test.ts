@@ -1,5 +1,5 @@
 /**
- * Foreign ids, recorded on evidence only (S363, re-key gate lens 2 F3/F7).
+ * Foreign ids, recorded on evidence only (re-key gate lens 2 F3/F7).
  *
  * The list is the re-key's worklist, so a false entry is dangerous: re-keying
  * an element that DOES live in this world leaves the server holding it twice.

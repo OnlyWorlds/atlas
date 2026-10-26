@@ -2,11 +2,11 @@
  * Sidebar driver — owns the mode toggle (in shell.sidebarToggle), dispatches
  * the body (worlds vs elements), and renders the footer gear.
  *
- * Session 223 decoupling: sidebar mode is now pure UI state (state.ui.sidebarMode,
+ * Sidebar mode is pure UI state (state.ui.sidebarMode,
  * persisted to localStorage via ui-prefs), NO LONGER derived from the URL.
  * Clicking the Worlds / Elements toggle updates state directly without
  * navigating. Room nav (top of middle pane) handles middle-pane navigation
- * independently. This matches Captain's "don't auto-switch" intent —
+ * independently. This matches Titus's "don't auto-switch" intent —
  * sidebar mode and room are orthogonal dimensions the user controls
  * independently.
  */
@@ -14,7 +14,7 @@
 import { isAtlasGrounded } from '../core/grounded';
 import { getState, patchSlice, subscribe, type SidebarMode } from '../core/state';
 import { onHashChange, parseHash, navigate, elementHash, settingsHash } from '../core/router';
-// elementsHash removed from imports — session 223 decoupling no longer routes
+// elementsHash removed from imports — the sidebar-mode decoupling no longer routes
 // through the /elements URL on toggle clicks or gear-toggle exit.
 import { setSidebarModePref } from '../core/ui-prefs';
 import { isTourFlagActive } from '../tour/tour-flag';
@@ -60,7 +60,7 @@ function resolveEffectiveBody(): EffectiveSidebarBody {
  *     context, which is the selected element if any, else home)
  *   - worlds-sidebar re-clicking the already-active world
  *
- * Session 223 change: previously fell back to `elementsHash` (sidebar elements
+ * This previously fell back to `elementsHash` (sidebar elements
  * mode); after the sidebar-mode-from-URL decoupling, sidebar mode is its own
  * state and the URL fallback is the world's home room.
  *
@@ -107,7 +107,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
   //
   // Right toggle is hidden when no world is active — there's nothing
   // meaningful to switch to. The Worlds toggle is always present.
-  // Rebuilt only when it would come out different (conv. 146, S421): a
+  // Rebuilt only when it would come out different (conv. 146): a
   // rebuild between a press and its release loses the click. Its handlers
   // read state at the click, so the key is what it draws.
   const toggleGate = renderGate();
@@ -120,7 +120,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
     const entry = worldId ? reg.worlds.find(w => w.id === worldId) : undefined;
     // Pre-setup (no atlas root) the whole sidebar is silent — a lit "Worlds"
     // tab over an empty rail competed with the landing, the screen's one
-    // voice (S255). The header appears once a root exists — OR once a world
+    // voice. The header appears once a root exists — OR once a world
     // is live on the route (the guided tour's OPFS world has no root, and
     // hiding the toggle left the tour stuck in worlds mode, 2026-07-19) —
     // OR during the tour's world-create step (the sidebar must appear in its
@@ -160,7 +160,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
       // geometry (same principle as the greyed worlds-header icons) — a
       // locked ghost segment holds the place the world name will take, so
       // "Worlds" renders at its real compact size from the first frame
-      // instead of a full-width centered label (Captain's round, 2026-07-19).
+      // instead of a full-width centered label (Titus's round, 2026-07-19).
       const ghost = document.createElement('button');
       ghost.type = 'button';
       ghost.className = 'atlas-mode-btn atlas-tour-locked';
@@ -228,8 +228,8 @@ export function mountSidebar(mount: SidebarMount): () => void {
   footer.appendChild(resetLayoutBtn);
   resetLayoutBtn.addEventListener('click', () => onResetLayout());
 
-  // ----- Footer notes button — opens the per-world notes overlay (session 223) -----
-  // Per-world freeform notes, atlas-local (never synced). Captain's "random
+  // ----- Footer notes button — opens the per-world notes overlay -----
+  // Per-world freeform notes, atlas-local (never synced). Titus's "random
   // notes modal" — available from any room. Disabled when no world is active.
   const notesBtn = document.createElement('button');
   notesBtn.className = 'atlas-icon-btn';
@@ -263,7 +263,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
     navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
   });
 
-  // ----- Footer ? button — keyboard shortcut reference (session 219) -----
+  // ----- Footer ? button — keyboard shortcut reference -----
   // Tiny inline popover listing implemented gestures + a "more coming"
   // footer. Discoverability for the bindings that exist TODAY (Esc, F,
   // Enter, Shift, right-click, etc.) while a full hotkeys kit lands later.
@@ -273,7 +273,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
   helpBtn.setAttribute('aria-label', 'Help');
   helpBtn.title = 'Help · this room + shortcuts (?)';
   helpBtn.innerHTML = '<span class="material-symbols-outlined">help</span>';
-  // S255v4 (Captain): the ? glyph read as general help but opened only the
+  // Titus: the ? glyph read as general help but opened only the
   // shortcuts popover. It now opens the room-aware help overlay (same surface
   // as the ? hotkey — room purpose, "you can", full shortcut reference). The
   // old shortcuts popover retires with its content module.
@@ -283,7 +283,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
     });
   });
 
-  // Order (S255v3, Captain): shortcuts before the OW mark — the brand glyph
+  // Order (Titus): shortcuts before the OW mark — the brand glyph
   // anchors the row's right end.
   footer.appendChild(helpBtn);
   footer.appendChild(owBtn);
@@ -322,7 +322,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
     prevRouteMode = route.mode;
   }
 
-  // Session 223: sidebar mode is no longer derived from the URL — it's a
+  // Sidebar mode is no longer derived from the URL — it's a
   // user preference (state.ui.sidebarMode, persisted via ui-prefs). Toggle
   // clicks are the only thing that change it. The room (middle pane) and
   // sidebar mode are now independent dimensions of navigation.
@@ -353,5 +353,5 @@ export function mountSidebar(mount: SidebarMount): () => void {
   };
 }
 
-// (Shortcuts popover retired S255v4 — the footer ? opens the room-aware
+// (Shortcuts popover retired — the footer ? opens the room-aware
 // help overlay, which includes the full shortcut reference.)

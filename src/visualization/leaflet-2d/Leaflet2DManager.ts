@@ -131,7 +131,7 @@ export class Leaflet2DManager {
       maxZoom: this.config.fixedZoom ? this.config.initialZoom : this.config.maxZoom,
       // Disable Leaflet's default top-left zoom control. We re-add it at
       // bottom-right below, where it won't collide with atlas's top-left
-      // pin-filter chip strip (DESIGN_MAPS.md session 211 polish).
+      // pin-filter chip strip (DESIGN_MAPS.md polish).
       zoomControl: false,
       attributionControl: false,
       renderer: L.canvas(),
@@ -139,7 +139,7 @@ export class Leaflet2DManager {
       zoomDelta: 0.5,
       wheelPxPerZoomLevel: 120,
       zoomAnimation: true,
-      // SOLID bounds, not elastic (S316, the pan snap-back). Leaflet's
+      // SOLID bounds, not elastic (the pan snap-back). Leaflet's
       // default viscosity 0 ALLOWS dragging past maxBounds and then
       // rubber-bands the view back on release — with bounds set to the exact
       // image rect, every pan appeared to work and then snapped back
@@ -189,7 +189,7 @@ export class Leaflet2DManager {
         { x: this.config.maxBounds[1][0], y: this.config.maxBounds[0][1] },
         this.config.canvasHeight
       );
-      // Padded 15% per side (S316): exact-rect bounds leave ZERO pannable
+      // Padded 15% per side: exact-rect bounds leave ZERO pannable
       // slack whenever the viewport exceeds the image on an axis, which reads
       // as "panning is broken". The pad is view breathing room only — stored
       // pin/vertex coords stay guarded by their own clamps (pin-drag,
@@ -202,7 +202,7 @@ export class Leaflet2DManager {
     // never paints over zones, pins, the grid, or transient drawing UI.
     // Without this the image renders in overlayPane (z=400) alongside zone
     // polygons; DOM order then determines stacking and the image can end
-    // up obscuring the polygons (session 213 smoke).
+    // up obscuring the polygons (seen in a smoke test).
     this.map.createPane('atlasBgImagePane');
     const bgPane = this.map.getPane('atlasBgImagePane');
     if (bgPane) bgPane.style.zIndex = '180';
@@ -239,7 +239,7 @@ export class Leaflet2DManager {
   /**
    * Set a background image. `onError` fires once if the browser cannot load
    * the URL (404, CORS, dead host) — callers can fall back to the flat
-   * canvas instead of leaving Leaflet's broken-image void (S300b).
+   * canvas instead of leaving Leaflet's broken-image void.
    */
   setBackgroundImage(url: string, width?: number, height?: number, onError?: () => void): void {
     if (!this.map || !this.backgroundLayer) return;
@@ -430,7 +430,7 @@ export class Leaflet2DManager {
       const pinHalf = iconSize / 2;
       const labelAnchorY = -(pinHalf + this.config.defaultLabelOffset);
       // The label is an element NAME from a world file, which anyone can write:
-      // it goes in as text, never as HTML (S360; this interpolated it raw, so a
+      // it goes in as text, never as HTML (this interpolated it raw, so a
       // name like `<img onerror=…>` ran script the moment its map opened).
       // updatePin already writes it via textContent.
       const labelSpan = document.createElement('span');

@@ -1,5 +1,5 @@
 /**
- * The store-level wall for ONE ELEMENT, ONE PIN, ONE MAP (S307).
+ * The store-level wall for ONE ELEMENT, ONE PIN, ONE MAP.
  *
  * Guarded at `createElement`, NOT at `createPin`: four UI paths funnel
  * through `createPin`, but the import applier calls `createElement('pin', …)`

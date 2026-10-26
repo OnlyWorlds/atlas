@@ -23,7 +23,7 @@ async function loadCors(src: string): Promise<HTMLImageElement> {
 /** The map overlay loads the same URL as a plain <img> (no Origin sent), and a
  *  host like R2 then answers without Access-Control-Allow-Origin. The browser
  *  can serve that cached, header-less copy to this CORS read, which fails even
- *  though the host allows CORS (Boss, S380, media.onlyworlds.com). So a failed
+ *  though the host allows CORS (Boss, media.onlyworlds.com). So a failed
  *  http(s) read retries once under a query that keeps it out of that cache
  *  entry. The first attempt is unchanged, so no host fares worse than before. */
 async function loadForPixels(url: string): Promise<HTMLImageElement> {

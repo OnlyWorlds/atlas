@@ -4,7 +4,7 @@
  * A Zone's `start_date` and `end_date` are its validity. A border with eras is
  * several Zones, one per era, chained by `linked_zones`; moving the date swaps
  * which era draws. The span is half-open, `[start, end)`, the standard's rule
- * (Skeld ruled it for every dated type, h57 #5063; Windrose reads it the
+ * (Skeld ruled it for every dated type, 2026-10-15; Windrose reads it the
  * same), so two eras that meet at a date never both draw there. (The charts'
  * `rangeVsNow` agrees at the end, a span ending AT the now is past, but calls a
  * span starting AT the now future: a seam for its forward half, not a
@@ -33,7 +33,7 @@ export function zoneSpan(zone: object): ZoneSpan {
  * (`TEMPORAL_TYPE_FIELDS`): a Character from its birth on, a Location from
  * its founding, an Event from its start to its end, a Title from its grant to
  * its revoke. A type with no date fields has no span, so it always shows (the
- * pins by their element's dates, the Captain's Q11, 2026-10-16).
+ * pins by their element's dates, Titus's Q11, 2026-10-16).
  */
 export function elementSpan(el: object | null | undefined): ZoneSpan {
   const type = (el as { type?: unknown } | null | undefined)?.type;

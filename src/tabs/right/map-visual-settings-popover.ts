@@ -1,7 +1,7 @@
 /**
  * Map visual settings popover (DESIGN_MAPS.md §11).
  *
- * Docks at the right edge of the middle panel (session 219). Reads + writes
+ * Docks at the right edge of the middle panel. Reads + writes
  * map_view_prefs for the current map. Re-targets on map-tab switch so it
  * stays open as the user moves between maps (P-bout U1).
  *
@@ -131,7 +131,7 @@ function openVisualSettingsPopover(entry: MapTabCacheEntry, _anchor: HTMLElement
 
   render();
 
-  // Dock at the RIGHT edge of the midpanel (Captain session 219). The popover
+  // Dock at the RIGHT edge of the midpanel (Titus's call). The popover
   // lives at document.body level with position: fixed, with coords computed
   // from the midpanel's bounding rect each frame. The map (in the right pane)
   // stays unobstructed; the panel takes a vertical slice of the middle pane
@@ -400,14 +400,14 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
     rerender();
   });
 
-  // The flip (S361): a user action for a map placed in older Atlas, never a
+  // The flip: a user action for a map placed in older Atlas, never a
   // migration. Writes the elements; its own inverse.
   const flipBtn = wrapper.querySelector<HTMLButtonElement>('[data-action="flip-map"]');
   flipBtn?.addEventListener('click', async () => {
     const store = getActiveStore();
     if (!store) return;
     // The flip's own refusal, said here: core/map-flip throws it as a plain
-    // Error, which the problem wording would treat as a bug (S369).
+    // Error, which the problem wording would treat as a bug.
     const mapEl = getState().data.elements.find(e => e.id === mapId) as { height?: unknown } | undefined;
     if (mapEl && !(typeof mapEl.height === 'number' && mapEl.height > 0)) {
       toastManager.info('This map has no size yet, so it cannot be flipped. Set an image or reopen it first.');
@@ -467,7 +467,7 @@ export function applyLivePrefs(entry: MapTabCacheEntry, prefs: MapViewPrefs): vo
 function applyGrid(entry: MapTabCacheEntry, show: boolean, spacing: number): void {
   // Grid is a separate layer from the image background — toggling it on/off
   // never touches the backgroundLayer (per Leaflet2DManager's gridLayer
-  // split, added to fix a session-213 bug where opening the popover wiped
+  // split, added to fix a bug where opening the popover wiped
   // image backgrounds).
   const manager = entry.manager;
   if (show) {

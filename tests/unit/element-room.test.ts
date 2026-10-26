@@ -2,7 +2,7 @@
  * `roomOf` — the one answer three surfaces ask (the palette, the elements
  * sidebar, the home desk). It exists because those three had drifted: two of
  * them navigated with a bare element hash and dropped every room-owning
- * element into the generic field editor (S306).
+ * element into the generic field editor.
  *
  * Pure, so it is cheap to pin — which is exactly why the divergence it
  * replaced was able to survive as long as it did.

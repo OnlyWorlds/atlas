@@ -1,6 +1,6 @@
 /**
- * #198, a linked world takes a new key in place (the Captain's go, 2026-10-16).
- * keel routed as it answers since #357 (Skeld h16 #6018): a key it does not
+ * #198, a linked world takes a new key in place (Titus's go, 2026-10-16).
+ * keel routed as it answers since #357 (Skeld 2026-10-16): a key it does not
  * know (a removed member's, a deleted world's) is 401 invalid_credentials with
  * no param; the member's next mint makes a key that works.
  *
@@ -159,7 +159,7 @@ test('signed out, a refused key says its cause, and Settings, This world takes a
   await page.evaluate((id) => { location.hash = `#/w/${id}/settings/world`; }, worldId);
   const keyLine = page.locator('[data-role="key-line"]');
   await expect(keyLine).toContainText('ends in FFFF');
-  // What the key does now, not what its kind could (S419's live walk).
+  // What the key does now, not what its kind could (seen in a live walk).
   await expect(keyLine).toContainText('OnlyWorlds no longer takes it');
   await expect(keyLine).not.toContainText('reads and writes');
   await expect(page.locator('[data-action="make-new-key"]')).toHaveCount(0);

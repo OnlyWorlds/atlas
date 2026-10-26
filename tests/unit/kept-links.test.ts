@@ -1,5 +1,5 @@
 /**
- * Links to elements this key no longer sees (conv. 151; the S439 gates' G3, H4).
+ * Links to elements this key no longer sees (conv. 151).
  * keel, probed live: a guest's PATCH that leaves a hidden link out keeps it;
  * a guest's read of its own element leaves the hidden link out.
  */

@@ -1,5 +1,5 @@
 /**
- * The way OUT of a hold (S363 composition gate, lens B). The hold itself was
+ * The way OUT of a hold. The hold itself was
  * airtight; each defect here left a world quietly not syncing afterwards, or
  * (Q4) offered a re-key that would duplicate an element on the server. Each
  * `it` was a lens probe that observed the defect, turned round.

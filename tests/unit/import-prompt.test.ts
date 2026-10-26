@@ -1,5 +1,5 @@
 /**
- * The convert-my-notes prompt (S264): the field whitelist is GENERATED from
+ * The convert-my-notes prompt: the field whitelist is GENERATED from
  * the SDK FIELD_SCHEMA at runtime, so the prompt is schema-true by
  * construction. These tests lock the digest's grammar and coverage — if the
  * schema grows a type or renames a field, the prompt follows automatically

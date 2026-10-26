@@ -1,5 +1,5 @@
 /**
- * The live folder's focus throttle and its tour exemption (S365, promoted from
+ * The live folder's focus throttle and its tour exemption (promoted from
  * the orient lane B probe). Real FsFolderStore over the in-memory FS.
  * - A focus inside the 5 s throttle arms one trailing pass, so an agent's
  *   edit that lands seconds after the last pass still shows (M4).
@@ -91,7 +91,7 @@ describe('the tour exemption is per world, not per origin', () => {
     expect({ skipped: out.skipped, desc: desc(id) }).toEqual({ skipped: 'busy', desc: undefined });
   });
 
-  it('no pass runs under a zone reshape (S367: its old ui.zoneEditing check was dead)', async () => {
+  it('no pass runs under a zone reshape (its old ui.zoneEditing check was dead)', async () => {
     const { root, id } = await localWorld();
     const edit = document.createElement('div');
     edit.className = 'atlas-zone-editing';

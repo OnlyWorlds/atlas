@@ -104,7 +104,7 @@ export interface WorldMetaWire {
   public_read?: boolean;
   created_at?: string;
   updated_at: string;
-  /** The world's first import, as keel serves it (Keel #571): kept, never sent. */
+  /** The world's first import, as keel serves it: kept, never sent. */
   origin?: Record<string, unknown>;
   /** A profile's keys on the World (`x_names`), as served; synced key by key. */
   [key: `x_${string}`]: unknown;
@@ -140,8 +140,8 @@ export interface OwApiClient {
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
   /**
    * World-meta read — GET /world's 13-field body in DISK names (world-meta
-   * sync, S262). REQUIRED, not optional: an optional method would silently
-   * reroute every legacy suite off the meta path (the S257
+   * sync). REQUIRED, not optional: an optional method would silently
+   * reroute every legacy suite off the meta path (the
    * coverage-migrates-onto-fallbacks law); there are exactly two implementers
    * (OwV2ClientAdapter + FakeOwApiClient), so required is cheap.
    */
@@ -235,7 +235,7 @@ export interface SyncEngineOptions {
   client: OwApiClient;
   policy?: ConflictPolicy;
   /**
-   * View-only world (S264 — linked with a READ key, no PIN). The engine never
+   * View-only world (linked with a READ key, no PIN). The engine never
    * pushes: every push trigger (autosave debounce, flushPendingPush, syncNow's
    * push half, the local-wins convergence push) dies at the `pushOnce` /
    * `requestPush` boundary, and the meta step is pull-apply only (no PATCH).
@@ -274,7 +274,7 @@ export class SyncEngine {
   private folder: FolderStore;
   private client: OwApiClient;
   private policy: CanonicalPolicy;
-  /** View-only engine (S264): pull-only, no push of any kind. */
+  /** View-only engine: pull-only, no push of any kind. */
   private readOnly = false;
   private where: 'folder' | 'browser' = 'folder';
   private apiWorldId: string | null = null;
@@ -312,11 +312,11 @@ export class SyncEngine {
    * While the dirty fields are exactly these, the meta step does not PATCH
    * again: it reports the SAME failure object, which `failureToastOnce` has
    * already decided, so the change stays honest in the status and is told once
-   * (S429, Kael's collaborator walk h57 #7224, finding 6: it was re-sent and
+   * (Kael's collaborator walk 2026-10-18, finding 6: it was re-sent and
    * re-told on every round). A new edit changes the fields and tries again.
    */
   private metaOwnerRefusal: { sig: string; failure: PerElementFailure } | null = null;
-  /** The x_ keys' body keel last refused (or Atlas found too big), by content (S458 gate G1). */
+  /** The x_ keys' body keel last refused (or Atlas found too big), by content. */
   private extRefusal: { sig: string; failure: PerElementFailure } | null = null;
   /** Debounce timer for `requestPush()` autosave. Reset on each write. */
   private debouncePushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -372,7 +372,7 @@ export class SyncEngine {
     this.paused = true;
     this.pauseReason = reason;
     // Under a hold the pill keeps saying what is happening; the release
-    // republishes this pause (S363 gate lens B F1).
+    // republishes this pause.
     if (this.holds > 0) return;
     this.setState({ kind: 'paused', reason, pending_changes: 0 });
   }
@@ -383,7 +383,7 @@ export class SyncEngine {
 
   /** Paused because the browser went offline: what the `online` listener lifts.
    *  Read from the engine, never from the published state, which says `held`
-   *  during a re-key (S363 gate lens B F1: the network pause outlived the network). */
+   *  during a re-key (once, the network pause outlived the network). */
   isNetworkPaused(): boolean {
     return this.paused && this.pauseReason === 'network';
   }
@@ -396,7 +396,7 @@ export class SyncEngine {
   }
 
   /**
-   * Holds taken by an exclusive local operation (the re-key, S363). Separate
+   * Holds taken by an exclusive local operation (the re-key). Separate
    * from `paused` on purpose (re-key gate, lens 2 F1/F2): `resume()` cannot
    * release a hold, and releasing one cannot clear a user, auth or corrupt
    * pause. Every round entry and push trigger reads `blocked`.
@@ -438,7 +438,7 @@ export class SyncEngine {
     // What the world said before the hold: an auth or corrupt-file error keeps
     // its red pill and its message afterwards (lens B F2).
     const before = this.state;
-    // `held_for` is what the pill says (S364): a re-key and a big batch of
+    // `held_for` is what the pill says: a re-key and a big batch of
     // outside edits waiting for the user's answer are different sentences.
     this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: reason });
     let released = false;
@@ -450,7 +450,7 @@ export class SyncEngine {
       if (at >= 0) this.holdReasons.splice(at, 1);
       if (this.stopped) return;
       if (this.holds > 0) {
-        // Another hold still stands: the pill says ITS sentence (S364 gate lens B B13).
+        // Another hold still stands: the pill says ITS sentence.
         this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: this.holdReasons[this.holdReasons.length - 1] });
         return;
       }
@@ -538,15 +538,15 @@ export class SyncEngine {
    * can also unlink the world from settings → World tab.
    */
   /**
-   * A round threw. The pill must not stay on "Saving..." (S308), so it goes
+   * A round threw. The pill must not stay on "Saving...", so it goes
    * back to idle, EXCEPT for a sync file that exists and will not parse
-   * (S361, gate F14): then the engine pauses and the pill turns red with the
+   * (gate F14): then the engine pauses and the pill turns red with the
    * file's own message ("fix or remove the file"). Before, a corrupt
    * sync-state.json replayed the whole world every round, failed at the
    * persist, and said nothing anywhere.
    */
   private transientRetryTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Push rounds in a row that met a held file (S368): caps the busy retries. */
+  /** Push rounds in a row that met a held file: caps the busy retries. */
   private busyRounds = 0;
   /**
    * Proposals keel took whose sync-state entry could not be written (a held
@@ -571,7 +571,7 @@ export class SyncEngine {
   private roundHiddenRefused: string[] = [];
   /** Hidden locals whose id OnlyWorlds shows (conv. 170): not adopted, said once. */
   private roundHiddenShown: string[] = [];
-  /** The role as the running push read it, afresh once per round (S439 gates G1, H1): a lowering while open moves it. */
+  /** The role as the running push read it, afresh once per round: a lowering while open moves it. */
   private roundRole: Promise<string | null> | null = null;
 
   private roundRoleNow(): Promise<string | null> {
@@ -582,7 +582,7 @@ export class SyncEngine {
   /** Ids whose links never go out: the kept set and what left the view (`left_view`, keel's one-rule §3). */
   private roundLinkHeld: ReadonlySet<string> = new Set();
 
-  /** An element's body as sent: sync stamps off, links to kept or left elements left out (keel keeps them, S439 G3). */
+  /** An element's body as sent: sync stamps off, links to kept or left elements left out (keel keeps them). */
   private outgoing(elem: Element): Record<string, unknown> {
     return withoutKeptLinks(elem.type, stripSyncFields(elem), this.roundLinkHeld);
   }
@@ -608,11 +608,11 @@ export class SyncEngine {
   private hideRefusedRole: string | null = null;
 
   /**
-   * conv. 173 (folder spec 4.8, Skeld h29 #12044): keel's hide for an element online that the file
+   * conv. 173 (folder spec 4.8, Skeld 2026-10-24): keel's hide for an element online that the file
    * marks hidden, by the owner's or a co-builder's key only. `hidden` on keel's 204. `not-sent` for
    * another role, a client without the route, keel's 403 or its 404 (the route off, or the element
    * gone: the write after it says which): the copy keeps today's word and line. `role-unknown` when the
-   * role could not be read: the caller holds the write for the next round (the S466 gate's G2).
+   * role could not be read: the caller holds the write for the next round.
    * A 401, 429, 503 or a lost network throws, as the write after it would. `role` defaults to the round's.
    */
   private async hideOnline(type: ElementType, id: string, role?: string | null): Promise<'hidden' | 'not-sent' | 'role-unknown'> {
@@ -683,7 +683,7 @@ export class SyncEngine {
       this.transientRetryTimer = null;
       if (this.stopped || this.blocked) return;
       // A pull in flight would hand pushOnce its own promise and the retry
-      // would never push (S368 gate A L2): wait for it, then push.
+      // would never push: wait for it, then push.
       const retry = (): void => {
         if (this.stopped || this.blocked) return;
         void this.pushOnce().catch(err => console.warn('[atlas:sync] transient retry failed:', err));
@@ -697,7 +697,7 @@ export class SyncEngine {
     if (err instanceof CorruptFileError) {
       this.paused = true;
       this.pauseReason = 'manual';
-      // The pill title is user copy: the file and the fix, not JSON.parse's text (S368).
+      // The pill title is user copy: the file and the fix, not JSON.parse's text.
       this.setState({ kind: 'error', message: damagedFileSentence(err.fileName, this.where), recoverable: true });
       return;
     }
@@ -738,7 +738,7 @@ export class SyncEngine {
    * Override the debounce window for tests via `setDebounceMs`.
    */
   requestPush(): void {
-    if (this.readOnly) return; // view-only world — nothing ever pushes (S264)
+    if (this.readOnly) return; // view-only world — nothing ever pushes
     if (this.blocked) {
       console.info('[atlas:sync] push requested but engine paused — skipping');
       return;
@@ -890,7 +890,7 @@ export class SyncEngine {
       return;
     }
     // Kept elements (conv. 151): neither side can reach keel for this key, and
-    // links to them never go out (the S439 gate's G2, G3).
+    // links to them never go out.
     this.roundKept = new Set(syncState.kept_outside_view ?? []);
     this.roundLinkHeld = linkHeld(syncState);
     const keepHere = async (): Promise<void> => {
@@ -913,7 +913,7 @@ export class SyncEngine {
         await keepHere();
         return;
       }
-      // conv. 173 (the S466 gate's G1): keeping mine sends the edit, so a mark keel does not hold goes
+      // conv. 173: keeping mine sends the edit, so a mark keel does not hold goes
       // as its hide first, by a role read now; a role that cannot be read sends nothing.
       if (local.server_updated_at && isHiddenMark(local)) {
         const remote = await this.client.getElement(local.type, id);
@@ -1030,7 +1030,7 @@ export class SyncEngine {
    */
   /**
    * A CREATE came back "id already on the server" (a lost response, a
-   * backfill miss): adopt the server's copy as the baseline. S361 (gate F3):
+   * backfill miss): adopt the server's copy as the baseline. The bug fixed:
    * adopting used to stamp clean unconditionally, so an edit made while the
    * lost create was in flight read as synced (its `local_updated_at` sorts
    * below the server's commit) and never uploaded. Now the bodies are
@@ -1040,7 +1040,7 @@ export class SyncEngine {
    * edit).
    */
   /**
-   * The round-end conflict write (S369, gate A M3): a held sync-state file is
+   * The round-end conflict write (gate A M3): a held sync-state file is
    * a world failure like the other round-end writes; anything else settles
    * the state (never a pill stuck on 'Saving') and ends the round.
    */
@@ -1067,7 +1067,7 @@ export class SyncEngine {
       if (back) remote = back;
     }
     // conv. 170: a hidden local whose id OnlyWorlds shows is not adopted, or its content would go up as
-    // an update onto what every member sees (the S461 gate's F2). It stays here, said once, until hidden there.
+    // an update onto what every member sees. It stays here, said once, until hidden there.
     if (isHiddenMark(local) && !isHiddenMark(remote) && !sameWireContent(local, remote)) {
       this.roundHiddenShown.push(local.id);
       console.info('[atlas:sync] a hidden element here is shown online under its id — not adopted, nothing sent', { id: local.id });
@@ -1081,7 +1081,7 @@ export class SyncEngine {
   }
 
   /**
-   * A pull-side local write (S369, gate A M4). A file another program holds
+   * A pull-side local write (gate A M4). A file another program holds
    * (OneDrive, antivirus) is a per-element failure and the pull goes on, as
    * the push's `localStep` does; anything else still ends the round.
    */
@@ -1103,7 +1103,7 @@ export class SyncEngine {
 
   /**
    * A never-stamped local the server holds with the SAME content is our own
-   * create whose stamp a held file refused (S368 gate A L3): adopt the
+   * create whose stamp a held file refused: adopt the
    * server's stamp instead of reporting a conflict with ourselves. Returns
    * true when the element was handled (adopted, or the adopt was refused by a
    * held file and recorded).
@@ -1175,7 +1175,7 @@ export class SyncEngine {
   }
 
   /**
-   * THE META STEP (world-meta sync, S262 — gate R2). One per sync round, from
+   * THE META STEP (world-meta sync — gate R2). One per sync round, from
    * all three run paths. GET-first three-way diff per field against the
    * canonical baseline in sync-state:
    *   server-only change → apply to disk (pull), local-only change → PATCH
@@ -1197,7 +1197,7 @@ export class SyncEngine {
    * the pill reads "Saving…" forever, the manual pull button silently no-ops
    * on `cur?.kind === 'syncing'`, and the auto-pull scheduler skips every
    * tick as busy. The code named this hole itself and deferred it days before
-   * release; this closes it (S323).
+   * release; this closes it.
    *
    * The throw still propagates — callers decide what to surface. Only the
    * stuck STATE is fixed.
@@ -1213,7 +1213,7 @@ export class SyncEngine {
     } catch (err) {
       // A held `.atlas/sync-state.json` (or `world.json`) past the writer's
       // retries is a failure of this step, not of the round: the element
-      // push still runs and the busy retry still arms (S368 gate A H1).
+      // push still runs and the busy retry still arms.
       if (isFileBusyError(err)) {
         return { meta_pushed: [], meta_pulled: [], failures: [failureOf('world', 'world', 'update', err)], auth_blocked: false };
       }
@@ -1236,7 +1236,7 @@ export class SyncEngine {
     // disk + baseline alone, no server read. When local meta is baseline-
     // clean, skip the GET /world entirely (it added a serial round-trip to
     // every debounced autosave). Pull/sync rounds never pass this flag: pull
-    // freshness IS the meta GET (world-meta design, S262). An absent
+    // freshness IS the meta GET (world-meta design). An absent
     // baseline never skips — the seed round must run.
     if (opts?.skipIfLocalClean) {
       try {
@@ -1274,7 +1274,7 @@ export class SyncEngine {
     if (this.stopped) return empty;
 
     const serverRec = server as unknown as Record<string, unknown>;
-    // STRICT (S361, gate F2): a world.json that will not parse must stop the
+    // STRICT (gate F2): a world.json that will not parse must stop the
     // meta step. The tolerant read returns an empty default, which the diff
     // below reads as "every field cleared locally" and PATCHes blank over the
     // server's world meta, then carries the blanks to every other device.
@@ -1287,7 +1287,7 @@ export class SyncEngine {
     }
     const syncState = await this.folder.readSyncState();
     const baseline = syncState.meta_baseline ?? null;
-    // A profile's x_ keys (Keel #571): their own three-way, beside the fields.
+    // A profile's x_ keys: their own three-way, beside the fields.
     const ext = this.planExtStep(local, serverRec, syncState.meta_ext_baseline ?? null);
     // The world's first import, kept in the folder as keel serves it (folder
     // spec 0.3.16, §4.2): read-only on the server, so only ever pulled, and
@@ -1346,8 +1346,8 @@ export class SyncEngine {
       for (const f of Object.keys(diff.pullFields)) baselineNext[f] = diff.pullFields[f];
     }
 
-    // The x_ keys travel in a PATCH of their own, after the settings (S458
-    // gate G1): keel refuses a body whole, so a key it will not take (over
+    // The x_ keys travel in a PATCH of their own, after the settings:
+    // keel refuses a body whole, so a key it will not take (over
     // 64 KB of keys in all) must never stop the now or a description.
     const extPush: Record<string, unknown> = {};
     for (const k of Object.keys(pushFields)) {
@@ -1368,7 +1368,7 @@ export class SyncEngine {
     // Push local-only changes as ONE partial PATCH. Baseline advances only
     // for the fields actually sent — from the response echo (gate finding:
     // adopting the full body would swallow concurrent server-side changes).
-    // View-only (S264): never PATCH — local meta can't legitimately diverge
+    // View-only: never PATCH — local meta can't legitimately diverge
     // (the store guard blocks UI writes), so anything here stays unpushed.
     let pushedNames = this.readOnly ? [] : Object.keys(pushFields);
     let serverUpdatedAt = server.updated_at || null;
@@ -1410,9 +1410,9 @@ export class SyncEngine {
         failures.push(failure);
         let refusedSig = pushSig;
         pushedNames = []; // nothing landed; baselines for them unchanged
-        // Keel #240: a co-builder may send the world's now alone, and keel
+        // A co-builder may send the world's now alone, and keel
         // refuses a mixed body whole. So a refused body that held the now sends
-        // the now by itself once; the rest stays refused (Kael h20 #7361).
+        // the now by itself once; the rest stays refused (Kael 2026-10-19).
         if (memberRefusal(err) === 'owner_only' && 'time_current' in pushFields && Object.keys(pushFields).length > 1) {
           try {
             const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush({ time_current: pushFields.time_current }));
@@ -1475,7 +1475,7 @@ export class SyncEngine {
   }
 
   /**
-   * The x_ keys' share of a meta round (Keel #571): what to send, what to
+   * The x_ keys' share of a meta round: what to send, what to
    * write locally, what is contested, and the baseline after the pulls and
    * the converged keys (sent keys advance from the PATCH echo). An absent
    * baseline seeds, as the fields do: the server's keys become the baseline,
@@ -1496,7 +1496,7 @@ export class SyncEngine {
         const l = canonicalExtValue(local[k]);
         if (s !== null && l === null) pullKeys[k] = v;
         // Both sides hold the key and differ: no side is the change, so no
-        // baseline is taken for it (the S458 gate's G2: a seed to the server's
+        // baseline is taken for it (a seed to the server's
         // value made the folder's read as an edit, pushed unasked). The next
         // three-way sees both changed; under pause-and-review it is held now.
         if (s !== null && l !== null && s !== l) {
@@ -1636,7 +1636,7 @@ export class SyncEngine {
    * iteration. Caller decides what to surface (toast count, retry UX).
    */
   pushOnce(): Promise<SyncResult> {
-    // View-only (S264): the push boundary. Every trigger funnels here (the
+    // View-only: the push boundary. Every trigger funnels here (the
     // debounce, flushPendingPush, resume, the local-wins convergence push) —
     // one guard closes them all.
     if (this.readOnly) return Promise.resolve(emptyResult());
@@ -1691,7 +1691,7 @@ export class SyncEngine {
     try {
       pushResult = await this.pushPhase();
     } catch (err) {
-      // Mirrors runPullOnly (S308). The pull path has carried this guard, with
+      // Mirrors runPullOnly. The pull path has carried this guard, with
       // a comment saying why, since it was written; the push path never got it,
       // so ANY throw here left the pill reading 'Saving…' forever — on the path
       // every single user edit takes (element save -> requestPushIfLinked).
@@ -1796,7 +1796,7 @@ export class SyncEngine {
       this.onSyncResult('sync', result);
       return result;
     }
-    // Settled like runPushOnly's (S369, gate A M3): a throw here left the
+    // Settled like runPushOnly's (gate A M3): a throw here left the
     // pill on 'Saving' forever on the full-sync path.
     let pushResult: Awaited<ReturnType<SyncEngine['pushPhase']>>;
     try {
@@ -1827,7 +1827,7 @@ export class SyncEngine {
       return result;
     }
     // A busy or unreachable server ends the round here too: the pull would
-    // meet the same wait. Retry once later (S361, lane b M4).
+    // meet the same wait. Retry once later (lane b M4).
     if (pushResult.transient_blocked) {
       this.settleIdle(null);
       this.scheduleTransientRetry(pushResult.retry_after_ms);
@@ -1866,7 +1866,7 @@ export class SyncEngine {
       ...keptFields(pushResult, pullResult),
     };
     // A raise in this round's pull gave back what its push had kept: those
-    // edits no longer stay here (the S439 gate's G9).
+    // edits no longer stay here.
     if (result.kept_edit_ids && pullResult.own_role !== undefined) {
       const keptAfter = new Set((await this.folder.readSyncState().catch(() => null))?.kept_outside_view ?? result.kept_edit_ids);
       const still = result.kept_edit_ids.filter(id => keptAfter.has(id));
@@ -1992,10 +1992,10 @@ export class SyncEngine {
   ): Promise<boolean> {
     // A kept peer is out of this key's view, not deleted (conv. 151): never a
     // review row. For a guest, keel's "does not exist" says the same of a peer
-    // it once gave (a stamp) and not kept yet (probed S439): it joins the kept
+    // it once gave (a stamp) and not kept yet (probed): it joins the kept
     // set, and the next round sends the child without the link, which keel
-    // keeps. A peer never sent is a local create, not out of view (the second
-    // S439 gate's H2); the role is this round's (H1).
+    // keeps. A peer never sent is a local create, not out of view;
+    // the role is this round's.
     if (this.roundLinkHeld.has(parsed.refId)) return false;
     const peer = await this.folder.getElement(parsed.refId);
     if (peer?.server_updated_at && await this.roundRoleNow() === 'guest') {
@@ -2054,7 +2054,7 @@ export class SyncEngine {
     // Re-fetch each candidate from disk (freshness) + pin element_type
     // self-heal, mirroring the per-element loop's pre-send discipline.
     const items: BulkItem[] = [];
-    /** The `local_updated_at` each sent body carried (S360 H1: an edit during the request stays dirty). */
+    /** The `local_updated_at` each sent body carried (an edit during the request stays dirty). */
     const sentStamps = new Map<string, string>();
     for (const elem of candidates) {
       let current = await this.folder.getElement(elem.id);
@@ -2090,7 +2090,7 @@ export class SyncEngine {
       const message = err instanceof Error ? err.message : String(err); // raw-error-ok: internal, classified below; never shown
       for (const it of items) {
         // failureOf carries keel's status and code, so a whole-request member
-        // refusal reads as not_yours like a per-item one (S386 gate).
+        // refusal reads as not_yours like a per-item one.
         failures.push(failureOf(it.element.id as string, it.type, 'create', err));
         onItemDone();
       }
@@ -2109,12 +2109,12 @@ export class SyncEngine {
       // without the seam) falls back to the read-back backfill.
       let stamped = 0;
       const needBackfill: BulkItem[] = [];
-      // keel's /bulk slot echoes the time but not the review mark it may have written (conv. 168, the
-      // S459 gate's F1): a key that is not a keeper reads its new elements back, so the mark lands.
+      // keel's /bulk slot echoes the time but not the review mark it may have written (conv. 168):
+      // a key that is not a keeper reads its new elements back, so the mark lands.
       const readBack = await this.marksPossible();
       // Three held files in a row means the folder is held, not one file:
       // the rest are recorded at once rather than each waiting out its own
-      // retries (S368 gate A M3: 500 creates once cost ~15 minutes). They
+      // retries (500 creates once cost ~15 minutes). They
       // stay dirty; the next round's re-POST answers 409 and adopts.
       let heldInARow = 0;
       for (let i = 0; i < items.length; i++) {
@@ -2187,8 +2187,8 @@ export class SyncEngine {
         onItemDone();
         continue;
       }
-      // A 404 item names an id hidden from this key (keel's /bulk, Skeld h29
-      // #8254): kept, never sent again (S441 gate G10).
+      // A 404 item names an id hidden from this key (keel's /bulk, Skeld,
+      // 2026-10-20): kept, never sent again.
       if ((res?.status === 404 || errObj.code === 'not_found') && hiddenCanBeDenied(await this.roundRoleNow())) {
         this.roundKeptAdd.push(item.element.id as string);
         console.info('[atlas:sync] bulk item 404 — an id hidden from this key, kept here', { id: item.element.id });
@@ -2239,8 +2239,8 @@ export class SyncEngine {
 
     // A survivor that links to a refused element (directly or through another
     // survivor that does) fails the atomic retry too, and used to take every
-    // independent survivor down with it, every round (S360 work order, bout
-    // 2 item 5). Hold those back as failures; the rest go through.
+    // independent survivor down with it, every round.
+    // Hold those back as failures; the rest go through.
     const refused = new Set<string>();
     result.items.forEach((it, i) => { if (it.status >= 400) refused.add(items[i].element.id as string); });
     const { ready, blocked } = splitByRefusedLinks(survivors, refused);
@@ -2268,8 +2268,8 @@ export class SyncEngine {
    */
   /**
    * A local write after the server already answered (a baseline stamp, an
-   * adopt, a tombstone clear), run so a refusal stays with its element
-   * (S368). Before, a file another program held made the stamp throw out of
+   * adopt, a tombstone clear), run so a refusal stays with its element.
+   * Before, a file another program held made the stamp throw out of
    * the round: the rest of the elements, the tombstones and the sync state
    * were skipped. The element stays dirty, so the next round redoes it (a
    * CREATE re-POST answers 409 and adopts). A damaged file still ends the
@@ -2370,7 +2370,7 @@ export class SyncEngine {
     // Kahn topo-sort ordering, exactly the pre-v2 behavior. Cycles there fall
     // back to input order and self-heal across rounds for the acyclic part.
     // A kept id with no baseline (a hidden element's copy after a Keep, or a
-    // create keel answered 404; S441 gate G1, G10) is never sent: it is not a
+    // create keel answered 404) is never sent: it is not a
     // create, it is something this key may no longer see.
     this.roundRole = null;
     this.roundHiddenRefused = [];
@@ -2417,7 +2417,7 @@ export class SyncEngine {
      * per-element failure toasts. Caller transitions engine to `error` state.
      */
     let authBlocked = false;
-    /** The first 429/503/network error (S361, lane b M4): ends the round
+    /** The first 429/503/network error (lane b M4): ends the round
      *  without pausing, so a busy server costs one request, not one per
      *  pending element. */
     let transient: unknown = null;
@@ -2444,7 +2444,7 @@ export class SyncEngine {
     const proposedIds: string[] = [];
     /** Deletes keel refused as `proposed_only`, each element back from keel (P6). */
     const refusedDeletes: Array<{ id: string; type: ElementType; name?: string }> = [];
-    /** Ids this round's 404s left for the next round: the role could not be read (the S439 gate's G5). */
+    /** Ids this round's 404s left for the next round: the role could not be read. */
     const roleUnknown: string[] = [];
     /** A 404 on an element someone else may still see: a guest keeps it, anyone else reviews it, an unknown role waits. */
     const keepsOn404 = async (id: string): Promise<boolean> => {
@@ -2475,12 +2475,12 @@ export class SyncEngine {
     /**
      * Creates refused this round. An UPDATE whose links name one would be
      * refused whole by keel (`invalid_link`), taking its other edits down
-     * with it; it waits instead (S363, re-key gate lens 2 F5: a re-keyed
+     * with it; it waits instead (re-key gate lens 2 F5: a re-keyed
      * element refused on upload must not drag every referrer's PATCH along).
      */
     // A create whose only failure was a held file WAS accepted by the server
-    // (the refusal was the local stamp after it), so it blocks nobody (S368
-    // gate A M1: its referrers waited under "OnlyWorlds refused" copy).
+    // (the refusal was the local stamp after it), so it blocks nobody (its
+    // referrers once waited under "OnlyWorlds refused" copy).
     const acceptedButHeld = (f: PerElementFailure) => isFileBusyError({ name: f.error_name });
     const refusedCreates = new Set<string>(
       failures.filter(f => f.operation === 'create' && !acceptedButHeld(f)).map(f => f.element_id),
@@ -2531,7 +2531,7 @@ export class SyncEngine {
             continue;
           }
           // Self-heal pins missing `element_type` (legacy bug — creation paths
-          // didn't set it before session 202). Real OW returns 400 with
+          // once didn't set it). Real OW returns 400 with
           // "element_type must be provided when element_id is specified" if
           // absent. Resolve from the referenced element's type and persist
           // back so subsequent pushes/pulls see a complete pin.
@@ -2635,7 +2635,7 @@ export class SyncEngine {
           if (!skipPush) {
             // conv. 173: a mark the file gained while keel shows the element goes as keel's hide FIRST,
             // so the edit never reaches members between the two; the PATCH's answer then carries it.
-            // A role not read this round holds the edit for the next (the S466 gate's G2).
+            // A role not read this round holds the edit for the next.
             if (isHiddenMark(current) && !isHiddenMark(remote)
               && await this.hideOnline(current.type, current.id) === 'role-unknown') {
               roleUnknown.push(current.id);
@@ -2647,7 +2647,7 @@ export class SyncEngine {
             const response = await this.client.updateElement(current.type, current.id, body);
             // The body sent carried `current.local_updated_at`; an edit that
             // landed while this request was in flight keeps the element dirty
-            // (S360 H1: it used to be stamped clean and never uploaded).
+            // (it used to be stamped clean and never uploaded).
             // keel takes the mark on a create only: its answer says whether it shows the element (F3),
             // and a mark taken out here comes back with it, since keel keeps hiding it (conv. 173).
             await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, hiddenKeptOf(response));
@@ -2697,8 +2697,8 @@ export class SyncEngine {
         // Don't add to failures (would surface as a raw error elsewhere).
         // A create answered 404, for a key that can be denied a hidden element
         // (a contributor or a guest; owners and co-builders see them all),
-        // names an id hidden from it (keel's create, Skeld h29 #8254: never
-        // id_conflict, nothing made). Kept, never sent again (S441 gate G10).
+        // names an id hidden from it (keel's create, Skeld 2026-10-20: never
+        // id_conflict, nothing made). Kept, never sent again.
         else if (isCreate && isNotFoundError(err) && hiddenCanBeDenied(await this.roundRoleNow())) {
           keptAdd.push(elem.id);
           keptEdits.push(elem.id);
@@ -2752,7 +2752,7 @@ export class SyncEngine {
         // Adopt the server's timestamp as baseline instead of failing forever;
         // any pending local divergence flows as UPDATE next round.
         else if (isCreate && isIdConflictError(err)) {
-          // The read-back is guarded (S361, lane b L2): a network error, 503
+          // The read-back is guarded (lane b L2): a network error, 503
           // or 401 here used to escape the loop, skipping the rest of the
           // round, the tombstones and the server_deletes persist. Auth bails the
           // round as the loop does; anything else is a per-element failure.
@@ -2782,7 +2782,7 @@ export class SyncEngine {
               message: 'this id already exists in another world',
             });
           } else {
-            // A read-back that failed proves nothing (S363, re-key gate lens 2
+            // A read-back that failed proves nothing (re-key gate lens 2
             // F3: a 409 plus a 503 used to read as foreign and would have been
             // offered a re-key, duplicating a same-world element).
             failures.push(failureOf(elem.id, elem.type, 'create', readErr, 'id_conflict, and checking it failed: '));
@@ -2872,7 +2872,7 @@ export class SyncEngine {
     }
 
     // conv. 173: the clean copies keel still shows though the file marks them hidden, after the
-    // person's own writes (the S466 gate's G6).
+    // person's own writes.
     if (!authBlocked && !transient && !this.stopped) {
       try {
         await this.hideShownCopies(kept);
@@ -2887,7 +2887,7 @@ export class SyncEngine {
     }
 
     // The delete's link scrub went out first, as unlink proposals keel now
-    // holds for the keeper: withdrawn, and the links put back (the S454 gate's G3).
+    // holds for the keeper: withdrawn, and the links put back.
     if (refusedDeletes.length > 0 && !authBlocked && !transient && !this.stopped) {
       const withdrawn = await this.restoreRefusedLinks(new Set(refusedDeletes.map(d => d.id)), failures);
       for (let i = proposedIds.length - 1; i >= 0; i--) if (withdrawn.has(proposedIds[i])) proposedIds.splice(i, 1);
@@ -2902,7 +2902,7 @@ export class SyncEngine {
     // any real server-deletes via its first pull. SKIP likewise when stopped
     // (detach/unlink) — a post-reset write would resurrect cleared state.
     if (!authBlocked && !this.stopped) {
-      // Foreign ids (S363): the stored list, this round's evidence, and only
+      // Foreign ids: the stored list, this round's evidence, and only
       // what is STILL here and never synced (formula: sync/foreign-ids.ts).
       const stillUnsynced = new Set(
         (await this.folder.listLocallyChangedSince(null)).filter(e => !e.server_updated_at).map(e => e.id),
@@ -2932,7 +2932,7 @@ export class SyncEngine {
         });
       } catch (err) {
         // A cloud client re-uploading `.atlas/sync-state.json` each round
-        // holds it exactly now (S368 gate A H1): the throw used to drop every
+        // holds it exactly now: the throw used to drop every
         // failure of the round, toast nothing and arm no retry. What this
         // write records is found again next round (a 404 re-detects a server
         // delete, a refusal re-proves a foreign id), so it waits with the rest.
@@ -2940,7 +2940,7 @@ export class SyncEngine {
         failures.push(failureOf('world', 'world', 'update', err));
       }
     }
-    // A file another program held past the writer's own retries (S368): the
+    // A file another program held past the writer's own retries: the
     // element stays dirty, so try again shortly instead of waiting for the
     // user's next edit (the Discord report: it healed only on the next save).
     // Five rounds in a row at most: a file that never frees up (read-only,
@@ -2951,7 +2951,7 @@ export class SyncEngine {
       this.scheduleTransientRetry(undefined);
     }
     // The role this round read, reported so Settings moves with the first
-    // kept 404, not at the next pull's resync (S440). A round that never
+    // kept 404, not at the next pull's resync. A round that never
     // asked reports nothing; an unknown role is not news.
     const roundRole = this.roundRole ? await this.roundRole : null;
     return {
@@ -3002,7 +3002,7 @@ export class SyncEngine {
    * A delete keel refused (P6) brought its element back, but the delete's
    * scrub (conv. 101) had already cut the links to it from every referrer,
    * and those edits went out first, as proposals a keeper could accept for a
-   * delete that never happened (the S454 gate's G3, TC h29 #10726). For each
+   * delete that never happened (TC, 2026-10-22). For each
    * changed element whose keel copy still links to an id in `back`: withdraw
    * its open proposal and put the links back. A copy that then matches keel's
    * takes keel's record (nothing left to send); one with other edits stays
@@ -3235,10 +3235,10 @@ export class SyncEngine {
     /** A hidden element's copy with an edit never sent: kept, never sent again (I2). */
     const keptHidden = new Set<string>();
     let hiddenDrops = 0;
-    /** Each element as it was before this round applied the server's copy: links to what left this round are put back from it (S441 gate G4). */
+    /** Each element as it was before this round applied the server's copy: links to what left this round are put back from it. */
     const preApply = new Map<string, Element>();
     let walkComplete = false;
-    /** Local writes another program's hold refused (S369): per element, not the round. */
+    /** Local writes another program's hold refused: per element, not the round. */
     const failures: PerElementFailure[] = [];
     /** A held file stopped the walk mid-page: the cursor must not pass it. */
     let heldStop = false;
@@ -3266,7 +3266,7 @@ export class SyncEngine {
         const keptBefore = curr.kept_outside_view ?? [];
         const keptNext = [...new Set([...keptBefore.filter(id => !revealed.has(id)), ...keptNow, ...keptHidden])];
         // A kept element is neither deleted nor reachable: no review row and
-        // no conflict holds it (the S439 gate's G2, G4). Nor is one that left.
+        // no conflict holds it. Nor is one that left.
         const keptIds = new Set(keptNext);
         const leftBefore = curr.left_view ?? [];
         const leftNext = [...new Set([...leftBefore.filter(id => !leftDel.has(id)), ...leftAdd])];
@@ -3351,7 +3351,7 @@ export class SyncEngine {
             revealed.add(op.id);
             leftDel.add(op.id);
             leftAdd.delete(op.id);
-            keptHidden.delete(op.id); // back in view in the same window (S441 gate G9)
+            keptHidden.delete(op.id); // back in view in the same window
           }
           if (tombstoneIds.has(op.id)) continue; // pending local delete owns this id
           // A push conflict holds an ordinary row; a hide is still a hide (G11).
@@ -3366,7 +3366,7 @@ export class SyncEngine {
 
             const serverStamp = op.element.updated_at;
             const local = await this.folder.getElement(op.id);
-            // keel's read leaves out links this key may not see; the copy keeps them (conv. 151, S439 G3).
+            // keel's read leaves out links this key may not see; the copy keeps them (conv. 151).
             const remoteBody = local
               ? withKeptLinks(op.type, stripServerOnlyFields(op.element), local, linkHeldBefore)
               : stripServerOnlyFields(op.element);
@@ -3425,7 +3425,7 @@ export class SyncEngine {
               });
               continue; // preserve the user's local change
             }
-            // M3 race guard, INSIDE the per-id chain (S361): the check and
+            // M3 race guard, INSIDE the per-id chain: the check and
             // the write are one slot, so a save cannot land between them.
             if (this.stopped) break;
             let applied = false;
@@ -3447,7 +3447,7 @@ export class SyncEngine {
             // offer to keep it, so it never reaches the review, whose Keep
             // would send it back as a create (I1). Unchanged, it leaves
             // silently; with an edit never sent, or no baseline (a Keep from
-            // an earlier review, S441 gate G1), it is kept and never sent (I2);
+            // an earlier review), it is kept and never sent (I2);
             // what a role change kept stays kept (conv. 151). Already gone
             // (a replay after a round whose save was skipped, G2): remembered
             // as left, so its links still never go out.
@@ -3509,7 +3509,7 @@ export class SyncEngine {
             }
           }
         }
-        // A held file (S369, gate A M1/M2): the rest of its page still
+        // A held file (gate A M1/M2): the rest of its page still
         // applies, so one locked file does not stop every other element's
         // news; then the walk stops with the cursor before this page, which
         // is replayed next pull (replays are idempotent).
@@ -3553,7 +3553,7 @@ export class SyncEngine {
     }
 
     // After a resync, what the fresh walk did not name left this key's view.
-    // A role change never takes from the copy (B12 Q2, the Captain h20 #8014;
+    // A role change never takes from the copy (B12 Q2, Titus 2026-10-20;
     // conv. 151): it is kept, marked, and stops syncing. Only keel's own word
     // that the view moved (`view`), or a role Atlas knows did not move, drops
     // it, and then only in a view-only world, where nothing can have been
@@ -3571,7 +3571,7 @@ export class SyncEngine {
       ? resyncWhy === 'view' || (resyncWhy === null && !roleMoved)
       : resyncWhy === 'view';
     // What waits in the delete review is the person's to decide, in a writable
-    // world: a resync never decides it for them (S441 gate G3).
+    // world: a resync never decides it for them.
     const inReview = new Set([...(syncState.server_deletes ?? []), ...newServerDeletes].map(d => d.id).filter(id => !revivedIds.has(id)));
     if (resynced && walkComplete && !this.stopped && !heldStop) {
       for (const el of await this.folder.listElements()) {
@@ -3604,7 +3604,7 @@ export class SyncEngine {
 
     // An element applied this round while its peer left (keel's read leaves
     // the link out, before or after the row) gets the link back from its copy as it was:
-    // the copy keeps links to what left (I4; S441 gate G4). Through the
+    // the copy keeps links to what left (I4). Through the
     // server channel, so the stamps stay and nothing reads as an edit.
     if (leftAdd.size > 0 && !this.stopped) {
       for (const [id, before] of preApply) {
@@ -3619,7 +3619,7 @@ export class SyncEngine {
     }
 
     // A held sync-state file leaves the cursor where it was: the next pull
-    // replays from there (S369, gate A M4), never the round's end.
+    // replays from there (gate A M4), never the round's end.
     try {
       await persistRound();
     } catch (err) {
@@ -3631,7 +3631,7 @@ export class SyncEngine {
       pushed: zero(), pulled: { creates, updates, deletes: deletes + hiddenDrops }, conflicts, failures, pulled_ids: pulledIds,
       ...(walkedAs !== undefined ? { own_role: walkedAs } : {}),
       ...(keptNow.length > 0 ? { kept: keptNow.length } : {}),
-      // A hidden element's copy with an edit: said as a kept edit is (S441 gate G5).
+      // A hidden element's copy with an edit: said as a kept edit is.
       ...(keptHidden.size > 0 ? { kept_edit_ids: [...keptHidden] } : {}),
     };
   }
@@ -3653,7 +3653,7 @@ export class SyncEngine {
      * the un-pulled types as "vanished from server."
      */
     let authBlocked = false;
-    /** Local writes another program's hold refused (S369): per element, not the round. */
+    /** Local writes another program's hold refused: per element, not the round. */
     const failures: PerElementFailure[] = [];
 
     const tombstones = await this.folder.listTombstonesSince(null);
@@ -3761,7 +3761,7 @@ export class SyncEngine {
         // the in-flight edit and the user's keystroke would silently vanish.
         // Re-read and bail if local has moved; the next pull (or autosave-
         // triggered push) reconciles cleanly.
-        // The re-check now happens INSIDE the per-id chain (S361, lane b M1).
+        // The re-check now happens INSIDE the per-id chain (lane b M1).
         let applied = false;
         if (!await this.pullWrite(failures, remote.id, type, async () => {
           applied = await this.folder.applyServerRecordIfUnchanged(
@@ -3826,7 +3826,7 @@ export class SyncEngine {
     // surfaced by sync-attach via onSyncResult.
     //
     // Dedup by element_id — without this, repeated refreshes would append the
-    // same conflict over and over (Captain caught this growing 1 → 2 → 3).
+    // same conflict over and over (Titus caught this growing 1 → 2 → 3).
     // Computed inside the store's sync-state chain so a concurrent round's
     // entries survive this round's write.
     //
@@ -3853,7 +3853,7 @@ export class SyncEngine {
         };
       });
     } catch (err) {
-      // A held sync-state file: the next pull derives the same again (S369).
+      // A held sync-state file: the next pull derives the same again.
       if (!isFileBusyError(err)) throw err;
       failures.push({ ...failureOf('world', 'world', 'read', err), source: 'disk' });
     }
@@ -3878,7 +3878,7 @@ export class SyncEngine {
 // ---- Helpers ----
 
 /**
- * A per-element failure from a thrown error, keeping its `name` (S368): the
+ * A per-element failure from a thrown error, keeping its `name`: the
  * toast classifies on it, because a held file's message is Chromium's stock
  * text and says nothing a user can act on.
  */
@@ -3895,7 +3895,7 @@ function failureOf(
     element_id, type, operation,
     message: prefix + (err instanceof Error ? err.message : String(err)), // raw-error-ok: the failure record; Details print its fields, never this
     ...(typeof name === 'string' && name !== 'Error' ? { error_name: name } : {}),
-    // What the details block may print (S369): the server's status and code,
+    // What the details block may print: the server's status and code,
     // never its message, which can quote a name.
     ...(typed ? { status: typed.status, code: typed.code, ...(typed.param ? { param: typed.param } : {}), source: 'server' as const } : {}),
   };
@@ -4067,10 +4067,10 @@ function hiddenHeldReport(changed: readonly Element[], held: ReadonlySet<string>
 }
 
 /**
- * Why keel moved this reader (one-rule §3, Skeld h20 #8021): `view` (a delete,
+ * Why keel moved this reader (one-rule §3, Skeld 2026-10-20): `view` (a delete,
  * a hide, a Character change: drop what the walk no longer names) or `role`
  * (a role or roster move: keep). Null when keel did not say; any other value
- * reads as `role`, the Captain's side of the error (conv. 151).
+ * reads as `role`, Titus's side of the error (conv. 151).
  */
 export function resyncReason(err: unknown): 'role' | 'view' | null {
   const r = (err as { reason?: unknown } | null)?.reason;
@@ -4200,7 +4200,7 @@ export function splitByRefusedLinks(
 ): { ready: Element[]; blocked: Element[] } {
   const bad = new Set(refusedIds);
   const blocked = new Set<string>();
-  // Wire fields only (S363 gate lens B F5): a page's `atlas_page_refs` or a
+  // Wire fields only: a page's `atlas_page_refs` or a
   // narrative's dismissed suggestions never reach keel, so an id there cannot
   // get the element refused, and holding it back on that basis stopped the
   // element's real edits from uploading for as long as the other stayed refused.
@@ -4255,7 +4255,7 @@ function transientFields(err: unknown): Pick<SyncResult, 'transient_blocked' | '
 
 export function isIdConflictError(err: unknown): boolean {
   const t = typedError(err);
-  // The CODE, not the status (S361, lane b L5): keel's idempotency_error is
+  // The CODE, not the status (lane b L5): keel's idempotency_error is
   // a 409 too.
   if (t) return t.code === 'id_conflict';
   if (!(err instanceof Error)) return false;

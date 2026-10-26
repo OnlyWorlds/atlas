@@ -1,6 +1,6 @@
 /**
  * Which fields an element page shows when empty ones hide: during the tour
- * (S299, S311, S317) and, since #24 (S388), for anyone who turns on "Hide
+ * and, since #24, for anyone who turns on "Hide
  * empty fields". Pure, so the rule is testable without the page.
  */
 

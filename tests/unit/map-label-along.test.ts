@@ -1,5 +1,5 @@
 /**
- * A name written along a line on a styled map (S424) joins the density
+ * A name written along a line on a styled map joins the density
  * layer: it covers the screen piece by piece along its line, and when an
  * area's name sits where it would print, it slides along the line to a
  * clear spot, or drops.

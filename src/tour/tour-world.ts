@@ -39,7 +39,7 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
       time_range_max: w.time_range_max,
       time_current: w.time_current,
     });
-    // The commit point (S361). `clearStageForTour` has usually released the
+    // The commit point. `clearStageForTour` has usually released the
     // prior world already; this keeps every world-swapping flow on one rule.
     await releasePriorWorld();
   } catch (err) {
@@ -72,7 +72,7 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
     saveRegistry(activated);
     patchSlice('registry', activated);
   });
-  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // The store first: a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
   patchSlice('active', { worldId: entry.id, meta, opened: true });

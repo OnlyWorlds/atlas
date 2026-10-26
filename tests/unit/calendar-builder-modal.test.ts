@@ -1,5 +1,5 @@
 /**
- * Calendar builder edit path (S367 critic K2): saving an existing calendar
+ * Calendar builder edit path: saving an existing calendar
  * must keep the structure the form does not show (months, week and festival
  * days on a year-grain world, a coarse `bundles.year`, unknown keys) and must
  * never rewrite the stored grain.
@@ -50,7 +50,7 @@ const MONTHFUL = {
   x_foreign: { kept: true },
 };
 
-describe('calendar builder edit keeps what the form cannot show (S367 critic K2)', () => {
+describe('calendar builder edit keeps what the form cannot show', () => {
   it('year-grain world: a no-change save keeps months, week, festival days, grain and unknown keys', async () => {
     const { updateElement } = setup('year', structuredClone(MONTHFUL));
     openBuilder('cal-1');
@@ -86,7 +86,7 @@ describe('calendar builder edit keeps what the form cannot show (S367 critic K2)
     expect(out.grain).toBe('day');
   });
 
-  it('an up era listed before a countdown era at its pivot keeps its order and reads right (SDK 4.76, h20 #13200)', async () => {
+  it('an up era listed before a countdown era at its pivot keeps its order and reads right (SDK 4.76, 2026-10-25)', async () => {
     const after = { name: 'After', abbrev: 'AF', start: 0 };
     const before = { name: 'Before', abbrev: 'BF', start: 0, direction: 'down' as const };
     const { updateElement } = setup('year', { version: 1, grain: 'year', eras: [after, before] });

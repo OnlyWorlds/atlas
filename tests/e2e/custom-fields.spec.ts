@@ -123,7 +123,7 @@ test('add-field flow: name → x_ prefix → value editor auto-opens → save', 
 
   // The popover must open AT the field, not at the bottom of the page — the
   // anchor rect must be measured AFTER element-detail's scroll restore
-  // (Captain's live find: a microtask-timed click measured the unscrolled
+  // (Titus's live find: a microtask-timed click measured the unscrolled
   // layout and the editor landed a page below the row).
   const rowBox = await row.boundingBox();
   const popBox = await popover.boundingBox();

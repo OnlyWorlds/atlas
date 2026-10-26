@@ -58,8 +58,8 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   const header = document.createElement('div');
   header.className = 'atlas-detail-section-header';
   // These three fields ride the v2 wire as extension fields (they are in
-  // ATLAS_WIRE_EXTENSION_FIELDS); this header said "Local only" from the v1
-  // era until S356.
+  // ATLAS_WIRE_EXTENSION_FIELDS); this header once said "Local only", a v1
+  // leftover.
   header.innerHTML = `
     <span class="atlas-detail-section-title">Zone visuals</span>
     <span class="atlas-detail-section-hint" title="atlas_color, atlas_opacity and atlas_label_visible are atlas extension fields; they sync with the world.">Synced</span>
@@ -70,19 +70,19 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   body.className = 'atlas-detail-section-body';
   section.appendChild(body);
 
-  // World styles (S356): what this zone inherits from its kind's rule when
+  // World styles: what this zone inherits from its kind's rule when
   // it has no colour of its own, so the picker shows the colour that is
   // actually drawn and the line under it says where it came from.
   const rule = resolveStyle(getState().styles.rules, zone);
   const ownColor = (zone as { atlas_color?: string }).atlas_color;
   // Hex only into the inputs below: the value comes from a world file (or
-  // styles.json) and is interpolated into `value="…"` (S360: a quote in it
+  // styles.json) and is interpolated into `value="…"` (a quote in it
   // was a script breakout). A non-hex colour another tool wrote still draws on
   // the map; the picker just starts from the default.
   const currentColor = hexColourOr(ownColor, hexColourOr(rule.color, '#22d3ee'));
   const currentOpacity = (zone as { atlas_opacity?: number }).atlas_opacity ?? rule.fill_opacity ?? 0.4;
   const currentLabelVisible = !!(zone as { atlas_label_visible?: boolean }).atlas_label_visible;
-  // A role rule (S362) names the role too: "Line · River · major river".
+  // A role rule names the role too: "Line · River · major river".
   const role = rule.source === 'role' && typeof (zone as { role?: unknown }).role === 'string' ? ((zone as { role?: string }).role ?? '').trim() : '';
   const kind = kindLabel({ supertype: typeof zone.supertype === 'string' ? zone.supertype : '', subtype: typeof zone.subtype === 'string' ? zone.subtype : '', role: role || undefined });
   const inheritLine = ownColor
@@ -174,11 +174,11 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
 }
 
 /**
- * Delete a zone (and its markers) from its element-detail section — Captain's
+ * Delete a zone (and its markers) from its element-detail section — Titus's
  * launch note: there was no VISIBLE way to delete a zone (the generic element
  * trash exists but reads "Delete element" in the header and is easy to miss on
  * a map-centric type). This routes through the SAME cascade-aware decision as
- * that trash: `decideDeleteConfirm` honours the S310 confirm-floor (a delete
+ * that trash: `decideDeleteConfirm` honours the confirm-floor (a delete
  * that cascades always confirms) and names the markers that go with it, then
  * the standard delete → refresh → clear-selection → push, landing on the
  * elements list. `store.deleteZone` IS `deleteElement`, so this is the blessed
@@ -310,7 +310,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
     // The point table is for editing points, which is rare next to reading
     // the page; a long one used to be most of a zone's page (Sikelia's
     // roads: 44 rows). Past a handful it folds behind the map row, which
-    // keeps the count and gains a pan-to-zone (S356).
+    // keeps the count and gains a pan-to-zone.
     const folded = list.length > MARKERS_FOLD_ABOVE;
     const details = document.createElement('details');
     details.className = 'atlas-zone-markers-group';

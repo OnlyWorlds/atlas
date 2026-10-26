@@ -1,7 +1,7 @@
 # Atlas — Maps Subsystem Design
 
-**Version**: 1.1 (2026-05-18) — foundation design; bout-sequence history archived to `docs-archive/PROGRESS-history.md`.
-**Status**: All M1-M7 + N1/N2/MR + L0/S/MW/NPM bouts shipped (sessions 208-210). XR (ghost pins) **shipped** — see §3.8 (`src/tabs/right/ghost-pins.ts`) (corrected 2026-07-22, S309; the earlier "dropped session 221" line was stale).
+**Version**: 1.1 (2026-05-18) — foundation design.
+**Status**: All M1-M7 + N1/N2/MR + L0/S/MW/NPM bouts shipped. XR (ghost pins) **shipped** — see §3.8 (`src/tabs/right/ghost-pins.ts`) (corrected 2026-07-22; an earlier "dropped" line was stale).
 **Supersedes**: the "Map Images in API Mode" section in `DESIGN.md` (image precedence has changed — `image_url` now wins).
 **Scope**: The map subsystem — domain model, tree organization, UI surfaces, image sources, test fixtures, and the deferred-work pile. Does not cover pin styling (a later pass), zone semantics beyond deferral notes, or marker work.
 
@@ -27,7 +27,7 @@ The same pattern fits future subsystems (`DESIGN_TIMELINES.md`, `DESIGN_WRITING.
 8. [Open extensions](#8-open-extensions)
 9. [Out of scope](#9-out-of-scope)
 
-(Section numbers §10/§10b/§10c — the original bout sequence — are vacant; content archived to `docs-archive/PROGRESS-history.md`. Renumbering would break ~25 cross-references in `src/`; numbering retained for stability.)
+(Section numbers §10/§10b/§10c — the original bout sequence — are vacant. Renumbering would break ~25 cross-references in `src/`; numbering retained for stability.)
 
 11. [Map visual settings](#11-map-visual-settings-per-map-prefs-popover)
 12. [Canvas toolbar](#12-canvas-toolbar-always-visible-above-the-leaflet-canvas)
@@ -290,13 +290,13 @@ Advanced section is collapsed by default. The hint text under "Local image" upda
 
 When a map is the selected element, the middle pane shows the standard element-detail editor (works today). All map fields edit-in-place via the schema-driven editor. The map's tab on the right shows the canvas.
 
-### 3.4 Lock toggle — REMOVED (session 210)
+### 3.4 Lock toggle — REMOVED
 
-Lock semantics existed to suppress pin-click auto-open. Auto-open itself was removed at the end of session 209 (both sidebar-click and pin-click paths). With auto-open gone, lock had no observable behavior to gate, so the icon, the single-locked-at-a-time logic, and the per-tab `locked` field have been deleted.
+Lock semantics existed to suppress pin-click auto-open. Auto-open itself was removed earlier (both sidebar-click and pin-click paths). With auto-open gone, lock had no observable behavior to gate, so the icon, the single-locked-at-a-time logic, and the per-tab `locked` field have been deleted.
 
 If auto-open returns later (e.g. as an opt-in setting), revive the lock model from git history. Until then: explicit clicks via the top-bar affordances in §3.5 are the only path to opening a map from an element, and locking has nothing to constrain.
 
-### 3.5 Map affordances in element-detail top bar (revised session 209)
+### 3.5 Map affordances in element-detail top bar (revised)
 
 The v1.0 inline "map presence" widget at the BOTTOM of the element-detail body was implemented in M7. Smoke testing showed it was buried — visible but easy to miss, and the visual weight felt wrong for what is core navigation. Replacement: **fold map and pin affordances into the element-detail top bar**, the existing icon row that currently carries save/trash/create-pin.
 
@@ -337,7 +337,7 @@ For **non-Location elements** (Character, Object, etc.):
 
 **Why the redesign**: the top bar is where the user's eye lands after navigating to an element. Putting map navigation there makes it discoverable in-flow. The inline section was too easy to miss past a long body of fields.
 
-### 3.6 Pin click-through and element selection (revised session 210)
+### 3.6 Pin click-through and element selection (revised)
 
 **Auto-open is REMOVED entirely** (both sidebar-click and pin-click). Clicking an element anywhere in atlas — sidebar row, pin on a map, ghost pin, chip in element-detail — sets `selectedElementId` and navigates to the element-detail route. The right pane does NOT change unless the user explicitly clicks a `[map]` or `[pin]` affordance in the element-detail top bar (§3.5).
 
@@ -350,9 +350,9 @@ Pin-click flow today:
 
 To navigate the user TO a map, see §3.5 (top-bar `[map]` / `[pin]` clusters).
 
-**Into a submap and back up** (1.25, #139, the Captain's ask; `src/tabs/right/map-submap-door.ts`). The click still only selects. While the selected element is a Location with maps of its own (`map.location`, other than the map on screen) and has a pin on the visible map, a door floats above and right of that pin: "Open <map>", up to three, in `getAssociatedMaps` order. The pin's map badge (`hasLinkedSubMap`) says a door exists before the click. A map with a parent in the tree (explicit `parent_map`, else inferred, §2) heads its toolbar with "↑ <parent>". Both swap the CURRENT map tab in place (`swapMapTab`), so a walk down and back up keeps one tab; a target already open in another tab is focused. Guards: `tests/unit/map-submap-door.test.ts`, `tests/e2e/submap-door.spec.ts` (revert-checked red).
+**Into a submap and back up** (1.25, Titus's ask; `src/tabs/right/map-submap-door.ts`). The click still only selects. While the selected element is a Location with maps of its own (`map.location`, other than the map on screen) and has a pin on the visible map, a door floats above and right of that pin: "Open <map>", up to three, in `getAssociatedMaps` order. The pin's map badge (`hasLinkedSubMap`) says a door exists before the click. A map with a parent in the tree (explicit `parent_map`, else inferred, §2) heads its toolbar with "↑ <parent>". Both swap the CURRENT map tab in place (`swapMapTab`), so a walk down and back up keeps one tab; a target already open in another tab is focused. Guards: `tests/unit/map-submap-door.test.ts`, `tests/e2e/submap-door.spec.ts` (revert-checked red).
 
-### 3.7 Right-click on map — place existing OR create new (planned, session 209)
+### 3.7 Right-click on map — place existing OR create new (planned)
 
 Current behavior: right-click → opens element-create modal → new element + drops pin pointing at it. Renamed and extended to support **placing existing elements**:
 
@@ -421,7 +421,7 @@ Current behavior: right-click → opens element-create modal → new element + d
 **Display precedence** (same in local-only AND api-linked worlds):
 1. If `image_url` is non-empty → load and display it.
 2. Else if `image_media_id` is set → load the local blob and display it.
-3. Else → the sized FLAT CANVAS (§4.2) — imageless maps are first-class since S300 (the pre-S300 grid fallback + view/placement refusals are retired).
+3. Else → the sized FLAT CANVAS (§4.2) — imageless maps are first-class (the old grid fallback + view/placement refusals are retired).
 
 **Edge-color extraction** runs on whichever image actually rendered. Cached per URL (avoid network re-fetch on every mount).
 
@@ -430,43 +430,43 @@ Current behavior: right-click → opens element-create modal → new element + d
 - Map create modal — see §3.2 hint dynamics.
 - Map detail — when both are set, show a small indicator near the image_url field: *"local image stored as fallback (not shown while URL is set)."*
 
-**Local image on EXISTING maps (S253)**: the element editor shows a maps-only "Local image" row directly under Image URL (`src/middle/element-detail-map-image.ts`): choose/replace/clear a folder-stored file (addMedia 'base-image' → `image_media_id`). Same primitives as the create flow. Note: the create modal's configure-existing mode has zero callers (dead path — do not wire without exercising it first).
+**Local image on EXISTING maps**: the element editor shows a maps-only "Local image" row directly under Image URL (`src/middle/element-detail-map-image.ts`): choose/replace/clear a folder-stored file (addMedia 'base-image' → `image_media_id`). Same primitives as the create flow. Note: the create modal's configure-existing mode has zero callers (dead path — do not wire without exercising it first).
 
 **Push behavior on api-linked worlds** (already correct in atlas-extension layer): `image_url` syncs. `image_media_id` and the actual media blob stay local. Other machines accessing the same api-linked world only see whatever `image_url` provides.
 
 **Implication**: a user with only `image_media_id` (no URL) on an api-linked world has a map that displays locally but shows as image-less on other machines. We surface this in the maps tab row as a soft hint: *"local-only image — set a URL to share."* Same hint used for orphan loc-bound surfaces — non-blocking, just informational.
 
-### 4.1 Pin coordinates anchor to the stored canvas dims (session 209, reshaped S300)
+### 4.1 Pin coordinates anchor to the stored canvas dims (reshaped)
 
-**Origin (S361, atlas 1.8)**: `x`/`y` run from the map's BOTTOM-left, the schema's origin, and ARE Leaflet CRS.Simple `lng`/`lat` (`CoordinateUtils.ts`, no height in the conversion). Before 1.8 atlas stored y top-down; the map gear popover's "Flip pins and zones" mirrors one map once. DESIGN_LAWS convention 97.
+**Origin (atlas 1.8)**: `x`/`y` run from the map's BOTTOM-left, the schema's origin, and ARE Leaflet CRS.Simple `lng`/`lat` (`CoordinateUtils.ts`, no height in the conversion). Before 1.8 atlas stored y top-down; the map gear popover's "Flip pins and zones" mirrors one map once. DESIGN_LAWS convention 97.
 
-Pins anchor to the map's coordinate system, whose size is the stored `width`/`height`. The session-209 image gate ("pin placement refused without an image") existed to prevent the "pins-placed-on-default-2000-grid-then-canvas-shrinks-to-image" bug; since S300 that protection comes from **durable stored dims** instead of a refusal — every map carries `width`/`height` (decoded from its image, or the §4.2 imageless default), so the coordinate space never silently changes shape under the pins. The gate and its toasts are removed from all four sites (placement click, contextual right-click, sidebar drag-drop, zone drawing).
+Pins anchor to the map's coordinate system, whose size is the stored `width`/`height`. The old image gate ("pin placement refused without an image") existed to prevent the "pins-placed-on-default-2000-grid-then-canvas-shrinks-to-image" bug; now that protection comes from **durable stored dims** instead of a refusal — every map carries `width`/`height` (decoded from its image, or the §4.2 imageless default), so the coordinate space never silently changes shape under the pins. The gate and its toasts are removed from all four sites (placement click, contextual right-click, sidebar drag-drop, zone drawing).
 
 **Implication when changing an image**: pins keep their stored coordinates (measured from the bottom edge since 1.8). If the new image has different dimensions, pin display positions may look "off" relative to image content — but the pins didn't move; the world under them did. Atlas does not auto-rescale pin coords on image change, by design. Users can manually adjust or accept the new positions.
 
-**Adding an image to a blank canvas (S300b — the ONE exception to coords-kept)**: the blank square was never geography, so the sketch's RELATIVE layout is its meaning. Pins AND zone markers scale proportionally (`core/map-spatial-scale.ts` kernel, applied via `middle/map-attach-scale.ts` through the per-id chains) from the old canvas into the decoded image dims — no options fork (border-clamp piles pins on edges, keep-outside strands them invisibly, remove is what delete is for; Captain's call 2026-07-20). The local-image row (which can veto pre-write) confirms first ("N pins and M zone points will scale with the canvas onto the image"); the `image_url` field edit (already committed at hook time) scales after decode and toasts. Both paths re-persist `width`/`height` from the decoded image (the local-attach path previously skipped this when dims were already stored — the stretch trap, closed in S300). Image→image swaps still never scale.
+**Adding an image to a blank canvas (the ONE exception to coords-kept)**: the blank square was never geography, so the sketch's RELATIVE layout is its meaning. Pins AND zone markers scale proportionally (`core/map-spatial-scale.ts` kernel, applied via `middle/map-attach-scale.ts` through the per-id chains) from the old canvas into the decoded image dims — no options fork (border-clamp piles pins on edges, keep-outside strands them invisibly, remove is what delete is for; Titus's call 2026-07-20). The local-image row (which can veto pre-write) confirms first ("N pins and M zone points will scale with the canvas onto the image"); the `image_url` field edit (already committed at hook time) scales after decode and toasts. Both paths re-persist `width`/`height` from the decoded image (the local-attach path previously skipped this when dims were already stored — the stretch trap, now closed). Image→image swaps still never scale.
 
-**Small images (S300, Freek)**: when an attached image's shorter side is under `SMALL_MAP_IMAGE_MIN_SIDE` (600px), attach paths show a soft "pin placement will be coarse" hint. Never a block.
+**Small images (a tester's find)**: when an attached image's shorter side is under `SMALL_MAP_IMAGE_MIN_SIDE` (600px), attach paths show a soft "pin placement will be coarse" hint. Never a block.
 
-### 4.2 Imageless maps — the flat canvas (S300)
+### 4.2 Imageless maps — the flat canvas
 
 An imageless map is a first-class working surface, not a config-pending state:
 
-- **Stored size**: maps created without an image are stamped `width = height = IMAGELESS_MAP_SIZE` (2000, square — Captain's call 2026-07-20). Legacy imageless maps get the same dims persisted once on first tab open (mirrors the URL-decode persist). Stored dims make the space identical on every device; the constant can change without moving anyone's pins.
-- **Backdrop**: one flat rectangle spanning the canvas — `background_color` when set, a quiet translucent panel tone otherwise, hairline cyan edge marking the bounds. No default grid (flat, Captain's call); the ⚙ "Show grid" pref composes a grid overlay on top for users who want scaffolding. `sourceKey` includes `background_color` so edits re-apply live.
-- **Full capability**: the tab opens normally (openMapTab refusal + element-detail divert removed; the S254 `ensureMapTabOpen` recursion guard is gone with it), pins place, zones draw, drag-drop works. The map-index row's muted-imageless treatment is retired.
+- **Stored size**: maps created without an image are stamped `width = height = IMAGELESS_MAP_SIZE` (2000, square — Titus's call 2026-07-20). Legacy imageless maps get the same dims persisted once on first tab open (mirrors the URL-decode persist). Stored dims make the space identical on every device; the constant can change without moving anyone's pins.
+- **Backdrop**: one flat rectangle spanning the canvas — `background_color` when set, a quiet translucent panel tone otherwise, hairline cyan edge marking the bounds. No default grid (flat, Titus's call); the ⚙ "Show grid" pref composes a grid overlay on top for users who want scaffolding. `sourceKey` includes `background_color` so edits re-apply live.
+- **Full capability**: the tab opens normally (openMapTab refusal + element-detail divert removed; the old `ensureMapTabOpen` recursion guard is gone with it), pins place, zones draw, drag-drop works. The map-index row's muted-imageless treatment is retired.
 - **Create flow**: the create modal auto-opens the tab with or without an image ("place pins now, add art later" — and when the art arrives, the sketch scales onto it, §4.1).
 - **Broken image URLs** (S300b): when the browser can't load a map's `image_url` (404, CORS, dead host), the tab falls back to the flat canvas + an honest chip instead of Leaflet's white void (`setBackgroundImage`'s `onError`). Stored dims keep the coordinate space; nothing moves.
-- **Dims-flip remount** (right-pane `lastActiveMapDimsKey`): when the active map's stored dims change, the tab disposes + remounts so the manager/interactions/zone overlay convert in the new space; the saved camera is CLEARED first (it targeted the old space — S300b). Background tabs get cache-evicted by `refreshCachedBackgrounds` instead; do not add a second active-tab remount path (it races this one into an empty pane — S300 close-gate follow-up).
+- **Dims-flip remount** (right-pane `lastActiveMapDimsKey`): when the active map's stored dims change, the tab disposes + remounts so the manager/interactions/zone overlay convert in the new space; the saved camera is CLEARED first (it targeted the old space). Background tabs get cache-evicted by `refreshCachedBackgrounds` instead; do not add a second active-tab remount path (it races this one into an empty pane).
 - **Sharing**: unchanged — `freezeMapBlock` ships only maps with a public `https` image_url (D3), so imageless maps don't publish as map blocks; local-media maps were already in that boat. Revisit if a "flat canvas on the published page" ask ever sharpens.
 
-**Placement-mode feedback (S299)**: arming placement (the +pin button, or the tour) now gives real feedback — the +pin icon lights cyan (`[data-action="pin-element"].active`), a "Click the map to place <name>" banner floats over the active map (`src/tabs/right/map-placement-hint.ts`, a boot-installed state watcher), the map cursor becomes a crosshair (`body.atlas-placing` — the class was defined since session 219 but never applied until now), and **Esc cancels** (owned via a skip in the deselect-to-home hotkey guard). Before S299 clicking +pin gave no visible state at all.
+**Placement-mode feedback**: arming placement (the +pin button, or the tour) now gives real feedback — the +pin icon lights cyan (`[data-action="pin-element"].active`), a "Click the map to place <name>" banner floats over the active map (`src/tabs/right/map-placement-hint.ts`, a boot-installed state watcher), the map cursor becomes a crosshair (`body.atlas-placing` — the class was defined long before but never applied until now), and **Esc cancels** (owned via a skip in the deselect-to-home hotkey guard). Before this, clicking +pin gave no visible state at all.
 
-**Pin labels default (S299)**: `FACTORY_DEFAULTS.pin_labels` is now `'always'` (was `'hover'`), matching `zone_labels` — pins are discoverable at a glance out of the box. Per-map ⚙ / the settings Maps-defaults editor can dial back to `'hover'`/`'threshold'`/`'never'`; existing saved user defaults are untouched.
+**Pin labels default**: `FACTORY_DEFAULTS.pin_labels` is now `'always'` (was `'hover'`), matching `zone_labels` — pins are discoverable at a glance out of the box. Per-map ⚙ / the settings Maps-defaults editor can dial back to `'hover'`/`'threshold'`/`'never'`; existing saved user defaults are untouched.
 
 ---
 
-## 5. Tab state across world switches (revised session 209)
+## 5. Tab state across world switches (revised)
 
 **Decision**: `ui.rightTabs` is GLOBAL across world switches. Tabs persist when changing worlds; tabs whose `mapId` isn't in the current world's `data.elements` render as stale (darkened, italic, cloud_off icon, click anywhere on the tab to close). User decides when to close cross-world tabs.
 
@@ -476,7 +476,7 @@ An imageless map is a first-class working surface, not a config-pending state:
 - `right-pane.ts` checks each tab's mapId against `data.elements` on every render. Missing → `atlas-tab-stale` class + click handler that closes (vs activates).
 - Stale tab body pane (`map-tab.ts`) shows a friendly "this map isn't in the current world" state with an explicit Close button.
 - `activateWorld` does NOT touch `ui.rightTabs` on world switch. Tabs persist.
-- Per-world snapshot helpers (`setWorldRightTabs` / `getWorldRightTabs`) were removed in the 2026-07-10 dead-export cleanup (dead-by-design since tabs went global in session 209); `right_tabs` stays on `WorldRegistryEntry` as a documented-but-unused field if per-world persistence is ever revived.
+- Per-world snapshot helpers (`setWorldRightTabs` / `getWorldRightTabs`) were removed in the 2026-07-10 dead-export cleanup (dead-by-design since tabs went global); `right_tabs` stays on `WorldRegistryEntry` as a documented-but-unused field if per-world persistence is ever revived.
 
 ---
 
@@ -559,7 +559,7 @@ Edge cases this exercises: location-inferred placement, hierarchy sort, explicit
 
 ### Fixture format
 
-Each world's fixture lives at `tools/atlas/tests/fixtures/map-worlds/world-{a,b,c}.json` — pure data, importable into both unit tests and Skeld's API-population script.
+Each world's fixture lives at `tests/fixtures/map-worlds/world-{a,b,c}.ts` — pure data, importable into both unit tests and Skeld's API-population script.
 
 ---
 
@@ -582,12 +582,12 @@ Pure documentation pass — no field changes, no schema breakage. Council briefi
 
 These are explicitly OUT of v1 scope but parked for later consideration. Not foundation work.
 
-- ~~**Drag-to-reorder hierarchy**~~ — **Shipped session 212** as Bout DR. Same-sibling-group only; drop above/below computed from cursor-Y vs row midpoint.
-- ~~**Pin styling pass for map-having elements**~~ — **Shipped sessions 219+221**: map glyph on pins whose linked element has a sub-map. Session 221 fixed an over-eager match (was firing on all pinned elements; now correctly Locations-with-submap only).
+- ~~**Drag-to-reorder hierarchy**~~ — **Shipped** as Bout DR. Same-sibling-group only; drop above/below computed from cursor-Y vs row midpoint.
+- ~~**Pin styling pass for map-having elements**~~ — **Shipped**: map glyph on pins whose linked element has a sub-map. A later fix narrowed an over-eager match (was firing on all pinned elements; now correctly Locations-with-submap only).
 
-The following were considered and explicitly dropped by Captain (session 221) — kept here for historical context, do NOT re-add to the backlog without a fresh design conversation:
+The following were considered and explicitly dropped by Titus — kept here for historical context, do NOT re-add to the backlog without a fresh design conversation:
 
-- ~~**Zone-targets-map**~~ — dropped. Captain: bring up again if the use case ever sharpens.
+- ~~**Zone-targets-map**~~ — dropped. Titus: bring up again if the use case ever sharpens.
 - ~~**Map subtype as visual filter**~~ — dropped.
 - ~~**Cross-element rendering on maps**~~ — dropped (ambient/ephemeral pins of "all Characters at this location"; out of scope for v1).
 - ~~**Map locking via URL / shareable**~~ — dropped. Map state stays local UX pref.
@@ -630,20 +630,20 @@ Schema:
 ```ts
 interface MapViewPrefs {
   pin_style:         'icon' | 'round-icon' | 'pin-shape';   // default: 'icon'
-  pin_labels:        'auto' | 'always' | 'hover' | 'threshold' | 'never';  // default: 'auto' (S356; was 'always' S299)
+  pin_labels:        'auto' | 'always' | 'hover' | 'threshold' | 'never';  // default: 'auto' (was 'always')
   pin_label_threshold: number;                              // default: 6 (used iff pin_labels === 'threshold')
   pin_tint:          'type-color' | 'accent' | 'muted';     // default: 'type-color'
   show_grid:         boolean;                               // default: false
   grid_spacing:      50 | 100 | 200;                        // default: 100
   lock_pin_drag:     boolean;                               // default: false
   zone_fill_opacity: number;                                // default: 0.4
-  zone_labels:       'auto' | 'always' | 'hover' | 'never'; // default: 'auto' (S356)
+  zone_labels:       'auto' | 'always' | 'hover' | 'never'; // default: 'auto'
 }
 ```
 
-**`'auto'` = the density layer (S356, `tabs/right/map-label-density.ts`).** Born on Sikelia (196 pins, 319 zones, one canvas): every label that has room is shown, and a label that would overprint a higher-ranked one drops. Rank: the selected element, then pins by world degree (incoming links + log of description length, the charts room's weight), then polygon zones, then line zones, bigger screen extent first. A pin label tries below, right, left, above its icon before dropping, and never covers another pin's icon or crosses the map's edge; a dropped pin label comes back as the hover tooltip. A map prints a name once: a zone and the pin of the same name share one label, the pin's if it has room, else the zone's. (S382, #121, show's rule from a327199: S356 let the top tenth of pins by weight cover a lighter icon as a last resort, which at fit zoom on Moppetopia put Feltropolis and USS Fuzzball over their neighbours; the published page and the share preview follow the same rule in `share-page-render.ts` `declutterMapLabels`.) Re-run on every settled pan/zoom and after every pin/zone sync; boxes are computed from projected anchors + canvas-measured text (one calibration rect read per pass, zero forced layouts after), so a pass costs single-digit ms. Culling is a class (`atlas-label-culled`), never `display`, so it cannot fight the mode toggle or the hover fade. On a sparse map `'auto'` renders exactly as `'always'`.
+**`'auto'` = the density layer (`tabs/right/map-label-density.ts`).** Born on Sikelia (196 pins, 319 zones, one canvas): every label that has room is shown, and a label that would overprint a higher-ranked one drops. Rank: the selected element, then pins by world degree (incoming links + log of description length, the charts room's weight), then polygon zones, then line zones, bigger screen extent first. A pin label tries below, right, left, above its icon before dropping, and never covers another pin's icon or crosses the map's edge; a dropped pin label comes back as the hover tooltip. A map prints a name once: a zone and the pin of the same name share one label, the pin's if it has room, else the zone's. (show's rule from a327199: an earlier version let the top tenth of pins by weight cover a lighter icon as a last resort, which at fit zoom on Moppetopia put Feltropolis and USS Fuzzball over their neighbours; the published page and the share preview follow the same rule in `share-page-render.ts` `declutterMapLabels`.) Re-run on every settled pan/zoom and after every pin/zone sync; boxes are computed from projected anchors + canvas-measured text (one calibration rect read per pass, zero forced layouts after), so a pass costs single-digit ms. Culling is a class (`atlas-label-culled`), never `display`, so it cannot fight the mode toggle or the hover fade. On a sparse map `'auto'` renders exactly as `'always'`.
 
-**Label priority from world styles (S356, DESIGN_ZONES §5b)**: a zone kind whose rule sets `label_priority` competes in the pin tier (priority 1) instead of after every pin, so the big rivers keep their names at fit.
+**Label priority from world styles (DESIGN_ZONES §5b)**: a zone kind whose rule sets `label_priority` competes in the pin tier (priority 1) instead of after every pin, so the big rivers keep their names at fit.
 
 **The icon-scale rule (same module, unconditional):** a pin icon is never wider than ~70% of the median gap between this map's pins at the current zoom (`pinScaleForSpacing`, floor 0.4). Sparse maps measure a gap wider than the icon and keep scale 1, so nothing existing changed; Sikelia's pins are 17px at fit and 32px one zoom in. Re-scaling patches the rendered `<img>` in place (no `setIcon`, which would replace 196 elements a zoom).
 
@@ -709,7 +709,7 @@ When `lock_pin_drag === true`, the pin marker creation in `map-tab-pin-drag.ts` 
 
 ## 12. Canvas toolbar (always visible above the leaflet canvas)
 
-> **Order as shipped (S356, Captain):** left set = settings | show zones · show pins | draw polygon · draw line (looking before making, dividers kept); right set = zones fold-out (the zone panel, DESIGN_ZONES §4.5) · fit-to-image (a view-state control, so it lives right) · open-map-element.
+> **Order as shipped (Titus):** left set = settings | show zones · show pins | draw polygon · draw line (looking before making, dividers kept); right set = zones fold-out (the zone panel, DESIGN_ZONES §4.5) · fit-to-image (a view-state control, so it lives right) · open-map-element.
 
 
 A thin row (~36px tall) docked at the top of each map tab's body, above the leaflet container. Map index tab (the pinned first tab) does NOT get a toolbar.
@@ -730,7 +730,7 @@ A thin row (~36px tall) docked at the top of each map tab's body, above the leaf
 | Button | Tooltip | Behavior |
 |---|---|---|
 | ⚙ | "Map visual settings" | Toggles the §11 popover |
-| ⬡ | "Draw polygon" | Enters drawing mode (DESIGN_ZONES.md §2). Active state styled when `ui.zoneDrafting?.mode === 'polygon'`. Always enabled — the no-image gate was **removed in S300** (zones draw on imageless maps; stored dims replace the refusal, see §4.2) (corrected 2026-07-22, S309). |
+| ⬡ | "Draw polygon" | Enters drawing mode (DESIGN_ZONES.md §2). Active state styled when `ui.zoneDrafting?.mode === 'polygon'`. Always enabled — the no-image gate was **removed** (zones draw on imageless maps; stored dims replace the refusal, see §4.2) (corrected 2026-07-22). |
 | ╱ | "Draw line" | Same, for line mode. |
 | 👁 zones | "Show/hide zones" | Toggles zonesLayer visibility on Leaflet2DManager. Transient (not persisted). |
 | 👁 pins | "Show/hide pins" | Toggles pinsLayer visibility. Transient. |
@@ -748,11 +748,11 @@ Toolbar mounts in `mountMapTab` inside `.atlas-tab-body`. The body becomes a ver
 
 ---
 
-## 13. Zone chip strip → toolbar dropdown (revised session 217, ZC9)
+## 13. Zone chip strip → toolbar dropdown (revised, ZC9)
 
 **Original v1 design**: a bottom-of-canvas chip strip mirroring the pin chip strip pattern.
 
-**Shipped instead** (session 217): a right-anchored dropdown on the canvas toolbar (see DESIGN_ZONES.md §4.5 for full rendering details). Trade-off: better canvas real estate, slight loss in at-a-glance scanning. Captain confirmed this direction; the strip is gone.
+**Shipped instead**: a right-anchored dropdown on the canvas toolbar (see DESIGN_ZONES.md §4.5 for full rendering details). Trade-off: better canvas real estate, slight loss in at-a-glance scanning. Titus confirmed this direction; the strip is gone.
 
 Mount: the toolbar button `zonesDropdownBtn` lives in `map-tab-toolbar.ts` (anchored right via a flex spacer). The dropdown panel is the same DOM element that was the chip strip (`entry.zoneStrip` in cache) — re-purposed via CSS class `.atlas-zones-dropdown-panel`. Hidden until the button toggles `.is-open`.
 
@@ -791,18 +791,18 @@ If the chip strip ever grows too wide for the canvas width, it horizontally scro
 
 ---
 
-## 15. Map styles: a map drawn from its own zones (#365, 1.53, S423-S426)
+## 15. Map styles: a map drawn from its own zones (1.53)
 
-The Captain's lead (h20 #6442); the research, trial and session record: `Forge/Notes/2026-10-17-s423-map-from-zones-design.md`. Notes decide, this section holds.
+Titus's lead (2026-10-17). This section holds the decisions.
 
 **The line**: the stored shape is the meaning; the look is the renderer's reading of it. Jitter, patterns, shore bands, paper and lettering are computed at render time from the zone's points and its kind, never stored. Choosing a style writes one field on the Map and nothing else. Never in scope: brushes, a symbol library, painted relief, a base-map painter.
 
-- **The kind** (Skeld h20 #6449): read from the zone's **subtype**, trimmed, case-insensitive (`zoneKindOf`, `core/map-ink.ts`). Areas `Landmass`, `Sea`, `Lake`, `Range`, `Forest`, `Marsh`, `Desert`, `Territory`; lines `River`, `Road` (`Route`, `Path` read as roads), `Wall`, `Border`, `Coast`. A subtype written `Class: kind` is tried by its halves, the class first (Skeld h58 #6762: Blood Meridian's "Border: treaty line" draws as a border). Any other subtype draws exactly as on a Plain map. The supertype carries the shape (DESIGN_ZONES §1.5); `role` is the author's own words and no style reads it. The New zone step offers the kind words on the subtype (a datalist), never requires them.
-- **The style** (`atlas_map_style` on Map, a wire extension, ATLAS_FIELDS; null = Plain): `ink` (Ink on parchment), `atlas` (Modern atlas, Seethe h20 #6542), `hatched` (Seethe h20 #6572). A preset is a table per kind: stroke, fill, a pattern, shore bands, a wobble, a region (`land` or `water`) and whether a line clips to land. The **Map style** row sits on the map's page under Background colour. An unknown value reads as Plain. On an imageless map (§4.2) the flat canvas takes the style's sea and edge when the map has no `background_color` of its own; on a map with a picture the picture is the ground (`overPicture`, the S426 gate's G3): the zones keep their ink, patterns, lettering and names, and cover nothing (land and water lose their fill and shore bands, a pattern its tint), so Blood Meridian's territories, borders and roads draw over its relief, and an Ink landmass never paints paper over a photograph. World styles (DESIGN_ZONES §5b) do not override a styled kind: the style is the register.
+- **The kind** (Skeld 2026-10-17): read from the zone's **subtype**, trimmed, case-insensitive (`zoneKindOf`, `core/map-ink.ts`). Areas `Landmass`, `Sea`, `Lake`, `Range`, `Forest`, `Marsh`, `Desert`, `Territory`; lines `River`, `Road` (`Route`, `Path` read as roads), `Wall`, `Border`, `Coast`. A subtype written `Class: kind` is tried by its halves, the class first (Skeld 2026-10-18: Blood Meridian's "Border: treaty line" draws as a border). Any other subtype draws exactly as on a Plain map. The supertype carries the shape (DESIGN_ZONES §1.5); `role` is the author's own words and no style reads it. The New zone step offers the kind words on the subtype (a datalist), never requires them.
+- **The style** (`atlas_map_style` on Map, a wire extension, ATLAS_FIELDS; null = Plain): `ink` (Ink on parchment), `atlas` (Modern atlas, Seethe 2026-10-17), `hatched` (Seethe 2026-10-17). A preset is a table per kind: stroke, fill, a pattern, shore bands, a wobble, a region (`land` or `water`) and whether a line clips to land. The **Map style** row sits on the map's page under Background colour. An unknown value reads as Plain. On an imageless map (§4.2) the flat canvas takes the style's sea and edge when the map has no `background_color` of its own; on a map with a picture the picture is the ground (`overPicture`): the zones keep their ink, patterns, lettering and names, and cover nothing (land and water lose their fill and shore bands, a pattern its tint), so Blood Meridian's territories, borders and roads draw over its relief, and an Ink landmass never paints paper over a photograph. World styles (DESIGN_ZONES §5b) do not override a styled kind: the style is the register.
 - **The ink holds still**: `inkPoints` is seeded midpoint displacement keyed to each segment's endpoints in world coordinates, never a vertex index, so a redraw, a pan or an inserted vertex elsewhere leaves the rest of the coast alone, and zooming in keeps every coarser ink point (`tests/unit/map-ink.test.ts`). The bulge side is taken from the endpoints in one fixed order, so an edge two zones share draws as one line whichever way each runs it (G5). Re-inked on `zoomend`. A zone being edited draws its stored points plain, so the handles sit on them.
 - **The renderer** (`ZoneOverlay`): patterns are `<pattern>` defs in the zone renderer's own svg, one per shape and colour (`inkPatternId`); shore bands under a landmass; `applyInkOrder` stacks seas, land and shore, areas, plain zones, lines, names. A river is cut to land (`clipLineToLand`, `ZoneGeometry.ts`): inside some landmass (anywhere, with none on the map), inside no sea or lake, against each region's outline as drawn at this zoom; a river with no land under it draws whole. The cost is bounded (G2): each ring's edges sit on a 64 x 64 grid, a segment tests only the edges near it, land is carried between outlines, and the overlay keeps the inked regions while the zoom and the regions' shapes stay the same. After Plain the zones take their plain order again (`applyPlainOrder`, G4).
 - **Names**: an area's name sits at its pole of inaccessibility (the point farthest inside), in the style's lettering (`.atlas-map-style-<id>`, a face per kind); a line's name runs along it on a `<textPath>`, left to right. Both join the density layer (§11.6): metrics per label face, cached per map; a name along a line tries five shares of the line, middle first, and drops when an area name or a pin is in the way.
-- **Pins** on a styled map print in its ink (one `atlas-map-ink` class on the container, the icon filtered, so it still carries its type); on Hatched in a washed sepia (Seethe h57 #6789).
+- **Pins** on a styled map print in its ink (one `atlas-map-ink` class on the container, the icon filtered, so it still carries its type); on Hatched in a washed sepia (Seethe 2026-10-18).
 - **Trace** (DESIGN_ZONES §2.5): a toggle on the drawing strip; while on, a drag lays a stroke instead of panning, and on release `simplifyStroke` (a five-sample moving average, then Douglas-Peucker at 3 screen px) puts its points into the ordinary draft, which finishes through the usual modal. A click still places one point, and so does a press that moves under 8 screen px. Each vertex is a Marker file, so the point budget is the design: at most 60 points a stroke (the tolerance grows by a quarter until it fits), and the raggedness comes from the renderer. While Trace is on the container takes `touch-action: none`, so a finger's drag is the stroke's; the stroke follows one pointer, a second finger drops it, and a cancelled stroke lands nothing (G6).
 - **Not taken** (from Seethe's tables): her pin ring and dot, the wall's ticks, the sea's rhumb lines. EB Garamond is not bundled (Georgia stands in). **Later, only when asked**: "Download as picture" with a key box; never "set as the map's picture".
 - **Guards**: `tests/e2e/map-ink.spec.ts` (the style row, Plain restoring, rivers ending at the coast, a name sliding clear, capitals never over a pin, a hatched map), units `map-ink`, `zone-clip-to-land`, `map-label-along`, `zone-label-pole`, `zone-trace-simplify`.
@@ -813,7 +813,6 @@ The Captain's lead (h20 #6442); the research, trial and session record: `Forge/N
 
 This doc is the source of truth for the map subsystem foundation. Bouts execute against it. If a decision proves wrong during implementation, the doc gets updated FIRST and then the code follows — never the reverse.
 
-Companion file: `tools/atlas/PROGRESS.md` will track operational state per bout.
-Companion file: `tools/atlas/tests/fixtures/map-worlds/` will hold the JSON fixtures.
+Companion file: `tests/fixtures/map-worlds/` holds the JSON fixtures.
 
 When all bouts ship and the schema motion lands, this doc transitions from "active design" to "reference."

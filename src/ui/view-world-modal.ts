@@ -1,5 +1,5 @@
 /**
- * ViewWorldModal (S264) — open an OnlyWorlds world VIEW-ONLY with a read key.
+ * ViewWorldModal — open an OnlyWorlds world VIEW-ONLY with a read key.
  *
  * The sister-and-her-DM flow: someone shares their world by minting a read
  * key on onlyworlds.com; the recipient pastes it here. No PIN exists or is
@@ -99,7 +99,7 @@ export class ViewWorldModal extends BaseModal {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Downloading…';
       cancelBtn.hidden = true;
-      // No outside-click or Escape close while the world downloads (S360).
+      // No outside-click or Escape close while the world downloads.
       this.dismissLocked = true;
 
       const renderProgress = (p: InitialDownloadProgress) => {
@@ -129,7 +129,7 @@ export class ViewWorldModal extends BaseModal {
         navigate(homeHash(result.entry.id));
       } catch (err) {
         // A refused key, an unknown world or no connection arrives worded
-        // (keyCheckError); the rest is worded here (S369).
+        // (keyCheckError); the rest is worded here.
         console.warn('[view-world] view failed:', err);
         const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where }).sentence;
         errorBox.textContent = sentence;

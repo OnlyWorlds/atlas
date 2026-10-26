@@ -1,5 +1,5 @@
 /**
- * #139 (S387): the pure halves of the submap door. Which maps a pinned place
+ * #139: the pure halves of the submap door. Which maps a pinned place
  * opens, which map is "up", and the tab swap that keeps one tab for the walk.
  */
 import { describe, it, expect, beforeEach } from 'vitest';

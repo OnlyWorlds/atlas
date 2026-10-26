@@ -151,7 +151,7 @@ describe('SyncEngine /bulk push path', () => {
     expect(client.__server_get('character', bad.id)).toBeUndefined();
   });
 
-  it('a survivor that links to a refused element is held back, so the independent ones still land (S361)', async () => {
+  it('a survivor that links to a refused element is held back, so the independent ones still land', async () => {
     // One refused element used to take every independent survivor down with
     // it: its dependents made the atomic retry fail, every round.
     const good = await folder.createElement('character', { name: 'Good' });
@@ -225,7 +225,7 @@ describe('SyncEngine /bulk push path', () => {
 
     expect(result.auth_blocked).toBe(true);
     expect(engine.getState().kind).toBe('error');
-    // Since the world-meta step (S262), dead creds bail at the round-opening
+    // Since the world-meta step, dead creds bail at the round-opening
     // GET /world — /bulk is never attempted and no per-item failures accrue.
     expect(result.failures).toHaveLength(0);
     expect(bulkCalls()).toHaveLength(0);
@@ -239,7 +239,7 @@ describe('FakeOwApiClient.pullChanges (unit — the engine wiring has its own su
     // pullChanges is OPT-IN (mirrors __enable_bulk): the engine dispatches on
     // its presence, so the fake keeps it detached by default and this unit
     // block attaches it explicitly.
-    client.__enable_changes(); // on by default since S365; kept to state the intent
+    client.__enable_changes(); // on by default; kept to state the intent
     const pull = client.pullChanges!;
     await client.createElement('character', { id: 'c1', name: 'A' });   // seq 1 upsert
     await client.createElement('character', { id: 'c2', name: 'B' });   // seq 2 upsert

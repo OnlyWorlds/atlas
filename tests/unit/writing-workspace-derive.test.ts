@@ -56,7 +56,7 @@ describe('extractProseLinks', () => {
 const ANY = () => true;
 
 describe('computeRelationPatch', () => {
-  // S364 lane A2: a chip can outlive its element (a delete scrubs link fields
+  // A chip can outlive its element (a delete scrubs link fields
   // and leaves prose alone), and the derive used to write the dead id back.
   it('does not derive a link to an element that no longer exists', () => {
     const narr = makeNarrative({ characters: [] } as any);

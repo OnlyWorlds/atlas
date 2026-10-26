@@ -3,16 +3,16 @@
  *
  * Conversion between Leaflet coordinates and storage coordinates.
  *
- * THE ORIGIN IS BOTTOM-LEFT (S361). The OnlyWorlds schema says pin and marker
+ * THE ORIGIN IS BOTTOM-LEFT. The OnlyWorlds schema says pin and marker
  * x/y run "from bottom left of the map" (`keel/schema/pin.yaml`); the folder
  * format, the toolkit, azgaar-converter, Sikelia and Windrose all agree.
  * Leaflet CRS.Simple is bottom-left too, and the image spans lat 0 (its
  * bottom edge) to its height, so a stored point IS a Leaflet point:
  * `lat = y`, `lng = x`. No height enters the conversion.
  *
- * Until S361 this file said "Storage/API uses top-left origin", citing the
+ * This file once said "Storage/API uses top-left origin", citing the
  * old ow.com map tool, and flipped `lat = height - y` both ways: every
- * standard world drew mirrored north-south in Atlas (Captain's Sikelia
+ * standard world drew mirrored north-south in Atlas (Titus's Sikelia
  * screenshot), and the flip needed a height that could be stale. Ruled
  * 2026-09-28: Atlas conforms, no migration; a map placed in older Atlas can
  * be mirrored once from its settings. `canvasHeight` stays in the signatures
@@ -27,7 +27,7 @@ import type { StoragePoint } from './types';
  * Used when: user clicks on canvas, saving marker positions
  *
  * @param latlng - Leaflet LatLng position
- * @param _canvasHeight - unused since S361 (bottom-left needs no height)
+ * @param _canvasHeight - unused (bottom-left needs no height)
  * @returns Storage coordinates (bottom-left origin, the schema's)
  */
 export function leafletToStorage(latlng: L.LatLng, _canvasHeight?: number): StoragePoint {
@@ -42,7 +42,7 @@ export function leafletToStorage(latlng: L.LatLng, _canvasHeight?: number): Stor
  * Used when: loading markers from storage, rendering on canvas
  *
  * @param point - Storage coordinates (bottom-left origin, the schema's)
- * @param _canvasHeight - unused since S361 (bottom-left needs no height)
+ * @param _canvasHeight - unused (bottom-left needs no height)
  * @returns Leaflet LatLng position
  */
 export function storageToLeaflet(point: StoragePoint, _canvasHeight?: number): L.LatLng {

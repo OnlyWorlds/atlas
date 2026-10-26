@@ -1,11 +1,11 @@
 /**
- * S364 (gate lens A B1, ruled (a)): a pull now reads the element AS ON DISK
+ * A pull now reads the element AS ON DISK
  * before applying (`applyServerRecordIfUnchanged` via `readForWrite`, so a
  * stamped outside edit is never overwritten). A served file that will not
  * parse (git conflict markers) therefore throws `CorruptFileError` in the
  * pull, and the round pauses with the file named, the posture convention 99
  * already set for push rounds: never write over a file Atlas cannot read.
- * Before S364 the pull silently wrote the server body over the conflict.
+ * Before this, the pull silently wrote the server body over the conflict.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';

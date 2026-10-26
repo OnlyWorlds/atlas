@@ -6,7 +6,7 @@
  * call window.confirm) and hand the facts in. That keeps the RULE testable
  * without a store, and keeps every delete surface on the same rule.
  *
- * THE RULE (S310)
+ * THE RULE
  * ---------------
  * A delete gets a confirmation when EITHER
  *   (a) the user's `confirm_before_delete` preference is on, OR
@@ -27,7 +27,7 @@
  *     ("disk unlinks in closed narratives have no Ctrl+Z")
  *   - `element-detail-header.ts` gated its CASCADING delete on the preference
  * The last one is the outlier, and it is the one wired to the writing room,
- * where the cascade is an entire manuscript. Verified live (S310): one click,
+ * where the cascade is an entire manuscript. Verified live: one click,
  * zero confirms, 8 of 9 elements destroyed.
  */
 
@@ -60,10 +60,10 @@ export interface DeleteConfirmInput {
    * could not look, not because nothing depends on this element.
    *
    * The two cases are opposite in consequence and were indistinguishable: an
-   * empty list means `cascades` is false, which switches off the S310 confirm
+   * empty list means `cascades` is false, which switches off the confirm
    * floor, so with `confirm_before_delete` turned off a failed probe deleted
-   * a whole subtree with no prompt at all. Unknown is not the same as none
-   * (S323).
+   * a whole subtree with no prompt at all. Unknown is not the same
+   * as none.
    */
   dependentsUnknown?: boolean;
 }

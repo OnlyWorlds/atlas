@@ -1,5 +1,5 @@
 /**
- * Settings → World tab (extracted from settings-panel session 233). Per-active-
+ * Settings → World tab (extracted from settings-panel). Per-active-
  * world controls: rename, state/folder/id metadata, stay-offline, refresh/test/
  * unlink (api-linked) or make-online (local-only), and the two delete flows
  * (forget = keep folder; delete = remove folder on disk).
@@ -129,7 +129,7 @@ export function worldKeyHtml(world: WorldRegistryEntry): string {
   const engine = getState().sync.byWorld[world.id];
   const offerMake = offersMakeKey(world) && (!!world.api.read_only || engine?.kind === 'error');
   // The key's kind says what it could do; a refusal sync met says what it
-  // does now (S419, #198's live walk: "reads and writes" under "Sync stopped").
+  // does now (#198's live walk: "reads and writes" under "Sync stopped").
   const refusal = engine?.kind === 'error' ? keyRefusalFor(world.id) : undefined;
   // A member's write key changes only what its role allows (B12 Q2, conv. 151).
   const member = world.api.member_role === 'guest' || world.api.member_role === 'contributor';
@@ -332,10 +332,10 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       }
     });
 
-  // "Open the folder in Explorer" (Captain, S360): a web page cannot open an
+  // "Open the folder in Explorer" (Titus): a web page cannot open an
   // OS folder or learn its full path. The nearest real thing is the system
   // folder picker opened INSIDE the world folder; whatever the user picks is
-  // ignored (S361).
+  // ignored.
   document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="show-folder"]')
     ?.addEventListener('click', async () => {
       const handle = await loadHandle(world.folder.handle_key).catch(() => undefined);
@@ -360,7 +360,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     toasts.info('Renamed');
   });
 
-  // World image URL (Captain, S311): the ONE meta field with no edit surface
+  // World image URL (Titus): the ONE meta field with no edit surface
   // anywhere in the ecosystem right now. Persists like the home page's
   // description edit — writeWorldMeta + the active.meta mirror — and rides the
   // world-meta sync (image_url is one of the eight synced fields; the ≤1024
@@ -393,7 +393,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     saveRegistry(next);
     patchSlice('registry', next);
     // The engine follows the EFFECTIVE pause: unticking this must not resume
-    // a world "Pause all sync" keeps offline (S367 critic C7, same predicate
+    // a world "Pause all sync" keeps offline (the same predicate
     // as the sidebar and Settings, Sync).
     const stillPaused = effectiveSyncPaused(next.worlds.find(w => w.id === world.id), next);
     const engine = getCurrentSyncWorldId() === world.id ? getCurrentSyncEngine() : null;
@@ -427,7 +427,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       if (!result) { surfaceSyncUnavailable(toasts); return; }
       // pullNowAndRefresh says what came down (the counts, or the conflicts'
       // own toasts): only the nothing-came case is said here, or a refresh
-      // says it twice (S411, the journey scout's gap C).
+      // says it twice (the journey scout's gap C).
       if (upToDate(result)) toasts.success('Already up to date');
     } catch (err) {
       console.warn('[settings-world] refresh failed:', err);
@@ -486,7 +486,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       // a wrong PIN are both 401, and telling someone to check their PIN when
       // their key was revoked sends them to a control that cannot fix it. The
       // engine has distinguished these for a while (sync-engine noteAuthBail);
-      // "test connection" was still giving one answer for three causes (S323).
+      // "test connection" was still giving one answer for three causes.
       const code = (err as { code?: string } | null)?.code;
       const status = (err as { status?: number } | null)?.status;
       const refusal = keyRefusalOf(err);
@@ -626,7 +626,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     if (!ok) return;
     deletePermBtn.disabled = true;
     // Asked BEFORE anything closes: a refusal must leave the world open and
-    // working (S365 gate lens B F1).
+    // working.
     const refusal = await whyWorldFolderNotDeletable(world);
     if (refusal) {
       toasts.error(refusal);
@@ -662,7 +662,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
 
 /**
  * Elements OnlyWorlds refused because their ids already live in another
- * world (S363): a copied or imported folder, a world taken online twice. Only
+ * world: a copied or imported folder, a world taken online twice. Only
  * new ids fix that, so this is where they are offered; and an id update that
  * did not finish is finished (or discarded) from here too.
  */
@@ -696,7 +696,7 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
     // A run in progress writes the journal: that is not "did not finish".
     const interrupted = !rk.isRekeyRunning() && await store.hasRekeyJournal().catch(() => false);
     if (interrupted) {
-      // A Route 2 link that stopped mid-way (S367): the world is local-only,
+      // A Route 2 link that stopped mid-way: the world is local-only,
       // so "not syncing" is not the news; what to do next is. The words are
       // set BEFORE the row shows, so the re-key copy never flashes (gate B10).
       const { rekeyJournalOrigin } = await import('../store/rekey');
@@ -724,7 +724,7 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
   await show();
   // An id move that ends (a Route 2 run behind the Make online modal, a
   // re-key) re-reads the rows: the render that happened DURING the run saw
-  // the journal as "running", not "did not finish" (S367 gate B3). The
+  // the journal as "running", not "did not finish". The
   // listener retires itself once this tab's markup is gone.
   const onSettled = (): void => {
     if (!document.contains(stuck)) { window.removeEventListener(rk.ID_MOVE_SETTLED_EVENT, onSettled); return; }
@@ -793,7 +793,7 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
 }
 
 // ---------------------------------------------------------------------------
-// Sync issues (S369): the elements still not syncing, why, and what to do.
+// Sync issues: the elements still not syncing, why, and what to do.
 // The list is `sync/sync-issues.ts`, rebuilt by every round; this tab is the
 // place a failure toast, the pill's ⚠ badge and an errored pill all lead to.
 // ---------------------------------------------------------------------------
@@ -904,7 +904,7 @@ function wireSyncIssues(world: WorldRegistryEntry, toasts: ToastManager): void {
 }
 
 /**
- * Links that point at elements no longer in this LOCAL world (S362): left by
+ * Links that point at elements no longer in this LOCAL world: left by
  * deletes from before Atlas removed links on delete, or by importing part of
  * an export. keel refuses an element whose link names nothing, so these
  * elements would never upload. Offered only on a local world, where absent

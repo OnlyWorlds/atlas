@@ -1,5 +1,5 @@
 /**
- * The re-key kernel (S363, `store/rekey.ts`). Rows follow re-key gate lens 1's
+ * The re-key kernel (`store/rekey.ts`). Rows follow re-key gate lens 1's
  * runway: each names the failure it catches.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -115,7 +115,7 @@ describe('the re-key kernel', () => {
   });
 
   it('a world that already holds two pins for one element on one map re-keys whole', async () => {
-    // Written before the S307 guard existed: seeded around it.
+    // Written before the one-pin-per-map guard existed: seeded around it.
     await store.createElementVerbatim('pin', { id: id(13), name: '', map_id: id(1), element_id: id(10), element_type: 'location', x: 5, y: 5 } as unknown as Element);
     const r = await startRekey(store, { worldId: W, ids: [id(10), id(12), id(13)], mintId: minter() });
     const pins = (await store.listElements('pin')).filter(p => p.element_id === r.map.get(id(10)));
@@ -257,7 +257,7 @@ describe('the crash matrix', () => {
   });
 });
 
-// ---- S363 gate lens A (Forge/Notes/2026-09-29-s363-gate/lens-a-kernel.md, RUNWAY rows 7-12) ----
+// ---- Kernel gate probes ----
 
 /** A store whose nth call of `method` throws: a tab closed at that point. */
 function crashOn(target: MockFolderStore, method: string, nth: number): FolderStore {

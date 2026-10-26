@@ -1,5 +1,5 @@
 /**
- * World units (standard 00.31.00, Keel #146, Atlas #149): three free-text
+ * World units (standard 00.31.00, Atlas #149): three free-text
  * labels on the World saying what the world's numbers are counted in. Labels
  * only: nothing converts, a world's own unit ('hands', 'leagues') shows as
  * written, and a world without units shows bare numbers.

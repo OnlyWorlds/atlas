@@ -6,7 +6,7 @@
  * persistent room nav strip on top (when a world is active) and the active
  * room's content below. Rooms: welcome, home (default for active worlds),
  * element, writing, knowledge, timeline, share, import, settings.
- * (search + templates rooms removed session 256; legacy URLs land on home.)
+ * (search + templates rooms removed; legacy URLs land on home.)
  */
 
 import { mountAppShell, AppShell } from './layout/app-shell';
@@ -62,11 +62,11 @@ export interface AppHandle {
 export function startApp(container: HTMLElement): AppHandle {
   // Hydrate registry from localStorage into observable state.
   patchSlice('registry', loadRegistry());
-  // Another tab saved the registry: take its changes in, keep ours (S365
-  // gate lens A H1/H2). Without this a tab's memory went stale and its next
+  // Another tab saved the registry: take its changes in, keep ours.
+  // Without this a tab's memory went stale and its next
   // save of the same world put the old copy back.
   window.addEventListener('storage', (e) => {
-    // Another tab held or dropped a seat (Keel #469, the v2 gate's G7).
+    // Another tab held or dropped a seat.
     if (isHeldSeatStorageKey(e.key)) heldSeatsChanged();
     if (e.key !== REGISTRY_STORAGE_KEY) return;
     const merged = adoptStoredRegistry(getState().registry);
@@ -74,13 +74,13 @@ export function startApp(container: HTMLElement): AppHandle {
   });
   // A page the browser brings back from its cache (Back, past a Sign in with
   // OnlyWorlds that finished in this tab) missed the storage events of its
-  // absence: the same merge (the S465 gate's G8).
+  // absence: the same merge.
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted) return;
     const merged = adoptStoredRegistry(getState().registry);
     if (merged) patchSlice('registry', merged);
   });
-  // Hydrate UI prefs (sidebar mode is state-driven since session 223 —
+  // Hydrate UI prefs (sidebar mode is state-driven —
   // decoupled from URL routing; persists across reloads as a user preference).
   const prefs = loadUiPrefs();
   patchSlice('ui', { ...getState().ui, sidebarMode: prefs.sidebarMode });
@@ -104,7 +104,7 @@ export function startApp(container: HTMLElement): AppHandle {
   // before it. It re-adopts browser worlds the registry lost, removes crashed
   // makes, marks worlds the browser cleared, and deletes nothing else.
   // Every make in this tab waits for it (`openBrowserMake`), the ones off the
-  // activation chain too (S376 gate B1).
+  // activation chain too.
   const settleReconciled = beginBootReconciliation();
   void enqueueActivationTask(async () => {
     try {
@@ -135,9 +135,9 @@ export function startApp(container: HTMLElement): AppHandle {
   toastManager.init();
   const toasts = toastManager;
 
-  // A held seat (Keel #469) goes when a world of its id lands here, by any
-  // door: one settle on every registry change, so no door is missed (rule 2,
-  // G3, G5), and a seat world that lost its secret takes the record's (G2).
+  // A held seat goes when a world of its id lands here, by any
+  // door: one settle on every registry change, so no door is missed,
+  // and a seat world that lost its secret takes the record's.
   let settledFor: unknown = null;
   const settleHeld = (): void => {
     const reg = getState().registry;
@@ -177,7 +177,7 @@ export function startApp(container: HTMLElement): AppHandle {
   // Mount shell.
   const shell = mountAppShell(container);
 
-  // Narrow-window layer (S323): stamps the breakpoint classes that turn the
+  // Narrow-window layer: stamps the breakpoint classes that turn the
   // side panes into drawers below 1100 / 820px. Must run before the first
   // paint of the nav so its drawer toggles read the right state.
   installNarrowLayout();
@@ -220,9 +220,9 @@ export function startApp(container: HTMLElement): AppHandle {
   // index 0 of the right pane. No auto-open; route-driven content.
   const unsubContextTab = installContextTabLifecycle();
 
-  // The live folder (S364): what another tool wrote shows when you come back.
+  // The live folder: what another tool wrote shows when you come back.
   const uninstallLiveFolder = installLiveFolder();
-  // The world's notes, cast, calendar lens and writing labels travel in its folder (S364).
+  // The world's notes, cast, calendar lens and writing labels travel in its folder.
   const uninstallWorldPrefs = installWorldPrefsSync();
   // Fully forget (#140): this tab answers another tab's roll call, and
   // reloads when another tab has forgotten, so its memory never writes the
@@ -280,7 +280,7 @@ export function startApp(container: HTMLElement): AppHandle {
     if (hasPendingJoin()) {
       void import('./ui/join-world-modal').then(m => m.runPendingJoin(toasts));
     }
-    // #/open/<world id> (#104, S416): a world page's Open in Atlas, the same way.
+    // #/open/<world id> (#104): a world page's Open in Atlas, the same way.
     // The id is taken before the chunk loads, so a chunk that fails to load
     // (a tab older than a deploy) is not asked for again on every render.
     captureOpenWorld();
@@ -365,9 +365,9 @@ export function startApp(container: HTMLElement): AppHandle {
     shell.middleRoomNav.setAttribute('data-active', navActive ? 'true' : 'false');
 
     // A room instance belongs to ONE world. The room-stable world switch
-    // (S256) keeps the room KIND, but rooms read world files once at mount
+    // keeps the room KIND, but rooms read world files once at mount
     // (charts.json, pages) and write whole lists back, so an instance carried
-    // across a switch wrote world A's charts over world B's (S364). Remount on
+    // across a switch wrote world A's charts over world B's. Remount on
     // a world change too; activateWorld flushes pending saves before it gets
     // here (flushBeforeLeavingWorld).
     const nextWorldId = active?.worldId ?? null;
@@ -405,7 +405,7 @@ export function startApp(container: HTMLElement): AppHandle {
     openCreateElement: () => {
       const active = getState().active;
       if (!active) return;
-      // Through the shared door (S301): this hotkey used to open a free-form
+      // Through the shared door: this hotkey used to open a free-form
       // create modal beside the tour's scripted one.
       openCreateDoor(toasts);
     },
@@ -422,7 +422,7 @@ export function startApp(container: HTMLElement): AppHandle {
       // Nav home, then clear the selection: DESIGN convention #32. In this
       // order, because every state tick mirrors a route's element into the
       // selection, so a clear made while the route still names the element
-      // came straight back (#175, S388).
+      // came straight back (#175).
       navigate(homeHash(active.worldId));
       patchSlice('ui', { ...getState().ui, selectedElementId: null });
     },
@@ -485,7 +485,7 @@ function ensureMapTabOpen(mapId: string): void {
   const existsIndex = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === mapId);
   if (existsIndex >= 0) {
     // Activate a background tab — a /map/<id> route that lands on an open but
-    // inactive tab should surface it (S265). Guarded: only patch when the
+    // inactive tab should surface it. Guarded: only patch when the
     // index actually changes, since this runs inside the render pass and an
     // unconditional patch would re-enter renderMiddle forever.
     if (ui.rightActiveIndex !== existsIndex) {
@@ -495,8 +495,8 @@ function ensureMapTabOpen(mapId: string): void {
   }
   const m = getState().data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
   if (!m) return;
-  // Imageless maps open normally since S300 (flat canvas); openMapTab no
-  // longer diverts, so the S254 render-pass recursion guard is unnecessary.
+  // Imageless maps open normally (flat canvas); openMapTab no
+  // longer diverts, so the old render-pass recursion guard is unnecessary.
   openMapTab(m);
 }
 

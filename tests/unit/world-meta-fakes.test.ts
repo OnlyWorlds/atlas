@@ -214,7 +214,7 @@ describe('statefulV2Handlers — GET/PATCH /world (wire names)', () => {
       body: JSON.stringify(body),
     });
 
-  it('GET returns the full body in wire names, origin with it (Keel #571)', async () => {
+  it('GET returns the full body in wire names, origin with it', async () => {
     mount();
     const body = await (await getWorld()).json();
     expect(Object.keys(body).sort()).toEqual([

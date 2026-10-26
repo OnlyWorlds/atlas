@@ -9,15 +9,15 @@
  * H11, a whitespace-only name was truthy and matched a blank server name.
  * Here pass 1 (id) runs over every local before pass 2 (name) starts, and an
  * empty normalized name never matches. A name shared by two or more elements
- * on one side is skipped and reported, never guessed (Captain's ruling: a
+ * on one side is skipped and reported, never guessed (Titus's ruling: a
  * visible duplicate beats a silent overwrite).
  *
  * A map or zone whose name matches is NOT matched when both sides already
  * have children on it (pins or markers on the map, markers on the zone):
  * the kernel would move the local children onto the server's map or zone
  * beside the server's own, so one element ended with two pins on one map,
- * or a zone outline drawn from two interleaved marker sets (S367 gate
- * A4/A5, Captain's ruling 2026-10-04). It stays its own element and is
+ * or a zone outline drawn from two interleaved marker sets (Titus's
+ * ruling 2026-10-04). It stays its own element and is
  * reported in `childClashes`. Children on one side only, or none, still
  * match. Children are read from the same lists, so this stays pure.
  *
@@ -181,7 +181,7 @@ export function planMerge(
     }
     // A map or zone both sides have children on is never a name match. Only
     // each side's OWN children count: a pin matched by id is the same element
-    // on both sides, not a second set (S368 gate lens B M1).
+    // on both sides, not a second set.
     const localParents = parentsWithChildren(
       locals.filter(l => !localMatch.has(l)).map(l => ({ type: l.type, rec: l as unknown as Record<string, unknown> })),
     );

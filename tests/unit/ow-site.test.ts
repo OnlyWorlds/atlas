@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { canOfferInvite, owAccessUrl, noAccountYetHtml, OW_SIGNUP_URL, OW_PIN_URL } from '../../src/core/ow-site';
 import type { WorldRegistryEntry, AccountWorldRow } from '../../src/core/types';
 
-// S407: Invite someone opens the website's Access pane (keel makes invite
+// Invite someone opens the website's Access pane (keel makes invite
 // links only there), and only where the person can make one.
 
 function linked(api: Partial<NonNullable<WorldRegistryEntry['api']>> = {}): WorldRegistryEntry {

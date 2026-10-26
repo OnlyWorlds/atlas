@@ -1,6 +1,6 @@
 /**
  * Link selected prose to an EXISTING element — the picker-backed sibling of
- * "Create element from selection" (Captain's ask, 2026-07-19: selected text
+ * "Create element from selection" (Titus's ask, 2026-07-19: selected text
  * whose words don't match an element name has no path to a chip; autolink
  * only fires on exact name/alias matches).
  *

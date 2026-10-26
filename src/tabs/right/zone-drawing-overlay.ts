@@ -11,7 +11,7 @@ import type { DrawMode } from './zone-drawing';
 export interface DrawingOverlayRefs {
   root: HTMLDivElement;
   update(markerCount: number, minMarkers: number): void;
-  /** Mirror the trace toggle (S423). */
+  /** Mirror the trace toggle. */
   setTrace(on: boolean): void;
 }
 

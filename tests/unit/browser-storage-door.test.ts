@@ -1,5 +1,5 @@
 /**
- * `browserStorageDoorOpen` (1.17, conv. 120; S374 gate F10): the synchronous
+ * `browserStorageDoorOpen` (1.17, conv. 120): the synchronous
  * view of the storage probe that the palette and the chooser read. Unsettled
  * reads as open (the door says why on the click); a settled refusal or a full
  * origin closes it; a full origin is asked again, so freeing space reopens it.
@@ -77,7 +77,7 @@ describe('browserStorageDoorOpen', () => {
     expect(browserStorageDoorOpen()).toBe(true);
   });
 
-  it('only a SecurityError is a refusal: a write raced by another tab is retried, never cached as a private window (S376 gate B2)', async () => {
+  it('only a SecurityError is a refusal: a write raced by another tab is retried, never cached as a private window', async () => {
     behaviour = 'raced-once';
     expect(await opfsStatus()).toBe('ok');
     expect(failures).toBe(1);
@@ -89,7 +89,7 @@ describe('browserStorageDoorOpen', () => {
     expect(probeNames).toHaveLength(2);
   });
 
-  it('an error that persists past the retry keeps the door and is asked again next time (S376 gate B2)', async () => {
+  it('an error that persists past the retry keeps the door and is asked again next time', async () => {
     behaviour = 'raced';
     expect(await opfsStatus()).not.toBe('refused');
     expect(failures).toBe(2); // the probe and its one retry
@@ -98,7 +98,7 @@ describe('browserStorageDoorOpen', () => {
     expect(await opfsStatus()).toBe('refused'); // not cached: the next ask probed again
   });
 
-  it('each probe writes its own file name, so two tabs never race one file (S376 gate B2)', async () => {
+  it('each probe writes its own file name, so two tabs never race one file', async () => {
     await opfsStatus();
     __resetOpfsStatusForTests();
     await opfsStatus();

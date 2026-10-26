@@ -1,6 +1,6 @@
 /**
- * The names profile in Atlas (schema-dist dist.48, profiles/names.md; contract
- * Forge/Notes/2026-10-22-s455-names-profile-atlas-contract.md).
+ * The names profile in Atlas (schema-dist dist.48, profiles/names.md; the names-profile
+ * contract).
  *
  * - The profile's 23 cases (names.fixture.json, copied whole) through
  *   `typeName`, the one module every printed type name asks.
@@ -62,7 +62,7 @@ describe("a world's word", () => {
     expect(aTypeName('character', { world, supertype: 'Agent', start: true })).toBe('An AI agent');
   });
 
-  it("names a supertype only when the world has a word for that supertype (Seethe h20 #11028)", () => {
+  it("names a supertype only when the world has a word for that supertype (Seethe 2026-10-23)", () => {
     expect(supertypeWord('character', 'Agent', { world })).toBe('AI agent');
     expect(supertypeWord('character', 'Hero', { world })).toBeNull(); // the type's word, not the supertype's
     expect(supertypeWord('character', 'Agent', { world: null })).toBeNull();

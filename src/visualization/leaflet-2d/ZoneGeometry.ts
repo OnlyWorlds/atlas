@@ -2,7 +2,7 @@
  * Pure geometry helpers for zones.
  *
  * Ported from zoner's ZoneCanvas.ts (audit: 2026-05-16). These functions
- * operate on storage-space coordinates (bottom-left origin since S361, x
+ * operate on storage-space coordinates (bottom-left origin, x
  * grows right, y grows up) — the same coord space as Marker.x / Marker.y.
  * Every helper here is reflection-invariant, so the flip changed none of them.
  *
@@ -197,7 +197,7 @@ export function snapToAxis(anchor: Point, click: Point): Point {
 /**
  * Douglas-Peucker on an open run of points: keeps both ends and every point
  * that sits farther than `tolerance` from the line the kept points make. A
- * traced stroke (S423) comes in at one point every few pixels and goes into
+ * traced stroke comes in at one point every few pixels and goes into
  * the world as the few that carry its shape: every point kept is a Marker
  * file, so the stored shape stays at meaning resolution and the ink draws
  * the rest.
@@ -225,7 +225,7 @@ export function simplifyPath(points: Point[], tolerance: number): Point[] {
 }
 
 /**
- * A traced stroke to the points a zone stores (S423): a moving average over
+ * A traced stroke to the points a zone stores: a moving average over
  * `2 * radius + 1` samples takes out the hand's wobble (the ink puts a coast's
  * raggedness back at draw time), then `simplifyPath`. Without the average, a
  * wobble near the tolerance survives and nearly doubles the points kept.
@@ -253,7 +253,7 @@ function signedDistanceToRing(p: Point, ring: Point[]): number {
 }
 
 /**
- * Where a name sits best inside a polygon (S423): the point farthest from its
+ * Where a name sits best inside a polygon: the point farthest from its
  * outline (the pole of inaccessibility, after Mapbox's polylabel: a grid of
  * cells refined best-first until no cell can beat the best by `precision`).
  * The vertex mean can fall outside a concave shape, a bay or a crescent; this
@@ -269,7 +269,7 @@ export function poleOfInaccessibility(ring: Point[], precision = 1): Point {
   const size = Math.min(maxX - minX, maxY - minY);
   if (!(size > 0)) return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
   // A name needs the middle to a hundredth of the shape, not to a unit. It
-  // halves the cost (measured S423: about 0.6 to 0.3 ms on a 300-point coast),
+  // halves the cost (measured: about 0.6 to 0.3 ms on a 300-point coast),
   // which counts because a label re-anchors on every sync of every zone.
   const eps = Math.max(precision, size / 100);
   type Cell = { x: number; y: number; h: number; d: number; max: number };
@@ -404,7 +404,7 @@ function inRing(p: Point, r: Ring): boolean {
 }
 
 /**
- * The parts of a line that lie on land (S423, Seethe's receipt h20 #6514:
+ * The parts of a line that lie on land (Seethe's receipt 2026-10-17:
  * a river ends at the coast). A point is on land when it is inside some
  * `land` ring (or there are none: the map's own ground is the land) and
  * inside no `water` ring (a sea, a lake). Each segment is cut where it
@@ -426,7 +426,7 @@ export function clipLineToLand(line: Point[], land: Point[][], water: Point[][])
 }
 
 /**
- * Where along a line its land lies (S424), as shares of the line's length
+ * Where along a line its land lies, as shares of the line's length
  * from its first point: the stretches `clipLineToLand` draws. A name along
  * a river keeps to them, so it never prints over the mouth's stretch at sea.
  * With no regions at all, the whole line.

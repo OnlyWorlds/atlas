@@ -1,6 +1,6 @@
 /**
  * A make dialog's failure says where the world was going (1.17, conv. 125,
- * 129; S376 lens C C21): the dialogs that ask the where-question pass the
+ * 129): the dialogs that ask the where-question pass the
  * answer to `problemFor`, so a browser make never says folder, disk or
  * OneDrive, whatever world happens to be open.
  */

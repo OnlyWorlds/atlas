@@ -10,8 +10,8 @@
  *   here would lose user data on every export→import cycle (D9 enablement).
  * - Converts spatial disk shape back to bare names (map_id → map, zone_id → zone)
  *   so pin/marker round-trip through ow.com's `/store/` and atlas's own import.
- * - Keeps the world id (the envelope, S354); includes api_key only on request, and
- *   the export room never requests it (S362).
+ * - Keeps the world id (the envelope); includes api_key only on request, and
+ *   the export room never requests it.
  */
 
 import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';
@@ -70,14 +70,14 @@ export async function buildWorldExport(
   if (meta.mass_unit) world.mass_unit = meta.mass_unit;
   if (meta.distance_unit) world.distance_unit = meta.distance_unit;
   // Where a copy came from and which slice it is travel with it (folder spec
-  // §4.2): a Character's view exported as JSON stays one (the S446 gate's G1).
+  // §4.2): a Character's view exported as JSON stays one.
   const lines = meta as unknown as Record<string, unknown>;
   if (lines.source && typeof lines.source === 'object') world.source = lines.source;
   if (lines.exported_as && typeof lines.exported_as === 'object') world.exported_as = lines.exported_as;
   if (lines.producer && typeof lines.producer === 'object') world.producer = lines.producer;
 
-  // THE ENVELOPE (S354, converging on keel's `onlyworlds-world-export`, owed
-  // to Skeld since S313). One shape both ways now: keel exports it, atlas
+  // THE ENVELOPE (converging on keel's `onlyworlds-world-export`, owed
+  // to Skeld). One shape both ways now: keel exports it, atlas
   // imports it (parse.ts), and atlas exports it. The world keeps its id: the
   // envelope's whole point is a lossless round-trip (id-is-identity), and
   // atlas's import already offers merge-or-copy when the id is known. The

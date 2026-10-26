@@ -70,7 +70,7 @@ test('create page → detail; rename + revert both persist; intent stays hidden 
   // "+ new page" creates immediately and lands on the detail view.
   await page.click('button.atlas-share-new');
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
-  // S369: a new page opens on its name, ready to type; Escape keeps the default.
+  // A new page opens on its name, ready to type; Escape keeps the default.
   await expect(page.locator('.atlas-share-detail-header input.atlas-element-name-input')).toHaveValue('New page');
   await page.keyboard.press('Escape');
   await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('New page');
@@ -500,12 +500,12 @@ test('map block: a pin moved elsewhere re-renders on the open page (no re-add ne
   }, ids);
 
   await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /left: 75%/);
-  // y 600 of 800 is stored from the BOTTOM (the schema's origin, S361), so it
+  // y 600 of 800 is stored from the BOTTOM (the schema's origin), so it
   // draws a quarter of the way down: the one conversion is at the freeze.
   await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /top: 25%/);
 });
 
-test('map block: labels follow show\'s rule (S382, #121): a name prints once, no label on another pin or label', async ({ page }) => {
+test('map block: labels follow show\'s rule (#121): a name prints once, no label on another pin or label', async ({ page }) => {
   await setupWorld(page);
   // The label pass measures laid-out ink once the image has its size, so the
   // map needs an image that loads: serve one for the fixture URL.
@@ -696,7 +696,7 @@ test('prose selection bubble: bold + link-to-existing with preserved label (alia
 });
 
 /**
- * S323 — the preview must show the ARTIFACT, not the app theme.
+ * The preview must show the ARTIFACT, not the app theme.
  *
  * A page carries its own `data-mode`; the app carries a separate theme. Dark
  * had no CSS rules at all until now — it was inherited free from a shell that
@@ -759,7 +759,7 @@ test('a dark page previews dark even while the app is in light mode', async ({ p
   expect(inLight.fieldLum).toBeGreaterThan(150);
 });
 
-// S364 lane A5: a charts refresh (the id-swap / re-key signal, or the first
+// A charts refresh (the id-swap / re-key signal, or the first
 // readCharts landing after a deep-linked page opens) rebuilt the block list
 // under an open text block, remounting its editor from the in-memory block,
 // which did not hold the pending text yet: typing jumped back and lost focus.
@@ -783,10 +783,10 @@ test('an open text block survives a charts refresh', async ({ page }) => {
   await expect(pm).toContainText('The mists never lift, ever.');
 });
 
-test('a page that arrived with only its story opens with that text, and a new block keeps it (S437)', async ({ page }) => {
+test('a page that arrived with only its story opens with that text, and a new block keeps it', async ({ page }) => {
   // Blocks are atlas-local: a page from the server, another device or another
   // tool carries only its story. It read "No blocks yet" and the first block
-  // compiled the story over (the S437 live walk's "This page has no content yet").
+  // compiled the story over (a live walk's "This page has no content yet").
   await setupWorld(page);
   const pageId = await createElement(page, 'narrative', {
     name: 'Wanted poster', subtype: 'page', story: 'The Kid, for crossing the river.',

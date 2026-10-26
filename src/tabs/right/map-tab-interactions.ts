@@ -1,5 +1,5 @@
 /**
- * Map-tab interaction wiring — extracted from map-tab.ts (session 233 re-trim).
+ * Map-tab interaction wiring — extracted from map-tab.ts.
  *
  * Registers all the user-input handlers on a freshly-mounted map: leaflet
  * map/pin events (click, contextmenu, pin click/hover), the contextual
@@ -46,7 +46,7 @@ export interface MapInteractionDeps {
 }
 
 /**
- * ONE ELEMENT, ONE PIN, ONE MAP (S307). The store refuses a duplicate, and
+ * ONE ELEMENT, ONE PIN, ONE MAP. The store refuses a duplicate, and
  * that refusal is an ordinary explainable outcome, not a bug — so it gets its
  * own sentence. Reporting it as "Failed to place pin" would read as breakage
  * for a rule the user simply cannot see.
@@ -79,7 +79,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     // session. Inserts on a segment now come exclusively from the segment
     // overlay's own click handler — clicking outside any segment means
     // "exit edit," matching the click-outside-to-deselect mental model.
-    // (Pre-session-226: clicked anywhere → inserted near nearest segment.
+    // (Before: clicked anywhere → inserted near nearest segment.
     // That surprised users trying to deselect by clicking the canvas.)
     // Drag-suppression check still applies: the mouseup that ENDS a drag
     // can fire as a map-click; swallow it so dragging doesn't accidentally
@@ -96,7 +96,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     if (!placement) return;
     // A view-only world takes no pin (conv. 149).
     if (worldIsViewOnly()) return;
-    // Imageless maps accept pins since S300 — the flat canvas has stored
+    // Imageless maps accept pins — the flat canvas has stored
     // width/height, so the coordinate space is as stable as an image's
     // (DESIGN_MAPS.md §4.2). No image gate.
     try {
@@ -112,7 +112,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         toasts.error('That element is not in this world any more, so it cannot be pinned.');
         return;
       }
-      // Tour beat (S299): a placement in the tour world adopts the bundle
+      // Tour beat: a placement in the tour world adopts the bundle
       // pin's identity (locked name + id — the reveal/heal handle) at the
       // user's own coordinates. The class check keeps the tour chunk out of
       // ordinary sessions; tourPinBake itself re-verifies the tour world.
@@ -133,7 +133,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       requestPushIfLinked();
       toasts.success('Pin placed');
       completeWaypoint('maps');
-      // (The bespoke `notifyTourPinPlaced()` call was removed in S301: the
+      // (The bespoke `notifyTourPinPlaced()` call was removed: the
       // tour bar subscribes to core state now, so the `patchSlice('data')`
       // above re-renders it like any other world change. That coupling was
       // the reason to subscribe — every future gated beat would have needed
@@ -200,7 +200,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     (e.originalEvent as MouseEvent).preventDefault();
     const latlng = (e as any).latlng;
     if (!latlng) return;
-    // Block during zone edit mode (Captain smoke session 219). Creating a
+    // Block during zone edit mode (found in Titus's smoke test). Creating a
     // pin via right-click WHILE editing a zone tore down the edit overlay
     // without confirming changes (the modal-open path triggered a stray
     // exitEditMode-without-cancel). Refuse cleanly with a toast so the
@@ -216,8 +216,8 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     const writePin = async (elementId: string, elementType: string): Promise<void> => {
       const store = getActiveStore();
       if (!store) return;
-      // A pin just placed shows, whatever the map's date (the S416 gate's
-      // F1); revealed before the write, so an element already pinned here,
+      // A pin just placed shows, whatever the map's date;
+      // revealed before the write, so an element already pinned here,
       // refused as a duplicate, shows the pin it has.
       revealPinsOnMap(entry.mapId, elementId);
       await store.createPin({
@@ -346,7 +346,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     try {
       const store = getActiveStore();
       if (!store) return;
-      // Tour beat (S318): the map step's copy offers BOTH gestures ("clicking
+      // Tour beat: the map step's copy offers BOTH gestures ("clicking
       // the + pin icon ... or dragging him in from the sidebar"), but only the
       // click path adopted the bundle pin's identity — a dragged-in pin was an
       // ordinary nameless pin that could never satisfy hasRef(TOUR_PIN_REF),

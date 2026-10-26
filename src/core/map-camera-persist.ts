@@ -92,7 +92,7 @@ export function getCameraState(mapId: string): CameraState | null {
 }
 
 /**
- * The re-key (S363) moves ids; stored state follows. Moves each old map id's
+ * The re-key moves ids; stored state follows. Moves each old map id's
  * entry to its new id (the new id is brand new, so the old entry wins).
  * The store is not world-scoped, so no world parameter. No-op when nothing matches.
  */

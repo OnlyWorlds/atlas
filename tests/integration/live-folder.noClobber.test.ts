@@ -1,4 +1,4 @@
-// Promoted from the S364 composition gate probe `b-e2e-clobber.probe.test.ts` (Forge/Notes/2026-09-29-s364-gate/): it asserts the fixed behaviour.
+// Promoted from a gate probe `b-e2e-clobber.probe.test.ts`: it asserts the fixed behaviour.
 /**
  * Lens B probe, whole chain on the REAL store: an agent edits a scene twice
  * while it is open in the writing room and nobody types. The second edit is

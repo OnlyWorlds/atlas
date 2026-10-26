@@ -67,7 +67,7 @@ test.describe('Bout CC — sidebar toggle + gear + selection UX', () => {
     await freshBoot(page);
     await setupAtlasRoot(page);
     await createWorld(page, 'world c');
-    // Switch to elements mode (state-driven since session 223 decoupling).
+    // Switch to elements mode (state-driven).
     await page.click('[data-action="mode-elements"]');
     await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveClass(/active/);
 
@@ -77,7 +77,7 @@ test.describe('Bout CC — sidebar toggle + gear + selection UX', () => {
     expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings/);
 
     // Click gear again → closes settings. With no element selection set,
-    // gear-toggle falls back to the world's home URL (session 223: was
+    // gear-toggle falls back to the world's home URL (it was
     // /elements). Sidebar mode stays as the user left it (elements).
     await page.click('[data-action="open-settings"]');
     await expect(page.locator('.atlas-settings')).toHaveCount(0);
@@ -132,7 +132,7 @@ test.describe('Bout CC — sidebar toggle + gear + selection UX', () => {
     const settingsHash = await page.evaluate(() => window.location.hash);
     expect(settingsHash).toMatch(/\/settings/);
 
-    // Session 223 decoupling: sidebar mode toggle clicks no longer navigate
+    // Sidebar mode toggle clicks no longer navigate
     // the URL. Clicking mode-elements from settings just confirms elements
     // mode; URL stays on settings until the user uses gear or room nav to
     // leave settings. Selected element is preserved in state.

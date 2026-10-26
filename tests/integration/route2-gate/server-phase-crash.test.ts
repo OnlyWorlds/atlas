@@ -1,5 +1,5 @@
 /**
- * Promoted from the S367 composition gate (lens A).
+ * Promoted from the composition gate (lens A).
  * Lens A attack 1: invariants 1-2 under crashes the keeper's matrix does NOT
  * inject. The keeper's matrix throws inside the KERNEL window only (journal on
  * disk). Here the tab dies in the SERVER phase, after the journal is cleared:

@@ -23,7 +23,7 @@ async function setupAtlasRoot(page: Page, dirName: string = 'polish-test-root') 
     const sub = await root.getDirectoryHandle(name, { create: true });
     api.setNextDirectory(sub);
   }, dirName);
-  // Session 222 W2: setup-atlas button moved off the sidebar — welcome panel
+  // The setup-atlas button moved off the sidebar — welcome panel
   // is the single CTA. Drop the .atlas-sidebar prefix to find the button.
   await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
@@ -48,14 +48,14 @@ test('timeline route renders the interactive timeline-view', async ({ page }) =>
   await setupAtlasRoot(page);
   await createWorld(page, 'world a');
 
-  // Session 223: default landing for active world is now `home`, not
+  // Default landing for active world is now `home`, not
   // `timeline`. Navigate explicitly to the timeline room.
   await page.evaluate(() => {
     const m = window.location.hash.match(/#\/w\/([^/]+)/);
     if (m) window.location.hash = `#/w/${m[1]}/timeline`;
   });
   await expect(page.locator('.atlas-timeline-room')).toBeVisible();
-  // Session 242: the room mounts the interactive canvas+DOM timeline-view.
+  // The room mounts the interactive canvas+DOM timeline-view.
   // See DESIGN_TIMELINE.md.
   await expect(page.locator('.atlas-timeline-view')).toBeVisible();
   await expect(page.locator('.atlas-timeline-view-canvas')).toBeVisible();
@@ -67,7 +67,7 @@ test('timeline canvas renders for worlds with temporal data', async ({ page }) =
   await createWorld(page, 'world b');
 
   // Create three events via the elements sidebar. Dot rendering is canvas-
-  // based (session 242 interactive timeline-view); we verify the canvas mounts
+  // based (the interactive timeline-view); we verify the canvas mounts
   // and the data plumbing reaches it via the test API instead of DOM dots.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   for (const name of ['first event', 'second event', 'third event']) {
@@ -155,7 +155,7 @@ test('timeline + event create from timeline header', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'world c');
-  // Session 223: default landing is home, not timeline. Navigate to the
+  // Default landing is home, not timeline. Navigate to the
   // timeline room explicitly to access the [+ Event] header button.
   await page.evaluate(() => {
     const m = window.location.hash.match(/#\/w\/([^/]+)/);
@@ -169,7 +169,7 @@ test('timeline + event create from timeline header', async ({ page }) => {
   // The type should be pre-selected to 'event'.
   await expect(page.locator('.atlas-create-type-btn[data-type="event"].active')).toBeVisible();
 
-  // Charts-context create (S263): a required Date field rides the modal
+  // Charts-context create: a required Date field rides the modal
   // (prefilled — 0 on this dateless world) and dateless types are visible
   // but disabled, so everything created here lands ON the chart.
   const dateInput = page.locator('input[name="element-date"]');
@@ -181,7 +181,7 @@ test('timeline + event create from timeline header', async ({ page }) => {
   await page.click('[data-modal="create-element"] [data-action="create"]');
   await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
 
-  // Creating from the charts room STAYS in the room (Captain, 2026-07-10) —
+  // Creating from the charts room STAYS in the room (Titus, 2026-07-10) —
   // the chart is the workspace; the element arrives dated and confirmed.
   expect(await page.evaluate(() => window.location.hash)).toMatch(/\/timeline$/);
   await expect(page.locator('.ow-toast', { hasText: 'Created battle of pelennor at 3019' })).toBeVisible();

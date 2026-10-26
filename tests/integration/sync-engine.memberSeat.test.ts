@@ -1,6 +1,5 @@
 /**
- * A world synced through a member's seat (OW Infra #104, S385; design
- * `Forge/Notes/2026-10-10-s385-join-door-design.md`).
+ * A world synced through a member's seat.
  *
  * keel refuses a contributor's change to someone else's element (403
  * `not_author`) and any member's change to the world's own settings (403

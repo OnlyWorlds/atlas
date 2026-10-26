@@ -12,7 +12,7 @@
  * Two draggable dividers between panes. Ratios persist to localStorage.
  *
  * Originally ported verbatim from `atlas-deprecated/src/layout/app-shell.ts`;
- * session 223 split the middle pane into roomNav + content to support the
+ * a later change split the middle pane into roomNav + content to support the
  * rooms model. Convention #31.
  */
 
@@ -42,7 +42,7 @@ export interface AppShell {
 
 interface Ratios { sidebar: number; middle: number; }
 // Sidebar default at 20% — wide enough that the 22 type-filter chips sit in
-// two rows of 11 on common window widths (Captain, 2026-07-10; was 19%,
+// two rows of 11 on common window widths (Titus, 2026-07-10; was 19%,
 // which wrapped them to a ragged third row).
 const DEFAULT_RATIOS: Ratios = { sidebar: 0.20, middle: 0.51 };
 // Prior default — a stored ratio equal to it means "never customized";
@@ -84,7 +84,7 @@ function clamp(n: number, lo: number, hi: number): number {
  * laptop used to push the shell past the viewport — `overflow: hidden` then
  * clipped the map's right-anchored controls (the pin trash, the zones
  * dropdown) off-screen with no scrollbar and no cue, and the ratio persists,
- * so the broken state survived a reload (S323).
+ * so the broken state survived a reload.
  */
 export const RIGHT_PANE_MIN_PX = 240 + 3;
 

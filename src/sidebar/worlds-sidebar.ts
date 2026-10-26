@@ -83,11 +83,11 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   header.className = 'atlas-section atlas-worlds-header';
   content.appendChild(header);
 
-  // The header is rebuilt only when it would come out different (S421). It
+  // The header is rebuilt only when it would come out different. It
   // used to be rebuilt on every state change and hashchange, and a press on
   // the old button with a release on its fresh twin sends the click to their
   // common ancestor: the click was lost, most often right after a route to
-  // `#/`, which sets off a burst of renders (front-door.spec, S419's race).
+  // `#/`, which sets off a burst of renders (the race front-door.spec caught).
   // The list and On OnlyWorlds below hold the same rule; their listeners are
   // delegated, so an identical rebuild is skipped outright. The comparison is
   // with the string last written, never `innerHTML` (the parser rewrites it).
@@ -112,14 +112,14 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     // root (finishing the tour is what sets one), and the root branch's create
     // button carries no tour override — see `isTouring`.
     if (root && !isTouring()) {
-      // Uniform compound-icon-button row (Captain session 219). Each button
+      // Uniform compound-icon-button row. Each button
       // reads "+target" via a small `add` glyph + a target glyph, with the
       // full action surfaced in the tooltip. Matches the [+map] / [+pin]
       // pattern in element-detail headers for visual coherence.
-      // The icon row is Captain's (S219) and stays the default; the labelled
+      // The icon row is Titus's and stays the default; the labelled
       // "add a world" button under it opens the same five as plain rows, and
-      // Settings → General can hide the icons (S365).
-      // Each icon names its action twice (S369): `title` for the pointer,
+      // Settings → General can hide the icons.
+      // Each icon names its action twice: `title` for the pointer,
       // `aria-label` (the chooser's own row title) for a screen reader, which
       // would otherwise read the glyphs' ligature text ("add folder_open").
       const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
@@ -140,11 +140,11 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     } else if (isTouring()) {
       // Guided tour, stage 1: the sidebar shows its TRUE
       // final structure — all five action icons in their real places — with
-      // only create-world live and the rest greyed (Captain's call: the
+      // only create-world live and the rest greyed (Titus's call: the
       // landscape appears once, in its exact geometry; nothing jumps into
       // existence later).
       // Same geometry as the real header: the icon wrapper and the labelled
-      // button, locked (S365 gate lens C L3: nothing appears after the tour).
+      // button, locked, so nothing appears after the tour.
       const html = `
         <div class="atlas-worlds-add-icons">
         ${addIconButton('create-local', newWorldGlyph(), 'Start a world. This one is the tour’s: Hyperion.', { pulse: true })}
@@ -174,7 +174,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // No atlas root (recoverable or first-launch): the sidebar header has
       // no actions. The welcome panel in the middle pane is the single CTA
       // for both "+ Set up atlas folder" and "↻ Recover atlas folder."
-      // Captain session 221: the sidebar's lone single-glyph button felt
+      // Titus's read: the sidebar's lone single-glyph button felt
       // orphaned against the column of compound-icon create buttons that
       // appear when a root IS set. Dropping it removes the visual mismatch
       // and consolidates the first-launch path to one place.
@@ -186,7 +186,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const linkBtn = header.querySelector<HTMLButtonElement>('[data-action="link-api"]');
     const viewBtn = header.querySelector<HTMLButtonElement>('[data-action="view-api"]');
     const openFolderBtn = header.querySelector<HTMLButtonElement>('[data-action="open-folder"]');
-    // One runner for the icon row, the chooser and Ctrl+K (S365,
+    // One runner for the icon row, the chooser and Ctrl+K (in
     // setup/world-doors.ts): the four that make a world folder ask for the
     // home folder first when there is none; open-folder opens a world in
     // place, or recognises a folder that keeps worlds.
@@ -197,13 +197,13 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     header.querySelector<HTMLButtonElement>('[data-action="add-world"]')
       ?.addEventListener('click', () => openAddWorldChooser(toasts));
 
-    // Hover trail (S255v2): hovering a create button paints its explanation
+    // Hover trail: hovering a create button paints its explanation
     // into the grounded welcome's detail zone. The welcome panel listens for
     // this event; when it isn't mounted the dispatch is a no-op.
     const dispatchHover = (path: string | null): void => {
       window.dispatchEvent(new CustomEvent('atlas:worlds-path-hover', { detail: { path } }));
     };
-    // Focus teaches too (S309): a keyboard user tabbing the row gets the same
+    // Focus teaches too: a keyboard user tabbing the row gets the same
     // trail — and open-folder joins the loop, which had NO teaching on any
     // input path (its DETAILS entry lives with the welcome panel's map).
     const addWorldBtn = header.querySelector<HTMLButtonElement>('[data-action="add-world"]');
@@ -217,7 +217,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     }
 
     // ZERO WORLDS: the create action is highlighted for as long as the state
-    // lasts (Captain, S308). This used to be a one-time tag dismissed FOREVER
+    // lasts (Titus). This used to be a one-time tag dismissed FOREVER
     // on first hover — so a user who set up a folder, brushed the button with
     // the cursor and came back the next day found an unexplained row of five
     // icons and the largest pane on screen saying only "your folder is ready".
@@ -227,7 +227,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     // The floating "start here" tag KEEPS its one-time behaviour — a label that
     // reappears every session reads as nagging. The persistent half is the
     // quiet highlight on the button; the loud half still fires once.
-    // With the icon row hidden in Settings, the signal goes on "add a world" (S365 lens C M5).
+    // With the icon row hidden in Settings, the signal goes on "add a world".
     const startBtn = createBtn ?? addWorldBtn;
     if (root && nothingYet(getState().registry) && startBtn) {
       startBtn.classList.add('atlas-tour-target');
@@ -242,8 +242,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         }, { once: true });
       }
     }
-    // Setup/recover-atlas buttons moved exclusively to the welcome panel
-    // (session 221 W2). The sidebar no longer renders them; their handlers
+    // Setup/recover-atlas buttons moved exclusively to the welcome panel.
+    // The sidebar no longer renders them; their handlers
     // were dropped along with the markup.
   }
 
@@ -252,7 +252,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   listEl.className = 'atlas-list';
   content.appendChild(listEl);
 
-  // "On OnlyWorlds" — account worlds not yet on disk (account mode, S260).
+  // "On OnlyWorlds" — account worlds not yet on disk (account mode).
   // Renders only when signed in; local rows above never wait on it.
   const remoteEl = document.createElement('div');
   remoteEl.className = 'atlas-remote-worlds';
@@ -342,7 +342,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       saveRegistry(next);
       patchSlice('registry', next);
       // Active world's engine follows the EFFECTIVE pause, so resuming here
-      // does not override Pause all (S367 critic C7).
+      // does not override Pause all.
       const stillPaused = effectiveSyncPaused(next.worlds.find(w => w.id === worldId), next);
       if (worldId === getCurrentSyncWorldId()) {
         const engine = getCurrentSyncEngine();
@@ -369,7 +369,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         const result = await pullNowAndRefresh();
         if (!result) { surfaceSyncUnavailable(toasts); return; }
         // pullNowAndRefresh says what came down (the counts, or the conflicts'
-        // own toasts): only the nothing-came case is said here (S411).
+        // own toasts): only the nothing-came case is said here.
         if (upToDate(result)) toasts.success('Already up to date');
       } catch (err) {
         console.warn('[worlds-sidebar] refresh failed:', err);
@@ -405,7 +405,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const held = isTouring() ? '' : heldSeats(state.registry).map(renderHeldRow).join('');
 
     if (worlds.length === 0) {
-      // Silent in both pre-root and zero-worlds states (S255v2): pre-root the
+      // Silent in both pre-root and zero-worlds states: pre-root the
       // landing is the one voice; with a root, the tour tag + hover details
       // teach — a narration line under them was redundant.
       setHtml(listEl, held);
@@ -520,7 +520,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // its own toggle or by the global "pause all sync" master switch. Local-only
   // worlds always render `folder` regardless of pause state (no sync to pause).
   const isPaused = world.state === 'api-linked' && (!!world.sync_paused || globalPaused);
-  // View-only worlds (S264, read-key link): the EYE is the identity — the row
+  // View-only worlds (read-key link): the EYE is the identity — the row
   // says at a glance this world is someone else's, read-not-write.
   const viewOnly = world.state === 'api-linked' && !!world.api?.read_only;
   // A world in this browser's storage carries its own glyph (conv. 129);
@@ -549,8 +549,8 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   const cls = ['atlas-row', active ? 'selected' : ''].filter(Boolean).join(' ');
   // Hover-reveal sync controls only for api-linked worlds. The dedicated
   // refresh button is gone: the CLOUD state icon is the refresh action now
-  // (Captain, 2026-07-10) — one icon fewer, same reach.
-  // A cleared row has nothing to sync: no pause, no refresh (S376 lens C C13).
+  // (Titus, 2026-07-10) — one icon fewer, same reach.
+  // A cleared row has nothing to sync: no pause, no refresh.
   const syncActions = world.state === 'api-linked' && !cleared
     ? `
         <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'Resume sync' : 'Pause sync (this world)'}">
@@ -596,7 +596,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
 /**
  * No world and no held seat: only then does the start-here signal show. A
  * held seat is a world waiting to come down, and the tag sat over its row
- * (1.91.0's live walk, S469).
+ * (1.91.0's live walk).
  */
 function nothingYet(reg: WorldsRegistry): boolean {
   return reg.worlds.length === 0 && heldSeats(reg).length === 0;
@@ -627,7 +627,7 @@ async function removeHeld(worldId: string, toasts: ToastManager): Promise<void> 
 }
 
 /**
- * A seat a link left held (Keel #469, rule 5): its own row kind, below the
+ * A seat a link left held: its own row kind, below the
  * worlds. Not a world: no activation, no settings, no counts, and no
  * `data-world-id` anywhere in it (the v2 gate's note f), so the list's open
  * handler never reads it as a world. The name downloads; the cross removes.
@@ -659,7 +659,7 @@ export interface ActivateWorldOpts {
   /**
    * No "Finished giving N elements new ids" when the open finishes a re-key:
    * the caller says its own outcome (the tour keep's K0: one "yours now", no
-   * id jargon, contract §7.3; S376 lens A A7).
+   * id jargon, contract §7.3).
    */
   quietRekey?: boolean;
   /** Keep `selectedElementId` as-is (so a URL like /element/<eid> survives activation). Default false. */
@@ -717,7 +717,7 @@ export async function activateWorld(
     try {
       return await doActivateWorld(worldId, toasts, opts);
     } catch (err) {
-      // An open never rejects (conv. 142, the S405 census): a toast's Open it, a
+      // An open never rejects (conv. 142): a toast's Open it, a
       // retry and a row click fire this and forget it, so whatever escapes the
       // open's own catches is said here, as what it was doing, never as
       // background work. Silent opens (boot's auto-activate) only log.
@@ -744,7 +744,7 @@ async function doActivateWorld(
   const state = getState();
   let entry = state.registry.worlds.find(w => w.id === worldId);
   if (!entry) {
-    // A stale link or a world removed in another tab (C2, S369: the id and
+    // A stale link or a world removed in another tab (C2: the id and
     // the word "registry" were the whole message).
     if (!silent) toasts.error(hasFolderMode()
       ? 'That world is no longer in your list. If its folder is still on your drive, use Open a world folder to bring it back.'
@@ -754,7 +754,7 @@ async function doActivateWorld(
   // Already active? Click should still "open" — switch to the right-tab view
   // if we're not already on a meaningful one. Without this, clicking the
   // already-active world from worlds-mode (default landing) appeared to do
-  // nothing — Captain flagged this as a regression in the Bout CC follow-up.
+  // nothing — Titus flagged this as a regression in the Bout CC follow-up.
   if (state.active?.worldId === worldId) {
     const route = parseHash(window.location.hash);
     const onRightTab =
@@ -793,12 +793,12 @@ async function doActivateWorld(
   // already names the world, we don't want to wipe selection that the URL is
   // about to re-establish.
   // Save what the open rooms still hold for the world being left BEFORE the
-  // element cache is emptied below (S360 F1: a room whose element vanished
+  // element cache is emptied below (once, a room whose element vanished
   // dropped its debounced prose). A no-op when nothing is pending.
   if (!preserveSelection) await flushBeforeLeavingWorld();
   const priorHash = window.location.hash;
-  // Tabs are GLOBAL across world switches by design (DESIGN_MAPS.md §5 revised
-  // session 209). Tabs whose mapId isn't in the active world's elements get
+  // Tabs are GLOBAL across world switches by design (DESIGN_MAPS.md §5).
+  // Tabs whose mapId isn't in the active world's elements get
   // the stale visual treatment (darkened, click-to-close) in right-pane.ts.
   if (!preserveSelection) {
     // loading:true — the cache is about to be primed async; empty ≠ loading
@@ -806,11 +806,11 @@ async function doActivateWorld(
     patchSlice('data', { elements: [], loading: true, loadingProgress: null });
     resetWorldStyles();
     // knowledgeLens + castAssign cleared too — both reference the OLD world.
-    // Muted types are per world (S356).
+    // Muted types are per world.
     patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null, mutedTypes: loadMutedTypes(worldId), madeBy: null, hideRoom: true, proposedOnly: null });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
-      // Room-stable world switch (S256, Captain: "less jumpy"): world-agnostic
+      // Room-stable world switch (Titus: "less jumpy"): world-agnostic
       // room KINDS follow to the new world at their landing level; specific
       // entity ids (narrative/entry/page/focus) are world-bound and drop.
       // Element + map routes fall to home. Settings keeps its tab — the
@@ -835,8 +835,8 @@ async function doActivateWorld(
           navigate(importHash(worldId));
           break;
         default:
-          // element / map / home / anything world-bound → home. (Session 223:
-          // activate → home, not /elements; sidebar mode is independent UI
+          // element / map / home / anything world-bound → home. (Activation
+          // goes home, not /elements; sidebar mode is independent UI
           // state, activation doesn't force a flip.)
           navigate(worldHash(worldId));
       }
@@ -859,7 +859,7 @@ async function doActivateWorld(
     entry = getState().registry.worlds.find(w => w.id === worldId) ?? entry;
   }
   // A world being moved (or made) in any tab holds its Web Lock: opening it
-  // now would edit a copy about to be removed (S373 gate F2, F8: a duplicated
+  // now would edit a copy about to be removed (a duplicated
   // tab shares this tab's id, so the lock file alone cannot tell).
   if (isBrowserWorld(entry)) {
     const { ifWorldLockFree } = await import('../core/browser-home');
@@ -894,10 +894,10 @@ async function doActivateWorld(
   if (!handle) {
     // NEVER advise deletion here. The files are intact on disk — only the
     // browser's handle to them is gone (cleared storage, another profile, a
-    // moved folder). "Delete + recreate to recover" (the wording until S307)
+    // moved folder). "Delete + recreate to recover" (the old wording)
     // pointed at the one action that actually loses the world, while the real
     // one-click fix is the [+folder_open] button in this very header.
-    // The toast carries that fix itself (S369): picking the folder again
+    // The toast carries that fix itself: picking the folder again
     // restores this entry's handle (`openWorldFolder` re-stores a missing one).
     if (!silent) {
       toasts.show(
@@ -917,7 +917,7 @@ async function doActivateWorld(
       ? await queryWritable(handle)
       : await ensureWritable(handle);
   if (!granted) {
-    // Worded as a disk-permission problem (S369), whose fix is Allow access:
+    // Worded as a disk-permission problem, whose fix is Allow access:
     // it asks for this world's folder inside the click, then opens it again.
     if (!silent) {
       showProblem(new DOMException('Folder permission was not granted', 'NotAllowedError'), {
@@ -972,7 +972,7 @@ async function doActivateWorld(
     // already gone; we're just removing the pointer to it.
     // A browser world removed between the derive and the open: re-derive.
     // Gone = cleared (the row stays); anything else is a problem. This catch
-    // never deletes a browser world's entry (S370 gate B10).
+    // never deletes a browser world's entry.
     if (isBrowserWorld(entry) && isFolderMissing(err)) {
       evictParkedStore(worldId);
       let gone = false;
@@ -1018,7 +1018,7 @@ async function doActivateWorld(
       return false;
     }
     // Another tab holds a live folder lock. Dead-ending here left the user
-    // stranded (Captain, 2026-07-10) — offer an explicit, consented takeover.
+    // stranded (Titus, 2026-07-10) — offer an explicit, consented takeover.
     // Never prompt on the silent boot path.
     if (err instanceof ELockHeld && !silent) {
       const hb = Date.parse(err.lock.last_heartbeat);
@@ -1060,10 +1060,10 @@ async function doActivateWorld(
       entry = next.worlds.find(w => w.id === worldId) ?? entry;
     }
   }
-  // View-only worlds (S264): arm the store guard before the UI can reach it.
+  // View-only worlds: arm the store guard before the UI can reach it.
   store.setViewOnly(entry.copy_of ? 'copy' : !!entry.api?.read_only);
   // The world's notes, cast, calendar lens and writing labels, from its
-  // folder (S364). BEFORE re-key recovery: recovery remaps the registry's
+  // folder. BEFORE re-key recovery: recovery remaps the registry's
   // cast ids, and the prefs sync then writes the remapped ids back out.
   {
     const { loadWorldPrefs } = await import('../core/world-prefs');
@@ -1071,7 +1071,7 @@ async function doActivateWorld(
   }
   // An id update that did not finish (a crash, a closed tab) completes HERE,
   // on both the open and the revive path, before anything reads the world
-  // (S363, re-key gate lens 1 F3/F6): otherwise the list would show old and
+  // (re-key gate lens 1 F3/F6): otherwise the list would show old and
   // new elements as twins. Until it completes the sync engine refuses every
   // round (the journal gate), so a failure here costs sync, never data.
   if (await store.hasRekeyJournal().catch(() => false)) {
@@ -1081,18 +1081,18 @@ async function doActivateWorld(
       const { rekeyRouteHash } = await import('../sync/rekey-route');
       // A run still going (the user navigated back to this world under its
       // modal) owns the folder; a second writer beside it is the one thing
-      // the journal cannot survive (S363 gate lens C F1).
+      // the journal cannot survive.
       const done = isRekeyRunning() ? null : await recoverRekey(store, { rekeyPersistedState });
       if (done) {
-        // The live folder's marks follow too (S367 gate B13; rekeyLiveUi does
+        // The live folder's marks follow too (rekeyLiveUi does
         // it for live runs, but this path never reaches rekeyLiveUi).
         const { remapDiskNoticeIds } = await import('../core/live-folder');
         remapDiskNoticeIds(worldId, done.map);
         const next = rekeyRouteHash(window.location.hash, worldId, done.map);
         if (next) window.location.replace(next);
         // A finished Route 2 journal speaks even on the silent boot path: the
-        // link itself is still not done, and nothing else would say so (S367
-        // gate B6: a reload mid-link reopens the world silently).
+        // link itself is still not done, and nothing else would say so (a
+        // reload mid-link reopens the world silently).
         if (((!silent && !quietRekey) || done.origin === 'merge') && done.map.size > 0) {
           toasts.info(done.origin === 'merge'
             ? `Finished matching ${done.map.size} ${done.map.size === 1 ? 'element' : 'elements'} to OnlyWorlds. Linking did not finish: run Make online again with the same key.`
@@ -1154,7 +1154,7 @@ async function doActivateWorld(
     if (stillActive()) patchSlice('data', { elements: [], loading: false, loadingProgress: null });
   }
   if (!stillActive()) return true; // superseded — the newer activation owns state now
-  // Orphan-snapshot recovery (Captain smoke session 219): if the user
+  // Orphan-snapshot recovery (found in Titus's smoke test): if the user
   // refreshed the page mid-zone-edit, the in-flight snapshot persisted to
   // localStorage. Replay revert via 3-way diff before sync engine attaches
   // so the autosave that fires on the diff doesn't fight with a fresh pull.
@@ -1178,7 +1178,7 @@ async function doActivateWorld(
   attachSyncEngine(entry, store);
 
   // A revived store trusted its caches: anything another tool wrote while the
-  // world sat parked shows after one pass (the live folder, S364). Background:
+  // world sat parked shows after one pass (the live folder). Background:
   // never blocks the switch-back.
   if (revived) void import('../core/live-folder').then(m => m.rescanNow({ force: true }));
 
@@ -1201,7 +1201,7 @@ function navigateAfterActivate(worldId: string): void {
     // URL is already on this world (possibly deep route) — re-fire hashchange.
     navigate(window.location.hash);
   } else {
-    // Session 223: navigate to home, not /elements. Sidebar mode is now
+    // Navigate to home, not /elements. Sidebar mode is now
     // independent state — activation doesn't dictate sidebar mode.
     navigate(worldHash(worldId));
   }
@@ -1211,7 +1211,7 @@ function navigateAfterActivate(worldId: string): void {
  * A browser world whose directory is gone (conv. 129). A world of the user's
  * own keeps its row, marked "Cleared by this browser", with its link intact,
  * until the user removes it. The tour's sandbox is removed as before and the
- * tour rebuilds it when it resumes (S370 gate B7).
+ * tour rebuilds it when it resumes.
  */
 function settleGoneBrowserWorld(entry: WorldRegistryEntry, silent: boolean, toasts: ToastManager): void {
   evictParkedStore(entry.id);
@@ -1227,7 +1227,7 @@ function settleGoneBrowserWorld(entry: WorldRegistryEntry, silent: boolean, toas
     saveRegistry(marked);
     patchSlice('registry', marked);
   }
-  // The row is still there, with the ways back on it (S376 lens C C13).
+  // The row is still there, with the ways back on it.
   if (!silent) {
     toasts.info(entry.api?.api_key
       ? `"${entry.name}" was cleared by this browser. Its row can bring it back from onlyworlds.com or from a world file.`
@@ -1265,7 +1265,7 @@ function isFolderMissing(err: unknown): boolean {
  *
  * Reading one entry off the root touches the directory itself. If that
  * succeeds, the folder exists and the original error was something else, so
- * nothing gets destroyed (S323).
+ * nothing gets destroyed.
  */
 async function rootDirectoryIsGone(handle: FileSystemDirectoryHandle): Promise<boolean> {
   try {

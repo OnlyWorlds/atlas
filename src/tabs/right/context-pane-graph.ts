@@ -118,7 +118,7 @@ const PARAMS = {
   collisionMinDist: 64,
   maxStep: 20,
   /**
-   * Hemisphere bias for ring 1 (S354): a constant downward push on backlink
+   * Hemisphere bias for ring 1: a constant downward push on backlink
    * nodes and an equal upward push on the subject's own links, so the two
    * halves of the ring settle above and below the center. Against the k_g
    * spring the equilibrium offset is k_h / k_g, about 75px, which reads as
@@ -142,7 +142,7 @@ export type HopDepth = 1 | 2 | 3 | 4;
 /**
  * Per-ring cap. Tighter caps for outer rings keep dense worlds visually
  * digestible. Tier-density may shrink ring 2 further (see RING2_CAP_CHAPTER /
- * _BOOK). Ring 1 was uncapped until S367 (critic C3): a Map's backlinks are
+ * _BOOK). Ring 1 was once uncapped: a Map's backlinks are
  * every pin and marker on it, and the sim is O(iters x n^2), so a Sikelia map
  * stalled the tab. Ring 1 now keeps its RING_CAPS[1] most connected; the
  * legend says how many were left out.
@@ -152,7 +152,7 @@ const RING2_CAP_CHAPTER = 6;
 const RING2_CAP_BOOK = 4;
 
 /**
- * Layout memo (S367 critic C3). The context tab remounts the graph on every
+ * Layout memo. The context tab remounts the graph on every
  * elements swap (each edit, each autosave), and the sim is deterministic in
  * its inputs, so a node + edge set already laid out reuses its positions.
  * Module-level so it survives the remount; a few entries cover recenters.
@@ -186,8 +186,8 @@ interface SimNode {
   isCenter: boolean;
   isCast: boolean;
   /**
-   * Ring-1 node that links TO the center without the center linking back
-   * (S354). Rendered muted with an arrow into the center; seeded and biased
+   * Ring-1 node that links TO the center without the center linking back.
+   * Rendered muted with an arrow into the center; seeded and biased
    * into the lower hemisphere. A mutual link is cast, never backlink.
    */
   isBacklink: boolean;
@@ -251,13 +251,13 @@ export function collectDirectNeighbors(el: Element): string[] {
   // Single-link fields too (narrator / protagonist / birthplace / location /
   // …) — generic id-shaped scan (convention #5). Without this, a knowledge
   // entry's narrator (its primary holder channel) and every other single-link
-  // relation was invisible to the graph (session 235 fix).
+  // relation was invisible to the graph.
   for (const [key, value] of Object.entries(el)) {
     if (SINGLE_LINK_SKIP_KEYS.has(key)) continue;
     if (typeof value === 'string') {
       if (looksLikeId(value)) seen.add(value);
     } else if (Array.isArray(value)) {
-      // Multi-links OUTSIDE the named list (S354): `governs`, `populations`,
+      // Multi-links OUTSIDE the named list: `governs`, `populations`,
       // `holders`, `allies`, `members`... the schema has dozens of multi-link
       // names and the list above holds eighteen. A family that `governs` a
       // regime was invisible to the regime's web. Any array of id-shaped
@@ -276,7 +276,7 @@ export function collectDirectNeighbors(el: Element): string[] {
 
 /**
  * Reverse adjacency for a world: for every element id, the ids of elements
- * whose fields point at it (S354). Built once per render from the same
+ * whose fields point at it. Built once per render from the same
  * `collectDirectNeighbors` read that draws the forward edges, so a link
  * counts in exactly one direction per pair and the two never disagree.
  * O(N × fields) over the loaded world; a 600-element world is well under a
@@ -485,7 +485,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // subsequent ring scores candidates by how many edges connect them back
     // to the previous ring, then takes the top-N per the cap.
     //
-    // Ring 1 is the UNION of both directions (S354, Captain's ask): what the
+    // Ring 1 is the UNION of both directions (Titus's ask): what the
     // subject links to (cast) plus everything that links to the subject
     // (backlinks). An element that is only ever pointed at, a regime named
     // by ten titles and three houses, used to draw an empty web.
@@ -510,7 +510,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       const t = byId.get(id)?.type;
       return t ? currentHiddenTypes.has(t) : false;
     };
-    // Ring 1 cap (S367 critic C3), applied AFTER the type filter so hiding
+    // Ring 1 cap, applied AFTER the type filter so hiding
     // a flood type lets the rest through. Scored like the outer
     // rings: edges back into the center and the ring itself; the stable sort
     // keeps cast ahead of backlinks on a tie. The left-out count feeds the
@@ -626,7 +626,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     for (const n of nodes) idToNode.set(n.id, n);
 
     // Edges: every relation between two visible nodes draws once, keeping
-    // its direction (S354): `from` is the element whose field holds the
+    // its direction: `from` is the element whose field holds the
     // link, `to` is the one it names. A pair linked both ways is one
     // `mutual` edge. The renderer only draws arrowheads on edges INTO the
     // center, so direction is visible exactly where the question "who links
@@ -653,7 +653,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // ring into the bottom of the canvas for no contrast.
     const biased = nodes.some(n => n.isCast) && nodes.some(n => n.isBacklink);
     // Seeds follow from ring order and the cast/backlink split, and the sim
-    // has no randomness, so this key fixes the result (S367 critic C3).
+    // has no randomness, so this key fixes the result.
     const memoKey = `${biased ? 1 : 0}#`
       + visibleRings.map((r, d) => r.map(id => (d === 1 && backlinkSet.has(id) ? '<' : '') + id).join(',')).join(';')
       + '#' + edges.map(e => `${e.fromId}>${e.toId}${e.mutual ? '=' : ''}`).join(',');
@@ -664,7 +664,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       const centerName = centerEl.name || '';
       runSim(nodes, edges, idToNode, biased, centerLabelSlotFor(centerName));
       // The slot was sized for the usual scale; a wide web fits the pane
-      // smaller, and the box kept clear shrinks under the label (S389:
+      // smaller, and the box kept clear shrinks under the label (once
       // Fluffington's label over Commander Vera at depth 2, 1440). Size it
       // again from the fit this pane gives, and relax again. Never below
       // the scale where the collision distance still keeps nodes apart: a
@@ -698,10 +698,10 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     host.innerHTML = '';
     paint(host, nodes, edges, neighborSets);
 
-    // Legend for the muted half of the ring (S354): one quiet line, only
+    // Legend for the muted half of the ring: one quiet line, only
     // when backlinks are on the canvas, so a first-time reader has the key
     // without a settings trip. Pointer-events off; it is not a control.
-    // The same line carries the ring-1 cap's left-out count (S367 critic C3).
+    // The same line carries the ring-1 cap's left-out count.
     const backlinkCount = nodes.filter(n => n.isBacklink).length;
     if (backlinkCount > 0 || ring1Omitted > 0) {
       const legend = document.createElement('div');
@@ -781,7 +781,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       const desc = typeof n.el?.description === 'string' ? n.el.description.trim() : '';
       const descSnippet = desc.length > 200 ? desc.slice(0, 197) + '…' : desc;
       // A backlink's tooltip says so in words, for the reader who has not
-      // yet learned the muted ring + arrow (S354). A zone beside its map
+      // yet learned the muted ring + arrow. A zone beside its map
       // says how many markers draw it there (#185: they are one line now).
       const centerName = nodes.find(c => c.isCenter)?.el?.name || 'this element';
       const markers = n.isCenter ? 0
@@ -839,7 +839,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   }
 
   /**
-   * The label pass (#141, S387; it replaced T-CX2's count budget, which hid by
+   * The label pass (#141; it replaced T-CX2's count budget, which hid by
    * degree alone and still let fourteen labels print over each other in a
    * busy ring). Every label takes the first clear side of its node or waits
    * for hover (`graph-labels.ts`). Priority: the center, then the selection,
@@ -928,7 +928,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.lineWidth = 1;
     const defaultStroke = 'rgba(34, 211, 238, 0.25)';
-    // Backlink edges read from the app ink rather than the accent (S354):
+    // Backlink edges read from the app ink rather than the accent:
     // they belong to the muted half of the ring. The canvas cannot read a
     // CSS variable directly, so resolve the ink triplet once per draw and
     // fall back to the dark-theme white.
@@ -1472,7 +1472,7 @@ function runSim(
       n.vx -= n.x * PARAMS.k_g;
       n.vy -= n.y * PARAMS.k_g;
       // Hemisphere bias, ring 1 only: backlinks settle below the center,
-      // the subject's own links above (S354).
+      // the subject's own links above.
       if (!hemisphereBias) continue;
       if (n.isBacklink) n.vy += PARAMS.k_h;
       else if (n.isCast) n.vy -= PARAMS.k_h;
