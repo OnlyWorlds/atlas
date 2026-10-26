@@ -1,6 +1,6 @@
 # Atlas
 
-Folder-first OnlyWorlds world browser and editor with optional API sync. A world is a folder of plain files on your disk (or in your browser's storage), and Atlas reads and writes it; linking the world to an account on [onlyworlds.com](https://www.onlyworlds.com) adds sync.
+A desktop worldbuilding studio for OnlyWorlds. Atlas works on world folders on your own computer (or in your browser's storage): browse and edit every element, follow its links, draw maps, and sync with an [onlyworlds.com](https://www.onlyworlds.com) account when you link one.
 
 Use it at [atlas.onlyworlds.com](https://atlas.onlyworlds.com); what changed in each release is at [atlas.onlyworlds.com/changelog.html](https://atlas.onlyworlds.com/changelog.html).
 
