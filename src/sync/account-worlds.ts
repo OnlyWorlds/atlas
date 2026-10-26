@@ -17,6 +17,7 @@
 
 import { downloadingLine } from '../ui/download-progress';
 import { getState, patchSlice, subscribe } from '../core/state';
+import { SIGNED_IN_AGAIN_LINE } from './token-revoke';
 import { navigate, homeHash } from '../core/router';
 import { saveRegistry, setPin, findWorldByServerId, findLinkedWorld } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
@@ -256,6 +257,13 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
     );
     if (!enteredPin) return false;
     pin = enteredPin;
+  }
+  // A sign-in in another tab while the questions waited replaced the token, and the old one is
+  // revoked (conv. 179): stop here rather than say the new one was refused (2026-10-26's gate, M2).
+  if (getState().registry.account_token !== token) {
+    toasts.info(SIGNED_IN_AGAIN_LINE);
+    refreshAccountWorlds(true);
+    return false;
   }
 
   patchSlice('accountWorlds', { ...getState().accountWorlds, opening: row.id });

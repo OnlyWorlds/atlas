@@ -9,6 +9,7 @@
 
 import { getState, patchSlice } from '../core/state';
 import { saveRegistry, setAccountToken } from '../registry/registry';
+import { revokeReplacedToken } from './token-revoke';
 import { WAITS_FOR_SIGN_IN, type ToastManager } from '../ui/toast-manager';
 import { isAtlasGrounded } from '../core/grounded';
 import { isTourFlagActive } from '../tour/tour-flag';
@@ -21,9 +22,13 @@ import { navigate } from '../core/router';
  * Forget can revoke it; a pasted token has none.
  */
 export async function keepSignIn(token: string, username: string, toasts: ToastManager, tokenId?: string | null): Promise<void> {
-  const next = setAccountToken(getState().registry, token, username, tokenId);
-  saveRegistry(next);
+  const before = getState().registry;
+  const next = setAccountToken(before, token, username, tokenId);
+  const saved = saveRegistry(next);
   patchSlice('registry', next);
+  // Only once the new token reached storage: a lost save keeps the old one there, and it must
+  // still work (2026-10-26's gate, M1).
+  if (saved) revokeReplacedToken(before, next);
   // The ask to sign in is answered: it goes before the door's next question (Kael, h57 #5950).
   toasts.dismiss(WAITS_FOR_SIGN_IN);
   toasts.success(username ? `Signed in as ${username}` : 'Signed in');

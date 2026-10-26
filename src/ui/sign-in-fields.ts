@@ -15,7 +15,7 @@ import { getState, patchSlice } from '../core/state';
 import { saveRegistry, setAccountToken } from '../registry/registry';
 import { AccountClient } from '../sync/account-client';
 import { signInWithPassword, passwordSignInLine } from '../sync/password-sign-in';
-import { revokeAtlasToken } from '../sync/token-revoke';
+import { revokeAtlasToken, revokeReplacedToken } from '../sync/token-revoke';
 import { PlainError } from '../core/plain-error';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { noAccountYetHtml } from '../core/ow-site';
@@ -83,9 +83,12 @@ export async function signInFromFields(root: ParentNode, signedInRest: string, t
     throw new PlainError(passwordSignInLine(err));
   }
   f.password.value = '';
-  const next = setAccountToken(getState().registry, minted.token, username, minted.tokenId);
-  saveRegistry(next);
+  const before = getState().registry;
+  const next = setAccountToken(before, minted.token, username, minted.tokenId);
+  const saved = saveRegistry(next);
   patchSlice('registry', next);
+  // Only once the new token reached storage (2026-10-26's gate, M1).
+  if (saved) revokeReplacedToken(before, next);
   toasts?.dismiss(WAITS_FOR_SIGN_IN);
   root.querySelector('[data-role="sign-in-fields"]')?.replaceWith(
     document.createRange().createContextualFragment(signedInLineHtml(username, signedInRest)),

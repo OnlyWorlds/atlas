@@ -36,6 +36,7 @@ import {
   sharedOpenLine,
 } from '../../src/sync/account-worlds';
 import { AccountClient } from '../../src/sync/account-client';
+import { SIGNED_IN_AGAIN_LINE } from '../../src/sync/token-revoke';
 import type { AccountWorldRow } from '../../src/core/types';
 import type { ToastManager } from '../../src/ui/toast-manager';
 
@@ -452,5 +453,29 @@ describe('createApiWorld — the signed-in v2 lane (session 260); signed out it 
 
     await expect(createApiWorld({ name: 'Legacy World', pin: '4242' })).rejects.toThrow(/Sign in to OnlyWorlds first/);
     expect(v1.worldCreations).toHaveLength(0);
+  });
+});
+
+describe('openAccountWorld — a sign-in elsewhere while it asks (conv. 179, 2026-10-26)', () => {
+  it('the token replaced while the where-question waits: stops with the line, mints nothing, says no refusal', async () => {
+    (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
+    localStorage.setItem('atlas_ui_prefs', JSON.stringify({ sidebarMode: 'worlds', defaultCreateType: 'character', newWorldWhere: 'folder' }));
+    const state = mount();
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+    // A home folder is set, so the folder answer goes on at once.
+    patchSlice('atlasRoot', { name: 'home' } as never);
+    const row: AccountWorldRow = { id: 'srv-collab', name: 'Collab World', role: 'collaborator', public_read: true, keys: [] };
+    const toasts = makeToasts();
+    const pending = openAccountWorld(row, toasts);
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull());
+    // Another tab signs in: the registry now holds another token.
+    patchSlice('registry', setAccountToken(getState().registry, 'ow_a_another_tab_token', 'titus'));
+    document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="go"]')!.click();
+    expect(await pending).toBe(false);
+    expect(state.minted).toHaveLength(0);
+    expect(toasts.calls.map(c => c.msg)).toContain(SIGNED_IN_AGAIN_LINE);
+    expect(toasts.calls.filter(c => c.level === 'error')).toEqual([]);
+    delete (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+    localStorage.removeItem('atlas_ui_prefs');
   });
 });

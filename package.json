@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "1.93.1",
+  "version": "1.94.0",
   "private": true,
   "license": "MIT",
   "description": "Atlas: folder-first OnlyWorlds world browser and editor with optional API sync",
@@ -17,7 +17,7 @@
     "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@onlyworlds/sdk": "4.76.1",
+    "@onlyworlds/sdk": "4.81.0",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-mention": "^3.31.3",
     "@tiptap/markdown": "^3.31.3",

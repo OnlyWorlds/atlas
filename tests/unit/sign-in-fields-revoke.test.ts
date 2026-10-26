@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const ID = '0f1e2d3c-4b5a-4968-8776-655443322110';
 const revoke = vi.fn(async () => 'revoked');
 const profile = vi.fn();
-vi.mock('../../src/sync/token-revoke', () => ({ revokeAtlasToken: (...a: unknown[]) => revoke(...(a as [])) }));
+vi.mock('../../src/sync/token-revoke', () => ({ revokeAtlasToken: (...a: unknown[]) => revoke(...(a as [])), revokeReplacedToken: () => {} }));
 vi.mock('../../src/sync/password-sign-in', () => ({
   signInWithPassword: vi.fn(async () => ({ token: 'ow_a_MINTED', tokenId: ID })),
   passwordSignInLine: () => 'Signing in did not work. Try again in a moment.',

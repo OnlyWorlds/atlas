@@ -21,6 +21,7 @@ import { loadUiPrefs, setInviterNamePref } from '../core/ui-prefs';
 import { problemFor } from '../core/problems';
 import { INVITE_DAYS, makeInvite, NEW_CHARACTER, type InviteFor, type MadeInvite } from '../sync/invite-link';
 import { qrCodeSvg } from './qr-code';
+import { SIGNED_IN_AGAIN_LINE } from '../sync/token-revoke';
 
 const FOR_WORDS: Record<InviteFor, { title: string; line: string; as: string; needs: string }> = {
   contributor: { title: 'A contributor', line: 'Sees the whole world and adds to it.', as: 'a contributor', needs: 'They need a free account.' },
@@ -142,6 +143,17 @@ export class InviteModal extends BaseModal {
       const character = playsAsSelect.value || NEW_CHARACTER;
       const characterName = character === NEW_CHARACTER ? null : playsAsSelect.selectedOptions[0]?.textContent ?? null;
       setInviterNamePref(name);
+      // A sign-in since the dialog opened replaced its token, and the old one is revoked (conv. 179):
+      // said as that, never as a refused key or PIN (2026-10-26's gate, M2).
+      if (getState().registry.account_token !== this.token) {
+        this.dismissLocked = false;
+        errorBox.textContent = `${SIGNED_IN_AGAIN_LINE} Close this and choose Invite someone again.`;
+        errorBox.hidden = false;
+        lock(false);
+        makeBtn.textContent = 'Make the link';
+        making = false;
+        return;
+      }
       try {
         const made = await makeInvite(this.token, this.worldId, inviteFor, name, character);
         this.dismissLocked = false;

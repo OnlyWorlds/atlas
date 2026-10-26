@@ -105,3 +105,38 @@ test('New world on OnlyWorlds comes back open, signed in', async ({ page }) => {
   await expect(back.locator('[data-action="sign-in-onlyworlds"]')).toHaveCount(0);
   await expect(back.locator('input[name="signin-password"]')).toHaveCount(0);
 });
+
+// A sign-in that returns over a token Atlas minted (another tab signed in meanwhile) lets the old
+// one go: revoked by the id recorded beside it, with the old token as its bearer, once the new one
+// is kept (2026-10-26; conv. 179). The sign-in is started from the module, since a signed-in
+// Settings offers no button.
+test('a sign-in over a token Atlas minted revokes the old one by its id', async ({ page }) => {
+  const keel = await serveAtlasAtItsOrigin(page, 'code');
+  const revokes: Array<{ path: string; auth: string | null }> = [];
+  await page.route('https://www.onlyworlds.com/api/v2/account/tokens/**', async (route) => {
+    revokes.push({ path: new URL(route.request().url()).pathname, auth: route.request().headers()['authorization'] ?? null });
+    await route.fulfill({ status: 204, body: '' });
+  });
+  await boot(page, '#/settings/onlyworlds');
+  await page.evaluate(() => {
+    const reg = { ...(window as any).__atlasTestApi.getState().registry };
+    reg.account_token = 'ow_a_OLDERTABTOKEN1';
+    reg.account_token_id = '0f1e2d3c-4b5a-4968-8776-655443322110';
+    reg.account_token_id_tail = reg.account_token.slice(-8);
+    reg.account_username = 'wren';
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  });
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await page.evaluate(async () => {
+    const m = await import('/src/sync/onlyworlds-sign-in.ts');
+    await m.beginOnlyWorldsSignIn({ hash: '#/settings/onlyworlds' });
+  });
+  await expect(page.locator('.ow-toast', { hasText: 'Signed in as wren' })).toBeVisible();
+  await expect.poll(() => revokes.length).toBe(1);
+  expect(revokes[0]).toEqual({ path: '/api/v2/account/tokens/0f1e2d3c-4b5a-4968-8776-655443322110', auth: 'Bearer ow_a_OLDERTABTOKEN1' });
+  const reg = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry);
+  expect(reg.account_token).toBe('ow_a_minted465');
+  expect(reg.account_token_id).toBe('5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d');
+  expect(keel.tokenBodies).toHaveLength(1);
+});

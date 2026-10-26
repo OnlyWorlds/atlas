@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.94.0',
+    date: '2026-10-26',
+    theme: 'One token at a time',
+    entries: [
+      {
+        id: 'replaced-token-revoked',
+        title: 'Signing in again takes back the token it replaces',
+        body: "When you sign in while Atlas already holds a token it made for you, for example after signing in from another tab, Atlas now revokes the older token on OnlyWorlds once the new one is kept, so it no longer works. A token you pasted in is never revoked.",
+        tags: ['safety', 'settings'],
+      },
+    ],
+  },
+  {
     version: '1.93.1',
     date: '2026-10-25',
     theme: 'A finger-sized remove for aliases',

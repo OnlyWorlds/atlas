@@ -8,8 +8,8 @@
  * keel's answers (probed on a crew account, and read in its source by the
  * gate): 204 revoked; 401 the token works no more (revoked already); 404 the
  * bearer works and the id is not its account's, so the token is still LIVE
- * (the gate's G1). Revoking a token minted by Sign in with OnlyWorlds also
- * withdraws the person's consent for Atlas: the next sign-in asks again.
+ * (the gate's G1). Revoking a token minted by Sign in with OnlyWorlds ends the
+ * person's consent for Atlas only when it was Atlas's last live token for them.
  *
  * This never writes the registry (the gate's G11): the caller has already
  * let the token go, and a later sign-in must not be undone by an old answer.
@@ -17,7 +17,27 @@
 
 import { DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
-import { isTokenId } from '../registry/registry';
+import { isTokenId, mintedTokenId } from '../registry/registry';
+import type { WorldsRegistry } from '../core/types';
+
+/** Said when a sign-in elsewhere replaced the token a step began with: the step stops, nothing refused. */
+export const SIGNED_IN_AGAIN_LINE = 'You signed in again since this started, so Atlas stopped here. Try once more.';
+
+/**
+ * A sign-in that replaces a token Atlas minted lets the old one go: revoked by
+ * the id recorded beside it, after the new token is kept (2026-10-26). keel
+ * keeps a tool's consent while another of its tokens for the person lives, so
+ * a sign-in by the same door asks nothing more next time; a move to the
+ * password door or to another account can end the old one's consent, which is
+ * what letting it go means. A pasted token, the same token kept again, or no
+ * token before: nothing is sent. Best effort: nothing waits on the answer.
+ */
+export function revokeReplacedToken(before: WorldsRegistry, after: WorldsRegistry, revoke: typeof revokeAtlasToken = revokeAtlasToken): void {
+  const id = mintedTokenId(before);
+  const old = before.account_token;
+  if (!id || !old || old === after.account_token) return;
+  void revoke(old, id);
+}
 
 /** How long a revoke may take: it is best effort, and nothing waits on it longer. */
 export const TOKEN_REVOKE_LIMIT_MS = 8_000;
