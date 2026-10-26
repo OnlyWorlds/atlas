@@ -33,7 +33,7 @@ export function zoneSpan(zone: object): ZoneSpan {
  * (`TEMPORAL_TYPE_FIELDS`): a Character from its birth on, a Location from
  * its founding, an Event from its start to its end, a Title from its grant to
  * its revoke. A type with no date fields has no span, so it always shows (the
- * pins by their element's dates, Titus's Q11, 2026-10-16).
+ * pins by their element's dates, Titus 2026-10-16).
  */
 export function elementSpan(el: object | null | undefined): ZoneSpan {
   const type = (el as { type?: unknown } | null | undefined)?.type;

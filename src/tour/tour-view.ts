@@ -13,14 +13,14 @@
  * step-enter, so a derived phase composes with that for free and a stored one
  * would have to be reconciled against it.
  *
- * PREFIX SEMANTICS (gate R10): the winning phase is the last one whose `when`
+ * PREFIX SEMANTICS: the winning phase is the last one whose `when`
  * holds AND all earlier phases' `when` also hold. "Last match wins" alone
  * picks a contradictory phase when the user deletes something mid-step: with
  * phases a/b(ship exists)/c(steinway exists), deleting the ship after minting
  * all three would keep showing c's "all three are here" copy. Prefix reading
  * is also how an author writes phases: top to bottom, each one further along.
  *
- * SUSPENSION (gate R4): when the tour's world is not the ACTIVE world, every
+ * SUSPENSION: when the tour's world is not the ACTIVE world, every
  * predicate would read someone else's world — collapsing the narration to
  * phase A ("create the Hegemony") while the user looks at their own novel, or
  * worse, resolving TRUE against foreign data and claiming a deed they never
@@ -125,7 +125,7 @@ export function canAdvance(phase: TourPhase, w: TourWorldView): boolean {
  * Build the view from a plain snapshot. `refToId` resolves bundle refs and
  * returns undefined before the bundle chunk has loaded — every `hasRef` then
  * reads false, which is why the opening phase must never claim a deed (the
- * bundle-load window, upheld by the gate as a real but benign flash).
+ * bundle-load window, upheld as a real but benign flash).
  */
 export function buildTourWorldView(input: {
   // Widened from {id, type} to carry the pin/marker geometry `pinInZone`

@@ -1,5 +1,5 @@
 /**
- * Settings → OnlyWorlds tab (Bout OW, workplan D11) — the hub that replaced
+ * Settings → OnlyWorlds tab (workplan D11) — the hub that replaced
  * the Account tab: what OnlyWorlds is, your account credentials, the
  * waypoints learning track, essential links, and a developers corner.
  *

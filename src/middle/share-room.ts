@@ -88,7 +88,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (proposedNote.textContent !== (line ?? '')) proposedNote.textContent = line ?? '';
     proposedNote.hidden = line === null;
   }
-  /** A proposed or hidden page is not published (conv. 168 gate F3, conv. 170): said, and nothing sent. */
+  /** A proposed or hidden page is not published (conv. 168, conv. 170): said, and nothing sent. */
   function refuseProposedPage(page: Element): boolean {
     const line = pageNotPublishedLine(page);
     if (!line) return false;
@@ -2200,7 +2200,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
 
     // A published page hands the world on (conv. 168): what is proposed and not
     // yet accepted stays off it, and the author is told what and why. Kept in
-    // step on every data tick (a keeper's accept arrives by a pull; gate F5).
+    // step on every data tick (a keeper's accept arrives by a pull).
     proposedNote = document.createElement('p');
     proposedNote.className = 'atlas-share-proposed-note';
     proposedNote.dataset.role = 'share-proposed-note';

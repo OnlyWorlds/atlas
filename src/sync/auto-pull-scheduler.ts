@@ -116,7 +116,7 @@ function tickPull(): void {
   const s = getState().sync.activeSync;
   // Defense-in-depth: even if reconcile didn't yet stop the interval (e.g.
   // engine transitioned mid-tick), the tick itself bails for any non-idle
-  // engine. Includes `error` so post-Bout-T auth-failed engines don't burn
+  // engine. Includes `error` so auth-failed engines don't burn
   // pullNow calls (engine.pullNow already no-ops while paused — this just
   // skips the wrapper plumbing too).
   if (s?.kind === 'paused' || s?.kind === 'syncing' || s?.kind === 'error') {

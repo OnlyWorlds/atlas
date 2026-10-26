@@ -62,7 +62,7 @@ async function openWorldById(id: string, toasts: ToastManager): Promise<void> {
     return;
   }
   // The boot reconciliation runs first on the chain and can bring a lost
-  // copy back into the registry: look for one after it (the gate's F6).
+  // copy back into the registry: look for one after it.
   await enqueueActivationTask(async () => {});
   if (await openHere(id, toasts)) return;
   const token = getState().registry.account_token;
@@ -75,7 +75,7 @@ async function openWorldById(id: string, toasts: ToastManager): Promise<void> {
     return;
   }
   // A fresh read: a world made or shared since this tab last asked is on it,
-  // and an old failure is not repeated from the slice (the gate's F2, F3).
+  // and an old failure is not repeated from the slice.
   const rows = await accountWorldsWhenFetched(token, undefined, { fresh: true });
   if (getState().registry.account_token !== token) return;
   if (rows === null) {
@@ -99,7 +99,7 @@ function askToOpen(row: AccountWorldRow, token: string, toasts: ToastManager): v
       label: 'Open',
       run: () => {
         // The toast stays until clicked: the row is this token's, and the tour
-        // may have started since (the gate's F7).
+        // may have started since.
         if (isTourFlagActive()) { toasts.info(OPEN_TOUR_LINE); return; }
         if (getState().registry.account_token !== token) {
           toasts.info('Atlas is signed in with another account now. Open the world again from onlyworlds.com.');
@@ -117,7 +117,7 @@ function askToOpen(row: AccountWorldRow, token: string, toasts: ToastManager): v
  * when no world is open: a link from anyone never moves a person out of the
  * world they are in without their click (Kael, 2026-10-16), and a folder's
  * permission query runs after the open world is cleared, so a refused one
- * would leave that world empty (the gate's F1). Any open that did not happen
+ * would leave that world empty. Any open that did not happen
  * asks for a click too.
  */
 async function openHere(id: string, toasts: ToastManager): Promise<boolean> {
@@ -140,7 +140,7 @@ async function openHere(id: string, toasts: ToastManager): Promise<boolean> {
       said();
       return true;
     }
-    // Its folder gone, the registry forgot it: the account's copy is the way back (the gate's F5).
+    // Its folder gone, the registry forgot it: the account's copy is the way back.
     if (!getState().registry.worlds.some(w => w.id === here.id)) return false;
   }
   // The click opens it, or says in its own words why it cannot (a cleared

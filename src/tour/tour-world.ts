@@ -56,7 +56,7 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
   // bug only existed on the path every real user takes. A read-back would work
   // too, but it can miss: `readWorldMeta` falls back to `{id:'', name:''}` when
   // world.json is unreadable, which would silently install a mirror WORSE than
-  // the hand-built one it replaced (close gate, LOW).
+  // the hand-built one it replaced.
 
   const { next, entry: made } = createLocalWorld(getState().registry, {
     name: w.name,

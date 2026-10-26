@@ -63,7 +63,7 @@ interface ActiveDraft {
    */
   trace: {
     on: boolean; stroke: Point[] | null; strokeLayer: L.Polyline | null; endedAt: number;
-    /** The one finger or pen the stroke follows (gate G6: a second one mixed in). */
+    /** The one finger or pen the stroke follows (a second one mixed in). */
     pointerId: number | null;
     /** The container's own touch-action, put back when Trace goes off. */
     touchAction: string | null;
@@ -354,11 +354,11 @@ const TRACE_TOLERANCE_PX = 3;
 /**
  * At most this many points from one stroke: each is a Marker file written on
  * finish, and the coast's raggedness comes from the style, not the points
- * (gate G8: a careful trace round a coast kept 165).
+ * (a careful trace round a coast kept 165).
  */
 const TRACE_MAX_POINTS = 60;
 
-/** A press that moves less than this many screen pixels is a click, not a stroke (gate G15). */
+/** A press that moves less than this many screen pixels is a click, not a stroke. */
 const TRACE_MIN_STROKE_PX = 8;
 
 /**
@@ -377,7 +377,7 @@ export function setTrace(on: boolean): void {
     lMap.dragging.disable();
     const el = lMap.getContainer();
     // With panning off, Leaflet's CSS leaves touch-action at pan-x pan-y, so
-    // the browser took a finger's drag and cancelled the stroke (gate G6).
+    // the browser took a finger's drag and cancelled the stroke.
     active.trace.touchAction = el.style.touchAction;
     el.style.touchAction = 'none';
     const listen = (type: string, handler: (e: PointerEvent) => void) => {

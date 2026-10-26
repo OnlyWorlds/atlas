@@ -122,7 +122,7 @@ function renderStorageDeviceSection(): string {
   `;
 }
 
-// ---- In this browser (1.17, contract §3.4, lens C R3-k) ----
+// ---- In this browser (1.17) ----
 
 /** Shown where worlds live in this browser, or can only live there (no folder picker). */
 function showBrowserStorageSection(): boolean {
@@ -230,7 +230,7 @@ function wireBrowserStorageSection(): void {
   void storage?.persisted?.().then(show).catch(() => {});
   section.querySelector<HTMLButtonElement>('[data-action="ask-persist"]')?.addEventListener('click', () => {
     if (typeof storage?.persist !== 'function') return;
-    // Inside the click, never awaited (Firefox may never answer, gate B M8).
+    // Inside the click, never awaited (Firefox may never answer).
     void storage.persist().then(kept => {
       show(kept);
       if (!kept && hasFolderMode()) {
@@ -411,7 +411,7 @@ function wireSyncTab(toasts: ToastManager): void {
       saveRegistry(next);
       patchSlice('registry', next);
       // The running engine follows its world's policy, which a shared world
-      // keeps as pause-and-review whatever this says (B12 Q1). Leaving
+      // keeps as pause-and-review whatever this says. Leaving
       // pause-and-review clears the held conflicts and pushes (SYNC_NOTES M4).
       reapplySyncPolicy();
     });

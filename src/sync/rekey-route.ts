@@ -1,5 +1,5 @@
 /**
- * The URL after ids change (re-key gate lens 3 F6). Pure.
+ * The URL after ids change. Pure.
  *
  * One rewriter for every route that carries an element id, used by the
  * re-key's live pass (`rekeyLiveUi`, which Route 2 runs too) and by recovery

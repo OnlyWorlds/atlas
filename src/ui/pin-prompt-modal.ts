@@ -1,7 +1,7 @@
 /**
  * PinPromptModal — one-field prompt for the OnlyWorlds PIN.
  *
- * Account-mode precondition surface (gate R1, 2026-07-13): flows that need
+ * Account-mode precondition surface (2026-07-13): flows that need
  * the PIN before touching the server (open an account world, create one)
  * call `promptForPin()` when the registry has none. The resolved PIN is
  * saved to the registry by the CALLER (keeps this modal a dumb input).
@@ -39,7 +39,7 @@ export class PinPromptModal extends BaseModal {
           </div>
         </form>
       `;
-      // TEXT, never markup (gate F5): `context` carries a world name from
+      // TEXT, never markup: `context` carries a world name from
       // the account API, and this is the one modal that collects the PIN. A
       // name holding a <form action> would re-parent the PIN input off-origin;
       // the CSP has no form-action to stop it.

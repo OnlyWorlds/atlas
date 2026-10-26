@@ -50,7 +50,7 @@ export async function openPickedWorld(picked: FileSystemDirectoryHandle, toasts:
   // The WORLD's name, not the folder's: it is the first
   // thing a toolkit arrival reads.
   const name = getState().registry.worlds.find(w => w.id === worldId)?.name || picked.name;
-  if (opts.quiet) { /* the caller says what happened, once (lens C L10) */ }
+  if (opts.quiet) { /* the caller says what happened, once */ }
   else if (already) toasts.info(`"${name}" is already in Atlas. Opening it`);
   else toasts.success(`Opened "${name}" in place. Its folder stays where it is`);
   const { activateWorld } = await import('../sidebar/worlds-sidebar');
@@ -184,7 +184,7 @@ export async function ensureAtlasRoot(
       return false;
     }
     if (result.worldFolder && opts.worldPicked === 'refuse') {
-      // Moving a world (1.17, lens C W4): opening the picked world here would
+      // Moving a world (1.17): opening the picked world here would
       // leave the world being moved.
       toasts.info('That folder is a world. Pick the folder where Atlas should keep worlds, not a world itself.');
       return false;

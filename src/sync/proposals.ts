@@ -63,7 +63,7 @@ export type Settlement =
  */
 export function settle(entry: ProposedEdit, rows: ProposalRow[], complete = true): Settlement {
   const row = rows.find(r => r.id === entry.proposal_id);
-  // A walk cut short may simply not have reached the row (the gate's G7): still open.
+  // A walk cut short may simply not have reached the row: still open.
   if (!row) return complete ? { kind: 'refused', proposal: { outcome: 'withdrawn' } } : { kind: 'open' };
   if (row.state === 'accepted') return { kind: 'accepted' };
   if (row.state === 'declined') {

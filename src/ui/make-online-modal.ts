@@ -102,7 +102,7 @@ export class MakeOnlineModal extends BaseModal {
       this.toasts.info('World is already online');
       return;
     }
-    // The tour world is a sandbox (re-key gate lens 3): until it is kept
+    // The tour world is a sandbox: until it is kept
     // its ids are the live demo world's, so keel refuses every element, and
     // Start fresh deletes it. Keeping it (1.17) gives it ids of its own and
     // ends the sandbox; then it goes online like any world.
@@ -334,7 +334,7 @@ export class MakeOnlineModal extends BaseModal {
       const created = await createApiWorld({ name, pin, lines });
       const apiKey = created.apiKey;
 
-      // 2. Build the v2 adapter for element CRUD (gate 10.7: the SDK client
+      // 2. Build the v2 adapter for element CRUD (the SDK client
       //    exists only for the worlds.get fallback below).
       const adapter = buildV2Adapter(apiKey, pin);
 
@@ -408,7 +408,7 @@ export class MakeOnlineModal extends BaseModal {
       if (failures > 0) {
         // Say why: "will retry" was false for the commonest cause, an
         // id another world already holds, which fails every retry.
-        // Registered as shown (re-key gate lens 2 F11): the flush-on-attach
+        // Registered as shown: the flush-on-attach
         // round re-sends the same failing set a moment later and must not
         // repeat the paragraph.
         this.toasts.error(`${name} is online. ${failureToastOnce(pushResult.failures, activeFilesWhere()) ?? describeFailures(pushResult.failures, activeFilesWhere())}`);

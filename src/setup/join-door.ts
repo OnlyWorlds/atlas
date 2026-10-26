@@ -263,7 +263,7 @@ export async function openPlayerWorld(opts: {
   // Already linked here (the owner trying their own link, or a second link):
   // the world stays what it is; a player key never replaces another key.
   // The seat held at the redeem goes with every outcome but a download that
-  // never lands (the v2 gate's G1); the dialog says the spare line here.
+  // never lands; the dialog says the spare line here.
   const linked = findLinkedWorld(reg, player.world.id);
   if (linked) {
     dropHeldSeat(player.world.id);

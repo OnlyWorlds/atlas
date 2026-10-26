@@ -550,7 +550,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   async function runImport(): Promise<void> {
     if (!parsed || importing) return;
     // Import as new asks where the world lives first, as its own small step
-    // (1.17, conv. 129; lens C R2-d): before `importing` is set, so a Cancel
+    // (1.17, conv. 129): before `importing` is set, so a Cancel
     // leaves the review as it was.
     let where: 'folder' | 'browser' = 'browser';
     if (mode === 'new') {

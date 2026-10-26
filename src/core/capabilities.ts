@@ -32,7 +32,7 @@ export function hasOpfsMode(): boolean {
 }
 
 /**
- * Can this window actually USE browser storage? (lane A H4.)
+ * Can this window actually USE browser storage?
  *
  * `hasOpfsMode` checks the API's shape, never calls it, so it cannot see a
  * window where the call is refused: a Firefox private window throws
@@ -40,7 +40,7 @@ export function hasOpfsMode(): boolean {
  * then stalled at its first create with that raw message. This probe makes
  * the call and a throwaway write, once per page, and caches the answer.
  *
- * The answer is a reason (1.17, contract §1.2, gate B20): `absent` (no API),
+ * The answer is a reason (1.17, contract §1.2): `absent` (no API),
  * `refused` (a private window), `full` (the origin's quota), or `ok`. A full
  * origin is never cached: freeing space must be able to change the answer,
  * and it must never read as a private window.
@@ -128,7 +128,7 @@ export function __resetOpfsStatusForTests(): void {
   opfsStatusKnown = null;
 }
 
-/** The one plain line for a window that refuses browser storage (lens C R3-h). */
+/** The one plain line for a window that refuses browser storage. */
 export const NO_BROWSER_STORAGE_LINE =
   'This window does not allow browser storage, so no world can be kept here. If it is a private window, open Atlas in a normal one.';
 

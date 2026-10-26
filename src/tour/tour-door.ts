@@ -10,7 +10,7 @@
  *     Titus's call — the narrator narrates, the app is where you act, and
  *     three modals in a row for three objects reads as paperwork.
  *
- * THE GUARD IS THE POINT (gate R8). Every one of these conditions must hold
+ * THE GUARD IS THE POINT. Every one of these conditions must hold
  * or we return false and the caller opens the ordinary modal: a tour flag left
  * in localStorage, a user who switched to their own world mid-tour, a step
  * with nothing left to mint — each of those used to produce a `+` that did

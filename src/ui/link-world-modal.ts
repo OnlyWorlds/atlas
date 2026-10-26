@@ -164,7 +164,7 @@ export class LinkWorldModal extends BaseModal {
       };
 
       try {
-        // On the activation chain (gate R2, 2026-07-13): a world click during
+        // On the activation chain (2026-07-13): a world click during
         // this multi-second download would otherwise close the download's
         // store mid-write, or the download's setActiveStore would clobber the
         // just-activated world.

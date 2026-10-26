@@ -46,7 +46,7 @@ export interface TimelineNode {
   /**
    * The origin of the date — REQUIRED (the normalizer always populates it,
    * {kind:'exact'} today). Required (not optional) so the compiler enforces the
-   * invariant the fuzzy/relative bouts will rely on (gate finding: optional was
+   * invariant the fuzzy/relative bouts will rely on (optional was
    * a trap). `dateSpec` is a derived cache of the resolved value, NOT the raw
    * textual source — fuzzy parsing re-reads the element field (see DESIGN_CHARTS).
    */
@@ -125,8 +125,8 @@ export type ChartScope =
   | { kind: 'selection'; elementIds: string[] };
 
 /**
- * The primary axis + its axis-specific settings, as a TAGGED UNION (gate
- * finding: `direction` is time-only and must not be a flat top-level field, or
+ * The primary axis + its axis-specific settings, as a TAGGED UNION
+ * (`direction` is time-only and must not be a flat top-level field, or
  * map-charts/other-axes force a breaking reshape of stored configs). Time-only
  * fields (direction, window, future now-lines) live under the 'time' arm;
  * a future 'space' arm carries `mapId` etc. Readers MUST treat an unknown
@@ -144,8 +144,8 @@ export interface ChartStyle {
  * The saved/shareable contract. Persisted to `.atlas/charts.json` AND published
  * as a share block, so it carries `schema_version` like every sibling wire
  * shape (PagePayload.schema_version) — added NOW, before any chart JSON exists,
- * so later additive fields are version-disambiguable on read (gate finding:
- * the migration risk lives HERE, not in the recomputed TimelineNode).
+ * so later additive fields are version-disambiguable on read
+ * (the migration risk lives HERE, not in the recomputed TimelineNode).
  */
 export interface ChartConfig {
   schema_version: 1;

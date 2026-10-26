@@ -50,7 +50,7 @@ export function pendingCustomFieldEdit(): string | null {
  * deleted (hidden). SCALAR values only — object/array values are STRUCTURED
  * data written by other tools (tangle battle records, magelet sidecars) and
  * must never render as an editable text row: `String(value)` shows
- * "[object Object]" and one save destroys the structure (gate A13, the
+ * "[object Object]" and one save destroys the structure (the
  * extension-edit hazard). Those render via structuredFieldEntriesFor.
  */
 export function customFieldMetasFor(el: Element): FieldMeta[] {
@@ -258,8 +258,7 @@ async function removeField(el: Element, fieldName: string, opts?: { alwaysConfir
   const value = (el as Record<string, unknown>)[fieldName];
   // alwaysConfirm: structured (object) values return FALSE from
   // isPopulatedCustomValue, which silently skipped the confirm on exactly
-  // the data the read-only row exists to protect (close-gate BLOCKER,
-  // 2026-07-19). The structured × passes it explicitly.
+  // the data the read-only row exists to protect (2026-07-19). The structured × passes it explicitly.
   if (isPopulatedCustomValue(value) || opts?.alwaysConfirm) {
     const ok = window.confirm(`Remove "${humanizeFieldName(fieldName)}" and its value from this element?`);
     if (!ok) return;
@@ -278,7 +277,7 @@ async function removeFieldNow(elementId: string, fieldName: string): Promise<voi
     await refreshElementsAfterWrite(store);
   } catch (err) {
     console.error('[custom-fields] remove failed:', err);
-    // No retry (gate B L1): the field may have been added again since.
+    // No retry: the field may have been added again since.
     showProblem(err, { doing: 'removing this field' });
   }
 }

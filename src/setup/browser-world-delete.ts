@@ -1,6 +1,6 @@
 /**
  * Delete a world kept in this browser (1.17, conv. 129; contract §1.2, §3.1,
- * §9 invariant 11; gate B11).
+ * §9 invariant 11).
  *
  * A browser world has no folder to keep, so it offers Delete only, never
  * Forget (Forget would orphan a directory nothing can reach). The removal is

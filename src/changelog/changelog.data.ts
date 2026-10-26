@@ -9,7 +9,7 @@
  * GROUNDING RULE: entries describe what actually shipped; credits name only
  * real, confirmed contributors. Reddit/community credits carry a `threadUrl`
  * that links the REQUEST THREAD, never a person's profile. AI-collaborator and
- * broader credits are Titus's call to add (design Q3 left open) — seeded
+ * broader credits are Titus's call to add — seeded
  * conservatively below.
  */
 

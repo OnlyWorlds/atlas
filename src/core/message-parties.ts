@@ -12,7 +12,7 @@
  * addressed to everyone. An id the world does not hold as a Character is
  * counted, never named.
  *
- * Two readings the profile cannot make alone (the S484 gate's G1, G2):
+ * Two readings the profile cannot make alone:
  * - keel strips links to elements a key may not see (a hidden one, outside a
  *   guest's view) from the bodies that key reads, so an empty list or a
  *   missing Narrator in a world not read whole may stand for someone hidden.

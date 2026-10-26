@@ -1,6 +1,6 @@
 /**
  * The browser home (`browser-worlds/`): naming, the make protocol, and the
- * boot reconciliation (1.17 bout 1, conv. 129; contract §1.2, §2.2, §3.2).
+ * boot reconciliation (1.17, conv. 129; contract §1.2, §2.2, §3.2).
  *
  * NAMES are `<slug>-<id8>-<nonce4>`, a fresh nonce at every creation, so no
  * directory is ever made under an earlier one's name: OPFS handles are
@@ -12,7 +12,7 @@
  * save, and keeps `.atlas/making` in the directory until just before that
  * save. So a make in progress in any tab is visible (the lock is held), and
  * a crashed one is recognisable (the marker with a free lock) and removed,
- * never adopted (gate A6, B1).
+ * never adopted.
  *
  * The RECONCILIATION runs once per boot, first in the activation chain. It
  * re-adopts worlds the registry lost, removes crashed makes and orphaned tour

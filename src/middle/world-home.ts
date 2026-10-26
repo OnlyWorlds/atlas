@@ -1,7 +1,7 @@
 /**
  * World Home — the default landing room for an active world.
  *
- * Bout H rebuild (workplan D2): a COVER PAGE with a STUDY-DESK
+ * Rebuild (workplan D2): a COVER PAGE with a STUDY-DESK
  * spine. The world as a book you just opened — identity hero (cover image
  * when set, name, description), quiet text-links, the cast slot (D2b
  * protagonist + home), one woven stat line — then re-entry: a "Continue"
@@ -664,7 +664,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   // test SUBTYPE, and subtype is free user text — so a narrative can be both
   // writing-shaped and subtype 'knowledge'. `roomOf` gives knowledge/page
   // precedence, so the pinned row's hardcoded "Write" could label a row that
-  // opens the knowledge room (close gate).
+  // opens the knowledge room.
   if (lastWriting) continueRows.push({ icon: verbIconFor(lastWriting, worldId), verb: verbFor(lastWriting, worldId), el: lastWriting });
   if (lastMap) continueRows.push({ icon: 'map', verb: 'Map', el: lastMap });
   if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: verbFor(lastEdited, worldId), el: lastEdited });

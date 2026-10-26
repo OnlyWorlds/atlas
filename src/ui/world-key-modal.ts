@@ -84,7 +84,7 @@ export class NewKeyModal extends BaseModal {
         patchSlice('registry', next);
       }
       // The key was read against this online world; it lands only if the
-      // world is still linked to it (the #198 gate's G4: another tab could
+      // world is still linked to it (another tab could
       // relink it during the PIN question).
       const latest = getState().registry.worlds.find(w => w.id === this.world.id);
       if (!latest?.api || latest.api.world_id !== entry.api?.world_id) {

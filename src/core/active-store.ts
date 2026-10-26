@@ -22,7 +22,7 @@ export function getActiveStore(): FsFolderStore | null {
   return activeStore;
 }
 
-// ---- Parked stores (speed bout, 2026-07-19) ----
+// ---- Parked stores (2026-07-19) ----
 //
 // On world switch the prior store is PARKED (heartbeat stopped, caches +
 // lock retained) instead of closed, so switching back revives it without
@@ -34,7 +34,7 @@ const PARK_CAP = 3;
 const parkedStores = new Map<string, FsFolderStore>();
 /** In-flight eviction closes, worldId → promise. A fresh open of the same
  *  world must WAIT for these — an eviction's async close deleting the lock
- *  could otherwise race the new store's just-claimed lock (gate note). */
+ *  could otherwise race the new store's just-claimed lock. */
 const pendingEvictions = new Map<string, Promise<unknown>>();
 
 function closeEvicted(worldId: string, store: FsFolderStore): void {

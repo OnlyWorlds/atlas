@@ -17,11 +17,11 @@
  *   → the caller's link step (registry, world.json, the engine), still inside
  *     the lock, so no live pass sees a half-linked world
  *   → the element list reloaded from disk, on every exit once the folder
- *     changed (a throw after the kernel included, gate B1).
+ *     changed (a throw after the kernel included).
  *
  * Nothing moves in the registry, the URL or the element list before the
  * kernel runs, so a refusal or a failure before it leaves the app as it was
- * (lane A H7: the old route moved the UI in its match phase).
+ * (the old route moved the UI in its match phase).
  */
 import { getState, patchSlice } from '../core/state';
 import type { FolderStore } from '../store/folder-store';
@@ -93,7 +93,7 @@ export function runRoute2(opts: Route2RunOpts): Promise<MergeResult> {
           recovered = await recoverRekey(opts.store, { rekeyPersistedState });
         } catch (again) {
           // Twice stopped: the journal stays and the server was never
-          // touched. The raw error says nothing a user can act on (gate B3).
+          // touched. The raw error says nothing a user can act on.
           console.warn('[atlas:make-online] finishing the id move failed too', again);
           throw new MergeRefusedError(LINK_STOPPED_LINE);
         }
@@ -110,7 +110,7 @@ export function runRoute2(opts: Route2RunOpts): Promise<MergeResult> {
         };
       }
       await opts.link(result);
-      // Linked: nothing this route uploaded is waiting for a rerun (gate A3).
+      // Linked: nothing this route uploaded is waiting for a rerun.
       await opts.store.updateSyncState(() => ({ route2_created: undefined }));
       return result;
     } finally {
@@ -154,7 +154,7 @@ export function hiddenOnlineLine(held: MergeResult['hiddenOnline']): string | nu
 
 /**
  * The toast's line about maps and zones left unmatched because the local and
- * the online one both have pins or markers on them (gate A4/A5, Titus's
+ * the online one both have pins or markers on them (Titus's
  * ruling 2026-10-04). Same shape as `ambiguousLine`.
  */
 export function childClashLine(clashes: MergeResult['childClashes']): string | null {

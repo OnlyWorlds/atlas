@@ -6,7 +6,7 @@
  *
  *   localStorage.setItem('atlas_dev_api_base', 'https://keel-staging.onrender.com')
  *
- * The stored value is an ORIGIN (gate 10.7): atlas derives every path prefix
+ * The stored value is an ORIGIN: atlas derives every path prefix
  * from it (`/api/v2`; nothing calls the v1 `/api/worldapi` or `/api/worldsync`
  * since create-world-external retired). Legacy stored
  * values that include a `/api/worldapi` or `/api/v2` suffix are normalized.

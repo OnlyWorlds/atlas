@@ -436,7 +436,7 @@ export function openHotkeyReferenceModal(): void {
     openModalImpl();
     return;
   }
-  // Bout HELP: the `?` surface is the room-aware help overlay (purpose +
+  // The `?` surface is the room-aware help overlay (purpose +
   // "you can" lines + the full shortcut reference — one shape, every room).
   // Dynamic import keeps it out of the main chunk.
   void import('../ui/help-overlay').then(m => {

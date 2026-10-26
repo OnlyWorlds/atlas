@@ -24,7 +24,7 @@ import type { TypeStripNames, WorldRegistryEntry, WorldsRegistry } from '../core
  * per entry against `tabBase`, this tab's view as it last loaded or saved it:
  * an entry (or top-level field) this tab did not change is taken from storage
  * as it is now; one it changed, added or removed is this tab's. Inside an
- * entry the same rule runs PER FIELD (gate lens A H1: opening world W stamps
+ * entry the same rule runs PER FIELD (opening world W stamps
  * `last_opened_at`, and a whole-entry rule then let this tab's stale copy of
  * W erase the other tab's notes or Make Online). Two tabs changing the SAME
  * field: the later save wins. And a tab learns of another's saves as they
@@ -289,7 +289,7 @@ export function attachApi(
       if (api.worldName) apiBlock.world_name = api.worldName;
       // Linked with a seat's key and secret (#104): the secret is this world's.
       if (api.seatSecret) { apiBlock.seat = {}; apiBlock.seat_secret = api.seatSecret; }
-      // Making a world online also un-demos it (Bout OW class rule): the
+      // Making a world online also un-demos it: the
       // world is genuinely the user's now, so gestures in it count.
       // A former-link memory is stale the moment a live link exists.
       // What a roster said, and the person's switch for it, belong to the

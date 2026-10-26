@@ -87,7 +87,7 @@ export async function signInFromFields(root: ParentNode, signedInRest: string, t
   const next = setAccountToken(before, minted.token, username, minted.tokenId);
   const saved = saveRegistry(next);
   patchSlice('registry', next);
-  // Only once the new token reached storage (2026-10-26's gate, M1).
+  // Only once the new token reached storage.
   if (saved) revokeReplacedToken(before, next);
   toasts?.dismiss(WAITS_FOR_SIGN_IN);
   root.querySelector('[data-role="sign-in-fields"]')?.replaceWith(

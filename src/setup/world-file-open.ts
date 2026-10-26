@@ -1,5 +1,5 @@
 /**
- * Open a world file (1.17 bout 5, conv. 129; contract §5.2, §9 invariants 6
+ * Open a world file (1.17, conv. 129; contract §5.2, §9 invariants 6
  * and 14; Skeld 2026-10-04).
  *
  * The reader (`store/world-file.ts`) refuses an unsafe or foreign file before
@@ -14,10 +14,10 @@
  * landing is a make (`openBrowserMake`: the Web Lock, `.atlas/making`,
  * world.json last, a failure removes the directory, a full origin is fatal).
  *
- * ONE OPEN PER WORLD AT A TIME (gate F2): a second open of the same world
+ * ONE OPEN PER WORLD AT A TIME: a second open of the same world
  * while one runs is refused in this tab and waits on a Web Lock across tabs,
  * and the identity is checked again just before the commit. The commit's
- * registry save must land, or the directory goes (gate F6).
+ * registry save must land, or the directory goes.
  */
 
 import { getState, patchSlice } from '../core/state';
@@ -69,7 +69,7 @@ function placeOf(reg: WorldsRegistry, worldId: string): { restore: WorldRegistry
   if (restore) return { restore, already: null };
   const here = worldAlreadyHere(reg, worldId);
   // A cleared world that is not this one (matched through a former link)
-  // does not stand in the way: the file opens as its own (gate F7).
+  // does not stand in the way: the file opens as its own.
   const blocks = here && !(isBrowserWorld(here) && here.cleared_at);
   return { restore: null, already: blocks ? here! : null };
 }
@@ -265,7 +265,7 @@ async function openRead(read: { worldId: string; worldName: string; files: World
       patchSlice('registry', next);
     });
   } catch (err) {
-    // A lost save is no commit (gate F6): the directory it would have named goes.
+    // A lost save is no commit: the directory it would have named goes.
     await removeBrowserWorldDir({ where: 'browser', folder: { handle_key: '', folder_name: make.dir } }).catch(() => {});
     throw err;
   }

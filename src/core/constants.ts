@@ -160,7 +160,7 @@ export function isDemoKey(apiKey: string): boolean {
 }
 
 /**
- * Atlas-extension field policy (split 2026-07-12, v2 port gate 10.3).
+ * Atlas-extension field policy (split 2026-07-12).
  *
  * Two buckets with DIFFERENT wire + pull semantics:
  *

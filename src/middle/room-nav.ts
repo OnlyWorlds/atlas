@@ -6,8 +6,6 @@
  *
  * Each icon navigates to its room. The active room (derived from URL hash) is
  * highlighted with the cyan accent. Hover shows a sentence-case tooltip.
- *
- * Stub for Bout 2 — fleshed out properly in Bout 3.
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';

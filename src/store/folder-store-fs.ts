@@ -226,7 +226,7 @@ export class FsFolderStore implements FolderStore {
   /** Set of types whose dirs have been scanned into fileIndex. */
   private indexedTypes: Set<ElementType> = new Set();
   /**
-   * Parsed element bodies, id → body (speed bout, 2026-07-19). The index pass
+   * Parsed element bodies, id → body (2026-07-19). The index pass
    * already parses every file to key on body.id; keeping the bodies makes
    * listElements/getElement memory reads instead of a full disk re-walk
    * (measured 3.5s per call on a 1500-element world before this cache).
@@ -269,7 +269,7 @@ export class FsFolderStore implements FolderStore {
   private rescanActive: Promise<RescanResult> | null = null;
   private rescanQueued: Promise<RescanResult> | null = null;
   private rescanQueuedFull = false;
-  /** Ids named by an unfinished re-key journal, as last read or written: a UI delete of one is refused (lens A F6). */
+  /** Ids named by an unfinished re-key journal, as last read or written: a UI delete of one is refused. */
   private rekeyPendingIds = new Set<string>();
   /** In-flight index builds, type → shared promise (concurrent-caller guard). */
   private indexBuilds: Map<ElementType, Promise<void>> = new Map();
@@ -316,8 +316,7 @@ export class FsFolderStore implements FolderStore {
     return next;
   }
   /**
-   * Store-global serialization for `world.json` (world-meta sync gate R4,
-   * 2026-07-13). writeWorldMeta is a read-merge-write of one shared file with
+   * Store-global serialization for `world.json` (2026-07-13). writeWorldMeta is a read-merge-write of one shared file with
    * writers that can genuinely race: the user's setNow / home identity edit
    * vs the sync engine's pull-apply. Without the chain, the pull's stale read
    * silently erases the user's just-written now-line. resetSyncBaseline's
@@ -376,7 +375,7 @@ export class FsFolderStore implements FolderStore {
       // Remove the lock only while it is still OURS. A parked store can be
       // evicted long after another tab legitimately took the world over
       // (stale-TTL takeover) — deleting unconditionally would destroy the
-      // OTHER tab's live lock (parking bout, 2026-07-19).
+      // OTHER tab's live lock (2026-07-19).
       if (atlasDir) {
         await this.runLockOp(async () => {
           const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE).catch(() => null);
@@ -399,7 +398,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * Park (speed bout, 2026-07-19): stop heartbeating but KEEP the root, lock
+   * Park (2026-07-19): stop heartbeating but KEEP the root, lock
    * file, and all caches — the store can be revived near-instantly on
    * switch-back. The lock stays ON DISK deliberately: it goes stale after
    * LOCK_STALE_MS (90s), so another tab can take the world over exactly as
@@ -412,7 +411,7 @@ export class FsFolderStore implements FolderStore {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
-    // Stale the on-disk heartbeat immediately (close-gate MED, 2026-07-19):
+    // Stale the on-disk heartbeat immediately (2026-07-19):
     // a parked lock with a fresh-looking heartbeat would make other tabs
     // (including a relaunch after tab close) sit behind the 90s wall with a
     // scary "open in another tab — take over?" prompt for worlds no tab is
@@ -467,7 +466,7 @@ export class FsFolderStore implements FolderStore {
   /**
    * Move to a folder, step 3 (1.17, contract §4.2): keep this tab's lock,
    * heartbeating, marked `moving`, so no other tab opens the world while its
-   * files are copied (closing would remove the lock: gate A2 M1). Edits are
+   * files are copied (closing would remove the lock). Edits are
    * refused until `endMove` or the close. Throws when the lock is not ours.
    */
   async beginMove(): Promise<void> {
@@ -516,7 +515,7 @@ export class FsFolderStore implements FolderStore {
       const age = Date.now() - heartbeat;
       // A world another tab is moving to a folder is never taken, not even
       // with the take-over consent: edits here would be lost when the browser
-      // copy goes (1.17, gate A2/B4). Stale (the mover crashed): taken below.
+      // copy goes (1.17). Stale (the mover crashed): taken below.
       if (existing.moving === true && existing.tab_id !== this.tabId && Number.isFinite(heartbeat) && age < LOCK_STALE_MS) {
         throw new ELockHeld(existing);
       }
@@ -592,8 +591,8 @@ export class FsFolderStore implements FolderStore {
    */
   private ensureIndexFor(type: ElementType): Promise<void> {
     if (this.indexedTypes.has(type)) return Promise.resolve();
-    // In-flight guard: type indexes build CONCURRENTLY across types (speed
-    // bout), so two callers racing the same type must share one build — a
+    // In-flight guard: type indexes build CONCURRENTLY across types,
+    // so two callers racing the same type must share one build — a
     // duplicated build would run the tidy pass twice over the same dir.
     // Progress reporting rides the store-level indexTick listener, so it
     // survives regardless of which caller started the build.
@@ -700,7 +699,7 @@ export class FsFolderStore implements FolderStore {
   ): Promise<LayoutScan | null> {
     const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
     if (!dir) return null;
-    // Read pass (speed bout, 2026-07-19): ONE directory enumeration collects
+    // Read pass (2026-07-19): ONE directory enumeration collects
     // file handles (no per-file getFileHandle round-trip), then bounded-
     // concurrency workers read + parse. 1500 serialized awaits used to
     // dominate first-open wall-time; results land at their file's index so
@@ -731,7 +730,7 @@ export class FsFolderStore implements FolderStore {
       }
     };
     await Promise.all(Array.from({ length: Math.min(INDEX_READ_CONCURRENCY, files.length) }, readWorker));
-    // ZOMBIE GUARD (close-gate finding, 2026-07-19): the store may have been
+    // ZOMBIE GUARD (2026-07-19): the store may have been
     // closed mid-read (rapid world switch closes the prior store without
     // awaiting builds). The captured dir handle keeps working after close,
     // so without this bail the build would repopulate the cleared maps and
@@ -942,7 +941,7 @@ export class FsFolderStore implements FolderStore {
    * re-read INSIDE the slot: a decision taken on the
    * walk's snapshot raced Atlas's own renames. Only types already indexed are
    * scanned: a type nobody has listed yet is read fresh when it is. One file
-   * that throws never sinks the pass (F6): its id is left for the next one.
+   * that throws never sinks the pass: its id is left for the next one.
    *
    * What it never does, by design: write a file, write a tombstone (a
    * deletion outside Atlas is not a server DELETE), rename or quarantine a
@@ -980,7 +979,7 @@ export class FsFolderStore implements FolderStore {
         throw err;
       }
     };
-    /** Run one candidate's slot; a throw is logged and leaves the id for the next pass (F6). */
+    /** Run one candidate's slot; a throw is logged and leaves the id for the next pass. */
     const slot = async (id: string, fn: () => Promise<void>): Promise<void> => {
       try {
         await this.writeChain.run(id, async () => { if (alive()) await fn(); });
@@ -991,7 +990,7 @@ export class FsFolderStore implements FolderStore {
 
     // 0. Bodies adopted from disk OUTSIDE a pass (readForWrite, including a
     //    pull that backed off from an outside edit): the cache already holds
-    //    them, so no stat will ever show them again (F5). Report them now.
+    //    them, so no stat will ever show them again. Report them now.
     for (const [id, before] of this.pendingAdoptions) {
       const entry = this.fileIndex.get(id);
       if (entry) report({ id, type: entry.type, kind: 'changed', before: structuredClone(before) });
@@ -1039,7 +1038,7 @@ export class FsFolderStore implements FolderStore {
       servedPaths.add(key);
       const s = byPath.get(key);
       if (!s) { goneIds.add(id); continue; }
-      // A served file already reported unreadable at this very stat (F10).
+      // A served file already reported unreadable at this very stat.
       if (!full && this.otherFileStamps.get(key)?.stamp === stampKey(s.stamp)) continue;
       const known = this.fileStamps.get(id);
       // FULL ("Reload from disk"): every served file is confirmed by content,
@@ -1052,7 +1051,7 @@ export class FsFolderStore implements FolderStore {
       if (!full && this.otherFileStamps.get(key)?.stamp === stampKey(s.stamp)) continue; // known, unserved, unchanged
       strangers.push(s);
     }
-    // Paths remembered as unserved that are no longer there (F11).
+    // Paths remembered as unserved that are no longer there.
     const scanned = new Set<string>(scannedTypes);
     for (const [key, rec] of this.otherFileStamps) {
       if (scanned.has(rec.type) && !byPath.has(key)) this.otherFileStamps.delete(key);
@@ -1105,12 +1104,12 @@ export class FsFolderStore implements FolderStore {
      * A file nobody serves: created outside, the served file renamed or moved
      * between layouts, a second copy of a served id, or another type's id.
      * Read once outside the chain to learn its id, then RE-READ inside the
-     * slot, and the served file's absence re-checked there too (F1).
+     * slot, and the served file's absence re-checked there too.
      */
     const handleStranger = async (s: Pick<Seen, 'type' | 'layout' | 'filename' | 'handle'>): Promise<void> => {
       const key = otherFileKey(s.type, s.layout, s.filename);
       const first = await this.readForRescan(s.type, s.handle);
-      if (!alive() || first === 'gone') return; // gone before we could read it: nothing to say (F8)
+      if (!alive() || first === 'gone') return; // gone before we could read it: nothing to say
       if (!first) {
         const now = await statOf(s.layout, s.type, s.filename).catch(() => null);
         if (!now) return;
@@ -1139,8 +1138,8 @@ export class FsFolderStore implements FolderStore {
           }
           // A second copy of a served id (an agent copying, then editing).
           // Serve what is served; never quarantine or rename live, under
-          // another tool's feet; remember the copy (its id too, F2) and mark
-          // the id shadowed so a re-key refuses it (F3).
+          // another tool's feet; remember the copy (its id too) and mark
+          // the id shadowed so a re-key refuses it.
           this.otherFileStamps.set(key, { stamp: stampKey(now.stamp), id, type: s.type });
           this.shadowedIds.add(id);
           console.warn(`[fs-folder-store] live folder: ${s.layout}/${s.type}/${s.filename} claims id ${id}, already served from ${entry.layout}/${entry.filename}; left alone`);
@@ -1193,7 +1192,7 @@ export class FsFolderStore implements FolderStore {
           return;
         }
         if (body.elem.id !== id) {
-          // Another element's file was moved onto this one's name (F4): this
+          // Another element's file was moved onto this one's name: this
           // id has lost its file, and the file is a stranger for the other id.
           goneIds.add(id);
           movedAway.push({ type: entry.type, layout: entry.layout, filename: entry.filename, handle: now.handle });
@@ -1211,14 +1210,14 @@ export class FsFolderStore implements FolderStore {
 
     // 5. Served files that are gone. Before calling it a delete, look for a
     //    copy of the same id we left unserved (an agent's copy-then-delete
-    //    move across two passes, a shadowed layout copy, F2): promote the one
+    //    move across two passes, a shadowed layout copy): promote the one
     //    the index rule would serve (newest local_updated_at, ties to elements/).
     for (const id of goneIds) {
       await slot(id, async () => {
         const entry = this.fileIndex.get(id);
         if (!entry) return;
         // The file is back (or Atlas wrote it meanwhile), unless another
-        // element now owns that path (a file moved onto this one's name, F4).
+        // element now owns that path (a file moved onto this one's name).
         const takenByOther = [...this.fileIndex].some(([other, e]) =>
           other !== id && e.type === entry.type && e.layout === entry.layout && e.filename === entry.filename);
         if (!takenByOther && (await servedExists(id))) return;
@@ -1256,7 +1255,7 @@ export class FsFolderStore implements FolderStore {
 
   /**
    * Read + normalise one file the way the index pass does. `'gone'` when the
-   * file is no longer there (never "unreadable", F8); null when it will not
+   * file is no longer there (never "unreadable"); null when it will not
    * parse or has no id.
    */
   private async readForRescan(type: ElementType, handle: FileSystemFileHandle): Promise<{ elem: Element; spelling: LinkSpelling | null } | 'gone' | null> {
@@ -1265,7 +1264,7 @@ export class FsFolderStore implements FolderStore {
       text = await (await handle.getFile()).text();
     } catch (err) {
       if (isNotFound(err)) return 'gone';
-      throw err; // held open by another program: the slot retries next pass (F6)
+      throw err; // held open by another program: the slot retries next pass
     }
     try {
       const elem = JSON.parse(text) as Element;
@@ -1395,7 +1394,7 @@ export class FsFolderStore implements FolderStore {
 
   async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {
     if (!opts?.fromSync) this.assertWritable(); // engine pull-apply bypasses
-    // Serialized read-merge-write (world-meta gate R4): the read and the
+    // Serialized read-merge-write: the read and the
     // write happen atomically relative to every other meta writer, so a
     // background pull-apply can never erase a concurrent user edit.
     return this.runWorldMetaOp(async () => {
@@ -1433,7 +1432,7 @@ export class FsFolderStore implements FolderStore {
 
   async listElements(type?: ElementType, opts?: ListElementsOptions): Promise<Element[]> {
     const types = type ? [type] : (ALL_ELEMENT_TYPES as readonly ElementType[]);
-    // Progress plumbing (speed bout): totals come from a cheap pre-count of
+    // Progress plumbing: totals come from a cheap pre-count of
     // pending dirs (directory enumeration only, no parse) so the caller can
     // show "N of M" while the expensive body reads run.
     const onProgress = opts?.onProgress;
@@ -1453,7 +1452,7 @@ export class FsFolderStore implements FolderStore {
       } finally {
         // Only clear our OWN listener — a concurrent progress caller may
         // have replaced it, and nulling theirs would freeze their counter
-        // (close-gate finding, 2026-07-19).
+        // (2026-07-19).
         if (this.indexTick === tick) this.indexTick = null;
       }
     } else {
@@ -1540,7 +1539,7 @@ export class FsFolderStore implements FolderStore {
     if (!entry) return cached;
     try {
       const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(entry.layout, entry.type));
-      // STRICT (gate F6): a file that exists and will not parse (git
+      // STRICT: a file that exists and will not parse (git
       // conflict markers) must stop the write. Falling back to the cache here
       // wrote atlas's copy over it, the one damaged-file case an earlier fix left open.
       const disk = dir ? await readJsonStrict<Element>(dir, entry.filename) : null;
@@ -1549,7 +1548,7 @@ export class FsFolderStore implements FolderStore {
       if (typeof disk.type !== 'string' || !disk.type) disk.type = entry.type;
       this.adoptDiskBody(id, disk);
       // Someone else changed the file since Atlas last served it: the next
-      // live-folder pass says so, since no stat will show it now (F5).
+      // live-folder pass says so, since no stat will show it now.
       const before = this.bodyCache.get(id);
       if (before && !this.pendingAdoptions.has(id) && !sameContentIgnoringStamps(before, disk)) {
         this.pendingAdoptions.set(id, structuredClone(before));
@@ -1661,7 +1660,7 @@ export class FsFolderStore implements FolderStore {
     return this.writeChain.run(id, async () => {
       const existing = await this.readForWrite(id);
       if (!existing) return null;
-      // keel's stub is left as it is: never changed here, never thrown on (the rekey kernel calls this; gate G4).
+      // keel's stub is left as it is: never changed here, never thrown on (the rekey kernel calls this).
       if (isKnownOf(existing)) return existing;
       const patch = mutate(existing);
       if (patch === null || Object.keys(patch).length === 0) return existing;
@@ -1695,7 +1694,7 @@ export class FsFolderStore implements FolderStore {
    * Write an element body, renaming the file only when the name (and
    * therefore the slug) genuinely changed since the last write.
    *
-   * STICKY RULE (gate finding, 2026-07-03): the file keeps its current name
+   * STICKY RULE (2026-07-03): the file keeps its current name
    * whenever that name is any valid form for the NEW name, compared
    * case-insensitively. This covers three hazards at once: (a) name
    * unchanged — plain overwrite; (b) a foreign case-variant of a valid form —
@@ -2047,7 +2046,7 @@ export class FsFolderStore implements FolderStore {
         else if (!entry.name.endsWith('.tmp')) files.push(entry.name);
       }
       let n = 0;
-      // Blobs before sidecars (lens 1 F5): `getMediaBlob` gives up on the
+      // Blobs before sidecars: `getMediaBlob` gives up on the
       // first sidecar whose blob is missing, so a sidecar never lands first.
       const sidecar = (name: string) => name.endsWith('.meta.json');
       for (const name of [...files.filter(f => !sidecar(f)), ...files.filter(sidecar)]) {
@@ -2125,7 +2124,7 @@ export class FsFolderStore implements FolderStore {
   async listLocallyChangedSince(baseline: string | null): Promise<Element[]> {
     const all = await this.listElements();
     return all.filter(elem => {
-      if (isKnownOf(elem)) return false; // keel's stub never waits to be sent (conv. 155, I4; gate G9)
+      if (isKnownOf(elem)) return false; // keel's stub never waits to be sent (conv. 155, I4)
       if (!elem.server_updated_at) return true;
       if (baseline === null) return elem.local_updated_at > elem.server_updated_at;
       return elem.local_updated_at > baseline;
@@ -2268,7 +2267,7 @@ export class FsFolderStore implements FolderStore {
     //    on never-synced folders. Iteration is sequential — atomic writes per
     //    file matter more than parallelism here.
     //    Each clear rides the per-id chain and merges into the file AS IT IS
-    //    ON DISK (lane b L1: rewriting from the cache reverted outside
+    //    ON DISK (rewriting from the cache reverted outside
     //    edits and raced a save landing during the unlink).
     const all = await this.listElements();
     let cleared = 0;
@@ -2292,7 +2291,7 @@ export class FsFolderStore implements FolderStore {
     // 4. Strip the api block from world.json so a future reload-and-rescan
     //    (e.g., handle re-permission, fresh atlas root setup) doesn't try to
     //    auto-attach against dead credentials. Rides the world-meta chain —
-    //    it rewrites the same file writeWorldMeta serializes (gate R4).
+    //    it rewrites the same file writeWorldMeta serializes.
     let hadApi = false;
     await this.runWorldMetaOp(async () => {
       // Strict: a world.json that will not parse must not be replaced
@@ -2309,7 +2308,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * Pull-apply rides the per-id write chain (lane b M1): it used to be
+   * Pull-apply rides the per-id write chain: it used to be
    * the one element write outside it, so a user save landing between the
    * engine's race check and this write was overwritten and read as synced.
    */
@@ -2359,7 +2358,7 @@ export class FsFolderStore implements FolderStore {
     const id = record.id as string;
 
     // Preserve atlas-extension fields from the existing local file per the
-    // split policy (gate 10.3, v2 port):
+    // split policy:
     //   - LOCAL_ONLY fields (image_media_id, page blocks, richtext, ...):
     //     ALWAYS preserved — the server never knows them, so its response
     //     carries none; overlaying directly would silently destroy the local
@@ -2375,8 +2374,8 @@ export class FsFolderStore implements FolderStore {
     if (existing) {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
         if (opts.dropLocal?.includes(field)) continue;
-        if (field === HIDDEN_SHOWN_ONLINE) continue; // the record is keel's word on the mark (conv. 170, F3)
-        if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset (gate G6)
+        if (field === HIDDEN_SHOWN_ONLINE) continue; // the record is keel's word on the mark (conv. 170)
+        if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }

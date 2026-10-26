@@ -42,7 +42,7 @@ import type { SyncResult } from '../core/types';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
-/** The attached engine's policy as its world stands now (B12 Q1): read by `reapplySyncPolicy`. */
+/** The attached engine's policy as its world stands now: read by `reapplySyncPolicy`. */
 let currentPolicyNow: (() => SyncPolicy) | null = null;
 
 /** A round re-reads the roster once its answer is this old (an invite accepted while the world is open). */
@@ -98,7 +98,7 @@ export function attachSyncEngine(
 
   // v2 port: the engine talks the keel v2 dialect through the thin fetch
   // adapter — no SDK client in the sync path (the SDK survives only for
-  // worlds.get validation at the link/settings surfaces, gate 10.7).
+  // worlds.get validation at the link/settings surfaces).
   const adapter = new OwV2ClientAdapter({
     apiKey: entry.api.api_key,
     apiPin: readOnly ? '' : (pin as string),
@@ -108,9 +108,9 @@ export function attachSyncEngine(
   const shouldPause = effectiveSyncPaused(entry, reg); // one predicate
   // A linked world restored from a world file (1.17, contract §5.2): its
   // first round is reviewed whatever the policy, so the file's older edits
-  // never overwrite newer ones on OnlyWorlds (gate A9). Then the policy.
+  // never overwrite newer ones on OnlyWorlds. Then the policy.
   let reviewFirst = entry.review_first_sync === true;
-  // B12 Q1: whether others share this world decides its policy, and keel's
+  // Whether others share this world decides its policy, and keel's
   // roster says so. Until keel has answered in this attach, nothing is
   // overwritten: the engine runs pause-and-review, the flush below waits for
   // the answer, and an edit made meanwhile meets the review. A paused world
@@ -147,7 +147,7 @@ export function attachSyncEngine(
           patchSlice('registry', next);
         }).catch(() => {});
       }
-      // A role that moved, and what this key no longer sees (B12 Q2, conv. 151).
+      // A role that moved, and what this key no longer sees (conv. 151).
       if (currentEngine === engine) void noteRoleNews(entry.id, folder, result);
       // Hidden elements this key cannot put online, said once (conv. 170).
       if (currentEngine === engine) noteHiddenHeld(entry.id, result);
@@ -189,7 +189,7 @@ export function attachSyncEngine(
   // A batch of outside edits that was waiting for the user's answer when the
   // world was left (or the page reloaded) keeps waiting:
   // the hold goes on BEFORE the flush-on-attach below, which would push it.
-  // The link's own attach answers any question saved before it (gate A2).
+  // The link's own attach answers any question saved before it.
   if (opts.justLinked) forgetPersistedDiskHold(entry.id);
   if (!readOnly) adoptPersistedDiskHold(entry.id, engine);
   currentFolder = folder;
@@ -229,9 +229,9 @@ export function attachSyncEngine(
   // typed in a prior session, lost the debounce to a reload) and should land
   // server-side before pull-on-activate looks for newer remote changes. Flush
   // is unconditional when pending exist; pull-on-activate is opt-in, except
-  // in a world shared with others (B12 Q1).
+  // in a world shared with others.
   //
-  // Before the flush, the roster (B12 Q1): the flush is the round most likely
+  // Before the flush, the roster: the flush is the round most likely
   // to meet a collaborator's newer words (edits from a last session against a
   // world others kept writing), so its policy must be known before it runs.
   // The read is bounded (`world-roster.ts`, 15 s); offline or refused, the
@@ -295,7 +295,7 @@ async function flushPendingOnAttach(
     // A batch too big to upload unasked waits for the user, as it would with
     // the window open (`holdBigBatchAtOpen`). A hold already persisted
     // was adopted before this ran and refuses the round by itself. Never for
-    // a world kept in this browser (1.17, gate B15): nothing outside Atlas can
+    // a world kept in this browser (1.17): nothing outside Atlas can
     // write its files, so what waits is the user's own offline editing.
     if (!justLinked && !inBrowser && changed.length > BIG_BATCH && !isDiskHoldPersisted(worldId)) {
       holdBigBatchAtOpen(worldId, changed.length, engine);
@@ -352,7 +352,7 @@ function toastFailuresOnce(
   // Give new ids already leads to the same Settings tab.
   if (!kinds.has('foreign_id')) fixIds.push('sync-issues');
   // A round is safe to repeat; only on the engine (and world) that failed. A
-  // full sync, so a held file on the pull side is retried too (gate A M4).
+  // full sync, so a held file on the pull side is retried too.
   const retry = engine ? () => {
     if (currentEngine !== engine) return;
     void engine.syncNow().catch(err => console.warn('[atlas:sync] retry sync failed:', err));
@@ -409,7 +409,7 @@ async function refreshKeptCount(worldId: string, folder: FolderStore): Promise<v
 }
 
 /**
- * A round's role and kept news (B12 Q2, conv. 151): the key's role recorded
+ * A round's role and kept news (conv. 151): the key's role recorded
  * on the entry, a move from a known role said once; elements a resync kept,
  * said when no role line did; edits that stay here, once per element.
  */
@@ -516,7 +516,7 @@ export function detachSyncEngine(): void {
 
 /**
  * Ask keel's roster whether others share this world, and keep the answer on
- * its registry entry (B12 Q1). Resolves whether keel answered; no answer
+ * its registry entry. Resolves whether keel answered; no answer
  * (offline, refused, timed out) changes nothing. `maxAgeMs` 0 reads afresh.
  * The answer is kept only while the world is still linked with the key it
  * was read with (a re-link during the read).
@@ -524,7 +524,7 @@ export function detachSyncEngine(): void {
 async function learnShared(worldId: string, apiKey: string, maxAgeMs: number): Promise<boolean> {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
   if (!entry || entry.state !== 'api-linked' || entry.api?.read_only || entry.api?.api_key !== apiKey) return false;
-  // A legacy key reads a private world only with its PIN (the gate's G4).
+  // A legacy key reads a private world only with its PIN.
   const rows = await rosterFor(entry, Date.now, { maxAgeMs, pin: worldPin(entry, getState().registry) ?? undefined });
   if (!rows) return false;
   const shared = rosterIsShared(rows);
@@ -562,8 +562,8 @@ async function movePolicy(engine: SyncEngine, folder: FolderStore, target: SyncP
  * the world from pause-and-review to local-wins, the held conflicts are
  * cleared and pushed at once: under the v2 cursor nothing re-detects them,
  * so without the push the divergence would sit invisible until the next edit
- * on either side (SYNC_NOTES M4; gate finding, 2026-07-12). A shared world
- * whose rule holds never takes this path from the default's change (B12 Q1).
+ * on either side (SYNC_NOTES M4; 2026-07-12). A shared world
+ * whose rule holds never takes this path from the default's change.
  */
 export function reapplySyncPolicy(): void {
   const engine = currentEngine;
@@ -721,7 +721,7 @@ export async function pullNowAndRefresh(): Promise<import('../core/types').SyncR
     if (result.meta_pulled?.length) parts.push('world settings');
     toastManager.info(`Pulled ${parts.join(' + ')} from OnlyWorlds`);
   } else if ((result.meta_pulled?.length ?? 0) > 0 && result.conflicts.length === 0) {
-    // Meta-only round (world-meta gate R7): the element counters are zero but
+    // Meta-only round: the element counters are zero but
     // something real changed — say so, or the pull reads as a silent no-op.
     toastManager.info('Pulled world settings from OnlyWorlds');
   }
@@ -804,7 +804,7 @@ function emitConflictToasts(
   phase: 'push' | 'pull' | 'sync',
   result: import('../core/types').SyncResult,
   /** The world whose engine ran the round, and whether that engine is still
-   *  the attached one (the #198 gate's G1: a stopped engine's late refusal
+   *  the attached one (a stopped engine's late refusal
    *  must never act on the world open now). */
   from: { worldId: string | null; current: boolean; policy?: SyncPolicy } = { worldId: currentWorldId, current: true },
 ): void {
@@ -812,7 +812,7 @@ function emitConflictToasts(
   // pill carries the persistent signal; this toast is the moment-it-happened
   // notification. Skip if the round had successes (mixed-blocked is rare and
   // the engine still went to error — keep the surfacing single).
-  // Busy, rate limited or offline (lane b M4): one plain sentence with
+  // Busy, rate limited or offline: one plain sentence with
   // the wait, instead of a wall of per-element failures.
   if (result.transient_blocked) {
     const secs = Math.max(1, Math.round((result.retry_after_ms ?? 30_000) / 1000));
@@ -886,11 +886,11 @@ function emitConflictToasts(
   }
 
   // A proposal the keeper did not take is no overwrite under any policy: it
-  // waits in the review, which says why (conv. 163; the gate's G4).
+  // waits in the review, which says why (conv. 163).
   const plain = result.conflicts.filter(c => !c.proposal);
   if (plain.length === 0) return;
   // The engine's own policy, never the default: a shared world runs
-  // pause-and-review whatever Settings names (B12 Q1).
+  // pause-and-review whatever Settings names.
   const policy = from.policy ?? currentEngine?.getPolicy() ?? getState().registry.sync_default_policy ?? 'local-wins';
   if (policy === 'pause-and-review') return; // badge + modal handle it
 
@@ -1001,7 +1001,7 @@ export async function refreshConflictsCount(): Promise<void> {
   }
   try {
     const list = await currentEngine.listConflicts();
-    // World-meta contested fields count toward the badge too (gate R9) —
+    // World-meta contested fields count toward the badge too —
     // they're the same "decide later" obligation, just world-shaped.
     const metaList = await currentEngine.listMetaConflicts();
     const total = list.length + metaList.length;

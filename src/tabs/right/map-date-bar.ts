@@ -1,7 +1,7 @@
 /**
  * The map's date bar (#280): a map whose zones carry dates shows them as of a
- * chosen date, and since 1.50 its pins by their element's dates (the
- * Titus's Q11). Bottom left of the canvas: the date in the world's
+ * chosen date, and since 1.50 its pins by their element's dates.
+ * Bottom left of the canvas: the date in the world's
  * calendar, a slider over the dates on this map, Now (the world's now, the
  * default) and All dates. Only drawn while a zone or a pinned element on this
  * map is dated; per map tab and for the session, like the zone panel's eyes.

@@ -112,10 +112,10 @@ export interface TimelineViewOptions {
    */
   onSetNow?: (value: number | null) => void;
   /**
-   * An undated rail element was dragged onto the axis and dropped at `date`
-   * (Bout 1.2). The room writes the type's start-date field, refreshes, and
+   * An undated rail element was dragged onto the axis and dropped at `date`.
+   * The room writes the type's start-date field, refreshes, and
    * makes the element visible (peek-or-focus — it may fall outside the current
-   * scope, so a bare write would silently vanish it, gate finding).
+   * scope, so a bare write would silently vanish it).
    */
   onDateElement?: (id: string, date: number, edge?: 'start' | 'end') => void;
   /** A view-only world (conv. 149): the room passes no onSetNow or
@@ -136,7 +136,7 @@ export interface TimelineViewExtras {
    */
   now?: number | null;
   /**
-   * The work queue (Act 1, Bout 1.1): elements of dateable types with no date
+   * The work queue: elements of dateable types with no date
    * yet. Shown in the ambient rail as the undated backlog so the gap between
    * "in the world" and "on the axis" is legible. `undefined` leaves it untouched.
    */
@@ -237,7 +237,7 @@ interface ViewState {
   now: number | null;
   nowDrag: boolean;             // a now-line drag is in progress (owns the mouse)
   onSetNow: ((value: number | null) => void) | null;
-  // The undated backlog (Bout 1.1) — dateable elements with no date, shown in
+  // The undated backlog — dateable elements with no date, shown in
   // the ambient rail. Expanded type groups persist across re-renders.
   undated: Array<{ id: string; type: string; name: string }>;
   undatedExpanded: Set<string>;
@@ -255,7 +255,7 @@ interface ViewState {
   // `maxDate` clamps a range's start at its recorded end (the end is anchored:
   // the drag reduces/extends the range, never slides it — Titus's ruling).
   glyphDrag: { dot: PlacedDot; startX: number; startY: number; active: boolean; edge: 'start' | 'end'; maxDate: number | null; minDate: number | null } | null;
-  // Drag-to-date (Bout 1.2): a rail item is being dragged onto the axis. Holds
+  // Drag-to-date: a rail item is being dragged onto the axis. Holds
   // the element DATA (not the DOM node — survives a mid-drag rail rebuild), the
   // start point + moved-past-threshold flag (click vs drag), and the floating
   // ghost. `dropDate` = the snapped date under the cursor when over the band.
@@ -441,7 +441,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     destroy(): void {
       state.destroyed = true;
       state.glyphDrag = null;
-      endDateDrag(state); // remove per-drag window listeners + the floating ghost (gate: no leak on mid-drag unmount)
+      endDateDrag(state); // remove per-drag window listeners + the floating ghost (no leak on mid-drag unmount)
       ro.disconnect();
       canvas.removeEventListener('mousemove', onMove);
       canvas.removeEventListener('mouseleave', onLeave);
@@ -806,7 +806,7 @@ function draw(state: ViewState): void {
   ctx.fillStyle = 'rgba(255,255,255,0.012)';
   ctx.fillRect(0, 0, w, h);
 
-  // An EMPTY chart still draws a droppable axis (Bout 1.2): you can drag the
+  // An EMPTY chart still draws a droppable axis: you can drag the
   // FIRST element onto it, even with nothing dated yet. The range comes from the
   // universe (dated elsewhere but filtered out here), else a sensible default
   // around the now / a neutral span. The node rendering is skipped below.
@@ -1080,7 +1080,7 @@ function draw(state: ViewState): void {
   // The now-line — drawn over the glyphs, the seam between past and future.
   drawNowLine(ctx, state, w, axisY);
 
-  // The drop guide (Bout 1.2) — a cyan dashed seam + "= N" while dragging a
+  // The drop guide — a cyan dashed seam + "= N" while dragging a
   // rail element onto the axis. Cyan = "you're placing this" (vs the warm now).
   drawDropGuide(ctx, state, w, axisY);
 
@@ -1130,7 +1130,7 @@ function strokeFadingSpan(
   ctx.restore();
 }
 
-/** The drop guide (Bout 1.2) — a cyan dashed line + "= N" tag at the snapped
+/** The drop guide — a cyan dashed line + "= N" tag at the snapped
  *  drop date while dragging a rail element over the axis. */
 function drawDropGuide(ctx: CanvasRenderingContext2D, state: ViewState, w: number, axisY: number): void {
   if (state.dropDate == null) return;
@@ -1875,7 +1875,7 @@ function renderAmbientRail(state: ViewState): void {
 
   // Nothing charted (dateless or empty world): the canvas empty state teaches
   // the next step. Stay quiet about the chart itself, but the undated backlog
-  // is exactly the "here's what you could place" call to action (Bout 1.1).
+  // is exactly the "here's what you could place" call to action.
   if (state.nodes.length === 0) {
     const undated = buildUndatedSection(state);
     if (undated) card.appendChild(undated);
@@ -1931,7 +1931,7 @@ function renderAmbientRail(state: ViewState): void {
   }
   card.appendChild(legend);
 
-  // The work queue (Bout 1.1): the undated backlog, below the legend.
+  // The work queue: the undated backlog, below the legend.
   const undated = buildUndatedSection(state);
   if (undated) card.appendChild(undated);
 
@@ -1939,9 +1939,9 @@ function renderAmbientRail(state: ViewState): void {
 }
 
 /**
- * The undated backlog section for the ambient rail (Bout 1.1) — dateable
+ * The undated backlog section for the ambient rail — dateable
  * elements with no date, grouped by type, each opening its element room to be
- * dated. Returns null when nothing is undated. (Bout 1.2 makes these draggable
+ * dated. Returns null when nothing is undated. (Drag-to-date makes these draggable
  * straight onto the axis; for now, click-through to the editor.)
  */
 function buildUndatedSection(state: ViewState): HTMLElement | null {
@@ -2009,7 +2009,7 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
         `<span class="atlas-timeline-rail-undated-name">${escapeText(it.name)}</span>`;
       // mousedown starts the drag lifecycle; a no-move mouseup is treated as a
       // click (opens the element). No separate click listener — that would
-      // double-fire onOpenElement with the pointerup path (gate finding).
+      // double-fire onOpenElement with the pointerup path.
       b.addEventListener('mousedown', (e) => startItemDrag(state, it, e));
       group.appendChild(b);
     }
@@ -2026,7 +2026,7 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
   return wrap;
 }
 
-// ====== Drag-to-date (Bout 1.2) ======
+// ====== Drag-to-date ======
 
 const DATE_DRAG_THRESHOLD = 4; // px before a mousedown becomes a drag (vs a click)
 
@@ -2060,7 +2060,7 @@ function handleDateDragMove(state: ViewState, e: MouseEvent): void {
   if (!d.active) {
     if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < DATE_DRAG_THRESHOLD) return;
     // Activate: floating ghost + freeze any in-flight camera animation so the
-    // guide date is stable under a held cursor (gate finding).
+    // guide date is stable under a held cursor.
     d.active = true;
     state.anim = null;
     d.ghost = buildDragGhost(d.type, d.name);
@@ -2145,7 +2145,7 @@ function buildDragGhost(type: string, name: string): HTMLElement {
 
 /** Drop-confirm popover (reuses the field-edit popover — number input, Enter
  *  saves, Esc/backdrop cancels; the backdrop intercepts click-away so the
- *  canvas mouse handlers never fire, gate finding).
+ *  canvas mouse handlers never fire).
  *
  *  `isCurrent` = `dropDate` is the value already stored (the card's date
  *  edit), not a proposed new one: then an untouched Enter writes nothing, and
@@ -2336,7 +2336,7 @@ function dateAtX(state: ViewState, x: number, w: number): number | null {
 
 function handleMouseMove(state: ViewState, e: Pick<MouseEvent, 'clientX' | 'clientY'>): void {
   // A date-drag owns the pointer — the window-level drag handler draws the
-  // guide; the canvas hover/pan must stay out of the way (gate finding: two
+  // guide; the canvas hover/pan must stay out of the way (two
   // "what's under the cursor" systems fighting + a cursor tug-of-war).
   if (state.dateDrag?.active) return;
   const rect = state.canvas.getBoundingClientRect();

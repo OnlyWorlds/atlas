@@ -1,5 +1,5 @@
 /**
- * The browser tab title follows the route (lane A A11): an element,
+ * The browser tab title follows the route: an element,
  * the room, the world, then "Atlas". Before this every tab and every Back
  * history entry read "Atlas · OnlyWorlds", so two atlas tabs side by side
  * could not be told apart. Recomputed on hash changes and on state ticks

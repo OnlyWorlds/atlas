@@ -78,7 +78,7 @@ export function buildMapLocalImageRow(m: WorldMap, toasts: ToastManager): HTMLEl
       toasts.success('Local image cleared');
     } catch (err) {
       console.error('[map-image] clear failed:', err);
-      // No retry (gate B L1): an image set since would be cleared.
+      // No retry: an image set since would be cleared.
       showProblem(err, { doing: 'clearing the map image', toasts });
     }
   };

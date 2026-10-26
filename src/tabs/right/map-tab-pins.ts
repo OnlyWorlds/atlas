@@ -35,7 +35,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
   // A pin without finite x/y is schema-legal (only `name` is required) but
   // cannot be drawn; Leaflet throws on it and every later pin went missing.
   // Skip it here, as pin-locate and the share payload already do.
-  // The date bar (Q11, 1.50) is applied after, as visibility only
+  // The date bar (1.50) is applied after, as visibility only
   // (`applyPinDates`): a marker the date hides stays built, so a slider drag
   // never re-creates icons and labels.
   const byId = new Map(elements.map(e => [e.id, e] as const));
@@ -119,7 +119,7 @@ export function revealPinsOnMap(mapId: string, elementId: string): void {
 }
 
 /**
- * The date bar moved (Q11): which built pins show, visibility only, then the
+ * The date bar moved: which built pins show, visibility only, then the
  * chips, labels and the submap door that read what shows.
  */
 export function refreshPinDates(entry: MapTabCacheEntry): void {

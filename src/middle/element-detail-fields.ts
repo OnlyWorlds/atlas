@@ -129,7 +129,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const readOnly = worldIsViewOnly() || isKnownOf(el);
   if (readOnly) wrap.classList.add('atlas-field-readonly');
 
-  // T-E1 (Bout E): sparse elements read as a wall of placeholder rows, so an
+  // T-E1: sparse elements read as a wall of placeholder rows, so an
   // empty row's label sits a step quieter, by colour (F-43). Hover restores it
   // (see atlas.css .atlas-field-empty-row).
   const rowRaw = (el as Record<string, unknown>)[meta.name];
@@ -683,7 +683,7 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
     // Local write succeeded — schedule a debounced push. No-op for local-only.
     requestPushIfLinked();
 
-    // Waypoint hooks (Bout OW). This function is GESTURE-ONLY — every caller
+    // Waypoint hooks. This function is GESTURE-ONLY — every caller
     // is a field-widget commit handler in this file; do not call it from
     // sync/import/derive paths or these hooks would leak (hookmap wp3/wp4).
     if ((fieldName === 'supertype' || fieldName === 'subtype')

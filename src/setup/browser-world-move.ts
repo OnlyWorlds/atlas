@@ -1,5 +1,5 @@
 /**
- * Move a world kept in this browser to a folder on the drive (1.17 bout 4,
+ * Move a world kept in this browser to a folder on the drive (1.17,
  * conv. 129; contract §4, §9 invariants 4-8). Chromium only: the
  * destination is the home folder.
  *
@@ -16,14 +16,14 @@
  *      last), then verify, then the token read back
  *   5  commit: open the destination store (its lock), store its handle, then
  *      ONE registry save, read back: `where` gone, the folder named,
- *      `moved_from` set, `move` gone. A save that did not land is no commit
- *      (gate F4): the browser copy is still the world.
+ *      `moved_from` set, `move` gone. A save that did not land is no commit:
+ *      the browser copy is still the world.
  *   6  the token removed, the world's store and sync now the folder's
  *   7  the browser copy removed, then `moved_from`
  *
  * A throw before the commit is a failed move: the destination this call
  * made is removed, the handle forgotten, the source taken back; the journal
- * goes only once the destination is gone (gate F6), else recovery finishes it.
+ * goes only once the destination is gone, else recovery finishes it.
  * A crash anywhere is finished by `recoverBrowserMove`, at boot, when the
  * world opens, and at the next Move click: before the commit it removes only
  * a folder that carries this move's token (or nothing else), after it only
@@ -77,7 +77,7 @@ function saveReg(next: WorldsRegistry): void {
 }
 
 /**
- * A save the move cannot go on without (gate F4): it reached storage and
+ * A save the move cannot go on without: it reached storage and
  * reads back as `holds` says, or it throws before the screen changes.
  */
 function saveRegOrThrow(next: WorldsRegistry, worldId: string, holds: (stored: WorldRegistryEntry | undefined) => boolean): void {
@@ -122,8 +122,8 @@ const REMOVE_RETRY_MS = [100, 250, 500, 1000];
 /**
  * Remove a destination folder ONLY when it is this move's: it carries the
  * move's token, or it holds no file but the token's own path (a refused write
- * leaves a 0-byte file behind: measured, both engines, gate M5). Any other
- * folder is someone's world and is never touched (gate A1). A busy refusal
+ * leaves a 0-byte file behind: measured, both engines). Any other
+ * folder is someone's world and is never touched. A busy refusal
  * (OneDrive, antivirus) is retried. Answers whether the folder is gone.
  */
 async function removeOwnDestination(home: FileSystemDirectoryHandle, name: string, moveId: string): Promise<boolean> {
@@ -195,7 +195,7 @@ async function runMove(worldId: string, lockedDir: string, opts: MoveOpts): Prom
   }
   // An earlier move that never committed: its folder goes first (this click
   // has the home folder's permission and this run holds the world's lock),
-  // its journal with it (gate F5). One that cannot go yet stops this move.
+  // its journal with it. One that cannot go yet stops this move.
   if (first.move) {
     await recoverUnlocked(worldId, { home, self: true });
     const left = entryOf(worldId)?.move;
@@ -208,8 +208,8 @@ async function runMove(worldId: string, lockedDir: string, opts: MoveOpts): Prom
   const fromDir = start.folder.folder_name;
   const toDir = await freeFolderName(home, start.name, String(meta.id ?? worldId));
   const move = { move_id: crypto.randomUUID(), to_folder_name: toDir, started_at: new Date().toISOString() };
-  // 2. The journal, before the folder exists on the drive (gate B26), and it
-  // must have landed (gate F4).
+  // 2. The journal, before the folder exists on the drive, and it
+  // must have landed.
   saveRegOrThrow(updateWorldEntry(getState().registry, worldId, { move }), worldId, s => s?.move?.move_id === move.move_id);
 
   // 3. Quiesce, keeping the lock.
@@ -227,8 +227,8 @@ async function runMove(worldId: string, lockedDir: string, opts: MoveOpts): Prom
     const src = await deriveBrowserWorldHandle(start);
     const made = await home.getDirectoryHandle(toDir, { create: true });
     if (!(await holdsOnly(made, ''))) {
-      // Someone made a folder of that name since it was found free (gate
-      // F10): never write into it, and never remove it.
+      // Someone made a folder of that name since it was found free:
+      // never write into it, and never remove it.
       throw new PlainError(`A folder named "${toDir}" appeared in your OnlyWorlds folder while moving. Nothing was moved; try again.`);
     }
     dest = made;
@@ -236,10 +236,10 @@ async function runMove(worldId: string, lockedDir: string, opts: MoveOpts): Prom
     const check = await verifyWorldTree(src, dest);
     if (!check.ok) throw new PlainError(`The copy in the folder did not match the world. Try again.`);
     if (!(await tokenIs(dest, move.move_id))) throw new PlainError('The copy in the folder changed while moving. Try again.');
-    // 5a. The destination's own store, claiming its lock (gate A10).
+    // 5a. The destination's own store, claiming its lock.
     destStore = new FsFolderStore();
     await destStore.open(dest);
-    // 5b. Its handle, under the world's own key (gate A8: never a rebuilt key).
+    // 5b. Its handle, under the world's own key (never a rebuilt key).
     await storeHandle(start.folder.handle_key, dest);
     vaultPut = true;
     // 5c. The commit: one registry save that must land.
@@ -264,7 +264,7 @@ async function runMove(worldId: string, lockedDir: string, opts: MoveOpts): Prom
       });
     }
     if (vaultPut) await deleteHandle(start.folder.handle_key).catch(() => {});
-    // The journal goes only with the folder it names (gate F6): one left on
+    // The journal goes only with the folder it names: one left on
     // the drive stays recorded, and recovery removes it later.
     if (destGone && entryOf(worldId)?.move?.move_id === move.move_id) saveReg(updateWorldEntry(getState().registry, worldId, { move: undefined }));
     await source.endMove().catch(() => {});
@@ -278,7 +278,7 @@ async function runMove(worldId: string, lockedDir: string, opts: MoveOpts): Prom
   } catch { /* a token left in a committed folder names this move only: nothing acts on it */ }
   setActiveStore(destStore);
   // What waits to upload is the user's own editing in the browser, never
-  // "files changed on disk" (gate F7).
+  // "files changed on disk".
   if (committed.state === 'api-linked') attachSyncEngine(committed, destStore!, { justMoved: true });
   release();
 
@@ -307,7 +307,7 @@ const recovering = new Map<string, Promise<MoveRecovery>>();
 /**
  * Finish what a crashed move left (contract §4.3), single-flight per world,
  * inside the world's Web Lock: a move live in any tab holds it, so recovery
- * waits ('waiting') instead of acting on a move in progress (gate F1). Before
+ * waits ('waiting') instead of acting on a move in progress. Before
  * the commit (`move` on a browser world): the destination goes only when it
  * is this move's, then the journal; the browser copy is the world. Without
  * the home folder's permission (no gesture at boot) it waits too; the next
@@ -365,7 +365,7 @@ async function recoverUnlocked(worldId: string, opts: { home?: FileSystemDirecto
 /**
  * Is another tab moving this world right now (its source lock fresh, marked
  * moving, not ours)? A lock that cannot be read answers yes: recovery waits
- * rather than act on a guess (gate F1, fail closed). No lock at all is no.
+ * rather than act on a guess (fail closed). No lock at all is no.
  */
 async function sourceMovingElsewhere(entry: WorldRegistryEntry): Promise<boolean> {
   try {

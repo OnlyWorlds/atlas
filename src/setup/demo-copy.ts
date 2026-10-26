@@ -14,14 +14,14 @@
  *   2  world.json: the world's id and name, and its own fields (the calendar,
  *      the description) as the server holds them; no `api` block, no key
  *   3  every element, through the link door's download (`initialDownloadAll`;
- *      a full origin stops it at once, gate F4)
+ *      a full origin stops it at once)
  *   4  the portable copy (`collectWorldFiles`: no link, no sync files), zipped
  *   5  the scratch goes with the call (memory, never written to disk)
  *
  * The copy keeps the world's id, as a world file downloaded from a linked
  * Moppetopia would (folder format §4.1). So the caller asks `isHere` once the
- * id is known, and a copy already here opens without a second download (gate
- * F1-F3). Its elements keep their ids too; a copy taken online later meets
+ * id is known, and a copy already here opens without a second download).
+ * Its elements keep their ids too; a copy taken online later meets
  * the foreign-id step every world file meets. Demo keys are read scope on the
  * server, so this path cannot write there.
  */

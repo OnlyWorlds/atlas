@@ -1,6 +1,6 @@
 /**
  * The world file: one `.zip` that holds one whole world, and the reader that
- * opens one back (1.17 bout 5, conv. 129; contract §5; Folder Format spec
+ * opens one back (1.17, conv. 129; contract §5; Folder Format spec
  * §4.1 "a portable copy", Skeld 2026-10-04).
  *
  * THE PORTABLE COPY: every file of the world as it is on disk, except the
@@ -55,7 +55,7 @@ export interface WorldFileEntry {
   data: Uint8Array;
 }
 
-/** A collected file, with the stamp the torn check compares (contract §5.1, gate A11). */
+/** A collected file, with the stamp the torn check compares (contract §5.1). */
 export interface CollectedFile extends WorldFileEntry {
   stamp: string;
 }

@@ -88,7 +88,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // root exists, a world is active, or the tour itself is running (the
     // tour's build-up owns the chrome then).
     const grounded = isAtlasGrounded(state);
-    // The tour too (gate M1): a replay exited before its world exists comes
+    // The tour too: a replay exited before its world exists comes
     // back to a landing whose tour button still says "Starting…".
     if (grounded || active || (!atlasRoot && atlasRootRecoverable) || isTourFlagActive()) landingKey = null;
     const bare = !grounded && !active && !isTourFlagActive();
@@ -167,7 +167,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       }
       landingKey = key;
       lastAccountBlock = accountBlock;
-      // 1.17 (contract §8, lens C R2-c, W5): a world can live in this browser,
+      // 1.17: a world can live in this browser,
       // so every browser gets "start a world" (the dialog asks where on
       // Chromium) and "other ways in" (the chooser: bring one down, view a
       // shared world, open a world file). After a full clear of site data this
@@ -271,7 +271,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         root.querySelector('[data-door="other-ways-in"]')?.setAttribute('title', 'Download one from OnlyWorlds, or view a shared world');
         const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
         if (!note) return;
-        // A full origin is not a private window (gate B20): say which.
+        // A full origin is not a private window: say which.
         note.textContent = status === 'full' ? BROWSER_STORAGE_FULL_LINE : NO_BROWSER_STORAGE_LINE;
         note.hidden = false;
       });
@@ -325,7 +325,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // super clear what the intent is here"); with worlds, it's just a picker.
     if (!active) {
       // Not during the tour (it owns the drawers, and would use up the once),
-      // and one task later (gate B3): the navigation that brought this screen
+      // and one task later: the navigation that brought this screen
       // up (a tour exit, a finished setup) fires its hashchange after this
       // render, and the drawer layer closes drawers on hashchange.
       if (!sidebarShownForNoWorld && !isTourFlagActive() && isNarrowSidebar()) {

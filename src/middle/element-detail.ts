@@ -1,5 +1,5 @@
 /**
- * Middle pane — element detail view (Bout B: schema-driven editor).
+ * Middle pane — element detail view (schema-driven editor).
  *
  * Reads schema sections from `field-schema.ts` (SDK FIELD_SCHEMA + ELEMENT_SECTIONS).
  * Each field renders by widget:
@@ -273,7 +273,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     }
 
     // The element NAME is the header's click-to-edit title (convention #80) — so
-    // drop the duplicate "Name" field from the schema-rendered Base section (F1).
+    // drop the duplicate "Name" field from the schema-rendered Base section.
     let sections = sectionsFor(el.type)
       .map(section => ({ ...section, fields: section.fields.filter(f => f.name !== 'name') }))
       .filter(section => section.fields.length > 0);

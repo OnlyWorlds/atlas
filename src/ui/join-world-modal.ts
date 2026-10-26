@@ -86,7 +86,7 @@ export function openHeldSeat(toasts: ToastManager, worldId: string): void {
       : `${here.name} is already here; open it from the sidebar. ${spareHeldLine(held)}`, 12_000);
     return;
   }
-  // The preview the dialog draws from, made from the record (the v2 gate's note c).
+  // The preview the dialog draws from, made from the record.
   const preview: JoinPreview = {
     reader: held.kind,
     world: { name: held.world_name || 'Untitled world', description: '' },
@@ -112,7 +112,7 @@ export class JoinWorldModal extends BaseModal {
   private player: JoinedPlayer | null = null;
   /** The world opened, or the cancel already said what was left behind. */
   private settled = false;
-  /** Hidden: a submit still awaiting the where-question stops there (the v2 gate's note d). */
+  /** Hidden: a submit still awaiting the where-question stops there. */
   private closed = false;
   private readonly asPlayer: boolean;
 
@@ -361,8 +361,8 @@ export class JoinWorldModal extends BaseModal {
         try {
           if (player) this.player = await redeemPlayerJoin(this.code, nameInput?.value ?? '', table && !askName ? picked ?? undefined : undefined);
           else this.seat = await redeemJoin(this.code);
-          // Kept the moment the answer is read, with no await between (the v2
-          // gate's G1): a tab closed or reloaded mid-download keeps the seat.
+          // Kept the moment the answer is read, with no await between:
+          // a tab closed or reloaded mid-download keeps the seat.
           const { replaced } = holdSeat(heldRecord(this.code, this.seat, this.player));
           if (replaced) this.toasts.info(spareHeldLine(replaced), 12_000);
         } catch (err) {
@@ -395,7 +395,7 @@ export class JoinWorldModal extends BaseModal {
       const joinedPlayer = this.player;
       const worldId = (seat ?? joinedPlayer)!.world.id;
       // A held seat's key is asked before any folder is made: keel may have
-      // removed the seat since (the v2 gate's note e; a 401 on the folder
+      // removed the seat since (a 401 on the folder
       // path would leave a half folder behind).
       if (held) {
         progressBox.textContent = 'Checking the seat on OnlyWorlds…';
@@ -431,7 +431,7 @@ export class JoinWorldModal extends BaseModal {
         progressBox.hidden = false;
       };
       try {
-        // One download of this world at a time in every tab (G6), and the
+        // One download of this world at a time in every tab, and the
         // registry as stored is read again just before, so a world another
         // tab brought down meanwhile is met as already here.
         const outcome: OpenJoinedOutcome = await withHeldSeatLock(worldId, () => enqueueActivationTask(() => {

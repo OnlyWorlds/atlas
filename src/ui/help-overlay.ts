@@ -1,5 +1,5 @@
 /**
- * The `?` help overlay (Bout HELP, workplan D8) — ONE shape for every room:
+ * The `?` help overlay (workplan D8) — ONE shape for every room:
  * what this room is for, a few "you can…" lines, then the full keyboard +
  * gesture reference (unified with the old hotkey modal, which this replaces).
  *

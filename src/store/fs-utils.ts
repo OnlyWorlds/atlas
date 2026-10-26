@@ -272,7 +272,7 @@ export async function writeJsonAtomic(
     } catch (err) {
       // Only a refused WRITE retries. A NotReadableError at the read-back
       // means the file changed after our close succeeded: someone else wrote
-      // it, and writing our bytes again would put them over theirs (gate A M2).
+      // it, and writing our bytes again would put them over theirs.
       const name = (err as { name?: unknown } | null)?.name;
       const writeRefused = name === 'InvalidStateError' || name === 'NoModificationAllowedError';
       if (!writeRefused || attempt >= busyRetryDelays.length) throw err;

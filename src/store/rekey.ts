@@ -33,7 +33,7 @@
  *
  * The launcher must be a room that is not holding elements open (Settings):
  * a mounted writing editor saves its whole document and would write old ids
- * back (gate lens A, lens-1 F1 narrowed). Adding a "give new ids" button to a
+ * back. Adding a "give new ids" button to a
  * room that keeps an editor mounted reopens that.
  */
 import type { Element, ElementType } from '../core/types';
@@ -69,7 +69,7 @@ export class RekeyRefusedError extends PlainError {
 
 /**
  * The element as it is ON DISK, read inside its own write chain with no write
- * (lens A F4: the cache misses an outside edit since open, and the old file is
+ * (the cache misses an outside edit since open, and the old file is
  * about to be deleted). A file that will not parse throws `CorruptFileError`.
  */
 async function readFresh(store: FolderStore, id: string): Promise<Element | null> {
@@ -130,7 +130,7 @@ export async function startRekey(
     if (el.server_updated_at && !opts.allowStaleBaseline) {
       throw new RekeyRefusedError(`${el.name || id} is already uploaded; it keeps its id.`);
     }
-    // Its other copy would stay behind and come back as a twin (lens A F3).
+    // Its other copy would stay behind and come back as a twin.
     if (store.hasShadowCopy(id)) {
       throw new RekeyRefusedError(`${el.name || id} has two files, one under elements/ and one under spatial/. Remove the one you do not want, then try again.`);
     }
@@ -155,10 +155,10 @@ export async function startRekey(
 /**
  * The journal on disk, checked. null when there is none, AND when the file is
  * empty: a tab closed inside the journal's FIRST write leaves an empty file,
- * and since step 2 starts only after that write resolves, nothing else ran
- * (lens A F7), so the empty file is cleared here. A journal that is not what
+ * and since step 2 starts only after that write resolves, nothing else ran,
+ * so the empty file is cleared here. A journal that is not what
  * v1 writes throws: better a world that says it cannot finish than one
- * re-keyed from a guess (lens A F8).
+ * re-keyed from a guess.
  */
 async function readJournal(store: FolderStore): Promise<RekeyJournal | null> {
   const journal = await store.readRekeyJournal();
@@ -223,7 +223,7 @@ export async function recoverRekey(store: FolderStore, hooks: RekeyHooks = {}): 
 }
 
 async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyHooks): Promise<RekeyResult> {
-  // Live pairs only (lens 1 F6): a pair whose old AND new element are both
+  // Live pairs only: a pair whose old AND new element are both
   // gone (a checkout, a hand delete between crash and reopen) is dropped, so
   // no surviving file gains a link to an element that does not exist.
   const pairs: Array<{ o: string; n: string; type: ElementType; oEl: Element | null }> = [];
@@ -234,7 +234,7 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
       console.info('[atlas:rekey] dropping a pair whose elements are both gone', { o, n });
       continue;
     }
-    // The element's own type, never the journal's word for it (lens A F8).
+    // The element's own type, never the journal's word for it.
     pairs.push({ o, n, type: (oEl ?? nEl)!.type, oEl });
   }
   const map = new Map(pairs.map(p => [p.o, p.n]));
@@ -264,7 +264,7 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
   // 4. Referrers. Filtered from the cache above (a whole-world walk through the
   // chain costs a disk read per file); inside each chain the transform runs
   // again on the file as it is on disk, and returns null when nothing changed
-  // so an untouched element is never stamped dirty (lens 1 F4).
+  // so an untouched element is never stamped dirty.
   for (const el of referrers) {
     try {
       await store.updateElementWith(el.id, b => {
@@ -275,7 +275,7 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
     } catch (err) {
       if (!(err instanceof CorruptFileError)) throw err;
       // A file that will not parse (a git conflict) is skipped and named, not
-      // a reason to abandon every other referrer (lens 1 F7). The finished map
+      // a reason to abandon every other referrer. The finished map
       // is kept in sync-state (step 6), so its links can follow once repaired.
       unrewritten.add(el.id);
       await store.writeRekeyJournal({ ...journal, unrewritten: [...unrewritten] });
@@ -303,7 +303,7 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
 
   // 6. The old elements go. An old element edited since the journal was
   // written (read from DISK: an outside tool counts too) REPLACES its new
-  // element first: a merge could not carry a field the edit cleared (lens A F9).
+  // element first: a merge could not carry a field the edit cleared.
   for (const p of pairs) {
     const current = await readFresh(store, p.o);
     if (current) {
@@ -329,8 +329,8 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
 }
 
 /**
- * DISCARD, done safely: an unfinished re-key is undone, not forgotten (lens A
- * F6). Forgetting left new elements naming new elements that were never
+ * DISCARD, done safely: an unfinished re-key is undone, not forgotten.
+ * Forgetting left new elements naming new elements that were never
  * written, and two copies of each element with nothing to say which to keep.
  *
  * Per pair: an old element still on disk means the pair can go back (its

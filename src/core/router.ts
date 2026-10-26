@@ -71,7 +71,7 @@ export const SETTINGS_TAB_GROUPS: ReadonlyArray<{ scope: 'atlas' | 'world'; tabs
 
 /**
  * Legacy settings-tab keys → current keys (older deep links / stored
- * last-tab; 'account' renamed to 'onlyworlds' in Bout OW; 'editing' split into
+ * last-tab; 'account' renamed to 'onlyworlds'; 'editing' split into
  * 'elements' + 'maps' 2026-07-19 — 'maps' resolves as a REAL tab now, so its
  * old alias-to-editing entry is gone).
  */

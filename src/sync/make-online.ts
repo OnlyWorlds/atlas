@@ -1,5 +1,5 @@
 /**
- * Make-Online helpers — used by the Make-Online modal (Bouts F+G).
+ * Make-Online helpers — used by the Make-Online modal.
  *
  * Route 1 (create new api world): POST /api/v2/account/worlds on the
  * signed-in account, then push all local elements to the new api world as
@@ -182,7 +182,7 @@ export interface MergeResult {
   failures: PerElementFailure[];
   /** Names left unmatched because two or more on one side share them (per type). */
   ambiguous: Array<{ type: ElementType; name: string }>;
-  /** Maps and zones left unmatched because both sides have pins or markers on them (gate A4/A5). */
+  /** Maps and zones left unmatched because both sides have pins or markers on them. */
   childClashes: Array<{ type: ElementType; name: string }>;
   /** Local id → server id, the elements that took the server's id. */
   rekeyed: Map<string, string>;
@@ -238,7 +238,7 @@ export class MergeRefusedError extends Error {
  *     server's full response lands locally); policy (c) the server's record
  *     lands locally and the local content, rich text included, is given up;
  *     a page's blocks are its content, so they go too and are rebuilt from
- *     the server's story (gate A9). Atlas's own bindings (map image, aliases)
+ *     the server's story. Atlas's own bindings (map image, aliases)
  *     survive both.
  *
  * The order is the design (a design note of 2026-09-29,
@@ -336,12 +336,12 @@ export async function mergeLocalIntoApi(
   const unreadable = new Set(unrewritten);
   // A planned create carrying a stale baseline (a folder copied out of an api
   // world, an unlink without reset) would, if its create failed, read as
-  // synced or as deleted on the server forever (gate A2). It never reached
+  // synced or as deleted on the server forever. It never reached
   // THIS server, so it is never-synced before anything is sent.
   for (const c of plan.creates) {
     if (c.local.server_updated_at && !unreadable.has(c.local.id)) await folder.clearServerBaseline(c.local.id);
   }
-  // Ids an earlier, unfinished run of this route created (gate A3): on a
+  // Ids an earlier, unfinished run of this route created: on a
   // rerun they meet their own upload as a same-id match.
   const ownUploads = new Set((await folder.readSyncState()).route2_created ?? []);
   type Matched = { id: string; local: Element; server: ServerRec; type: ElementType };
@@ -412,7 +412,7 @@ export async function mergeLocalIntoApi(
     const batch: Array<{ dec: { local: Element; type: ElementType }; item: BulkItem; sent: string }> = [];
     for (const dec of decisions) {
       // A file that will not parse is that element's failure, not the batch's
-      // (gate A7: the disk read is strict).
+      // (the disk read is strict).
       let s: Awaited<ReturnType<typeof sendable>>;
       try {
         s = await sendable(dec.local.id);
@@ -572,7 +572,7 @@ export async function mergeLocalIntoApi(
         continue;
       }
       // An element this route itself uploaded on an earlier, unfinished run is
-      // not a duplicate: its local copy wins whatever the policy (gate A3).
+      // not a duplicate: its local copy wins whatever the policy.
       if (policy === 'b' || ownUploads.has(m.id)) {
         const s = await sendable(m.id);
         if (!s) continue;
@@ -581,7 +581,7 @@ export async function mergeLocalIntoApi(
           response = await adapter.updateElement(m.type, m.id, s.body);
         } catch (err) {
           if (!isOwProposed(err)) throw err;
-          // A seat on a reviewed world (conv. 163, the gate's G9): keel took the
+          // A seat on a reviewed world (conv. 163): keel took the
           // copy as a proposal and its own is unchanged. The element takes keel's
           // stamp and stays an unsent edit, recorded so no round proposes it again.
           await folder.stampServerUpdatedAt(m.id, m.type, m.server.updated_at, null, hiddenWordOf(m.server));
@@ -595,8 +595,8 @@ export async function mergeLocalIntoApi(
         }
         // The server's full post-PATCH record lands locally (PATCH is partial:
         // fields the local copy lacks stay on the server; the store keeps the
-        // file's atlas-only fields). Guarded like every push stamp (conv. 96,
-        // gate A1): if the file changed during the request, nothing lands and
+        // file's atlas-only fields). Guarded like every push stamp (conv. 96):
+        // if the file changed during the request, nothing lands and
         // the element stays dirty, so the next round sends the newer text.
         const { updated_at: _ts, ...fullBody } = response;
         const landed = await folder.applyServerRecordIfUnchanged(m.type, fullBody, response.updated_at, s.sent);
@@ -613,10 +613,10 @@ export async function mergeLocalIntoApi(
         let body: Record<string, unknown> = serverBody;
         // A page's blocks are its text (`story` is compiled from them on
         // every save), so they go too, or the next save would put the local
-        // page back over the server's (gate A9, Titus's ruling 2026-10-04).
+        // page back over the server's (Titus's ruling 2026-10-04).
         // Blocks are rebuilt only when the server's copy is a page: a local
         // page the server holds as a scene becomes that scene, with no page
-        // fields left on it (gate lens B L2).
+        // fields left on it.
         if (m.type === 'narrative' && (isPageNarrative(m.local) || isPageNarrative(serverBody as unknown as Element))) {
           dropLocal.push('atlas_page_blocks', 'atlas_page_refs');
           if (isPageNarrative(serverBody as unknown as Element)) {

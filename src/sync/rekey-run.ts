@@ -11,7 +11,7 @@
  *   → release (pushes only when nothing else keeps the world offline).
  *
  * The caller shows a locked modal for the whole run: no world switch, no map
- * gesture, no typing lands between the steps (re-key gate lens 1 F1, lens 3 F12).
+ * gesture, no typing lands between the steps.
  */
 import { getState, setState, patchSlice } from '../core/state';
 import type { ElementType, WorldRegistryEntry } from '../core/types';
@@ -48,7 +48,7 @@ async function singleFlight<T>(work: () => Promise<T>): Promise<T> {
   running = true;
   try {
     // Taking the flag stops every new live-folder pass; one already running
-    // could still land a pre-move element list over ours (lane B N2).
+    // could still land a pre-move element list over ours.
     await settleLivePass();
     return await work();
   } finally {
@@ -82,7 +82,7 @@ export async function foreignIdsFor(
 ): Promise<Array<{ id: string; type: ElementType }>> {
   if (entry.state !== 'api-linked' || !entry.api || entry.api.read_only) return [];
   // The shown world's elements are already in memory; listing a 12k world from
-  // the store clones every body, and Settings asks on every render (lens C F4).
+  // the store clones every body, and Settings asks on every render.
   const elements = getState().active?.worldId === entry.id ? getState().data.elements : await store.listElements();
   return liveForeignIds((await store.readSyncState()).foreign, entry.api.world_id, elements);
 }
@@ -91,7 +91,7 @@ export async function foreignIdsFor(
  * Step 6p: browser state that names old ids, for one world. Runs inside the
  * kernel (both the live run and recovery at activation), BEFORE the old
  * elements are removed, so no crash point leaves a stored route or tab on a
- * deleted element (lens 1 F8, lens 3 F11).
+ * deleted element.
  */
 export function rekeyPersistedState(worldId: string, map: ReadonlyMap<string, string>): void {
   const reg = getState().registry;
@@ -111,10 +111,10 @@ export function rekeyPersistedState(worldId: string, map: ReadonlyMap<string, st
 
 /**
  * Step 7: the screen follows, in ONE state change. Elements come back from
- * disk (never a graft of the old entry under the new id: lens 3 F7 found that
+ * disk (never a graft of the old entry under the new id: that
  * doubles an element and leaves every referrer naming the old id in memory).
  * An open map tab on a re-keyed map is disposed first so its Leaflet
- * instance and handlers bound to the old id do not leak (lens 3 F10).
+ * instance and handlers bound to the old id do not leak.
  */
 export async function rekeyLiveUi(store: FolderStore, worldId: string, map: ReadonlyMap<string, string>): Promise<void> {
   if (map.size === 0) return;
@@ -168,7 +168,7 @@ async function giveUnlocked(opts: Parameters<typeof giveForeignElementsNewIds>[0
   opts.onStage?.('running');
   try {
     await flushBeforeLeavingWorld();
-    // Per world, never the device-wide tour flag (lens 3 F5).
+    // Per world, never the device-wide tour flag.
     if (entry.demo === true || readTourState()?.worldId === entry.id) {
       throw new RekeyRefusedError('The tour world keeps its ids.');
     }
@@ -184,7 +184,7 @@ async function giveUnlocked(opts: Parameters<typeof giveForeignElementsNewIds>[0
     } catch (err) {
       if (err instanceof RekeyRefusedError || !(await store.hasRekeyJournal())) throw err;
       // Retry once as recovery; a second failure leaves the journal (sync
-      // stays shut) and Settings offers to finish it (lens 1 F3).
+      // stays shut) and Settings offers to finish it.
       console.warn('[atlas:rekey] run failed, retrying from its journal', err);
       const recovered = await recoverRekey(store, hooks);
       if (!recovered) throw err;
@@ -261,7 +261,7 @@ export function finishInterruptedRekey(store: FolderStore, worldId: string): Pro
 }
 
 /**
- * Settings' Discard: UNDO an interrupted re-key (gate lens A F6). Pairs that
+ * Settings' Discard: UNDO an interrupted re-key. Pairs that
  * had finished stay finished; the rest go back to their old ids, with every
  * link that had moved. Only a journal that will not parse (nothing to act on)
  * is forgotten outright: `forget: true`.

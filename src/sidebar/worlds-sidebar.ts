@@ -401,7 +401,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const worlds = isTouring()
       ? state.registry.worlds.filter(w => w.demo === true)
       : state.registry.worlds;
-    // Held seats draw in every branch, the empty one too (the v2 gate's G4).
+    // Held seats draw in every branch, the empty one too.
     const held = isTouring() ? '' : heldSeats(state.registry).map(renderHeldRow).join('');
 
     if (worlds.length === 0) {
@@ -604,7 +604,7 @@ function nothingYet(reg: WorldsRegistry): boolean {
 
 /**
  * Remove a held seat on the person's word (rule 3): never while a download of
- * it runs in any tab (the v2 gate's G6). The seat stays on onlyworlds.com.
+ * it runs in any tab. The seat stays on onlyworlds.com.
  */
 async function removeHeld(worldId: string, toasts: ToastManager): Promise<void> {
   const h = heldSeat(worldId);
@@ -629,7 +629,7 @@ async function removeHeld(worldId: string, toasts: ToastManager): Promise<void> 
 /**
  * A seat a link left held: its own row kind, below the
  * worlds. Not a world: no activation, no settings, no counts, and no
- * `data-world-id` anywhere in it (the v2 gate's note f), so the list's open
+ * `data-world-id` anywhere in it, so the list's open
  * handler never reads it as a world. The name downloads; the cross removes.
  */
 function renderHeldRow(h: HeldSeat): string {
@@ -693,7 +693,7 @@ export interface ActivateWorldOpts {
 // activation overlapping an early sidebar click, or a double-click). All
 // activations serialize through this chain; a queued request that has been
 // superseded by a newer click is skipped instead of run.
-// Serialization moved to core/activation-chain.ts (gate R2, 2026-07-13):
+// Serialization moved to core/activation-chain.ts (2026-07-13):
 // ONE chain now covers activations AND link/download flows, so a mid-flight
 // initial download can't be closed by a world click racing beside it.
 
@@ -754,7 +754,7 @@ async function doActivateWorld(
   // Already active? Click should still "open" — switch to the right-tab view
   // if we're not already on a meaningful one. Without this, clicking the
   // already-active world from worlds-mode (default landing) appeared to do
-  // nothing — Titus flagged this as a regression in the Bout CC follow-up.
+  // nothing — Titus flagged this as a regression.
   if (state.active?.worldId === worldId) {
     const route = parseHash(window.location.hash);
     const onRightTab =
@@ -929,7 +929,7 @@ async function doActivateWorld(
     return false;
   }
 
-  // PARK the prior store instead of closing it (speed bout, 2026-07-19):
+  // PARK the prior store instead of closing it (2026-07-19):
   // heartbeat stops, caches + lock stay — switching back revives it without
   // re-walking the folder. Falls back to close when we can't name it.
   const prior = getActiveStore();
@@ -1070,8 +1070,8 @@ async function doActivateWorld(
     await loadWorldPrefs(store, worldId);
   }
   // An id update that did not finish (a crash, a closed tab) completes HERE,
-  // on both the open and the revive path, before anything reads the world
-  // (re-key gate lens 1 F3/F6): otherwise the list would show old and
+  // on both the open and the revive path, before anything reads the world:
+  // otherwise the list would show old and
   // new elements as twins. Until it completes the sync engine refuses every
   // round (the journal gate), so a failure here costs sync, never data.
   if (await store.hasRekeyJournal().catch(() => false)) {
@@ -1099,7 +1099,7 @@ async function doActivateWorld(
             : `Finished giving ${done.map.size} ${done.map.size === 1 ? 'element a new id' : 'elements new ids'}.`);
         }
         // Files that would not open keep old ids; Settings offers "Update
-        // links" once they are repaired (gate lens A F5).
+        // links" once they are repaired.
         if (done.unrewritten.length > 0) {
           const n = done.unrewritten.length;
           toasts.error(`${n === 1 ? '1 element' : `${n} elements`} could not be updated because ${n === 1 ? 'its file' : 'their files'} would not open. Fix ${n === 1 ? 'it' : 'them'}, then use Update links in Settings.`, 10_000);
@@ -1123,7 +1123,7 @@ async function doActivateWorld(
   // Prime the elements cache for this world. Cold opens report progress —
   // throttled: every patchSlice re-renders subscribers, so per-file patches
   // on a 1500-element walk would burn the win they're reporting on.
-  // SUPERSEDE GUARD (close-gate finding, 2026-07-19): if the user activates
+  // SUPERSEDE GUARD (2026-07-19): if the user activates
   // another world mid-walk, this store is closed and replaced — but the
   // body-cache hit path can still resolve with THIS world's elements (it no
   // longer touches root, so it can't throw the way the disk path did).

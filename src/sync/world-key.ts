@@ -48,8 +48,8 @@ export function canMakeWorldKey(entry: WorldRegistryEntry | undefined): boolean 
 
 /**
  * True when Settings offers Make a new key: signed in, and the world on the
- * account's list as loaded, never a guest's (a guest's key only reads; the
- * #198 gate's G3, G7). Sync's own recovery asks `canMakeWorldKey` and fetches
+ * account's list as loaded, never a guest's (a guest's key only reads).
+ * Sync's own recovery asks `canMakeWorldKey` and fetches
  * the list fresh.
  */
 export function offersMakeKey(entry: WorldRegistryEntry | undefined): boolean {
@@ -140,7 +140,7 @@ export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, read
       console.warn('[world-key] the kept set\'s walk was not reset:', err); // raw-error-ok: a log
     }
     // Still this world's store, and still the open world, after the write
-    // (the #198 gate's G2: a switch mid-write attached A's engine over B).
+    // (a switch mid-write attached A's engine over B).
     if (getState().active?.worldId === entry.id && getActiveStore() === store) {
       attachSyncEngine(updated, store);
     }
@@ -171,8 +171,7 @@ export async function makeNewWorldKey(entry: WorldRegistryEntry, opts: { keyDead
   const row: AccountWorldRow | undefined = getState().accountWorlds.rows.find(r => r.id === worldId);
   if (!row) {
     // Deleted or removed only when keel said it no longer knows the key; a
-    // world linked with another account's key is simply not this one's (the
-    // #198 gate's G3).
+    // world linked with another account's key is simply not this one's.
     return opts.cause === 'key_unknown'
       ? { kind: 'gone', line: `${entry.name} is no longer on your OnlyWorlds account: it was deleted there, or you were removed from it. Everything here stays as it is.` }
       : { kind: 'not-on-account', line: `${entry.name} is not on the OnlyWorlds account you are signed in with, so Atlas cannot make its key. Put in a key from the world's page on onlyworlds.com.` };
@@ -215,7 +214,7 @@ export async function makeNewWorldKey(entry: WorldRegistryEntry, opts: { keyDead
     await putKeyInPlace(current, minted.minted.key, minted.readOnly);
   } catch (err) {
     // Taken back only if it never landed: a step after the registry save
-    // must not leave the world on a revoked key (the #198 gate's G6).
+    // must not leave the world on a revoked key.
     const landed = getState().registry.worlds.find(w => w.id === entry.id)?.api?.api_key === minted.minted.key;
     if (!landed) await takeBack();
     return { kind: 'failed', error: err };

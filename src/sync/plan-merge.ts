@@ -44,7 +44,7 @@ export interface MergePlan {
   downloads: Array<{ server: ServerRec; type: ElementType }>;
   /** Names skipped because two or more on one side share them (per type). */
   ambiguous: Array<{ type: ElementType; name: string }>;
-  /** Maps and zones whose name matched but that both sides have children on: not matched (gate A4/A5). */
+  /** Maps and zones whose name matched but that both sides have children on: not matched. */
   childClashes: Array<{ type: ElementType; name: string }>;
   /** A server record whose id is a local element of ANOTHER type: never downloaded (it would overwrite that file). */
   idClashes: Array<{ id: string; localType: ElementType; serverType: ElementType }>;
@@ -205,7 +205,7 @@ export function planMerge(
     // First the maps and zones that clash, so their children can stay out of
     // name matching: a named marker (converter worlds name every one) matched
     // to its server twin would move onto the server id under its LOCAL zone,
-    // and policy b would then strip the online outline (gate lens B H1).
+    // and policy b would then strip the online outline.
     const clashedLocal = new Set<string>();
     const clashedServer = new Set<string>();
     for (const [bucketKey, bucketLocals] of localsByKey) {

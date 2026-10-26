@@ -144,7 +144,7 @@ export class InviteModal extends BaseModal {
       const characterName = character === NEW_CHARACTER ? null : playsAsSelect.selectedOptions[0]?.textContent ?? null;
       setInviterNamePref(name);
       // A sign-in since the dialog opened replaced its token, and the old one is revoked (conv. 179):
-      // said as that, never as a refused key or PIN (2026-10-26's gate, M2).
+      // said as that, never as a refused key or PIN.
       if (getState().registry.account_token !== this.token) {
         this.dismissLocked = false;
         errorBox.textContent = `${SIGNED_IN_AGAIN_LINE} Close this and choose Invite someone again.`;

@@ -1,5 +1,5 @@
 /**
- * The newcomer's "What do you have?" (#127, Titus's Q1, 2026-10-09:
+ * The newcomer's "What do you have?" (#127, Titus 2026-10-09:
  * optional, never blocking, subtle and minimal). The empty world home asks it
  * as three quiet rows; a world started from a deep link (`#/start`,
  * `#/bring-in`) was already answered on onlyworlds.com, so its home asks

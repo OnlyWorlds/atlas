@@ -938,7 +938,7 @@ function buildPinAffordance(
       openMapTab(m, sourceElementId);
     }
     // panMapTabTo waits on entry.ready, so a freshly opened tab settles
-    // before the camera moves. The pin shows whatever the map's date (F3).
+    // before the camera moves. The pin shows whatever the map's date.
     if (pin.element_id) revealPinsOnMap(pin.map_id, pin.element_id);
     panMapTabTo(pin.map_id, pin.x, pin.y);
   });

@@ -1,5 +1,5 @@
 /**
- * Delete a world kept in this browser (1.17, contract §3.1, lens C R3-c):
+ * Delete a world kept in this browser (1.17):
  * a modal, not `window.confirm`, saying what goes and what stays. The work is
  * `deleteBrowserWorld` (close first, removal retried, the entry kept on any
  * failure); a failure reopens the world and says nothing was removed.

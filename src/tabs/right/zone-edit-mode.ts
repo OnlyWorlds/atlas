@@ -1021,7 +1021,7 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
 export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts?: ToastManager): Promise<boolean> {
   const persisted = readPersistedSnapshot(activatedWorldId);
   // Returns whether a recovery was ATTEMPTED — the caller re-primes the
-  // elements cache only then (speed bout 2026-07-19: the unconditional
+  // elements cache only then (2026-07-19: the unconditional
   // re-prime cost a full disk walk on every normal activation).
   if (!persisted) return false;
   // Build a temporary session shape just enough for restoreFromSnapshot.

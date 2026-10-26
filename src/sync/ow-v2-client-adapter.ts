@@ -247,7 +247,7 @@ export function adaptV2Record(raw: unknown, type: ElementType): ServerRecord {
   }
   if (typeof out.id !== 'string') throw new Error('adaptV2Record: response missing string id');
   if (typeof out.updated_at !== 'string') throw new Error('adaptV2Record: response missing string updated_at');
-  // keel's stub becomes a record in its own shape here, before any compare (conv. 155, I1; gate G2).
+  // keel's stub becomes a record in its own shape here, before any compare (conv. 155, I1).
   if (isKnownOf(out)) return stubShape(out) as ServerRecord;
   return out as ServerRecord;
 }
@@ -278,7 +278,7 @@ export class OwV2ClientAdapter implements OwApiClient {
    * hit, or a truthy has_more with a dead/non-advancing cursor). The engine
    * consumes this to suppress server-delete detection for those types — an
    * incomplete `seenLocalIds` would falsely flag unfetched elements as
-   * "vanished from server" (a destructive prompt). Gate 10.5: the guard STAYS
+   * "vanished from server" (a destructive prompt). The guard STAYS
    * under v2; only its trigger changed from offset pagination to cursor-walk
    * incompleteness.
    */
@@ -313,8 +313,8 @@ export class OwV2ClientAdapter implements OwApiClient {
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     // keel #520 (PR 171, live 2026-10-22): a write names the app that made it,
     // so keel's changed_client and its Recent changes page say "through atlas".
-    // keel reads it on writes only, and its CORS allow list carries it (Boss's
-    // keel-cors gate); a GET keeps the headers its preflight always asked for.
+    // keel reads it on writes only, and its CORS allow list carries it;
+    // a GET keeps the headers its preflight always asked for.
     if (method !== 'GET') headers['X-OW-Client'] = ATLAS_CLIENT_NAME;
     const timeoutMs = method === 'GET' ? this.readTimeoutMs : null;
     const controller = timeoutMs ? new AbortController() : null;
@@ -393,8 +393,8 @@ export class OwV2ClientAdapter implements OwApiClient {
 
   /**
    * GET /me — who this key is: its role (owner, co_builder, contributor,
-   * guest) is what a resync and a guest's 404 are read against (B12 Q2,
-   * conv. 151). A read key's call too.
+   * guest) is what a resync and a guest's 404 are read against (conv. 151).
+   * A read key's call too.
    */
   async me(): Promise<{ role: string }> {
     const response = await this.request('GET', '/me') as { role?: unknown } | undefined;
@@ -530,7 +530,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       if (!page?.has_more || !page.next_cursor) return { rows, complete: true };
       cursor = page.next_cursor;
     }
-    // Cut short: a row not reached is not a row withdrawn (the gate's G7).
+    // Cut short: a row not reached is not a row withdrawn.
     return { rows, complete: false };
   }
 
@@ -555,14 +555,14 @@ export class OwV2ClientAdapter implements OwApiClient {
     // Cursor walk until has_more:false. Safety cap far above real worlds; a
     // capped or non-advancing walk marks the type incomplete instead of
     // throwing — partial data is fine for pull-creates/updates, only the
-    // server-delete inference must be suppressed (gate 10.5).
+    // server-delete inference must be suppressed.
     const SAFETY_CAP_PAGES = 500; // 500 × 100 = 50k elements per type
     const all: unknown[] = [];
     let cursor: string | null = null;
     let complete = false;
 
     for (let page = 0; page < SAFETY_CAP_PAGES; page++) {
-      // limit=500 asks for the wire's max page (speed bout 2026-07-19); the
+      // limit=500 asks for the wire's max page (2026-07-19); the
       // server honors what it allows (currently caps at 250)
       // and silently ignores unknown params, so this can only shrink the
       // round-trip count vs the default 100 — never break the walk.
@@ -604,7 +604,7 @@ export class OwV2ClientAdapter implements OwApiClient {
     // A malformed item (missing id/updated_at) must not abort the whole
     // type's list — skip it AND mark the type incomplete so server-delete
     // detection can't act on the partial view (same hardening the /changes
-    // path got against the brick-the-walk class; close-gate finding).
+    // path got against the brick-the-walk class).
     const adapted: ServerRecord[] = [];
     for (const r of all) {
       try {
@@ -697,7 +697,7 @@ export class OwV2ClientAdapter implements OwApiClient {
         // to the op-level stamp, 2026-07-12) — but synthesize from the op
         // level if a future server ever omits it. Without this, one such op
         // would throw in adaptV2Record and permanently brick the walk at
-        // this cursor (gate finding).
+        // this cursor.
         const element = op.element.updated_at === undefined && op.updated_at
           ? { ...op.element, updated_at: op.updated_at }
           : op.element;

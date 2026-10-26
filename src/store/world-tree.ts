@@ -1,7 +1,7 @@
 /**
  * A world as a tree of files: walk it, copy it byte for byte, verify a copy
- * (1.17 bout 4, conv. 129; contract §4.1). Shared by Move to a folder, and by
- * the download and the world-file unpack still to come (bout 5).
+ * (1.17, conv. 129; contract §4.1). Shared by Move to a folder, and by
+ * the download and the world-file unpack still to come.
  *
  * TRANSIENT files never travel: the lock, the make marker, every move file,
  * the re-key journal, and the browser's swap and staging files. A move's own
@@ -12,7 +12,7 @@
  * The copy writes `.atlas/move-incoming.json` (this move's token) FIRST and
  * `world.json` LAST: until the token's last file lands nothing in the
  * destination says "world", and recovery removes a destination only when its
- * token carries the move's id (invariant 6, gate A1).
+ * token carries the move's id (invariant 6).
  */
 
 import { PlainError } from '../core/plain-error';
@@ -141,7 +141,7 @@ export async function copyWorldTree(
 /**
  * Is `dst` a faithful copy of `src`? Equal path sets (transient files left
  * out on both sides), every `.json` equal byte for byte, every other file
- * equal in size (media is compared by size: invariant 4 says so, gate A13).
+ * equal in size (media is compared by size: invariant 4 says so).
  */
 export async function verifyWorldTree(
   src: FileSystemDirectoryHandle,

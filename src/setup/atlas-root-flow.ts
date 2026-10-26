@@ -619,7 +619,7 @@ export async function releasePriorWorld(): Promise<void> {
 
 export async function scaffoldWorldInRoot(
   name: string,
-  // Sample-world path (Bout DEMO): scaffold under an explicit parent handle
+  // Sample-world path: scaffold under an explicit parent handle
   // (OPFS on first launch) instead of the atlas root — no folder pick, no
   // permission prompt (OPFS needs none).
   parentOverride?: { handle: FileSystemDirectoryHandle; label: string },
@@ -781,7 +781,7 @@ export async function createWorldFromImportedData(
     onProgress?: (p: ApplyProgress) => void;
     /** Scaffold under this handle instead of the atlas root (sample world / OPFS). */
     parentHandle?: { handle: FileSystemDirectoryHandle; label: string };
-    /** ONLY the bundled sample world sets this (Bout OW demo-origin contract). */
+    /** ONLY the bundled sample world sets this. */
     demo?: boolean;
     /** Make the world in this browser's storage (1.17) instead of the home folder. */
     where?: 'folder' | 'browser';
@@ -889,7 +889,7 @@ export interface LinkExistingApiWorldOpts {
   /**
    * World identity already known to the caller (account-mode open flow: the
    * account list returned `{id, name}` moments ago). Skips the GET /world
-   * validation round-trip — one fewer post-mint failure window (gate R1b).
+   * validation round-trip — one fewer post-mint failure window.
    */
   knownWorld?: { id: string; name: string };
   /**
@@ -990,7 +990,7 @@ export async function linkExistingApiWorldInRoot(
   // `keyCheckError`; anything else is rethrown as it came, for the
   // modal to word.
   // Skipped when the caller already holds the world identity (account-mode
-  // list → open; gate R1b — the fresh minted key needs no re-validation).
+  // list → open; the fresh minted key needs no re-validation).
   let world: { id?: string; name?: string };
   if (opts.knownWorld) {
     world = opts.knownWorld;
@@ -1012,7 +1012,7 @@ export async function linkExistingApiWorldInRoot(
   // the same api world. Multi-device is handled by separate atlas instances
   // (each with its own folder); two locals in one atlas linked to the same
   // api would cause confusing sync amplification and has no valid use case.
-  // Gate R3c: match ANY entry associated with this server world — a live link
+  // Match ANY entry associated with this server world — a live link
   // OR a former one (unlinked world whose folder is still here). Re-checked
   // here (inside the activation-chained task) so two concurrent link attempts
   // for the same world can't both pass a stale read.
@@ -1047,7 +1047,7 @@ export async function linkExistingApiWorldInRoot(
   const slug = slugify(displayName);
   let subName = `${slug}-${serverWorldId.slice(0, 8)}`;
 
-  // Folder-collision guard (gate R3b): the deterministic name can already be
+  // Folder-collision guard: the deterministic name can already be
   // taken by a leftover folder (unlink/forget keeps folders on disk). Never
   // download into existing data — fall to a numeric suffix instead.
   for (let n = 2; ; n++) {

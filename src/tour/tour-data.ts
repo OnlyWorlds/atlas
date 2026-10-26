@@ -513,7 +513,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       { from: 9, to: 10, type: 'object', ref: 'object:Ebony Spaceship' },
       { from: 23, to: 23, type: 'object', ref: "object:The Consul’s Steinway" },
     ],
-    // NOT routed at an object it creates (gate R7): the step would open on the
+    // NOT routed at an object it creates: the step would open on the
     // app’s "Element not found in this world" card with the dock underneath
     // telling the user to make it. The Consul is the right surface anyway —
     // his Objects fill in as each object lands.

@@ -1,5 +1,5 @@
 /**
- * Until the schema carries a zone's shape (Titus's Q1 (c), motion #362),
+ * Until the schema carries a zone's shape (Titus's (c), motion #362),
  * other tools cannot tell an area from a line by anything on the wire. The
  * Titus's interim (2026-10-18): a new zone whose supertype the user left
  * empty gets the shape's word there, `polygon` or `line`. A supertype the user

@@ -36,7 +36,7 @@ export function wireOnlyWorldsSignIn(root: ParentNode, toasts: ToastManager, doo
   btn.addEventListener('click', () => {
     if (btn.disabled) return;
     // A form signing in with the password, or making the world, holds its
-    // inputs disabled: leaving the page then would cut it off (the gate's G7).
+    // inputs disabled: leaving the page then would cut it off.
     if (btn.closest('[data-role="sign-in-fields"]')?.querySelector('input:disabled')) return;
     btn.disabled = true;
     btn.textContent = 'Opening OnlyWorlds…';

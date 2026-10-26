@@ -193,8 +193,8 @@ export function mountSidebar(mount: SidebarMount): () => void {
   //
   // Clicking gear from any non-settings route → opens Settings.
   // Clicking gear from Settings → closes Settings + restores the right-tab
-  // context (selected element if any, else elements list). This is Q3:
-  // gear-as-toggle returns the user to where they were instead of stranding
+  // context (selected element if any, else elements list).
+  // Gear-as-toggle returns the user to where they were instead of stranding
   // them in a settings view.
   const gear = document.createElement('button');
   gear.className = 'atlas-icon-btn';
@@ -251,7 +251,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
     notesBtn.title = active ? 'Notes for this world (N)' : 'Open a world to use notes';
   }
 
-  // ----- Footer OW icon — opens Settings → OnlyWorlds (Bout OW, D11) -----
+  // ----- Footer OW icon — opens Settings → OnlyWorlds (D11) -----
   // No new window concept: it's a route; browser Back returns for free.
   const owBtn = document.createElement('button');
   owBtn.className = 'atlas-icon-btn atlas-footer-owmark';

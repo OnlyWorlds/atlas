@@ -1,8 +1,7 @@
 /**
  * "Give them new ids": confirm, then a LOCKED run with progress.
  *
- * Locked because the run must own the world (re-key gate lens 1 F1, lens 3
- * F12): no outside click, no Escape, and (composition gate lens C F1) the app
+ * Locked because the run must own the world: no outside click, no Escape, and the app
  * behind the overlay goes `inert` for the run, so no keyboard focus reaches a
  * world row, a Settings button or a map while elements and their links move.
  * `rekey-run` also refuses a second run outright.
@@ -98,7 +97,7 @@ export class RekeyModal extends BaseModal {
           cancel.disabled = false;
           const refused = err instanceof RekeyRefusedError;
           if (!refused) console.error('[atlas:rekey] failed:', err);
-          // Only a journal means something started (lens C F3): without one
+          // Only a journal means something started: without one
           // the kernel wrote nothing, and "finish the update" would be false.
           const unfinished = !refused && await this.store.hasRekeyJournal().catch(() => false);
           progress.textContent = refused ? problemFor(err, { doing: 'giving new ids' }).sentence

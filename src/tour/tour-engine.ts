@@ -2,7 +2,7 @@
  * Tour engine — boot, reveal, and step state for the guided Hyperion tour.
  *
  * THE SAFETY LAYER: the tour only ever writes to the demo world it booted
- * (registry `demo: true`, mirrored in world.json — the Bout OW contract that
+ * (registry `demo: true`, mirrored in world.json — the contract that
  * also keeps demo gestures from completing waypoints). Every mutation goes
  * through the ordinary FolderStore of the ACTIVE world, and every write-path
  * entry point re-checks that the active world is the tour's demo world —
@@ -310,7 +310,7 @@ async function healMedia(revealed: Set<string>): Promise<number> {
     try {
       const resp = await fetch(TOUR_MEDIA_URLS[asset]());
       const blob = await resp.blob();
-      // Re-check AFTER the (arbitrarily slow) fetch (gate MED): a
+      // Re-check AFTER the (arbitrarily slow) fetch: a
       // teardown from startTour/launchTour — not serialized behind the step
       // chain like exitTour — could have swapped the store while we awaited.
       // Writing to the captured, now-closed store would land on a dead world.
@@ -395,7 +395,7 @@ async function aliasesOnFor(revealed: Set<string>): Promise<boolean> {
 
 /**
  * The set of bundle ids a LINK may point at, which is NOT the same as the set
- * of elements this step creates (gate R1/R2).
+ * of elements this step creates.
  *
  * Stripping exists for one reason: never render a chip pointing at something
  * that is not there. So the honest rule is **never strip a link whose target
@@ -447,8 +447,7 @@ async function revealUpTo(stepIndex: number): Promise<void> {
   }
   const healed = await healLinks(universe, linkable, aliasesOn);
   const mediaHealed = await healMedia(linkable);
-  // ANY heal write refreshes in the same step-enter (gate C5, two lenses
-  // convergent on the media leg) — a healed link or re-attached image must
+  // ANY heal write refreshes in the same step-enter — a healed link or re-attached image must
   // be visible on the surface the user is looking at, not next tick.
   if (wrote || healed > 0 || mediaHealed > 0) await refreshElements();
   // AFTER the refresh, so the rows exist when the highlight paints them.
@@ -543,7 +542,7 @@ export async function createTourWorld(): Promise<void> {
   if (!p) return;
   const { scaffoldTourWorld } = await import('./tour-world');
   const { entry } = await scaffoldTourWorld();
-  // Exit can race the scaffold await (gate HIGH-1): if the tour was torn
+  // Exit can race the scaffold await: if the tour was torn
   // down meanwhile, the just-created world would linger as a phantom demo
   // entry with isTourActive() false — the residue contract's one leak.
   // Teardown's demo+prefix sweep is exactly the rollback.
@@ -582,8 +581,8 @@ export function enterStep(index: number): Promise<void> {
 }
 
 /**
- * Lifecycle flags the BAR reads to suppress state-driven renders (gate R4 +
- * R13). Both exist because the bar now subscribes to core state, so every
+ * Lifecycle flags the BAR reads to suppress state-driven renders.
+ * Both exist because the bar now subscribes to core state, so every
  * write inside a step-enter or a teardown would otherwise repaint the panel
  * mid-flight:
  *
@@ -613,7 +612,7 @@ async function enterStepNow(index: number): Promise<void> {
     enteringStep = false;
   }
   // The single authoritative post-step paint, emitted AFTER the flag clears so
-  // the bar's own listener is allowed through (close gate, MED): the flag used
+  // the bar's own listener is allowed through: the flag used
   // to guard only the state subscription, while `writeTourState`'s emit at the
   // TOP of enterStepInner still repainted the new step's copy — and its stage
   // and highlight classes — before the reveal wrote anything and before
@@ -629,8 +628,8 @@ async function enterStepInner(index: number): Promise<void> {
     await createTourWorld();
   }
   writeTourState({ ...readTourState()!, step: clamped });
-  // A pin placement armed on a prior step must not survive a navigation
-  // (gate MED): a leftover arm + a map click on a later map step mints
+  // A pin placement armed on a prior step must not survive a navigation:
+  // a leftover arm + a map click on a later map step mints
   // a SECOND consul pin (tourPinBake declines once the bundle pin exists).
   // Leaving the pin step disarms; re-entering it re-offers the button.
   if (getState().ui.pinPlacement) {
@@ -804,13 +803,13 @@ export async function tourPinBake(
 /**
  * Mint the next un-minted ref of the current step's `creates` run.
  *
- * SERIALIZED, with the next ref computed INSIDE the chain (gate R9, the
+ * SERIALIZED, with the next ref computed INSIDE the chain (the
  * `enqueueStep` idiom for the same reason): two fast clicks both computing
  * "next un-minted" against one pre-click snapshot mint the SAME element twice,
  * so the third ref never lands and Next never appears.
  *
  * Resolves false when there is nothing to mint — the caller then opens the
- * ordinary create modal rather than leaving a dead button (gate R8).
+ * ordinary create modal rather than leaving a dead button.
  */
 let mintChain: Promise<void> = Promise.resolve();
 export function mintNextCreate(): Promise<boolean> {
@@ -843,7 +842,7 @@ async function mintNextCreateNow(): Promise<boolean> {
   const universe = await bundleIds();
   const revealed = await idsUpTo(currentStepIndex());
   // `linkableIds` reads what is ON DISK, so the sibling minted a moment ago is
-  // already in the set — which is the whole of gate R1: the balcony keeps its
+  // already in the set — which is the whole point: the balcony keeps its
   // parent_object link to the spaceship the user made two clicks earlier,
   // instead of the objects step teaching that relationship on a page whose
   // Parent object is empty.
@@ -851,8 +850,8 @@ async function mintNextCreateNow(): Promise<boolean> {
   const aliasesOn = await aliasesOnFor(linkable);
   // revealOne declines if the store went away or the world switched during the
   // six awaits above, and reporting a mint that never landed is exactly the
-  // dead + button gate R8 exists to prevent: the click would be swallowed with
-  // nothing created and no modal (close gate, MED).
+  // dead + button the guard exists to prevent: the click would be swallowed with
+  // nothing created and no modal.
   const wrote = await revealOne(resolved.el, universe, linkable, aliasesOn);
   if (!wrote) return false;
   await refreshElements();
@@ -865,7 +864,7 @@ async function mintNextCreateNow(): Promise<boolean> {
   // write time above, and in the heal below), and the e2e locks the OUTCOME,
   // not each mechanism — reverting either one alone still leaves the balcony's
   // parent_object intact, because the other repairs it. Revert BOTH and the
-  // link goes null, which is the gate's headline bug. So neither is dead code;
+  // link goes null, which is the headline bug. So neither is dead code;
   // they cover different orders of arrival.
   const healed = await healLinks(universe, await linkableIds(universe, revealed), aliasesOn);
   if (healed > 0) await refreshElements();
@@ -981,7 +980,7 @@ export async function resumeTour(): Promise<void> {
     if (!entry) { writeTourState(null); return; }
     // A keep that began before the tab closed (world.json un-demoed, K2) is
     // finished, never re-entered as a step: a reveal would bring back bundle
-    // ids beside the new ones (contract §7.2, lens A A5). The keep opens the
+    // ids beside the new ones. The keep opens the
     // world itself and changes nothing when it cannot.
     if (isBrowserWorld(entry) && await entryFolderState(entry) === 'kept') {
       await keepTourWorld({ finishing: true });
@@ -1003,7 +1002,7 @@ export async function resumeTour(): Promise<void> {
  * emphasis swap, and return to wherever the tour was launched from.
  */
 export function exitTour(): Promise<void> {
-  // Serialized behind any in-flight step (gate HIGH-1/MED-3): teardown never
+  // Serialized behind any in-flight step: teardown never
   // interleaves a running reveal/heal — the step finishes (its per-write
   // guards see the flag flip and bail), THEN the world comes down.
   stepChain = stepChain
@@ -1015,7 +1014,7 @@ export function exitTour(): Promise<void> {
 async function exitTourNow(): Promise<void> {
   const p = readTourState();
   if (!p) return;
-  // Suppress the bar's state-driven renders for the whole teardown (gate R4):
+  // Suppress the bar's state-driven renders for the whole teardown:
   // the several patchSlice calls below all land while the tour flag is still
   // set, so a subscribed panel would visibly rewind to phase A on its way out.
   tearingDown = true;
@@ -1110,7 +1109,7 @@ export function commitTourKeep(worldId: string): boolean {
 
 /**
  * The tour world was made by 1.16 or earlier (no `where`, its folder at the
- * OPFS root): its finale offers Start fresh only (contract §7.1, lens B B14),
+ * OPFS root): its finale offers Start fresh only,
  * since keeping it would leave a world outside the browser home.
  */
 export function tourWorldIsLegacy(): boolean {
@@ -1185,8 +1184,7 @@ export async function isTourFolder(dir: FileSystemDirectoryHandle): Promise<bool
  * What the tour world's own directory says it is (1.17, contract §7.2): the
  * keep un-demos world.json first (K2), so this is the one place that knows a
  * keep began. 'tour': world.json says demo, or is not written yet. 'kept':
- * it parses and does not say demo. 'unknown': empty (a crash inside the write,
- * lens A M5) or unreadable, and nothing is decided on it. Never read from
+ * it parses and does not say demo. 'unknown': empty (a crash inside the write) or unreadable, and nothing is decided on it. Never read from
  * `active.meta`: an unreadable file falls back to `{ id: '', name: '' }`
  * there, which would read as kept.
  */
@@ -1282,16 +1280,15 @@ export function pickTourEntry(
 /**
  * Remove the tour world entirely (registry entry + handle + its directory).
  * `knownId`: the scaffold-race rollback names the world it just made, since
- * the tour state has no world id then (lens A A4).
+ * the tour state has no world id then.
  *
- * A browser tour world's own world.json is read first (contract §7.2, lane K
- * headline 2): 'kept' means a keep began (K2 ran), so the keep is finished
- * (K3, K4, the world opened first) and nothing is deleted; when it cannot
+ * A browser tour world's own world.json is read first: 'kept' means a keep began, so the keep is finished
+ * (the world opened first) and nothing is deleted; when it cannot
  * finish, nothing changes and the next teardown or boot tries again.
  * 'unknown' deletes nothing either: the tour ends and the directory stays.
  */
 async function teardownPriorTourWorld(knownId?: string): Promise<'gone' | 'kept' | 'stays'> {
-  // Disarm any pending pin placement (gate MED scenario B): a restart
+  // Disarm any pending pin placement: a restart
   // that leaves it armed would toast "element not found" on the next run's
   // pre-consul map click.
   if (getState().ui.pinPlacement) {

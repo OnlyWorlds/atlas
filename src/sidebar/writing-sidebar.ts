@@ -641,7 +641,7 @@ function openTreeContextMenu(
     </button>
   `;
 
-  // NOT DURING THE TOUR (integration gate).
+  // NOT DURING THE TOUR.
   //
   // The tour's `the-writing` step reveals the Hyperion book and its Chapter 1
   // and gates advance on the chip count inside that chapter's story. The

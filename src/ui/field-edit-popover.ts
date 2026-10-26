@@ -271,7 +271,7 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
       e.stopPropagation();
       cancel();
     } else if (e.key === 'Enter') {
-      // A focused BUTTON keeps its own Enter (lane a B2): Tab to
+      // A focused BUTTON keeps its own Enter: Tab to
       // Cancel and press Enter used to SAVE.
       if (e.target instanceof HTMLButtonElement) return;
       if (isLong) {

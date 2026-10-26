@@ -65,7 +65,7 @@ let root: HTMLElement | null = null;
 let unsub: (() => void) | null = null;
 let unsubState: (() => void) | null = null;
 /**
- * The render memo (gate R3). MUST be cleared on mount and unmount, and a null
+ * The render memo. MUST be cleared on mount and unmount, and a null
  * root MUST count as a miss: exit at step 1 memoizes a signature, and a later
  * replay enters step 0 BEFORE the bar mounts, so a surviving memo would match
  * itself and early-return against a dead root — leaving `atlas-touring` chrome
@@ -73,7 +73,7 @@ let unsubState: (() => void) | null = null;
  */
 let lastSignature: string | null = null;
 /**
- * The ✦ flyout's open state, keyed by step id (gate R11). Mid-step re-renders
+ * The ✦ flyout's open state, keyed by step id. Mid-step re-renders
  * are new in this bout: without this, a user reading "more information" on the
  * pin step loses it the instant they place the pin. Cleared on step change,
  * because a new step's flyout should open closed.
@@ -171,7 +171,7 @@ function mount(container: HTMLElement): void {
   // the tour exists). Guarded so it never speaks about a foreign world or
   // repaints mid-step; the memo keeps the common case free.
   unsubState = subscribe(() => {
-    // NOT guarded on `tourWorldIsActive()` (close gate, 3-lens convergent): a
+    // NOT guarded on `tourWorldIsActive()`: a
     // world switch IS the suspension trigger, so bailing on it made the whole
     // suspension contract unreachable — `resolvePhase` returning phase A,
     // `canAdvance` returning false, and the signature's live/suspended term
@@ -252,7 +252,7 @@ function glyphMap(): Map<number, Array<{ type: ElementType; step: number; ref?: 
 }
 
 /**
- * Is this span's glyph lit? (gate R6.)
+ * Is this span's glyph lit?
  *
  * A span WITHOUT a ref keeps the original step-keyed rule: lit once its step
  * is reached. A span WITH one lights on that element's EXISTENCE, which is
@@ -343,7 +343,7 @@ function buildSentence(idx: number, step: TourStep, view: TourWorldView, bare = 
 }
 
 /**
- * Everything the panel's DOM depends on, as one cheap string (gate R5).
+ * Everything the panel's DOM depends on, as one cheap string.
  *
  * The per-ref progress terms are load-bearing, not decoration: minting #2 of 3
  * changes neither the step, the phase, nor `canAdvance`, so without them the
@@ -364,7 +364,7 @@ function signatureFor(
     // used to be captured only by COINCIDENCE: the two hands-on beats happen
     // to duplicate their ref into a sentence span, so the `glyphs` term moved
     // with them. A hands-on beat whose word is not in the sentence would have
-    // had a Next that never appeared (close gate, MED).
+    // had a Next that never appeared.
     handsOnRefFor(step) ? String(handsOnDone) : '',
     // The pin's soft correction: dragging the placed pin into the zone changes
     // neither step, phase-id (both b and c are already possible), nor
@@ -375,7 +375,7 @@ function signatureFor(
     // The now beat's deed is a world-meta write, not an element: no ref, no
     // glyph, no `creates` progress. Carried explicitly rather than left to ride
     // on the phase id, because relying on a term moving "by coincidence" is
-    // exactly what left the hands-on gate uncovered before (close gate).
+    // exactly what left the hands-on gate uncovered before.
     step.handsOn === 'set-now' ? String(view.nowIsSet) : '',
     // Same reasoning for the writing beat: each Tab-link changes only the
     // chapter's `story`, which moves no ref, no glyph and no `creates`
@@ -415,7 +415,7 @@ function render(): void {
     flyoutScrollTop = 0;
   }
   lastSignature = signature;
-  // Restore focus after the rebuild (gate R14): an in-flight click on a
+  // Restore focus after the rebuild: an in-flight click on a
   // button the render replaces is otherwise silently dropped.
   const focusedAction = document.activeElement instanceof HTMLElement
     && root.contains(document.activeElement)
@@ -537,7 +537,7 @@ function render(): void {
       renderBodyText(p, para);
       deeper.appendChild(p);
     }
-    // Open-state survives a mid-step re-render (gate R11): placing the pin
+    // Open-state survives a mid-step re-render: placing the pin
     // used to snatch away the paragraph the user was reading.
     deeper.hidden = flyoutOpenFor !== step.id;
     if (!deeper.hidden) {
@@ -667,7 +667,7 @@ function render(): void {
     // (with the folder picker) · Start fresh. A 1.16 tour world still running
     // across the upgrade lives outside the browser home: Start fresh only.
     // The bar sits outside `.atlas-shell`, so the keep dialog's `inert` does
-    // not reach it: every button is disabled for the run (lane K K0).
+    // not reach it: every button is disabled for the run.
     const legacy = tourWorldIsLegacy();
     const name = tourWorldName();
     // Back too (own eyes): a Back queued behind the keep is a no-op
@@ -953,7 +953,7 @@ function appendCategoryText(host: HTMLElement, text: string): void {
 }
 
 /**
- * Put focus back on the control the user was on (gate R14). Without it, a
+ * Put focus back on the control the user was on. Without it, a
  * state tick that lands between mousedown and mouseup rebuilds the button
  * under the pointer and the click is silently dropped.
  */

@@ -30,7 +30,7 @@ import type { ToastManager } from './toast-manager';
  * next scripted element); everywhere else it is the ordinary create modal.
  *
  * The tour branch FALLS THROUGH to the normal modal whenever it declines
- * (gate R8) — it must never be a silently dead button, which is exactly what
+ * — it must never be a silently dead button, which is exactly what
  * a world-blind hijack produces when the user has switched to their own world.
  */
 export function openCreateDoor(toasts: ToastManager, opts: ElementCreateOptions = {}): void {
@@ -55,8 +55,8 @@ export function openCreateDoor(toasts: ToastManager, opts: ElementCreateOptions 
 /**
  * The ordinary modal, guarded at the OPEN moment rather than at dispatch.
  *
- * Two hazards, both from the async window the tour branch adds (close gate,
- * MED x2): `Ctrl+E`'s `disabledInModal` check reads the DOM at keydown and
+ * Two hazards, both from the async window the tour branch adds:
+ * `Ctrl+E`'s `disabledInModal` check reads the DOM at keydown and
  * sees no overlay yet, so a repeat during the dynamic import stacks a second
  * modal; and the user can hit Exit tour while the import is in flight, so the
  * modal would open over the landing page with no active store and Create would

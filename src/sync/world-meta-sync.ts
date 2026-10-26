@@ -1,12 +1,11 @@
 /**
  * World-meta sync kernel — pure functions for the engine's meta step.
  *
- * The contract: keel `GET|PATCH /api/v2/world`, pinned from source 2026-07-13
- * (design + gate record: a design note of 2026-07-13).
+ * The contract: keel `GET|PATCH /api/v2/world`, pinned from source 2026-07-13.
  * Everything here is pure and unit-tested; the engine's executeMetaStep and
  * the adapter's getWorldMeta/patchWorldMeta consume it.
  *
- * Load-bearing rules (gate R2/R3/R5):
+ * Load-bearing rules:
  *  - CANONICAL equality: disk `undefined` ≡ wire empties ('' text, [] list,
  *    null int). Without this every idle world would re-PATCH empties forever
  *    (the oscillation finding) — baselines are STORED canonical.
@@ -70,7 +69,7 @@ export const META_WIRE_RENAME: Readonly<Record<string, string>> = {
 
 /**
  * Keel validates types but never lengths — an overflowing value raw-500s at
- * the DB layer (dig Q9). The engine routes overlong fields to per-field
+ * the DB layer. The engine routes overlong fields to per-field
  * failures instead of sending them. (name≤255 listed for completeness even
  * though name isn't synced in v1.)
  */
@@ -151,14 +150,14 @@ export interface MetaThreeWayDiff {
   pushFields: Record<string, unknown>;
   /** field → canonical server value to apply locally (server changed, local didn't). */
   pullFields: Record<string, unknown>;
-  /** Both sides changed to DIFFERENT values — policy decides (gate R9). */
+  /** Both sides changed to DIFFERENT values — policy decides. */
   contested: string[];
   /** Both sides changed to the SAME value — baseline just advances. */
   converged: string[];
 }
 
 /**
- * Per-field three-way diff (gate R2). All comparisons canonical. `baseline`
+ * Per-field three-way diff. All comparisons canonical. `baseline`
  * is a canonical snapshot (pickSyncedMeta output); local/server are raw
  * meta-shaped objects in disk names.
  */
@@ -314,7 +313,7 @@ export function extDirty(local: Record<string, unknown>, baseline: Record<string
 /**
  * Encode a set of DISK-named fields for the PATCH body: whitelist to the 11,
  * canonicalize to typed empties (explicit null for cleared ints — omission
- * would mean "no change" and a cleared now would resurrect, gate finding).
+ * would mean "no change" and a cleared now would resurrect).
  * The RENAME to wire names happens in the adapter, not here — this output is
  * still disk-named so the engine and fakes reason in one vocabulary. A
  * profile's `x_` key passes as given, null removing it.

@@ -120,7 +120,7 @@ export class BaseModal {
         panel.className =
             'atlas-modal-panel' + (opts.panelClass ? ` ${opts.panelClass}` : '');
         if (opts.dataModal) panel.setAttribute('data-modal', opts.dataModal);
-        // A real dialog to assistive tech (lane a A1): role, modality,
+        // A real dialog to assistive tech: role, modality,
         // and its title as the accessible name when it has one.
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-modal', 'true');

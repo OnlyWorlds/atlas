@@ -7,7 +7,7 @@
  * same object). Used by the re-key kernel (`store/rekey.ts`) for the new
  * elements and for every referrer.
  *
- * What is a reference (the field-path table, re-key gate lens 3):
+ * What is a reference (the field-path table):
  *   - any top-level string or string[] member EQUAL to an old id, except in
  *     identity/stamp fields and prose (a bare uuid a writer typed is text);
  *   - an `ow://<type>/<id>` link inside ANY top-level string (story,

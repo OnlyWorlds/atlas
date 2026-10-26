@@ -6,8 +6,8 @@
  * A named restore, not the link flow: the link would refuse (the cleared row
  * is the same world), make a second entry, and write the SERVER's id into
  * world.json, while a world made here and taken online keeps its own. So:
- * a fresh nonced directory through the make protocol (never the old name,
- * gate B6), world.json with the entry's OWN world id and the `api` block this
+ * a fresh nonced directory through the make protocol (never the old name),
+ * world.json with the entry's OWN world id and the `api` block this
  * browser holds for that exact world, the whole download (a full origin is
  * fatal), then the SAME entry updated: its new directory, `cleared_at` gone,
  * and `review_first_sync`, so its first sync reviews before it writes. Any
@@ -107,7 +107,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   }
   const ownId = ownWorldIdOf(entry);
   const oldDir = entry.folder.folder_name;
-  // No parked store may hold a handle into this world any more (gate B6).
+  // No parked store may hold a handle into this world any more.
   evictParkedStore(entry.id);
   await awaitEviction(entry.id);
 
@@ -123,7 +123,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   }
 
   // The commit: the restored entry, saved strictly, while the world that was
-  // open is still open (gate F1). Against the row as it is NOW: nothing
+  // open is still open. Against the row as it is NOW: nothing
   // commits over another tab's answer.
   try {
     await make.finish(() => {

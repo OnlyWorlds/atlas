@@ -10,7 +10,7 @@
  * Gating rules live in the CALLER (charts room): hidden on view-only worlds;
  * on api-linked worlds it waits for the first meta round and PRE-FILLS from
  * whatever is already set — device B never silently overwrites device A's
- * physics (gate 2026-07-14). This modal itself just shows current values and
+ * physics. This modal itself just shows current values and
  * writes the diff.
  */
 

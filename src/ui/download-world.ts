@@ -1,5 +1,5 @@
 /**
- * "Download the whole world", from a click (1.17 bout 5, contract §5.1): one
+ * "Download the whole world", from a click (1.17, contract §5.1): one
  * path for every door (Settings, This world; the keep-safe card). The save
  * picker opens inside the click, before any work; the toast says honestly
  * what happened (a picked file is saved; a Blob is only handed to the

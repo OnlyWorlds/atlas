@@ -5,13 +5,13 @@
  * itself as the bearer (keel asks no PIN here). Never a lookup by last four or
  * name: a delete runs only on an id Atlas made and recorded.
  *
- * keel's answers (probed on a crew account, and read in its source by the
- * gate): 204 revoked; 401 the token works no more (revoked already); 404 the
- * bearer works and the id is not its account's, so the token is still LIVE
- * (the gate's G1). Revoking a token minted by Sign in with OnlyWorlds ends the
+ * keel's answers (probed on a crew account, and read in its source):
+ * 204 revoked; 401 the token works no more (revoked already); 404 the
+ * bearer works and the id is not its account's, so the token is still LIVE.
+ * Revoking a token minted by Sign in with OnlyWorlds ends the
  * person's consent for Atlas only when it was Atlas's last live token for them.
  *
- * This never writes the registry (the gate's G11): the caller has already
+ * This never writes the registry: the caller has already
  * let the token go, and a later sign-in must not be undone by an old answer.
  */
 
@@ -57,7 +57,7 @@ export async function revokeAtlasToken(
   const send = (keepalive: boolean) => (deps.fetch ?? fetch)(`${base}/account/tokens/${encodeURIComponent(tokenId)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
-    // A tab closed right after Forget still sends it (the gate's G8).
+    // A tab closed right after Forget still sends it.
     keepalive,
     signal: ctl.signal,
   });
@@ -66,8 +66,8 @@ export async function revokeAtlasToken(
     try {
       res = await send(true);
     } catch (err) {
-      // A browser may refuse a keepalive request that needs a preflight: once more without it
-      // (the code gate's F5), unless the time limit already ended it.
+      // A browser may refuse a keepalive request that needs a preflight: once more without it,
+      // unless the time limit already ended it.
       if (ctl.signal.aborted) throw err;
       res = await send(false);
     }

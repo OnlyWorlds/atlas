@@ -93,7 +93,7 @@ export interface FolderStore {
    * or null for "no write" (no stamp, no file touch). Returns null when the
    * element does not exist. Use whenever a patch is COMPUTED FROM current
    * state — a patch built from a pre-chain snapshot can silently revert a
-   * concurrent writer's fields (the tour heal gate's TOCTOU finding).
+   * concurrent writer's fields (a TOCTOU race in the tour heal).
    */
   updateElementWith(
     id: string,
@@ -272,7 +272,7 @@ export interface FolderStore {
   ): Promise<Element>;
   /** Pull-apply guarded INSIDE the per-id chain: writes only if the element's
    *  `local_updated_at` still equals `expectedLocalUpdatedAt` (null = absent).
-   *  Returns false when a local edit landed first (lane b M1). */
+   *  Returns false when a local edit landed first. */
   applyServerRecordIfUnchanged(
     type: ElementType, record: Record<string, unknown>, server_updated_at: string,
     expectedLocalUpdatedAt: string | null,

@@ -346,7 +346,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     pill = document.createElement('div');
     pill.setAttribute('data-role', 'sync-pill');
     pill.className = 'atlas-sync-pill';
-    // Bout EE: pill lives in the sidebar footer alongside the gear and the
+    // The pill lives in the sidebar footer alongside the gear and the
     // reset-layout button (anchored right via margin-left:auto in CSS). Falls
     // back to document.body only if the shell hasn't mounted yet (test envs
     // that bypass the shell, etc.).

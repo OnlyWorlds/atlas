@@ -14,7 +14,7 @@
  * keep the new baseline, and lift `local_updated_at` just past it so the
  * element stays dirty and the next push sends the edit.
  *
- * `null` (gate F3) means the caller KNOWS the server holds different
+ * `null` means the caller KNOWS the server holds different
  * content (a create adopted after a lost response): keep the element dirty
  * whatever the timestamps say, so the local body goes out as an UPDATE.
  *

@@ -194,7 +194,7 @@ export interface WorldMeta {
   /** World cover image URL. Preserved on import/export round-trip (DESIGN_IMPORT.md). */
   image_url?: string;
   /**
-   * True only for the bundled sample world (Bout OW/DEMO). Gestures inside a
+   * True only for the bundled sample world. Gestures inside a
    * demo world never complete waypoints. Lives in world.json so the flag
    * survives localStorage wipes + rediscovery; make-online and keeping the
    * tour world at its finale clear it (the world is genuinely yours then). Normal imports never set it — the import
@@ -251,7 +251,7 @@ export interface SyncState {
    * treated as opaque). Null/absent = never walked; the next pull cold-starts
    * from the world's epoch. Advanced only in lockstep with the round's
    * derived side-effects (server_deletes + conflicts) — never past ops whose
-   * side-effects weren't persisted (gate finding, 2026-07-12). Cleared by
+   * side-effects weren't persisted (2026-07-12). Cleared by
    * resetSyncBaseline: a re-link must never inherit another world's cursor.
    */
   changes_cursor?: string | null;
@@ -272,7 +272,7 @@ export interface SyncState {
   server_deletes?: ServerDeleteRecord[];
   /**
    * Elements this world's key no longer sees online, kept here as they are
-   * (B12 Q2, Titus 2026-10-20; conv. 151): a role change never takes
+   * (Titus 2026-10-20; conv. 151): a role change never takes
    * from the copy. Kept elements stop syncing; a later walk that names one
    * gives it back. Cleared by resetSyncBaseline.
    */
@@ -296,7 +296,7 @@ export interface SyncState {
   hidden_held?: string[];
   /**
    * Ids whose whole copy was kept as last known when keel served them as a
-   * stub on a walk no `view` reset started (conv. 155, I3; B12). A later view
+   * stub on a walk no `view` reset started (conv. 155, I3). A later view
    * reset never replaces them; the element arriving whole takes it out.
    * Cleared by resetSyncBaseline.
    */
@@ -316,12 +316,12 @@ export interface SyncState {
    */
   walked_as_role?: string;
   /**
-   * World-meta sync baseline (gate R2): a CANONICAL snapshot of the 8
+   * World-meta sync baseline: a CANONICAL snapshot of the 8
    * synced world.json wire fields as last confirmed with the server
    * (''/[]/null empties — see META_SYNC_FIELDS in sync/world-meta-sync.ts).
    * Absent = meta never synced: the next meta step SEEDS it from GET /world
-   * and never PATCHes that round (the absent-baseline blind-push was the
-   * gate's 3-lens convergent finding). Refreshed PER-FIELD: only fields a
+   * and never PATCHes that round (the absent-baseline blind-push).
+   * Refreshed PER-FIELD: only fields a
    * PATCH sent or a pull applied — untouched fields keep their stale baseline
    * so later server-only changes still surface. Cleared by resetSyncBaseline.
    */
@@ -333,7 +333,7 @@ export interface SyncState {
   /**
    * Contested world-meta fields under pause-and-review (both sides changed
    * since baseline, values differ). Persisted so the badge survives reload;
-   * resolved via the conflict-review modal's world-settings rows (gate R9).
+   * resolved via the conflict-review modal's world-settings rows.
    */
   meta_conflicts?: string[];
   /**
@@ -354,7 +354,7 @@ export interface SyncState {
    */
   foreign?: ForeignIds;
   /**
-   * Every finished re-key's map, old id → new id (gate lens A F5).
+   * Every finished re-key's map, old id → new id.
    * Kept so a link inside a file that could not be read during the re-key (a
    * git conflict) can still follow once the file is repaired
    * (`repairRekeyedLinks`); without it the map died with the journal.
@@ -474,16 +474,16 @@ export interface SyncResult {
   /**
    * Refines auth_blocked when the server's typed error distinguished the
    * cause: a REVOKED key wants "mint a new key" guidance, not "check your
-   * PIN" (gate R4, 2026-07-13 — minted account-mode keys are revocable from
+   * PIN" (2026-07-13 — minted account-mode keys are revocable from
    * the portal independently of the PIN). `read_only_key` is a 403
    * permission_error — the key can never write, so the round bails like any
    * auth failure but the copy must say "read-only key", never "check your
-   * PIN" (world-meta gate R1, 2026-07-13).
+   * PIN" (2026-07-13).
    */
   auth_reason?: KeyRefusal;
   /**
    * The round stopped early because OnlyWorlds was busy (503 server_busy),
-   * rate limited (429, e.g. a PIN lockout) or unreachable (lane b M4).
+   * rate limited (429, e.g. a PIN lockout) or unreachable.
    * Nothing is paused and no baseline moved; the engine retries once after
    * `retry_after_ms`. `transient_reason` picks the words the user sees.
    */
@@ -495,11 +495,11 @@ export interface SyncResult {
    * `PATCH|GET /world` this round (world-meta sync). Lets the UI
    * surface meta-only rounds honestly — pushed/pulled above count elements
    * only, so without these a meta-only round reads as "nothing synced"
-   * (gate R7, the lying-pill class).
+   * (the lying-pill class).
    */
   meta_pushed?: string[];
   meta_pulled?: string[];
-  /** The key's role, when the round read keel's `GET /me` (B12 Q2, conv. 151). */
+  /** The key's role, when the round read keel's `GET /me` (conv. 151). */
   own_role?: string;
   /** Elements a resync found outside this key's view and kept (conv. 151). */
   kept?: number;
@@ -593,7 +593,7 @@ export interface WorldRegistryEntry {
     read_only?: boolean;
     /**
      * The key's role as last told to the person (keel `GET /me`: owner,
-     * co_builder, contributor, guest; B12 Q2, conv. 151). A change from a
+     * co_builder, contributor, guest; conv. 151). A change from a
      * known role is said once; first sight is recorded silently.
      */
     member_role?: string;
@@ -678,7 +678,7 @@ export interface WorldRegistryEntry {
    * §4.2 step 2): saved BEFORE the destination folder exists, so a crash
    * leaves a record of which folder on the drive was this move's. Recovery
    * removes that folder only when its `.atlas/move-incoming.json` carries
-   * this `move_id` (gate A1); the browser copy stays the world.
+   * this `move_id`; the browser copy stays the world.
    */
   move?: { move_id: string; to_folder_name: string; started_at: string };
   /**
@@ -699,12 +699,12 @@ export interface WorldRegistryEntry {
   /**
    * A linked world restored from a world file (1.17, contract §5.2): its first
    * sync round runs as pause-and-review whatever the policy, so the file's
-   * older edits never overwrite newer ones on OnlyWorlds (gate A9; Skeld's
+   * older edits never overwrite newer ones on OnlyWorlds (Skeld's
    * third condition, 2026-10-04). Cleared once a round has run.
    */
   review_first_sync?: boolean;
   /**
-   * What keel's roster last said (B12 Q1, Titus's (a), 2026-10-20):
+   * What keel's roster last said (Titus's (a), 2026-10-20):
    * someone besides the owner can write here (an active person or agent; a
    * player's link does not count). Unset until a roster read answers. A
    * shared world syncs as pause-and-review and pulls when it opens

@@ -1,5 +1,5 @@
 /**
- * Keep the tour world (1.17, contract §7; lane K §3; lens A A4, A5).
+ * Keep the tour world (1.17).
  *
  * The finale offers Keep this world · Save it to a folder (with the folder
  * picker) · Start fresh. Keep turns the sandbox into a world of the user's

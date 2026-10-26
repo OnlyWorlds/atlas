@@ -39,7 +39,7 @@ export async function applySignInOutcome(outcome: SignInOutcome, toasts: ToastMa
   } else {
     if (!outcome.cancelled) console.warn('[sign-in] the return did not sign in:', outcome.error);
     const line = signInCallbackLine(outcome);
-    // Without a door coming back, the way to try again is Settings (the gate's G4).
+    // Without a door coming back, the way to try again is Settings.
     const toSettings = !resume.door && parseHash(resume.hash).mode !== 'settings'
       ? { actions: [{ label: 'Open Settings', run: () => navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds')) }] }
       : undefined;
@@ -55,7 +55,7 @@ export async function applySignInOutcome(outcome: SignInOutcome, toasts: ToastMa
   }
   // Make online belongs to one world: only once that world is the active one (R6).
   // A folder whose permission lapsed over the round trip does not reopen by
-  // itself (boot asks quietly): then the person is told (the gate's G5).
+  // itself (boot asks quietly): then the person is told.
   await enqueueActivationTask(async () => {});
   const want = parseHash(resume.hash).worldId;
   if (!want || getState().active?.worldId !== want) {

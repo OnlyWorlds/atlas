@@ -1,5 +1,5 @@
 /**
- * Waypoints (Bout OW, workplan D11c) — the OnlyWorlds learning track.
+ * Waypoints (workplan D11c) — the OnlyWorlds learning track.
  *
  * Thirteen named waypoints (keep-a-copy since 1.17; story and knowledge since
  * #127, when the home's room cards merged into this track), each

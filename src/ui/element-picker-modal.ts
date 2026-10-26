@@ -88,7 +88,7 @@ class ElementPickerModal extends BaseModal {
   }
 
   /**
-   * Every close path settles the promise (gate F4). The picker used to
+   * Every close path settles the promise. The picker used to
    * run its own Escape listener AFTER BaseModal's: the base hid the picker
    * first, the picker's `isTopmost()` check then failed, and `pickElement()`
    * never resolved. Its own overlay `click` had the same hole behind the

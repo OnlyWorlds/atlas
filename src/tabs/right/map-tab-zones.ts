@@ -46,7 +46,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
   const rules = state.styles.rules;
   // A map drawn from its own zones: the map's style gives each zone
   // whose subtype names a kind that kind's treatment; the rest draw plain.
-  // Over a picture the picture is the ground: the zones keep their ink and cover nothing (gate G3).
+  // Over a picture the picture is the ground: the zones keep their ink and cover nothing.
   const thisMap = state.data.elements.find(e => e.id === entry.mapId) as WorldMap | undefined;
   const style = mapStyleOf(thisMap);
   const preset = style && thisMap && pickMapImageSource(thisMap).kind !== 'flat' ? overPicture(style) : style;
@@ -90,7 +90,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
     });
   }
   if (preset) entry.zoneOverlay.applyInkOrder(PLAIN_ZONE_LAYER);
-  // Back from a style, the zones take their plain order again (gate G4).
+  // Back from a style, the zones take their plain order again.
   else entry.zoneOverlay.applyPlainOrder(onThisMap.map(z => z.id));
   // The pins read the style from the container (CSS: inked icons, lettered names).
   entry.container.classList.toggle('atlas-map-ink', Boolean(preset));

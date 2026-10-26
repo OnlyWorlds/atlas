@@ -39,7 +39,7 @@ async function browserStorageProblem(doing: string): Promise<string | null> {
   return status === 'full' ? browserStorageFullSentence(doing) : NO_BROWSER_STORAGE_LINE;
 }
 
-/** Firefox's own storage prompt, explained before it appears (contract §2.3, lens C R6-c). */
+/** Firefox's own storage prompt, explained before it appears. */
 export { FIREFOX_PERSIST_NOTE };
 
 /**
@@ -141,7 +141,7 @@ export async function readyWhere(where: WorldWhere, toasts: ToastManager, purpos
 
 /**
  * The question as its own small step, for a door with no dialog of its own
- * (the account row's open, import as new: contract §1.4, lens C R2-d).
+ * (the account row's open, import as new).
  * Resolves the ready place, or null when the user cancelled or the place
  * cannot hold a world (said in a toast). Call it before the caller's first
  * await: without the folder picker it asks `persist()` at once.

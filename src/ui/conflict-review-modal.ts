@@ -24,7 +24,7 @@ import { proposalReviewLine } from '../sync/proposal-lines';
 
 export class ConflictReviewModal extends BaseModal {
   private conflicts: Conflict[] = [];
-  /** Contested world-meta fields (world-meta sync gate R9) — rendered as
+  /** Contested world-meta fields — rendered as
    *  compact "world setting" rows above the element rows. */
   private metaConflicts: string[] = [];
   /**
@@ -81,7 +81,7 @@ export class ConflictReviewModal extends BaseModal {
   }
 
   /** A contested world-meta field: same two verbs as element rows, resolved
-   *  via engine.resolveMetaConflict (gate R9). */
+   *  via engine.resolveMetaConflict. */
   private renderMetaRow(field: string): HTMLElement {
     const row = document.createElement('div');
     row.className = 'atlas-conflict-row';

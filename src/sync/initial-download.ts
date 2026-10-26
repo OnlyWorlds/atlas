@@ -1,5 +1,5 @@
 /**
- * Initial download helper — used by the Link-Existing-API flow (Bout E).
+ * Initial download helper — used by the Link-Existing-API flow.
  *
  * Given a freshly-opened FolderStore and a configured OW client adapter,
  * fetch every element of every type from the server and write them to the
@@ -121,7 +121,7 @@ export async function initialDownloadAll(
   opts: { stopOnQuota?: boolean } = {},
 ): Promise<InitialDownloadResult> {
   // ---- List phase: gather all records per type so we know the total ----
-  // Type walks run concurrently in a bounded pool (speed bout 2026-07-19):
+  // Type walks run concurrently in a bounded pool (2026-07-19):
   // the 22 per-type list walks are independent requests, and most types are
   // tiny or empty — serializing them made list-phase wall-time the SUM of 22
   // round-trips. Pool of 6 keeps server load polite; results land keyed by

@@ -278,7 +278,7 @@ export function poleOfInaccessibility(ring: Point[], precision = 1): Point {
     return { x, y, h, d, max: d + h * Math.SQRT2 };
   };
   // A binary max-heap on `max`: a sliver's queue grows into the tens of
-  // thousands, and a linear scan per step hung the tab (gate G1).
+  // thousands, and a linear scan per step hung the tab.
   const queue: Cell[] = [];
   const push = (c: Cell): void => {
     queue.push(c);
@@ -307,7 +307,7 @@ export function poleOfInaccessibility(ring: Point[], precision = 1): Point {
     return top;
   };
   // Seed cells are the shape's short side, but never more than 32 along the
-  // long one: a 2000 x 0.01 sliver seeded 200,000 of them (gate G1).
+  // long one: a 2000 x 0.01 sliver seeded 200,000 of them.
   const seed = Math.max(size, Math.max(maxX - minX, maxY - minY) / 32);
   const h0 = seed / 2;
   for (let x = minX; x < maxX; x += seed) {
@@ -342,7 +342,7 @@ function crossingT(a: Point, b: Point, c: Point, d: Point): number | undefined {
 
 /**
  * A ring with its edges bucketed on a grid of at most GRID x GRID cells, so a
- * short segment tests only the edges near it (gate G2: an inked coast at deep
+ * short segment tests only the edges near it (an inked coast at deep
  * zoom has thousands of edges, and every river segment tested all of them).
  */
 interface Ring {
@@ -468,7 +468,7 @@ function eachLandPiece(
     (landR.length === 0 || landR.some(r => inRing(p, r))) && !waterR.some(r => inRing(p, r));
   const rings = [...landR, ...waterR];
   // Land or not can change only where an outline passes, so a segment with no
-  // edge near it carries the state its neighbour ended in (gate G2).
+  // edge near it carries the state its neighbour ended in.
   let carried: boolean | undefined;
   for (let i = 0; i < line.length - 1; i++) {
     const a = line[i], b = line[i + 1];

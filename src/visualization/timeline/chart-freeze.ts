@@ -17,7 +17,7 @@
  * a RULE resolved against the LIVE elements at every publish/republish: a
  * `types`/`all` chart re-snapshots current membership (an element added later
  * JOINS a republished chart), and a `focus` chart discloses the focus element's
- * whole dated neighbourhood. **Titus confirmed (Bout 3): freeze-at-publish +
+ * whole dated neighbourhood. **Titus confirmed: freeze-at-publish +
  * re-snapshot-on-republish IS the intended model — exactly how every share block
  * updates (publish = snapshot now; republish = refresh to current state),
  * consistent with the circle block.** Authors should still know republish can
@@ -47,7 +47,7 @@ export interface PayloadChartNode {
    * Resolved start position on the time axis. Deliberately exact-resolved:
    * fuzzy/relative dates publish their resolved midpoint, and a future soft-band
    * render adds an OPTIONAL field (additive — old viewers ignore it), never a
-   * reshape of `date` (the chart#1 axis flat-vs-tagged lesson). Gate-noted.
+   * reshape of `date` (the chart#1 axis flat-vs-tagged lesson).
    */
   date: number;
   /** Range end, when the element carries one and it's after `date`. */

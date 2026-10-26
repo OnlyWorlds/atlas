@@ -249,7 +249,7 @@ export function adoptPersistedDiskHold(worldId: string, engine: { hold(reason: '
 }
 
 /**
- * Wait out a pass already in flight (lane B N2). An id move takes the
+ * Wait out a pass already in flight. An id move takes the
  * re-key single-flight first, which stops every NEW pass; one that started
  * before could still land its element list over the move's. Never throws.
  */

@@ -1,5 +1,5 @@
 /**
- * Download the whole world as one file (1.17 bout 5, conv. 129; contract
+ * Download the whole world as one file (1.17, conv. 129; contract
  * §5.1, §9 invariant 13).
  *
  * The file is the portable copy (`store/world-file.ts`): every file of the
@@ -7,7 +7,7 @@
  * transient. A linked world first pushes once (online), so the file holds
  * what the server holds, then holds sync for the walk. The walk is taken
  * twice: a world that changed while the file was made (a file added, changed
- * or unreadable mid-walk: gate A11, B9) is refused, never handed over torn.
+ * or unreadable mid-walk) is refused, never handed over torn.
  *
  * Where it goes is chosen INSIDE the click (`pickSaveTarget`): the save
  * picker on Chromium (the file is written where the user said), else a Blob
@@ -176,7 +176,7 @@ export async function downloadWorld(
       if (err instanceof PlainError) throw err;
       // A file that changed or vanished under the walk reads as a refused
       // snapshot (Chromium NotReadableError, Firefox AbortError): the same
-      // case, never a disk-busy sentence (gate B9).
+      // case, never a disk-busy sentence.
       const name = (err as { name?: string })?.name;
       if (name === 'NotReadableError' || name === 'AbortError' || name === 'NotFoundError') throw new PlainError(TORN_LINE);
       throw err;

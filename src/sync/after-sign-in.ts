@@ -27,7 +27,7 @@ export async function keepSignIn(token: string, username: string, toasts: ToastM
   const saved = saveRegistry(next);
   patchSlice('registry', next);
   // Only once the new token reached storage: a lost save keeps the old one there, and it must
-  // still work (2026-10-26's gate, M1).
+  // still work.
   if (saved) revokeReplacedToken(before, next);
   // The ask to sign in is answered: it goes before the door's next question (Kael, 2026-10-16).
   toasts.dismiss(WAITS_FOR_SIGN_IN);

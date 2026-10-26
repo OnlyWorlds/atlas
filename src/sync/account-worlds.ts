@@ -10,7 +10,7 @@
  * `openAccountWorld` is a row's click, owned or shared (#199): preconditions
  * (where it lands, the PIN when it will write) → mint this account's own key
  * → download via the existing link pipeline ON the activation chain →
- * navigate home + waypoint. Ordering is the gate's R1: every precondition
+ * navigate home + waypoint. Ordering matters: every precondition
  * resolves BEFORE the mint so a failed open never leaves an orphaned
  * server-side key.
  */
@@ -143,7 +143,7 @@ export function accountWorldsWhenFetched(
  * Remote rows to render: every account world not already represented by a
  * registry entry — a LIVE link (api.world_id) or a remembered former link
  * (an unlinked world whose folder is still here; relinking is Make Online →
- * link's job, not a fresh download's — gate R3a).
+ * link's job, not a fresh download's).
  */
 export function remoteAccountWorlds(): AccountWorldRow[] {
   const { registry, accountWorlds } = getState();
@@ -225,7 +225,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
   // (contract §2.3).
   if (!hasFolderMode()) requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
 
-  // ---- Preconditions BEFORE the mint (gate R1: no orphaned keys) ----
+  // ---- Preconditions BEFORE the mint (no orphaned keys) ----
   // The duplicate check re-runs inside the link flow (on the chain); this
   // early one just avoids a pointless mint on an obviously-stale row.
   if (findLinkedWorld(state.registry, row.id) ?? findWorldByServerId(state.registry, row.id)) {
@@ -259,7 +259,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
     pin = enteredPin;
   }
   // A sign-in in another tab while the questions waited replaced the token, and the old one is
-  // revoked (conv. 179): stop here rather than say the new one was refused (2026-10-26's gate, M2).
+  // revoked (conv. 179): stop here rather than say the new one was refused.
   if (getState().registry.account_token !== token) {
     toasts.info(SIGNED_IN_AGAIN_LINE);
     refreshAccountWorlds(true);
@@ -277,7 +277,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
     const { minted, readOnly, why } = await mintOwnKey(client, row);
     // A member with a PIN on their account and none saved here: asked now,
     // with the overlay down. A Cancel takes the new key back, so a refusal
-    // leaves nothing on keel (gate R1).
+    // leaves nothing on keel.
     if (!pin && !readOnly) {
       overlay.hide();
       enteredPin = await new PinPromptModal().prompt(

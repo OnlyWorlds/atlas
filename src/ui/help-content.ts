@@ -1,5 +1,5 @@
 /**
- * Per-room help content (Bout HELP, workplan D8) — ALL the strings in one
+ * Per-room help content (workplan D8) — ALL the strings in one
  * file, cheap to maintain. Voice: Part 3 rules — one-sentence purpose,
  * verb-first "you can" lines, no model-speak, no em-dash appositives.
  *

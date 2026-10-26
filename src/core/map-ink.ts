@@ -41,7 +41,7 @@ export const ZONE_KIND_WORDS = [
  */
 export function zoneKindOf(subtype: unknown): InkKind | undefined {
   if (typeof subtype !== 'string') return undefined;
-  // Own keys only: "constructor" is not a kind (gate G10).
+  // Own keys only: "constructor" is not a kind.
   const word = (s: string) => {
     const k = s.trim().toLowerCase();
     return Object.prototype.hasOwnProperty.call(KIND_WORDS, k) ? KIND_WORDS[k] : undefined;
@@ -213,7 +213,7 @@ export function mapStylePreset(id: unknown): MapStylePreset | undefined {
 const overPictureCache = new Map<MapStyleId, MapStylePreset>();
 
 /**
- * A style over a map's picture (gate G3): the picture is the ground, so the
+ * A style over a map's picture: the picture is the ground, so the
  * zones keep their ink, patterns, names and lettering but cover nothing:
  * land and water lose their fill and shore bands, a pattern its tint. Blood
  * Meridian's territories, borders and roads over its relief draw as before.
@@ -265,11 +265,11 @@ const MAX_DEPTH = 10;
 function subdivide(a: Point, b: Point, minSeg: number, rough: number, out: Point[], depth: number): void {
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy);
-  // Coordinates near the float limit overflow the midpoint: draw the stored segment (gate G10).
+  // Coordinates near the float limit overflow the midpoint: draw the stored segment.
   if (!Number.isFinite(len) || len < minSeg || depth >= MAX_DEPTH) return;
   const off = (segmentHash(a, b) - 0.5) * len * rough;
   // The bulge side comes from the endpoints in one fixed order, so an edge two
-  // zones share draws as one line whichever way each runs it (gate G5).
+  // zones share draws as one line whichever way each runs it.
   const flip = a.x > b.x || (a.x === b.x && a.y > b.y) ? -1 : 1;
   const m = { x: (a.x + b.x) / 2 - (dy / len) * off * flip, y: (a.y + b.y) / 2 + (dx / len) * off * flip };
   if (!Number.isFinite(m.x) || !Number.isFinite(m.y)) return;

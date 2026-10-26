@@ -186,7 +186,7 @@ export class ZoneOverlay {
       if (e.shape.mode === 'polygon' && e.shape.ink?.region) from.push({ shape: e.shape, editing: e.editing });
     }
     // Kept while the zoom and every region's shape are the same objects: the
-    // same ring arrays let the geometry reuse its edge index (gate G2: a clip
+    // same ring arrays let the geometry reuse its edge index (a clip
     // per river per pass re-inked every coast).
     const c = this.regionCache;
     if (c && c.zoom === zoom && c.from.length === from.length
@@ -255,7 +255,7 @@ export class ZoneOverlay {
 
   /**
    * Back on a plain map after a style: the zones in the order a plain load
-   * draws them (gate G4: only the rebuilt kinds came to the top, so a
+   * draws them (only the rebuilt kinds came to the top, so a
    * map-wide sea took the clicks meant for the kingdom on it). A no-op on a
    * map that was never styled.
    */
@@ -773,7 +773,7 @@ export class ZoneOverlay {
     if (entry.editing === editing) return;
     entry.editing = editing;
     // Inked: the handles sit on the stored points, so the path draws them plain while editing.
-    // A clipped river draws whole too, so its handles out at sea sit on it (gate G7).
+    // A clipped river draws whole too, so its handles out at sea sit on it.
     if (entry.shape.ink && (entry.shape.ink.rough > 0 || entry.shape.ink.clipToLand)) this.setDrawnPoints(entry);
     this.applyStyle(entry);
   }

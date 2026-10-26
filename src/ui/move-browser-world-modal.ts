@@ -1,5 +1,5 @@
 /**
- * Move to a folder (1.17 bout 4, contract §4.2): say what happens, then a
+ * Move to a folder (1.17, contract §4.2): say what happens, then a
  * LOCKED run with progress. Step 1 runs inside the Move click, which is the
  * gesture the folder picker and the permission prompt need: the home folder
  * made writable, or picked (a picked world folder is refused as a home, lens

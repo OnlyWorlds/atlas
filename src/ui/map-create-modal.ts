@@ -148,14 +148,14 @@ class MapCreateModal extends BaseModal {
       input.setSelectionRange(len, len);
     });
     // Escape and the full outside click are BaseModal's; `hide` below
-    // settles the promise however the modal closed (gate F4).
+    // settles the promise however the modal closed.
   }
 
   private cancel(): void {
     this.hide();
   }
 
-  /** Every close path settles `createMapDialog()` (gate F4: Escape and
+  /** Every close path settles `createMapDialog()` (Escape and
    *  the overlay click both left it pending; the pin-prompt idiom). */
   protected override hide(): void {
     super.hide();

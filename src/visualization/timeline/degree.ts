@@ -8,7 +8,7 @@
  * the same dated-neighbourhood lesson the recipe learned (`datedNeighborCount`,
  * chart-recipe.ts). Pure + deterministic; computed ONCE over the full dated set
  * (in the normalizer) so a node's significance is STABLE across scope/zoom —
- * filtering to a subset never changes who the anchors are (gate risk: a degree
+ * filtering to a subset never changes who the anchors are (a degree
  * recomputed per-filtered-render would make anchors flicker).
  */
 

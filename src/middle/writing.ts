@@ -284,7 +284,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
     // element-detail entirely for active narratives in writing mode
     // (convention #51).
     //
-    // Bout 10: TipTap + ProseMirror are heavyweight (~140 KB gzipped) and
+    // TipTap + ProseMirror are heavyweight (~140 KB gzipped) and
     // only matter when the writer actually opens a narrative. We dynamic-
     // import the workspace module the first time we need it; subsequent
     // narrative switches hit the cached promise. A loading placeholder

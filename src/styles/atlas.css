@@ -2795,7 +2795,7 @@ body.atlas-preroot .atlas-middle {
   flex: 0 0 auto;
 }
 
-/* Structured (object/array) extension fields — read-only rows (gate A13). */
+/* Structured (object/array) extension fields — read-only rows. */
 .atlas-custom-structured-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -3032,7 +3032,7 @@ body.atlas-preroot .atlas-middle {
 
 /* Map row pin-count badge — small cyan-tinted chip showing how many pins on
    each map. The earlier `.atlas-row-meta` was too low-contrast to read. */
-/* Per-element sync/save indicator in the detail header (Bout II). */
+/* Per-element sync/save indicator in the detail header. */
 .atlas-element-sync-dot {
   display: inline-flex;
   align-items: center;
@@ -3894,7 +3894,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
    ============================================================ */
 
 .atlas-sync-pill {
-  /* Bout EE: pill lives inside the sidebar footer as a flex sibling of the
+  /* The pill lives inside the sidebar footer as a flex sibling of the
      gear + reset buttons. `margin-left: auto` anchors it to the right edge
      of the footer regardless of how many other buttons sit on the left. */
   margin-left: auto;
@@ -4598,7 +4598,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* ============================================================
-   Scrollbars (subtle): ONE mechanism everywhere (lane a A8).
+   Scrollbars (subtle): ONE mechanism everywhere.
    The old `.atlas-shell *::-webkit-scrollbar` block never reached modals,
    the command palette or body-mounted popovers (native fat bars), and from
    Chromium 121 any element with the standard `scrollbar-width` ignores the
@@ -5993,7 +5993,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* =================================================================
-   Bout B — Element picker modal + referenced-by chips
+   Element picker modal + referenced-by chips
    ================================================================= */
 
 .atlas-picker-panel {
@@ -6146,7 +6146,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* =================================================================
-   Bout C — Map index pane (tabs use legacy .atlas-tab-bar / .atlas-tab)
+   Map index pane (tabs use legacy .atlas-tab-bar / .atlas-tab)
    ================================================================= */
 
 /* Map index */
@@ -6179,7 +6179,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* =================================================================
-   Bout D — Sync indicator pill states + welcome actions
+   Sync indicator pill states + welcome actions
    ================================================================= */
 
 /* Extend legacy `.atlas-sync-pill` (position: fixed, bottom-right) with the
@@ -6678,7 +6678,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transition: opacity 140ms ease;
 }
 
-/* The Map style row on a map with a picture (gate G3): what the style does there. */
+/* The Map style row on a map with a picture: what the style does there. */
 .atlas-map-style-note {
   margin-top: 4px;
   font-size: 12px;
@@ -11218,7 +11218,7 @@ td.atlas-writing-setup-promote-count {
 }
 
 /* Home-view tabs use the shared room-section tab pattern (.atlas-room-tabs,
-   D1) — see the Bout U block near the end of this file. */
+   D1) — see the additions block near the end of this file. */
 
 .atlas-knowledge-empty-cta {
   margin-top: 12px;
@@ -11492,7 +11492,7 @@ td.atlas-writing-setup-promote-count {
 
 /* Bring in / take out tabs */
 /* Import tabs use the shared room-section tab pattern (.atlas-room-tabs, D1)
-   — see the Bout U block near the end of this file. */
+   — see the additions block near the end of this file. */
 .atlas-import-panel[hidden] { display: none; }
 
 /* Drop zone */
@@ -11702,7 +11702,7 @@ td.atlas-writing-setup-promote-count {
   color: var(--atlas-text-soft);
 }
 
-/* ---- Bout IE polish (IE3/IE5/IE6/IE7 + D8) ---- */
+/* ---- IE polish (IE3/IE5/IE6/IE7 + D8) ---- */
 
 /* IE6: one-line framing for the bring-in tab. */
 .atlas-import-lead {
@@ -13209,7 +13209,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   margin-left: auto;
   color: var(--atlas-text-muted);
 }
-/* The undated backlog (Bout 1.1) — the work queue in the ambient rail. */
+/* The undated backlog — the work queue in the ambient rail. */
 .atlas-timeline-rail-undated {
   margin-top: 14px;
   padding-top: 12px;
@@ -13293,7 +13293,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   text-overflow: ellipsis;
 }
 
-/* The floating drag chip (Bout 1.2) — follows the cursor while dragging a rail
+/* The floating drag chip — follows the cursor while dragging a rail
    element onto the axis. */
 .atlas-timeline-drag-ghost {
   position: fixed;
@@ -15042,7 +15042,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-cyan, #22d3ee);
   font-weight: 600;
 }
-/* ==== Bout U additions — paste into atlas.css once Q-A releases it ==== */
+/* ==== Additions ==== */
 
 /* Room-section tabs (D1) — THE pattern for major in-room sections.
    Generalizes .atlas-import-tab, sized/weighted up so tabs read as main
@@ -15167,7 +15167,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-origin-label { color: var(--atlas-text-muted); font-size: 10px; }
 .atlas-origin-row [data-action="made-by-agents"] + [data-action="hide-room"] { margin-left: 6px; }
 
-/* ==== Bout H — home cover-page × study-desk (workplan D2) ==== */
+/* ==== Home cover-page × study-desk (workplan D2) ==== */
 
 .atlas-home-cover {
   height: 160px;
@@ -15561,7 +15561,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-accent-text);
 }
 
-/* ==== Bout S — share simplification (D5/T-S7/S3) ==== */
+/* ==== Share simplification (D5/T-S7/S3) ==== */
 
 /* T-S7: the slim meta summary row (theme swatch + words + publish state). */
 .atlas-share-meta-summary {
@@ -15624,7 +15624,7 @@ body.atlas-share-fullpreview > * {
   padding: 40px 28px;
 }
 
-/* ==== Bout HELP — the ? overlay (D8) ==== */
+/* ==== The ? overlay (D8) ==== */
 /* The help panel caps at the viewport and scrolls its body — the shortcut
    reference is tall by design, the chrome (title) stays pinned. */
 .atlas-help-panel {
@@ -15666,7 +15666,7 @@ body.atlas-share-fullpreview > * {
   margin: 14px 0;
 }
 
-/* ==== Bout OW — OnlyWorlds page + waypoints (D11) ==== */
+/* ==== OnlyWorlds page + waypoints (D11) ==== */
 .atlas-ow-intro .atlas-settings-hint { line-height: 1.6; }
 .atlas-ow-intro a { color: var(--atlas-accent-text); text-decoration: none; }
 .atlas-ow-intro a:hover { text-decoration: underline; }
@@ -15840,7 +15840,7 @@ body.atlas-share-fullpreview > * {
 }
 .atlas-waypoint-toast-rider-btn:hover { color: var(--atlas-accent-text); }
 
-/* ==== Bout E — T-E1: quiet empty field rows (hover restores) ==== */
+/* ==== T-E1: quiet empty field rows (hover restores) ==== */
 /* An empty row's label sits one step below a filled one, by colour: muted,
    back to soft on hover. F-43 retired the opacities it used (0.62 on the
    label read 3.11:1 in light, 4.47 in dark; conv. 156). The empty value and
@@ -17278,7 +17278,7 @@ body.atlas-drawer-sidebar-open .atlas-update-banner {
   bottom: 72px;
 }
 
-/* Reduced motion (lane a A9): transitions go instant and the INFINITE
+/* Reduced motion: transitions go instant and the INFINITE
    pulses stop. Targeted on purpose: a blanket animation kill would freeze
    the loading spinner into a static arc, which reads as broken. */
 @media (prefers-reduced-motion: reduce) {

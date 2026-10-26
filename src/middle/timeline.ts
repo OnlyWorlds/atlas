@@ -378,7 +378,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   }
 
   /**
-   * The work queue (Act 1, Bout 1.1): elements of dateable types that carry no
+   * The work queue: elements of dateable types that carry no
    * date yet — the backlog that could go on the axis. Global (the whole world's
    * undated backlog, not the current scope), grouped for the rail by the caller.
    */
@@ -404,16 +404,16 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   }
 
   /**
-   * Drag-to-date commit (Bout 1.2): write the type's start-date field, then
+   * Drag-to-date commit: write the type's start-date field, then
    * GUARANTEE the element is visible. A bare write can silently vanish it — the
    * default tableau caps at 22 by weight and a type filter excludes off-type
    * elements, so a freshly-dated low-weight element may enter neither the rail
-   * (now dated) nor the scoped chart (gate: convergent HIGH finding).
+   * (now dated) nor the scoped chart.
    */
   async function dateElement(id: string, date: number, edge: 'start' | 'end' = 'start'): Promise<void> {
     const store = getActiveStore();
     const el = getState().data.elements.find(e => e.id === id);
-    if (!store || !el) { toasts.error('That element is not in this world any more.'); return; } // deleted mid-drag (gate)
+    if (!store || !el) { toasts.error('That element is not in this world any more.'); return; } // deleted mid-drag
     const mapping = TEMPORAL_TYPE_FIELDS[el.type];
     const field = edge === 'end' ? mapping?.end : mapping?.start;
     if (!field) { toasts.error('This type has no date field'); return; }
@@ -443,7 +443,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     } catch (err) {
       console.error('[charts] drag-to-date write failed:', err);
       // Writing the same date again is safe (the bounds are checked again too).
-      // No retry (gate B L1): a later drag would be written over by this one.
+      // No retry: a later drag would be written over by this one.
       showProblem(err, { doing: 'saving the date', toasts });
     }
   }
@@ -452,7 +452,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    * Confirm a just-dated element. PEEK it if it's on the chart — a gentle
    * highlight + card, never a FOCUS (focus narrows the scope and loses the
    * user's view, Titus). If it fell outside the current tableau/filter, an
-   * honest toast confirms the write instead of it silently vanishing (gate).
+   * honest toast confirms the write instead of it silently vanishing.
    */
   function showDatedElement(id: string, name: string, date: number, verb: 'Dated' | 'Created' = 'Dated'): void {
     const phrase = verb === 'Created' ? `Created ${name} at ${date}` : `Dated ${name} to ${date}`;
@@ -515,7 +515,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   /** Open the world clock modal — with the api-linked baseline wait when the
    *  unit is still unset (the seed rule would otherwise let device B blindly
-   *  overwrite the physics device A already established, gate 2026-07-14). */
+   *  overwrite the physics device A already established). */
   async function openWorldClock(onSaved?: () => void): Promise<void> {
     const entry = registryEntry();
     if (!clockIsSet() && entry?.api && !entry.api.read_only) {

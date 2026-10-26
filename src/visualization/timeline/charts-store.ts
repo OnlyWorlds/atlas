@@ -83,7 +83,7 @@ export function rewriteChartScopeIds(
     }
     // The lens reference is an element id too (a calendar Construct) — a
     // Route-2 match-swap would silently strand it, and the degrade-to-bare-
-    // numbers rule would HIDE the loss (gate 2026-07-14).
+    // numbers rule would HIDE the loss.
     if (chart.calendarId === oldId) {
       changed = true;
       chart = { ...chart, calendarId: newId };

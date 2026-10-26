@@ -5,7 +5,7 @@
  * Pure. The engine merges each round's evidence with `mergeForeignIds`
  * inside its end-of-round sync-state mutator; the Settings line and the
  * re-key guard read `liveForeignIds` at the moment they act. A stored entry
- * is a hint, never a fact on its own (re-key gate lens 2 F7): an element that
+ * is a hint, never a fact on its own: an element that
  * was deleted, uploaded, adopted or re-keyed since simply drops out of the
  * intersection, with no removal path to remember.
  */

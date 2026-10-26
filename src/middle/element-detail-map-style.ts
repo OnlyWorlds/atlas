@@ -39,7 +39,7 @@ export function buildMapStyleRow(m: WorldMap, toasts: ToastManager): HTMLElement
   select.disabled = worldIsViewOnly();
   value.appendChild(select);
 
-  // Over a picture the style draws the zones' ink and covers nothing (gate G3, `overPicture`).
+  // Over a picture the style draws the zones' ink and covers nothing (`overPicture`).
   if (pickMapImageSource(m).kind !== 'flat') {
     const note = document.createElement('div');
     note.className = 'atlas-map-style-note';

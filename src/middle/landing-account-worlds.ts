@@ -24,7 +24,7 @@ export function landingAccountWorldsHtml(state: AppState): string {
   const rows = remoteAccountWorlds();
   if (aw.status === 'error' && rows.length === 0) {
     // A token keel refused fails every retry: the way out is Settings, where
-    // a new one is pasted (the gate's M3; this screen has no other way there).
+    // a new one is pasted (this screen has no other way there).
     const action = aw.errorKind === 'auth'
       ? '<button type="button" class="atlas-btn-link" data-role="landing-worlds-settings">Open Settings, OnlyWorlds</button>'
       : '<button type="button" class="atlas-btn-link" data-role="landing-worlds-retry">Try again</button>';
@@ -41,7 +41,7 @@ export function landingAccountWorldsHtml(state: AppState): string {
   const items = rows.map((r) => {
     const opening = aw.opening === r.id;
     const shared = r.role === 'collaborator';
-    // A guest's world opens to read (#199), so its row says so (gate L3).
+    // A guest's world opens to read (#199), so its row says so.
     const what = opensToWrite(r) ? 'work on it' : 'read it';
     return `
       <li><button type="button" class="atlas-landing-world${opening ? ' is-opening' : ''}" data-landing-world-id="${escapeAttr(r.id)}"

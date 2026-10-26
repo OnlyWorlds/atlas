@@ -42,8 +42,8 @@ export function effectiveEndDate(
 /**
  * Coerce a raw temporal field value to a finite number, or null if it isn't a
  * usable date. The SINGLE parse used by BOTH the normalizer and the recipe's
- * `hasStartDate`, so "is this dated?" can never disagree between them (gate
- * finding). Rejects: null/'' · non-number/non-string types (arrays, booleans,
+ * `hasStartDate`, so "is this dated?" can never disagree between them.
+ * Rejects: null/'' · non-number/non-string types (arrays, booleans,
  * objects) · NaN · ±Infinity (an Infinity date would blow out the axis scale).
  * Non-numeric strings ('that winter') → null today → the element is dropped;
  * the future fuzzy bout re-reads the raw field to parse felt dates (a conscious,

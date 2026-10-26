@@ -131,7 +131,7 @@ export function worldKeyHtml(world: WorldRegistryEntry): string {
   // The key's kind says what it could do; a refusal sync met says what it
   // does now (#198's live walk: "reads and writes" under "Sync stopped").
   const refusal = engine?.kind === 'error' ? keyRefusalFor(world.id) : undefined;
-  // A member's write key changes only what its role allows (B12 Q2, conv. 151).
+  // A member's write key changes only what its role allows (conv. 151).
   const member = world.api.member_role === 'guest' || world.api.member_role === 'contributor';
   const does = refusal === 'key_revoked' || refusal === 'key_unknown' ? ', and OnlyWorlds no longer takes it'
     : world.api.read_only || refusal === 'read_only_key' ? ' and can only read'
@@ -152,7 +152,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
   // Where the world lives (1.17, conv. 129): a browser world has no folder to
   // show or keep, so Delete only (contract §3.1, §3.4); its ways out are Move
   // to a folder (Chromium) and Download the whole world (every browser). The
-  // tour sandbox offers none of them (its lifecycle is the tour's, gate B12).
+  // tour sandbox offers none of them (its lifecycle is the tour's).
   const inBrowser = filesWhereOf(world) === 'browser';
   const dangerActions = world.demo === true
     ? ''
@@ -267,10 +267,10 @@ function inviteListLoaded(): boolean {
   return !!registry.account_token && accountWorlds.status === 'ready' && accountWorlds.fetchedWithToken === registry.account_token;
 }
 
-/** One dialog per click: the click waits on a lazy import before it opens (gate L3). */
+/** One dialog per click: the click waits on a lazy import before it opens. */
 let inviteOpening = false;
 
-/** B12 Q1: a world shared with others says how it syncs, with its own switch. Nothing for a world alone. */
+/** A world shared with others says how it syncs, with its own switch. Nothing for a world alone. */
 function sharedLineHtml(world: WorldRegistryEntry): string {
   const text = sharedWorldLine(world, getState().registry);
   if (!text) return '';
@@ -406,7 +406,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       : stillPaused ? 'This world will sync when Pause all sync is turned off' : 'Sync resumed for this world');
   });
 
-  // B12 Q1: a shared world's own switch for the rule (Settings, Storage's
+  // A shared world's own switch for the rule (Settings, Storage's
   // default never turns it off on its own).
   const sharedInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-shared-review"]');
   sharedInput?.addEventListener('change', () => {
@@ -667,8 +667,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
  * did not finish is finished (or discarded) from here too.
  */
 /** The last count seen per world: Settings re-renders on every state change,
- *  and a row that starts hidden and appears after two awaits blinks each time
- *  (gate lens C F4). The row renders from this, then refreshes. */
+ *  and a row that starts hidden and appears after two awaits blinks each time.
+ * The row renders from this, then refreshes. */
 const lastForeignCount: Record<string, number> = {};
 
 function foreignLine(n: number): string {
@@ -686,7 +686,7 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
   const staleText = stale?.querySelector<HTMLElement>('[data-role="rekey-stale-text"]');
   const store = getActiveStore();
   // The interrupted and stale rows live outside the api-linked branch: a crash
-  // then an unlink must still leave a way to finish or undo (gate lens C F10).
+  // then an unlink must still leave a way to finish or undo.
   if (!stuck || !stale || !staleText || !store) return;
   const rk = await import('../sync/rekey-run');
 
@@ -698,7 +698,7 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
     if (interrupted) {
       // A Route 2 link that stopped mid-way: the world is local-only,
       // so "not syncing" is not the news; what to do next is. The words are
-      // set BEFORE the row shows, so the re-key copy never flashes (gate B10).
+      // set BEFORE the row shows, so the re-key copy never flashes.
       const { rekeyJournalOrigin } = await import('../store/rekey');
       stuckIsMerge = (await rekeyJournalOrigin(store)) === 'merge';
       const line = stuck.querySelector<HTMLElement>('[data-role="rekey-interrupted-text"]');
@@ -733,7 +733,7 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
   window.addEventListener(rk.ID_MOVE_SETTLED_EVENT, onSettled);
 
   btn?.addEventListener('click', async () => {
-    btn.disabled = true; // a second click during the chunk load stacked two modals (lens C F6)
+    btn.disabled = true; // a second click during the chunk load stacked two modals
     try {
       const { RekeyModal } = await import('../ui/rekey-modal');
       await new RekeyModal(toasts, world, store, count).open();
@@ -867,7 +867,7 @@ function renderSyncIssues(world: WorldRegistryEntry): string {
       ${i.kind === 'other' ? '<button class="atlas-btn-ghost atlas-btn-small" data-action="copy-issue">Copy details</button>' : ''}
     </li>`).join('');
   const more = issues.length > ISSUE_ROWS_SHOWN ? `<p class="atlas-settings-hint">And ${issues.length - ISSUE_ROWS_SHOWN} more.</p>` : '';
-  // The engine's own sentence, as written; one full stop at the end (gate B L2).
+  // The engine's own sentence, as written; one full stop at the end.
   const stoppedLine = stopped
     ? `<p class="atlas-settings-hint" data-role="sync-stopped">Sync stopped: ${escapeText(stopped.replace(/\.?\s*$/, '.'))}</p>`
     : '';

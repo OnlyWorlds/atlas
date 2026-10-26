@@ -52,8 +52,8 @@ export function noteRoundIssues(
   now: string = new Date().toISOString(),
 ): boolean {
   const prev = byWorld.get(worldId) ?? new Map<string, SyncIssue>();
-  // A round that ran to its end replaces the entries of the side it retried
-  // (gate A M5): a push never retries a pull's write, and a pull never
+  // A round that ran to its end replaces the entries of the side it retried:
+  // a push never retries a pull's write, and a pull never
   // retries an upload. A sync round does both.
   const complete = !result.auth_blocked && !result.transient_blocked;
   const replaces = (side: 'push' | 'pull'): boolean =>

@@ -5,7 +5,7 @@
  * not redact the roster). A failure is kept for a minute, then asked again,
  * so a page that repaints on every notify never hammers keel.
  *
- * Sync asks with `maxAgeMs` (B12 Q1): whether others share the world decides
+ * Sync asks with `maxAgeMs`: whether others share the world decides
  * its policy, so the attach reads afresh (0: past any kept answer or failure)
  * and each round re-reads once the answer is older than a few minutes. A
  * re-read keeps the rows it had until the new ones arrive.

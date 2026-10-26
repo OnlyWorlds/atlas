@@ -89,8 +89,8 @@ export function heldSeat(worldId: string): HeldSeat | null {
 }
 
 /**
- * The held seats to show: never one whose world is here already (the G7
- * read). Showing filters; the drop, with what it says, is `settleHeldSeats`.
+ * The held seats to show: never one whose world is here already.
+ * Showing filters; the drop, with what it says, is `settleHeldSeats`.
  */
 export function heldSeats(reg: WorldsRegistry = getState().registry): HeldSeat[] {
   return allHeldSeats()
@@ -108,7 +108,7 @@ export function heldSeatsChanged(): void {
 }
 
 /**
- * Keep a seat the moment its redeem answers (the v2 gate's G1). Answers
+ * Keep a seat the moment its redeem answers. Answers
  * whether it is held, and the older record a second link for the same world
  * replaced (its seat is now spare, rule 4); a record of the same key is no
  * replacement.
@@ -142,7 +142,7 @@ export function codeTail(code: string): string {
   return code.slice(-6);
 }
 
-/** A storage event about held seats (or a whole clear): the lists draw again (G7). */
+/** A storage event about held seats (or a whole clear): the lists draw again. */
 export function isHeldSeatStorageKey(key: string | null): boolean {
   return key === null || key.startsWith(HELD_SEAT_PREFIX);
 }
@@ -152,17 +152,17 @@ export interface HeldSeatSettlement {
   next: WorldsRegistry | null;
   /** Entries that took a record's key and secret (the reconnected rule). */
   handedOver: WorldRegistryEntry[];
-  /** Records dropped whose seat no world here uses: the spare line (G5). */
+  /** Records dropped whose seat no world here uses: the spare line. */
   spare: HeldSeat[];
 }
 
 /**
- * Settle every record whose world has landed here, by any door (rule 2, G3:
+ * Settle every record whose world has landed here, by any door (rule 2:
  * `worldAlreadyHere`, so a world file of the held world counts). A landed
  * seat world that lost its secret while an agent record holds one takes the
- * record's key and secret (G2: a reload mid-download into a folder leaves a
+ * record's key and secret (a reload mid-download into a folder leaves a
  * linked folder with no secret, which discovery adopts later). A record whose
- * key the landed world uses goes quietly; any other is spare (G5).
+ * key the landed world uses goes quietly; any other is spare.
  */
 export function settleHeldSeats(reg: WorldsRegistry): HeldSeatSettlement {
   const out: HeldSeatSettlement = { next: null, handedOver: [], spare: [] };
@@ -206,14 +206,14 @@ function locks(): Locks | null {
 }
 const lockName = (worldId: string) => `held-${worldId}`;
 
-/** A download of a held world holds this lock in every tab (G6). */
+/** A download of a held world holds this lock in every tab. */
 export async function withHeldSeatLock<T>(worldId: string, fn: () => Promise<T>): Promise<T> {
   const l = locks();
   if (!l) return fn();
   return l.request(lockName(worldId), {}, () => fn()) as Promise<T>;
 }
 
-/** Is a download of this world running in any tab? Remove refuses while one is (G6). */
+/** Is a download of this world running in any tab? Remove refuses while one is. */
 export async function heldSeatBusy(worldId: string): Promise<boolean> {
   const l = locks();
   if (!l) return false;

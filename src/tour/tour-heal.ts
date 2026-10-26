@@ -1,7 +1,7 @@
 /**
  * Tour heal kernel — pure array-merge semantics for the resilience pass.
  *
- * THE MERGE RULE (resilience gate): healing a bundle element's array
+ * THE MERGE RULE: healing a bundle element's array
  * link field must repair the bundle's own weave without ever eating the
  * user's work. Three moves, in order:
  *
@@ -10,7 +10,7 @@
  *      own forward-links retract with it).
  *   2. PRESERVE everything else on disk verbatim, in disk order — including
  *      a user's manual link to a bundle element that happens to be
- *      unrevealed right now (the gate's headline: provenance matters; a
+ *      unrevealed right now (provenance matters; a
  *      bundle id the bundle does NOT author for this field is user data).
  *   3. APPEND bundle-authored ids that are revealed but missing.
  *

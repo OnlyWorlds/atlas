@@ -63,7 +63,7 @@ export async function exportProvenance(
         readMe(api.api_key),
         new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('the key read timed out')), ME_TIMEOUT_MS); }),
       ]).finally(() => clearTimeout(timer));
-      // The key must be this world's: a slice read from another world is no slice of this one (G6).
+      // The key must be this world's: a slice read from another world is no slice of this one.
       if (me.world?.id !== undefined && String(me.world.id) === String(api.world_id)) {
         const id = typeof me.character === 'string' ? me.character : null;
         const name = id ? await nameOf(id) : undefined;

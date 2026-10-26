@@ -138,7 +138,6 @@ export function filterNodesByScope(nodes: TimelineNode[], scope: ChartScope): Ti
       // Unknown scope kind from a newer atlas / corrupt charts.json / a future
       // share block: fail SAFE to empty (an honest empty state), never dump the
       // entire world — that's the dense "wall" this feature exists to prevent.
-      // Gate finding.
       const unknown = (scope as { kind?: string }).kind;
       if (unknown !== undefined) {
         console.warn(`[chart] unknown scope kind "${unknown}" — rendering empty (forward-compat fallback)`);

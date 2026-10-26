@@ -1,5 +1,5 @@
 /**
- * The "Open a world file" door (1.17 bout 5, contract §5.2): pick a world
+ * The "Open a world file" door (1.17, contract §5.2): pick a world
  * file (the standard's `.owworld`, or the `.zip` Atlas saves: folder spec 4.7
  * OW-1, the same file), open it as a world in this browser, then open the world. Every
  * browser has it (a file input, no folder picker). The work, refusals and

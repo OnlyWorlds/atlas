@@ -73,7 +73,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     cached.ready.then(() => {
       cached.manager.getMap()?.invalidateSize();
       syncPins(cached);
-      // Zones too (resilience gate): elements-slice changes while the
+      // Zones too: elements-slice changes while the
       // tab was cached (zone deleted + tour-healed, edited elsewhere) never
       // reached the overlay — pins re-synced on re-entry, zones didn't.
       syncZones(cached);
@@ -182,7 +182,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     zoneStrip,
   };
   wireChipStrip(entry, toasts);
-  // The date moved: the zones' visibility, then the pins by their elements' dates (Q11).
+  // The date moved: the zones' visibility, then the pins by their elements' dates.
   wireDateBar(entry, () => { refreshZoneDates(entry); refreshPinDates(entry); });
   mapTabCache.set(mapId, entry);
 
@@ -434,7 +434,7 @@ subscribe(() => {
   // would re-sync 300 zones on every search keystroke.)
   const styles = state.styles;
   // The world's now moves the zones of a map whose date bar follows it (#280),
-  // and its pins by their elements' dates (Q11).
+  // and its pins by their elements' dates.
   const now = state.active?.meta?.time_current;
   if (elements === lastElementsRef && selected === lastSelectedRef && styles === lastStylesRef && now === lastNow) return;
   const zonesOnly = elements === lastElementsRef && selected === lastSelectedRef;
