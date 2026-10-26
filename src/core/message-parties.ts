@@ -1,14 +1,28 @@
 /**
- * Who a message is from and to (#526). The crew's convention, used on the
- * Manifest's Wire and in work worlds: a message is a Narrative with supertype
- * Message, its sender the Narrator, its recipients the Characters. Atlas
- * draws that as one line above the text, so a message reads as a message and
- * not as a story with a narrator.
+ * Who a message is from and to (#526), by the published message profile
+ * (schema-dist `profiles/message.md`): a Narrative with supertype Message, its
+ * claimed sender the Narrator, its recipients the Characters. Atlas draws that
+ * as one line above the text. The rules are the SDK's (`isMessage`,
+ * `recipientsOf`, `isToEveryone`, `senderStatus`); this file only names the
+ * Characters they point at.
  *
- * Pure: the element and the world's elements come in. An id the world does
- * not hold is left out (a stub names it, a deleted one does not); a message
- * with neither a sender nor a recipient in the world gets no line.
+ * The sender is a claim until checked: only the world's members list proves
+ * it, so a folder, an export or a world whose roster is not read yet says
+ * "claims to be from", never the plain sender. An empty Characters list is
+ * addressed to everyone. An id the world does not hold as a Character is
+ * counted, never named.
+ *
+ * Two readings the profile cannot make alone (the S484 gate's G1, G2):
+ * - keel strips links to elements a key may not see (a hidden one, outside a
+ *   guest's view) from the bodies that key reads, so an empty list or a
+ *   missing Narrator in a world not read whole may stand for someone hidden.
+ *   `wholeWorld` false says so, never "everyone" or "nobody" alone.
+ * - `created_by` proves a sender only on the body as keel served it: a copy
+ *   with an unpushed edit (or a hand-edited file) is checked against nothing.
+ *
+ * Pure: the element, the world's elements and the reading come in.
  */
+import { isMessage as sdkIsMessage, isToEveryone, recipientsOf, senderStatus, type OwMessageMember, type OwSenderStatus } from '@onlyworlds/sdk';
 import type { Element } from './types';
 
 export interface MessageParty {
@@ -17,35 +31,86 @@ export interface MessageParty {
 }
 
 export interface MessageParties {
+  /** The profile's answer: `verified` only when the members list proves it. */
+  sender: OwSenderStatus;
+  /** The claimed sender (the Narrator); null when there is none ("from nobody"). */
   from: MessageParty | null;
+  /** The Narrator names an id this world does not hold as a Character. */
+  fromOutside: boolean;
+  /** On a mismatch, the Character whose key wrote it, when this world holds it. */
+  writtenBy: MessageParty | null;
+  /** On a mismatch, the writer's Character is not one this world holds. */
+  writtenByOutside: boolean;
+  toEveryone: boolean;
+  /** The recipients this world holds as Characters, in order, each once. */
   to: MessageParty[];
+  /** Recipient ids this world does not hold as Characters. */
+  toOutside: number;
+  /** The reader sees the whole world: an empty list or no Narrator hides no one. */
+  wholeWorld: boolean;
+}
+
+export interface MessageReading {
+  /** keel's members list, or null when it is not read (a folder, an export, not yet). */
+  members?: readonly OwMessageMember[] | null;
+  /** The reader's key reads the whole world (the owner, a co-builder, a world made here). Default true. */
+  wholeWorld?: boolean;
+}
+
+/**
+ * The body as keel last served it: stamped by the server and no edit since.
+ * Only then does its `created_by` say who wrote it.
+ */
+export function authorAsServed(el: Element): boolean {
+  const rec = el as Record<string, unknown>;
+  const server = rec.server_updated_at;
+  const local = rec.local_updated_at;
+  return typeof server === 'string' && !(typeof local === 'string' && local > server);
 }
 
 export function isMessage(el: Element): boolean {
-  if (el.type !== 'narrative') return false;
-  const sup = (el as Record<string, unknown>).supertype;
-  return typeof sup === 'string' && sup.trim().toLowerCase() === 'message';
+  return sdkIsMessage(el);
 }
 
-export function messageParties(el: Element, elements: readonly Element[]): MessageParties | null {
+export function messageParties(
+  el: Element,
+  elements: readonly Element[],
+  reading: MessageReading = {},
+): MessageParties | null {
   if (!isMessage(el)) return null;
-  const rec = el as Record<string, unknown>;
-  const party = (id: unknown): MessageParty | null => {
-    if (typeof id !== 'string' || !id) return null;
+  const members = reading.members && authorAsServed(el) ? reading.members : null;
+  const party = (id: string): MessageParty | null => {
     const hit = elements.find(e => e.id === id && e.type === 'character');
     if (!hit) return null;
     const name = typeof hit.name === 'string' && hit.name.trim() ? hit.name.trim() : '(unnamed)';
     return { id, name };
   };
-  const from = party(rec.narrator);
-  const ids = Array.isArray(rec.characters) ? rec.characters : [];
+  const status = senderStatus(el, members);
+  const from = status.claimed ? party(status.claimed) : null;
+  const writtenBy = status.writtenBy ? party(status.writtenBy) : null;
+  const toEveryone = isToEveryone(el);
   const to: MessageParty[] = [];
-  for (const id of ids) {
-    // The sender listed among the recipients too (a note to self, or a convention slip) is said once.
-    if (from && id === from.id) continue;
+  let toOutside = 0;
+  const seen = new Set<string>();
+  for (const id of recipientsOf(el)) {
+    if (seen.has(id)) continue;
+    seen.add(id);
     const p = party(id);
-    if (p && !to.some(t => t.id === p.id)) to.push(p);
+    if (p) to.push(p);
+    else toOutside++;
   }
-  if (!from && to.length === 0) return null;
-  return { from, to };
+  // No sender and no recipient: a story's letter with nothing on it to read, so
+  // no line rather than "from nobody, to everyone".
+  if (!status.claimed && toEveryone) return null;
+  return {
+    sender: status.status,
+    from,
+    fromOutside: status.claimed !== null && !from,
+    writtenBy,
+    writtenByOutside: status.writtenBy !== null && !writtenBy,
+    toEveryone,
+    to,
+    toOutside,
+    wholeWorld: reading.wholeWorld ?? true,
+  };
 }

@@ -216,6 +216,16 @@ describe('a published profile key is never a custom field (x_identity_, Skeld 20
     expect(profileFieldEntriesFor(makeCharacter({ x_checks_rules: ['one'] }))).toEqual([{ name: 'x_checks_rules', value: ['one'] }]);
   });
 
+  it('the spine profile\'s keys are kept too (x_spine_, dist.55)', () => {
+    for (const name of ['x_spine_status', 'x_spine_depends_on', 'x_spine_owner']) {
+      expect(customFieldNameProblem(makeCharacter(), name)).toMatch(/x_spine_/);
+    }
+    expect(customFieldNameProblem(makeCharacter(), 'x_spines')).toBeNull();
+    const row = makeCharacter({ x_spine_status: 'live', x_mood: 'grim' });
+    expect(customFieldMetasFor(row).map(m => m.name)).toEqual(['x_mood']);
+    expect(profileFieldEntriesFor(row)).toEqual([{ name: 'x_spine_status', value: 'live' }]);
+  });
+
   it('a carried key is no editable row, shows read-only, and is never suggested', () => {
     const el = makeCharacter({ x_identity_key: KEY, x_mood: 'grim' });
     expect(customFieldMetasFor(el).map(m => m.name)).toEqual(['x_mood']);

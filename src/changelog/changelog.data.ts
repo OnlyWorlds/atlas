@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.95.0',
+    date: '2026-10-26',
+    theme: 'Said as it is known',
+    entries: [
+      {
+        id: 'message-sender-claimed',
+        title: 'A message says who it claims to be from until OnlyWorlds proves it',
+        body: "A message's line now reads \"From\" only when OnlyWorlds' member list shows its writer plays the sender. Otherwise it says \"Claims to be from\", and when another member's key wrote it, it names that key. A message with no recipients reads \"To everyone\", or \"To everyone, or someone hidden from you\" on a key that does not see the whole world, and a recipient Atlas cannot show is counted rather than dropped.",
+        tags: ['writing', 'safety'],
+      },
+      {
+        id: 'graph-proposed-hidden',
+        title: 'The graph marks proposed and hidden elements',
+        body: 'In the Context graph, an element waiting for review or hidden on OnlyWorlds gets a dotted ring and the word beside its name, with what it means on hover, as in the element list.',
+        tags: ['graph'],
+      },
+      {
+        id: 'spine-keys-kept',
+        title: "The spine profile's keys are kept for it",
+        body: 'Custom field names that start with x_spine_ are kept for the spine profile other tools read: shown read only, never typed as a custom field. When a world gets new ids, a spine row\'s dependencies and a parlor\'s links to its sittings and work items now follow them.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.94.0',
     date: '2026-10-26',
     theme: 'One token at a time',

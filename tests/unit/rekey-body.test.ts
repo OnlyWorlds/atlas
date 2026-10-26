@@ -172,4 +172,17 @@ describe('rekeyBody: a published profile key is never an id (identity profile ru
     expect(body.x_identity_key).toBe(O);
     expect(body.x_rival).toBe(N);
   });
+
+  it('the packet and the review marks stay too, each by its own page', () => {
+    const { body } = rekeyBody(el('relation', { x_packet_elements: [O], x_review_checked: O }), map);
+    expect(body.x_packet_elements).toEqual([O]);
+    expect(body.x_review_checked).toBe(O);
+  });
+
+  it('a reserved key the pages leave to §3.3 moves with its id: the spine\'s depends_on, the room\'s sitting and take', () => {
+    const { body } = rekeyBody(el('relation', { x_spine_depends_on: [O, X], x_room_of: O2, x_room_item: O }), map);
+    expect(body.x_spine_depends_on).toEqual([N, X]);
+    expect(body.x_room_of).toBe(map.get(O2));
+    expect(body.x_room_item).toBe(N);
+  });
 });

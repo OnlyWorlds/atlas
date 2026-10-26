@@ -36,6 +36,8 @@ import { getTierForNarrative } from '../../middle/writing-helpers';
 import { escapeText } from '../../core/dom-utils';
 import { placeGraphLabels, GRAPH_LABEL_SIDES, type GraphLabelItem } from './graph-labels';
 import { currentLore, isRoomElement } from '../../core/parlor-room';
+import { proposedMarkOf, proposedTitle, proposedWord } from '../../core/review-mark';
+import { hiddenMarkLine } from '../../core/hidden-mark';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -756,6 +758,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // DOM nodes.
     const nodeEls = new Map<string, HTMLElement>();
     const paintCenterId = nodes.find(c => c.isCenter)?.id ?? homeId;
+    const paintState = getState();
+    const paintWorldState = paintState.registry.worlds.find(w => w.id === paintState.active?.worldId)?.state;
     for (const n of nodes) {
       const nodeEl = document.createElement('button');
       nodeEl.type = 'button';
@@ -773,9 +777,20 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       const iconName = n.el ? (ELEMENT_ICONS[n.el.type] ?? 'category') : 'edit_note';
       const rawName = n.el?.name?.trim()
         || (n.isCenter && n.id === homeId ? subject.name || '(home)' : '(unknown)');
+      // A proposed or hidden element is drawn with its mark, never plain, as on
+      // every other surface: a dotted ring, the word in the label and its line in
+      // the tooltip. Atlas is the keeper's copy, so they are shown, marked.
+      const proposed = n.el ? proposedMarkOf(n.el) : null;
+      const hiddenLine = n.el ? hiddenMarkLine(n.el, paintWorldState) : null;
+      const markWords = [proposed ? proposedWord(proposed) : '', hiddenLine ? 'Hidden' : ''].filter(Boolean);
+      if (proposed) nodeEl.classList.add('is-proposed');
+      if (hiddenLine) nodeEl.classList.add('is-hidden');
+      if (markWords.length) nodeEl.dataset.mark = markWords.join(' ').toLowerCase();
       nodeEl.innerHTML =
         `<span class="material-symbols-outlined">${iconName}</span>` +
-        `<span class="atlas-context-graph-node-label">${escapeText(rawName)}</span>`;
+        `<span class="atlas-context-graph-node-label">${escapeText(rawName)}` +
+        (markWords.length ? ` <span class="atlas-context-graph-node-mark">${escapeText(markWords.join(', '))}</span>` : '') +
+        `</span>`;
       // Native browser tooltip — name + first ~200 chars of description so
       // the writer can peek at "what is this" without clicking.
       const desc = typeof n.el?.description === 'string' ? n.el.description.trim() : '';
@@ -787,7 +802,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       const markers = n.isCenter ? 0
         : lastMarkerCounts.get(`${paintCenterId}|${n.id}`) ?? lastMarkerCounts.get(`${n.id}|${paintCenterId}`) ?? 0;
       const markerLine = markers ? `\n${markers} marker${markers === 1 ? '' : 's'} on the map` : '';
-      const heading = (n.isBacklink ? `${rawName}\nlinks to ${centerName}` : rawName) + markerLine;
+      const markLines = [proposed ? proposedTitle(proposed) : '', hiddenLine ?? ''].filter(Boolean).map(l => `\n${l}`).join('');
+      const heading = (n.isBacklink ? `${rawName}\nlinks to ${centerName}` : rawName) + markLines + markerLine;
       nodeEl.title = descSnippet ? `${heading}\n\n${descSnippet}` : heading;
 
       nodeEl.addEventListener('click', (e) => {

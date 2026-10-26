@@ -106,12 +106,16 @@ export function proposedWord(mark: ProposedMark): string {
   return mark.lapsed ? 'Proposed, lapsed' : 'Proposed';
 }
 
+/** The short line under a row's or a graph node's word (its tooltip). */
+export function proposedTitle(mark: ProposedMark): string {
+  return mark.lapsed ? 'Proposed and not yet reviewed; the proposal has lapsed' : 'Proposed and not yet reviewed: not part of the world until a keeper accepts it';
+}
+
 /** The word on a row built as HTML (the list, Home's Recent), or nothing for a settled element. */
 export function proposedRowWord(el: unknown): string {
   const mark = proposedMarkOf(el);
   if (!mark) return '';
-  const title = mark.lapsed ? 'Proposed and not yet reviewed; the proposal has lapsed' : 'Proposed and not yet reviewed: not part of the world until a keeper accepts it';
-  return `<span class="atlas-row-proposed" data-role="proposed-word" title="${escapeAttr(title)}">${escapeText(proposedWord(mark))}</span>`;
+  return `<span class="atlas-row-proposed" data-role="proposed-word" title="${escapeAttr(proposedTitle(mark))}">${escapeText(proposedWord(mark))}</span>`;
 }
 
 /**

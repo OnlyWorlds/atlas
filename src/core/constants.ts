@@ -317,11 +317,27 @@ export function isExtensionField(name: string): boolean {
  * what its room makes (core/parlor-room.ts).
  * `x_checks_` is the checks profile's (dist.47):
  * `x_checks_rules` on a work world's Charter, which a reader never writes.
+ * `x_spine_` is the spine profile's (dist.55): a software ecosystem's rows,
+ * their address, status and what each depends on.
  */
-export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_'] as const;
+export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_', 'x_spine_'] as const;
 
 export function isProfileField(name: string): boolean {
   return PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));
+}
+
+/**
+ * The profile keys a re-key never enters, each by its own page: the identity
+ * key (folder spec v0.3.11, the one exception to §3.3), the packet (its ids are
+ * the source world's as they were) and the review marks. Every other profile
+ * key is an `x_` value like any other, so a value that is exactly a moved id
+ * moves with it (§3.3): the spine's `x_spine_depends_on`, the room's sitting in
+ * `x_room_of` and its Take's `x_room_item` are ids in this world.
+ */
+export const REKEY_EXEMPT_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_'] as const;
+
+export function isRekeyExemptField(name: string): boolean {
+  return REKEY_EXEMPT_PREFIXES.some(p => name.startsWith(p));
 }
 
 /**

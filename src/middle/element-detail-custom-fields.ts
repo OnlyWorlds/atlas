@@ -202,7 +202,8 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
       body.appendChild(row);
     }
     // A published profile's key: its value, read only, with no ×. Changing or
-    // removing it would merge or split a being for every tool that reads it.
+    // removing it changes what every tool that reads it sees (an identity key
+    // would merge or split a being).
     for (const entry of profiles) {
       const row = document.createElement('div');
       row.className = 'atlas-custom-structured-row';
@@ -210,7 +211,9 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
       const label = document.createElement('div');
       label.className = 'atlas-custom-structured-label';
       label.textContent = humanizeFieldName(entry.name);
-      label.title = `${entry.name}: says which elements, in this world or others, are the same being. Atlas shows it read-only.`;
+      label.title = entry.name.startsWith('x_identity_')
+        ? `${entry.name}: says which elements, in this world or others, are the same being. Atlas shows it read-only.`
+        : `${entry.name}: a shared field other tools read the same way. Atlas shows it read-only.`;
       const value = document.createElement('pre');
       value.className = 'atlas-custom-structured-value';
       value.textContent = typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value);

@@ -14124,6 +14124,18 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-context-graph-node.is-backlink .atlas-context-graph-node-label {
   opacity: 0.62;
 }
+/* A proposed or hidden node keeps its ring's meaning (dashed is ring 2) and
+   adds a dotted warn ring outside it, with the word in its label. */
+.atlas-context-graph-node.is-proposed,
+.atlas-context-graph-node.is-hidden {
+  outline: 1.5px dotted var(--atlas-warn);
+  outline-offset: 2px;
+}
+.atlas-context-graph-node-mark {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--atlas-warn);
+}
 /* The legend: bottom-left, one muted line, present only when backlinks
    are drawn. */
 .atlas-context-graph-legend {

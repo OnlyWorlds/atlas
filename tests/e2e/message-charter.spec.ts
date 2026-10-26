@@ -61,13 +61,19 @@ test.describe('#526 messages and the charter', () => {
 
     await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, msg]);
     const line = page.locator('[data-role="message-parties"]');
-    await expect(line).toHaveText('From Codex · To BB, Kael');
+    // A folder world has no roster, so the sender is a claim (the message profile).
+    await expect(line).toHaveText('Claims to be from Codex · To BB, Kael');
     await line.getByRole('link', { name: 'BB' }).click();
     await expect(page).toHaveURL(new RegExp(`#/w/${w}/element/${bb}$`));
 
     await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, saga]);
     await expect(page.locator('[data-role="element-name"]')).toHaveText('A saga');
     await expect(page.locator('[data-role="message-parties"]')).toHaveCount(0);
+
+    // An empty Characters list is addressed to everyone.
+    const all = await createElement(page, 'narrative', { name: 'To the crew', supertype: 'Message', narrator: kael, characters: [] });
+    await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, all]);
+    await expect(page.locator('[data-role="message-parties"]')).toHaveText('Claims to be from Kael · To everyone');
   });
 
   test("a world's charter leads Home and opens from there", async ({ page }) => {

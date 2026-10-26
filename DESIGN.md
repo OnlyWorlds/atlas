@@ -54,7 +54,7 @@ A decision is written into the right doc here when it is made; these docs are th
 | Doc | Holds |
 |---|---|
 | `DESIGN.md` | this index: vision, the principle, world states, the map of everything else |
-| `DESIGN_LAWS.md` | the numbered Critical Conventions 1-177, grouped by area, with their guards |
+| `DESIGN_LAWS.md` | the numbered Critical Conventions 1-180, grouped by area, with their guards |
 | `DESIGN_FOLDER.md` | on-disk layout, the union read, **File naming** (the Folder Format spec source), the atlas root, every `.atlas/` file, media, the FolderStore contract |
 | `DESIGN_SYNC.md` | the SyncEngine as built, push and pull triggers, pause and hold, creating and linking worlds, Make Online, ids, the re-key kernel, account mode, world-meta sync |
 | `DESIGN_SHELL.md` | the three-pane shell, rooms, the narrow-window layer, the state shape, routes, the context pane |

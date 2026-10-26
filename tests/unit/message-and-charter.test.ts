@@ -14,32 +14,81 @@ const kael = el({ id: 'c3', type: 'character', name: ' Kael ' });
 const place = el({ id: 'l1', type: 'location', name: 'Harbour' });
 const world = [codex, bb, kael, place];
 
-describe('messageParties', () => {
-  it('reads the sender from the Narrator and the recipients from the Characters, in order', () => {
-    const m = el({ id: 'n1', type: 'narrative', supertype: 'Message', narrator: 'c1', characters: ['c2', 'c3'] });
-    expect(messageParties(m, world)).toEqual({ from: { id: 'c1', name: 'Codex' }, to: [{ id: 'c2', name: 'BB' }, { id: 'c3', name: 'Kael' }] });
+describe('messageParties, by the message profile', () => {
+  // As keel served it: a stamp and no edit since, so its created_by counts.
+  const msg = (o: Record<string, unknown>) => el({ id: 'n1', type: 'narrative', supertype: 'Message', server_updated_at: '2026-10-26T10:00:00Z', ...o });
+  // keel's members list: the owner's row has id null; m2 plays BB, m3 plays Kael.
+  const members = [{ id: null, character: 'c1' }, { id: 'm2', character: 'c2' }, { id: 'm3', character: 'c3' }];
+
+  it('reads the claimed sender from the Narrator and the recipients from the Characters, in order', () => {
+    const m = msg({ narrator: 'c1', characters: ['c2', 'c3'] });
+    expect(messageParties(m, world)).toEqual({
+      sender: 'unverifiable', from: { id: 'c1', name: 'Codex' }, fromOutside: false, writtenBy: null, writtenByOutside: false,
+      toEveryone: false, to: [{ id: 'c2', name: 'BB' }, { id: 'c3', name: 'Kael' }], toOutside: 0, wholeWorld: true,
+    });
   });
 
-  it('knows a message by its supertype in any case, and nothing else', () => {
+  it('knows a message by the pair, folded, the whole word', () => {
     expect(isMessage(el({ type: 'narrative', supertype: ' message ' }))).toBe(true);
+    expect(isMessage(el({ type: 'narrative', supertype: 'Messages' }))).toBe(false);
     expect(isMessage(el({ type: 'narrative', supertype: 'Saga' }))).toBe(false);
     expect(isMessage(el({ type: 'narrative' }))).toBe(false);
     expect(isMessage(el({ type: 'event', supertype: 'Message' }))).toBe(false);
     expect(messageParties(el({ id: 'n', type: 'narrative', supertype: 'Saga', narrator: 'c1' }), world)).toBeNull();
   });
 
-  it('leaves out ids the world does not hold and links that are not Characters', () => {
-    const m = el({ id: 'n1', type: 'narrative', supertype: 'Message', narrator: 'gone', characters: ['l1', 'c2', 'gone'] });
-    expect(messageParties(m, world)).toEqual({ from: null, to: [{ id: 'c2', name: 'BB' }] });
+  it('is verified only when the roster proves the writer plays the Narrator', () => {
+    expect(messageParties(msg({ narrator: 'c2', created_by: 'm2' }), world, { members })?.sender).toBe('verified');
+    expect(messageParties(msg({ narrator: 'c1', created_by: null }), world, { members })?.sender).toBe('verified');
+    // No roster, or no created_by at all (a folder): a claim.
+    expect(messageParties(msg({ narrator: 'c2', created_by: 'm2' }), world, { members: null })?.sender).toBe('unverifiable');
+    expect(messageParties(msg({ narrator: 'c2' }), world, { members })?.sender).toBe('unverifiable');
   });
 
-  it('says the sender once when it is also a recipient, and each recipient once', () => {
-    const m = el({ id: 'n1', type: 'narrative', supertype: 'Message', narrator: 'c1', characters: ['c1', 'c2', 'c2'] });
-    expect(messageParties(m, world)?.to).toEqual([{ id: 'c2', name: 'BB' }]);
+  it('created_by proves nothing on a body keel did not serve as it is (the S484 gate G2)', () => {
+    // Never stamped (made or hand-written here), or edited since the stamp: a claim.
+    const unstamped = el({ id: 'n1', type: 'narrative', supertype: 'Message', narrator: 'c1', created_by: null });
+    expect(messageParties(unstamped, world, { members })?.sender).toBe('unverifiable');
+    const edited = msg({ narrator: 'c1', created_by: null, local_updated_at: '2026-10-26T11:00:00Z' });
+    expect(messageParties(edited, world, { members })?.sender).toBe('unverifiable');
+    const clean = msg({ narrator: 'c1', created_by: null, local_updated_at: '2026-10-26T09:00:00Z' });
+    expect(messageParties(clean, world, { members })?.sender).toBe('verified');
   });
 
-  it('draws no line for a message with nobody in the world on it', () => {
-    expect(messageParties(el({ id: 'n1', type: 'narrative', supertype: 'Message' }), world)).toBeNull();
+  it('a mismatch names whose key wrote it', () => {
+    const p = messageParties(msg({ narrator: 'c1', created_by: 'm3' }), world, { members });
+    expect(p?.sender).toBe('mismatch');
+    expect(p?.from?.name).toBe('Codex');
+    expect(p?.writtenBy).toEqual({ id: 'c3', name: 'Kael' });
+  });
+
+  it('an empty Characters list is addressed to everyone; a list of nothing valid to nobody', () => {
+    expect(messageParties(msg({ narrator: 'c1', characters: [] }), world)?.toEveryone).toBe(true);
+    expect(messageParties(msg({ narrator: 'c1' }), world)?.toEveryone).toBe(true);
+    const none = messageParties(msg({ narrator: 'c1', characters: [''] }), world);
+    expect(none?.toEveryone).toBe(false);
+    expect(none?.to).toEqual([]);
+    expect(none?.toOutside).toBe(0);
+  });
+
+  it('counts ids the world does not hold as Characters, and names none of them', () => {
+    const p = messageParties(msg({ narrator: 'gone', characters: ['l1', 'c2', 'gone', 'c2'] }), world);
+    expect(p?.from).toBeNull();
+    expect(p?.fromOutside).toBe(true);
+    expect(p?.to).toEqual([{ id: 'c2', name: 'BB' }]);
+    expect(p?.toOutside).toBe(2);
+  });
+
+  it('a note to self lists its sender as written', () => {
+    expect(messageParties(msg({ narrator: 'c1', characters: ['c1'] }), world)?.to).toEqual([{ id: 'c1', name: 'Codex' }]);
+  });
+
+  it('from nobody when there is no Narrator, and no line with nothing on it', () => {
+    const p = messageParties(msg({ characters: ['c2'] }), world);
+    expect(p?.from).toBeNull();
+    expect(p?.fromOutside).toBe(false);
+    expect(messageParties(msg({}), world)).toBeNull();
+    expect(messageParties(msg({ characters: [] }), world)).toBeNull();
   });
 });
 
