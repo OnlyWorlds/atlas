@@ -17,7 +17,7 @@
     "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@onlyworlds/sdk": "4.84.1",
+    "@onlyworlds/sdk": "4.86.0",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-mention": "^3.31.3",
     "@tiptap/markdown": "^3.31.3",
