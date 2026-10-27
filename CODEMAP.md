@@ -54,6 +54,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/join-capture.ts`: the `#/join/` code out of the address bar first (contract R2), held in memory for the door.
 - `src/core/held-seats.ts`: HELD SEATS (conv. 178): a spent link's seat, one localStorage record per world, `holdSeat` at the redeem, `heldSeats` for the list, `settleHeldSeats` (run on every registry change in `src/app.ts`) when its world lands, the `held-<id>` Web Lock. Guard: `tests/integration/held-seats.test.ts`.
 - `src/core/open-capture.ts`: the `#/open/<world id>` id out of the address bar the same way (1.49), held in memory for `src/setup/open-door.ts`.
+- `src/core/open-address.ts`: a pasted OnlyWorlds address (1.97: the site's link to a world or an element, or `ow://` text with its world) read by the SDK's `parseOwLink` into the `#/open` door's hash, or refused in words (a page name, no world, cut short). Two ways in: the search palette's one Open this link row (`src/ui/command-palette.ts`, `openPastedLink`) and a paste outside a text field (`src/app.ts`). Unit `tests/unit/open-address.test.ts`, e2e in `tests/e2e/open-door.spec.ts`.
 
 ## src/store
 

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.97.0',
+    date: '2026-10-27',
+    theme: 'A link from OnlyWorlds, pasted',
+    entries: [
+      {
+        id: 'paste-onlyworlds-address',
+        title: 'Paste a link to a world or an element from OnlyWorlds',
+        body: "Paste a link from onlyworlds.com (Copy link on a world or an element) anywhere in Atlas outside a text field, or into Search, and Atlas opens it the way Open in Atlas does: a world already here opens at that element, a world from your account after you say Open. A link that names the world by its page name says to use Copy link instead.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.96.0',
     date: '2026-10-27',
     theme: 'The way back to the site',

@@ -45,6 +45,7 @@ import { installLiveFolder } from './core/live-folder';
 import { installWorldPrefsSync } from './core/world-prefs';
 import { captureJoinCode, hasPendingJoin } from './core/join-capture';
 import { captureOpenWorld, takePendingOpen, takePendingOpenElements } from './core/open-capture';
+import { openHashOfAddress, pasteIsForAField } from './core/open-address';
 import { clearOpenLanding, landingStep, peekOpenLanding, setOpenLanding } from './core/open-landing';
 import { openPacketBar } from './ui/open-packet-bar';
 import { installForgetPresence } from './setup/forget-browser';
@@ -79,6 +80,15 @@ export function startApp(container: HTMLElement): AppHandle {
     if (!e.persisted) return;
     const merged = adoptStoredRegistry(getState().registry);
     if (merged) patchSlice('registry', merged);
+  });
+  // A pasted OnlyWorlds address outside a text field opens by the #/open door
+  // (core/open-address.ts); a paste into a field stays the field's.
+  document.addEventListener('paste', (e) => {
+    if (pasteIsForAField(e.target)) return;
+    const link = openHashOfAddress(e.clipboardData?.getData('text/plain') ?? '');
+    if (!link) return;
+    e.preventDefault();
+    void import('./ui/command-palette').then(m => m.openPastedLink(link));
   });
   // Hydrate UI prefs (sidebar mode is state-driven —
   // decoupled from URL routing; persists across reloads as a user preference).

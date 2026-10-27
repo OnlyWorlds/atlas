@@ -200,3 +200,58 @@ test('a truncated link is said, and the address bar is cleared (#104)', async ({
   await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
   expect(keel.mints).toBe(0);
 });
+
+const SITE = 'https://www.onlyworlds.com/w/';
+
+async function toClipboard(page: Page, text: string) {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate((t) => navigator.clipboard.writeText(t), text);
+}
+
+/** A real paste (Ctrl+V) with nothing focused, the address on the clipboard. */
+async function pasteOnPage(page: Page, text: string) {
+  await toClipboard(page, text);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+  await page.keyboard.press('ControlOrMeta+V');
+}
+
+test('a pasted site address, outside a text field, goes through the same door (#755)', async ({ page }) => {
+  const keel = await mockKeel(page);
+  await seedSignIn(page);
+  await arriveAt(page, '#/');
+  await page.waitForSelector('.atlas-shell');
+  await pasteOnPage(page, `Look: ${SITE}${ID}/character/c0000000-0000-4000-8000-000000000077.`);
+  await expect(page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' })).toBeVisible();
+  expect(keel.mints).toBe(0);
+  // A world named by its page name is said, and nothing is asked.
+  await pasteOnPage(page, `${SITE}open-realm`);
+  await expect(page.locator('.ow-toast', { hasText: 'names the world by its page name' })).toBeVisible();
+  expect(keel.mints).toBe(0);
+});
+
+test('the palette opens a pasted address by the same door, and a field keeps its paste (#755)', async ({ page }) => {
+  await setupAtlasRoot(page);
+  const keel = await mockKeel(page);
+  await seedSignIn(page);
+  await arriveAt(page, '#/');
+  await page.waitForSelector('[data-action="create-local"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Paste Desk');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect.poll(async () => (await entryFor(page)).active).not.toBeNull();
+  await page.keyboard.press('ControlOrMeta+K');
+  const input = page.locator('.atlas-cmdk-input, [data-role="cmdk-input"]').first();
+  await expect(input).toBeFocused();
+  // A paste into the palette's field is the field's: it fills, and the row offers the link.
+  await toClipboard(page, `${SITE}${ID}`);
+  await input.focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect(input).toHaveValue(`${SITE}${ID}`);
+  const row = page.locator('.atlas-cmdk-row[data-kind="action"]', { hasText: 'Open this link' });
+  await expect(row).toBeVisible();
+  await expect(page.locator('[data-action="cmdk-see-all"]')).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' })).toBeVisible();
+  expect(keel.mints).toBe(0);
+});

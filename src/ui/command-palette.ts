@@ -35,6 +35,7 @@ import { forPointer } from '../core/pointer';
 import { currentLore } from '../core/parlor-room';
 import { proposedMarkOf, proposedWord } from '../core/review-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
+import { openHashOfAddress } from '../core/open-address';
 
 const MAX_ELEMENT_RESULTS = 12;
 const MAX_ROOM_RESULTS = 3;
@@ -53,6 +54,8 @@ export interface PaletteResult {
   proposed?: string;
   /** The hidden mark's line (conv. 170), shown as the word Hidden with it as title. */
   hidden?: string;
+  /** A pasted OnlyWorlds address: the open door's hash, or why it cannot open. */
+  link?: { hash: string } | { refused: string };
   score: number;
 }
 
@@ -176,6 +179,15 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
  * Exported for unit tests.
  */
 export function paletteRows(query: string, elements: readonly Element[]): PaletteResult[] {
+  // A pasted OnlyWorlds address is one row: open it, by the #/open door.
+  const link = openHashOfAddress(query);
+  if (link) {
+    return [{
+      kind: 'action', id: 'open-link', name: 'Open this link', link, score: 100,
+      hint: 'OnlyWorlds link',
+      ...('refused' in link ? { snippet: link.refused } : {}),
+    }];
+  }
   const results = searchPalette(query, elements);
   const name = query.trim();
   // The tour scripts every create; a typed name would be ignored there. A
@@ -253,8 +265,12 @@ class CommandPalette extends BaseModal {
   }
 
   /** Result rows + the see-all row when a query is live. */
+  private isLink(): boolean {
+    return this.results.some(r => r.link);
+  }
+
   private rowCount(): number {
-    return this.results.length + (this.query.trim() ? 1 : 0);
+    return this.results.length + (this.query.trim() && !this.isLink() ? 1 : 0);
   }
 
   private renderList(): void {
@@ -282,7 +298,7 @@ class CommandPalette extends BaseModal {
       icon.textContent = r.kind === 'room'
         ? (ROOMS.find(rm => rm.segment === r.id)?.icon ?? 'door_open')
         : r.kind === 'action'
-          ? (ACTIONS.find(a => a.id === r.id)?.icon ?? 'bolt')
+          ? (r.link ? 'link' : ACTIONS.find(a => a.id === r.id)?.icon ?? 'bolt')
           : r.kind === 'create'
             ? 'add'
             : (r.type ? ELEMENT_ICONS[r.type] : 'category');
@@ -330,7 +346,8 @@ class CommandPalette extends BaseModal {
       this.list.appendChild(row);
     });
 
-    // See-all: hand the query to the elements-sidebar filter.
+    // See-all: hand the query to the elements-sidebar filter (a link is no filter).
+    if (this.isLink()) return;
     const seeAll = document.createElement('button');
     seeAll.type = 'button';
     seeAll.className = 'atlas-cmdk-row atlas-cmdk-seeall'
@@ -373,7 +390,8 @@ class CommandPalette extends BaseModal {
       return;
     }
     if (r.kind === 'action') {
-      if (r.id === 'reload-disk') void reloadFromDisk();
+      if (r.link) void openPastedLink(r.link);
+      else if (r.id === 'reload-disk') void reloadFromDisk();
       else if (r.id === 'add-world' || r.id === 'open-world-folder' || r.id === 'open-world-file') void openWorldDoor(r.id);
       return;
     }
@@ -406,6 +424,17 @@ class CommandPalette extends BaseModal {
     // there is a dead click. The home desk deliberately does not route.
     openElementTarget(el, this.worldId, { routeToMap: true });
   }
+}
+
+/**
+ * A pasted OnlyWorlds address, from the palette or a paste outside a text
+ * field: the door's hash, which the app takes on its next render, or the
+ * refusal said.
+ */
+export async function openPastedLink(link: { hash: string } | { refused: string }): Promise<void> {
+  if ('hash' in link) { navigate(link.hash); return; }
+  const { toastManager } = await import('./toast-manager');
+  toastManager.error(link.refused);
 }
 
 /** Open the palette (no-op without an active world, or when already open). */
