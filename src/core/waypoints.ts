@@ -72,16 +72,16 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     id: 'first-world',
     name: 'Your world, your files',
     // True for a world in this browser too (1.17, contract §6.2).
-    concept: 'Your world is plain files in an open format, no account needed: in a folder on your drive any tool can read it, and a world in this browser can leave as one file any time.',
+    concept: 'A world is plain files in an open format, kept in a folder on your drive or in this browser.',
     action: 'Start your first world.',
-    toast: 'Your world is plain files, and it can always leave.',
+    toast: 'Your world is kept as plain files.',
     glyph: 'description', // plain files, wherever they live: never a folder
     link: () => '#/',
   },
   {
     id: 'first-element',
     name: 'A place for everything',
-    concept: 'Every OnlyWorlds tool speaks the same 22 element types, a shared vocabulary for whole worlds.',
+    concept: 'A world is made of 22 element types, the same in every OnlyWorlds tool.',
     action: 'Create your first element and meet the type grid.',
     toast: 'Every piece of your world has a place.',
     glyph: 'category',
@@ -89,10 +89,10 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   },
   {
     id: 'taxonomy',
-    name: 'Label it your way',
+    name: 'Your own labels',
     concept: 'Supertype and subtype are free labels on every element, with no fixed list.',
     action: 'Set a supertype and a subtype on any element.',
-    toast: 'Labels are yours to invent.',
+    toast: 'Your elements carry labels of your own.',
     glyph: 'sell',
     link: (w) => (w ? `#/w/${w}/elements` : null),
   },
@@ -164,7 +164,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'share',
     name: 'Share your world as a page',
-    concept: 'Publishing renders your existing elements at a public URL. No separate site needed.',
+    concept: 'A page shows the elements you pick at a public address.',
     action: 'Preview or publish a page in the pages room.',
     toast: 'Your world has a public face.',
     glyph: 'public',
@@ -183,7 +183,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     // 1.17, contract §6.2: atlas-level, once ever; a world of the user's own.
     id: 'keep-copy',
     name: 'Keep a copy',
-    concept: 'A world is plain files, so it can always leave whole: as one downloaded file, in a folder, or in your account.',
+    concept: 'A copy can be one downloaded file, a folder on your drive, or your onlyworlds.com account.',
     action: 'Download your world, move it to a folder, or take it online.',
     toast: 'Your world has a copy outside this browser.',
     glyph: 'download',

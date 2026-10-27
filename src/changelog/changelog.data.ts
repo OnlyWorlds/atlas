@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.97.2',
+    date: '2026-10-27',
+    theme: 'Fewer words',
+    entries: [
+      {
+        id: 'signed-in-no-email',
+        title: 'Signed in, Settings no longer asks for your email',
+        body: 'The email field only filled in the sign-in of Make online, which a signed-in account skips. It shows again when you sign out.',
+        tags: ['settings'],
+      },
+      {
+        id: 'waypoints-plainer',
+        title: 'The waypoints say what they are, plainly',
+        body: 'Several waypoint lines in Settings are shorter and less like an advert, and "Label it your way" is now "Your own labels".',
+        tags: ['copy'],
+      },
+    ],
+  },
+  {
     version: '1.97.1',
     date: '2026-10-27',
     theme: 'A message read in part',

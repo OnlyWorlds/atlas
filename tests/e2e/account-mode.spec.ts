@@ -129,8 +129,12 @@ test('forget drops the token and the remote section disappears', async ({ page }
   await page.reload();
   await page.waitForSelector('.atlas-shell');
   await page.click('[data-action="open-settings"]');
+  // Signed in, the email that only fills the signed-out sign-in fields is not asked.
+  await expect(page.locator('[data-role="account-token-block"]')).toContainText('Signed in');
+  await expect(page.locator('.atlas-settings input[name="email"]')).toHaveCount(0);
   await page.click('[data-action="account-forget"]');
   await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await expect(page.locator('.atlas-settings input[name="email"]')).toBeVisible();
   await expect(page.locator('.atlas-remote-worlds')).toBeEmpty();
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('atlas_worlds_registry')!).account_token ?? null
@@ -499,6 +503,7 @@ test('signing in with email and password keeps a token made for this browser, ne
   await page.fill('input[name="account-password"]', PASSWORD);
   await page.click('[data-action="account-sign-in-password"]');
   await expect(page.locator('.ow-toast', { hasText: 'Signed in as e2e-member' })).toBeVisible();
+  await expect(page.locator('.atlas-settings input[name="email"]')).toHaveCount(0);
   expect(minted).toHaveLength(1);
   expect(minted[0].session).toBe('e2e-session');
   expect(minted[0].name).toMatch(/^Atlas in /);

@@ -47,8 +47,8 @@ export function signInErrorLine(err: unknown): string {
 
 /**
  * #282 (journey scout gap 3): the tab read as two sign-ins side by side. The
- * account token is the one sign-in, so it comes first; the PIN and email
- * below it are what Atlas keeps for writing, each saying what it is for and
+ * account token is the one sign-in, so it comes first; the PIN (and, signed
+ * out, the email) below it are what Atlas keeps for writing, each saying what it is for and
  * where it comes from (keel: one PIN per account, set on Account settings).
  */
 export function renderAccountTab(reg: WorldsRegistry): string {
@@ -69,6 +69,17 @@ export function renderAccountTab(reg: WorldsRegistry): string {
         </div>
       </label>
       <p class="atlas-settings-hint" data-role="pin-hint">One PIN for all your worlds. You set it on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
+      ${reg.account_token ? '' : renderEmailField(reg)}
+    </section>
+  `;
+}
+
+/**
+ * The email only fills the sign-in fields of Make online and a new online
+ * world, which ask for it only while signed out; signed in, nothing reads it.
+ */
+function renderEmailField(reg: WorldsRegistry): string {
+  return `
       <label class="atlas-settings-field">
         <span>Email</span>
         <input class="atlas-input" type="email" name="email"
@@ -77,7 +88,6 @@ export function renderAccountTab(reg: WorldsRegistry): string {
                autocomplete="email" />
       </label>
       <p class="atlas-settings-hint" data-role="email-hint">Your onlyworlds.com email. Where Atlas asks you to sign in, such as Make online, it fills it in from here.</p>
-    </section>
   `;
 }
 

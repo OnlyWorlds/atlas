@@ -2,7 +2,7 @@
   "src/core/browser-worlds.ts": 1,
   "src/core/live-folder.ts": 1,
   "src/core/problems.ts": 10,
-  "src/core/waypoints.ts": 4,
+  "src/core/waypoints.ts": 5,
   "src/demo/demo-view.ts": 1,
   "src/main.ts": 2,
   "src/middle/element-detail-header.ts": 1,
