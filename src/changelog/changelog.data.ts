@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.97.1',
+    date: '2026-10-27',
+    theme: 'A message read in part',
+    entries: [
+      {
+        id: 'served-trimmed-not-sent',
+        title: 'A message you were shown in part syncs your edits again',
+        body: "When OnlyWorlds shows you a message with some of its recipients left out, because your seat may not see them, it marks which lists it shortened. Atlas keeps that mark in the file and no longer sends it back, so an edit to such a message is no longer refused on sync. The recipients you cannot see stay on the message online.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.97.0',
     date: '2026-10-27',
     theme: 'A link from OnlyWorlds, pasted',

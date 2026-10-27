@@ -229,8 +229,12 @@ export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via', 
  * `SERVER_AUTHOR_FIELDS` and kept the same way: on disk as received, never
  * sent (keel ignores it in a write), never a difference anyone made, dropped
  * on import. A pull without it removes it (an unhide).
+ * `x_served_trimmed`: the fields of a body keel served with ids this
+ * reader may not see left out (the message profile). Kept the same way,
+ * and never sent: keel refuses a write that carries it with a 422 (folder
+ * spec §4.4 rule 6). Being an x_ key, an import keeps it as any other.
  */
-export const SERVER_MARK_FIELDS = ['hidden'] as const;
+export const SERVER_MARK_FIELDS = ['hidden', 'x_served_trimmed'] as const;
 
 export const ATLAS_LOCAL_ONLY_FIELDS = [
   'image_media_id',
