@@ -26,7 +26,7 @@ import {
   writingHash,
 } from '../core/router';
 import { getState, patchSlice, subscribe } from '../core/state';
-import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused, updateWorldEntry } from '../registry/registry';
+import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused, storedRegistry, updateWorldEntry } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { copyChip, copyLine } from '../core/world-copy';
@@ -38,6 +38,7 @@ import { CreateWorldModal } from '../ui/create-world-modal';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
+import { takeBackMintedKey } from '../sync/key-takeback';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable, upToDate } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
@@ -314,9 +315,21 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       const entry = getState().registry.worlds.find(w => w.id === worldId);
       if (!entry?.cleared_at) return;
       if (!window.confirm(`Remove "${entry.name}" from your list? The browser has already cleared its storage.`)) return;
-      const next = deleteWorldEntry(getState().registry, worldId);
-      saveRegistry(next);
+      // Re-read from storage after the blocking confirm: another tab's
+      // Download again could have restored this row with a live key meanwhile
+      // (#814 gate G1/G7). getState() is this tab's in-memory copy, stale until
+      // the queued storage event is adopted; storedRegistry() reads localStorage
+      // fresh. Act only if it is still the cleared row, same key and same folder.
+      let stored: ReturnType<typeof storedRegistry> | null = null;
+      try { stored = storedRegistry(); } catch { stored = null; }
+      const now = (stored ?? getState().registry).worlds.find(w => w.id === worldId);
+      if (!now?.cleared_at || now.api?.api_key !== entry.api?.api_key || now.folder?.folder_name !== entry.folder?.folder_name) { renderAll(); return; }
+      // Remove the row first (its storage is already gone), then take the key
+      // back only if that save landed (T3).
+      const next = deleteWorldEntry(stored ?? getState().registry, worldId);
+      if (!saveRegistry(next)) { renderAll(); return; }
       patchSlice('registry', next);
+      await takeBackMintedKey(now);
       return;
     }
     const favBtn = target.closest<HTMLElement>('[data-role="fav-toggle"]');

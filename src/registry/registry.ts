@@ -229,6 +229,8 @@ export interface CreateApiLinkedWorldOpts {
   /** Linked as an agent seat (#104): the marker, and its secret when this browser holds it. */
   seat?: { role?: string };
   seatSecret?: string;
+  /** The id and tail of the key Atlas minted for this world (#814); recorded only for a key Atlas made. */
+  keyMint?: { id: string; tail: string };
 }
 
 /**
@@ -249,6 +251,10 @@ export function createApiLinkedWorld(
   if (opts.seat && !opts.readOnly) {
     apiBlock.seat = { ...opts.seat };
     if (opts.seatSecret) apiBlock.seat_secret = opts.seatSecret;
+  }
+  // #814: only when Atlas minted the key, and its tail still matches it.
+  if (opts.keyMint && opts.keyMint.tail && opts.apiKey.endsWith(opts.keyMint.tail)) {
+    apiBlock.key_mint = { id: opts.keyMint.id, tail: opts.keyMint.tail };
   }
   const entry: WorldRegistryEntry = {
     id: crypto.randomUUID(),

@@ -44,6 +44,7 @@ import { sharedRuleHolds, sharedWorldLine } from '../sync/shared-world';
 import { memberRoleLine } from '../sync/role-change';
 import { buildV2Adapter } from '../sync/make-online';
 import { keyRefusalFor, makeNewWorldKey, newKeyCures, offersMakeKey } from '../sync/world-key';
+import { takeBackMintedKey } from '../sync/key-takeback';
 import { keyRefusalHere, keyRefusalOf, seatRefusalLine } from '../sync/world-key-lines';
 import type { WorldRegistryEntry } from '../core/types';
 import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
@@ -565,9 +566,17 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         toasts.error('The world is unlinked, but Atlas could not clear its old sync record in this world. Before taking it online again, reload the page; if Make online then shows an empty world, tell us at onlyworlds.com/feedback.');
       }
     }
+    // The key Atlas minted leaves with the link; on a browser world it is
+    // taken back (#814), read from the registry as it stands now, before the
+    // api block is stripped. A folder world's key may be in a copy of the
+    // folder, so nothing is sent for one.
+    const beforeDetach = getState().registry.worlds.find(w => w.id === world.id) ?? world;
     const next = detachApi(getState().registry, world.id);
-    saveRegistry(next);
+    const saved = saveRegistry(next);
     patchSlice('registry', next);
+    // Only once the unlink has landed in storage: else a reload restores the
+    // linked world on a key this would have revoked (#814 T3/gate G4).
+    if (saved) await takeBackMintedKey(beforeDetach);
     toasts.success(`Unlinked ${world.name}`);
   });
 

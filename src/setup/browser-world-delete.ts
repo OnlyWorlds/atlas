@@ -22,6 +22,7 @@ import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
 import { deleteWorldEntry, saveRegistry } from '../registry/registry';
 import { detachSyncEngine, getCurrentSyncWorldId } from '../sync/sync-attach';
 import { clearSyncIssues } from '../sync/sync-issues';
+import { takeBackMintedKey } from '../sync/key-takeback';
 import type { WorldRegistryEntry } from '../core/types';
 
 export type BrowserDeleteResult =
@@ -60,8 +61,11 @@ export async function deleteBrowserWorld(world: WorldRegistryEntry): Promise<Bro
     } catch (error) {
       return { ok: false as const, error, wasActive };
     }
-    // Removed: only now does the entry go.
+    // Removed: only now does the entry go. The key Atlas minted for it is
+    // taken back first (#814), by the record on the entry as the registry
+    // holds it now; its files are in this browser alone, so no copy uses it.
     clearSyncIssues(world.id);
+    await takeBackMintedKey(getState().registry.worlds.find(w => w.id === world.id) ?? world);
     const next = deleteWorldEntry(getState().registry, world.id);
     const listSaved = saveRegistry(next);
     patchSlice('registry', next);

@@ -605,6 +605,14 @@ export interface WorldRegistryEntry {
      * it, and the world is opened again from onlyworlds.com.
      */
     seat_secret?: string;
+    /**
+     * The id and key-tail of the key Atlas minted from the account token for
+     * this world (#814). Registry only, never world.json: a folder's key is
+     * shared by every copy of the folder, so only a browser world's key is
+     * ever taken back, and then only while `api_key` still ends with `tail`
+     * (`mintedKeyId`). A pasted key clears it; a swap writes it fresh.
+     */
+    key_mint?: { id: string; tail: string };
   };
   /**
    * Server world id this entry was PREVIOUSLY linked to (set by unlink /

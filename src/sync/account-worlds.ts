@@ -18,6 +18,7 @@
 import { downloadingLine } from '../ui/download-progress';
 import { getState, patchSlice, subscribe } from '../core/state';
 import { SIGNED_IN_AGAIN_LINE } from './token-revoke';
+import { mintRecordOf } from './key-takeback';
 import { navigate, homeHash } from '../core/router';
 import { saveRegistry, setPin, findWorldByServerId, findLinkedWorld } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
@@ -307,6 +308,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
         readOnly,
         displayName: row.name,
         knownWorld: { id: row.id, name: row.name },
+        keyMint: mintRecordOf(minted.key, minted.id),
         onProgress: (p) => {
           if (p.phase === 'list') {
             overlay.update(`Finding elements${p.currentType ? ` · ${p.currentType}` : ''}…`);

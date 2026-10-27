@@ -29,6 +29,7 @@ import { heldSeats } from '../core/held-seats';
 import { getState } from '../core/state';
 import { mintedTokenId } from '../registry/registry';
 import { revokeAtlasToken } from '../sync/token-revoke';
+import { mintedKeyId, takeBackMintedKey } from '../sync/key-takeback';
 
 const CHANNEL = 'atlas-forget';
 /** This tab: a channel hears other channel objects in its own tab too, so messages carry who sent them. */
@@ -151,7 +152,14 @@ export async function forgetEverything(deps: {
     for (const d of (await indexedDB.databases?.()) ?? []) if (d.name) names.add(d.name);
   } catch { /* databases() missing: the vault is Atlas's one database */ }
   for (const name of names) await deleteDatabase(name).catch(err => console.warn('[forget] could not delete', name, err));
-  // 5. A token Atlas minted is revoked here, after everything that can stop
+  // 5. The keys Atlas minted for the browser worlds now gone are taken back
+  // (#814), before the token that can revoke them, and before the registry
+  // that holds their records (their files are in this browser alone, so no
+  // copy uses them). Each is best effort and does not stop the forget.
+  // Concurrently, so a batch of offline revokes is bounded by one 8 s limit,
+  // not their sum (#814 gate G5). Folder worlds are skipped inside the call.
+  await Promise.all(getState().registry.worlds.filter(w => mintedKeyId(w)).map(w => takeBackMintedKey(w)));
+  // 6. A token Atlas minted is revoked here, after everything that can stop
   // the forget and right before the registry goes: a forget that stopped
   // earlier keeps a working token, never a revoked one.
   // Its outcome does not stop the forget.

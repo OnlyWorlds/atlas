@@ -910,6 +910,12 @@ export interface LinkExistingApiWorldOpts {
    * `cancel` abandons the link and removes the folder this call created.
    */
   shouldStop?: () => DownloadStop;
+  /**
+   * The id of the key Atlas minted for this world (#814). Recorded on the
+   * entry (only for a browser world, and only while the key's tail matches),
+   * so that removing the world can take the key back on the account.
+   */
+  keyMint?: { id: string; tail: string };
 }
 
 export interface LinkExistingApiWorldResult {
@@ -1129,6 +1135,8 @@ export async function linkExistingApiWorldInRoot(
     readOnly,
     seat,
     seatSecret: seat ? apiPin : undefined,
+    // No key_mint on a folder world (#814 gate G6): a folder's key is shared by
+    // every copy of the folder, so it is never taken back and never recorded.
   });
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
@@ -1194,7 +1202,7 @@ async function linkIntoBrowser(
   const { next, entry: made } = createApiLinkedWorld(regAfter, {
     name: displayName, apiWorldId: serverWorldId, apiKey, folderName: subName, handleKey,
     pathHint: `browser storage/${subName}`, apiWorldName: world.name, readOnly,
-    seat, seatSecret: seat ? apiPin : undefined,
+    seat, seatSecret: seat ? apiPin : undefined, keyMint: opts.keyMint,
   });
   const placed = updateWorldEntry(next, made.id, { where: 'browser' });
   const entry = placed.worlds.find(w => w.id === made.id)!;

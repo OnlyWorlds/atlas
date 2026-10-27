@@ -30,6 +30,7 @@ import { AccountClient } from './account-client';
 import { accountWorldsWhenFetched, mintOwnKey, sharedOpenLine, type ReadOnlyWhy } from './account-worlds';
 import { keyRefusalOf } from './world-key-lines';
 import { PinPromptModal } from '../ui/pin-prompt-modal';
+import { mintRecordOf, takeBackMintedKey, type KeyMint } from './key-takeback';
 
 /** A read key, by keel's prefix; a write key or a legacy ten-digit one otherwise. */
 export function isReadKey(key: string): boolean {
@@ -103,11 +104,15 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
  * moves), world.json's mirror, the store's view-only flag, and a fresh engine
  * when the world is open. Nothing about the world's own state is touched.
  */
-export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, readOnly: boolean): Promise<WorldRegistryEntry> {
+export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, readOnly: boolean, keyMint: KeyMint | null = null): Promise<WorldRegistryEntry> {
   if (!canTakeNewKey(entry)) throw new PlainError('This world cannot take a new key here.');
-  // The role belongs to the key: a new one (perhaps another account's) is read afresh (conv. 151).
-  const { read_only: _was, member_role: _role, ...rest } = entry.api;
-  const api = { ...rest, api_key: key, ...(readOnly ? { read_only: true } : {}) };
+  // The role belongs to the key: a new one (perhaps another account's) is read
+  // afresh (conv. 151). The mint record goes with the key it was made for, so
+  // the old one never carries forward over a new key (#814): a pasted key
+  // (keyMint null) clears it, a swap writes it fresh.
+  const { read_only: _was, member_role: _role, key_mint: _mint, ...rest } = entry.api;
+  const freshMint = keyMint && keyMint.tail && key.endsWith(keyMint.tail) ? { key_mint: { id: keyMint.id, tail: keyMint.tail } } : {};
+  const api = { ...rest, api_key: key, ...(readOnly ? { read_only: true } : {}), ...freshMint };
   const next = updateWorldEntry(getState().registry, entry.id, { api });
   if (!saveRegistry(next)) {
     throw new PlainError('Atlas could not save the new key in this browser, so the old one stays. Free some storage, then try again.');
@@ -166,6 +171,21 @@ export async function makeNewWorldKey(entry: WorldRegistryEntry, opts: { keyDead
   const token = getState().registry.account_token;
   if (!token || !canTakeNewKey(entry)) return { kind: 'failed' };
   const worldId = entry.api.world_id;
+  // One at a time per world: the Settings button and sync's recovery can both
+  // drive this for one world, and two swaps interleaved leave a minted key live
+  // and unrecorded (#814 gate G3). The second caller stands down.
+  if (keyInFlight.has(entry.id)) return { kind: 'failed' };
+  keyInFlight.add(entry.id);
+  try {
+    return await makeNewWorldKeyOnce(entry, opts, token, worldId);
+  } finally {
+    keyInFlight.delete(entry.id);
+  }
+}
+
+const keyInFlight = new Set<string>();
+
+async function makeNewWorldKeyOnce(entry: WorldRegistryEntry & { api: NonNullable<WorldRegistryEntry['api']> }, opts: { keyDead: boolean; cause?: KeyRefusal }, token: string, worldId: string): Promise<MakeKeyOutcome> {
   const fetched = await accountWorldsWhenFetched(token, 15_000, { fresh: true });
   if (fetched === null) return { kind: 'failed' };
   const row: AccountWorldRow | undefined = getState().accountWorlds.rows.find(r => r.id === worldId);
@@ -210,8 +230,13 @@ export async function makeNewWorldKey(entry: WorldRegistryEntry, opts: { keyDead
     await takeBack();
     return { kind: 'failed' };
   }
+  // The key the new one replaces, captured before the swap: on a browser world
+  // Atlas minted it (#814), so it is taken back once the new one has landed. A
+  // folder world's key may be in use by a copy of the folder, so `current`
+  // naming a folder world reads as not Atlas's and nothing is sent.
+  const replaced: Pick<WorldRegistryEntry, 'api' | 'where'> = { api: current.api, where: current.where };
   try {
-    await putKeyInPlace(current, minted.minted.key, minted.readOnly);
+    await putKeyInPlace(current, minted.minted.key, minted.readOnly, mintRecordOf(minted.minted.key, minted.minted.id));
   } catch (err) {
     // Taken back only if it never landed: a step after the registry save
     // must not leave the world on a revoked key.
@@ -219,6 +244,8 @@ export async function makeNewWorldKey(entry: WorldRegistryEntry, opts: { keyDead
     if (!landed) await takeBack();
     return { kind: 'failed', error: err };
   }
+  // The new key is in place and saved; the old one is Atlas's to let go.
+  await takeBackMintedKey(replaced);
   const readLine = minted.readOnly ? sharedOpenLine(row, minted.why) : null;
   return {
     kind: 'swapped',
