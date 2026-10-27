@@ -16,9 +16,9 @@ const PERSON = 'd1c2d3e4-0000-4000-8000-000000000003';
 const el = (extra: Record<string, unknown>): Element =>
   ({ id: 'e1', type: 'character', name: 'Rhea', ...extra }) as unknown as Element;
 const roster: OwMember[] = [
-  { id: null, kind: 'owner', role: 'owner', character: null, status: 'active' },
-  { id: SEAT, kind: 'agent', role: 'contributor', character: CHAR, status: 'active', name: 'Skeld' },
-  { id: PERSON, kind: 'person', role: 'co_builder', character: null, status: 'active' },
+  { id: null, kind: 'owner', role: 'owner', character: null, status: 'active', lenses: [] },
+  { id: SEAT, kind: 'agent', role: 'contributor', character: CHAR, status: 'active', lenses: [], name: 'Skeld' },
+  { id: PERSON, kind: 'person', role: 'co_builder', character: null, status: 'active', lenses: [] },
 ];
 const names = (id: string) => (id === CHAR ? 'The Boatswain' : undefined);
 
