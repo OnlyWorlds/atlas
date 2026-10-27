@@ -1,5 +1,5 @@
 /**
- * The Files card (keel #393) through the real page: an online world's element
+ * The Files card through the real page: an online world's element
  * lists its files with the world's total, adds one through a ticket (the
  * world's own PIN to keel, only the ticket to the upload host), fetches a
  * download link at the click, and removes a file this key added. A local

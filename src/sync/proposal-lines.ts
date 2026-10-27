@@ -1,6 +1,6 @@
 /**
- * What a person reads when keel takes a seat's edit as a proposal (keel #519,
- * conv. 163). World and element names are world data: these lines go out as
+ * What a person reads when keel takes a seat's edit as a proposal
+ * (conv. 163). World and element names are world data: these lines go out as
  * text (toasts and titles set text, never HTML).
  */
 import type { Conflict } from '../core/types';

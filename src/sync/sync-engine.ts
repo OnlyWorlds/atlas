@@ -170,7 +170,7 @@ export interface OwApiClient {
   pullChanges?(since: string | null, limit?: number): Promise<ChangesPage>;
   /** GET /me: the key's role (conv. 151). Absent: the role is unknown, and a resync keeps. */
   me?(): Promise<{ role: string }>;
-  /** keel #519's queue, the caller's own rows (conv. 163, P5). Absent: entries stay until it is. */
+  /** keel's queue, the caller's own rows (conv. 163, P5). Absent: entries stay until it is. */
   listProposals?(): Promise<{ rows: import('./proposals').ProposalRow[]; complete: boolean }>;
   /** The proposer withdraws its own open row (conv. 163, P3). */
   withdrawProposal?(type: ElementType, id: string, proposalId: string): Promise<void>;
@@ -4052,7 +4052,7 @@ function linkHeld(s: { kept_outside_view?: string[]; left_view?: string[]; hidde
   return new Set([...(s.kept_outside_view ?? []), ...(s.left_view ?? []), ...(s.hidden_held ?? [])]);
 }
 
-/** keel's refusal to make an element hidden for this key (403 `hidden_not_allowed`, keel #587; conv. 170). */
+/** keel's refusal to make an element hidden for this key (403 `hidden_not_allowed`; conv. 170). */
 export function isHiddenRefusal(err: unknown): boolean {
   const t = typedError(err);
   return !!t && t.status === 403 && t.code === 'hidden_not_allowed';

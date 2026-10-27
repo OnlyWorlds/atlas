@@ -57,7 +57,7 @@ async function mockKeel(page: Page, opts: { worldName?: string; refuse?: boolean
     if (path === '/join') {
       const body = route.request().postDataJSON() as Record<string, unknown>;
       keel.joins.push(body);
-      // keel #353's PlayerJoined (join_api.py `_player_join`): a read key and the Character.
+      // keel's PlayerJoined (join_api.py `_player_join`): a read key and the Character.
       if (opts.player) return route.fulfill({ status: 201, json: {
         kind: 'player', key: READ_KEY, role: 'guest',
         world: { id: WORLD_ID, name: opts.worldName ?? 'Moppetopia', description: '' },
@@ -129,7 +129,7 @@ test('a join link: the code is gone before keel answers, the screen names the wo
   expect(after.meta).toContain('"seat"');
 });
 
-test('a player link (#416, keel #353): opens to read as the Character, no account, no seat, no PIN', async ({ page }) => {
+test('a player link (#416): opens to read as the Character, no account, no seat, no PIN', async ({ page }) => {
   await freshBoot(page);
   const keel = await mockKeel(page, { player: true });
   keel.releasePreview();
@@ -165,7 +165,7 @@ test('a player link (#416, keel #353): opens to read as the Character, no accoun
   expect(after.meta).toMatchObject({ world_id: WORLD_ID, read_only: true });
 });
 
-// keel #422 PR 2 (PR 110), Seethe's frame 5: a party link's pick in Atlas.
+// keel (PR 110), Seethe's frame 5: a party link's pick in Atlas.
 // The table keel here answers as `table_preview` and `_table_pick` do.
 async function mockTable(page: Page, opts: { characters?: Array<{ id: string; name: string }>; taken?: string[]; stealOnPick?: string } = {}) {
   const now = '2026-10-10T00:00:00.000Z';

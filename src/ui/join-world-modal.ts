@@ -60,13 +60,13 @@ export async function runPendingJoin(toasts: ToastManager): Promise<void> {
     toasts.error('This invitation is of a kind this version of Atlas does not know. Reload Atlas and open the link again, or ask for a new link.', 12_000);
     return;
   }
-  // A person's code joins with their account, never as a seat (keel #212, #294).
+  // A person's code joins with their account, never as a seat.
   if (preview.reader === 'person') {
     const { PersonJoinModal } = await import('./person-join-modal');
     new PersonJoinModal(toasts, code, preview).open();
     return;
   }
-  // An agent's code joins as a seat; a player's (keel #353) opens to read as
+  // An agent's code joins as a seat; a player's opens to read as
   // the Character the link gives, with no account. One dialog, two redeems.
   new JoinWorldModal(toasts, code, preview).open();
 }
@@ -161,7 +161,7 @@ export class JoinWorldModal extends BaseModal {
   private buildModal(): HTMLElement {
     const p = this.preview;
     const player = this.asPlayer;
-    // A party link (keel #422 PR 2, Seethe's frame 5): each player picks who
+    // A party link (Seethe's frame 5): each player picks who
     // they are from the owner's list, or, on a table with no list, names a
     // fresh Character. A refused pick looks again and spends nothing.
     const table = player ? p.table : undefined;

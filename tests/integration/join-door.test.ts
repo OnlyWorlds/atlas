@@ -226,7 +226,7 @@ describe('openJoinedWorld', () => {
   });
 });
 
-// keel #353, the sharing floor's T2 (#416): a player's code opens in Atlas to
+// A player's code opens in Atlas to
 // read, as the Character the link gives, with no account and no PIN.
 describe('a player link', () => {
   const PLAYER = 'ow_j_' + 'P'.repeat(32);

@@ -359,7 +359,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const customFields = isTourFlagActive() ? null : buildCustomFieldsSection(el);
     if (customFields) detail.appendChild(customFields);
 
-    // Files (keel #393): kept on OnlyWorlds with the element, so an online
+    // Files: kept on OnlyWorlds with the element, so an online
     // world only. The card reads and repaints itself (element-detail-files).
     const filesEntry = filesWorld();
     if (filesEntry && !isTourFlagActive()) detail.appendChild(buildFilesSection(el, filesEntry, toastManager));

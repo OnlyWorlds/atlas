@@ -1,5 +1,5 @@
 /**
- * keel #519, the proposed change (conv. 163; a contract of
+ * keel, the proposed change (conv. 163; a contract of
  * 2026-10-22).
  *
  * On a world whose keeper reviews AI seats (`agent_writes_proposed`), a seat's

@@ -57,9 +57,9 @@ export const FAKE_SEAT_ID = 'seat-0001';
 
 export class FakeOwApiClient implements OwApiClient {
   private clock = () => new Date().toISOString();
-  /** keel #519 seam (`__propose_writes`): a seat on a reviewed world. */
+  /** keel seam (`__propose_writes`): a seat on a reviewed world. */
   private proposeWrites = false;
-  /** keel #519 calls, apart from `calls` so the exact-sequence suites keep their meaning. */
+  /** keel calls, apart from `calls` so the exact-sequence suites keep their meaning. */
   proposalCalls: Array<{ method: 'list' } | { method: 'withdraw'; id: string }> = [];
   private seatMade = new Set<string>();
   /** `__cut_proposal_walk`: the queue read stops after this many rows, newest first (keel's cursor walk cut short). */
@@ -246,7 +246,7 @@ export class FakeOwApiClient implements OwApiClient {
       throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
     }
     const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
-    // keel #565, as probed live: a seat's new element on a reviewed world carries the mark,
+    // keel, as probed live: a seat's new element on a reviewed world carries the mark,
     // and the 201 answers with it.
     if (this.proposeWrites) record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' };
     this.bucket(type).set(id, record);
@@ -275,7 +275,7 @@ export class FakeOwApiClient implements OwApiClient {
     // server-side delete and routes via the same review modal as pull-time
     // detection — see pushPhase / resolveConflict.
     if (!existing) throw new Error(`API Error 404: ${id} not found in this world.`);
-    // keel #519 (conv. 163): a seat on a reviewed world proposes; the element does not change.
+    // keel (conv. 163): a seat on a reviewed world proposes; the element does not change.
     if (this.proposeWrites) {
       const row = { id: cryptoRandomId(), element_type: type, element_id: id, state: 'open', fields: { ...wireBody }, decline_reason: null as string | null };
       this.proposalRows.set(row.id, row);
@@ -330,7 +330,7 @@ export class FakeOwApiClient implements OwApiClient {
     // __inject_failure instead of relying on the fake's default behavior.
     const m = this.bucket(type);
     if (!m.has(id)) return;
-    // keel #519: a seat on a reviewed world deletes only what it made (403 `proposed_only`).
+    // keel: a seat on a reviewed world deletes only what it made (403 `proposed_only`).
     if (this.proposeWrites && !this.seatMade.has(id)) {
       const err = new Error("API Error 403: On this world an agent seat's writes land as proposed, and a seat deletes only what it created.") as
         Error & { status?: number; code?: string; param?: string | null };
@@ -343,7 +343,7 @@ export class FakeOwApiClient implements OwApiClient {
     this.appendDelete(type, id);
   }
 
-  // ---- keel #519, the proposed change (conv. 163) ----
+  // ---- keel, the proposed change (conv. 163) ----
 
   /** The caller's own rows, newest first (`GET /world/proposals?state=all`). */
   async listProposals(): Promise<{ rows: ProposalRow[]; complete: boolean }> {
@@ -364,7 +364,7 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
-   * Test seam (keel #519): the key is an agent seat on a world whose keeper
+   * Test seam: the key is an agent seat on a world whose keeper
    * reviews AI seats. A PATCH answers 202 with a proposal and changes nothing;
    * a delete of an element the seat did not create is 403 `proposed_only`.
    * Elements created after the seam is set are the seat's own.
@@ -388,7 +388,7 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
-   * keel #565's review route for a new element written as proposed: accept writes
+   * keel's review route for a new element written as proposed: accept writes
    * the mark null (a write, the stamp moves, a feed row); decline deletes it.
    */
   __review_new_element(type: ElementType, id: string, decision: 'accept' | 'decline'): void {
@@ -810,7 +810,7 @@ export class FakeOwApiClient implements OwApiClient {
   __inject_auth_failure(
     enabled = true,
     code?: 'invalid_credentials' | 'key_revoked',
-    /** keel #357: a wrong or missing PIN is `invalid_credentials` with param
+    /** keel: a wrong or missing PIN is `invalid_credentials` with param
      *  `API-Pin`; a key keel does not know (a removed member's, a deleted
      *  world's) is the same code with no param. */
     param: 'API-Pin' | null = null,
@@ -953,7 +953,7 @@ export class FakeOwApiClient implements OwApiClient {
     throw err;
   }
 
-  /** keel #587: the owner (no member seat set) or a co-builder may make an element hidden. */
+  /** keel: the owner (no member seat set) or a co-builder may make an element hidden. */
   private canHide(): boolean {
     return this.memberRole === null || this.memberRole === 'co_builder';
   }

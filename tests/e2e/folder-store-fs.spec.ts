@@ -351,7 +351,7 @@ test('stale lock (older than TTL) is taken over by a new tab', async ({ page }) 
     const api = window.__atlasTestApi;
     const root = await api.opfsRoot();
 
-    // Forge a stale lock by injecting an old heartbeat directly.
+    // Fake a stale lock by injecting an old heartbeat directly.
     const atlasDir = await root.getDirectoryHandle('.atlas', { create: true });
     const fh = await atlasDir.getFileHandle('lock', { create: true });
     const w = await fh.createWritable();

@@ -37,7 +37,7 @@ describe.each([
 ])('%s', (_label, make) => {
   it('an edit after a sync, made by a clock behind the server, stays unsynced', async () => {
     const store = await make();
-    const el = await store.createElement('location', { name: 'The Forge', image_url: 'https://media.onlyworlds.com/u/w/x.png' });
+    const el = await store.createElement('location', { name: 'The Smithy', image_url: 'https://media.onlyworlds.com/u/w/x.png' });
     await store.stampServerUpdatedAt(el.id, 'location', SERVER_STAMP);
     expect(await store.listLocallyChangedSince(null)).toHaveLength(0);
     await store.updateElement(el.id, { image_url: null } as never);

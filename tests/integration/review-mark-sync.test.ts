@@ -1,5 +1,5 @@
 /**
- * keel #565's mark through the engine (conv. 168, R5 and R6): a seat's new
+ * keel's mark through the engine (conv. 168, R5 and R6): a seat's new
  * element comes back from keel marked proposed, and the copy that made it keeps
  * the mark with its stamp; a keeper's accept (the mark null) and decline (the
  * element deleted) reach the copy on a pull. FakeOwApiClient plays keel's shape

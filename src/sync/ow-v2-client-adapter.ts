@@ -59,7 +59,7 @@ export function sendsPin(method: string, path: string, apiKey: string): boolean 
   return method !== 'GET' || path === '/me' || /^\d{10}$/.test(apiKey);
 }
 
-/** Atlas's name on every write (keel #520's `X-OW-Client`: lower case, digits, hyphens, 1 to 32). */
+/** Atlas's name on every write (keel's `X-OW-Client`: lower case, digits, hyphens, 1 to 32). */
 export const ATLAS_CLIENT_NAME = 'atlas';
 
 /** keel's media ticket (keel `media/api.py`): spend it once at `upload_url` before `exp`. */
@@ -210,7 +210,7 @@ export function toV2WireShape(
     if (op === 'update' && k === PROPOSED_MARK) continue;
     out[rename.get(k) ?? k] = v;
   }
-  // The hidden mark goes up on the create only (folder spec §4.8; keel #587 takes it there and ignores
+  // The hidden mark goes up on the create only (folder spec §4.8; keel takes it there and ignores
   // it on an update), as the boolean keel takes, so a push never publishes what the folder hides.
   if (op === 'create' && isHiddenMark(body)) out.hidden = true;
   return out;
@@ -311,7 +311,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       ...extraHeaders,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    // keel #520 (PR 171, live 2026-10-22): a write names the app that made it,
+    // keel (PR 171, live 2026-10-22): a write names the app that made it,
     // so keel's changed_client and its Recent changes page say "through atlas".
     // keel reads it on writes only, and its CORS allow list carries it;
     // a GET keeps the headers its preflight always asked for.
@@ -340,7 +340,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       if (timer) clearTimeout(timer);
     }
     if (response.status === 204) return undefined;
-    // keel #519 (conv. 163, P1): a seat's write on a reviewed world answers
+    // keel (conv. 163, P1): a seat's write on a reviewed world answers
     // 202 with a proposal, and the element did not change. Never returned as a
     // body, so no caller can stamp a proposal as the element.
     if (response.status === 202) {
@@ -506,7 +506,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   }
 
   /**
-   * keel's hide (`PUT /{type}/{id}/hidden`, keel #421): 204, no body, idempotent; the element's
+   * keel's hide (`PUT /{type}/{id}/hidden`): 204, no body, idempotent; the element's
    * body and `updated_at` do not move. The owner's keys and co-builders only, anyone else 403
    * (folder spec 4.8, Skeld 2026-10-24; conv. 173). Atlas never sends the unhide.
    */
@@ -515,7 +515,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   }
 
   /**
-   * keel #519's queue, the caller's own rows in every state
+   * keel's queue, the caller's own rows in every state
    * (`GET /world/proposals?state=all`, newest first; conv. 163, P5). A seat
    * sees its own; the walk stops at `pages` pages, newest first, which holds
    * every row an open entry can name (keel keeps 50 open per world).

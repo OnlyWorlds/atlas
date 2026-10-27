@@ -1,6 +1,6 @@
 /**
  * #347: in a synced world, an element whose last write keel recorded through an agent door
- * (`changed_via` seat, mcp or declared; keel #299) carries a quiet mark after its name; a
+ * (`changed_via` seat, mcp or declared) carries a quiet mark after its name; a
  * person's carries none, and a world on disk only shows none (its fields may be from another
  * time). The line is the mark's label, and a click or tap says it. A local edit is the person's,
  * so the mark leaves. Keel is routed: every read answers empty, every write is refused, so

@@ -1,5 +1,5 @@
 /**
- * The `#/join/` door for a person's code (keel #294's Atlas half; keel #212):
+ * The `#/join/` door for a person's code (Atlas's half of keel's join):
  * keel's /join page sends a person here with "Open in Atlas". The preview's
  * `reader: 'person'` turns the door: a person joins with their own account at
  * POST /account/join (never the agent route), then the world opens on a key

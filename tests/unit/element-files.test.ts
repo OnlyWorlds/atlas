@@ -1,5 +1,5 @@
 /**
- * Files on elements (keel #393): the cache, the three acts and their words
+ * Files on elements: the cache, the three acts and their words
  * (`src/sync/element-files.ts`), through a fake SDK client.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

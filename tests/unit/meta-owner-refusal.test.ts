@@ -64,8 +64,8 @@ describe('a refused world-details change is sent and told once', () => {
 });
 
 /**
- * Kael 2026-10-19: keel lets a co-builder send the world's now alone (keel #240,
- * core/world_api.py patch_world) and refuses any other body whole. A round that
+ * Kael 2026-10-19: keel lets a co-builder send the world's now alone
+ * (core/world_api.py patch_world) and refuses any other body whole. A round that
  * changed the description and the now together lost the now too. The fake
  * keel below holds keel's own rule for a member key.
  */

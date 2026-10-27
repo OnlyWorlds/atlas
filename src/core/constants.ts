@@ -211,20 +211,20 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
 
 /**
  * Who wrote an element, as keel records it: `created_by` (keel membership
- * phase 2, 2026-09-28), `changed_by` and `changed_via` (keel #299, SDK 4.26:
+ * phase 2, 2026-09-28), `changed_by` and `changed_via` (SDK 4.26:
  * the membership and the door of the LAST write). Server-authored and
  * read-only: kept on disk as received, never sent (keel ignores them in a
  * write body, `elements/serialize.py` IGNORED_READONLY_FIELDS; atlas does not
  * rely on that), never a difference anyone made, and meaningless in another
  * world, so an import drops them. One list for every site that must agree.
- * `changed_client` (keel #520): the software that made the last write, as it
+ * `changed_client`: the software that made the last write, as it
  * named itself; the same kind of field, kept the same way.
  */
 export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via', 'changed_client'] as const;
 
 /**
  * keel's marks about an element, said only to some readers: `hidden: true`
- * (keel #537, PR 160) on a body served to whoever sees a hidden element (the
+ * on a body served to whoever sees a hidden element (the
  * owner, a co-builder, its maker), absent otherwise. Server-said like
  * `SERVER_AUTHOR_FIELDS` and kept the same way: on disk as received, never
  * sent (keel ignores it in a write), never a difference anyone made, dropped
@@ -309,7 +309,7 @@ export function isExtensionField(name: string): boolean {
  * cross-world identity profile, Skeld 2026-10-20): a typed "Identity key" would
  * merge two beings, and a deleted one would split one (Kael 2026-10-20). Shown
  * read-only, and never rewritten by a re-key (the profile's rule 9). `x_packet_`
- * is the work packet's (keel PR 148, Skeld 2026-10-21): its ids are the source
+ * is the work packet's (Skeld 2026-10-21): its ids are the source
  * world's as they were when the packet was made, so a re-key never enters it.
  * `x_review_` is the review profile's (dist.37, Skeld 2026-10-22): a new
  * element's proposed mark and its last check, sent like any `x_` field.

@@ -1,6 +1,6 @@
 {
   "id": "11111111-2222-4333-8444-555555555507",
   "type": "character",
-  "name": "Extension Carrier",
+  "name": "Extension Bearer",
   "x_probe_note": "unknown to every implementation; must survive a read-write round trip unchanged"
 }

@@ -48,7 +48,7 @@ describe('the lines', () => {
     expect(keyRefusalHere('pin')).not.toMatch(/new key/);
   });
 
-  it('a seat\'s renewed key reads as renewed, never as removed, and offers no paste (keel #355, 2026-10-16)', () => {
+  it('a seat\'s renewed key reads as renewed, never as removed, and offers no paste (2026-10-16)', () => {
     expect(seatRefusalLine('key_revoked')).toBe('Sync paused: this seat\'s key was renewed or revoked on onlyworlds.com.');
     expect(seatRefusalLine('key_revoked', { paused: false })).toBe('This seat\'s key was renewed or revoked on onlyworlds.com.');
     expect(seatRefusalLine('key_unknown')).toMatch(/may have removed it/);

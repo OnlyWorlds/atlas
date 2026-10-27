@@ -1,5 +1,5 @@
 /**
- * keel #520 (PR 171, live 2026-10-22): every write Atlas makes names the app,
+ * keel (PR 171, live 2026-10-22): every write Atlas makes names the app,
  * `X-OW-Client: atlas`, so keel's changed_client and Recent changes say
  * "through atlas". keel reads it on writes only; a read keeps the headers its
  * CORS preflight always asked for.
@@ -25,7 +25,7 @@ afterEach(() => {
   seen.length = 0;
 });
 
-describe('the client name on writes (keel #520)', () => {
+describe('the client name on writes', () => {
   it('is a name keel takes: lower case, digits and hyphens, 1 to 32', () => {
     expect(ATLAS_CLIENT_NAME).toMatch(/^[a-z0-9-]{1,32}$/);
   });

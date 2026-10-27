@@ -5,7 +5,7 @@ imperfect, that any implementation claiming to READ the OnlyWorlds Folder
 Format can run against. It answers "does your reader handle X?" with a failing
 test instead of a question asked of a person.
 
-**Created**: 2026-07-28 (Temper) · fixture **v1.2.1** · built to
+**Created**: 2026-07-28 (Temper) · fixture **v1.2.2** · built to
 folder-format spec **v0.3.6** · proposed by Kael, adopted by every
 pass of Skeld's review round. **Report the fixture version you ran** —
 `expected.json`'s `fixture_history` says what each one contained, and 1.0.0

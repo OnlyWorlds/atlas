@@ -305,7 +305,7 @@ export function renderCollectionView(
       cell.appendChild(collectionIcon(entry.type));
     }
     // Name over type, in one column: beside each other the type label took a
-    // fixed slice and cut most names to "Captain ..." even at 1440 (#123).
+    // fixed slice and cut most names short even at 1440 (#123).
     const text = document.createElement('span');
     text.className = 'atlas-share-collection-text';
     const name = document.createElement('span');

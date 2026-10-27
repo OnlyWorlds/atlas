@@ -24,7 +24,7 @@ import type { WorldRegistryEntry } from '../core/types';
 
 /** What `/join/preview` says about a code, without spending it. */
 export interface JoinPreview {
-  /** Who the code is for (keel #212, #353): an agent redeems at /join, a person joins with their account, a player redeems at /join with no account for a read key; any other value is a kind this Atlas does not know. */
+  /** Who the code is for: an agent redeems at /join, a person joins with their account, a player redeems at /join with no account for a read key; any other value is a kind this Atlas does not know. */
   reader: 'agent' | 'person' | 'player' | 'unknown';
   world: { name: string; description: string };
   /** Free text the inviter typed, or null: never shown as a checked name (R8). */
@@ -35,7 +35,7 @@ export interface JoinPreview {
   withCharacter: boolean;
   /** ISO 8601; the tool's own clock tells "spent by someone else" from "expired" (R5). */
   expiresAt: string;
-  /** A player link for a whole table (keel #422 PR 2); absent on a link for one. */
+  /** A player link for a whole table; absent on a link for one. */
   table?: JoinTable;
 }
 
@@ -91,7 +91,7 @@ export function seatAgentName(ua: string = typeof navigator === 'undefined' ? ''
   return 'Atlas';
 }
 
-/** What `/join` hands a player (keel #353), kept in memory only: a read key, never a secret. */
+/** What `/join` hands a player, kept in memory only: a read key, never a secret. */
 export interface JoinedPlayer {
   world: { id: string; name: string };
   key: string;
@@ -188,7 +188,7 @@ export function isPickRefused(err: unknown): boolean {
   return err instanceof OwV2Error && err.status === 422 && err.param === 'character';
 }
 
-/** The world has as many players as keel seats (keel PR 110's `world_full`, from a table or a link for one). */
+/** The world has as many players as keel seats (keel's `world_full`, from a table or a link for one). */
 export function isWorldFull(err: unknown): boolean {
   return err instanceof OwV2Error && err.status === 422 && err.code === 'world_full';
 }
@@ -221,10 +221,10 @@ export async function redeemJoin(code: string, agentName = seatAgentName()): Pro
 }
 
 /**
- * Spends a player's code (keel #353): no account, no credential. `name` is
+ * Spends a player's code: no account, no credential. `name` is
  * the player's, optional (keel names a fresh Character for it, or keeps a
  * picked Character's). A 404 after a good preview: someone else may have used it.
- * On a table the player's pick goes as `character` (keel #422 PR 2); a refused
+ * On a table the player's pick goes as `character`; a refused
  * pick (`isPickRefused`) spends nothing.
  */
 export async function redeemPlayerJoin(code: string, name = '', pick?: string): Promise<JoinedPlayer> {

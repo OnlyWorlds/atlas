@@ -1,5 +1,5 @@
 /**
- * Who wrote an element (keel #299, SDK 4.26): every server write records
+ * Who wrote an element (SDK 4.26): every server write records
  * `changed_by` and `changed_via`, and every read hands them back, beside
  * `created_by`. They are the server's, never a difference anyone made
  * (`SERVER_AUTHOR_FIELDS`): a conflict never names them, and our own lost
@@ -69,7 +69,7 @@ describe('the author fields are the server\'s', () => {
     expect(onDisk.changed_via).toBe('seat');
   });
 
-  it("the client that wrote it (keel #520) is the server's too: kept on disk, never a field anyone changed", async () => {
+  it("the client that wrote it is the server's too: kept on disk, never a field anyone changed", async () => {
     const el = await folder.createElement('character', { name: 'Rhea' });
     await engine.syncNow();
     await folder.updateElement(el.id, { name: 'Rhea (mine)' });

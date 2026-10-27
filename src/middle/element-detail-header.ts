@@ -143,7 +143,7 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
   // Last changed by an agent, said quietly (#347).
   const agentMark = buildAgentMark(el);
   if (agentMark) header.appendChild(agentMark);
-  // Hidden on OnlyWorlds, said the same quiet way (keel #537).
+  // Hidden on OnlyWorlds, said the same quiet way.
   const hiddenMark = opts.hiddenNote ? null : buildHiddenMark(el);
   if (hiddenMark) header.appendChild(hiddenMark);
 

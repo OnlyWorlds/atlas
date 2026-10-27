@@ -1,5 +1,5 @@
 /**
- * keel #537 (PR 160, live 2026-10-22, Skeld 2026-10-22): a body served to a reader who sees a
+ * keel (PR 160, live 2026-10-22, Skeld 2026-10-22): a body served to a reader who sees a
  * hidden element (the owner, a co-builder, its maker) carries `hidden: true` at the top level,
  * absent on every other body; echoed back in a write it is ignored. Atlas keeps it as keel's
  * word, like who wrote the element: never sent on an update, never a difference anyone made,

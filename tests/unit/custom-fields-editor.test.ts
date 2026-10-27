@@ -196,7 +196,7 @@ describe('a published profile key is never a custom field (x_identity_, Skeld 20
     expect(customFieldNameProblem(makeCharacter(), 'x_identity')).toBeNull();
   });
 
-  it('the work packet\'s keys are kept too (x_packet_, keel PR 148)', () => {
+  it('the work packet\'s keys are kept too (x_packet_)', () => {
     for (const name of ['x_packet_elements', 'x_packet_source', 'x_packet_producer']) {
       expect(customFieldNameProblem(makeCharacter(), name)).toMatch(/x_packet_/);
     }

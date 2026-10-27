@@ -154,7 +154,7 @@ test('duplicate files for same id are deduped on next open (rename-crash recover
     const created = await s1.createElement('character', { id: 'char-x', name: 'Old' });
     await s1.close();
 
-    // Forge a duplicate file for the same id with a NEWER timestamp.
+    // Fake a duplicate file for the same id with a NEWER timestamp.
     const charDir = await (root as any)
       .getDirectoryHandle('elements')
       .then((d: any) => d.getDirectoryHandle('character'));

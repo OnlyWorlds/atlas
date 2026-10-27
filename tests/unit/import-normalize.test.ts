@@ -69,7 +69,7 @@ describe('normalizeRecord — keepUnknown (envelope §8c passthrough)', () => {
     expect(record.changed_via).toBeUndefined();
   });
 
-  it("strips the client that last wrote it (changed_client, keel #520): the source world's", () => {
+  it("strips the client that last wrote it (changed_client): the source world's", () => {
     const { record } = normalizeRecord({ name: 'A', changed_client: 'lantern' }, 'character' as never, { keepUnknown: true });
     expect(record.changed_client).toBeUndefined();
   });

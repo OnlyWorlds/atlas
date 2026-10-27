@@ -2224,7 +2224,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'collection-whole-names',
         title: 'A collection shows whole names',
-        body: 'On a page, a collection cut most names short ("Captain ...") to fit the type beside them. The type now sits under the name, and a long name wraps instead of being cut, in Atlas and on the published page. A published page\'s link preview also carries its own opening text and its first picture.',
+        body: 'On a page, a collection cut most names short to fit the type beside them. The type now sits under the name, and a long name wraps instead of being cut, in Atlas and on the published page. A published page\'s link preview also carries its own opening text and its first picture.',
         tags: ['pages', 'fix'],
       },
     ],

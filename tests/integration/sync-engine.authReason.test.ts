@@ -48,7 +48,7 @@ describe('SyncEngine push auth_reason', () => {
     }
   });
 
-  it('tells a key keel no longer knows from a refused PIN (keel #357, #198)', async () => {
+  it('tells a key keel no longer knows from a refused PIN', async () => {
     await folder.createElement('character', { name: 'Cleo' });
     client.__inject_auth_failure(true, 'invalid_credentials');
     const unknown = await engine.pushOnce();

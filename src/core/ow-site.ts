@@ -19,7 +19,7 @@ export function lanternLineHtml(): string {
   return `On a phone, <a class="atlas-settings-link atlas-link-inline" data-link="lantern" href="${LANTERN_URL}" target="_blank" rel="noopener">Lantern</a> is the OnlyWorlds app made for one: it catches notes at the table and keeps your world offline.`;
 }
 
-/** A world's page on onlyworlds.com, opened at Access: its own path, kept through the site's sign-in (keel PR 90, Skeld 2026-10-19). */
+/** A world's page on onlyworlds.com, opened at Access: its own path, kept through the site's sign-in (Skeld 2026-10-19). */
 export function owAccessUrl(apiWorldId: string): string {
   return `https://www.onlyworlds.com/account/worlds/${encodeURIComponent(apiWorldId)}/access`;
 }

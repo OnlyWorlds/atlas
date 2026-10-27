@@ -1,5 +1,5 @@
 /**
- * #347: who last wrote an element (keel #299's `changed_by`, `changed_via`)
+ * #347: who last wrote an element (keel's `changed_by`, `changed_via`)
  * describes the server's last write. A local edit is this person's, so both
  * stores drop the pair on every edit (`dropLastWriter`) and the quiet agent
  * mark never sits on a person's change; `created_by` stays. Atlas's own
@@ -51,7 +51,7 @@ describe.each(stores)('%s', (_name, make) => {
       expect(el.description).toBe('by hand');
       expect('changed_via' in el).toBe(false);
       expect('changed_by' in el).toBe(false);
-      expect('changed_client' in el).toBe(false); // keel #520: the software of the last write
+      expect('changed_client' in el).toBe(false); // keel: the software of the last write
       expect(el.created_by).toBe(MAKER);
     }
   });

@@ -166,7 +166,7 @@ export class AccountClient {
   }
 
   /**
-   * Accept a person's join link (keel #212, `POST /account/join`, body
+   * Accept a person's join link (`POST /account/join`, body
    * `{code}`): the account becomes a member with the link's role. 404 for any
    * code that will not open (or one made for an agent), 409 already_member.
    */

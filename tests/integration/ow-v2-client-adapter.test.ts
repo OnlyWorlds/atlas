@@ -220,7 +220,7 @@ describe('OwV2ClientAdapter — created_by is read-only (keel membership phase 2
     expect('created_by' in toV2WireShape(body, 'character', 'update')).toBe(false);
   });
 
-  it('nor who last wrote it (keel #299: changed_by, changed_via), which a pull keeps', async () => {
+  it('nor who last wrote it (keel: changed_by, changed_via), which a pull keeps', async () => {
     const { adaptV2Record, toV2WireShape } = await import('../../src/sync/ow-v2-client-adapter');
     const member = uuid();
     const rec = adaptV2Record({ id: uuid(), name: 'Frodo', updated_at: clock.next(), changed_by: member, changed_via: 'seat' }, 'character');
@@ -233,7 +233,7 @@ describe('OwV2ClientAdapter — created_by is read-only (keel membership phase 2
     }
   });
 
-  it("nor the client that last wrote it (keel #520: changed_client), which a pull keeps", async () => {
+  it("nor the client that last wrote it (keel: changed_client), which a pull keeps", async () => {
     const { adaptV2Record, toV2WireShape } = await import('../../src/sync/ow-v2-client-adapter');
     const rec = adaptV2Record({ id: uuid(), name: 'Frodo', updated_at: clock.next(), changed_via: 'api', changed_client: 'lantern' }, 'character');
     expect(rec.changed_client).toBe('lantern');

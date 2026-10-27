@@ -3,7 +3,7 @@
  * it as the file wrote it; a published page hands the world on, so it leaves a
  * hidden element out as a missing one, counts it in the builder's line, and
  * does not publish a hidden page; a push sends the mark on a create only, as
- * the boolean keel takes (keel #587), never on an update.
+ * the boolean keel takes, never on an update.
  */
 import { describe, it, expect } from 'vitest';
 import type { Element } from '../../src/core/types';
@@ -113,7 +113,7 @@ describe('the wire', () => {
   });
 });
 
-describe('keel\'s refusal to hide (403 hidden_not_allowed, keel #587)', () => {
+describe('keel\'s refusal to hide (403 hidden_not_allowed)', () => {
   const refusal = Object.assign(new Error("API Error 403: Only the world's owner and its co-builders can create an element hidden."), { status: 403, code: 'hidden_not_allowed', param: null });
   it('is about the element, never a dead key, wherever it is thrown', () => {
     expect(isHiddenRefusal(refusal)).toBe(true);

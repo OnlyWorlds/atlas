@@ -1,11 +1,11 @@
 /**
- * The hidden mark (folder spec §4.8, RULED 2026-10-23; keel #537, PR 160 on the
+ * The hidden mark (folder spec §4.8, RULED 2026-10-23, PR 160 on the
  * server). An element file's `hidden` means hidden from whoever the world is
  * handed to, never from the person holding the folder: Atlas is a viewer, so it
  * shows the element with the word on it, and leaves it out of what it hands on
  * (a published page). keel serves `hidden: true` only to those who can still
  * see a hidden element (the owner, a co-builder and its maker), and takes the
- * mark in a write on a create only (keel #587); later, its hide route (conv. 173).
+ * mark in a write on a create only; later, its hide route (conv. 173).
  */
 import { escapeAttr } from './dom-utils';
 

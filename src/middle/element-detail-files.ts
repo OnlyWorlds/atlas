@@ -1,5 +1,5 @@
 /**
- * The Files card on an element page (keel #393; Seethe's mock 04,
+ * The Files card on an element page (Seethe's mock 04,
  * 2026-10-19): the files
  * OnlyWorlds holds on this element, each with its label, kind, size, who
  * added it (AGENT when an agent did) and when, and Download and Remove; the

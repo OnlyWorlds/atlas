@@ -1,5 +1,5 @@
 /**
- * The hidden mark said on the element (folder spec §4.8, conv. 170; keel #537;
+ * The hidden mark said on the element (folder spec §4.8, conv. 170;
  * `src/core/hidden-mark.ts`): Atlas is a viewer, so the holder sees a hidden
  * element with the mark in every world. A linked element keel has says who on
  * OnlyWorlds can see it; any other (a folder world, an unlinked one, a linked

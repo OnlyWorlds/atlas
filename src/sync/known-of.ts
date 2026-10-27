@@ -10,7 +10,7 @@ import type { Element } from '../core/types';
 import { PlainError } from '../core/plain-error';
 import { SERVER_AUTHOR_FIELDS } from '../core/constants';
 
-/** The keys a stub keeps (keel PR 113; `change_seq` never lands on disk). */
+/** The keys a stub keeps (`change_seq` never lands on disk). */
 export const KNOWN_OF_KEPT_KEYS: readonly string[] = [
   'id', 'type', 'name', 'description', 'supertype', 'subtype', 'image_url', 'created_at', 'updated_at',
 ];
@@ -35,7 +35,7 @@ function unset(v: unknown): boolean {
 
 /**
  * I1 (rule 1): a stub as it is, `known_of: true`, the kept keys, and the
- * fields keel shares on a stub (keel #448, PR 117: a Character's physicality,
+ * fields keel shares on a stub (PR 117: a Character's physicality,
  * height, weight, species and reputation, from a public tag in keel's
  * schema). keel serves every other field unset, so a field with a value is one
  * keel shares: read from the wire, never from a list here that keel's schema

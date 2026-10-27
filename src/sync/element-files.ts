@@ -1,5 +1,5 @@
 /**
- * Files on elements (keel #393, the SDK's files methods; Seethe's mock 04):
+ * Files on elements (the SDK's files methods; Seethe's mock 04):
  * the rows of one element, the world's total against its room, and the
  * three acts (add, download, remove), read and written through the SDK.
  *

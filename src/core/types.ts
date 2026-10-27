@@ -288,7 +288,7 @@ export interface SyncState {
   left_view?: string[];
   /**
    * Hidden elements this key cannot put on OnlyWorlds (folder spec §4.8, conv.
-   * 170: keel #587 takes the mark on a create from the owner or a co-builder
+   * 170: keel takes the mark on a create from the owner or a co-builder
    * only), with what is anchored on them: never sent, and links to them stay in
    * the copy. Worked out afresh each push round from the key's role, so a raise
    * sends them. Cleared by resetSyncBaseline.
@@ -302,7 +302,7 @@ export interface SyncState {
    */
   kept_whole?: string[];
   /**
-   * Edits keel took as proposals (keel #519, conv. 163): a seat's write on a
+   * Edits keel took as proposals (conv. 163): a seat's write on a
    * world whose keeper reviews AI seats answers 202 and the element does not
    * change. One entry per element, the newest proposal; the local edit stays
    * on disk, and the version the entry names is never sent again. Settled by
@@ -443,7 +443,7 @@ export type SyncEngineState =
  * Why keel refused a world's key (#198), from its typed error: `key_revoked`
  * (revoked on onlyworlds.com), `key_unknown` (401 `invalid_credentials` with
  * no param: keel no longer knows the key, because the world was deleted or
- * the member removed, keel #357), `pin` (the same code with param `API-Pin`:
+ * the member removed), `pin` (the same code with param `API-Pin`:
  * a wrong or missing PIN), `read_only_key` (403 `permission_error` on a
  * write). Copy: `src/sync/world-key-lines.ts`.
  */

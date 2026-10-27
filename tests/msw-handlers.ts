@@ -889,7 +889,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
 
 // ---------------------------------------------------------------------------
 // The join door (#104, conv. 20): keel's /join and /join/preview as built
-// (accounts/join_api.py, keel #119). No API-Key: the code is the credential.
+// (accounts/join_api.py). No API-Key: the code is the credential.
 // Every bad code (unknown, used, expired) answers the SAME 404; the preview
 // never spends a code; a redeem spends it once; agent_name is required.
 // ---------------------------------------------------------------------------
@@ -897,7 +897,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
 export interface FakePass {
   code: string;
   world: { id: string; name: string; description?: string };
-  /** keel #212/#353. Left out, the preview sends no `reader` (a keel before #212: an agent code). */
+  /** Who the code is for. Left out, the preview sends no `reader` (an older keel: an agent code). */
   reader?: 'agent' | 'person' | 'player';
   /** A player code's picked Character; left out, the redeem makes one named for the player. */
   character?: { id: string; name: string };
@@ -908,7 +908,7 @@ export interface FakePass {
   /** ISO; default an hour from now. A past value makes the pass expired. */
   expiresAt?: string;
   /**
-   * A party link (keel #422 PR 2, PR 110's `table_preview` and `_table_pick`):
+   * A party link (PR 110's `table_preview` and `_table_pick`):
    * a player pass with `maxUses` 2 or more. `characters` is the owner's list
    * (empty: each player names a fresh Character); `taken` holds the ids a live
    * seat plays (the fake adds each pick); `hidden` ones leave the preview and
@@ -970,7 +970,7 @@ export function joinV2Handlers(opts: { baseUrl: string; passes: FakePass[] }): {
     }),
     http.post(`${base}/join`, async ({ request }) => {
       const body = await request.json().catch(() => null) as { code?: unknown; agent_name?: unknown; name?: unknown } | null;
-      // keel #353 (join_api.py `_player_join`, agents.redeem_player): a player
+      // keel (join_api.py `_player_join`, agents.redeem_player): a player
       // code takes an optional `name` (checked before the code is touched) and
       // no agent_name, and answers a read key and the Character it reads as.
       const asPlayer = opts.passes.find(x => x.code === body?.code)?.reader === 'player';
