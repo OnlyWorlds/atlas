@@ -54,6 +54,7 @@ import type { LayoutDir } from '../core/constants';
 import { parseWorldStyles, type WorldStyles } from '../core/world-styles';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { findDuplicatePin, DuplicatePinError } from '../core/pin-uniqueness';
+import { codePointCompare } from './code-point-order';
 import type {
   Element,
   ElementType,
@@ -710,7 +711,8 @@ export class FsFolderStore implements FolderStore {
         files.push({ name: entry.name, handle: entry as FileSystemFileHandle });
       }
     }
-    files.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    // The format's one order (§4): by code point, never UTF-16 units or the platform's.
+    files.sort((a, b) => codePointCompare(a.name, b.name));
     type Rec = { filename: string; body: Element; spelling: LinkSpelling | null; stamp: FileStamp };
     const bodies: Array<Element | null> = new Array(files.length);
     const stamps: FileStamp[] = new Array(files.length);
@@ -785,9 +787,11 @@ export class FsFolderStore implements FolderStore {
     const survivors = new Map<string, Rec>();
     for (const [id, recs] of grouped) {
       if (!this.root) return null; // closed mid-dedupe — stop unlinking losers
-      recs.sort((a, b) =>
-        (a.body.local_updated_at ?? '') < (b.body.local_updated_at ?? '') ? 1
-        : (a.body.local_updated_at ?? '') > (b.body.local_updated_at ?? '') ? -1 : 0);
+      // The format's rule for a repeated id (§4, clarified 2026-10-27): the FIRST file in code-point
+      // name order wins, as every other reader serves it. `recs` is already in that order (the files
+      // were sorted above and grouped in it). Never Atlas's own stamp: `local_updated_at` is optional,
+      // so preferring it serves a copy no other reader would. Atlas's own rename cannot leave two
+      // different bodies (writeElementAndRename writes in place first), so this never costs an edit.
       const [survivor, ...losers] = recs;
       for (const loser of losers) {
         // A rename-crash twin carries the same content, and is safe to drop.
@@ -1211,7 +1215,7 @@ export class FsFolderStore implements FolderStore {
     // 5. Served files that are gone. Before calling it a delete, look for a
     //    copy of the same id we left unserved (an agent's copy-then-delete
     //    move across two passes, a shadowed layout copy): promote the one
-    //    the index rule would serve (newest local_updated_at, ties to elements/).
+    //    the index rule would serve (§4: elements/ over spatial/, then the first by code-point name).
     for (const id of goneIds) {
       await slot(id, async () => {
         const entry = this.fileIndex.get(id);
@@ -1232,11 +1236,8 @@ export class FsFolderStore implements FolderStore {
         }
         if (!alive()) return;
         if (copies.length > 0) {
-          copies.sort((a, b) => {
-            const la = a.elem.local_updated_at ?? '', lb = b.elem.local_updated_at ?? '';
-            if (la !== lb) return la < lb ? 1 : -1;
-            return (a.layout === ELEMENTS_DIR ? 0 : 1) - (b.layout === ELEMENTS_DIR ? 0 : 1);
-          });
+          copies.sort((a, b) =>
+            ((a.layout === ELEMENTS_DIR ? 0 : 1) - (b.layout === ELEMENTS_DIR ? 0 : 1)) || codePointCompare(a.filename, b.filename));
           const [winner] = copies;
           rehome(id, entry.type, winner.layout, winner.filename, winner.stamp, winner.elem, winner.spelling);
           if (copies.length === 1) this.shadowedIds.delete(id);
@@ -1724,12 +1725,15 @@ export class FsFolderStore implements FolderStore {
       this.cacheSet(next);
       return;
     }
-    // Name genuinely changed — write the new file first, then remove the old.
-    // resolveFilename outputs are valid forms and lc-equality with the current
-    // name was excluded above, so old and new are DISTINCT physical entries
-    // even on case-folding filesystems. A crash between the two steps is
-    // covered by ensureIndexFor's dedupe (latest local_updated_at wins).
+    // Name genuinely changed: the new body goes into the CURRENT file first, then the new name gets
+    // the same body, then the old file goes. resolveFilename outputs are valid forms and lc-equality
+    // with the current name was excluded above, so old and new are DISTINCT physical entries even on
+    // case-folding filesystems. A crash at any step leaves either one file with the new body (the
+    // open-time tidy renames it) or two files with the same body (the dedupe drops one, whichever
+    // order serves): never two different bodies, so the format's first-by-name rule can never serve
+    // the version from before the edit.
     const newFilename = this.resolveFilename(type, layout, id, next.name);
+    await this.writeElementFile(dir, currentFilename, next);
     await this.writeElementFile(dir, newFilename, next);
     this.setIndex(id, type, layout, newFilename);
     this.cacheSet(next);

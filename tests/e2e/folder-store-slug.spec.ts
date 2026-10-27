@@ -5,8 +5,9 @@
  *   - createElement('Alice') writes `alice--<id-tail8>.json` (short fixture
  *     ids stay whole; identity is the id INSIDE the file).
  *   - updateElement renames the file when the element name changes.
- *   - The rename-crash window is recoverable: if two files claim the same id
- *     on next open, dedupe-by-newest cleans it up.
+ *   - Two files claiming one id on next open: the first by code-point name is
+ *     served, as every reader serves it (the format's §4); the other is set
+ *     aside, never served by Atlas's own newer stamp.
  *   - Reopen reads the slug-prefixed file correctly.
  *
  * Unit coverage of slugify/parseIdFromFilename lives in
@@ -141,9 +142,9 @@ test('reopen reads slug-prefixed file by id', async ({ page }) => {
   expect(files).toEqual(['shire--loc-1.json']);
 });
 
-test('duplicate files for same id are deduped on next open (rename-crash recovery)', async ({ page }) => {
-  // Simulate an atlas crash mid-rename: write BOTH the new and old file by hand,
-  // then open the store. ensureIndexFor should dedupe by latest local_updated_at.
+test('duplicate files for same id: the first by name is served, never the newer stamp', async ({ page }) => {
+  // Two files for one id, written by hand: the second sorts AFTER the first and carries a newer
+  // stamp. The format serves the first by code-point name (§4), so Atlas must too.
   const result = await page.evaluate(async () => {
     const api = window.__atlasTestApi;
     const root = await api.opfsRoot();
@@ -159,7 +160,7 @@ test('duplicate files for same id are deduped on next open (rename-crash recover
       .getDirectoryHandle('elements')
       .then((d: any) => d.getDirectoryHandle('character'));
     const newer = { ...created, name: 'New', local_updated_at: '2099-12-31T23:59:59.999Z' };
-    const fh = await charDir.getFileHandle(`new--char-x.json`, { create: true });
+    const fh = await charDir.getFileHandle(`zed--char-x.json`, { create: true });
     const w = await fh.createWritable();
     await w.write(JSON.stringify(newer));
     await w.close();
@@ -194,9 +195,9 @@ test('duplicate files for same id are deduped on next open (rename-crash recover
   });
 
   expect(result.before).toHaveLength(2);
-  expect(result.after).toEqual(['new--char-x.json']);
+  expect(result.after).toEqual(['old--char-x.json']);
   expect(result.listCount).toBe(1);
-  expect(result.survivorName).toBe('New');
+  expect(result.survivorName).toBe('Old');
 });
 
 test('a hand-made variant sharing an id is set aside in .atlas/quarantine, never deleted', async ({ page }) => {
