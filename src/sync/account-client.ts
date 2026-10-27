@@ -144,12 +144,14 @@ export class AccountClient {
    * `name` labels the key in the portal ("atlas · windows") so the keys table
    * reads honestly — Titus's named-keys condition, live 2026-07-13. Omitted
    * name keeps the old bare mint (server stores "").
+   * Every key Atlas mints is kept on this device (`keep: true`): keel's sweep
+   * of a revoked token's keys passes it by, so Sign out lets go of the account
+   * and the worlds here keep syncing with their own keys.
    */
   async mintWorldKey(worldId: string, name?: string, scope: 'write' | 'read' = 'write'): Promise<MintedWorldKey> {
-    const fields: Record<string, string> = {};
-    if (name) fields.name = name;
-    if (scope === 'read') fields.scope = 'read';
-    const body = Object.keys(fields).length > 0 ? fields : undefined;
+    const body: Record<string, string | boolean> = { keep: true };
+    if (name) body.name = name;
+    if (scope === 'read') body.scope = 'read';
     const raw = await this.request('POST', `/account/worlds/${worldId}/keys`, body) as MintedWorldKey;
     if (!raw || typeof raw.key !== 'string' || !raw.key) {
       throw new Error('key mint response missing the full key');

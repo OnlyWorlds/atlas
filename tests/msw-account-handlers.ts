@@ -56,7 +56,7 @@ export interface StatefulAccountOptions {
 export interface AccountHandlerState {
   /** Every key minted via POST /account/worlds/{id}/keys, in order.
    *  `name` mirrors the server: stored verbatim, "" when absent. */
-  minted: Array<{ worldId: string; key: string; name: string; scope: 'READ' | 'WRITE' }>;
+  minted: Array<{ worldId: string; key: string; name: string; scope: 'READ' | 'WRITE'; keep: boolean }>;
   /** Every world created via POST /account/worlds, in order. */
   created: Array<{ name: string; id: string; key: string; origin?: { source: unknown; producer: unknown } }>;
   /** GET /account/worlds hit count — lets the caller assert fetch de-dup. */
@@ -181,7 +181,7 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
       if (!row) {
         return envelope(404, 'not_found', `World '${worldId}' not found.`);
       }
-      const body = (await request.json().catch(() => ({}))) as { name?: unknown; scope?: unknown } | null;
+      const body = (await request.json().catch(() => ({}))) as { name?: unknown; scope?: unknown; keep?: unknown } | null;
       const name = typeof body?.name === 'string' ? body.name : '';
       if (name.length > 255) {
         return envelope(422, 'invalid_request', 'name must be at most 255 characters.', 'name');
@@ -195,7 +195,7 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
       }
       mintCounter += 1;
       const key = `${scope === 'READ' ? 'ow_r_' : 'ow_w_'}test${mintCounter}`;
-      state.minted.push({ worldId, key, name, scope });
+      state.minted.push({ worldId, key, name, scope, keep: body?.keep === true });
       return HttpResponse.json(
         { id: `key-${mintCounter}`, last4: key.slice(-4), scope, name, last_used_at: null, revoked: false, key },
         { status: 201 },

@@ -99,6 +99,13 @@ describe('AccountClient.mintWorldKey', () => {
     expect(state.minted[0].worldId).toBe('srv-owned');
   });
 
+  it('asks keel to keep every key it mints, so a sign-out leaves the worlds here working', async () => {
+    const state = mount();
+    await new AccountClient(TOKEN).mintWorldKey('srv-owned');
+    await new AccountClient(TOKEN).mintWorldKey('srv-owned', 'atlas · windows', 'read');
+    expect(state.minted.map(m => m.keep)).toEqual([true, true]);
+  });
+
   it('404s (not an auth error) when the account is not in the world', async () => {
     mount();
     let caught: unknown;

@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: "When Make online has put a world on OnlyWorlds, its message carries Open on onlyworlds.com, which opens the world's own page there, where its members, keys and invites are.",
         tags: ['sync'],
       },
+      {
+        id: 'sign-out-keeps-world-keys',
+        title: 'Signing out keeps your worlds working',
+        body: 'The keys Atlas makes for your worlds are now kept on OnlyWorlds when you sign out, so a world here goes on syncing with its own key. Signing out lets go of your account only.',
+        tags: ['sync'],
+      },
     ],
   },
   {
