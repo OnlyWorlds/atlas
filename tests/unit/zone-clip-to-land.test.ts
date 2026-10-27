@@ -144,9 +144,15 @@ describe('clipLineToLand against the plain walk', () => {
       const t = (i / 100) * Math.PI * 2;
       return Array.from({ length: 80 }, (_, k) => ({ x: 1000 + (400 + 5 * k) * Math.cos(t), y: 1000 + (400 + 5 * k) * Math.sin(t) }));
     });
+    // Per river against the plain walk, on the same machine in the same run, never a wall-clock
+    // limit: a fixed 150 ms read 105 to 215 ms under load, while the index ran 70 to 150 times
+    // faster per river than the walk. Three rivers of the walk keep the test short.
     const t0 = performance.now();
     for (const r of rivers) clipLineToLand(r, [coast], []);
-    // The plain walk took about 630 ms here; the index takes a few.
-    expect(performance.now() - t0).toBeLessThan(150);
+    const indexedPerRiver = (performance.now() - t0) / rivers.length;
+    const t1 = performance.now();
+    for (const r of rivers.slice(0, 3)) plain(r, [coast], []);
+    const walkedPerRiver = (performance.now() - t1) / 3;
+    expect(indexedPerRiver).toBeLessThan(walkedPerRiver / 10);
   }, 30000);
 });
