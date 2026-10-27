@@ -13,6 +13,7 @@ import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { toV2WireShape } from '../../src/sync/ow-v2-client-adapter';
 import { diffFieldNames } from '../../src/sync/sync-engine';
 import type { FolderStore } from '../../src/store/folder-store';
+import { customFieldMetasFor, customFieldNameProblem, structuredFieldEntriesFor } from '../../src/middle/element-detail-custom-fields';
 
 const NOTE = '00000000-0000-4000-8000-0000000007a1';
 const SEEN = '00000000-0000-4000-8000-0000000007a2';
@@ -58,6 +59,13 @@ describe('the wire', () => {
       expect(MARK in body).toBe(false);
       expect(body.characters).toEqual([SEEN]);
     }
+  });
+
+  it("is keel's word, never a person's field: not listed, not offered as a name", () => {
+    const el = { ...trimmed, x_mood: 'grim', x_tags: ['a'] } as never;
+    expect(customFieldMetasFor(el).map(f => f.name)).toEqual(['x_mood']);
+    expect(structuredFieldEntriesFor(el).map(f => f.name)).toEqual(['x_tags']);
+    expect(customFieldNameProblem({ id: NOTE, type: 'narrative', name: 'Orders' } as never, 'x_served_trimmed')).toMatch(/OnlyWorlds uses that name/);
   });
 
   it("is never a difference: a copy without it is the same as keel's body with it", () => {

@@ -18,7 +18,7 @@
  */
 
 import type { Element } from '../core/types';
-import { isCustomEditableField, isPopulatedCustomValue, isProfileField, PROFILE_FIELD_PREFIXES } from '../core/constants';
+import { isCustomEditableField, isPopulatedCustomValue, isProfileField, PROFILE_FIELD_PREFIXES, SERVER_MARK_FIELDS } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { worldIsViewOnly } from '../core/view-only';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
@@ -123,6 +123,7 @@ export function customFieldNameProblem(el: Element, key: string): string | null 
   if (knownFieldsFor(el.type).has(bare)) {
     return `"${humanizeFieldName(bare)}" is a built-in field for this type: use that field instead`;
   }
+  if ((SERVER_MARK_FIELDS as readonly string[]).includes(key)) return 'OnlyWorlds uses that name for its own mark. Pick another.';
   if (!isCustomEditableField(key)) return 'Atlas uses that name itself. Pick another.';
   const current = (el as Record<string, unknown>)[key];
   if (current !== undefined && current !== null) {

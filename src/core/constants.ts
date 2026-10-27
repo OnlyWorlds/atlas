@@ -347,13 +347,15 @@ export function isRekeyExemptField(name: string): boolean {
 /**
  * A user-editable custom field: extension-namespaced but NOT atlas machinery
  * (page blocks, richtext, aliases, zone visuals, ...) and not a published
- * profile's key. The D9 custom-fields section in element detail renders
- * exactly these; a `null` value is the field's delete tombstone (keel keeps
- * null-valued extension keys — probed 2026-07-12) and hides the row.
+ * profile's key, nor keel's own mark (`x_served_trimmed`). The D9 custom-fields
+ * section in element detail renders exactly these; a `null` value is the field's
+ * delete tombstone (keel keeps null-valued extension keys — probed 2026-07-12)
+ * and hides the row.
  */
 export function isCustomEditableField(name: string): boolean {
   return isExtensionField(name)
     && !(ATLAS_LOCAL_EXTENSION_FIELDS as readonly string[]).includes(name)
+    && !(SERVER_MARK_FIELDS as readonly string[]).includes(name)
     && !isProfileField(name);
 }
 
