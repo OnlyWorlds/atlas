@@ -47,6 +47,7 @@ import {
   type MergeProgress,
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
+import { owWorldUrl } from '../core/ow-site';
 import { signInFieldsHtml, signedInLineHtml, missingSignIn, signInInputs, signInFromFields, PIN_REASON_HTML } from './sign-in-fields';
 import { wireOnlyWorldsSignIn } from './onlyworlds-sign-in-button';
 
@@ -414,7 +415,11 @@ export class MakeOnlineModal extends BaseModal {
         this.toasts.error(`${name} is online. ${failureToastOnce(pushResult.failures, activeFilesWhere()) ?? describeFailures(pushResult.failures, activeFilesWhere())}`);
       } else {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
-        this.toasts.success(`${name} is online · ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);
+        // The way back to the site: the world's own page there, where its members, keys and invites live.
+        const page = owWorldUrl(world.id);
+        this.toasts.show(`${name} is online · ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`, 'success', 0, {
+          actions: [{ label: 'Open on onlyworlds.com', run: () => { window.open(page, '_blank', 'noopener'); } }],
+        });
       }
       completeWaypoint('ecosystem'); completeKeepCopyIfBrowserWorld();
       void pushDone; void pushTotal;

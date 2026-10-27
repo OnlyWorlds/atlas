@@ -94,6 +94,31 @@ describe('Make online, signed out, signs in and makes the world on the account',
     expect(v1.worldCreations).toHaveLength(0);
   });
 
+  it("the success toast opens the world's own page on onlyworlds.com", async () => {
+    mountKeel({ password: 'right' });
+    document.body.insertAdjacentHTML('beforeend', '<div id="toast-container"></div>');
+    const toasts = new ToastManager();
+    toasts.init();
+    new MakeOnlineModal(toasts).open();
+    const modal = document.querySelector<HTMLElement>('[data-modal="make-online"]')!;
+    fill(modal, 'signin-login', 'walker@example.com');
+    fill(modal, 'signin-password', 'right');
+    fill(modal, 'create-pin', '1234');
+    modal.querySelector<HTMLFormElement>('[data-form="create-route"]')!.requestSubmit();
+
+    const toast = await vi.waitFor(() => {
+      const t = [...document.querySelectorAll<HTMLElement>('.ow-toast')].find(el => /W is online/.test(el.textContent ?? ''));
+      expect(t).toBeDefined();
+      return t!;
+    }, { timeout: 5000 });
+    const button = [...toast.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === 'Open on onlyworlds.com');
+    expect(button).toBeDefined();
+    const opened = vi.spyOn(window, 'open').mockReturnValue(null);
+    button!.click();
+    expect(opened).toHaveBeenCalledWith('https://www.onlyworlds.com/account/worlds/0e2e0000-0000-4000-8000-000000000134', '_blank', 'noopener');
+    opened.mockRestore();
+  });
+
   it('a refused password says why, keeps nothing, and makes no world', async () => {
     const keel = mountKeel({ password: 'right' });
     new MakeOnlineModal(new ToastManager()).open();

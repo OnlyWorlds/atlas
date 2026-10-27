@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.96.0',
+    date: '2026-10-27',
+    theme: 'The way back to the site',
+    entries: [
+      {
+        id: 'make-online-site-page',
+        title: "A world made online links to its page on onlyworlds.com",
+        body: "When Make online has put a world on OnlyWorlds, its message carries Open on onlyworlds.com, which opens the world's own page there, where its members, keys and invites are.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.95.1',
     date: '2026-10-26',
     theme: 'How a battle was decided',
