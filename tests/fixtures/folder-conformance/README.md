@@ -29,7 +29,7 @@ world/
     character/
       only-name--55555501.json                id + name and NOTHING else
       declared-elsewhere--55555502.json        body type contradicts its directory
-      extension-carrier--55555507.json         carries an unknown x_* field
+      extension-bearer--55555507.json          carries an unknown x_* field
       1111...555555555509.json                 name is the EMPTY STRING (legal)
       null-fields--5555550a.json               explicit nulls on links, a date, a text field
       idless.json                              NO id — must be skipped, never deleted
@@ -68,7 +68,7 @@ world/
    `null` on a single link, a multi link, a date and a text field. `null`
    means UNSET and is a different claim from `0` or `""`. A reader may display
    whatever fallback it likes; it must not write one back.
-5. **Round-trip unknown extension fields.** `extension-carrier` holds
+5. **Round-trip unknown extension fields.** `extension-bearer` holds
    `x_probe_note`. A reader that writes must write it back unchanged.
 6. **Tolerate a mapless pin.** `wandering-pin` has no `map`/`map_id` and no
    `element`/`element_id`. Pin/marker `required:` lists were dropped from

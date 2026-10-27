@@ -41,7 +41,7 @@
       "spec_version": "0.3.6",
       "elements": 9,
       "legacy_elements": 1,
-      "change": "NAME ONLY: the extension element's name is Extension Bearer. Its id, its file and its x_probe_note are unchanged; a reader that compares names takes the new one."
+      "change": "NAME ONLY: the extension element's name is Extension Bearer. Its file follows the name (extension-bearer--55555507.json); its id and its x_probe_note are unchanged."
     }
   ],
   "world": {
