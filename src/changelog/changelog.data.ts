@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.98.1',
+    date: '2026-10-28',
+    theme: 'A shared world comes down faster',
+    entries: [
+      {
+        id: 'first-download-in-memory',
+        title: 'Viewing or linking a world into this browser is several times faster',
+        body: 'A world from OnlyWorlds now downloads whole first and is then saved to this browser in one pass, as Explore Moppetopia already did. A world of 300 elements opens in a few seconds in Chrome, where it took about 15, and faster in Firefox too. The dialog says when it is saving.',
+        tags: ['sync', 'performance'],
+      },
+      {
+        id: 'guide-year-empty',
+        title: 'A new Event from the home starts with no year in a world without dates',
+        body: 'Something happened on the home used to fill the year in as 1. In a world with no dates yet the box now starts empty, so the year is yours to type.',
+        tags: ['home', 'onboarding'],
+      },
+    ],
+  },
+  {
     version: '1.98.0',
     date: '2026-10-28',
     theme: 'A guide that follows what you make',

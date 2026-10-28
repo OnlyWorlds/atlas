@@ -12,7 +12,7 @@
 
 import { BaseModal } from './modal-base';
 import type { ToastManager } from './toast-manager';
-import { downloadingLine } from './download-progress';
+import { progressLine } from './download-progress';
 import { lockWhereChoice, readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { showProblem } from './problem-fixes';
 import { getState, patchSlice } from '../core/state';
@@ -327,7 +327,7 @@ export class JoinWorldModal extends BaseModal {
       lockWhereChoice(form, on);
       if (nameInput) nameInput.disabled = on || !!this.player;
       if (picksBox) picksBox.disabled = on || !!this.player;
-      if (on) { stop = null; cancelDl.disabled = finishBtn.disabled = false; }
+      if (on) { stop = null; cancelDl.disabled = finishBtn.disabled = false; finishBtn.hidden = false; }
     };
 
     // One submit at a time: a second Open while the first awaits the folder
@@ -423,10 +423,17 @@ export class JoinWorldModal extends BaseModal {
         }
       }
       const renderProgress = (pr: InitialDownloadProgress) => {
-        if (stop) return;
+        // Saving what downloaded: nothing is left to keep or stop early, and
+        // the saving speaks even after Stop and keep (it is what runs then).
+        // Once the last file has landed the world is being registered: a
+        // cancel could no longer undo it, so the button stops offering one.
+        const saving = pr.phase === 'land' || pr.phase === 'open';
+        if (saving) finishBtn.hidden = true;
+        if ((pr.phase === 'land' && pr.done >= pr.total) || pr.phase === 'open') cancelDl.disabled = true;
+        if (stop === 'cancel' || (stop && !saving)) return;
         progressBox.textContent = pr.phase === 'list'
           ? `Discovering ${pr.currentType ?? ''}…`
-          : pr.total === 0 ? 'World is empty; finishing up' : downloadingLine(pr.done, pr.total, where);
+          : pr.total === 0 ? 'World is empty; finishing up' : progressLine(pr, where);
         progressBox.hidden = false;
       };
       try {

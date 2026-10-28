@@ -4,7 +4,7 @@
  * elements, not what Atlas keeps on its own), then runs the named restore
  * (`setup/bring-down-again.ts`) with progress, the dialog locked meanwhile.
  */
-import { downloadingLine } from './download-progress';
+import { progressLine } from './download-progress';
 import { BaseModal } from './modal-base';
 import { askBrowserToKeepWorlds } from '../setup/world-parent';
 import type { ToastManager } from './toast-manager';
@@ -50,7 +50,7 @@ export class BringDownAgainModal extends BaseModal {
       try {
         const out = await bringDownAgain(w.id, {
           onProgress: (p) => {
-            progress.textContent = p.phase === 'list' ? 'Asking OnlyWorlds for the world…' : downloadingLine(p.done, p.total, 'browser');
+            progress.textContent = p.phase === 'list' ? 'Asking OnlyWorlds for the world…' : progressLine(p, 'browser');
           },
         });
         this.dismissLocked = false;

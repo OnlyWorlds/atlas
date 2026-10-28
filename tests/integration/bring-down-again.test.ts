@@ -32,6 +32,8 @@ vi.mock('../../src/store/folder-store-fs', async () => {
   const { MockFolderStore } = await import('../fixtures/mock-folder-store');
   return { FsFolderStore: MockFolderStore };
 });
+// The store keeps no files, so the first download lands as the mock store's state (1.98.1).
+vi.mock('../../src/setup/browser-first-download', () => import('../fixtures/mock-first-download'));
 vi.mock('../../src/sync/make-online', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/sync/make-online')>()),
   buildV2Adapter: (apiKey: string, apiPin: string) => new OwV2ClientAdapter({ apiKey, apiPin, baseUrl: TEST_BASE }),

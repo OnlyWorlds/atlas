@@ -83,7 +83,19 @@ export class MockFolderStore implements FolderStore {
     if (this.viewOnly) throw new PlainError('This world is view-only, so it cannot be changed here. Make your own copy to edit it.');
   }
 
-  async open(_handle: FileSystemDirectoryHandle | null): Promise<void> {
+  /**
+   * What a mocked first download landed on a handle (`mock-first-download.ts`):
+   * the next store opened on that handle takes its whole state, as a real
+   * store opened on landed files reads them.
+   */
+  static landed = new WeakMap<object, MockFolderStore>();
+
+  async open(handle: FileSystemDirectoryHandle | null): Promise<void> {
+    const from = handle ? MockFolderStore.landed.get(handle) : undefined;
+    if (from) {
+      MockFolderStore.landed.delete(handle!);
+      Object.assign(this, from);
+    }
     this.opened = true;
   }
 

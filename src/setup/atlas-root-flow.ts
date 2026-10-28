@@ -42,6 +42,7 @@ import { getActiveStore, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
 import { initialDownloadAll, seedLinkedWorldMeta, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
+import { downloadIntoMake } from './browser-first-download';
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
@@ -688,13 +689,15 @@ export const BROWSER_STORAGE_FULL = (doing: string) => browserStorageFullSentenc
  * `.atlas/making` until the caller's registry save (`make.finish`). Every
  * failure after this must close the store and `make.abort()`.
  */
-export async function scaffoldBrowserWorld(name: string, adoptId?: string): Promise<{
+export async function scaffoldBrowserWorld(name: string, adoptId?: string, opts: { open?: boolean } = {}): Promise<{
   store: FsFolderStore; worldUuid: string; subName: string; handleKey: string; make: BrowserMake;
 }> {
   const trimmed = name.trim() || 'Untitled world';
   const worldUuid = adoptId ?? newId();
   const make = await openBrowserMake(trimmed, worldUuid);
   const store = new FsFolderStore();
+  // A first download lands its files before the store opens (`downloadIntoMake`): `open: false`.
+  if (opts.open === false) return { store, worldUuid, subName: make.dir, handleKey: `world-${worldUuid}`, make };
   try {
     await store.open(make.handle);
   } catch (err) {
@@ -1182,17 +1185,17 @@ async function linkIntoBrowser(
   v: { apiKey: string; apiPin: string; readOnly: boolean; world: { id?: string; name?: string }; serverWorldId: string; displayName: string; seat?: { role?: string } },
 ): Promise<LinkExistingApiWorldResult> {
   const { apiKey, apiPin, readOnly, world, serverWorldId, displayName, seat } = v;
-  const { store, subName, make } = await scaffoldBrowserWorld(displayName, serverWorldId);
+  const { store, subName, make } = await scaffoldBrowserWorld(displayName, serverWorldId, { open: false });
   // Identity stays `world-<id>`; a key some entry already holds gets a suffix,
   // as the folder path's vault loop does.
   let handleKey = `world-${serverWorldId}`;
   for (let n = 2; getState().registry.worlds.some(w => w.folder.handle_key === handleKey); n++) handleKey = `world-${serverWorldId}-${n}`;
   let downloadResult: Awaited<ReturnType<typeof initialDownloadAll>>;
   try {
-    await store.writeWorldMeta(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat }));
+    // Into memory, then landed once (`browser-first-download.ts`); the store opens on what landed.
     const adapter = buildV2Adapter(apiKey, apiPin);
-    downloadResult = await initialDownloadAll(store, adapter, opts.onProgress, opts.shouldStop, { stopOnQuota: true });
-    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it
+    downloadResult = await downloadIntoMake(make, linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat }), adapter, opts);
+    await store.open(make.handle);
     await releasePriorWorld();
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');
@@ -1212,7 +1215,9 @@ async function linkIntoBrowser(
   setActiveStore(store);
   patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: serverWorldId, name: displayName })), opened: true });
   try {
-    patchSlice('data', { elements: await store.listElements() });
+    // A cold read of what landed: counted, since in Firefox it takes seconds for a big world.
+    const onProgress = (done: number, total: number) => opts.onProgress?.({ done, total, phase: 'open' });
+    patchSlice('data', { elements: await store.listElements(undefined, { onProgress }) });
   } catch (err) {
     console.warn('[link-api] failed to prime elements after download:', err);
     patchSlice('data', { elements: [] });

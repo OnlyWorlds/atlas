@@ -15,7 +15,7 @@
  * server-side key.
  */
 
-import { downloadingLine } from '../ui/download-progress';
+import { progressLine } from '../ui/download-progress';
 import { getState, patchSlice, subscribe } from '../core/state';
 import { SIGNED_IN_AGAIN_LINE } from './token-revoke';
 import { mintRecordOf } from './key-takeback';
@@ -314,7 +314,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
           } else {
             overlay.update(p.total === 0
               ? 'Empty world; finishing up…'
-              : downloadingLine(p.done, p.total, where));
+              : progressLine(p, where));
           }
         },
       })

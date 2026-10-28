@@ -29,6 +29,7 @@ import { createLocalWorld, saveRegistry, updateWorldEntry } from '../registry/re
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import type { WorldFileEntry } from '../store/world-file';
 import { diskApiBlock } from '../core/seat';
+import { DownloadCancelledError } from '../sync/initial-download';
 
 export type OpenWorldFileOutcome =
   | { kind: 'opened' | 'restored'; worldId: string }
@@ -81,7 +82,13 @@ function placeOf(reg: WorldsRegistry, worldId: string): { restore: WorldRegistry
  */
 export const WRITE_CONCURRENCY = 8;
 
-export async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileEntry[], worldJson: Uint8Array, onWritten?: (done: number, total: number) => void): Promise<void> {
+/**
+ * Land a world's files in `dir`, `world.json` last. `stopped` is asked before
+ * each file: once it says yes no file starts, the ones in flight finish, and
+ * the landing throws `DownloadCancelledError` without writing `world.json`
+ * (the caller removes the half-made world, as on any failure).
+ */
+export async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileEntry[], worldJson: Uint8Array, onWritten?: (done: number, total: number) => void, stopped?: () => boolean): Promise<void> {
   // Each folder is looked up (and made) once, however many files land in it.
   const dirs = new Map<string, Promise<FileSystemDirectoryHandle>>();
   const dirFor = (segs: string[]): Promise<FileSystemDirectoryHandle> => {
@@ -113,6 +120,10 @@ export async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileE
   let failed = false;
   const lane = async (): Promise<void> => {
     while (!failed && next < rest.length) {
+      if (stopped?.()) {
+        failed = true;
+        throw new DownloadCancelledError();
+      }
       const f = rest[next++];
       try {
         await write(f.path, f.data);
@@ -127,6 +138,7 @@ export async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileE
   const settled = await Promise.allSettled(lanes);
   const refused = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected');
   if (refused) throw refused.reason;
+  if (stopped?.()) throw new DownloadCancelledError();
   await write('world.json', worldJson); // last: nothing says "world" until every other file landed
   onWritten?.(total, total);
 }

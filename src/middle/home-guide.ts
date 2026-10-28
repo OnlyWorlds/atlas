@@ -83,19 +83,19 @@ export function buildGuideStrip(dots: Dots, worldId: string, toasts: ToastManage
   return strip;
 }
 
-function create(type: 'character' | 'location' | 'event' | 'narrative', dot: DotId, toasts: ToastManager, extra: { temporalContext?: { defaultDate: number } } = {}): void {
+function create(type: 'character' | 'location' | 'event' | 'narrative', dot: DotId, toasts: ToastManager, extra: { temporalContext?: { defaultDate?: number } } = {}): void {
   focusDot = dot;
   new ElementCreateModal(toasts, { initialType: type, suppressNavigate: true, ...extra }).open();
 }
 
-/** The world's latest whole-number date, else 1: what a new Event's year field starts at. */
-function latestDate(els: readonly Element[]): number {
+/** The world's latest whole-number date: what a new Event's year field starts at. None: the field starts empty, so the year is the person's own (1.98.0 started it at 1, a year nobody chose). */
+function latestDate(els: readonly Element[]): number | undefined {
   let best: number | null = null;
   for (const e of els) {
     const d = dateOf(e);
     if (d !== null && (best === null || d > best)) best = d;
   }
-  return best ?? 1;
+  return best ?? undefined;
 }
 
 function pressMark(dot: DotId, lit: boolean, worldId: string, toasts: ToastManager): void {

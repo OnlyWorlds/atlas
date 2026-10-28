@@ -12,7 +12,7 @@
  * with `readOnly: true`), same activation-chain ride.
  */
 
-import { downloadingLine } from './download-progress';
+import { progressLine } from './download-progress';
 import { BaseModal } from './modal-base';
 import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { ToastManager } from './toast-manager';
@@ -108,7 +108,7 @@ export class ViewWorldModal extends BaseModal {
         } else {
           progressBox.textContent = p.total === 0
             ? 'World is empty; finishing up'
-            : downloadingLine(p.done, p.total, where);
+            : progressLine(p, where);
         }
         progressBox.hidden = false;
       };

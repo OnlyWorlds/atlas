@@ -27,7 +27,8 @@ import { withWorldLock } from '../core/browser-home';
 import { PlainError } from '../core/plain-error';
 import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
 import { saveRegistry, setActiveWorld, storedRegistry, updateWorldEntry } from '../registry/registry';
-import { initialDownloadAll, seedLinkedWorldMeta, type InitialDownloadProgress } from '../sync/initial-download';
+import type { InitialDownloadProgress } from '../sync/initial-download';
+import { downloadIntoMake } from './browser-first-download';
 import { buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine, diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { abandonBrowserMake, releasePriorWorld, scaffoldBrowserWorld } from './atlas-root-flow';
@@ -111,13 +112,13 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   evictParkedStore(entry.id);
   await awaitEviction(entry.id);
 
-  const { store, subName, make } = await scaffoldBrowserWorld(entry.name, ownId);
+  const { store, subName, make } = await scaffoldBrowserWorld(entry.name, ownId, { open: false });
   let downloaded;
   try {
-    await store.writeWorldMeta({ id: ownId, name: entry.name, api: diskApiBlock(entry.api), producer: atlasProducer('server') });
+    // Into memory, then landed once (`browser-first-download.ts`); the store opens on what landed.
     const adapter = buildV2Adapter(entry.api.api_key, pin);
-    downloaded = await initialDownloadAll(store, adapter, opts.onProgress, undefined, { stopOnQuota: true });
-    await seedLinkedWorldMeta(store, adapter); // its settings and own words come down with it
+    downloaded = await downloadIntoMake(make, { id: ownId, name: entry.name, api: diskApiBlock(entry.api), producer: atlasProducer('server') }, adapter, { onProgress: opts.onProgress });
+    await store.open(make.handle);
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }
@@ -153,7 +154,9 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   setActiveStore(store);
   patchSlice('active', { worldId, meta: await store.readWorldMeta().catch(() => ({ id: ownId, name: entry.name })), opened: true });
   try {
-    patchSlice('data', { elements: await store.listElements() });
+    // A cold read of what landed: counted, since in Firefox it takes seconds for a big world.
+    const onProgress = (done: number, total: number) => opts.onProgress?.({ done, total, phase: 'open' });
+    patchSlice('data', { elements: await store.listElements(undefined, { onProgress }) });
   } catch (err) {
     console.warn('[bring-down-again] could not prime the elements:', err);
     patchSlice('data', { elements: [] });

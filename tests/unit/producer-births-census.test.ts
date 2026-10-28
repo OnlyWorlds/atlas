@@ -1,6 +1,6 @@
 /**
  * Every world.json Atlas gives birth to says who made it (folder spec §4.2,
- * v0.3.14). A birth is a `writeWorldMeta` call that names the world's `id`;
+ * v0.3.14). A birth is a `writeWorldMeta` (or `downloadIntoMake`) call that names the world's `id`;
  * each one must carry a producer line (or build it: `linkedWorldMeta`,
  * `importedProducer`). The count is pinned, so a scan that finds nothing
  * cannot pass, and a new birth has to be counted here on purpose.
@@ -18,12 +18,20 @@ function files(dir: string): string[] {
   });
 }
 
-/** The text of each `writeWorldMeta(...)` call's arguments, by balanced parentheses. */
+/**
+ * The text of each `writeWorldMeta(...)` call's arguments, by balanced
+ * parentheses, and of each `downloadIntoMake(...)`: a browser world's first
+ * download hands its world.json to the store in memory (1.98.1).
+ */
 function calls(text: string): string[] {
+  return ['writeWorldMeta', 'downloadIntoMake'].flatMap(fn => callsOf(text, fn));
+}
+
+function callsOf(text: string, fn: string): string[] {
   const out: string[] = [];
-  for (let i = text.indexOf('writeWorldMeta('); i >= 0; i = text.indexOf('writeWorldMeta(', i + 1)) {
+  for (let i = text.indexOf(`${fn}(`); i >= 0; i = text.indexOf(`${fn}(`, i + 1)) {
     let depth = 0;
-    let j = i + 'writeWorldMeta'.length;
+    let j = i + fn.length;
     for (; j < text.length; j++) {
       if (text[j] === '(') depth++;
       else if (text[j] === ')' && --depth === 0) break;

@@ -18,7 +18,7 @@ import { buildDemoWorldFile, DEMO_WORLD_ID, DEMO_WORLD_NAME } from '../setup/dem
 import type { WorldRegistryEntry } from '../core/types';
 import { isCodeLoadError } from '../core/reload-offer';
 import { showLoadingOverlay, type LoadingOverlayHandle } from './loading-overlay';
-import { downloadingLine } from './download-progress';
+import { progressLine } from './download-progress';
 
 /**
  * The file picker, opened SYNCHRONOUSLY inside the caller's click (a file
@@ -186,7 +186,7 @@ async function openDemoWorldOnce(toasts: ToastManager): Promise<void> {
     await openWorldBytes(async () => {
       const built = await buildDemoWorldFile({
         isHere: id => demoHere(id) !== null,
-        onProgress: p => { if (p.phase === 'write') overlay.update(downloadingLine(p.done, p.total, 'browser')); },
+        onProgress: p => { if (p.phase === 'write') overlay.update(progressLine(p, 'browser')); },
       });
       if (built.kind === 'file') {
         openingName = built.name;

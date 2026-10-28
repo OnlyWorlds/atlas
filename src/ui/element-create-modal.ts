@@ -109,11 +109,11 @@ export interface ElementCreateOptions {
    * gate killed. With this set: (a) types without a start-date field render
    * greyed-out in the grid (visible but disabled — teaches the difference)
    * and are excluded from category matching; (b) a Date field appears under
-   * Name, prefilled with `defaultDate` and labeled with the selected type's
+   * Name, prefilled with `defaultDate` (empty without one) and labeled with the selected type's
    * real start field; (c) the date is REQUIRED and merged into the create
    * body, so the new element lands on the chart immediately.
    */
-  temporalContext?: { defaultDate: number };
+  temporalContext?: { defaultDate?: number };
   /**
    * Guided-tour mode: the REAL dialog with the script locked — the type grid
    * offers only `initialType` and the name input is read-only. Pair with
@@ -252,7 +252,7 @@ export class ElementCreateModal extends BaseModal {
     const dateFieldHtml = this.opts.temporalContext
       ? `<label class="atlas-modal-field" data-role="date-field">
           <span data-role="date-label">Date</span>
-          <input class="atlas-input" type="number" name="element-date" autocomplete="off" value="${escapeAttr(String(this.opts.temporalContext.defaultDate))}" />
+          <input class="atlas-input" type="number" name="element-date" autocomplete="off" ${this.opts.temporalContext.defaultDate === undefined ? 'value="" placeholder="The year it happened, such as 120"' : `value="${escapeAttr(String(this.opts.temporalContext.defaultDate))}"`} />
         </label>`
       : '';
 
@@ -415,7 +415,7 @@ export class ElementCreateModal extends BaseModal {
         const dateInput = form.querySelector<HTMLInputElement>('input[name="element-date"]')!;
         const parsed = dateInput.value.trim() === '' ? NaN : Number(dateInput.value);
         if (!Number.isFinite(parsed)) {
-          errorBox.textContent = 'A date is required to place it on the chart';
+          errorBox.textContent = 'Type a date first: it is what places it on the chart.';
           errorBox.hidden = false;
           dateInput.focus();
           return;

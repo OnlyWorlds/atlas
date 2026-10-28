@@ -215,6 +215,22 @@ test('a seen note is never drawn again, across a reload; the twin is the first d
   expect(await notesDrawn(page)).toEqual([]);
 });
 
+test('Something happened in a world with no dates: the year starts empty and is the person\'s to type', async ({ page }) => {
+  await setupWorld(page);
+  await page.click('[data-dot="happened"]');
+  const modal = page.locator('[data-modal="create-element"]');
+  const year = modal.locator('input[name="element-date"]');
+  await expect(year).toHaveValue('');
+  await expect(year).toHaveAttribute('placeholder', /year/);
+  await page.fill('input[name="element-name"]', 'The Founding');
+  await modal.locator('[data-action="create"]').click();
+  await expect(modal).toContainText('Type a date first');
+  await year.fill('7');
+  await modal.locator('[data-action="create"]').click();
+  await expect(modal).toBeHidden();
+  expect(await litOf(page)).toContain('happened+');
+});
+
 test('the Somewhere mark always acts: it draws the offer even with the notes off', async ({ page }) => {
   await setupWorld(page);
   await createViaStore(page, 'character', { name: 'Ada' });
