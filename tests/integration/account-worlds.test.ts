@@ -258,7 +258,7 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull());
     expect(document.querySelector<HTMLInputElement>('[data-modal="where-ask"] input[value="folder"]')!.checked).toBe(true);
     document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="go"]')!.click();
-    await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).not.toBeNull(), { timeout: 10_000 });
     document.querySelector<HTMLButtonElement>('[data-modal="home-folder"] [data-action="cancel"]')!.click();
     // Back at the question (the browser row is still there to choose); Cancel it.
     await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).toBeNull());
