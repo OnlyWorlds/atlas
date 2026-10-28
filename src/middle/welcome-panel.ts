@@ -240,7 +240,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             </div>
             <p class="atlas-landing-more">${more}</p>
             <div class="atlas-landing-worlds" data-role="landing-worlds"${accountBlock ? '' : ' hidden'}>${accountBlock}</div>
-            <p class="atlas-landing-tag">Worldbuilding on OnlyWorlds.</p>
+            <p class="atlas-landing-tag">Worldbuilding on an open standard.</p>
             <p class="atlas-landing-note" data-role="storage-note"${folderNote ? '' : ' hidden'}>${folderNote}</p>
             ${isCoarsePointer() ? `<p class="atlas-landing-note" data-role="lantern-note">${lanternLineHtml()}</p>` : ''}
           </div>

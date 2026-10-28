@@ -75,7 +75,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'front-door-words',
         title: 'The first screen says Create a world and Explore',
-        body: 'Start a world is now Create a world, here and wherever Atlas offers it, with the shorter line "In a folder or in this browser". Explore Moppetopia is now Explore, "An example world".',
+        body: 'Start a world is now Create a world, here and wherever Atlas offers it, with the shorter line "In a folder or in this browser". Explore Moppetopia is now Explore, "An example world". The line under Atlas reads "Worldbuilding on an open standard."',
         tags: ['onboarding'],
       },
     ],
