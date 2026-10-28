@@ -33,6 +33,7 @@ describe('filterSummary', () => {
     expect(filterSummary(set(), set(), 'agents')).toBe('All types · made by agents');
     expect(filterSummary(set('narrative'), set(), 'people', true)).toBe('Showing narratives · made by people · the room hidden');
     expect(filterSummary(set(), set(), null, true)).toBe('All types · the room hidden');
+    expect(filterSummary(set(), set(), null, true, false, true)).toBe('All types · the room hidden · the reading aids hidden');
   });
 
   it('has no em-dash', () => {

@@ -11,8 +11,11 @@
  * `charter` names (§4.6 (a)), whose press writes the supertype too, since the
  * pair and the mark together make the aid; on an unmarked Construct whose
  * supertype is Guide or Domain. While another Charter or Guide leads, the offer
- * says which, and that Home then offers to retire it (one Charter and one Guide
- * at a time; 1.101's G7). Only where the press can be written: not a view-only
+ * asks the authority whether the press would make this one lead (newest wins,
+ * or world.json's pick): if so it says so, and Home then offers to retire the
+ * other; if not, there is no press, and the line says to retire the leading
+ * one first (1.101's G7, the code gate's C1). The leading one's own page offers
+ * its retire too, so a keeper can always change which one leads. Only where the press can be written: not a view-only
  * world (a read key, a copy), not a member's, a Character's or the public view
  * on disk, and on a linked world only the owner or a co-builder (keel answers
  * anyone else 403 `keeper_only`).
@@ -23,7 +26,7 @@
  */
 import { handsOnAsProposed } from '@onlyworlds/sdk';
 import type { Element, WorldRegistryEntry } from '../core/types';
-import { aidKind, findCharter, isReadingAid, leadingGuideId, readingAids, type AidKind } from '../core/charter';
+import { aidKind, findCharter, isReadingAid, leadingGuideId, markWouldLead, readingAids, type AidKind } from '../core/charter';
 import { getActiveStore } from '../core/active-store';
 import { worldIsViewOnly } from '../core/view-only';
 import { readsWholeWorld } from './element-detail-message';
@@ -46,8 +49,8 @@ export function canMarkCharter(entry: WorldRegistryEntry | undefined, meta: unkn
   return readsWholeWorld(entry, meta);
 }
 
-/** What the press on this element would make it, and which one leads now (null when none). */
-export interface MarkOffer { kind: AidKind; leading: Element | null }
+/** What the press on this element would make it, which one leads now (null when none), and whether the press would make this one lead. */
+export interface MarkOffer { kind: AidKind; leading: Element | null; wouldLead: boolean }
 
 export function markOfferFor(el: Element, meta: unknown, elements: readonly Element[] = []): MarkOffer | null {
   if (handsOnAsProposed(el) || isReadingAid(el)) return null;
@@ -62,7 +65,7 @@ export function markOfferFor(el: Element, meta: unknown, elements: readonly Elem
     const id = leadingGuideId(elements);
     leading = id ? elements.find(e => e.id === id) ?? null : null;
   }
-  return { kind, leading };
+  return { kind, leading, wouldLead: markWouldLead(el, kind, elements, named) };
 }
 
 /** Whether this element is one the press is offered on. */
@@ -74,16 +77,17 @@ const nameOf = (el: Element, fallback: string): string => (typeof el.name === 's
 
 /** The offer's line: what the press does, and that the element then leaves the lists (1.101's G11). */
 function offerLine(el: Element, offer: MarkOffer): string {
-  const leaves = 'The lists then leave it out while the reading aids are hidden (Show them on Home).';
-  if (offer.kind === 'domain') return `Not one of this world's domains yet. Once it is marked, Home lists it under the world's charter, with its first line. ${leaves}`;
+  const leaves = 'The lists then leave it out while the reading aids are hidden; Home\'s line or the list\'s chip shows them.';
+  if (offer.kind === 'domain') return `Not one of this world's domains yet. Once it is marked, Home lists it among the world's domains, with its first line. ${leaves}`;
   const word = offer.kind === 'charter' ? 'charter' : 'guide';
   const what = offer.kind === 'charter' ? 'AI readers follow it as the house rules' : 'it is the first thing a newcomer reads';
+  // A Law world.json names becomes a Charter by the press: said, never done quietly (the 1.100 gate's S2, the code gate's C2).
+  const sup = offer.kind === 'charter' && aidKind(el) !== 'charter' ? ' Marking it also sets its supertype to Charter.' : '';
   if (offer.leading) {
-    return `This world's ${word} is ${nameOf(offer.leading, word)}. Marking this one makes it the ${word}, and Home then offers to retire ${nameOf(offer.leading, word)}. ${leaves}`;
+    const other = nameOf(offer.leading, word);
+    return `This world's ${word} is ${other}. Marking this one makes it the ${word} in place of ${other}, and Home then offers to retire ${other}.${sup} ${leaves}`;
   }
-  if (offer.kind === 'charter' && aidKind(el) !== 'charter') {
-    return `This world's own record names this Law as its charter. Marking it also sets its supertype to Charter; then Home shows it first and ${what}. ${leaves}`;
-  }
+  if (sup) return `This world's own record names this Law as its charter.${sup} Then Home shows it first and ${what}. ${leaves}`;
   return `Not this world's ${word} yet. Once it is marked, Home shows it first and ${what}. ${leaves}`;
 }
 
@@ -95,6 +99,18 @@ function buttonLabel(kind: AidKind): string {
 export function buildCharterMarkOffer(el: Element, entry: WorldRegistryEntry | undefined, meta: unknown, worldId: string, elements: readonly Element[] = []): HTMLElement | null {
   if (!canMarkCharter(entry, meta, worldId)) return null;
   const offer = markOfferFor(el, meta, elements);
+  if (offer && !offer.wouldLead && offer.leading) {
+    // The press would mark a second one that does not lead: no press, the way that works instead (C1).
+    const word = offer.kind === 'charter' ? 'charter' : 'guide';
+    const box = document.createElement('div');
+    box.className = 'atlas-charter-mark';
+    box.dataset.role = 'charter-mark-blocked';
+    const line = document.createElement('p');
+    line.className = 'atlas-charter-mark-line';
+    line.textContent = `This world's ${word} is ${nameOf(offer.leading, word)}, and it would still lead: the newest marked ${word} leads${offer.kind === 'charter' ? ', or the one the world\'s own record names' : ''}. To make this one the ${word}, retire ${nameOf(offer.leading, word)} on its page first, then mark this one here.`;
+    box.append(line);
+    return box;
+  }
   if (offer) {
     const box = document.createElement('div');
     box.className = 'atlas-charter-mark';
@@ -115,24 +131,32 @@ export function buildCharterMarkOffer(el: Element, entry: WorldRegistryEntry | u
   return buildRetireOffer(el, meta, elements);
 }
 
-/** On a marked Charter or Guide that does not lead: say which leads, and offer the retire (D6). */
+/**
+ * On a marked Charter or Guide: the retire (D6). One that does not lead says
+ * which does; the leading one says what retiring it leaves, so a keeper can
+ * always change which one leads (the code gate's C1).
+ */
 function buildRetireOffer(el: Element, meta: unknown, elements: readonly Element[]): HTMLElement | null {
   if (!isReadingAid(el)) return null;
   const kind = aidKind(el);
   if (kind !== 'charter' && kind !== 'guide') return null;
   const { charters, guides } = readingAids(elements);
+  if (!(kind === 'charter' ? charters : guides).includes(el.id)) return null;
   const leadId = kind === 'charter'
     ? findCharter(elements, (meta as { charter?: unknown } | null | undefined)?.charter)?.id ?? null
     : leadingGuideId(elements);
-  if (!leadId || leadId === el.id || !(kind === 'charter' ? charters : guides).includes(el.id)) return null;
-  const leading = elements.find(e => e.id === leadId);
+  const leading = leadId ? elements.find(e => e.id === leadId) : undefined;
   const word = kind === 'charter' ? 'charter' : 'guide';
+  const ordinary = `it stays in the world as an ordinary ${el.type === 'law' ? 'Law' : 'Construct'}, and you can mark it again later`;
+  const others = (kind === 'charter' ? charters : guides).length - 1;
   const box = document.createElement('div');
   box.className = 'atlas-charter-mark';
   box.dataset.role = 'aid-retire-offer';
   const line = document.createElement('p');
   line.className = 'atlas-charter-mark-line';
-  line.textContent = `Marked as a ${word}, but this world's ${word} is ${leading ? nameOf(leading, word) : 'another'}. Retiring this one takes its mark off: it stays in the world as an ordinary ${el.type === 'law' ? 'Law' : 'Construct'}, and you can mark it again later.`;
+  line.textContent = leadId === el.id
+    ? `This is this world's ${word}. Retiring it takes its mark off: ${ordinary}. Home then shows ${others > 0 ? `the next marked ${word}` : `no ${word}`}.`
+    : `Marked as a ${word}, but this world's ${word} is ${leading ? nameOf(leading, word) : 'another'}. Retiring this one takes its mark off: ${ordinary}.`;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'atlas-btn atlas-btn--secondary';

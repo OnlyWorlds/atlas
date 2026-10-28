@@ -74,8 +74,8 @@ export const CHANGELOG: ChangelogRelease[] = [
       },
       {
         id: 'reading-aids-retire',
-        title: 'A second charter or guide can be retired',
-        body: 'When a world has two marked charters, or two guides, its owner sees the other one on Home with Retire it: its mark comes off and it stays in the world as an ordinary element. A new charter can now be marked while another leads, and the old one is then offered for retiring.',
+        title: 'A keeper can change which charter or guide leads',
+        body: 'The newest marked charter leads, or the one a world folder names. Its page now offers Retire it: its mark comes off and it stays in the world as an ordinary element. A newer charter can be marked in its place, and Home then offers to retire the old one; an older one says to retire the leading one first. The same holds for a guide.',
         tags: ['home'],
       },
     ],

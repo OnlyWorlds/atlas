@@ -17,6 +17,7 @@ const MARKET = '0192a000-0000-7000-8000-000000200105';
 const PIER = '0192a000-0000-7000-8000-000000200106';
 const MARA = '0192a000-0000-7000-8000-000000200107';
 const HARBOUR = '0192a000-0000-7000-8000-000000200108';
+const BELL = '0192a000-0000-7000-8000-000000200109';
 
 async function setupWorld(page: Page) {
   await page.goto('/');
@@ -61,6 +62,7 @@ test.describe('the reading aids at the door and out of the lore', () => {
     await put(page, 'construct', DOCKS, 'The Docks', { supertype: 'Domain', x_charter_of: own, description: 'Where the boats come in.\nMore here.', locations: [PIER] });
     await put(page, 'construct', HARBOUR, 'The Harbour', { supertype: 'Domain', x_charter_of: own, description: 'The water itself.' });
     await put(page, 'construct', MARKET, 'The Market', { supertype: 'Domain', description: 'Where the fish go.' });
+    await put(page, 'construct', BELL, 'The Bell');
 
     await go(page, `#/w/${wid}`);
     const door = page.locator('[data-role="reading-aids"]');
@@ -95,7 +97,7 @@ test.describe('the reading aids at the door and out of the lore', () => {
     await page.locator('[data-field="constructs"] .atlas-link-pick').click();
     await expect(page.locator(`.atlas-picker-row[data-element-id="${HARBOUR}"]`)).toBeVisible();
     await page.keyboard.press('Escape');
-    await go(page, `#/w/${wid}/element/${MARKET}`);
+    await go(page, `#/w/${wid}/element/${BELL}`);
     await page.locator('[data-field="constructs"] .atlas-link-pick').click();
     await expect(page.locator(`.atlas-picker-row[data-element-id="${GUIDE}"]`)).toHaveCount(0);
     await expect(page.locator(`.atlas-picker-row[data-element-id="${HARBOUR}"]`)).toHaveCount(0);
@@ -109,6 +111,29 @@ test.describe('the reading aids at the door and out of the lore', () => {
     await expect(offer).toHaveCount(0);
     await go(page, `#/w/${wid}`);
     await expect(page.locator('[data-role="domains"]')).toContainText('The Market');
+  });
+
+  test('a keeper changes which Charter leads: an older one is not offered a mark that cannot lead; the leader retires from its page; then the older one is marked and leads', async ({ page }) => {
+    await setupWorld(page);
+    const own = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.meta.id as string);
+    const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId as string);
+    await put(page, 'law', CHARTER, 'House Rules', { supertype: 'Charter', x_charter_of: own, created_at: '2026-10-01T00:00:00Z' });
+    await put(page, 'law', OLD, 'Old Rules', { supertype: 'Charter', created_at: '2026-01-01T00:00:00Z' });
+    await go(page, `#/w/${wid}/element/${OLD}`);
+    const blocked = page.locator('[data-role="charter-mark-blocked"]');
+    await expect(blocked).toContainText('retire House Rules on its page first');
+    await expect(page.locator('[data-role="charter-mark-btn"]')).toHaveCount(0);
+    await go(page, `#/w/${wid}/element/${CHARTER}`);
+    const retire = page.locator('[data-role="aid-retire-offer"]');
+    await expect(retire).toContainText("This is this world's charter.");
+    await retire.locator('[data-action="aid-retire"]').click();
+    await go(page, `#/w/${wid}/element/${OLD}`);
+    await expect(page.locator('[data-role="charter-mark-btn"]')).toHaveText("Mark as this world's charter");
+    await page.locator('[data-role="charter-mark-btn"]').click();
+    await expect(page.locator('[data-role="charter-mark-btn"]')).toHaveCount(0);
+    await go(page, `#/w/${wid}`);
+    await expect(page.locator('[data-role="charter"]')).toContainText('Old Rules');
+    await expect(page.locator('[data-role="aid-other"]')).toHaveCount(0);
   });
 
   test('a second marked Charter is retired from Home, and stays as lore', async ({ page }) => {

@@ -37,14 +37,34 @@ describe('which Law is offered the press', () => {
     expect(offersCharterMark({ id: 'c', type: 'construct', supertype: 'Charter' } as unknown as Element, {})).toBe(false);
     expect(offersCharterMark(law({ supertype: 'Regulation' }), {})).toBe(false);
   });
-  it('while a marked Charter leads, offered with the leading one named (1.101 G7: the retire follows on Home)', () => {
+  it('while a marked Charter leads: a newer one is offered in its place (1.101 G7); an older one gets no press and the way that works (the code gate C1)', () => {
     const leading = law({ id: 'l0', name: 'Old Rules', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-10-01T00:00:00Z' });
-    const story = law({ supertype: 'Charter' });
-    expect(markOfferFor(story, {}, [leading, story])?.leading?.id).toBe('l0');
-    expect(markOfferFor(story, {}, [story])?.leading).toBeNull();                   // the control
-    const box = buildCharterMarkOffer(story, register({ state: 'local-only' }), {}, WORLD, [leading, story]);
-    expect(box?.textContent).toMatch(/This world's charter is Old Rules\. Marking this one makes it the charter, and Home then offers to retire Old Rules\./);
+    const newer = law({ supertype: 'Charter', created_at: '2026-10-20T00:00:00Z' });
+    const older = law({ supertype: 'Charter', created_at: '2026-01-01T00:00:00Z' });
+    expect(markOfferFor(newer, {}, [leading, newer])).toMatchObject({ kind: 'charter', wouldLead: true });
+    expect(markOfferFor(newer, {}, [newer])?.leading).toBeNull();                   // the control
+    expect(markOfferFor(older, {}, [leading, older])?.wouldLead).toBe(false);
+    const e = register({ state: 'local-only' });
+    const box = buildCharterMarkOffer(newer, e, {}, WORLD, [leading, newer]);
+    expect(box?.dataset.role).toBe('charter-mark');
+    expect(box?.textContent).toMatch(/This world's charter is Old Rules\. Marking this one makes it the charter in place of Old Rules, and Home then offers to retire Old Rules\./);
     expect(box?.textContent).toMatch(/lists then leave it out/);
+    const blocked = buildCharterMarkOffer(older, e, {}, WORLD, [leading, older]);
+    expect(blocked?.dataset.role).toBe('charter-mark-blocked');
+    expect(blocked?.querySelector('button')).toBeNull();
+    expect(blocked?.textContent).toMatch(/retire Old Rules on its page first/);
+    // world.json naming the older one makes it lead: then the press is offered, and the supertype said (C2).
+    const named = law({ supertype: 'Regulation', created_at: '2026-01-01T00:00:00Z' });
+    const nbox = buildCharterMarkOffer(named, e, { charter: 'l1' }, WORLD, [leading, named]);
+    expect(nbox?.dataset.role).toBe('charter-mark');
+    expect(nbox?.textContent).toMatch(/also sets its supertype to Charter/);
+  });
+  it("the leading Charter's own page offers its retire, saying what Home then shows", () => {
+    const only = law({ id: 'l0', name: 'House Rules', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-10-01T00:00:00Z' });
+    const e = register({ state: 'local-only' });
+    const box = buildCharterMarkOffer(only, e, {}, WORLD, [only]);
+    expect(box?.dataset.role).toBe('aid-retire-offer');
+    expect(box?.textContent).toMatch(/This is this world's charter\. .* Home then shows no charter\./);
   });
   it('a Guide and a Domain Construct, unmarked, each with its own words', () => {
     const c = (o: Record<string, unknown>): Element => ({ id: 'c1', type: 'construct', name: 'Start', ...o }) as unknown as Element;
@@ -57,14 +77,14 @@ describe('which Law is offered the press', () => {
     expect(buildCharterMarkOffer(c({ supertype: 'Guide' }), e, {}, WORLD)?.querySelector('button')?.textContent).toBe("Mark as this world's guide");
     expect(buildCharterMarkOffer(c({ supertype: 'Domain' }), e, {}, WORLD)?.querySelector('button')?.textContent).toBe("Mark as one of this world's domains");
   });
-  it('a marked Charter that does not lead offers the retire on its own page; the leading one offers nothing', () => {
+  it('a marked Charter that does not lead offers the retire on its own page, saying which leads; the leading one its own retire', () => {
     const old = law({ id: 'l0', name: 'Old Rules', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-01-01T00:00:00Z' });
     const now = law({ id: 'l2', name: 'House Rules', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-10-01T00:00:00Z' });
     const e = register({ state: 'local-only' });
     const box = buildCharterMarkOffer(old, e, {}, WORLD, [old, now]);
     expect(box?.dataset.role).toBe('aid-retire-offer');
     expect(box?.textContent).toMatch(/this world's charter is House Rules/);
-    expect(buildCharterMarkOffer(now, e, {}, WORLD, [old, now])).toBeNull();
+    expect(buildCharterMarkOffer(now, e, {}, WORLD, [old, now])?.textContent).toMatch(/This is this world's charter\. .* Home then shows the next marked charter\./);
     // world.json's pick leads instead: then the newer one is the other (the gate's G8).
     expect(buildCharterMarkOffer(now, e, { charter: 'l0' }, WORLD, [old, now])?.dataset.role).toBe('aid-retire-offer');
   });

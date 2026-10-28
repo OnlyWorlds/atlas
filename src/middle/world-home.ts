@@ -57,7 +57,7 @@ import { renderChartView } from '../visualization/timeline/chart-static';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { downloadLabel, isPartialSlice, partialSliceNote } from '../core/provenance';
 import { copyLine, worldIsCopiedBy } from '../core/world-copy';
-import { aidsHidden, currentLore, roomCount, toggleAids } from '../core/parlor-room';
+import { aidsHidden, currentLore, loreWithAids, roomCount, toggleAids } from '../core/parlor-room';
 import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
 import { DEMO_WORLD_ID } from '../setup/demo-copy';
@@ -187,10 +187,11 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // The keep-safe card (1.17, contract §6.1): after the guide, in its
     // chrome; a world kept only in this browser asks for a copy. Built first:
     // while it asks, the guide's copy dot stays dark, so the two never disagree.
-    const keep = buildKeepSafe(worldId, settled, toasts);
+    // The keep-safe card counts every change since the last copy, the reading aids' too, whatever the switch (the code gate's C4).
+    const keep = buildKeepSafe(worldId, settledOf(loreWithAids()), toasts);
     if (!viewOnly) {
       // A world that holds only its reading aids is not told it holds nothing (the gate's G9).
-      const tour = buildTour(lore, totalElements + readingAids(s.data.elements).count, worldId, !!keep, toasts);
+      const tour = buildTour(lore, totalElements > 0 ? totalElements : readingAids(s.data.elements).count, worldId, !!keep, toasts);
       if (tour) root.appendChild(tour);
     }
     if (keep) root.appendChild(keep);
@@ -467,9 +468,13 @@ function buildCover(
     aidsLine.className = 'atlas-home-statline-seg atlas-home-room';
     aidsLine.setAttribute('data-action', 'home-aids');
     aidsLine.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    // Named by what this world holds (the code gate's C10): a world with only Domains has no charter to name.
+    const p = readingAids(getState().data.elements).packet;
+    const which = [p.charter ? 'charter' : '', p.guide ? 'guide' : '', p.domains.length ? (p.domains.length === 1 ? 'domain' : 'domains') : ''].filter(Boolean);
+    const named = which.length > 1 ? `${which.slice(0, -1).join(', ')} and ${which[which.length - 1]}` : which[0] ?? 'reading aids';
     aidsLine.title = hidden
-      ? 'Count and list the charter, guide and domains with the rest of the world, in the lists, Charts and Search'
-      : 'Leave the charter, guide and domains out of the counts, the lists, Charts and Search';
+      ? `Count and list the ${named} with the rest of the world, in the lists, Charts and Search`
+      : `Leave the ${named} out of the counts, the lists, Charts and Search`;
     const what = aidCount === 1 ? 'This world\'s reading aid' : `This world's reading aids, <b>${aidCount}</b>,`;
     aidsLine.innerHTML = hidden
       ? `${what} ${aidCount === 1 ? 'is' : 'are'} not counted or listed · Show ${aidCount === 1 ? 'it' : 'them'}`

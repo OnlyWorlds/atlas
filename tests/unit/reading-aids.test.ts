@@ -9,7 +9,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { CHARTER_PAIRS } from '@onlyworlds/sdk';
 import fixture from '../fixtures/charter.fixture.json';
 import { aidKind, isReadingAid, readingAids } from '../../src/core/charter';
-import { aidsHidden, currentLore, loreElements, loreWithAids, pageReadsWholeWorld, toggleAids } from '../../src/core/parlor-room';
+import { aidsHidden, currentLore, loreElements, loreFor, loreWithAids, pageLore, toggleAids } from '../../src/core/parlor-room';
 import { getState, patchSlice } from '../../src/core/state';
 import type { Element } from '../../src/core/types';
 
@@ -79,10 +79,21 @@ describe('the lore leaves them out', () => {
     expect(ids).toContain('dm');
     expect(ids).not.toContain('msg');
   });
-  it("an aid's page reads the whole world, as a room element's does", () => {
-    expect(pageReadsWholeWorld(guide)).toBe(true);
-    expect(pageReadsWholeWorld(room)).toBe(true);
-    expect(pageReadsWholeWorld(lore)).toBe(false);
-    expect(pageReadsWholeWorld(undefined)).toBe(false);
+  it("an aid's page reads the aids but keeps the room under its switch; a room element's reads the whole world", () => {
+    patchSlice('data', { ...getState().data, elements: WORLD });
+    const ids = (els: Element[]) => els.map(e => e.id);
+    expect(ids(pageLore(guide))).toContain('dm');
+    expect(ids(pageLore(guide))).not.toContain('msg');
+    expect(ids(pageLore(room))).toContain('msg');
+    expect(ids(pageLore(lore))).not.toContain('dm');
+  });
+  it("the picker: an aid or a would-be aid offers the aids; a room element's picker offers the lore (conv. 161)", () => {
+    patchSlice('data', { ...getState().data, elements: WORLD });
+    const ids = (els: Element[]) => els.map(e => e.id);
+    expect(ids(loreFor(guide))).toContain('dm');
+    expect(ids(loreFor(el('ug', 'construct', { supertype: 'Guide' })))).toContain('dm');
+    expect(ids(loreFor(room))).not.toContain('msg');
+    expect(ids(loreFor(room))).not.toContain('dm');
+    expect(ids(loreFor(plain))).not.toContain('dm');
   });
 });

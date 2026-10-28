@@ -21,7 +21,7 @@
 import type { Element, ElementType } from './types';
 import { ROOM_PAIRS, isRoomElement as sdkIsRoomElement } from '@onlyworlds/sdk';
 import { getState, patchSlice } from './state';
-import { isReadingAid, readingAids } from './charter';
+import { aidKind, isReadingAid, readingAids } from './charter';
 
 /**
  * The room profile's pairs as the SDK carries them (4.55.0, generated from
@@ -97,17 +97,24 @@ export function currentLore(): Element[] {
 }
 
 /**
- * Whether an element's own page reads the whole world (its references, its
- * Web, the picker its link fields open): a room element's, and a reading
- * aid's, whose links name what the lore hides (a Guide's Domains; 1.101's D2).
+ * What an element's page reads for its references and its Web: a room
+ * element's, the whole world (1.76); a reading aid's, the lore with the aids
+ * in, since its links name them (a Guide's Domains), while the room keeps its
+ * own switch (1.101's D2, the code gate's C3); any other, the lore.
  */
-export function pageReadsWholeWorld(el: Element | null | undefined): boolean {
-  return !!el && (isRoomElement(el) || isReadingAid(el));
+export function pageLore(el: Element | null | undefined): Element[] {
+  if (el && isRoomElement(el)) return getState().data.elements;
+  return el && isReadingAid(el) ? loreWithAids() : currentLore();
 }
 
-/** The source a lore view on an element's page reads: the whole world on a room element's or an aid's page, else the lore. */
+/**
+ * What the picker a field opens offers, and its candidate count: on a reading
+ * aid's page, or one whose pair would make it one (an unmarked Guide picks the
+ * marked Domains; the code gate's C8), the lore with the aids in; elsewhere,
+ * a room element's page included, the lore (conv. 161).
+ */
 export function loreFor(el: Element | null | undefined): Element[] {
-  return pageReadsWholeWorld(el) ? getState().data.elements : currentLore();
+  return el && (isReadingAid(el) || aidKind(el) !== null) ? loreWithAids() : currentLore();
 }
 
 /** The two switches as one key, for a render gate that reads the lore (the 1.101 gate's G2, G3). */

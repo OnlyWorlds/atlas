@@ -941,7 +941,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
             : 'Opening world…')
         : elements.length === 0
           ? ''
-          : 'No elements match the current filter.';
+          // A world that holds only its reading aids, hidden by their switch (the code gate's C9).
+          : origin.hideAids && elements.every(el => isReadingAid(el))
+            ? 'Only this world\'s reading aids so far. Home shows them; the chip above lists them.'
+            : 'No elements match the current filter.';
       listEl.innerHTML = msg ? `<div class="atlas-pane-empty">${msg}</div>` : '';
       return;
     }

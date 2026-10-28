@@ -12,25 +12,15 @@
  * copy of its rule (the 1.100 contract gate found a copy disagreeing on
  * keel's microseconds, a time with no offset and a proposed mark).
  */
-import { CHARTER_PAIRS, charterOf, handsOnAsProposed, isCharterElement, simpleCaseFold, type OwReadingAids } from '@onlyworlds/sdk';
+import { charterOf, handsOnAsProposed, isCharterElement, readingAidOf, type OwReadingAids } from '@onlyworlds/sdk';
 import type { Element } from './types';
 
 /** Which reading aid a pair makes (the charter profile's three). */
 export type AidKind = 'charter' | 'guide' | 'domain';
 
-/**
- * The pair alone, marked or not: which aid this element would be. The SDK's
- * own pairs (`CHARTER_PAIRS`) matched on the type and the supertype trimmed and
- * folded with the SDK's fold; `readingAidKey` does this inside the SDK and is
- * not exported yet (the 1.101 contract gate's G1), so no copy of the pairs
- * lives here.
- */
+/** The pair alone, marked or not: which aid this element would be (the SDK's `readingAidOf`, 4.101.0, the mark ignored). */
 export function aidKind(el: Element): AidKind | null {
-  const sup = (el as Record<string, unknown>).supertype;
-  if (typeof el.type !== 'string' || typeof sup !== 'string') return null;
-  const want = simpleCaseFold(sup.trim());
-  const pair = CHARTER_PAIRS.find(p => p.type === el.type && simpleCaseFold(p.supertype) === want);
-  return pair ? pair.aid : null;
+  return readingAidOf(el);
 }
 
 /** A Law with supertype Charter, marked or not: the button's reach (core/charter-mark.ts). */
@@ -56,9 +46,10 @@ export function isMarkedCharter(el: Element): boolean {
 interface AidsMemo { from: readonly Element[]; packet: OwReadingAids; charters: string[]; guides: string[]; count: number }
 let memo: AidsMemo | null = null;
 
+const NO_AIDS: OwReadingAids = { charter: null, guide: null, domains: [] };
+
 export function readingAids(elements: readonly Element[]): AidsMemo {
   if (memo && memo.from === elements) return memo;
-  const packet = charterOf({ elements } as never, { rung: 'owner' });
   const charters: string[] = [];
   const guides: string[] = [];
   let count = 0;
@@ -69,8 +60,30 @@ export function readingAids(elements: readonly Element[]): AidsMemo {
     if (kind === 'charter') charters.push(el.id);
     else if (kind === 'guide') guides.push(el.id);
   }
+  // The SDK's whole reading only when there is an aid to read (the code gate's C6: 8 ms an array at 5,000).
+  const packet = count > 0 ? charterOf({ elements } as never, { rung: 'owner' }) : NO_AIDS;
   memo = { from: elements, packet, charters, guides, count };
   return memo;
+}
+
+/**
+ * Whether marking `el` would make it the one that leads (the code gate's C1):
+ * the authority asked about the world as it would be, never a copy of its
+ * rule. A Charter leads as `findCharter` picks (world.json's pick among marked
+ * ones, else the newest), a Guide by the SDK's packet; a Domain always joins.
+ */
+export function markWouldLead(el: Element, kind: AidKind, elements: readonly Element[], named?: unknown): boolean {
+  if (kind === 'domain') return true;
+  const marked = { ...el, x_charter_of: 'mark' } as Element;
+  if (kind === 'charter' && el.type === 'law') (marked as Record<string, unknown>).supertype = 'Charter';
+  const after = elements.some(e => e.id === el.id) ? elements.map(e => (e.id === el.id ? marked : e)) : [...elements, marked];
+  // Asked directly, never through `readingAids`: its one memo slot belongs to the world as it is.
+  if (kind === 'charter' && typeof named === 'string' && named) {
+    const pick = after.find(e => e.id === named);
+    if (pick && isMarkedCharter(pick)) return pick.id === el.id;
+  }
+  const packet = charterOf({ elements: after } as never, { rung: 'owner' });
+  return (kind === 'charter' ? packet.charter?.id : packet.guide?.id) === el.id;
 }
 
 /** The SDK's pick, memoised on the elements array (the store hands a new array on every change). */
