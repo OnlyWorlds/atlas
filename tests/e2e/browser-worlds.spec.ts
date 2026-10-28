@@ -194,7 +194,7 @@ test('@firefox the create dialog says the world lives in this browser, and makes
 const V2 = 'https://www.onlyworlds.com/api/v2';
 const SERVER_WORLD = '11111111-2222-4333-8444-555555555555';
 
-async function mockKeel(page: Page, characters: number) {
+async function mockKeel(page: Page, characters: number, opts: { listDelayMs?: number } = {}) {
   const now = '2026-10-05T12:00:00.000Z';
   const chars = Array.from({ length: characters }, (_, i) => ({
     id: `c0000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
@@ -207,6 +207,8 @@ async function mockKeel(page: Page, characters: number) {
       return route.fulfill({ json: { id: SERVER_WORLD, name: 'Big World', updated_at: now } });
     }
     const type = path.split('/').filter(Boolean)[0];
+    // A slow keel: each type's listing waits, so a cancel lands while the world is still coming down.
+    if (opts.listDelayMs) await new Promise(r => setTimeout(r, opts.listDelayMs));
     return route.fulfill({ json: { data: type === 'character' ? chars : [], has_more: false, next_cursor: null } });
   });
 }
@@ -227,13 +229,17 @@ async function linkedBrowserWorld(page: Page) {
     const { getState } = await import('/src/core/state.ts');
     const e = getState().registry.worlds.find((w: any) => w.api?.world_id === serverId);
     if (!e) return null;
+    // The world opens from memory and its files land behind it (#865): read the disk once they have.
+    await (window as any).__atlasTestApi.landed();
     const home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds');
     const dir = await home.getDirectoryHandle(e.folder.folder_name);
     let marker = true;
     try { await (await dir.getDirectoryHandle('.atlas')).getFileHandle('making'); } catch { marker = false; }
     const meta = JSON.parse(await (await (await dir.getFileHandle('world.json')).getFile()).text());
+    let landing = true;
+    try { await (await dir.getDirectoryHandle('.atlas')).getFileHandle('landing'); } catch { landing = false; }
     return {
-      where: e.where ?? null, state: e.state, marker, worldJsonApi: meta.api?.world_id ?? null,
+      where: e.where ?? null, state: e.state, marker, landing, worldJsonApi: meta.api?.world_id ?? null,
       active: getState().active?.worldId === e.id, elements: getState().data.elements.length,
     };
   }, SERVER_WORLD);
@@ -272,7 +278,7 @@ async function linkLandsInBrowser(page: Page, folderMode: boolean) {
   await modal.locator('[data-action="link"]').click();
   await expect(modal).toHaveCount(0);
   await expect.poll(() => linkedBrowserWorld(page)).toEqual({
-    where: 'browser', state: 'api-linked', marker: false, worldJsonApi: SERVER_WORLD, active: true, elements: 30,
+    where: 'browser', state: 'api-linked', marker: false, landing: false, worldJsonApi: SERVER_WORLD, active: true, elements: 30,
   });
 }
 
@@ -329,11 +335,13 @@ test('@firefox a cleared linked world: its row brings it down again, under the s
 
 test('Cancel link into this browser leaves no directory and no row', async ({ page }) => {
   await boot(page);
-  await mockKeel(page, 1500);
+  // The download comes down into memory in a moment (#865), so the cancel lands
+  // while keel is still being listed, one slowed type at a time.
+  await mockKeel(page, 1500, { listDelayMs: 300 });
   await openLink(page);
   const modal = page.locator('[data-modal="link-world"]');
   await modal.locator('[data-action="link"]').click();
-  await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
+  await expect(modal.locator('[data-role="progress"]')).toContainText('Discovering');
   await modal.locator('[data-action="cancel-link"]').click();
   await expect(modal).toHaveCount(0);
   await expect(page.locator('.ow-toast', { hasText: 'Download cancelled' })).toBeVisible();
