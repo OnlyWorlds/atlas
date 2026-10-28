@@ -751,17 +751,24 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
 // ---- The home onboarding (the first cards; #127 the question; 1.20 cards kept, done) ----
 
 /**
+ * Moppetopia is the open world whose world.json id is the demo world's. The
+ * registry's `demo` flag is the tour's sandbox, never Moppetopia's copy
+ * (1.98.0 read the flag alone, so its line never showed on Moppetopia).
+ */
+function isMoppetopiaOpen(worldId: string): boolean {
+  const s = getState();
+  return s.active?.worldId === worldId && s.active.meta?.id === DEMO_WORLD_ID;
+}
+
+/**
  * The demo's way out (Titus 2026-10-27, a fresh window: "i clicked in; but
  * dont see how i get out ... or how i delete the world"): one quiet line
  * under Moppetopia's name, a world of your own and where its delete lives.
- * Moppetopia is the copy whose world.json id is the demo world's; the
- * registry's `demo` flag is the tour's sandbox, which has no delete
- * (1.98.0 read the flag, so the line never showed on Moppetopia).
+ * Never in the tour's sandbox, which has no delete.
  */
 function buildDemoLine(worldId: string, toasts: ToastManager): HTMLElement | null {
-  const s = getState();
-  const entry = s.registry.worlds.find(w => w.id === worldId);
-  if (!entry || entry.demo || s.active?.worldId !== worldId || s.active.meta?.id !== DEMO_WORLD_ID) return null;
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  if (!entry || entry.demo || !isMoppetopiaOpen(worldId)) return null;
   const p = document.createElement('p');
   p.className = 'atlas-home-demo-line';
   p.setAttribute('data-role', 'demo-line');
@@ -847,8 +854,9 @@ function buildTour(
   // persisted flag directly: cheap, and no tour-engine import here.
   if (isTourFlagActive()) return null;
   const entry = getState().registry.worlds.find(w => w.id === worldId);
-  // The demo is a world to look at: its dots stay quiet (the guide, step 1 §2).
-  if (!entry || entry.demo === true || entry.tour_dismissed?.includes('home-cards')) return null;
+  // The demo is a world to look at: its dots stay quiet (the guide, step 1 §2),
+  // Moppetopia's copy as much as the tour's sandbox.
+  if (!entry || entry.demo === true || isMoppetopiaOpen(worldId) || entry.tour_dismissed?.includes('home-cards')) return null;
   const dots = guideDots(lore, entry, { keepSafeShowing });
   // Every dot lit, or only the copy the keep-safe card below already asks for:
   // no strip (an established world never gets it back for the card's week).
