@@ -196,12 +196,16 @@ test('the #/try-demo link (1.18.1) opens the same copy once; a reload does not a
   expect(await read()).toEqual({ entries: 1, active: 'Moppetopia' });
   const worldReads = () => seen.filter(r => /\/api\/v2\/world\/?$/.test(r.path)).length;
   expect(worldReads()).toBe(1);
+  // Its files land behind the open world (#865): down before the reload, as
+  // a person's would be once the home's saving line has gone.
+  await page.evaluate(() => (window as unknown as { __atlasTestApi: { landed(): Promise<void> } }).__atlasTestApi.landed());
   // Back and a reload land where the link left off; nothing downloads again.
   await page.reload();
   await page.waitForSelector('.atlas-shell');
   await page.waitForTimeout(1500);
   expect(worldReads()).toBe(1);
-  expect((await read()).entries).toBe(1);
+  // Still the open world, never a row cleared by a landing cut short (a count alone stays 1 then: code gate C5).
+  expect(await read()).toEqual({ entries: 1, active: 'Moppetopia' });
   expect(seen.filter(r => r.method !== 'GET')).toEqual([]);
 });
 

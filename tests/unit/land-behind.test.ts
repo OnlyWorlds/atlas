@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { memoryDirectory } from '../../src/store/memory-dir';
-import { forgetLanding, hasLandingMarker, liveLanding, onLandingFailed, startLanding } from '../../src/store/land-behind';
+import { forgetLanding, hasLandingMarker, landingLockHeld, liveLanding, onLandingFailed, startLanding } from '../../src/store/land-behind';
 import { FsFolderStore } from '../../src/store/folder-store-fs';
 import { DownloadCancelledError } from '../../src/sync/initial-download';
 import { isTransientPath } from '../../src/store/world-tree';
@@ -355,5 +355,54 @@ describe('the contract gate\'s probes', () => {
     forgetLanding('w-failed');
     expect(liveLanding('w-failed')).toBeUndefined();
     off();
+  });
+});
+
+describe('the code gate\'s findings, kept as guards', () => {
+  /** Web Locks as a browser holds them: a request waits on a held name, `ifAvailable` answers null. */
+  function webLocks() {
+    const held = new Set<string>();
+    const waiters = new Map<string, Array<() => void>>();
+    (navigator as unknown as { locks?: unknown }).locks = {
+      request: async (name: string, opts: { ifAvailable?: boolean }, cb: (l: unknown) => unknown) => {
+        if (held.has(name)) {
+          if (opts?.ifAvailable) return cb(null);
+          await new Promise<void>(r => waiters.set(name, [...(waiters.get(name) ?? []), r]));
+        }
+        held.add(name);
+        try { return await cb({ name }); } finally {
+          held.delete(name);
+          const next = waiters.get(name)?.shift();
+          next?.();
+        }
+      },
+    };
+  }
+
+  it('C1: a failed landing keeps its lock until its cleanup forgets it', async () => {
+    webLocks();
+    try {
+      const mem = await world();
+      const d = slowDisk({ failOn: 'alice-0001.json' });
+      const l = await startLanding('w-c1', mem, d.disk);
+      d.release();
+      await l.landed.catch(() => {});
+      expect(await landingLockHeld('w-c1')).toBe(true); // another tab must not decide it under the cleanup
+      forgetLanding('w-c1');
+      await new Promise(r => setTimeout(r, 0)); // a lock lets go after its callback settles
+      expect(await landingLockHeld('w-c1')).toBe(false);
+    } finally {
+      delete (navigator as unknown as { locks?: unknown }).locks;
+    }
+  });
+
+  it('C4: a progress listener that throws never fails the landing', async () => {
+    const mem = await world();
+    const d = slowDisk();
+    const l = await startLanding('w-c4', mem, d.disk);
+    l.onProgress(() => { throw new Error('a listener\'s own fault'); });
+    d.release();
+    await expect(l.landed).resolves.toBeUndefined();
+    expect((await tree(d.real)).has('world.json')).toBe(true);
   });
 });

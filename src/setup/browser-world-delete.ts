@@ -69,6 +69,8 @@ export async function deleteBrowserWorld(world: WorldRegistryEntry): Promise<Bro
     try {
       await removeBrowserWorldDir(world);
     } catch (error) {
+      // The stopped landing is let go either way: the disk decides the world from here (code gate C2).
+      forgetLanding(world.folder.folder_name);
       return { ok: false as const, error, wasActive };
     }
     forgetLanding(world.folder.folder_name);

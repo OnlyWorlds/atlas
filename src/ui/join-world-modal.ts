@@ -432,7 +432,7 @@ export class JoinWorldModal extends BaseModal {
         if (stop === 'cancel' || (stop && !saving)) return;
         progressBox.textContent = pr.phase === 'list'
           ? `Discovering ${pr.currentType ?? ''}…`
-          : pr.total === 0 ? 'World is empty; finishing up' : progressLine(pr);
+          : pr.total === 0 && pr.phase !== 'open' ? 'World is empty; finishing up' : progressLine(pr);
         progressBox.hidden = false;
       };
       try {

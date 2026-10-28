@@ -1215,7 +1215,13 @@ async function linkIntoBrowser(
   const placed = updateWorldEntry(next, made.id, { where: 'browser' });
   const entry = placed.worlds.find(w => w.id === made.id)!;
   const activated = setActiveWorld(placed, entry.id);
-  await make.finish(() => { saveRegistry(activated); patchSlice('registry', activated); });
+  try {
+    await make.finish(() => { saveRegistry(activated); patchSlice('registry', activated); });
+  } catch (err) {
+    // The commit refused (its marker would not go): nothing registered, so nothing of it stays (code gate C3).
+    await abandonLanding(landing);
+    return abandonBrowserMake(store, make, err, 'downloading the world');
+  }
   if (readOnly) store.setViewOnly(true);
   setActiveStore(store);
   patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: serverWorldId, name: displayName })), opened: true });

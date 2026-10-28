@@ -312,7 +312,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
           if (p.phase === 'list') {
             overlay.update(`Finding elements${p.currentType ? ` · ${p.currentType}` : ''}…`);
           } else {
-            overlay.update(p.total === 0
+            overlay.update(p.total === 0 && p.phase !== 'open'
               ? 'Empty world; finishing up…'
               : progressLine(p));
           }

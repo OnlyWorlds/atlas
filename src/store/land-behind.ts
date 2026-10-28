@@ -175,7 +175,8 @@ class LandingState implements Landing {
 
   setProgress(done: number, total: number): void {
     this.progress = { done, total };
-    for (const fn of this.listeners) fn(this.progress);
+    // A listener's own fault never fails the landing (code gate C4): its last call comes after world.json landed.
+    for (const fn of this.listeners) { try { fn(this.progress); } catch (err) { console.warn('[landing] a progress listener threw', err); } } // raw-error-ok: a console record
   }
 
   /** The memory or disk directory at `path` in the phase now. */
@@ -476,6 +477,8 @@ async function readTree(dir: FileSystemDirectoryHandle): Promise<{ dirs: string[
 }
 
 const live = new Map<string, LandingState>();
+/** Each landing's lock release, called when it landed or when its cleanup forgets it (code gate C1). */
+const releases = new Map<LandingState, () => void>();
 const failedListeners = new Set<(landing: Landing, err: unknown) => void>();
 
 /** The landing this tab holds for a browser world's directory: live, or failed until its cleanup forgets it. */
@@ -490,7 +493,13 @@ export function allLandings(): Landing[] {
 
 /** The cleanup of a failed landing is done: the directory is gone, the entry settled. */
 export function forgetLanding(dirName: string): void {
-  if (live.get(dirName)?.state !== 'landing') live.delete(dirName);
+  const l = live.get(dirName);
+  if (!l || l.state === 'landing') return;
+  live.delete(dirName);
+  // Only now does another tab see a free lock beside the marker: a failed or
+  // stopped landing keeps it until its directory is settled (code gate C1).
+  releases.get(l)?.();
+  releases.delete(l);
 }
 
 /** One listener, registered once by the app, hears every landing that fails after its open (contract L9'). */
@@ -535,13 +544,15 @@ export async function startLanding(dirName: string, mem: FileSystemDirectoryHand
   }
   const state = new LandingState(dirName, mem, disk);
   live.set(dirName, state);
+  releases.set(state, release);
   if (typeof window !== 'undefined') window.addEventListener('beforeunload', onBeforeUnload);
   state.landed.then(() => {
     if (live.get(dirName) === state) live.delete(dirName);
+    releases.delete(state);
     release();
     if (!anyLandingLive() && typeof window !== 'undefined') window.removeEventListener('beforeunload', onBeforeUnload);
   }, err => {
-    release(); // stays in `live` as failed until its cleanup forgets it
+    // Stays in `live` as failed, its lock held, until its cleanup forgets it.
     if (!anyLandingLive() && typeof window !== 'undefined') window.removeEventListener('beforeunload', onBeforeUnload);
     if (!(err instanceof DownloadCancelledError)) for (const fn of failedListeners) fn(state, err);
   });

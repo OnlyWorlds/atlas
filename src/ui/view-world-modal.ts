@@ -106,7 +106,7 @@ export class ViewWorldModal extends BaseModal {
         if (p.phase === 'list') {
           progressBox.textContent = `Discovering ${p.currentType ?? ''}…`;
         } else {
-          progressBox.textContent = p.total === 0
+          progressBox.textContent = p.total === 0 && p.phase !== 'open'
             ? 'World is empty; finishing up'
             : progressLine(p);
         }
