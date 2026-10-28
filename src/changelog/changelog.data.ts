@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.99.0',
+    date: '2026-10-28',
+    theme: 'A world in this browser opens before it is saved',
+    entries: [
+      {
+        id: 'open-then-save',
+        title: 'A world from OnlyWorlds or a world file opens at once in this browser, and saves behind you',
+        body: 'Explore Moppetopia, viewing or linking a world, bringing one down again and opening a world file now open the world as soon as it has downloaded, then save its files to this browser while you look around. Its home says "Saving this world in this browser" with a count until it is done; keep the tab open until then. Firefox saves each file slowly, so there Moppetopia opens in a few seconds where it took about 20.',
+        tags: ['sync', 'performance'],
+      },
+      {
+        id: 'guide-labels-column',
+        title: 'The guide\'s labels no longer run into each other on a new world\'s home',
+        body: 'Under What do you have?, the five marks sat in the narrow label column and their names overlapped. They now sit in the wide column beside Nothing yet.',
+        tags: ['home', 'onboarding'],
+      },
+      {
+        id: 'front-door-words',
+        title: 'The first screen says Create a world and Explore',
+        body: 'Start a world is now Create a world, here and wherever Atlas offers it, with the shorter line "In a folder or in this browser". Explore Moppetopia is now Explore, "An example world".',
+        tags: ['onboarding'],
+      },
+    ],
+  },
+  {
     version: '1.98.1',
     date: '2026-10-28',
     theme: 'A shared world comes down faster',

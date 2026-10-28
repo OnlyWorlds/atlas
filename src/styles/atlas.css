@@ -8893,12 +8893,16 @@ svg .atlas-zone-ink.atlas-zone-hovered {
    grid sized itself to all its cards and ran out of a stacked column. */
 .atlas-home-have-row > * { min-width: 0; }
 .atlas-home-have-row .atlas-home-onboarding-grid { grid-column: 2; }
+/* The guide's marks take the wide column too: in the label column (11.5rem)
+   five labels ran into each other (Titus, 2026-10-28). */
+.atlas-home-have-row .atlas-guide-strip { grid-column: 2; max-width: 600px; }
 .atlas-home-have-act { font-size: inherit; padding: 0; }
 .atlas-home-have-end { white-space: nowrap; }
 /* A narrow middle pane stacks the label over its line. */
 @container (max-width: 460px) {
   .atlas-home-have-row { grid-template-columns: 1fr; row-gap: 4px; }
   .atlas-home-have-row .atlas-home-onboarding-grid { grid-column: 1; margin-top: 6px; }
+  .atlas-home-have-row .atlas-guide-strip { grid-column: 1; }
 }
 
 /* A card the world already has: it stays in its place (the layout holds
@@ -15838,6 +15842,8 @@ body.atlas-share-fullpreview > * {
   border-color: var(--atlas-cyan-soft);
 }
 .atlas-guide-mark-label {
+  /* Never wider than its own mark: a long word wraps or clips, never runs into the next label. */
+  max-width: 100%;
   font-size: 0.78rem;
   line-height: 1.2;
   text-align: center;
@@ -17572,3 +17578,10 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
   font-size: 0.86rem;
 }
 .atlas-home-demo-line .atlas-btn-link { font-size: inherit; }
+
+/* A browser world's files still landing (#865): one quiet line under its name (home-landing.ts). */
+.atlas-home-landing {
+  margin: -6px 0 18px;
+  color: var(--atlas-text-soft);
+  font-size: 0.86rem;
+}

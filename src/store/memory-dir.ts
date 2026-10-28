@@ -33,6 +33,8 @@ export class MemoryFile {
   get size(): number { return this.bytes.length; }
   async text(): Promise<string> { return new TextDecoder().decode(this.bytes); }
   async arrayBuffer(): Promise<ArrayBuffer> { return this.bytes.slice().buffer as ArrayBuffer; }
+  /** The bytes themselves, uncopied: a landing reads a whole world through this (#865, no extra copy). Never written to. */
+  bytesView(): Uint8Array { return this.bytes; }
 }
 
 export class MemoryFileHandle {
@@ -41,6 +43,9 @@ export class MemoryFileHandle {
   constructor(readonly name: string) { this.file = new MemoryFile(name, new Uint8Array(0), Date.now()); }
 
   async getFile(): Promise<File> { return this.file as unknown as File; }
+
+  /** Hold these bytes as the file's, uncopied (a write later swaps in new ones, never touching them). */
+  adopt(bytes: Uint8Array): void { this.file = new MemoryFile(this.name, bytes, Date.now()); }
 
   async createWritable(opts: { keepExistingData?: boolean } = {}) {
     let bytes = opts.keepExistingData ? new Uint8Array(await this.file.arrayBuffer()) : new Uint8Array(0);
@@ -143,4 +148,16 @@ export class MemoryDirHandle {
 /** A fresh in-memory directory, typed as the browser's handle for the code that takes one. */
 export function memoryDirectory(name = ''): FileSystemDirectoryHandle {
   return new MemoryDirHandle(name) as unknown as FileSystemDirectoryHandle;
+}
+
+/** A directory in memory holding these files (`a/b.json` paths), their bytes adopted, never copied (#865: a world file's open). */
+export async function memoryDirectoryWith(files: ReadonlyArray<{ path: string; data: Uint8Array }>, name = ''): Promise<FileSystemDirectoryHandle> {
+  const root = new MemoryDirHandle(name);
+  for (const f of files) {
+    const segs = f.path.split('/');
+    let d = root;
+    for (const seg of segs.slice(0, -1)) d = await d.getDirectoryHandle(seg, { create: true });
+    (await d.getFileHandle(segs[segs.length - 1], { create: true })).adopt(f.data);
+  }
+  return root as unknown as FileSystemDirectoryHandle;
 }

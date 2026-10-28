@@ -18,7 +18,8 @@ import { getState, patchSlice } from '../core/state';
 import { getActiveStore, setActiveStore, evictParkedStore, awaitEviction } from '../core/active-store';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
-import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
+import { LANDING_IN_ANOTHER_TAB, isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
+import { forgetLanding, landingLockHeld, liveLanding } from '../store/land-behind';
 import { deleteWorldEntry, saveRegistry } from '../registry/registry';
 import { detachSyncEngine, getCurrentSyncWorldId } from '../sync/sync-attach';
 import { clearSyncIssues } from '../sync/sync-issues';
@@ -32,8 +33,8 @@ export type BrowserDeleteResult =
    * as cleared by this browser.
    */
   | { ok: true; listSaved: boolean }
-  /** Nothing was removed; the entry is kept. `wasActive`: reopen it. */
-  | { ok: false; error: unknown; wasActive: boolean };
+  /** Nothing was removed; the entry is kept. `wasActive`: reopen it. `line`: why, when it is not the removal's failure. */
+  | { ok: false; error: unknown; wasActive: boolean; line?: string };
 
 /** The line said when the removal did not happen (contract §1.2). */
 export const BROWSER_DELETE_FAILED = (name: string) =>
@@ -43,6 +44,15 @@ export async function deleteBrowserWorld(world: WorldRegistryEntry): Promise<Bro
   if (!isBrowserWorld(world)) throw new Error('deleteBrowserWorld: not a browser world'); // raw-error-ok: a programming guard, never shown
   return enqueueActivationTask(async () => {
     const wasActive = getState().active?.worldId === world.id;
+    // Still landing (#865, contract L8'): here, it stops and every write of it
+    // ends before the removal; in another tab, nothing is removed under it.
+    const landing = liveLanding(world.folder.folder_name);
+    if (landing) {
+      landing.stop();
+      await landing.landed.catch(() => {});
+    } else if (await landingLockHeld(world.folder.folder_name)) {
+      return { ok: false as const, error: null, wasActive, line: LANDING_IN_ANOTHER_TAB('Delete') };
+    }
     if (wasActive) {
       // The rooms' pending saves land (or are refused) before the close, so
       // no debounced write reopens a file during the removal.
@@ -61,6 +71,7 @@ export async function deleteBrowserWorld(world: WorldRegistryEntry): Promise<Bro
     } catch (error) {
       return { ok: false as const, error, wasActive };
     }
+    forgetLanding(world.folder.folder_name);
     // Removed: only now does the entry go. The key Atlas minted for it is
     // taken back first (#814), by the record on the entry as the registry
     // holds it now; its files are in this browser alone, so no copy uses it.

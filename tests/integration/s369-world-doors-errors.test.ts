@@ -199,7 +199,7 @@ describe('add-a-world icons (1g)', () => {
       for (const g of b.querySelectorAll('.material-symbols-outlined')) expect(g.getAttribute('aria-hidden')).toBe('true');
     }
     expect(icons.map(b => b.getAttribute('aria-label'))).toEqual([
-      'Start a world', 'Open a world folder', 'New world on OnlyWorlds',
+      'Create a world', 'Open a world folder', 'New world on OnlyWorlds',
       'Download a world from OnlyWorlds', 'View a shared world',
     ]);
     unmount();

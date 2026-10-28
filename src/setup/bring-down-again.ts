@@ -28,7 +28,9 @@ import { PlainError } from '../core/plain-error';
 import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
 import { saveRegistry, setActiveWorld, storedRegistry, updateWorldEntry } from '../registry/registry';
 import type { InitialDownloadProgress } from '../sync/initial-download';
-import { downloadIntoMake } from './browser-first-download';
+import { abandonLanding, downloadIntoMemory, landAndOpen } from './browser-first-download';
+import type { Landing } from '../store/land-behind';
+import { settleIfLandingFailed } from './landing-failed';
 import { buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine, diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { abandonBrowserMake, releasePriorWorld, scaffoldBrowserWorld } from './atlas-root-flow';
@@ -114,12 +116,15 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
 
   const { store, subName, make } = await scaffoldBrowserWorld(entry.name, ownId, { open: false });
   let downloaded;
+  let landing: Landing | null = null;
   try {
-    // Into memory, then landed once (`browser-first-download.ts`); the store opens on what landed.
+    // Into memory, then opened there while its files land behind (`browser-first-download.ts`).
     const adapter = buildV2Adapter(entry.api.api_key, pin);
-    downloaded = await downloadIntoMake(make, { id: ownId, name: entry.name, api: diskApiBlock(entry.api), producer: atlasProducer('server') }, adapter, { onProgress: opts.onProgress });
-    await store.open(make.handle);
+    const down = await downloadIntoMemory({ id: ownId, name: entry.name, api: diskApiBlock(entry.api), producer: atlasProducer('server') }, adapter, { onProgress: opts.onProgress });
+    downloaded = down.result;
+    landing = await landAndOpen(make, down.dir, store);
   } catch (err) {
+    await abandonLanding(landing);
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }
 
@@ -139,6 +144,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
       patchSlice('registry', next);
     });
   } catch (err) {
+    await abandonLanding(landing); // no write of it may run under the removal (gate G6)
     await store.close().catch(() => {});
     await removeBrowserWorldDir({ where: 'browser', folder: { handle_key: '', folder_name: subName } }).catch(() => {});
     throw err;
@@ -167,5 +173,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   // without its PIN (or seat secret) waits on it.
   const why = diagnoseSyncUnavailable()?.kind;
   const syncWaits = why === 'pin-missing' ? 'pin' : why === 'seat-secret-missing' ? 'seat' : null;
+  // Failed between its open and the commit (contract G6): settled once the door has opened it, never under it.
+  if (landing) void settleIfLandingFailed(landing);
   return { entry: restored, downloaded: downloaded.totalDownloaded, failures: downloaded.failures.length, syncWaits };
 }

@@ -42,12 +42,11 @@ export interface InitialDownloadProgress {
   currentType?: ElementType;
   /**
    * Phase of the download: 'list' while gathering counts, 'write' while
-   * persisting, 'land' while a browser world's first download is saved from
-   * memory into browser storage (`done` and `total` count files then),
-   * 'open' while the store opened on what landed reads its elements (no
-   * cancel then: the world is already registered).
+   * persisting, 'open' once everything has downloaded and the world opens
+   * (no cancel then: the world is being registered; a browser world's files
+   * land behind it, #865).
    */
-  phase: 'list' | 'write' | 'land' | 'open';
+  phase: 'list' | 'write' | 'open';
 }
 
 export interface InitialDownloadResult {

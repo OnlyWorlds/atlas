@@ -26,7 +26,8 @@
  */
 
 import type { WorldRegistryEntry, WorldsRegistry } from './types';
-import { BROWSER_HOME, browserHome, isBrowserWorld, isGoneError, markWorldCleared, removeBrowserWorldDir, unmarkWorldCleared } from './browser-worlds';
+import { BROWSER_HOME, browserHome, isBrowserWorld, isGoneError, markWorldCleared, removeBrowserWorldDir, settleDeadLanding, unmarkWorldCleared } from './browser-worlds';
+import { hasLandingMarker, landingLockHeld } from '../store/land-behind';
 import { slugify } from '../store/fs-utils';
 import { adoptStoredRegistry, createApiLinkedWorld, createLocalWorld, findWorldByOwIdentity, saveRegistry, storedRegistry, updateWorldEntry } from '../registry/registry';
 import { seatFromFile } from './seat';
@@ -210,6 +211,8 @@ type WorldFacts = { id?: unknown; name?: unknown; demo?: unknown; api?: { world_
 interface DirFacts {
   name: string;
   making: boolean;
+  /** `.atlas/landing` stands: a landing began here and did not finish (#865). */
+  landing: boolean;
   /** Parsed world.json, `null` when absent, `'unreadable'` when it will not parse. */
   meta: WorldFacts | null | 'unreadable';
 }
@@ -234,7 +237,7 @@ async function readFacts(dir: FileSystemDirectoryHandle, name: string): Promise<
   } catch (err) {
     meta = isGoneError(err) ? null : 'unreadable';
   }
-  return { name, making, meta };
+  return { name, making, landing: await hasLandingMarker(dir), meta };
 }
 
 /** What the last reconciliation left as a move's stale copy (Settings, Storage counts them). Session only. */
@@ -292,6 +295,20 @@ export async function reconcileBrowserHome(
       const f = await readFacts(dir, name);
       const claimed = out.next.worlds.find(w => isBrowserWorld(w) && w.folder.folder_name === name);
       if (claimed) {
+        // A landing no tab holds any more is decided by its disk (contract L6'):
+        // landed (world.json there) keeps the world; otherwise it goes and its
+        // row is cleared like any browser world whose directory is gone.
+        if (f.landing && !(await landingLockHeld(name))) {
+          if ((await settleDeadLanding(claimed, dir)) === 'removed') {
+            if (!claimed.cleared_at) {
+              out.ops.push({ kind: 'mark', entryId: claimed.id, dir: name });
+              out.next = markWorldCleared(out.next, claimed.id);
+              out.cleared.push(claimed.id);
+            }
+            out.removed.push(name);
+            return;
+          }
+        }
         if (claimed.cleared_at && f.meta && f.meta !== 'unreadable') {
           out.ops.push({ kind: 'unmark', entryId: claimed.id, dir: name });
           out.next = unmarkWorldCleared(out.next, claimed.id);

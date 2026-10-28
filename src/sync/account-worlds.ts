@@ -314,7 +314,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
           } else {
             overlay.update(p.total === 0
               ? 'Empty world; finishing up…'
-              : progressLine(p, where));
+              : progressLine(p));
           }
         },
       })

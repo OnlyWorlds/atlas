@@ -39,6 +39,7 @@ vi.mock('../../src/sync/sync-attach', async (importOriginal) => ({
 import { linkExistingApiWorldInRoot, BROWSER_STORAGE_FULL } from '../../src/setup/atlas-root-flow';
 import { DownloadCancelledError, type DownloadStop, type InitialDownloadProgress } from '../../src/sync/initial-download';
 import { FsFolderStore } from '../../src/store/folder-store-fs';
+import { allLandings, liveLanding } from '../../src/store/land-behind';
 
 const SERVER_WORLD = '068e5012-d77c-799d-8000-95548fbae700';
 let root: FakeDirHandle;
@@ -70,49 +71,64 @@ afterEach(() => {
 const link = (over: Partial<Parameters<typeof linkExistingApiWorldInRoot>[0]> = {}) =>
   linkExistingApiWorldInRoot({ where: 'browser', apiKey: 'k', apiPin: '1234', knownWorld: { id: SERVER_WORLD, name: 'Hollow Reach' }, ...over });
 
-describe('the browser link door, its first download landed once', () => {
-  it('lands, registers and lists every element; the landing and the cold open each report', async () => {
+describe('the browser link door: opened from memory, landed behind', () => {
+  it('opens at once with every element, then lands the whole world and drops its markers', async () => {
     const seen: InitialDownloadProgress[] = [];
     const r = await link({ onProgress: p => seen.push({ ...p }) });
     expect(r.downloaded).toBe(6);
     expect(getState().registry.worlds).toHaveLength(1);
     expect(getState().data.elements).toHaveLength(6);
+    await Promise.all(allLandings().map(l => l.landed));
     const f = files(home()!.children.get(r.entry.folder.folder_name) as FakeDirHandle);
     expect(f).toContain('world.json');
     expect(f).not.toContain('.atlas/making');
-    const land = seen.filter(p => p.phase === 'land');
-    expect(land[land.length - 1].done).toBe(land[land.length - 1].total);
-    expect(seen.some(p => p.phase === 'open')).toBe(true);
-    // The phases arrive in order: no download report after the landing began.
-    const firstLand = seen.findIndex(p => p.phase === 'land');
-    expect(seen.slice(firstLand).every(p => p.phase === 'land' || p.phase === 'open')).toBe(true);
+    expect(f).not.toContain('.atlas/landing');
+    expect(liveLanding(r.entry.folder.folder_name)).toBeUndefined();
+    // The download, then `open`: no phase after it says downloading.
+    const firstOpen = seen.findIndex(p => p.phase === 'open');
+    expect(firstOpen).toBeGreaterThan(0);
+    expect(seen.slice(firstOpen).every(p => p.phase === 'open')).toBe(true);
   });
 
-  it('a cancel in the landing: DownloadCancelledError, no directory, no row', async () => {
+  it('a cancel asked once the last element is down: DownloadCancelledError, no directory, no row (gate G9)', async () => {
     let stop: DownloadStop = null;
     await expect(link({
-      onProgress: p => { if (p.phase === 'land' && p.done >= 2) stop = 'cancel'; },
+      onProgress: p => { if (p.phase === 'write' && p.done === p.total) stop = 'cancel'; },
       shouldStop: () => stop,
     })).rejects.toBeInstanceOf(DownloadCancelledError);
     expect(getState().registry.worlds).toHaveLength(0);
     expect(home()?.children.size ?? 0).toBe(0);
   });
 
-  it('a full origin in the landing: the sentence, nothing kept', async () => {
-    let landing = false;
-    let n = 0;
+  it('a full origin at the landing\'s first write: the sentence, nothing kept', async () => {
+    let downloaded = false;
     const real = FakeFileHandle.prototype.createWritable;
     vi.spyOn(FakeFileHandle.prototype, 'createWritable').mockImplementation(async function (this: FakeFileHandle, ...a: unknown[]) {
-      if (landing && ++n === 3) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+      if (downloaded) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
       return real.apply(this, a as never);
     });
-    await expect(link({ onProgress: p => { if (p.phase === 'write' && p.done === p.total) landing = true; } }))
+    await expect(link({ onProgress: p => { if (p.phase === 'open') downloaded = true; } }))
       .rejects.toMatchObject({ name: 'PlainError', message: BROWSER_STORAGE_FULL('downloading the world') });
     expect(getState().registry.worlds).toHaveLength(0);
     expect(home()?.children.size ?? 0).toBe(0);
   });
 
-  it('an open that fails after the landing: abandoned, nothing kept, the world that was open untouched', async () => {
+  it('a full origin while its files land behind the open world: the world closes, its directory goes, its row is cleared', async () => {
+    let downloaded = false;
+    let n = 0;
+    const real = FakeFileHandle.prototype.createWritable;
+    vi.spyOn(FakeFileHandle.prototype, 'createWritable').mockImplementation(async function (this: FakeFileHandle, ...a: unknown[]) {
+      if (downloaded && ++n === 4) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); // the marker and two files land first
+      return real.apply(this, a as never);
+    });
+    const r = await link({ onProgress: p => { if (p.phase === 'open') downloaded = true; } });
+    await vi.waitFor(() => expect(getState().registry.worlds.find(w => w.id === r.entry.id)?.cleared_at).toBeTruthy());
+    expect(home()?.children.has(r.entry.folder.folder_name)).toBe(false);
+    expect(getState().active).toBeNull();
+    expect(liveLanding(r.entry.folder.folder_name)).toBeUndefined();
+  });
+
+  it('an open that fails on the landing: abandoned, nothing kept, the world that was open untouched', async () => {
     const prior = priorStore();
     setActiveStore(prior as never);
     let opens = 0;
@@ -125,31 +141,29 @@ describe('the browser link door, its first download landed once', () => {
     expect(opens).toBe(2); // the scratch's, then the world's own
     expect(getState().registry.worlds).toHaveLength(0);
     expect(home()?.children.size ?? 0).toBe(0);
+    expect(allLandings()).toHaveLength(0);
     expect(getActiveStore()).toBe(prior);
     expect(prior.close).not.toHaveBeenCalled();
     setActiveStore(null);
   });
 
-  it('Stop and keep in the download, then the landing: what arrived is kept, and the saving still reports', async () => {
+  it('Stop and keep in the download: what arrived is kept and opens', async () => {
     let stop: DownloadStop = null;
-    const seen: string[] = [];
     const r = await link({
-      onProgress: p => { seen.push(p.phase); if (p.phase === 'write' && p.done === 2) stop = 'finish'; },
+      onProgress: p => { if (p.phase === 'write' && p.done === 2) stop = 'finish'; },
       shouldStop: () => stop,
     });
     expect(r.stoppedEarly).toBeTruthy();
     expect(r.downloaded).toBe(2);
     expect(getState().data.elements).toHaveLength(2);
-    expect(seen).toContain('land');
   });
 
-  it('the world that was open stays the active store through the whole landing, released after', async () => {
+  it('the world that was open stays the active store until the commit, released after', async () => {
     const prior = priorStore();
     setActiveStore(prior as never);
-    const atLand: boolean[] = [];
-    await link({ onProgress: p => { if (p.phase === 'land') atLand.push(getActiveStore() === (prior as never) && prior.close.mock.calls.length === 0); } });
-    expect(atLand.length).toBeGreaterThan(0);
-    expect(atLand.every(Boolean)).toBe(true);
+    const atOpen: boolean[] = [];
+    await link({ onProgress: p => { if (p.phase === 'open') atOpen.push(getActiveStore() === (prior as never) && prior.close.mock.calls.length === 0); } });
+    expect(atOpen[0]).toBe(true);
     expect(prior.close).toHaveBeenCalled();
   });
 });

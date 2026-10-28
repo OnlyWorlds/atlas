@@ -80,7 +80,7 @@ export class CreateWorldModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'Start a world',
+      title: 'Create a world',
       dataModal: 'create-world',
     });
 

@@ -280,7 +280,7 @@ export function newWorldGlyph(): string {
 
 /** The chooser's rows: the icon row's five, said in words. */
 const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line: string; /** Said instead without the folder picker. */ browserOnlyLine?: string }> = [
-  { action: 'create-local', get icon() { return newWorldGlyph(); }, title: 'Start a world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.', browserOnlyLine: 'Plain files, in this browser. Works offline; take it online any time.' },
+  { action: 'create-local', get icon() { return newWorldGlyph(); }, title: 'Create a world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.', browserOnlyLine: 'Plain files, in this browser. Works offline; take it online any time.' },
   { action: 'open-folder', icon: 'folder_open', title: 'Open a world folder', line: 'One you already have, from Atlas, another tool, or your AI. It opens where it is; nothing is copied.' },
   { action: 'new-api', icon: 'cloud_upload', title: 'New world on OnlyWorlds', line: 'Created on onlyworlds.com and here, synced from the start. Needs a free account.' },
   { action: 'link-api', icon: 'link', title: 'Download a world from OnlyWorlds', line: 'Its API key and PIN: Atlas downloads a full copy and keeps the two in sync.' },

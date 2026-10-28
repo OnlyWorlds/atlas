@@ -1,26 +1,19 @@
 /**
- * The download progress line (1.17, contract §2.2; d-1000 built as the walk
- * page's lean, moved to the saving in 1.98.1): a big world being saved into
- * this browser says it takes a while, and every dialog that downloads a world
- * uses the one line for both phases.
+ * The download progress line (1.17, contract §2.2): every dialog that
+ * downloads a world uses the one line for the download and the open. A
+ * browser world's files land after it opens, counted on its home (#865), so
+ * no dialog line says saving any more.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BIG_BROWSER_DOWNLOAD, progressLine } from '../../src/ui/download-progress';
+import { progressLine } from '../../src/ui/download-progress';
 
 describe('progressLine', () => {
-  it('counts elements while they download, files while they are saved', () => {
-    expect(progressLine({ phase: 'write', done: 47, total: 310 }, 'browser')).toBe('Downloading 47 of 310 elements…');
-    expect(progressLine({ phase: 'land', done: 47, total: 312 }, 'browser')).toBe('Saving 47 of 312 files in this browser…');
-    expect(progressLine({ phase: 'land', done: 312, total: 312 }, 'browser')).toBe('Opening the world…');
-  });
-
-  it('says it takes a while only for a big world being saved into this browser', () => {
-    expect(progressLine({ phase: 'land', done: 47, total: 4771 }, 'browser')).toBe('Saving 47 of 4771 files in this browser… A world this size takes a while in this browser.');
-    expect(progressLine({ phase: 'write', done: 47, total: 4771 }, 'browser')).toBe('Downloading 47 of 4771 elements…');
-    expect(progressLine({ phase: 'write', done: 47, total: 4771 }, 'folder')).toBe('Downloading 47 of 4771 elements…');
-    expect(progressLine({ phase: 'land', done: 1, total: BIG_BROWSER_DOWNLOAD }, 'browser')).toBe(`Saving 1 of ${BIG_BROWSER_DOWNLOAD} files in this browser…`);
+  it('counts elements while they download, then says the world opens', () => {
+    expect(progressLine({ phase: 'write', done: 47, total: 310 })).toBe('Downloading 47 of 310 elements…');
+    expect(progressLine({ phase: 'open', done: 0, total: 0 })).toBe('Opening the world…');
+    expect(progressLine({ phase: 'open', done: 12, total: 310 })).toBe('Opening the world… 12 of 310');
   });
 
   it('is the line in every dialog that downloads a world', () => {

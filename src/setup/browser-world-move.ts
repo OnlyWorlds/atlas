@@ -37,6 +37,7 @@ import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { PlainError } from '../core/plain-error';
 import { ATLAS_INTERNAL_DIR, ATLAS_ROOT_HANDLE_KEY, LOCK_STALE_MS } from '../core/constants';
 import { MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, isBrowserWorld, isGoneError, removeBrowserWorldDir } from '../core/browser-worlds';
+import { liveLanding } from '../store/land-behind';
 import { ifWorldLockFree, withWorldLock } from '../core/browser-home';
 import { slugify } from '../store/fs-utils';
 import { FsFolderStore, currentTabId } from '../store/folder-store-fs';
@@ -172,6 +173,8 @@ export async function moveBrowserWorldToFolder(world: WorldRegistryEntry, opts: 
   if (getState().active?.worldId !== world.id) throw new PlainError('Open this world first, then move it.');
   if (isRekeyRunning()) throw new PlainError('Wait for the id update to finish, then move the world.');
   const dir = world.folder.folder_name;
+  // Its files still landing (#865): the move would wait on them holding every world click (gate G7).
+  if (liveLanding(dir)?.state === 'landing') throw new PlainError('Wait until this world is saved in this browser, then move it.');
   return withIdMoveLock(() => enqueueActivationTask(() => withWorldLock(dir, async () => {
     movingHere.add(world.id);
     try {

@@ -40,7 +40,7 @@ describe('welcome-panel label restores', () => {
   });
 
   it('renders the door labels in sentence case (Titus, 2026-10-20: sentence case everywhere)', () => {
-    for (const label of ["'Start a world'", "'Explore Moppetopia'", "'Watch how it works'", "'Other ways in'"]) expect(source).toContain(label);
+    for (const label of ["'Create a world'", "'Explore'", "'Watch how it works'", "'Other ways in'"]) expect(source).toContain(label);
   });
 
   it('the tour door has TWO labels, which is why capturing beats restating', () => {

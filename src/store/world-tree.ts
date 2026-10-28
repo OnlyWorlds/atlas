@@ -45,7 +45,7 @@ export function isTransientPath(path: string): boolean {
   if (/\.(crswap|tmp)$/i.test(path)) return true;
   if (!path.startsWith(`${ATLAS_INTERNAL_DIR}/`)) return false;
   const rest = path.slice(ATLAS_INTERNAL_DIR.length + 1);
-  return rest === 'lock' || rest === 'making' || rest === 'rekey-journal.json' || /^move[^/]*\.json$/.test(rest);
+  return rest === 'lock' || rest === 'making' || rest === 'landing' || rest === 'rekey-journal.json' || /^move[^/]*\.json$/.test(rest);
 }
 
 export interface TreeFile {

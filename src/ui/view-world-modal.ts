@@ -108,7 +108,7 @@ export class ViewWorldModal extends BaseModal {
         } else {
           progressBox.textContent = p.total === 0
             ? 'World is empty; finishing up'
-            : progressLine(p, where);
+            : progressLine(p);
         }
         progressBox.hidden = false;
       };

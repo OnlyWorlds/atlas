@@ -316,7 +316,7 @@ test('the Start-page links: #/start asks nothing; #/bring-in lands in the Data r
   await page.waitForSelector('.atlas-shell');
   const dialog = page.locator('[data-modal="create-world"]');
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('Start a world');
+  await expect(dialog).toContainText('Create a world');
   // The hash went first: a reload does not ask again.
   expect(await page.evaluate(() => window.location.hash)).toBe('#/');
   // Count every moment the question is in the page, not just the end state

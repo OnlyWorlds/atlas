@@ -35,6 +35,7 @@ import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { setWorldFavoriteElement, dismissTourCard, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { keepSafeCard, snoozeUntil } from './home-keepsafe';
+import { buildLandingLine } from './home-landing';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { hasFolderMode } from '../core/capabilities';
 import { DOTS, guideDots } from '../core/guide';
@@ -162,6 +163,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts, charterRoles(worldId)));
     const demoLine = buildDemoLine(worldId, toasts);
     if (demoLine) root.appendChild(demoLine);
+    const landingLine = buildLandingLine(getState().registry.worlds.find(w => w.id === worldId));
+    if (landingLine) root.appendChild(landingLine);
     if (totalElements === 0 && getState().data.loading) {
       // Empty and still-loading are different truths: during activation the
       // cache is primed async from disk, and showing onboarding meanwhile

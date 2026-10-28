@@ -42,7 +42,9 @@ import { getActiveStore, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
 import { initialDownloadAll, seedLinkedWorldMeta, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
-import { downloadIntoMake } from './browser-first-download';
+import { abandonLanding, downloadIntoMemory, landAndOpen } from './browser-first-download';
+import type { Landing } from '../store/land-behind';
+import { settleIfLandingFailed } from './landing-failed';
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
@@ -696,7 +698,7 @@ export async function scaffoldBrowserWorld(name: string, adoptId?: string, opts:
   const worldUuid = adoptId ?? newId();
   const make = await openBrowserMake(trimmed, worldUuid);
   const store = new FsFolderStore();
-  // A first download lands its files before the store opens (`downloadIntoMake`): `open: false`.
+  // A first download opens its store on the landing's root (`landAndOpen`): `open: false`.
   if (opts.open === false) return { store, worldUuid, subName: make.dir, handleKey: `world-${worldUuid}`, make };
   try {
     await store.open(make.handle);
@@ -1191,13 +1193,16 @@ async function linkIntoBrowser(
   let handleKey = `world-${serverWorldId}`;
   for (let n = 2; getState().registry.worlds.some(w => w.folder.handle_key === handleKey); n++) handleKey = `world-${serverWorldId}-${n}`;
   let downloadResult: Awaited<ReturnType<typeof initialDownloadAll>>;
+  let landing: Landing | null = null;
   try {
-    // Into memory, then landed once (`browser-first-download.ts`); the store opens on what landed.
+    // Into memory, then opened there while its files land behind (`browser-first-download.ts`).
     const adapter = buildV2Adapter(apiKey, apiPin);
-    downloadResult = await downloadIntoMake(make, linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat }), adapter, opts);
-    await store.open(make.handle);
+    const down = await downloadIntoMemory(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat }), adapter, opts);
+    downloadResult = down.result;
+    landing = await landAndOpen(make, down.dir, store);
     await releasePriorWorld();
   } catch (err) {
+    await abandonLanding(landing);
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }
   let regAfter = getState().registry;
@@ -1224,6 +1229,8 @@ async function linkIntoBrowser(
   }
   patchSlice('ui', { ...getState().ui, selectedElementId: null });
   attachSyncEngine(entry, store);
+  // Failed between its open and the commit (contract G6): settled once the door has opened it, never under it.
+  if (landing) void settleIfLandingFailed(landing);
   return {
     entry,
     downloaded: downloadResult.totalDownloaded,

@@ -71,7 +71,8 @@ export class DeleteBrowserWorldModal extends BaseModal {
         const { activateWorld } = await import('../sidebar/worlds-sidebar');
         await activateWorld(w.id, this.toasts).catch(() => false);
       }
-      errorBox.textContent = BROWSER_DELETE_FAILED(w.name);
+      // A refusal with its own words (another tab still lands it, #865) says them.
+      errorBox.textContent = result.line ?? BROWSER_DELETE_FAILED(w.name);
       errorBox.hidden = false;
       deleteBtn.disabled = false;
       deleteBtn.textContent = 'Delete';

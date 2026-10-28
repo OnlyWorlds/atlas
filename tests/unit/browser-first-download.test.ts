@@ -1,15 +1,16 @@
 /**
- * A browser world's first download into memory, then landed once
- * (`setup/browser-first-download.ts`): the landed tree is the one the old
- * path (the download straight into the world's own directory) leaves, and a
- * cancel in the landing leaves no world.json. Seeded from the contract
- * gate's probe: name and id-tail collisions, a case twin, a stub, a map and a pin.
+ * A browser world's first download into memory, opened there at once and
+ * landed behind (`setup/browser-first-download.ts`, #865): the landed tree is
+ * the one the old path (the download straight into the world's own directory)
+ * leaves, and a cancel undoes the door up to its `open`. Seeded from the
+ * 1.98.1 contract gate's probe: name and id-tail collisions, a case twin, a
+ * stub, a map and a pin.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FsFolderStore } from '../../src/store/folder-store-fs';
 import { memoryDirectory } from '../../src/store/memory-dir';
 import { initialDownloadAll, seedLinkedWorldMeta, DownloadCancelledError, type DownloadStop, type InitialDownloadProgress } from '../../src/sync/initial-download';
-import { downloadIntoMake } from '../../src/setup/browser-first-download';
+import { downloadIntoMemory, landAndOpen } from '../../src/setup/browser-first-download';
 import type { OwApiClient } from '../../src/sync/sync-engine';
 
 const T = '2026-10-01T00:00:00.000Z';
@@ -52,8 +53,8 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); });
 
-describe('downloadIntoMake', () => {
-  it('lands the tree the old path leaves, and the store opens on it to the same world', async () => {
+describe('downloadIntoMemory, then landAndOpen', () => {
+  it('the store opens at once on what it downloaded, and what lands is the tree the old path leaves', async () => {
     const old = memoryDirectory('old');
     const so = new FsFolderStore();
     await so.open(old);
@@ -65,42 +66,51 @@ describe('downloadIntoMake', () => {
 
     const landed = memoryDirectory('landed');
     const progress: InitialDownloadProgress[] = [];
-    const rn = await downloadIntoMake({ handle: landed }, meta, adapter, { onProgress: p => progress.push(p) });
+    const down = await downloadIntoMemory(meta, adapter, { onProgress: p => progress.push(p) });
     const sn = new FsFolderStore();
-    await sn.open(landed);
+    const landing = await landAndOpen({ dir: 'fd-1', handle: landed }, down.dir, sn);
     const listNew = (await sn.listElements()).sort((x, y) => (x.id < y.id ? -1 : 1)); // key order may differ: a cold read against the writer's cache (gate N6)
+    await landing.landed;
     await sn.close();
 
-    expect(rn).toEqual(ro);
+    expect(down.result).toEqual(ro);
     expect(listNew).toEqual(listOld);
     const [a, b] = [await tree(old), await tree(landed)];
     const diffs = [...new Set([...a.keys(), ...b.keys()])].filter(k => a.get(k) !== b.get(k));
     expect(diffs).toEqual([]);
-    const land = progress.filter(p => p.phase === 'land');
-    expect(land.length).toBeGreaterThan(1);
-    expect(land[land.length - 1].done).toBe(land[land.length - 1].total);
+    // The door says `open` once, last: no cancel after it (gate G9).
+    expect(progress[progress.length - 1].phase).toBe('open');
+    expect(progress.filter(p => p.phase === 'open')).toHaveLength(1);
   });
 
-  it('a cancel in the landing throws DownloadCancelledError and writes no world.json', async () => {
-    const landed = memoryDirectory('cancelled');
+  it('a cancel during the download throws DownloadCancelledError', async () => {
     let stop: DownloadStop = null;
-    const run = downloadIntoMake({ handle: landed }, meta, adapter, {
-      onProgress: p => { if (p.phase === 'land' && p.done >= 2) stop = 'cancel'; },
+    const run = downloadIntoMemory(meta, adapter, {
+      onProgress: p => { if (p.phase === 'write' && p.done >= 2) stop = 'cancel'; },
       shouldStop: () => stop,
     });
     await expect(run).rejects.toBeInstanceOf(DownloadCancelledError);
-    expect((await tree(landed)).has('world.json')).toBe(false);
   });
 
-  it('a finish asked in the landing lands the whole world, nothing stopped early', async () => {
-    const landed = memoryDirectory('finished');
+  it('a cancel asked after the last element still undoes the door, and says no `open` (gate G9)', async () => {
     let stop: DownloadStop = null;
-    const r = await downloadIntoMake({ handle: landed }, meta, adapter, {
-      onProgress: p => { if (p.phase === 'land') stop = 'finish'; },
+    const phases: string[] = [];
+    const run = downloadIntoMemory(meta, adapter, {
+      onProgress: p => { phases.push(p.phase); if (p.phase === 'write' && p.done === p.total) stop = 'cancel'; },
+      // Polled during the download too: it answers cancel only once the last element is down.
       shouldStop: () => stop,
     });
-    expect(r.stoppedEarly).toBeUndefined();
-    expect(r.totalDownloaded).toBe(9);
-    expect((await tree(landed)).has('world.json')).toBe(true);
+    await expect(run).rejects.toBeInstanceOf(DownloadCancelledError);
+    expect(phases).not.toContain('open');
+  });
+
+  it('a finish asked at the end keeps the whole world, nothing stopped early', async () => {
+    let stop: DownloadStop = null;
+    const { result } = await downloadIntoMemory(meta, adapter, {
+      onProgress: p => { if (p.phase === 'write' && p.done === p.total) stop = 'finish'; },
+      shouldStop: () => stop,
+    });
+    expect(result.stoppedEarly).toBeUndefined();
+    expect(result.totalDownloaded).toBe(9);
   });
 });

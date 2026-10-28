@@ -12,8 +12,14 @@ import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
 import { FakeDirHandle } from '../fixtures/fake-fs';
 import { BROWSER_HOME, setOpfsRootForTests } from '../../src/core/browser-worlds';
 import { openWorldFile } from '../../src/setup/world-file-open';
+import { allLandings } from '../../src/store/land-behind';
 import { attachSyncEngine, detachSyncEngine } from '../../src/sync/sync-attach';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
+
+// A world file's world opens at once and its files land behind it (#865): what is
+// read from disk afterwards is read once every landing of the test has landed.
+const landedAll = () => Promise.all(allLandings().map(l => l.landed.catch(() => {})));
+const openLanded = async (...a: Parameters<typeof openWorldFile>) => { const o = await openWorldFile(...a); await landedAll(); return o; };
 
 const j = (v: unknown) => JSON.stringify(v, null, 2) + '\n';
 const asDir = (d: FakeDirHandle) => d as unknown as FileSystemDirectoryHandle;
@@ -55,7 +61,7 @@ afterEach(() => { setOpfsRootForTests(null); detachSyncEngine(); });
 describe('a copy beside the world (conv. 177)', () => {
   it('opens under a fresh id by the snapshot rule, the files byte-exact, the world it copies untouched', async () => {
     const before = JSON.stringify(reg().worlds[0]);
-    const out = await openWorldFile(worldZip(DAY_FILE), { asCopy: true });
+    const out = await openLanded(worldZip(DAY_FILE), { asCopy: true });
     expect(out.kind).toBe('copied');
     const copy = reg().worlds.find(w => w.id === (out as { worldId: string }).worldId)!;
     expect(copy).toMatchObject({ name: 'Hollow Reach', state: 'local-only', where: 'browser', copy_of: { world_id: WID, at: AT } });
@@ -71,7 +77,7 @@ describe('a copy beside the world (conv. 177)', () => {
   });
 
   it('the same copy twice is one copy, and nothing is written the second time', async () => {
-    const first = await openWorldFile(worldZip(DAY_FILE), { asCopy: true });
+    const first = await openLanded(worldZip(DAY_FILE), { asCopy: true });
     const dirsAfterFirst = [...home.children.keys()].sort();
     // Nothing written, not even a directory taken back (the re-check after
     // the write would answer the same, after writing).
@@ -82,7 +88,7 @@ describe('a copy beside the world (conv. 177)', () => {
       return real.call(this, name, o);
     };
     let second;
-    try { second = await openWorldFile(worldZip(DAY_FILE), { asCopy: true }); } finally { FakeDirHandle.prototype.getFileHandle = real; }
+    try { second = await openLanded(worldZip(DAY_FILE), { asCopy: true }); } finally { FakeDirHandle.prototype.getFileHandle = real; }
     expect(created).toEqual([]);
     expect(second).toEqual({ kind: 'already', worldId: (first as { worldId: string }).worldId });
     expect([...home.children.keys()].sort()).toEqual(dirsAfterFirst);
@@ -90,24 +96,24 @@ describe('a copy beside the world (conv. 177)', () => {
   });
 
   it('another day is another copy; a file with no time is never "the same"', async () => {
-    await openWorldFile(worldZip(DAY_FILE), { asCopy: true });
-    await openWorldFile(worldZip({ ...DAY_FILE, source: { ...DAY_FILE.source, at: '2026-10-23T03:30:00+00:00' } }), { asCopy: true });
+    await openLanded(worldZip(DAY_FILE), { asCopy: true });
+    await openLanded(worldZip({ ...DAY_FILE, source: { ...DAY_FILE.source, at: '2026-10-23T03:30:00+00:00' } }), { asCopy: true });
     const undated = { id: WID, name: 'Hollow Reach' };
-    const a = await openWorldFile(worldZip(undated), { asCopy: true });
-    const b = await openWorldFile(worldZip(undated), { asCopy: true });
+    const a = await openLanded(worldZip(undated), { asCopy: true });
+    const b = await openLanded(worldZip(undated), { asCopy: true });
     expect([a.kind, b.kind]).toEqual(['copied', 'copied']);
     expect(reg().worlds.filter(w => w.copy_of)).toHaveLength(4);
     expect(reg().worlds.find(w => w.id === (a as { worldId: string }).worldId)!.copy_of).toEqual({ world_id: WID });
   });
 
   it('the plain open still answers "already here"', async () => {
-    expect(await openWorldFile(worldZip(DAY_FILE))).toEqual({ kind: 'already', worldId: 'w1' });
+    expect(await openLanded(worldZip(DAY_FILE))).toEqual({ kind: 'already', worldId: 'w1' });
   });
 
   it('a file another writer marked writable: false opens view-only, its copy_of mirrored', async () => {
     patchSlice('registry', defaultRegistry());
     const snap = { id: '0192a000-aaaa-7bbb-8ccc-0000000000ff', name: 'Hollow Reach', snapshot_of: WID, snapshot_at: AT, writable: false };
-    const out = await openWorldFile(worldZip(snap));
+    const out = await openLanded(worldZip(snap));
     expect(out.kind).toBe('opened');
     expect(reg().worlds[0].copy_of).toEqual({ world_id: WID, at: AT });
   });

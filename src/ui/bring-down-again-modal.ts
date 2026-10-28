@@ -50,7 +50,7 @@ export class BringDownAgainModal extends BaseModal {
       try {
         const out = await bringDownAgain(w.id, {
           onProgress: (p) => {
-            progress.textContent = p.phase === 'list' ? 'Asking OnlyWorlds for the world…' : progressLine(p, 'browser');
+            progress.textContent = p.phase === 'list' ? 'Asking OnlyWorlds for the world…' : progressLine(p);
           },
         });
         this.dismissLocked = false;

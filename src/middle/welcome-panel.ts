@@ -191,13 +191,14 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
            <span class="atlas-landing-choice-note">${note}</span>
          </span>`;
       const doors = [
-        // The style ladder (2026-10-20): Start a world is this screen's one
-        // Entry; the demo door is Standard, the everyday button.
-        choice('start-world', 'atlas-btn-entry', 'Start a world', folderMode
-          ? 'Your first world, in a folder on your drive or in this browser'
-          : 'It lives in this browser'),
+        // The style ladder (2026-10-20): Create a world is this screen's one
+        // Entry; the demo door is Standard, the everyday button. The words and
+        // the short sublines are Titus's (2026-10-28).
+        choice('start-world', 'atlas-btn-entry', 'Create a world', folderMode
+          ? 'In a folder or in this browser'
+          : 'In this browser'),
         // #113: the demo world as the user's own copy (needs browser storage).
-        choice('try-demo', 'atlas-btn-primary', 'Explore Moppetopia', 'A demo world, your own copy to change'),
+        choice('try-demo', 'atlas-btn-primary', 'Explore', 'An example world'),
       ].join('');
       const link = (action: string, label: string, hint: string): string =>
         `<button type="button" class="atlas-btn-link atlas-landing-more-link" data-door="${action}" data-action="${action}" title="${hint}">${label}</button>`;
@@ -271,7 +272,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           const note = root.querySelector(`[data-door="${action}"] .atlas-landing-choice-note`);
           if (note) note.textContent = text;
         };
-        caption('start-world', 'Your first world, in a folder on your drive');
+        caption('start-world', 'In a folder on your drive');
         root.querySelector('[data-door="other-ways-in"]')?.setAttribute('title', 'Download one from OnlyWorlds, or view a shared world');
         const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
         if (!note) return;
@@ -367,7 +368,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <p class="atlas-grounded-detail-hint">Click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
-            <h3>Start a world</h3>
+            <h3>Create a world</h3>
             <p>A new world, in your OnlyWorlds folder or in this browser: the dialog asks. It is plain files, works offline, and can go online later.</p>
             <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
           'new-api': `

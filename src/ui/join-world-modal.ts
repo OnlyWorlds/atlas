@@ -423,17 +423,16 @@ export class JoinWorldModal extends BaseModal {
         }
       }
       const renderProgress = (pr: InitialDownloadProgress) => {
-        // Saving what downloaded: nothing is left to keep or stop early, and
-        // the saving speaks even after Stop and keep (it is what runs then).
-        // Once the last file has landed the world is being registered: a
-        // cancel could no longer undo it, so the button stops offering one.
-        const saving = pr.phase === 'land' || pr.phase === 'open';
+        // Opening: everything has downloaded and the world is being
+        // registered, so nothing is left to keep, stop early or cancel; it
+        // speaks even after Stop and keep (it is what runs then).
+        const saving = pr.phase === 'open';
         if (saving) finishBtn.hidden = true;
-        if ((pr.phase === 'land' && pr.done >= pr.total) || pr.phase === 'open') cancelDl.disabled = true;
+        if (saving) cancelDl.disabled = true;
         if (stop === 'cancel' || (stop && !saving)) return;
         progressBox.textContent = pr.phase === 'list'
           ? `Discovering ${pr.currentType ?? ''}…`
-          : pr.total === 0 ? 'World is empty; finishing up' : progressLine(pr, where);
+          : pr.total === 0 ? 'World is empty; finishing up' : progressLine(pr);
         progressBox.hidden = false;
       };
       try {

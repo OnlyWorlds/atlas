@@ -19,6 +19,7 @@
 import type { WorldRegistryEntry, WorldsRegistry } from './types';
 import { updateWorldEntry } from '../registry/registry';
 import { loadHandle } from '../store/handle-vault';
+import { hasLandingMarker, landingLockHeld, liveLanding, removeLandingMarker } from '../store/land-behind';
 
 /** The one OPFS directory every browser world lives in. */
 export const BROWSER_HOME = 'browser-worlds';
@@ -80,7 +81,34 @@ export type WorldHandleResult =
   /** A browser world whose directory the browser no longer holds. */
   | { kind: 'gone' }
   /** A folder world whose vault handle is missing (the files may be fine). */
-  | { kind: 'lost' };
+  | { kind: 'lost' }
+  /** A browser world another tab is still landing (#865, contract L4'). */
+  | { kind: 'landing' }
+  /** A browser world whose landing failed in this tab; its cleanup is under way (L9'). */
+  | { kind: 'failed' };
+
+/** Said when a world is opened, deleted or downloaded while another tab lands it (contract L4', L8'). */
+export const LANDING_IN_ANOTHER_TAB = (doing: 'Open' | 'Delete') => `This world is still being saved in this browser in another tab. ${doing} it once that finishes.`;
+/** Said when a world whose landing failed here is clicked before its cleanup ends. */
+export const LANDING_FAILED_HERE = 'This world could not be saved in this browser.';
+
+/**
+ * A landing that died (its marker stands, no tab holds its lock), decided by
+ * the disk (contract L6'): `world.json` is the batch's last write, so with it
+ * the world landed and is kept (edits queued after it that never landed are
+ * lost as a prefix); without it the directory is removed and the caller marks
+ * the entry cleared, as for any browser world whose directory is gone.
+ */
+export async function settleDeadLanding(entry: Pick<WorldRegistryEntry, 'where' | 'folder'>, handle: FileSystemDirectoryHandle): Promise<'kept' | 'removed'> {
+  let landed = true;
+  try { await handle.getFileHandle('world.json'); } catch (err) { if (!isGoneError(err)) throw err; landed = false; }
+  if (landed) {
+    await removeLandingMarker(handle);
+    return 'kept';
+  }
+  await removeBrowserWorldDir(entry);
+  return 'removed';
+}
 
 /**
  * The world's directory handle: derived for a browser world, from the vault
@@ -89,12 +117,22 @@ export type WorldHandleResult =
  */
 export async function worldHandleFor(entry: WorldRegistryEntry): Promise<WorldHandleResult> {
   if (isBrowserWorld(entry)) {
+    const dir = entry.folder.folder_name;
+    // Landing in this tab: the world is its landing's root (#865, L4').
+    const mine = liveLanding(dir);
+    if (mine) return mine.state === 'failed' ? { kind: 'failed' } : { kind: 'ok', handle: mine.root };
+    let handle: FileSystemDirectoryHandle;
     try {
-      return { kind: 'ok', handle: await deriveBrowserWorldHandle(entry) };
+      handle = await deriveBrowserWorldHandle(entry);
     } catch (err) {
       if (isGoneError(err)) return { kind: 'gone' };
       throw err;
     }
+    if (await hasLandingMarker(handle)) {
+      if (await landingLockHeld(dir)) return { kind: 'landing' };
+      if ((await settleDeadLanding(entry, handle)) === 'removed') return { kind: 'gone' };
+    }
+    return { kind: 'ok', handle };
   }
   const handle = await loadHandle(entry.folder.handle_key);
   return handle ? { kind: 'ok', handle } : { kind: 'lost' };

@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeDirHandle } from '../fixtures/fake-fs';
-import { BROWSER_HOME } from '../../src/core/browser-worlds';
+import { BROWSER_HOME, setOpfsRootForTests, worldHandleFor } from '../../src/core/browser-worlds';
 import { mintBrowserDirName, reconcileBrowserHome, staleBrowserCopies, worldAlreadyHere } from '../../src/core/browser-home';
 import { defaultRegistry } from '../../src/core/types';
 import type { WorldRegistryEntry, WorldsRegistry } from '../../src/core/types';
@@ -157,5 +157,68 @@ describe('reconcileBrowserHome', () => {
     expect(out.removed).toEqual([]);
     expect(out.adopted).toEqual([]);
     expect(home.children.size).toBe(2);
+  });
+});
+
+describe('a landing that died (#865, contract L6\' and L4\')', () => {
+  const D = 'land-0192a000-1a2b';
+  /** The OPFS root the removal resolves against, holding the browser home. */
+  function opfsWith(files: Record<string, string>): { root: FakeDirHandle; home: FakeDirHandle } {
+    const root = new FakeDirHandle('opfs');
+    for (const [p, body] of Object.entries(files)) root.put(`${BROWSER_HOME}/${p}`, body);
+    setOpfsRootForTests(async () => root as unknown as FileSystemDirectoryHandle);
+    return { root, home: root.children.get(BROWSER_HOME) as FakeDirHandle };
+  }
+  afterEach(() => setOpfsRootForTests(null));
+  const claimed = (over: Partial<WorldRegistryEntry> = {}) => entry({ where: 'browser', folder: { handle_key: `world-${W1}`, folder_name: D }, ...over });
+
+  it('reconcile: landed (world.json there) keeps the world and drops the marker', async () => {
+    const { home } = opfsWith({ [`${D}/.atlas/landing`]: 'x', [`${D}/world.json`]: j({ id: W1, name: 'Landed' }), [`${D}/characters/a.json`]: '{}' });
+    fakeLocks(new Set());
+    const e = claimed();
+    const out = await reconcileBrowserHome(regOf(e), { tourActive: false, home: asDir(home) });
+    expect(out.removed).toEqual([]);
+    expect(out.next.worlds.find(w => w.id === e.id)?.cleared_at).toBeUndefined();
+    const dir = home.children.get(D) as FakeDirHandle;
+    expect(dir.children.has('world.json')).toBe(true);
+    expect((dir.children.get('.atlas') as FakeDirHandle).children.has('landing')).toBe(false);
+  });
+
+  it('reconcile: not landed (no world.json) removes the directory and clears the row, its link kept', async () => {
+    const { home } = opfsWith({ [`${D}/.atlas/landing`]: 'x', [`${D}/characters/a.json`]: '{}' });
+    fakeLocks(new Set());
+    const e = claimed({ state: 'api-linked', api: { world_id: W1, api_key: 'ow_r_k', read_only: true } });
+    const out = await reconcileBrowserHome(regOf(e), { tourActive: false, home: asDir(home) });
+    expect(out.removed).toEqual([D]);
+    expect(home.children.has(D)).toBe(false);
+    const after = out.next.worlds.find(w => w.id === e.id)!;
+    expect(after.cleared_at).toBeTruthy();
+    expect(after.api?.api_key).toBe('ow_r_k');
+  });
+
+  it('reconcile: a landing another tab still holds is left alone', async () => {
+    const { home } = opfsWith({ [`${D}/.atlas/landing`]: 'x', [`${D}/characters/a.json`]: '{}' });
+    fakeLocks(new Set([`atlas-landing:${D}`]));
+    const e = claimed();
+    const out = await reconcileBrowserHome(regOf(e), { tourActive: false, home: asDir(home) });
+    expect(out.removed).toEqual([]);
+    expect(home.children.has(D)).toBe(true);
+    expect(out.next.worlds.find(w => w.id === e.id)?.cleared_at).toBeUndefined();
+  });
+
+  it('worldHandleFor: another tab landing it answers landing; a dead one is decided on the spot', async () => {
+    const { home } = opfsWith({ [`${D}/.atlas/landing`]: 'x', [`${D}/characters/a.json`]: '{}' });
+    fakeLocks(new Set([`atlas-landing:${D}`]));
+    expect((await worldHandleFor(claimed())).kind).toBe('landing');
+    fakeLocks(new Set());
+    expect((await worldHandleFor(claimed())).kind).toBe('gone');
+    expect(home.children.has(D)).toBe(false);
+  });
+
+  it('worldHandleFor: a dead landing that had landed opens, its marker gone', async () => {
+    const { home } = opfsWith({ [`${D}/.atlas/landing`]: 'x', [`${D}/world.json`]: j({ id: W1, name: 'Landed' }) });
+    fakeLocks(new Set());
+    expect((await worldHandleFor(claimed())).kind).toBe('ok');
+    expect(((home.children.get(D) as FakeDirHandle).children.get('.atlas') as FakeDirHandle).children.has('landing')).toBe(false);
   });
 });

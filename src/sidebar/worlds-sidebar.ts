@@ -32,7 +32,7 @@ import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vau
 import { copyChip, copyLine } from '../core/world-copy';
 import { dropHeldSeat, heldSeat, heldSeatBusy, heldSeats, type HeldSeat } from '../core/held-seats';
 import { SEAT_REMOVE_WHERE } from '../core/seat';
-import { MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
+import { LANDING_FAILED_HERE, LANDING_IN_ANOTHER_TAB, MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
@@ -124,7 +124,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // `aria-label` (the chooser's own row title) for a screen reader, which
       // would otherwise read the glyphs' ligature text ("add folder_open").
       const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
-        ${addIconButton('create-local', newWorldGlyph(), hasFolderMode() ? 'Start a world: in a folder on your drive or in this browser' : 'Start a world: kept in this browser')}
+        ${addIconButton('create-local', newWorldGlyph(), hasFolderMode() ? 'Create a world: in a folder on your drive or in this browser' : 'Create a world: kept in this browser')}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.') : ''}
         ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'New world on OnlyWorlds: made on onlyworlds.com and on your drive or in this browser' : 'New world on OnlyWorlds: made on onlyworlds.com and in this browser')}
         ${addIconButton('link-api', 'link', 'Download a world from OnlyWorlds with its API key')}
@@ -148,7 +148,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // button, locked, so nothing appears after the tour.
       const html = `
         <div class="atlas-worlds-add-icons">
-        ${addIconButton('create-local', newWorldGlyph(), 'Start a world. This one is the tour’s: Hyperion.', { pulse: true })}
+        ${addIconButton('create-local', newWorldGlyph(), 'Create a world. This one is the tour’s: Hyperion.', { pulse: true })}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder already on your drive. Yours to use after the tour.', { locked: true }) : ''}
         ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'Create a world that lives on onlyworlds.com as well as on your drive or in this browser. Yours to use after the tour.' : 'Create a world that lives on onlyworlds.com as well as in this browser. Yours to use after the tour.', { locked: true })}
         ${addIconButton('link-api', 'link', 'Bring in a world you already keep on onlyworlds.com. Yours to use after the tour.', { locked: true })}
@@ -894,6 +894,12 @@ async function doActivateWorld(
   }
   if (resolved.kind === 'gone') {
     settleGoneBrowserWorld(entry, silent, toasts);
+    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    return false;
+  }
+  if (resolved.kind === 'landing' || resolved.kind === 'failed') {
+    // Another tab still lands it, or this tab's landing failed and its cleanup runs (#865).
+    if (!silent) toasts.info(resolved.kind === 'landing' ? LANDING_IN_ANOTHER_TAB('Open') : LANDING_FAILED_HERE);
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }

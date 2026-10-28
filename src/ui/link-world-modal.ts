@@ -158,7 +158,7 @@ export class LinkWorldModal extends BaseModal {
         } else {
           progressBox.textContent = p.total === 0
             ? 'World is empty; finishing up'
-            : progressLine(p, where);
+            : progressLine(p);
         }
         progressBox.hidden = false;
       };
@@ -174,14 +174,13 @@ export class LinkWorldModal extends BaseModal {
             apiKey,
             apiPin,
             displayName,
-            // Saving what downloaded: nothing is left to keep or stop early, and
-            // the saving speaks even after Stop and keep (it is what runs then).
+            // Opening: everything has downloaded and the world is being
+            // registered, so nothing is left to keep, stop early or cancel; it
+            // speaks even after Stop and keep (it is what runs then).
             onProgress: (p) => {
-              // Once the last file has landed the world is being registered: a
-              // cancel could no longer undo it, so the button stops offering one.
-              const saving = p.phase === 'land' || p.phase === 'open';
+              const saving = p.phase === 'open';
               if (saving) finishBtn.hidden = true;
-              if ((p.phase === 'land' && p.done >= p.total) || p.phase === 'open') cancelLinkBtn.disabled = true;
+              if (saving) cancelLinkBtn.disabled = true;
               if (!stop || (saving && stop !== 'cancel')) renderProgress(p);
             },
             shouldStop: () => stop,

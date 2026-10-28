@@ -65,7 +65,7 @@ test('first visit: two doors, start a world and Moppetopia under it, then Watch 
   const doors = page.locator('.atlas-landing-actions .atlas-landing-btn');
   // #127 (Titus's Q4): two doors; the rest is one quiet line of links,
   // the tour one click from the first screen (his Q5).
-  await expect(doors).toHaveText(['Start a world', 'Explore Moppetopia']);
+  await expect(doors).toHaveText(['Create a world', 'Explore']);
   await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Watch how it works', 'Other ways in']);
   // Stacked: Moppetopia sits under Start a world.
   const [startBox, demoBox] = [await doors.nth(0).boundingBox(), await doors.nth(1).boundingBox()];
@@ -89,7 +89,7 @@ test('first visit, browser storage refused on Chromium: no tour, and the doors l
   await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage');
   await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
   const notes = page.locator('.atlas-landing-choice-note');
-  await expect(notes).toHaveText(['Your first world, in a folder on your drive']);
+  await expect(notes).toHaveText(['In a folder on your drive']);
   // The link line keeps Other ways in (the folder door is inside it), without a dangling separator.
   await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Other ways in']);
   await expect(page.locator('.atlas-landing-more-sep')).toHaveCount(0);

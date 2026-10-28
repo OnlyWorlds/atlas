@@ -6,13 +6,20 @@
  * here is refused; a world the browser cleared is restored under its own
  * entry, and a linked one gets its link back with its first sync reviewed.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
 import { getState, patchSlice } from '../../src/core/state';
 import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
 import { FakeDirHandle, FakeFileHandle } from '../fixtures/fake-fs';
 import { BROWSER_HOME, setOpfsRootForTests } from '../../src/core/browser-worlds';
 import { openWorldFile } from '../../src/setup/world-file-open';
+import { allLandings } from '../../src/store/land-behind';
+import { watchFailedLandings } from '../../src/setup/landing-failed';
+
+// A world file's world opens at once and its files land behind it (#865): what is
+// read from disk afterwards is read once every landing of the test has landed.
+const landedAll = () => Promise.all(allLandings().map(l => l.landed.catch(() => {})));
+const openLanded = async (...a: Parameters<typeof openWorldFile>) => { const o = await openWorldFile(...a); await landedAll(); return o; };
 
 const j = (v: unknown) => JSON.stringify(v, null, 2) + '\n';
 const asDir = (d: FakeDirHandle) => d as unknown as FileSystemDirectoryHandle;
@@ -47,7 +54,7 @@ describe('openWorldFile', () => {
       return real.call(this, name, o);
     };
     let out;
-    try { out = await openWorldFile(worldZip()); } finally { FakeDirHandle.prototype.getFileHandle = real; }
+    try { out = await openLanded(worldZip()); } finally { FakeDirHandle.prototype.getFileHandle = real; }
     expect(out).toMatchObject({ kind: 'opened' });
     const e = reg().worlds.find(w => w.id === (out as { worldId: string }).worldId)!;
     expect(e).toMatchObject({ name: 'Hollow Reach', where: 'browser', folder: { handle_key: `world-${WID}` } });
@@ -64,7 +71,7 @@ describe('openWorldFile', () => {
       folder: { handle_key: `world-${WID}`, folder_name: 'hollow-reach-0192a000' },
     };
     patchSlice('registry', { ...defaultRegistry(), worlds: [here] });
-    expect(await openWorldFile(worldZip())).toEqual({ kind: 'already', worldId: 'w1' });
+    expect(await openLanded(worldZip())).toEqual({ kind: 'already', worldId: 'w1' });
     expect(dirs()).toEqual([]);
     expect(reg().worlds).toHaveLength(1);
   });
@@ -76,7 +83,7 @@ describe('openWorldFile', () => {
       folder: { handle_key: `world-${WID}-2`, folder_name: 'hollow-reach-0192a000' },
     };
     patchSlice('registry', { ...defaultRegistry(), worlds: [here] });
-    expect(await openWorldFile(worldZip())).toMatchObject({ kind: 'already' });
+    expect(await openLanded(worldZip())).toMatchObject({ kind: 'already' });
     expect(dirs()).toEqual([]);
   });
 
@@ -87,7 +94,7 @@ describe('openWorldFile', () => {
       folder: { handle_key: `world-${WID}`, folder_name: 'hollow-reach-0192a000-dead' },
     };
     patchSlice('registry', { ...defaultRegistry(), worlds: [cleared] });
-    const out = await openWorldFile(worldZip());
+    const out = await openLanded(worldZip());
     expect(out).toEqual({ kind: 'restored', worldId: 'w1' });
     const e = reg().worlds[0];
     expect(reg().worlds).toHaveLength(1);
@@ -106,7 +113,7 @@ describe('openWorldFile', () => {
     };
     patchSlice('registry', { ...defaultRegistry(), worlds: [cleared] });
     const lines = { source: { server: 'https://www.onlyworlds.com', world: 'srv-1', at: '2026-10-20T19:00:00.000Z' }, exported_as: { kind: 'character', role: 'guest', character: { id: 'a', name: 'Ana' } } };
-    expect(await openWorldFile(worldZip({ id: WID, name: 'Hollow Reach', ...lines }))).toEqual({ kind: 'restored', worldId: 'w1' });
+    expect(await openLanded(worldZip({ id: WID, name: 'Hollow Reach', ...lines }))).toEqual({ kind: 'restored', worldId: 'w1' });
     const meta = JSON.parse((home.children.get(reg().worlds[0].folder.folder_name) as FakeDirHandle).get('world.json')!);
     expect(meta.api).toMatchObject({ world_id: 'srv-1' });
     expect('source' in meta || 'exported_as' in meta).toBe(false);
@@ -114,7 +121,7 @@ describe('openWorldFile', () => {
 
   it('a world file opened as a new world keeps its lines (no link goes back)', async () => {
     const lines = { source: { server: 'https://www.onlyworlds.com', world: 'srv-9', at: '2026-10-20T19:00:00.000Z' }, exported_as: { kind: 'character', role: 'guest', character: { id: 'a', name: 'Ana' } } };
-    const out = await openWorldFile(worldZip({ id: WID, name: 'Hollow Reach', ...lines }));
+    const out = await openLanded(worldZip({ id: WID, name: 'Hollow Reach', ...lines }));
     expect(out.kind).toBe('opened');
     const e = reg().worlds.find(w => w.id === (out as { worldId: string }).worldId)!;
     const meta = JSON.parse((home.children.get(e.folder.folder_name) as FakeDirHandle).get('world.json')!);
@@ -130,17 +137,17 @@ describe('openWorldFile', () => {
       folder: { handle_key: `world-${WID}`, folder_name: 'hollow-reach-0192a000-dead' },
     };
     patchSlice('registry', { ...defaultRegistry(), worlds: [cleared] });
-    expect(await openWorldFile(worldZip())).toEqual({ kind: 'restored', worldId: 'w1' });
+    expect(await openLanded(worldZip())).toEqual({ kind: 'restored', worldId: 'w1' });
     const raw = (home.children.get(reg().worlds[0].folder.folder_name) as FakeDirHandle).get('world.json')!;
     expect(raw).not.toContain(SECRET);
     expect(JSON.parse(raw)).toMatchObject({ api: { world_id: 'srv-1', api_key: 'ow_w_seat', seat: { role: 'contributor' } } });
     expect(reg().worlds[0].api?.seat_secret).toBe(SECRET);
   });
 
-  it('a full browser storage mid-write leaves no directory and no entry, and says so', async () => {
+  it('a full browser storage at the landing\'s first write leaves no directory and no entry, and says so', async () => {
     const real = FakeFileHandle.prototype.createWritable;
     FakeFileHandle.prototype.createWritable = async function (this: FakeFileHandle, o?: { keepExistingData?: boolean }) {
-      if (this.name === 'map.png') throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+      if (this.name === 'landing') throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
       return real.call(this, o);
     };
     try {
@@ -152,8 +159,29 @@ describe('openWorldFile', () => {
     expect(reg().worlds).toHaveLength(0);
   });
 
+  it('a full browser storage while its files land behind it: the directory goes and the row is cleared (contract L9\')', async () => {
+    const real = FakeFileHandle.prototype.createWritable;
+    FakeFileHandle.prototype.createWritable = async function (this: FakeFileHandle, o?: { keepExistingData?: boolean }) {
+      if (this.name === 'map.png') throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+      return real.call(this, o);
+    };
+    const unwatch = watchFailedLandings(); // as main.ts does at boot
+    let out;
+    try {
+      out = await openWorldFile(worldZip());
+      await landedAll();
+    } finally {
+      FakeFileHandle.prototype.createWritable = real;
+    }
+    expect(out).toMatchObject({ kind: 'opened' });
+    await vi.waitFor(() => expect(reg().worlds[0]?.cleared_at).toBeTruthy());
+    expect(dirs()).toEqual([]);
+    unwatch();
+  });
+
   it('two opens of the same file at once land one world, never two entries (gate F2)', async () => {
     const [a, b] = await Promise.allSettled([openWorldFile(worldZip()), openWorldFile(worldZip())]);
+    await landedAll();
     expect(reg().worlds).toHaveLength(1);
     expect(dirs()).toHaveLength(1);
     expect([a.status, b.status].sort()).toEqual(['fulfilled', 'rejected']);
@@ -166,6 +194,7 @@ describe('openWorldFile', () => {
     };
     patchSlice('registry', { ...defaultRegistry(), worlds: [cleared] });
     await Promise.allSettled([openWorldFile(worldZip()), openWorldFile(worldZip())]);
+    await landedAll();
     expect(dirs()).toEqual([reg().worlds[0].folder.folder_name]);
   });
 
@@ -175,7 +204,7 @@ describe('openWorldFile', () => {
       'w/.atlas/sync-state.json': strToU8('{"conflicts":[]}'),
       'w/.atlas/tombstones.json': strToU8('[]'),
     });
-    const out = await openWorldFile(zip);
+    const out = await openLanded(zip);
     const e = reg().worlds.find(w => w.id === (out as { worldId: string }).worldId)!;
     const dir = home.children.get(e.folder.folder_name) as FakeDirHandle;
     expect(dir.list()).toEqual(['world.json']);
@@ -210,7 +239,7 @@ describe('openWorldFile', () => {
       folder: { handle_key: 'world-0192ffff-0000-7000-8000-000000000000', folder_name: 'other-0192ffff-dead' },
     } as WorldRegistryEntry;
     patchSlice('registry', { ...defaultRegistry(), worlds: [cleared] });
-    const out = await openWorldFile(worldZip());
+    const out = await openLanded(worldZip());
     expect(out.kind).toBe('opened');
     expect(reg().worlds).toHaveLength(2);
   });
@@ -223,7 +252,7 @@ describe('openWorldFile', () => {
   describe('the where-question (contract §5.2: a NEW world only, asked before anything is written)', () => {
     it('is asked for a new world, and a cancelled answer writes nothing', async () => {
       let asked = 0;
-      const out = await openWorldFile(worldZip(), { chooseWhere: async () => { asked++; expect(dirs()).toEqual([]); return null; } });
+      const out = await openLanded(worldZip(), { chooseWhere: async () => { asked++; expect(dirs()).toEqual([]); return null; } });
       expect(out).toEqual({ kind: 'cancelled' });
       expect(asked).toBe(1);
       expect(dirs()).toEqual([]);
@@ -231,7 +260,7 @@ describe('openWorldFile', () => {
     });
 
     it('either answer lands the world in this browser first (a folder answer is the caller\'s move after it)', async () => {
-      const out = await openWorldFile(worldZip(), { chooseWhere: async () => 'folder' });
+      const out = await openLanded(worldZip(), { chooseWhere: async () => 'folder' });
       expect(out.kind).toBe('opened');
       expect(reg().worlds[0]).toMatchObject({ where: 'browser' });
       expect(dirs()).toHaveLength(1);
@@ -244,9 +273,9 @@ describe('openWorldFile', () => {
         folder: { handle_key: `world-${WID}`, folder_name: 'hollow-reach-0192a000' },
       };
       patchSlice('registry', { ...defaultRegistry(), worlds: [here] });
-      expect(await openWorldFile(worldZip(), { chooseWhere: ask })).toEqual({ kind: 'already', worldId: 'w1' });
+      expect(await openLanded(worldZip(), { chooseWhere: ask })).toEqual({ kind: 'already', worldId: 'w1' });
       patchSlice('registry', { ...defaultRegistry(), worlds: [{ ...here, where: 'browser', cleared_at: '2026-10-05T09:00:00.000Z', folder: { ...here.folder, folder_name: 'hollow-reach-0192a000-dead' } }] });
-      expect(await openWorldFile(worldZip(), { chooseWhere: ask })).toEqual({ kind: 'restored', worldId: 'w1' });
+      expect(await openLanded(worldZip(), { chooseWhere: ask })).toEqual({ kind: 'restored', worldId: 'w1' });
     });
   });
 });

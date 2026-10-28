@@ -19,6 +19,7 @@ import { getActiveStore } from '../core/active-store';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { PlainError } from '../core/plain-error';
 import { worldHandleFor } from '../core/browser-worlds';
+import { liveLanding } from '../store/land-behind';
 import { hasFolderMode } from '../core/capabilities';
 import { saveRegistry, updateWorldEntry } from '../registry/registry';
 import { worldFileName, WORLD_FILE_MAX_BYTES } from '../store/world-tree';
@@ -147,6 +148,10 @@ export async function downloadWorld(
   const release = engine ? await engine.hold('download') : () => {};
   try {
     await flushBeforeLeavingWorld();
+    // A world still landing in this tab is downloaded once it has landed: the
+    // turn to disk between the two walks below would read as a torn copy (gate G13).
+    const landing = liveLanding(world.folder.folder_name);
+    if (landing?.state === 'landing') await landing.landed.catch(() => {});
     const where = await worldHandleFor(world);
     if (where.kind !== 'ok') throw new PlainError('Atlas cannot reach this world\'s files right now. Open it again from the sidebar, then download it.');
     try {

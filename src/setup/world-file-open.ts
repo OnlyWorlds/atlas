@@ -30,6 +30,10 @@ import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import type { WorldFileEntry } from '../store/world-file';
 import { diskApiBlock } from '../core/seat';
 import { DownloadCancelledError } from '../sync/initial-download';
+import { memoryDirectoryWith } from '../store/memory-dir';
+import { startLanding, type Landing } from '../store/land-behind';
+import { abandonLanding } from './browser-first-download';
+import { settleIfLandingFailed } from './landing-failed';
 
 export type OpenWorldFileOutcome =
   | { kind: 'opened' | 'restored'; worldId: string }
@@ -48,8 +52,6 @@ export interface OpenWorldFileOpts {
    * first, and a folder answer is the §4 move after it opens. Null cancels.
    */
   chooseWhere?: () => Promise<'browser' | 'folder' | null>;
-  /** Each file written, with the count so far and the total (world.json last). */
-  onWritten?: (done: number, total: number) => void;
   /**
    * Open the file as a view-only copy beside the world it holds (conv. 177):
    * a fresh world id, `snapshot_of`, `writable: false`, in this browser.
@@ -143,6 +145,16 @@ export async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileE
   onWritten?.(total, total);
 }
 
+/**
+ * Open the file's files from memory and land them in the make's directory
+ * behind it (#865): the door commits at once and the world opens on the
+ * landing's root (`worldHandleFor`). Their buffers are the memory's, uncopied.
+ */
+async function landFiles(make: { dir: string; handle: FileSystemDirectoryHandle }, files: WorldFileEntry[], worldJson: Uint8Array): Promise<Landing> {
+  const mem = await memoryDirectoryWith([...files.filter(f => f.path !== 'world.json'), { path: 'world.json', data: worldJson }]);
+  return startLanding(make.dir, mem, make.handle);
+}
+
 /** Open a world file's bytes. Refusals throw a `PlainError`, having written nothing. */
 export async function openWorldFile(bytes: Uint8Array, opts: OpenWorldFileOpts = {}): Promise<OpenWorldFileOutcome> {
   const { readWorldZip } = await import('../store/world-file');
@@ -177,8 +189,9 @@ async function openCopy(read: { worldId: string; worldName: string; files: World
   if (first) return { kind: 'already', worldId: first.id };
 
   const make = await openBrowserMake(read.worldName, freshId);
+  let landing: Landing;
   try {
-    await writeAll(make.handle, read.files, new TextEncoder().encode(JSON.stringify(meta, null, 2) + '\n'), opts.onWritten);
+    landing = await landFiles(make, read.files, new TextEncoder().encode(JSON.stringify(meta, null, 2) + '\n'));
   } catch (err) {
     await make.abort().catch(e => console.warn('[world-file] could not remove the half-made copy', e)); // raw-error-ok: a console record
     if (isQuotaError(err)) throw new PlainError(browserStorageFullSentence('opening the world file'));
@@ -186,6 +199,7 @@ async function openCopy(read: { worldId: string; worldName: string; files: World
   }
   const now = sameHere();
   if (now) {
+    await abandonLanding(landing);
     await make.abort().catch(() => {});
     return { kind: 'already', worldId: now.id };
   }
@@ -202,9 +216,11 @@ async function openCopy(read: { worldId: string; worldName: string; files: World
       patchSlice('registry', next);
     });
   } catch (err) {
+    await abandonLanding(landing); // no write of it may run under the removal (gate G6)
     await removeBrowserWorldDir({ where: 'browser', folder: { handle_key: '', folder_name: make.dir } }).catch(() => {});
     throw err;
   }
+  void settleIfLandingFailed(landing); // failed between its open and the commit (contract G6)
   return { kind: 'copied', worldId: made.entry.id };
 }
 
@@ -228,8 +244,9 @@ async function openRead(read: { worldId: string; worldName: string; files: World
   }
 
   const make = await openBrowserMake(read.worldName, read.worldId);
+  let landing: Landing;
   try {
-    await writeAll(make.handle, read.files, worldJson, opts.onWritten);
+    landing = await landFiles(make, read.files, worldJson);
   } catch (err) {
     await make.abort().catch(e => console.warn('[world-file] could not remove the half-made world', e)); // raw-error-ok: a console record
     if (isQuotaError(err)) throw new PlainError(browserStorageFullSentence('opening the world file'));
@@ -243,6 +260,7 @@ async function openRead(read: { worldId: string; worldName: string; files: World
     ? !!restore && now.restore.id === restore.id && now.restore.folder.folder_name === restore.folder.folder_name
     : !restore && !now.already;
   if (!same) {
+    await abandonLanding(landing);
     await make.abort().catch(() => {});
     const here = worldAlreadyHere(getState().registry, read.worldId);
     if (here) return { kind: 'already', worldId: here.id };
@@ -278,8 +296,10 @@ async function openRead(read: { worldId: string; worldName: string; files: World
     });
   } catch (err) {
     // A lost save is no commit: the directory it would have named goes.
+    await abandonLanding(landing);
     await removeBrowserWorldDir({ where: 'browser', folder: { handle_key: '', folder_name: make.dir } }).catch(() => {});
     throw err;
   }
+  void settleIfLandingFailed(landing); // failed between its open and the commit (contract G6)
   return { kind: restore ? 'restored' : 'opened', worldId };
 }

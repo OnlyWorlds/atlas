@@ -19,6 +19,7 @@ import { installStaleCodeRecovery } from './core/reload-offer';
 import { hasFolderMode, hasOpfsMode } from './core/capabilities';
 import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
 import { installIconA11y } from './ui/icon-a11y';
+import { watchFailedLandings } from './setup/landing-failed';
 import { installDocumentTitle } from './ui/document-title';
 import { installTruncationTitles } from './ui/truncation-title';
 import { applyTheme } from './core/theme';
@@ -96,6 +97,7 @@ function boot(): void {
   // no shared icon helper to fix at — so the boundary is one observer. See
   // ui/icon-a11y.ts for the demolition plan.
   installIconA11y();
+  watchFailedLandings();
   // The tab title follows the route; clipped names show whole on hover.
   installDocumentTitle();
   installTruncationTitles();
@@ -154,6 +156,11 @@ if (import.meta.env.DEV) {
      * work runs, so it is not a valid sync point for anything that inspects
      * the world after a step change.
      */
+    /** Wait until every browser world landing in this tab has its files in browser storage (#865): a spec that reloads after an open awaits this. */
+    async landed(): Promise<void> {
+      const { allLandings } = await import('./store/land-behind');
+      await Promise.all(allLandings().map(l => l.landed.catch(() => {})));
+    },
     async awaitTourSettled(): Promise<void> {
       const { awaitTourSettled } = await import('./tour/tour-engine');
       await awaitTourSettled();
