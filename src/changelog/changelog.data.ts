@@ -63,13 +63,13 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'charter-by-mark',
         title: 'A world\'s charter is the one marked as its charter, and a keeper can mark it',
-        body: 'OnlyWorlds now counts a Law with the supertype Charter as a world\'s house rules only when it carries the charter mark; without it, it is a charter in the story. Home shows the newest marked one, as onlyworlds.com does. A Charter that is not marked yet says so on its page, and the world\'s owner or a co-builder can press Mark as this world\'s charter.',
+        body: 'OnlyWorlds now counts a Law with the supertype Charter as a world\'s house rules only when it carries the charter mark; without it, it is a charter in the story. Home shows the newest marked one, as onlyworlds.com does. Charters made on onlyworlds.com by a world\'s owner or co-builders already carry the mark, so an account world\'s Home shows the same charter as before. Where no marked charter leads yet, the owner or a co-builder sees Mark as this world\'s charter on an unmarked one\'s page.',
         tags: ['home', 'sync'],
       },
       {
         id: 'sdk-4-100',
         title: 'Atlas reads the newest OnlyWorlds rules',
-        body: 'Atlas moves to the newest OnlyWorlds SDK and writes new world folders as format 0.3.20. A parlor\'s room mark counts whatever its value, as other tools read it, and the names a shared field other tools read (the charter and lens marks among them) cannot be taken for a custom field.',
+        body: 'Atlas moves to the newest OnlyWorlds SDK and writes new world folders as format 0.3.20. A parlor\'s room mark counts as other tools read it now, a number included, and a custom field cannot take a name that a shared field other tools read already uses (the charter and lens marks among them).',
         tags: ['sync'],
       },
     ],

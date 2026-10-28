@@ -15,7 +15,7 @@
  */
 import { handsOnAsProposed, isCharterElement } from '@onlyworlds/sdk';
 import type { Element, WorldRegistryEntry } from '../core/types';
-import { isCharter } from '../core/charter';
+import { findCharter, isCharter } from '../core/charter';
 import { getActiveStore } from '../core/active-store';
 import { worldIsViewOnly } from '../core/view-only';
 import { readsWholeWorld } from './element-detail-message';
@@ -38,23 +38,29 @@ export function canMarkCharter(entry: WorldRegistryEntry | undefined, meta: unkn
   return readsWholeWorld(entry, meta);
 }
 
-/** Whether this element is one the press is offered on. */
-export function offersCharterMark(el: Element, meta: unknown): boolean {
+/**
+ * Whether this element is one the press is offered on. Only while no marked
+ * Charter leads (the 1.100 code gate's S1): beside a leading one the press
+ * would make two and Home would not change; retiring the old one is #868's.
+ */
+export function offersCharterMark(el: Element, meta: unknown, elements: readonly Element[] = []): boolean {
   if (el.type !== 'law' || handsOnAsProposed(el) || isCharterElement(el as never)) return false;
   const named = (meta as { charter?: unknown } | null | undefined)?.charter;
-  return isCharter(el) || (typeof named === 'string' && named === el.id);
+  if (!isCharter(el) && !(typeof named === 'string' && named === el.id)) return false;
+  return findCharter(elements, named) === null;
 }
 
-export function buildCharterMarkOffer(el: Element, entry: WorldRegistryEntry | undefined, meta: unknown, worldId: string): HTMLElement | null {
-  if (!offersCharterMark(el, meta) || !canMarkCharter(entry, meta, worldId)) return null;
+export function buildCharterMarkOffer(el: Element, entry: WorldRegistryEntry | undefined, meta: unknown, worldId: string, elements: readonly Element[] = []): HTMLElement | null {
+  if (!offersCharterMark(el, meta, elements) || !canMarkCharter(entry, meta, worldId)) return null;
   const box = document.createElement('div');
   box.className = 'atlas-charter-mark';
   box.dataset.role = 'charter-mark';
   const line = document.createElement('p');
   line.className = 'atlas-charter-mark-line';
+  // A Law of another supertype that world.json names becomes a Charter too: said, never done quietly (S2).
   line.textContent = isCharter(el)
     ? 'Not this world\'s charter yet. Once it is marked, Home shows it first and AI readers follow it as the house rules.'
-    : 'This world\'s own record names this Law as its charter. Once it is marked, Home shows it first and AI readers follow it as the house rules.';
+    : 'This world\'s own record names this Law as its charter. Marking it also sets its supertype to Charter; then Home shows it first and AI readers follow it as the house rules.';
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'atlas-btn atlas-btn--secondary atlas-charter-mark-btn';

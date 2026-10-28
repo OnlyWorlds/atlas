@@ -201,7 +201,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // An unmarked Charter: the keeper's one write that makes it the world's (the charter profile, 1.100).
     const activeId = st.active?.worldId;
     if (activeId) {
-      const offer = buildCharterMarkOffer(el, st.registry.worlds.find(w => w.id === activeId), st.active?.meta, activeId);
+      const offer = buildCharterMarkOffer(el, st.registry.worlds.find(w => w.id === activeId), st.active?.meta, activeId, st.data.elements);
       if (offer) detail.appendChild(offer);
     }
     body.appendChild(detail);

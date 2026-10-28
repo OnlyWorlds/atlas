@@ -37,6 +37,12 @@ describe('which Law is offered the press', () => {
     expect(offersCharterMark({ id: 'c', type: 'construct', supertype: 'Charter' } as unknown as Element, {})).toBe(false);
     expect(offersCharterMark(law({ supertype: 'Regulation' }), {})).toBe(false);
   });
+  it('not while a marked Charter already leads (the code gate S1): the press would change nothing on Home', () => {
+    const leading = law({ id: 'l0', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-10-01T00:00:00Z' });
+    const story = law({ supertype: 'Charter' });
+    expect(offersCharterMark(story, {}, [leading, story])).toBe(false);
+    expect(offersCharterMark(story, {}, [story])).toBe(true);                       // the control
+  });
   it('a Law of another supertype that world.json names (M6)', () => {
     expect(offersCharterMark(law({ supertype: 'Regulation' }), { charter: 'l1' })).toBe(true);
     expect(offersCharterMark(law({ supertype: 'Regulation' }), { charter: 'other' })).toBe(false);
@@ -45,7 +51,7 @@ describe('which Law is offered the press', () => {
 
 describe('who may press it (M3)', () => {
   it('a world on disk that is the whole world: yes', () => {
-    const e = register({ state: 'local' });
+    const e = register({ state: 'local-only' });
     expect(canMarkCharter(e, { name: 'W' }, WORLD)).toBe(true);
   });
   it('a read-key world, even when keel answered owner: no', () => {
@@ -53,7 +59,7 @@ describe('who may press it (M3)', () => {
     expect(canMarkCharter(e, {}, WORLD)).toBe(false);
   });
   it('a view-only copy: no', () => {
-    const e = register({ state: 'local', copy_of: { world_id: 'acct' } });
+    const e = register({ state: 'local-only', copy_of: { world_id: 'acct' } });
     expect(canMarkCharter(e, {}, WORLD)).toBe(false);
   });
   it('a linked contributor or guest: no; an owner or a co-builder: yes', () => {
@@ -63,7 +69,7 @@ describe('who may press it (M3)', () => {
     }
   });
   it("a contributor's, a Character's or the public view on disk: no; the owner's or a co-builder's: yes", () => {
-    const e = register({ state: 'local' });
+    const e = register({ state: 'local-only' });
     const as = (exported_as: Record<string, unknown>) => canMarkCharter(e, { exported_as }, WORLD);
     expect(as({ kind: 'member', role: 'contributor' })).toBe(false);
     expect(as({ kind: 'character', character: { name: 'Ana' } })).toBe(false);
@@ -85,7 +91,7 @@ describe('what the mark names (M4)', () => {
     expect(charterMarkValue(e, { id: 'folder-own' }, WORLD)).toBe('acct-1');
   });
   it("a world on disk: world.json's own id", () => {
-    const e = register({ state: 'local' });
+    const e = register({ state: 'local-only' });
     expect(charterMarkValue(e, { id: 'folder-own' }, WORLD)).toBe('folder-own');
   });
 });

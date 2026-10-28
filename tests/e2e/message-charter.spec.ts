@@ -47,6 +47,9 @@ async function worldId(page: Page): Promise<string> {
   return await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
 }
 
+// The charter profile (1.100): a Charter leads only with its mark, read by presence.
+const MARK = 'w-charter-mark';
+
 test.describe('#526 messages and the charter', () => {
   test('a message shows From and To above its text, and a story does not', async ({ page }) => {
     await setupWorld(page);
@@ -85,7 +88,7 @@ test.describe('#526 messages and the charter', () => {
 
     await createElement(page, 'law', { name: 'House rules', supertype: 'Regulation', description: 'Not the charter.' });
     const charter = await createElement(page, 'law', {
-      name: 'Charter', supertype: 'Charter',
+      name: 'Charter', supertype: 'Charter', x_charter_of: MARK,
       description: 'What this world is\nThe team and its partners.\n\nWho is here\nThe owner and three agents.',
     });
     const card = page.locator('[data-role="charter"]');
@@ -105,7 +108,7 @@ test.describe('#526 messages and the charter', () => {
     // A story world: both prompts, the control for the absence below.
     await expect(ghosts).toHaveCount(2);
 
-    await createElement(page, 'law', { name: 'Charter', supertype: 'Charter', description: 'What this world is\nThe team.' });
+    await createElement(page, 'law', { name: 'Charter', supertype: 'Charter', x_charter_of: MARK, description: 'What this world is\nThe team.' });
     await expect(page.locator('[data-role="charter"]')).toBeVisible();
     await expect(ghosts).toHaveCount(0);
 
@@ -118,13 +121,13 @@ test.describe('#526 messages and the charter', () => {
     await expect(ghosts).toHaveCount(0);
   });
 
-  test("world.json's charter names which Law leads Home, through a reopen (§4.6 (a))", async ({ page }) => {
+  test("world.json's charter picks which marked Charter leads Home, through a reopen (§4.6 (a))", async ({ page }) => {
     await setupWorld(page);
-    const rules = await createElement(page, 'law', { name: 'House rules', supertype: 'Regulation', description: 'The rules this folder names.' });
-    await createElement(page, 'law', { name: 'Charter', supertype: 'Charter', description: 'The one by supertype.' });
+    const rules = await createElement(page, 'law', { name: 'House rules', supertype: 'Charter', x_charter_of: MARK, description: 'The rules this folder names.' });
+    await createElement(page, 'law', { name: 'Charter', supertype: 'Charter', x_charter_of: MARK, description: 'The newest marked one.' });
     const w = await worldId(page);
     await page.evaluate((w) => { window.location.hash = `#/w/${w}`; }, w);
-    // By supertype first: the folder names nothing yet.
+    // The newest marked one first (the higher id; neither was read back from a server): the folder names nothing yet.
     await expect(page.locator('[data-role="charter"]').getByRole('link')).toHaveText('Charter');
     await page.evaluate(async (id) => {
       await (window as any).__atlasTestApi.getActiveStore().writeWorldMeta({ charter: id });
