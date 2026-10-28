@@ -6,7 +6,7 @@
  * dead key (M5). Each refusal case has its writable control beside it.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { buildCharterMarkOffer, canMarkCharter, charterMarkValue, offersCharterMark } from '../../src/middle/element-detail-charter-mark';
+import { buildCharterMarkOffer, canMarkCharter, charterMarkValue, markOfferFor, offersCharterMark } from '../../src/middle/element-detail-charter-mark';
 import { isAuthError } from '../../src/sync/sync-engine';
 import { classifyFailure } from '../../src/sync/sync-failure-copy';
 import { patchSlice } from '../../src/core/state';
@@ -37,11 +37,36 @@ describe('which Law is offered the press', () => {
     expect(offersCharterMark({ id: 'c', type: 'construct', supertype: 'Charter' } as unknown as Element, {})).toBe(false);
     expect(offersCharterMark(law({ supertype: 'Regulation' }), {})).toBe(false);
   });
-  it('not while a marked Charter already leads (the code gate S1): the press would change nothing on Home', () => {
-    const leading = law({ id: 'l0', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-10-01T00:00:00Z' });
+  it('while a marked Charter leads, offered with the leading one named (1.101 G7: the retire follows on Home)', () => {
+    const leading = law({ id: 'l0', name: 'Old Rules', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-10-01T00:00:00Z' });
     const story = law({ supertype: 'Charter' });
-    expect(offersCharterMark(story, {}, [leading, story])).toBe(false);
-    expect(offersCharterMark(story, {}, [story])).toBe(true);                       // the control
+    expect(markOfferFor(story, {}, [leading, story])?.leading?.id).toBe('l0');
+    expect(markOfferFor(story, {}, [story])?.leading).toBeNull();                   // the control
+    const box = buildCharterMarkOffer(story, register({ state: 'local-only' }), {}, WORLD, [leading, story]);
+    expect(box?.textContent).toMatch(/This world's charter is Old Rules\. Marking this one makes it the charter, and Home then offers to retire Old Rules\./);
+    expect(box?.textContent).toMatch(/lists then leave it out/);
+  });
+  it('a Guide and a Domain Construct, unmarked, each with its own words', () => {
+    const c = (o: Record<string, unknown>): Element => ({ id: 'c1', type: 'construct', name: 'Start', ...o }) as unknown as Element;
+    expect(markOfferFor(c({ supertype: ' guide ' }), {})?.kind).toBe('guide');
+    expect(markOfferFor(c({ supertype: 'Domain' }), {})?.kind).toBe('domain');
+    expect(markOfferFor(c({ supertype: 'Domain', x_charter_of: 'w' }), {})).toBeNull();
+    expect(markOfferFor(c({ supertype: 'Domain', x_review_proposed: { by: 'm1' } }), {})).toBeNull();
+    expect(markOfferFor(c({ supertype: 'Region' }), {})).toBeNull();
+    const e = register({ state: 'local-only' });
+    expect(buildCharterMarkOffer(c({ supertype: 'Guide' }), e, {}, WORLD)?.querySelector('button')?.textContent).toBe("Mark as this world's guide");
+    expect(buildCharterMarkOffer(c({ supertype: 'Domain' }), e, {}, WORLD)?.querySelector('button')?.textContent).toBe("Mark as one of this world's domains");
+  });
+  it('a marked Charter that does not lead offers the retire on its own page; the leading one offers nothing', () => {
+    const old = law({ id: 'l0', name: 'Old Rules', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-01-01T00:00:00Z' });
+    const now = law({ id: 'l2', name: 'House Rules', supertype: 'Charter', x_charter_of: 'w', created_at: '2026-10-01T00:00:00Z' });
+    const e = register({ state: 'local-only' });
+    const box = buildCharterMarkOffer(old, e, {}, WORLD, [old, now]);
+    expect(box?.dataset.role).toBe('aid-retire-offer');
+    expect(box?.textContent).toMatch(/this world's charter is House Rules/);
+    expect(buildCharterMarkOffer(now, e, {}, WORLD, [old, now])).toBeNull();
+    // world.json's pick leads instead: then the newer one is the other (the gate's G8).
+    expect(buildCharterMarkOffer(now, e, { charter: 'l0' }, WORLD, [old, now])?.dataset.role).toBe('aid-retire-offer');
   });
   it('a Law of another supertype that world.json names (M6)', () => {
     expect(offersCharterMark(law({ supertype: 'Regulation' }), { charter: 'l1' })).toBe(true);

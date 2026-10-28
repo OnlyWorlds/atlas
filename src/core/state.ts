@@ -134,6 +134,12 @@ export interface UiState {
    * was asked in, so it applies only there and no way of opening another world can strand it.
    */
   proposedOnly: string | null;
+  /**
+   * The reading aids (the charter profile: a world's marked Charter, Guide and Domains) shown in the
+   * whole views: the id of the world it was asked in, as `proposedOnly`, so they are hidden by default
+   * and in every other world whatever opened it (core/parlor-room.ts `loreElements`; the 1.101 gate's G10).
+   */
+  showAids: string | null;
   search: string;
   /** Right-pane tabs (always begins with implicit map-index; additional are maps). */
   rightTabs: RightTabRef[];
@@ -232,6 +238,7 @@ let state: AppState = {
     madeBy: null,
     hideRoom: true,
     proposedOnly: null,
+    showAids: null,
     search: '',
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,

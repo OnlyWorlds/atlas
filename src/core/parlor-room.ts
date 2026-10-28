@@ -10,15 +10,18 @@
  * carries `x_room_of`, the id of the world or sitting its room belongs to,
  * written by the parlor on everything it makes. Without the mark a Narrative
  * with supertype Message is lore (a novel's letters, the Manifest's Wire) and
- * stays in view. The rule and its pairs are the SDK's since 1.77. A pair, never a supertype alone: a Location called Board is a place. The
- * charter (a Law, supertype Charter) stays in: it is the world's own rule,
- * shown on Home, not a line said in the room (TC's list, 2026-10-21, leaves it
- * out too). Member is Skeld's ruling, 2026-10-22. A supertype matches in any
- * case, trimmed.
+ * stays in view. The rule and its pairs are the SDK's since 1.77. A pair, never a supertype alone: a Location called Board is a place.
+ * Member is Skeld's ruling, 2026-10-22. A supertype matches in any case, trimmed.
+ *
+ * The lore leaves out a second kind too, under its own switch (1.101, the
+ * charter profile's rule 1): the world's reading aids, its marked Charter,
+ * Guide and Domains (core/charter.ts `isReadingAid`), which Home shows first
+ * at the door. An unmarked Charter Law is lore and stays in.
  */
 import type { Element, ElementType } from './types';
 import { ROOM_PAIRS, isRoomElement as sdkIsRoomElement } from '@onlyworlds/sdk';
-import { getState } from './state';
+import { getState, patchSlice } from './state';
+import { isReadingAid, readingAids } from './charter';
 
 /**
  * The room profile's pairs as the SDK carries them (4.55.0, generated from
@@ -51,18 +54,65 @@ export function isRoomElement(el: Element): boolean {
  * render gate keyed on the result redraws exactly when either moves, and a
  * world with no room returns its own array.
  */
-let loreMemo: { from: readonly Element[]; hide: boolean; out: Element[] } | null = null;
-export function loreElements(elements: Element[], hide: boolean): Element[] {
-  if (loreMemo && loreMemo.from === elements && loreMemo.hide === hide) return loreMemo.out;
-  const out = hide && elements.some(isRoomElement) ? elements.filter(el => !isRoomElement(el)) : elements;
-  loreMemo = { from: elements, hide, out };
+// One slot per pair of switches, so the lore and the suggestions' source
+// (loreWithAids) never evict each other and each keeps its identity.
+const loreMemo = new Map<string, { from: readonly Element[]; out: Element[] }>();
+export function loreElements(elements: Element[], hide: boolean, hideAids = true): Element[] {
+  const key = `${hide ? 1 : 0}${hideAids ? 1 : 0}`;
+  const hit = loreMemo.get(key);
+  if (hit && hit.from === elements) return hit.out;
+  const room = hide && elements.some(isRoomElement);
+  const aids = hideAids && readingAids(elements).count > 0;
+  const out = room || aids ? elements.filter(el => !(room && isRoomElement(el)) && !(aids && isReadingAid(el))) : elements;
+  loreMemo.set(key, { from: elements, out });
   return out;
+}
+
+/**
+ * The world without the room but with its reading aids, for what is not a lore
+ * view: the supertype and field-name suggestions, which may still offer
+ * Charter, Guide and Domain (the charter profile's writer rule; 1.101's G6).
+ */
+export function loreWithAids(): Element[] {
+  const s = getState();
+  return loreElements(s.data.elements, s.ui.hideRoom, false);
+}
+
+/** Whether the whole views hide the reading aids now: unless they were shown in this very world. */
+export function aidsHidden(): boolean {
+  const s = getState();
+  return s.ui.showAids === null || s.ui.showAids !== s.active?.worldId;
+}
+
+/** The one switch for the reading aids (the list's chip, Home's line): shown in this world, or hidden again. */
+export function toggleAids(): void {
+  const s = getState();
+  patchSlice('ui', { ...s.ui, showAids: aidsHidden() ? s.active?.worldId ?? null : null });
 }
 
 /** The world as the whole views read it now. */
 export function currentLore(): Element[] {
   const s = getState();
-  return loreElements(s.data.elements, s.ui.hideRoom);
+  return loreElements(s.data.elements, s.ui.hideRoom, aidsHidden());
+}
+
+/**
+ * Whether an element's own page reads the whole world (its references, its
+ * Web, the picker its link fields open): a room element's, and a reading
+ * aid's, whose links name what the lore hides (a Guide's Domains; 1.101's D2).
+ */
+export function pageReadsWholeWorld(el: Element | null | undefined): boolean {
+  return !!el && (isRoomElement(el) || isReadingAid(el));
+}
+
+/** The source a lore view on an element's page reads: the whole world on a room element's or an aid's page, else the lore. */
+export function loreFor(el: Element | null | undefined): Element[] {
+  return pageReadsWholeWorld(el) ? getState().data.elements : currentLore();
+}
+
+/** The two switches as one key, for a render gate that reads the lore (the 1.101 gate's G2, G3). */
+export function loreSwitches(): string {
+  return `${getState().ui.hideRoom ? 1 : 0}${aidsHidden() ? 1 : 0}`;
 }
 
 /** How many of the room's elements the world holds, shown or not. */

@@ -34,7 +34,8 @@ import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDisk
 import { isCoarsePointer } from '../core/pointer';
 import { renderGate } from '../ui/render-gate';
 import { madeByOf, rosterHasAgent, rosterKinds, type MadeBy } from '../core/made-by';
-import { currentLore, isRoomElement } from '../core/parlor-room';
+import { aidsHidden, currentLore, isRoomElement, toggleAids } from '../core/parlor-room';
+import { isReadingAid, readingAids } from '../core/charter';
 import { isProposed, proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
 import { rosterFor, rosterNow } from '../sync/world-roster';
@@ -63,6 +64,7 @@ export function filterSummary(
   madeBy: MadeBy | null = null,
   hideRoom = false,
   proposedOnly = false,
+  hideAids = false,
 ): string {
   let types: string;
   if (filters.size > 0) {
@@ -74,7 +76,7 @@ export function filterSummary(
       .map(t => typeName(t, { many: true }));
     types = hidden.length === 0 ? 'All types' : `All types except ${joinTypeNames(hidden)}`;
   }
-  return types + (madeBy ? ` · made by ${madeBy}` : '') + (hideRoom ? ' · the room hidden' : '') + (proposedOnly ? ' · only proposed' : '');
+  return types + (madeBy ? ` · made by ${madeBy}` : '') + (hideRoom ? ' · the room hidden' : '') + (hideAids ? ' · the reading aids hidden' : '') + (proposedOnly ? ' · only proposed' : '');
 }
 
 /**
@@ -301,9 +303,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   const originGate = renderGate();
   let rosterAsked: string | null = null;
   let proposedMemo: { from: readonly Element[] | null; n: number } = { from: null, n: 0 };
-  let originMemo: { elements: readonly Element[]; roster: unknown; kinds: ReturnType<typeof rosterKinds>; counts: Record<MadeBy, number>; room: number; proposed: number } | null = null;
+  let originMemo: { elements: readonly Element[]; roster: unknown; kinds: ReturnType<typeof rosterKinds>; counts: Record<MadeBy, number>; room: number; aids: number; proposed: number } | null = null;
 
-  interface Origin { kinds: ReturnType<typeof rosterKinds>; madeBy: MadeBy | null; hideRoom: boolean; showMadeBy: boolean; room: number; counts: Record<MadeBy, number>; proposed: number; proposedOnly: boolean }
+  interface Origin { kinds: ReturnType<typeof rosterKinds>; madeBy: MadeBy | null; hideRoom: boolean; aids: number; hideAids: boolean; showMadeBy: boolean; room: number; counts: Record<MadeBy, number>; proposed: number; proposedOnly: boolean }
 
   /** What the row offers and which of its filters apply now, for the list and the summary. */
   function readOrigin(): Origin {
@@ -331,7 +333,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         const by = madeByOf(el, kinds);
         if (by) counts[by]++;
       }
-      originMemo = { elements, roster, kinds, counts, room, proposed: 0 };
+      originMemo = { elements, roster, kinds, counts, room, aids: readingAids(elements).count, proposed: 0 };
     }
     // Offered only when an agent made something: a roster whose agent seats made nothing,
     // or were removed before they did (W11), has nothing to tell apart.
@@ -344,6 +346,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       kinds: originMemo.kinds,
       madeBy: showMadeBy ? state.ui.madeBy : null,
       hideRoom: originMemo.room > 0 && state.ui.hideRoom,
+      aids: originMemo.aids,
+      hideAids: originMemo.aids > 0 && aidsHidden(),
       showMadeBy,
       room: originMemo.room,
       counts: originMemo.counts,
@@ -353,10 +357,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   }
 
   function renderOrigin(o: Origin): void {
-    const show = o.showMadeBy || o.room > 0 || o.proposed > 0;
+    const show = o.showMadeBy || o.room > 0 || o.aids > 0 || o.proposed > 0;
     originRow.hidden = !show;
     // Rebuilt only when it would come out different (conv. 146: a rebuild between a press and its release loses the click).
-    if (!originGate.changed([JSON.stringify([show, o.showMadeBy, o.madeBy, o.counts, o.room, o.hideRoom, o.proposed, o.proposedOnly])])) return;
+    if (!originGate.changed([JSON.stringify([show, o.showMadeBy, o.madeBy, o.counts, o.room, o.hideRoom, o.aids, o.hideAids, o.proposed, o.proposedOnly])])) return;
     originRow.replaceChildren();
     if (!show) return;
     const chip = (label: string, title: string, on: boolean, action: string, click: () => void): HTMLButtonElement => {
@@ -388,11 +392,17 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
     if (o.room > 0) {
       originRow.appendChild(chip('Hide the room',
-        'Hide the parlor\'s room: its messages, board entries, work items, specs, hearts, votes, sittings and member cards. The charter stays',
+        'Hide the parlor\'s room: its messages, board entries, work items, specs, hearts, votes, sittings and member cards',
         o.hideRoom, 'hide-room', () => {
           const ui = getState().ui;
           patchSlice('ui', { ...ui, hideRoom: !ui.hideRoom });
         }));
+    }
+    if (o.aids > 0) {
+      // The reading aids (the charter profile): Home shows them first; the lists leave them out unless asked.
+      originRow.appendChild(chip('Hide the reading aids',
+        'Hide this world\'s charter, guide and domains from the lists, Charts and Search. Home shows them first either way',
+        o.hideAids, 'hide-aids', () => toggleAids()));
     }
     if (o.proposed > 0) {
       // Proposed, not yet reviewed (conv. 168): the keeper's way to find what waits.
@@ -632,7 +642,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     for (const el of elements) countByType.set(el.type, (countByType.get(el.type) ?? 0) + 1);
 
     const origin = readOrigin();
-    filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom, origin.proposedOnly);
+    filterSummaryLine.textContent = filterSummary(filters, muted, origin.madeBy, origin.hideRoom, origin.proposedOnly, origin.hideAids);
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
     // audit #1, Titus-blessed 2026-07-20). Outside the tour: all types.
@@ -871,6 +881,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       madeBy: origin.madeBy,
       kinds: origin.madeBy ? origin.kinds : null,
       hideRoom: origin.hideRoom,
+      hideAids: origin.hideAids,
       proposedOnly: origin.proposedOnly,
       lens: lens?.knowerId ?? null,
       activeMapId,
@@ -906,6 +917,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       .filter(el => !origin.proposedOnly || isProposed(el))
       // The room hides when showing the world whole; a supertype picked by its chip is asked for, so it shows.
       .filter(el => !origin.hideRoom || superFilter !== null || !isRoomElement(el))
+      // The reading aids hide by their own switch alone: a supertype chip never brings them back (1.101's G5).
+      .filter(el => !origin.hideAids || !isReadingAid(el))
       // Same match language as the command palette (name/alias/taxonomy/
       // description) — its "see all →" hands queries here and must never
       // under-deliver (core/element-search.ts).

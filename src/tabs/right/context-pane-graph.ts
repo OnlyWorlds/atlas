@@ -35,7 +35,7 @@ import { navigate, elementHash } from '../../core/router';
 import { getTierForNarrative } from '../../middle/writing-helpers';
 import { escapeText } from '../../core/dom-utils';
 import { placeGraphLabels, GRAPH_LABEL_SIDES, type GraphLabelItem } from './graph-labels';
-import { currentLore, isRoomElement } from '../../core/parlor-room';
+import { currentLore, pageReadsWholeWorld } from '../../core/parlor-room';
 import { proposedMarkOf, proposedTitle, proposedWord } from '../../core/review-mark';
 import { hiddenMarkLine } from '../../core/hidden-mark';
 
@@ -460,8 +460,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // Build sim inputs.
     const state = getState();
     // A lore element's web leaves the parlor's room out while it is hidden
-    // (core/parlor-room.ts); a room element's web reads the whole world.
-    const elements = isRoomElement(centerEl) ? state.data.elements : currentLore();
+    // (core/parlor-room.ts), and the reading aids; a room element's or an aid's web reads the whole world.
+    const elements = pageReadsWholeWorld(centerEl) ? state.data.elements : currentLore();
     const byId = new Map<string, Element>();
     for (const e of elements) byId.set(e.id, e);
 

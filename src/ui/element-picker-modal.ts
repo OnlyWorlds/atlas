@@ -18,7 +18,7 @@ import { ALL_ELEMENT_TYPES } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
 import { typeName, aTypeName } from '../core/type-words';
 import { escapeText } from '../core/dom-utils';
-import { currentLore } from '../core/parlor-room';
+import { loreFor } from '../core/parlor-room';
 
 export interface PickElementOptions {
   restrictToType?: ElementType;
@@ -31,6 +31,12 @@ export interface PickElementOptions {
    * just those, not the whole world.
    */
   restrictToIds?: string[];
+  /**
+   * The element whose field opened the picker: on a room element's or a
+   * reading aid's page it offers the whole world (a Guide picks its Domains),
+   * elsewhere the lore (core/parlor-room.ts `loreFor`).
+   */
+  source?: Element;
 }
 
 const ROW_CAP = 200;
@@ -182,7 +188,7 @@ class ElementPickerModal extends BaseModal {
 
   private refreshList(): void {
     // A link offers the lore (conv. 161); a picker given its ids picks from those, room or not.
-    const all = this.opts.restrictToIds ? getState().data.elements : currentLore();
+    const all = this.opts.restrictToIds ? getState().data.elements : loreFor(this.opts.source);
     const exclude = new Set(this.opts.excludeIds ?? []);
     const restrict = this.opts.restrictToIds ? new Set(this.opts.restrictToIds) : null;
 

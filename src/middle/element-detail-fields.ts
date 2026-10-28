@@ -17,6 +17,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { loreFor } from '../core/parlor-room';
 import { worldIsViewOnly } from '../core/view-only';
 import { isKnownOf } from '../sync/known-of';
 import { navigate, elementHash } from '../core/router';
@@ -413,11 +414,12 @@ function renderAliasesRow(el: Element, readOnly: boolean): HTMLElement {
 }
 
 /** Elements of `target` type available to link (self excluded). null = the
- *  field has no declared target (generic link) — candidate logic doesn't apply. */
+ *  field has no declared target (generic link) — candidate logic doesn't apply.
+ *  Counted from what the picker this field opens offers (`loreFor`, 1.101's G4). */
 function candidateCountFor(el: Element, target: ElementType | undefined): number | null {
   if (!target) return null;
   let n = 0;
-  for (const e of getState().data.elements) {
+  for (const e of loreFor(el)) {
     if (e.type === target && e.id !== el.id) n++;
   }
   return n;
@@ -498,6 +500,7 @@ function renderSingleLink(meta: FieldMeta, el: Element, readOnly: boolean): HTML
     if (raw) exclude.add(String(raw));
     const picked = await pickElement({
       restrictToType: meta.target,
+      source: el,
       excludeIds: [...exclude],
       title: `Pick ${meta.target ? aTypeName(meta.target) : 'a link'} for ${humanizeFieldName(meta.name)}`,
     });
@@ -559,6 +562,7 @@ function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLE
     // include the character itself.
     const picked = await pickElement({
       restrictToType: meta.target,
+      source: el,
       excludeIds: [el.id, ...ids],
       title: `Add ${meta.target ? aTypeName(meta.target) : 'a link'} to ${humanizeFieldName(meta.name)}`,
     });

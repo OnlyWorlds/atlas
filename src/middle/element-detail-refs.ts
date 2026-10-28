@@ -32,7 +32,7 @@ import { isPageNarrative } from '../core/sharing';
 import { humanizeFieldName } from './element-detail-fields';
 import { getEditorSettings } from '../registry/registry';
 import { foldBacklinks, markerFoldLabel } from '../core/spatial-backlinks';
-import { currentLore, isRoomElement } from '../core/parlor-room';
+import { currentLore, pageReadsWholeWorld } from '../core/parlor-room';
 
 /** Field names that never encode a relationship — skipped by the reverse scan. */
 const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
@@ -440,10 +440,10 @@ function collectIdsFromValue(value: unknown, selfId: string, out: Set<string>): 
  */
 export function findIncomingReferences(targetId: string): Element[] {
   // A lore element's references leave the parlor's room out while it is
-  // hidden (core/parlor-room.ts); a room element's page reads the whole world.
+  // hidden (core/parlor-room.ts), and the reading aids; a room element's or an aid's page reads the whole world.
   const whole = getState().data.elements;
   const target = whole.find(e => e.id === targetId);
-  const all = target && isRoomElement(target) ? whole : currentLore();
+  const all = pageReadsWholeWorld(target) ? whole : currentLore();
   const hits: Element[] = [];
   for (const el of all) {
     if (el.id === targetId) continue;

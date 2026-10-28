@@ -1804,6 +1804,12 @@ html {
 .atlas-home-charter-link { font-size: 15px; color: var(--atlas-prose-link); text-decoration: none; }
 .atlas-home-charter-link:hover, .atlas-home-charter-link:focus-visible { text-decoration: underline; }
 .atlas-home-charter-lead { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--atlas-text); overflow-wrap: anywhere; }
+/* The door's reading aids (1.101): the Charter, the Guide, the Domains, one stack. */
+.atlas-home-aids { max-width: 680px; }
+.atlas-home-aids .atlas-home-charter + .atlas-home-charter { margin-top: 6px; }
+.atlas-home-domain-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.atlas-home-domain-line { font-size: 14px; color: var(--atlas-text-muted); overflow-wrap: anywhere; }
+.atlas-home-aid-other { margin: 6px 0 0; font-size: 13px; color: var(--atlas-text-muted); }
 /* The work packet bar: a link that named several elements (#487). */
 .atlas-packet-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 900; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--atlas-bg-raised); border: 1px solid var(--atlas-divider-strong); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); max-width: calc(100vw - 32px); flex-wrap: wrap; }
 .atlas-packet-bar-count { font-size: 14px; color: var(--atlas-text); min-width: 4.5em; }

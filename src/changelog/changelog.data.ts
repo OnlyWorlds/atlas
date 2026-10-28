@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.101.0',
+    date: '2026-10-28',
+    theme: 'A world\'s reading aids at its door',
+    entries: [
+      {
+        id: 'reading-aids-door',
+        title: 'Home shows a world\'s charter, its guide and its domains first',
+        body: 'A world can carry three reading aids for whoever enters it: the charter (the rules here), the guide (start here) and the domains (the places in the world, each with one line). Home shows them first, in that order, each a link. A Construct with the supertype Guide or Domain can be marked as one from its own page, as a charter can.',
+        tags: ['home'],
+      },
+      {
+        id: 'reading-aids-lists',
+        title: 'The lists, Charts and Search leave the reading aids out unless you ask',
+        body: 'Like the parlor\'s room, the charter, guide and domains stay out of the element list, the counts, Search and Charts, so the world reads as its story. One line on Home and a chip in the list show them, in this world only. A guide\'s or a domain\'s own page still links anything in the world.',
+        tags: ['home', 'world'],
+      },
+      {
+        id: 'reading-aids-retire',
+        title: 'A second charter or guide can be retired',
+        body: 'When a world has two marked charters, or two guides, its owner sees the other one on Home with Retire it: its mark comes off and it stays in the world as an ordinary element. A new charter can now be marked while another leads, and the old one is then offered for retiring.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.100.0',
     date: '2026-10-28',
     theme: 'A world\'s charter, by its mark',

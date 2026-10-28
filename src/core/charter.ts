@@ -12,31 +12,75 @@
  * copy of its rule (the 1.100 contract gate found a copy disagreeing on
  * keel's microseconds, a time with no offset and a proposed mark).
  */
-import { charterOf, handsOnAsProposed, isCharterElement } from '@onlyworlds/sdk';
+import { CHARTER_PAIRS, charterOf, handsOnAsProposed, isCharterElement, simpleCaseFold, type OwReadingAids } from '@onlyworlds/sdk';
 import type { Element } from './types';
+
+/** Which reading aid a pair makes (the charter profile's three). */
+export type AidKind = 'charter' | 'guide' | 'domain';
+
+/**
+ * The pair alone, marked or not: which aid this element would be. The SDK's
+ * own pairs (`CHARTER_PAIRS`) matched on the type and the supertype trimmed and
+ * folded with the SDK's fold; `readingAidKey` does this inside the SDK and is
+ * not exported yet (the 1.101 contract gate's G1), so no copy of the pairs
+ * lives here.
+ */
+export function aidKind(el: Element): AidKind | null {
+  const sup = (el as Record<string, unknown>).supertype;
+  if (typeof el.type !== 'string' || typeof sup !== 'string') return null;
+  const want = simpleCaseFold(sup.trim());
+  const pair = CHARTER_PAIRS.find(p => p.type === el.type && simpleCaseFold(p.supertype) === want);
+  return pair ? pair.aid : null;
+}
 
 /** A Law with supertype Charter, marked or not: the button's reach (core/charter-mark.ts). */
 export function isCharter(el: Element): boolean {
-  if (el.type !== 'law') return false;
-  const sup = (el as Record<string, unknown>).supertype;
-  return typeof sup === 'string' && sup.trim().toLowerCase() === 'charter';
+  return aidKind(el) === 'charter';
+}
+
+/**
+ * A reading aid as Atlas counts one, everywhere ("marked", the gate's N2): the
+ * pair and the mark (the SDK's test, the mark by presence) and not proposed,
+ * which is exactly what `charterOf` sees at the owner rung.
+ */
+export function isReadingAid(el: Element): boolean {
+  return isCharterElement(el as never) && !handsOnAsProposed(el);
 }
 
 /** A Charter the profile counts: the pair and the mark, and not proposed. */
 export function isMarkedCharter(el: Element): boolean {
-  return el.type === 'law' && isCharterElement(el as never) && !handsOnAsProposed(el);
+  return el.type === 'law' && isReadingAid(el) && aidKind(el) === 'charter';
 }
 
-let memoElements: readonly Element[] | null = null;
-let memoId: string | null = null;
+/** The SDK's packet and the marked Charters and Guides, once per elements array (the gate's G12). */
+interface AidsMemo { from: readonly Element[]; packet: OwReadingAids; charters: string[]; guides: string[]; count: number }
+let memo: AidsMemo | null = null;
+
+export function readingAids(elements: readonly Element[]): AidsMemo {
+  if (memo && memo.from === elements) return memo;
+  const packet = charterOf({ elements } as never, { rung: 'owner' });
+  const charters: string[] = [];
+  const guides: string[] = [];
+  let count = 0;
+  for (const el of elements) {
+    if (!isReadingAid(el)) continue;
+    count++;
+    const kind = aidKind(el);
+    if (kind === 'charter') charters.push(el.id);
+    else if (kind === 'guide') guides.push(el.id);
+  }
+  memo = { from: elements, packet, charters, guides, count };
+  return memo;
+}
 
 /** The SDK's pick, memoised on the elements array (the store hands a new array on every change). */
 function newestMarked(elements: readonly Element[]): string | null {
-  if (elements !== memoElements) {
-    memoElements = elements;
-    memoId = charterOf({ elements } as never, { rung: 'owner' }).charter?.id ?? null;
-  }
-  return memoId;
+  return readingAids(elements).packet.charter?.id ?? null;
+}
+
+/** The leading marked Guide's id, or null. */
+export function leadingGuideId(elements: readonly Element[]): string | null {
+  return readingAids(elements).packet.guide?.id ?? null;
 }
 
 /**

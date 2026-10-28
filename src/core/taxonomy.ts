@@ -19,7 +19,7 @@ import { KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE } from './knowledge';
 import { PAGE_SUBTYPE } from './sharing';
 import { isCustomEditableField, isPopulatedCustomValue } from './constants';
 import type { Element } from './types';
-import { currentLore } from './parlor-room';
+import { loreWithAids } from './parlor-room';
 
 const TAXONOMY_SUGGESTION_CAP = 8;
 const CUSTOM_FIELD_SUGGESTION_CAP = 12;
@@ -36,7 +36,7 @@ const CUSTOM_FIELD_SUGGESTION_CAP = 12;
  */
 export function customFieldNameSuggestions(): string[] {
   const counts = new Map<string, number>();
-  for (const el of currentLore()) {
+  for (const el of loreWithAids()) {
     for (const [k, v] of Object.entries(el)) {
       if (!k.startsWith('x_') || !isCustomEditableField(k)) continue;
       if (!isPopulatedCustomValue(v)) continue;
@@ -60,8 +60,8 @@ export function suggestionsForField(el: Element, fieldName: string): string[] | 
     }
   }
   const counts = new Map<string, number>();
-  // Suggested values come from the lore (conv. 161): never the room's own supertypes.
-  for (const other of currentLore()) {
+  // Suggested values come from the lore (conv. 161): never the room's own supertypes, the reading aids' kept.
+  for (const other of loreWithAids()) {
     if (other.type !== el.type) continue;
     const v = (other as Record<string, unknown>)[fieldName];
     if (typeof v !== 'string') continue;

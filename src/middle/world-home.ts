@@ -46,7 +46,8 @@ import { isCodeLoadError } from '../core/reload-offer';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
-import { charterLead, findCharter } from '../core/charter';
+import { charterLead, findCharter, readingAids } from '../core/charter';
+import { canMarkCharter, retireAid } from './element-detail-charter-mark';
 import { tableauScope } from '../visualization/timeline/chart-recipe';
 import { roomOf, openElementTarget } from '../core/element-room';
 import { resolveCalendarLens } from '../core/calendar-lens';
@@ -56,7 +57,7 @@ import { renderChartView } from '../visualization/timeline/chart-static';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { downloadLabel, isPartialSlice, partialSliceNote } from '../core/provenance';
 import { copyLine, worldIsCopiedBy } from '../core/world-copy';
-import { currentLore, roomCount } from '../core/parlor-room';
+import { aidsHidden, currentLore, roomCount, toggleAids } from '../core/parlor-room';
 import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
 import { DEMO_WORLD_ID } from '../setup/demo-copy';
@@ -134,7 +135,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // The elements by what they say, not by the array: every idle sync round
     // patches a fresh array that changed nothing, and a rebuild then swallowed
     // a press on the guide's marks straddling it (conv. 146, the guide's code gate C3).
-    const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, s.data.loading, s.data.loadingProgress?.done, s.registry,
+    const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, aidsHidden(), s.data.loading, s.data.loadingProgress?.done, s.registry,
       s.ui.castAssign?.kind, savedCharts, isTourFlagActive()];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     lastInputs = inputs;
@@ -188,7 +189,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // while it asks, the guide's copy dot stays dark, so the two never disagree.
     const keep = buildKeepSafe(worldId, settled, toasts);
     if (!viewOnly) {
-      const tour = buildTour(lore, totalElements, worldId, !!keep, toasts);
+      // A world that holds only its reading aids is not told it holds nothing (the gate's G9).
+      const tour = buildTour(lore, totalElements + readingAids(s.data.elements).count, worldId, !!keep, toasts);
       if (tour) root.appendChild(tour);
     }
     if (keep) root.appendChild(keep);
@@ -352,20 +354,10 @@ function buildCover(
     const worldHere = getState().registry.worlds.some(w => w.id !== worldId && !w.copy_of && worldIsCopiedBy(w, copy));
     identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="copy-note">${escapeText(copyLine(meta.name, copy, worldHere))}</p>`);
   }
-  // The world's charter, first (#526): its name links to it, its opening reads here.
-  // The newest marked Charter (the charter profile, serial 83); world.json's
-  // `charter` picks among marked ones when a folder says which (§4.6 (a)).
-  const charter = findCharter(getState().data.elements, (meta as unknown as Record<string, unknown> | null | undefined)?.charter);
-  if (charter) {
-    const lead = charterLead(charter);
-    const name = typeof charter.name === 'string' && charter.name.trim() ? charter.name.trim() : 'Charter';
-    identity.insertAdjacentHTML('beforeend', `
-      <div class="atlas-home-charter" data-role="charter">
-        <span class="atlas-home-charter-label">This world's charter</span>
-        <a class="atlas-home-charter-link" href="${escapeText(elementHash(worldId, charter.id))}">${escapeText(name)}</a>
-        ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
-      </div>`);
-  }
+  // The world's reading aids, first (the charter profile's rule 2): the Charter,
+  // the Guide, the Domains, each linked; what is absent draws nothing.
+  const aids = buildReadingAids(meta, worldId);
+  if (aids) identity.appendChild(aids.block);
   cover.appendChild(identity);
 
   const nameEl = identity.querySelector<HTMLElement>('[data-edit="name"]');
@@ -377,9 +369,9 @@ function buildCover(
   // removed: the room nav + onboarding tiles cover every one of them.)
 
   // Cast slot (D2b) — renders only when a favorite is set; assignment lives
-  // on the element-detail header (char + loc). A world with a charter is set up
-  // for work (#526): its Home never asks for a protagonist or a home place.
-  const cast = buildCastSlot(worldId, !!charter);
+  // on the element-detail header (char + loc). A world with a reading aid at its
+  // door is set up for work (#526): its Home never asks for a protagonist or a home place.
+  const cast = buildCastSlot(worldId, !!aids);
   if (cast) cover.appendChild(cast);
 
   // The woven stat line (replaces the count-card grid + the meta chips).
@@ -464,6 +456,27 @@ function buildCover(
     });
     cover.appendChild(roomLine);
   }
+  // The reading aids: said once beside the counts (the profile's rule 2), one
+  // click lists them in every whole view or leaves them out again (the list's
+  // chip is the same switch).
+  const aidCount = readingAids(getState().data.elements).count;
+  if (aidCount > 0) {
+    const hidden = aidsHidden();
+    const aidsLine = document.createElement('button');
+    aidsLine.type = 'button';
+    aidsLine.className = 'atlas-home-statline-seg atlas-home-room';
+    aidsLine.setAttribute('data-action', 'home-aids');
+    aidsLine.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    aidsLine.title = hidden
+      ? 'Count and list the charter, guide and domains with the rest of the world, in the lists, Charts and Search'
+      : 'Leave the charter, guide and domains out of the counts, the lists, Charts and Search';
+    const what = aidCount === 1 ? 'This world\'s reading aid' : `This world's reading aids, <b>${aidCount}</b>,`;
+    aidsLine.innerHTML = hidden
+      ? `${what} ${aidCount === 1 ? 'is' : 'are'} not counted or listed · Show ${aidCount === 1 ? 'it' : 'them'}`
+      : `${what} ${aidCount === 1 ? 'is' : 'are'} counted and listed · Leave ${aidCount === 1 ? 'it' : 'them'} out`;
+    aidsLine.addEventListener('click', () => toggleAids());
+    cover.appendChild(aidsLine);
+  }
   // Proposed, not yet reviewed (conv. 168): said apart from the counts, and one
   // click lists them, the keeper's way to find what waits to be settled.
   const proposed = proposedCount(currentLore());
@@ -505,6 +518,79 @@ const CAST_KINDS = [
  * the sidebar to the right type so the path is one hop. Both kinds get a
  * ghost side by side (nexus beside protagonist, Titus 2026-07-10).
  */
+/**
+ * The door (the charter profile's rule 2, 1.101): the Charter (its opening),
+ * the Guide (its opening), the Domains (each its sentence), from the SDK's
+ * `charterOf` at the owner rung (memoised, core/charter.ts); world.json's
+ * `charter` picks among marked Charters. Nothing absent draws, and no prompt
+ * to add one. A keeper also reads each other marked Charter or Guide with
+ * Retire it (one write: its mark to null, Skeld's ruling); everyone else the
+ * leading ones only.
+ */
+function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement } | null {
+  const elements = getState().data.elements;
+  const { packet, charters, guides } = readingAids(elements);
+  const charter = findCharter(elements, (meta as Record<string, unknown> | null | undefined)?.charter);
+  const byId = (id: string) => elements.find(e => e.id === id);
+  const guide = packet.guide ? byId(packet.guide.id) : undefined;
+  if (!charter && !guide && packet.domains.length === 0) return null;
+  const nameOf = (el: { name?: unknown }, fallback: string) => (typeof el.name === 'string' && el.name.trim() ? el.name.trim() : fallback);
+  const link = (id: string, name: string, cls: string) => `<a class="${cls}" href="${escapeText(elementHash(worldId, id))}">${escapeText(name)}</a>`;
+  const block = document.createElement('div');
+  block.className = 'atlas-home-aids';
+  block.dataset.role = 'reading-aids';
+  if (charter) {
+    const lead = charterLead(charter);
+    block.insertAdjacentHTML('beforeend', `
+      <div class="atlas-home-charter" data-role="charter">
+        <span class="atlas-home-charter-label">This world's charter</span>
+        ${link(charter.id, nameOf(charter, 'Charter'), 'atlas-home-charter-link')}
+        ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
+      </div>`);
+  }
+  if (guide) {
+    const lead = charterLead(guide);
+    block.insertAdjacentHTML('beforeend', `
+      <div class="atlas-home-charter atlas-home-guide" data-role="guide">
+        <span class="atlas-home-charter-label">Start here</span>
+        ${link(guide.id, nameOf(guide, 'Guide'), 'atlas-home-charter-link')}
+        ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
+      </div>`);
+  }
+  if (packet.domains.length > 0) {
+    const rows = packet.domains.map(d =>
+      `<li>${link(d.id, d.name.trim() || 'Domain', 'atlas-home-charter-link')}${d.sentence ? `<span class="atlas-home-domain-line"> · ${escapeText(d.sentence)}</span>` : ''}</li>`).join('');
+    block.insertAdjacentHTML('beforeend', `
+      <div class="atlas-home-charter atlas-home-domains" data-role="domains">
+        <span class="atlas-home-charter-label">${packet.domains.length === 1 ? 'Its domain' : 'Its domains'}</span>
+        <ul class="atlas-home-domain-list">${rows}</ul>
+      </div>`);
+  }
+  // A keeper's door names each other marked Charter or Guide with the retire (the gate's G8).
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  if (canMarkCharter(entry, meta, worldId)) {
+    const others: Array<[Element, string]> = [];
+    for (const id of charters) if (id !== charter?.id) { const el = byId(id); if (el) others.push([el, 'charter']); }
+    for (const id of guides) if (id !== guide?.id) { const el = byId(id); if (el) others.push([el, 'guide']); }
+    for (const [el, word] of others) {
+      const line = document.createElement('p');
+      line.className = 'atlas-home-aid-other';
+      line.dataset.role = 'aid-other';
+      line.innerHTML = `Another ${word} is also marked: ${link(el.id, nameOf(el, word === 'charter' ? 'Charter' : 'Guide'), 'atlas-home-charter-link')} · `;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'atlas-btn-link';
+      btn.dataset.action = 'aid-retire';
+      btn.textContent = 'Retire it';
+      btn.title = `Take its mark off: it stays in the world as an ordinary ${el.type === 'law' ? 'Law' : 'Construct'}, and you can mark it again later`;
+      btn.addEventListener('click', () => { void retireAid(el, btn); });
+      line.appendChild(btn);
+      block.appendChild(line);
+    }
+  }
+  return { block };
+}
+
 function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
   const ghost = document.createElement('button');
   ghost.type = 'button';
