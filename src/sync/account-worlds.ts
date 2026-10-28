@@ -10,7 +10,7 @@
  * `openAccountWorld` is a row's click, owned or shared (#199): preconditions
  * (where it lands, the PIN when it will write) → mint this account's own key
  * → download via the existing link pipeline ON the activation chain →
- * navigate home + waypoint. Ordering matters: every precondition
+ * navigate home. Ordering matters: every precondition
  * resolves BEFORE the mint so a failed open never leaves an orphaned
  * server-side key.
  */
@@ -23,7 +23,6 @@ import { navigate, homeHash } from '../core/router';
 import { saveRegistry, setPin, findWorldByServerId, findLinkedWorld } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
-import { completeWaypoint } from '../core/waypoints';
 import { AccountClient, accountErrorMessage, isAccountAuthError, type MintedWorldKey } from './account-client';
 import { OwV2Error } from './ow-v2-client-adapter';
 import { PinPromptModal } from '../ui/pin-prompt-modal';
@@ -324,7 +323,6 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
 
     // ---- Complete the handoff (R5 — parity with LinkWorldModal) ----
     navigate(homeHash(result.entry.id));
-    completeWaypoint('ecosystem');
     if (result.failures.length > 0) {
       toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
     } else {

@@ -16,7 +16,6 @@ import { lockWhereChoice, readyWhere, takeWhereInClick, whereChoiceHtml, wireWhe
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { saveRegistry, attachApi, setPin } from '../registry/registry';
-import { completeWaypoint } from '../core/waypoints';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { createApiWorld, buildV2Adapter, worldOriginLines } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
@@ -139,9 +138,6 @@ export class NewApiWorldModal extends BaseModal {
           progressEl.textContent = where === 'browser' ? `Creating "${name}" in this browser…` : `Creating "${name}" in your folder…`;
           ({ entry } = await createWorldInRoot(name, { where }));
           madeLocally = { id: entry.id, name: entry.name };
-          // Waypoint: a real folder world exists from here on, even if the
-          // later API step fails (hookmap wp1 — ungated by construction).
-          completeWaypoint('first-world');
         }
 
         progressEl.textContent = `Creating the world on onlyworlds.com…`;
@@ -182,7 +178,6 @@ export class NewApiWorldModal extends BaseModal {
         }
 
         this.toasts.success(`${entry.name} created online`);
-        completeWaypoint('ecosystem'); // this modal IS Route 1 (new api world)
         this.hide();
       } catch (err) {
         progressEl.hidden = true;

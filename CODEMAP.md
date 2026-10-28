@@ -19,6 +19,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/charter.ts`: `findCharter`, the world's charter that leads Home: keel's one definition (1.80): only a Law the owner (`created_by` null, or made here and not read back) or a co-builder on the roster made (`madeByKeeper`, `rosterRoles`; no roster read, no membership counts); world.json's `charter` when it names such a Law (folder spec §4.6 (a), 1.74), else the newest such Law with supertype Charter by `created_at`, a tie to the higher id (keel's `house_of`). Home asks the roster once per synced world and draws again on its answer. `charterLead`, its first paragraph for Home.
 - `src/core/hidden-mark.ts`: the hidden mark (folder spec §4.8, conv. 170): `isHiddenMark` the one reading, `hiddenMarkLine` (who on OnlyWorlds sees it, or the folder line), `hiddenRowWord` for the list and Recent rows, the said-once lines; the glyph is drawn beside the agent mark by `buildHiddenMark` (`src/middle/element-agent-mark.ts`) in the element page, Knowledge's entry and a page's header.
 - `src/core/state.ts`: the observable store.
+- `src/core/guide.ts`: the guide (onboarding step 1, conv. 181), pure: the five dots from the world (`guideDots`), what a gesture earns (`noteEarned`), the notes' memory and switch (`atlas_guide_v1`); `src/core/waypoints.ts`: the Settings rows, lit from the world (`waypointsLit`); `src/middle/home-guide.ts`: the strip on the home; `src/ui/guide-note.ts`: the one note (`reportGesture`, its slot, its actions inside the element lock).
 - `src/core/view-only.ts`: `worldIsViewOnly` and `entryIsViewOnly`, the one read of a view-only world, a read key's or a copy (conv. 149, 177); `tests/unit/view-only-ratchet.test.ts` keeps every UI writer asking it.
 - `src/core/world-copy.ts`: a view-only copy (conv. 177): `copyWorldJson` (the snapshot rule), `copyOfMeta` (`writable: false` from any writer), the same copy, the copy's words.
 - `src/core/router.ts`: hash router, `settingsHash(world, tab)` deep-link helpers. The route table is DESIGN_SHELL "Routes".
@@ -106,7 +107,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/registry/registry.ts`: the localStorage registry + helpers (two-tab merge, conv. 115; `setWorldFavoriteElement` for the protagonist/nexus).
 - `src/demo/hyperion-world.json`: the TOUR bundle, baked from demo key 0000000000 (its ids are the live demo world's). Re-bakes follow DESIGN_TOUR's trap list.
 - `src/demo/demo-page.json`: the example share page (`#/demo`).
-- `src/demo/demo-view.ts`: `mountDemo` / `unmountDemo` / `isDemoMounted`, the view-only example page. A demo origin must NEVER complete waypoints.
+- `src/demo/demo-view.ts`: `mountDemo` / `unmountDemo` / `isDemoMounted`, the view-only example page. A demo origin never earns a guide note.
 - `src/editor/field-schema.ts`: the SDK `FIELD_SCHEMA` + `ELEMENT_SECTIONS` adapter; `src/editor/field-descriptions.ts`: per-field tooltips.
 - `src/layout/app-shell.ts`: the three-pane shell with `resetRatios`; sidebar default 20%. `src/layout/narrow-layout.ts`: the drawers (conv. 89).
 
@@ -130,7 +131,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/middle/landing-account-worlds.ts`: the first screen's account worlds, markup only (`landingAccountWorldsHtml`): every account world not here yet, opened through the sidebar's `openAccountWorld`.
 - `src/middle/story-sidecar.ts`: `storyOutranksSidecar`: plain text wins at open (conv. 116); `src/middle/story-notice.ts`: the once-per-element notice.
 - `src/middle/timeline.ts`: the Charts room (owns ChartConfig, control bar, gallery; DESIGN_CHARTS).
-- `src/middle/world-home.ts`: the world home (cover, "What do you have?" and "Grow your world" with cards kept done, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).
+- `src/middle/world-home.ts`: the world home (cover, the demo's way out, "What do you have?" and "Grow your world" holding the guide's strip, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).
 
 ## src/tabs/right, src/visualization
 

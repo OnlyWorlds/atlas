@@ -131,12 +131,12 @@ async function tryDemoOpensACopy(page: Page) {
   });
   expect(after).toEqual({ mine: true, fluff: 'Mine now.' });
 
-  // The demo is not the user's first world or an import.
+  // The demo earns no note: its copy coming down is no gesture, and a gesture in it is silent.
+  expect(await page.locator('[data-role="guide-note"]').count()).toBe(0);
   expect(await page.evaluate(async () => {
-    const { loadWaypointsState } = await import('/src/core/waypoints.ts');
-    const done = loadWaypointsState().completed as Record<string, unknown>;
-    return { first: !!done['first-world'], imp: !!done['import'] };
-  })).toEqual({ first: false, imp: false });
+    const { loadGuideState } = await import('/src/core/guide.ts');
+    return Object.keys(loadGuideState().seen);
+  })).toEqual([]);
 
   // A second try, from another world, opens the copy: no download, no twin (gate F3).
   await page.evaluate(async () => { const { navigate } = await import('/src/core/router.ts'); navigate('#/'); });

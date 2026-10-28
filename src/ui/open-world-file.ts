@@ -12,7 +12,6 @@ import { hasFolderMode, opfsStatus, NO_BROWSER_STORAGE_LINE } from '../core/capa
 import { askWhereWithHome } from './where-choice';
 import { browserStorageFullSentence } from '../core/problems';
 import { showProblem } from './problem-fixes';
-import { completeWaypoint } from '../core/waypoints';
 import { WORLD_FILE_MAX_BYTES } from '../store/world-tree';
 import { worldAlreadyHere } from '../core/browser-home';
 import { buildDemoWorldFile, DEMO_WORLD_ID, DEMO_WORLD_NAME } from '../setup/demo-copy';
@@ -73,8 +72,6 @@ interface OpenWords {
   already: string;
   opened: (name: string) => string;
   restored: (name: string, linked: boolean) => string;
-  /** The first-world and import waypoints: the file door's, never the demo's. */
-  waypoints: boolean;
   /** A world already here can open beside itself as a view-only copy (conv. 177): the file door's, never the demo's. */
   offerCopy?: boolean;
 }
@@ -88,7 +85,6 @@ const FILE_WORDS: OpenWords = {
   opened: name => `Opened "${name}". It lives in this browser.`,
   restored: (name, linked) => `Restored "${name}" from the file.${linked ? ' Changes that conflict with OnlyWorlds wait for you.' : ''}`,
   offerCopy: true,
-  waypoints: true,
 };
 
 /** Open a picked world file: a new world in this browser, a cleared one restored, or the one already here offered. */
@@ -142,7 +138,6 @@ const DEMO_WORDS: OpenWords = {
   already: `${DEMO_WORLD_NAME} is already in Atlas.`,
   opened: name => `Opened "${name}": your own copy, in this browser. Nothing you change goes back to OnlyWorlds.`,
   restored: name => `Brought back a fresh copy of "${name}" in this browser.`,
-  waypoints: false,
 };
 
 /**
@@ -289,10 +284,6 @@ async function openWorldBytes(getBytes: () => Promise<Uint8Array | null>, toasts
     const entry = getState().registry.worlds.find(w => w.id === out.worldId);
     const opened = await activateWorld(out.worldId, toasts);
     overlay?.close();
-    if (opened && words.waypoints) {
-      completeWaypoint('first-world');
-      completeWaypoint('import');
-    }
     const name = entry?.name ?? 'The world';
     // (TypeScript cannot see the closure's assignment, hence the cast.)
     const home = moveTo as { home: FileSystemDirectoryHandle; hint: string } | null;

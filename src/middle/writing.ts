@@ -17,7 +17,6 @@
 import { getState, patchSlice, subscribe } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { onHashChange, parseHash, navigate, writingHash, settingsHash } from '../core/router';
-import { completeWaypoint } from '../core/waypoints';
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
@@ -126,8 +125,6 @@ async function createNarrativeAtRoot(
     supertype,
     order: 0,
   } as Partial<Element>);
-  // Waypoint (#127): reached only from the room's New book / New draft clicks.
-  completeWaypoint('story');
   const all = await refreshElementsAfterWrite(folder);
   return created;
 }

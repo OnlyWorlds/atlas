@@ -30,7 +30,6 @@ import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
 import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
-import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
 import {
   PAGE_SUBTYPE,
@@ -192,8 +191,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         atlas_page_blocks: [],
         atlas_page_refs: [],
       } as Partial<Element>);
-      // Waypoint: page creation bypasses the element-create modal (hookmap wp2).
-      completeWaypoint('first-element');
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
       renameOnOpen = created.id;
@@ -1492,7 +1489,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         // don't lose the URL. The one toast for it (patchPage stays quiet).
         toasts.error(`Published at ${publicUrlFor(res.slug)}, but Atlas could not record it in the world. Keep that URL.`);
       }
-      completeWaypoint('share'); // hookmap wp9 — the publish gesture succeeded
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       surfaceSharingError(err, 'publishing this page');
@@ -2114,9 +2110,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       void (async () => {
         await commitOpenEdit(pageId);
         previewMode = !previewMode;
-        // Waypoint (hookmap wp9): only the flip INTO preview counts —
-        // an explicit visitor-view gesture, not the auto-rendered pane.
-        if (previewMode) completeWaypoint('share');
         buildDetail(pageId);
       })();
     });
@@ -2136,7 +2129,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         const current = elOf(pageId);
         if (current) {
           openFullPagePreview(current);
-          completeWaypoint('share'); // hookmap wp9 — explicit preview gesture
         }
       })();
     });

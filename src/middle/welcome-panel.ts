@@ -16,7 +16,7 @@ import { escapeText } from '../core/dom-utils';
 import { navigate, settingsHash, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
 import { recoverAtlasRoot, setupAtlasRoot } from '../setup/atlas-root-flow';
-import { finishSetupDoor, openAddWorldChooser, pickAndOpenWorldFolder, runAddWorldAction } from '../setup/world-doors';
+import { finishSetupDoor, openAddWorldChooser, runAddWorldAction } from '../setup/world-doors';
 import { isAtlasGrounded } from '../core/grounded';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
@@ -201,10 +201,14 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       ].join('');
       const link = (action: string, label: string, hint: string): string =>
         `<button type="button" class="atlas-btn-link atlas-landing-more-link" data-door="${action}" data-action="${action}" title="${hint}">${label}</button>`;
+      // The tour is Watch how it works (onboarding step 4, Titus 2026-10-27):
+      // kept whole, offered, never the onboarding. A world folder you already
+      // have opens from Other ways in, with the rest of the ways a world arrives.
       const more = [
-        link('start-tour', tourDone ? 'Replay the tour' : 'Take the tour', 'A guided build of a world from one sentence of a novel'),
-        folderMode ? link('open-world-folder', 'Open a world folder', 'One you already have, from Atlas, another tool or your AI') : '',
-        link('other-ways-in', 'Other ways in', 'Download one from OnlyWorlds, view a shared world, open a world file'),
+        link('start-tour', tourDone ? 'Watch it again' : 'Watch how it works', 'A guided build of a world from one sentence of a novel'),
+        link('other-ways-in', 'Other ways in', folderMode
+          ? 'Open a world folder you have, download one from OnlyWorlds, view a shared world, open a world file'
+          : 'Download one from OnlyWorlds, view a shared world, open a world file'),
       ].filter(Boolean).join('<span class="atlas-landing-more-sep" aria-hidden="true">·</span>');
       // The note names the DESKTOP part of the constraint: mobile
       // Chrome has no folder picker either, so the sentence says "desktop".
@@ -306,15 +310,6 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           }
           tourBtn.disabled = false;
           tourBtn.textContent = tourLabel;
-        }
-      });
-      const openBtn = root.querySelector<HTMLButtonElement>('[data-action="open-world-folder"]');
-      openBtn?.addEventListener('click', async () => {
-        openBtn.disabled = true;
-        try {
-          await pickAndOpenWorldFolder(toastManager);
-        } finally {
-          openBtn.disabled = false;
         }
       });
       return;

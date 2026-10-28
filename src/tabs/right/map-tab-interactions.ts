@@ -16,7 +16,6 @@ import { typeName } from '../../core/type-words';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
 import { worldIsViewOnly } from '../../core/view-only';
-import { completeWaypoint } from '../../core/waypoints';
 import { navigate, elementHash } from '../../core/router';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
@@ -132,7 +131,6 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       patchSlice('ui', { ...getState().ui, pinPlacement: null });
       requestPushIfLinked();
       toasts.success('Pin placed');
-      completeWaypoint('maps');
       // (The bespoke `notifyTourPinPlaced()` call was removed: the
       // tour bar subscribes to core state now, so the `patchSlice('data')`
       // above re-renders it like any other world change. That coupling was
@@ -228,7 +226,6 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         y: clampToCanvas(Math.round(point.y), height),
       });
       await refreshElementsAfterWrite(store);
-      completeWaypoint('maps'); // both callers are new-pin modal gestures
     };
 
     const modal = new ElementCreateModal(toasts, {
@@ -366,7 +363,6 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       });
       await refreshElementsAfterWrite(store);
       toasts.success('Pin placed');
-      completeWaypoint('maps');
     } catch (err) {
       reportPinFailure(err, toasts, 'drag-drop create pin failed');
     }

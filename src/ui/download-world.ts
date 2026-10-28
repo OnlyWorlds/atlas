@@ -9,7 +9,6 @@ import type { ToastManager } from './toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 import { downloadName, downloadWorld, pickSaveTarget } from '../setup/world-download';
 import { showProblem } from './problem-fixes';
-import { completeWaypoint } from '../core/waypoints';
 import { PrivateRecordsModal } from './private-records-modal';
 
 export async function downloadWorldFromClick(
@@ -31,7 +30,6 @@ export async function downloadWorldFromClick(
     const done = await downloadWorld(world, target, { ask: q => new PrivateRecordsModal().ask(q) });
     if (!done) return null; // the person chose no file
     const { file, leftOut } = done;
-    completeWaypoint('keep-copy');
     const kept = target.kind === 'picker'
       ? `Saved ${file}. Keep it: it brings this world back.`
       : `Your browser is saving ${file}. Keep the file: it brings this world back.`;

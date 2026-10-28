@@ -61,11 +61,11 @@ const PROBES: Probe[] = [
   { name: 'zone draft strip', chain: ['atlas-zone-draft-overlay'] },
   { name: 'zone draft mode', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-mode'] },
   { name: 'zone draft button', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-btn'] },
-  // The waypoint toast keeps a dark chip in both themes; its lines read the text family
-  // (seen live in 1.58.1: "Your world can travel between tools." dark on dark).
-  { name: 'waypoint toast line', chain: ['atlas-waypoint-toast', 'atlas-waypoint-toast-line'] },
-  { name: 'waypoint toast rider', chain: ['atlas-waypoint-toast', 'atlas-waypoint-toast-rider'] },
-  { name: 'waypoint toast rider button', chain: ['atlas-waypoint-toast', 'atlas-waypoint-toast-rider-btn'] },
+  // The guide's note follows the theme (the toast it replaced kept a dark chip): its line,
+  // its action links and the strip's labels read the text family on the raised panel.
+  { name: 'guide note line', chain: ['atlas-guide-note', 'atlas-guide-note-line'] },
+  { name: 'guide note action', chain: ['atlas-guide-note', 'button:atlas-guide-note-act'] },
+  { name: 'guide strip label', chain: ['atlas-home-onboarding', 'atlas-guide-strip', 'atlas-guide-marks', 'button:atlas-guide-mark', 'atlas-guide-mark-label'] },
   // The family census: the map's placement hint paints the canvas floor; its Cancel read themed ink.
   { name: 'map placement hint', chain: ['atlas-map-placement-hint'] },
   { name: 'map placement hint cancel', chain: ['atlas-map-placement-hint', 'atlas-map-placement-hint-cancel'] },

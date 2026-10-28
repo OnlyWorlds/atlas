@@ -19,7 +19,7 @@ import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { findUnlinkedMentions, createdToastText } from '../core/unlinked-mentions';
 import { getActiveStore } from '../core/active-store';
-import { completeWaypoint } from '../core/waypoints';
+import { reportGesture } from './guide-note';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
 import { typeName } from '../core/type-words';
@@ -68,6 +68,12 @@ export interface ElementCreateOptions {
    * the elements-sidebar clearing its search after a prefilled create.
    */
   afterCreate?: (id: string, type: ElementType) => void;
+  /**
+   * The caller reports the guide's gesture itself (a link field's create
+   * writes the link, and that commit is the gesture), so the create is silent.
+   * A caller with `onCreated` is contextual too, and silent the same way.
+   */
+  reportsOwnGesture?: boolean;
   /**
    * NPM mode (DESIGN_MAPS.md §3.7). When set, the name field gets ghost-line
    * autocomplete against existing elements of the currently-selected category;
@@ -462,9 +468,6 @@ export class ElementCreateModal extends BaseModal {
           this.hide();
           const result = await createMapDialog(this.toasts, { initialName: name });
           if (!result) return; // user cancelled — no element created
-          // Waypoint: this early-return path bypasses the hook below — a
-          // first element that's a Map still counts (hookmap wp2).
-          completeWaypoint('first-element');
           // afterCreate must fire on this path too (it clears the sidebar
           // search takeover) — only onCreated is deliberately skipped here,
           // since its absence is what routed us to the inline map flow.
@@ -483,7 +486,6 @@ export class ElementCreateModal extends BaseModal {
         const startField = this.opts.temporalContext ? this.startFieldOf(this.selected) : null;
         const temporalData = startField && temporalDate != null ? { [startField]: temporalDate } : {};
         const el = await store.createElement(this.selected, { ...this.opts.extraData, ...temporalData, name } as Partial<Element>);
-        completeWaypoint('first-element');
         const elements = await store.listElements();
         patchSlice('data', { elements });
         // Creating an element flips the sidebar to elements mode so the new
@@ -512,6 +514,9 @@ export class ElementCreateModal extends BaseModal {
           const worldId = getState().active?.worldId;
           if (worldId) navigate(elementHash(worldId, el.id));
         }
+        // The guide hears the create last: after the dialog closed, its
+        // callbacks ran and the page moved, so a note lands where the person is.
+        if (!this.opts.onCreated && !this.opts.reportsOwnGesture) reportGesture({ kind: 'created', id: el.id });
       } catch (err) {
         console.error('[element-create] failed:', err);
         errorBox.textContent = problemFor(err, { inline: true, doing: 'creating the element' }).sentence;

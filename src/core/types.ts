@@ -195,7 +195,7 @@ export interface WorldMeta {
   image_url?: string;
   /**
    * True only for the bundled sample world. Gestures inside a
-   * demo world never complete waypoints. Lives in world.json so the flag
+   * demo world never earn a guide note. Lives in world.json so the flag
    * survives localStorage wipes + rediscovery; make-online and keeping the
    * tour world at its finale clear it (the world is genuinely yours then). Normal imports never set it — the import
    * world-block mapper whitelists fields, and createWorldFromImportedData
@@ -660,7 +660,7 @@ export interface WorldRegistryEntry {
    * dismissed.
    */
   tour_dismissed?: string[];
-  /** Mirror of `WorldMeta.demo` — the bundled sample world. Gestures in a demo world never complete waypoints. */
+  /** Mirror of `WorldMeta.demo` — the bundled sample world. Gestures in a demo world never earn a guide note. */
   demo?: boolean;
   /**
    * A view-only copy (conv. 177): mirror of world.json's `writable: false`

@@ -36,7 +36,6 @@ import {
 } from './writing-workspace-autolink';
 import type { Element } from '../core/types';
 import { isValidChipLabel, trimMatchSpan } from '../core/prose-autolink';
-import { completeWaypoint } from '../core/waypoints';
 import type { JSONContent } from '@tiptap/core';
 
 export interface WorkspaceEditorOptions {
@@ -268,10 +267,6 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
             // tracker. Runs after the transaction so the chip is real DOM.
             if (id) {
               onMentionInserted?.(id, type);
-              // Waypoint (hookmap wp4): this command only runs from the @
-              // suggestion picker — a true gesture; programmatic content-set
-              // never reaches it. One site covers writing+knowledge+share.
-              completeWaypoint('links');
             }
           },
         },

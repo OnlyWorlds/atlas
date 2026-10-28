@@ -21,6 +21,12 @@ async function freshBoot(page: Page): Promise<void> {
   await page.waitForSelector('.atlas-shell');
 }
 
+/** A world folder you already have opens from Other ways in (the landing's own link moved there, 2026-10-27). */
+async function openWorldFolderDoor(page: Page) {
+  await page.click('[data-action="other-ways-in"]');
+  await page.click('[data-modal="add-world"] [data-choice="open-folder"]');
+}
+
 /** A world folder as another tool writes it (world.json + one element), handed to the next picker. */
 async function seedWorldFolderForPicker(page: Page, dirName: string): Promise<void> {
   await page.evaluate(async ({ dirName, worldId }) => {
@@ -44,7 +50,7 @@ async function seedWorldFolderForPicker(page: Page, dirName: string): Promise<vo
 test('first visit: "open a world folder" opens the world in place, no home folder asked', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
 
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await expect(page.getByText('Gil the Agent').first()).toBeVisible();
@@ -52,7 +58,7 @@ test('first visit: "open a world folder" opens the world in place, no home folde
   expect(root).toBeNull();
 });
 
-test('first visit: two doors, start a world and Moppetopia, then the tour, a world folder and other ways in', async ({ page }) => {
+test('first visit: two doors, start a world and Moppetopia under it, then Watch how it works and other ways in', async ({ page }) => {
   // 1.17 (contract §8, lens C R2-c): "set up a folder" became "start a world",
   // whose dialog asks where; "other ways in" is the chooser.
   await freshBoot(page);
@@ -60,7 +66,10 @@ test('first visit: two doors, start a world and Moppetopia, then the tour, a wor
   // #127 (Titus's Q4): two doors; the rest is one quiet line of links,
   // the tour one click from the first screen (his Q5).
   await expect(doors).toHaveText(['Start a world', 'Explore Moppetopia']);
-  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Take the tour', 'Open a world folder', 'Other ways in']);
+  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Watch how it works', 'Other ways in']);
+  // Stacked: Moppetopia sits under Start a world.
+  const [startBox, demoBox] = [await doors.nth(0).boundingBox(), await doors.nth(1).boundingBox()];
+  expect(demoBox!.y).toBeGreaterThan(startBox!.y + startBox!.height);
   await expect(page.locator('.atlas-landing-note')).toBeHidden();
 
   await page.click('[data-action="other-ways-in"]');
@@ -81,9 +90,9 @@ test('first visit, browser storage refused on Chromium: no tour, and the doors l
   await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
   const notes = page.locator('.atlas-landing-choice-note');
   await expect(notes).toHaveText(['Your first world, in a folder on your drive']);
-  // The link line keeps the folder doors, without a dangling separator.
-  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Open a world folder', 'Other ways in']);
-  await expect(page.locator('.atlas-landing-more-sep')).toHaveCount(1);
+  // The link line keeps Other ways in (the folder door is inside it), without a dangling separator.
+  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Other ways in']);
+  await expect(page.locator('.atlas-landing-more-sep')).toHaveCount(0);
   await expect(page.locator('[data-action="other-ways-in"]')).toHaveAttribute('title', 'Download one from OnlyWorlds, or view a shared world');
 });
 
@@ -135,19 +144,19 @@ test('first visit: start a world in a folder, pointed at a world folder for its 
 test('a world opened without a home folder: a reload shows the world list, not the landing', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-3');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
 
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
-  await expect(page.locator('[data-action="open-world-folder"]')).toHaveCount(0);
+  await expect(page.locator('.atlas-landing-compact')).toHaveCount(0);
   await expect(page.locator('.atlas-sidebar').getByText('Agent World').first()).toBeVisible();
 });
 
 test('the first NEW world asks where worlds live, then creates it there', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-4');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
 
   await page.goto('/#/');
@@ -181,7 +190,7 @@ test('the first NEW world asks where worlds live, then creates it there', async 
 test('cancelling the home-folder question creates nothing', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-5');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await page.goto('/#/');
   await page.waitForSelector('.atlas-shell');
@@ -210,7 +219,7 @@ test('cancelling the home-folder question creates nothing', async ({ page }) => 
 test('a click on Start a world survives a sidebar re-render between press and release', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-8');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await page.goto('/#/');
   const button = page.locator('[data-action="create-local"]');
@@ -228,7 +237,7 @@ test('a click on Start a world survives a sidebar re-render between press and re
 test('a click on a world row survives a sidebar re-render between press and release', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-9');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await page.goto('/#/');
   const row = page.locator('[data-world-id]').first();
@@ -275,7 +284,7 @@ async function clickAcrossRerender(page: Page, selector: string): Promise<void> 
 test('a click on a room in the strip survives a re-render between press and release', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-10');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await clickAcrossRerender(page, '.atlas-room-nav-btn[data-room="knowledge"]');
   await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('knowledge');
@@ -284,7 +293,7 @@ test('a click on a room in the strip survives a re-render between press and rele
 test('a click on the sidebar mode toggle survives a re-render between press and release', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-11');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   const before = await page.evaluate(() => (window as any).__atlasTestApi.getState().ui.sidebarMode);
   const other = before === 'worlds' ? 'mode-elements' : 'mode-worlds';
@@ -296,7 +305,7 @@ test('a click on the sidebar mode toggle survives a re-render between press and 
 test('a click on the element page survives a re-render between press and release', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-12');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/element/00000000-0000-4000-8000-0000000000a1`; });
   const toggle = page.locator('.atlas-empty-fields-toggle button');
@@ -310,34 +319,27 @@ test('a click on the element page survives a re-render between press and release
 test('a click on a settings tab survives a re-render between press and release', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-13');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/settings/general`; });
   await clickAcrossRerender(page, '.atlas-settings-tab[data-settings-tab="storage"]');
   await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('storage');
 });
 
-// Waypoints live outside the store, so Settings redraws on their own event:
-// with redraws keyed (1.51.5), nothing else would show a new count.
-test('the OnlyWorlds tab\'s waypoint count moves when a waypoint lands', async ({ page }) => {
+// The guide's switch lives outside the store, so Settings redraws on its own
+// event: with redraws keyed (1.51.5), nothing else would show the switch moved.
+test('the OnlyWorlds tab redraws when the notes are switched from another place', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-16');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await page.evaluate(() => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/settings/onlyworlds`; });
-  const count = page.locator('.atlas-ow-waypoints-count');
-  await expect(count).toBeVisible();
+  const sw = page.locator('[data-action="guide-notes-switch"]');
+  await expect(sw).toHaveText('Notes after what you do: On');
   await page.waitForTimeout(500);
-  const total = Number((await count.textContent())!.split(' of ')[1]);
-  await page.evaluate(() => {
-    const raw = localStorage.getItem('atlas_waypoints_v1');
-    const s = raw ? JSON.parse(raw) : { completed: {} };
-    s.completed = s.completed ?? {};
-    document.querySelectorAll('[data-waypoint]').forEach((el) => { s.completed[(el as HTMLElement).dataset.waypoint!] = new Date().toISOString(); });
-    localStorage.setItem('atlas_waypoints_v1', JSON.stringify(s));
-    document.dispatchEvent(new CustomEvent('atlas:waypoints-changed'));
-  });
-  await expect(count).toHaveText(`${total} of ${total}`);
+  // Switched off elsewhere (another tab, a note's own path): only the event tells Settings.
+  await page.evaluate(async () => { const { setNotesOff } = await import('/src/core/guide.ts'); setNotesOff(true); });
+  await expect(sw).toHaveText('Notes after what you do: Off');
 });
 
 // Row 5: the right pane's tab bar, and the badges on the sync pill, where a
@@ -345,7 +347,7 @@ test('the OnlyWorlds tab\'s waypoint count moves when a waypoint lands', async (
 test('a click on a right pane tab survives a re-render between press and release', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-14');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   const before = await page.evaluate(() => (window as any).__atlasTestApi.getState().ui.rightActiveIndex);
   const other = await page.evaluate((b) => (window as any).__atlasTestApi.getState().ui.rightTabs.findIndex((_: unknown, i: number) => i !== b), before);
@@ -357,7 +359,7 @@ test('a click on a right pane tab survives a re-render between press and release
 async function openWorldWith(page: Page, dir: string, type: string, fields: Record<string, unknown>): Promise<string> {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, dir);
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   return await page.evaluate(async ({ type, fields }) => {
     const api = (window as any).__atlasTestApi;
@@ -428,7 +430,7 @@ test('the map index chevron folds a parent map', async ({ page }) => {
 test('a click on the sync pill\'s conflict badge stays on the badge across a re-render', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-15');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   // The pill's linked branch with two conflicts (no server: the UI branch only).
   await page.evaluate(() => {
@@ -448,7 +450,7 @@ test('a click on the sync pill\'s conflict badge stays on the badge across a re-
 test('"add a world" opens the chooser; its open-a-world row opens a picked world', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-6');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
 
   // A second world folder, through the chooser this time.
@@ -473,7 +475,7 @@ test('"add a world" opens the chooser; its open-a-world row opens a picked world
 test('Settings can hide the add-world icons; "add a world" stays, across a reload', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-8');
-  await page.click('[data-action="open-world-folder"]');
+  await openWorldFolderDoor(page);
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"]')).toBeVisible();
 

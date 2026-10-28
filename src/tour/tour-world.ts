@@ -6,7 +6,7 @@
  * the Web Lock, `.atlas/making`, a nonced `browser-worlds/hyperion-<id8>-<n4>`,
  * a failure removes it), registered `where: 'browser'` AND `demo: true`. No
  * folder pick, no permission prompt. `demo` (registry + world.json mirror)
- * keeps tour gestures off the waypoints and keeps the flag on rediscovery.
+ * keeps tour gestures from earning guide notes and keeps the flag on rediscovery.
  * Elements are NOT written here: the tour engine reveals them step by step.
  * The tour never asks the browser to keep worlds (§2.3: Keep does).
  */

@@ -22,7 +22,6 @@ import { importHash, navigate, worldHash } from '../core/router';
 import { markNewcomerAnswered } from '../core/newcomer';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
-import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
 import type { WorldRegistryEntry } from '../core/types';
@@ -120,7 +119,7 @@ export class CreateWorldModal extends BaseModal {
       const name = nameInput.value.trim() || 'Untitled world';
 
       // Tour mode: hand the create to the tour engine and close. No folder,
-      // no waypoint, no navigation of our own — the tour routes.
+      // no guide note, no navigation of our own — the tour routes.
       if (this.tour) {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Creating…';
@@ -160,11 +159,6 @@ export class CreateWorldModal extends BaseModal {
           // never draws the question it was answered, not even under this dialog.
           beforeActivate: link ? markNewcomerAnswered : undefined,
         });
-        // Waypoint: the created world is non-demo by construction — ungated
-        // even when the sample world is active at click time (hookmap wp1).
-        // No toast lands on the empty home this opens (#127): the home's core
-        // pair is first-world's receipt.
-        completeWaypoint('first-world');
         this.toasts.success(`Created ${entry.name}`);
         this.hide();
         this.onCreated?.({ entry });

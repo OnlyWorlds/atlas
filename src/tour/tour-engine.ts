@@ -3,7 +3,7 @@
  *
  * THE SAFETY LAYER: the tour only ever writes to the demo world it booted
  * (registry `demo: true`, mirrored in world.json — the contract that
- * also keeps demo gestures from completing waypoints). Every mutation goes
+ * also keeps demo gestures from earning guide notes). Every mutation goes
  * through the ordinary FolderStore of the ACTIVE world, and every write-path
  * entry point re-checks that the active world is the tour's demo world —
  * if the user activates another world mid-tour, the tour pauses rather than

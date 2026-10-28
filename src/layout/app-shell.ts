@@ -138,6 +138,15 @@ export function mountAppShell(container: HTMLElement): AppShell {
   middleContent.className = 'atlas-middle-content';
   middle.appendChild(middleContent);
 
+  // The guide's one note (ui/guide-note.ts): a zero-height row at the pane's
+  // foot that the note floats up from, so it never reflows a room. An empty
+  // live region from the start, so a note put in it is read out.
+  const guideSlot = document.createElement('div');
+  guideSlot.className = 'atlas-guide-slot';
+  guideSlot.setAttribute('role', 'status');
+  guideSlot.setAttribute('aria-live', 'polite');
+  middle.appendChild(guideSlot);
+
   const divider2 = document.createElement('div');
   divider2.className = 'atlas-divider';
 

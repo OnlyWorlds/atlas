@@ -456,45 +456,52 @@ function renderWritingTierActions(el: Element, header: HTMLElement): void {
     btn.title = `New ${childLabel.toLowerCase()}`;
     const iconName = childTier === 'l4' ? 'edit_note' : 'add';
     btn.innerHTML = `<span class="material-symbols-outlined">${iconName}</span>`;
-    btn.addEventListener('click', () => {
-      new WritingCreateModal({
-        label: childLabel,
-        parentId: el.id,
-        onCreate: async (name) => {
-          const store = getActiveStore();
-          if (!store) return;
-          const supertype = supertypeForTier(childTier, active.worldId);
-          // Find next order under this parent.
-          const siblings = getState().data.elements.filter(
-            e => e.type === 'narrative' && (e as Element & { parent_narrative?: string }).parent_narrative === el.id,
-          );
-          let maxOrder = -1;
-          for (const s of siblings) {
-            const o = (s as Element & { order?: number }).order ?? 0;
-            if (o > maxOrder) maxOrder = o;
-          }
-          const created = await store.createElement('narrative', {
-            name,
-            supertype,
-            parent_narrative: el.id,
-            order: maxOrder + 1,
-          } as Partial<Element>);
-          const all = await refreshElementsAfterWrite(store);
-          // Navigate to the created narrative — stay in the current room.
-          const currentRoute = parseHash(window.location.hash);
-          if (currentRoute.mode === 'writing') {
-            navigate(writingHashForNarrative(active.worldId, created.id, all));
-          } else {
-            navigate(elementHash(active.worldId, created.id));
-          }
-          toastManager.info(`${childLabel} created`);
-        },
-      }).open();
-    });
+    btn.addEventListener('click', () => openWritingChildCreate(el, childTier, active.worldId));
     cluster.appendChild(btn);
   }
 
   header.appendChild(cluster);
+}
+
+/**
+ * The writing tree's "+ new child" dialog for a narrative: the header's own
+ * buttons, and the guide's Add a chapter, open the same one.
+ */
+export function openWritingChildCreate(el: Element, childTier: 'l1' | 'l2' | 'l3' | 'l4', worldId: string): void {
+  const childLabel = getWritingLabels(worldId)[childTier];
+  new WritingCreateModal({
+    label: childLabel,
+    parentId: el.id,
+    onCreate: async (name) => {
+      const store = getActiveStore();
+      if (!store) return;
+      const supertype = supertypeForTier(childTier, worldId);
+      // Find next order under this parent.
+      const siblings = getState().data.elements.filter(
+        e => e.type === 'narrative' && (e as Element & { parent_narrative?: string }).parent_narrative === el.id,
+      );
+      let maxOrder = -1;
+      for (const s of siblings) {
+        const o = (s as Element & { order?: number }).order ?? 0;
+        if (o > maxOrder) maxOrder = o;
+      }
+      const created = await store.createElement('narrative', {
+        name,
+        supertype,
+        parent_narrative: el.id,
+        order: maxOrder + 1,
+      } as Partial<Element>);
+      const all = await refreshElementsAfterWrite(store);
+      // Navigate to the created narrative — stay in the current room.
+      const currentRoute = parseHash(window.location.hash);
+      if (currentRoute.mode === 'writing') {
+        navigate(writingHashForNarrative(worldId, created.id, all));
+      } else {
+        navigate(elementHash(worldId, created.id));
+      }
+      toastManager.info(`${childLabel} created`);
+    },
+  }).open();
 }
 
 // ====== Map / Pin clusters (DESIGN_MAPS.md §3.5) ======

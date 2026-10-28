@@ -199,14 +199,14 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
 
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
-  // Waypoints live outside the store: the OnlyWorlds tab's count moves on
-  // their own event (it used to wait for the next unrelated redraw).
-  document.addEventListener('atlas:waypoints-changed', render);
+  // The guide's notes switch lives outside the store: the OnlyWorlds tab redraws
+  // on its own event (it would wait for the next unrelated redraw).
+  document.addEventListener('atlas:guide-changed', render);
   render();
   return () => {
     unsubState();
     unsubHash();
-    document.removeEventListener('atlas:waypoints-changed', render);
+    document.removeEventListener('atlas:guide-changed', render);
   };
 }
 

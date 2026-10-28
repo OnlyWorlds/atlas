@@ -233,7 +233,7 @@ export async function discoverWorldsInRoot(
         pathHint: `${rootPathHint}/${entry.name}`,
         // Re-mirror the demo flag from world.json — without this, a
         // localStorage wipe + rediscovery would silently un-demo the sample
-        // world and its gestures would start completing waypoints.
+        // world and its gestures would start earning guide notes.
         demo: meta.demo === true,
       }));
     }
@@ -803,7 +803,7 @@ export async function createWorldFromImportedData(
   // (which is the adopted id when the caller adopted one, else a fresh mint).
   // `demo` never rides an import plan — only the explicit sample-world opt sets
   // it (an exported demo world must re-import as an ordinary world, or its
-  // gestures would silently stop completing waypoints).
+  // gestures would silently stop earning guide notes).
   const { demo: _dropDemo, ...importedMeta } = plan.worldMeta ?? {};
   let applied: ApplyResult;
   try {

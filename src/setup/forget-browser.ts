@@ -7,7 +7,7 @@
  * Atlas): the worlds kept in this browser (OPFS), the remembered folders
  * (the handle vault, Atlas's one IndexedDB), and localStorage and
  * sessionStorage (the registry, the PIN, the account sign-in, settings,
- * waypoints, the tour). The app's own cached files stay: they are the app.
+ * the guide's notes, the tour). The app's own cached files stay: they are the app.
  *
  * The order is the gate (craft: every failure leaves a state; name it):
  * 1. Another open Atlas tab would write its registry back after the clear,

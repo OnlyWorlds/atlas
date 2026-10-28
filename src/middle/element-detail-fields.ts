@@ -32,8 +32,7 @@ import { AliasesEditModal } from '../ui/aliases-edit-modal';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import type { FieldMeta, SectionLayout } from '../editor/field-schema';
-import { relationFieldsFor } from '../editor/field-schema';
-import { completeWaypoint, completeTaxonomyHalf } from '../core/waypoints';
+import { reportGesture } from '../ui/guide-note';
 import { getFieldDescription } from '../editor/field-descriptions';
 import { unitLabelFor } from '../core/world-units';
 import { pickElement } from '../ui/element-picker-modal';
@@ -441,6 +440,8 @@ function openCreateForLink(el: Element, meta: FieldMeta, existingIds: string[]):
     excludeTypes: [...LINK_CREATABLE].filter(t => t !== target),
     suppressNavigate: true,
     title: `New ${label} · ${humanizeFieldName(meta.name)}`,
+    // The link it writes is the gesture (a Location here reports placed), never the create.
+    reportsOwnGesture: true,
     afterCreate: (id, type) => {
       if (type !== target) return; // grid is locked, but never link off-target
       const value = meta.widget === 'multi-link' ? [...existingIds, id] : id;
@@ -683,18 +684,13 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
     // Local write succeeded — schedule a debounced push. No-op for local-only.
     requestPushIfLinked();
 
-    // Waypoint hooks. This function is GESTURE-ONLY — every caller
-    // is a field-widget commit handler in this file; do not call it from
-    // sync/import/derive paths or these hooks would leak (hookmap wp3/wp4).
-    if ((fieldName === 'supertype' || fieldName === 'subtype')
-        && typeof valueToPersist === 'string' && valueToPersist.trim()) {
-      completeTaxonomyHalf(fieldName);
-    }
-    const nonEmpty = Array.isArray(valueToPersist) ? valueToPersist.length > 0
-      : typeof valueToPersist === 'string' ? valueToPersist.trim().length > 0
-      : false;
-    if (nonEmpty && relationFieldsFor(el.type).some(f => f.diskField === fieldName)) {
-      completeWaypoint('links');
+    // The guide's gestures. This function is GESTURE-ONLY: every caller is a
+    // field-widget commit in this file (a link field's create included); never
+    // call it from sync, import or derive paths, or the notes would speak for them.
+    if (el.type === 'character' && fieldName === 'location') {
+      reportGesture({ kind: 'location-set', character: el.id });
+    } else if (el.type === 'event' && fieldName === 'start_date') {
+      reportGesture({ kind: 'date-set', event: el.id });
     }
 
     // Map.image_url auto-detect (DESIGN_MAPS.md §4):

@@ -25,7 +25,6 @@ import { deleteHandle } from '../store/handle-vault';
 import { BaseModal } from '../ui/modal-base';
 import { NO_FOLDER_PICKER_LINE, PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 import { browserStorageDoorOpen, hasFolderMode } from '../core/capabilities';
-import { completeWaypoint } from '../core/waypoints';
 import { pickWorldFile, openWorldFileFrom, openDemoWorld } from '../ui/open-world-file';
 import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
@@ -55,8 +54,6 @@ export async function openPickedWorld(picked: FileSystemDirectoryHandle, toasts:
   else toasts.success(`Opened "${name}" in place. Its folder stays where it is`);
   const { activateWorld } = await import('../sidebar/worlds-sidebar');
   const ok = await activateWorld(worldId, toasts as ToastManager);
-  // Opening a world folder is a first world too (1.17, contract §6.2).
-  if (ok && !already) completeWaypoint('first-world');
   if (!ok && !already && getState().active?.worldId !== worldId) {
     const entry = getState().registry.worlds.find(w => w.id === worldId);
     if (entry) {

@@ -56,6 +56,43 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.98.0',
+    date: '2026-10-28',
+    theme: 'A guide that follows what you make',
+    entries: [
+      {
+        id: 'guide-strip',
+        title: 'Five dots on the home show what your world can do',
+        body: 'Someone, somewhere, something happened, a story and a copy. Each lights up when the world has it, however it got there, so an imported world is lit for what it holds. Press one to make that thing, or to open it.',
+        tags: ['home', 'onboarding'],
+      },
+      {
+        id: 'guide-notes',
+        title: 'A short note after what you just made',
+        body: 'Make a Character, a Location, an Event or a story and one quiet line says what it is and offers the next step: place Ada at Hollow Keep, give the Event a year, write the story as a book. Each shows once. Settings, OnlyWorlds turns them off, or shows them again.',
+        tags: ['onboarding'],
+      },
+      {
+        id: 'waypoints-from-the-world',
+        title: 'The waypoints list what your world can do now',
+        body: 'Settings, OnlyWorlds reads each waypoint from the open world itself, with no count to chase. The small messages that popped up for each waypoint are gone.',
+        tags: ['settings', 'onboarding'],
+      },
+      {
+        id: 'first-screen-stacked',
+        title: 'The first screen leads with Start a world',
+        body: 'Explore Moppetopia sits under it, the tour is offered as Watch how it works, and a world folder you already have opens from Other ways in.',
+        tags: ['onboarding'],
+      },
+      {
+        id: 'demo-way-out',
+        title: 'Moppetopia says how to leave it',
+        body: 'Its home has one line under its name: start a world of your own, or delete this copy.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.97.2',
     date: '2026-10-27',
     theme: 'Fewer words',

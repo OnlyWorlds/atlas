@@ -454,7 +454,9 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
     const sub = await root.getDirectoryHandle('persistent-root', { create: true });
     (window as any).__atlasTestApi.setNextDirectory(sub);
   });
-  await page.click('[data-action="open-world-folder"]');
+  // A world folder opens from Other ways in (the landing's own link moved there, 2026-10-27).
+  await page.click('[data-action="other-ways-in"]');
+  await page.click('[data-modal="add-world"] [data-choice="open-folder"]');
   await page.waitForSelector('[data-action="create-local"]');
 
   // Both worlds should be visible in the sidebar again.

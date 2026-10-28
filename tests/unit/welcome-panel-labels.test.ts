@@ -36,19 +36,19 @@ describe('welcome-panel label restores', () => {
     // These are the exact drifted literals that shipped. If either reappears
     // as an assignment, the rename bug is back.
     expect(source).not.toContain(`textContent = 'Set up your OnlyWorlds folder'`);
-    expect(source).not.toContain(`textContent = 'Take the tour'`);
+    expect(source).not.toContain(`textContent = 'Watch how it works'`);
   });
 
   it('renders the door labels in sentence case (Titus, 2026-10-20: sentence case everywhere)', () => {
-    for (const label of ["'Start a world'", "'Explore Moppetopia'", "'Open a world folder'", "'Other ways in'"]) expect(source).toContain(label);
+    for (const label of ["'Start a world'", "'Explore Moppetopia'", "'Watch how it works'", "'Other ways in'"]) expect(source).toContain(label);
   });
 
   it('the tour door has TWO labels, which is why capturing beats restating', () => {
-    // `${tourDone ? 'replay the tour' : 'take the tour'}` — a hard-coded
+    // `${tourDone ? 'Watch it again' : 'Watch how it works'}` (the tour worded as an offer, 2026-10-27): a hard-coded
     // restore could not be right for both, and the shipped one ("Take the
     // tour") was right for neither. A returning user who hit a launch error
     // would have watched "replay the tour" become "Take the tour".
-    expect(source).toContain(`'Replay the tour'`);
-    expect(source).toContain(`'Take the tour'`);
+    expect(source).toContain(`'Watch it again'`);
+    expect(source).toContain(`'Watch how it works'`);
   });
 });

@@ -33,7 +33,9 @@ test('the header and the room strip keep their places when the icon font arrives
     await w.close();
     api.setNextDirectory(dir);
   });
-  await page.click('[data-action="open-world-folder"]');
+  // A world folder opens from Other ways in (the landing's own link moved there, 2026-10-27).
+  await page.click('[data-action="other-ways-in"]');
+  await page.click('[data-modal="add-world"] [data-choice="open-folder"]');
   await expect(page.locator('h1', { hasText: 'Font World' })).toBeVisible();
   const boxes = () => page.evaluate(() => {
     const sel = ['.atlas-worlds-header [data-action="create-local"]', '.atlas-worlds-header [data-action="add-world"]', '.atlas-room-nav-strip .atlas-room-nav-btn'];

@@ -25,7 +25,8 @@ async function boot(page: Page) {
 test('@firefox the landing offers the tour, and the tour builds its world in browser storage', async ({ page }) => {
   await boot(page);
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
-  await expect(page.locator('[data-action="open-world-folder"]')).toHaveCount(0);
+  // No folder picker here: Other ways in never offers a world folder.
+  await expect(page.locator('[data-action="other-ways-in"]')).not.toHaveAttribute('title', /folder/);
   await expect(page.locator('.atlas-landing-note')).toContainText('Chrome, Edge or Brave');
 
   await page.click('[data-action="start-tour"]');

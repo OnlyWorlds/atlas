@@ -232,7 +232,6 @@ html {
 :root[data-theme='light'] .atlas-timeline-view,
 :root[data-theme='light'] .atlas-timeline-canvas,
 :root[data-theme='light'] .atlas-zone-draft-overlay,
-:root[data-theme='light'] .atlas-waypoint-toast,
 :root[data-theme='light'] .atlas-map-placement-hint {
   --atlas-ink-rgb: 255, 255, 255;
   --atlas-accent-rgb: 34, 211, 238;
@@ -4731,12 +4730,11 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
    tool's own voice rather than a marketing hero's. */
 .atlas-landing-compact .atlas-landing-actions {
   display: flex;
-  /* Wraps: three or four doors in a narrow desktop
-     window pushed the first one off-screen to the left. */
-  flex-wrap: wrap;
-  row-gap: 14px;
-  gap: 22px;
-  align-items: flex-start;
+  /* Stacked (Titus 2026-10-27): Start a world is the one decision, the demo
+     sits under it as the smaller second door. */
+  flex-direction: column;
+  row-gap: 18px;
+  align-items: center;
   justify-content: center;
   /* BELOW the tagline (both orders were built and shot): the eye reads
      mark → name → what it is → what you can do. Placed above, the buttons
@@ -15776,69 +15774,153 @@ body.atlas-share-fullpreview > * {
 }
 .atlas-footer-owmark:hover .atlas-footer-ow-icon { opacity: 1; }
 
-/* Waypoint toast — OW-styled, clickable, own renderer (core/waypoints.ts) */
-.atlas-waypoint-toast {
+/* ==== The guide (onboarding step 1): the strip on the home, the one note ====
+   The strip: five unnumbered marks on a hairline, filled when the world has
+   the thing, the next one ringed faintly; never a count (home-guide.ts).
+   The note: the quiet version drawn for it (2026-10-27): a
+   neutral border with a thin accent rule at the left, no tinted fill, the
+   actions plain links. It floats up from a zero-height slot at the middle
+   pane's foot (app-shell.ts), so it never reflows a room (ui/guide-note.ts). */
+.atlas-guide-strip {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-  border: 1px solid rgba(var(--atlas-accent-rgb), 0.35);
-  /* A DELIBERATE dark chip in both themes (the light-mode census ruling):
-     the waypoint toast is the one celebratory surface with the OW sigil and
-     its own voice, so it keeps a distinct dark ground next to the themed
-     toasts. It says so with the canvas tokens, the same way the tour root
-     and the pin chips do, instead of a bare literal that read as a miss. */
-  background: rgba(var(--atlas-canvas-scrim-rgb), 0.92);
-  cursor: default;
-}
-.atlas-waypoint-toast-body {
-  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  color: inherit;
+  gap: 8px 18px;
 }
-.atlas-waypoint-toast-glyph { width: 18px; height: 18px; flex: none; }
-.atlas-waypoint-toast-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.atlas-guide-marks {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  flex: 1 1 360px;
   min-width: 0;
 }
-.atlas-waypoint-toast-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--atlas-accent-text);
+/* The hairline the marks sit on: a hint of a path, never a gate. */
+.atlas-guide-marks::before {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 15px;
+  border-top: 1px solid rgba(var(--atlas-ink-rgb), 0.12);
 }
-.atlas-waypoint-toast-line {
-  font-size: 12px;
-  color: var(--atlas-text-soft);
-}
-.atlas-waypoint-toast-rider {
+.atlas-guide-mark {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px 8px;
-  border-top: 1px solid var(--atlas-divider);
-  font-size: 11px;
-  /* Muted, as its two buttons: dim measured 2.28:1 on the chip once the
-     contrast spec composited the text's own alpha. */
-  color: var(--atlas-text-muted);
-}
-.atlas-waypoint-toast-rider-btn {
+  min-width: 0;
+  padding: 8px 2px 6px;
   background: none;
   border: none;
-  padding: 0;
-  font-size: 11px;
-  color: var(--atlas-text-muted);
+  border-radius: 6px;
+  color: var(--atlas-text-soft);
   cursor: pointer;
+  font: inherit;
 }
-.atlas-waypoint-toast-rider-btn:hover { color: var(--atlas-accent-text); }
+.atlas-guide-mark:hover,
+.atlas-guide-mark:focus-visible { background: var(--atlas-bg-hover); color: var(--atlas-text); }
+.atlas-guide-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--atlas-ink-rgb), 0.35);
+  background: var(--atlas-bg);
+  box-sizing: border-box;
+}
+.atlas-guide-mark.is-lit .atlas-guide-dot {
+  background: var(--atlas-accent);
+  border-color: var(--atlas-accent);
+}
+.atlas-guide-mark.is-next .atlas-guide-dot {
+  box-shadow: 0 0 0 4px rgba(var(--atlas-accent-rgb), 0.16);
+  border-color: var(--atlas-cyan-soft);
+}
+.atlas-guide-mark-label {
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: center;
+  /* Two lines at most: "Something happened" wraps on a phone, never overflows. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.atlas-guide-mark.is-lit .atlas-guide-mark-label { color: var(--atlas-text); }
+.atlas-guide-any { font-size: 0.82rem; white-space: nowrap; }
+/* A narrow strip (a phone, or a narrow middle pane on a wide screen): the marks
+   keep their row and Anything else takes its own line. Keyed to the strip's own
+   width, not the window's. */
+.atlas-guide-strip { container-type: inline-size; }
+@container (max-width: 460px) {
+  .atlas-guide-any { flex-basis: 100%; }
+  .atlas-guide-marks { gap: 0; }
+  .atlas-guide-mark { padding-left: 0; padding-right: 0; }
+  .atlas-guide-mark-label { font-size: 0.68rem; letter-spacing: -0.01em; }
+}
+
+.atlas-guide-slot {
+  position: relative;
+  flex: 0 0 0;
+  height: 0;
+  overflow: visible;
+  z-index: 30;
+}
+.atlas-guide-note {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 40px 10px 14px;
+  background: var(--atlas-bg-raised);
+  border: 1px solid rgba(var(--atlas-ink-rgb), 0.14);
+  border-left: 2px solid var(--atlas-cyan-soft);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  color: var(--atlas-text);
+  font-size: 0.88rem;
+}
+.atlas-guide-note-line { flex: 1 1 100%; }
+.atlas-guide-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.atlas-guide-note-act {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--atlas-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  font: inherit;
+}
+.atlas-guide-note-act:hover,
+.atlas-guide-note-act:focus-visible { color: var(--atlas-text); }
+.atlas-guide-note-year { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.atlas-guide-note-year label { display: inline-flex; align-items: center; gap: 6px; color: var(--atlas-text-soft); }
+.atlas-guide-note-year-input { width: 6.5em; padding: 3px 6px; }
+.atlas-guide-note-error { flex-basis: 100%; color: var(--atlas-danger); font-size: 0.8rem; }
+.atlas-guide-note-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+/* A narrow window: the toasts own the foot (they would cover the note's ×),
+   so the slot sits under the room strip and the note floats down from it. */
+@media (max-width: 820px) {
+  .atlas-middle-content { order: 1; }
+  .atlas-guide-note { top: 8px; bottom: auto; left: 10px; right: 10px; }
+}
 
 /* ==== T-E1: quiet empty field rows (hover restores) ==== */
 /* An empty row's label sits one step below a filled one, by colour: muted,
@@ -17482,3 +17564,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
   .atlas-files-hint { text-align: left; }
 }
 .atlas-file-bit { white-space: nowrap; }
+
+/* The demo's way out: one quiet line under Moppetopia's name (world-home.ts buildDemoLine). */
+.atlas-home-demo-line {
+  margin: -6px 0 18px;
+  color: var(--atlas-text-soft);
+  font-size: 0.86rem;
+}
+.atlas-home-demo-line .atlas-btn-link { font-size: inherit; }

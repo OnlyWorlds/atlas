@@ -16,7 +16,6 @@ import { escapeText } from '../core/dom-utils';
 import { ensureWritable, loadHandle } from '../store/handle-vault';
 import { ensureAtlasRoot } from '../setup/world-doors';
 import { moveBrowserWorldToFolder, MOVE_DID_NOT_FINISH } from '../setup/browser-world-move';
-import { completeWaypoint } from '../core/waypoints';
 
 function appRoot(): HTMLElement | null {
   return document.querySelector<HTMLElement>('.atlas-shell');
@@ -142,7 +141,6 @@ export class MoveBrowserWorldModal extends BaseModal {
     this.dismissLocked = false;
     if (outcome?.ok) {
       this.hide();
-      completeWaypoint('keep-copy');
       this.toasts.success((lines.success ?? `"${w.name}" now lives in a folder on your drive: ${outcome.pathHint}.`)
         + (outcome.leftBrowserCopy ? ' Its old copy in this browser is removed the next time Atlas starts.' : ''));
       return true;

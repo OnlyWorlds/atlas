@@ -53,6 +53,11 @@ export interface ModalShellOpts {
 const openModals: BaseModal[] = [];
 let modalTitleSeq = 0;
 
+/** Whether any dialog is up: a BaseModal, or another dialog drawn on the shared overlay. */
+export function anyModalOpen(): boolean {
+  return openModals.length > 0 || !!document.querySelector('.atlas-modal-overlay');
+}
+
 /**
  * What sits behind the topmost open modal is `inert` (found by
  * Seethe): `aria-modal` tells a screen reader, but Tab walked out of the
@@ -173,6 +178,8 @@ export class BaseModal {
         this.dismissLocked = false;
         const at = openModals.indexOf(this);
         if (at >= 0) openModals.splice(at, 1);
+        // The last one closed: what waited for the page to be free may speak (the guide's notes).
+        if (at >= 0 && openModals.length === 0) queueMicrotask(() => document.dispatchEvent(new CustomEvent('atlas:modal-closed')));
         if (this.modal) {
             const hadFocus = this.modal.contains(document.activeElement);
             this.modal.classList.remove('visible');

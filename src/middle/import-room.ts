@@ -23,7 +23,6 @@ import { hasFolderMode } from '../core/capabilities';
 import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
-import { completeWaypoint } from '../core/waypoints';
 import { sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
 import { parsePayload } from '../import/parse';
@@ -639,9 +638,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         reportFailures(applied.failures, plan.report.droppedLinks.length);
         if (reviewMount.isConnected && stillMine()) { clearLoaded(); renderExport(); }
       }
-      // Waypoint (hookmap wp7): the import BUTTON gesture is the waypoint —
-      // ungated (portability class). The imported DATA completes nothing.
-      completeWaypoint('import');
     } catch (err) {
       console.error('[import] failed', err);
       // No retry button: a half-finished import run again could duplicate.
@@ -788,7 +784,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         const next = updateWorldEntry(getState().registry, aw.worldId, { kept_export_at: new Date().toISOString() });
         saveRegistry(next);
         patchSlice('registry', next);
-        completeWaypoint('keep-copy', { toast: 'Your world has a copy of its own.' });
       }
       const n = checked.reduce((sum, t) => sum + (activeElements().filter(e => e.type === t).length), 0);
       toasts.success(`Exported ${n} element${n === 1 ? '' : 's'}`);
@@ -876,12 +871,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   // IE7: example JSON as copy or download — doubles as format documentation.
   root.querySelector<HTMLButtonElement>('[data-action="example-copy"]')!.addEventListener('click', () => {
     void navigator.clipboard.writeText(EXAMPLE_JSON)
-      .then(() => { toasts.success('Example JSON copied'); completeWaypoint('import'); })
+      .then(() => { toasts.success('Example JSON copied'); })
       .catch(() => toasts.error(CLIPBOARD_BLOCKED));
   });
   root.querySelector<HTMLButtonElement>('[data-action="example-download"]')!.addEventListener('click', () => {
     downloadText(EXAMPLE_JSON, 'onlyworlds_example.json');
-    completeWaypoint('import');
   });
 
   // D8: the convert-my-notes prompt for an AI assistant.

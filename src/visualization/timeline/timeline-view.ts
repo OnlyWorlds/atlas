@@ -24,7 +24,6 @@ import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { rankAnchors, ANCHOR_CAP } from './degree';
 import { applyAlpha, ensureIconFont } from './canvas-utils';
-import { completeWaypoint } from '../../core/waypoints';
 import { openFieldEditPopover } from '../../ui/field-edit-popover';
 import { forPointer } from '../../core/pointer';
 import {
@@ -2564,7 +2563,6 @@ function handleMouseUp(state: ViewState, e?: Pick<MouseEvent, 'clientX' | 'clien
         return;
       }
       state.onSelect(g.dot.node.id);
-      completeWaypoint('time'); // a true canvas click, same as the old path
       return;
     }
     draw(state); // clear the guide
@@ -2605,9 +2603,6 @@ function handleMouseUp(state: ViewState, e?: Pick<MouseEvent, 'clientX' | 'clien
       return;
     }
     state.onSelect(state.hoveredDot.node.id); // a click (not a drag) selects
-    // Waypoint (hookmap wp6): a true canvas click — the URL-derived anchor
-    // default and programmatic onSelect calls never pass through here.
-    completeWaypoint('time');
   } else if (!state.dragMoved && !state.hoveredDot && state.selectedId) {
     // Click on empty canvas → dismiss the peek (dismissal moved here
     // from the re-click, which now escalates to focus instead).

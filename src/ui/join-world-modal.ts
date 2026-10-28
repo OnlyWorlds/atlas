@@ -18,7 +18,6 @@ import { showProblem } from './problem-fixes';
 import { getState, patchSlice } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { enqueueActivationTask } from '../core/activation-chain';
-import { completeWaypoint } from '../core/waypoints';
 import { problemFor } from '../core/problems';
 import { takePendingJoin } from '../core/join-capture';
 import { diskApiBlock } from '../core/seat';
@@ -450,7 +449,6 @@ export class JoinWorldModal extends BaseModal {
           if (r.stoppedEarly) this.toasts.info(`Opened ${opened} with ${r.downloaded} of ${r.stoppedEarly.total} elements. Use Refresh from OnlyWorlds to download the rest.`);
           else if (r.failures.length > 0) this.toasts.error(`Opened ${opened}. ${r.failures.length} element${r.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${r.failures.length === 1 ? 'it' : 'them'}.`);
           else this.toasts.success(`Opened ${opened} · ${r.downloaded} element${r.downloaded === 1 ? '' : 's'} downloaded`);
-          completeWaypoint('ecosystem');
           navigate(homeHash(r.entry.id));
           return;
         }

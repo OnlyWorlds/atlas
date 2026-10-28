@@ -1,14 +1,13 @@
 /**
- * Bout OW — waypoints + the OnlyWorlds settings page.
+ * The waypoints on Settings, OnlyWorlds (the guide, step 1): the list as the
+ * memory of what the open world can do.
  *
- * Covers the user-visible contract (hookmap doc):
- *   - Creating a world (a real gesture) completes 'first-world'; the OW page
- *     shows the lit row + the quiet counter.
- *   - The first waypoint toast carries the "These are optional." rider.
- *   - Creating an element via the modal completes 'first-element'.
+ * Covers the user-visible contract:
+ *   - Every row is lit from the world itself, never from a stamp: a world
+ *     made by the store (as an import makes it) reads lit as surely as one
+ *     made by hand, and there is no count.
+ *   - The notes' switch and Show the notes again.
  *   - Legacy /settings/account URLs alias to the renamed onlyworlds tab.
- *   - The sidebar footer OW icon routes to the tab.
- *   - "mark all as familiar" stamps everything.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -44,46 +43,46 @@ test.beforeEach(async ({ page }) => {
   await freshBoot(page);
 });
 
-test('creating a world completes first-world; OW page shows it lit + counted', async ({ page }) => {
+const litRows = (page: Page) => page.locator('[data-waypoint]')
+  .evaluateAll(els => els.filter(e => e.getAttribute('data-lit') === 'true').map(e => e.getAttribute('data-waypoint')));
+
+test('rows are lit from the world itself: what the store wrote reads as surely as what a hand made', async ({ page }) => {
   await setupAtlasRoot(page);
   await createWorld(page, 'Waypoint World');
-
-  // The OW page lists it as met with the quiet counter. (Its toast no longer
-  // lands on the new empty home, #127: the home's own question speaks there.)
   await page.click('[data-action="open-onlyworlds"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
   expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/onlyworlds$/);
-  await expect(page.locator('[data-waypoint="first-world"]')).toHaveClass(/is-met/);
-  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('1 of 13');
-
-  // The first toast that does show carries the optional-rider.
+  // A folder world already has its copy; nothing else yet; no count anywhere.
+  expect(await litRows(page)).toEqual(['copy']);
+  await expect(page.locator('[data-role="waypoints-section"]')).not.toContainText(/\d+ of \d+/);
+  // The store writes what an import would: a placed pair, a dated Event, a pin, a Trait.
   await page.evaluate(async () => {
-    const m = await import('/src/core/waypoints.ts');
-    m.completeWaypoint('council');
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const keep = await store.createElement('location', { name: 'Hollow Keep' });
+    await store.createElement('character', { name: 'Ada', location: keep.id });
+    await store.createElement('event', { name: 'The Founding', start_date: 120 });
+    await store.createElement('trait', { name: 'Stubborn' });
+    api.patchData(await store.listElements());
   });
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.locator('.atlas-settings h1').click();
-  const toast = page.locator('.atlas-waypoint-toast');
-  await expect(toast).toBeVisible();
-  await expect(toast).toContainText('Help shape the format');
-  await expect(toast).toContainText('These are optional.');
+  await expect.poll(() => litRows(page)).toEqual(['someone', 'placed', 'happened', 'copy', 'ring-traits']);
+  // An unlit row keeps its way in; a lit one has none.
+  await expect(page.locator('[data-waypoint="story"] .atlas-ow-waypoint-arrow')).toHaveCount(1);
+  await expect(page.locator('[data-waypoint="someone"] .atlas-ow-waypoint-arrow')).toHaveCount(0);
 });
 
-test('creating an element via the modal completes first-element', async ({ page }) => {
+test('the notes switch and Show the notes again', async ({ page }) => {
   await setupAtlasRoot(page);
-  await createWorld(page, 'Element World');
-
-  // Sidebar flips to the world's elements mode; create via the + modal.
-  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
-  await page.click('[data-action="create-element"]');
-  await expect(page.locator('[data-modal="create-element"]')).toBeVisible();
-  await page.fill('input[name="element-name"]', 'Waypoint Hero');
-  await page.click('.atlas-create-type-btn[data-type="character"]');
-  await page.click('[data-modal="create-element"] [data-action="create"]');
-  await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
-
+  await createWorld(page, 'Switch World');
   await page.click('[data-action="open-onlyworlds"]');
-  await expect(page.locator('[data-waypoint="first-element"]')).toHaveClass(/is-met/);
+  const sw = page.locator('[data-action="guide-notes-switch"]');
+  await expect(sw).toHaveText('Notes after what you do: On');
+  await sw.click();
+  await expect(sw).toHaveText('Notes after what you do: Off');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_guide_v1')!).off)).toBe(true);
+  await page.evaluate(() => localStorage.setItem('atlas_guide_v1', JSON.stringify({ seen: { someone: 'x' }, off: true })));
+  await page.click('[data-action="guide-notes-again"]');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_guide_v1')!).seen)).toEqual({});
 });
 
 test('legacy /settings/account URL aliases to the onlyworlds tab', async ({ page }) => {
@@ -93,13 +92,4 @@ test('legacy /settings/account URL aliases to the onlyworlds tab', async ({ page
   await page.evaluate((w) => { window.location.hash = `#/w/${w}/settings/account`; }, worldId);
   await expect(page.locator('[data-settings-tab="onlyworlds"]')).toHaveClass(/active/);
   await expect(page.locator('.atlas-settings input[name="email"]')).toBeVisible();
-});
-
-test('mark all as familiar stamps every waypoint', async ({ page }) => {
-  await setupAtlasRoot(page);
-  await createWorld(page, 'Veteran World');
-  await page.click('[data-action="open-onlyworlds"]');
-  await page.click('[data-action="waypoints-mark-all"]');
-  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('13 of 13');
-  await expect(page.locator('.atlas-ow-waypoint.is-met')).toHaveCount(13);
 });

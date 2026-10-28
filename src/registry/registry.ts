@@ -188,7 +188,7 @@ export interface CreateLocalWorldOpts {
   handleKey: string;
   pathHint?: string;
   parentId?: string;
-  /** The bundled sample world (mirrors WorldMeta.demo — see waypoints). */
+  /** The bundled sample world (mirrors WorldMeta.demo — the guide stays quiet there). */
   demo?: boolean;
 }
 

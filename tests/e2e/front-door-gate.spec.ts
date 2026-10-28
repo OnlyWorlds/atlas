@@ -52,7 +52,9 @@ async function exists(page: Page, path: string): Promise<boolean> {
 
 async function openInPlaceFromLanding(page: Page, dir: string, id: string, name: string): Promise<void> {
   await seed(page, { [`${dir}/world.json`]: { id, name } }, dir);
-  await page.click('[data-action="open-world-folder"]');
+  // A world folder opens from Other ways in (the landing's own link moved there, 2026-10-27).
+  await page.click('[data-action="other-ways-in"]');
+  await page.click('[data-modal="add-world"] [data-choice="open-folder"]');
   await expect(page.locator('h1', { hasText: name })).toBeVisible();
 }
 
@@ -147,7 +149,9 @@ test('B7 a folder holding several world folders names what it found', async ({ p
     'lensb-b7/worlds/one/world.json': { id: A, name: 'One' },
     'lensb-b7/worlds/two/world.json': { id: B, name: 'Two' },
   }, 'lensb-b7/worlds');
-  await page.click('[data-action="open-world-folder"]');
+  // A world folder opens from Other ways in (the landing's own link moved there, 2026-10-27).
+  await page.click('[data-action="other-ways-in"]');
+  await page.click('[data-modal="add-world"] [data-choice="open-folder"]');
   await page.waitForTimeout(500);
   const toasts = await page.locator('.ow-toast-message').allTextContents();
   expect(toasts.join(' | ')).toMatch(/2 world/);

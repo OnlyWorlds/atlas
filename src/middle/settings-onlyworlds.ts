@@ -1,12 +1,12 @@
 /**
  * Settings → OnlyWorlds tab (workplan D11) — the hub that replaced
  * the Account tab: what OnlyWorlds is, your account credentials, the
- * waypoints learning track, essential links, and a developers corner.
+ * waypoints, essential links, and a developers corner.
  *
- * Waypoint defs + state live in src/core/waypoints.ts; the contract (hook
- * table, gating, toast rules) is a design note of 2026-07-07.
- * The unmet rows ARE the self-paced tour: concept line + action line + a deep
- * link that opens the feature. No tour machinery.
+ * The waypoints are the guide's memory (`core/waypoints.ts`, the guide
+ * step 1 design note of 2026-10-27): what the open world can do, lit from the
+ * world itself; an unlit row's arrow opens its way in. The notes' switch
+ * lives here too.
  */
 
 import { hasFolderMode } from '../core/capabilities';
@@ -18,17 +18,9 @@ import { renderAccountTab, wireAccountTab } from './settings-account';
 import { getState } from '../core/state';
 import { worldPin } from '../core/seat';
 import { buildV2Adapter } from '../sync/make-online';
-import {
-  WAYPOINTS,
-  loadWaypointsState,
-  completedCount,
-  markAllFamiliar,
-  isMuted,
-  setMuted,
-  completeWaypoint,
-  consumePendingHighlight,
-  OW_COUNCIL_URL,
-} from '../core/waypoints';
+import { PATH_WAYPOINTS, RING_WAYPOINTS, OW_COUNCIL_URL, waypointsLit, type WaypointDef } from '../core/waypoints';
+import { guideElements, loadGuideState, setNotesOff, showNotesAgain } from '../core/guide';
+import { keepSafeCard } from './home-keepsafe';
 
 const OW_SITE_URL = 'https://onlyworlds.com';
 const OW_TOOLKIT_URL = 'https://onlyworlds.github.io';
@@ -73,23 +65,28 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
   `;
 }
 
+/**
+ * The list as the memory (the guide, step 1): each row lit from the open
+ * world itself, never from a stamp, so no count to chase. With no world open
+ * the rows show unlit with no way in.
+ */
 function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): string {
-  const state = loadWaypointsState();
-  const count = completedCount();
-  const demoActive = activeWorld?.demo === true;
-  const rows = WAYPOINTS.map((w) => {
-    const met = !!state.completed[w.id];
-    const link = w.id === 'council' ? OW_COUNCIL_URL : w.link(activeWorld?.id ?? null);
+  const s = getState();
+  const open = !!activeWorld && s.active?.worldId === activeWorld.id;
+  const els = open ? s.data.elements : [];
+  const keepSafeShowing = open && !!keepSafeCard({ entry: activeWorld, elements: guideElements(els), loading: !!s.data.loading, now: Date.now() });
+  const lit = open ? waypointsLit(els, activeWorld, keepSafeShowing) : null;
+  const row = (w: WaypointDef): string => {
+    const met = !!lit?.[w.id];
+    const link = open ? w.link(activeWorld!.id) : null;
     // Unmet cards carry a quiet arrow in the bottom-right corner that opens
     // the feature (Titus's call: an arrow reads more elegant than a text link).
     const arrow = met || !link
       ? ''
-      : w.id === 'council'
-        ? `<a class="atlas-ow-waypoint-arrow" href="${OW_COUNCIL_URL}" target="_blank" rel="noopener" data-ow-council aria-label="${escapeText(w.action)}" title="${escapeText(w.action)}"><span class="material-symbols-outlined">arrow_forward</span></a>`
-        : `<a class="atlas-ow-waypoint-arrow" href="${link}" data-ow-nav="${link}" aria-label="${escapeText(w.action)}" title="${escapeText(w.action)}"><span class="material-symbols-outlined">arrow_forward</span></a>`;
+      : `<a class="atlas-ow-waypoint-arrow" href="${link}" data-ow-nav="${link}" aria-label="${escapeText(w.action)}" title="${escapeText(w.action)}"><span class="material-symbols-outlined">arrow_forward</span></a>`;
     return `
-      <div class="atlas-ow-waypoint ${met ? 'is-met' : ''}" data-waypoint="${w.id}">
-        <span class="material-symbols-outlined atlas-ow-waypoint-glyph">${met ? 'check_circle' : w.glyph}</span>
+      <div class="atlas-ow-waypoint ${met ? 'is-met' : ''}" data-waypoint="${w.id}" data-lit="${met}">
+        <span class="material-symbols-outlined atlas-ow-waypoint-glyph" aria-hidden="true">${met ? 'check_circle' : w.glyph}</span>
         <div class="atlas-ow-waypoint-text">
           <span class="atlas-ow-waypoint-name">${escapeText(w.name)}</span>
           <span class="atlas-ow-waypoint-concept">${escapeText(w.concept)}</span>
@@ -98,19 +95,18 @@ function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): st
         ${arrow}
       </div>
     `;
-  }).join('');
+  };
+  const off = loadGuideState().off;
   return `
     <section class="atlas-settings-section" data-role="waypoints-section">
-      <div class="atlas-ow-waypoints-head">
-        <h3>Waypoints</h3>
-        <span class="atlas-ow-waypoints-count">${count} of ${WAYPOINTS.length}</span>
-      </div>
-      <p class="atlas-settings-hint">Small ways Atlas and OnlyWorlds fit together. Each one opens the feature it describes.</p>
-      ${demoActive ? '<p class="atlas-settings-hint atlas-ow-demo-hint">You are exploring the sample world; these light up in a world of your own.</p>' : ''}
-      <div class="atlas-ow-waypoint-grid">${rows}</div>
+      <div class="atlas-ow-waypoints-head"><h3>Waypoints</h3></div>
+      <p class="atlas-settings-hint">What ${open ? 'this world' : 'a world'} can do. Each one opens the place it describes.</p>
+      <div class="atlas-ow-waypoint-grid">${PATH_WAYPOINTS.map(row).join('')}</div>
+      <h4 class="atlas-ow-waypoints-ring">More your world can do</h4>
+      <div class="atlas-ow-waypoint-grid">${RING_WAYPOINTS.map(row).join('')}</div>
       <div class="atlas-ow-waypoints-foot">
-        <button type="button" class="atlas-btn-ghost" data-action="waypoints-mark-all">Mark all as familiar</button>
-        <button type="button" class="atlas-btn-ghost" data-action="waypoints-mute">${isMuted() ? 'Turn messages on' : 'Turn messages off'}</button>
+        <button type="button" class="atlas-btn-ghost" data-action="guide-notes-switch" aria-pressed="${!off}">${off ? 'Notes after what you do: Off' : 'Notes after what you do: On'}</button>
+        <button type="button" class="atlas-btn-ghost" data-action="guide-notes-again">Show the notes again</button>
       </div>
     </section>
   `;
@@ -137,13 +133,13 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
   }
 
   function wireWaypointControls(): void {
-    root!.querySelector<HTMLButtonElement>('[data-action="waypoints-mark-all"]')?.addEventListener('click', () => {
-      markAllFamiliar();
-      toasts.info('All waypoints marked as familiar');
+    root!.querySelector<HTMLButtonElement>('[data-action="guide-notes-switch"]')?.addEventListener('click', () => {
+      setNotesOff(!loadGuideState().off);
       refreshSection();
     });
-    root!.querySelector<HTMLButtonElement>('[data-action="waypoints-mute"]')?.addEventListener('click', () => {
-      setMuted(!isMuted());
+    root!.querySelector<HTMLButtonElement>('[data-action="guide-notes-again"]')?.addEventListener('click', () => {
+      showNotesAgain();
+      toasts.info('The notes will show again, once each');
       refreshSection();
     });
     // Internal deep links go through the router (plain href would still work,
@@ -154,29 +150,10 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
         navigate(a.dataset.owNav!);
       });
     });
-    // Council visit-through IS the waypoint (hookmap wp10 — page-level, ungated).
-    root!.querySelectorAll<HTMLAnchorElement>('[data-ow-council]').forEach((a) => {
-      a.addEventListener('click', () => {
-        completeWaypoint('council');
-        // The new tab opens; refresh so the row lights when the user returns.
-        setTimeout(refreshSection, 0);
-      });
-    });
   }
 
   wireWaypointControls();
   void showPublicPage(root, activeWorld);
-
-  // Toast click handoff: scroll to + flash the waypoint the toast named.
-  const highlight = consumePendingHighlight();
-  if (highlight) {
-    const row = root.querySelector<HTMLElement>(`[data-waypoint="${highlight}"]`);
-    if (row) {
-      row.classList.add('is-highlight');
-      row.scrollIntoView({ block: 'center' });
-      setTimeout(() => row.classList.remove('is-highlight'), 2400);
-    }
-  }
 }
 
 /**
