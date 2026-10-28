@@ -27,6 +27,7 @@ import { getActiveStore } from '../core/active-store';
 import { elementHash, navigate, timelineHash, writingHash } from '../core/router';
 import { typeName } from '../core/type-words';
 import { worldIsViewOnly } from '../core/view-only';
+import { isMoppetopiaOpen } from '../core/moppetopia';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { hasFolderMode } from '../core/capabilities';
 import { isPartialSlice } from '../core/provenance';
@@ -72,7 +73,8 @@ const entryOf = (worldId: string) => getState().registry.worlds.find(w => w.id =
 /** The states in which no note speaks (a mark's own press is the person asking, and passes `forced`). */
 function silent(worldId: string): boolean {
   const entry = entryOf(worldId);
-  if (!entry || entry.demo === true || worldIsViewOnly(worldId) || isTourFlagActive()) return true;
+  // The tour's sandbox and Moppetopia are worlds to look at: no note speaks in either (#840's gate, G2).
+  if (!entry || entry.demo === true || isMoppetopiaOpen(worldId) || worldIsViewOnly(worldId) || isTourFlagActive()) return true;
   if (entry.tour_dismissed?.includes('home-cards')) return true;
   return false;
 }
@@ -197,6 +199,8 @@ function stillHolds(n: EarnedNote): boolean {
     case 'dated': { const ev = elementOf(n.event); return !!ev && dateOf(ev) !== null; }
     case 'story':
     case 'chapter': return !!elementOf(n.narrative);
+    // The reward's own note (#840): its anchor still placed. Its ring check comes with its drawing.
+    case 'reading': return !!ch && !!placeIdOf(ch);
     case 'copy': {
       const worldId = activeWorldId();
       return !!worldId && !guideDots(getState().data.elements, entryOf(worldId)).copy && !keepSafeShowing(worldId);

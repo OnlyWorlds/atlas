@@ -60,7 +60,7 @@ import { copyLine, worldIsCopiedBy } from '../core/world-copy';
 import { aidsHidden, currentLore, loreWithAids, roomCount, toggleAids } from '../core/parlor-room';
 import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
-import { DEMO_WORLD_ID } from '../setup/demo-copy';
+import { isMoppetopiaOpen } from '../core/moppetopia';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -828,16 +828,6 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
 }
 
 // ---- The home onboarding (the first cards; #127 the question; 1.20 cards kept, done) ----
-
-/**
- * Moppetopia is the open world whose world.json id is the demo world's. The
- * registry's `demo` flag is the tour's sandbox, never Moppetopia's copy
- * (1.98.0 read the flag alone, so its line never showed on Moppetopia).
- */
-function isMoppetopiaOpen(worldId: string): boolean {
-  const s = getState();
-  return s.active?.worldId === worldId && s.active.meta?.id === DEMO_WORLD_ID;
-}
 
 /**
  * The demo's way out (Titus 2026-10-27, a fresh window: "i clicked in; but

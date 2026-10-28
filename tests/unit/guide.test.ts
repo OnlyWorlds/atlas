@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { guideDots, DOTS, isFilled, noteEarned, loadGuideState, markNoteSeen, setNotesOff } from '../../src/core/guide';
+import { guideDots, DOTS, isFilled, noteEarned, loadGuideState, markNoteSeen, setNotesOff, rewardEarned, type Dots } from '../../src/core/guide';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
 
 let n = 0;
@@ -16,6 +16,31 @@ const browserWorld = (extra: Record<string, unknown> = {}): WorldRegistryEntry =
   ({ id: 'w', where: 'browser', state: 'local-only', ...extra }) as unknown as WorldRegistryEntry;
 const lit = (els: Element[], entry: WorldRegistryEntry | undefined = browserWorld()) =>
   DOTS.filter(d => guideDots(els, entry)[d.id]).map(d => d.id);
+
+describe('rewardEarned (#840: the gesture that took the web to two)', () => {
+  const three: Dots = { someone: true, placed: true, happened: true, story: false, copy: false };
+  it('earned when the gesture\'s element is what took the anchor\'s ring to two; the place named first', () => {
+    expect(rewardEarned(three, 'ada', ['keep', 'siege'], 'siege', 'keep')).toEqual({ anchor: 'ada', names: ['keep', 'siege'], more: 0 });
+    // An Event first, linked to Ada, then the place: the place is the gesture element.
+    expect(rewardEarned(three, 'ada', ['siege', 'keep'], 'keep', 'keep')).toEqual({ anchor: 'ada', names: ['keep', 'siege'], more: 0 });
+  });
+  it('never from a gesture that linked nothing new: the ring without it already holds two (an arrived world, H2)', () => {
+    expect(rewardEarned(three, 'ada', ['keep', 'brin', 'siege'], 'siege', 'keep')).toBeNull();
+  });
+  it('never when the gesture\'s element is not in the ring, or the ring holds one', () => {
+    expect(rewardEarned(three, 'ada', ['keep', 'brin'], 'siege', 'keep')).toBeNull();
+    expect(rewardEarned(three, 'ada', ['keep'], 'keep', 'keep')).toBeNull();
+  });
+  it('never while one of the first three dots is dark', () => {
+    for (const dark of ['someone', 'placed', 'happened'] as const) {
+      expect(rewardEarned({ ...three, [dark]: false }, 'ada', ['keep', 'siege'], 'siege', 'keep')).toBeNull();
+    }
+  });
+  it('a place the Web does not draw is not named; the anchor is never its own neighbour', () => {
+    expect(rewardEarned(three, 'ada', ['ada', 'siege', 'brin'], 'siege', 'keep')?.names).toEqual(['siege', 'brin']);
+    expect(rewardEarned(three, 'ada', ['siege', 'brin'], 'brin', 'keep')?.names).toEqual(['brin', 'siege']);
+  });
+});
 
 describe('guideDots', () => {
   it('an empty browser world: nothing lit', () => {

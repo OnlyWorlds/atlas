@@ -329,6 +329,30 @@ function isSpatial(el: Element | undefined): boolean {
   return el?.type === 'pin' || el?.type === 'marker';
 }
 
+/**
+ * The Web's first ring around a centre: what it links to (cast, first) and what links to it
+ * (back, less the cast), each in the links' own order. The Web builds its ring one from this, and
+ * so do the guide's reward and Home's picture (`webRingOne`), so the three never count apart.
+ */
+export function ringOneOf(links: WebLinks, centerId: string): { cast: string[]; back: string[] } {
+  const cast = Array.from(links.out.get(centerId) ?? NO_LINKS);
+  const castSet = new Set(cast);
+  const back = Array.from(links.inc.get(centerId) ?? []).filter(id => !castSet.has(id));
+  return { cast, back };
+}
+
+/**
+ * What the Web draws around an element at depth 1, before its cap: ring one as the Web reads the
+ * element's world (`pageLore`: the room by its switch, the reading aids out), less the types the
+ * world's Web has switched off. `links` may be handed in when one build serves several centres.
+ */
+export function webRingOne(anchor: Element, hidden: ReadonlySet<string> = new Set(), links?: WebLinks): string[] {
+  const built = links ?? buildWebLinks(pageLore(anchor), anchor.id);
+  const { cast, back } = ringOneOf(built, anchor.id);
+  const byId = new Map(pageLore(anchor).map(e => [e.id, e] as const));
+  return [...cast, ...back].filter(id => { const t = byId.get(id)?.type; return !!t && !hidden.has(t); });
+}
+
 export function buildWebLinks(elements: readonly Element[], centerId: string): WebLinks {
   const byId = new Map<string, Element>();
   for (const e of elements) byId.set(e.id, e);
@@ -495,10 +519,9 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     const links = buildWebLinks(elements, centerEl.id);
     lastMarkerCounts = links.markerCounts;
     const outOf = (id: string): ReadonlySet<string> => links.out.get(id) ?? NO_LINKS;
-    const allCastIds = Array.from(outOf(centerEl.id));
+    // Ring one through the one function the guide's reward and Home's picture count with (#840's C0).
+    const { cast: allCastIds, back: backlinkIds } = ringOneOf(links, centerEl.id);
     const castSet = new Set(allCastIds);
-    const backlinkIds = Array.from(links.inc.get(centerEl.id) ?? [])
-      .filter(id => !castSet.has(id));
     const backlinkSet = new Set(backlinkIds);
     const ring1All = [...allCastIds, ...backlinkIds];
     const inAnyRing = new Set<string>([centerEl.id, ...ring1All]);

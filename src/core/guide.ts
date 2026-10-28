@@ -108,7 +108,7 @@ export function guideDots(
 
 // ---- The notes: what a gesture earns ----
 
-export type NoteId = 'someone' | 'place-offer' | 'placed' | 'event' | 'dated' | 'story' | 'chapter' | 'copy';
+export type NoteId = 'someone' | 'place-offer' | 'placed' | 'event' | 'dated' | 'story' | 'chapter' | 'copy' | 'reading';
 
 /** A note as earned: its id and the ids its sentence and actions are about, captured at the gesture. */
 export interface EarnedNote {
@@ -202,6 +202,37 @@ export function noteEarned(gesture: Gesture, all: readonly Element[], speaksCale
     default:
       return null;
   }
+}
+
+// ---- The reward: See Ada's world (onboarding step 2, #840) ----
+
+/** The three gestures that can make a web: the commit that placed, the commit that dated, Were there. */
+export type RewardGesture = 'placed' | 'dated' | 'were-there';
+
+export interface Reward {
+  /** The Character whose web the gesture made. */
+  anchor: string;
+  /** The two the alone note names, by the contract's order; the count past them. */
+  names: string[];
+  more: number;
+}
+
+/**
+ * Whether a gesture just gave the anchor its web (the #840 contract's C2, the gates' G1 and H2), pure:
+ * right after it the three first dots are lit, the anchor's ring (the Web's own count, `webRingOne`,
+ * proposed elements left out by the caller) holds at least two, the gesture's element (the place, or
+ * the Event) is in it, and the ring without that element holds fewer than two. So an import, a sync,
+ * an arrived world or a year on an Event that linked nothing new earns nothing.
+ * `place`: the anchor's place, named first when the Web draws it (H17).
+ */
+export function rewardEarned(dots: Dots, anchor: string, ring: readonly string[], element: string, place: string | null): Reward | null {
+  if (!dots.someone || !dots.placed || !dots.happened) return null;
+  const others = ring.filter(id => id !== anchor);
+  if (others.length < 2 || !others.includes(element)) return null;
+  if (others.filter(id => id !== element).length >= 2) return null;
+  const order = [...(place && others.includes(place) ? [place] : []), element, ...others];
+  const names = [...new Set(order)].slice(0, 2);
+  return { anchor, names, more: others.length - names.length };
 }
 
 // ---- The notes: what this browser remembers ----

@@ -39,12 +39,8 @@ import { atlasProducer } from '../core/provenance';
 /** Moppetopia's public demo key (read scope, no PIN). */
 export const DEMO_WORLD_KEY = '0000000001';
 export const DEMO_WORLD_NAME = 'Moppetopia';
-/**
- * Moppetopia's world id on onlyworlds.com (measured 2026-10-09), so a copy
- * already here opens with no connection. Should the demo world ever be
- * remade under a new id, the id the server answers is checked as well.
- */
-export const DEMO_WORLD_ID = '0695db52-5433-7332-8000-db7fe10da375';
+/** Moppetopia's world id lives in core, where the guide's notes read it too. */
+export { DEMO_WORLD_ID } from '../core/moppetopia';
 
 /**
  * A demo read that has not answered in this long is given up: on a
