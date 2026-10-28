@@ -39,11 +39,11 @@ import { attachApi, detachApi, setPin } from '../../src/registry/registry';
 import { __resetLiveFolderForTests } from '../../src/core/live-folder';
 import { rosterIsShared, sharedWorldLine, worldSyncPolicy } from '../../src/sync/shared-world';
 
-const OWNER: OwMember = { id: null, kind: 'owner', role: 'owner', character: null, status: 'active', lenses: [] };
-const CO_BUILDER: OwMember = { id: 'm1', kind: 'person', role: 'co_builder', character: null, status: 'active', lenses: [] };
-const PLAYER: OwMember = { id: 'm2', kind: 'player', role: 'player' as never, character: 'c9', status: 'active', lenses: [] };
-const GONE: OwMember = { id: 'm3', kind: 'person', role: 'contributor', character: null, status: 'removed', lenses: [] };
-const AGENT: OwMember = { id: 'm4', kind: 'agent', role: 'contributor', character: null, status: 'active', lenses: [], name: 'Kael' };
+const OWNER: OwMember = { id: null, kind: 'owner', role: 'owner', character: null, status: 'active', lenses: [], lenses_from: 'chosen' };
+const CO_BUILDER: OwMember = { id: 'm1', kind: 'person', role: 'co_builder', character: null, status: 'active', lenses: [], lenses_from: 'chosen' };
+const PLAYER: OwMember = { id: 'm2', kind: 'player', role: 'player' as never, character: 'c9', status: 'active', lenses: [], lenses_from: 'chosen' };
+const GONE: OwMember = { id: 'm3', kind: 'person', role: 'contributor', character: null, status: 'removed', lenses: [], lenses_from: 'chosen' };
+const AGENT: OwMember = { id: 'm4', kind: 'agent', role: 'contributor', character: null, status: 'active', lenses: [], lenses_from: 'chosen', name: 'Kael' };
 
 const base: WorldRegistryEntry = {
   id: 'w1', name: 'Shared World', state: 'api-linked',

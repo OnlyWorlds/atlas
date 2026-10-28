@@ -8,7 +8,7 @@ import { OwV2Client, type OwMember } from '@onlyworlds/sdk';
 import { rosterFor, rosterNow, resetRosterCache } from '../../src/sync/world-roster';
 import type { WorldRegistryEntry } from '../../src/core/types';
 
-const rows: OwMember[] = [{ id: 'm1', kind: 'agent', role: 'contributor', character: null, status: 'active', lenses: [], name: 'Skeld' }];
+const rows: OwMember[] = [{ id: 'm1', kind: 'agent', role: 'contributor', character: null, status: 'active', lenses: [], lenses_from: 'chosen', name: 'Skeld' }];
 const linked = (key = 'ow_k_1') =>
   ({ id: 'w1', name: 'W', state: 'api-linked', api: { world_id: 'srv1', api_key: key } }) as unknown as WorldRegistryEntry;
 

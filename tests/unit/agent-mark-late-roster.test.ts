@@ -23,9 +23,9 @@ import { buildAgentMark } from '../../src/middle/element-agent-mark';
 const AGENT = 'a0000000-0000-4000-8000-000000000001';
 const PERSON = 'b0000000-0000-4000-8000-000000000002';
 const roster: OwMember[] = [
-  { id: null, kind: 'owner', role: 'owner', character: null, status: 'active', lenses: [] },
-  { id: AGENT, kind: 'agent', role: 'co_builder', character: null, status: 'active', lenses: [], name: 'Skeld' },
-  { id: PERSON, kind: 'person', role: 'co_builder', character: null, status: 'active', lenses: [] },
+  { id: null, kind: 'owner', role: 'owner', character: null, status: 'active', lenses: [], lenses_from: 'chosen' },
+  { id: AGENT, kind: 'agent', role: 'co_builder', character: null, status: 'active', lenses: [], lenses_from: 'chosen', name: 'Skeld' },
+  { id: PERSON, kind: 'person', role: 'co_builder', character: null, status: 'active', lenses: [], lenses_from: 'chosen' },
 ];
 const el = (via: string, by: string | null) =>
   ({ id: 'e1', type: 'character', name: 'Harbour master', changed_via: via, changed_by: by }) as unknown as Element;
