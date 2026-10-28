@@ -1795,6 +1795,9 @@ html {
 .atlas-proposed-note { margin: 4px 0 10px; padding: 6px 10px; font-size: 12px; line-height: 1.45; color: var(--atlas-text); background: var(--atlas-warn-soft-tint); border: 1px solid var(--atlas-warn-soft-border); border-radius: 6px; max-width: 680px; }
 /* Hidden (conv. 170): a plain fact for its holder, so the neutral box, not the proposed warn tint. */
 .atlas-hidden-note { margin: 4px 0 10px; padding: 6px 10px; font-size: 12px; line-height: 1.45; color: var(--atlas-text); border: 1px solid var(--atlas-divider); border-radius: 6px; max-width: 680px; }
+/* An unmarked Charter's one write (the charter profile, 1.100): the hidden note's quiet box, with its button. */
+.atlas-charter-mark { margin: 4px 0 10px; padding: 8px 10px; border: 1px solid var(--atlas-divider); border-radius: 6px; max-width: 680px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.atlas-charter-mark-line { margin: 0; flex: 1 1 260px; font-size: 12px; line-height: 1.45; color: var(--atlas-text); }
 /* A world's charter on Home (#526). */
 .atlas-home-charter { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--atlas-divider); border-radius: 6px; max-width: 680px; }
 .atlas-home-charter-label { display: block; font-size: 12px; color: var(--atlas-text-muted); margin-bottom: 2px; }

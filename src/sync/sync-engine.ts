@@ -4128,6 +4128,8 @@ export function isAuthError(err: unknown): boolean {
     if (memberRefusal(err)) return false;
     // keel would not make one element hidden for this key (conv. 170): about the element, not the key.
     if (t.code === 'hidden_not_allowed') return false;
+    // keel would not take the charter mark from this key (the charter profile): about the element, not the key.
+    if (t.code === 'keeper_only') return false;
     return t.status === 401 || t.status === 403
       || t.code === 'invalid_credentials' || t.code === 'key_revoked';
   }

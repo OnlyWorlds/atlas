@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { isMessage, messageParties } from '../../src/core/message-parties';
-import { charterLead, findCharter, isCharter, rosterRoles } from '../../src/core/charter';
+import { charterLead, findCharter, isCharter } from '../../src/core/charter';
 import type { Element } from '../../src/core/types';
 
 const el = (o: Record<string, unknown>): Element => o as unknown as Element;
@@ -101,41 +101,36 @@ describe('the charter', () => {
     expect(isCharter(el({ type: 'construct', supertype: 'Charter' }))).toBe(false);
   });
 
-  it('the newest by created_at leads, as keel orders it (D152); an edit never moves it; a tie goes to the higher id', () => {
+  // The pick is the charter profile's (serial 83), by the pair AND the mark; its fixture runs in charter-mark.test.ts.
+  const M = { x_charter_of: 'w1' };
+
+  it('the newest marked one leads (keel stamps created_at); an edit never moves it; a tie goes to the higher id', () => {
     // The older one has the higher id and the later edit, so neither the id nor the edit can pick it.
-    const old = law({ id: 'z', name: 'Old', supertype: 'Charter', created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-22T00:00:00Z' });
-    const fresh = law({ id: 'b', name: 'New', supertype: 'Charter', created_at: '2026-10-21T00:00:00Z', updated_at: '2026-10-21T00:00:00Z' });
+    const old = law({ id: 'z', name: 'Old', supertype: 'Charter', ...M, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-22T00:00:00Z' });
+    const fresh = law({ id: 'b', name: 'New', supertype: 'Charter', ...M, created_at: '2026-10-21T00:00:00Z', updated_at: '2026-10-21T00:00:00Z' });
     expect(findCharter([old, fresh, place])?.id).toBe('b');
-    const x = law({ id: 'x', name: 'A', supertype: 'Charter', created_at: 't' });
-    const y = law({ id: 'y', name: 'B', supertype: 'Charter', created_at: 't' });
+    const x = law({ id: 'x', name: 'A', supertype: 'Charter', ...M, created_at: '2026-10-21T00:00:00Z' });
+    const y = law({ id: 'y', name: 'B', supertype: 'Charter', ...M, created_at: '2026-10-21T00:00:00Z' });
     expect(findCharter([y, x])?.id).toBe('y');
-    const here = law({ id: 'h', name: 'Made here', supertype: 'Charter' });
-    expect(findCharter([fresh, here])?.id).toBe('h');                 // not read back yet: the newest
+    const here = law({ id: 'h', name: 'Made here', supertype: 'Charter', ...M });
+    expect(findCharter([fresh, here])?.id).toBe('b');                 // no created_at sorts as the oldest
     expect(findCharter([place])).toBeNull();
   });
 
-  it("counts only a Law the owner or a co-builder made (D152): never a guest's or a seat's, and none while the roster is unread", () => {
+  it('a Charter without the mark is lore, whoever made it: no Charter leads', () => {
     const owners = law({ id: 'o', name: 'House', supertype: 'Charter', created_by: null, created_at: '2026-10-01T00:00:00Z' });
-    const cobuilt = law({ id: 'k', name: 'Ours', supertype: 'Charter', created_by: 'm-co', created_at: '2026-10-10T00:00:00Z' });
-    const seats = law({ id: 's', name: 'Mine', supertype: 'Charter', created_by: 'm-seat', created_at: '2026-10-20T00:00:00Z' });
-    const roles = rosterRoles([
-      { id: 'm-co', kind: 'person', role: 'co_builder' },
-      { id: 'm-seat', kind: 'agent', role: 'contributor' },
-    ] as never);
-    expect(findCharter([owners, cobuilt, seats], undefined, roles)?.id).toBe('k');
-    expect(findCharter([owners, cobuilt, seats])?.id).toBe('o');      // no roster: the owner's only
-    expect(findCharter([seats], undefined, roles)).toBeNull();
-    expect(findCharter([owners, seats], 's', roles)?.id).toBe('o');  // world.json naming a seat's Law does not make it the charter
+    expect(findCharter([owners])).toBeNull();
+    expect(findCharter([owners], 'o')).toBeNull();                    // world.json never stands in for the mark
   });
 
-  it("world.json's charter names it (§4.6 (a)): a Law it names wins, anything else leaves the rule by supertype", () => {
-    const old = law({ id: 'a', name: 'Old', supertype: 'Charter', created_at: '2026-10-01T00:00:00Z' });
-    const fresh = law({ id: 'b', name: 'New', supertype: 'Charter', created_at: '2026-10-21T00:00:00Z' });
-    const plain = law({ id: 'c', name: 'House rules', supertype: 'Regulation' });
+  it("world.json's charter picks among marked Charters only (§4.6 (a), v0.3.20); anything else leaves the newest", () => {
+    const old = law({ id: 'a', name: 'Old', supertype: 'Charter', ...M, created_at: '2026-10-01T00:00:00Z' });
+    const fresh = law({ id: 'b', name: 'New', supertype: 'Charter', ...M, created_at: '2026-10-21T00:00:00Z' });
+    const plain = law({ id: 'c', name: 'House rules', supertype: 'Regulation', ...M });
     expect(findCharter([old, fresh, place], 'a')?.id).toBe('a');       // the tie-break, against the newer one
-    expect(findCharter([old, fresh, plain], 'c')?.id).toBe('c');       // a Law it names, whatever its supertype
+    expect(findCharter([old, fresh, plain], 'c')?.id).toBe('b');       // a marked Law of another supertype is no Charter
     for (const named of [place.id, 'gone', '', 7, null, undefined, ['a']]) {
-      expect(findCharter([old, fresh, place], named)?.id).toBe('b'); // not a Law here, or not an id: the rule
+      expect(findCharter([old, fresh, place], named)?.id).toBe('b');
     }
   });
 

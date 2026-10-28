@@ -46,8 +46,7 @@ import { isCodeLoadError } from '../core/reload-offer';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
-import { charterLead, findCharter, rosterRoles, type RosterRoles } from '../core/charter';
-import { rosterFor, rosterNow } from '../sync/world-roster';
+import { charterLead, findCharter } from '../core/charter';
 import { tableauScope } from '../visualization/timeline/chart-recipe';
 import { roomOf, openElementTarget } from '../core/element-room';
 import { resolveCalendarLens } from '../core/calendar-lens';
@@ -136,7 +135,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // patches a fresh array that changed nothing, and a rebuild then swallowed
     // a press on the guide's marks straddling it (conv. 146, the guide's code gate C3).
     const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, s.data.loading, s.data.loadingProgress?.done, s.registry,
-      s.ui.castAssign?.kind, savedCharts, isTourFlagActive(), rosterVersion];
+      s.ui.castAssign?.kind, savedCharts, isTourFlagActive()];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     lastInputs = inputs;
     const active = s.active;
@@ -160,7 +159,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const totalElements = Array.from(counts.values()).reduce((a, b) => a + b, 0);
 
     root.innerHTML = '';
-    root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts, charterRoles(worldId)));
+    root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts));
     const demoLine = buildDemoLine(worldId, toasts);
     if (demoLine) root.appendChild(demoLine);
     const landingLine = buildLandingLine(getState().registry.worlds.find(w => w.id === worldId));
@@ -211,20 +210,6 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
 
   const onChartsChanged = (): void => refreshSavedCharts();
   window.addEventListener('atlas:charts-changed', onChartsChanged);
-  // The charter counts a co-builder's Law only once the roster says so (D152):
-  // a synced world asks the roster once, and its answer draws Home again.
-  let rosterVersion = 0;
-  let rosterAsked: string | null = null;
-  function charterRoles(worldId: string): RosterRoles {
-    const entry = getState().registry.worlds.find(w => w.id === worldId);
-    if (!entry || entry.state !== 'api-linked') return null;
-    const rows = rosterNow(entry);
-    if (!rows && rosterAsked !== worldId) {
-      rosterAsked = worldId;
-      void rosterFor(entry).then(got => { if (got) { rosterVersion++; render(); } else rosterAsked = null; });
-    }
-    return rosterRoles(rows);
-  }
   refreshSavedCharts();
   const unsub = subscribe(render);
   render();
@@ -325,7 +310,6 @@ function buildCover(
   totalElements: number,
   counts: Map<string, number>,
   toasts: ToastManager,
-  roles: RosterRoles,
 ): HTMLElement {
   const cover = document.createElement('section');
   cover.className = 'atlas-home-identity';
@@ -369,8 +353,9 @@ function buildCover(
     identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="copy-note">${escapeText(copyLine(meta.name, copy, worldHere))}</p>`);
   }
   // The world's charter, first (#526): its name links to it, its opening reads here.
-  // world.json's `charter` names it when a folder says which (§4.6 (a)).
-  const charter = findCharter(getState().data.elements, (meta as unknown as Record<string, unknown> | null | undefined)?.charter, roles);
+  // The newest marked Charter (the charter profile, serial 83); world.json's
+  // `charter` picks among marked ones when a folder says which (§4.6 (a)).
+  const charter = findCharter(getState().data.elements, (meta as unknown as Record<string, unknown> | null | undefined)?.charter);
   if (charter) {
     const lead = charterLead(charter);
     const name = typeof charter.name === 'string' && charter.name.trim() ? charter.name.trim() : 'Charter';

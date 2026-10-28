@@ -116,7 +116,7 @@ export const WORLD_META_FILE = 'world.json';
  * reader must not rewrite keys as a side effect, and an edit is not a
  * capture). Absence means pre-0.3.3 or unknown, which every reader tolerates.
  */
-export const FOLDER_FORMAT_VERSION = '0.3.18';
+export const FOLDER_FORMAT_VERSION = '0.3.20';
 export const ELEMENTS_DIR = 'elements' as const;
 export const SPATIAL_DIR = 'spatial' as const;
 export const MEDIA_DIR = 'media';
@@ -323,11 +323,18 @@ export function isExtensionField(name: string): boolean {
  * `x_checks_rules` on a work world's Charter, which a reader never writes.
  * `x_spine_` is the spine profile's (dist.55): a software ecosystem's rows,
  * their address, status and what each depends on.
+ * `x_charter_` is the charter profile's (dist.83): `x_charter_of`, the mark
+ * that makes a Charter, Guide or Domain the world's reading aid.
+ * `x_lens_` is the lens profile's (dist.74), beside its recipe key `x_lens`
+ * itself (PROFILE_FIELD_NAMES).
  */
-export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_', 'x_spine_'] as const;
+export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_', 'x_spine_', 'x_charter_', 'x_lens_'] as const;
+
+/** Whole profile keys no prefix covers: a lens's recipe. */
+export const PROFILE_FIELD_NAMES = ['x_lens'] as const;
 
 export function isProfileField(name: string): boolean {
-  return PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));
+  return (PROFILE_FIELD_NAMES as readonly string[]).includes(name) || PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));
 }
 
 /**

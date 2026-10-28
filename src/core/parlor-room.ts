@@ -31,13 +31,15 @@ export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> =
 
 /**
  * The SDK's rule (4.55.0): the pair, trimmed and case-folded, AND the mark
- * `x_room_of`. A body whose type, supertype or mark is not a string (a
- * foreign file can hold anything) is lore here, before the SDK is asked.
+ * `x_room_of`, read by presence since 4.100.0 (serial 83: any value but null,
+ * a string only when something is left after trimming; a number counts). A
+ * body whose type or supertype is not a string (a foreign file can hold
+ * anything) is lore here, before the SDK is asked; the mark goes as it is.
  */
 export function isRoomElement(el: Element): boolean {
   const r = el as Record<string, unknown>;
-  if (typeof r.type !== 'string' || typeof r.supertype !== 'string' || typeof r.x_room_of !== 'string') return false;
-  return sdkIsRoomElement({ type: r.type, supertype: r.supertype, x_room_of: r.x_room_of });
+  if (typeof r.type !== 'string' || typeof r.supertype !== 'string') return false;
+  return sdkIsRoomElement({ type: r.type, supertype: r.supertype, x_room_of: r.x_room_of } as never);
 }
 
 /**

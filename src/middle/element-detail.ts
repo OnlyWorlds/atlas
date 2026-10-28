@@ -43,6 +43,7 @@ import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { proposedNoteFor } from './element-agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
+import { buildCharterMarkOffer } from './element-detail-charter-mark';
 
 /**
  * Per-element scroll position memory. Survives re-renders (field edits, link
@@ -196,6 +197,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
       note.dataset.role = 'hidden-note';
       note.textContent = hiddenLine;
       detail.appendChild(note);
+    }
+    // An unmarked Charter: the keeper's one write that makes it the world's (the charter profile, 1.100).
+    const activeId = st.active?.worldId;
+    if (activeId) {
+      const offer = buildCharterMarkOffer(el, st.registry.worlds.find(w => w.id === activeId), st.active?.meta, activeId);
+      if (offer) detail.appendChild(offer);
     }
     body.appendChild(detail);
 

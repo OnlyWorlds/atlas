@@ -110,12 +110,12 @@ describe('the lore (1.76)', () => {
   });
 });
 
-// schema-dist's room profile (profiles/room.fixture.json, copied whole at v0.33.0-dist.74, 28 cases): the cases
+// schema-dist's room profile (profiles/room.fixture.json, copied whole at v0.33.0-dist.83, 32 cases): the cases
 // every reader of the room answers, run against the SDK's rule (1.77): a repin that moves it goes red.
 import roomFixture from '../fixtures/room.fixture.json';
 import { ROOM_SUPERTYPES } from '../../src/core/parlor-room';
 
-describe("the room profile's cases (dist.74)", () => {
+describe("the room profile's cases (dist.83)", () => {
   it('holds the profile pairs, no more, no less', () => {
     const want = roomFixture.pairs.map(p => `${p.type}/${p.supertype.toLowerCase()}`).sort();
     expect(ROOM_SUPERTYPES.map(([t, w]) => `${t}/${w}`).sort()).toEqual(want);

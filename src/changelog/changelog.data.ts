@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.100.0',
+    date: '2026-10-28',
+    theme: 'A world\'s charter, by its mark',
+    entries: [
+      {
+        id: 'charter-by-mark',
+        title: 'A world\'s charter is the one marked as its charter, and a keeper can mark it',
+        body: 'OnlyWorlds now counts a Law with the supertype Charter as a world\'s house rules only when it carries the charter mark; without it, it is a charter in the story. Home shows the newest marked one, as onlyworlds.com does. A Charter that is not marked yet says so on its page, and the world\'s owner or a co-builder can press Mark as this world\'s charter.',
+        tags: ['home', 'sync'],
+      },
+      {
+        id: 'sdk-4-100',
+        title: 'Atlas reads the newest OnlyWorlds rules',
+        body: 'Atlas moves to the newest OnlyWorlds SDK and writes new world folders as format 0.3.20. A parlor\'s room mark counts whatever its value, as other tools read it, and the names a shared field other tools read (the charter and lens marks among them) cannot be taken for a custom field.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.99.0',
     date: '2026-10-28',
     theme: 'A world in this browser opens before it is saved',

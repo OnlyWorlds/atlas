@@ -825,6 +825,8 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       return issue.type === 'world'
         ? `Only the world's owner can change its details on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`
         : `Someone else made it, and this world lets Atlas change only what it made. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
+    case 'keeper_mark':
+      return `It carries the mark that makes it the world's charter, and only the owner or a co-builder can set that on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'file_busy':
       if (inBrowser) {
         return f.operation === 'read'

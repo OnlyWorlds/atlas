@@ -14,7 +14,7 @@
 import type { PerElementFailure } from '../core/types';
 import { isFileBusyError } from '../store/fs-utils';
 
-export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'not_yours' | 'other';
+export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'not_yours' | 'keeper_mark' | 'other';
 
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
@@ -28,6 +28,8 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
   // A member seat's refusals (#104): by keel's code, never its text.
   if (f.status === 403 && (f.code === 'not_author' || f.code === 'owner_only')) return 'not_yours';
+  // keel takes the charter mark (`x_charter_of`) only from the owner or a co-builder (the charter profile).
+  if (f.status === 403 && f.code === 'keeper_only') return 'keeper_mark';
   return 'other';
 }
 
@@ -80,6 +82,11 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
     const els = notYours.filter(f => f.type !== 'world').length;
     if (els > 0) parts.push(`${plural(els, 'change', 'changes')} could not sync because this world lets Atlas change only what it made: ${els === 1 ? 'that element was' : 'those elements were'} made by someone else. ${els === 1 ? 'The change stays' : 'The changes stay'} ${place}.`);
     if (world) parts.push(`This world's details changed here, and only its owner can change them on OnlyWorlds. The change stays ${place}.`);
+  }
+  const keeperMark = byKind.get('keeper_mark');
+  if (keeperMark) {
+    const n = new Set(keeperMark.map(f => f.element_id)).size;
+    parts.push(`${plural(n, 'change', 'changes')} could not sync because only the world's owner or a co-builder can mark its charter. ${n === 1 ? 'The change stays' : 'The changes stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
   }
   const other = byKind.get('other');
   if (other) {
