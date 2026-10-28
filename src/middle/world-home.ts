@@ -59,6 +59,7 @@ import { copyLine, worldIsCopiedBy } from '../core/world-copy';
 import { currentLore, roomCount } from '../core/parlor-room';
 import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
+import { DEMO_WORLD_ID } from '../setup/demo-copy';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -753,10 +754,14 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
  * The demo's way out (Titus 2026-10-27, a fresh window: "i clicked in; but
  * dont see how i get out ... or how i delete the world"): one quiet line
  * under Moppetopia's name, a world of your own and where its delete lives.
+ * Moppetopia is the copy whose world.json id is the demo world's; the
+ * registry's `demo` flag is the tour's sandbox, which has no delete
+ * (1.98.0 read the flag, so the line never showed on Moppetopia).
  */
 function buildDemoLine(worldId: string, toasts: ToastManager): HTMLElement | null {
-  const entry = getState().registry.worlds.find(w => w.id === worldId);
-  if (!entry?.demo) return null;
+  const s = getState();
+  const entry = s.registry.worlds.find(w => w.id === worldId);
+  if (!entry || entry.demo || s.active?.worldId !== worldId || s.active.meta?.id !== DEMO_WORLD_ID) return null;
   const p = document.createElement('p');
   p.className = 'atlas-home-demo-line';
   p.setAttribute('data-role', 'demo-line');

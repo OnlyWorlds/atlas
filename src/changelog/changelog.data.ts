@@ -67,6 +67,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['sync', 'performance'],
       },
       {
+        id: 'demo-line-shows',
+        title: 'Moppetopia\'s home now shows how to leave it',
+        body: 'The line under its name, start a world of your own or delete this copy, was listed in 1.98.0 but did not show on Moppetopia. It does now.',
+        tags: ['home', 'onboarding'],
+      },
+      {
         id: 'guide-year-empty',
         title: 'A new Event from the home starts with no year in a world without dates',
         body: 'Something happened on the home used to fill the year in as 1. In a world with no dates yet the box now starts empty, so the year is yours to type.',

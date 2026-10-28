@@ -116,6 +116,11 @@ async function tryDemoOpensACopy(page: Page) {
     const { getState } = await import('/src/core/state.ts');
     return getState().ui.sidebarMode;
   })).toBe('elements');
+  // Its way out on its home: a world of your own, and where its delete lives
+  // (1.98.0 keyed this to the tour's flag, so it never showed here).
+  const demoLine = page.locator('[data-role="demo-line"]');
+  await expect(demoLine).toBeVisible();
+  await expect(demoLine.locator('[data-action="demo-delete"]')).toBeVisible();
 
   // Editable: a new element and an edit land on disk.
   await page.evaluate(async () => {
