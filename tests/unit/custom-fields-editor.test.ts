@@ -216,6 +216,14 @@ describe('a published profile key is never a custom field (x_identity_, Skeld 20
     expect(profileFieldEntriesFor(makeCharacter({ x_checks_rules: ['one'] }))).toEqual([{ name: 'x_checks_rules', value: ['one'] }]);
   });
 
+  it('an empty profile value draws no row (an empty review mark is settled, SDK 4.102.1); a real one still does', () => {
+    for (const empty of [{}, [], '', ' 　 ']) {
+      expect(profileFieldEntriesFor(makeCharacter({ x_review_proposed: empty })), JSON.stringify(empty)).toEqual([]);
+    }
+    const mark = { by: null, expires: '2099-01-01' };
+    expect(profileFieldEntriesFor(makeCharacter({ x_review_proposed: mark }))).toEqual([{ name: 'x_review_proposed', value: mark }]);
+  });
+
   it('the spine profile\'s keys are kept too (x_spine_, dist.55)', () => {
     for (const name of ['x_spine_status', 'x_spine_depends_on', 'x_spine_owner']) {
       expect(customFieldNameProblem(makeCharacter(), name)).toMatch(/x_spine_/);

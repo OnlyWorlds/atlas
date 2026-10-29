@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'empty-review-mark',
         title: 'An element with an empty review mark reads as settled',
-        body: 'A proposal waiting for the keeper\'s review is marked on the element. A mark left empty by another tool (an empty list, an empty object or blank text) used to count as a proposal; it now reads as no mark at all, as the OnlyWorlds review rules say, so the element is counted and listed like any other.',
+        body: 'A proposal waiting for the keeper\'s review is marked on the element. A mark left empty by another tool (an empty list, an empty object or blank text) used to count as a proposal; it now reads as no mark at all, as the OnlyWorlds review rules say, so the element is counted and listed like any other, and its page shows no empty mark among its fields.',
         tags: ['world', 'fix'],
       },
     ],

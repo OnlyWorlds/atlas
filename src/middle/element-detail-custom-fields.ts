@@ -80,10 +80,20 @@ export function profileFieldEntriesFor(el: Element): Array<{ name: string; value
   const out: Array<{ name: string; value: unknown }> = [];
   for (const [k, v] of Object.entries(el)) {
     if (!isProfileField(k)) continue;
-    if (v === null || v === undefined || v === '') continue;
+    // An empty value is absent, as the profiles read their marks (an empty review mark is
+    // settled, SDK 4.102.1): no row says a key that holds nothing.
+    if (isEmptyProfileValue(v)) continue;
     out.push({ name: k, value: v });
   }
   return out;
+}
+
+/** Absent, null, blank text (by Unicode White_Space), an empty list or an empty object. */
+function isEmptyProfileValue(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v === 'string') return v.replace(/\p{White_Space}/gu, '') === '';
+  if (Array.isArray(v)) return v.length === 0;
+  return typeof v === 'object' && Object.keys(v as object).length === 0;
 }
 
 function inferWidget(value: unknown): WidgetKind {
