@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.105.0',
+    date: '2026-10-29',
+    theme: 'Read your world through a lens',
+    entries: [
+      {
+        id: 'calendar-odd-format',
+        title: 'A calendar from another tool with an unusual format opens and saves',
+        body: 'A calendar whose date format was set by another tool to something other than text now opens in the calendar builder with the format blank, prints dates in the default way, and saves without an error. The stored value stays until you type a format of your own.',
+        tags: ['calendar', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.104.0',
     date: '2026-10-29',
     theme: 'Help for the room you are in',

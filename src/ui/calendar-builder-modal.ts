@@ -133,8 +133,10 @@ export class CalendarBuilderModal extends BaseModal {
         inWeek: ic.in_week !== false,
         rest: Object.fromEntries(Object.entries(ic).filter(([k]) => !DRAWN_INTER_KEYS.has(k))),
       })),
-      format: cfg.format ?? '',
-      formatIntercalary: cfg.format_intercalary ?? '',
+      // A format that is not a string is one the SDK ignores (4.103.0): the
+      // form shows it blank, and a blank save leaves the stored value alone.
+      format: typeof cfg.format === 'string' ? cfg.format : '',
+      formatIntercalary: typeof cfg.format_intercalary === 'string' ? cfg.format_intercalary : '',
     };
   }
 
@@ -210,10 +212,10 @@ export class CalendarBuilderModal extends BaseModal {
     }
 
     if (d.format.trim()) config.format = d.format.trim();
-    else delete config.format;
+    else if (typeof config.format === 'string') delete config.format;
     if (!this.yearGrain()) {
       if (d.formatIntercalary.trim()) config.format_intercalary = d.formatIntercalary.trim();
-      else delete config.format_intercalary;
+      else if (typeof config.format_intercalary === 'string') delete config.format_intercalary;
     }
 
     const errors = validateCalendarConfig(config);

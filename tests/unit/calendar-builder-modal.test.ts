@@ -86,6 +86,26 @@ describe('calendar builder edit keeps what the form cannot show', () => {
     expect(out.grain).toBe('day');
   });
 
+  it('a format that is not a string opens blank and survives a no-change save (SDK 4.103.0 ignores it)', async () => {
+    const cfg = { ...structuredClone(MONTHFUL), format: 5, format_intercalary: { a: 1 } };
+    const { updateElement } = setup('day', structuredClone(cfg));
+    const root = openBuilder('cal-1');
+    expect(root.querySelector<HTMLInputElement>('[data-field="format"]')!.value).toBe('');
+    await save();
+    expect(toasts.error).not.toHaveBeenCalled();
+    expect(written(updateElement)).toEqual(cfg);
+  });
+
+  it('a format typed over one that is not a string replaces it', async () => {
+    const { updateElement } = setup('day', { ...structuredClone(MONTHFUL), format: 5 });
+    const root = openBuilder('cal-1');
+    const fmt = root.querySelector<HTMLInputElement>('[data-field="format"]')!;
+    fmt.value = '{day} {month}';
+    fmt.dispatchEvent(new Event('input', { bubbles: true }));
+    await save();
+    expect(written(updateElement).format).toBe('{day} {month}');
+  });
+
   it('an up era listed before a countdown era at its pivot keeps its order and reads right (SDK 4.76, 2026-10-25)', async () => {
     const after = { name: 'After', abbrev: 'AF', start: 0 };
     const before = { name: 'Before', abbrev: 'BF', start: 0, direction: 'down' as const };
