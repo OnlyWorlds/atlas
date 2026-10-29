@@ -18,7 +18,8 @@ const clock = () => new Date(Date.UTC(2026, 1, 1, 0, 0, t++)).toISOString();
 const ID = '0192a000-0000-7000-8000-00000000a347';
 const SEAT = 'b1c2d3e4-0000-4000-8000-000000000001';
 const MAKER = 'b1c2d3e4-0000-4000-8000-000000000002';
-const pulled = { id: ID, type: 'character', name: 'Aldric', created_by: MAKER, changed_by: SEAT, changed_via: 'seat', changed_client: 'lantern' };
+const DOORS = { lantern: '2026-01-30T00:00:00Z', site: '2026-01-20T00:00:00Z' };
+const pulled = { id: ID, type: 'character', name: 'Aldric', created_by: MAKER, changed_by: SEAT, changed_via: 'seat', changed_client: 'lantern', doors: DOORS };
 
 async function realStore(): Promise<{ s: FsFolderStore; root: FakeDirHandle }> {
   const root = new FakeDirHandle('w');
@@ -53,6 +54,9 @@ describe.each(stores)('%s', (_name, make) => {
       expect('changed_by' in el).toBe(false);
       expect('changed_client' in el).toBe(false); // keel: the software of the last write
       expect(el.created_by).toBe(MAKER);
+      // keel's tools that wrote it, each with its last write there: still true
+      // after an edit here (the next pull brings Atlas's own line).
+      expect(el.doors).toEqual(DOORS);
     }
   });
 

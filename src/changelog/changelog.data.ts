@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Nothing you see changes. The first screen\'s scripts are about 5% smaller, and the offer to reload when a new version is ready is now checked against a real build before each release.',
         tags: ['performance'],
       },
+      {
+        id: 'doors-server-field',
+        title: 'Which tools wrote an element stays OnlyWorlds\' own word',
+        body: 'OnlyWorlds now records each tool that wrote an element. Atlas keeps that record as it arrives and never sends it back, a conflict never lists it as a change, and bringing in an online world\'s file no longer flags it as an unknown field on every element.',
+        tags: ['sync', 'fix'],
+      },
     ],
   },
   {

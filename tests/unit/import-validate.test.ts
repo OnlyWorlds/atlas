@@ -41,6 +41,13 @@ describe('validatePayload', () => {
     expect(issues).toEqual([]);
   });
 
+  it('accepts the tools that wrote it (doors, empty or not): a linked world\'s export carries them', () => {
+    const issues = validatePayload(parsePayload({
+      Character: [{ name: 'A', doors: { atlas: '2026-10-29T10:00:00Z' } }, { name: 'B', doors: null }],
+    }));
+    expect(issues).toEqual([]);
+  });
+
   it('flags an unknown element-type bucket', () => {
     const issues = validatePayload(parsePayload({ Character: [{ name: 'A' }], Widgets: [{ name: 'W' }] }));
     expect(issues.some(i => i.field === 'Widgets' && /unknown element type/i.test(i.issue))).toBe(true);

@@ -74,6 +74,11 @@ describe('normalizeRecord — keepUnknown (envelope §8c passthrough)', () => {
     expect(record.changed_client).toBeUndefined();
   });
 
+  it("strips the tools that wrote it (doors): the source world's", () => {
+    const { record } = normalizeRecord({ name: 'A', doors: { lantern: '2026-10-29T10:00:00Z' } }, 'character' as never, { keepUnknown: true });
+    expect(record.doors).toBeUndefined();
+  });
+
   it('default path still drops and counts unknown fields (the pair)', () => {
     const { record, droppedUnknown } = normalizeRecord(
       { name: 'A', future_field: 'dropped' }, 'character' as never);

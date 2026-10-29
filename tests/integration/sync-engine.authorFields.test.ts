@@ -84,4 +84,21 @@ describe('the author fields are the server\'s', () => {
     await engine.pullNow();
     expect((await folder.getElement(other.id))!.changed_client).toBe('lantern');
   });
+
+  it("the tools that wrote it are the server's too: kept on disk, never a field anyone changed", async () => {
+    const doors = { lantern: '2026-10-29T10:00:00Z', atlas: '2026-10-29T09:00:00Z' };
+    const el = await folder.createElement('character', { name: 'Rhea' });
+    await engine.syncNow();
+    await folder.updateElement(el.id, { name: 'Rhea (mine)' });
+    client.__server_mutate('character', el.id, { name: 'Rhea (theirs)', doors });
+    const result = await engine.syncNow();
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0].fields).toEqual(['name']);
+
+    const other = await folder.createElement('character', { name: 'Bram' });
+    await engine.syncNow();
+    client.__server_mutate('character', other.id, { description: 'from Lantern', doors });
+    await engine.pullNow();
+    expect((await folder.getElement(other.id))!.doors).toEqual(doors);
+  });
 });

@@ -241,6 +241,16 @@ describe('OwV2ClientAdapter — created_by is read-only (keel membership phase 2
       expect('changed_client' in toV2WireShape({ ...rec }, 'character', op)).toBe(false);
     }
   });
+
+  it("nor the tools that wrote it (keel: doors), which a pull keeps", async () => {
+    const { adaptV2Record, toV2WireShape } = await import('../../src/sync/ow-v2-client-adapter');
+    const doors = { atlas: '2026-10-29T10:00:00Z', lantern: '2026-10-28T09:00:00Z' };
+    const rec = adaptV2Record({ id: uuid(), name: 'Frodo', updated_at: clock.next(), doors }, 'character');
+    expect(rec.doors).toEqual(doors);
+    for (const op of ['create', 'update'] as const) {
+      expect('doors' in toV2WireShape({ ...rec }, 'character', op)).toBe(false);
+    }
+  });
 });
 
 describe('OwV2ClientAdapter — LIST cursor walk', () => {

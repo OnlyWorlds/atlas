@@ -219,8 +219,11 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
  * world, so an import drops them. One list for every site that must agree.
  * `changed_client`: the software that made the last write, as it
  * named itself; the same kind of field, kept the same way.
+ * `doors` (SDK 4.106): each tool that wrote the element, with the time of
+ * its last write there, or null; kept the same way, and kept through an edit
+ * here too, since every tool's line stays true until the next pull.
  */
-export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via', 'changed_client'] as const;
+export const SERVER_AUTHOR_FIELDS = ['created_by', 'changed_by', 'changed_via', 'changed_client', 'doors'] as const;
 
 /**
  * keel's marks about an element, said only to some readers: `hidden: true`
