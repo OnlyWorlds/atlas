@@ -121,6 +121,12 @@ export interface EarnedNote {
   pair?: { character: string; location: string };
   /** `event`: the Event has no date and the world speaks no calendar (Set year). */
   askYear?: boolean;
+  /**
+   * The reward this note's gesture earned (#840): its See <name>'s world
+   * button, carried on the note so a dialog's wait keeps it. `reading` is the
+   * reward alone, when the gesture's own note was seen before.
+   */
+  rider?: Reward;
 }
 
 /**

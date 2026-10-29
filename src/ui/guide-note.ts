@@ -39,9 +39,12 @@ import { anyModalOpen } from './modal-base';
 import { linkIdsOf } from '../core/link-ids';
 import { toastManager } from './toast-manager';
 import { showProblem } from './problem-fixes';
+import { isProposed } from '../core/review-mark';
+import { webRingOne } from '../tabs/right/context-pane-graph';
+import { onWebDrawerReleased, openWebOn, webDrawerHolds } from './open-web';
 import {
-  guideDots, guideElements, isFilled, loadGuideState, markNoteSeen, noteEarned, placeIdOf,
-  type EarnedNote, type Gesture,
+  guideDots, guideElements, isFilled, loadGuideState, markNoteSeen, newestOf, noteEarned, placeIdOf, rewardEarned,
+  type EarnedNote, type Gesture, type Reward,
 } from '../core/guide';
 
 interface Showing {
@@ -52,6 +55,10 @@ interface Showing {
   /** What it drew (`drawnKey`): redrawn only when that changes. */
   key?: string;
   node: HTMLElement;
+  /** The reward's button on this note: the note's own rider, or Were there's, earned while it showed. */
+  rider?: Reward;
+  /** The button has been drawn (and `reading` stamped): later redraws keep it. */
+  riderDrawn?: boolean;
 }
 
 let showing: Showing | null = null;
@@ -90,15 +97,55 @@ function speaksCalendar(): boolean {
  * contextual callback, after its callbacks settled), the editor's location
  * and start-date commits, and this file's own actions (`fromAction`).
  */
-export function reportGesture(gesture: Gesture, opts: { fromAction?: boolean } = {}): void {
+export function reportGesture(
+  gesture: Gesture,
+  opts: { fromAction?: boolean; pair?: { character: string; location: string } } = {},
+): void {
   wire();
   const worldId = activeWorldId();
   if (!worldId) return;
   const els = getState().data.elements;
   if (gesture.kind === 'created' && els.find(e => e.id === gesture.id)?.type === 'event') copyEarnedIn = worldId;
   const note = noteEarned(gesture, els, speaksCalendar());
-  if (note) offer(note, worldId, { fromAction: opts.fromAction === true, forced: false });
+  // The reward rides only on the commit that lit `placed` or `happened` (#840's C2); Were there earns its own.
+  const reward = note?.id === 'placed' ? earnReading(worldId, note.character!, note.location!)
+    : note?.id === 'dated' ? earnReading(worldId, datedAnchor(note.event!, opts.pair), note.event!)
+    : null;
+  const how = { fromAction: opts.fromAction === true, forced: false };
+  const took = note ? offer(reward ? { ...note, rider: reward } : note, worldId, how) : false;
+  // Its gesture's note seen before: the reward speaks alone.
+  if (reward && !took) offer({ id: 'reading', character: reward.anchor, rider: reward }, worldId, how);
   if (!showing && !pending) tryCopy();
+}
+
+/** Whose web a year made: the event note's pair if the Event links them, else the newest placed Character it links. */
+function datedAnchor(eventId: string, pair: { character: string } | undefined): string | null {
+  const ev = elementOf(eventId) as Record<string, unknown> | undefined;
+  if (!ev) return null;
+  const linked = linkIdsOf(ev.characters);
+  if (pair && linked.includes(pair.character)) return pair.character;
+  const placed = guideElements(getState().data.elements).filter(e =>
+    e.type === 'character' && linked.includes(e.id) && !!elementOf(placeIdOf(e) ?? undefined));
+  return newestOf(placed)?.id ?? null;
+}
+
+/** The anchor's ring as the Web draws it at depth 1, less what is only proposed: a doubt is not a link made. */
+function readingRing(worldId: string, anchor: Element): string[] {
+  const hidden = new Set<string>(entryOf(worldId)?.context_filters_off ?? []);
+  return webRingOne(anchor, hidden).filter(id => !isProposed(elementOf(id)));
+}
+
+/**
+ * Whether this gesture just gave the anchor its web (the kernel's `rewardEarned`), or null:
+ * never once seen, with the notes off, or where no note speaks.
+ */
+function earnReading(worldId: string, anchorId: string | null, elementId: string): Reward | null {
+  const anchor = elementOf(anchorId ?? undefined);
+  if (!anchor || anchor.type !== 'character' || silent(worldId)) return null;
+  const s = loadGuideState();
+  if (s.off || s.seen.reading) return null;
+  const els = getState().data.elements;
+  return rewardEarned(guideDots(els, entryOf(worldId)), anchor.id, readingRing(worldId, anchor), elementId, placeIdOf(anchor));
 }
 
 /** The Somewhere mark's press: the offer, whatever `seen` and the switch say, never stamped. */
@@ -109,19 +156,24 @@ export function showPlaceOffer(character: string, location: string): void {
   offer({ id: 'place-offer', character, location }, worldId, { fromAction: false, forced: true });
 }
 
-function offer(note: EarnedNote, worldId: string, how: { fromAction: boolean; forced: boolean }): void {
+/** Whether the note drew, or waits for a dialog to close. */
+function offer(note: EarnedNote, worldId: string, how: { fromAction: boolean; forced: boolean }): boolean {
+  // A note on a page the person has left goes first, as `clear()` removes it: its
+  // hashchange has not run yet (a create that navigated), and it must not block this one.
+  if (showing && showing.drawnHash !== window.location.hash) { showing.node.remove(); showing = null; }
   if (!how.forced) {
-    if (silent(worldId)) return;
+    if (silent(worldId)) return false;
     const s = loadGuideState();
-    if (s.off || s.seen[note.id]) return;
+    if (s.off || s.seen[note.id]) return false;
     // One at a time: dropped, never stamped, so a later gesture can earn it.
-    if (showing && !how.fromAction) return;
+    if (showing && !how.fromAction) return false;
   }
   if (anyModalOpen()) {
     pending = { note, worldId, forced: how.forced };
-    return;
+    return true;
   }
   draw(note, worldId, how.forced);
+  return true;
 }
 
 /** The keep-safe card asks for the same copy: while it would show, `copy` stays quiet (the two never offer at once). */
@@ -136,7 +188,8 @@ function keepSafeShowing(worldId: string): boolean {
  * and take it away again unseen), and never under a dialog.
  */
 function tryCopy(): void {
-  if (showing || pending || acting) return;
+  // Nor under the Web's drawer, from the press that opens it until it closes (#840's C1).
+  if (showing || pending || acting || webDrawerHolds()) return;
   const worldId = activeWorldId();
   if (!worldId || copyEarnedIn !== worldId || silent(worldId)) return;
   const s = loadGuideState();
@@ -158,7 +211,7 @@ function draw(note: EarnedNote, worldId: string, forced: boolean): void {
   node.className = 'atlas-guide-note';
   node.setAttribute('data-role', 'guide-note');
   node.setAttribute('data-note', note.id);
-  showing = { note, worldId, drawnHash: window.location.hash, node };
+  showing = { note, worldId, drawnHash: window.location.hash, node, ...(note.rider ? { rider: note.rider } : {}) };
   if (!forced) markNoteSeen(note.id);
   fill();
   host.appendChild(node);
@@ -199,8 +252,8 @@ function stillHolds(n: EarnedNote): boolean {
     case 'dated': { const ev = elementOf(n.event); return !!ev && dateOf(ev) !== null; }
     case 'story':
     case 'chapter': return !!elementOf(n.narrative);
-    // The reward's own note (#840): its anchor still placed. Its ring check comes with its drawing.
-    case 'reading': return !!ch && !!placeIdOf(ch);
+    // The reward alone (#840): its anchor still placed, and its web still two or more.
+    case 'reading': return riderHolds(n.rider) && readingRing(showing?.worldId ?? '', ch!).filter(id => id !== ch!.id).length >= 2;
     case 'copy': {
       const worldId = activeWorldId();
       return !!worldId && !guideDots(getState().data.elements, entryOf(worldId)).copy && !keepSafeShowing(worldId);
@@ -208,10 +261,24 @@ function stillHolds(n: EarnedNote): boolean {
   }
 }
 
+/** The reward's button stands while its anchor is there and placed somewhere that is (G17a). */
+function riderHolds(r: Reward | undefined): boolean {
+  const ch = elementOf(r?.anchor);
+  return !!ch && !!elementOf(placeIdOf(ch) ?? undefined);
+}
+
+/** An element's name as text, for a line that names elements of any type. */
+function anyName(id: string): string {
+  return nameOf(id, elementOf(id)?.type ?? 'element');
+}
+
 /** What a note draws from the store: its names, and the Event fields its actions read. */
 function drawnKey(n: EarnedNote): string {
   const ev = elementOf(n.event) as Record<string, unknown> | undefined;
+  const r = showing?.note === n ? showing.rider : n.rider;
+  const anchor = elementOf(r?.anchor);
   return JSON.stringify([
+    r ? [nameOf(r.anchor, 'character'), !!anchor, anchor ? placeIdOf(anchor) : null, riderHolds(r), r.names.map(anyName)] : null,
     nameOf(n.character, 'character'), nameOf(n.location, 'location'), nameOf(n.event, 'event'), nameOf(n.narrative, 'narrative'),
     n.pair ? [nameOf(n.pair.character, 'character'), nameOf(n.pair.location, 'location')] : null,
     ev ? [linkIdsOf(ev.characters), linkIdsOf(ev.locations), ev.start_date ?? null] : null,
@@ -278,7 +345,7 @@ function fill(): void {
         const pc = nameOf(pair.character, 'character');
         const pl = nameOf(pair.location, 'location');
         act('were-there', `${pc} and ${pl} were there`, async () => {
-          await writeIfEmpty(note.event!, ex => {
+          const wrote = await writeIfEmpty(note.event!, ex => {
             // Read as ids, whatever shape another tool wrote, and written back as ids.
             const r = ex as Record<string, unknown>;
             const chars = linkIdsOf(r.characters);
@@ -289,6 +356,11 @@ function fill(): void {
               locations: locs.includes(pair.location) ? locs : [...locs, pair.location],
             } as Partial<Element>;
           });
+          // Were there can be what gave the pair's Character its web (#840's C2): the button joins this note.
+          if (wrote === 'wrote' && showing?.note === note) {
+            const reward = earnReading(worldId, pair.character, note.event!);
+            if (reward) showing.rider = reward;
+          }
           // Not a leave: the note keeps its year (fill carries it), and redraws without this action.
           fill();
         });
@@ -361,6 +433,28 @@ function fill(): void {
       }
       break;
     }
+    case 'reading': {
+      const r = note.rider!;
+      // "Ada, Hollow Keep and The Fall are linked now.", "and N more" past two.
+      const all = [ch, ...r.names.map(anyName)];
+      const last = r.more > 0 ? `${r.more} more` : all.pop()!;
+      line.textContent = `${all.join(', ')} and ${last} are linked now.`;
+      break;
+    }
+  }
+
+  // The reward (#840's C2): See <name>'s world, the note's second button, drawn only while the
+  // note carries it. Its first drawing stamps `reading`; a later redraw keeps it.
+  const rider = showing.rider;
+  if (rider && riderHolds(rider) && (note.id === 'reading' || showing.riderDrawn || !loadGuideState().seen.reading)) {
+    if (!showing.riderDrawn) {
+      showing.riderDrawn = true;
+      markNoteSeen('reading');
+    }
+    act('see-world', `See ${nameOf(rider.anchor, 'character')}'s world`, () => {
+      leave();
+      openWebOn(worldId, rider.anchor);
+    });
   }
 
   const close = document.createElement('button');
@@ -431,7 +525,7 @@ function addYear(actions: HTMLElement, note: EarnedNote): void {
     }
     const wrote = await writeIfEmpty(note.event!, ex =>
       isFilled((ex as { start_date?: unknown }).start_date) ? null : { start_date: year } as Partial<Element>);
-    if (wrote === 'wrote') reportGesture({ kind: 'date-set', event: note.event! }, { fromAction: true });
+    if (wrote === 'wrote') reportGesture({ kind: 'date-set', event: note.event! }, { fromAction: true, pair: note.pair });
     if (showing?.note === note) leave();
   };
   set.addEventListener('click', () => { void runAction(run); });
@@ -508,6 +602,8 @@ function wire(): void {
   document.addEventListener('atlas:guide-changed', () => {
     if (loadGuideState().off && showing) clear();
   });
+  // The Web's drawer closed (or never opened): `copy`, held from the press, may speak now.
+  onWebDrawerReleased(() => tryCopy());
 }
 
 /** Test seam: forget everything this module holds. */

@@ -107,6 +107,17 @@ export interface GraphOpts {
    * uses this to update its chip list dynamically as the user recenters.
    */
   onRender?: (presentTypes: ReadonlySet<ElementType>) => void;
+  /**
+   * A press on the centre node. Given, it replaces the centre's select (Home's
+   * picture opens the Web on the centre, #840's C3); absent, the Web's own.
+   */
+  onCenterPress?: (elementId: string) => void;
+  /** False: the wheel scrolls the page instead of zooming (Home's picture). Default true. */
+  wheelZoom?: boolean;
+  /** Ring one's cap, in place of RING_CAPS[1] (Home's picture draws a dozen). */
+  ringCap?: number;
+  /** False: no node menu, the browser's own menu shows. Default true. */
+  contextMenu?: boolean;
 }
 
 const PARAMS = {
@@ -173,6 +184,9 @@ export function contextGraphLayoutRules(centerName: string): { minDist: number; 
 }
 /** Test seam: forget memoised layouts. */
 export function clearContextGraphLayoutMemo(): void { layoutMemo.clear(); }
+let liveGraphs = 0;
+/** Test seam: graphs mounted and not yet destroyed (a rebuild must destroy the one it replaces). */
+export function contextGraphLiveCount(): number { return liveGraphs; }
 
 function diameterFor(n: { isCenter: boolean }): number {
   return n.isCenter ? CENTER_NODE_DIAMETER : NODE_DIAMETER;
@@ -394,8 +408,11 @@ export function buildWebLinks(elements: readonly Element[], centerId: string): W
 
 export function mountContextGraph(opts: GraphOpts): GraphHandle {
   const { host, subject, onSelect, onRender } = opts;
+  const ring1Cap = opts.ringCap ?? RING_CAPS[1];
   host.innerHTML = '';
   host.style.position = 'relative';
+  liveGraphs++;
+  let destroyed = false;
 
   // The "home" view is always the subject. `currentCenterId` may diverge from
   // `homeId` when the user click-recenters on another node.
@@ -542,7 +559,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // legend; the left-out ids stay in inAnyRing so they never pose as ring 2.
     const ring1Eligible = ring1All.filter(id => !isHidden(id));
     let ring1 = ring1Eligible;
-    if (ring1Eligible.length > RING_CAPS[1]) {
+    if (ring1Eligible.length > ring1Cap) {
       const pool = new Set<string>([centerEl.id, ...ring1Eligible]);
       const score = new Map<string, number>();
       for (const id of ring1Eligible) {
@@ -552,7 +569,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       }
       ring1 = [...ring1Eligible]
         .sort((a, b) => (score.get(b) ?? 0) - (score.get(a) ?? 0))
-        .slice(0, RING_CAPS[1]);
+        .slice(0, ring1Cap);
     }
     const ring1Omitted = ring1Eligible.length - ring1.length;
     const rings: string[][] = [[centerEl.id], ring1];
@@ -837,6 +854,10 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
           if (worldId) navigate(elementHash(worldId, n.id));
           return;
         }
+        if (n.isCenter && opts.onCenterPress) {
+          opts.onCenterPress(n.id);
+          return;
+        }
         if (n.isCenter) {
           // Center node click: if we're on home, deselect; if we've recentered
           // elsewhere, clicking center is the same as picking that element
@@ -861,11 +882,13 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
 
       // Right-click menu — quick actions for the node. Suppress the native
       // browser context menu so our menu wins.
-      nodeEl.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        openNodeMenu(n, e.clientX, e.clientY);
-      });
+      if (opts.contextMenu !== false) {
+        nodeEl.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openNodeMenu(n, e.clientX, e.clientY);
+        });
+      }
 
       target.appendChild(nodeEl);
       nodeEls.set(n.id, nodeEl);
@@ -1175,7 +1198,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     userScale = nextScale;
     paintFromState();
   };
-  host.addEventListener('wheel', onWheel, { passive: false });
+  if (opts.wheelZoom !== false) host.addEventListener('wheel', onWheel, { passive: false });
 
   // Drag-pan on empty background (left button only).
   host.addEventListener('mousedown', (e) => {
@@ -1461,6 +1484,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       return presentTypes;
     },
     destroy(): void {
+      if (!destroyed) { destroyed = true; liveGraphs--; }
       closeNodeMenu();
       resizeObserver?.disconnect();
       resizeObserver = null;

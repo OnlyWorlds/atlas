@@ -157,6 +157,10 @@ export function installNarrowLayout(): void {
     if (e.key !== 'Escape') return;
     if (!isDrawerOpen('right') && !isDrawerOpen('sidebar')) return;
     closeDrawers();
+    // The drawer owns this Escape, as every overlay owns its own: the global
+    // deselect-to-home after it on the same listener list would also leave
+    // the page, and the drawer is already closed by the time it asks.
+    e.stopImmediatePropagation();
   });
 
   // A drawer is a view of the CURRENT room; navigating away should not leave

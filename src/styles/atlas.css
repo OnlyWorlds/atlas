@@ -15455,6 +15455,24 @@ a.atlas-share-map-pin { cursor: pointer; }
   vertical-align: baseline;
 }
 
+/* The world's picture (#840): the Web, small, a fixed height that never takes the page's scroll. */
+.atlas-home-picture { margin-top: 24px; }
+.atlas-home-picture-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+.atlas-home-picture-head .atlas-home-section-title { margin: 0; }
+.atlas-context-pane-graph.atlas-home-picture-graph {
+  flex: none;
+  height: 260px;
+  min-height: 0;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+}
+
 /* The chart strip — the world's history shape on the cover.
    Always the tableau; saved charts ride below as chips. */
 .atlas-home-charts { margin-top: 24px; }

@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.102.0',
+    date: '2026-10-29',
+    theme: 'A character\'s world, and the world\'s picture',
+    entries: [
+      {
+        id: 'see-their-world',
+        title: 'See a character\'s world, the moment it has two links',
+        body: 'When placing a character, or giving a year to an Event they were in, first links them to two things, the note that follows offers See Ada\'s world (by their name). It opens the Web on them beside their page, or its drawer on a phone. It is offered once in this browser, and never in the demo world.',
+        tags: ['home', 'world'],
+      },
+      {
+        id: 'home-picture',
+        title: 'Home draws the best-linked element and what it touches',
+        body: 'A world with an element linked to three or more shows the Web around its best-linked one on Home, under the cover. A press on the centre, or See its world beside the title, opens the Web on it. The page scrolls past it as before.',
+        tags: ['home'],
+      },
+      {
+        id: 'drawer-escape',
+        title: 'Escape closes a side panel and stays on the page',
+        body: 'In a narrow window, Escape over an open side panel closed it and also went back to Home. It now only closes the panel.',
+        tags: ['layout', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.101.0',
     date: '2026-10-28',
     theme: 'A world\'s reading aids at its door',

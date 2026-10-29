@@ -61,6 +61,7 @@ import { aidsHidden, currentLore, loreWithAids, roomCount, toggleAids } from '..
 import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
 import { isMoppetopiaOpen } from '../core/moppetopia';
+import { buildHomePicture, type HomePicture } from './home-picture';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -127,6 +128,9 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     return said;
   };
 
+  // The world's picture (#840's C3): its graph is destroyed before every rebuild and on unmount.
+  let picture: HomePicture | null = null;
+
   function render(): void {
     const s = getState();
     // The lore (core/parlor-room.ts): the world without the parlor's room while
@@ -139,6 +143,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       s.ui.castAssign?.kind, savedCharts, isTourFlagActive()];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     lastInputs = inputs;
+    picture?.destroy();
+    picture = null;
     const active = s.active;
     if (!active) {
       root.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
@@ -178,6 +184,13 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       loadingEl.innerHTML = `<p class="atlas-home-loading-copy">${copy}</p>`;
       root.appendChild(loadingEl);
       return;
+    }
+    // The world's picture: after the cover and its lines, above the guide's strip.
+    // Never ranked while the world is still opening, nor under the tour, whose steps point at Home's own parts.
+    picture = s.data.loading || isTourFlagActive() ? null : buildHomePicture(worldId, said);
+    if (picture) {
+      root.appendChild(picture.section);
+      picture.mount();
     }
     // The tour: tutorial-state cards computed from world contents —
     // the core create pair, then the next wave / room CTAs. Renders nothing
@@ -219,6 +232,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   return () => {
     window.removeEventListener('atlas:charts-changed', onChartsChanged);
     unsub();
+    picture?.destroy();
+    picture = null;
   };
 }
 
