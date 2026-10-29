@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'In a world on OnlyWorlds, the foot of an element\'s page now says where it was last changed, such as in Atlas, in Lantern, on onlyworlds.com, in code or with an AI, and the tools before that, each with its time. It names tools, never people.',
         tags: ['sync'],
       },
+      {
+        id: 'export-without-author-fields',
+        title: 'An export leaves out who wrote each element',
+        body: 'A JSON export from the Data room no longer carries OnlyWorlds\' record of which member and which tool last wrote each element. That record describes the account world for its members and means nothing to whoever receives the file. Your world\'s folder keeps it.',
+        tags: ['world'],
+      },
     ],
   },
   {

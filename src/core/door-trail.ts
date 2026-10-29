@@ -6,19 +6,17 @@
  * its `X-OW-Client` name or, for a write that named no client, its door word,
  * each with that tool's last write time. The SDK's `doorsOf` reads it (and
  * falls back to the last write's `changed_client` or `changed_via` for an
- * element written before the field existed); this module only says the words.
- *
- * The words are the Waymark's name line (OW Waymark, 2026-10-29): a listed
- * tool "in <its name>", the site "on onlyworlds.com", the agent doors (the
- * SDK's `isAgentDoor`: seat, mcp, declared) "with an AI", keel's own write
- * (`server`) "by OnlyWorlds", and any other door or unlisted client "in code",
- * never a guess at who. Atlas says no "by you": it does not keep the reader's
- * membership, and the trail claims nothing past the door.
+ * element written before the field existed), and its `doorWhere` says each in
+ * the Waymark's name-line words (a listed tool "in <its name>", the site "on
+ * onlyworlds.com", the agent doors "with an AI", keel's own write "by
+ * OnlyWorlds", anything else "in code"; one table for every tool, SDK 4.108).
+ * Atlas says no "by you": it does not keep the reader's membership, and the
+ * trail claims nothing past the door.
  *
  * Pure. Atlas keeps keel's `updated_at` as `server_updated_at`, so the trail
  * reads it under keel's name.
  */
-import { doorsOf, isAgentDoor, type OwDoor, type OwWriteDoor } from '@onlyworlds/sdk';
+import { doorsOf, doorWhere } from '@onlyworlds/sdk';
 import { hiddenKeptOf, hiddenWordOf } from './hidden-mark';
 import type { Element } from './types';
 
@@ -27,15 +25,6 @@ export interface TrailStep {
   where: string;
   /** The time as keel served it. */
   at: string;
-}
-
-/** The door in the name line's words. */
-export function doorWhere(d: Pick<OwDoor, 'door' | 'tool'>): string {
-  if (d.tool) return `in ${d.tool.name}`;
-  if (d.door === 'site') return 'on onlyworlds.com';
-  if (isAgentDoor(d.door as OwWriteDoor)) return 'with an AI';
-  if (d.door === 'server') return 'by OnlyWorlds';
-  return 'in code';
 }
 
 /** The element's trail, newest first; empty when OnlyWorlds has said nothing of it. */

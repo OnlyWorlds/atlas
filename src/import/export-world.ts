@@ -15,17 +15,22 @@
  */
 
 import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';
-import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
+import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../core/constants';
 import { relationFieldsFor } from '../editor/field-schema';
 import { ONLYWORLDS_VERSION } from '@onlyworlds/sdk';
 import type { FolderStore } from '../store/folder-store';
 import type { RawRecord } from './types';
 
+// Who and which tool wrote it (`created_by`, `changed_by`, `changed_via`, `changed_client`, `doors`)
+// describe the server's record for its members, and a membership id means nothing to whoever
+// receives the world: an export carries what a non-member reader is served (folder spec guidance,
+// 2026-10-29). The folder keeps them as served.
 const STRIP_EXPORT = new Set<string>([
   'type',
   'local_updated_at',
   'server_updated_at',
   ...ATLAS_LOCAL_ONLY_FIELDS,
+  ...SERVER_AUTHOR_FIELDS,
 ]);
 
 export interface ExportOptions {

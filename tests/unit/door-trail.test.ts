@@ -2,22 +2,23 @@
  * The trail's words (#760): the Waymark's name line, from the SDK's `doorsOf`.
  */
 import { describe, it, expect } from 'vitest';
-import { doorTrail, doorWhere, doorsKeptOf, stampKeptOf, stampWordOf } from '../../src/core/door-trail';
+import { doorTrail, doorsKeptOf, stampKeptOf, stampWordOf } from '../../src/core/door-trail';
 import { HIDDEN_SHOWN_ONLINE } from '../../src/core/hidden-mark';
 import type { Element } from '../../src/core/types';
 
 const el = (extra: Record<string, unknown>): Element =>
   ({ id: '00000000-0000-4000-8000-0000000000d1', type: 'character', name: 'Ada', ...extra }) as unknown as Element;
 
-describe('doorWhere', () => {
+describe('the words, the SDK\'s doorWhere', () => {
   it('says a listed tool by its name, the site, an AI, OnlyWorlds itself, and code for the rest', () => {
-    expect(doorWhere({ door: 'atlas', tool: { id: 'atlas', name: 'Atlas' } })).toBe('in Atlas');
-    expect(doorWhere({ door: 'site', tool: null })).toBe('on onlyworlds.com');
-    for (const d of ['seat', 'mcp', 'declared']) expect(doorWhere({ door: d, tool: null })).toBe('with an AI');
-    expect(doorWhere({ door: 'server', tool: null })).toBe('by OnlyWorlds');
-    for (const d of ['sync', 'api', 'v1', 'sdk', 'python', 'toolkit', 'some-unlisted-tool']) {
-      expect(doorWhere({ door: d, tool: null })).toBe('in code');
-    }
+    const at = '2026-10-29T12:00:00Z';
+    const where = (door: string) => doorTrail(el({ server_updated_at: at, doors: { [door]: at } }))[0]?.where;
+    expect(where('atlas')).toBe('in Atlas');
+    expect(where('lantern')).toBe('in Lantern');
+    expect(where('site')).toBe('on onlyworlds.com');
+    for (const d of ['seat', 'mcp', 'declared']) expect(where(d)).toBe('with an AI');
+    expect(where('server')).toBe('by OnlyWorlds');
+    for (const d of ['sync', 'api', 'v1', 'sdk', 'python', 'toolkit', 'some-unlisted-tool']) expect(where(d)).toBe('in code');
   });
 });
 
