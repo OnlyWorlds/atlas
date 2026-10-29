@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'The chart step says to open the chart before going on, the question about an Event names it, and the three ways to keep a copy each say where the copy goes. On a phone every button in the card takes a thumb, and the step names no longer run together.',
         tags: ['onboarding'],
       },
+      {
+        id: 'world-file-without-author-fields',
+        title: 'A world file leaves out who wrote each element',
+        body: 'Download the whole world now leaves out the record of which member and which tool last wrote each element, as the JSON export already does: it means nothing to the person a file is handed to. The world itself keeps it.',
+        tags: ['import'],
+      },
     ],
   },
   {

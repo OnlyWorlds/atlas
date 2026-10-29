@@ -276,3 +276,17 @@ describe('private records (§4.5 rule 11, OW-8)', () => {
     expect(leftOutRecords(labPrivate, zipWorld(labPrivate, 'w'))).toEqual(['lab']);
   });
 });
+
+describe('the author fields stay home (SDK 4.109.0, the standard ruling on exports)', () => {
+  it('an element file leaves created_by, changed_by, changed_via, changed_client and doors out; the rest of it travels', () => {
+    const el = { id: 'c1', type: 'character', name: 'Ada', created_by: 'm1', changed_by: 'm2', changed_via: 'atlas', changed_client: 'atlas', doors: { atlas: 'x' } };
+    const files = [
+      { path: 'world.json', data: strToU8(JSON.stringify({ id: 'w', name: 'W' })) },
+      { path: 'elements/character/ada--c1.json', data: strToU8(JSON.stringify(el)) },
+    ];
+    const out = unzipSync(zipWorld(files as never, 'W'));
+    const written = JSON.parse(new TextDecoder().decode(out['W/elements/character/ada--c1.json']));
+    for (const f of ['created_by', 'changed_by', 'changed_via', 'changed_client', 'doors']) expect(written, f).not.toHaveProperty(f);
+    expect(written).toMatchObject({ id: 'c1', type: 'character', name: 'Ada' });
+  });
+});
