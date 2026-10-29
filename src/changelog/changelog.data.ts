@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Help (the ? key, or Help in the sidebar) now opens wider on a desktop: the room\'s own lines on the left and the shortcuts that room uses on the right, so most rooms need no scrolling. The shortcuts for other rooms are folded under "Shortcuts in other rooms". On a narrow window the room\'s lines come first.',
         tags: ['help', 'layout'],
       },
+      {
+        id: 'home-picture-link-target',
+        title: 'See a world\'s link is easier to tap on a phone',
+        body: 'On a phone, the link above the picture on a world\'s home (in Moppetopia it reads See Puddle Navy\'s world) now answers a tap anywhere in a taller strip around its words. The words look as they did.',
+        tags: ['home', 'layout'],
+      },
     ],
   },
   {

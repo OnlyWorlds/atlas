@@ -27,6 +27,9 @@ describe('the help, room by room', () => {
       expect(help.keys[0], room).toBe('Global');
       for (const key of help.keys) expect(all, `${room}: ${key}`).toContain(key);
     }
+    // And the other way: a group no room claims would sit folded everywhere.
+    const claimed = new Set(Object.values(HELP_CONTENT).flatMap(h => h.keys));
+    for (const label of all) expect(claimed.has(label), `no room opens ${label}`).toBe(true);
   });
 
   it("Writing: the room's lines first, its three groups open, the rest folded", () => {

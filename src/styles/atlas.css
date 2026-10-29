@@ -15472,6 +15472,19 @@ a.atlas-share-map-pin { cursor: pointer; }
   margin-bottom: 8px;
 }
 .atlas-home-picture-head .atlas-home-section-title { margin: 0; }
+/* A finger's target (#945): the link's hit area grows to about 46 px tall, unseen, so
+   its words and focus ring stay as they are. It leans up: the picture below keeps its own presses. */
+@media (pointer: coarse), (max-width: 760px) {
+  .atlas-home-picture-see { position: relative; }
+  .atlas-home-picture-see::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -24px;
+    bottom: -8px;
+  }
+}
 .atlas-context-pane-graph.atlas-home-picture-graph {
   flex: none;
   height: 260px;
@@ -15682,8 +15695,8 @@ body.atlas-share-fullpreview > * {
   scrollbar-width: thin;
 }
 
-/* Wide: the room on the left, its keys on the right; narrow: stacked. */
-@media (min-width: 761px) {
+/* Wide: the room on the left, its keys on the right; narrow: stacked (below 980 the Map and Mouse groups cannot share a column pair). */
+@media (min-width: 980px) {
   .atlas-help-panel .atlas-modal-body {
     display: grid;
     grid-template-columns: minmax(260px, 1fr) minmax(0, 1.6fr);
@@ -15693,12 +15706,12 @@ body.atlas-share-fullpreview > * {
   .atlas-help-panel .atlas-help-keys:only-child { grid-column: 1 / -1; }
   .atlas-help-panel .atlas-shortcuts-groups {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 36px;
     align-items: start;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 979px) {
   /* A phone's height is short: the room's own lines come first and get all of it. */
   .atlas-modal-panel.atlas-help-panel { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
   .atlas-help-panel .atlas-help-room + .atlas-help-keys {
@@ -15713,6 +15726,8 @@ body.atlas-share-fullpreview > * {
   flex-direction: column;
   gap: 10px;
 }
+/* The old reference modal's floor (360 px) would push a 320 px window sideways. */
+.atlas-help-panel .atlas-shortcuts-content { min-width: 0; }
 .atlas-shortcuts-more { margin-top: 4px; }
 .atlas-shortcuts-more > summary {
   cursor: pointer;
