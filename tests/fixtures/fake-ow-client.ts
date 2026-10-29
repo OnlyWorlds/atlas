@@ -935,7 +935,7 @@ export class FakeOwApiClient implements OwApiClient {
   private writeDoor: { changed_by?: string | null; changed_via?: string } = {};
 
   /**
-   * keel's door record (`doors`, keel #760): every element write sets its key to the write's
+   * keel's door record (`doors`): every element write sets its key to the write's
    * `updated_at`, the client's name when it sent one, else its door (`elements/doors.py`).
    * Off by default; a test about the trail turns it on with the key its writes stamp
    * (Atlas's own: `atlas`).
