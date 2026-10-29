@@ -83,8 +83,8 @@ test('world.json is born with format_version and a foreign world.json is never g
     await store2.close();
     return { born, edited, theirs };
   });
-  expect(r.born.format_version).toBe('0.3.20');
-  expect(r.edited.format_version).toBe('0.3.20');
+  expect(r.born.format_version).toBe('0.3.21');
+  expect(r.edited.format_version).toBe('0.3.21');
   expect(r.edited.name).toBe('Renamed');
   expect(r.theirs.name).toBe('Theirs, edited');
   expect(r.theirs.format_version).toBeUndefined();

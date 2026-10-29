@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Opening a world file as a copy beside its world and reloading within a moment could, in Firefox, open the copy again as an ordinary world you could edit. It now stays a view-only copy.',
         tags: ['world', 'fix'],
       },
+      {
+        id: 'folder-format-0-3-21',
+        title: 'New world folders are format 0.3.21',
+        body: 'Atlas moves to the newest OnlyWorlds SDK and writes new world folders as format 0.3.21, the version in which a world\'s files keep the record of which tools wrote each element.',
+        tags: ['folders'],
+      },
     ],
   },
   {
