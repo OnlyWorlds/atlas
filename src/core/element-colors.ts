@@ -43,66 +43,41 @@
  * light column is carried so the SDK swap is lossless.
  */
 
+import { ELEMENT_GROUPS, GROUP_COLORS, type ElementGroup } from '@onlyworlds/sdk';
 import type { ElementType } from './types';
 
 export type ElementFamily = 'agents' | 'world' | 'abstract' | 'temporal';
 
 /**
- * Type to family. Spatial FOLDED INTO WORLD (Skeld's ruling): map/pin/marker/
- * zone describe where things are, which is what Location and Construct already
- * encode — and keeping Spatial separate failed all-pairs validation in dark
- * mode on the two greens.
- *
- * Atlas-specific evidence supporting the fold, gathered before agreeing:
- * `map-tab-pins.ts` calls `pinVisualFor(el.type, ...)`, so a pin is coloured by
- * its TARGET element's type. The `pin` / `marker` / `map` entries here almost
- * never colour a mark on a map — they surface in element lists and the graph.
- * A family that rarely renders its own hue does not need its own hue.
+ * Atlas's four family words, one per group of the standard's presentation
+ * defaults (the SDK's groups, generated from the distribution since 4.102.0).
+ * The names stay Atlas's so no consumer moves; which type sits in which group,
+ * and every hex, are the SDK's. The standard moved Construct to pink and
+ * Ability to amber (serial 86): Atlas follows the standard, never its own copy.
+ * Spatial types fold into green (Skeld's ruling of 2026-07-22, kept by the
+ * standard): a pin is coloured by its TARGET's type (`pinVisualFor`), so the
+ * map, pin, marker and zone entries mostly colour lists and the graph.
  */
-export const ELEMENT_FAMILIES: Record<ElementType, ElementFamily> = {
-  character:   'agents',
-  creature:    'agents',
-  species:     'agents',
-  family:      'agents',
-  collective:  'agents',
-  institution: 'agents',
-
-  location:    'world',
-  object:      'world',
-  construct:   'world',
-  map:         'world',
-  pin:         'world',
-  marker:      'world',
-  zone:        'world',
-
-  ability:     'abstract',
-  trait:       'abstract',
-  title:       'abstract',
-  language:    'abstract',
-  law:         'abstract',
-
-  event:       'temporal',
-  narrative:   'temporal',
-  phenomenon:  'temporal',
-  relation:    'temporal',
+const FAMILY_OF_GROUP: Record<ElementGroup, ElementFamily> = {
+  blue: 'agents',
+  green: 'world',
+  pink: 'abstract',
+  amber: 'temporal',
 };
+
+/** Type to family, read from the SDK's groups. */
+export const ELEMENT_FAMILIES: Record<ElementType, ElementFamily> = Object.fromEntries(
+  Object.entries(ELEMENT_GROUPS).map(([type, group]) => [type, FAMILY_OF_GROUP[group as ElementGroup]]),
+) as Record<ElementType, ElementFamily>;
 
 /**
- * Family to hex. Both modes were selected and validated against their own
- * surface rather than auto-flipped from one another, so do not derive one from
- * the other. World is identical in both by validation, not by oversight.
+ * Family to hex: the SDK's `GROUP_COLORS`. Both modes were validated against
+ * their own surface (Skeld's CVD validator), so one is never derived from the
+ * other, and green is the same in both by validation, not by oversight.
  */
-export const FAMILY_COLORS: Record<ElementFamily, { light: string; dark: string }> = {
-  agents:   { light: '#2a78d6', dark: '#3987e5' },
-  // The #009a00 lift was REFUTED by Skeld's validator (2026-07-22): ΔE 0.2
-  // against Temporal amber for protan viewers, and the green is boxed in on
-  // both sides (brighter -> amber collision, teal-er -> pink collision).
-  // Reverted to the validated value; the recession trade is Titus's call —
-  // full record in the comment at the bottom of this file.
-  world:    { light: '#008300', dark: '#008300' },
-  abstract: { light: '#e87ba4', dark: '#d55181' },
-  temporal: { light: '#eda100', dark: '#c98500' },
-};
+export const FAMILY_COLORS: Record<ElementFamily, { light: string; dark: string }> = Object.fromEntries(
+  (Object.keys(FAMILY_OF_GROUP) as ElementGroup[]).map(g => [FAMILY_OF_GROUP[g], { ...GROUP_COLORS[g] }]),
+) as Record<ElementFamily, { light: string; dark: string }>;
 
 /** Unknown types (a foreign tool's element) get the world green rather than a
  *  throw — the Folder Format welcomes files atlas did not write. */

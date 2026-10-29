@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.102.1',
+    date: '2026-10-29',
+    theme: 'The standard\'s colours',
+    entries: [
+      {
+        id: 'standard-colours',
+        title: 'Constructs are pink and Abilities amber, as the standard now draws them',
+        body: 'An element\'s colour says its group, and its icon says its type. The OnlyWorlds standard moved Construct into the pink group and Ability into the amber one, and Atlas now reads every type\'s group and colour from the standard itself.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.102.0',
     date: '2026-10-29',
     theme: 'A character\'s world, and the world\'s picture',
