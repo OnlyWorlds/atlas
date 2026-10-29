@@ -149,7 +149,11 @@ async function opensAndReopens(page: Page, folder: boolean) {
     delete reg.account_username;
     localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
   });
-  // A fresh load opens on no world; the door activates the copy itself.
+  // A fresh load opens on no world; the door activates the copy itself. The
+  // copy's files land first: a load inside the landing removes a half world
+  // by design and offers the door again (Firefox's landing ran up to 0.4 s
+  // past this point, and the spec read that as the copy never opening).
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.landed(); });
   await arriveAt(page, `#/open/${ID}`);
   await expect.poll(async () => (await entryFor(page)).active).toBe(entry.localId);
   await expect.poll(async () => (await entryFor(page)).elements).toBe(1);
