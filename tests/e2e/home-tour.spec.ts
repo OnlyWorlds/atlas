@@ -471,6 +471,10 @@ test.describe('on a touch phone', () => {
     await setupWorld(page, 'browser');
     const heights = (sel: string) => block(page).locator(sel).evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
     expect(Math.min(...await heights('[data-guide-door]'))).toBeGreaterThanOrEqual(44);
+    await page.click('[data-guide-door="nothing"]');
+    // Anything else, the card's one link: a strip a thumb can hit.
+    expect(Math.min(...await heights('[data-create-any], [data-step-action]'))).toBeGreaterThanOrEqual(44);
+    await page.click('[data-action="guide-back"]');
     await page.click('[data-guide-door="bring"]');
     // The ghost buttons too: the rooms' own touch rule makes them 40 px unless the block's outranks it.
     expect(Math.min(...await heights('[data-bring-action], [data-action="guide-back"]'))).toBeGreaterThanOrEqual(44);

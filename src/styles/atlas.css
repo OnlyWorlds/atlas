@@ -16142,6 +16142,8 @@ body.atlas-share-fullpreview > * {
   .atlas-guide-block .atlas-guide-door, .atlas-guide-block .atlas-guide-card-actions button, .atlas-guide-block .atlas-guide-way > button { min-height: 44px; }
   .atlas-guide-back { min-height: 44px; padding: 0 8px 0 0; }
   .atlas-guide-head { height: 44px; }
+  /* Anything else keeps its words where they are, in a strip a thumb can hit. */
+  .atlas-guide-block .atlas-guide-any { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 }
 
 .atlas-guide-slot {
