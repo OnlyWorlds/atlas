@@ -378,7 +378,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         body:
           'Maps are like layers on top of images that you create elsewhere. (as url or local upload). Turns them into a canvas on which you can place things.' +
           '\nMarkers combine to form zones, as seen in the map pane.' +
-          '\nPins point an element to a coordinate on a map.\n\nCreate one now for the Consul by clicking the + pin icon in the middle pane, or dragging him in from the sidebar. Make sure to land him over the swamps.' ,
+          '\nPins point an element to a coordinate on a map.\n\nCreate one now for the Consul by clicking the + pin icon in the middle pane, then clicking the map, or by dragging him in from the sidebar. Make sure to land him over the swamps.' ,
         // A finger cannot drag from the sidebar (#279): the +pin tap, then a tap on the map.
         touchBody:
           'Maps are like layers on top of images that you create elsewhere. (as url or local upload). Turns them into a canvas on which you can place things.' +

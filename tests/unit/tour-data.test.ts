@@ -413,4 +413,11 @@ describe('a step\'s view is a function of the STEP', () => {
     const consul = TOUR_STEPS.find(s => s.id === 'the-consul');
     expect(consul?.route).toEqual({ kind: 'element', ref: 'character:The Consul' });
   });
+
+  it('the pin beat names both presses of the + pin gesture, the icon then the map (#886)', () => {
+    // A stranger who pressed the icon and waited read the beat as stuck: the pin lands on a second press.
+    const a = TOUR_STEPS.find(s => s.id === 'the-map')?.phases.find(p => p.id === 'a');
+    expect(a?.body).toMatch(/\+ pin icon[^.]*then clicking the map/);
+    expect(a?.touchBody).toMatch(/\+ pin icon[^.]*then tapping the map/);
+  });
 });

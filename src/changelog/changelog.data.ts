@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'On a phone, the two links under Create a world and Explore answer a tap over a strip about as tall as a fingertip, centred on their words. They look the same as before.',
         tags: ['layout'],
       },
+      {
+        id: 'tour-pin-two-clicks',
+        title: 'The tour says both clicks that place the Consul\'s pin',
+        body: 'At the map in Watch how it works, the step now says to click the + pin icon and then the map. The pin lands on that second click, and the step read as stuck to someone who stopped after the first.',
+        tags: ['tour'],
+      },
     ],
   },
   {
