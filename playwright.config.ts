@@ -63,6 +63,8 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:3045',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    // The changelog build, then Vite 8's first start: measured at 45 s on a
+    // loaded machine, where 30 s left the suite without a server.
+    timeout: 120_000,
   },
 });
