@@ -27,11 +27,18 @@ export interface RoomHelp {
   can: HelpLine[];
   /** Lines true only for a world kept in a folder; left out for a browser world or a browser without folders. */
   folderCan?: string[];
+  /**
+   * The shortcut groups this room uses, shown open; every other group folds
+   * under "Shortcuts in other rooms" (#855). Labels are the reference's own
+   * section labels (`shortcuts-content.ts`).
+   */
+  keys: string[];
 }
 
 export const HELP_CONTENT: Record<string, RoomHelp> = {
   home: {
     name: 'Home',
+    keys: ['Global'],
     purpose: 'Your world at a glance, and the fastest way back into it.',
     can: [
       'edit the world name and description by clicking them',
@@ -43,6 +50,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   element: {
     name: 'Element',
+    keys: ['Global', 'Editor'],
     purpose: 'Every field of one element, in the shared OnlyWorlds shape.',
     can: [
       'edit any field by clicking its value',
@@ -58,6 +66,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   writing: {
     name: 'Writing',
+    keys: ['Global', 'Editor', 'Writing'],
     purpose: 'Write your world in a nested tree of books, chapters, and scenes.',
     can: [
       'rename the tiers to fit your project',
@@ -73,6 +82,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   knowledge: {
     name: 'Knowledge',
+    keys: ['Global', 'Editor'],
     purpose: 'What the characters and circles of your world know.',
     can: [
       'give knowledge to a character or a circle',
@@ -85,6 +95,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   timeline: {
     name: 'Charts',
+    keys: ['Global', 'Charts'],
     purpose: 'Your world along a time axis, in your world\'s own words.',
     can: [
       {
@@ -107,6 +118,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   share: {
     name: 'Pages',
+    keys: ['Global'],
     purpose: 'Build pages from your world to share with a group or publish for anyone.',
     can: [
       'stack blocks: headings, text, cards, collections, maps, charts, circles',
@@ -117,6 +129,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   import: {
     name: 'Data',
+    keys: ['Global'],
     purpose: 'Bring OnlyWorlds data into atlas, or take your world out as a file.',
     can: [
       { mouse: 'drop or paste JSON and review before anything lands', touch: 'choose a .json or a world file (.owworld or .zip), or paste JSON, and review before anything lands' },
@@ -130,6 +143,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   settings: {
     name: 'Settings',
+    keys: ['Global'],
     purpose: 'Atlas-wide preferences and per-world configuration.',
     can: [
       'connect your OnlyWorlds account for sync and publishing',
@@ -144,6 +158,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   // in the subsystem carrying the most concepts a user has to be taught.
   map: {
     name: 'Maps',
+    keys: ['Global', 'Editor', 'Map', 'Mouse'],
     purpose: 'Place your world in space: maps, the pins that put elements on them, and zones that give regions a shape.',
     can: [
       'create a map with no image at all and sketch on a blank canvas; attach a picture later and your pins and zones scale to fit it',
@@ -174,6 +189,7 @@ export interface ResolvedHelp {
   name: string;
   purpose: string;
   can: string[];
+  keys: string[];
 }
 
 function resolveLines(lines: readonly HelpLine[], touch: boolean): string[] {
@@ -190,10 +206,10 @@ export function helpForRoom(mode: string, touch: boolean = isCoarsePointer()): R
   const help = HELP_CONTENT[mode];
   if (!help) return null;
   const can = resolveLines(help.can, touch);
-  if (!help.folderCan) return { name: help.name, purpose: help.purpose, can };
+  if (!help.folderCan) return { name: help.name, purpose: help.purpose, can, keys: help.keys };
   // Folder-only lines need a browser with folders and an open world kept in one.
   const { registry, active } = getState();
   const entry = registry.worlds.find(w => w.id === active?.worldId);
   const inFolder = hasFolderMode() && filesWhereOf(entry) === 'folder';
-  return { name: help.name, purpose: help.purpose, can: inFolder ? [...can, ...help.folderCan] : can };
+  return { name: help.name, purpose: help.purpose, can: inFolder ? [...can, ...help.folderCan] : can, keys: help.keys };
 }

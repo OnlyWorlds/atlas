@@ -107,8 +107,12 @@ function hotkeySections(): Section[] {
  *
  * Where a label appears in both (e.g. "Editor", "Map"), the rows are merged
  * so the user sees a single grouped section per label.
+ *
+ * `open` names the groups a room uses (#855): those render first, and every
+ * other group folds under "Shortcuts in other rooms". Without it, every group
+ * renders open.
  */
-export function buildShortcutsContent(): HTMLElement {
+export function buildShortcutsContent(open?: readonly string[]): HTMLElement {
   const root = document.createElement('div');
   root.className = 'atlas-shortcuts-content';
 
@@ -120,42 +124,60 @@ export function buildShortcutsContent(): HTMLElement {
     else merged.set(s.label, [...s.rows]);
   }
 
+  const roomGroups = document.createElement('div');
+  roomGroups.className = 'atlas-shortcuts-groups';
+  roomGroups.setAttribute('data-role', 'help-room-keys');
+  const more = document.createElement('details');
+  more.className = 'atlas-shortcuts-more';
+  more.setAttribute('data-role', 'help-more-keys');
+  const summary = document.createElement('summary');
+  summary.textContent = 'Shortcuts in other rooms';
+  more.appendChild(summary);
+  const otherGroups = document.createElement('div');
+  otherGroups.className = 'atlas-shortcuts-groups';
+  more.appendChild(otherGroups);
+
   for (const [label, rows] of merged) {
-    const section = document.createElement('div');
-    section.className = 'atlas-shortcuts-section';
-
-    const header = document.createElement('div');
-    header.className = 'atlas-shortcuts-section-header';
-    header.textContent = label;
-    section.appendChild(header);
-
-    const list = document.createElement('dl');
-    list.className = 'atlas-shortcuts-list';
-    for (const row of rows) {
-      const dt = document.createElement('dt');
-      if (row.parts) {
-        row.parts.forEach((p, i) => {
-          if (i > 0) dt.appendChild(document.createTextNode(' + '));
-          const kbd = document.createElement('kbd');
-          kbd.textContent = p;
-          dt.appendChild(kbd);
-        });
-      } else if (row.comboAsKbd) {
-        renderKbdCombo(dt, row.combo);
-      } else {
-        dt.textContent = row.combo;
-      }
-      list.appendChild(dt);
-
-      const dd = document.createElement('dd');
-      dd.textContent = row.description;
-      list.appendChild(dd);
-    }
-    section.appendChild(list);
-    root.appendChild(section);
+    (!open || open.includes(label) ? roomGroups : otherGroups).appendChild(buildSection(label, rows));
   }
-
+  if (roomGroups.childElementCount > 0) root.appendChild(roomGroups);
+  if (otherGroups.childElementCount > 0) root.appendChild(more);
   return root;
+}
+
+function buildSection(label: string, rows: Row[]): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'atlas-shortcuts-section';
+
+  const header = document.createElement('div');
+  header.className = 'atlas-shortcuts-section-header';
+  header.textContent = label;
+  section.appendChild(header);
+
+  const list = document.createElement('dl');
+  list.className = 'atlas-shortcuts-list';
+  for (const row of rows) {
+    const dt = document.createElement('dt');
+    if (row.parts) {
+      row.parts.forEach((p, i) => {
+        if (i > 0) dt.appendChild(document.createTextNode(' + '));
+        const kbd = document.createElement('kbd');
+        kbd.textContent = p;
+        dt.appendChild(kbd);
+      });
+    } else if (row.comboAsKbd) {
+      renderKbdCombo(dt, row.combo);
+    } else {
+      dt.textContent = row.combo;
+    }
+    list.appendChild(dt);
+
+    const dd = document.createElement('dd');
+    dd.textContent = row.description;
+    list.appendChild(dd);
+  }
+  section.appendChild(list);
+  return section;
 }
 
 /**

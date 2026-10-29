@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.104.0',
+    date: '2026-10-29',
+    theme: 'Help for the room you are in',
+    entries: [
+      {
+        id: 'help-room-by-room',
+        title: 'Help shows the room you are in first',
+        body: 'Help (the ? key, or Help in the sidebar) now opens wider on a desktop: the room\'s own lines on the left and the shortcuts that room uses on the right, so most rooms need no scrolling. The shortcuts for other rooms are folded under "Shortcuts in other rooms". On a narrow window the room\'s lines come first.',
+        tags: ['help', 'layout'],
+      },
+    ],
+  },
+  {
     version: '1.103.0',
     date: '2026-10-29',
     theme: 'Bring in your notes before you have a world',

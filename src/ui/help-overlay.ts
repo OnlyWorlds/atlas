@@ -1,7 +1,11 @@
 /**
  * The `?` help overlay (workplan D8) — ONE shape for every room:
- * what this room is for, a few "you can…" lines, then the full keyboard +
+ * what this room is for, a few "you can…" lines, then the keyboard +
  * gesture reference (unified with the old hotkey modal, which this replaces).
+ *
+ * Room by room (#855): on a wide window the room's own lines sit on the left
+ * and its shortcut groups on the right; the groups other rooms use fold under
+ * "Shortcuts in other rooms". On a narrow window the same order stacks.
  *
  * Room-aware: derives the current room from the URL when opened via the `?`
  * hotkey. Content strings live in `help-content.ts`; the shortcut list stays
@@ -36,16 +40,25 @@ class HelpOverlay extends BaseModal {
       panelClass: 'atlas-help-panel',
     });
 
+    // A map open in the right pane leaves the address on the room, so its
+    // help would never show there: the map's lines follow the room's (Titus,
+    // 2026-10-15), and so do its shortcut groups.
+    const mapHelp = help && mode !== 'map' && rightPaneShowsMap() ? helpForRoom('map') : null;
+
     if (help) {
+      const room = document.createElement('div');
+      room.className = 'atlas-help-room';
+      room.setAttribute('data-role', 'help-room');
+
       const purpose = document.createElement('p');
       purpose.className = 'atlas-help-purpose';
       purpose.textContent = help.purpose;
-      body.appendChild(purpose);
+      room.appendChild(purpose);
 
       const canHead = document.createElement('h3');
       canHead.className = 'atlas-help-can-head';
       canHead.textContent = 'You can';
-      body.appendChild(canHead);
+      room.appendChild(canHead);
 
       const list = document.createElement('ul');
       list.className = 'atlas-help-can';
@@ -54,17 +67,13 @@ class HelpOverlay extends BaseModal {
         li.textContent = line;
         list.appendChild(li);
       }
-      body.appendChild(list);
+      room.appendChild(list);
 
-      // A map open in the right pane leaves the address on the room, so its
-      // help would never show there: the map's lines follow the room's (Titus,
-      // 2026-10-15).
-      const mapHelp = mode !== 'map' && rightPaneShowsMap() ? helpForRoom('map') : null;
       if (mapHelp) {
         const mapHead = document.createElement('h3');
         mapHead.className = 'atlas-help-can-head';
         mapHead.textContent = 'On the open map';
-        body.appendChild(mapHead);
+        room.appendChild(mapHead);
         const mapList = document.createElement('ul');
         mapList.className = 'atlas-help-can';
         mapList.setAttribute('data-role', 'help-open-map');
@@ -73,13 +82,14 @@ class HelpOverlay extends BaseModal {
           li.textContent = line;
           mapList.appendChild(li);
         }
-        body.appendChild(mapList);
+        room.appendChild(mapList);
       }
-
-      const divider = document.createElement('div');
-      divider.className = 'atlas-help-divider';
-      body.appendChild(divider);
+      body.appendChild(room);
     }
+
+    const keys = document.createElement('div');
+    keys.className = 'atlas-help-keys';
+    keys.setAttribute('data-role', 'help-keys');
 
     // A touch screen gets no key or right-click reference (#279): it could
     // use none of it. It hears of Lantern instead, the app made for a phone.
@@ -87,22 +97,25 @@ class HelpOverlay extends BaseModal {
       const touchHead = document.createElement('h3');
       touchHead.className = 'atlas-help-can-head';
       touchHead.textContent = 'On a touch screen';
-      body.appendChild(touchHead);
+      keys.appendChild(touchHead);
       const touch = document.createElement('p');
       touch.className = 'atlas-help-purpose';
       touch.textContent = 'Tap to open and edit, and pinch to zoom a map. Shortcuts need a keyboard.';
-      body.appendChild(touch);
+      keys.appendChild(touch);
       const lantern = document.createElement('p');
       lantern.className = 'atlas-help-purpose atlas-help-lantern';
       lantern.innerHTML = lanternLineHtml();
-      body.appendChild(lantern);
+      keys.appendChild(lantern);
     } else {
       const shortcutsHead = document.createElement('h3');
       shortcutsHead.className = 'atlas-help-can-head';
       shortcutsHead.textContent = 'Keyboard and mouse';
-      body.appendChild(shortcutsHead);
-      body.appendChild(buildShortcutsContent());
+      keys.appendChild(shortcutsHead);
+      // No room (the welcome): every group open, as before.
+      const open = help ? [...help.keys, ...(mapHelp?.keys ?? [])] : undefined;
+      keys.appendChild(buildShortcutsContent(open));
     }
+    body.appendChild(keys);
 
     this.modal = overlay;
     this.show();

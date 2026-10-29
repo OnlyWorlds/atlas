@@ -169,7 +169,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/ui/element-create-modal.ts`, `src/ui/element-picker-modal.ts`, `src/ui/zone-create-modal.ts`, `src/ui/map-create-modal.ts` (its configure-existing mode has no callers: DESIGN_MAPS).
 - `src/ui/field-edit-popover.ts` (commits changed non-empty text on outside click), `src/ui/field-edit-inline.ts` (Shift+Enter saves in multi-mode).
 - `src/ui/colour-popover.ts`: the atlas colour picker (presets + hex + Apply).
-- `src/ui/help-overlay.ts` (the `?` overlay) over `src/ui/help-content.ts` (ALL per-room help strings, one file).
+- `src/ui/help-overlay.ts` (the `?` overlay) over `src/ui/help-content.ts` (ALL per-room help strings, one file, and each room's open shortcut groups, `keys`).
 - `src/ui/room-tabs.ts` (the room-section tab pattern), `src/ui/drill-in.ts` (the `‹ Room` back band on entity views).
 - `src/ui/shortcuts-content.ts`; `src/ui/hotkey-reference-modal.ts` is DORMANT (superseded by the help overlay).
 - `src/ui/world-key-modal.ts` (1.51): `NewKeyModal`, Put in a new key from Settings, This world (a modal: the settings panel rebuilds on every state change).

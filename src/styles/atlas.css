@@ -15663,11 +15663,16 @@ body.atlas-share-fullpreview > * {
 /* ==== The ? overlay (D8) ==== */
 /* The help panel caps at the viewport and scrolls its body — the shortcut
    reference is tall by design, the chrome (title) stays pinned. */
-.atlas-help-panel {
+.atlas-modal-panel.atlas-help-panel {
   display: flex;
   flex-direction: column;
-  max-height: 86vh;
+  max-height: 90vh;
   min-height: 0;
+  /* Room by room (#855): wide enough for the room's lines beside its keys. */
+  width: min(1120px, calc(100vw - 32px));
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .atlas-help-panel .atlas-modal-body {
@@ -15676,6 +15681,48 @@ body.atlas-share-fullpreview > * {
   padding-right: 8px;
   scrollbar-width: thin;
 }
+
+/* Wide: the room on the left, its keys on the right; narrow: stacked. */
+@media (min-width: 761px) {
+  .atlas-help-panel .atlas-modal-body {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(0, 1.6fr);
+    column-gap: 40px;
+    align-items: start;
+  }
+  .atlas-help-panel .atlas-help-keys:only-child { grid-column: 1 / -1; }
+  .atlas-help-panel .atlas-shortcuts-groups {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 36px;
+    align-items: start;
+  }
+}
+@media (max-width: 760px) {
+  /* A phone's height is short: the room's own lines come first and get all of it. */
+  .atlas-modal-panel.atlas-help-panel { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
+  .atlas-help-panel .atlas-help-room + .atlas-help-keys {
+    border-top: 1px solid var(--atlas-divider);
+    margin-top: 14px;
+    padding-top: 14px;
+  }
+}
+
+.atlas-shortcuts-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.atlas-shortcuts-more { margin-top: 4px; }
+.atlas-shortcuts-more > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--atlas-text-muted);
+  padding: 4px 0;
+}
+.atlas-shortcuts-more > summary:hover { color: var(--atlas-text); }
+.atlas-shortcuts-more[open] > summary { margin-bottom: 8px; }
 
 .atlas-help-purpose {
   margin: 0 0 14px 0;
@@ -15694,13 +15741,10 @@ body.atlas-share-fullpreview > * {
   padding-left: 18px;
   font-size: 12.5px;
   color: var(--atlas-text-muted);
-  line-height: 1.7;
+  line-height: 1.5;
 }
+.atlas-help-can li + li { margin-top: 3px; }
 .atlas-help-can li::marker { color: var(--atlas-accent-text); }
-.atlas-help-divider {
-  border-top: 1px solid var(--atlas-divider);
-  margin: 14px 0;
-}
 
 /* ==== OnlyWorlds page + waypoints (D11) ==== */
 .atlas-ow-intro .atlas-settings-hint { line-height: 1.6; }
