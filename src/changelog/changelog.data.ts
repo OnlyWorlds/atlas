@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.108.1',
+    date: '2026-10-29',
+    theme: 'Clearer steps',
+    entries: [
+      {
+        id: 'guide-card-words',
+        title: 'The first world\'s card says more plainly what each step does',
+        body: 'The chart step says to open the chart before going on, the question about an Event names it, and the three ways to keep a copy each say where the copy goes. On a phone every button in the card takes a thumb, and the step names no longer run together.',
+        tags: ['onboarding'],
+      },
+    ],
+  },
+  {
     version: '1.108.0',
     date: '2026-10-29',
     theme: 'A first screen that leads',

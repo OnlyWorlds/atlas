@@ -70,6 +70,7 @@ const PROBES: Probe[] = [
   { name: 'guide door title', chain: ['atlas-home-onboarding', 'atlas-guide-doors', 'atlas-guide-door', 'atlas-guide-door-title'], min: 4.5 },
   { name: 'guide door line', chain: ['atlas-home-onboarding', 'atlas-guide-doors', 'atlas-guide-door', 'atlas-guide-door-line'], min: 4.5 },
   { name: 'guide card line', chain: ['atlas-home-onboarding', 'atlas-guide-card', 'atlas-guide-card-line'], min: 4.5 },
+  { name: 'guide card hint', chain: ['atlas-home-onboarding', 'atlas-guide-card', 'atlas-guide-card-way', 'atlas-guide-card-hint'], min: 4.5 },
   { name: 'guide way line', chain: ['atlas-home-onboarding', 'atlas-guide-ways', 'atlas-guide-way', 'atlas-home-have-line'], min: 4.5 },
   // The family census: the map's placement hint paints the canvas floor; its Cancel read themed ink.
   { name: 'map placement hint', chain: ['atlas-map-placement-hint'] },

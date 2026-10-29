@@ -295,6 +295,8 @@ interface CardAction {
   verb: string;
   label: string;
   run: (button: HTMLButtonElement) => void | Promise<unknown>;
+  /** A short clause under the button, saying where this way puts things. */
+  hint?: string;
   /** The press stays on the home and redraws the card (Next, Place, Were there): focus goes to the new card's button. */
   stays?: boolean;
 }
@@ -408,10 +410,11 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
         const ada = nameOf(pairChar, 'character');
         const hollow = nameOf(byId.get(pair.location), 'location');
         const event = dated.id;
-        line = `${founding} happened in year ${year}. Were ${ada} and ${hollow} there?`;
-        actions.push({ verb: 'were-there', label: `${ada} and ${hollow} were there`, stays: true, run: () => wereThereFromCard(worldId, event, pair) });
+        line = `${founding} happened in year ${year}. Were ${ada} and ${hollow} at ${founding}?`;
+        actions.push({ verb: 'were-there', label: `Add ${ada} and ${hollow} to ${founding}`, stays: true, run: () => wereThereFromCard(worldId, event, pair) });
       } else {
-        line = `${founding} is on the chart at year ${year}.`;
+        // Not yet seen: the sentence says the chart is the way on, since Next waits for it.
+        line = `${founding} is on the chart at year ${year}.${done ? '' : ' Open the chart to see it, then go on.'}`;
       }
       // Were there is offered, never required: Next stands once the chart was seen.
       actions.push(done ? next() : chart);
@@ -431,7 +434,8 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
       }
       const tier = getTierForNarrative(tale, worldId);
       const word = tier ? labels[tier].toLowerCase() : null;
-      line = word ? `${nameOf(tale, 'narrative')} is ${/^[aeiou]/.test(word) ? 'an' : 'a'} ${word}.` : `${nameOf(tale, 'narrative')} is a story.`;
+      // The world's own word arrives with its place, not as a jump from "story".
+      line = word ? `${nameOf(tale, 'narrative')} is in your world, listed as ${/^[aeiou]/.test(word) ? 'an' : 'a'} ${word}.` : `${nameOf(tale, 'narrative')} is a story.`;
       actions.push(done ? next() : { verb: 'open-writing', label: 'Open the writing room', run: () => navigate(writingHash(worldId, tale.id)) });
       break;
     }
@@ -444,7 +448,7 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
       }
       line = `${world} is kept only in this browser.`;
       actions.push({
-        verb: 'download', label: 'Download', run: async (button) => {
+        verb: 'download', label: 'Download', hint: 'a file on this computer', run: async (button) => {
           const now = getState().registry.worlds.find(w => w.id === worldId);
           if (!now || button.disabled) return;
           const { downloadWorldFromClick } = await import('../ui/download-world');
@@ -454,7 +458,7 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
       });
       if (hasFolderMode()) {
         actions.push({
-          verb: 'move', label: 'Move to a folder', run: async () => {
+          verb: 'move', label: 'Move to a folder', hint: 'files you keep yourself', run: async () => {
             const now = getState().registry.worlds.find(w => w.id === worldId);
             if (!now) return;
             cardOpenedDialog = true;
@@ -465,7 +469,8 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
       }
       if (entry && entry.state !== 'api-linked' && !entry.copy_of && !isPartialSlice(getState().active?.meta)) {
         actions.push({
-          verb: 'online', label: 'Make online', run: async () => {
+          // keel: a world is read only by the people its owner invites until the owner turns public reading on.
+          verb: 'online', label: 'Make online', hint: 'on onlyworlds.com, private to you until you share it', run: async () => {
             cardOpenedDialog = true;
             const { MakeOnlineModal } = await import('../ui/make-online-modal');
             new MakeOnlineModal(toasts).open();
@@ -492,6 +497,16 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
     b.className = i === 0 ? 'atlas-btn-primary' : 'atlas-btn-ghost';
     b.setAttribute('data-step-action', a.verb);
     b.textContent = a.label;
+    // A way with a hint stands over its clause (the copy step: three ways that would read alike).
+    let slot: HTMLElement = b;
+    if (a.hint) {
+      slot = document.createElement('span');
+      slot.className = 'atlas-guide-card-way';
+      const hint = document.createElement('span');
+      hint.className = 'atlas-guide-card-hint';
+      hint.textContent = a.hint;
+      slot.append(b, hint);
+    }
     b.addEventListener('click', () => {
       // A world on the path with no pointer (imported, older): the first press on its card holds the
       // step, so the step it leads to is confirmed with Next instead of moving on unseen.
@@ -502,7 +517,7 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
         dropAskAfter(a.run(b));
       } else void a.run(b);
     });
-    row.appendChild(b);
+    row.appendChild(slot);
   });
   el.append(p, row);
   return el;
