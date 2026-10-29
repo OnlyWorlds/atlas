@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "1.107.0",
+  "version": "1.108.0",
   "private": true,
   "license": "MIT",
   "description": "Atlas: folder-first OnlyWorlds world browser and editor with optional API sync",

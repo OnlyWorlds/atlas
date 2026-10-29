@@ -24,8 +24,9 @@ const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0
 const E = (n: number, type: string, name: string, extra: Record<string, unknown> = {}) =>
   ({ id: uuid(n), type, name, ...extra }) as unknown as Element;
 
+/** A world past the guide's path (`done`) unless the test says otherwise: there the notes speak (#964's one voice). */
 function world(elements: Element[], entry: Partial<WorldRegistryEntry> = {}): void {
-  const e = { id: 'w', name: 'W', where: 'folder', state: 'local-only', ...entry } as unknown as WorldRegistryEntry;
+  const e = { id: 'w', name: 'W', where: 'folder', state: 'local-only', guide_step: 'done', ...entry } as unknown as WorldRegistryEntry;
   patchSlice('registry', { worlds: [e] } as never);
   patchSlice('active', { worldId: 'w', meta: { name: 'W' } } as never);
   patchSlice('data', { elements } as never);
@@ -151,6 +152,24 @@ describe('C2: the reward on its note', () => {
     window.location.hash = `#/w/w/element/${ev.id}`;
     reportGesture({ kind: 'created', id: ev.id });
     expect(shown()?.dataset.note).toBe('event');
+  });
+});
+
+describe('#964: one voice while the path shows', () => {
+  it('the year\'s own note stays silent, and the reward still speaks alone (G4)', () => {
+    const { ev } = adaReady({ guide_step: 'happened' } as never);
+    reportGesture({ kind: 'date-set', event: ev.id });
+    expect(shown()?.dataset.note).toBe('reading');
+    expect(shown()?.querySelector('[data-note-action="see-world"]')?.textContent).toBe("See Ada's world");
+  });
+
+  it('a path note showing gives way when the path starts again (G9)', () => {
+    const { ev } = adaReady();
+    reportGesture({ kind: 'date-set', event: ev.id });
+    expect(shown()?.dataset.note).toBe('dated');
+    const reg = getState().registry;
+    patchSlice('registry', { ...reg, worlds: reg.worlds.map(w => ({ ...w, guide_step: 'story' })) } as never);
+    expect(shown()).toBeNull();
   });
 });
 

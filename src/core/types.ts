@@ -851,6 +851,15 @@ export interface WorldRegistryEntry {
   /** When the big-world note on lenses was shown in this world (#841's P5). */
   lens_note_at?: string;
   /**
+   * Where the guide's path stands in this world (#964): the step its card
+   * speaks for, or `done` after the last Next. Kept in this browser, never
+   * synced; written only by a press (Start from nothing, Next) or a world
+   * made from a Start-page link, and only ever forward.
+   */
+  guide_step?: 'someone' | 'placed' | 'happened' | 'story' | 'copy' | 'done';
+  /** The path's rooms seen once their step was lit (#964): `happened` (the chart), `story` (the writing room). */
+  guide_visited?: string[];
+  /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
    * survives reloads without depending on the world's folder being granted
