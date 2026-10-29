@@ -16,6 +16,12 @@ const LOCAL = 'http://localhost:3045';
 
 interface Keel { tokenBodies: Array<Record<string, unknown>>; keelOrder: string[] }
 
+// The app may still be loading through the origin's route when a test ends: those requests are
+// let go, never read as a failure (a flaky run, 2026-10-29: route.fetch after the page closed).
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 async function serveAtlasAtItsOrigin(page: Page, answer: 'code' | 'cancel'): Promise<Keel> {
   const keel: Keel = { tokenBodies: [], keelOrder: [] };
   // Everything else at keel answers empty, so nothing waits on a real server.
