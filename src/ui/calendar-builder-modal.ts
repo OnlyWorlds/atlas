@@ -88,7 +88,10 @@ export class CalendarBuilderModal extends BaseModal {
 
   constructor(private toasts: ToastManager, private opts: CalendarBuilderOpts) {
     super();
-    this.grain = String(getState().active?.meta?.time_basic_unit ?? 'step');
+    // A blank clock unit is no grain: the calendar profile requires one, and
+    // SDK 4.102.5 reads a calendar with an empty grain as no calendar at all.
+    const unit = getState().active?.meta?.time_basic_unit;
+    this.grain = typeof unit === 'string' && unit.trim() !== '' ? unit : 'step';
     this.draft = this.loadDraft();
   }
 

@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { patchSlice } from '../../src/core/state';
 import { setActiveStore } from '../../src/core/active-store';
 import { CalendarBuilderModal } from '../../src/ui/calendar-builder-modal';
-import { validateCalendarConfig, eraForStep, formatStep, type CalendarConfig } from '@onlyworlds/sdk';
+import { validateCalendarConfig, eraForStep, formatStep, readCalendarConfig, type CalendarConfig } from '@onlyworlds/sdk';
 
 const toasts = { success: vi.fn(), error: vi.fn(), show: vi.fn() } as any;
 
@@ -127,5 +127,17 @@ describe('calendar builder edit keeps what the form cannot show', () => {
     name.dispatchEvent(new Event('input', { bubbles: true }));
     await save();
     expect((createElement.mock.calls[0] as any)[1].atlas_calendar).toEqual({ version: 1, grain: 'day' });
+  });
+
+  it('a blank world clock unit never writes an empty grain (the profile requires one, SDK 4.102.5)', async () => {
+    const { createElement } = setup('', null);
+    const root = openBuilder();
+    const name = root.querySelector<HTMLInputElement>('[data-field="name"]')!;
+    name.value = 'Blank Reckoning';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    await save();
+    const cfg = (createElement.mock.calls[0] as any)[1].atlas_calendar;
+    expect(cfg.grain).toBe('step');
+    expect(readCalendarConfig(cfg)).not.toBeNull();
   });
 });
