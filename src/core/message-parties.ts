@@ -12,6 +12,10 @@
  * addressed to everyone. An id the world does not hold as a Character is
  * counted, never named.
  *
+ * keel's trimmed mark (`x_served_trimmed`, #888): a list or a sender served
+ * with ids this key may not see left out reads "someone you cannot see"
+ * (`hasUnseenRecipients`, the `unseen` sender), never everyone or nobody.
+ *
  * Two readings the profile cannot make alone:
  * - keel strips links to elements a key may not see (a hidden one, outside a
  *   guest's view) from the bodies that key reads, so an empty list or a
@@ -22,7 +26,7 @@
  *
  * Pure: the element, the world's elements and the reading come in.
  */
-import { isMessage as sdkIsMessage, isToEveryone, recipientsOf, senderStatus, type OwMessageMember, type OwSenderStatus } from '@onlyworlds/sdk';
+import { hasUnseenRecipients, isMessage as sdkIsMessage, isToEveryone, recipientsOf, senderStatus, type OwMessageMember, type OwSenderStatus } from '@onlyworlds/sdk';
 import type { Element } from './types';
 
 export interface MessageParty {
@@ -46,6 +50,8 @@ export interface MessageParties {
   to: MessageParty[];
   /** Recipient ids this world does not hold as Characters. */
   toOutside: number;
+  /** keel served the list with recipients this key may not see left out (`x_served_trimmed` names `characters`). */
+  toUnseen: boolean;
   /** The reader sees the whole world: an empty list or no Narrator hides no one. */
   wholeWorld: boolean;
 }
@@ -100,8 +106,9 @@ export function messageParties(
     else toOutside++;
   }
   // No sender and no recipient: a story's letter with nothing on it to read, so
-  // no line rather than "from nobody, to everyone".
-  if (!status.claimed && toEveryone) return null;
+  // no line rather than "from nobody, to everyone". A sender keel left out for
+  // this key (`unseen`) is someone, so the line stays.
+  if (!status.claimed && toEveryone && status.status !== 'unseen') return null;
   return {
     sender: status.status,
     from,
@@ -111,6 +118,7 @@ export function messageParties(
     toEveryone,
     to,
     toOutside,
+    toUnseen: hasUnseenRecipients(el) === true,
     wholeWorld: reading.wholeWorld ?? true,
   };
 }

@@ -74,7 +74,13 @@ export function fillMessageParties(line: HTMLElement, parties: MessageParties, w
   // An id Atlas has no Character for (hidden from this key, another type, gone) is counted, never named.
   const notShown = 'someone not shown here';
 
-  if (!parties.from && !parties.fromOutside) {
+  // keel's trimmed mark (#888, the message profile's "a list trimmed for the reader"): someone
+  // this key may not see, never who and never how many.
+  const unseen = 'someone you cannot see';
+
+  if (parties.sender === 'unseen') {
+    line.append(label('From'), ' ', unseen);
+  } else if (!parties.from && !parties.fromOutside) {
     line.append(label('From'), parties.wholeWorld ? ' nobody' : ' nobody, or someone hidden from you');
   } else {
     const who = parties.from ? link(parties.from) : notShown;
@@ -92,15 +98,15 @@ export function fillMessageParties(line: HTMLElement, parties: MessageParties, w
   line.append(' · ', label('To'), ' ');
   if (parties.toEveryone) {
     line.append(parties.wholeWorld ? 'everyone' : 'everyone, or someone hidden from you');
-  } else if (parties.to.length === 0 && parties.toOutside === 0) {
-    line.append('nobody');
   } else {
-    parties.to.forEach((p, i) => {
-      if (i > 0) line.append(', ');
-      line.append(link(p));
-    });
+    const parts: Array<HTMLElement | string> = parties.to.map(link);
     const n = parties.toOutside;
-    if (n > 0 && parties.to.length > 0) line.append(n === 1 ? ` and ${notShown}` : ` and ${n} others not shown here`);
-    else if (n > 0) line.append(n === 1 ? notShown : `${n} not shown here`);
+    if (n > 0) parts.push(n === 1 ? notShown : parties.to.length > 0 ? `${n} others not shown here` : `${n} not shown here`);
+    if (parties.toUnseen) parts.push(unseen);
+    if (parts.length === 0) line.append('nobody');
+    parts.forEach((part, i) => {
+      if (i > 0) line.append(i === parts.length - 1 ? ' and ' : ', ');
+      line.append(part);
+    });
   }
 }

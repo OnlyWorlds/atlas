@@ -24,7 +24,7 @@ describe('messageParties, by the message profile', () => {
     const m = msg({ narrator: 'c1', characters: ['c2', 'c3'] });
     expect(messageParties(m, world)).toEqual({
       sender: 'unverifiable', from: { id: 'c1', name: 'Codex' }, fromOutside: false, writtenBy: null, writtenByOutside: false,
-      toEveryone: false, to: [{ id: 'c2', name: 'BB' }, { id: 'c3', name: 'Kael' }], toOutside: 0, wholeWorld: true,
+      toEveryone: false, to: [{ id: 'c2', name: 'BB' }, { id: 'c3', name: 'Kael' }], toOutside: 0, toUnseen: false, wholeWorld: true,
     });
   });
 

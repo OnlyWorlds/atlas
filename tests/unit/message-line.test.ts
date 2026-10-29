@@ -74,4 +74,30 @@ describe('the message line says what the profile proves', () => {
     expect(said({ narrator: 'c1', characters: [] }, null, false)).toBe('Claims to be from Codex · To everyone, or someone hidden from you');
     expect(said({ characters: ['c2'] }, null, false)).toBe('From nobody, or someone hidden from you · To BB');
   });
+
+  // #888: keel names in `x_served_trimmed` each field it served with ids this key may not see left out.
+  it('a list served trimmed says someone you cannot see, never everyone or nobody', () => {
+    const trimmed = { x_served_trimmed: ['characters'] };
+    expect(said({ narrator: 'c1', characters: [], ...trimmed }, null, false)).toBe('Claims to be from Codex · To someone you cannot see');
+    expect(said({ narrator: 'c1', characters: [], ...trimmed })).toBe('Claims to be from Codex · To someone you cannot see');
+    expect(said({ narrator: 'c1', ...trimmed }, null, false)).toBe('Claims to be from Codex · To someone you cannot see');
+    expect(said({ narrator: 'c1', characters: ['c2'], ...trimmed }, null, false)).toBe('Claims to be from Codex · To BB and someone you cannot see');
+    expect(said({ narrator: 'c1', characters: ['c2', 'x1'], ...trimmed }, null, false))
+      .toBe('Claims to be from Codex · To BB, someone not shown here and someone you cannot see');
+  });
+
+  it('a sender served trimmed is from someone you cannot see, never from nobody, proved or not', () => {
+    const trimmed = { narrator: null, x_served_trimmed: ['narrator'] };
+    expect(said({ characters: ['c2'], ...trimmed }, null, false)).toBe('From someone you cannot see · To BB');
+    expect(said({ characters: ['c2'], created_by: 'm2', ...trimmed }, members, false)).toBe('From someone you cannot see · To BB');
+    // An empty list without its own mark keeps its reading, and the line is drawn.
+    expect(said({ characters: [], ...trimmed }, null, false)).toBe('From someone you cannot see · To everyone, or someone hidden from you');
+    expect(said({ characters: [], narrator: null, x_served_trimmed: ['narrator', 'characters'] }, null, false))
+      .toBe('From someone you cannot see · To someone you cannot see');
+  });
+
+  it('a mark that names neither field changes nothing', () => {
+    expect(said({ narrator: 'c1', characters: [], x_served_trimmed: [] })).toBe('Claims to be from Codex · To everyone');
+    expect(said({ characters: ['c2'], x_served_trimmed: ['characters'].slice(1) })).toBe('From nobody · To BB');
+  });
 });
