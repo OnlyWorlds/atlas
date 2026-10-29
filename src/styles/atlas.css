@@ -14021,6 +14021,95 @@ a.atlas-share-map-pin { cursor: pointer; }
   background: rgba(var(--atlas-accent-rgb), 0.2);
   color: var(--atlas-accent-text);
 }
+/* The lens chip (#841): Lens: none, or the lens the Web reads through. */
+.atlas-context-pane-toolbar-lens {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.atlas-context-pane-toolbar-lens-chip {
+  appearance: none;
+  border: 1px solid rgba(var(--atlas-ink-rgb), 0.12);
+  background: transparent;
+  color: var(--atlas-text-muted);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 4px 9px;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+.atlas-context-pane-toolbar-lens-chip:hover {
+  color: rgba(var(--atlas-ink-rgb), 0.9);
+  border-color: rgba(var(--atlas-ink-rgb), 0.3);
+}
+.atlas-context-pane-toolbar-lens-chip.is-on {
+  background: rgba(var(--atlas-accent-rgb), 0.2);
+  border-color: rgba(var(--atlas-accent-rgb), 0.5);
+  color: var(--atlas-accent-text);
+}
+.atlas-context-lens-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 180px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--atlas-bg-raised);
+  border: 1px solid rgba(var(--atlas-accent-rgb), 0.28);
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.atlas-context-lens-menu-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--atlas-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 10px;
+  min-height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+.atlas-context-lens-menu-item:hover,
+.atlas-context-lens-menu-item:focus-visible {
+  background: rgba(var(--atlas-accent-rgb), 0.15);
+  color: var(--atlas-accent-text);
+}
+.atlas-context-lens-menu-item[aria-checked="true"] {
+  color: var(--atlas-accent-text);
+  font-weight: 600;
+}
+.atlas-context-lens-menu-item.is-keep {
+  border-top: 1px solid var(--atlas-divider);
+  margin-top: 3px;
+  border-radius: 0 0 4px 4px;
+}
+.atlas-context-lens-menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .atlas-context-pane-toolbar-lens-chip { padding: 8px 12px; font-size: 12px; }
+  .atlas-context-lens-menu-item { min-height: 44px; font-size: 14px; }
+}
+/* The lens's line under the Web: what it keeps and why the rest were left out. */
+.atlas-context-graph-lens-line {
+  right: 10px;
+  flex-wrap: wrap;
+  line-height: 1.35;
+}
 
 .atlas-context-pane-empty {
   height: 100%;

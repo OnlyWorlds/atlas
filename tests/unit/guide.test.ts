@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { guideDots, DOTS, isFilled, noteEarned, loadGuideState, markNoteSeen, setNotesOff, rewardEarned, type Dots } from '../../src/core/guide';
+import { guideDots, DOTS, isFilled, noteEarned, loadGuideState, markNoteSeen, setNotesOff, rewardEarned, lensNoteEarned, type Dots } from '../../src/core/guide';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
 
 let n = 0;
@@ -255,5 +255,35 @@ describe('loadGuideState: the first read carries the old switch over', () => {
     setNotesOff(true);
     document.removeEventListener('atlas:guide-changed', on);
     expect(heard).toBe(1);
+  });
+});
+
+describe('lensNoteEarned (#841 P5: a world this size hears of lenses once)', () => {
+  const big = (k: number, extra: Element[] = []) => [...Array.from({ length: k }, () => el('object')), ...extra];
+
+  it('speaks on a hand-made element from forty of the world\'s own, naming the newest Character', () => {
+    const older = el('character', { created_at: '2026-01-01T00:00:00Z' });
+    const newer = el('character', { created_at: '2026-02-01T00:00:00Z' });
+    const all = big(38, [older, newer]);
+    expect(lensNoteEarned({ kind: 'created', id: newer.id }, all, undefined)).toEqual({ id: 'lens', character: newer.id });
+    expect(lensNoteEarned({ kind: 'created', id: newer.id }, all.slice(1), undefined)).toBeNull();
+  });
+
+  it('is silent once stamped, in a world with a lens, and on a gesture that made nothing', () => {
+    const all = big(40);
+    expect(lensNoteEarned({ kind: 'created', id: all[0].id }, all, '2026-10-29T10:00:00Z')).toBeNull();
+    const lens = el('construct', { supertype: ' lens ' });
+    expect(lensNoteEarned({ kind: 'created', id: all[0].id }, [...all, lens], undefined)).toBeNull();
+    expect(lensNoteEarned({ kind: 'date-set', event: all[0].id }, all, undefined)).toBeNull();
+  });
+
+  it('counts the world\'s own elements: the room and the proposed are not the world\'s size', () => {
+    const room = Array.from({ length: 5 }, () => el('narrative', { supertype: 'Message', x_room_of: 'w' }));
+    const proposed = el('object', { x_review_proposed: { by: 'm' } });
+    expect(lensNoteEarned({ kind: 'created', id: 'x' }, big(36, [...room, proposed]), undefined)).toBeNull();
+  });
+
+  it('with no Character the note has no one to open', () => {
+    expect(lensNoteEarned({ kind: 'created', id: 'x' }, big(40), undefined)).toEqual({ id: 'lens' });
   });
 });

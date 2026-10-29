@@ -49,6 +49,8 @@ import { escapeText } from '../core/dom-utils';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { filesWhereOf } from '../core/browser-worlds';
 import { buildAgentMark, buildHiddenMark, buildProposedMark } from './element-agent-mark';
+import { choosable } from '../core/web-lens';
+import { openWebOn } from '../ui/open-web';
 
 /**
  * Pending "auto-edit on next render" signal. When set to an element id, the
@@ -178,6 +180,19 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
   // protagonist, locations its home. Renders on the home cover's cast slot.
   const favBtn = buildFavoriteAction(el);
   if (favBtn) header.appendChild(favBtn);
+
+  // Read this lens (#841's P3): the Web reads the world through it, the phone's drawer included.
+  const worldIdForLens = getState().active?.worldId;
+  if (worldIdForLens && choosable(el)) {
+    const readBtn = document.createElement('button');
+    readBtn.type = 'button';
+    readBtn.className = 'atlas-btn-ghost atlas-header-read-lens';
+    readBtn.setAttribute('data-action', 'read-lens');
+    readBtn.title = 'Show the world as this lens reads it, on the Web';
+    readBtn.textContent = 'Read this lens';
+    readBtn.addEventListener('click', () => openWebOn(worldIdForLens, el.id, { lens: el.id }));
+    header.appendChild(readBtn);
+  }
 
   // Per-element save/sync indicator. Local-only world = always "saved"
   // (synchronous disk write). Api-linked + local stamp > server stamp =

@@ -38,6 +38,7 @@ import { placeGraphLabels, GRAPH_LABEL_SIDES, type GraphLabelItem } from './grap
 import { pageLore } from '../../core/parlor-room';
 import { proposedMarkOf, proposedTitle, proposedWord } from '../../core/review-mark';
 import { hiddenMarkLine } from '../../core/hidden-mark';
+import type { LensPicture } from '../../core/web-lens';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -118,6 +119,13 @@ export interface GraphOpts {
   ringCap?: number;
   /** False: no node menu, the browser's own menu shows. Default true. */
   contextMenu?: boolean;
+  /**
+   * The Web through a lens (#841): the lens's own picture instead of the hop
+   * rings. Its nodes are exactly what the lens kept (the first LENS_DRAW_MAX),
+   * its anchors seeded at the middle; a press selects and never recentres, and
+   * the hop depth, the type filters and back are inert. `line` is said under it.
+   */
+  lens?: { picture: LensPicture; line: string; title?: string };
 }
 
 const PARAMS = {
@@ -408,6 +416,7 @@ export function buildWebLinks(elements: readonly Element[], centerId: string): W
 
 export function mountContextGraph(opts: GraphOpts): GraphHandle {
   const { host, subject, onSelect, onRender } = opts;
+  const lensMode = opts.lens ?? null;
   const ring1Cap = opts.ringCap ?? RING_CAPS[1];
   host.innerHTML = '';
   host.style.position = 'relative';
@@ -453,6 +462,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   let centerStack: string[] = [];
 
   function pushCenter(id: string): void {
+    // A lens has no centre to move: a press selects only.
+    if (lensMode) return;
     if (id === homeId) {
       centerStack = [];
     } else if (centerStack[centerStack.length - 1] !== id) {
@@ -465,6 +476,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   }
 
   function jumpToBreadcrumbIndex(index: number): void {
+    if (lensMode) return;
     resetUserTransform();
     // index === -1 → home; 0..n → stack position.
     if (index < 0) {
@@ -490,7 +502,99 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     return getState().data.elements.find(e => e.id === id) ?? null;
   }
 
+  /**
+   * The lens's picture (#841's lens mode): no ring walk, no `pageLore`, no
+   * type filter. The nodes are the lens's drawn ids, their bodies from every
+   * element Atlas holds (a room element the lens kept is drawn: the lens named
+   * it); the anchors are seeded on a small circle at the middle, the rest
+   * around them, and nothing is pinned.
+   */
+  function renderLens(): void {
+    const { picture, line, title } = lensMode!;
+    host.innerHTML = '';
+    lastMarkerCounts = new Map();
+    presentTypes = new Set();
+    const lineEl = document.createElement('div');
+    lineEl.dataset.role = 'lens-line';
+    lineEl.textContent = line;
+    if (title) lineEl.title = title;
+    if (picture.drawn.length === 0) {
+      lineEl.className = 'atlas-context-pane-empty';
+      host.appendChild(lineEl);
+      lastNodes = [];
+      lastEdges = [];
+      lastNodeEls = new Map();
+      lastLayout = [];
+      onRender?.(presentTypes);
+      return;
+    }
+    const byId = new Map<string, Element>();
+    for (const e of getState().data.elements) byId.set(e.id, e);
+    const anchorSet = new Set(picture.anchors);
+    const nodes: SimNode[] = [];
+    const seed = (ids: string[], radius: number, offset: number, isAnchor: boolean): void => {
+      ids.forEach((id, i) => {
+        const angle = offset + (i / Math.max(1, ids.length)) * Math.PI * 2;
+        const r = ids.length === 1 && isAnchor ? 0 : radius;
+        nodes.push({
+          id, el: byId.get(id) ?? null,
+          x: Math.cos(angle) * r, y: Math.sin(angle) * r, vx: 0, vy: 0,
+          isCenter: false, isCast: isAnchor, isBacklink: false,
+        });
+      });
+    };
+    seed(picture.drawn.filter(id => anchorSet.has(id)), 50, -Math.PI / 2, true);
+    seed(picture.drawn.filter(id => !anchorSet.has(id)), 170, Math.PI / 7, false);
+    const idToNode = new Map<string, SimNode>();
+    for (const n of nodes) idToNode.set(n.id, n);
+
+    const edges: SimEdge[] = [];
+    const edgeByPair = new Map<string, SimEdge>();
+    for (const { from, to } of picture.edges) {
+      const key = from < to ? `${from}|${to}` : `${to}|${from}`;
+      const existing = edgeByPair.get(key);
+      if (existing) {
+        if (existing.fromId !== from) existing.mutual = true;
+        continue;
+      }
+      const edge: SimEdge = { fromId: from, toId: to, mutual: false };
+      edgeByPair.set(key, edge);
+      edges.push(edge);
+    }
+
+    // Its own memo key: the lens and exactly what it drew, never a ring view's.
+    const memoKey = `lens#${picture.lensId}#${nodes.map(n => (n.isCast ? '*' : '') + n.id).join(',')}`
+      + '#' + edges.map(e => `${e.fromId}>${e.toId}${e.mutual ? '=' : ''}`).join(',');
+    const memo = layoutMemo.get(memoKey);
+    if (memo && memo.length === nodes.length) {
+      memo.forEach(([x, y], i) => { nodes[i].x = x; nodes[i].y = y; });
+    } else {
+      runSim(nodes, edges, idToNode, false, null);
+      simRuns++;
+      layoutMemo.delete(memoKey);
+      layoutMemo.set(memoKey, nodes.map(n => [n.x, n.y]));
+      if (layoutMemo.size > LAYOUT_MEMO_MAX) layoutMemo.delete(layoutMemo.keys().next().value!);
+    }
+    lastLayout = nodes.map(n => ({ id: n.id, x: n.x, y: n.y, isCenter: false }));
+
+    const neighborSets = new Map<string, Set<string>>();
+    for (const n of nodes) neighborSets.set(n.id, new Set([n.id]));
+    for (const e of edges) {
+      neighborSets.get(e.fromId)?.add(e.toId);
+      neighborSets.get(e.toId)?.add(e.fromId);
+    }
+    paint(host, nodes, edges, neighborSets);
+    lineEl.className = 'atlas-context-graph-legend atlas-context-graph-lens-line';
+    host.appendChild(lineEl);
+    lastNodes = nodes;
+    lastEdges = edges;
+    lastNeighborSets = neighborSets;
+    if (lastHighlightedId) applyHighlightTo(lastNodeEls, lastHighlightedId);
+    onRender?.(presentTypes);
+  }
+
   function renderForCenter(centerId: string): void {
+    if (lensMode) { renderLens(); return; }
     currentCenterId = centerId;
     const centerEl = findElement(centerId);
     if (!centerEl) {
@@ -854,6 +958,10 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
           if (worldId) navigate(elementHash(worldId, n.id));
           return;
         }
+        if (lensMode) {
+          onSelect(n.id);
+          return;
+        }
         if (n.isCenter && opts.onCenterPress) {
           opts.onCenterPress(n.id);
           return;
@@ -1101,7 +1209,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       // Edges between visible-to-visible only when lock-layout is active and
       // some types are hidden. Otherwise lastEdges already matches the visible
       // node set (full re-render path).
-      const visibleEdges = currentLockLayout && currentHiddenTypes.size > 0
+      const visibleEdges = !lensMode && currentLockLayout && currentHiddenTypes.size > 0
         ? filterEdgesToVisibleNodes(lastEdges)
         : lastEdges;
       drawEdges(lastCanvas, lastNodes, visibleEdges, offsetX, offsetY, scale);
@@ -1240,7 +1348,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   });
 
   // Initial render.
-  renderForCenter(homeId);
+  if (lensMode) renderLens();
+  else renderForCenter(homeId);
 
   // ResizeObserver — re-project layout when the host resizes (right-pane drag).
   // Coalesce via requestAnimationFrame so multiple rapid resize events trigger
@@ -1441,7 +1550,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       applyLabelPlacement();
     },
     goBack(): boolean {
-      if (centerStack.length === 0) return false;
+      if (lensMode || centerStack.length === 0) return false;
       // Pop one entry and re-render at the new tail (or home if empty).
       centerStack.pop();
       const nextCenter = centerStack.length > 0
@@ -1458,6 +1567,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     },
     setHiddenTypes(hidden: ReadonlySet<ElementType>): void {
       currentHiddenTypes = hidden;
+      // The lens's own `types` decide while a lens is chosen.
+      if (lensMode) return;
       if (currentLockLayout && lastNodes.length > 0) {
         applyFiltersWithoutResim();
       } else {
@@ -1466,6 +1577,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     },
     setHopDepth(depth: HopDepth | undefined): void {
       currentHopDepth = depth;
+      // The lens's own `depth` decides while a lens is chosen.
+      if (lensMode) return;
       // Hop depth always re-renders — changing hop adds/removes whole node
       // rings, which is fundamentally different from filter visibility.
       renderForCenter(currentCenterId);

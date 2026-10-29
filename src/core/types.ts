@@ -843,6 +843,14 @@ export interface WorldRegistryEntry {
    */
   context_edge_color?: boolean;
   /**
+   * Context pane: the lens the Web reads through (#841), a lens element's id.
+   * Kept on this computer, never written to the world. Absent, or an id that
+   * is no longer a readable lens in the world, reads as none.
+   */
+  context_lens?: string;
+  /** When the big-world note on lenses was shown in this world (#841's P5). */
+  lens_note_at?: string;
+  /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
    * survives reloads without depending on the world's folder being granted

@@ -36,6 +36,13 @@ import { mountContextToolbar, type ContextToolbarHandle } from './context-pane-t
 import { extractTemporalNodes } from '../../visualization/timeline/data-normalizer';
 import { rankAnchors } from '../../visualization/timeline/degree';
 import { currentLore } from '../../core/parlor-room';
+import {
+  chosenLens, keepLensField, keepLensOn, keepingLens, lensChoices, lensLine, readLensPicture, setWebLens,
+} from '../../core/web-lens';
+import type { ToolbarLens } from './context-pane-toolbar';
+import { getActiveStore } from '../../core/active-store';
+import { refreshElementsAfterWrite } from '../../sync/sync-attach';
+import { showProblem } from '../../ui/problem-fixes';
 
 export interface MountContextTabOpts {
   pane: HTMLElement;
@@ -148,7 +155,7 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
 }
 
 export function mountContextTab(opts: MountContextTabOpts): () => void {
-  const { pane } = opts;
+  const { pane, toasts } = opts;
   pane.innerHTML = '';
 
   const root = document.createElement('div');
@@ -188,9 +195,11 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
 
   // Currently rendered context — populated by renderAll. The unified
   // onSelect handler reads this to dispatch to the right behavior.
-  let currentRender: { mode: DetailsMode; subject: Element | null } = {
+  let currentRender: { mode: DetailsMode; subject: Element | null; focused: boolean; lensOnly: boolean } = {
     mode: 'empty',
     subject: null,
+    focused: false,
+    lensOnly: false,
   };
 
   let selectedId: string | null = null;
@@ -232,9 +241,14 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
    * setLockLayout first so subsequent setHiddenTypes sees the new flag.
    */
   function syncPrefsToGraph(): void {
-    if (!graphHandle || !currentRender.subject) return;
     const prefs = getWorldContextPrefs();
     const prev = lastAppliedPrefs;
+    // A lens chosen or cleared is a different picture: draw it whole.
+    if (prev && prev.lens !== prefs.lens) {
+      renderAll(parseHash(window.location.hash));
+      return;
+    }
+    if (!graphHandle || !currentRender.subject) return;
     if (prev
       && prev.lockLayout === prefs.lockLayout
       && prev.edgeColor === prefs.edgeColor
@@ -254,12 +268,61 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
       graphHandle.setEdgeColor(prefs.edgeColor);
     }
     lastAppliedPrefs = prefs;
-    toolbarHandle?.update({
-      presentTypes: graphHandle.getPresentTypes(),
-      hiddenTypes: prefs.hidden,
-      effectiveHop: effectiveHopFor(currentRender.subject, prefs.hop),
-      lockLayout: prefs.lockLayout,
-    });
+    toolbarHandle?.update(toolbarState(graphHandle.getPresentTypes()));
+  }
+
+  /** The toolbar's whole state: the ring controls from the prefs, the lens chip from the world. */
+  function toolbarState(presentTypes: ReadonlySet<ElementType>): Parameters<ContextToolbarHandle['update']>[0] {
+    const p = getWorldContextPrefs();
+    const subject = currentRender.subject;
+    return {
+      presentTypes,
+      hiddenTypes: p.hidden,
+      effectiveHop: subject ? effectiveHopFor(subject, p.hop) : 2,
+      lockLayout: p.lockLayout,
+      lens: toolbarLens(),
+      lensOnly: currentRender.lensOnly,
+    };
+  }
+
+  function toolbarLens(): ToolbarLens {
+    const state = getState();
+    const worldId = state.active?.worldId ?? null;
+    const els = state.data.elements;
+    const chosen = chosenLens(els, getWorldContextPrefs().lens);
+    const subject = currentRender.lensOnly ? null : currentRender.subject;
+    const field = chosen ? null : keepLensField(worldId, subject, currentRender.focused);
+    return {
+      chosen: chosen ? { id: chosen.id, name: readLensPicture(chosen).name } : null,
+      choices: lensChoices(els),
+      keep: field && subject && worldId
+        ? { name: subject.name?.trim() || 'Unnamed', busy: keepingLens(worldId, subject.id) }
+        : null,
+    };
+  }
+
+  /** Keep a lens on the Web's subject, then read the Web through it. */
+  async function keepLens(): Promise<void> {
+    const worldId = getState().active?.worldId;
+    const subject = currentRender.subject;
+    const field = keepLensField(worldId, subject, currentRender.focused);
+    const store = getActiveStore();
+    if (!worldId || !subject || !field || !store || keepingLens(worldId, subject.id)) return;
+    const refreshToolbar = (): void => { toolbarHandle?.update(toolbarState(graphHandle?.getPresentTypes() ?? new Set())); };
+    const name = subject.name?.trim() || 'Unnamed';
+    const run = keepLensOn(worldId, subject, field, store, () => refreshElementsAfterWrite(store));
+    refreshToolbar();
+    try {
+      const id = await run;
+      if (id && getState().active?.worldId === worldId) {
+        setWebLens(worldId, id);
+        toasts.success(`${name}'s world is a lens now. The Web is reading it.`);
+      }
+    } catch (err) {
+      showProblem(err, { doing: 'keeping the lens', toasts });
+    } finally {
+      refreshToolbar();
+    }
   }
 
   function showEmpty(message: string): void {
@@ -287,16 +350,19 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     hop: HopDepth | undefined;
     lockLayout: boolean;
     edgeColor: boolean;
+    /** The chosen lens's id as stored; `chosenLens` checks it before any reading. */
+    lens: string | null;
   } {
     const state = getState();
     const worldId = state.active?.worldId;
-    if (!worldId) return { hidden: new Set(), hop: undefined, lockLayout: false, edgeColor: false };
+    if (!worldId) return { hidden: new Set(), hop: undefined, lockLayout: false, edgeColor: false, lens: null };
     const entry = state.registry.worlds.find(w => w.id === worldId);
     const hidden = new Set<ElementType>((entry?.context_filters_off ?? []) as ElementType[]);
     const hop = entry?.context_hop_depth as HopDepth | undefined;
     const lockLayout = entry?.context_lock_layout === true;
     const edgeColor = entry?.context_edge_color === true;
-    return { hidden, hop, lockLayout, edgeColor };
+    const lens = typeof entry?.context_lens === 'string' && entry.context_lens ? entry.context_lens : null;
+    return { hidden, hop, lockLayout, edgeColor, lens };
   }
 
   /** Mutate the active world's registry entry. Persists + patches state. */
@@ -387,39 +453,90 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     previewHost.innerHTML = '';
     selectedId = null;
 
-    currentRender = { mode: subject.detailsMode, subject: subject.element };
+    // A subject the person focused, not one the pane picked for a room (a caption says so).
+    currentRender = {
+      mode: subject.detailsMode, subject: subject.element,
+      focused: !!subject.element && !subject.caption, lensOnly: false,
+    };
     // Anchor caption rides with the subject (only anchored defaults set it).
     setCaption(subject.caption ?? null);
 
-    // No subject: show empty state and bail. Distinguish "no focus yet" from
-    // "focus resolves to nothing in current data".
-    if (subject.detailsMode === 'empty') {
-      showEmpty(emptyCopyForRoute(route));
-      return;
-    }
-    if (subject.element === null) {
-      const loaded = state.data.elements.length > 0;
-      showEmpty(loaded ? 'Element not found.' : 'Loading…');
-      return;
-    }
-
-    // Subject resolved — load per-world prefs and mount graph + toolbar.
     const prefs = getWorldContextPrefs();
-    const subjectEl = subject.element;
-    const effectiveHop = effectiveHopFor(subjectEl, prefs.hop);
+    // Seed prefs cache so the first state tick after mount doesn't re-apply.
+    lastAppliedPrefs = prefs;
+    const lensEl = chosenLens(state.data.elements, prefs.lens);
+    const worldId = state.active?.worldId ?? null;
 
-    // onRender callback bridges the graph's per-render present-types update
-    // into the toolbar so its chips reflect the current view.
-    const handleGraphRender = (presentTypes: ReadonlySet<ElementType>): void => {
-      const p = getWorldContextPrefs();
-      toolbarHandle?.update({
-        presentTypes,
-        hiddenTypes: p.hidden,
-        effectiveHop: effectiveHopFor(subjectEl, p.hop),
-        lockLayout: p.lockLayout,
+    function mountToolbar(): void {
+      // Toolbar callbacks ONLY persist to the registry — the orchestrator's
+      // syncPrefsToGraph picks up the change (via the state subscriber →
+      // maybeRender) and applies it to the graph. Settings page edits land
+      // here the same way.
+      toolbarHandle = mountContextToolbar({
+        host: toolbarHost,
+        initial: toolbarState(graphHandle?.getPresentTypes() ?? new Set()),
+        onToggleType: (type) => {
+          const cur = getWorldContextPrefs().hidden;
+          const next = new Set(cur);
+          if (next.has(type)) next.delete(type);
+          else next.add(type);
+          patchWorldEntry({ context_filters_off: Array.from(next) });
+        },
+        onSetHop: (hop) => {
+          patchWorldEntry({ context_hop_depth: hop });
+        },
+        onToggleLockLayout: () => {
+          patchWorldEntry({ context_lock_layout: !getWorldContextPrefs().lockLayout });
+        },
+        onChooseLens: (id) => { if (worldId) setWebLens(worldId, id); },
+        onKeepLens: () => { void keepLens(); },
       });
+      toolbarHost.dataset.state = 'visible';
+    }
+
+    /** The Web through the chosen lens, with its line; the subject named when it is not in it. */
+    function lensOpt(subjectEl: Element | null) {
+      if (!lensEl) return undefined;
+      const picture = readLensPicture(lensEl);
+      const line = lensLine(picture, subjectEl
+        ? { name: subjectEl.name?.trim() || 'This element', kept: picture.keptIds.includes(subjectEl.id) }
+        : null);
+      const title = picture.unreadableKey ? `The setting Atlas can't read: ${picture.unreadableKey}` : undefined;
+      return { picture, line, title };
+    }
+
+    const handleGraphRender = (presentTypes: ReadonlySet<ElementType>): void => {
+      toolbarHandle?.update(toolbarState(presentTypes));
     };
 
+    // No subject: show empty state and bail. Distinguish "no focus yet" from
+    // "focus resolves to nothing in current data". A chosen lens needs no
+    // subject: it is drawn all the same, and the chip shows wherever the
+    // world holds a lens to choose.
+    if (subject.detailsMode === 'empty' || subject.element === null) {
+      const message = subject.detailsMode === 'empty'
+        ? emptyCopyForRoute(route)
+        : (state.data.elements.length > 0 ? 'Element not found.' : 'Loading…');
+      if (lensEl) {
+        currentRender = { ...currentRender, subject: null, focused: false, lensOnly: true };
+        setCaption(null);
+        graphHandle = mountContextGraph({
+          host: graphSlot, subject: lensEl, onSelect: id => graphHandle?.highlight(id),
+          lens: lensOpt(null), onRender: handleGraphRender,
+        });
+        mountToolbar();
+        return;
+      }
+      showEmpty(message);
+      if (worldId && lensChoices(state.data.elements).length > 0) {
+        currentRender = { ...currentRender, lensOnly: true };
+        mountToolbar();
+      }
+      return;
+    }
+
+    // Subject resolved — mount graph + toolbar.
+    const subjectEl = subject.element;
     graphHandle = mountContextGraph({
       host: graphSlot,
       subject: subjectEl,
@@ -429,37 +546,9 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
       lockLayout: prefs.lockLayout,
       edgeColor: prefs.edgeColor,
       onRender: handleGraphRender,
+      lens: lensOpt(subjectEl),
     });
-
-    // Mount toolbar with the initial state. Toolbar callbacks ONLY persist
-    // to the registry — the orchestrator's syncPrefsToGraph picks up the
-    // change (via the state subscriber → maybeRender) and applies it to the
-    // graph. Settings page edits land here the same way.
-    toolbarHandle = mountContextToolbar({
-      host: toolbarHost,
-      initial: {
-        presentTypes: graphHandle.getPresentTypes(),
-        hiddenTypes: prefs.hidden,
-        effectiveHop,
-        lockLayout: prefs.lockLayout,
-      },
-      onToggleType: (type) => {
-        const cur = getWorldContextPrefs().hidden;
-        const next = new Set(cur);
-        if (next.has(type)) next.delete(type);
-        else next.add(type);
-        patchWorldEntry({ context_filters_off: Array.from(next) });
-      },
-      onSetHop: (hop) => {
-        patchWorldEntry({ context_hop_depth: hop });
-      },
-      onToggleLockLayout: () => {
-        patchWorldEntry({ context_lock_layout: !getWorldContextPrefs().lockLayout });
-      },
-    });
-    toolbarHost.dataset.state = 'visible';
-    // Seed prefs cache so the first state tick after mount doesn't re-apply.
-    lastAppliedPrefs = prefs;
+    mountToolbar();
 
     if (subject.detailsMode === 'writing') {
       const narrative = subjectEl;

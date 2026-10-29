@@ -11,7 +11,7 @@
  * Contract: a design note of 2026-10-27 (the guide, step 1).
  */
 
-import { dateOf } from '@onlyworlds/sdk';
+import { dateOf, isLens } from '@onlyworlds/sdk';
 import type { Element, WorldRegistryEntry } from './types';
 import { isStoryNarrative } from './narrative-kind';
 import { isBrowserWorld } from './browser-worlds';
@@ -108,7 +108,24 @@ export function guideDots(
 
 // ---- The notes: what a gesture earns ----
 
-export type NoteId = 'someone' | 'place-offer' | 'placed' | 'event' | 'dated' | 'story' | 'chapter' | 'copy' | 'reading';
+export type NoteId = 'someone' | 'place-offer' | 'placed' | 'event' | 'dated' | 'story' | 'chapter' | 'copy' | 'reading' | 'lens';
+
+/** The big-world note on lenses (#841's P5) speaks from this many of the world's own elements. */
+export const LENS_NOTE_AT = 40;
+
+/**
+ * Whether a world this size, with no lens, hears of lenses: the note's own
+ * gesture is any element made by hand. Once per world, stamped on its
+ * registry entry (`lens_note_at`), never in the browser-wide `seen`. The
+ * note names the newest Character, whose web it opens (none: no button).
+ */
+export function lensNoteEarned(gesture: Gesture, all: readonly Element[], stampedAt: string | undefined): EarnedNote | null {
+  if (gesture.kind !== 'created' || stampedAt) return null;
+  const els = guideElements(all);
+  if (els.length < LENS_NOTE_AT || all.some(e => isLens(e))) return null;
+  const ch = newestOf(els.filter(e => e.type === 'character'));
+  return { id: 'lens', ...(ch ? { character: ch.id } : {}) };
+}
 
 /** A note as earned: its id and the ids its sentence and actions are about, captured at the gesture. */
 export interface EarnedNote {

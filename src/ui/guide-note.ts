@@ -20,9 +20,10 @@
  * Contract: a design note of 2026-10-27 (the guide, step 1, draft 2).
  */
 
-import { dateOf } from '@onlyworlds/sdk';
+import { dateOf, isLens } from '@onlyworlds/sdk';
 import type { Element } from '../core/types';
-import { getState, subscribe } from '../core/state';
+import { getState, patchSlice, subscribe } from '../core/state';
+import { saveRegistry, updateWorldEntry } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
 import { elementHash, navigate, timelineHash, writingHash } from '../core/router';
 import { typeName } from '../core/type-words';
@@ -43,7 +44,7 @@ import { isProposed } from '../core/review-mark';
 import { webRingOne } from '../tabs/right/context-pane-graph';
 import { onWebDrawerReleased, openWebOn, webDrawerHolds } from './open-web';
 import {
-  guideDots, guideElements, isFilled, loadGuideState, markNoteSeen, newestOf, noteEarned, placeIdOf, rewardEarned,
+  guideDots, guideElements, isFilled, lensNoteEarned, loadGuideState, markNoteSeen, newestOf, noteEarned, placeIdOf, rewardEarned,
   type EarnedNote, type Gesture, type Reward,
 } from '../core/guide';
 
@@ -117,6 +118,11 @@ export function reportGesture(
   const took = note ? offer(reward ? { ...note, rider: reward } : note, worldId, how) : false;
   // Its gesture's note seen before: the reward speaks alone.
   if (reward && !took) offer({ id: 'reading', character: reward.anchor, rider: reward }, worldId, how);
+  // A world this size hears of lenses once, into a free slot (#841's P5).
+  if (!showing && !pending) {
+    const lensNote = lensNoteEarned(gesture, els, entryOf(worldId)?.lens_note_at);
+    if (lensNote) offer(lensNote, worldId, how);
+  }
   if (!showing && !pending) tryCopy();
 }
 
@@ -215,9 +221,19 @@ function draw(note: EarnedNote, worldId: string, forced: boolean): void {
   node.setAttribute('data-role', 'guide-note');
   node.setAttribute('data-note', note.id);
   showing = { note, worldId, drawnHash: window.location.hash, node, ...(note.rider ? { rider: note.rider } : {}) };
-  if (!forced) markNoteSeen(note.id);
+  // The lens note is stamped per world, on its registry entry; the others per browser.
+  if (!forced && note.id === 'lens') stampLensNote(worldId);
+  else if (!forced) markNoteSeen(note.id);
   fill();
   host.appendChild(node);
+}
+
+function stampLensNote(worldId: string): void {
+  const reg = getState().registry;
+  if (!reg.worlds.some(w => w.id === worldId)) return;
+  const next = updateWorldEntry(reg, worldId, { lens_note_at: new Date().toISOString() });
+  saveRegistry(next);
+  patchSlice('registry', next);
 }
 
 /** Leave: the slot empties, then `copy` may speak. */
@@ -257,6 +273,8 @@ function stillHolds(n: EarnedNote): boolean {
     case 'chapter': return !!elementOf(n.narrative);
     // The reward alone (#840): its anchor still placed, and its web still two or more.
     case 'reading': return riderHolds(n.rider) && readingRing(showing?.worldId ?? '', ch!).filter(id => id !== ch!.id).length >= 2;
+    // Its button goes with its Character; the line stands until the world holds a lens.
+    case 'lens': return !getState().data.elements.some(e => isLens(e));
     case 'copy': {
       const worldId = activeWorldId();
       return !!worldId && !guideDots(getState().data.elements, entryOf(worldId)).copy && !keepSafeShowing(worldId);
@@ -444,6 +462,12 @@ function fill(): void {
       line.textContent = `${all.join(', ')} and ${last} are linked now.`;
       break;
     }
+    case 'lens':
+      line.textContent = 'A world this size reads well through a lens. Open someone\'s web and keep a lens on them.';
+      if (elementOf(note.character)) {
+        act('open-web', `Open ${ch}'s web`, () => { leave(); openWebOn(worldId, note.character!); });
+      }
+      break;
   }
 
   // The reward (#840's C2): See <name>'s world, the note's second button, drawn only while the

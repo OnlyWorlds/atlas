@@ -18,6 +18,7 @@
 import { ELEMENT_ICONS } from '../../core/constants';
 import { typeName } from '../../core/type-words';
 import type { ElementType } from '../../core/types';
+import { markEscapeOwned } from '../../core/escape-mark';
 
 export interface ContextToolbarHandle {
   /**
@@ -45,6 +46,21 @@ export interface ContextToolbarState {
    * existing graph layout (no sim re-run).
    */
   lockLayout: boolean;
+  /**
+   * The lens chip (#841): shown in every world, so the first lens can be made.
+   * With a lens chosen the type chips, the lock and the hop pill go: the
+   * lens's own `types` and `depth` decide. Absent: no chip (Home's picture).
+   */
+  lens?: ToolbarLens;
+  /** Only the lens chip: a route with no subject, where the Web draws a lens or nothing. */
+  lensOnly?: boolean;
+}
+
+export interface ToolbarLens {
+  chosen: { id: string; name: string } | null;
+  choices: ReadonlyArray<{ id: string; name: string; template: boolean }>;
+  /** Keep a lens on <name>, when offered; `busy` while its write runs. */
+  keep: { name: string; busy: boolean } | null;
 }
 
 export interface ContextToolbarOpts {
@@ -53,6 +69,8 @@ export interface ContextToolbarOpts {
   onToggleType: (type: ElementType) => void;
   onSetHop: (hop: ToolbarHop) => void;
   onToggleLockLayout: () => void;
+  onChooseLens?: (lensId: string | null) => void;
+  onKeepLens?: () => void;
 }
 
 // Deterministic chip order so the toolbar doesn't jitter as the underlying
@@ -77,6 +95,10 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
   const rightCluster = document.createElement('div');
   rightCluster.className = 'atlas-context-pane-toolbar-right';
   host.appendChild(rightCluster);
+
+  const lensSlot = document.createElement('div');
+  lensSlot.className = 'atlas-context-pane-toolbar-lens';
+  rightCluster.appendChild(lensSlot);
 
   const lockSlot = document.createElement('div');
   lockSlot.className = 'atlas-context-pane-toolbar-lock';
@@ -150,10 +172,105 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
     lockSlot.appendChild(btn);
   }
 
+  // ---- the lens chip and its list ----------------------------------------
+  let menu: HTMLElement | null = null;
+
+  function closeMenu(): void {
+    if (!menu) return;
+    menu.remove();
+    menu = null;
+    document.removeEventListener('mousedown', onDocDown, true);
+    window.removeEventListener('keydown', onMenuKey, true);
+  }
+  function onDocDown(e: MouseEvent): void {
+    const t = e.target as Node;
+    if (menu?.contains(t) || lensSlot.contains(t)) return;
+    closeMenu();
+  }
+  function onMenuKey(e: KeyboardEvent): void {
+    if (e.key !== 'Escape' || !menu) return;
+    // Marked, never stopped: the drawer and the global Escape read the mark and step aside.
+    markEscapeOwned(e);
+    closeMenu();
+    lensSlot.querySelector<HTMLButtonElement>('[data-role="lens-chip"]')?.focus();
+  }
+
+  function menuItem(label: string, attrs: Record<string, string>, onClick: () => void, opts: { checked?: boolean; disabled?: boolean } = {}): HTMLButtonElement {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'atlas-context-lens-menu-item';
+    item.setAttribute('role', 'menuitemradio');
+    item.setAttribute('aria-checked', opts.checked ? 'true' : 'false');
+    for (const [k, v] of Object.entries(attrs)) item.setAttribute(k, v);
+    item.textContent = label;
+    if (opts.disabled) item.disabled = true;
+    item.addEventListener('click', () => { onClick(); closeMenu(); });
+    return item;
+  }
+
+  function openMenu(): void {
+    const lens = current.lens;
+    if (!lens) return;
+    closeMenu();
+    const m = document.createElement('div');
+    m.className = 'atlas-context-lens-menu';
+    m.dataset.role = 'lens-menu';
+    m.setAttribute('role', 'menu');
+    m.appendChild(menuItem('None', { 'data-lens-id': '' }, () => opts.onChooseLens?.(null), { checked: !lens.chosen }));
+    for (const c of lens.choices) {
+      const label = c.template ? `${c.name} (template)` : c.name;
+      m.appendChild(menuItem(label, { 'data-lens-id': c.id }, () => opts.onChooseLens?.(c.id), { checked: lens.chosen?.id === c.id }));
+    }
+    if (lens.keep) {
+      const keep = menuItem(`Keep a lens on ${lens.keep.name}`, { 'data-role': 'keep-lens' }, () => opts.onKeepLens?.(), { disabled: lens.keep.busy });
+      keep.setAttribute('role', 'menuitem');
+      keep.removeAttribute('aria-checked');
+      keep.classList.add('is-keep');
+      m.appendChild(keep);
+    }
+    document.body.appendChild(m);
+    menu = m;
+    const chip = lensSlot.querySelector<HTMLElement>('[data-role="lens-chip"]');
+    const r = chip?.getBoundingClientRect();
+    if (r) {
+      const w = m.getBoundingClientRect().width;
+      m.style.top = `${Math.round(r.bottom + 4)}px`;
+      m.style.left = `${Math.round(Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)))}px`;
+    }
+    queueMicrotask(() => {
+      document.addEventListener('mousedown', onDocDown, true);
+      window.addEventListener('keydown', onMenuKey, true);
+    });
+    m.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+  }
+
+  function renderLens(): void {
+    lensSlot.innerHTML = '';
+    const lens = current.lens;
+    if (!lens) { closeMenu(); return; }
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'atlas-context-pane-toolbar-lens-chip';
+    if (lens.chosen) chip.classList.add('is-on');
+    chip.dataset.role = 'lens-chip';
+    chip.setAttribute('aria-haspopup', 'menu');
+    chip.setAttribute('aria-expanded', menu ? 'true' : 'false');
+    const name = lens.chosen ? lens.chosen.name : 'none';
+    chip.title = lens.chosen
+      ? `The Web reads through ${lens.chosen.name}. Choose another lens, or None.`
+      : 'Read the Web through a lens: a saved reading of your world.';
+    chip.innerHTML = `<span class="atlas-context-pane-toolbar-lens-word">Lens:</span> <span class="atlas-context-pane-toolbar-lens-name"></span>`;
+    chip.querySelector('.atlas-context-pane-toolbar-lens-name')!.textContent = name;
+    chip.addEventListener('click', () => { if (menu) closeMenu(); else openMenu(); chip.setAttribute('aria-expanded', menu ? 'true' : 'false'); });
+    lensSlot.appendChild(chip);
+    if (menu) openMenu();
+  }
+
   function renderAll(): void {
-    renderChips();
-    renderLock();
-    renderHop();
+    renderLens();
+    const ringControls = !current.lensOnly && !current.lens?.chosen;
+    if (ringControls) { renderChips(); renderLock(); renderHop(); }
+    else { chipsRow.innerHTML = ''; lockSlot.innerHTML = ''; hopRow.innerHTML = ''; }
   }
 
   renderAll();
@@ -164,6 +281,7 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
       renderAll();
     },
     destroy(): void {
+      closeMenu();
       host.classList.remove('atlas-context-pane-toolbar');
       host.innerHTML = '';
     },

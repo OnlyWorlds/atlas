@@ -17,6 +17,7 @@
 import { getState, patchSlice } from '../core/state';
 import { elementHash, navigate } from '../core/router';
 import { isDrawerOpen, isNarrow, onNarrowChange, openDrawer } from '../layout/narrow-layout';
+import { setWebLens } from '../core/web-lens';
 
 let holding: 'opening' | 'open' | null = null;
 const released = new Set<() => void>();
@@ -48,7 +49,10 @@ function watch(): void {
   });
 }
 
-export function openWebOn(worldId: string, elementId: string): void {
+export function openWebOn(worldId: string, elementId: string, opts: { lens?: string | null } = {}): void {
+  // The Web draws what was asked for: an element's own web reads through no
+  // lens, and Read this lens chooses that lens (#841's P3).
+  setWebLens(worldId, opts.lens ?? null);
   const ui = getState().ui;
   const idx = ui.rightTabs.findIndex(t => t.kind === 'context');
   if (idx >= 0 && idx !== ui.rightActiveIndex) patchSlice('ui', { ...ui, rightActiveIndex: idx });

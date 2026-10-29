@@ -30,6 +30,8 @@
  * so they cost nothing at desktop widths.
  */
 
+import { escapeOwned } from '../core/escape-mark';
+
 export const NARROW_RIGHT_MAX = 1100;
 export const NARROW_SIDEBAR_MAX = 820;
 
@@ -162,6 +164,8 @@ export function installNarrowLayout(): void {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!isDrawerOpen('right') && !isDrawerOpen('sidebar')) return;
+    // A list inside the drawer closed itself with this Escape (the Web's lens chip).
+    if (escapeOwned(e)) return;
     // A dialog opened over the drawer owns this Escape (the 1.102 code gate's C2).
     if (document.querySelector('.atlas-modal-overlay')) return;
     closeDrawers();

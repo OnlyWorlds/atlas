@@ -587,7 +587,7 @@ export function toggleWritingTreeCollapsed(
 /**
  * The re-key moves ids; stored state follows. Remaps the element ids a
  * world entry carries (favourites, calendar lens, writing-tree collapse, last
- * writing narrative). Returns the SAME registry when nothing matched; the
+ * writing narrative, the Web's lens). Returns the SAME registry when nothing matched; the
  * caller saves.
  */
 export function rekeyRegistryEntry(
@@ -618,6 +618,8 @@ export function rekeyRegistryEntry(
     }
     const last = one(w.last_writing_narrative_id);
     if (last !== w.last_writing_narrative_id) next = { ...next, last_writing_narrative_id: last as string };
+    const lens = one(w.context_lens);
+    if (lens !== w.context_lens) next = { ...next, context_lens: lens as string };
     if (next !== w) changed = true;
     return next;
   });
