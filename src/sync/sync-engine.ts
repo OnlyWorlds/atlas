@@ -38,7 +38,8 @@ import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
 import { hiddenHeldOf } from './hidden-held';
-import { hiddenKeptOf, hiddenWordOf, HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
+import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
+import { stampKeptOf, stampWordOf } from '../core/door-trail';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
 import { isKnownOf, knownOfMove, stubShape } from './known-of';
 import type {
@@ -1076,7 +1077,7 @@ export class SyncEngine {
     await this.folder.stampServerUpdatedAt(
       local.id, local.type as ElementType, remote.updated_at,
       sameWireContent(local, remote) ? (local.local_updated_at as string | undefined) : null,
-      hiddenWordOf(remote),
+      stampWordOf(remote),
     );
   }
 
@@ -1117,7 +1118,7 @@ export class SyncEngine {
   ): Promise<'no' | 'adopted' | 'held'> {
     if (local.server_updated_at || !sameWireContent(local, remoteBody)) return 'no';
     const wrote = await this.pullWrite(failures, local.id, type, () =>
-      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at as string | undefined, hiddenWordOf(remoteBody)));
+      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at as string | undefined, stampWordOf(remoteBody)));
     if (!wrote) return 'held'; // the /changes walk must not pass it
     console.info(`[atlas:sync] pull: ${type}/${local.id} is our own create with an unrecorded stamp; baseline adopted`);
     return 'adopted';
@@ -2650,7 +2651,7 @@ export class SyncEngine {
             // (it used to be stamped clean and never uploaded).
             // keel takes the mark on a create only: its answer says whether it shows the element,
             // and a mark taken out here comes back with it, since keel keeps hiding it (conv. 173).
-            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, hiddenKeptOf(response));
+            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, stampKeptOf(response));
             updates++;
           }
         }
@@ -3107,7 +3108,7 @@ export class SyncEngine {
             && await this.folder.applyServerRecordIfUnchanged(entry.type, body, updated_at, local.local_updated_at ?? null);
           // Edited since (before the settle, or during it): the newer edit stays
           // and goes out on the new baseline.
-          if (!landed) await this.folder.stampServerUpdatedAt(entry.element_id, entry.type, updated_at, entry.local_updated_at, hiddenWordOf(body));
+          if (!landed) await this.folder.stampServerUpdatedAt(entry.element_id, entry.type, updated_at, entry.local_updated_at, stampWordOf(body));
         });
         if (!ok) continue;
         accepted.push(entry.element_id);
@@ -3933,7 +3934,7 @@ function stripServerOnlyFields(record: Record<string, unknown>): Record<string, 
 /** Same content on the wire's terms: server stamps and atlas's local-only fields do not count. */
 /** What keel's answer leaves in the copy with the stamp: a create's proposed mark (conv. 168) and keel's word on the hidden mark (conv. 170). */
 function keptFrom(answer: unknown, onCreate: boolean): Record<string, unknown> | undefined {
-  const kept = { ...(onCreate ? keptOnCreate(answer) : undefined), ...hiddenKeptOf(answer) };
+  const kept = { ...(onCreate ? keptOnCreate(answer) : undefined), ...stampKeptOf(answer) };
   return Object.keys(kept).length > 0 ? kept : undefined;
 }
 

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.107.0',
+    date: '2026-10-29',
+    theme: 'Where it has been',
+    entries: [
+      {
+        id: 'element-door-trail',
+        title: 'An element says which tools last shaped it',
+        body: 'In a world on OnlyWorlds, the foot of an element\'s page now says where it was last changed, such as in Atlas, in Lantern, on onlyworlds.com, in code or with an AI, and the tools before that, each with its time. It names tools, never people.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.106.2',
     date: '2026-10-29',
     theme: 'A copy stays a copy',

@@ -43,6 +43,7 @@ import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { proposedNoteFor } from './element-agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
+import { doorTrail, type TrailStep } from '../core/door-trail';
 import { buildCharterMarkOffer } from './element-detail-charter-mark';
 
 /**
@@ -439,7 +440,37 @@ export function mountElementDetail(target: HTMLElement): () => void {
       <div>Updated locally: ${updated}</div>
       <div>Server: ${synced}</div>
     `;
+    const trail = trailLines(el);
+    if (trail) meta.append(...trail);
     return meta;
+  }
+
+  /**
+   * Where it has been on OnlyWorlds (#760): the newest door, then the rest. A synced world
+   * only, as the agent mark: a folder can carry keel's fields from another time. An element
+   * with no baseline is not on OnlyWorlds yet (never sent, or its baseline cleared), whatever
+   * old fields it carries. A keel stub says nothing of the element's own writes.
+   */
+  function trailLines(el: Element): HTMLElement[] | null {
+    const state = getState();
+    const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
+    if (entry?.state !== 'api-linked' || !el.server_updated_at || isKnownOf(el)) return null;
+    const steps = doorTrail(el);
+    if (steps.length === 0) return null;
+    const step = (s: TrailStep) => {
+      const when = relativeTime(s.at);
+      return when
+        ? `${escapeText(s.where)}, <span title="${escapeText(new Date(s.at).toLocaleString())}">${escapeText(when)}</span>`
+        : escapeText(s.where);
+    };
+    const last = document.createElement('div');
+    last.dataset.role = 'door-trail';
+    last.innerHTML = `On OnlyWorlds: last shaped ${step(steps[0])}`;
+    if (steps.length === 1) return [last];
+    const before = document.createElement('div');
+    before.dataset.role = 'door-trail-before';
+    before.innerHTML = `Before that: ${steps.slice(1).map(step).join(' · ')}`;
+    return [last, before];
   }
 
   const unsubState = subscribe(render);

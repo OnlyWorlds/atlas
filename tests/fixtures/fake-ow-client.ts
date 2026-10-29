@@ -245,7 +245,7 @@ export class FakeOwApiClient implements OwApiClient {
     if (!this.assignServerIds && this.bucket(type).has(id)) {
       throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
     }
-    const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
+    const record: ServerRecord = this.stampDoors({ ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() });
     // keel, as probed live: a seat's new element on a reviewed world carries the mark,
     // and the 201 answers with it.
     if (this.proposeWrites) record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' };
@@ -283,7 +283,7 @@ export class FakeOwApiClient implements OwApiClient {
     }
     // keel (probed live): an update ignores `hidden` both ways; only the site's Hide moves it.
     const { hidden: _ignored, ...patch } = wireBody;
-    const next: ServerRecord = { ...existing, ...patch, ...this.writeDoor, id, type, updated_at: this.clock() };
+    const next: ServerRecord = this.stampDoors({ ...existing, ...patch, ...this.writeDoor, id, type, updated_at: this.clock() });
     m.set(id, next);
     this.appendUpsert(next);
     return { ...next };
@@ -661,7 +661,7 @@ export class FakeOwApiClient implements OwApiClient {
       if (!wireBody) continue;
       const type = items[i].type;
       const id = results[i].id;
-      const record: ServerRecord = { ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() };
+      const record: ServerRecord = this.stampDoors({ ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() });
       // keel's bulk marks a seat's new element too, and its slot echoes only the time.
       if (this.proposeWrites) { record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' }; this.seatMade.add(id); }
       this.bucket(type).set(id, record);
@@ -933,6 +933,24 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   private writeDoor: { changed_by?: string | null; changed_via?: string } = {};
+
+  /**
+   * keel's door record (`doors`, keel #760): every element write sets its key to the write's
+   * `updated_at`, the client's name when it sent one, else its door (`elements/doors.py`).
+   * Off by default; a test about the trail turns it on with the key its writes stamp
+   * (Atlas's own: `atlas`).
+   */
+  __stamp_doors(key: string | null): void {
+    this.doorKey = key;
+  }
+
+  private doorKey: string | null = null;
+
+  private stampDoors(record: ServerRecord): ServerRecord {
+    if (!this.doorKey) return record;
+    const prior = record.doors && typeof record.doors === 'object' ? record.doors as Record<string, unknown> : {};
+    return { ...record, doors: { ...prior, [this.doorKey]: record.updated_at } };
+  }
 
   private memberRole: 'contributor' | 'co_builder' | 'guest' | null = null;
   private othersIds = new Set<string>();
