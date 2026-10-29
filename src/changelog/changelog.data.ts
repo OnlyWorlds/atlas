@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.102.2',
+    date: '2026-10-29',
+    theme: 'An empty review mark is no proposal',
+    entries: [
+      {
+        id: 'empty-review-mark',
+        title: 'An element with an empty review mark reads as settled',
+        body: 'A proposal waiting for the keeper\'s review is marked on the element. A mark left empty by another tool (an empty list, an empty object or blank text) used to count as a proposal; it now reads as no mark at all, as the OnlyWorlds review rules say, so the element is counted and listed like any other.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.102.1',
     date: '2026-10-29',
     theme: 'The standard\'s colours',

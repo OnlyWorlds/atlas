@@ -29,14 +29,17 @@ describe('R1, the readings', () => {
     expect(isProposed(el('c', 'Ada', { x_review_proposed: null }))).toBe(false);
     expect(isProposed(el('d', 'Odd', { x_review_proposed: 'yes' }))).toBe(false);
     expect(isProposed(el('e', 'Odd', { x_review_proposed: [MARK] }))).toBe(false);
-    expect(isProposed(el('f', 'Bare', { x_review_proposed: {} }))).toBe(true);
+    // An empty mark is absent (the review profile, SDK 4.102.1): {} reads settled.
+    expect(isProposed(el('f', 'Bare', { x_review_proposed: {} }))).toBe(false);
   });
 
-  it('handed on, any value but null counts (a doubt leaves it out)', () => {
+  it('handed on, any value but null or empty counts (a doubt leaves it out)', () => {
     expect(handsOnAsProposed(el('a', 'Quill', { x_review_proposed: MARK }))).toBe(true);
     expect(handsOnAsProposed(el('d', 'Odd', { x_review_proposed: 'yes' }))).toBe(true);
     expect(handsOnAsProposed(el('c', 'Ada', { x_review_proposed: null }))).toBe(false);
     expect(handsOnAsProposed(el('b', 'Ada'))).toBe(false);
+    // Empty is absent here too: an empty string, white space, [] and {} hand on settled.
+    for (const empty of ['', '  ', [], {}]) expect(handsOnAsProposed(el('g', 'Empty', { x_review_proposed: empty })), JSON.stringify(empty)).toBe(false);
   });
 
   it('reads lapsed from the expires day itself, as keel does (midnight UTC)', () => {
