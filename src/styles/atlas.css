@@ -14105,6 +14105,20 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-accent-text);
   font-weight: 600;
 }
+.atlas-context-lens-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+/* Why Keep a lens is held back here (#957): a plain line, muted ink (AA, conv. 156), never an option. */
+.atlas-context-lens-menu-note {
+  margin: 3px 0 0;
+  padding: 7px 10px 5px;
+  border-top: 1px solid var(--atlas-divider);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--atlas-text-muted);
+}
 .atlas-context-lens-menu-item.is-keep {
   border-top: 1px solid var(--atlas-divider);
   margin-top: 3px;

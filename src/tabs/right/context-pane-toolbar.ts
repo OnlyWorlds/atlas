@@ -61,6 +61,8 @@ export interface ToolbarLens {
   choices: ReadonlyArray<{ id: string; name: string; template: boolean }>;
   /** Keep a lens on <name>, when offered; `busy` while its write runs. */
   keep: { name: string; busy: boolean } | null;
+  /** Why the world holds Keep back (#957): a plain line under the list, never an option. */
+  heldBack?: string | null;
 }
 
 export interface ContextToolbarOpts {
@@ -214,21 +216,35 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
     const lens = current.lens;
     if (!lens) return;
     closeMenu();
+    // The popup holds the list (role=menu, its options only) and, outside it, the
+    // held-back line (#957): read by the list's description, never an option or a stop.
     const m = document.createElement('div');
     m.className = 'atlas-context-lens-menu';
     m.dataset.role = 'lens-menu';
-    m.setAttribute('role', 'menu');
-    m.appendChild(menuItem('None', { 'data-lens-id': '' }, () => opts.onChooseLens?.(null), { checked: !lens.chosen }));
+    const list = document.createElement('div');
+    list.className = 'atlas-context-lens-menu-list';
+    list.setAttribute('role', 'menu');
+    list.setAttribute('aria-label', 'Lens');
+    m.appendChild(list);
+    list.appendChild(menuItem('None', { 'data-lens-id': '' }, () => opts.onChooseLens?.(null), { checked: !lens.chosen }));
     for (const c of lens.choices) {
       const label = c.template ? `${c.name} (template)` : c.name;
-      m.appendChild(menuItem(label, { 'data-lens-id': c.id }, () => opts.onChooseLens?.(c.id), { checked: lens.chosen?.id === c.id }));
+      list.appendChild(menuItem(label, { 'data-lens-id': c.id }, () => opts.onChooseLens?.(c.id), { checked: lens.chosen?.id === c.id }));
     }
     if (lens.keep) {
       const keep = menuItem(`Keep a lens on ${lens.keep.name}`, { 'data-role': 'keep-lens' }, () => opts.onKeepLens?.(), { disabled: lens.keep.busy });
       keep.setAttribute('role', 'menuitem');
       keep.removeAttribute('aria-checked');
       keep.classList.add('is-keep');
-      m.appendChild(keep);
+      list.appendChild(keep);
+    } else if (lens.heldBack) {
+      const note = document.createElement('p');
+      note.className = 'atlas-context-lens-menu-note';
+      note.dataset.role = 'keep-held-back';
+      note.id = 'atlas-lens-keep-held-back';
+      note.textContent = lens.heldBack;
+      list.setAttribute('aria-describedby', note.id);
+      m.appendChild(note);
     }
     document.body.appendChild(m);
     menu = m;

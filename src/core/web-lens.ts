@@ -204,6 +204,19 @@ function worldTakesALens(worldId: string): boolean {
 }
 
 /**
+ * Why this world holds Keep a lens back, said once under the Lens list (#957):
+ * null where the world takes a lens, and in the tour, whose own lock speaks.
+ */
+export function keepHeldBackLine(worldId: string | null | undefined): string | null {
+  if (!worldId || isTourFlagActive()) return null;
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  if (!entry) return null;
+  if (worldIsViewOnly(worldId)) return 'Keep a lens works in a world you can write to.';
+  if (entry.demo === true || isMoppetopiaOpen(worldId)) return 'Keep a lens works in a world of your own.';
+  return null;
+}
+
+/**
  * Whether Keep a lens on <subject> is offered, and in which field the subject
  * goes. `focused`: the person opened this element, the pane did not pick it.
  * A hidden subject is never offered: a lens would carry its name into a

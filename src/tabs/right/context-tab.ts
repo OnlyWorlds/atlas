@@ -37,7 +37,7 @@ import { extractTemporalNodes } from '../../visualization/timeline/data-normaliz
 import { rankAnchors } from '../../visualization/timeline/degree';
 import { currentLore } from '../../core/parlor-room';
 import {
-  chosenLens, keepLensField, keepLensOn, keepingLens, lensChoices, lensLine, lensName, readLensPicture, setWebLens,
+  chosenLens, keepHeldBackLine, keepLensField, keepLensOn, keepingLens, lensChoices, lensLine, lensName, readLensPicture, setWebLens,
 } from '../../core/web-lens';
 import type { ToolbarLens } from './context-pane-toolbar';
 import { getActiveStore } from '../../core/active-store';
@@ -298,6 +298,8 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
       keep: field && subject && worldId
         ? { name: subject.name?.trim() || 'Unnamed', busy: keepingLens(worldId, subject.id) }
         : null,
+      // Said only where Keep would otherwise be weighed: no lens chosen, an element the person opened.
+      heldBack: !chosen && subject && currentRender.focused ? keepHeldBackLine(worldId) : null,
     };
   }
 

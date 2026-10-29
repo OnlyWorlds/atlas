@@ -9,7 +9,7 @@ import { resolveLens } from '@onlyworlds/sdk';
 import { patchSlice } from '../../src/core/state';
 import type { Element, WorldsRegistry } from '../../src/core/types';
 import {
-  LENS_DRAW_MAX, chosenLens, keepLensField, keepLensOn, keepingLens, lensChoices, lensLine,
+  LENS_DRAW_MAX, chosenLens, keepHeldBackLine, keepLensField, keepLensOn, keepingLens, lensChoices, lensLine,
   lensOnAlone, readLensPicture,
 } from '../../src/core/web-lens';
 import { mountContextGraph, clearContextGraphLayoutMemo } from '../../src/tabs/right/context-pane-graph';
@@ -204,6 +204,27 @@ describe('Keep a lens on <name>', () => {
     expect(keepLensField('w1', ada, true)).toBeNull();
   });
 
+  it('says why exactly where the world holds Keep back, and nowhere it is offered (#957)', () => {
+    const cases: Array<[string, () => void, string | null]> = [
+      ['a world of one\'s own', () => setWorld(world), null],
+      ['a demo', () => setWorld(world, { demo: true }), 'Keep a lens works in a world of your own.'],
+      ['a view-only copy', () => setWorld(world, { copy_of: 'w0' }), 'Keep a lens works in a world you can write to.'],
+      ['Moppetopia', () => { setWorld(world); patchSlice('active', { worldId: 'w1', meta: { id: '0695db52-5433-7332-8000-db7fe10da375' } } as never); }, 'Keep a lens works in a world of your own.'],
+    ];
+    for (const [name, arrange, line] of cases) {
+      arrange();
+      expect(keepHeldBackLine('w1'), name).toBe(line);
+      // The pair: a line only where Keep is not offered for the same opened element.
+      expect(keepLensField('w1', ada, true) === null, name).toBe(line !== null);
+    }
+    // The tour's own lock speaks there.
+    setWorld(world, { demo: true });
+    localStorage.setItem('atlas_tour_v1', JSON.stringify({ active: true }));
+    expect(keepHeldBackLine('w1')).toBeNull();
+    localStorage.removeItem('atlas_tour_v1');
+    expect(keepHeldBackLine(null)).toBeNull();
+  });
+
   it('writes one Construct with the anchor and nothing else, once for a double press', async () => {
     setWorld(world);
     let resolveCreate: (v: Element) => void = () => {};
@@ -242,7 +263,7 @@ describe('Keep a lens on <name>', () => {
 });
 
 describe('the chip\'s list', () => {
-  function mountChip() {
+  function mountChip(held: { keep: { name: string; busy: boolean } | null; heldBack?: string | null } = { keep: { name: 'Ada', busy: false } }) {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const onChooseLens = vi.fn();
@@ -250,7 +271,7 @@ describe('the chip\'s list', () => {
       host,
       initial: {
         presentTypes: new Set(), hiddenTypes: new Set(), effectiveHop: 2, lockLayout: false,
-        lens: { chosen: null, choices: [{ id: lens.id, name: 'Two people', template: false }], keep: { name: 'Ada', busy: false } },
+        lens: { chosen: null, choices: [{ id: lens.id, name: 'Two people', template: false }], ...held },
       },
       onToggleType: () => {}, onSetHop: () => {}, onToggleLockLayout: () => {}, onChooseLens,
     });
@@ -270,6 +291,30 @@ describe('the chip\'s list', () => {
     const next = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
     window.dispatchEvent(next);
     expect(escapeOwned(next)).toBe(false);
+  });
+
+  it('the held-back line is a plain line outside the list: no option, no stop, the list\'s description (#957)', async () => {
+    const { handle } = mountChip({ keep: null, heldBack: 'Keep a lens works in a world of your own.' });
+    await Promise.resolve();
+    const popup = document.querySelector<HTMLElement>('[data-role="lens-menu"]')!;
+    const list = popup.querySelector<HTMLElement>('[role="menu"]')!;
+    const note = popup.querySelector<HTMLElement>('[data-role="keep-held-back"]')!;
+    expect(note.textContent).toBe('Keep a lens works in a world of your own.');
+    expect(list.contains(note)).toBe(false);
+    expect(note.tagName).toBe('P');
+    expect(note.hasAttribute('tabindex') || note.hasAttribute('role')).toBe(false);
+    expect(list.getAttribute('aria-describedby')).toBe(note.id);
+    // The list still reads as its options only: None and the one lens.
+    expect([...list.children].map(c => c.getAttribute('role'))).toEqual(['menuitemradio', 'menuitemradio']);
+    handle.destroy();
+  });
+
+  it('where Keep is offered, no held-back line is drawn', async () => {
+    const { handle } = mountChip({ keep: { name: 'Ada', busy: false }, heldBack: 'should not show' });
+    await Promise.resolve();
+    expect(document.querySelector('[data-role="keep-held-back"]')).toBeNull();
+    expect(document.querySelector('[data-role="lens-menu"] [role="menu"] [data-role="keep-lens"]')).not.toBeNull();
+    handle.destroy();
   });
 
   it('the list leaves the page with the toolbar', async () => {
