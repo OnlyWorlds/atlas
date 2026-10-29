@@ -32,6 +32,7 @@
 
 import { isZoneGestureActive } from './zone-gesture';
 import { worldIsViewOnly } from './view-only';
+import { escapeClosedDrawer } from '../layout/narrow-layout';
 
 export interface HotkeyBinding {
   /** Stable identifier for tests + the reference modal. */
@@ -460,6 +461,8 @@ export function installHotkeys(bindings: HotkeyBinding[] = defaultBindings()): (
     const ctx = { inModal: isModalOpen(), inTextInput: isInTextInput(e.target) };
     const match = findMatching(e, installedBindings, ctx);
     if (!match) return;
+    // An Escape that closed a drawer (narrow-layout, earlier on this list) was the drawer's.
+    if (match.id === 'deselect-to-home' && escapeClosedDrawer(e)) return;
     const result = match.action();
     // Default: prevent default + stop propagation. The action can return
     // `false` to let the event continue (e.g. for chord-style bindings, or

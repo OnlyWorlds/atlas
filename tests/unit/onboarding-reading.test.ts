@@ -10,6 +10,7 @@ import {
 } from '../../src/tabs/right/context-pane-graph';
 import { getState, patchSlice } from '../../src/core/state';
 import { openWebOn, resetOpenWebForTests, webDrawerHolds } from '../../src/ui/open-web';
+import { closeDrawers, escapeClosedDrawer, installNarrowLayout, isDrawerOpen, openDrawer } from '../../src/layout/narrow-layout';
 import { reportGesture, resetGuideNoteForTests } from '../../src/ui/guide-note';
 import { homeCentre, homePictureRanks, resetHomePictureForTests, buildHomePicture } from '../../src/middle/home-picture';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
@@ -150,6 +151,82 @@ describe('C2: the reward on its note', () => {
     window.location.hash = `#/w/w/element/${ev.id}`;
     reportGesture({ kind: 'created', id: ev.id });
     expect(shown()?.dataset.note).toBe('event');
+  });
+});
+
+describe('C2: the code gate\'s findings on the reward', () => {
+  it('a move of the one placed Character, or a changed year, made no new link: no reward (C4); the twin with an empty field earns it', () => {
+    const { ada, keep, ev } = adaReady();
+    reportGesture({ kind: 'location-set', character: ada.id }, { was: uuid(9) });
+    expect(shown()?.querySelector('[data-note-action="see-world"]') ?? null).toBeNull();
+    resetGuideNoteForTests();
+    document.querySelector('[data-role="guide-note"]')?.remove();
+    reportGesture({ kind: 'date-set', event: ev.id }, { was: 119 });
+    expect(shown()?.querySelector('[data-note-action="see-world"]') ?? null).toBeNull();
+    resetGuideNoteForTests();
+    localStorage.clear();
+    reportGesture({ kind: 'date-set', event: ev.id }, { was: null });
+    expect(shown()?.querySelector('[data-note-action="see-world"]')?.textContent).toBe("See Ada's world");
+    void keep;
+  });
+
+  it('an anchor no longer placed earns nothing, and nothing is stamped (C5)', () => {
+    const { ada, keep } = adaReady();
+    const bram = E(6, 'character', 'Bram', { location: keep.id });
+    const sword = E(4, 'object', 'Sword');
+    const ev = E(3, 'event', 'The Fall', { characters: [ada.id], start_date: 120 });
+    patchSlice('data', { elements: [{ ...ada, location: null, objects: [sword.id] } as unknown as Element, keep, bram, ev, sword] } as never);
+    // The year's own note seen before, so the reward would speak alone.
+    localStorage.setItem('atlas_guide_v1', JSON.stringify({ seen: { dated: '2026-10-29T00:00:00.000Z' }, off: false }));
+    reportGesture({ kind: 'date-set', event: ev.id }, { pair: { character: ada.id, location: keep.id } });
+    expect(shown()?.dataset.note ?? null).not.toBe('reading');
+    expect(shown()?.querySelector('[data-note-action="see-world"]') ?? null).toBeNull();
+    expect(JSON.parse(localStorage.getItem('atlas_guide_v1') ?? '{}').seen?.reading).toBeUndefined();
+  });
+
+  it('a button that left with Ada\'s place does not come back when a write restores it (C6)', () => {
+    const { ada, keep, ev } = adaReady();
+    reportGesture({ kind: 'date-set', event: ev.id });
+    expect(shown()?.querySelector('[data-note-action="see-world"]')).not.toBeNull();
+    patchSlice('data', { elements: [{ ...ada, location: null } as unknown as Element, keep, ev] } as never);
+    expect(shown()?.querySelector('[data-note-action="see-world"]')).toBeNull();
+    patchSlice('data', { elements: [{ ...ada } as Element, keep, ev] } as never);
+    expect(shown()?.dataset.note).toBe('dated');
+    expect(shown()?.querySelector('[data-note-action="see-world"]')).toBeNull();
+  });
+});
+
+describe('Escape over a drawer (the code gate\'s C1, C2)', () => {
+  beforeAll(() => {
+    const shell = document.createElement('div');
+    shell.className = 'atlas-shell';
+    document.body.appendChild(shell);
+    installNarrowLayout();
+  });
+  const esc = () => { const e = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }); document.dispatchEvent(e); return e; };
+
+  it('closes the drawer, is marked for the hotkeys, and still reaches the listeners after it', () => {
+    let later = 0;
+    const after = (e: KeyboardEvent) => { if (e.key === 'Escape') later++; };
+    document.addEventListener('keydown', after);
+    openDrawer('right');
+    const e = esc();
+    document.removeEventListener('keydown', after);
+    expect(isDrawerOpen('right')).toBe(false);
+    expect(escapeClosedDrawer(e)).toBe(true);
+    expect(later).toBe(1);
+  });
+
+  it('a dialog over the drawer owns the Escape: the drawer stays, and the press is not marked', () => {
+    openDrawer('sidebar');
+    const overlay = document.createElement('div');
+    overlay.className = 'atlas-modal-overlay';
+    document.body.appendChild(overlay);
+    const e = esc();
+    overlay.remove();
+    expect(isDrawerOpen('sidebar')).toBe(true);
+    expect(escapeClosedDrawer(e)).toBe(false);
+    closeDrawers();
   });
 });
 

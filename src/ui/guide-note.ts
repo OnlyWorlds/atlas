@@ -99,7 +99,7 @@ function speaksCalendar(): boolean {
  */
 export function reportGesture(
   gesture: Gesture,
-  opts: { fromAction?: boolean; pair?: { character: string; location: string } } = {},
+  opts: { fromAction?: boolean; pair?: { character: string; location: string }; was?: unknown } = {},
 ): void {
   wire();
   const worldId = activeWorldId();
@@ -108,7 +108,9 @@ export function reportGesture(
   if (gesture.kind === 'created' && els.find(e => e.id === gesture.id)?.type === 'event') copyEarnedIn = worldId;
   const note = noteEarned(gesture, els, speaksCalendar());
   // The reward rides only on the commit that lit `placed` or `happened` (#840's C2); Were there earns its own.
-  const reward = note?.id === 'placed' ? earnReading(worldId, note.character!, note.location!)
+  // A field that held something before (a move, a changed year) made no new link (the code gate's C4).
+  const reward = isFilled(opts.was) ? null
+    : note?.id === 'placed' ? earnReading(worldId, note.character!, note.location!)
     : note?.id === 'dated' ? earnReading(worldId, datedAnchor(note.event!, opts.pair), note.event!)
     : null;
   const how = { fromAction: opts.fromAction === true, forced: false };
@@ -141,7 +143,8 @@ function readingRing(worldId: string, anchor: Element): string[] {
  */
 function earnReading(worldId: string, anchorId: string | null, elementId: string): Reward | null {
   const anchor = elementOf(anchorId ?? undefined);
-  if (!anchor || anchor.type !== 'character' || silent(worldId)) return null;
+  // An anchor not placed has no button to draw (the code gate's C5): nothing is earned.
+  if (!anchor || anchor.type !== 'character' || silent(worldId) || !riderHolds({ anchor: anchor.id, names: [], more: 0 })) return null;
   const s = loadGuideState();
   if (s.off || s.seen.reading) return null;
   const els = getState().data.elements;
@@ -445,6 +448,8 @@ function fill(): void {
 
   // The reward (#840's C2): See <name>'s world, the note's second button, drawn only while the
   // note carries it. Its first drawing stamps `reading`; a later redraw keeps it.
+  // A button that stopped holding is gone for good: a later write that puts it back is no gesture (C6).
+  if (showing.rider && note.id !== 'reading' && !riderHolds(showing.rider)) showing.rider = undefined;
   const rider = showing.rider;
   if (rider && riderHolds(rider) && (note.id === 'reading' || showing.riderDrawn || !loadGuideState().seen.reading)) {
     if (!showing.riderDrawn) {

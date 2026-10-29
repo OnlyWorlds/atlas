@@ -20,6 +20,7 @@ import { getState } from '../core/state';
 import { currentLore, loreSwitches } from '../core/parlor-room';
 import { buildWebLinks, mountContextGraph, webRingOne, type GraphHandle } from '../tabs/right/context-pane-graph';
 import { openWebOn } from '../ui/open-web';
+import { typeName } from '../core/type-words';
 
 /** How many of the best-linked are tried, and how many the Web must draw around one. */
 const TRIED = 5;
@@ -28,6 +29,7 @@ const AROUND = 3;
 const HOME_RING_CAP = 12;
 
 let memoKey: string | null = null;
+let memoSaid: string | null = null;
 let memoCentre: string | null = null;
 let ranks = 0;
 
@@ -45,9 +47,11 @@ function filtersOf(worldId: string): string[] {
  */
 export function homeCentre(worldId: string, said: string): string | null {
   const filters = filtersOf(worldId);
-  const key = JSON.stringify([worldId, said, loreSwitches(), filters]);
-  if (key === memoKey) return memoCentre;
+  // The world's words compared as they are, never copied into the key (the code gate's C9).
+  const key = JSON.stringify([worldId, loreSwitches(), filters]);
+  if (key === memoKey && said === memoSaid) return memoCentre;
   memoKey = key;
+  memoSaid = said;
   ranks++;
   memoCentre = rankCentre(getState().data.elements, new Set(filters));
   return memoCentre;
@@ -88,7 +92,9 @@ export function buildHomePicture(worldId: string, said: string): HomePicture | n
   const centreId = homeCentre(worldId, said);
   const centre = centreId ? getState().data.elements.find(e => e.id === centreId) : undefined;
   if (!centre) return null;
-  const name = typeof centre.name === 'string' && centre.name.trim() ? centre.name.trim() : 'This element';
+  // An unnamed centre reads as its type, as the guide's notes do (the code gate's C10).
+  const named = typeof centre.name === 'string' && centre.name.trim() ? centre.name.trim() : null;
+  const name = named ?? `this ${typeName(centre.type)}`;
 
   const section = document.createElement('section');
   section.className = 'atlas-home-picture';
@@ -97,7 +103,7 @@ export function buildHomePicture(worldId: string, said: string): HomePicture | n
   head.className = 'atlas-home-picture-head';
   const title = document.createElement('h3');
   title.className = 'atlas-home-section-title atlas-home-picture-title';
-  title.textContent = `${name} and what it touches`;
+  title.textContent = named ? `${named} and what it touches` : `This ${typeName(centre.type)} and what it touches`;
   const see = document.createElement('button');
   see.type = 'button';
   see.className = 'atlas-btn-link atlas-home-picture-see';
@@ -136,6 +142,7 @@ export function buildHomePicture(worldId: string, said: string): HomePicture | n
 /** Test seam: forget the ranked centre. */
 export function resetHomePictureForTests(): void {
   memoKey = null;
+  memoSaid = null;
   memoCentre = null;
   ranks = 0;
 }

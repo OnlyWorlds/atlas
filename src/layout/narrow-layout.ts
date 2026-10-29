@@ -43,6 +43,12 @@ export type DrawerName = 'right' | 'sidebar';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
+const drawerEscapes = new WeakSet<Event>();
+
+/** This Escape closed a drawer: the global deselect-to-home leaves it be. */
+export function escapeClosedDrawer(e: Event): boolean {
+  return drawerEscapes.has(e);
+}
 
 function width(): number {
   return typeof window === 'undefined' ? 1920 : window.innerWidth;
@@ -156,11 +162,13 @@ export function installNarrowLayout(): void {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!isDrawerOpen('right') && !isDrawerOpen('sidebar')) return;
+    // A dialog opened over the drawer owns this Escape (the 1.102 code gate's C2).
+    if (document.querySelector('.atlas-modal-overlay')) return;
     closeDrawers();
-    // The drawer owns this Escape, as every overlay owns its own: the global
-    // deselect-to-home after it on the same listener list would also leave
-    // the page, and the drawer is already closed by the time it asks.
-    e.stopImmediatePropagation();
+    // Marked, never stopped: the global deselect-to-home after it would also
+    // leave the page (the drawer is already closed by the time it asks), and
+    // reads the mark; every other Escape listener runs as before (the gate's C1, C3).
+    drawerEscapes.add(e);
   });
 
   // A drawer is a view of the CURRENT room; navigating away should not leave

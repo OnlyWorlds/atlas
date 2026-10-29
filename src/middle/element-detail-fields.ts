@@ -681,6 +681,9 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
       }
     }
   }
+  // The field before this commit, read before the write: a move or a changed year is
+  // never read by the guide as the link or the date that made a web (conv. 182).
+  const was = (el as Record<string, unknown>)[fieldName];
   try {
     await store.updateElement(el.id, { [fieldName]: valueToPersist } as Partial<Element>);
     const elements = await store.listElements();
@@ -692,9 +695,9 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
     // field-widget commit in this file (a link field's create included); never
     // call it from sync, import or derive paths, or the notes would speak for them.
     if (el.type === 'character' && fieldName === 'location') {
-      reportGesture({ kind: 'location-set', character: el.id });
+      reportGesture({ kind: 'location-set', character: el.id }, { was });
     } else if (el.type === 'event' && fieldName === 'start_date') {
-      reportGesture({ kind: 'date-set', event: el.id });
+      reportGesture({ kind: 'date-set', event: el.id }, { was });
     }
 
     // Map.image_url auto-detect (DESIGN_MAPS.md §4):
