@@ -119,6 +119,8 @@ export function messageParties(
     to,
     toOutside,
     toUnseen: hasUnseenRecipients(el) === true,
-    wholeWorld: reading.wholeWorld ?? true,
+    // A body keel marked was read with a key that marks: a field the mark does not
+    // name lost nobody, so it is not hedged a second way (the #888 gate's G2).
+    wholeWorld: Array.isArray((el as Record<string, unknown>).x_served_trimmed) ? true : reading.wholeWorld ?? true,
   };
 }

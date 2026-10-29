@@ -99,13 +99,17 @@ export function fillMessageParties(line: HTMLElement, parties: MessageParties, w
   if (parties.toEveryone) {
     line.append(parties.wholeWorld ? 'everyone' : 'everyone, or someone hidden from you');
   } else {
-    const parts: Array<HTMLElement | string> = parties.to.map(link);
+    // Names joined by commas, as before #888; " and " only before the last of the
+    // tail (the ones not shown, the ones unseen), so "BB, Kael" reads as it did.
+    const names: Array<HTMLElement | string> = parties.to.map(link);
+    const tail: string[] = [];
     const n = parties.toOutside;
-    if (n > 0) parts.push(n === 1 ? notShown : parties.to.length > 0 ? `${n} others not shown here` : `${n} not shown here`);
-    if (parties.toUnseen) parts.push(unseen);
+    if (n > 0) tail.push(n === 1 ? notShown : names.length > 0 ? `${n} others not shown here` : `${n} not shown here`);
+    if (parties.toUnseen) tail.push(unseen);
+    const parts = [...names, ...tail];
     if (parts.length === 0) line.append('nobody');
     parts.forEach((part, i) => {
-      if (i > 0) line.append(i === parts.length - 1 ? ' and ' : ', ');
+      if (i > 0) line.append(tail.length > 0 && i === parts.length - 1 ? ' and ' : ', ');
       line.append(part);
     });
   }
