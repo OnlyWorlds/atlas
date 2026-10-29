@@ -212,11 +212,13 @@ test('the path by the card alone: five steps, each confirmed with Next, the bloc
   await modal.locator('input[name="element-date"]').fill('120');
   await modal.locator('[data-action="create"]').click();
   await expect(modal).toHaveCount(0);
-  await expect(card(page)).toContainText('The Founding happened in year 120. Were Ada and Hollow Keep there?');
+  await expect(card(page)).toContainText('The Founding happened in year 120. Were Ada and Hollow Keep at The Founding?');
   // Were there is offered, never required: the chart stands beside it.
   await expect(step(page, 'open-chart')).toBeVisible();
+  await expect(step(page, 'were-there')).toHaveText('Add Ada and Hollow Keep to The Founding');
   await step(page, 'were-there').click();
-  await expect(card(page)).toContainText('The Founding is on the chart at year 120.');
+  await expect(card(page)).toContainText('The Founding is on the chart at year 120. Open the chart to see it, then go on.');
+  await expect(step(page, 'were-there')).toHaveCount(0);
   const ev = await element(page, 'The Founding');
   expect(ev.characters).toEqual([(await element(page, 'Ada')).id]);
   expect(ev.locations).toEqual([keep.id]);
@@ -235,7 +237,7 @@ test('the path by the card alone: five steps, each confirmed with Next, the bloc
   await createInModal(page, "Ada's Tale");
   // The world's first writing label, so the story is a book in the writing room.
   await expect.poll(async () => (await element(page, "Ada's Tale")).supertype).toBe('Book');
-  await expect(card(page)).toContainText("Ada's Tale is a book.");
+  await expect(card(page)).toContainText("Ada's Tale is in your world, listed as a book.");
   await step(page, 'open-writing').click();
   await expect(page).toHaveURL(/\/writing/);
   await expect.poll(async () => (await entryOf(page)).guide_visited).toEqual(['happened', 'story']);
@@ -367,6 +369,8 @@ test('a browser world: the copy step carries the keep-safe ways', async ({ page 
   await expect(card(page)).toContainText('tourworld is kept only in this browser.');
   await expect(step(page, 'download')).toBeVisible();
   await expect(step(page, 'online')).toBeVisible();
+  // Each way says where it puts the copy: three ways that would otherwise read alike.
+  await expect(card(page).locator('.atlas-guide-card-hint')).toHaveText(['a file on this computer', 'files you keep yourself', 'on onlyworlds.com, private to you until you share it']);
 });
 
 // ---- The code gate's findings ----
@@ -459,6 +463,27 @@ for (const [w, h] of [[360, 640], [390, 844]] as const) {
     expect(overflow.page).toBeLessThanOrEqual(0);
   });
 }
+
+test.describe('on a touch phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('every way in the block takes a thumb: doors, Back, Bring in\'s ways and the card\'s buttons are 44 px or more', async ({ page }) => {
+    await setupWorld(page, 'browser');
+    const heights = (sel: string) => block(page).locator(sel).evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
+    expect(Math.min(...await heights('[data-guide-door]'))).toBeGreaterThanOrEqual(44);
+    await page.click('[data-guide-door="bring"]');
+    // The ghost buttons too: the rooms' own touch rule makes them 40 px unless the block's outranks it.
+    expect(Math.min(...await heights('[data-bring-action], [data-action="guide-back"]'))).toBeGreaterThanOrEqual(44);
+    await page.click('[data-action="guide-back"]');
+    await page.click('[data-guide-door="nothing"]');
+    await patchEntry(page, { guide_step: 'copy' });
+    await createViaStore(page, 'character', { name: 'Ada' });
+    await expect(step(page, 'online')).toBeVisible();
+    const card = await heights('[data-step-action]');
+    expect(card.length).toBeGreaterThanOrEqual(2);
+    expect(Math.min(...card)).toBeGreaterThanOrEqual(44);
+  });
+});
 
 // ---- The notes, in a world past the path ----
 

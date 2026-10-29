@@ -16076,6 +16076,9 @@ body.atlas-share-fullpreview > * {
   .atlas-guide-marks { gap: 0; }
   .atlas-guide-mark { padding-left: 0; padding-right: 0; }
   .atlas-guide-mark-label { font-size: 0.68rem; letter-spacing: -0.01em; }
+  /* Neighbouring labels never read as one run: the two long middle labels ("Somewhere",
+     "Something happened") take wider columns, each column near its label's own width. */
+  .atlas-guide-marks { grid-template-columns: 1fr 1.2fr 1.1fr 0.75fr 0.75fr; }
 }
 
 /* The guide's block (#964): one head row in every state (Back slot, heading, ×), the
@@ -16123,6 +16126,10 @@ body.atlas-share-fullpreview > * {
 .atlas-guide-card-line { margin: 0 0 10px; max-width: 520px; font-size: 14px; line-height: 1.5; color: var(--atlas-text); }
 .atlas-guide-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .atlas-guide-card-actions button { font-size: 13px; padding: 6px 14px; }
+.atlas-guide-card-actions { align-items: flex-start; }
+.atlas-guide-card-way { display: flex; flex-direction: column; gap: 4px; max-width: 16rem; }
+.atlas-guide-card-way > button { align-self: flex-start; }
+.atlas-guide-card-hint { font-size: 12px; line-height: 1.4; color: var(--atlas-text-muted); }
 @container (max-width: 460px) {
   .atlas-guide-doors { grid-template-columns: 1fr; }
 }
@@ -16131,7 +16138,8 @@ body.atlas-share-fullpreview > * {
 }
 /* Touch: the doors, Back and the card's buttons take a thumb (1.105.1's precedent). */
 @media (pointer: coarse) {
-  .atlas-guide-door, .atlas-guide-card-actions button, .atlas-guide-way > button { min-height: 44px; }
+  /* Scoped to the block: the rooms' own touch rule (`.atlas-middle .atlas-btn-ghost`, 40 px) would outrank a bare selector. */
+  .atlas-guide-block .atlas-guide-door, .atlas-guide-block .atlas-guide-card-actions button, .atlas-guide-block .atlas-guide-way > button { min-height: 44px; }
   .atlas-guide-back { min-height: 44px; padding: 0 8px 0 0; }
   .atlas-guide-head { height: 44px; }
 }
