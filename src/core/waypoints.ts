@@ -39,10 +39,10 @@ const elementsRoom = (w: string | null): string | null => (w ? `#/w/${w}/element
 
 /** The five, in the guide's order. */
 export const PATH_WAYPOINTS: readonly WaypointDef[] = [
-  { id: 'someone', name: 'Someone', concept: 'A Character is someone in your world.', action: 'Create a Character.', glyph: 'person', link: elementsRoom, chapter: ['A5'] },
+  { id: 'someone', name: 'Someone', concept: 'A Character is someone.', action: 'Create a Character.', glyph: 'person', link: elementsRoom, chapter: ['A5'] },
   { id: 'placed', name: 'Somewhere', concept: 'A Character can be at a Location, and the Location lists who is there.', action: 'Set a Character\'s Location.', glyph: 'castle', link: elementsRoom, chapter: ['A5', 'A6', 'A6-located'] },
   { id: 'happened', name: 'Something happened', concept: 'An Event with a year has its place on the chart.', action: 'Give an Event a year.', glyph: 'insights', link: w => (w ? timelineHash(w) : null), chapter: ['A14'] },
-  { id: 'story', name: 'A story', concept: 'A Narrative is a story told in your world, and its text can link what it mentions.', action: 'Start a book in the writing room.', glyph: 'menu_book', link: w => (w ? writingHash(w) : null), chapter: ['A13'] },
+  { id: 'story', name: 'A story', concept: 'A Narrative is a story that is told, and its text can link what it mentions.', action: 'Start a book in the writing room.', glyph: 'menu_book', link: w => (w ? writingHash(w) : null), chapter: ['A13'] },
   { id: 'copy', name: 'A copy', concept: 'A copy can be one downloaded file, a folder on your drive, or your onlyworlds.com account.', action: 'Download your world, move it to a folder, or take it online.', glyph: 'download', link: w => (w ? settingsHash(w, 'world') : null), chapter: ['A7'] },
 ];
 

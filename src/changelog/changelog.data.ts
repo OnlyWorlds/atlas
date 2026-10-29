@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'guide-notes-plain',
         title: 'The guide\'s notes for a Character and a Narrative say it plainly',
-        body: 'The note after your first Character now reads "Ada is someone.", and after your first Narrative "A Narrative is a story that is told.", in the same plain voice as the others.',
+        body: 'The note after your first Character now reads "Ada is someone.", and after your first Narrative "A Narrative is a story that is told.", in the same plain voice as the others, and the guide\'s list of steps says the same.',
         tags: ['onboarding', 'copy'],
       },
     ],
