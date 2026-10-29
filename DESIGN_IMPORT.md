@@ -36,7 +36,7 @@ So the import core is: **detect format → validate → resolve identity (ids + 
 
 | Mode | Trigger | Source shape | Lands where | Identity strategy |
 |---|---|---|---|---|
-| **A — Import as new world** | full-world JSON dropped/picked | `{World:{…}, Character:[…], …}` (has `World`, uuid ids, uuid relations) | a **new** world folder (Create-Local, populated) | keep the file's uuids verbatim |
+| **A — Import as new world** | full-world JSON dropped/picked; loose elements too, by choice or with no world open (1.103, #856) | `{World:{…}, Character:[…], …}` (has `World`, uuid ids, uuid relations) | a **new** world folder (Create-Local, populated) | keep the file's uuids verbatim |
 | **B — Merge into current world** | loose elements *or* a full JSON's elements (World table ignored) | type-keyed lists; ids optional; relations as uuids *or* names | the currently-open world's folder | id when present & matched, else name+type; per-conflict skip/overwrite |
 | **Export — full world** | button in import/export room | n/a (reads folder) | downloaded `*.json` (ow.com-uploadable) | inverse of Mode A |
 | **Export — by-type subset** | type checkboxes in export panel | n/a | downloaded `*.json` | subset of full export |
@@ -250,6 +250,10 @@ World-scoped export does not exist yet (only the page-scoped share payload). Bui
 Round-trip is the acceptance test: **export → re-import (Mode A) → equivalent world.**
 
 ---
+
+## The room with no world (1.103, #856)
+
+`#/import` is the Data room before a world exists: Other ways in's "Bring in a file, notes or JSON" and the site's `#/bring-in` land there, and nothing is made until Import. Every payload is "Import as a new world" (a full world named from its World block, loose elements "Imported world"); Create world asks the persist request and the where-question as Mode A always has, makes the world from the plan and lands on its home. A world file opens as its own world, as anywhere, and from here lands on its home too. With a world open `#/import` is that world's `#/w/<id>/import` (replaced, not pushed); arriving that way, loose elements default to a new world (`core/bring-in-intent.ts`, read once by the room), while the world's own Data room merges them by default, and a view-only world defaults to new. Only `#/import` itself is world-less: a closed world's `#/w/<id>/import` (a folder world after a reload, or an open from the room that failed) shows the welcome, never an offer that would duplicate it. The room bar keeps its preview strip (conv. 31) with Data marked current; the header has Back to start. Under the tour both routes say the tour's line and go to `#/`. Back from a world opened out of the room returns to its Data room (accepted). Guards: `tests/e2e/bring-in-door.spec.ts`.
 
 ## UI — single-panel import/export room
 

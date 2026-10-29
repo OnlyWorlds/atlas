@@ -990,7 +990,7 @@ function buildTour(
   const last = (action: string, label: string): string =>
     `<span class="atlas-home-have-end">${act(action, label)}.</span>`;
   const elsewhere = row('elsewhere', 'A world somewhere else',
-    `${act('bring-in', 'Bring it in')}: a world file, OnlyWorlds JSON, or notes an AI assistant converts. `
+    `${act('bring-in', 'Bring in a file, notes or JSON')}. An AI assistant can turn notes into JSON for you. `
     + (hasFolderMode()
       ? `Or ${act('open-folder', 'open a world folder')} where it is, or ${last('download', 'download one from OnlyWorlds')}`
       : `Or ${last('download', 'download one from OnlyWorlds')}`));

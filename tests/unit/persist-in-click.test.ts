@@ -97,8 +97,14 @@ describe('the doors without a folder picker ask before their first await', () =>
     expect(ask).toBeLessThan(room.indexOf("await import('../ui/where-choice')"));
     // One file door for the drop and the chooser (`takeFile`, 1.88.3): a world-named file asks
     // and opens at once; a name that says neither asks before the bytes are read (OW-1).
-    const opens = [...room.matchAll(/void openWorldFileFrom\(file, toasts\)/g)].map(m => m.index!);
+    const opens = [...room.matchAll(/void openFileWorld\(file\)/g)].map(m => m.index!);
     expect(opens).toHaveLength(2);
+    // openFileWorld (1.103: a world file from the room with no world lands on its home) opens
+    // before any await of its own, so the ask before it still runs inside the gesture.
+    const wrapper = room.indexOf('const openFileWorld = async');
+    expect(wrapper).toBeGreaterThan(-1);
+    const firstAwait = room.indexOf('await ', wrapper);
+    expect(room.slice(firstAwait)).toMatch(/^await openWorldFileFrom\(file, toasts\);/);
     expect(room.slice(opens[0] - 100, opens[0])).toContain('requestPersistOnFirstBrowserWorld(');
     const sniff = room.indexOf('void startsLikeWorldFile(file)');
     expect(sniff).toBeGreaterThan(-1);

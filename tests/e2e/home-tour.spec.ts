@@ -105,7 +105,7 @@ test('the path: each mark stays on the home, each note says what was made, each 
   await createInModal(page, 'Ada');
   await expect(page.locator('.atlas-world-home')).toBeVisible();
   await expect(note(page)).toHaveAttribute('data-note', 'someone');
-  await expect(note(page)).toContainText('Ada is someone in your world.');
+  await expect(note(page)).toContainText('Ada is someone.');
   expect(await litOf(page)).toEqual(['someone+', 'placed', 'happened', 'story', 'copy+']);
 
   await note(page).locator('[data-note-action="add-place"]').click();
@@ -310,7 +310,7 @@ test('the strip at a 360 px phone: five marks, no sideways scroll', async ({ pag
   expect(overflow.page).toBeLessThanOrEqual(0);
 });
 
-test('the Start-page links: #/start asks nothing; #/bring-in lands in the Data room', async ({ page }) => {
+test('the Start-page links: #/start asks nothing; #/bring-in lands in the Data room with no dialog', async ({ page }) => {
   await freshBoot(page);
   await page.goto('/#/start');
   await page.waitForSelector('.atlas-shell');
@@ -337,14 +337,11 @@ test('the Start-page links: #/start asks nothing; #/bring-in lands in the Data r
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => (window as any).__sawQuestion)).toBe(0);
 
+  // #/bring-in (#856): no dialog; with a world open it is that world's Data room.
   await page.goto('/#/bring-in');
   await page.waitForSelector('.atlas-shell');
-  await expect(dialog).toBeVisible();
-  const rows2 = dialog.locator('.atlas-where-row input');
-  if (await rows2.count() > 1) await rows2.nth(1).check();
-  await page.fill('input[name="world-name"]', 'Notes from elsewhere');
-  await dialog.locator('[data-action="pick"]').click();
-  await expect(page).toHaveURL(/\/import$/);
+  await expect(page).toHaveURL(/#\/w\/[^/]+\/import$/);
+  await expect(dialog).toHaveCount(0);
   await expect(page.locator('.atlas-import-ai')).toContainText('add nothing your notes do not say');
 });
 

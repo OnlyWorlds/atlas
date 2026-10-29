@@ -74,8 +74,9 @@ test('first visit: two doors, start a world and Moppetopia under it, then Watch 
 
   await page.click('[data-action="other-ways-in"]');
   const chooser = page.locator('[data-modal="add-world"]');
-  await expect(chooser.locator('[data-choice]')).toHaveCount(7);
+  await expect(chooser.locator('[data-choice]')).toHaveCount(8);
   await expect(chooser.locator('[data-choice="open-file"]')).toBeVisible();
+  await expect(chooser.locator('[data-choice="bring-in"] strong')).toHaveText('Bring in a file, notes or JSON');
   await expect(chooser.locator('[data-choice="try-demo"] strong')).toHaveText('Explore Moppetopia');
 });
 
@@ -93,7 +94,7 @@ test('first visit, browser storage refused on Chromium: no tour, and the doors l
   // The link line keeps Other ways in (the folder door is inside it), without a dangling separator.
   await expect(page.locator('.atlas-landing-more-link')).toHaveText(['Other ways in']);
   await expect(page.locator('.atlas-landing-more-sep')).toHaveCount(0);
-  await expect(page.locator('[data-action="other-ways-in"]')).toHaveAttribute('title', 'Download one from OnlyWorlds, or view a shared world');
+  await expect(page.locator('[data-action="other-ways-in"]')).toHaveAttribute('title', 'Download one from OnlyWorlds, view a shared world, or bring in a file, notes or JSON');
 });
 
 test('first visit: start a world asks where, folder first, and the browser row lands a world in this browser', async ({ page }) => {
@@ -465,8 +466,8 @@ test('"add a world" opens the chooser; its open-a-world row opens a picked world
   await page.locator('[data-action="add-world"]').click();
   const chooser = page.locator('[data-modal="add-world"]');
   // Six ways in since 1.17 (the sixth opens a world file, contract §5.2); the
-  // seventh since 1.18 is the demo world (#113).
-  await expect(chooser.locator('[data-choice]')).toHaveCount(7);
+  // seventh since 1.18 is the demo world (#113); the eighth brings in a file, notes or JSON (#856).
+  await expect(chooser.locator('[data-choice]')).toHaveCount(8);
   await expect(chooser.locator('[data-choice="open-file"] strong')).toHaveText('Open a world file');
   await chooser.locator('[data-choice="open-folder"]').click();
   await expect(page.locator('h1', { hasText: 'Second World' })).toBeVisible();

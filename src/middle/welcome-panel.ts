@@ -208,8 +208,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const more = [
         link('start-tour', tourDone ? 'Watch it again' : 'Watch how it works', 'A guided build of a world from one sentence of a novel'),
         link('other-ways-in', 'Other ways in', folderMode
-          ? 'Open a world folder you have, download one from OnlyWorlds, view a shared world, open a world file'
-          : 'Download one from OnlyWorlds, view a shared world, open a world file'),
+          ? 'Open a world folder you have, download one from OnlyWorlds, view a shared world, open a world file, or bring in notes or JSON'
+          : 'Download one from OnlyWorlds, view a shared world, open a world file, or bring in notes or JSON'),
       ].filter(Boolean).join('<span class="atlas-landing-more-sep" aria-hidden="true">·</span>');
       // The note names the DESKTOP part of the constraint: mobile
       // Chrome has no folder picker either, so the sentence says "desktop".
@@ -273,7 +273,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           if (note) note.textContent = text;
         };
         caption('start-world', 'In a folder on your drive');
-        root.querySelector('[data-door="other-ways-in"]')?.setAttribute('title', 'Download one from OnlyWorlds, or view a shared world');
+        root.querySelector('[data-door="other-ways-in"]')?.setAttribute('title', 'Download one from OnlyWorlds, view a shared world, or bring in a file, notes or JSON');
         const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
         if (!note) return;
         // A full origin is not a private window: say which.

@@ -8411,6 +8411,15 @@ svg .atlas-zone-ink.atlas-zone-hovered {
   background: transparent;
 }
 
+/* The Data room with no world (#856): its preview button is the room you are in. */
+.atlas-room-nav-preview-btn.active,
+.atlas-room-nav-preview-btn.active:hover {
+  color: var(--atlas-accent-text);
+  background: var(--atlas-cyan-tint);
+  border-color: var(--atlas-cyan-soft);
+}
+.atlas-room-nav-preview-btn.active .atlas-room-nav-label { color: inherit; }
+
 .atlas-room-nav-strip.is-preview { gap: 10px; }
 
 /* World just activated: labels collapse, icons slide into their real
@@ -11601,8 +11610,6 @@ td.atlas-writing-setup-promote-count {
 .atlas-import-mode { display: flex; flex-direction: column; gap: 6px; }
 .atlas-import-radio { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--atlas-text-soft); cursor: pointer; }
 .atlas-import-radio input { accent-color: var(--atlas-cyan); }
-.atlas-import-mode-fixed { font-size: 13px; color: var(--atlas-text-soft); margin: 0; }
-.atlas-import-mode-fixed b { color: var(--atlas-text); }
 
 .atlas-import-field { display: flex; flex-direction: column; gap: 4px; max-width: 360px; }
 .atlas-import-field > span { font-size: 11px; color: var(--atlas-text-muted); }

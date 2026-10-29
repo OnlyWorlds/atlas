@@ -162,6 +162,12 @@ export function parseHash(hash: string): Route {
     return { worldId: null, mode: parts[0] };
   }
 
+  // /import (#856): the Data room with no world open; the import makes the
+  // world. With a world open, app.ts sends it to that world's Data room.
+  if (parts[0] === 'import') {
+    return { worldId: null, mode: 'import' };
+  }
+
   // /w/<id>...
   if (parts[0] === 'w' && parts[1]) {
     const worldId = parts[1];
@@ -314,6 +320,9 @@ export function shareHash(worldId: string, pageId?: string): string {
 export function importHash(worldId: string): string {
   return `#/w/${worldId}/import`;
 }
+
+/** The Data room with no world (#856): Bring in a file, notes or JSON, before a world exists. */
+export const BRING_IN_HASH = '#/import';
 
 export function onHashChange(fn: (route: Route) => void): () => void {
   const handler = () => fn(parseHash(window.location.hash));

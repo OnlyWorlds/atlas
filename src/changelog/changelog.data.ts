@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.103.0',
+    date: '2026-10-29',
+    theme: 'Bring in your notes before you have a world',
+    entries: [
+      {
+        id: 'bring-in-door',
+        title: 'Bring in a file, notes or JSON from the first screen',
+        body: 'Other ways in now has Bring in a file, notes or JSON. It opens the Data room with no world made yet: a world file opens as it is, and OnlyWorlds JSON is reviewed first, then Create world makes the world from it, named from the file or by you. Loose elements, such as the JSON an AI assistant makes from your notes, become a new world too, and in a world\'s own Data room they still merge into it by default. The atlas.onlyworlds.com/#/bring-in link opens the same room without asking for a world first.',
+        tags: ['import', 'onboarding'],
+      },
+      {
+        id: 'guide-notes-plain',
+        title: 'The guide\'s notes for a Character and a Narrative say it plainly',
+        body: 'The note after your first Character now reads "Ada is someone.", and after your first Narrative "A Narrative is a story that is told.", in the same plain voice as the others.',
+        tags: ['onboarding', 'copy'],
+      },
+    ],
+  },
+  {
     version: '1.102.2',
     date: '2026-10-29',
     theme: 'An empty review mark is no proposal',

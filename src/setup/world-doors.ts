@@ -28,6 +28,7 @@ import { browserStorageDoorOpen, hasFolderMode } from '../core/capabilities';
 import { pickWorldFile, openWorldFileFrom, openDemoWorld } from '../ui/open-world-file';
 import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
+import { BRING_IN_HASH, navigate } from '../core/router';
 import { requestPersistOnFirstBrowserWorld } from './world-parent';
 import type { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -203,14 +204,14 @@ export async function ensureAtlasRoot(
 }
 
 /** The ways into a world, named by the sidebar buttons' `data-action` (and the chooser's sixth row, a world file). */
-export type AddWorldAction = 'create-local' | 'open-folder' | 'new-api' | 'link-api' | 'view-api' | 'open-file' | 'try-demo';
+export type AddWorldAction = 'create-local' | 'open-folder' | 'new-api' | 'link-api' | 'view-api' | 'open-file' | 'try-demo' | 'bring-in';
 
 /**
- * The Start page's links (#127): `#/start` and `#/bring-in` open the
- * start-a-world dialog; the world it makes counts as answered, and
- * `bring-in` lands in its Data room.
+ * The Start page's `#/start` (#127) opens the start-a-world dialog; the world
+ * it makes counts as answered. (`#/bring-in` opens the Data room with no world
+ * since 1.103, #856: app.ts.)
  */
-export async function startWorldFromLink(then: 'home' | 'bring-in', toasts: ToastManager): Promise<void> {
+export async function startWorldFromLink(then: 'home', toasts: ToastManager): Promise<void> {
   if (isTourFlagActive()) {
     toasts.info('That is yours to use after the tour.');
     return;
@@ -233,6 +234,12 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
     requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
     const file = await pickWorldFile();
     if (file) await openWorldFileFrom(file, toasts);
+    return;
+  }
+  if (action === 'bring-in') {
+    // #856: the Data room before a world exists; Import makes the world (with a
+    // world open, app.ts sends this to that world's Data room).
+    navigate(BRING_IN_HASH);
     return;
   }
   if (action === 'try-demo') {
@@ -286,6 +293,7 @@ const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line
   { action: 'link-api', icon: 'link', title: 'Download a world from OnlyWorlds', line: 'Its API key and PIN: Atlas downloads a full copy and keeps the two in sync.' },
   { action: 'view-api', icon: 'visibility', title: 'View a shared world', line: 'Someone gave you a read key: browse their world, view only. No PIN needed.' },
   { action: 'open-file', icon: 'file_open', title: 'Open a world file', line: 'A world file Atlas saved, from this or any other browser.' },
+  { action: 'bring-in', icon: 'place_item', title: 'Bring in a file, notes or JSON', line: 'A world file, OnlyWorlds JSON, or notes an AI assistant converts: review it, and it becomes a world.' },
   { action: 'try-demo', icon: 'explore', title: 'Explore Moppetopia', line: 'The demo world, as your own copy in this browser to explore and change. Nothing goes back to OnlyWorlds.' },
 ];
 
@@ -313,7 +321,9 @@ class AddWorldChooser extends BaseModal {
   open(): void {
     const { overlay, body } = this.buildModalShell({ title: 'Add a world', dataModal: 'add-world' });
     const needsStorage = (a: AddWorldAction): boolean => a === 'open-file' || a === 'try-demo';
-    const rows = CHOICES.filter(c => (c.action !== 'open-folder' || hasFolderMode()) && (!needsStorage(c.action) || browserStorageDoorOpen()));
+    // Bring in can make its world in a folder too, so it shows like Create (#856).
+    const rows = CHOICES.filter(c => (c.action !== 'open-folder' || hasFolderMode()) && (!needsStorage(c.action) || browserStorageDoorOpen())
+      && (c.action !== 'bring-in' || hasFolderMode() || browserStorageDoorOpen()));
     body.innerHTML = `<div class="atlas-add-world-list">${rows.map(c => `
       <button type="button" class="atlas-add-world-row" data-choice="${c.action}">
         <span class="material-symbols-outlined atlas-add-world-icon" aria-hidden="true">${c.icon}</span>

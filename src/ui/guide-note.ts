@@ -318,7 +318,7 @@ function fill(): void {
 
   switch (note.id) {
     case 'someone':
-      line.textContent = `${ch} is someone in your world.`;
+      line.textContent = `${ch} is someone.`;
       act('add-place', 'Add a place', async () => {
         leave();
         const { ElementCreateModal } = await import('./element-create-modal');
@@ -379,7 +379,7 @@ function fill(): void {
     }
     case 'story': {
       const labels = getWritingLabels(worldId);
-      line.textContent = 'A Narrative is a story told in your world.';
+      line.textContent = 'A Narrative is a story that is told.';
       act('write', `Write it as a ${labels.l1.toLowerCase()}`, async () => {
         const id = note.narrative!;
         const made = await writeIfEmpty(id, ex => (isFilled((ex as { supertype?: unknown }).supertype) ? null : { supertype: labels.l1 } as Partial<Element>));

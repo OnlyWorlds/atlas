@@ -171,7 +171,10 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
   const stripGate = renderGate();
 
   function renderPreview(): void {
-    if (!stripGate.changed([`preview|${isDrawerOpen('sidebar')}`])) return;
+    // The Data room with no world (#856) is a room here: its button reads current.
+    const here = parseHash(window.location.hash);
+    const worldlessData = here.mode === 'import' && here.worldId === null;
+    if (!stripGate.changed([`preview|${isDrawerOpen('sidebar')}|${worldlessData}`])) return;
     strip.innerHTML = '';
     strip.classList.add('is-preview');
     // The sidebar toggle belongs here too: with no world open the
@@ -188,8 +191,14 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       // a disabled control fires no hover, so no tooltip can ever explain it.
       // These have no click handler, so removing `disabled` changes nothing
       // except that hover/focus now teach what the room will be.
-      btn.setAttribute('aria-disabled', 'true');
-      btn.title = `${room.label} · opens once a world exists`;
+      if (worldlessData && room.id === 'import') {
+        btn.classList.add('active');
+        btn.setAttribute('aria-current', 'page');
+        btn.title = `${room.label} · bring in a file, notes or JSON`;
+      } else {
+        btn.setAttribute('aria-disabled', 'true');
+        btn.title = `${room.label} · opens once a world exists`;
+      }
       btn.innerHTML =
         `<span class="material-symbols-outlined">${room.icon}</span>` +
         // This once carried `room.id === 'import' ? 'import' : ...`, a

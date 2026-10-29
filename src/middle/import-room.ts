@@ -14,6 +14,7 @@
  */
 
 import { isAtlasOnlyStorage } from '../core/browser-worlds';
+import { takeBringInAsWorld } from '../core/bring-in-intent';
 import { getActiveStore } from '../core/active-store';
 import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
 import { typeName } from '../core/type-words';
@@ -21,7 +22,7 @@ import { escapeText } from '../core/dom-utils';
 import { getState, patchSlice, subscribe } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
 import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
-import { importHash, navigate, parseHash } from '../core/router';
+import { homeHash, importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
@@ -180,8 +181,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   // The folder half of the AI story: only where it is true, a real
   // folder (not a world in browser storage, which no other program can reach).
   const activeId = getState().active?.worldId;
+  // Came to bring something in as a world while another was open (#856).
+  const asWorld = takeBringInAsWorld();
   const inBrowser = isAtlasOnlyStorage(getState().registry.worlds.find(w => w.id === activeId));
-  const agentLine = hasFolderMode() && !inBrowser
+  // With no world open there is no folder to edit (#856's second gate, S5).
+  const agentLine = activeId && hasFolderMode() && !inBrowser
     ? '<p class="atlas-import-ai-note">Or let an AI assistant edit this world\'s folder directly: Atlas shows its changes when you come back to this window.</p>'
     : '';
   target.innerHTML = '';
@@ -192,7 +196,10 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   root.innerHTML = `
     <header class="atlas-room-header">
       <h1>Data</h1>
-      <p class="atlas-room-subtitle">Take your world out as an OnlyWorlds file, or bring in anything in the OnlyWorlds format, whatever made it.</p>
+      <p class="atlas-room-subtitle">${activeId
+        ? 'Take your world out as an OnlyWorlds file, or bring in anything in the OnlyWorlds format, whatever made it.'
+        : 'Bring in a file, notes or JSON: a world file opens as it is, and OnlyWorlds JSON (an AI assistant can turn notes into it) becomes a world when you press Create world.'}</p>
+      ${activeId ? '' : '<a class="atlas-btn-link atlas-import-back" href="#/" data-action="back-to-start">Back to start</a>'}
     </header>
     <div class="atlas-room-tabs" role="tablist">
       <button type="button" class="atlas-room-tab is-active" data-tab="in" role="tab">
@@ -321,9 +328,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     // Default mode: a full world whose id already exists locally defaults to
     // MERGE (updating it is the usual intent on re-import); an unseen full world
     // → new; loose lists → merge into current.
+    // Loose merges into the open world, unless there is none, it is view-only,
+    // or the person came through Bring in a file, notes or JSON (#856).
+    const openEntry = getState().registry.worlds.find(w => w.id === activeWorld()?.worldId);
     mode = result.format === 'full-world'
       ? (idMatchWorld() ? 'merge' : 'new')
-      : 'merge';
+      : (activeWorld() && !entryIsViewOnly(openEntry ?? null) && !asWorld ? 'merge' : 'new');
     conflict = 'skip';
     worldName = (typeof result.world?.name === 'string' && result.world.name.trim())
       ? result.world.name.trim()
@@ -433,8 +443,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
     const isFull = parsed.format === 'full-world';
     const canMerge = !!aw;
-    // Loose with no active world is a dead end — guide the user.
-    const looseBlocked = !isFull && !canMerge;
     const adopting = isFull && !!exportWorldId() && !idMatch;
 
     reviewMount.innerHTML = `
@@ -445,9 +453,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <span class="atlas-import-summary-meta">${parsed.totalElements} element${parsed.totalElements === 1 ? '' : 's'} · ${typeCount} type${typeCount === 1 ? '' : 's'}</span>
         </div>
 
-        ${looseBlocked ? `
-          <p class="atlas-import-warn"><span class="material-symbols-outlined">info</span> Loose elements merge into an open world. Open or create a world first, then come back.</p>
-        ` : `
           ${idMatch ? `
             <p class="atlas-import-warn"><span class="material-symbols-outlined">info</span> A world with this id already exists here as <b>${escapeText(idMatch.name)}</b>. Update it, or bring this in as a separate copy.</p>
           ` : ''}
@@ -459,7 +464,8 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
               <label class="atlas-import-radio"><input type="radio" name="imp-mode" value="new" ${mode === 'new' ? 'checked' : ''}/> <span>Import as a new world</span></label>
               ${canMerge ? `<label class="atlas-import-radio"><input type="radio" name="imp-mode" value="merge" ${mode === 'merge' ? 'checked' : ''}/> <span>Merge into ${escapeText(aw!.meta?.name ?? 'the current world')}</span></label>` : ''}
             `) : `
-              <p class="atlas-import-mode-fixed">Merge into <b>${escapeText(aw!.meta?.name ?? 'the current world')}</b></p>
+              ${canMerge ? `<label class="atlas-import-radio"><input type="radio" name="imp-mode" value="merge" ${mode === 'merge' ? 'checked' : ''}/> <span>Merge into ${escapeText(aw!.meta?.name ?? 'the current world')}</span></label>` : ''}
+              <label class="atlas-import-radio"><input type="radio" name="imp-mode" value="new" ${mode === 'new' ? 'checked' : ''}/> <span>Import as a new world</span></label>
             `}
           </div>
 
@@ -500,7 +506,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             ${importing ? 'Importing…' : (mode === 'new' ? 'Create world' : `Merge into ${escapeText(mergeTargetName)}`)}
           </button>
           ${importing ? `<div class="atlas-import-progress" data-role="import-progress"><div class="atlas-import-progress-fill"></div><span class="atlas-import-progress-label">Writing 0 / ${r.created + r.updated}</span></div>` : ''}
-        `}
       </div>
     `;
     wireReview(issues);
@@ -548,6 +553,8 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
   async function runImport(): Promise<void> {
     if (!parsed || importing) return;
+    // From the Data room with no world (#856) the new world is the point: land on its home.
+    const fromWorldless = !activeWorld();
     // Import as new asks where the world lives first, as its own small step
     // (1.17, conv. 129): before `importing` is set, so a Cancel
     // leaves the review as it was.
@@ -599,7 +606,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         // The address follows the new world, as a sidebar switch keeps the room:
         // left on the old world's, the tab named it over the new world's
         // elements and a reload opened the old one again.
-        navigate(importHash(entry.id));
+        navigate(fromWorldless ? homeHash(entry.id) : importHash(entry.id));
         toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
         reportFailures(applied.failures, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.
@@ -833,12 +840,19 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   // (`.owworld`, `.zip`) at once; a `.json` is JSON; a name that says neither is decided by its
   // first bytes (OW-1: the content decides). Every branch that may open a world asks the browser
   // to keep it before its first await (contract §2.3, invariant 10).
+  // From the room with no world (#856) a world file lands on its home, as JSON does.
+  const openFileWorld = async (file: File): Promise<void> => {
+    const fromWorldless = !activeWorld();
+    await openWorldFileFrom(file, toasts);
+    const id = getState().active?.worldId;
+    if (fromWorldless && id && window.location.hash === importHash(id)) navigate(homeHash(id));
+  };
   const takeFile = (file: File, label: string, doing: string): void => {
     const readJson = (): void => { void file.text().then(t => ingest(t, label), err => { console.error('[import] file read failed', err); showProblem(err, { doing, folder: 'picked', toasts }); }); };
-    if (isWorldFile(file)) { requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000)); void openWorldFileFrom(file, toasts); return; }
+    if (isWorldFile(file)) { requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000)); void openFileWorld(file); return; }
     if (/\.json$/i.test(file.name) || file.type === 'application/json') { readJson(); return; }
     requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
-    void startsLikeWorldFile(file).then(zip => { if (zip) void openWorldFileFrom(file, toasts); else readJson(); });
+    void startsLikeWorldFile(file).then(zip => { if (zip) void openFileWorld(file); else readJson(); });
   };
   dropEl.addEventListener('drop', e => {
     e.preventDefault();

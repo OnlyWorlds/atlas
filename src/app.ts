@@ -34,7 +34,9 @@ import { beginBootReconciliation, reconcileAtBoot } from './core/browser-home';
 import { REGISTRY_STORAGE_KEY } from './core/constants';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
 import { loadUiPrefs } from './core/ui-prefs';
-import { onHashChange, parseHash, navigate, homeHash, elementHash } from './core/router';
+import { onHashChange, parseHash, navigate, homeHash, elementHash, importHash, BRING_IN_HASH } from './core/router';
+import { isTourFlagActive } from './tour/tour-flag';
+import { markBringInAsWorld } from './core/bring-in-intent';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
 import { activateWorld } from './sidebar/worlds-sidebar';
 import { initAutoPullScheduler } from './sync/auto-pull-scheduler';
@@ -281,8 +283,8 @@ export function startApp(container: HTMLElement): AppHandle {
       history.replaceState(history.state, '', '#/');
       void import('./setup/world-doors').then(m => m.runAddWorldAction('try-demo', toasts));
     }
-    // #/start and #/bring-in (#127): the Start page's other two answers, the
-    // same way: the hash goes first, then the start-a-world dialog opens once.
+    // #/start (#127): the Start page's answer, the same way: the hash goes
+    // first, then the start-a-world dialog opens once. (#/bring-in: below.)
     // #/join/<code> (#104): a world opened from onlyworlds.com. main.ts took a
     // code present at boot; one opened into this running tab is taken here,
     // the hash first (R2), then the door runs once.
@@ -303,12 +305,26 @@ export function startApp(container: HTMLElement): AppHandle {
     }
     applyOpenLanding();
     const linkMode = parseHash(window.location.hash).mode;
-    if (linkMode === 'start' || linkMode === 'bring-in') {
+    if (linkMode === 'start') {
       history.replaceState(history.state, '', '#/');
-      void import('./setup/world-doors').then(m => m.startWorldFromLink(linkMode === 'bring-in' ? 'bring-in' : 'home', toasts));
+      void import('./setup/world-doors').then(m => m.startWorldFromLink('home', toasts));
+    }
+    // #/bring-in (#856): the Data room, with nothing made until Import; the
+    // tour holds the world list while it runs, so it is refused then.
+    const bringIn = linkMode === 'bring-in' || (linkMode === 'import' && parseHash(window.location.hash).worldId === null);
+    if (bringIn && isTourFlagActive()) {
+      history.replaceState(history.state, '', '#/');
+      toasts.info('That is yours to use after the tour.');
+    } else if (linkMode === 'bring-in') {
+      history.replaceState(history.state, '', BRING_IN_HASH);
     }
     const route = parseHash(window.location.hash);
     const active = getState().active;
+    // With a world open, the world-less Data room is that world's (it offers a new world or a merge).
+    if (active && route.mode === 'import' && route.worldId === null) {
+      markBringInAsWorld();
+      history.replaceState(history.state, '', importHash(active.worldId));
+    }
 
     // The demo is a full-viewport overlay above the shell — the middle pane
     // behind it stays on whatever the no-demo route resolves to. The chunk
@@ -324,8 +340,14 @@ export function startApp(container: HTMLElement): AppHandle {
     // Resolve the room (middleMode) from the route + active state.
     let nextMode: MiddleMode;
     if (!active) {
-      // No active world → either welcome (root) or settings (no-world settings).
-      nextMode = route.mode === 'settings' ? 'settings' : 'welcome';
+      // No active world → welcome (root), settings (no-world settings), or the
+      // world-less Data room (#856). Only its own route: a closed world's
+      // #/w/<id>/import (a folder world on reload) never offers a duplicate, and
+      // an activation started from the room keeps it mounted until it lands.
+      // (only while that open is in flight: a failed one leaves the closed world's address to the welcome)
+      const worldless = route.mode === 'import'
+        && (route.worldId === null || (currentMode === 'import' && mountedWorldId === null && getState().data.loading === true));
+      nextMode = route.mode === 'settings' ? 'settings' : worldless ? 'import' : 'welcome';
     } else {
       switch (route.mode) {
         case 'settings':

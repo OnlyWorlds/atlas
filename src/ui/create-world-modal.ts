@@ -44,10 +44,10 @@ export interface CreateWorldTourOptions {
 /**
  * A world started from a deep link (#127): the visitor already answered
  * "What do you have?" on onlyworlds.com, so the new world is marked answered,
- * and `bring-in` lands in its Data room instead of its home.
+ * and lands on its home.
  */
 export interface CreateWorldLinkOptions {
-  then: 'home' | 'bring-in';
+  then: 'home';
 }
 
 export class CreateWorldModal extends BaseModal {
@@ -166,7 +166,7 @@ export class CreateWorldModal extends BaseModal {
         // world's (empty) contents are the visible surface.
         patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
         setSidebarModePref('elements');
-        navigate(this.link?.then === 'bring-in' ? importHash(entry.id) : worldHash(entry.id));
+        navigate(worldHash(entry.id));
       } catch (err) {
         // A refusal (no home folder, no permission) reads as itself; the rest
         // is worded.
