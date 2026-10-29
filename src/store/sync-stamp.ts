@@ -66,7 +66,7 @@ export function stampedBody(
  */
 /**
  * A local edit is this person's: who last wrote the element on the server
- * (`changed_by`, `changed_via`) no longer describes it, and the
+ * (`changed_by`, `changed_via`, `changed_client`) no longer describes it, and the
  * next push is made through Atlas's own door. Dropped on every edit, so the
  * quiet agent mark (#347, `src/core/agent-mark.ts`) never sits on a person's
  * change; the next pull brings keel's word back. `created_by` stays: the

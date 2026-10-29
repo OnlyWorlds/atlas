@@ -83,7 +83,8 @@ export interface FolderStore {
    */
   createElement(type: ElementType, data: Partial<Element>): Promise<Element>;
   /**
-   * Update an element. Stamps `local_updated_at = now()` on the merged result.
+   * Update an element. Stamps `local_updated_at` on the merged result with
+   * `editStamp`: now, or the server's stamp plus 1 ms when now is not later.
    * Preserves any existing `server_updated_at` unless explicitly cleared.
    */
   updateElement(id: string, patch: Partial<Element>): Promise<Element>;

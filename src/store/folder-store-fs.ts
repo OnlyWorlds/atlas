@@ -583,9 +583,11 @@ export class FsFolderStore implements FolderStore {
    *
    * Two extra jobs ride the same pass:
    * - Rename-crash dedupe: multiple files whose BODIES carry the same id
-   *   (atlas crashed between write-new and delete-old) — the survivor is the
-   *   latest `local_updated_at`, the rest are unlinked. Grouping is by body
-   *   id, so a same-named stranger can never be deleted as a "loser".
+   *   (a crash between two writes, or another tool's copy): the survivor is
+   *   the first file in code-point name order, as every reader of the format
+   *   serves it; a loser with the same content is unlinked, one that differs
+   *   goes to quarantine. Grouping is by body id, so a same-named stranger
+   *   can never be deleted as a "loser".
    * - Lazy tidy: a survivor whose filename isn't the canonical
    *   `<slug>--<tail>` form (legacy full-uuid files, hand-renamed files) is
    *   rewritten to the canonical name, once per type per open.
