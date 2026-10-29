@@ -46,10 +46,15 @@ html {
    ("folder_open") laid out wide and invisible, so every icon button was wider
    and then shrank, and a click aimed in that window landed beside its target
    (the e2e's lost Start a world clicks on a cold runner). Every
-   Material Symbols glyph is one em wide, so the box is the glyph's box. */
+   Material Symbols glyph is one em wide, so the box is the glyph's box.
+   It never shrinks: `overflow: hidden` lets a flex item shrink below its
+   content, and in a narrow button (the room nav's 28 px with a button's own
+   padding, the sidebar's type filters) every icon lost its right side, 4 px
+   of 18 (1.87.1 to 1.107.0; `tests/unit/icon-box.test.ts`). */
 .material-symbols-outlined {
   width: 1em;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 /* Open Sans — the OnlyWorlds ecosystem standard (--ow-font-sans in
@@ -16149,11 +16154,20 @@ body.atlas-share-fullpreview > * {
 .atlas-field-empty-row .atlas-field-label { color: var(--atlas-text-muted); transition: color 120ms ease; }
 .atlas-field-empty-row:hover .atlas-field-label { color: var(--atlas-text-soft); }
 
-/* Candidate-bearing empty link fields: the pick icon lifts a notch — there is
-   something in the world to connect here. */
+/* Candidate-bearing empty link fields: the pick icon lifts — there is
+   something in the world to connect here. With nothing to link yet it sits a
+   step further back (its click still creates one), so the two read apart at
+   a glance (Titus 2026-10-29: "barely noticeable"). */
 .atlas-link-pick-ready {
   color: var(--atlas-text-soft);
-  opacity: 0.9;
+  opacity: 1;
+}
+.atlas-link-pick-empty:not(.atlas-link-pick-ready) {
+  opacity: 0.72;
+}
+.atlas-link-pick-empty:not(.atlas-link-pick-ready):hover,
+.atlas-link-row-clickable:hover .atlas-link-pick-empty:not(.atlas-link-pick-ready) {
+  opacity: 1;
 }
 .atlas-link-pick-ready:hover {
   color: var(--atlas-accent-text);

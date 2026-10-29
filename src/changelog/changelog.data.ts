@@ -72,6 +72,18 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'A JSON export from the Data room no longer carries OnlyWorlds\' record of which member and which tool last wrote each element. That record describes the account world for its members and means nothing to whoever receives the file. Your world\'s folder keeps it.',
         tags: ['world'],
       },
+      {
+        id: 'icons-whole-again',
+        title: 'Icons are whole again',
+        body: 'Since 1.87.1 the icons in the room bar, the sidebar\'s type filters and a few other narrow buttons lost a sliver of their right side. They are drawn whole again.',
+        tags: ['layout', 'fix'],
+      },
+      {
+        id: 'link-icons-say-what-can-link',
+        title: 'A link field shows whether there is anything to link',
+        body: 'On an element\'s page, the icon at the end of an empty link field is now plainly brighter when the world has something to link there, and quieter when it has nothing yet. A click on the quiet one still makes one.',
+        tags: ['editor'],
+      },
     ],
   },
   {
