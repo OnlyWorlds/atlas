@@ -62,7 +62,7 @@ export function lensChoices(elements: readonly Element[]): LensChoice[] {
   return elements
     .filter(choosable)
     .map(el => ({ id: el.id, name: nameOf(el), template: isTemplate(el) }))
-    .sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '') || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 /** The chosen lens, checked before any reading: gone, no lens, or proposed reads as none. */

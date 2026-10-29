@@ -14,6 +14,8 @@ import {
 } from '../../src/core/web-lens';
 import { mountContextGraph, clearContextGraphLayoutMemo } from '../../src/tabs/right/context-pane-graph';
 import { rekeyRegistryEntry } from '../../src/registry/registry';
+import { mountContextToolbar } from '../../src/tabs/right/context-pane-toolbar';
+import { escapeOwned } from '../../src/core/escape-mark';
 
 beforeAll(() => {
   (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class { observe() {} disconnect() {} unobserve() {} };
@@ -236,5 +238,44 @@ describe('Keep a lens on <name>', () => {
     expect(lensOnAlone([el(34, 'construct', 'c', { ...base, locations: [keep.id] })], ada.id, 'characters')).toBeNull();
     expect(lensOnAlone([el(35, 'construct', 'd', { ...base, x_served_trimmed: ['characters'] })], ada.id, 'characters')).toBeNull();
     expect(lensOnAlone([el(36, 'construct', 'e', { ...base, subtype: 'Template' })], ada.id, 'characters')).toBeNull();
+  });
+});
+
+describe('the chip\'s list', () => {
+  function mountChip() {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const onChooseLens = vi.fn();
+    const handle = mountContextToolbar({
+      host,
+      initial: {
+        presentTypes: new Set(), hiddenTypes: new Set(), effectiveHop: 2, lockLayout: false,
+        lens: { chosen: null, choices: [{ id: lens.id, name: 'Two people', template: false }], keep: { name: 'Ada', busy: false } },
+      },
+      onToggleType: () => {}, onSetHop: () => {}, onToggleLockLayout: () => {}, onChooseLens,
+    });
+    host.querySelector<HTMLButtonElement>('[data-role="lens-chip"]')!.click();
+    return { host, handle, onChooseLens };
+  }
+
+  it('an Escape that closes the list is marked, so the drawer and deselect-to-home step aside', async () => {
+    mountChip();
+    await Promise.resolve();
+    expect(document.querySelector('[data-role="lens-menu"]')).not.toBeNull();
+    const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+    window.dispatchEvent(esc);
+    expect(document.querySelector('[data-role="lens-menu"]')).toBeNull();
+    expect(escapeOwned(esc)).toBe(true);
+    // With the list closed, the next Escape is nobody's mark.
+    const next = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+    window.dispatchEvent(next);
+    expect(escapeOwned(next)).toBe(false);
+  });
+
+  it('the list leaves the page with the toolbar', async () => {
+    const { handle } = mountChip();
+    await Promise.resolve();
+    handle.destroy();
+    expect(document.querySelector('[data-role="lens-menu"]')).toBeNull();
   });
 });
