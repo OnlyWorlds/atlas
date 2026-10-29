@@ -43,6 +43,7 @@ import { showProblem } from './problem-fixes';
 import { isProposed } from '../core/review-mark';
 import { webRingOne } from '../tabs/right/context-pane-graph';
 import { onWebDrawerReleased, openWebOn, webDrawerHolds } from './open-web';
+import { keepLensField } from '../core/web-lens';
 import {
   guideDots, guideElements, isFilled, lensNoteEarned, loadGuideState, markNoteSeen, newestOf, noteEarned, placeIdOf, rewardEarned,
   type EarnedNote, type Gesture, type Reward,
@@ -120,7 +121,7 @@ export function reportGesture(
   if (reward && !took) offer({ id: 'reading', character: reward.anchor, rider: reward }, worldId, how);
   // A world this size hears of lenses once, into a free slot (#841's P5).
   if (!showing && !pending) {
-    const lensNote = lensNoteEarned(gesture, els, entryOf(worldId)?.lens_note_at);
+    const lensNote = lensNoteEarned(gesture, els, entryOf(worldId)?.lens_note_at, ch => keepLensField(worldId, ch, true) !== null);
     if (lensNote) offer(lensNote, worldId, how);
   }
   if (!showing && !pending) tryCopy();

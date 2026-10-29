@@ -23,7 +23,7 @@
 import { getState, patchSlice, subscribe, type RightTabRef } from '../../core/state';
 import type { Element, ElementType, WorldRegistryEntry } from '../../core/types';
 import { ToastManager } from '../../ui/toast-manager';
-import { onHashChange, parseHash, type Route } from '../../core/router';
+import { elementHash, navigate, onHashChange, parseHash, type Route } from '../../core/router';
 import { saveRegistry } from '../../registry/registry';
 import { getTierForNarrative, isWritingNarrative } from '../../middle/writing-helpers';
 import { mountContextGraph, type GraphHandle, type HopDepth } from './context-pane-graph';
@@ -37,7 +37,7 @@ import { extractTemporalNodes } from '../../visualization/timeline/data-normaliz
 import { rankAnchors } from '../../visualization/timeline/degree';
 import { currentLore } from '../../core/parlor-room';
 import {
-  chosenLens, keepLensField, keepLensOn, keepingLens, lensChoices, lensLine, readLensPicture, setWebLens,
+  chosenLens, keepLensField, keepLensOn, keepingLens, lensChoices, lensLine, lensName, readLensPicture, setWebLens,
 } from '../../core/web-lens';
 import type { ToolbarLens } from './context-pane-toolbar';
 import { getActiveStore } from '../../core/active-store';
@@ -293,7 +293,7 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     const subject = currentRender.lensOnly ? null : currentRender.subject;
     const field = chosen ? null : keepLensField(worldId, subject, currentRender.focused);
     return {
-      chosen: chosen ? { id: chosen.id, name: readLensPicture(chosen).name } : null,
+      chosen: chosen ? { id: chosen.id, name: lensName(chosen) } : null,
       choices: lensChoices(els),
       keep: field && subject && worldId
         ? { name: subject.name?.trim() || 'Unnamed', busy: keepingLens(worldId, subject.id) }
@@ -310,13 +310,17 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     if (!worldId || !subject || !field || !store || keepingLens(worldId, subject.id)) return;
     const refreshToolbar = (): void => { toolbarHandle?.update(toolbarState(graphHandle?.getPresentTypes() ?? new Set())); };
     const name = subject.name?.trim() || 'Unnamed';
-    const run = keepLensOn(worldId, subject, field, store, () => refreshElementsAfterWrite(store));
+    const stillHere = (): boolean => getState().active?.worldId === worldId;
+    // The cache is refreshed only while the world is still open: another world's list never lands on it (C9).
+    const run = keepLensOn(worldId, subject, field, store, async () => { if (stillHere()) await refreshElementsAfterWrite(store); });
     refreshToolbar();
     try {
-      const id = await run;
-      if (id && getState().active?.worldId === worldId) {
-        setWebLens(worldId, id);
-        toasts.success(`${name}'s world is a lens now. The Web is reading it.`);
+      const kept = await run;
+      if (kept && stillHere()) {
+        setWebLens(worldId, kept.id);
+        toasts.success(kept.made
+          ? `${kept.name} is a lens now. The Web is reading it.`
+          : `${kept.name} already reads ${name}. The Web is reading it.`);
       }
     } catch (err) {
       showProblem(err, { doing: 'keeping the lens', toasts });
@@ -498,8 +502,10 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     function lensOpt(subjectEl: Element | null) {
       if (!lensEl) return undefined;
       const picture = readLensPicture(lensEl);
-      const line = lensLine(picture, subjectEl
-        ? { name: subjectEl.name?.trim() || 'This element', kept: picture.keptIds.includes(subjectEl.id) }
+      // A lens is never in its own reading: on its own page (Read this lens) the line names no subject (C2).
+      const named = subjectEl && subjectEl.id !== lensEl.id ? subjectEl : null;
+      const line = lensLine(picture, named
+        ? { name: named.name?.trim() || 'This element', kept: picture.keptIds.includes(named.id) }
         : null);
       const title = picture.unreadableKey ? `The setting Atlas can't read: ${picture.unreadableKey}` : undefined;
       return { picture, line, title };
@@ -518,10 +524,12 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
         ? emptyCopyForRoute(route)
         : (state.data.elements.length > 0 ? 'Element not found.' : 'Loading…');
       if (lensEl) {
+        // With no page to preview on, a press opens the element's page, where the Web keeps the lens (C5).
+        const openPressed = (id: string | null): void => { if (id && worldId) navigate(elementHash(worldId, id)); };
         currentRender = { ...currentRender, subject: null, focused: false, lensOnly: true };
         setCaption(null);
         graphHandle = mountContextGraph({
-          host: graphSlot, subject: lensEl, onSelect: id => graphHandle?.highlight(id),
+          host: graphSlot, subject: lensEl, onSelect: openPressed,
           lens: lensOpt(null), onRender: handleGraphRender,
         });
         mountToolbar();

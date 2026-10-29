@@ -15561,17 +15561,17 @@ a.atlas-share-map-pin { cursor: pointer; }
   margin-bottom: 8px;
 }
 .atlas-home-picture-head .atlas-home-section-title { margin: 0; }
-/* A finger's target (#945): the link's hit area grows to about 46 px tall, unseen, so
-   its words and focus ring stay as they are. It leans up: the picture below keeps its own presses. */
+/* A finger's target (#945): the link's hit area grows to about 46 px tall (44 measured), unseen, so
+   its words and focus ring stay as they are. It leans up: below, it reaches only into the picture's empty top margin, whose presses do nothing. */
 @media (pointer: coarse), (max-width: 760px) {
-  .atlas-home-picture-see { position: relative; }
+  .atlas-home-picture-see { position: relative; z-index: 1; }
   .atlas-home-picture-see::before {
     content: '';
     position: absolute;
     left: 0;
     right: 0;
     top: -24px;
-    bottom: -8px;
+    bottom: -14px;
   }
 }
 .atlas-context-pane-graph.atlas-home-picture-graph {

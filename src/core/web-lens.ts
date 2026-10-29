@@ -28,6 +28,8 @@ import { isHiddenMark } from './hidden-mark';
 import { worldIsViewOnly } from './view-only';
 import { isMoppetopiaOpen } from './moppetopia';
 import { isTourFlagActive } from '../tour/tour-flag';
+import { isKeptHere } from '../sync/sync-attach';
+import { PlainError } from './plain-error';
 
 /** The Web draws at most this many of a lens's kept elements, the first in the reading's order. */
 export const LENS_DRAW_MAX = 60;
@@ -48,7 +50,8 @@ export interface LensChoice {
   template: boolean;
 }
 
-function nameOf(el: Element): string {
+/** A lens's name as the chip and the line say it. */
+export function lensName(el: Element): string {
   return (typeof el.name === 'string' && el.name.trim()) || 'Unnamed lens';
 }
 
@@ -61,7 +64,7 @@ export function choosable(el: Element | undefined): el is Element {
 export function lensChoices(elements: readonly Element[]): LensChoice[] {
   return elements
     .filter(choosable)
-    .map(el => ({ id: el.id, name: nameOf(el), template: isTemplate(el) }))
+    .map(el => ({ id: el.id, name: lensName(el), template: isTemplate(el) }))
     .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '') || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -110,7 +113,7 @@ function anchorIdsOf(lens: Element): string[] {
 
 /** Read a lens for the Web. Pure: nothing is written. */
 export function readLensPicture(lens: Element, elements: readonly Element[] = getState().data.elements): LensPicture {
-  const base = { lensId: lens.id, name: nameOf(lens), unreadableKey: null, kept: 0, keptIds: [], drawn: [], edges: [], anchors: [], cut: {} };
+  const base = { lensId: lens.id, name: lensName(lens), unreadableKey: null, kept: 0, keptIds: [], drawn: [], edges: [], anchors: [], cut: {} };
   if (isTemplate(lens)) return { ...base, kind: 'template' };
   const world = lensWorld(elements);
   let reading;
@@ -204,14 +207,23 @@ function worldTakesALens(worldId: string): boolean {
  * Whether Keep a lens on <subject> is offered, and in which field the subject
  * goes. `focused`: the person opened this element, the pane did not pick it.
  * A hidden subject is never offered: a lens would carry its name into a
- * visible Construct (the profile's leak law).
+ * visible Construct (the profile's leak law). Nor is one this copy keeps
+ * outside the key's view online (conv. 151): the push leaves its link out, so
+ * keel would hold its name on a lens with no anchor, which reads the whole
+ * world (the code gate's C1).
  */
 export function keepLensField(worldId: string | null | undefined, subject: Element | null, focused: boolean): string | null {
   if (!worldId || !subject || !focused) return null;
   const field = LENS_ANCHOR_FIELD[subject.type as ElementType];
   if (!field) return null;
   if (isLens(subject) || isRoomElement(subject) || handsOnAsProposed(subject) || isHiddenMark(subject)) return null;
+  if (isKeptHere(worldId, subject.id)) return null;
   return worldTakesALens(worldId) ? field : null;
+}
+
+/** The ids a push leaves out of every link (the engine's `linkHeld`): kept outside the view, left it, or held hidden. */
+function heldFromPush(s: { kept_outside_view?: string[]; left_view?: string[]; hidden_held?: string[] }): Set<string> {
+  return new Set([...(s.kept_outside_view ?? []), ...(s.left_view ?? []), ...(s.hidden_held ?? [])]);
 }
 
 /** An `x_lens` that is no recipe: absent, null or an empty object. */
@@ -246,30 +258,44 @@ export function keepingLens(worldId: string, anchorId: string): boolean {
 export interface LensStore {
   listElements(): Promise<Element[]>;
   createElement(type: ElementType, data: Partial<Element>): Promise<Element>;
+  readSyncState?(): Promise<{ kept_outside_view?: string[]; left_view?: string[]; hidden_held?: string[] }>;
+}
+
+/** The lens that now reads the subject, and whether this press made it (false: one was there already). */
+export interface KeptLens {
+  id: string;
+  name: string;
+  made: boolean;
 }
 
 /**
- * Keep a lens on the subject: the id of the lens that now reads it, made or
- * found. Null when a write for this anchor is already running. The store is
- * read again first, so a lens a second tab made is chosen, not made twice.
+ * Keep a lens on the subject: the lens that now reads it, made or found. Null
+ * when a write for this anchor is already running. The store is read again
+ * first: a lens already there is chosen, not made twice, and the sync state
+ * is asked whether a push would leave the subject's link out (the code gate's
+ * C1), which refuses in words. (Two tabs on one world are kept apart by the
+ * world's lock; this re-read covers a lens made since this view drew.)
  * `refresh` runs after a write (the cache and the push).
  */
 export async function keepLensOn(
   worldId: string, subject: Element, field: string, store: LensStore,
   refresh: () => Promise<unknown>,
-): Promise<string | null> {
+): Promise<KeptLens | null> {
   const key = `${worldId}|${subject.id}`;
   if (keeping.has(key)) return null;
   keeping.add(key);
   try {
     const found = lensOnAlone(await store.listElements(), subject.id, field);
-    if (found) return found.id;
-    const name = (typeof subject.name === 'string' && subject.name.trim()) || 'Unnamed';
+    if (found) return { id: found.id, name: lensName(found), made: false };
+    if (store.readSyncState && heldFromPush(await store.readSyncState()).has(subject.id)) {
+      throw new PlainError('This element is kept only in this copy, outside what OnlyWorlds shows you, so a lens on it cannot go online with it.');
+    }
+    const name = `${(typeof subject.name === 'string' && subject.name.trim()) || 'Unnamed'}'s world`;
     const created = await store.createElement('construct', {
-      name: `${name}'s world`, supertype: 'Lens', [field]: [subject.id],
+      name, supertype: 'Lens', [field]: [subject.id],
     } as Partial<Element>);
     await refresh();
-    return created.id;
+    return { id: created.id, name, made: true };
   } finally {
     keeping.delete(key);
   }

@@ -137,6 +137,8 @@ function bindDeeperEscape(): void {
     if (document.querySelector('.atlas-modal-overlay')) return;
     const t = e.target;
     if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    // The Web's lens list, open over the page, owns this Escape (the lens code gate's C11).
+    if (t instanceof Element && t.closest('[data-role="lens-menu"]')) return;
     if (closeDeeperFlyout()) { e.preventDefault(); e.stopPropagation(); }
   };
   window.addEventListener('keydown', deeperEscapeHandler, true);

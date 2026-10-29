@@ -37,6 +37,7 @@ import { bulkLinkTerm } from '../../middle/writing-bulk-link';
 import { getWritingLabels } from '../../middle/writing-helpers';
 import { toastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
+import { escapeOwned } from '../../core/escape-mark';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -65,7 +66,8 @@ export function mountContextPreview(opts: ContextPreviewOpts): ContextPreviewHan
   let currentEl: Element | null = null;
 
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && currentEl) {
+    // An Escape the Web's lens list closed itself with is that list's alone (the lens code gate's C3).
+    if (e.key === 'Escape' && currentEl && !escapeOwned(e)) {
       e.preventDefault();
       onClose();
     }

@@ -61,6 +61,24 @@ export const CHANGELOG: ChangelogRelease[] = [
     theme: 'Read your world through a lens',
     entries: [
       {
+        id: 'web-lens',
+        title: 'Read your world through a lens on the Web',
+        body: 'The Web has a Lens choice: None, or any lens in your world, such as one made on the Lenses page of onlyworlds.com. With a lens chosen the Web shows what that lens keeps, and a line under it says how many it keeps and why the rest were left out. A lens\'s own page has Read this lens. The choice is kept on this computer for each world and never changes the world.',
+        tags: ['web', 'lens'],
+      },
+      {
+        id: 'keep-a-lens',
+        title: 'Keep a lens on someone',
+        body: 'On the Web of an element you opened, the Lens list offers Keep a lens on <name>. It saves a lens of that element and what links to it or from it, as a Construct in your world, and the Web reads through it at once. A world of forty or more elements with no lens yet says so once.',
+        tags: ['web', 'lens'],
+      },
+      {
+        id: 'home-picture-link-below',
+        title: 'See a world\'s link answers a thumb under its words too',
+        body: 'On a phone, the link above the picture on a world\'s home now answers a tap a little under its words as well as above them, where the picture\'s edge used to take it.',
+        tags: ['home', 'layout'],
+      },
+      {
         id: 'calendar-odd-format',
         title: 'A calendar from another tool with an unusual format opens and saves',
         body: 'A calendar whose date format was set by another tool to something other than text now opens in the calendar builder with the format blank, prints dates in the default way, and saves without an error. The stored value stays until you type a format of your own.',

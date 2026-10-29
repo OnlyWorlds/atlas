@@ -176,11 +176,12 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
   let menu: HTMLElement | null = null;
 
   function closeMenu(): void {
+    // The listeners go even with no list drawn: an add still queued checks the list it was for (C8).
+    document.removeEventListener('mousedown', onDocDown, true);
+    window.removeEventListener('keydown', onMenuKey, true);
     if (!menu) return;
     menu.remove();
     menu = null;
-    document.removeEventListener('mousedown', onDocDown, true);
-    window.removeEventListener('keydown', onMenuKey, true);
   }
   function onDocDown(e: MouseEvent): void {
     const t = e.target as Node;
@@ -204,7 +205,8 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
     for (const [k, v] of Object.entries(attrs)) item.setAttribute(k, v);
     item.textContent = label;
     if (opts.disabled) item.disabled = true;
-    item.addEventListener('click', () => { onClick(); closeMenu(); });
+    // Closed first: the choice redraws the toolbar, which would draw an open list again.
+    item.addEventListener('click', () => { closeMenu(); onClick(); });
     return item;
   }
 
@@ -238,6 +240,7 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
       m.style.left = `${Math.round(Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)))}px`;
     }
     queueMicrotask(() => {
+      if (menu !== m) return;
       document.addEventListener('mousedown', onDocDown, true);
       window.addEventListener('keydown', onMenuKey, true);
     });

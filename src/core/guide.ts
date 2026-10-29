@@ -119,11 +119,15 @@ export const LENS_NOTE_AT = 40;
  * registry entry (`lens_note_at`), never in the browser-wide `seen`. The
  * note names the newest Character, whose web it opens (none: no button).
  */
-export function lensNoteEarned(gesture: Gesture, all: readonly Element[], stampedAt: string | undefined): EarnedNote | null {
+export function lensNoteEarned(
+  gesture: Gesture, all: readonly Element[], stampedAt: string | undefined,
+  canAnchor: (character: Element) => boolean = () => true,
+): EarnedNote | null {
   if (gesture.kind !== 'created' || stampedAt) return null;
   const els = guideElements(all);
   if (els.length < LENS_NOTE_AT || all.some(e => isLens(e))) return null;
-  const ch = newestOf(els.filter(e => e.type === 'character'));
+  // Only a Character Keep a lens can take: the note says "keep a lens on them" (the code gate's C6).
+  const ch = newestOf(els.filter(e => e.type === 'character' && canAnchor(e)));
   return { id: 'lens', ...(ch ? { character: ch.id } : {}) };
 }
 

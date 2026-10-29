@@ -219,7 +219,7 @@ describe('Keep a lens on <name>', () => {
     await vi.waitFor(() => expect(store.createElement).toHaveBeenCalledTimes(1));
     expect(store.createElement).toHaveBeenCalledWith('construct', { name: "Ada's world", supertype: 'Lens', characters: [ada.id] });
     resolveCreate(el(30, 'construct', "Ada's world", { supertype: 'Lens', characters: [ada.id] }));
-    expect(await first).toBe(id(30));
+    expect(await first).toEqual({ id: id(30), name: "Ada's world", made: true });
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(keepingLens('w1', ada.id)).toBe(false);
   });
@@ -227,7 +227,7 @@ describe('Keep a lens on <name>', () => {
   it('chooses a lens that already is exactly this one, and writes nothing', async () => {
     const mine = el(31, 'construct', "Ada's world", { supertype: 'Lens', characters: [ada.id], x_lens: {} });
     const store = { listElements: vi.fn(async () => [...world, mine]), createElement: vi.fn() };
-    expect(await keepLensOn('w1', ada, 'characters', store as never, async () => {})).toBe(mine.id);
+    expect(await keepLensOn('w1', ada, 'characters', store as never, async () => {})).toEqual({ id: mine.id, name: "Ada's world", made: false });
     expect(store.createElement).not.toHaveBeenCalled();
   });
 
