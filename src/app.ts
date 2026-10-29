@@ -22,6 +22,7 @@ import { mountKnowledgeRoom } from './middle/knowledge-room';
 import { mountShareRoom } from './middle/share-room';
 import { mountImportRoom } from './middle/import-room';
 import { mountRoomNav } from './middle/room-nav';
+import { noteRoomVisit } from './core/guide-path';
 import { mountRightPane } from './tabs/right/right-pane';
 import { installContextTabLifecycle } from './tabs/right/context-tab-lifecycle';
 import { openMapTab } from './tabs/right/map-index-tab';
@@ -409,6 +410,8 @@ export function startApp(container: HTMLElement): AppHandle {
       mountedWorldId = nextWorldId;
       unmountMiddle = mountRoom(nextMode, shell.middleContent, toasts);
       patchSliceIfChanged('middleMode', nextMode);
+      // The guide's path counts a room seen here, its one mount (#964's G10), for the world the route names (the gate's C4).
+      noteRoomVisit(nextMode, route.worldId === nextWorldId ? nextWorldId : null);
     }
 
     // Mid-session activation is intentionally NOT automatic — without a fresh

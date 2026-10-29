@@ -16035,11 +16035,8 @@ body.atlas-share-fullpreview > * {
   border: none;
   border-radius: 6px;
   color: var(--atlas-text-soft);
-  cursor: pointer;
   font: inherit;
 }
-.atlas-guide-mark:hover,
-.atlas-guide-mark:focus-visible { background: var(--atlas-bg-hover); color: var(--atlas-text); }
 .atlas-guide-dot {
   width: 14px;
   height: 14px;
@@ -16079,6 +16076,64 @@ body.atlas-share-fullpreview > * {
   .atlas-guide-marks { gap: 0; }
   .atlas-guide-mark { padding-left: 0; padding-right: 0; }
   .atlas-guide-mark-label { font-size: 0.68rem; letter-spacing: -0.01em; }
+}
+
+/* The guide's block (#964): one head row in every state (Back slot, heading, ×), the
+   two doors, Bring in's ways, and the step card under the bar. The drawn states sheet
+   (2026-10-29) is the visual spec. */
+.atlas-guide-head { align-items: center; height: 34px; margin: -6px 0 10px; }
+.atlas-guide-head .atlas-home-have-title { margin: 0; }
+/* The Back slot collapses when there is no Back: the heading starts where the content does. */
+.atlas-guide-back-slot { display: flex; align-items: center; flex: none; }
+.atlas-guide-back-slot:empty { display: none; }
+.atlas-guide-back { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; padding: 4px 0; }
+.atlas-guide-back .material-symbols-outlined { font-size: 16px; }
+/* The doors hold the path's height, so pressing Start from nothing never grows the block. */
+.atlas-guide-block[data-state="doors"] { min-height: 236px; display: flex; flex-direction: column; }
+.atlas-guide-doors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.atlas-guide-door {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--atlas-text);
+  background: rgba(var(--atlas-accent-rgb), 0.05);
+  border: 1px solid var(--atlas-divider-strong);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.atlas-guide-door:hover,
+.atlas-guide-door:focus-visible { border-color: var(--atlas-cyan-soft); background: rgba(var(--atlas-accent-rgb), 0.09); }
+.atlas-guide-door-title { font-size: 14px; font-weight: 600; }
+.atlas-guide-door-line { font-size: 13px; line-height: 1.45; color: var(--atlas-text-muted); }
+.atlas-guide-way {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) 1fr;
+  gap: 6px 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--atlas-divider);
+}
+.atlas-guide-way:first-child { border-top: 0; padding-top: 0; }
+.atlas-guide-way > button { justify-self: start; }
+.atlas-guide-way .atlas-home-have-line { margin: 0; max-width: none; font-size: 13px; line-height: 1.5; }
+.atlas-guide-card { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--atlas-divider); }
+.atlas-guide-card-line { margin: 0 0 10px; max-width: 520px; font-size: 14px; line-height: 1.5; color: var(--atlas-text); }
+.atlas-guide-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.atlas-guide-card-actions button { font-size: 13px; padding: 6px 14px; }
+@container (max-width: 460px) {
+  .atlas-guide-doors { grid-template-columns: 1fr; }
+}
+@container (max-width: 520px) {
+  .atlas-guide-way { grid-template-columns: 1fr; }
+}
+/* Touch: the doors, Back and the card's buttons take a thumb (1.105.1's precedent). */
+@media (pointer: coarse) {
+  .atlas-guide-door, .atlas-guide-card-actions button, .atlas-guide-way > button { min-height: 44px; }
+  .atlas-guide-back { min-height: 44px; padding: 0 8px 0 0; }
+  .atlas-guide-head { height: 44px; }
 }
 
 .atlas-guide-slot {

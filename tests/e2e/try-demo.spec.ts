@@ -122,7 +122,7 @@ async function tryDemoOpensACopy(page: Page) {
   await expect(demoLine).toBeVisible();
   await expect(demoLine.locator('[data-action="demo-delete"]')).toBeVisible();
   // A world to look at: its dots stay quiet, though this one has no story to light them all.
-  await expect(page.locator('[data-role="guide-strip"]')).toHaveCount(0);
+  await expect(page.locator('[data-role="guide-block"]')).toHaveCount(0);
 
   // Editable: a new element and an edit land on disk.
   await page.evaluate(async () => {

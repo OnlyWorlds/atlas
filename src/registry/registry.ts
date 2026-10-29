@@ -114,6 +114,11 @@ export function storedRegistry(): WorldsRegistry {
   return readRegistry();
 }
 
+/** A world's entry as stored now, which another tab may have moved on: read only, this tab's merge base untouched. */
+export function storedWorldEntry(worldId: string): WorldRegistryEntry | undefined {
+  return readRegistry().worlds.find(w => w.id === worldId);
+}
+
 function readRegistry(): WorldsRegistry {
   try {
     const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);

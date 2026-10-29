@@ -45,9 +45,10 @@ import { webRingOne } from '../tabs/right/context-pane-graph';
 import { onWebDrawerReleased, openWebOn, webDrawerHolds } from './open-web';
 import { keepLensField } from '../core/web-lens';
 import {
-  guideDots, guideElements, isFilled, lensNoteEarned, loadGuideState, markNoteSeen, newestOf, noteEarned, placeIdOf, rewardEarned,
-  type EarnedNote, type Gesture, type Reward,
+  guideDots, guideElements, isFilled, lensNoteEarned, loadGuideState, markNoteSeen, newestOf, noteEarned, PATH_NOTES, placeIdOf, rewardEarned,
+  type EarnedNote, type Gesture, type NoteId, type Reward,
 } from '../core/guide';
+import { pathShowing } from '../core/guide-path';
 
 interface Showing {
   note: EarnedNote;
@@ -79,13 +80,16 @@ let lastElements: unknown = null;
 const activeWorldId = (): string | null => getState().active?.worldId ?? null;
 const entryOf = (worldId: string) => getState().registry.worlds.find(w => w.id === worldId);
 
-/** The states in which no note speaks (a mark's own press is the person asking, and passes `forced`). */
-function silent(worldId: string): boolean {
+/**
+ * The states in which a note does not speak (a forced offer is the person asking). While the
+ * path shows, its card is the one voice: the eight path notes are silent in every room (#964).
+ */
+function silent(worldId: string, noteId?: NoteId): boolean {
   const entry = entryOf(worldId);
   // The tour's sandbox and Moppetopia are worlds to look at: no note speaks in either (#840's gate, G2).
   if (!entry || entry.demo === true || isMoppetopiaOpen(worldId) || worldIsViewOnly(worldId) || isTourFlagActive()) return true;
   if (entry.tour_dismissed?.includes('home-cards')) return true;
-  return false;
+  return !!noteId && PATH_NOTES.includes(noteId) && pathShowing(worldId);
 }
 
 function speaksCalendar(): boolean {
@@ -158,13 +162,55 @@ function earnReading(worldId: string, anchorId: string | null, elementId: string
   return rewardEarned(guideDots(els, entryOf(worldId)), anchor.id, readingRing(worldId, anchor), elementId, placeIdOf(anchor));
 }
 
-/** The Somewhere mark's press: the offer, whatever `seen` and the switch say, never stamped. */
-export function showPlaceOffer(character: string, location: string): void {
+/**
+ * The path card's Place (#964's G3): the same write as the offer's, into an empty
+ * `location` only, on the ids the card drew, then the gesture, so #840's reward can earn.
+ */
+export async function placeFromCard(worldId: string, character: string, location: string): Promise<boolean> {
   wire();
-  const worldId = activeWorldId();
-  if (!worldId) return;
-  offer({ id: 'place-offer', character, location }, worldId, { fromAction: false, forced: true });
+  const wrote = await writePlace(worldId, character, location);
+  if (wrote === 'wrote') reportGesture({ kind: 'location-set', character }, { fromAction: true });
+  return wrote !== 'failed';
 }
+
+/** The path card's Were there (#964's G4): the note's write, then the reward it may have earned, spoken alone. */
+export async function wereThereFromCard(worldId: string, event: string, pair: { character: string; location: string }): Promise<boolean> {
+  wire();
+  const wrote = await writeWereThere(worldId, event, pair);
+  if (wrote === 'wrote') {
+    const reward = earnReading(worldId, pair.character, event);
+    if (reward) offer({ id: 'reading', character: reward.anchor, rider: reward }, worldId, { fromAction: true, forced: false });
+  }
+  return wrote !== 'failed';
+}
+
+/** The path card's Start a story (#964's G12): a Narrative made from it takes the world's first writing label, if it has no supertype. */
+export async function labelStoryFromCard(worldId: string, narrative: string, label: string): Promise<void> {
+  await writeIfEmpty(worldId, narrative, ex =>
+    ex.type !== 'narrative' || isFilled((ex as { supertype?: unknown }).supertype) ? null : { supertype: label } as Partial<Element>);
+}
+
+/** Stamp the path's notes seen once its card has said them all (the path's Done, #964's N2). */
+export function stampPathNotesSeen(): void {
+  for (const id of PATH_NOTES) markNoteSeen(id);
+}
+
+const writePlace = (worldId: string, character: string, location: string) =>
+  writeIfEmpty(worldId, character, ex =>
+    isFilled((ex as { location?: unknown }).location) ? null : { location } as Partial<Element>);
+
+/** Were there: the pair joins the Event's own lists, read as ids whatever shape another tool wrote, written back as ids. */
+const writeWereThere = (worldId: string, event: string, pair: { character: string; location: string }) =>
+  writeIfEmpty(worldId, event, ex => {
+    const r = ex as Record<string, unknown>;
+    const chars = linkIdsOf(r.characters);
+    const locs = linkIdsOf(r.locations);
+    if (chars.includes(pair.character) && locs.includes(pair.location)) return null;
+    return {
+      characters: chars.includes(pair.character) ? chars : [...chars, pair.character],
+      locations: locs.includes(pair.location) ? locs : [...locs, pair.location],
+    } as Partial<Element>;
+  });
 
 /** Whether the note drew, or waits for a dialog to close. */
 function offer(note: EarnedNote, worldId: string, how: { fromAction: boolean; forced: boolean }): boolean {
@@ -172,7 +218,7 @@ function offer(note: EarnedNote, worldId: string, how: { fromAction: boolean; fo
   // hashchange has not run yet (a create that navigated), and it must not block this one.
   if (showing && showing.drawnHash !== window.location.hash) { showing.node.remove(); showing = null; }
   if (!how.forced) {
-    if (silent(worldId)) return false;
+    if (silent(worldId, note.id)) return false;
     const s = loadGuideState();
     if (s.off || s.seen[note.id]) return false;
     // One at a time: dropped, never stamped, so a later gesture can earn it.
@@ -201,7 +247,7 @@ function tryCopy(): void {
   // Nor under the Web's drawer, from the press that opens it until it closes (#840's C1).
   if (showing || pending || acting || webDrawerHolds()) return;
   const worldId = activeWorldId();
-  if (!worldId || copyEarnedIn !== worldId || silent(worldId)) return;
+  if (!worldId || copyEarnedIn !== worldId || silent(worldId, 'copy')) return;
   const s = loadGuideState();
   if (s.off || s.seen.copy) return;
   if (keepSafeShowing(worldId) || guideDots(getState().data.elements, entryOf(worldId)).copy) return;
@@ -347,9 +393,7 @@ function fill(): void {
     case 'place-offer':
       line.textContent = `${ch} and ${loc}: place one in the other?`;
       act('place', `Place ${ch} at ${loc}`, async () => {
-        const target = note.location!;
-        const wrote = await writeIfEmpty(note.character!, ex =>
-          isFilled((ex as { location?: unknown }).location) ? null : { location: target } as Partial<Element>);
+        const wrote = await writePlace(worldId, note.character!, note.location!);
         if (wrote === 'wrote') reportGesture({ kind: 'location-set', character: note.character! }, { fromAction: true });
         if (showing?.note === note) leave();
       });
@@ -367,17 +411,7 @@ function fill(): void {
         const pc = nameOf(pair.character, 'character');
         const pl = nameOf(pair.location, 'location');
         act('were-there', `${pc} and ${pl} were there`, async () => {
-          const wrote = await writeIfEmpty(note.event!, ex => {
-            // Read as ids, whatever shape another tool wrote, and written back as ids.
-            const r = ex as Record<string, unknown>;
-            const chars = linkIdsOf(r.characters);
-            const locs = linkIdsOf(r.locations);
-            if (chars.includes(pair.character) && locs.includes(pair.location)) return null;
-            return {
-              characters: chars.includes(pair.character) ? chars : [...chars, pair.character],
-              locations: locs.includes(pair.location) ? locs : [...locs, pair.location],
-            } as Partial<Element>;
-          });
+          const wrote = await writeWereThere(worldId, note.event!, pair);
           // Were there can be what gave the pair's Character its web (#840's C2): the button joins this note.
           if (wrote === 'wrote' && showing?.note === note) {
             const reward = earnReading(worldId, pair.character, note.event!);
@@ -387,7 +421,7 @@ function fill(): void {
           fill();
         });
       }
-      if (note.askYear && ev && !isFilled(ev.start_date)) addYear(actions, note);
+      if (note.askYear && ev && !isFilled(ev.start_date)) addYear(actions, note, worldId);
       break;
     }
     case 'dated': {
@@ -401,7 +435,7 @@ function fill(): void {
       line.textContent = 'A Narrative is a story that is told.';
       act('write', `Write it as a ${labels.l1.toLowerCase()}`, async () => {
         const id = note.narrative!;
-        const made = await writeIfEmpty(id, ex => (isFilled((ex as { supertype?: unknown }).supertype) ? null : { supertype: labels.l1 } as Partial<Element>));
+        const made = await writeIfEmpty(worldId, id, ex => (isFilled((ex as { supertype?: unknown }).supertype) ? null : { supertype: labels.l1 } as Partial<Element>));
         // A write that failed has said so (showProblem): no move to a room that cannot hold it.
         if (made === 'failed') { if (showing?.note === note) leave(); return; }
         const el = elementOf(id);
@@ -525,7 +559,7 @@ async function runAction(run: () => void | Promise<void>): Promise<void> {
 const YEAR = /^-?\d+$/;
 
 /** Year [ ] Set year: a whole number only, written only when the Event has none. */
-function addYear(actions: HTMLElement, note: EarnedNote): void {
+function addYear(actions: HTMLElement, note: EarnedNote, worldId: string): void {
   const wrap = document.createElement('span');
   wrap.className = 'atlas-guide-note-year';
   const label = document.createElement('label');
@@ -553,7 +587,7 @@ function addYear(actions: HTMLElement, note: EarnedNote): void {
       err.hidden = false;
       return;
     }
-    const wrote = await writeIfEmpty(note.event!, ex =>
+    const wrote = await writeIfEmpty(worldId, note.event!, ex =>
       isFilled((ex as { start_date?: unknown }).start_date) ? null : { start_date: year } as Partial<Element>);
     if (wrote === 'wrote') reportGesture({ kind: 'date-set', event: note.event! }, { fromAction: true, pair: note.pair });
     if (showing?.note === note) leave();
@@ -569,10 +603,10 @@ function addYear(actions: HTMLElement, note: EarnedNote): void {
  * is on disk, inside its lock, and returns null to write nothing. A failure
  * is said (showProblem) and answered 'failed', so no action moves on from it.
  */
-async function writeIfEmpty(id: string, mutate: (existing: Element) => Partial<Element> | null): Promise<'wrote' | 'nothing' | 'failed'> {
-  const worldId = showing?.worldId;
+async function writeIfEmpty(worldId: string, id: string, mutate: (existing: Element) => Partial<Element> | null): Promise<'wrote' | 'nothing' | 'failed'> {
   const store = getActiveStore();
-  if (!store || !worldId || activeWorldId() !== worldId) return 'nothing';
+  // The world the caller drew in (a note's, the card's), and only while it is still the open one.
+  if (!store || activeWorldId() !== worldId) return 'nothing';
   let wrote = false;
   try {
     await store.updateElementWith(id, ex => {
@@ -606,6 +640,8 @@ function wire(): void {
     }
     if (showing && (worldIsViewOnly(worldId) || isTourFlagActive()
       || entryOf(showing.worldId)?.tour_dismissed?.includes('home-cards'))) { clear(); return; }
+    // The path started (a delete brought its block back): a path note showing gives way to the card (#964's G9).
+    if (showing && PATH_NOTES.includes(showing.note.id) && pathShowing(showing.worldId)) { clear(); return; }
     const els = getState().data.elements;
     if (els !== lastElements) {
       lastElements = els;

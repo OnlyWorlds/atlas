@@ -95,10 +95,33 @@ async function watchNotes(page: Page) {
 }
 const notesDrawn = (page: Page): Promise<string[]> => page.evaluate(() => (window as any).__notes);
 
-/** Ada, Hollow Keep, and Ada placed there, each by hand from the strip; the placed note left showing. */
+/** The open world's registry entry patched; `guide_step: 'done'` is a world past the guide's path, where the notes speak (#964). */
+async function patchEntry(page: Page, patch: Record<string, unknown>) {
+  await page.evaluate(async (p) => {
+    const { getState, patchSlice } = await import('/src/core/state.ts');
+    const reg = await import('/src/registry/registry.ts');
+    const s = getState();
+    const next = (reg as any).updateWorldEntry(s.registry, s.active!.worldId, p);
+    (reg as any).saveRegistry(next);
+    patchSlice('registry', next);
+  }, patch);
+}
+const pastThePath = (page: Page) => patchEntry(page, { guide_step: 'done' });
+
+/** The create dialog as Anything else opens it (any width, no sidebar). */
+async function openCreate(page: Page) {
+  await page.evaluate(async () => {
+    const { ElementCreateModal } = await import('/src/ui/element-create-modal.ts');
+    const { toastManager } = await import('/src/ui/toast-manager.ts');
+    new ElementCreateModal(toastManager, { suppressNavigate: true }).open();
+  });
+}
+
+/** Past the path: Ada, Hollow Keep, and Ada placed there, each by hand; the placed note left showing. */
 async function adaPlaced(page: Page) {
-  await page.click('[data-dot="someone"]');
-  await createInModal(page, 'Ada');
+  await pastThePath(page);
+  await openCreate(page);
+  await createInModal(page, 'Ada', 'character');
   await expect(note(page)).toHaveAttribute('data-note', 'someone');
   await note(page).locator('[data-note-action="add-place"]').click();
   await createInModal(page, 'Hollow Keep');
@@ -108,7 +131,38 @@ async function adaPlaced(page: Page) {
   await expect(seeWorld(page)).toHaveCount(0);
 }
 
-test('the reward speaks once, on the year that made Ada\'s web, and opens the Web on her', async ({ page }) => {
+test('on the path, by the card alone: Were there gives Ada her web, and the reward speaks alone (#964\'s G4)', async ({ page }) => {
+  await setupWorld(page);
+  await watchNotes(page);
+  const step = (verb: string) => page.locator(`[data-role="guide-card"] [data-step-action="${verb}"]`);
+  await page.click('[data-guide-door="nothing"]');
+  await step('create-character').click();
+  await createInModal(page, 'Ada');
+  await step('next').click();
+  await step('create-location').click();
+  await createInModal(page, 'Hollow Keep');
+  await step('place').click();
+  await step('next').click();
+  await step('create-event').click();
+  const modal = page.locator('[data-modal="create-element"]');
+  await page.fill('input[name="element-name"]', 'The Founding');
+  await modal.locator('input[name="element-date"]').fill('120');
+  await modal.locator('[data-action="create"]').click();
+  await expect(modal).toHaveCount(0);
+  // Placed and dated, but the Event names neither: no web yet, and no path note on the way.
+  await expect(note(page)).toHaveCount(0);
+  await step('were-there').click();
+  await expect(note(page)).toHaveAttribute('data-note', 'reading');
+  await expect(note(page)).toContainText('Ada, Hollow Keep and The Founding are linked now.');
+  await expect(seeWorld(page)).toHaveText("See Ada's world");
+  expect(await notesDrawn(page)).toEqual(['reading']);
+  const ada = await element(page, 'Ada');
+  await seeWorld(page).click();
+  await expect(page).toHaveURL(new RegExp(`/element/${ada.id}$`));
+  await expect(webNodes(page)).toHaveCount(3);
+});
+
+test('past the path: the reward speaks once, on the year that made Ada\'s web, and opens the Web on her', async ({ page }) => {
   await setupWorld(page);
   await watchNotes(page);
   await adaPlaced(page);
@@ -153,7 +207,7 @@ test('a browser that has seen the reward: the same path draws the year\'s note w
   await page.evaluate(() => localStorage.setItem('atlas_guide_v1', JSON.stringify({ seen: { reading: '2026-10-29T00:00:00.000Z' }, off: false })));
   await adaPlaced(page);
   await note(page).locator('[data-note-close]').click();
-  await page.click('[data-role="guide-strip"] [data-create-any]');
+  await openCreate(page);
   await createInModal(page, 'The Founding', 'event');
   await note(page).locator('[data-note-action="were-there"]').click();
   await note(page).locator('.atlas-guide-note-year-input').fill('120');
@@ -167,7 +221,7 @@ test('the year\'s own note seen before: the reward speaks alone, naming what is 
   await page.evaluate(() => localStorage.setItem('atlas_guide_v1', JSON.stringify({ seen: { dated: '2026-10-29T00:00:00.000Z' }, off: false })));
   await adaPlaced(page);
   await note(page).locator('[data-note-close]').click();
-  await page.click('[data-role="guide-strip"] [data-create-any]');
+  await openCreate(page);
   await createInModal(page, 'The Founding', 'event');
   await note(page).locator('[data-note-action="were-there"]').click();
   await note(page).locator('.atlas-guide-note-year-input').fill('120');
@@ -182,7 +236,7 @@ test('at a phone\'s width: the Web\'s drawer opens once the page settles, and th
   await setupWorld(page, 'browser');
   await adaPlaced(page);
   await note(page).locator('[data-note-close]').click();
-  await page.click('[data-role="guide-strip"] [data-create-any]');
+  await openCreate(page);
   await createInModal(page, 'The Founding', 'event');
   await note(page).locator('[data-note-action="were-there"]').click();
   await note(page).locator('.atlas-guide-note-year-input').fill('120');
@@ -256,6 +310,7 @@ test('a world with nothing worth drawing has no picture, and its twin with a thi
 test('Moppetopia: a create by hand speaks no note, and Home shows the picture', async ({ page }) => {
   await setupWorld(page);
   await builtWorld(page);
+  await pastThePath(page);
   // The open world is Moppetopia by its world id, as its copy carries it.
   await page.evaluate(async (demoId) => {
     const { getState, patchSlice } = await import('/src/core/state.ts');
@@ -275,6 +330,7 @@ test('Moppetopia: a create by hand speaks no note, and Home shows the picture', 
 test('the twin: the same Event made by hand in a world that is not Moppetopia speaks its note', async ({ page }) => {
   await setupWorld(page);
   await builtWorld(page);
+  await pastThePath(page);
   await goHome(page);
   await page.click('[data-action="create-element"]');
   await createInModal(page, 'A Moppet Feast', 'event');

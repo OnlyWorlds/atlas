@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.108.0',
+    date: '2026-10-29',
+    theme: 'A first screen that leads',
+    entries: [
+      {
+        id: 'first-screen-two-doors',
+        title: 'A new world starts with two doors',
+        body: 'An empty world now asks one question with two answers: Start from nothing, or Bring in a world I have. Each opens in place, and Back returns to the choice.',
+        tags: ['onboarding'],
+      },
+      {
+        id: 'guide-step-card',
+        title: 'One card leads you through your first world',
+        body: 'Under the five steps, one card says what to do now and holds the button for it. When a step is done, Next takes you on, so you choose when to move. The small notes stay quiet while the card leads, and the block keeps its place on the page.',
+        tags: ['onboarding'],
+      },
+    ],
+  },
+  {
     version: '1.107.0',
     date: '2026-10-29',
     theme: 'Where it has been',

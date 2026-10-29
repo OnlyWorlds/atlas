@@ -106,9 +106,49 @@ export function guideDots(
   return { someone, placed, happened, story, copy };
 }
 
+// ---- The path: a bar that shows, a card that leads (#964) ----
+
+/** Where the path stands in a world: a dot, or `done` once the last step was confirmed. */
+export type StepId = DotId | 'done';
+
+/** The steps that are confirmed only after their room was seen: the chart, the writing room. */
+export const VISIT_STEPS: readonly DotId[] = ['happened', 'story'];
+
+/** Empty for the guide: none of the world's own elements (a pins-only or room-only world is empty too). */
+export function worldIsEmptyForGuide(all: readonly Element[]): boolean {
+  return guideElements(all).length === 0;
+}
+
+const order = (s: StepId): number => (s === 'done' ? DOTS.length : DOTS.findIndex(d => d.id === s));
+
+/** The later of two places on the path: a stale tab can never move it back. */
+export function laterStep(a: StepId | undefined, b: StepId): StepId {
+  return a !== undefined && order(a) > order(b) ? a : b;
+}
+
+/** The step the card speaks for: the pointer when set, else the first unlit dot. */
+export function currentStep(dots: Dots, pointer: StepId | undefined): StepId {
+  if (pointer && order(pointer) >= 0) return pointer;
+  return DOTS.find(d => !dots[d.id])?.id ?? 'done';
+}
+
+/** Where Next goes: the next step in order that is not already lit, else `done`. */
+export function nextStep(current: StepId, dots: Dots): StepId {
+  if (current === 'done') return 'done';
+  return DOTS.slice(order(current) + 1).find(d => !dots[d.id])?.id ?? 'done';
+}
+
+/** Whether a step's card offers Next: its dot lit and, for the chart and the writing room, the room seen. */
+export function stepDone(step: DotId, dots: Dots, visited: readonly string[] | undefined): boolean {
+  return dots[step] && (!VISIT_STEPS.includes(step) || (visited ?? []).includes(step));
+}
+
 // ---- The notes: what a gesture earns ----
 
 export type NoteId = 'someone' | 'place-offer' | 'placed' | 'event' | 'dated' | 'story' | 'chapter' | 'copy' | 'reading' | 'lens';
+
+/** The notes the path's card speaks for: silent while the path shows (`reading` and `lens` are not among them). */
+export const PATH_NOTES: readonly NoteId[] = ['someone', 'place-offer', 'placed', 'event', 'dated', 'story', 'chapter', 'copy'];
 
 /** The big-world note on lenses (#841's P5) speaks from this many of the world's own elements. */
 export const LENS_NOTE_AT = 40;

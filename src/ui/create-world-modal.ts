@@ -20,6 +20,7 @@ import { getState, patchSlice } from '../core/state';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { importHash, navigate, worldHash } from '../core/router';
 import { markNewcomerAnswered } from '../core/newcomer';
+import { startPath } from '../core/guide-path';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { escapeText } from '../core/dom-utils';
@@ -159,6 +160,8 @@ export class CreateWorldModal extends BaseModal {
           // never draws the question it was answered, not even under this dialog.
           beforeActivate: link ? markNewcomerAnswered : undefined,
         });
+        // A Start-page world opens on the guide's path at its first step (#964).
+        if (link) startPath(entry.id);
         this.toasts.success(`Created ${entry.name}`);
         this.hide();
         this.onCreated?.({ entry });

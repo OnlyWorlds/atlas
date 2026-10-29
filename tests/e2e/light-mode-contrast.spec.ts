@@ -65,7 +65,12 @@ const PROBES: Probe[] = [
   // its action links and the strip's labels read the text family on the raised panel.
   { name: 'guide note line', chain: ['atlas-guide-note', 'atlas-guide-note-line'] },
   { name: 'guide note action', chain: ['atlas-guide-note', 'button:atlas-guide-note-act'] },
-  { name: 'guide strip label', chain: ['atlas-home-onboarding', 'atlas-guide-strip', 'atlas-guide-marks', 'button:atlas-guide-mark', 'atlas-guide-mark-label'] },
+  { name: 'guide strip label', chain: ['atlas-home-onboarding', 'atlas-guide-strip', 'atlas-guide-marks', 'atlas-guide-mark', 'atlas-guide-mark-label'] },
+  // The first screen's doors and the path's card (#964): body text, the 4.5:1 floor.
+  { name: 'guide door title', chain: ['atlas-home-onboarding', 'atlas-guide-doors', 'atlas-guide-door', 'atlas-guide-door-title'], min: 4.5 },
+  { name: 'guide door line', chain: ['atlas-home-onboarding', 'atlas-guide-doors', 'atlas-guide-door', 'atlas-guide-door-line'], min: 4.5 },
+  { name: 'guide card line', chain: ['atlas-home-onboarding', 'atlas-guide-card', 'atlas-guide-card-line'], min: 4.5 },
+  { name: 'guide way line', chain: ['atlas-home-onboarding', 'atlas-guide-ways', 'atlas-guide-way', 'atlas-home-have-line'], min: 4.5 },
   // The family census: the map's placement hint paints the canvas floor; its Cancel read themed ink.
   { name: 'map placement hint', chain: ['atlas-map-placement-hint'] },
   { name: 'map placement hint cancel', chain: ['atlas-map-placement-hint', 'atlas-map-placement-hint-cancel'] },
