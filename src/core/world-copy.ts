@@ -34,6 +34,20 @@ export function copyOfMeta(meta: unknown): CopyOf | null {
   };
 }
 
+/**
+ * The registry's `copy_of` after an open has read the world's meta: what
+ * world.json declares, when there was a world.json to read. A store reads a
+ * missing or empty world.json as `{ id: '' }`, which says nothing either way,
+ * so the mark the registry holds stays; taking it away would make a copy
+ * editable on no evidence (#959: a reload in a landing's last moment left a
+ * copy's world.json empty in Firefox).
+ */
+export function copyMarkOnOpen(meta: { id?: unknown } & Record<string, unknown>, held: CopyOf | undefined): CopyOf | undefined {
+  const declared = copyOfMeta(meta);
+  if (declared) return declared;
+  return isId(meta.id) ? undefined : held;
+}
+
 /** The time a world file says it was taken: its own `snapshot_at`, else its export's `source.at`. Never one Atlas makes up. */
 function fileTimeOf(m: Record<string, unknown>): string | undefined {
   if (isTime(m.snapshot_at)) return m.snapshot_at;

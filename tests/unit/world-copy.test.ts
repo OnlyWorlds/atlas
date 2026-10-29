@@ -4,7 +4,7 @@
  * said, `writable: false`, every other key kept, never a link.
  */
 import { describe, expect, it } from 'vitest';
-import { copyChip, copyLine, copyOfMeta, copyWorldJson, sameCopy, worldIsCopiedBy } from '../../src/core/world-copy';
+import { copyChip, copyLine, copyMarkOnOpen, copyOfMeta, copyWorldJson, sameCopy, worldIsCopiedBy } from '../../src/core/world-copy';
 import { entryIsViewOnly } from '../../src/core/view-only';
 import type { WorldRegistryEntry } from '../../src/core/types';
 
@@ -49,6 +49,21 @@ describe('copyOfMeta', () => {
     expect(copyOfMeta({ id: 'x', writable: 'false' })).toBeNull();
     expect(copyOfMeta(null)).toBeNull();
     expect(copyOfMeta([{ writable: false }])).toBeNull();
+  });
+});
+
+describe('copyMarkOnOpen: the registry mirror follows world.json, only when there is one to follow', () => {
+  const MARK = { world_id: WID, at: AT };
+  it('a world.json that says copy marks it, whatever the registry held', () => {
+    expect(copyMarkOnOpen({ id: 'x', writable: false, snapshot_of: WID, snapshot_at: AT }, undefined)).toEqual(MARK);
+  });
+  it('a world.json read whole without the mark takes it away (its writer made it a world of its own)', () => {
+    expect(copyMarkOnOpen({ id: 'x', name: 'Hollow Reach' }, MARK)).toBeUndefined();
+  });
+  it('an empty or missing world.json (read as no id) says nothing, so a copy stays a copy', () => {
+    // A reload in the landing's last moment left a copy's world.json empty in Firefox (#959).
+    expect(copyMarkOnOpen({ id: '', name: '' }, MARK)).toEqual(MARK);
+    expect(copyMarkOnOpen({ id: '', name: '' }, undefined)).toBeUndefined();
   });
 });
 

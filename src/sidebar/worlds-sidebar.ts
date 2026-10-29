@@ -1069,10 +1069,11 @@ async function doActivateWorld(
   }
   const meta = await store.readWorldMeta();
   // A view-only copy (conv. 177) is what its world.json says, whoever wrote
-  // it: the registry's mirror follows the file before anything reads it.
+  // it: the registry's mirror follows the file before anything reads it, and
+  // an empty or missing world.json leaves the mirror as it is (#959).
   {
-    const { copyOfMeta } = await import('../core/world-copy');
-    const copy = copyOfMeta(meta);
+    const { copyMarkOnOpen } = await import('../core/world-copy');
+    const copy = copyMarkOnOpen(meta as unknown as Record<string, unknown>, entry.copy_of);
     if (JSON.stringify(copy ?? null) !== JSON.stringify(entry.copy_of ?? null)) {
       const next = updateWorldEntry(getState().registry, worldId, { copy_of: copy ?? undefined });
       if (saveRegistry(next)) patchSlice('registry', next);

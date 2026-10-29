@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.106.2',
+    date: '2026-10-29',
+    theme: 'A copy stays a copy',
+    entries: [
+      {
+        id: 'copy-stays-view-only-after-reload',
+        title: 'A view-only copy stays view-only after a reload',
+        body: 'Opening a world file as a copy beside its world and reloading within a moment could, in Firefox, open the copy again as an ordinary world you could edit. It now stays a view-only copy.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.106.1',
     date: '2026-10-29',
     theme: 'A newer build',
