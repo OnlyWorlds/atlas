@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.106.0',
+    date: '2026-10-29',
+    theme: 'Say what you cannot see',
+    entries: [
+      {
+        id: 'message-someone-you-cannot-see',
+        title: 'A message says when someone in it is hidden from you',
+        body: 'When OnlyWorlds leaves out a sender or recipient your key may not see, the message\'s line now says "someone you cannot see" instead of "nobody", and never says who or how many.',
+        tags: ['messages', 'sync'],
+      },
+      {
+        id: 'lens-keep-held-back',
+        title: 'The Lens list says why Keep a lens is not offered',
+        body: 'In Moppetopia, a demo or a view-only world, the Lens list now says that Keep a lens works in a world of your own, or one you can write to.',
+        tags: ['web', 'lens'],
+      },
+    ],
+  },
+  {
     version: '1.105.1',
     date: '2026-10-29',
     theme: 'The first screen\'s links take a thumb',
