@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.105.1',
+    date: '2026-10-29',
+    theme: 'The first screen\'s links take a thumb',
+    entries: [
+      {
+        id: 'landing-links-thumb',
+        title: 'Watch how it works and Other ways in take a thumb',
+        body: 'On a phone, the two links under Create a world and Explore answer a tap over a strip about as tall as a fingertip, centred on their words. They look the same as before.',
+        tags: ['layout'],
+      },
+    ],
+  },
+  {
     version: '1.105.0',
     date: '2026-10-29',
     theme: 'Read your world through a lens',

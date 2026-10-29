@@ -4777,6 +4777,20 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-landing-more-link:hover,
 .atlas-landing-more-link:focus-visible { color: var(--atlas-accent-text); }
 .atlas-landing-more-sep { color: var(--atlas-text-muted); }
+/* A finger's target (#948, as #945): on a phone each link's hit area grows to about 46 px tall,
+   centred on its words and unseen, so the words and the focus ring stay as they are. It reaches
+   only into the row's empty margins: the caption above is 22 px off, the next line further. */
+@media (pointer: coarse), (max-width: 760px) {
+  .atlas-landing-more-link { position: relative; }
+  .atlas-landing-more-link::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -15px;
+    bottom: -15px;
+  }
+}
 /* Signed in, the account's worlds under the doors: the first screen has
    no sidebar, so this is where its On OnlyWorlds rows are offered. Quiet rows,
    one per world, so the two doors stay the first decision. */
