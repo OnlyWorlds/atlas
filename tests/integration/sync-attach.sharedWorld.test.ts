@@ -17,7 +17,7 @@ import { MonotonicClock } from '../fixtures/monotonic-clock';
 let client: FakeOwApiClient;
 vi.mock('../../src/sync/ow-v2-client-adapter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/sync/ow-v2-client-adapter')>()),
-  OwV2ClientAdapter: vi.fn(() => client),
+  OwV2ClientAdapter: vi.fn(function () { return client; }), // a function, so `new` can construct it
 }));
 const roster = vi.fn(async (..._args: unknown[]): Promise<OwMember[] | null> => null);
 vi.mock('../../src/sync/world-roster', async (importOriginal) => ({

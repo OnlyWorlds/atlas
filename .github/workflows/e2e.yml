@@ -29,6 +29,14 @@ jobs:
         env:
           CI: '1'
           PLAYWRIGHT_JUNIT_OUTPUT_NAME: results.xml
+      # The suite runs on the dev server, where no service worker registers: the update
+      # banner is checked on a production build, against a real worker, in both engines.
+      - name: update banner on a production build
+        if: success() || failure()
+        run: |
+          npm run build
+          node scripts/check-update-banner.mjs dist chromium
+          node scripts/check-update-banner.mjs dist firefox
       - if: always()
         uses: actions/upload-artifact@v4
         with:

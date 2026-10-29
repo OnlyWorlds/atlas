@@ -22,9 +22,12 @@ export function registerServiceWorker(): void {
   // intercept or stale caches.
   if (import.meta.env.DEV) return;
 
-  // Lazy-import the virtual module so it doesn't crash if the plugin isn't
-  // wired (e.g. tests, raw vitest runs that don't transform main.ts).
-  void import(/* @vite-ignore */ 'virtual:pwa-register')
+  // Lazy-import the virtual module; vitest aliases it to a stub. The import
+  // must stay analysable: with `@vite-ignore`, Vite 8 left the specifier
+  // literal, the browser asked for `virtual:pwa-register`, the CSP refused it,
+  // and the plugin's own registerSW.js registered the worker without the
+  // update banner or the save before reload.
+  void import('virtual:pwa-register')
     .then((mod) => {
       const register = (mod as { registerSW?: (opts?: unknown) => (reload?: boolean) => Promise<void> }).registerSW;
       if (typeof register === 'function') {

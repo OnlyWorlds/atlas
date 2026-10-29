@@ -18,7 +18,7 @@ export default defineConfig({
   build: {
     target: 'es2020',
     outDir: 'dist',
-    rollupOptions: {
+    rolldownOptions: {
       // Two HTML entries: the app (index.html) and the static public
       // changelog (changelog.html, emitted by `npm run changelog` before
       // build). The changelog carries no module scripts, so Vite just emits
@@ -26,6 +26,17 @@ export default defineConfig({
       input: {
         main: 'index.html',
         changelog: 'changelog.html',
+      },
+      output: {
+        codeSplitting: {
+          // Everything the first screen imports statically loads as one
+          // file, as it did under Rollup. Left to itself, Rolldown gave each
+          // module a lazy room also imports a chunk of its own: about ninety
+          // scripts on the first load, a second slower on a phone network.
+          // Named for the entry, so the first screen's files stay main-*.js
+          // and main-*.css.
+          groups: [{ name: 'main', tags: ['$initial'] }],
+        },
       },
     },
   },

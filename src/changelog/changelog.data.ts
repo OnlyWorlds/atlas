@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.106.1',
+    date: '2026-10-29',
+    theme: 'A newer build',
+    entries: [
+      {
+        id: 'vite-8-build',
+        title: 'Atlas is built with Vite 8',
+        body: 'Nothing you see changes. The first screen\'s scripts are about 5% smaller, and the offer to reload when a new version is ready is now checked against a real build before each release.',
+        tags: ['performance'],
+      },
+    ],
+  },
+  {
     version: '1.106.0',
     date: '2026-10-29',
     theme: 'Say what you cannot see',
