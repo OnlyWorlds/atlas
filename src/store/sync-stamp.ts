@@ -43,6 +43,11 @@ export function stampedBody(
   const said = kept !== undefined && HIDDEN_SHOWN_ONLINE in kept;
   if (!said && !existing.server_updated_at) delete rec[HIDDEN_SHOWN_ONLINE];
   if (rec[HIDDEN_SHOWN_ONLINE] !== true || !isHiddenMark(next)) delete rec[HIDDEN_SHOWN_ONLINE];
+  // A first stamp is a new row on keel (a create, a re-keyed id, a create after a cleared baseline):
+  // its door record is only what this answer says. One left from the element's older life (another
+  // world, the old id, the pull before an Unlink) would name tools that never wrote this row, and a
+  // `/bulk` echo brings no body to replace it (#760, the code gate's G1).
+  if (!existing.server_updated_at && !(kept && 'doors' in kept)) delete rec.doors;
   if (sentLocalUpdatedAt === undefined) return next;
   if (sentLocalUpdatedAt !== null && existing.local_updated_at === sentLocalUpdatedAt) return next;
   // Edited in flight. Already newer than the baseline: nothing to do.
