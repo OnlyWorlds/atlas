@@ -184,6 +184,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     });
   }
   searchRow.appendChild(createBtn);
+  // While the box is named Create an element (an empty world), Enter keeps that promise: it opens
+  // New element with what was typed, as the + does. A search box keeps Enter for nothing.
+  let boxCreates = false;
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.isComposing || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || !boxCreates) return;
+    e.preventDefault();
+    openNormalCreate();
+  });
 
   content.appendChild(searchRow);
 
@@ -834,6 +842,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const worldEmpty = elements.length === 0 && !state.data.loading && !viewOnly;
     searchInput.placeholder = worldEmpty ? 'Create an element…' : 'Search elements…';
     searchInput.setAttribute('aria-label', worldEmpty ? 'Create an element' : 'Search elements');
+    boxCreates = worldEmpty;
     createBtn.hidden = viewOnly;
     createBtn.classList.toggle('atlas-create-pulse', worldEmpty);
 

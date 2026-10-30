@@ -75,6 +75,27 @@ test('elements mode becomes enabled and toggles when a world is active', async (
   await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element…');
 });
 
+test('Enter in the empty world\'s box opens New element with the typed name; a search box keeps Enter', async ({ page }) => {
+  await setupWorldA(page);
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  const box = page.locator('[data-role="elements-search"]');
+  await expect(box).toHaveAttribute('aria-label', 'Create an element');
+  await box.fill('Zed');
+  await box.press('Enter');
+  await expect(page.locator('[data-modal="create-element"]')).toBeVisible();
+  await expect(page.locator('input[name="element-name"]')).toHaveValue('Zed');
+  await page.click('[data-modal="create-element"] [data-action="create"]');
+  await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
+  await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'Zed' })).toBeVisible();
+
+  // The world has an element: the box searches, and Enter opens nothing.
+  await expect(box).toHaveAttribute('aria-label', 'Search elements');
+  await box.fill('Ze');
+  await box.press('Enter');
+  await page.waitForTimeout(300);
+  await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
+});
+
 test('create element from elements sidebar → row + detail view', async ({ page }) => {
   await setupWorldA(page);
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');

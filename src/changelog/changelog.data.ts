@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.109.2',
+    date: '2026-10-30',
+    theme: 'Enter makes it',
+    entries: [
+      {
+        id: 'empty-world-enter-creates',
+        title: 'Enter in an empty world\'s box makes the element',
+        body: 'In a world with no elements yet, the box beside the element list is named Create an element. Pressing Enter there now opens New element with what you typed as its name, as the + beside it does. In a world with elements the box searches, as before.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.109.1',
     date: '2026-10-30',
     theme: 'Named for a screen reader',
