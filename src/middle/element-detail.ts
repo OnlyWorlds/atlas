@@ -106,8 +106,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
   // is deferred, not dropped: it runs once focus leaves the input, after the
   // blur has read the value it commits.
   let renderDeferred = false;
-  const onFocusOut = (): void => {
+  const onFocusOut = (e?: FocusEvent): void => {
     if (!renderDeferred) return;
+    // Focus leaving the mark's fan-out is the press that closes it: the slot runs the redraw once that press lands.
+    if (e?.target instanceof HTMLElement && e.target.closest('.ow-waymark')) return;
     renderDeferred = false;
     queueMicrotask(render);
   };
@@ -115,6 +117,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
   // The OnlyWorlds mark beside the name: held open, a redraw waits for its fan-out to close (Waymark R7).
   let mark: WaymarkSlot | null = null;
   let markHadFocus = false;
+  let drawnHash = '';
   const dropMark = (): void => { mark?.dispose(); mark = null; };
 
   // Rebuilt only when an input moved (conv. 146): a rebuild between a
@@ -125,7 +128,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
   const gate = renderGate();
 
   function render(): void {
-    if (isEditingIn(target) || waymarkOpenIn(target)) { renderDeferred = true; return; }
+    // An open fan-out holds a redraw, but never a route change: the page follows the address.
+    if (isEditingIn(target) || (waymarkOpenIn(target) && window.location.hash === drawnHash)) { renderDeferred = true; return; }
+    drawnHash = window.location.hash;
     const s = getState();
     const touring = isTourFlagActive();
     if (!gate.changed([window.location.hash, s.active, s.data, s.ui, s.registry, s.styles, touring,

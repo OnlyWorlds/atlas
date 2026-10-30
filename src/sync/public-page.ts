@@ -1,37 +1,56 @@
 /**
- * Is a read key's world shown on onlyworlds.com to someone signed out? keel's
- * whole switch is `public_read` and `public_page.on` on GET /world (any key).
- * Read once per world per session, when a mark first wants it, kept in
- * memory only; until the answer, and after a failed read, the answer is
- * "not known" and no mark shows (the Waymark contract's R1).
+ * Is a world's public page on? keel's whole switch is `public_read` and
+ * `public_page.on` on GET /world (any key). Asked only for a reader who
+ * reaches the site through the public page (a read key, a player's link, an
+ * agent seat); kept in memory, fresh for five minutes, so a page switched off
+ * loses its marks at the next mount after that. Until an answer, and after a
+ * failed read, the answer is "not known" and no mark shows (the Waymark
+ * contract's R1).
  */
 
+import { getState } from '../core/state';
+import { worldPin } from '../core/seat';
 import type { WorldRegistryEntry } from '../core/types';
-import { isPublicReader } from '../core/waymark-for';
+import { readsByPublicPage } from '../core/waymark-for';
 import { buildV2Adapter } from './make-online';
 
-const known = new Map<string, boolean>();
+const FRESH_MS = 5 * 60 * 1000;
+const READ_TIMEOUT_MS = 10_000;
+
+const known = new Map<string, { on: boolean; at: number }>();
 const asking = new Map<string, Promise<boolean | null>>();
 
-/** The switch as known now: true, false, or null (not read yet, or the read failed). */
+/** The switch as last read (true or false), or null: never read, or every read failed. */
 export function publicPageOnNow(entry: WorldRegistryEntry): boolean | null {
   const id = entry.api?.world_id;
-  return id ? known.get(id) ?? null : null;
+  return id ? known.get(id)?.on ?? null : null;
 }
 
-/** Read the switch for a read key's world, once per session; answers what is known after. */
+/** Whether the last answer is older than five minutes (or there is none). */
+export function publicPageStale(entry: WorldRegistryEntry, now = Date.now()): boolean {
+  const id = entry.api?.world_id;
+  const k = id ? known.get(id) : undefined;
+  return !k || now - k.at > FRESH_MS;
+}
+
+/**
+ * Read the switch for a public-page reader's world, at most one read in flight
+ * per world; a fresh answer is reused. Answers the switch, or null when the
+ * read failed (nothing is kept, so a later mount may ask again).
+ */
 export function readPublicPageOn(entry: WorldRegistryEntry): Promise<boolean | null> {
   const id = entry.api?.world_id;
   const key = entry.api?.api_key;
-  if (!id || !key || !isPublicReader(entry)) return Promise.resolve(null);
-  if (known.has(id)) return Promise.resolve(known.get(id)!);
+  if (!id || !key || !readsByPublicPage(entry)) return Promise.resolve(null);
+  if (!publicPageStale(entry)) return Promise.resolve(known.get(id)!.on);
   const inFlight = asking.get(id);
   if (inFlight) return inFlight;
-  // A read goes bare: a read key carries no PIN.
-  const ask = buildV2Adapter(key, '').getWorldMeta().then(
-    meta => { known.set(id, meta.public_page_on === true); return known.get(id)!; },
-    err => { console.warn('[atlas:waymark] the public page switch was not read; no mark this session', err); return null; },
-  );
+  // A read key goes bare; a seat's key carries its own secret as the PIN.
+  const pin = entry.api?.read_only ? '' : worldPin(entry, getState().registry) ?? '';
+  const ask = buildV2Adapter(key, pin, undefined, { readTimeoutMs: READ_TIMEOUT_MS }).getWorldMeta().then(
+    meta => { known.set(id, { on: meta.public_page_on === true, at: Date.now() }); return meta.public_page_on === true; },
+    err => { console.warn('[atlas:waymark] the public page switch was not read; no mark until it is', err); return null; },
+  ).finally(() => { asking.delete(id); });
   asking.set(id, ask);
   return ask;
 }

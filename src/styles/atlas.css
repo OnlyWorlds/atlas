@@ -17416,6 +17416,8 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     min-width: 40px;
     min-height: 40px;
   }
+  /* In the 36 px header band they stay the band's height (its clip once did this; it now clips sideways only). */
+  .atlas-middle .atlas-middle-header .atlas-icon-btn-sm { min-height: 36px; }
 
   /* The aliases dialog sits outside the middle pane, so its remove stayed 22px (#526's gap). */
   .atlas-aliases-row .atlas-icon-btn-sm {

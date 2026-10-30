@@ -188,6 +188,77 @@ test.describe('the OnlyWorlds mark beside a name', () => {
     await expect(page.locator('.atlas-home-name-row')).toHaveCount(1);
   });
 
+  test('with a redraw held, the press that closes the fan-out still lands: a rename starts on the element and on Home', async ({ page }) => {
+    await setupWorld(page);
+    await pulledElement(page, ADA, 'Ada');
+    await linkWorld(page);
+    await openElement(page, ADA, 'Ada');
+    await mark(page).click();
+    await expect(pop(page)).toBeVisible();
+    await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      api.patchData([...(await api.getActiveStore().listElements())]);
+    });
+    await page.waitForTimeout(200);
+    await page.locator('[data-role="element-name"]').click();
+    await expect(page.locator('[data-role="element-name"] input, .atlas-middle-header input:not(.ow-waymark *)').first()).toBeVisible();
+
+    await goHome(page);
+    await mark(page).click();
+    await expect(pop(page)).toBeVisible();
+    await pulledElement(page, DEE, 'Dee');
+    await page.waitForTimeout(200);
+    await page.locator('.atlas-home-world-name').click();
+    // The rename popover's box has focus, with the world's name in it.
+    await expect.poll(() => page.evaluate(() => {
+      const a = document.activeElement as HTMLInputElement | null;
+      return a?.tagName === 'INPUT' ? a.value : null;
+    })).toBe('Harbour');
+    // Leaving it runs the held redraw: Home counts Dee.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-role="grid-square"], .atlas-home-grid-cell').filter({ hasText: 'Dee' }).first()).toBeVisible();
+  });
+
+  test('"Link copied" stays through a sync round\'s redraw; a route change goes through while the fan-out is open', async ({ page, context, browserName }) => {
+    test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium\'s in this suite');
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await setupWorld(page);
+    await pulledElement(page, ADA, 'Ada');
+    await pulledElement(page, DEE, 'Dee');
+    await linkWorld(page);
+    await openElement(page, ADA, 'Ada');
+    await mark(page).click();
+    await pop(page).getByText('Copy link').click();
+    const toast = page.locator('.ow-waymark__toast:not([hidden])');
+    await expect(toast).toBeVisible();
+    await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      api.patchData([...(await api.getActiveStore().listElements())]);
+    });
+    await page.waitForTimeout(150);
+    await expect(toast).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`https://www.onlyworlds.com/w/${SERVER_WORLD}/character/${ADA}`);
+    await expect(toast).toHaveCount(0, { timeout: 5000 });
+
+    // Open, then the address moves (a keyboard route, code): the page follows it.
+    await mark(page).click();
+    await expect(pop(page)).toBeVisible();
+    await openElement(page, DEE, 'Dee');
+  });
+
+  test('a read key\'s world whose switch cannot be read: the page answers and shows no mark', async ({ page }) => {
+    await setupWorld(page);
+    await pulledElement(page, ADA, 'Ada');
+    await page.route(`${V2}/world/**`, route => route.fulfill({ status: 500, json: { error: { code: 'server_error', message: 'routed', type: 'api_error' } } }));
+    await page.route(`${V2}/world`, route => route.fulfill({ status: 500, json: { error: { code: 'server_error', message: 'routed', type: 'api_error' } } }));
+    await linkWorld(page, { api_key: 'ow_r_' + 'R'.repeat(32), read_only: true });
+    await goHome(page);
+    await openElement(page, ADA, 'Ada');
+    await page.waitForTimeout(500);
+    await expect(mark(page)).toHaveCount(0);
+    expect(await page.evaluate(() => 1 + 1)).toBe(2);
+  });
+
   test('a read key\'s world: the mark only while its public page is on', async ({ page }) => {
     await setupWorld(page);
     await pulledElement(page, ADA, 'Ada');

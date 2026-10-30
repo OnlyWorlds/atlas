@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'waymark-open-with',
         title: 'The OnlyWorlds mark beside a name',
-        body: 'In a world on OnlyWorlds, the mark beside the world\'s name on Home and beside an element\'s name opens a short menu: open it on onlyworlds.com or in another tool, or copy its link. It shows who last shaped the element, and only appears where that page exists for you.',
+        body: 'In a world on OnlyWorlds, the mark beside the world\'s name on Home and beside an element\'s name opens a short menu: open it on onlyworlds.com or in another tool, or copy its link. It shows who last shaped the element. The page on onlyworlds.com opens when you are signed in there, or for anyone when the world\'s public page is on; where neither is true, there is no mark.',
         tags: ['world'],
       },
       {

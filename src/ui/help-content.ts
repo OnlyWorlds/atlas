@@ -50,7 +50,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
         touch: 'on a new world, follow the first steps: tap the + square to make the next thing, then tap one square and then another to put it there',
       },
       'already have notes or a file? Bring it in, under the first steps',
-      'in a world on OnlyWorlds, press the OnlyWorlds mark beside its name to open it on onlyworlds.com or in another tool, or to copy its link',
+      'in a world on OnlyWorlds that you own, press the OnlyWorlds mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
     ],
   },
   element: {
@@ -65,7 +65,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'add your own fields in the Custom fields section',
       'keep files with it in an online world, in the Files section: text, pdf, or a world\'s own bundle, up to 25 MB each',
       'place it on a map from the header pin button',
-      'once it is on OnlyWorlds, press the mark beside its name to open it on onlyworlds.com or in another tool, or to copy its link',
+      'once it is on OnlyWorlds, press the mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
       { mouse: 'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)', touch: 'tap Hide types at the end of the sidebar strip, then tap a type to keep it out of the full list (pins and markers start that way)' },
       'see in the Web tab where it is mentioned but not linked, and link every mention with one click',
       'read the Web through one of your lenses, or keep a lens on this element, from the Lens choice above the Web',

@@ -274,6 +274,9 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // the cover draws its doors above the card again, as on a world past its first steps.
     const handOver = (): void => {
       if (doors === 'held' && cover.isConnected) {
+        // An open fan-out on the name is never swapped away under the person: the redraw after it closes hands over.
+        if (waymarkOpenIn(cover)) { owed = true; return; }
+        markHadFocus = marks.some(waymarkHasFocus);
         const full = buildCover(meta, worldId, totalElements, counts, toasts, 'above', onMark, onGridClosed);
         cover.replaceWith(full);
         cover = full;

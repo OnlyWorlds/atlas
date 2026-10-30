@@ -56,6 +56,26 @@ describe('the public page switch', () => {
     expect(headers.get('API-Pin') ?? '').toBe('');
   });
 
+  it('an answer older than five minutes is read again, so a page switched off is known off', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    answer({ public_read: true, public_page: { on: true } });
+    expect(await readPublicPageOn(readKey())).toBe(true);
+    answer({ public_read: true, public_page: { on: false } });
+    now.mockReturnValue(1_000_000 + 4 * 60_000);
+    expect(await readPublicPageOn(readKey())).toBe(true);
+    now.mockReturnValue(1_000_000 + 6 * 60_000);
+    expect(await readPublicPageOn(readKey())).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+
+  it('a seat\'s world is read too (an agent seat reaches the site only through the public page)', async () => {
+    answer({ public_read: true, public_page: { on: true } });
+    const seat = { ...readKey(), api: { world_id: WID, api_key: 'ow_w_seat', seat: { role: 'contributor' }, seat_secret: 'ow_s_secret' } } as WorldRegistryEntry;
+    expect(await readPublicPageOn(seat)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('never read for a member\'s world; not known before a read and after a failed one', async () => {
     const member = { ...readKey(), api: { world_id: WID, api_key: 'k' } } as WorldRegistryEntry;
     expect(await readPublicPageOn(member)).toBeNull();
