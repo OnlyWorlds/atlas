@@ -49,7 +49,6 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
   let calendar: CalendarConfig | null = null;
   let now: number | null = null;
   let focusId: string | null = null;
-  let cast: { protagonistId?: string | null; nexusId?: string | null } = {};
   let selectedId: string | null = null;
   let nodes: TimelineNode[] = [];
   let raf = 0;
@@ -101,7 +100,6 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
     card.dataset.id = node.id;
     card.dataset.side = side;
     if (node.id === focusId) card.classList.add('focused');
-    if (node.id === cast.protagonistId || node.id === cast.nexusId) card.classList.add('cast');
     card.style.top = `${Math.round(y)}px`;
 
     const icon = node.glyph ?? (ELEMENT_ICONS as Record<string, string>)[node.elementType] ?? 'category';
@@ -222,7 +220,6 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
         if (extras.now !== undefined) now = extras.now;
         if (extras.calendar !== undefined) calendar = extras.calendar ?? null;
         if (extras.focusId !== undefined) focusId = extras.focusId;
-        if (extras.cast !== undefined) cast = extras.cast ?? {};
       }
       rebuild();
     },

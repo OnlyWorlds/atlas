@@ -818,9 +818,9 @@ async function doActivateWorld(
     // (the misleading empty-home flash, 2026-07-10).
     patchSlice('data', { elements: [], loading: true, loadingProgress: null });
     resetWorldStyles();
-    // knowledgeLens + castAssign cleared too — both reference the OLD world.
+    // knowledgeLens cleared too — it references the OLD world.
     // Muted types are per world.
-    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null, mutedTypes: loadMutedTypes(worldId), madeBy: null, hideRoom: true, proposedOnly: null });
+    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, mutedTypes: loadMutedTypes(worldId), madeBy: null, hideRoom: true, proposedOnly: null });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
       // Room-stable world switch (Titus: "less jumpy"): world-agnostic

@@ -58,8 +58,8 @@ const LABEL_MAX_CHARS = 60;
 const LABEL_NEAR_RADIUS = 150;   // px — cursor neighbourhood that gets labels
 const LABEL_NEAR_MAX = 9;        // most labels to reveal around the cursor
 // S4 label budget: fan columns are NODE_X_GAP wide; each column may label at
-// most one node per this many px of band height (weight-ranked; favorites +
-// anchors are exempt). The remainder surfaces as a "+N" badge under the column.
+// most one node per this many px of band height (weight-ranked; anchors are
+// exempt). The remainder surfaces as a "+N" badge under the column.
 const LABEL_BUDGET_PX_PER_ROW = 56;
 const PLUS_BADGE_H = 14;         // badge hit-box height
 const ZOOM_MAX = 200;            // max magnification vs the fitted span
@@ -83,7 +83,7 @@ const GHOST_MS = 2500;           // previous-window ghost fade duration
 const TRAVEL_MS = 280;           // focus-jump window animation
 // The now-line (Act 1 / S11) — the seam between past and the forward half.
 // Warm gold: "now" is consequential (craft: warm = consequential, cyan =
-// appreciation), and it reads distinct from the cyan viewport band + cast marks.
+// appreciation), and it reads distinct from the cyan viewport band.
 const NOW_COLOR = '245, 180, 90';
 const NOW_GRAB_PX = 6;           // px tolerance to grab the now-line for dragging
 // A finger (#301) gets wider grips than a cursor.
@@ -124,10 +124,6 @@ export interface TimelineViewOptions {
 
 /** Render extras the room threads in alongside the node set (S4/S5). */
 export interface TimelineViewExtras {
-  /** The cast (protagonist/home nexus). Their labels always win the budget
-   *  (S4) and their glyphs carry a persistent cyan mark + pin badge at every
-   *  scope and zoom. Re-passed each render; last value sticks. */
-  cast?: { protagonistId?: string | null; nexusId?: string | null };
   /**
    * The world's "now" (`World.time_current`) — draws the now-line + the forward
    * half (Act 1 / S11). `undefined` leaves the current value untouched; `null`
@@ -217,10 +213,6 @@ interface ViewState {
   labelBoxes: LabelBox[];
   // "+N" cluster badges from the last draw — click targets (zoom to cluster).
   plusBadges: PlusBadge[];
-  // Cast favorites (S4): labels always win the budget; glyphs get the mark.
-  favoriteIds: Set<string>;
-  protagonistId: string | null;
-  nexusId: string | null;
   onFocus: (id: string) => void;
   // cursor (canvas coords; null when outside) — drives proximity labels
   mouseX: number | null;
@@ -319,9 +311,6 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     layoutSig: null, layoutNodes: null,
     labelBoxes: [],
     plusBadges: [],
-    favoriteIds: new Set(),
-    protagonistId: null,
-    nexusId: null,
     onFocus: opts.onFocus,
     mouseX: null, mouseY: null,
     dragging: false, dragStartX: 0, dragStartWindow: null, dragMoved: false,
@@ -376,12 +365,6 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       const prevBase = state.baseRange;
       state.nodes = nodes;
       if (universe) state.universe = universe;
-      if (extras?.cast) {
-        state.protagonistId = extras.cast.protagonistId ?? null;
-        state.nexusId = extras.cast.nexusId ?? null;
-        state.favoriteIds = new Set([state.protagonistId, state.nexusId]
-          .filter((x): x is string => !!x));
-      }
       // `undefined` = leave as-is; `null`/number = set. Never clobber a live
       // drag preview (a background re-render mid-drag would snap the line back).
       if (extras && 'now' in extras && !state.nowDrag) state.now = extras.now ?? null;
@@ -991,7 +974,7 @@ function draw(state: ViewState): void {
     }
   }
 
-  // Labels — priority tiers (selected/hover → favorites → anchors → proximity),
+  // Labels — priority tiers (selected/hover → anchors → proximity),
   // then a WEIGHT-RANKED PER-COLUMN BUDGET for the rest (S4): each fan column
   // labels its heaviest nodes up to a space-proportional budget; the remainder
   // surfaces as a clickable "+N" badge (zoom to cluster) instead of a smear.
@@ -1011,15 +994,11 @@ function draw(state: ViewState): void {
     const isSel = dot.node.id === state.selectedId;
     const isHover = dot === state.hoveredDot;
     const isAnchor = anchorIds.has(dot.node.id);
-    const isCast = dot.node.id === state.protagonistId || dot.node.id === state.nexusId;
     // Ahead of now → dim/hollow (S11 fieldless forward render), unless the user
     // is reading it (selected/hover stays full so it's legible on interaction).
     const isFuture = rangeVsNow(dot.node.startDate, dot.node.endDate, state.now) === 'future'
       && !isSel && !isHover;
-    // The cast outranks anchors visually — a protagonist that's hard to find
-    // defeats the whole cast system (Titus, 2026-07-10).
     const size = isSel ? ICON_SELECTED
-      : isCast ? ICON_ANCHOR + detail + 5
       : isAnchor ? ICON_ANCHOR + detail
       : isHover ? ICON_HOVER
       : ICON_BASE - 1 + detail * 2;   // 13 (overview) → 15 → 17 (close)
@@ -1068,10 +1047,6 @@ function draw(state: ViewState): void {
     ctx.strokeText(icon, dot.x, dot.y);
     ctx.fillStyle = isFuture ? applyAlpha(dot.node.color, FUTURE_NODE_ALPHA) : dot.node.color;
     ctx.fillText(icon, dot.x, dot.y);
-
-    // The cast signal (revised 2026-07-10, Titus: ring + corner badge were
-    // "a bit much"): a modest size boost (above) + the BRIGHT CYAN LABEL do
-    // the signifying — quiet, fitting the style, still unmistakable.
   }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -1495,8 +1470,7 @@ function stripHit(
   return { kind: 'track' };
 }
 
-/** S4 label weight: connectivity + how much is actually written about it.
- *  Favorites don't need a boost here — they're pushed as their own tier. */
+/** S4 label weight: connectivity + how much is actually written about it. */
 function labelWeight(n: TimelineNode): number {
   return n.degree + Math.log10(1 + n.contentMass);
 }
@@ -1517,8 +1491,6 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   };
   push(state.selectedId ? byId.get(state.selectedId) : undefined, 0);
   push(state.hoveredDot ?? undefined, 0);
-  // favorites always win (S4) — ahead of anchors, exempt from the budget
-  for (const d of placed.filter(d => state.favoriteIds.has(d.node.id))) push(d, 1);
   // anchors by degree desc (highest significance wins a contested row slot)
   for (const d of placed.filter(d => anchorIds.has(d.node.id)).sort((a, b) => b.node.degree - a.node.degree)) push(d, 1);
   // proximity reveal — the "explore the rest" layer, nearest first
@@ -1555,22 +1527,19 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   // and labels one fan-level up/down — the dense-band smear. Greedy in priority
   // order: anchors + selection claim their space first, the rest fill the gaps.
   const overlaps = (a: Box, b: Box): boolean => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
-  const isCastId = (id: string): boolean => id === state.protagonistId || id === state.nexusId;
   // Collision extent MIRRORS the draw math (size formula + outermost ring +
   // stroke) instead of fixed constants — the old 16/21/9 ignored selection
   // rings and LOD growth, so labels ended inside zoom-grown ring visuals
   // (Titus's sshot: a label flush against the next node's ring).
   const glyphHalf = (d: PlacedDot): number => {
     const isSel = d.node.id === state.selectedId;
-    const isCast = isCastId(d.node.id);
     const isAnchor = anchorIds.has(d.node.id);
     const size = isSel ? ICON_SELECTED
-      : isCast ? ICON_ANCHOR + detail + 5
       : isAnchor ? ICON_ANCHOR + detail
       : ICON_BASE - 1 + detail * 2;
     const ringR = size * 0.6;
     if (isSel) return ringR + (d.node.id === state.focusId ? 9 + 2 : 7 + 1.5) + 2;
-    if (isAnchor || isCast) return ringR + 8 + 1 + 2;
+    if (isAnchor) return ringR + 8 + 1 + 2;
     return size * 0.5 + 2;
   };
   const glyphBoxes = placed.map(d => ({ id: d.node.id, box: boxAround(d.x, d.y, glyphHalf(d)) }));
@@ -1581,16 +1550,14 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   for (const { dot } of cands) {
     const isSel = dot.node.id === state.selectedId;
     const isAnchor = anchorIds.has(dot.node.id);
-    const isCast = isCastId(dot.node.id);
-    ctx.font = isCast ? '600 12.5px system-ui, sans-serif'
-      : isAnchor ? '600 12px system-ui, sans-serif'
+    ctx.font = isAnchor ? '600 12px system-ui, sans-serif'
       : '11px system-ui, sans-serif';
     const text = truncate(dot.node.name, LABEL_MAX_CHARS);
     const tw = ctx.measureText(text).width;
     // Offsets clear the node's OWN drawn extent too — glyphHalf is the truth
     // (a selected node's side label must start past its rings).
     const gh = glyphHalf(dot);
-    const off = Math.max(isCast ? 18 : isAnchor ? 16 : 10, gh + 4);
+    const off = Math.max(isAnchor ? 16 : 10, gh + 4);
     // Candidate positions in preference order: beside the glyph first (panel-
     // edge flip preserved), then ABOVE/BELOW it. In multi-column eras a side
     // label always crosses the next column, so without the vertical fallbacks
@@ -1643,7 +1610,6 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
     placedBoxes.push(fit.box);
     state.labelBoxes.push({ ...fit.box, nodeId: dot.node.id });
     ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)'
-      : isCast ? 'rgba(34,211,238,0.95)'   // bright cyan = the cast signal
       : isAnchor ? 'rgba(255,255,255,0.86)'
       : 'rgba(255,255,255,0.6)';
     ctx.textAlign = fit.align;
@@ -1864,8 +1830,8 @@ function renderCard(state: ViewState): void {
 }
 
 /**
- * The rail's resting state: a quiet legend of what's on the chart, the cast,
- * and the interaction hint. Ambient orientation, not chrome — the rail exists
+ * The rail's resting state: a quiet legend of what's on the chart and the
+ * interaction hint. Ambient orientation, not chrome — the rail exists
  * so peeks never reflow the canvas.
  */
 function renderAmbientRail(state: ViewState): void {
@@ -1894,25 +1860,6 @@ function renderAmbientRail(state: ViewState): void {
   head.textContent = state.chartLabel ?? 'This chart';
   if (state.chartLabel) head.title = 'Saved chart';
   card.appendChild(head);
-
-  // Cast lines — only when the cast is actually on the chart.
-  const castRows: Array<{ icon: string; label: string; node: TimelineNode }> = [];
-  const prot = state.protagonistId ? state.nodes.find(n => n.id === state.protagonistId) : undefined;
-  const nex = state.nexusId ? state.nodes.find(n => n.id === state.nexusId) : undefined;
-  if (prot) castRows.push({ icon: 'person_pin', label: 'protagonist', node: prot });
-  if (nex) castRows.push({ icon: 'home_pin', label: 'home', node: nex });
-  for (const row of castRows) {
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'atlas-timeline-rail-cast';
-    el.innerHTML =
-      `<span class="material-symbols-outlined">${row.icon}</span>` +
-      `<span class="atlas-timeline-rail-cast-name">${escapeText(row.node.name)}</span>` +
-      `<span class="atlas-timeline-rail-cast-role">${row.label}</span>`;
-    el.title = `Read ${row.node.name}`;
-    el.addEventListener('click', () => state.onSelect(row.node.id));
-    card.appendChild(el);
-  }
 
   // Type legend — what the marks mean, with in-view counts.
   const counts = new Map<string, number>();

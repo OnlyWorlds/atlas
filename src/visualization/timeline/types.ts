@@ -67,7 +67,7 @@ export interface TimelineNode {
   /**
    * Content mass — raw character count of the element's long-form text
    * (description + narrative story prose). Second input to the S4 label
-   * weight (degree + content mass + favorites): an element someone wrote
+   * weight (degree + content mass): an element someone wrote
    * three paragraphs about matters more than a bare-named stub at equal
    * degree. A pure render cache like `degree`, never serialized; the weight
    * function applies its own scaling (log), so this stays a raw count.

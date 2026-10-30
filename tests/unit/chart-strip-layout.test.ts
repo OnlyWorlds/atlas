@@ -91,7 +91,7 @@ describe('layoutStrip', () => {
     expect(clashes(nodes, 900, 2)).toEqual([]);
   });
 
-  it('kept names (anchors, cast) take their labels before earlier plain names', () => {
+  it('kept names (anchors) take their labels before earlier plain names', () => {
     // A plain name dated first would take the midline row ahead of the anchor.
     const nodes: StripInput[] = [
       { x: 20, size: 14, labelW: 200 },

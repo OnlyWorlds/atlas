@@ -678,11 +678,10 @@ test('the hand-over card at 390 with 12 elements: the hint goes, the line says t
   await expect(card(page).locator('.atlas-home-grow-hint')).toHaveCount(0);
   await expect(card(page).locator('[data-step-action="create-event"]')).toBeVisible();
   await expect(card(page).locator('[data-action="grow-web"]')).toBeVisible();
-  // No squares to keep still: the cover's count line and cast doors stand above the card again.
+  // No squares to keep still: the cover's count line stands above the card again.
   const counts = page.locator('.atlas-home-identity .atlas-home-statline');
   await expect(counts).toContainText('8 characters');
   expect((await counts.boundingBox())!.y).toBeLessThan((await card(page).boundingBox())!.y);
-  await expect(page.locator('.atlas-home-identity .atlas-home-cast-ghost')).toHaveCount(2);
 });
 
 test('the demo world: the grid with no + and no target', async ({ page }) => {

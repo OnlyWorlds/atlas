@@ -1,6 +1,6 @@
 /**
- * THE WHOLE WORLD IN THE FOLDER. A world's notes, its cast (the home
- * protagonist and home), its calendar lens and its writing labels are things
+ * THE WHOLE WORLD IN THE FOLDER. A world's notes, its cast (the protagonist
+ * and home an older Atlas picked; kept, no longer shown), its calendar lens and its writing labels are things
  * the user wrote ABOUT the world, and they lived only in this browser's
  * localStorage registry: copying the folder, opening it on another machine,
  * "Forget world" or clearing site data lost them. They now also live in
@@ -25,8 +25,8 @@
  *                                 browser last synced it: the file wins
  *   - CHANGE (`installWorldPrefsSync`): a registry change to the active
  *     world's prefs is written to the file (debounced), wherever it came
- *     from: the notes overlay, the cast pin, a re-key or an id swap remapping
- *     the cast, the calendar chip.
+ *     from: the notes overlay, a re-key or an id swap remapping the cast, the
+ *     calendar chip.
  * Read-both-write-new: nothing is removed from the registry, so an older
  * Atlas keeps working from its copy (Titus).
  */

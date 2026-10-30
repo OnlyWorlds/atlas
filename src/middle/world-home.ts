@@ -3,8 +3,8 @@
  *
  * Rebuild (workplan D2): a COVER PAGE with a STUDY-DESK
  * spine. The world as a book you just opened — identity hero (cover image
- * when set, name, description), quiet text-links, the cast slot (D2b
- * protagonist + home), one woven stat line — then re-entry: a "Continue"
+ * when set, name, description), quiet text-links, one woven stat line — then
+ * re-entry: a "Continue"
  * strip (last writing / last map / last edit) and a tight Recent list whose
  * rows route to the room the element actually lives in.
  *
@@ -33,7 +33,7 @@ import { typeName } from '../core/type-words';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
-import { setWorldFavoriteElement, dismissTourCard, saveRegistry, updateWorldEntry } from '../registry/registry';
+import { dismissTourCard, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { keepSafeCard, snoozeUntil } from './home-keepsafe';
 import { buildLandingLine } from './home-landing';
 import { downloadWorldFromClick } from '../ui/download-world';
@@ -44,7 +44,6 @@ import { blockFocusKey, settleAfterDraw } from './home-guide';
 import { buildGrowBlock, buildHomeGrid, type GrowBlock } from './home-grow';
 import { isNewcomerAnswered } from '../core/newcomer';
 import { isTourFlagActive } from '../tour/tour-flag';
-import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
 import { charterLead, findCharter, readingAids } from '../core/charter';
 import { canMarkCharter, retireAid } from './element-detail-charter-mark';
@@ -117,7 +116,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   }
 
   // Home rebuilds only when something it draws from moved: it used to
-  // rebuild the cover, cast, chart strip, desk and loose threads on every
+  // rebuild the cover, chart strip, desk and loose threads on every
   // state notify, ~80 ms a time at Sikelia's size, for sync ticks, toasts and
   // clicks in other panes. A new input the home reads must join this list.
   let lastInputs: unknown[] | null = null;
@@ -172,7 +171,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // patches a fresh array that changed nothing, and a rebuild then swallowed
     // a press on the guide's marks straddling it (conv. 146, the guide's code gate C3).
     const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, aidsHidden(), s.data.loading, s.data.loadingProgress?.done, s.registry,
-      s.ui.castAssign?.kind, savedCharts, isTourFlagActive(), s.active ? doorOf(s.active.worldId) : undefined];
+      savedCharts, isTourFlagActive(), s.active ? doorOf(s.active.worldId) : undefined];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     if (root.querySelector(`[${GRID_OPEN_ATTR}]`) || waymarkOpenIn(root)) { owed = true; return; }
     lastInputs = inputs;
@@ -206,8 +205,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
 
     const guideFocus = blockFocusKey();
     // While the path is open, nothing above the squares changes with an act: the cover keeps only
-    // what acts never change (the name, a description already written), and holds back the cast
-    // doors, the count line and "Describe your world" until the path is closed.
+    // what acts never change (the name, a description already written), and holds back the count
+    // line and "Describe your world" until the path is closed.
     const pathOpen = pathShowing(worldId);
     if (!s.data.loading) {
       if (pathOpen) pathWasOpen = worldId;
@@ -344,13 +343,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
  * when one exists (saving a chart is the "starring" act for v1), else the
  * TABLEAU — the same default the Charts room lands on (Titus set a home
  * location and couldn't find it here: the old Story-recipe default could
- * never include a location). Cast rides into the freeze so protagonist/home
- * read cyan. Every node carries a ref, so a click lands in the Charts room
- * FOCUSED on that element. Hidden below 3 dated nodes.
+ * never include a location). Every node carries a ref, so a click lands in
+ * the Charts room FOCUSED on that element. Hidden below 3 dated nodes.
  */
 function buildChartStrip(elements: readonly Element[], worldId: string, savedCharts: ChartConfig[]): HTMLElement | null {
-  const favorites = getState().registry.worlds.find(w => w.id === worldId)?.favorites;
-  const cast = { protagonistId: favorites?.protagonist_id ?? null, nexusId: favorites?.nexus_id ?? null };
   // ALWAYS the tableau (Titus: "home charts feel a bit random") — the
   // strip previews exactly what the Charts room opens to. One mental model:
   // home is the zoomed-out truth, the room is the same picture with controls.
@@ -372,14 +368,11 @@ function buildChartStrip(elements: readonly Element[], worldId: string, savedCha
     id: 'home-tableau',
     name: 'Tableau',
     axis: { kind: 'time', direction: 'both' },
-    scope: tableauScope(
-      extractTemporalNodes([...elements]),
-      [cast.protagonistId, cast.nexusId].filter((x): x is string => !!x),
-    ),
+    scope: tableauScope(extractTemporalNodes([...elements])),
     render: '2d',
     ...(homeLens ? { calendarId: homeLens.id } : {}),
   };
-  const frozen = freezeChartBlock(chart.id, 'home-chart-strip', [chart], [...elements], new Set(elements.map(e => e.id)), { cast });
+  const frozen = freezeChartBlock(chart.id, 'home-chart-strip', [chart], [...elements], new Set(elements.map(e => e.id)));
   if (!frozen || frozen.nodes.length < 3) return null;
 
   const section = document.createElement('section');
@@ -497,27 +490,20 @@ function buildCover(
   // (The old quick text-links — new element / open writing / import — were
   // removed: the room nav + onboarding tiles cover every one of them.)
 
-  // Cast slot (D2b) — renders only when a favorite is set; assignment lives
-  // on the element-detail header (char + loc). A world with a reading aid at its
-  // door is set up for work (#526): its Home never asks for a protagonist or a home place.
-  // While the path is open (or closed in this mount) these are held back or drawn under the grid.
-  if (doors === 'above') {
-    const cast = buildCastSlot(worldId, !!aids);
-    if (cast) cover.appendChild(cast);
-    cover.appendChild(buildStatline(counts));
-  }
+  // While the path is open (or closed in this mount) the count line is held back or drawn under the grid.
+  if (doors === 'above') cover.appendChild(buildStatline(counts));
   appendCoverLines(cover, worldId);
   return cover;
 }
 
-/** The cover's doors: "Describe your world", the cast doors and the count line. */
+/** The cover's doors: "Describe your world" and the count line. */
 export type CoverDoors = 'above' | 'held' | 'below';
 
 const DESCRIBE_PROMPT = `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">Describe your world…</p>`;
 
 /**
  * The cover's doors drawn under the grid, after the path closed while this Home was open: the
- * same prompt, cast doors and count line, so the close moves no square above them.
+ * same prompt and count line, so the close moves no square above them.
  */
 function buildCoverDoors(
   meta: NonNullable<ReturnType<typeof getState>['active']>['meta'],
@@ -533,9 +519,6 @@ function buildCoverDoors(
     const descEl = section.querySelector<HTMLElement>('[data-edit="description"]')!;
     descEl.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
   }
-  // A world with a reading aid at its door gets no ghosts, as `buildCover` reads it.
-  const cast = buildCastSlot(worldId, !!buildReadingAids(meta, worldId));
-  if (cast) section.appendChild(cast);
   section.appendChild(buildStatline(counts));
   return section;
 }
@@ -673,26 +656,6 @@ function appendCoverLines(cover: HTMLElement, worldId: string): void {
   }
 }
 
-/** The per-kind cast configuration — card + ghost share it. */
-const CAST_KINDS = [
-  {
-    kind: 'protagonist' as const, role: 'protagonist', icon: 'person_pin',
-    elementType: 'character' as const, ghostName: 'Choose a protagonist',
-    ghostTitle: 'Open a character and click the person pin in its header to set your protagonist',
-  },
-  {
-    kind: 'nexus' as const, role: 'home', icon: 'home_pin',
-    elementType: 'location' as const, ghostName: 'Choose a home',
-    ghostTitle: 'Open a location and click the home pin in its header to set your home place',
-  },
-];
-
-/**
- * Ghost cast card for an unset slot — the setter lives on the element-detail
- * header, which Titus couldn't find from home (2026-07-10). Clicking filters
- * the sidebar to the right type so the path is one hop. Both kinds get a
- * ghost side by side (nexus beside protagonist, Titus 2026-07-10).
- */
 /**
  * The door (the charter profile's rule 2, 1.101): the Charter (its opening),
  * the Guide (its opening), the Domains (each its sentence), from the SDK's
@@ -764,131 +727,6 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
     }
   }
   return { block };
-}
-
-function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
-  const ghost = document.createElement('button');
-  ghost.type = 'button';
-  const assigning = getState().ui.castAssign?.kind === spec.kind;
-  ghost.className = 'atlas-home-cast-card atlas-home-cast-ghost'
-    + (assigning ? ' atlas-home-cast-assigning' : '');
-  ghost.title = spec.ghostTitle;
-  // Quiet by default (the "shows here on the cover" line was noise);
-  // in assignment mode the role line becomes the instruction. The line is
-  // ALWAYS rendered (nbsp when idle) so the card never changes height and
-  // the layout never shifts on click.
-  ghost.innerHTML = `
-    <span class="material-symbols-outlined atlas-home-cast-icon">${spec.icon}</span>
-    <span class="atlas-home-cast-text">
-      <span class="atlas-home-cast-name">${spec.ghostName}</span>
-      <span class="atlas-home-cast-role">${assigning ? 'in the left sidebar' : ' '}</span>
-    </span>
-  `;
-  ghost.addEventListener('click', () => {
-    const ui = getState().ui;
-    // Assignment MODE (Titus, 2026-07-10): the ghost doesn't just filter —
-    // the next click on a matching sidebar row assigns directly. One hop.
-    patchSlice('ui', {
-      ...ui,
-      sidebarMode: 'elements',
-      elementFilters: new Set([spec.elementType]),
-      castAssign: { kind: spec.kind },
-    });
-    setSidebarModePref('elements');
-  });
-  return ghost;
-}
-
-/**
- * The cast slot: a card per set favorite, a ghost per unset one. The ghosts
- * are story prompts, so a world with a charter gets none; a favorite set
- * from an element's header still shows.
- */
-function buildCastSlot(worldId: string, hasCharter: boolean): HTMLElement | null {
-  if (getState().data.loading) return null;
-  const reg = getState().registry;
-  const favorites = reg.worlds.find(w => w.id === worldId)?.favorites;
-  const elements = getState().data.elements;
-
-  const slot = document.createElement('div');
-  slot.className = 'atlas-home-cast';
-  let rendered = 0;
-  for (const spec of CAST_KINDS) {
-    const favId = spec.kind === 'protagonist' ? favorites?.protagonist_id : favorites?.nexus_id;
-    const el = favId ? elements.find(e => e.id === favId) : undefined;
-    if (favId && !el && elements.length > 0) {
-      // Stale favorite: the element was deleted (locally or via pull) and the
-      // registry id dangles. Self-heal lazily — every delete path lands on a
-      // home render eventually, and the loading guard above means an absent
-      // element is genuinely absent, not not-yet-loaded. Deferred: patching
-      // registry mid-render is the recursive-render class (conv #112).
-      const staleKind = spec.kind;
-      queueMicrotask(() => {
-        const next = setWorldFavoriteElement(getState().registry, worldId, staleKind, null);
-        saveRegistry(next);
-        patchSlice('registry', next);
-      });
-    }
-    if (el) {
-      slot.appendChild(buildCastCard(el, spec, worldId));
-      rendered++;
-    } else if (!hasCharter && elements.some(e => e.type === spec.elementType)) {
-      // Ghost only when the world HAS candidates of that type.
-      slot.appendChild(buildCastGhost(spec));
-      rendered++;
-    }
-  }
-  // Always return the slot — empty it reserves its row via CSS min-height, so
-  // the first character/location's ghost doesn't shift the page below (Titus:
-  // "the cards jumped down").
-  void rendered;
-  return slot;
-}
-
-/** One set cast card: face, name, role, click-through, hover × unset. */
-function buildCastCard(el: Element, spec: typeof CAST_KINDS[number], worldId: string): HTMLElement {
-  const { role, icon, kind } = spec;
-  const card = document.createElement('button');
-  card.type = 'button';
-  card.className = 'atlas-home-cast-card';
-    const image = (el as { image_url?: string }).image_url;
-    if (image) {
-      const face = document.createElement('span');
-      face.className = 'atlas-home-cast-face';
-      face.style.backgroundImage = `url(${JSON.stringify(image)})`;
-      card.appendChild(face);
-    } else {
-      const face = document.createElement('span');
-      face.className = 'material-symbols-outlined atlas-home-cast-icon';
-      face.textContent = ELEMENT_ICONS[el.type] ?? 'category';
-      card.appendChild(face);
-    }
-    const text = document.createElement('span');
-    text.className = 'atlas-home-cast-text';
-    text.innerHTML = `
-      <span class="atlas-home-cast-name">${escapeText(el.name || '(unnamed)')}</span>
-      <span class="atlas-home-cast-role"><span class="material-symbols-outlined">${icon}</span>${role}</span>
-    `;
-    card.appendChild(text);
-    card.addEventListener('click', () => navigate(elementHash(worldId, el.id)));
-    // Unset affordance (sitdown pile, S5 discoverability): the setter lives on
-    // the element header, but the UNSET must be reachable from where the
-    // assignment is visible. A span, not a button — buttons don't nest.
-    const unset = document.createElement('span');
-    unset.className = 'atlas-home-cast-unset material-symbols-outlined';
-    unset.setAttribute('role', 'button');
-    unset.setAttribute('aria-label', `Unset ${role}`);
-    unset.title = `Unset ${role}`;
-    unset.textContent = 'close';
-    unset.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const next = setWorldFavoriteElement(getState().registry, worldId, kind, null);
-      saveRegistry(next);
-      patchSlice('registry', next);
-      toastManager.info(`No longer the world's ${role}`);
-    });
-    card.appendChild(unset);
-    return card;
 }
 
 // ---- The desk (continue + recent) ------------------------------------------

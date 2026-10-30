@@ -40,7 +40,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/taxonomy.ts`: `suggestionsForField` (derive-from-world autocomplete) + `reservedValueHint`/`reservedRowHint` (writing tier CASE-SENSITIVE; knowledge/page/circle case-insensitive, mirroring the semantic sites).
 - `src/core/hotkeys.ts`: the declarative binding dispatcher (Ctrl+E/S/K; `?` opens the room-aware help overlay).
 - `src/core/live-folder.ts`: THE LIVE FOLDER (conv. 111): when to rescan, flush first, notices, linked-world rulings.
-- `src/core/world-prefs.ts`: notes/cast/calendar/labels mirrored to `.atlas/world-prefs.json` (conv. 112).
+- `src/core/world-prefs.ts`: notes/cast/calendar/labels mirrored to `.atlas/world-prefs.json` (conv. 112; the cast is kept, no longer shown, 1.113: `tests/unit/cast-retired.test.ts` holds who may read it).
 - `src/core/grounded.ts`: `isAtlasGrounded`: a root OR any non-demo world (conv. 114).
 - `src/core/browser-worlds.ts`: BROWSER WORLDS (1.17, conv. 129): `where` / `isBrowserWorld` / `isAtlasOnlyStorage`, `worldHandleFor` (derived), `removeBrowserWorldDir`, `filesWhereOf` (where the copy says the files are).
 - `src/core/browser-home.ts`: the browser home: nonced names, the make protocol (`openBrowserMake`: Web Lock + `.atlas/making`), boot `reconcileBrowserHome`.
@@ -106,7 +106,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 ## src/registry, src/demo, src/editor, src/layout
 
-- `src/registry/registry.ts`: the localStorage registry + helpers (two-tab merge, conv. 115; `setWorldFavoriteElement` for the protagonist/nexus).
+- `src/registry/registry.ts`: the localStorage registry + helpers (two-tab merge, conv. 115; `rekeyRegistryEntry` moves the ids an entry carries, the retired cast's `favorites` among them).
 - `src/demo/hyperion-world.json`: the TOUR bundle, baked from demo key 0000000000 (its ids are the live demo world's). Re-bakes follow DESIGN_TOUR's trap list.
 - `src/demo/demo-page.json`: the example share page (`#/demo`).
 - `src/demo/demo-view.ts`: `mountDemo` / `unmountDemo` / `isDemoMounted`, the view-only example page. A demo origin never earns a guide note.

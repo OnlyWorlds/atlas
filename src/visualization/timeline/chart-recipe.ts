@@ -2,7 +2,7 @@
  * Chart scope engine (DESIGN_CHARTS.md "The default").
  *
  * A world's full temporal dump is never a useful default (that's the "wall").
- * `tableauScope` composes the opening view — cast, leads, one seat per type,
+ * `tableauScope` composes the opening view — leads, one seat per type,
  * then weight-filled to the budget. No wizard: the auto-default IS the
  * welcome, the controls ARE the customization.
  *
@@ -25,13 +25,12 @@ function nodeWeight(n: TimelineNode): number {
 
 /**
  * The TABLEAU (Titus, 2026-07-10) — the world's default view when no type
- * filter is active: cast-centered essentials across categories, deliberately
- * not-crowded. Protagonist + nexus when set (and dated); otherwise the most
- * weighted character and location stand in; then the top-weighted nodes fill
- * across types (per-type cap so no single category floods it). Replaces the
- * old all-chips-off → whole-world-soup inversion. Deterministic.
+ * filter is active: essentials across categories, deliberately not-crowded.
+ * The most weighted character and location lead; then the top-weighted nodes
+ * fill across types (per-type cap so no single category floods it). Replaces
+ * the old all-chips-off → whole-world-soup inversion. Deterministic.
  */
-export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): ChartScope {
+export function tableauScope(nodes: TimelineNode[]): ChartScope {
   const TOTAL_CAP = 22;
   const PER_TYPE_CAP = 4; // diversity-pass cap only — the overflow pass relaxes it
   const picked = new Set<string>();
@@ -43,18 +42,12 @@ export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): Char
   const byWeight = (a: TimelineNode, b: TimelineNode): number =>
     nodeWeight(b) - nodeWeight(a) || (a.id < b.id ? -1 : 1);
 
-  // 1. The cast — always in, never counted against the caps.
-  for (const id of favoriteIds) {
-    const n = nodes.find(x => x.id === id);
-    if (n && !picked.has(n.id)) take(n);
-  }
-  // 2. A lead character + a lead location, when the cast doesn't cover them.
+  // 1. A lead character + a lead location.
   for (const t of ['character', 'location'] as const) {
-    if ([...picked].some(id => nodes.find(n => n.id === id)?.elementType === t)) continue;
     const best = nodes.filter(n => n.elementType === t).sort(byWeight)[0];
     if (best) take(best);
   }
-  // 3. Type fairness (charts lab fx-6: institutions got ZERO slots while
+  // 2. Type fairness (charts lab fx-6: institutions got ZERO slots while
   //    peers held duplicates): every type present seats its best node before
   //    any type doubles up. Alphabetical type order for determinism.
   for (const t of [...new Set(nodes.map(n => n.elementType))].sort()) {
@@ -63,7 +56,7 @@ export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): Char
     const best = nodes.filter(n => n.elementType === t && !picked.has(n.id)).sort(byWeight)[0];
     if (best) take(best);
   }
-  // 4. Essentials across categories: global weight order, per-type capped —
+  // 3. Essentials across categories: global weight order, per-type capped —
   //    diversity wins the early slots.
   const global = [...nodes].sort(byWeight);
   for (const n of global) {
@@ -72,7 +65,7 @@ export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): Char
     if ((typeCounts.get(n.elementType) ?? 0) >= PER_TYPE_CAP) continue;
     take(n);
   }
-  // 5. Overflow (charts lab fx-4: 63 dated elements opened as SEVEN dots
+  // 4. Overflow (charts lab fx-4: 63 dated elements opened as SEVEN dots
   //    because the per-type cap strangled the dominant type): remaining slots
   //    fill by weight regardless of type. In a world that is mostly events,
   //    events ARE the world — TOTAL_CAP alone guards against the wall.

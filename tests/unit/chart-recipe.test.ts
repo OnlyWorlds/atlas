@@ -80,22 +80,17 @@ describe('tableauScope — the default world view (all chips off)', () => {
     degree: opts.degree ?? 0, contentMass: opts.contentMass ?? 0,
   });
 
-  it('cast always in; lead character + location stand in when unset', () => {
+  it('the lead character and location come first, by weight', () => {
     const nodes = [
       mk('c1', 'character', { degree: 5 }),
       mk('c2', 'character', { degree: 1 }),
       mk('l1', 'location', { degree: 3 }),
       mk('e1', 'event', { degree: 2 }),
     ];
-    const withCast = tableauScope(nodes, ['c2']);
-    expect(withCast.kind).toBe('selection');
-    const ids1 = (withCast as { elementIds: string[] }).elementIds;
-    expect(ids1).toContain('c2');       // the explicit cast, even at low weight
-    expect(ids1).toContain('l1');       // lead location stands in
-    const noCast = tableauScope(nodes, []);
-    const ids2 = (noCast as { elementIds: string[] }).elementIds;
-    expect(ids2).toContain('c1');       // lead character inferred by weight
-    expect(ids2).toContain('l1');
+    const scope = tableauScope(nodes);
+    expect(scope.kind).toBe('selection');
+    const ids = (scope as { elementIds: string[] }).elementIds;
+    expect(ids.slice(0, 2)).toEqual(['c1', 'l1']);
   });
 
   it('diversity first, then a dominant type may fill remaining slots', () => {
@@ -104,7 +99,7 @@ describe('tableauScope — the default world view (all chips off)', () => {
       mk('c1', 'character', { degree: 1 }),
       mk('e1', 'event', { degree: 1 }),
     ];
-    const ids = (tableauScope(nodes, []) as { elementIds: string[] }).elementIds;
+    const ids = (tableauScope(nodes) as { elementIds: string[] }).elementIds;
     // Every present type is seated (fairness) …
     expect(ids).toContain('c1');
     expect(ids).toContain('e1');
@@ -121,7 +116,7 @@ describe('tableauScope — the default world view (all chips off)', () => {
       mk('l2', 'location', { degree: 0 }),
       mk('l3', 'location', { degree: 0 }),
     ];
-    const ids = (tableauScope(nodes, []) as { elementIds: string[] }).elementIds;
+    const ids = (tableauScope(nodes) as { elementIds: string[] }).elementIds;
     expect(ids.length).toBe(22);                                  // budget spent, not stranded at 7
     expect(ids.some(id => id.startsWith('l'))).toBe(true);        // locations keep a seat
     expect(ids.filter(id => id.startsWith('e')).length).toBeGreaterThan(10); // events allowed to dominate
@@ -133,7 +128,7 @@ describe('tableauScope — the default world view (all chips off)', () => {
     // institutions deliberately weighted ABOVE nothing but below everyone else
     const nodes = types.flatMap((t, ti) =>
       [0, 1].map(k => mk(`${t}-${k}`, t, { degree: t === 'institution' ? 0 : 24 - ti - k })));
-    const ids = (tableauScope(nodes, []) as { elementIds: string[] }).elementIds;
+    const ids = (tableauScope(nodes) as { elementIds: string[] }).elementIds;
     for (const t of types) {
       expect(ids.some(id => id.startsWith(`${t}-`)), `type ${t} must hold a seat`).toBe(true);
     }
@@ -143,8 +138,8 @@ describe('tableauScope — the default world view (all chips off)', () => {
   it('caps the total and is deterministic', () => {
     const nodes = Array.from({ length: 60 }, (_, i) =>
       mk(`x${i}`, ['event', 'character', 'location', 'object', 'narrative', 'title'][i % 6], { degree: i % 9 }));
-    const a = (tableauScope(nodes, []) as { elementIds: string[] }).elementIds;
-    const b = (tableauScope(nodes, []) as { elementIds: string[] }).elementIds;
+    const a = (tableauScope(nodes) as { elementIds: string[] }).elementIds;
+    const b = (tableauScope(nodes) as { elementIds: string[] }).elementIds;
     expect(a.length).toBeLessThanOrEqual(22);
     expect(a).toEqual(b);
   });

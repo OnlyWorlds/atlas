@@ -32,16 +32,15 @@ interface Placed {
   color: string;
   name: string;
   anchor: boolean;
-  cast?: 'protagonist' | 'home';
   ref?: string;
   endX?: number;
   /** Strip layout only: the side this node's label won, or none (the default
-   *  layout labels anchors and cast, flipping left at the right edge). */
+   *  layout labels anchors, flipping left at the right edge). */
   side?: 'right' | 'left';
 }
 
 /** One node as the strip lays it out: its x, its glyph size, its label's
- *  measured width, and whether it is a name the strip keeps (anchor, cast). */
+ *  measured width, and whether it is a name the strip keeps (an anchor). */
 export interface StripInput { x: number; size: number; labelW: number; keep?: boolean }
 /** Where the strip put a node: its row (0 = midline, ± outward) and its label's side, if any. */
 export interface StripPlacement { level: number; side: 'right' | 'left' | null }
@@ -53,7 +52,7 @@ const LABEL_OFFSET = 0.7;
 
 /**
  * The home strip's layout (rebuilt for #121): the kept names
- * (anchors, cast) first, then the rest, each group in date order, each node
+ * (anchors) first, then the rest, each group in date order, each node
  * on the nearest free row, centre-out. A node takes the first clear spot for
  * glyph plus label (each row: label right, then left), else a clear spot for
  * its glyph alone, else a row where its glyph covers no label (glyphs may
@@ -263,13 +262,13 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
         .map((n, i) => ({ n, i }))
         .sort((a, b) => a.n.date - b.n.date || a.i - b.i);
       const inputs = ordered.map(({ n }) => {
-        // Cast and anchors measure at 12px, the rest 11px, as they draw.
-        ctx.font = n.anchor || n.cast ? "12px system-ui, sans-serif" : "11px system-ui, sans-serif";
+        // Anchors measure at 12px, the rest 11px, as they draw.
+        ctx.font = n.anchor ? "12px system-ui, sans-serif" : "11px system-ui, sans-serif";
         return {
           x: dateToX(n.date),
-          size: n.cast ? ICON_ANCHOR + 3 : n.anchor ? ICON_ANCHOR : ICON,
+          size: n.anchor ? ICON_ANCHOR : ICON,
           labelW: ctx.measureText(n.name).width,
-          keep: !!(n.anchor || n.cast),
+          keep: !!n.anchor,
         };
       });
       const layout = layoutStrip(inputs, cssW, maxLevel);
@@ -278,7 +277,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
         return {
           x: inputs[k].x, y: midY + layout[k].level * Y_STEP,
           icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
-          color, name: n.name, anchor: !!n.anchor, cast: n.cast, ref: n.ref,
+          color, name: n.name, anchor: !!n.anchor, ref: n.ref,
           endX: n.endDate != null ? dateToX(n.endDate) : undefined,
           side: layout[k].side ?? undefined,
         };
@@ -300,7 +299,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
         return {
           x, y: midY + level * Y_STEP,
           icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
-          color, name: n.name, anchor: !!n.anchor, cast: n.cast, ref: n.ref,
+          color, name: n.name, anchor: !!n.anchor, ref: n.ref,
           endX: n.endDate != null ? dateToX(n.endDate) : undefined,
         };
       });
@@ -317,12 +316,11 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       ctx.stroke();
     }
 
-    // Glyphs + anchor/cast labels (cast = the world's protagonist/home —
-    // always labelled, in cyan, matching the interactive room's signal).
+    // Glyphs + anchor labels.
     ctx.textBaseline = 'middle';
     for (const p of placed) {
-      const size = p.cast ? ICON_ANCHOR + 3 : p.anchor ? ICON_ANCHOR : ICON;
-      if (p.anchor && !p.cast) {
+      const size = p.anchor ? ICON_ANCHOR : ICON;
+      if (p.anchor) {
         // In the strip the halo stays inside its row: at size * 0.85 it
         // reached halfway into the next row's labels.
         const halo = opts.layout === 'strip' ? Math.min(size * 0.85, Y_STEP / 2 - 1) : size * 0.85;
@@ -337,8 +335,8 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       ctx.fillText(p.icon, p.x, p.y);
 
       const strip = opts.layout === 'strip';
-      if (strip ? p.side : (p.anchor || p.cast)) {
-        const plain = !p.anchor && !p.cast;
+      if (strip ? p.side : p.anchor) {
+        const plain = !p.anchor;
         ctx.font = plain ? "11px system-ui, sans-serif" : "12px system-ui, sans-serif";
         const lw = ctx.measureText(p.name).width;
         // The strip paints the side its layout decided; the default layout
@@ -350,8 +348,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
           ctx.fillStyle = '#0a0a0a';
           ctx.fillRect(x0 - 2, p.y - 8, lw + 4, 16);
         }
-        ctx.fillStyle = p.cast ? 'rgba(34,211,238,0.95)'
-          : plain ? 'rgba(255,255,255,0.62)'
+        ctx.fillStyle = plain ? 'rgba(255,255,255,0.62)'
           : 'rgba(255,255,255,0.85)';
         ctx.textAlign = 'left';
         ctx.fillText(p.name, x0, p.y);

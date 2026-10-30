@@ -520,24 +520,6 @@ export function dismissTourCard(
   };
 }
 
-export function setWorldFavoriteElement(
-  reg: WorldsRegistry,
-  worldId: string,
-  kind: 'protagonist' | 'nexus',
-  elementId: string | null,
-): WorldsRegistry {
-  return {
-    ...reg,
-    worlds: reg.worlds.map(w => {
-      if (w.id !== worldId) return w;
-      const favorites = { ...(w.favorites ?? {}) };
-      if (kind === 'protagonist') favorites.protagonist_id = elementId;
-      else favorites.nexus_id = elementId;
-      return { ...w, favorites };
-    }),
-  };
-}
-
 /**
  * The charts room's active calendar lens for a world (2B). Device-local room
  * state; null = bare numbers. Dangling ids are resolved (to bare numbers) at

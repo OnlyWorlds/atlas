@@ -644,10 +644,13 @@ export interface WorldRegistryEntry {
   order?: number;
   favorite?: boolean;
   /**
-   * Home-cover favorites (D2b): the world's named cast — a protagonist
-   * (character) and a home/nexus (location). Assignment via the element-detail
-   * header icon (char + loc only); rendered as the cast slot on the home
-   * cover page. Atlas-local (registry-side, never synced).
+   * The world's cast as an older Atlas picked it: a protagonist (a Character)
+   * and a home, `nexus` (a Location). Retired from the UI in 1.113: nothing
+   * shows or writes it, and it is kept as it was (in `.atlas/world-prefs.json`
+   * too, WORLD_PREF_KEYS) so an older Atlas on the same folder keeps its cast;
+   * a re-key still moves its ids. Atlas-local (registry-side, never synced).
+   * Read only here, in `registry/`, `core/world-prefs.ts` and `store/rekey.ts`
+   * (`tests/unit/cast-retired.test.ts`).
    */
   favorites?: {
     protagonist_id?: string | null;

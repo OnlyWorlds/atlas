@@ -722,17 +722,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       .addEventListener('click', () => { mintDismissed = true; renderMintOffer(); });
   }
 
-  /** The world's cast favorites (protagonist/nexus ids) from the registry. */
-  function castIds(): string[] {
-    const wid = worldId();
-    const favorites = wid ? getState().registry.worlds.find(w => w.id === wid)?.favorites : undefined;
-    return [favorites?.protagonist_id, favorites?.nexus_id]
-      .filter((x): x is string => typeof x === 'string' && x.length > 0);
-  }
-
   /**
    * The scope the live view is currently showing. Focus (URL) wins; an EMPTY
-   * type filter means the TABLEAU (the world's cast + weighted essentials),
+   * type filter means the TABLEAU (the world's weighted essentials),
    * not "everything" — unticking every chip used to invert into the full soup.
    */
   function effectiveScope(allNodes: TimelineNode[], route: Route): ChartScope {
@@ -740,7 +732,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // focus (the URL) still wins; a type-chip click clears it (above).
     if (!route.elementId && appliedSelection) return appliedSelection.scope;
     if (!route.elementId && typeFilter && typeFilter.size === 0) {
-      return tableauScope(allNodes, castIds());
+      return tableauScope(allNodes);
     }
     return scopeFromFocus(route.elementId ?? null, typeFilter);
   }
@@ -1019,15 +1011,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // The active saved chart, if the live scope matches one — its name becomes
     // the rail's heading ("This chart" should speak the chart's name).
     const activeChart = savedCharts.find(c => sameScope(c.scope, scope)) ?? null;
-    // Cast favorites (S4 + the cast marks): re-read each render so a toggle on
-    // the element header reflects immediately.
-    const favorites = getState().registry.worlds.find(w => w.id === wid)?.favorites;
     const extras: TimelineViewExtras = {
       chartLabel: activeChart?.name ?? null,
-      cast: {
-        protagonistId: favorites?.protagonist_id ?? null,
-        nexusId: favorites?.nexus_id ?? null,
-      },
       now: nowValue(),
       undated: undatedElements(),
       // The chart's subject (Act 2A): the URL focus draws emphasized.

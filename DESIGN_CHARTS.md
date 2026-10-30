@@ -159,7 +159,7 @@ ChartScope =
 
 ## The default — the TABLEAU (revised 2026-07-10, Titus's call)
 
-**The Charts room LANDS on the tableau**: no type chips lit (neutral state), `tableauScope` composing the world at a glance — protagonist + nexus always in (lead character + location stand in when unset), then the top-weighted essentials across categories (per-type cap 4, total 22, weight = degree + log content-mass, deterministic). Cast marks + the sparse-set spacing make the protagonist central and the view breathable. Ticking chips narrows to those types; all-off returns to the tableau (the old empty-filter → "everything" inversion is closed).
+**The Charts room LANDS on the tableau**: no type chips lit (neutral state), `tableauScope` composing the world at a glance: the lead character and location by weight, then the top-weighted essentials across categories (per-type cap 4, total 22, weight = degree + log content-mass, deterministic). The sparse-set spacing keeps the view breathable. (Until 1.113 the world's cast, a picked protagonist and home, led the tableau and drew in cyan; the cast is retired from the UI, its stored picks kept: DESIGN_HOME "The cast, retired".) Ticking chips narrows to those types; all-off returns to the tableau (the old empty-filter → "everything" inversion is closed).
 
 `pickDefaultChart(elements)` was the ordered recipe list (Story → Events → Character life → Foundings → all). It is **DELETED** — it went consumer-less once the tableau became both the room default and the home-strip default (the home chart strip now runs `tableauScope`, see line ~271). The recipe list is kept below as historical rationale, not a live engine (corrected 2026-07-22):
 1. **Writing spine** — a `parent_narrative` tree + dated content → narratives + events.
@@ -191,8 +191,8 @@ X is the only meaningful axis (date); Y is anti-overlap. The rule: **a node sits
 **Navigation — PEEK/FOCUS split (2026-07-10; REVISES the original "unified select=focus", which Titus reopened after real use — every click narrowing made reading expensive):**
 - **PEEK** — clicking a glyph, label, or card chip shows that element's card in the reserved right rail. No routing, no scope change; re-click, ×, or another click moves it. Reading is free.
 - **FOCUS** — the card's Focus action (and the room's fallback for out-of-scope chip targets) routes to `/timeline/<id>`: scope narrows to the temporal neighbourhood, the pill shows, **browser Back walks the focus chain**. A focus navigation auto-peeks its element. **Edit** on the card opens the element inspect room.
-- **The rail is ALWAYS reserved** (no canvas reflow on peek — the "jump" complaint): nothing peeked → ambient content (cast rows, type legend with counts, interaction hint).
-- **The TABLEAU**: all type chips off = the world's default view, NOT everything — `tableauScope` picks the cast (protagonist/nexus; lead character + location stand in) plus weighted essentials across categories (per-type cap 4, total 22). The old empty-filter → 'all' inversion is closed. Cast glyphs carry a persistent cyan ring + pin badge at every scope/zoom.
+- **The rail is ALWAYS reserved** (no canvas reflow on peek — the "jump" complaint): nothing peeked → ambient content (type legend with counts, interaction hint).
+- **The TABLEAU**: all type chips off = the world's default view, NOT everything — `tableauScope` picks the lead character and location plus weighted essentials across categories (per-type cap 4, total 22). The old empty-filter → 'all' inversion is closed.
 - The right-pane context graph anchor-defaults to the highest-degree in-scope node (never empty).
 
 ---
@@ -266,7 +266,7 @@ Two things under "recurring": (1) true recurrence (rule generates instances — 
 
 Lab: 6 fixture worlds. The durable rules:
 
-- **The tableau fill (tableauScope, chart-recipe.ts)**: cast (uncapped) → lead character+location → ONE SEAT PER PRESENT TYPE (fairness round-robin — no dateable type with members renders zero) → per-type-capped weight fill (diversity wins early slots) → OVERFLOW fill by weight regardless of type up to the 22 total. Rationale: in a world that is mostly events, events ARE the world; the total cap alone guards the wall. A 14-dated world shows all 14; a 63-dated world spends the whole budget.
+- **The tableau fill (tableauScope, chart-recipe.ts)**: lead character+location → ONE SEAT PER PRESENT TYPE (fairness round-robin — no dateable type with members renders zero) → per-type-capped weight fill (diversity wins early slots) → OVERFLOW fill by weight regardless of type up to the 22 total. Rationale: in a world that is mostly events, events ARE the world; the total cap alone guards the wall. A 14-dated world shows all 14; a 63-dated world spends the whole budget.
 - **Range lines are occupied lanes** (computeBeeswarm): range-bearing nodes reserve their full x-span at their row, so point-events never sit exactly ON a range line — on-the-line used to fake membership by coincidence of the midline rule. (Room renderer only; chart-static's copy inherits at the next show re-lift.)
 - **Click progression**: click = peek · click the peeked node again = FOCUS · click empty canvas / Esc / card × = dismiss. Revises the 2026-07-10 re-click-deselects lock, reopened by its own locker in live use.
 - **Selection mark**: two rings (soft type-color halo + crisp near-white inner) — the old single 0.55-alpha ring was invisible. Hit radius 14px (the whole drawn circle, not the icon).

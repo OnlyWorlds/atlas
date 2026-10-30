@@ -1630,8 +1630,8 @@ html {
 /* The KIND icon only — the bare icon that sits directly in the band (element/
    knowledge/share entity headers append it as a direct child). The old
    descendant selector painted EVERY header icon cyan at 20px, including the
-   cast-favorite toggle — which made every character's person_pin read as "this
-   is the protagonist" (Titus's flag; specificity tie, later rule won).
+   header's toggles, which then all read as switched on (Titus's flag;
+   specificity tie, later rule won).
    Icons nested inside buttons keep their own button styling. */
 .atlas-middle-header > .material-symbols-outlined {
   font-size: 20px;
@@ -2643,11 +2643,10 @@ body.atlas-touring:not(.atlas-tour-finalstep) .atlas-sidebar-footer { display: n
    above the dock (the walk measured 6.5px short on the Consul's World
    section). Tour-only padding gives the scroll somewhere to go. */
 body.atlas-touring .atlas-detail { padding-bottom: 56px; }
-/* The element header's protagonist / sync-dot / delete controls are noise on
+/* The element header's sync-dot / delete controls are noise on
    a beginner's first element pages (Titus). The map/pin cluster
    stays: the pin beat teaches with the real +pin button. */
 body.atlas-touring [data-action="delete-element"],
-body.atlas-touring [data-action="set-cast-favorite"],
 body.atlas-touring [data-role="element-sync-dot"] { display: none; }
 /* The landing's middle is never wanted during the tour — the narrator is the
    voice (before `shell` the shell is hidden anyway; after it, a world exists). */
@@ -11413,11 +11412,7 @@ td.atlas-writing-setup-promote-count {
 }
 
 /* Sidebar banner — visible while the lens is on; carries the exit ×. */
-/* .atlas-cast-assign-banner mirrors the lens banner look but keeps its OWN
-   class — e2e locators on .atlas-lens-banner must match exactly one element.
-   The -icon/-label/-off child classes are shared (style-only, never located). */
-.atlas-lens-banner,
-.atlas-cast-assign-banner {
+.atlas-lens-banner {
   display: none;
   align-items: center;
   gap: 6px;
@@ -11430,14 +11425,11 @@ td.atlas-writing-setup-promote-count {
   line-height: 1.3;
 }
 
-.atlas-lens-banner[data-active="true"],
-.atlas-cast-assign-banner[data-active="true"] { display: flex; }
+.atlas-lens-banner[data-active="true"] { display: flex; }
 
-.atlas-lens-banner-icon,
-.atlas-cast-assign-icon { font-size: 14px; flex: 0 0 auto; }
+.atlas-lens-banner-icon { font-size: 14px; flex: 0 0 auto; }
 
-.atlas-lens-banner-label,
-.atlas-cast-assign-label {
+.atlas-lens-banner-label {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -11445,8 +11437,7 @@ td.atlas-writing-setup-promote-count {
   white-space: nowrap;
 }
 
-.atlas-lens-banner-off,
-.atlas-cast-assign-off {
+.atlas-lens-banner-off {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -11458,8 +11449,7 @@ td.atlas-writing-setup-promote-count {
   border-radius: 4px;
 }
 
-.atlas-lens-banner-off:hover,
-.atlas-cast-assign-off:hover { color: var(--atlas-accent-text); }
+.atlas-lens-banner-off:hover { color: var(--atlas-accent-text); }
 
 /* The live folder: what another tool changed on disk. Same shape as
    the lens banner; its own class family (lens e2e locators are strict). */
@@ -11516,8 +11506,7 @@ td.atlas-writing-setup-promote-count {
   background: var(--atlas-cyan);
 }
 
-.atlas-lens-banner-off .material-symbols-outlined,
-.atlas-cast-assign-off .material-symbols-outlined { font-size: 13px; }
+.atlas-lens-banner-off .material-symbols-outlined { font-size: 13px; }
 
 /* The dimming itself — the world going dark outside the knower's knowledge.
    Transition scoped to the lens class (NOT bare .atlas-row) so drag-dim
@@ -13193,42 +13182,12 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-timeline-chip-more:hover { color: var(--atlas-accent-text); }
 
-/* The rail's ambient (nothing-peeked) state: legend + cast + hint. */
+/* The rail's ambient (nothing-peeked) state: legend + hint. */
 .atlas-timeline-rail-head {
   font-size: 12px;
   font-weight: 600;
   color: var(--atlas-text-muted);
   margin-bottom: 8px;
-}
-.atlas-timeline-rail-cast {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  background: transparent;
-  border: none;
-  padding: 4px 0;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--atlas-text);
-  cursor: pointer;
-  text-align: left;
-}
-.atlas-timeline-rail-cast .material-symbols-outlined {
-  font-size: 15px;
-  color: var(--atlas-accent-text);
-}
-.atlas-timeline-rail-cast:hover .atlas-timeline-rail-cast-name { color: var(--atlas-accent-text); }
-.atlas-timeline-rail-cast-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.atlas-timeline-rail-cast-role {
-  font-size: 10px;
-  color: var(--atlas-text-muted);
 }
 .atlas-timeline-rail-legend {
   margin-top: 10px;
@@ -15375,102 +15334,6 @@ a.atlas-share-map-pin { cursor: pointer; }
   pointer-events: none;
 }
 
-/* Cast slot (D2b): protagonist + home cards. */
-.atlas-home-cast {
-  display: flex;
-  gap: 10px;
-  margin-top: 18px;
-  /* Reserved even when empty — the first ghost card must not shift the tour
-     below. Matches the card's rendered height. */
-  min-height: 52px;
-}
-.atlas-home-cast-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(var(--atlas-ink-rgb), 0.02);
-  border: 1px solid var(--atlas-divider);
-  border-radius: 6px;
-  padding: 8px 14px 8px 10px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
-}
-.atlas-home-cast-card:hover {
-  border-color: var(--atlas-cyan-soft, rgba(var(--atlas-accent-rgb), 0.4));
-  background: rgba(var(--atlas-ink-rgb), 0.04);
-}
-/* Ghost card: no favorite set yet — quiet invitation, not a demand. */
-.atlas-home-cast-ghost {
-  background: transparent;
-  border-style: dashed;
-}
-/* Assignment mode: the ghost was clicked, the next sidebar click assigns —
-   hold a cyan edge while the "click in the left sidebar" instruction shows. */
-.atlas-home-cast-ghost.atlas-home-cast-assigning {
-  border-color: var(--atlas-cyan-soft, rgba(var(--atlas-accent-rgb), 0.4));
-}
-.atlas-home-cast-ghost.atlas-home-cast-assigning .atlas-home-cast-role {
-  color: var(--atlas-accent-text);
-}
-.atlas-home-cast-ghost .atlas-home-cast-icon,
-.atlas-home-cast-ghost .atlas-home-cast-name {
-  color: var(--atlas-text-muted);
-}
-.atlas-home-cast-ghost:hover .atlas-home-cast-icon,
-.atlas-home-cast-ghost:hover .atlas-home-cast-name {
-  color: var(--atlas-text);
-}
-.atlas-home-cast-face {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background-size: cover;
-  background-position: center;
-  flex: 0 0 auto;
-}
-.atlas-home-cast-icon {
-  font-size: 26px !important;
-  color: var(--atlas-text-muted);
-}
-.atlas-home-cast-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-}
-.atlas-home-cast-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--atlas-text);
-}
-.atlas-home-cast-role {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10px;
-  color: var(--atlas-text-muted);
-}
-.atlas-home-cast-role .material-symbols-outlined { font-size: 12px; }
-/* Unset affordance: hidden at rest, revealed on card hover (the card stays a
-   clean cover element until you reach for it). Warm on hover = consequential. */
-.atlas-home-cast-unset {
-  font-size: 14px !important;
-  color: var(--atlas-text-muted);
-  opacity: 0;
-  margin-left: 4px;
-  padding: 2px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
-}
-.atlas-home-cast-card:hover .atlas-home-cast-unset { opacity: 0.7; }
-.atlas-home-cast-unset:hover {
-  opacity: 1 !important;
-  color: var(--atlas-danger-hover);
-  background: rgba(var(--atlas-ink-rgb), 0.06);
-}
-
 /* The woven stat line — replaces the count-card grid. */
 .atlas-home-statline {
   display: flex;
@@ -15727,11 +15590,6 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-accent-text);
   opacity: 0.75;
   flex: 0 0 auto;
-}
-
-/* Element-detail header: cast-favorite toggle (D2b). */
-.atlas-header-favorite.active .material-symbols-outlined {
-  color: var(--atlas-accent-text);
 }
 
 /* ==== Share simplification (D5/T-S7/S3) ==== */
@@ -16809,10 +16667,6 @@ body.atlas-share-fullpreview > * {
 }
 
 .atlas-scroll-card.focused .atlas-scroll-card-name { color: rgb(var(--atlas-ink-rgb)); }
-
-.atlas-scroll-card.cast .atlas-scroll-card-dot {
-  box-shadow: 0 0 0 3px rgba(var(--atlas-accent-rgb), 0.35);
-}
 
 .atlas-scroll-card-head {
   display: flex;

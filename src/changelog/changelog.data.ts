@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.113.0',
+    date: '2026-10-30',
+    theme: 'A quieter Home',
+    entries: [
+      {
+        id: 'cast-retired',
+        title: 'No protagonist or home place on Home',
+        body: 'Home no longer shows a protagonist and a home place. Any you picked are kept in the world folder.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.112.1',
     date: '2026-10-30',
     theme: 'The mark offline',

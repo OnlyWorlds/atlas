@@ -52,7 +52,7 @@ A room is a top-level mode of the middle pane (`MiddleMode` in `src/core/state.t
 
 **The room nav strip** (`src/middle/room-nav.ts`): Home, Writing, Knowledge, Charts, Pages, Data, then a field-shaped search pill anchored right (it opens the command palette), plus the drawer toggles below 1100px. With no world it renders a labelled PREVIEW of the same rooms (`aria-disabled`, tooltips say they open once a world exists). The selected-element chip sits at its right edge while an element is selected (conv. 45). Settings is not on the strip; the sidebar gear is its door.
 
-**Element selection** lives in the element room: selecting an element navigates to `#/w/<id>/element/<eid>`, whose compact header band carries the element's actions (delete, add child, map and pin chips, favorites). **Esc** clears the selection and goes home when no modal, popover or placement is active, except in the writing, knowledge, pages and data rooms, which own their keyboards (conv. 32, 46; `src/core/hotkeys.ts`).
+**Element selection** lives in the element room: selecting an element navigates to `#/w/<id>/element/<eid>`, whose compact header band carries the element's actions (delete, add child, map and pin chips). **Esc** clears the selection and goes home when no modal, popover or placement is active, except in the writing, knowledge, pages and data rooms, which own their keyboards (conv. 32, 46; `src/core/hotkeys.ts`).
 
 **Room headers, the two-tier rule** (conv. 80):
 - A **room landing** (home, knowledge list, pages list, charts, settings, data, writing with no narrative) opens with `.atlas-room-header`: a 22px `<h1>` in `--atlas-text` plus an optional subtitle, with the primary action in an `.atlas-room-actions` row below. Section headings inside are sentence case.
@@ -95,7 +95,6 @@ interface UiState {
   zoneEditing: { zoneId: string; mapId: string } | null;
   sidebarWritingOverride: boolean;                        // in-session only
   knowledgeLens: { knowerId: string } | null;             // dims the sidebar to one knower's knowledge; in-session
-  castAssign: { kind: 'protagonist' | 'nexus' } | null;   // the home ghost card's assign mode; in-session
 }
 ```
 

@@ -42,7 +42,6 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     purpose: 'Your world at a glance, and the fastest way back into it.',
     can: [
       'edit the world name and description by clicking them',
-      'set a protagonist or home from any character or location header',
       'jump to any element type from the stat line',
       'pick up where you left off from the Recent list',
       {
@@ -116,8 +115,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       },
       'focus a title or character to see its tenure or life drawn to the now',
       {
-        mouse: 'filter by type and zoom from eras down to days (no types picked = the cast and essentials, not everything)',
-        touch: 'filter by type, pinch to zoom from eras down to days and slide sideways to travel (no types picked = the cast and essentials, not everything)',
+        mouse: 'filter by type and zoom from eras down to days (no types picked = the essentials, not everything)',
+        touch: 'filter by type, pinch to zoom from eras down to days and slide sideways to travel (no types picked = the essentials, not everything)',
       },
       'switch to the document view and scroll through your history: eras section it, skipped time is named, the now is a seam you scroll across',
       { mouse: 'save a chart and reload it from the gallery, or drop it onto a share page', touch: 'save a chart and reload it from the gallery, or put it on a page with + chart in Pages' },
