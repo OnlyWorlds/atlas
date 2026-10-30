@@ -1503,8 +1503,10 @@ html {
   /* never wrap — keeps the header strictly 1 row */
   gap: 10px;
   background: var(--atlas-bg-panel);
-  overflow: hidden;
-  /* clip rather than push the band taller */
+  /* Clip sideways rather than push the band taller; below it stays open, so the
+     OnlyWorlds mark's fan-out (a pop under the name) shows past the band. */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 /* Defensive: any direct children that try to claim their own height get
@@ -18074,3 +18076,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 @media (pointer: coarse) {
   .atlas-guide-block.atlas-home-grow .atlas-btn-link, .atlas-home-grow-picture .atlas-btn-link { min-height: 44px; display: inline-flex; align-items: center; }
 }
+
+/* The OnlyWorlds mark beside a name (the SDK's Waymark, waymark-slot.ts): its own slot after the heading.
+   On Home the name and the mark share a row, the mark on the name's last line at the heading's size. */
+.atlas-home-name-row { display: flex; align-items: last baseline; gap: 0; min-width: 0; }
+.atlas-home-name-row .atlas-home-world-name { min-width: 0; }
+.atlas-home-name-row .atlas-waymark { font-size: 22px; flex: 0 0 auto; }
+.atlas-middle-header .atlas-waymark { font-size: 15px; display: inline-flex; align-items: center; }
+.atlas-waymark:empty { display: none; }

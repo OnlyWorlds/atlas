@@ -9,6 +9,8 @@
 // works offline. The CSS rule references the woff2 shipped by the package;
 // Vite copies it into the bundle and the @font-face URL resolves locally.
 import 'material-symbols/outlined.css';
+// The OnlyWorlds mark and its fan-out (the SDK's Waymark): its one stylesheet, no style attributes.
+import '@onlyworlds/sdk/waymark.css';
 
 import { FsFolderStore, ELockHeld } from './store/folder-store-fs';
 import { startApp } from './app';

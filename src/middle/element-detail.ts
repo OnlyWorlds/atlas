@@ -38,6 +38,8 @@ import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
 import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-detail-header';
+import { waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
+import { keptSetOf } from '../sync/sync-attach';
 import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
@@ -110,6 +112,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
     queueMicrotask(render);
   };
   target.addEventListener('focusout', onFocusOut);
+  // The OnlyWorlds mark beside the name: held open, a redraw waits for its fan-out to close (Waymark R7).
+  let mark: WaymarkSlot | null = null;
+  const dropMark = (): void => { mark?.dispose(); mark = null; };
 
   // Rebuilt only when an input moved (conv. 146): a rebuild between a
   // press and its release loses the click, and the page subscribes to every
@@ -119,13 +124,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
   const gate = renderGate();
 
   function render(): void {
-    if (isEditingIn(target)) { renderDeferred = true; return; }
+    if (isEditingIn(target) || waymarkOpenIn(target)) { renderDeferred = true; return; }
     const s = getState();
     const touring = isTourFlagActive();
     if (!gate.changed([window.location.hash, s.active, s.data, s.ui, s.registry, s.styles, touring,
       touring && document.body.classList.contains('atlas-tour-basefull'),
-      pendingInlineNameEdit(), pendingCustomFieldEdit()])) return;
+      pendingInlineNameEdit(), pendingCustomFieldEdit(), s.active ? keptSetOf(s.active.worldId) : undefined])) return;
     captureScrollBeforeRender();
+    dropMark();
     target.innerHTML = '';
     const state = getState();
     const route = parseHash(window.location.hash);
@@ -161,7 +167,16 @@ export function mountElementDetail(target: HTMLElement): () => void {
   }
 
   function renderDetail(el: Element): void {
-    target.appendChild(renderHeader(el, { hiddenNote: true }));
+    const header = renderHeader(el, { hiddenNote: true });
+    target.appendChild(header);
+    // The mark sits after the name, never inside it (the name is click-to-rename); mounted here, not in
+    // renderHeader, which the writing workspace shares.
+    const name = header.querySelector('[data-role="element-name"]');
+    const worldId = getState().active?.worldId;
+    if (name && worldId) {
+      mark = waymarkSlot(worldId, el, onFocusOut);
+      name.after(mark.el);
+    }
 
     const body = document.createElement('div');
     body.className = 'atlas-middle-body';
@@ -481,6 +496,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     unsubHash();
     renderDeferred = false;
     target.removeEventListener('focusout', onFocusOut);
+    dropMark();
   };
 }
 

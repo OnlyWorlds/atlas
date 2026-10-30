@@ -63,6 +63,7 @@ import { hiddenRowWord } from '../core/hidden-mark';
 import { isMoppetopiaOpen } from '../core/moppetopia';
 import { buildHomePicture, type HomePicture } from './home-picture';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
+import { waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -139,6 +140,16 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   let owed = false;
   const onGridClosed = (): void => { if (owed) { owed = false; render(); } };
   root.addEventListener(GRID_CLOSED, onGridClosed);
+  // The OnlyWorlds mark beside the world's name (Waymark R7): its open fan-out holds a redraw the same way.
+  let marks: WaymarkSlot[] = [];
+  const dropMarks = (all: boolean): void => {
+    marks = marks.filter(m => {
+      if (!all && m.el.isConnected) return true;
+      m.dispose();
+      return false;
+    });
+  };
+  const onMark = (m: WaymarkSlot): void => { marks.push(m); };
   // The path closed while this Home was open (Done, ×): the cover's doors come back under the grid in
   // this mount, so the close moves no square; a Home opened fresh draws them above again.
   let pathWasOpen: string | null = null;
@@ -155,8 +166,9 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, aidsHidden(), s.data.loading, s.data.loadingProgress?.done, s.registry,
       s.ui.castAssign?.kind, savedCharts, isTourFlagActive(), s.active ? doorOf(s.active.worldId) : undefined];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
-    if (root.querySelector(`[${GRID_OPEN_ATTR}]`)) { owed = true; return; }
+    if (root.querySelector(`[${GRID_OPEN_ATTR}]`) || waymarkOpenIn(root)) { owed = true; return; }
     lastInputs = inputs;
+    dropMarks(true);
     picture?.destroy();
     picture = null;
     grow?.destroy();
@@ -194,7 +206,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }
     const doors: CoverDoors = pathOpen ? 'held' : closedHere === worldId ? 'below' : 'above';
     root.innerHTML = '';
-    let cover = buildCover(meta, worldId, totalElements, counts, toasts, doors);
+    let cover = buildCover(meta, worldId, totalElements, counts, toasts, doors, onMark, onGridClosed);
     root.appendChild(cover);
     const demoLine = buildDemoLine(worldId, toasts);
     if (demoLine) root.appendChild(demoLine);
@@ -253,9 +265,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // the cover draws its doors above the card again, as on a world past its first steps.
     const handOver = (): void => {
       if (doors === 'held' && cover.isConnected) {
-        const full = buildCover(meta, worldId, totalElements, counts, toasts, 'above');
+        const full = buildCover(meta, worldId, totalElements, counts, toasts, 'above', onMark, onGridClosed);
         cover.replaceWith(full);
         cover = full;
+        dropMarks(false);
       }
       centred(() => tour?.section ?? null)();
     };
@@ -298,6 +311,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   render();
   return () => {
     root.removeEventListener(GRID_CLOSED, onGridClosed);
+    dropMarks(true);
     window.removeEventListener('atlas:charts-changed', onChartsChanged);
     unsub();
     unsubDoor();
@@ -402,6 +416,8 @@ function buildCover(
   counts: Map<string, number>,
   toasts: ToastManager,
   doors: CoverDoors = 'above',
+  onMark?: (m: WaymarkSlot) => void,
+  onMarkClose?: () => void,
 ): HTMLElement {
   const cover = document.createElement('section');
   cover.className = 'atlas-home-identity';
@@ -434,6 +450,16 @@ function buildCover(
     <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Click to rename (here only; the online name is in Settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   `;
+  // The OnlyWorlds mark after the name, in a row with it, never inside the click-to-rename h1.
+  const heading = identity.querySelector('.atlas-home-world-name');
+  if (heading && onMark) {
+    const row = document.createElement('div');
+    row.className = 'atlas-home-name-row';
+    heading.replaceWith(row);
+    const mark = waymarkSlot(worldId, null, onMarkClose);
+    row.append(heading, mark.el);
+    onMark(mark);
+  }
   // A copy that is one Character's view, or the public one (folder spec §4.2, R1).
   const sliceNote = partialSliceNote(meta);
   if (sliceNote) identity.insertAdjacentHTML('beforeend', `<p class="atlas-home-slice-note" data-role="slice-note">${escapeText(sliceNote)}</p>`);
