@@ -88,7 +88,7 @@ export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: 
     p.setAttribute('class', cls);
     svg.appendChild(p);
   };
-  // A holder's rail (Seethe's drawing B): down the left of its column band, one step further in per
+  // A holder's rail (the design's drawing B): down the left of its column band, one step further in per
   // level its holder is in, from below the holder's name, with a tick to each held square's left edge.
   const step = g.colW * INDENT;
   const held = new Map<string, typeof grid.cells>();
@@ -112,7 +112,11 @@ export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: 
     const y2 = topY(b.line, b.row) + g.sq / 2;
     const adjacent = a.line === b.line && Math.abs(a.pos - b.pos) <= 1 && a.row === b.row;
     if (adjacent) path(`M${x1} ${y1} L${x2} ${y2}`, 'atlas-home-grid-link');
-    else {
+    else if (a.line === b.line && a.pos === b.pos) {
+      // Two in one column (a stack): the line bows out to the right, never straight through the squares between.
+      const bow = Math.max(x1, x2) + g.sq / 2 + g.colW * 0.2;
+      path(`M${x1 + g.sq / 2} ${y1} C ${bow} ${y1}, ${bow} ${y2}, ${x2 + g.sq / 2} ${y2}`, 'atlas-home-grid-link');
+    } else {
       const lift = Math.min(y1, y2) - g.sq / 2 - 6;
       path(`M${x1} ${y1} C ${x1} ${lift}, ${x2} ${lift}, ${x2} ${y2}`, 'atlas-home-grid-link');
     }
@@ -145,6 +149,8 @@ export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: 
     const name = document.createElement('span');
     name.className = 'atlas-home-grid-name';
     name.textContent = names.nameOf(c.id);
+    // The name clamps at two lines; the whole of it rides on hover (the accessible name reads the text whole).
+    cell.title = names.nameOf(c.id);
     cell.append(square, name);
     host.appendChild(cell);
   }

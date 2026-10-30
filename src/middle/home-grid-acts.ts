@@ -126,12 +126,20 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
     }
     drag.el.style.transform = `translate(${dx}px, ${dy}px)`;
   };
+  /** Let go without a drop: the square springs back, nothing is written. */
+  const springBack = (d: NonNullable<typeof drag>): void => {
+    d.el.classList.remove('is-lifted');
+    d.el.style.transform = '';
+    select(null);
+  };
   const endDrag = (e: PointerEvent): void => {
     if (!drag || e.pointerId !== drag.pointer) return;
     const d = drag;
     drag = null;
     if (!d.lifted) return;
     swallowClick = true;
+    // A cancelled pointer (the browser took it: a scroll, a lost window) is never a drop (the code gate's SHOULD).
+    if (e.type === 'pointercancel') { springBack(d); return; }
     d.el.classList.remove('is-lifted');
     d.el.style.transform = '';
     // The square under the pointer, the lifted one looked through.
@@ -160,6 +168,15 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) { opts.open(id); return; }
       press(id);
+      return;
+    }
+    // Escape mid-drag lets go: the release that follows writes nothing (the code gate's SHOULD).
+    if (e.key === 'Escape' && drag?.lifted) {
+      markEscapeOwned(e);
+      const d = drag;
+      drag = null;
+      swallowClick = true;
+      springBack(d);
       return;
     }
     if (e.key === 'Escape' && selectedIn(opts.worldId)) {

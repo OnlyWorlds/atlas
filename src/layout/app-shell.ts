@@ -114,7 +114,7 @@ function buildGuideSkip(): HTMLElement {
     const block = document.querySelector<HTMLElement>('[data-role="guide-block"]');
     if (!block) return;
     // In this order, never the head's Back or ×: a door, the card's first button, a way to bring a world in.
-    const target = ['[data-guide-door]', '[data-role="guide-card"] [data-step-action]', '[data-bring-action]', 'button:not([disabled])']
+    const target = ['[data-grid-plus]', '[data-role="home-grid"] [data-grid-id][tabindex="0"]', '[data-guide-door]', '[data-role="guide-card"] [data-step-action]', '[data-bring-action]', 'button:not([disabled])']
       .map(s => block.querySelector<HTMLElement>(s)).find(Boolean);
     if (!target) return;
     target.focus({ preventScroll: true });

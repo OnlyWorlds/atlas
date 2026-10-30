@@ -19,6 +19,7 @@
  */
 import type { Element, WorldRegistryEntry } from './types';
 import { entryIsViewOnly } from './view-only';
+import { isKnownOf } from '../sync/known-of';
 
 function roleOf(entry: WorldRegistryEntry): string | undefined {
   return entry.api?.member_role ?? entry.api?.seat?.role;
@@ -26,6 +27,8 @@ function roleOf(entry: WorldRegistryEntry): string | undefined {
 
 export function mayChange(entry: WorldRegistryEntry | undefined, element: Element): boolean {
   if (entryIsViewOnly(entry)) return false;
+  // A known-of stub is server-managed and read-only: never written back, whoever reads it.
+  if (isKnownOf(element)) return false;
   const role = entry ? roleOf(entry) : undefined;
   if (role === undefined || role === 'owner' || role === 'co_builder') return true;
   const by = (element as Record<string, unknown>).created_by;

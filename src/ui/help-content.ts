@@ -45,7 +45,11 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'set a protagonist or home from any character or location header',
       'jump to any element type from the stat line',
       'pick up where you left off from the Recent list',
-      'on an empty world, Start from nothing or Bring in a world you have; then the card under the five steps says what to do, and Next moves you on',
+      {
+        mouse: 'on a new world, follow the first steps: press the + square to make the next thing, then drag one square onto another (or press one, then the other) to put it there',
+        touch: 'on a new world, follow the first steps: tap the + square to make the next thing, then tap one square and then another to put it there',
+      },
+      'already have notes or a file? Bring it in, under the first steps',
     ],
   },
   element: {

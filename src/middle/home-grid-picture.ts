@@ -19,7 +19,7 @@ import { collectReferencedIds } from './element-detail-refs';
 import { drawGrid, geometryFor, gridHeight, withoutPlusLine, type PlusSquare } from './home-grid-view';
 import { typeName } from '../core/type-words';
 
-/** The grid gives way past this height (Seethe's lean from the drawings, 2026-10-30: about the first screen under the card's head). */
+/** The grid gives way past this height (a lean from the design's drawings, 2026-10-30: about the first screen under the card's head). */
 export const HAND_OVER_PX = 640;
 const TOO_MANY = 48;
 const MAP_SPACE = new Set(['map', 'pin', 'marker']);
@@ -120,9 +120,17 @@ export function buildGridPicture(
       if (!handedOver) { handedOver = true; onHandOver(); }
       return false;
     }
+    // A redraw at a new width (a scrollbar came, the window moved) keeps the focus where it was.
+    const had = document.activeElement instanceof HTMLElement && host.contains(document.activeElement)
+      ? document.activeElement.getAttribute('data-grid-id') ?? (document.activeElement.closest('[data-grid-plus]') ? 'plus' : null)
+      : null;
     unwire?.();
     drawGrid(host, laid(), geo, input.names, plus);
     unwire = afterDraw?.(host);
+    if (had) {
+      const back = had === 'plus' ? host.querySelector<HTMLElement>('[data-grid-plus]') : host.querySelector<HTMLElement>(`[data-grid-id="${CSS.escape(had)}"]`);
+      back?.focus({ preventScroll: true });
+    }
     return true;
   };
 

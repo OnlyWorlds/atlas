@@ -81,17 +81,17 @@ describe('roomBarStep', () => {
 describe('Back\'s focus ask', () => {
   const homeBlock = () => {
     const block = document.createElement('section');
-    block.innerHTML = '<div data-role="guide-card"><button data-step-action="next">Next</button></div>';
+    block.innerHTML = '<div data-role="home-grid"><div data-grid-id="a" tabindex="-1">Ada</div><div data-grid-id="k" tabindex="0">Keep</div></div>';
     document.body.appendChild(block);
     return block;
   };
 
-  it('the asking world\'s home takes it: Next focused', () => {
+  it('the asking world\'s home takes it: the grid\'s own Tab stop focused (the home that grows)', () => {
     world([ada, keep, ev], { guide_step: 'happened' });
     askFocusAfterHome('w');
     const block = homeBlock();
     settleAfterDraw(block);
-    expect(document.activeElement?.getAttribute('data-step-action')).toBe('next');
+    expect(document.activeElement?.getAttribute('data-grid-id')).toBe('k');
     block.remove();
   });
 
@@ -100,10 +100,10 @@ describe('Back\'s focus ask', () => {
     askFocusAfterHome('elsewhere');
     const block = homeBlock();
     settleAfterDraw(block);
-    expect(document.activeElement?.getAttribute('data-step-action')).toBeNull();
+    expect(document.activeElement?.getAttribute('data-grid-id')).toBeNull();
     // The ask is spent: the next draw, now in the asking world, has nothing to take.
     settleAfterDraw(block);
-    expect(document.activeElement?.getAttribute('data-step-action')).toBeNull();
+    expect(document.activeElement?.getAttribute('data-grid-id')).toBeNull();
     block.remove();
   });
 });

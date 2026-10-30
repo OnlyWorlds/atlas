@@ -7,6 +7,7 @@
  */
 
 import { fieldLabel } from '@onlyworlds/sdk';
+import { isKnownOf } from '../sync/known-of';
 import type { Element } from '../core/types';
 import { getState } from '../core/state';
 import { getActiveStore } from '../core/active-store';
@@ -23,9 +24,15 @@ export interface JustNow { worldId: string; write: PairWrite; sentence: string; 
 
 let justNow: JustNow | null = null;
 
-/** The last write in this world, or null. */
+/**
+ * The last write in this world while it is still true: its field still holds what it wrote (the code
+ * gate's C5: Mira moved elsewhere, the line goes, and no Undo is offered that would do nothing).
+ */
 export function justNowIn(worldId: string): JustNow | null {
-  return justNow && justNow.worldId === worldId ? justNow : null;
+  if (!justNow || justNow.worldId !== worldId) return null;
+  const on = getState().data.elements.find(e => e.id === justNow!.write.on);
+  if (!on || undoPatchFor(justNow.write, recordOf(on)) === null) return null;
+  return justNow;
 }
 
 const nameOf = (el: Element | undefined): string => {
@@ -54,7 +61,9 @@ export function writeBetween(aId: string, bId: string): PairWrite | null {
   const els = getState().data.elements;
   const a = els.find(e => e.id === aId);
   const b = els.find(e => e.id === bId);
-  if (!a || !b) return null;
+  // A known-of stub is read-only and holds only a name: never a write's end (its id written into
+  // another's field would link to a shell the reader cannot open).
+  if (!a || !b || isKnownOf(a) || isKnownOf(b)) return null;
   return pairWrite({ id: a.id, type: a.type, record: recordOf(a) }, { id: b.id, type: b.type, record: recordOf(b) });
 }
 
@@ -113,4 +122,9 @@ export async function undoJustNow(worldId: string): Promise<'wrote' | 'nothing' 
 /** Test seam. */
 export function resetJustNowForTests(): void {
   justNow = null;
+}
+
+/** Test seam: set what the last write said. */
+export function setJustNowForTests(j: JustNow): void {
+  justNow = j;
 }

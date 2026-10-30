@@ -14,7 +14,9 @@
 
 import { dateOf } from '@onlyworlds/sdk';
 import type { Element, ElementType } from '../core/types';
-import { getState } from '../core/state';
+import { getState, patchSlice } from '../core/state';
+import { showProblem } from '../ui/problem-fixes';
+import { toastManager } from '../ui/toast-manager';
 import { elementHash, importHash, navigate, timelineHash, writingHash } from '../core/router';
 import { DOTS, cardStep, guideElements, newestOf, placeIdOf, unplacedCharacters, type Dots, type StepId } from '../core/guide';
 import { advancePath, doorOf, setDoor, startPath } from '../core/guide-path';
@@ -27,6 +29,7 @@ import { labelStoryFromCard, stampPathNotesSeen } from '../ui/guide-note';
 import { makeFromSquare } from '../ui/home-grid-make';
 import { justNowIn, placeIn, promiseFor, undoJustNow, writeBetween } from '../ui/home-grid-place';
 import { buildGridPicture, gridInput, type GridPicture } from './home-grid-picture';
+import { arrivalOf } from '../core/home-grid';
 import { plusWord, type PlusSquare } from './home-grid-view';
 import { selectedIn, wireGridActs } from './home-grid-acts';
 import { bringInWays } from './home-guide';
@@ -137,7 +140,7 @@ export interface GrowBlock {
   destroy(): void;
 }
 
-export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager, onDismiss: () => void): GrowBlock {
+export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager, onDismiss: () => void, onHandOver: () => void = () => {}): GrowBlock {
   const s = getState();
   const entry = s.registry.worlds.find(w => w.id === worldId);
   const step = cardStep(dots, entry?.guide_step);
@@ -216,7 +219,7 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
   }
   let picture: GridPicture | null = null;
   if (input) {
-    picture = buildGridPicture(input, plus, () => { fallbackSlot.hidden = false; }, host => {
+    picture = buildGridPicture(input, plus, () => { fallbackSlot.hidden = false; onHandOver(); }, host => {
       wirePlus(host, worldId, said.plus);
       return wireActs(host, worldId, input, section);
     });
@@ -266,7 +269,8 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
   return {
     section,
     mount(): void {
-      picture?.mount();
+      // No grid at all (too big at any width): Home's centred picture, under the card (the code gate's C1).
+      if (picture) picture.mount(); else onHandOver();
       if (focusAfter) {
         const t = section.querySelector<HTMLElement>(focusAfter);
         focusAfter = null;
@@ -299,7 +303,13 @@ function appendOpenAndJustNow(section: HTMLElement, worldId: string): void {
   undo.className = 'atlas-btn-link';
   undo.setAttribute('data-action', 'grow-undo');
   undo.textContent = 'Undo';
-  undo.addEventListener('click', () => { focusAfter = '[data-role="grow-line"], [data-role="home-grid"] [data-grid-id]'; void undoJustNow(worldId); });
+  undo.addEventListener('click', () => {
+    focusAfter = '[data-role="grow-line"], [data-role="home-grid"] [data-grid-id]';
+    void undoJustNow(worldId).then(r => {
+      // The field moved since the line was drawn: say so, and draw again without the line.
+      if (r === 'nothing') { focusAfter = null; toastManager.info('Nothing to undo: that changed since.'); patchSlice('data', { ...getState().data }); }
+    });
+  });
   row.append(tag, text, undo);
   section.appendChild(row);
 }
@@ -329,6 +339,18 @@ export function buildHomeGrid(worldId: string, onHandOver: () => void): GrowBloc
   section.setAttribute('data-role', 'home-grow-picture');
   const picture = buildGridPicture(input, null, () => { section.hidden = true; onHandOver(); }, host => wireActs(host, worldId, input, section));
   section.appendChild(picture.section);
+  // The newest element linked to nothing in the world, said once (the dim squares are the list).
+  const loose = input.ids.filter(id => input.names.isLoose(id))
+    .map(id => els.find(e => e.id === id)!)
+    .filter(Boolean)
+    .sort((a, b) => arrivalOf(b) - arrivalOf(a))[0];
+  if (loose) {
+    const p = document.createElement('p');
+    p.className = 'atlas-home-grow-recap';
+    p.setAttribute('data-role', 'grow-loose');
+    p.textContent = `${nameOf(loose)} isn't connected to anything yet.`;
+    section.appendChild(p);
+  }
   appendOpenAndJustNow(section, worldId);
   return {
     section,
@@ -411,17 +433,28 @@ function wirePlus(host: HTMLElement, worldId: string, type: ElementType | null):
       const n = name.value.trim();
       if (!n) { note.textContent = 'Type a name first'; name.focus(); return; }
       const y = year && year.value.trim() !== '' ? Number(year.value) : null;
-      focusAfter = '[data-grid-plus], [data-role="home-grid"] [data-grid-id]:last-of-type';
       // The first make from a + square is the path's start (a press, never a render): written here,
       // not when the box opens, since the registry write redraws the home and would take the box.
       startPath(worldId);
+      // Asked after that redraw, so the draw that shows the new square is the one that takes it.
+      focusAfter = '[data-grid-plus], [data-role="home-grid"] [data-grid-id]:last-of-type';
       void makeFromSquare(type, n, Number.isFinite(y) ? y : null).then(made => {
-        if (made && type === 'narrative') void labelStoryFromCard(worldId, made.id, getWritingLabels(worldId).l1);
+        if (made && type === 'narrative') {
+          // The label is a second write and a second redraw: the focus is asked for it too.
+          focusAfter = '[data-grid-plus], [data-role="home-grid"] [data-grid-id]:last-of-type';
+          // A label that wrote nothing drew nothing: the ask goes, so no later draw takes the focus.
+          void labelStoryFromCard(worldId, made.id, getWritingLabels(worldId).l1).finally(() => { focusAfter = null; });
+        }
+      }).catch(err => {
+        // A make that failed is said, never silent (the code gate's SHOULD).
+        focusAfter = null;
+        showProblem(err, { doing: 'making the element', toasts: toastManager });
       });
     });
     form.addEventListener('keydown', e => {
       if (e.key === 'Escape') { e.preventDefault(); form.remove(); cell.classList.remove('is-making'); cell.focus(); }
-      if (e.key === 'Enter' && e.target === year) { e.preventDefault(); form.requestSubmit(); }
+      // Two inputs and no submit button: a browser submits on Enter in neither, so both ask (the code gate's C3).
+      if (e.key === 'Enter' && (e.target === year || e.target === name)) { e.preventDefault(); form.requestSubmit(); }
     });
     cell.classList.add('is-making');
     cell.appendChild(form);

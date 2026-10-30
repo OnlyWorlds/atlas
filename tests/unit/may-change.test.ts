@@ -75,6 +75,15 @@ describe('mayChange', () => {
   });
 });
 
+describe('mayChange: a known-of stub (the code gate C2)', () => {
+  it('is never changeable, by an owner, a co-builder or a guest', () => {
+    const stub = { ...el(), known_of: true } as Element;
+    for (const e of [undefined, entry({ member_role: 'co_builder', membership: ME }), entry({ member_role: 'guest', membership: ME })]) {
+      expect(mayChange(e, stub)).toBe(false);
+    }
+  });
+});
+
 describe('mayAdd', () => {
   it('everywhere but a view-only world', () => {
     expect(mayAdd(undefined)).toBe(true);

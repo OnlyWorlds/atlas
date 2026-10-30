@@ -199,16 +199,19 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // The home that grows: while the world is small, Home's picture is the grid (with its acts); past
     // the grid's height it hands over to today's centred picture, drawn in its place.
     const quiet = s.data.loading || isTourFlagActive();
+    // Today's centred picture, drawn right after what gave way to it (Home's grid, or the card's own).
+    const centred = (after: () => HTMLElement | null) => (): void => {
+      if (quiet || picture) return;
+      picture = buildHomePicture(worldId, said);
+      if (!picture) return;
+      const anchor = after();
+      if (anchor?.isConnected) anchor.after(picture.section); else root.appendChild(picture.section);
+      picture.mount();
+    };
     const drawPicture = (): void => {
       if (quiet) return;
-      const centred = (): void => {
-        picture = buildHomePicture(worldId, said);
-        if (!picture) return;
-        if (grid?.section.isConnected) grid.section.after(picture.section); else root.appendChild(picture.section);
-        picture.mount();
-      };
-      grid = worldIsViewOnly(worldId) || !s.data.elements.length ? null : buildHomeGrid(worldId, centred);
-      if (!grid) { centred(); return; }
+      grid = worldIsViewOnly(worldId) || !s.data.elements.length ? null : buildHomeGrid(worldId, centred(() => grid?.section ?? null));
+      if (!grid) { centred(() => null)(); return; }
       root.appendChild(grid.section);
       grid.mount();
     };
@@ -222,7 +225,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // while it asks, the guide's copy dot stays dark, so the two never disagree.
     // The keep-safe card counts every change since the last copy, the reading aids' too, whatever the switch (the code gate's C4).
     const keep = buildKeepSafe(worldId, settledOf(loreWithAids()), toasts);
-    const tour = viewOnly ? null : buildTour(worldId, toasts);
+    const tour: GrowBlock | null = viewOnly ? null : buildTour(worldId, toasts, centred(() => tour?.section ?? null));
     // While the path shows, the picture draws below the block, so the card never moves down mid-path (G7),
     // and nothing moves at a first press either (the gate's C10). The keep-safe card draws below the block
     // too, its warning never held back for a path someone may not finish (C2), except while the card itself
@@ -957,7 +960,7 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
   return section;
 }
 
-function buildTour(worldId: string, toasts: ToastManager): GrowBlock | null {
+function buildTour(worldId: string, toasts: ToastManager, onHandOver: () => void): GrowBlock | null {
   // While the GUIDED tour is running, the home onboarding stays silent: two
   // onboardings talking at once (an intersection bug class). Read the
   // persisted flag directly: cheap, and no tour-engine import here.
@@ -968,7 +971,7 @@ function buildTour(worldId: string, toasts: ToastManager): GrowBlock | null {
   if (!entry || entry.demo === true || isMoppetopiaOpen(worldId) || entry.tour_dismissed?.includes('home-cards')) return null;
   // The home that grows: no doors; an empty world opens on the path, the card read from the dots.
   if (!pathShowing(worldId)) return null;
-  return buildGrowBlock(pathDots(worldId), worldId, toasts, () => persistDismiss(worldId, 'home-cards'));
+  return buildGrowBlock(pathDots(worldId), worldId, toasts, () => persistDismiss(worldId, 'home-cards'), onHandOver);
 }
 
 /**

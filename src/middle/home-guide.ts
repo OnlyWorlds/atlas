@@ -52,8 +52,10 @@ let scrollAfterDraw = false;
 let askWorld: string | null = null;
 let focusWired = false;
 
-const CARD_BUTTON = '[data-role="guide-card"] [data-step-action]';
-const FOCUS_KEYS = ['data-step-action', 'data-guide-door', 'data-bring-action', 'data-action'] as const;
+// The home that grows: the card's own buttons (the fallback act, a recap link, the keep ways).
+const CARD_BUTTON = '[data-role="guide-block"] :not([hidden]) > [data-step-action]';
+// A grid square and the + square keep their focus across the home's rebuilds too (the home that grows).
+const FOCUS_KEYS = ['data-step-action', 'data-guide-door', 'data-bring-action', 'data-action', 'data-grid-id', 'data-grid-plus'] as const;
 
 /**
  * The control focus is on inside the block, as a selector the rebuilt block answers to; null when
@@ -84,17 +86,35 @@ export function settleAfterDraw(block: HTMLElement | null, kept: string | null =
   scrollAfterDraw = false;
   askWorld = null;
   if (!block) return;
+  // The block's own mount already placed the focus a press asked for (the grow card's Bring it in, a
+  // make): the control held before the rebuild never takes it back (the e2e's red at Bring it in).
+  if (!asked && kept && document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+    && block.contains(document.activeElement)) return;
   const target = asked ? block.querySelector<HTMLElement>(asked) ?? (asked === NEXT_BUTTON ? block.querySelector<HTMLElement>(CARD_BUTTON) : null)
     : kept ? block.querySelector<HTMLElement>(kept) ?? (kept.startsWith('[data-step-action') ? block.querySelector<HTMLElement>(CARD_BUTTON) : null)
     : null;
   target?.focus({ preventScroll: true });
+  // The grid draws once the home is laid out (its width), which can be a frame or two after this:
+  // a room's Back that found nothing yet looks again for a few frames (the code gate's C6).
+  if (!target && asked === NEXT_BUTTON) {
+    const world = getState().active?.worldId;
+    let tries = 6;
+    const again = (): void => {
+      if (!block.isConnected || getState().active?.worldId !== world) return;
+      const t = block.querySelector<HTMLElement>(NEXT_BUTTON);
+      if (t) { if (document.activeElement === document.body) t.focus({ preventScroll: true }); return; }
+      if (--tries > 0) requestAnimationFrame(again);
+    };
+    requestAnimationFrame(again);
+  }
   if (!scroll) return;
   const top = block.getBoundingClientRect().top;
   const bottom = (target ?? block).getBoundingClientRect().bottom;
   if (top < 0 || bottom > window.innerHeight) block.scrollIntoView({ block: 'start' });
 }
 
-const NEXT_BUTTON = '[data-step-action="next"]';
+// Where a room's Back lands (the code gate's C6): the grid's own Tab stop, else its + square.
+const NEXT_BUTTON = '[data-role="home-grid"] [data-grid-id][tabindex="0"], [data-role="home-grid"] [data-grid-plus]';
 
 /**
  * A room's Back to Grow your world (#975): the home's next draw focuses Next, else the card's first

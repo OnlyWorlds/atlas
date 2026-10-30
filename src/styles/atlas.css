@@ -15478,7 +15478,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   margin-top: 18px;
   /* Reserved even when empty — the first element's count must not shift the
      tour cards below. */
-  min-height: 17px;
+  min-height: 18px;
   font-size: 13px;
   color: var(--atlas-text-muted);
 }
@@ -18019,3 +18019,10 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-grid-make .atlas-input { width: 100%; min-height: 32px; font-size: 0.82rem; }
 .atlas-home-grid-make-note { font-size: 0.74rem; color: var(--atlas-text-soft); }
 @media (pointer: coarse) { .atlas-home-grid-make .atlas-input { min-height: 44px; } }
+/* A focused square's own mark, outside the selected and target rings, so a focused target reads apart (the code gate's C4). */
+.atlas-home-grid .atlas-home-grid-cell:focus-visible .atlas-home-grid-square { outline: 2px solid var(--atlas-text); outline-offset: 5px; }
+.atlas-home-grid .atlas-home-grid-plus:focus-visible .atlas-home-grid-square { outline: 2px solid var(--atlas-text); outline-offset: 5px; }
+/* Touch: the grow card's links take a thumb too (Bring it in, Undo, a recap's link, Open). */
+@media (pointer: coarse) {
+  .atlas-guide-block.atlas-home-grow .atlas-btn-link, .atlas-home-grow-picture .atlas-btn-link { min-height: 44px; display: inline-flex; align-items: center; }
+}

@@ -56,6 +56,37 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.110.0',
+    date: '2026-10-30',
+    theme: 'A home that grows with your world',
+    entries: [
+      {
+        id: 'home-that-grows',
+        title: 'A new world grows on its Home, one square at a time',
+        body: 'A new world opens straight on its first steps. Press the + square and type a name to make someone, somewhere, something that happened and a story. Drag a character onto a location, or press one and then the other, to put them there; the line under the picture says what changed, with Undo.',
+        tags: ['world'],
+      },
+      {
+        id: 'home-grid-picture',
+        title: 'A small world draws as squares on Home',
+        body: 'While a world is small, Home shows each element as a square in its colour, a character under the place it is in and an event under the story that tells it. A bigger world keeps the picture centred on its best-linked element.',
+        tags: ['world', 'layout'],
+      },
+      {
+        id: 'first-steps-again',
+        title: 'Show the first steps again',
+        body: 'Settings, World, brings the first steps back to Home after you closed them.',
+        tags: ['world'],
+      },
+      {
+        id: 'ids-carry-time',
+        title: 'New elements get time-ordered ids',
+        body: 'An element made in Atlas now gets an id that says when it was made, the kind onlyworlds.com already gives. Nothing you have changes.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.109.3',
     date: '2026-10-30',
     theme: 'A lens reads only what its fields can hold',

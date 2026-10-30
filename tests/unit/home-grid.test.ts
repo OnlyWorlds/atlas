@@ -54,7 +54,7 @@ describe('arrivalOf', () => {
   });
 });
 
-describe('gridOf: the walk (Seethe\'s fourth drawing)', () => {
+describe('gridOf: the walk (the design\'s fourth drawing)', () => {
   const mira = v7(1000), harbour = v7(2000), founding = v7(3000), story = v7(4000);
   it('an empty world has only the + square, at the first column', () => {
     const g = gridOf([], [], 4);
