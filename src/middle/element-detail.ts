@@ -38,6 +38,8 @@ import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
 import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-detail-header';
+import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
+import { keptSetOf } from '../sync/sync-attach';
 import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
@@ -104,12 +106,19 @@ export function mountElementDetail(target: HTMLElement): () => void {
   // is deferred, not dropped: it runs once focus leaves the input, after the
   // blur has read the value it commits.
   let renderDeferred = false;
-  const onFocusOut = (): void => {
+  const onFocusOut = (e?: FocusEvent): void => {
     if (!renderDeferred) return;
+    // Focus leaving the mark's fan-out is the press that closes it: the slot runs the redraw once that press lands.
+    if (e?.target instanceof HTMLElement && e.target.closest('.ow-waymark')) return;
     renderDeferred = false;
     queueMicrotask(render);
   };
   target.addEventListener('focusout', onFocusOut);
+  // The OnlyWorlds mark beside the name: held open, a redraw waits for its fan-out to close (Waymark R7).
+  let mark: WaymarkSlot | null = null;
+  let markHadFocus = false;
+  let drawnHash = '';
+  const dropMark = (): void => { mark?.dispose(); mark = null; };
 
   // Rebuilt only when an input moved (conv. 146): a rebuild between a
   // press and its release loses the click, and the page subscribes to every
@@ -119,13 +128,17 @@ export function mountElementDetail(target: HTMLElement): () => void {
   const gate = renderGate();
 
   function render(): void {
-    if (isEditingIn(target)) { renderDeferred = true; return; }
+    // An open fan-out holds a redraw, but never a route change: the page follows the address.
+    if (isEditingIn(target) || (waymarkOpenIn(target) && window.location.hash === drawnHash)) { renderDeferred = true; return; }
+    drawnHash = window.location.hash;
     const s = getState();
     const touring = isTourFlagActive();
     if (!gate.changed([window.location.hash, s.active, s.data, s.ui, s.registry, s.styles, touring,
       touring && document.body.classList.contains('atlas-tour-basefull'),
-      pendingInlineNameEdit(), pendingCustomFieldEdit()])) return;
+      pendingInlineNameEdit(), pendingCustomFieldEdit(), s.active ? keptSetOf(s.active.worldId) : undefined])) return;
     captureScrollBeforeRender();
+    markHadFocus = waymarkHasFocus(mark);
+    dropMark();
     target.innerHTML = '';
     const state = getState();
     const route = parseHash(window.location.hash);
@@ -161,7 +174,19 @@ export function mountElementDetail(target: HTMLElement): () => void {
   }
 
   function renderDetail(el: Element): void {
-    target.appendChild(renderHeader(el, { hiddenNote: true }));
+    const header = renderHeader(el, { hiddenNote: true });
+    target.appendChild(header);
+    // The mark sits after the name, never inside it (the name is click-to-rename); mounted here, not in
+    // renderHeader, which the writing workspace shares.
+    const name = header.querySelector('[data-role="element-name"]');
+    const worldId = getState().active?.worldId;
+    if (name && worldId) {
+      mark = waymarkSlot(worldId, el, onFocusOut);
+      name.after(mark.el);
+      // A redraw held while the fan-out was open runs as it closes: focus stays on the mark it came back to.
+      if (markHadFocus) focusWaymark(mark);
+      markHadFocus = false;
+    }
 
     const body = document.createElement('div');
     body.className = 'atlas-middle-body';
@@ -481,6 +506,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     unsubHash();
     renderDeferred = false;
     target.removeEventListener('focusout', onFocusOut);
+    dropMark();
   };
 }
 

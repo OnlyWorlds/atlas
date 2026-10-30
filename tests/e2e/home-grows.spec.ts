@@ -389,6 +389,19 @@ async function storeEdit(page: Page, op: 'update' | 'delete', id: string, patch:
   }, { op, id, patch });
 }
 
+test('a name keeps 6 px of its column\'s edges clear, where a lane link climbs', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'location', { name: 'The Harbour of Ten Thousand Lanterns' });
+  await createViaStore(page, 'character', { name: 'Mira' });
+  await expect(square(page, 'Mira')).toBeVisible();
+  for (const name of ['The Harbour of Ten Thousand Lanterns', 'Mira']) {
+    const cell = page.locator('[data-grid-id]').filter({ hasText: name }).first();
+    const [c, n] = await Promise.all([cell.boundingBox(), cell.locator('.atlas-home-grid-name').boundingBox()]);
+    expect(n!.x).toBeGreaterThanOrEqual(c!.x + 5.5);
+    expect(n!.x + n!.width).toBeLessThanOrEqual(c!.x + c!.width - 5.5);
+  }
+});
+
 test('a line pair: two Characters cannot be linked; Mira onto The Founding by two presses, then Undo, then by a drag', async ({ page }) => {
   await setupWorld(page);
   await createViaStore(page, 'character', { name: 'Mira' });

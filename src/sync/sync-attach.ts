@@ -398,6 +398,11 @@ export function isKeptHere(worldId: string, elementId: string): boolean {
   return keptSets[worldId]?.has(elementId) ?? false;
 }
 
+/** The kept set itself, a new object only when it changed: a render gate's part for a page that reads `isKeptHere`. */
+export function keptSetOf(worldId: string): ReadonlySet<string> | undefined {
+  return keptSets[worldId];
+}
+
 async function refreshKeptCount(worldId: string, folder: FolderStore): Promise<void> {
   try {
     const ids = (await folder.readSyncState()).kept_outside_view ?? [];

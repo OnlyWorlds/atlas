@@ -1503,8 +1503,10 @@ html {
   /* never wrap — keeps the header strictly 1 row */
   gap: 10px;
   background: var(--atlas-bg-panel);
-  overflow: hidden;
-  /* clip rather than push the band taller */
+  /* Clip sideways rather than push the band taller; below it stays open, so the
+     OnlyWorlds mark's fan-out (a pop under the name) shows past the band. */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 /* Defensive: any direct children that try to claim their own height get
@@ -17414,6 +17416,8 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     min-width: 40px;
     min-height: 40px;
   }
+  /* In the 36 px header band they stay the band's height (its clip once did this; it now clips sideways only). */
+  .atlas-middle .atlas-middle-header .atlas-icon-btn-sm { min-height: 36px; }
 
   /* The aliases dialog sits outside the middle pane, so its remove stayed 22px (#526's gap). */
   .atlas-aliases-row .atlas-icon-btn-sm {
@@ -17959,7 +17963,8 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 }
 .atlas-home-grid-square .material-symbols-outlined { font-size: calc(var(--sq) * 0.45); }
 .atlas-home-grid-name {
-  max-width: 100%;
+  /* 6 px of each column's edge stay clear of ink: a lane link climbs on that edge (home-grid-view.ts). */
+  max-width: calc(100% - 12px);
   font-size: 0.78rem;
   line-height: 1.2;
   color: var(--atlas-text);
@@ -18074,3 +18079,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 @media (pointer: coarse) {
   .atlas-guide-block.atlas-home-grow .atlas-btn-link, .atlas-home-grow-picture .atlas-btn-link { min-height: 44px; display: inline-flex; align-items: center; }
 }
+
+/* The OnlyWorlds mark beside a name (the SDK's Waymark, waymark-slot.ts): its own slot after the heading.
+   On Home the name and the mark share a row, the mark on the name's last line at the heading's size. */
+.atlas-home-name-row { display: flex; align-items: last baseline; gap: 0; min-width: 0; }
+.atlas-home-name-row .atlas-home-world-name { min-width: 0; }
+.atlas-home-name-row .atlas-waymark { font-size: 22px; flex: 0 0 auto; }
+.atlas-middle-header .atlas-waymark { font-size: 15px; display: inline-flex; align-items: center; }
+.atlas-waymark:empty { display: none; }

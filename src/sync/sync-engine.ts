@@ -103,6 +103,8 @@ export interface WorldMetaWire {
   mass_unit: string;
   distance_unit: string;
   public_read?: boolean;
+  /** The world's public page is on (`public_read` and `public_page.on`, keel's whole switch): read, never written. */
+  public_page_on?: boolean;
   created_at?: string;
   updated_at: string;
   /** The world's first import, as keel serves it: kept, never sent. */

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.112.0',
+    date: '2026-10-30',
+    theme: 'Open it elsewhere',
+    entries: [
+      {
+        id: 'waymark-open-with',
+        title: 'The OnlyWorlds mark beside a name',
+        body: 'In a world on OnlyWorlds, the mark beside the world\'s name on Home and beside an element\'s name opens a short menu: open it on onlyworlds.com or in another tool, or copy its link. It shows who last shaped the element. The page on onlyworlds.com opens when you are signed in there, or for anyone when the world\'s public page is on; where neither is true, there is no mark.',
+        tags: ['world'],
+      },
+      {
+        id: 'home-grows-name-room',
+        title: 'Room between a name and a line on Home',
+        body: 'A square\'s name keeps clear of its column\'s edges, so a line running down between two columns never brushes a long name.',
+        tags: ['world', 'layout'],
+      },
+    ],
+  },
+  {
     version: '1.111.1',
     date: '2026-10-30',
     theme: 'Quieter squares',
