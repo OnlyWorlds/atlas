@@ -15,7 +15,7 @@ vi.mock('../../src/ui/home-grid-make', () => ({
   makeFromSquare: async (type: string, name: string) => { made.push({ type, name }); return { id: 'new', type }; },
 }));
 
-const { buildHomeGrid } = await import('../../src/middle/home-grow');
+const { buildHomeGrid, mayPlace } = await import('../../src/middle/home-grow');
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const E = (n: number, type: string, name: string, extra: Record<string, unknown> = {}) =>
@@ -40,10 +40,22 @@ function drawn(): HTMLElement {
   return g.section;
 }
 
+/** The card's width as jsdom reports it, and the grid's resize observers: a test changes the one and calls the others to owe a redraw. */
+let width = 600;
+const observers: (() => void)[] = [];
+const resize = (w: number): void => { width = w; for (const cb of observers) cb(); };
+
 beforeAll(() => {
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get() { return 600; } });
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get() { return width; } });
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+    constructor(cb: () => void) { observers.push(cb); }
+    observe(): void {}
+    disconnect(): void {}
+  };
 });
 afterEach(() => {
+  width = 600;
+  observers.length = 0;
   resetGridActsForTests();
   document.body.innerHTML = '';
   made.length = 0;
@@ -136,5 +148,96 @@ describe('where the grid acts', () => {
     expect(section.querySelector('[data-grid-plus]')).not.toBeNull();
     section.querySelector<HTMLElement>(`[data-grid-id="${uuid(1)}"]`)!.click();
     expect(section.querySelector('.is-target')).not.toBeNull();
+  });
+});
+
+describe('a hold never outlives the person\'s attention', () => {
+  const sqOf = (section: HTMLElement) => section.querySelector<HTMLElement>('[data-grid-plus]')!.style.getPropertyValue('--sq');
+  const tick = () => new Promise<void>(r => setTimeout(r, 5));
+  const openBox = (section: HTMLElement): HTMLInputElement => {
+    section.querySelector<HTMLElement>('[data-grid-plus]')!.click();
+    section.querySelector<HTMLElement>('[data-kind="character"]')!.click();
+    return section.querySelector<HTMLInputElement>('.atlas-home-grid-make input')!;
+  };
+
+  it('a kind picked after a redraw was owed opens its box on the live +, the focus in it (C2)', async () => {
+    world([ada, keep]);
+    const section = drawn();
+    expect(sqOf(section)).toBe('64px');
+    section.querySelector<HTMLElement>('[data-grid-plus]')!.click();
+    // A resize while the list is open: owed, not drawn.
+    resize(500);
+    expect(section.querySelector('[role="menu"]')).not.toBeNull();
+    expect(sqOf(section)).toBe('64px');
+    section.querySelector<HTMLElement>('[data-kind="character"]')!.click();
+    const live = section.querySelector<HTMLElement>('[data-grid-plus]')!;
+    expect(live.querySelector('form')).not.toBeNull();
+    expect(live.contains(document.activeElement)).toBe(true);
+    // The box holds the redraw in turn; Escape lets it run.
+    expect(sqOf(section)).toBe('64px');
+    key(document.activeElement, 'Escape');
+    expect(sqOf(section)).toBe('48px');
+    expect(made).toEqual([]);
+  });
+
+  it('the box closes when the focus leaves it: nothing made, and the redraw it held runs (C1)', async () => {
+    world([ada, keep]);
+    const section = drawn();
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    const name = openBox(section);
+    name.value = 'Bren';
+    resize(500);
+    expect(sqOf(section)).toBe('64px');
+    elsewhere.focus();
+    await tick();
+    expect(section.querySelector('.atlas-home-grid-make')).toBeNull();
+    expect(made).toEqual([]);
+    expect(sqOf(section)).toBe('48px');
+  });
+
+  it('the box closes on a press outside it, and the redraw waits until that press has landed (C1, C5)', async () => {
+    world([ada, keep]);
+    const section = drawn();
+    openBox(section);
+    resize(500);
+    const mira = section.querySelector<HTMLElement>(`[data-grid-id="${uuid(1)}"]`)!;
+    mira.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    expect(section.querySelector('.atlas-home-grid-make')).toBeNull();
+    // The press is still under way: its square is still the one in the page, and it acts.
+    expect(mira.isConnected).toBe(true);
+    expect(sqOf(section)).toBe('64px');
+    window.dispatchEvent(new MouseEvent('pointerup'));
+    mira.click();
+    await tick();
+    expect(sqOf(section)).toBe('48px');
+    expect(section.querySelector(`[data-grid-id="${uuid(1)}"]`)!.classList.contains('is-selected')).toBe(true);
+  });
+
+  it('the list closes when the focus leaves it (C1)', async () => {
+    world([ada, keep]);
+    const section = drawn();
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    section.querySelector<HTMLElement>('[data-grid-plus]')!.click();
+    resize(500);
+    elsewhere.focus();
+    await tick();
+    expect(section.querySelector('[role="menu"]')).toBeNull();
+    expect(sqOf(section)).toBe('48px');
+  });
+});
+
+describe('Place asks who may act at the press', () => {
+  it('a contributor may place their own Mira, never on the owner\'s Event (the write is the Event\'s)', () => {
+    const mira = E(1, 'character', 'Mira', { created_by: 'me' });
+    const founding = E(5, 'event', 'The Founding', { created_by: null });
+    world([mira, keep, founding]);
+    expect(mayPlace('w', uuid(1), uuid(5))).toBe(true);
+    world([mira, keep, founding], { api: { member_role: 'contributor', membership: 'me' } } as never);
+    expect(mayPlace('w', uuid(1), uuid(2))).toBe(true);
+    expect(mayPlace('w', uuid(1), uuid(5))).toBe(false);
+    world([mira, keep, founding], { demo: true });
+    expect(mayPlace('w', uuid(1), uuid(2))).toBe(false);
   });
 });

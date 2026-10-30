@@ -194,7 +194,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }
     const doors: CoverDoors = pathOpen ? 'held' : closedHere === worldId ? 'below' : 'above';
     root.innerHTML = '';
-    root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts, doors));
+    let cover = buildCover(meta, worldId, totalElements, counts, toasts, doors);
+    root.appendChild(cover);
     const demoLine = buildDemoLine(worldId, toasts);
     if (demoLine) root.appendChild(demoLine);
     const landingLine = buildLandingLine(getState().registry.worlds.find(w => w.id === worldId));
@@ -248,7 +249,17 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // while it asks, the guide's copy dot stays dark, so the two never disagree.
     // The keep-safe card counts every change since the last copy, the reading aids' too, whatever the switch (the code gate's C4).
     const keep = buildKeepSafe(worldId, settledOf(loreWithAids()), toasts);
-    const tour: GrowBlock | null = viewOnly ? null : buildTour(worldId, toasts, centred(() => tour?.section ?? null));
+    // The card's grid gave way (decided at its mount, before a paint): with no squares to keep still,
+    // the cover draws its doors above the card again, as on a world past its first steps.
+    const handOver = (): void => {
+      if (doors === 'held' && cover.isConnected) {
+        const full = buildCover(meta, worldId, totalElements, counts, toasts, 'above');
+        cover.replaceWith(full);
+        cover = full;
+      }
+      centred(() => tour?.section ?? null)();
+    };
+    const tour: GrowBlock | null = viewOnly ? null : buildTour(worldId, toasts, handOver);
     // While the path shows, the picture draws below the block, so the card never moves down mid-path (G7),
     // and nothing moves at a first press either (the gate's C10). The keep-safe card draws below the block
     // too, its warning never held back for a path someone may not finish (C2), except while the card itself

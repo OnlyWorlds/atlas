@@ -43,7 +43,7 @@ import { buildGridPicture, gridInput, type GridPicture } from './home-grid-pictu
 import { arrivalOf } from '../core/home-grid';
 import { plusWord, type PlusSquare } from './home-grid-view';
 import { selectedIn, wireGridActs } from './home-grid-acts';
-import { GRID_OPEN_ATTR, gridClosed, openKindList } from './home-grid-kinds';
+import { GRID_OPEN_ATTR, afterPress, gridClosed, openKindList, watchLeave } from './home-grid-kinds';
 import { bringInWays } from './home-guide';
 import { homeCentre } from './home-picture';
 import { openWebOn } from '../ui/open-web';
@@ -166,7 +166,22 @@ function focusPlus(): void {
   plus?.click();
 }
 
+/**
+ * Whether this member may place `from` on `to` now: the grid acts here, the pair writes, and the
+ * element written is one this member may change. Asked again at the press (Place, a drop), never
+ * only when the target was lit: a role can change between the light and the press.
+ */
+export function mayPlace(worldId: string, from: string, to: string): boolean {
+  if (!gridActsIn(worldId)) return false;
+  const w = writeBetween(from, to);
+  if (!w) return false;
+  const s = getState();
+  const on = s.data.elements.find(e => e.id === w.on);
+  return !!on && mayChange(s.registry.worlds.find(x => x.id === worldId), on);
+}
+
 async function drop(worldId: string, from: string, to: string): Promise<void> {
+  if (!mayPlace(worldId, from, to)) return;
   focusAfter = `[data-grid-id="${from}"]`;
   const r = await placeIn(worldId, from, to);
   if (r !== 'wrote') focusAfter = null;
@@ -556,18 +571,31 @@ function wirePlus(host: HTMLElement, worldId: string, plus: PlusSquare | null): 
     note.className = 'atlas-home-grid-make-note';
     note.setAttribute('role', 'status');
     form.appendChild(note);
-    const close = (): void => {
+    /**
+     * Nothing made, the box gone (Escape, a press outside it, the focus leaving it): a hold never
+     * outlives the person's attention. Escape gives the focus back to the +; a press elsewhere acts
+     * as a press, so the redraw that waited runs only after it has landed.
+     */
+    let closed = false;
+    const close = (how: 'escape' | 'press' | 'blur'): void => {
+      if (closed) return;
+      closed = true;
+      unwatch();
       form.remove();
       cell.classList.remove('is-making');
-      cell.focus();
-      gridClosed(host);
+      if (how === 'escape') { cell.focus(); gridClosed(host); }
+      else if (how === 'press') afterPress(() => gridClosed(host));
+      else setTimeout(() => gridClosed(host), 0);
     };
+    const unwatch = watchLeave(form, t => cell.contains(t), how => close(how));
     form.addEventListener('submit', e => {
       e.preventDefault();
       const n = name.value.trim();
       if (!n) { note.textContent = 'Type a name first'; name.focus(); return; }
       const y = year && year.value.trim() !== '' ? Number(year.value) : null;
       // The make's own writes redraw the home: the box no longer holds a redraw back.
+      closed = true;
+      unwatch();
       form.removeAttribute(GRID_OPEN_ATTR);
       // The path's start is the named + only (a press, never a render): written here, not when the
       // box opens, since the registry write redraws the home and would take the box.
@@ -589,7 +617,7 @@ function wirePlus(host: HTMLElement, worldId: string, plus: PlusSquare | null): 
       gridClosed(host);
     });
     form.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      if (e.key === 'Escape') { e.preventDefault(); close('escape'); }
       // Two inputs and no submit button: a browser submits on Enter in neither, so both ask (the code gate's C3).
       if (e.key === 'Enter' && (e.target === year || e.target === name)) { e.preventDefault(); form.requestSubmit(); }
     });
@@ -622,8 +650,10 @@ function wirePlus(host: HTMLElement, worldId: string, plus: PlusSquare | null): 
  * there is map space and draws no square: the dialog's own result says what was made.
  */
 async function openAnother(cell: HTMLElement): Promise<void> {
-  // Focused first, so the dialog's close gives the focus back here.
-  cell.focus({ preventScroll: true });
+  // Focused first, so the dialog's close gives the focus back here: the + as it is drawn now (a
+  // redraw that waited on the list has run, and may have replaced the square the list opened from).
+  const live = cell.isConnected ? cell : document.querySelector<HTMLElement>('[data-role="home-grid"] [data-grid-plus]');
+  live?.focus({ preventScroll: true });
   const { ElementCreateModal } = await import('../ui/element-create-modal');
   new ElementCreateModal(toastManager, {
     suppressNavigate: true,

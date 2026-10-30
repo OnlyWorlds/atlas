@@ -112,6 +112,20 @@ describe('presses', () => {
     expect(a.said[a.said.length - 1]).toBe('Mira and Ilse cannot be linked by placing');
   });
 
+  it('a said line goes with Escape, another press or an act', () => {
+    const host = grid([{ id: 'Mira', line: 0, pos: 0 }, { id: 'Ilse', line: 0, pos: 1 }, { id: 'Harbour', line: 0, pos: 2 }]);
+    const a = acts(host);
+    cell(host, 'Mira').click();
+    cell(host, 'Ilse').click();
+    expect(a.said[a.said.length - 1]).toBe('Mira and Ilse cannot be linked by placing');
+    key(cell(host, 'Ilse'), 'Escape');
+    expect(a.said[a.said.length - 1]).toBeNull();
+    cell(host, 'Mira').click();
+    cell(host, 'Ilse').click();
+    cell(host, 'Harbour').click();
+    expect(a.said[a.said.length - 1]).toBeNull();
+  });
+
   it('a press on the selected square lets go, and Enter is a press', () => {
     const host = grid([{ id: 'Mira', line: 0, pos: 0 }, { id: 'Founding', line: 0, pos: 1 }]);
     const a = acts(host);

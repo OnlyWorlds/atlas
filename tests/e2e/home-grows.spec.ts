@@ -658,6 +658,11 @@ test('the hand-over card at 390 with 12 elements: the hint goes, the line says t
   await expect(card(page).locator('.atlas-home-grow-hint')).toHaveCount(0);
   await expect(card(page).locator('[data-step-action="create-event"]')).toBeVisible();
   await expect(card(page).locator('[data-action="grow-web"]')).toBeVisible();
+  // No squares to keep still: the cover's count line and cast doors stand above the card again.
+  const counts = page.locator('.atlas-home-identity .atlas-home-statline');
+  await expect(counts).toContainText('8 characters');
+  expect((await counts.boundingBox())!.y).toBeLessThan((await card(page).boundingBox())!.y);
+  await expect(page.locator('.atlas-home-identity .atlas-home-cast-ghost')).toHaveCount(2);
 });
 
 test('the demo world: the grid with no + and no target', async ({ page }) => {
@@ -673,4 +678,26 @@ test('the demo world: the grid with no + and no target', async ({ page }) => {
   await expect(square(page, 'Mira')).toHaveClass(/is-selected/);
   await expect(page.locator('[data-grid-id].is-target')).toHaveCount(0);
   await expect(page.locator('[data-action="grow-open"]')).toHaveText('Open Mira');
+});
+
+test('an open name box gives way to a press elsewhere: the press acts, and Home draws what it wrote', async ({ page }) => {
+  await setupWorld(page);
+  await miraAndHarbour(page);
+  // A box opened and left: a press on Mira, then The Harbour, places her, drawn and said.
+  await plus(page).click();
+  await page.getByRole('menuitem', { name: 'a character' }).click();
+  await expect(page.locator('.atlas-home-grid-make input').first()).toBeFocused();
+  await square(page, 'Mira').click();
+  await expect(page.locator('.atlas-home-grid-make')).toHaveCount(0);
+  await expect(square(page, 'Mira')).toHaveClass(/is-selected/);
+  await square(page, 'The Harbour').click();
+  await expect(just(page)).toContainText('Mira is in The Harbour');
+  await expect.poll(() => placeOf(page, 'Mira')).toEqual({ pos: '1', row: '1' });
+  await expect(card(page)).toHaveAttribute('data-step', 'happened');
+  // A box opened and left for the card's ×: the card goes.
+  await plus(page).click();
+  await expect(page.locator('.atlas-home-grid-make input').first()).toBeFocused();
+  await card(page).locator('[data-action="cards-dismiss"]').click();
+  await expect(card(page)).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().data.elements.length)).toBe(2);
 });

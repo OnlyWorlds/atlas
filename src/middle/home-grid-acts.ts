@@ -124,9 +124,19 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
     const keep = cells.find(c => c.id === focusId) ?? cells.find(c => c.id === selectedIn(opts.worldId)) ?? cells[0];
     for (const c of cells) c.el.tabIndex = c === keep ? 0 : -1;
   };
+  /** A promise or a note said under the grid by a press: it lasts until the press changes. */
+  let speaking = false;
+  const speak = (text: string, placeIt?: () => void): void => { speaking = true; opts.say(text, placeIt); };
+  /** Take back what a press said (any change of the press, Escape, any act). */
+  const hush = (): void => {
+    if (!pending && !speaking) return;
+    pending = null;
+    speaking = false;
+    opts.say(null);
+  };
   const select = (id: string | null): void => {
     selected = id ? { worldId: opts.worldId, id } : null;
-    if (pending) { pending = null; opts.say(null); }
+    hush();
     paint();
     opts.onSelect(id);
   };
@@ -137,7 +147,7 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
   /** A line target's first press: the promise and Place, the press kept. */
   const promise = (from: string, to: string, text: string): void => {
     pending = { worldId: opts.worldId, from, to };
-    opts.say(text, () => place(from, to));
+    speak(text, () => place(from, to));
     paint();
   };
   const press = (id: string): void => {
@@ -155,7 +165,7 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
     }
     const no = sel ? opts.cannotLink(sel, id) : null;
     select(id);
-    if (no) opts.say(no);
+    if (no) speak(no);
   };
 
   for (const c of cells) {
@@ -168,7 +178,7 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
     const p = pending;
     const w = p.worldId === opts.worldId && selectedIn(opts.worldId) === p.from && byId.has(p.to)
       && opts.targetsOf(p.from).includes(p.to) ? opts.writeOf(p.from, p.to) : null;
-    if (w && !w.holds) opts.say(w.promise, () => place(p.from, p.to)); else pending = null;
+    if (w && !w.holds) speak(w.promise, () => place(p.from, p.to)); else pending = null;
   }
   roving();
   paint();
@@ -189,7 +199,7 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
     if (!drag.lifted && Math.hypot(dx, dy) < DRAG_PX) return;
     if (!drag.lifted) {
       drag.lifted = true;
-      if (pending) { pending = null; opts.say(null); }
+      hush();
       selected = { worldId: opts.worldId, id: drag.id };
       paint();
       drag.el.classList.add('is-lifted');
@@ -222,7 +232,7 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
     const no = to && !ok && to !== d.id ? opts.cannotLink(d.id, to) : null;
     select(null);
     if (ok) opts.drop(d.id, to!);
-    else if (no) opts.say(no);
+    else if (no) speak(no);
   };
   const onClick = (e: MouseEvent): void => {
     if (swallowClick) { swallowClick = false; return; }
@@ -252,6 +262,8 @@ export function wireGridActs(host: HTMLElement, opts: ActsOptions): () => void {
       springBack(d);
       return;
     }
+    // Escape with nothing held still takes back a line the last press said.
+    if (e.key === 'Escape' && !selectedIn(opts.worldId) && speaking) { hush(); return; }
     if (e.key === 'Escape' && selectedIn(opts.worldId)) {
       // Marked, never stopped: the global deselect-to-home reads the mark and steps aside.
       markEscapeOwned(e);
