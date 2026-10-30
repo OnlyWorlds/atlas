@@ -48,6 +48,8 @@ export type BlockState =
 let focusAfterDraw: string | null = null;
 /** A door was pressed: bring the block into view after the draw (a phone, §5 3). */
 let scrollAfterDraw = false;
+/** The world a room's Back asked for; null for the home's own presses. */
+let askWorld: string | null = null;
 let focusWired = false;
 
 const CARD_BUTTON = '[data-role="guide-card"] [data-step-action]';
@@ -74,10 +76,13 @@ export function blockFocusKey(): string | null {
  * and the scroll a door asked for.
  */
 export function settleAfterDraw(block: HTMLElement | null, kept: string | null = null): void {
-  const asked = focusAfterDraw;
-  const scroll = scrollAfterDraw;
+  // An ask made for one world is never taken by another's home (gate 2's G8: a switch before the draw).
+  const mine = askWorld === null || askWorld === getState().active?.worldId;
+  const asked = mine ? focusAfterDraw : null;
+  const scroll = mine && scrollAfterDraw;
   focusAfterDraw = null;
   scrollAfterDraw = false;
+  askWorld = null;
   if (!block) return;
   const target = asked ? block.querySelector<HTMLElement>(asked) ?? (asked === NEXT_BUTTON ? block.querySelector<HTMLElement>(CARD_BUTTON) : null)
     : kept ? block.querySelector<HTMLElement>(kept) ?? (kept.startsWith('[data-step-action') ? block.querySelector<HTMLElement>(CARD_BUTTON) : null)
@@ -94,11 +99,12 @@ const NEXT_BUTTON = '[data-step-action="next"]';
 /**
  * A room's Back to Grow your world (#975): the home's next draw focuses Next, else the card's first
  * button (the visit not stamped, another tab moved on), brought into view on a phone. The home that
- * draws no block drops the ask.
+ * draws no block drops the ask, and so does another world's home.
  */
-export function askFocusAfterHome(): void {
+export function askFocusAfterHome(worldId: string): void {
   focusAfterDraw = NEXT_BUTTON;
   scrollAfterDraw = true;
+  askWorld = worldId;
 }
 
 /** A press asked for focus after its redraw: a press whose write landed nothing drew nothing, so the ask goes (the gate's C3). */

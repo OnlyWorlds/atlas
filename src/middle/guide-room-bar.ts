@@ -92,7 +92,7 @@ export function mountGuideRoomBar(host: HTMLElement, room: GuideRoom): () => voi
   back.addEventListener('click', () => {
     const worldId = getState().active?.worldId;
     if (!worldId) return;
-    askFocusAfterHome();
+    askFocusAfterHome(worldId);
     navigate(homeHash(worldId));
   });
 
