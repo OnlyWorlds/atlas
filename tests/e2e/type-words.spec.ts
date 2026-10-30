@@ -39,6 +39,16 @@ async function setupWorld(page: Page) {
   await page.fill('input[name="world-name"]', 'Work');
   await page.click('[data-modal="create-world"] [data-action="pick"]');
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  // Past its first steps (as Done writes): while the path is open the cover holds back its cast
+  // doors and count line, so nothing above the grid moves with an act.
+  await page.evaluate(async () => {
+    const { getState, patchSlice } = await import('/src/core/state.ts');
+    const reg = await import('/src/registry/registry.ts');
+    const s = getState();
+    const next = (reg as any).updateWorldEntry(s.registry, s.active!.worldId, { guide_step: 'done' });
+    (reg as any).saveRegistry(next);
+    patchSlice('registry', next);
+  });
 }
 
 /** Elements first, then the words, as a pull that brings only the map would. */

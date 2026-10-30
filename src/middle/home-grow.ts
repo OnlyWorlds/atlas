@@ -5,25 +5,36 @@
  * the dots on every draw (`cardStep`), whatever made the element, so there is
  * no Next: each card also says what the step before made possible.
  *
- *   When the grid is not drawn (past its height), the card carries its step's
- *   act as a button, the same function the + square and the drop call, and
- *   the "just now" line with its Undo stays on the card either way.
+ *   The card's head (the step, the dots, the ×) is one line; the grid sits
+ *   right under it, and every word that changes with an act (the step's line,
+ *   the hint, a promise, the "just now" line, the buttons) sits under the
+ *   grid, so nothing above the squares moves when something is made or placed.
  *
- * Contract: a design note of 2026-10-30 (the home that grows, draft 3).
+ *   Where the step names no kind to make, the + square is a plain +: "add",
+ *   with a list of kinds. Only the path's own named + starts the path.
+ *
+ *   When the grid is not drawn (past its height), the card carries its step's
+ *   act as a button, the same function the + square and the drop call, says
+ *   so, and says where the whole world is; the "just now" line with its Undo
+ *   stays on the card either way.
+ *
+ * Contract: a design note of 2026-10-30 (the home that grows, draft 3), and
+ * its addendum for every pair the table offers.
  */
 
-import { dateOf } from '@onlyworlds/sdk';
+import { dateOf, dragField } from '@onlyworlds/sdk';
 import type { Element, ElementType } from '../core/types';
 import { getState, patchSlice } from '../core/state';
 import { showProblem } from '../ui/problem-fixes';
 import { toastManager } from '../ui/toast-manager';
-import { elementHash, importHash, navigate, timelineHash, writingHash } from '../core/router';
+import { elementHash, navigate, timelineHash, writingHash } from '../core/router';
 import { DOTS, cardStep, guideElements, newestOf, placeIdOf, unplacedCharacters, type Dots, type StepId } from '../core/guide';
-import { advancePath, doorOf, setDoor, startPath } from '../core/guide-path';
+import { advancePath, doorOf, pathShowing, setDoor, startPath } from '../core/guide-path';
 import { isStoryNarrative } from '../core/narrative-kind';
 import { isPartialSlice } from '../core/provenance';
 import { hasFolderMode } from '../core/capabilities';
 import { mayAdd, mayChange } from '../core/may-change';
+import { isMoppetopiaOpen } from '../core/moppetopia';
 import { getWritingLabels } from './writing-helpers';
 import { labelStoryFromCard, stampPathNotesSeen } from '../ui/guide-note';
 import { makeFromSquare } from '../ui/home-grid-make';
@@ -32,7 +43,10 @@ import { buildGridPicture, gridInput, type GridPicture } from './home-grid-pictu
 import { arrivalOf } from '../core/home-grid';
 import { plusWord, type PlusSquare } from './home-grid-view';
 import { selectedIn, wireGridActs } from './home-grid-acts';
+import { GRID_OPEN_ATTR, gridClosed, openKindList } from './home-grid-kinds';
 import { bringInWays } from './home-guide';
+import { homeCentre } from './home-picture';
+import { openWebOn } from '../ui/open-web';
 import { typeName } from '../core/type-words';
 import type { ToastManager } from '../ui/toast-manager';
 
@@ -44,6 +58,18 @@ const nameOf = (el: Element | null | undefined): string => {
   return n || (el ? `this ${typeName(el.type)}` : '');
 };
 
+/** The plain + square: no kind named, a list of kinds on a press. */
+const PLAIN_PLUS: PlusSquare = { type: null, word: 'add' };
+
+/**
+ * Where the grid acts: a + square and lit targets. Never on the demo, Moppetopia or a world this
+ * reader only views; there a press opens nothing but the selection's Open line.
+ */
+export function gridActsIn(worldId: string): boolean {
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  return entry?.demo !== true && !isMoppetopiaOpen(worldId) && mayAdd(entry);
+}
+
 interface Speech {
   /** The step's sentence. */
   line: string;
@@ -51,15 +77,19 @@ interface Speech {
   hint?: string;
   /** What the step before made possible: sentences with an optional link. */
   recap: { text: string; link?: { label: string; run: () => void; role: string } }[];
-  /** The + square's kind, or null for none. */
+  /** The + square's kind, or null for none named (a plain +). */
   plus: ElementType | null;
   /** The act as a button, when the grid is not drawn. */
   fallback?: { label: string; run: () => void; role: string };
+  /** The card's line once the grid gives way, up to its link to the Web ("…, or see the whole world in "). */
+  handOver: string;
 }
 
+const withButton = (act: string): string => `${act} with this button, or see the whole world in `;
+const thenWeb = (line: string): string => `${line} See the whole world in `;
 
 /** What the card says at a step, read from the world. */
-function speak(step: StepId, dots: Dots, worldId: string, toasts: ToastManager): Speech {
+function speak(step: StepId, dots: Dots, worldId: string): Speech {
   const s = getState();
   const entry = s.registry.worlds.find(w => w.id === worldId);
   const els = guideElements(s.data.elements);
@@ -68,46 +98,53 @@ function speak(step: StepId, dots: Dots, worldId: string, toasts: ToastManager):
   const byId = new Map(els.map(e => [e.id, e] as const));
   const recap: Speech['recap'] = [];
   const open = (el: Element) => ({ label: `Open ${nameOf(el)}`, role: 'open-element', run: () => navigate(elementHash(worldId, el.id)) });
+  const make = (type: ElementType) => withButton(`Make ${stepWord(type)}`);
 
   switch (step) {
     case 'someone':
       return { line: 'Start with someone.', hint: 'Press the + and type a name.', recap, plus: 'character',
-        fallback: { label: 'Create a Character', role: 'create-character', run: () => focusPlus() } };
+        fallback: { label: 'Create a Character', role: 'create-character', run: () => focusPlus() }, handOver: make('character') };
     case 'placed': {
       const location = newestOf(ofType('location'));
       const someone = newestOf(ofType('character'));
       if (!location) {
         return { line: `Now somewhere for ${nameOf(someone)} to be.`, hint: 'Press the + and type a name.', recap, plus: 'location',
-          fallback: { label: 'Create a Location', role: 'create-location', run: () => focusPlus() } };
+          fallback: { label: 'Create a Location', role: 'create-location', run: () => focusPlus() }, handOver: make('location') };
       }
       const free = newestOf(unplacedCharacters(els).filter(mine));
       const place = newestOf(ofType('location').filter(l => free && writeBetween(free.id, l.id)));
       if (free && place) {
         const w = writeBetween(free.id, place.id)!;
+        const act = `Place ${nameOf(free)} in ${nameOf(place)}`;
         return {
           line: `${promiseFor(w, free, place)}.`,
           hint: `Drag ${nameOf(free)} onto ${nameOf(place)}, or press ${nameOf(free)}, then ${nameOf(place)}.`,
           recap, plus: null,
-          fallback: { label: `Place ${nameOf(free)} in ${nameOf(place)}`, role: 'place', run: () => void drop(worldId, free.id, place.id) },
+          fallback: { label: act, role: 'place', run: () => void drop(worldId, free.id, place.id) },
+          handOver: withButton(act),
         };
       }
       // Only Characters whose place is gone: the field is someone's data, never overwritten.
       const gone = newestOf(ofType('character').filter(c => mine(c) && placeIdOf(c) && !byId.has(placeIdOf(c)!)));
-      if (gone) return { line: `${nameOf(gone)}'s place was deleted.`, recap: [{ text: '', link: open(gone) }], plus: null };
+      if (gone) {
+        const line = `${nameOf(gone)}'s place was deleted.`;
+        return { line, recap: [{ text: '', link: open(gone) }], plus: null, handOver: thenWeb(line) };
+      }
       return { line: 'Make someone of your own to place.', hint: 'Press the + and type a name.', recap, plus: 'character',
-        fallback: { label: 'Create a Character', role: 'create-character', run: () => focusPlus() } };
+        fallback: { label: 'Create a Character', role: 'create-character', run: () => focusPlus() },
+        handOver: withButton('Make someone of your own to place') };
     }
     case 'happened': {
       const undated = newestOf(ofType('event').filter(e => dateOf(e) === null));
       if (undated) recap.push({ text: `Give ${nameOf(undated)} a year to see it on the chart.`, link: open(undated) });
       return { line: 'Something happened in your world.', hint: 'Press the + and give it a name and a year.', recap, plus: 'event',
-        fallback: { label: 'Create an Event', role: 'create-event', run: () => focusPlus() } };
+        fallback: { label: 'Create an Event', role: 'create-event', run: () => focusPlus() }, handOver: make('event') };
     }
     case 'story': {
       const dated = newestOf(ofType('event').filter(e => dateOf(e) !== null));
       if (dated) recap.push({ text: `${nameOf(dated)} is on the chart at year ${dateOf(dated)}.`, link: { label: 'See it on the chart', role: 'open-chart', run: () => navigate(timelineHash(worldId, dated.id)) } });
       return { line: 'Tell a story in your world.', hint: 'Press the + and give it a title.', recap, plus: 'narrative',
-        fallback: { label: 'Start a story', role: 'create-story', run: () => focusPlus() } };
+        fallback: { label: 'Start a story', role: 'create-story', run: () => focusPlus() }, handOver: make('narrative') };
     }
     default: {
       const tale = newestOf(ofType('narrative').filter(n => isStoryNarrative(n) && (n as { supertype?: unknown }).supertype !== 'Chronicle'));
@@ -117,7 +154,8 @@ function speak(step: StepId, dots: Dots, worldId: string, toasts: ToastManager):
         recap.push({ text: `Drag ${nameOf(event)} onto ${nameOf(tale)}: ${promiseFor(w, tale, event)}.` });
       }
       if (tale) recap.push({ text: '', link: { label: 'Open the writing room', role: 'open-writing', run: () => navigate(writingHash(worldId, tale.id)) } });
-      return { line: dots.copy ? 'That is a world. Keep making.' : 'That is a world. Keep it, or keep making.', recap, plus: null };
+      const line = dots.copy ? 'That is a world. Keep making.' : 'That is a world. Keep it, or keep making.';
+      return { line, recap, plus: null, handOver: thenWeb(line) };
     }
   }
 }
@@ -134,6 +172,34 @@ async function drop(worldId: string, from: string, to: string): Promise<void> {
   if (r !== 'wrote') focusAfter = null;
 }
 
+/**
+ * A line under the grid that a press can speak in: a promise with its Place button, or that a pair
+ * cannot be linked. `base` is what it says otherwise (the card's step line; nothing on Home's grid).
+ */
+function sayer(line: HTMLElement, base: () => string): (text: string | null, place?: () => void) => void {
+  return (text, place) => {
+    line.innerHTML = '';
+    if (text === null) { line.textContent = base(); line.removeAttribute('data-said'); return; }
+    line.setAttribute('data-said', place ? 'promise' : 'note');
+    line.append(document.createTextNode(`${text}.`));
+    if (place) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'atlas-btn-primary atlas-home-grow-place';
+      b.setAttribute('data-action', 'grid-place');
+      b.textContent = 'Place';
+      b.addEventListener('click', place);
+      line.append(document.createTextNode(' '), b);
+    }
+  };
+}
+
+/** The element the Web opens on, for "the whole world in the Web": Home's picture's centre, else the newest. */
+function webCentre(worldId: string): string | null {
+  const els = getState().data.elements;
+  return homeCentre(worldId, JSON.stringify(els)) ?? newestOf(guideElements(els))?.id ?? null;
+}
+
 export interface GrowBlock {
   section: HTMLElement;
   mount(): void;
@@ -145,7 +211,7 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
   const entry = s.registry.worlds.find(w => w.id === worldId);
   const step = cardStep(dots, entry?.guide_step);
   const may = mayAdd(entry);
-  const said = speak(step, dots, worldId, toasts);
+  const said = speak(step, dots, worldId);
 
   const section = document.createElement('section');
   section.className = 'atlas-home-onboarding atlas-guide-block atlas-home-grow';
@@ -155,7 +221,7 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
   // The card carries the keep-safe ways: the home holds its keep-safe card back (one voice for a copy).
   if (step === 'copy' && !dots.copy) section.setAttribute('data-holds-copy', '');
 
-  // The head: where on the path, the five dots, the ×.
+  // The head: where on the path, the five dots, the ×. One line of one height, whatever the step.
   const head = document.createElement('div');
   head.className = 'atlas-home-grow-head';
   const at = document.createElement('span');
@@ -186,21 +252,25 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
   head.append(at, marks, x);
   section.appendChild(head);
 
+  // Under the grid: the step's line (a press's promise speaks in it), then the hint.
   const line = document.createElement('p');
   line.className = 'atlas-home-grow-line';
   line.setAttribute('data-role', 'grow-line');
+  line.setAttribute('aria-live', 'polite');
   line.textContent = said.line;
-  section.appendChild(line);
+  const say = sayer(line, () => said.line);
+  let hint: HTMLElement | null = null;
   if (said.hint && may) {
-    const hint = document.createElement('p');
+    hint = document.createElement('p');
     hint.className = 'atlas-home-grow-hint';
     hint.textContent = said.hint;
-    section.appendChild(hint);
   }
 
-  // The grid, the card's picture: the + square carries the step's kind.
+  // The grid, right under the head: the + square carries the step's kind, or is a plain + where none is named.
   const input = gridInput(getState().data.elements, getState().data.elements);
-  const plus: PlusSquare | null = may && said.plus ? { type: said.plus, word: stepWord(said.plus) } : null;
+  const plus: PlusSquare | null = !may ? null
+    : said.plus ? { type: said.plus, word: stepWord(said.plus) }
+      : gridActsIn(worldId) ? PLAIN_PLUS : null;
   const fallbackSlot = document.createElement('div');
   fallbackSlot.className = 'atlas-home-grow-fallback';
   fallbackSlot.hidden = true;
@@ -217,14 +287,33 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
     });
     fallbackSlot.appendChild(b);
   }
+  // The grid gave way (decided at mount, never at build): the hint goes, and the line says what the
+  // button does and where the whole world is.
+  const handOver = (): void => {
+    fallbackSlot.hidden = false;
+    hint?.remove();
+    hint = null;
+    line.innerHTML = '';
+    line.append(document.createTextNode(said.fallback && may ? said.handOver : thenWeb(said.line)));
+    const web = document.createElement('button');
+    web.type = 'button';
+    web.className = 'atlas-btn-link';
+    web.setAttribute('data-action', 'grow-web');
+    web.textContent = 'the Web';
+    web.addEventListener('click', () => { const id = webCentre(worldId); if (id) openWebOn(worldId, id); });
+    line.append(web, document.createTextNode('.'));
+    onHandOver();
+  };
   let picture: GridPicture | null = null;
   if (input) {
-    picture = buildGridPicture(input, plus, () => { fallbackSlot.hidden = false; onHandOver(); }, host => {
-      wirePlus(host, worldId, said.plus);
-      return wireActs(host, worldId, input, section);
+    picture = buildGridPicture(input, plus, handOver, host => {
+      wirePlus(host, worldId, plus);
+      return wireActs(host, worldId, input, section, say);
     });
     section.appendChild(picture.section);
-  } else fallbackSlot.hidden = false;
+  }
+  section.appendChild(line);
+  if (hint) section.appendChild(hint);
   section.appendChild(fallbackSlot);
 
   appendOpenAndJustNow(section, worldId);
@@ -270,7 +359,7 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
     section,
     mount(): void {
       // No grid at all (too big at any width): Home's centred picture, under the card (the code gate's C1).
-      if (picture) picture.mount(); else onHandOver();
+      if (picture) picture.mount(); else handOver();
       if (focusAfter) {
         const t = section.querySelector<HTMLElement>(focusAfter);
         focusAfter = null;
@@ -300,7 +389,7 @@ function appendOpenAndJustNow(section: HTMLElement, worldId: string): void {
   text.textContent = j.sentence;
   const undo = document.createElement('button');
   undo.type = 'button';
-  undo.className = 'atlas-btn-link';
+  undo.className = 'atlas-btn-link atlas-home-grow-undo';
   undo.setAttribute('data-action', 'grow-undo');
   undo.textContent = 'Undo';
   undo.addEventListener('click', () => {
@@ -314,11 +403,26 @@ function appendOpenAndJustNow(section: HTMLElement, worldId: string): void {
   section.appendChild(row);
 }
 
+type Input = NonNullable<ReturnType<typeof gridInput>>;
+
 /** The grid's acts on a drawn host: one wiring for the card's grid and Home's own. */
-function wireActs(host: HTMLElement, worldId: string, input: NonNullable<ReturnType<typeof gridInput>>, section: HTMLElement): () => void {
+function wireActs(host: HTMLElement, worldId: string, input: Input, section: HTMLElement, say: ReturnType<typeof sayer>): () => void {
+  const el = (id: string) => getState().data.elements.find(e => e.id === id);
   return wireGridActs(host, {
     worldId,
     targetsOf: id => targetsOf(id, input, worldId),
+    writeOf: (from, to) => {
+      const w = writeBetween(from, to);
+      return w ? { promise: promiseFor(w, el(w.on), el(w.target)), holds: w.holds } : null;
+    },
+    cannotLink: (from, to) => {
+      if (!gridActsIn(worldId)) return null;
+      const a = el(from);
+      const b = el(to);
+      if (!a || !b || dragField(a.type, b.type)) return null;
+      return `${nameOf(a)} and ${nameOf(b)} cannot be linked by placing`;
+    },
+    say,
     drop: (from, to) => void drop(worldId, from, to),
     open: id => navigate(elementHash(worldId, id)),
     onSelect: id => paintOpen(section, worldId, id),
@@ -326,19 +430,29 @@ function wireActs(host: HTMLElement, worldId: string, input: NonNullable<ReturnT
 }
 
 /**
- * Home's picture after the path (or with the card closed): the same grid with its acts, no + square
- * yet; past its height, `onHandOver` draws today's centred picture in its place. Null when the world
- * is too big for a grid at any width.
+ * Home's picture after the path (or with the card closed): the same grid with its acts and a plain +;
+ * past its height, `onHandOver` draws today's centred picture in its place. Null when the world is too
+ * big for a grid at any width, or has nothing to draw and no + to offer.
  */
 export function buildHomeGrid(worldId: string, onHandOver: () => void): GrowBlock | null {
   const els = getState().data.elements;
   const input = gridInput(els, els);
-  if (!input || input.count === 0) return null;
+  const acts = gridActsIn(worldId);
+  if (!input || (input.count === 0 && !acts)) return null;
   const section = document.createElement('section');
   section.className = 'atlas-home-grow-picture';
   section.setAttribute('data-role', 'home-grow-picture');
-  const picture = buildGridPicture(input, null, () => { section.hidden = true; onHandOver(); }, host => wireActs(host, worldId, input, section));
-  section.appendChild(picture.section);
+  const plus = acts ? PLAIN_PLUS : null;
+  const sayLine = document.createElement('p');
+  sayLine.className = 'atlas-home-grow-line atlas-home-grid-say';
+  sayLine.setAttribute('data-role', 'grid-say');
+  sayLine.setAttribute('aria-live', 'polite');
+  const say = sayer(sayLine, () => '');
+  const picture = buildGridPicture(input, plus, () => { section.hidden = true; onHandOver(); }, host => {
+    wirePlus(host, worldId, plus);
+    return wireActs(host, worldId, input, section, say);
+  });
+  section.append(picture.section, sayLine);
   // The newest element linked to nothing in the world, said once (the dim squares are the list).
   const loose = input.ids.filter(id => input.names.isLoose(id))
     .map(id => els.find(e => e.id === id)!)
@@ -367,7 +481,8 @@ export function buildHomeGrid(worldId: string, onHandOver: () => void): GrowBloc
 }
 
 /** The squares a selected one can go to: the pair's write in the world as drawn, and only on what this member may change. */
-function targetsOf(id: string, input: NonNullable<ReturnType<typeof gridInput>>, worldId: string): string[] {
+function targetsOf(id: string, input: Input, worldId: string): string[] {
+  if (!gridActsIn(worldId)) return [];
   const s = getState();
   const entry = s.registry.worlds.find(w => w.id === worldId);
   const byId = new Map(s.data.elements.map(e => [e.id, e] as const));
@@ -396,17 +511,30 @@ function paintOpen(section: HTMLElement, worldId: string, id: string | null, el?
   line.appendChild(a);
 }
 
-/** The + square: a press opens a name box in place (and a year for an Event); Enter keeps, Escape leaves nothing made. */
-function wirePlus(host: HTMLElement, worldId: string, type: ElementType | null): void {
+/**
+ * The + square. A named + (the path's step) opens a name box in place (and a year for an Event); a
+ * plain + opens the list of kinds first, and a kind picked opens the same box. Enter keeps, Escape
+ * leaves nothing made. Only a named + starts the path, and only while the path showed at the press:
+ * a plain + never writes the pointer, so a world past the path gets no card back from a make.
+ */
+function wirePlus(host: HTMLElement, worldId: string, plus: PlusSquare | null): void {
   const cell = host.querySelector<HTMLElement>('[data-grid-plus]');
-  if (!cell || !type) return;
+  if (!cell || !plus) return;
+  const named = plus.type as ElementType | null;
   cell.setAttribute('role', 'button');
   cell.tabIndex = 0;
-  cell.setAttribute('aria-label', `Make ${stepWord(type)}`);
-  const openBox = (): void => {
+  if (named) cell.setAttribute('aria-label', `Make ${stepWord(named)}`);
+  else {
+    cell.setAttribute('aria-label', 'Add');
+    cell.setAttribute('aria-haspopup', 'menu');
+    cell.setAttribute('aria-expanded', 'false');
+  }
+  const openBox = (type: ElementType, startsPath: boolean): void => {
     if (cell.querySelector('input')) return;
     const form = document.createElement('form');
     form.className = 'atlas-home-grid-make';
+    // While it is open, a resize or a sync redraw waits (the redraw would take it).
+    form.setAttribute(GRID_OPEN_ATTR, '');
     const name = document.createElement('input');
     name.type = 'text';
     name.className = 'atlas-input';
@@ -428,14 +556,22 @@ function wirePlus(host: HTMLElement, worldId: string, type: ElementType | null):
     note.className = 'atlas-home-grid-make-note';
     note.setAttribute('role', 'status');
     form.appendChild(note);
+    const close = (): void => {
+      form.remove();
+      cell.classList.remove('is-making');
+      cell.focus();
+      gridClosed(host);
+    };
     form.addEventListener('submit', e => {
       e.preventDefault();
       const n = name.value.trim();
       if (!n) { note.textContent = 'Type a name first'; name.focus(); return; }
       const y = year && year.value.trim() !== '' ? Number(year.value) : null;
-      // The first make from a + square is the path's start (a press, never a render): written here,
-      // not when the box opens, since the registry write redraws the home and would take the box.
-      startPath(worldId);
+      // The make's own writes redraw the home: the box no longer holds a redraw back.
+      form.removeAttribute(GRID_OPEN_ATTR);
+      // The path's start is the named + only (a press, never a render): written here, not when the
+      // box opens, since the registry write redraws the home and would take the box.
+      if (startsPath) startPath(worldId);
       // Asked after that redraw, so the draw that shows the new square is the one that takes it.
       focusAfter = '[data-grid-plus], [data-role="home-grid"] [data-grid-id]:last-of-type';
       void makeFromSquare(type, n, Number.isFinite(y) ? y : null).then(made => {
@@ -450,9 +586,10 @@ function wirePlus(host: HTMLElement, worldId: string, type: ElementType | null):
         focusAfter = null;
         showProblem(err, { doing: 'making the element', toasts: toastManager });
       });
+      gridClosed(host);
     });
     form.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { e.preventDefault(); form.remove(); cell.classList.remove('is-making'); cell.focus(); }
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
       // Two inputs and no submit button: a browser submits on Enter in neither, so both ask (the code gate's C3).
       if (e.key === 'Enter' && (e.target === year || e.target === name)) { e.preventDefault(); form.requestSubmit(); }
     });
@@ -460,10 +597,44 @@ function wirePlus(host: HTMLElement, worldId: string, type: ElementType | null):
     cell.appendChild(form);
     name.focus();
   };
-  cell.addEventListener('click', e => { if (!(e.target as HTMLElement).closest('form')) openBox(); });
-  cell.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target === cell) { e.preventDefault(); openBox(); }
+  const press = (): void => {
+    if (cell.querySelector('form')) return;
+    if (named) { openBox(named, pathShowing(worldId)); return; }
+    if (host.querySelector('.atlas-home-grid-kinds')) return;
+    openKindList(host, cell, kind => {
+      if (kind === 'other') void openAnother(cell);
+      else openBox(kind, false);
+    });
+  };
+  cell.addEventListener('click', e => {
+    // A press on the + while its list was open closed the list: this click leaves it closed.
+    if (cell.hasAttribute('data-kinds-just-closed')) { cell.removeAttribute('data-kinds-just-closed'); return; }
+    if (!(e.target as HTMLElement).closest('form')) press();
   });
+  cell.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target === cell) { e.preventDefault(); press(); }
+  });
+}
+
+/**
+ * "Another kind…": the New element dialog, staying on Home (the new square is the plain +'s place).
+ * Its type is the dialog's own default; a cancel gives the focus back to the plain +. A Map made
+ * there is map space and draws no square: the dialog's own result says what was made.
+ */
+async function openAnother(cell: HTMLElement): Promise<void> {
+  // Focused first, so the dialog's close gives the focus back here.
+  cell.focus({ preventScroll: true });
+  const { ElementCreateModal } = await import('../ui/element-create-modal');
+  new ElementCreateModal(toastManager, {
+    suppressNavigate: true,
+    afterCreate: id => {
+      queueMicrotask(() => {
+        const made = document.querySelector<HTMLElement>(`[data-role="home-grid"] [data-grid-id="${CSS.escape(id)}"]`)
+          ?? document.querySelector<HTMLElement>('[data-role="home-grid"] [data-grid-plus]');
+        made?.focus({ preventScroll: true });
+      });
+    },
+  }).open();
 }
 
 function latestYear(): number | null {

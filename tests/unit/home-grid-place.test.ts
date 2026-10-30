@@ -32,7 +32,7 @@ describe('writeBetween', () => {
 });
 
 describe('justNowIn', () => {
-  const write = { on: 'm', field: 'location', target: 'h', single: true };
+  const write = { on: 'm', field: 'location', target: 'h', single: true, holds: true };
   it('holds while the field still says what it wrote, and goes once it moved', () => {
     world([mira({ location: 'h' }), harbour(), docks]);
     setJustNowForTests({ worldId: 'w', write, sentence: 'Mira is in The Harbour' });
@@ -44,5 +44,21 @@ describe('justNowIn', () => {
     world([mira({ location: 'h' }), harbour()]);
     setJustNowForTests({ worldId: 'w', write, sentence: 'x' });
     expect(justNowIn('other')).toBeNull();
+  });
+  it('names the latest act only: an element made or gone since takes it away', () => {
+    world([mira({ location: 'h' }), harbour(), docks]);
+    setJustNowForTests({ worldId: 'w', write, sentence: 'Mira is in The Harbour' });
+    world([mira({ location: 'h' }), harbour(), docks, { ...docks, id: 'n', name: 'New' }]);
+    expect(justNowIn('w')).toBeNull();
+    world([mira({ location: 'h' }), harbour(), docks]);
+    setJustNowForTests({ worldId: 'w', write, sentence: 'Mira is in The Harbour' });
+    world([mira({ location: 'h' }), harbour()]);
+    expect(justNowIn('w')).toBeNull();
+  });
+  it('says the names as they are now', () => {
+    world([mira({ location: 'h' }), harbour()]);
+    setJustNowForTests({ worldId: 'w', write, sentence: 'Mira is in The Harbour' });
+    world([mira({ location: 'h', name: 'Mira Vane' }), harbour()]);
+    expect(justNowIn('w')?.sentence).toBe('Mira Vane is in The Harbour');
   });
 });

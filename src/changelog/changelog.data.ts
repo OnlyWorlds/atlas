@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.111.0',
+    date: '2026-10-30',
+    theme: 'Every link a square can make',
+    entries: [
+      {
+        id: 'home-grows-every-link',
+        title: 'Link any two squares on Home that can be linked',
+        body: 'On a small world\'s Home, drag a character onto an event, or any other pair OnlyWorlds links, and the line is drawn, with Undo. By presses, the first press on such a square says what it would write, with Place, so looking around never changes your world. Two squares that cannot be linked say so. With the keyboard, Tab moves through the squares a held one can go to.',
+        tags: ['world'],
+      },
+      {
+        id: 'home-grows-plain-plus',
+        title: 'Add any kind from Home\'s + square',
+        body: 'After the first steps, or wherever a step asks for nothing in particular, the + square says "add" and offers a character, a location, an event, a story or another kind. While the first steps are open, nothing above the squares moves as your world grows, and the steps\' card says what its button does when the world outgrows the squares.',
+        tags: ['world', 'layout'],
+      },
+    ],
+  },
+  {
     version: '1.110.0',
     date: '2026-10-30',
     theme: 'A home that grows with your world',

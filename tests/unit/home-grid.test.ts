@@ -135,6 +135,21 @@ describe('gridOf: the gate\'s cases', () => {
     expect(g.cells.find(c => c.id === ev)!.holder).toBe(t1);
     expect(g.links).toEqual([{ source: t2, target: ev, field: 'events' }]);
   });
+  it('only the pair\'s own field holds: a Character\'s birthplace is a line, its location a hold', () => {
+    const nodes = [node('h', 'location', '2026-01-01T00:00:00Z'), node('k', 'location', '2026-01-02T00:00:00Z'), node('m', 'character', '2026-01-03T00:00:00Z')];
+    const g = gridOf(nodes, [edge('m', 'birthplace', 'h'), edge('m', 'location', 'k')], 4);
+    expect(g.cells.find(c => c.id === 'm')).toMatchObject({ holder: 'k', depth: 1 });
+    expect(g.links).toEqual([{ source: 'm', target: 'h', field: 'birthplace' }]);
+    const born = gridOf(nodes, [edge('m', 'birthplace', 'h')], 4);
+    expect(born.cells.find(c => c.id === 'm')).toMatchObject({ holder: null, depth: 0, row: 0 });
+  });
+  it('a line pair stays a line: Mira listed by The Founding moves no square', () => {
+    const nodes = [node('f', 'event', '2026-01-01T00:00:00Z'), node('m', 'character', '2026-01-02T00:00:00Z')];
+    const before = gridOf(nodes, [], 4);
+    const after = gridOf(nodes, [edge('f', 'characters', 'm')], 4);
+    expect(after.cells).toEqual(before.cells);
+    expect(after.links).toEqual([{ source: 'f', target: 'm', field: 'characters' }]);
+  });
   it('a link to an element not in the picture holds nothing', () => {
     const mira = v7(1000);
     const g = gridOf([node(mira, 'character')], [edge(mira, 'location', 'gone')], 4);

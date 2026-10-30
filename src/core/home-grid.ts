@@ -6,9 +6,14 @@
  *   Arrival: a UUIDv7 id's own milliseconds, else `created_at`, else first.
  *   A new element is always last, so being born moves nothing drawn before.
  *
- *   Holds: a few link fields put one square under another (a Character in
- *   its Location, an Event in its story). A held element stands in its
- *   holder's column, its own column left empty; every other link is a line.
+ *   Holds: the pairs the SDK's `dragField` marks `holds` put one square
+ *   under another (a Character in its Location, an Event in its story). A
+ *   held element stands in its holder's column, its own column left empty;
+ *   every other link is a line.
+ *
+ *   Which end is held, by the field's own kind: a single link puts the
+ *   element that carries it under its target; a list puts the elements it
+ *   lists under the one that lists them.
  *
  *   Columns wrap onto lines at the card's width; a line is as tall as its
  *   deepest stack.
@@ -16,24 +21,23 @@
  * Pure: nodes and edges as the SDK's `worldGraph` answers them.
  */
 
-/** A holding field: which end of the edge is held. Temporary until the SDK's `dragField` carries `holds`. */
-export interface HoldDef {
-  /** The type whose field it is (the edge's source). */
-  on: string;
-  field: string;
-  /** Which end of the edge stands under the other. */
-  held: 'source' | 'target';
-}
+import { dragField } from '@onlyworlds/sdk';
+import { linkKind } from './home-grid-pair';
 
-/** The pairs that hold (the schema owner's ruling of 2026-10-30). Swapped for `dragField(...).holds` at schema-dist serial 95. */
-export const HOLDS: readonly HoldDef[] = [
-  { on: 'character', field: 'location', held: 'source' },
-  { on: 'creature', field: 'location', held: 'source' },
-  { on: 'object', field: 'location', held: 'source' },
-  { on: 'creature', field: 'zone', held: 'source' },
-  { on: 'location', field: 'zone', held: 'source' },
-  { on: 'narrative', field: 'events', held: 'target' },
-];
+/**
+ * Whether a link from an element of `sourceType` through `field` to one of
+ * `targetType` holds, and which end stands under the other: the table's
+ * `holds` for that pair and that field, the end by the field's kind. Null
+ * for a link that draws a line.
+ */
+export function holdOf(sourceType: string, field: string, targetType: string): { held: 'source' | 'target'; list: boolean } | null {
+  const row = dragField(sourceType, targetType);
+  if (!row || !row.holds || row.on !== sourceType || row.field !== field) return null;
+  const kind = linkKind(sourceType, field);
+  if (kind === 'single_link') return { held: 'source', list: false };
+  if (kind === 'multi_link') return { held: 'target', list: true };
+  return null;
+}
 
 export interface GridNode { id: string; type: string; created_at?: unknown }
 export interface GridEdge { source: string; field: string; target: string; index: number }
@@ -100,7 +104,6 @@ export function gridOf(
   nodes: readonly GridNode[],
   edges: readonly GridEdge[],
   perLine: number,
-  holds: readonly HoldDef[] = HOLDS,
 ): Grid {
   const per = Math.max(1, Math.floor(perLine));
   const order = [...nodes].sort((a, b) => arrivalOf(a) - arrivalOf(b) || byCodePoint(a.id, b.id));
@@ -108,21 +111,22 @@ export function gridOf(
   const typeOf = new Map(nodes.map(n => [n.id, n.type] as const));
 
   // Each element's holding candidates, with the edge that makes each (its index orders a list holder's stack).
-  const candidates = new Map<string, { holder: string; index: number }[]>();
-  const holdEdge = (e: GridEdge): { held: string; holder: string } | null => {
-    const def = holds.find(h => h.on === typeOf.get(e.source) && h.field === e.field);
-    if (!def || !rank.has(e.target) || e.source === e.target) return null;
-    return def.held === 'source' ? { held: e.source, holder: e.target } : { held: e.target, holder: e.source };
+  const candidates = new Map<string, { holder: string; index: number; list: boolean }[]>();
+  const holdEdge = (e: GridEdge): { held: string; holder: string; list: boolean } | null => {
+    if (!rank.has(e.source) || !rank.has(e.target) || e.source === e.target) return null;
+    const h = holdOf(typeOf.get(e.source)!, e.field, typeOf.get(e.target)!);
+    if (!h) return null;
+    return h.held === 'source' ? { held: e.source, holder: e.target, list: h.list } : { held: e.target, holder: e.source, list: h.list };
   };
   for (const e of edges) {
     const h = holdEdge(e);
     if (!h) continue;
     const list = candidates.get(h.held) ?? [];
-    list.push({ holder: h.holder, index: e.index });
+    list.push({ holder: h.holder, index: e.index, list: h.list });
     candidates.set(h.held, list);
   }
   // The holder: the narrowest place, then the earliest by arrival.
-  const holderOf = new Map<string, { holder: string; index: number }>();
+  const holderOf = new Map<string, { holder: string; index: number; list: boolean }>();
   for (const [held, list] of candidates) {
     const best = [...list].sort((a, b) =>
       (HOLDER_RANK[typeOf.get(a.holder)!] ?? 2) - (HOLDER_RANK[typeOf.get(b.holder)!] ?? 2)
@@ -148,12 +152,12 @@ export function gridOf(
     list.push(held);
     children.set(holder, list);
   }
-  // A list holder's stack keeps the list's own order (a placing appends); any other, arrival.
-  for (const [holder, list] of children) {
+  // Held through a list: the list's own order (a placing appends); through a single link, arrival.
+  for (const list of children.values()) {
     list.sort((a, b) => {
-      const ia = holderOf.get(a)!.index;
-      const ib = holderOf.get(b)!.index;
-      return typeOf.get(holder) === 'narrative' ? ia - ib || rank.get(a)! - rank.get(b)! : rank.get(a)! - rank.get(b)!;
+      const ha = holderOf.get(a)!;
+      const hb = holderOf.get(b)!;
+      return ha.list && hb.list ? ha.index - hb.index || rank.get(a)! - rank.get(b)! : rank.get(a)! - rank.get(b)!;
     });
   }
 

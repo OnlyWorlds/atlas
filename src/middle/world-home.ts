@@ -62,6 +62,7 @@ import { proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
 import { isMoppetopiaOpen } from '../core/moppetopia';
 import { buildHomePicture, type HomePicture } from './home-picture';
+import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -133,6 +134,15 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   // The home that grows: the card (with its grid) or Home's own grid, each destroyed before a rebuild.
   let grow: GrowBlock | null = null;
   let grid: GrowBlock | null = null;
+  // A name box or the plain +'s list is open on the grid: a redraw would take it, so it waits until
+  // it closes (the code gate's C8), and then runs.
+  let owed = false;
+  const onGridClosed = (): void => { if (owed) { owed = false; render(); } };
+  root.addEventListener(GRID_CLOSED, onGridClosed);
+  // The path closed while this Home was open (Done, ×): the cover's doors come back under the grid in
+  // this mount, so the close moves no square; a Home opened fresh draws them above again.
+  let pathWasOpen: string | null = null;
+  let closedHere: string | null = null;
 
   function render(): void {
     const s = getState();
@@ -145,6 +155,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, aidsHidden(), s.data.loading, s.data.loadingProgress?.done, s.registry,
       s.ui.castAssign?.kind, savedCharts, isTourFlagActive(), s.active ? doorOf(s.active.worldId) : undefined];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
+    if (root.querySelector(`[${GRID_OPEN_ATTR}]`)) { owed = true; return; }
     lastInputs = inputs;
     picture?.destroy();
     picture = null;
@@ -173,8 +184,17 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const totalElements = Array.from(counts.values()).reduce((a, b) => a + b, 0);
 
     const guideFocus = blockFocusKey();
+    // While the path is open, nothing above the squares changes with an act: the cover keeps only
+    // what acts never change (the name, a description already written), and holds back the cast
+    // doors, the count line and "Describe your world" until the path is closed.
+    const pathOpen = pathShowing(worldId);
+    if (!s.data.loading) {
+      if (pathOpen) pathWasOpen = worldId;
+      else if (pathWasOpen === worldId) closedHere = worldId;
+    }
+    const doors: CoverDoors = pathOpen ? 'held' : closedHere === worldId ? 'below' : 'above';
     root.innerHTML = '';
-    root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts));
+    root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts, doors));
     const demoLine = buildDemoLine(worldId, toasts);
     if (demoLine) root.appendChild(demoLine);
     const landingLine = buildLandingLine(getState().registry.worlds.find(w => w.id === worldId));
@@ -208,10 +228,13 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       if (anchor?.isConnected) anchor.after(picture.section); else root.appendChild(picture.section);
       picture.mount();
     };
+    // A view-only world draws the grid too, with no + square and no targets (home-grow's `gridActsIn`).
     const drawPicture = (): void => {
       if (quiet) return;
-      grid = worldIsViewOnly(worldId) || !s.data.elements.length ? null : buildHomeGrid(worldId, centred(() => grid?.section ?? null));
+      grid = buildHomeGrid(worldId, centred(() => grid?.section ?? null));
       if (!grid) { centred(() => null)(); return; }
+      // Closed in this mount: the grid stands where the card's grid stood.
+      if (doors === 'below') grid.section.setAttribute('data-after-close', '');
       root.appendChild(grid.section);
       grid.mount();
     };
@@ -233,6 +256,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // The card carries the grid while the path shows; Home's own picture draws only without it.
     const pathUp = !!tour;
     if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; } else drawPicture();
+    if (doors === 'below') {
+      const under = buildCoverDoors(meta, worldId, counts, toasts);
+      if (under) root.appendChild(under);
+    }
     if (keep && !tour?.section.hasAttribute('data-holds-copy')) root.appendChild(keep);
     settleAfterDraw(tour?.section ?? null, guideFocus);
     if (totalElements === 0) return;
@@ -259,6 +286,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   const unsubDoor = onDoorChange(render);
   render();
   return () => {
+    root.removeEventListener(GRID_CLOSED, onGridClosed);
     window.removeEventListener('atlas:charts-changed', onChartsChanged);
     unsub();
     unsubDoor();
@@ -362,6 +390,7 @@ function buildCover(
   totalElements: number,
   counts: Map<string, number>,
   toasts: ToastManager,
+  doors: CoverDoors = 'above',
 ): HTMLElement {
   const cover = document.createElement('section');
   cover.className = 'atlas-home-identity';
@@ -384,9 +413,9 @@ function buildCover(
     ? viewOnly
       ? `<p class="atlas-home-world-description">${escapeText(meta.description)}</p>`
       : `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
-    : viewOnly
+    : viewOnly || doors !== 'above'
       ? ''
-      : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">Describe your world…</p>`;
+      : DESCRIBE_PROMPT;
   identity.innerHTML = viewOnly ? `
     <h1 class="atlas-home-world-name">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
@@ -421,12 +450,52 @@ function buildCover(
   // Cast slot (D2b) — renders only when a favorite is set; assignment lives
   // on the element-detail header (char + loc). A world with a reading aid at its
   // door is set up for work (#526): its Home never asks for a protagonist or a home place.
-  const cast = buildCastSlot(worldId, !!aids);
-  if (cast) cover.appendChild(cast);
+  // While the path is open (or closed in this mount) these are held back or drawn under the grid.
+  if (doors === 'above') {
+    const cast = buildCastSlot(worldId, !!aids);
+    if (cast) cover.appendChild(cast);
+    cover.appendChild(buildStatline(counts));
+  }
+  appendCoverLines(cover, worldId);
+  return cover;
+}
 
-  // The woven stat line (replaces the count-card grid + the meta chips).
-  // ALWAYS rendered — empty at zero elements, with a reserved min-height, so
-  // the first element's "1 character" doesn't shift everything below.
+/** The cover's doors: "Describe your world", the cast doors and the count line. */
+export type CoverDoors = 'above' | 'held' | 'below';
+
+const DESCRIBE_PROMPT = `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">Describe your world…</p>`;
+
+/**
+ * The cover's doors drawn under the grid, after the path closed while this Home was open: the
+ * same prompt, cast doors and count line, so the close moves no square above them.
+ */
+function buildCoverDoors(
+  meta: NonNullable<ReturnType<typeof getState>['active']>['meta'],
+  worldId: string,
+  counts: Map<string, number>,
+  toasts: ToastManager,
+): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'atlas-home-identity atlas-home-cover-doors';
+  section.setAttribute('data-role', 'cover-doors');
+  if (!meta.description && !worldIsViewOnly(worldId)) {
+    section.insertAdjacentHTML('beforeend', DESCRIBE_PROMPT);
+    const descEl = section.querySelector<HTMLElement>('[data-edit="description"]')!;
+    descEl.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
+  }
+  // A world with a reading aid at its door gets no ghosts, as `buildCover` reads it.
+  const cast = buildCastSlot(worldId, !!buildReadingAids(meta, worldId));
+  if (cast) section.appendChild(cast);
+  section.appendChild(buildStatline(counts));
+  return section;
+}
+
+/**
+ * The woven stat line (replaces the count-card grid + the meta chips).
+ * ALWAYS rendered — empty at zero elements, with a reserved min-height, so
+ * the first element's "1 character" doesn't shift everything below.
+ */
+function buildStatline(counts: Map<string, number>): HTMLElement {
   {
     const statline = document.createElement('div');
     statline.className = 'atlas-home-statline';
@@ -481,8 +550,12 @@ function buildCover(
       seg.addEventListener('click', () => filterSidebarTo(singles.map(e => e.type)));
       statline.appendChild(seg);
     }
-    cover.appendChild(statline);
+    return statline;
   }
+}
+
+/** The cover's lines beside the counts: the parlor's room, the reading aids, what waits to be reviewed. */
+function appendCoverLines(cover: HTMLElement, worldId: string): void {
   // The parlor's room: said where the counts are, one click
   // shows it in every whole view or hides it again (the list's chip is the
   // same switch, `ui.hideRoom`).
@@ -548,8 +621,6 @@ function buildCover(
     });
     cover.appendChild(line);
   }
-
-  return cover;
 }
 
 /** The per-kind cast configuration — card + ghost share it. */

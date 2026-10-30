@@ -18022,6 +18022,50 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 /* A focused square's own mark, outside the selected and target rings, so a focused target reads apart (the code gate's C4). */
 .atlas-home-grid .atlas-home-grid-cell:focus-visible .atlas-home-grid-square { outline: 2px solid var(--atlas-text); outline-offset: 5px; }
 .atlas-home-grid .atlas-home-grid-plus:focus-visible .atlas-home-grid-square { outline: 2px solid var(--atlas-text); outline-offset: 5px; }
+/* Release (b): nothing above the squares changes with an act. The card's head is one line of one
+   height; the grid sits right under it and every word that changes sits under the grid. A grid drawn
+   after the path closed in the same visit stands where the card's grid stood (the card's border,
+   padding and head kept as space). */
+.atlas-world-home { --atlas-grow-head-h: 34px; }
+@media (pointer: coarse) { .atlas-world-home { --atlas-grow-head-h: 44px; } }
+.atlas-home-grow-head { height: var(--atlas-grow-head-h); white-space: nowrap; overflow: hidden; }
+.atlas-home-grow-head .atlas-home-have-dismiss { min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+@media (pointer: coarse) { .atlas-home-grow-head .atlas-home-have-dismiss { min-width: 44px; height: 44px; } }
+.atlas-home-grow-picture[data-after-close] { margin-top: 0; padding: calc(17px + var(--atlas-grow-head-h)) 19px 0; }
+/* Undo takes a thumb at every width (Done is 44 too). */
+.atlas-home-grow-undo { min-height: 44px; display: inline-flex; align-items: center; padding: 0 6px; }
+/* A line target's first press: its promise in the line, with Place. */
+.atlas-home-grow-place { margin-left: 6px; vertical-align: middle; }
+.atlas-home-grow-line .atlas-btn-link { font-size: inherit; font-weight: inherit; }
+.atlas-home-grid-say { margin: 4px 0 2px; font-size: 0.95rem; }
+.atlas-home-grid-say:empty { display: none; }
+.atlas-home-grid-cell.is-pending .atlas-home-grid-square { box-shadow: 0 0 0 3px var(--atlas-accent); }
+/* The plain +'s list of kinds: a popover over the grid, never part of its height. */
+.atlas-home-grid-kinds {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 172px;
+  padding: 4px;
+  background: var(--atlas-bg-raised);
+  border: 1px solid var(--atlas-divider-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.atlas-home-grid-kind {
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--atlas-text);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-home-grid-kind:hover, .atlas-home-grid-kind:focus { background: rgba(var(--atlas-ink-rgb), 0.08); }
+.atlas-home-grid-kind:focus-visible { outline: 2px solid var(--atlas-accent); outline-offset: -2px; }
 /* Touch: the grow card's links take a thumb too (Bring it in, Undo, a recap's link, Open). */
 @media (pointer: coarse) {
   .atlas-guide-block.atlas-home-grow .atlas-btn-link, .atlas-home-grow-picture .atlas-btn-link { min-height: 44px; display: inline-flex; align-items: center; }

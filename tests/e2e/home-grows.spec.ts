@@ -8,8 +8,18 @@
  * Firefox) and by the keyboard; a view-only world offers no + and lights no
  * target; the Settings row brings a finished world's card back.
  *
+ * Release (b): every pair the table offers is a target. A line pair (Mira
+ * onto The Founding) by a drag, and by two presses (the first writes
+ * nothing and says the promise), its Undo; two Characters cannot be linked;
+ * a contributor's own Mira and the owner's Event; a browse by presses writes
+ * nothing. The plain + in each state with no kind named, its list by keys, a
+ * make from it in a world with no pointer. Nothing above the squares moves
+ * with an act or the close, at 390 and 1440. The "just now" line names the
+ * latest act. Undo's height. Tab through the targets in grid order. The
+ * hand-over card's words. No + on the demo.
+ *
  * Contract: a design note of 2026-10-30, the home that grows, draft 3 (§6 the
- * path, §7 the acts, §9's e2e line).
+ * path, §7 the acts, §9's e2e line), and its addendum for release (b).
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -147,7 +157,8 @@ async function miraAndHarbour(page: Page) {
   await make(page, 'Mira');
   await make(page, 'The Harbour');
   await expect(card(page)).toHaveAttribute('data-step', 'placed');
-  await expect(plus(page)).toHaveCount(0);
+  // The step names no kind to make: the + is plain.
+  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'any');
 }
 
 test('from an empty world to Done by presses: each step read from the world, each placing said and undone', async ({ page }) => {
@@ -208,6 +219,8 @@ test('from an empty world to Done by presses: each step read from the world, eac
   await expect.poll(async () => (await element(page, 'How the Harbour began')).supertype).toBeTruthy();
   await expect(card(page)).toHaveAttribute('data-step', 'copy');
   await expect(card(page)).toContainText('Drag The Founding onto How the Harbour began');
+  // The copy step names no kind: a plain + (release b).
+  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'any');
 
   // The Event into the story, by two presses: under the story, and the story lists it.
   await select(page, 'The Founding');
@@ -225,8 +238,10 @@ test('from an empty world to Done by presses: each step read from the world, eac
   const entry = await entryOf(page);
   expect(entry.guide_step).toBe('done');
   expect(entry.tour_dismissed ?? []).not.toContain('home-cards');
-  // The grid stays as Home's picture.
+  // The grid stays as Home's picture, with a plain + (release b).
   await expect(square(page, 'Mira')).toBeVisible();
+  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'any');
+  await expect(plus(page)).toContainText('add');
 });
 
 test('a placing by a mouse drag: the same write, the same sentence', async ({ page }) => {
@@ -356,4 +371,306 @@ test('a dismissed card comes back from the same Settings row', async ({ page }) 
   await expect.poll(async () => (await entryOf(page)).tour_dismissed ?? []).not.toContain('home-cards');
   await goHome(page);
   await expect(card(page)).toHaveAttribute('data-step', 'someone');
+});
+
+// ---- Release (b): every pair the table offers, the plain +, the window frame ----
+
+/** The line under the grid a press speaks in: the card's line, or Home's own under its grid. */
+const said = (page: Page) => page.locator('[data-role="guide-block"] [data-role="grow-line"], [data-role="grid-say"]').first();
+const gridTop = (page: Page) => page.locator('[data-role="home-grid"]').first().evaluate(el => el.getBoundingClientRect().top);
+const idOf = async (page: Page, name: string) => (await element(page, name)).id as string;
+
+async function storeEdit(page: Page, op: 'update' | 'delete', id: string, patch: Record<string, unknown> = {}) {
+  await page.evaluate(async ({ op, id, patch }) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    if (op === 'update') await store.updateElement(id, patch); else await store.deleteElement(id);
+    api.patchData(await store.listElements());
+  }, { op, id, patch });
+}
+
+test('a line pair: two Characters cannot be linked; Mira onto The Founding by two presses, then Undo, then by a drag', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'character', { name: 'Mira' });
+  await createViaStore(page, 'event', { name: 'The Founding' });
+  await createViaStore(page, 'character', { name: 'Ilse' });
+  const mira = await idOf(page, 'Mira');
+  const before = { mira: await placeOf(page, 'Mira'), founding: await placeOf(page, 'The Founding') };
+  const listed = async () => (await element(page, 'The Founding')).characters ?? [];
+
+  // Two Characters: no target, and a press says why nothing is written. (On 1.110.0 no line pair lit at all.)
+  await select(page, 'Mira');
+  await expect(square(page, 'The Founding')).toHaveClass(/is-target/);
+  await expect(square(page, 'Ilse')).not.toHaveClass(/is-target/);
+  await square(page, 'Ilse').click();
+  await expect(said(page)).toContainText('Mira and Ilse cannot be linked by placing');
+  await expect(just(page)).toHaveCount(0);
+
+  // Two presses: the first writes nothing and says the promise with Place; the second writes.
+  await select(page, 'Mira');
+  await square(page, 'The Founding').click();
+  await expect(said(page)).toContainText('The Founding will list Mira.');
+  await expect(said(page).locator('[data-action="grid-place"]')).toBeVisible();
+  expect(await listed()).toEqual([]);
+  await expect(just(page)).toHaveCount(0);
+  await square(page, 'The Founding').click();
+  await expect(just(page)).toContainText('The Founding now lists Mira');
+  expect(await listed()).toEqual([mira]);
+  // No square moved; a line drawn.
+  expect(await placeOf(page, 'Mira')).toEqual(before.mira);
+  expect(await placeOf(page, 'The Founding')).toEqual(before.founding);
+  await expect(page.locator('[data-role="home-grid"] .atlas-home-grid-link')).toHaveCount(1);
+
+  // Undo takes the line back.
+  await just(page).locator('[data-action="grow-undo"]').click();
+  await expect.poll(listed).toEqual([]);
+  await expect(page.locator('[data-role="home-grid"] .atlas-home-grid-link')).toHaveCount(0);
+
+  // A drag writes at once.
+  await drag(page, 'Mira', 'The Founding');
+  await expect(just(page)).toContainText('The Founding now lists Mira');
+  expect(await listed()).toEqual([mira]);
+  expect(await placeOf(page, 'Mira')).toEqual(before.mira);
+
+  // The Founding's own page lists Mira.
+  const founding = await idOf(page, 'The Founding');
+  await page.evaluate((id) => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/element/${id}`;
+  }, founding);
+  await expect(page.locator('.atlas-middle-content')).toContainText('Mira');
+});
+
+test('a browse by presses writes nothing: press Mira, press The Founding, press a third square', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'character', { name: 'Mira' });
+  await createViaStore(page, 'event', { name: 'The Founding' });
+  await createViaStore(page, 'location', { name: 'The Harbour' });
+  await select(page, 'Mira');
+  await square(page, 'The Founding').click();
+  await expect(said(page)).toContainText('The Founding will list Mira.');
+  await square(page, 'The Harbour').click();
+  await expect(square(page, 'The Harbour')).toHaveClass(/is-selected/);
+  await page.waitForTimeout(200);
+  expect((await element(page, 'The Founding')).characters ?? []).toEqual([]);
+  expect((await element(page, 'Mira')).location ?? null).toBeNull();
+  await expect(just(page)).toHaveCount(0);
+});
+
+test('a contributor: their own Mira lights the owner\'s The Harbour, never the owner\'s The Founding', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'character', { name: 'Mira', created_by: 'member-me' });
+  await createViaStore(page, 'event', { name: 'The Founding', created_by: null });
+  await createViaStore(page, 'location', { name: 'The Harbour', created_by: null });
+  await patchEntry(page, { api: { member_role: 'contributor', membership: 'member-me' } });
+  await goHome(page);
+  await select(page, 'Mira');
+  // Mira's place is Mira's field (hers); The Founding's list is the owner's Event.
+  await expect(square(page, 'The Harbour')).toHaveClass(/is-target/);
+  await expect(square(page, 'The Founding')).not.toHaveClass(/is-target/);
+});
+
+test('the plain +: in each state with no kind named, its list by keys, Another kind…, after ×', async ({ page }) => {
+  await setupWorld(page);
+  await miraAndHarbour(page);
+  await expect(plus(page)).toContainText('add');
+  // By keys: Enter opens the list, arrows move, Escape closes it with the focus on the +.
+  await plus(page).focus();
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('menu', { name: 'Add which kind' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem')).toHaveText(['a character', 'a location', 'an event', 'a story', 'Another kind…']);
+  await expect(menu.getByRole('menuitem', { name: 'a character' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'an event' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(plus(page)).toBeFocused();
+  await expect(card(page)).toBeVisible();
+  // Enter picks: the square takes a name and a year, as the named + does; Escape makes nothing.
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.atlas-home-grid-make input[type="number"]')).toBeVisible();
+  await expect(page.locator('.atlas-home-grid-make input').first()).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.atlas-home-grid-make')).toHaveCount(0);
+  // Tab closes the list and moves on.
+  await page.keyboard.press('Enter');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(menu).toHaveCount(0);
+  // Another kind…: the New element dialog, Home stays; a cancel gives the focus back to the +.
+  await plus(page).click();
+  await menu.getByRole('menuitem', { name: 'Another kind…' }).click();
+  const dialog = page.locator('.atlas-modal-overlay').last();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(plus(page)).toBeFocused();
+  await expect(card(page)).toBeVisible();
+
+  // After ×: Home's own grid, a plain +.
+  await card(page).locator('[data-action="cards-dismiss"]').click();
+  await expect(card(page)).toHaveCount(0);
+  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'any');
+});
+
+test('a world past the path with no pointer: a make from the plain + brings no card back', async ({ page }) => {
+  await setupWorld(page);
+  const harbour = await createViaStore(page, 'location', { name: 'The Harbour' });
+  await createViaStore(page, 'character', { name: 'Mira', location: harbour });
+  await createViaStore(page, 'event', { name: 'The Founding', start_date: 12 });
+  await createViaStore(page, 'narrative', { name: 'How the Harbour began', supertype: 'Book' });
+  // The copy step, no pointer: a plain + on the card.
+  await expect(card(page)).toHaveAttribute('data-step', 'copy');
+  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'any');
+  // A copy made: all five lit, and no pointer, so no card.
+  await patchEntry(page, { kept_download_at: new Date().toISOString() });
+  await goHome(page);
+  await expect(card(page)).toHaveCount(0);
+  expect((await entryOf(page)).guide_step).toBeUndefined();
+  await plus(page).click();
+  await page.getByRole('menuitem', { name: 'a character' }).click();
+  await page.locator('.atlas-home-grid-make input').first().fill('Bren');
+  await page.keyboard.press('Enter');
+  await expect(square(page, 'Bren')).toHaveCount(1);
+  await page.waitForTimeout(300);
+  await expect(card(page)).toHaveCount(0);
+  expect((await entryOf(page)).guide_step).toBeUndefined();
+});
+
+for (const width of [390, 1440]) {
+  test(`nothing above the squares moves with an act or the close by Done, at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+    await setupWorld(page);
+    const t0 = await gridTop(page);
+    const same = async (act: string) => {
+      await page.waitForTimeout(150);
+      expect(Math.abs((await gridTop(page)) - t0), act).toBeLessThanOrEqual(1);
+    };
+    await make(page, 'Mira'); await same('a make');
+    await make(page, 'The Harbour'); await same('a second make');
+    await plus(page).click();
+    await expect(page.getByRole('menu')).toBeVisible(); await same('the plain + list opened');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0); await same('the list closed');
+    await select(page, 'Mira');
+    await dropOn(page, 'The Harbour', 'Mira is in The Harbour'); await same('a placing');
+    // Undo is a thumb's target at every width.
+    expect((await just(page).locator('[data-action="grow-undo"]').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await just(page).locator('[data-action="grow-undo"]').click();
+    await expect(just(page)).toHaveCount(0); await same('Undo');
+    await select(page, 'Mira');
+    await dropOn(page, 'The Harbour', 'Mira is in The Harbour');
+    await make(page, 'The Founding', 12); await same('an event');
+    await select(page, 'Mira');
+    await square(page, 'The Founding').click();
+    await expect(said(page)).toContainText('The Founding will list Mira.'); await same('a promise');
+    await said(page).locator('[data-action="grid-place"]').click();
+    await expect(just(page)).toContainText('The Founding now lists Mira'); await same('a line placing');
+    await make(page, 'How the Harbour began'); await same('a story');
+    await card(page).locator('[data-step-action="done"]').click();
+    await expect(card(page)).toHaveCount(0); await same('Done');
+    // The cover's doors came back under the grid in this visit; a Home opened fresh draws them above.
+    const doors = page.locator('[data-role="cover-doors"]');
+    await expect(doors).toBeVisible();
+    expect((await doors.boundingBox())!.y).toBeGreaterThan(t0);
+    await page.evaluate(() => {
+      const s = (window as any).__atlasTestApi.getState();
+      window.location.hash = `#/w/${s.active.worldId}/settings`;
+    });
+    await page.waitForTimeout(200);
+    await goHome(page);
+    await expect(page.locator('.atlas-home-identity .atlas-home-statline')).toBeVisible();
+    await expect(doors).toHaveCount(0);
+  });
+
+  test(`the close by × moves no square, at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+    await setupWorld(page);
+    await miraAndHarbour(page);
+    const t0 = await gridTop(page);
+    const at = (await square(page, 'Mira').boundingBox())!;
+    await card(page).locator('[data-action="cards-dismiss"]').click();
+    await expect(card(page)).toHaveCount(0);
+    await page.waitForTimeout(150);
+    expect(Math.abs((await gridTop(page)) - t0)).toBeLessThanOrEqual(1);
+    const now = (await square(page, 'Mira').boundingBox())!;
+    expect(Math.abs(now.x - at.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(now.y - at.y)).toBeLessThanOrEqual(1);
+  });
+}
+
+test('the "just now" line names the latest act: a rename shows, a make ends it, a delete ends it', async ({ page }) => {
+  await setupWorld(page);
+  await miraAndHarbour(page);
+  await select(page, 'Mira');
+  await dropOn(page, 'The Harbour', 'Mira is in The Harbour');
+  // A rename: the line says the new name.
+  await storeEdit(page, 'update', await idOf(page, 'Mira'), { name: 'Mirabel' });
+  await expect(just(page)).toContainText('Mirabel is in The Harbour');
+  // A make after the placing: the placing is no longer the latest act.
+  await make(page, 'The Founding', 12);
+  await expect(just(page)).toHaveCount(0);
+  // Place again, then delete another element: the line goes.
+  await createViaStore(page, 'character', { name: 'Ilse' });
+  await select(page, 'Ilse');
+  await dropOn(page, 'The Harbour', 'Ilse is in The Harbour');
+  await storeEdit(page, 'delete', await idOf(page, 'The Founding'));
+  await expect(just(page)).toHaveCount(0);
+});
+
+test('Tab while a square is held: through its targets in grid order, a target that arrived first included; Enter places', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'location', { name: 'The Harbour' });
+  await createViaStore(page, 'character', { name: 'Mira' });
+  await square(page, 'Mira').focus();
+  await page.keyboard.press('Enter');
+  await expect(square(page, 'Mira')).toHaveClass(/is-selected/);
+  await page.keyboard.press('Tab');
+  await expect(square(page, 'The Harbour')).toBeFocused();
+  await expect(square(page, 'The Harbour')).toHaveAccessibleDescription('Mira will be in The Harbour');
+  // Tab past the last leaves the grid and ends the press.
+  await page.keyboard.press('Tab');
+  await expect(square(page, 'The Harbour')).not.toBeFocused();
+  await expect(page.locator('[data-grid-id].is-selected')).toHaveCount(0);
+  // Again, and Enter places.
+  await square(page, 'Mira').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await expect(just(page)).toContainText('Mira is in The Harbour');
+  expect((await element(page, 'Mira')).location).toBe((await element(page, 'The Harbour')).id);
+});
+
+test('the hand-over card at 390 with 12 elements: the hint goes, the line says the button and the Web', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setupWorld(page);
+  const places: string[] = [];
+  for (const n of ['North', 'South', 'East', 'West']) places.push(await createViaStore(page, 'location', { name: n }));
+  for (let i = 0; i < 8; i++) await createViaStore(page, 'character', { name: `Folk ${i + 1}`, location: places[i % 4] });
+  await expect(card(page)).toHaveAttribute('data-step', 'happened');
+  await expect(card(page).locator('[data-role="home-grid"]')).toBeHidden();
+  await expect(card(page).locator('[data-role="grow-line"]')).toHaveText('Make an event with this button, or see the whole world in the Web.');
+  await expect(card(page).locator('.atlas-home-grow-hint')).toHaveCount(0);
+  await expect(card(page).locator('[data-step-action="create-event"]')).toBeVisible();
+  await expect(card(page).locator('[data-action="grow-web"]')).toBeVisible();
+});
+
+test('the demo world: the grid with no + and no target', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'character', { name: 'Mira' });
+  await createViaStore(page, 'location', { name: 'The Harbour' });
+  await patchEntry(page, { demo: true });
+  await goHome(page);
+  await expect(card(page)).toHaveCount(0);
+  await expect(square(page, 'Mira')).toBeVisible();
+  await expect(plus(page)).toHaveCount(0);
+  await square(page, 'Mira').click();
+  await expect(square(page, 'Mira')).toHaveClass(/is-selected/);
+  await expect(page.locator('[data-grid-id].is-target')).toHaveCount(0);
+  await expect(page.locator('[data-action="grow-open"]')).toHaveText('Open Mira');
 });

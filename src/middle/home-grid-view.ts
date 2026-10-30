@@ -112,7 +112,15 @@ export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: 
     const y2 = topY(b.line, b.row) + g.sq / 2;
     const adjacent = a.line === b.line && Math.abs(a.pos - b.pos) <= 1 && a.row === b.row;
     if (adjacent) path(`M${x1} ${y1} L${x2} ${y2}`, 'atlas-home-grid-link');
-    else if (a.line === b.line && a.pos === b.pos) {
+    else if (a.line === b.line && Math.abs(a.pos - b.pos) === 1) {
+      // Next columns, different rows (a held square and its neighbour's top): side to side through the
+      // gap between the two columns, never up across the stack above the lower square.
+      const s = Math.sign(x2 - x1);
+      const sx = x1 + s * g.sq / 2;
+      const ex = x2 - s * g.sq / 2;
+      const gap = (sx + ex) / 2;
+      path(`M${sx} ${y1} C ${gap} ${y1}, ${gap} ${y2}, ${ex} ${y2}`, 'atlas-home-grid-link');
+    } else if (a.line === b.line && a.pos === b.pos) {
       // Two in one column (a stack): the line bows out to the right, never straight through the squares between.
       const bow = Math.max(x1, x2) + g.sq / 2 + g.colW * 0.2;
       path(`M${x1 + g.sq / 2} ${y1} C ${bow} ${y1}, ${bow} ${y2}, ${x2 + g.sq / 2} ${y2}`, 'atlas-home-grid-link');
