@@ -145,6 +145,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   searchInput.className = 'atlas-input';
   searchInput.type = 'text';
   searchInput.placeholder = 'Search elements…';
+  // A name that stays once someone types (a placeholder is only a name while the box is empty).
+  searchInput.setAttribute('aria-label', 'Search elements');
   searchInput.setAttribute('data-role', 'elements-search');
   searchInput.style.flex = '1 1 auto';
   searchRow.appendChild(searchInput);
@@ -831,6 +833,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const viewOnly = worldIsViewOnly();
     const worldEmpty = elements.length === 0 && !state.data.loading && !viewOnly;
     searchInput.placeholder = worldEmpty ? 'Create an element…' : 'Search elements…';
+    searchInput.setAttribute('aria-label', worldEmpty ? 'Create an element' : 'Search elements');
     createBtn.hidden = viewOnly;
     createBtn.classList.toggle('atlas-create-pulse', worldEmpty);
 
