@@ -397,6 +397,10 @@ test('a line pair: two Characters cannot be linked; Mira onto The Founding by tw
   const mira = await idOf(page, 'Mira');
   const before = { mira: await placeOf(page, 'Mira'), founding: await placeOf(page, 'The Founding') };
   const listed = async () => (await element(page, 'The Founding')).characters ?? [];
+  // The step's hint, before any press has spoken in the line.
+  const hint = card(page).locator('.atlas-home-grow-hint');
+  await expect(hint).toBeVisible();
+  const hintBox = await hint.boundingBox();
 
   // Two Characters: no target, and a press says why nothing is written. (On 1.110.0 no line pair lit at all.)
   await select(page, 'Mira');
@@ -407,10 +411,13 @@ test('a line pair: two Characters cannot be linked; Mira onto The Founding by tw
   await expect(just(page)).toHaveCount(0);
 
   // Two presses: the first writes nothing and says the promise with Place; the second writes.
+  // The step's hint steps aside while the promise speaks, and keeps its room (1.111.1).
   await select(page, 'Mira');
   await square(page, 'The Founding').click();
   await expect(said(page)).toContainText('The Founding will list Mira.');
   await expect(said(page).locator('[data-action="grid-place"]')).toBeVisible();
+  await expect(hint).toBeHidden();
+  expect((await hint.evaluate(n => n.getBoundingClientRect().height))).toBe(hintBox!.height);
   expect(await listed()).toEqual([]);
   await expect(just(page)).toHaveCount(0);
   await square(page, 'The Founding').click();

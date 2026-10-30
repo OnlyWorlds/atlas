@@ -17939,6 +17939,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-grid-link { fill: none; stroke: rgba(var(--atlas-accent-rgb), 0.75); stroke-width: 1.6; }
 .atlas-home-grid-cell {
   position: absolute;
+  -webkit-tap-highlight-color: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -17998,6 +17999,8 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-grow-dot.is-next { box-shadow: 0 0 0 2px rgba(var(--atlas-accent-rgb), 0.45); }
 .atlas-home-grow-line { margin: 10px 0 2px; font-size: 1.05rem; font-weight: 600; color: var(--atlas-text); }
 .atlas-home-grow-hint { margin: 0 0 4px; color: var(--atlas-text-soft); font-size: 0.86rem; }
+/* A promise or a note speaks in the step's line: the step's hint waits, its room kept so nothing below moves. */
+.atlas-home-grow-line[data-said] + .atlas-home-grow-hint { visibility: hidden; }
 .atlas-home-grow-recap, .atlas-home-grow-open, .atlas-home-grow-just { margin: 6px 0 0; color: var(--atlas-text-soft); font-size: 0.86rem; }
 .atlas-home-grow-open:empty { display: none; }
 .atlas-home-grow-just { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--atlas-text); }

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.111.1',
+    date: '2026-10-30',
+    theme: 'Quieter squares',
+    entries: [
+      {
+        id: 'home-grows-quiet-press',
+        title: 'A press on Home\'s squares reads cleanly',
+        body: 'On a phone, pressing a square no longer flashes a filled box over it. While a press says what it would write, the step\'s own hint steps aside, so the card reads one thing at a time.',
+        tags: ['world', 'layout'],
+      },
+    ],
+  },
+  {
     version: '1.111.0',
     date: '2026-10-30',
     theme: 'Every link a square can make',
