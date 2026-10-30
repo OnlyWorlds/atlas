@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.109.0',
+    date: '2026-10-30',
+    theme: 'A way back',
+    entries: [
+      {
+        id: 'guide-room-bar',
+        title: 'The chart and the writing room lead back to the first steps',
+        body: 'When a new world\'s first steps send you to the chart or the writing room, the room now says which step you are on and offers Back to Grow your world, which returns you to the steps with Next ready.',
+        tags: ['onboarding'],
+      },
+    ],
+  },
+  {
     version: '1.108.2',
     date: '2026-10-30',
     theme: 'By keyboard',

@@ -38,6 +38,7 @@ import { CalendarBuilderModal } from '../ui/calendar-builder-modal';
 import { narrativeKindOf } from '../core/narrative-kind';
 import { renderGate } from '../ui/render-gate';
 import { currentLore } from '../core/parlor-room';
+import { mountGuideRoomBar } from './guide-room-bar';
 
 /** A sensible first "now": the LATEST recorded moment (Titus —
  *  "snap to the center of whatever elements are at the latest date"). The
@@ -60,6 +61,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   const wrap = document.createElement('div');
   wrap.className = 'atlas-timeline-room';
   target.appendChild(wrap);
+  // The guide's bar first (#975): the way back to the path, the room's first Tab stop.
+  const unmountGuideBar = mountGuideRoomBar(wrap, 'timeline');
 
   const header = document.createElement('header');
   header.className = 'atlas-room-header';
@@ -1068,6 +1071,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   return () => {
     window.removeEventListener('atlas:charts-changed', onChartsChanged);
+    unmountGuideBar();
     unsubState();
     unsubHash();
     handle?.destroy();

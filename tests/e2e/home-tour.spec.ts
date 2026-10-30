@@ -292,6 +292,106 @@ test('the path by the card alone: five steps, each confirmed with Next, the bloc
   expect((await notesDrawn(page)).filter(n => n !== 'reading')).toEqual([]);
 });
 
+// ---- #975: the card follows the person into the room ----
+
+const roomBar = (page: Page) => page.locator('[data-role="guide-room-bar"]');
+
+/** A world at a step with that step lit: Ada placed at Hollow Keep, The Founding at year 120, and `extra`. */
+async function worldAtStep(page: Page, at: string, extra: Array<[string, Record<string, unknown>]> = []) {
+  await setupWorld(page);
+  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
+  await createViaStore(page, 'character', { name: 'Ada', location: keep });
+  await createViaStore(page, 'event', { name: 'The Founding', start_date: 120 });
+  for (const [type, data] of extra) await createViaStore(page, type, data);
+  await patchEntry(page, { guide_step: at });
+  await goHome(page);
+}
+
+test('#975: Open the chart keeps a way back in the room; it stays through the chart\'s own moves; Back lands on Next', async ({ page }) => {
+  await worldAtStep(page, 'happened');
+  await step(page, 'open-chart').click();
+  await expect(page).toHaveURL(/\/timeline\//);
+  await expect(roomBar(page)).toBeVisible();
+  await expect(roomBar(page)).toContainText('Step 3 of 5, Something happened');
+  // The room's first child: nothing in the chart sits under it.
+  expect(await page.evaluate(() => document.querySelector('.atlas-timeline-room')!.firstElementChild!.getAttribute('data-role'))).toBe('guide-room-bar');
+  // The chart's own move (clear the focus) keeps it.
+  await page.locator('.atlas-chart-focus-clear').click();
+  await expect(page).toHaveURL(/\/timeline$/);
+  await expect(roomBar(page)).toBeVisible();
+  await roomBar(page).locator('[data-action="guide-room-back"]').click();
+  await expect(page.locator('.atlas-world-home')).toBeVisible();
+  await expect(step(page, 'next')).toHaveText('Next: A story');
+  await expect(step(page, 'next')).toBeFocused();
+  // Nothing written by the bar: the visit is the room mount's.
+  expect((await entryOf(page)).guide_visited).toEqual(['happened']);
+});
+
+test('#975: the bar reads the world, not the press: the room nav on step 3 shows it, on another step or past Next it does not', async ({ page }) => {
+  await worldAtStep(page, 'placed');
+  const toChart = () => page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/timeline`;
+  });
+  await toChart();
+  await expect(page.locator('.atlas-timeline-room')).toBeVisible();
+  await expect(roomBar(page)).toBeHidden();
+  await goHome(page);
+  await patchEntry(page, { guide_step: 'happened' });
+  await toChart();
+  await expect(roomBar(page)).toBeVisible();
+  // Next pressed in another tab, merged: the bar goes without a remount.
+  await patchEntry(page, { guide_step: 'story' });
+  await expect(roomBar(page)).toBeHidden();
+});
+
+test('#975: Open the writing room keeps a way back too, for a story the writing room does not list', async ({ page }) => {
+  // A Narrative with no writing label (made from Anything else): the room shows its landing, and the bar names the step, not the story.
+  await worldAtStep(page, 'story', [['narrative', { name: 'Loose Tale' }]]);
+  await expect(card(page)).toContainText('Loose Tale is a story.');
+  await step(page, 'open-writing').click();
+  await expect(page).toHaveURL(/\/writing\//);
+  await expect(roomBar(page)).toBeVisible();
+  await expect(roomBar(page)).toContainText('Step 4 of 5, A story');
+  await expect(roomBar(page)).not.toContainText('Loose Tale');
+  await roomBar(page).locator('[data-action="guide-room-back"]').click();
+  await expect(step(page, 'next')).toBeFocused();
+});
+
+test('#975: a step lit inside the room counts the room seen: Back finds Next (the gate\'s G1)', async ({ page }) => {
+  await setupWorld(page);
+  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
+  await createViaStore(page, 'character', { name: 'Ada', location: keep });
+  await patchEntry(page, { guide_step: 'happened' });
+  await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/timeline`;
+  });
+  await expect(page.locator('.atlas-timeline-room')).toBeVisible();
+  await expect(roomBar(page)).toBeHidden();
+  // The year given in the chart: the step lights while the room is mounted.
+  await createViaStore(page, 'event', { name: 'The Founding', start_date: 120 });
+  await expect(roomBar(page)).toBeVisible();
+  await expect.poll(async () => (await entryOf(page)).guide_visited).toEqual(['happened']);
+  await roomBar(page).locator('[data-action="guide-room-back"]').click();
+  await expect(step(page, 'next')).toBeFocused();
+});
+
+test('#975: a reload in the room, the world reopening under it, still counts the room seen', async ({ page }) => {
+  await worldAtStep(page, 'happened');
+  await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/timeline`;
+  });
+  await expect(roomBar(page)).toBeVisible();
+  // The mount's own write runs first: undo it, then reload, so only the reopened room can write it.
+  await patchEntry(page, { guide_visited: [] });
+  await page.reload();
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi?.getState().active?.worldId));
+  await expect(roomBar(page)).toBeVisible();
+  await expect.poll(async () => (await entryOf(page)).guide_visited).toEqual(['happened']);
+});
+
 test('a step done by hand elsewhere reads done on the card when the person comes back', async ({ page }) => {
   await setupWorld(page);
   await page.click('[data-guide-door="nothing"]');
@@ -499,8 +599,34 @@ for (const [w, h] of [[360, 640], [390, 844]] as const) {
   });
 }
 
+test.describe('on a small touch phone', () => {
+  test.use({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true });
+
+  test('#975: Back lands with Next in view once the home has settled (the gate\'s G2)', async ({ page }) => {
+    await worldAtStep(page, 'happened');
+    await step(page, 'open-chart').click();
+    await roomBar(page).locator('[data-action="guide-room-back"]').click();
+    await expect(step(page, 'next')).toBeFocused();
+    // The home draws again when its saved charts arrive: read the view after that, not at the first draw.
+    await page.waitForTimeout(1000);
+    await expect(step(page, 'next')).toBeFocused();
+    await expect(step(page, 'next')).toBeInViewport({ ratio: 1 });
+  });
+});
+
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('#975: the room\'s Back takes a thumb, and lands with Next in view', async ({ page }) => {
+    await worldAtStep(page, 'happened');
+    await step(page, 'open-chart').click();
+    const back = roomBar(page).locator('[data-action="guide-room-back"]');
+    await expect(back).toBeVisible();
+    expect(Math.round((await back.boundingBox())!.height)).toBeGreaterThanOrEqual(44);
+    await back.click();
+    await expect(step(page, 'next')).toBeFocused();
+    await expect(step(page, 'next')).toBeInViewport();
+  });
 
   test('every way in the block takes a thumb: doors, Back, Bring in\'s ways and the card\'s buttons are 44 px or more', async ({ page }) => {
     await setupWorld(page, 'browser');

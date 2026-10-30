@@ -79,7 +79,7 @@ export function settleAfterDraw(block: HTMLElement | null, kept: string | null =
   focusAfterDraw = null;
   scrollAfterDraw = false;
   if (!block) return;
-  const target = asked ? block.querySelector<HTMLElement>(asked)
+  const target = asked ? block.querySelector<HTMLElement>(asked) ?? (asked === NEXT_BUTTON ? block.querySelector<HTMLElement>(CARD_BUTTON) : null)
     : kept ? block.querySelector<HTMLElement>(kept) ?? (kept.startsWith('[data-step-action') ? block.querySelector<HTMLElement>(CARD_BUTTON) : null)
     : null;
   target?.focus({ preventScroll: true });
@@ -87,6 +87,18 @@ export function settleAfterDraw(block: HTMLElement | null, kept: string | null =
   const top = block.getBoundingClientRect().top;
   const bottom = (target ?? block).getBoundingClientRect().bottom;
   if (top < 0 || bottom > window.innerHeight) block.scrollIntoView({ block: 'start' });
+}
+
+const NEXT_BUTTON = '[data-step-action="next"]';
+
+/**
+ * A room's Back to Grow your world (#975): the home's next draw focuses Next, else the card's first
+ * button (the visit not stamped, another tab moved on), brought into view on a phone. The home that
+ * draws no block drops the ask.
+ */
+export function askFocusAfterHome(): void {
+  focusAfterDraw = NEXT_BUTTON;
+  scrollAfterDraw = true;
 }
 
 /** A press asked for focus after its redraw: a press whose write landed nothing drew nothing, so the ask goes (the gate's C3). */

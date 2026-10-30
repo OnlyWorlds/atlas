@@ -16146,6 +16146,34 @@ body.atlas-share-fullpreview > * {
   .atlas-guide-block .atlas-guide-any { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 }
 
+/* The guide's bar in the chart and the writing room (#975): in the room's flow, its first row,
+   so it covers nothing and is the first Tab stop. */
+.atlas-guide-room-bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 6px 24px;
+  border-bottom: 1px solid var(--atlas-divider);
+  background: rgba(var(--atlas-accent-rgb), 0.05);
+}
+.atlas-guide-room-bar[hidden] { display: none; }
+/* Writing focus mode is the person's chosen quiet: the bar steps aside with the chrome (Esc brings it back). */
+.atlas-shell:has(.atlas-writing-workspace.is-focus-mode) .atlas-guide-room-bar { display: none; }
+.atlas-guide-room-back { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; padding: 4px 0; }
+.atlas-guide-room-back .material-symbols-outlined { font-size: 16px; }
+.atlas-guide-room-step { font-size: 12px; color: var(--atlas-text-muted); }
+/* A narrow pane: the line above, the button the bar's full width (Seethe's look). */
+@media (max-width: 820px) {
+  /* The room header's own 24 px sides: on a phone the middle pane starts 12 px off the screen's edge. */
+  .atlas-guide-room-bar { flex-direction: column; align-items: stretch; padding: 6px 24px; }
+  .atlas-guide-room-back { justify-content: center; }
+}
+@media (pointer: coarse) {
+  .atlas-guide-room-bar .atlas-guide-room-back { min-height: 44px; padding: 0 8px 0 0; }
+}
+
 .atlas-guide-slot {
   position: relative;
   flex: 0 0 0;
