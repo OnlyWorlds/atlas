@@ -1,7 +1,7 @@
 /**
  * waymarkFor: the mark shows only where the site has a page for this reader
  * (contract `2026-10-30-s519-atlas-waymark-contract.md`, R1 to R3, and its
- * code gate's C2 and C3): keel's world address sends on only the owner; an
+ * code gate's C2 and C3): keel's world address sends on the owner and every member; an
  * element's address also a signed-in member; a read key, a player's link or
  * an agent seat reach the site only through the public page, which shows no
  * hidden, room or proposed element.
@@ -32,11 +32,11 @@ describe('the world\'s own mark', () => {
     }
   });
 
-  it('a member who is not the owner: none (keel\'s world address sends on only the owner), unless the public page is on', () => {
+  it('a member who is not the owner: the member\'s mark, whatever the public page (keel\'s world address sends every live member to their page)', () => {
     for (const e of members) {
-      expect(waymarkFor(e, null, { meta })).toBeNull();
-      expect(waymarkFor(e, null, { meta, publicPageOn: false })).toBeNull();
-      expect(waymarkFor(e, null, { meta, publicPageOn: true })?.reader).toBe('member');
+      for (const publicPageOn of [undefined, false, true]) {
+        expect(waymarkFor(e, null, { meta, publicPageOn })?.reader).toBe('member');
+      }
     }
   });
 

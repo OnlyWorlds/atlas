@@ -50,7 +50,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
         touch: 'on a new world, follow the first steps: tap the + square to make the next thing, then tap one square and then another to put it there',
       },
       'already have notes or a file? Bring it in, under the first steps',
-      'in a world on OnlyWorlds that you own, press the OnlyWorlds mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
+      'in a world on OnlyWorlds, press the OnlyWorlds mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
     ],
   },
   element: {

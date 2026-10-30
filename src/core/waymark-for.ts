@@ -4,10 +4,11 @@
  * the public page's switch) are handed in.
  *
  * The rule: the mark shows only where the site has a page for this reader.
- * keel's `/w/<world>` sends on the owner (signed in there) and otherwise
- * shows the public page when it is on; an element's address also sends on a
- * signed-in member whose role reads it. So:
- * - the world's own mark: the owner, or anyone while the public page is on;
+ * keel's `/w/<world>` sends on the owner and every live member (signed in
+ * there, since 30 Oct 2026) and otherwise shows the public page when it is on; an
+ * element's address sends on a signed-in member whose role reads it. So:
+ * - the world's own mark: the owner or a member, or anyone while the public
+ *   page is on;
  * - an element's mark: the owner or a member, once it has reached keel and
  *   while the key still shows it; a read key, a player's link or an agent
  *   seat (no account on the site) only while the public page is on, and only
@@ -50,12 +51,6 @@ function isSeat(entry: WorldRegistryEntry): boolean {
   return !!entry.api?.seat;
 }
 
-/** The world's owner: no seat, no read key, and keel's /me says owner (or has not said yet, as for every new link). */
-function isOwner(entry: WorldRegistryEntry): boolean {
-  const role = entry.api?.member_role;
-  return !isSeat(entry) && !entry.api?.read_only && (role === undefined || role === 'owner');
-}
-
 /** Whose site pages this reader can open only through the public page: the public face. */
 export function readsByPublicPage(entry: WorldRegistryEntry): boolean {
   return isPublicReader(entry) || isSeat(entry);
@@ -69,11 +64,7 @@ export function waymarkFor(entry: WorldRegistryEntry | null | undefined, el: Ele
   if (viaPublic && !pageOn) return null;
   const reader: WaymarkReader = viaPublic ? 'public' : 'member';
   const world = { id: entry.api.world_id, name: facts.meta.name, ...(facts.meta.x_names !== undefined ? { x_names: facts.meta.x_names } : {}) };
-  if (!el) {
-    // keel's world address sends on only the owner; a member there sees the public page or nothing.
-    if (!viaPublic && !isOwner(entry) && !pageOn) return null;
-    return { world, element: null, reader };
-  }
+  if (!el) return { world, element: null, reader };
   const rec = el as unknown as Record<string, unknown>;
   if (typeof rec.server_updated_at !== 'string' || !rec.server_updated_at) return null;
   if (facts.kept) return null;
