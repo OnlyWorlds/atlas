@@ -767,6 +767,8 @@ function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
     mass_unit: text(src.mass_unit),
     distance_unit: text(src.distance_unit),
     public_read: typeof src.public_read === 'boolean' ? src.public_read : undefined,
+    public_page_on: src.public_read === true && !!src.public_page && typeof src.public_page === 'object'
+      && (src.public_page as Record<string, unknown>).on === true,
     created_at: typeof src.created_at === 'string' ? src.created_at : undefined,
     updated_at: typeof src.updated_at === 'string' ? src.updated_at : '',
   };

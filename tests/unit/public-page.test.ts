@@ -1,31 +1,70 @@
 /**
- * A world's public page address from keel's `GET /world` (Skeld
- * 2026-10-23): `/w/<slug>`, else `/w/<world id>`, only when its owner
- * turned it on. keel's body as served, 2026-10-23: `public_page: { on, ... }`
- * beside `slug` (null until set).
+ * A read key's world: is its public page on? keel's whole switch is
+ * `public_read` and `public_page.on` on GET /world; read once per world per
+ * session, never on a member's world, and "not known" after a failed read.
  */
-import { describe, it, expect } from 'vitest';
-import { publicPageUrl } from '../../src/core/public-page';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readPublicPageOn, publicPageOnNow, resetPublicPageForTests } from '../../src/sync/public-page';
+import type { WorldRegistryEntry } from '../../src/core/types';
 
-const id = '068e012b-52a9-79bf-8000-26bb67891425';
-const off = { on: false, palette: null, hero: '', sections: [], pin: null, index: false };
+const WID = '0195a3c0-0000-7000-8000-000000000001';
+const readKey = (id = WID): WorldRegistryEntry =>
+  ({ id: 'f', name: 'W', state: 'api-linked', api: { world_id: id, api_key: 'ow_r_test', read_only: true } }) as WorldRegistryEntry;
 
-describe('publicPageUrl', () => {
-  it('a page that is on: by its slug, else by the world id', () => {
-    expect(publicPageUrl({ id, slug: 'the-abbey', public_page: { ...off, on: true } })).toBe('https://www.onlyworlds.com/w/the-abbey');
-    expect(publicPageUrl({ id, slug: null, public_page: { ...off, on: true } })).toBe(`https://www.onlyworlds.com/w/${id}`);
-    expect(publicPageUrl({ id, slug: '  ', public_page: { ...off, on: true } })).toBe(`https://www.onlyworlds.com/w/${id}`);
+const body = (extra: Record<string, unknown>) => ({
+  id: WID, name: 'W', description: '', image_url: '', time_basic_unit: '', time_format_names: [], time_format_equivalents: [],
+  time_range_min: null, time_range_max: null, time_range_current: null, length_unit: '', mass_unit: '', distance_unit: '',
+  updated_at: '2026-10-30T10:00:00Z', ...extra,
+});
+
+let fetchMock: ReturnType<typeof vi.fn>;
+const answer = (extra: Record<string, unknown>) =>
+  fetchMock.mockResolvedValue(new Response(JSON.stringify(body(extra)), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+beforeEach(() => {
+  resetPublicPageForTests();
+  fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+});
+afterEach(() => vi.unstubAllGlobals());
+
+describe('the public page switch', () => {
+  it('on only when public_read and public_page.on are both true', async () => {
+    const cases: Array<[Record<string, unknown>, boolean]> = [
+      [{ public_read: true, public_page: { on: true } }, true],
+      [{ public_read: true, public_page: { on: false } }, false],
+      [{ public_read: false, public_page: { on: true } }, false],
+      [{ public_read: true }, false],
+      [{ public_read: true, public_page: null }, false],
+      [{}, false],
+    ];
+    for (const [extra, on] of cases) {
+      resetPublicPageForTests();
+      answer(extra);
+      expect(await readPublicPageOn(readKey())).toBe(on);
+      expect(publicPageOnNow(readKey())).toBe(on);
+    }
   });
 
-  it('off, absent, or not the boolean: no address', () => {
-    expect(publicPageUrl({ id, slug: 'the-abbey', public_page: off })).toBeNull();
-    expect(publicPageUrl({ id, slug: 'the-abbey' })).toBeNull();
-    expect(publicPageUrl({ id, public_page: { on: 'true' } })).toBeNull();
-    expect(publicPageUrl({ id, public_page: null })).toBeNull();
-    expect(publicPageUrl(null)).toBeNull();
+  it('read once per world per session, bare (no PIN) on the read key', async () => {
+    answer({ public_read: true, public_page: { on: true } });
+    await Promise.all([readPublicPageOn(readKey()), readPublicPageOn(readKey())]);
+    await readPublicPageOn(readKey());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(init?.headers);
+    expect(headers.get('API-Pin') ?? '').toBe('');
   });
 
-  it("a slug is one path segment, whatever it holds", () => {
-    expect(publicPageUrl({ id, slug: 'a/b c', public_page: { on: true } })).toBe('https://www.onlyworlds.com/w/a%2Fb%20c');
+  it('never read for a member\'s world; not known before a read and after a failed one', async () => {
+    const member = { ...readKey(), api: { world_id: WID, api_key: 'k' } } as WorldRegistryEntry;
+    expect(await readPublicPageOn(member)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(publicPageOnNow(readKey())).toBeNull();
+    fetchMock.mockRejectedValue(new TypeError('offline'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await readPublicPageOn(readKey())).toBeNull();
+    expect(publicPageOnNow(readKey())).toBeNull();
+    warn.mockRestore();
   });
 });
