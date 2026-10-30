@@ -31,6 +31,7 @@ import {
 } from './writing-helpers';
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
+import { mountGuideRoomBar } from './guide-room-bar';
 
 // Re-export for backward compat with any callers still importing from writing.
 export { getWritingLabels } from './writing-helpers';
@@ -60,6 +61,8 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
   const container = document.createElement('div');
   container.className = 'atlas-writing-room-container';
   target.appendChild(container);
+  // The guide's bar above every mode (#975): setup, the landing and the editor.
+  const unmountGuideBar = mountGuideRoomBar(target, 'writing');
 
   let unmountInner: (() => void) | null = null;
   let lastMode: 'setup' | 'editor' | 'empty' | null = null;
@@ -105,6 +108,7 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     unsub();
     unsubHash();
     unmountInner?.();
+    unmountGuideBar();
   };
 }
 
