@@ -99,6 +99,30 @@ export function middleCapFor(shellWidthPx: number, sidebarFraction: number, frac
   return Math.min(fractionCap, Math.max(0.2, available / shellWidthPx));
 }
 
+/**
+ * The first Tab stop while a new world's first steps show (#972): one press past the chrome
+ * (the toolbar, the rail's kind icons, the list) to the block's first control. Shown only while
+ * the home holds the guide block (CSS `:has`, so it never outlives the block); unseen until focused.
+ */
+function buildGuideSkip(): HTMLElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'atlas-guide-skip';
+  b.setAttribute('data-role', 'guide-skip');
+  b.textContent = 'Skip to the first steps';
+  b.addEventListener('click', () => {
+    const block = document.querySelector<HTMLElement>('[data-role="guide-block"]');
+    if (!block) return;
+    // In this order, never the head's Back or ×: a door, the card's first button, a way to bring a world in.
+    const target = ['[data-guide-door]', '[data-role="guide-card"] [data-step-action]', '[data-bring-action]', 'button:not([disabled])']
+      .map(s => block.querySelector<HTMLElement>(s)).find(Boolean);
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    block.scrollIntoView({ block: 'nearest' });
+  });
+  return b;
+}
+
 export function mountAppShell(container: HTMLElement): AppShell {
   container.innerHTML = '';
 
@@ -159,6 +183,7 @@ export function mountAppShell(container: HTMLElement): AppShell {
   rightPane.className = 'atlas-pane atlas-right-pane';
   right.appendChild(rightPane);
 
+  shell.appendChild(buildGuideSkip());
   shell.appendChild(sidebar);
   shell.appendChild(divider1);
   shell.appendChild(middle);

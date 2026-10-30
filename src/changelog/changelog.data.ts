@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.108.2',
+    date: '2026-10-30',
+    theme: 'By keyboard',
+    entries: [
+      {
+        id: 'guide-skip',
+        title: 'A new world\'s first steps are one Tab away',
+        body: 'While a new world shows its first steps, the first press of Tab offers Skip to the first steps, which goes straight to them past the toolbar and the lists. The Web and Maps tabs show a clear ring when you reach them by keyboard.',
+        tags: ['onboarding'],
+      },
+    ],
+  },
+  {
     version: '1.108.1',
     date: '2026-10-29',
     theme: 'Clearer steps',

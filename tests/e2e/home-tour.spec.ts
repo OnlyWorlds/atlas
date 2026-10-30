@@ -150,6 +150,41 @@ test('an empty world: two doors, Bring in opens in place, Back returns to the do
   expect((await entryOf(page)).guide_step).toBeUndefined();
 });
 
+test('#972: the first Tab stop skips the chrome to the first steps; it goes with the block', async ({ page }) => {
+  await setupWorld(page);
+  const skip = page.locator('[data-role="guide-skip"]');
+  const fromTop = async () => {
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('Tab');
+    await expect(skip).toBeFocused();
+    const box = await skip.boundingBox();
+    expect(box && box.y >= 0, 'seen once focused').toBe(true);
+    await page.keyboard.press('Enter');
+  };
+  await fromTop();
+  await expect(block(page).locator('[data-guide-door="nothing"]')).toBeFocused();
+  await page.click('[data-guide-door="nothing"]');
+  // A click moves the browser's Tab starting point to where it landed, so the path's skip is pressed from focus.
+  await skip.focus();
+  await page.keyboard.press('Enter');
+  await expect(step(page, 'create-character')).toBeFocused();
+  // Unseen until focused.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const away = await skip.boundingBox();
+  expect(away && away.y + away.height <= 0, 'off screen unfocused').toBe(true);
+  // The tab bar clips its overflow: a tab's keyboard ring is drawn inside it.
+  await page.keyboard.press('Shift');
+  await page.locator('.atlas-tab').first().focus();
+  expect(await page.locator('.atlas-tab').first().evaluate(e => getComputedStyle(e).outlineOffset)).toBe('-2px');
+  // The block dismissed: no skip, and the first Tab stop is the chrome's.
+  await page.click('[data-action="cards-dismiss"]');
+  await expect(block(page)).toHaveCount(0);
+  await expect(skip).toBeHidden();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Tab');
+  await expect(skip).not.toBeFocused();
+});
+
 test('Start from nothing writes the pointer; a reload shows the doors again; the block keeps its place and height', async ({ page }) => {
   await setupWorld(page);
   const doors = await boxOf(page);

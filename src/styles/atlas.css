@@ -17590,6 +17590,34 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 :where(.atlas-list, .atlas-picker-list, .atlas-cmdk-list) :where([role="button"], button):focus-visible {
   outline-offset: -2px;
 }
+/* The tab bar clips its overflow, so a ring outside a tab is mostly cut: draw it inside (#972). */
+.atlas-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* #972: the first Tab stop while a new world's first steps show; unseen until focused, gone with the block. */
+.atlas-guide-skip {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--atlas-text);
+  background: var(--atlas-bg-raised);
+  border: 1px solid var(--atlas-cyan);
+  border-radius: 6px;
+  cursor: pointer;
+  transform: translateY(-200%);
+}
+.atlas-guide-skip:focus,
+.atlas-guide-skip:focus-visible {
+  transform: none;
+}
+.atlas-shell:not(:has([data-role="guide-block"])) .atlas-guide-skip {
+  display: none;
+}
 
 /* A5: an action revealed on hover is also revealed when focus is inside its
    row (keyboard users could land on an invisible button), and shown quietly
