@@ -5,9 +5,12 @@
  * `importedProducer`). The count is pinned, so a scan that finds nothing
  * cannot pass, and a new birth has to be counted here on purpose.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const SRC = join(__dirname, '../../src');
 

@@ -22,9 +22,12 @@
  * allowlist entry is cheap; a rule the next reader has to re-derive is not.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const ROOT = resolve(process.cwd());
 const SRC_DIR = join(ROOT, 'src');

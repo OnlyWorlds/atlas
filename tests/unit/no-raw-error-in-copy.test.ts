@@ -28,9 +28,12 @@
  * To lower the baseline after routing sites: run this file with
  * UPDATE_RAW_ERROR_BASELINE=1, then read the diff of the JSON.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const ROOT = resolve(process.cwd());
 const SCAN_DIRS = ['ui', 'middle', 'sidebar', 'tabs', 'setup', 'sync', 'core'].map(d => join(ROOT, 'src', d));

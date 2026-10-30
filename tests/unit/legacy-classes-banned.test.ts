@@ -11,9 +11,12 @@
  * and we want to use it intentionally, update the allowlist below.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 // Resolve src/ from the project root via process.cwd(). vitest runs from
 // tools/atlas, so this points at tools/atlas/src.

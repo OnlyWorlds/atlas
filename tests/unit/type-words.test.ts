@@ -7,13 +7,16 @@
  * - N5: a world with no map prints exactly what Atlas printed before.
  * - N1: no other source file reads ELEMENT_LABELS.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import namesFixture from '../fixtures/names.fixture.json';
 import { typeName, typeNameStart, aTypeName, hasOwnWord, supertypeWord } from '../../src/core/type-words';
 import { ELEMENT_LABELS } from '../../src/core/constants';
 import { patchSlice, getState } from '../../src/core/state';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const SLUGS = Object.keys(ELEMENT_LABELS) as (keyof typeof ELEMENT_LABELS)[];
 

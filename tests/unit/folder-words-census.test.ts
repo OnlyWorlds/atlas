@@ -10,9 +10,12 @@
  * Named limits: a word built from pieces, and strings in comments that look
  * like code, are not seen; identifiers (`folder_name`) never count.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const ROOT = join(__dirname, '..', '..');
 const SRC = join(ROOT, 'src');

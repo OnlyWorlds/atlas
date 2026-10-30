@@ -6,9 +6,12 @@
  * mirror and the re-key's world-prefs remap read them; nothing else in `src/`
  * may, and the UI that showed or set them stays gone.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const SRC = join(__dirname, '../../src');
 

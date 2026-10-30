@@ -3,11 +3,14 @@
  * clashed and failed nothing (#198's live walk: one press said "Sync
  * paused" and "Already up to date" together, on a refused key).
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { upToDate } from '../../src/ui/sync-toasts';
 import type { SyncResult } from '../../src/core/types';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 function round(over: Partial<SyncResult> = {}): SyncResult {
   return {

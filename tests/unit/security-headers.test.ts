@@ -11,10 +11,13 @@
  *   so a looser header line would be silently overruled by the meta;
  * - the fetch call sites are counted, so a new one comes here first.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_V2_BASE } from '../../src/sync/ow-v2-client-adapter';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const ROOT = process.cwd();
 const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8');

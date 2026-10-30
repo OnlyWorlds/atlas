@@ -16,10 +16,13 @@
  * catches it.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { TOUR_STEPS } from '../../src/tour/tour-data';
+
+// It reads the source tree: on a machine another suite holds, a scan has run past the default 15 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 /**
  * 1-based step index (matches tour.spec.ts's `data-tour-step` / `nextStep`
