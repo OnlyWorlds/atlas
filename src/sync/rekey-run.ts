@@ -13,9 +13,10 @@
  * The caller shows a locked modal for the whole run: no world switch, no map
  * gesture, no typing lands between the steps.
  */
-import { getState, setState, patchSlice, patchActiveMeta } from '../core/state';
+import { getState, setState, patchSlice, type AppState } from '../core/state';
 import type { ElementType, WorldMeta, WorldRegistryEntry } from '../core/types';
-import { remapStrandMark, STRAND_KEY } from '../core/strand-mark';
+import { STRAND_KEY } from '../core/strand-mark';
+import { canonicalExtValue } from './world-meta-sync';
 import type { FolderStore } from '../store/folder-store';
 import { startRekey, recoverRekey, rollbackRekey, repairRekeyedLinks, staleRekeyedLinks, RekeyRefusedError, type RekeyResult, type RekeyHooks } from '../store/rekey';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
@@ -117,6 +118,26 @@ export function rekeyPersistedState(worldId: string, map: ReadonlyMap<string, st
  * An open map tab on a re-keyed map is disposed first so its Leaflet
  * instance and handlers bound to the old id do not leak.
  */
+/**
+ * world.json's strand mark as the kernel left it (step 5c moves it, Discard moves it back), for the
+ * mirror; null when world.json will not parse (the mirror is then left as it is). Read from disk, never
+ * remapped in memory: a mirror that was already stale would stay stale.
+ */
+export async function diskStrand(store: FolderStore): Promise<{ value: unknown } | null> {
+  try {
+    return { value: ((await store.readWorldMeta({ strict: true })) as unknown as Record<string, unknown>)[STRAND_KEY] };
+  } catch {
+    return null;
+  }
+}
+
+function withDiskStrand(active: AppState['active'], strand: { value: unknown } | null): AppState['active'] {
+  if (!active || !strand) return active;
+  const meta = active.meta as unknown as Record<string, unknown>;
+  if (canonicalExtValue(meta[STRAND_KEY] ?? null) === canonicalExtValue(strand.value ?? null)) return active;
+  return { ...active, meta: { ...active.meta, [STRAND_KEY]: strand.value } as WorldMeta };
+}
+
 export async function rekeyLiveUi(store: FolderStore, worldId: string, map: ReadonlyMap<string, string>): Promise<void> {
   if (map.size === 0) return;
   const before = getState();
@@ -125,9 +146,7 @@ export async function rekeyLiveUi(store: FolderStore, worldId: string, map: Read
     if (tab.kind === 'map' && map.has(tab.mapId)) disposeMapTab(tab.mapId);
   }
   const elements = await store.listElements();
-  // The kernel moved world.json's strand mark (step 5c); the mirror follows (conv. 169).
-  const strand = remapStrandMark((getState().active?.meta as unknown as Record<string, unknown> | undefined)?.[STRAND_KEY], map);
-  if (strand.changed) patchActiveMeta(worldId, { [STRAND_KEY]: strand.value } as Partial<WorldMeta>);
+  const strand = await diskStrand(store);
   const cur = getState();
   if (cur.active?.worldId !== worldId) return;
   const sw = (id: string | null | undefined) => (id && map.get(id)) || id;
@@ -136,6 +155,7 @@ export async function rekeyLiveUi(store: FolderStore, worldId: string, map: Read
   const ui = cur.ui;
   setState({
     ...cur,
+    active: withDiskStrand(cur.active, strand),
     data: { ...cur.data, elements },
     ui: {
       ...ui,
@@ -285,8 +305,9 @@ export function discardInterruptedRekey(
     try {
       const r = await rollbackRekey(store, { rekeyPersistedState });
       const elements = await store.listElements();
+      const strand = await diskStrand(store);
       const cur = getState();
-      if (cur.active?.worldId === worldId) setState({ ...cur, data: { ...cur.data, elements } });
+      if (cur.active?.worldId === worldId) setState({ ...cur, active: withDiskStrand(cur.active, strand), data: { ...cur.data, elements } });
       return r;
     } finally {
       release();

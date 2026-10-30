@@ -1097,7 +1097,8 @@ async function doActivateWorld(
   if (await store.hasRekeyJournal().catch(() => false)) {
     try {
       const { recoverRekey } = await import('../store/rekey');
-      const { rekeyPersistedState, isRekeyRunning } = await import('../sync/rekey-run');
+      const { rekeyPersistedState, isRekeyRunning, diskStrand } = await import('../sync/rekey-run');
+      const { STRAND_KEY } = await import('../core/strand-mark');
       const { rekeyRouteHash } = await import('../sync/rekey-route');
       // A run still going (the user navigated back to this world under its
       // modal) owns the folder; a second writer beside it is the one thing
@@ -1108,6 +1109,9 @@ async function doActivateWorld(
         // it for live runs, but this path never reaches rekeyLiveUi).
         const { remapDiskNoticeIds } = await import('../core/live-folder');
         remapDiskNoticeIds(worldId, done.map);
+        // And the strand mark the recovery moved: `meta` was read before it.
+        const strand = done.map.size > 0 ? await diskStrand(store) : null;
+        if (strand) (meta as unknown as Record<string, unknown>)[STRAND_KEY] = strand.value;
         const next = rekeyRouteHash(window.location.hash, worldId, done.map);
         if (next) window.location.replace(next);
         // A finished Route 2 journal speaks even on the silent boot path: the

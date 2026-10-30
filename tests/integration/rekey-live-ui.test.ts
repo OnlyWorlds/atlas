@@ -91,6 +91,14 @@ describe('rekeyLiveUi: the live state follows the ids', () => {
     expect(getState().ui.selectedElementId).toBe('other');
   });
 
+  it('the strand mark\'s mirror is read from disk, even when the mirror was already stale', async () => {
+    await store.writeWorldMeta({ id: W, name: 'W', x_strand: { narrative: 'new-id', event: null, location: null } } as never);
+    patchSlice('active', { ...getState().active!, meta: { id: W, name: 'W', x_strand: { narrative: 'stale' } } as never });
+    await run();
+    expect((getState().active!.meta as unknown as Record<string, unknown>).x_strand)
+      .toEqual({ narrative: 'new-id', event: null, location: null });
+  });
+
   it('reloads the elements from disk: the new id resolves, the old one is gone', async () => {
     await run();
     const ids = getState().data.elements.map(e => e.id).sort();

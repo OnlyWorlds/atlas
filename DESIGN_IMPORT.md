@@ -249,6 +249,8 @@ World-scoped export does not exist yet (only the page-scoped share payload). Bui
 
 Round-trip is the acceptance test: **export → re-import (Mode A) → equivalent world.**
 
+**As built** (`src/import/export-world.ts`; the plan above is its first draft): the keel envelope (`format: 'onlyworlds-world-export'`, the world block WITH its id, lowercase type buckets), credentials never offered by the room. Since 1.113.1 the world block also carries every `x_` key on the World verbatim (`x_names`, the strand's `x_strand`; a null is left out), as the import keeps them; an import that gives an incoming element a fresh id moves the strand mark's ids with it. A by-type export still carries the World's keys whole, so its strand can name elements the file leaves out (an empty slot on the way back in).
+
 ---
 
 ## The room with no world (1.103, #856)
