@@ -68,5 +68,6 @@ describe('every "Already up to date" asks upToDate', () => {
     }
     expect(sites).toBeGreaterThanOrEqual(4);
     expect(offenders).toEqual([]);
-  });
+    // It reads every source file: on a machine another suite holds, that has run past the default 15 s.
+  }, 60_000);
 });

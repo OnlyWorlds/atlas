@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.112.1',
+    date: '2026-10-30',
+    theme: 'The mark offline',
+    entries: [
+      {
+        id: 'waymark-offline',
+        title: 'The OnlyWorlds mark without a connection',
+        body: 'With no connection, the menu beside a name says which ways to open it need one and leaves them still, so a press never leads to a page that cannot load; Copy link still works. On a phone, the menu keeps clear of the home bar.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.112.0',
     date: '2026-10-30',
     theme: 'Open it elsewhere',
