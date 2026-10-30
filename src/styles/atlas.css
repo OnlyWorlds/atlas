@@ -17961,7 +17961,8 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 }
 .atlas-home-grid-square .material-symbols-outlined { font-size: calc(var(--sq) * 0.45); }
 .atlas-home-grid-name {
-  max-width: 100%;
+  /* 6 px of each column's edge stay clear of ink: a lane link climbs on that edge (home-grid-view.ts). */
+  max-width: calc(100% - 12px);
   font-size: 0.78rem;
   line-height: 1.2;
   color: var(--atlas-text);
