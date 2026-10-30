@@ -81,6 +81,9 @@ describe('an element\'s mark', () => {
       expect(waymarkFor(e, el({ hidden: 'true' }), { meta, publicPageOn: true })).toBeNull();
       expect(waymarkFor(e, el({ type: 'narrative', supertype: 'Message', x_room_of: 'room' }), { meta, publicPageOn: true })).toBeNull();
       expect(waymarkFor(e, el({ x_review_proposed: { by: 'm9' } }), { meta, publicPageOn: true })).toBeNull();
+      expect(waymarkFor(e, el({ x_review_proposed: true }), { meta, publicPageOn: true })).toBeNull(); // a doubt
+      expect(waymarkFor(e, el({ type: 'pin' }), { meta, publicPageOn: true })).toBeNull();
+      expect(waymarkFor(e, el({ type: 'marker' }), { meta, publicPageOn: true })).toBeNull();
     }
     // The owner's hidden element still has its own page for the owner.
     expect(waymarkFor(linked(), el({ hidden: true }), { meta })?.reader).toBe('member');

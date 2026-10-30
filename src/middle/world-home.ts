@@ -275,7 +275,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const handOver = (): void => {
       if (doors === 'held' && cover.isConnected) {
         // An open fan-out on the name is never swapped away under the person: the redraw after it closes hands over.
-        if (waymarkOpenIn(cover)) { owed = true; return; }
+        // lastInputs is cleared so that redraw draws, though none of Home's inputs moved (the second code gate's D3).
+        if (waymarkOpenIn(cover)) { lastInputs = null; owed = true; centred(() => tour?.section ?? null)(); return; }
         markHadFocus = marks.some(waymarkHasFocus);
         const full = buildCover(meta, worldId, totalElements, counts, toasts, 'above', onMark, onGridClosed);
         cover.replaceWith(full);

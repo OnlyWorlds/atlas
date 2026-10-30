@@ -188,7 +188,8 @@ test.describe('the OnlyWorlds mark beside a name', () => {
     await expect(page.locator('.atlas-home-name-row')).toHaveCount(1);
   });
 
-  test('with a redraw held, the press that closes the fan-out still lands: a rename starts on the element and on Home', async ({ page }) => {
+  // In both engines: Firefox sends no focusout when a removed field had focus (the second code gate's D1).
+  for (const tag of ['', ' @firefox']) test(`with a redraw held, the press that closes the fan-out still lands: a rename starts on the element and on Home${tag}`, async ({ page }) => {
     await setupWorld(page);
     await pulledElement(page, ADA, 'Ada');
     await linkWorld(page);

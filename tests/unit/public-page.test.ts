@@ -69,6 +69,26 @@ describe('the public page switch', () => {
     now.mockRestore();
   });
 
+  it('a failed refresh drops the stale answer (no mark on an old yes), and waits a minute before asking again', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(2_000_000);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    answer({ public_read: true, public_page: { on: true } });
+    expect(await readPublicPageOn(readKey())).toBe(true);
+    now.mockReturnValue(2_000_000 + 6 * 60_000);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: { code: 'unauthorized', message: 'x', type: 'authentication_error' } }), { status: 401, headers: { 'Content-Type': 'application/json' } }));
+    expect(await readPublicPageOn(readKey())).toBeNull();
+    expect(publicPageOnNow(readKey())).toBeNull();
+    now.mockReturnValue(2_000_000 + 6 * 60_000 + 30_000);
+    expect(await readPublicPageOn(readKey())).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    now.mockReturnValue(2_000_000 + 8 * 60_000);
+    answer({ public_read: true, public_page: { on: false } });
+    expect(await readPublicPageOn(readKey())).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    now.mockRestore();
+    warn.mockRestore();
+  });
+
   it('a seat\'s world is read too (an agent seat reaches the site only through the public page)', async () => {
     answer({ public_read: true, public_page: { on: true } });
     const seat = { ...readKey(), api: { world_id: WID, api_key: 'ow_w_seat', seat: { role: 'contributor' }, seat_secret: 'ow_s_secret' } } as WorldRegistryEntry;

@@ -17,8 +17,12 @@ import { buildV2Adapter } from './make-online';
 const FRESH_MS = 5 * 60 * 1000;
 const READ_TIMEOUT_MS = 10_000;
 
+const FAILED_WAIT_MS = 60_000;
+
 const known = new Map<string, { on: boolean; at: number }>();
 const asking = new Map<string, Promise<boolean | null>>();
+/** When a read last failed, per world: a redraw within the minute does not ask again. */
+const failedAt = new Map<string, number>();
 
 /** The switch as last read (true or false), or null: never read, or every read failed. */
 export function publicPageOnNow(entry: WorldRegistryEntry): boolean | null {
@@ -45,11 +49,23 @@ export function readPublicPageOn(entry: WorldRegistryEntry): Promise<boolean | n
   if (!publicPageStale(entry)) return Promise.resolve(known.get(id)!.on);
   const inFlight = asking.get(id);
   if (inFlight) return inFlight;
-  // A read key goes bare; a seat's key carries its own secret as the PIN.
-  const pin = entry.api?.read_only ? '' : worldPin(entry, getState().registry) ?? '';
+  const failed = failedAt.get(id);
+  if (failed !== undefined && Date.now() - failed < FAILED_WAIT_MS) return Promise.resolve(null);
+  // A seat's key carries its own secret as the PIN; a read key goes bare.
+  const pin = entry.api?.seat ? worldPin(entry, getState().registry) ?? '' : entry.api?.read_only ? '' : worldPin(entry, getState().registry) ?? '';
   const ask = buildV2Adapter(key, pin, undefined, { readTimeoutMs: READ_TIMEOUT_MS }).getWorldMeta().then(
-    meta => { known.set(id, { on: meta.public_page_on === true, at: Date.now() }); return meta.public_page_on === true; },
-    err => { console.warn('[atlas:waymark] the public page switch was not read; no mark until it is', err); return null; },
+    meta => {
+      failedAt.delete(id);
+      known.set(id, { on: meta.public_page_on === true, at: Date.now() });
+      return meta.public_page_on === true;
+    },
+    err => {
+      // A stale answer is not kept past a failed refresh (a key withdrawn answers 401): not known, no mark.
+      failedAt.set(id, Date.now());
+      known.delete(id);
+      console.warn('[atlas:waymark] the public page switch was not read; no mark until it is', err);
+      return null;
+    },
   ).finally(() => { asking.delete(id); });
   asking.set(id, ask);
   return ask;
@@ -59,4 +75,5 @@ export function readPublicPageOn(entry: WorldRegistryEntry): Promise<boolean | n
 export function resetPublicPageForTests(): void {
   known.clear();
   asking.clear();
+  failedAt.clear();
 }

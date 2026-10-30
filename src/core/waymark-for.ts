@@ -20,7 +20,7 @@
 import type { Element, WorldRegistryEntry } from './types';
 import { isHiddenMark } from './hidden-mark';
 import { isRoomElement } from './parlor-room';
-import { isProposed } from './review-mark';
+import { handsOnAsProposed } from './review-mark';
 
 export type WaymarkReader = 'member' | 'public';
 
@@ -68,8 +68,10 @@ export function waymarkFor(entry: WorldRegistryEntry | null | undefined, el: Ele
   const rec = el as unknown as Record<string, unknown>;
   if (typeof rec.server_updated_at !== 'string' || !rec.server_updated_at) return null;
   if (facts.kept) return null;
-  // The public page shows no hidden element, no room element and nothing proposed.
-  if (reader === 'public' && (isHiddenMark(el) || isRoomElement(el) || isProposed(el))) return null;
+  // The public page shows no hidden element, no room element and nothing proposed or doubted; a Pin or a
+  // Marker has no page of its own there (its address opens the world's page).
+  if (reader === 'public' && (isHiddenMark(el) || isRoomElement(el) || handsOnAsProposed(el)
+    || el.type === 'pin' || el.type === 'marker')) return null;
   const name = typeof el.name === 'string' && el.name ? el.name : '(unnamed)';
   const element = facts.stub || reader === 'public'
     ? { id: el.id, type: el.type, name }

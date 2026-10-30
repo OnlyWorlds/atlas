@@ -121,47 +121,61 @@ export function waymarkSlot(worldId: string, el: Element | null, onSettled: () =
   // A press that closes the fan-out: its click must land before the page rebuilds under it.
   // (A click inside the fan-out, on a row, has already landed when it closes: it clears the press first.)
   let pressing = false;
-  const onDown = (): void => { pressing = true; };
+  let pointerIsDown = false;
+  const onDown = (): void => { pressing = true; pointerIsDown = true; };
+  const onUp = (): void => { pointerIsDown = false; };
   const onClick = (): void => { pressing = false; };
+  // One close is one settle, however many records it brings (a failed copy's close hides the toast too).
   let waiting: (() => void) | null = null;
+  let scheduled = false;
+
+  const run = (): void => {
+    scheduled = false;
+    waiting = null;
+    if (gone) return;
+    // The press opened a text field (a rename, a name box): the redraw waits until the person leaves it,
+    // by blur or by the field going away (a popover's cancel removes it, and Firefox sends no focusout then).
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && !slot.contains(active)
+      && (active.matches('input, textarea, select') || active.isContentEditable)) {
+      scheduled = true;
+      const left = (): boolean => !active.isConnected || document.activeElement !== active;
+      const poll = (): void => { if (gone) return; if (left()) run(); else setTimeout(poll, 250); };
+      setTimeout(poll, 250);
+      return;
+    }
+    const twin = twinOf(document.activeElement);
+    onSettled();
+    // The page's rebuild runs on a microtask; look after it. Only a name that finds one control is followed.
+    setTimeout(() => {
+      if (!twin || (document.activeElement && document.activeElement !== document.body)) return;
+      const found = document.querySelectorAll<HTMLElement>(twin);
+      if (found.length === 1) found[0].focus();
+    }, 0);
+  };
 
   const settle = (): void => {
-    if (gone || waymarkOpenIn(slot)) return;
-    const run = (): void => {
-      waiting = null;
-      if (gone) return;
-      // The press opened a text field (a rename, a name box): the redraw waits until the person leaves it.
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && !slot.contains(active)
-        && (active.matches('input, textarea, select') || active.isContentEditable)) {
-        active.addEventListener('focusout', () => setTimeout(run, 0), { once: true });
-        return;
-      }
-      const twin = twinOf(document.activeElement);
-      onSettled();
-      // The page's rebuild runs on a microtask; look after it.
-      setTimeout(() => {
-        if (twin && (!document.activeElement || document.activeElement === document.body)) {
-          document.querySelector<HTMLElement>(twin)?.focus();
-        }
-      }, 0);
-    };
-    if (!pressing) { setTimeout(run, 0); return; }
+    if (gone || waiting || scheduled || waymarkOpenIn(slot)) return;
+    if (!pressing) { scheduled = true; setTimeout(run, 0); return; }
     pressing = false;
-    if (waiting) return;
     let done = false;
+    let guard = 0;
     const once = (): void => {
       if (done) return;
       done = true;
       window.removeEventListener('click', once, true);
       window.removeEventListener('pointercancel', once, true);
       clearTimeout(guard);
+      scheduled = true;
+      waiting = null;
       setTimeout(run, 0);
     };
     window.addEventListener('click', once, true);
     window.addEventListener('pointercancel', once, true);
-    // A press that never becomes a click (a drag, a press held and moved off): run anyway.
-    const guard = setTimeout(once, 1000);
+    // A press that never becomes a click (a drag off, a lost pointer): run once the pointer is up and a
+    // moment has passed, however long the press is held.
+    const check = (): void => { if (pointerIsDown) guard = window.setTimeout(check, 250); else once(); };
+    guard = window.setTimeout(check, 1000);
     waiting = once;
   };
 
@@ -173,6 +187,7 @@ export function waymarkSlot(worldId: string, el: Element | null, onSettled: () =
         if (t.getAttribute('aria-expanded') === 'true') {
           pressing = false;
           window.addEventListener('pointerdown', onDown, true);
+          window.addEventListener('pointerup', onUp, true);
           window.addEventListener('click', onClick, true);
         } else settle();
       } else if (t.classList.contains('ow-waymark__toast') && r.attributeName === 'hidden' && t.hidden) {
@@ -189,6 +204,7 @@ export function waymarkSlot(worldId: string, el: Element | null, onSettled: () =
       gone = true;
       watch.disconnect();
       window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('click', onClick, true);
       waiting?.();
       unmount?.();
