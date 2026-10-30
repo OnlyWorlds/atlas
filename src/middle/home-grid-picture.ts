@@ -18,6 +18,7 @@ import { gridOf, type Grid } from '../core/home-grid';
 import { collectReferencedIds } from './element-detail-refs';
 import { drawGrid, geometryFor, gridHeight, withoutPlusLine, type PlusSquare } from './home-grid-view';
 import { typeName } from '../core/type-words';
+import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 
 /** The grid gives way past this height (a lean from the design's drawings, 2026-10-30: about the first screen under the card's head). */
 export const HAND_OVER_PX = 640;
@@ -102,7 +103,13 @@ export function buildGridPicture(
   let handedOver = false;
   let unwire: (() => void) | void = undefined;
 
+  // A name box or the kind list open: a redraw would take it, so it waits, and the next draw after
+  // it closes takes the new width (the code gate's C8).
+  let owed = false;
+  host.addEventListener(GRID_CLOSED, () => { if (owed) { owed = false; draw(); } });
+
   const draw = (): boolean => {
+    if (host.querySelector(`[${GRID_OPEN_ATTR}]`)) { owed = true; return !handedOver; }
     const width = host.clientWidth || section.clientWidth;
     if (width <= 0 || width === lastWidth) return !handedOver;
     lastWidth = width;

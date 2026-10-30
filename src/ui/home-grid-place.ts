@@ -20,19 +20,32 @@ import { reportGesture } from './guide-note';
 import { worldIsViewOnly } from '../core/view-only';
 
 /** What the last write said, for the card's "just now" line and its Undo. */
-export interface JustNow { worldId: string; write: PairWrite; sentence: string; undone?: boolean }
+export interface JustNow {
+  worldId: string;
+  write: PairWrite;
+  sentence: string;
+  /** The world's element ids when it was written: another element made or gone since makes it no longer the latest act. */
+  ids?: ReadonlySet<string>;
+  undone?: boolean;
+}
 
 let justNow: JustNow | null = null;
 
+const idsNow = (): Set<string> => new Set(getState().data.elements.map(e => e.id));
+
 /**
- * The last write in this world while it is still true: its field still holds what it wrote (the code
- * gate's C5: Mira moved elsewhere, the line goes, and no Undo is offered that would do nothing).
+ * The last write in this world while it is still the latest act and still true: no element made or
+ * gone since (from any door, an import or a pull), and its field still holds what it wrote (the code
+ * gate's C5: Mira moved elsewhere, the line goes, and no Undo is offered that would do nothing). The
+ * sentence is made from the names as they are now. This tab's own memory: another tab never shows it.
  */
 export function justNowIn(worldId: string): JustNow | null {
   if (!justNow || justNow.worldId !== worldId) return null;
-  const on = getState().data.elements.find(e => e.id === justNow!.write.on);
+  const els = getState().data.elements;
+  if (justNow.ids && (els.length !== justNow.ids.size || els.some(e => !justNow!.ids!.has(e.id)))) return null;
+  const on = els.find(e => e.id === justNow!.write.on);
   if (!on || undoPatchFor(justNow.write, recordOf(on)) === null) return null;
-  return justNow;
+  return { ...justNow, sentence: sentenceFor(justNow.write, on, els.find(e => e.id === justNow!.write.target)) };
 }
 
 const nameOf = (el: Element | undefined): string => {
@@ -103,7 +116,7 @@ export async function placeIn(worldId: string, aId: string, bId: string): Promis
   const on = els.find(e => e.id === w.on);
   const sentence = sentenceFor(w, on, els.find(e => e.id === w.target));
   const result = await writeLocked(worldId, w.on, ex => patchFor(w, recordOf(ex)), () => {
-    justNow = { worldId, write: w, sentence };
+    justNow = { worldId, write: w, sentence, ids: idsNow() };
   });
   if (result !== 'wrote') return result;
   if (w.field === 'location' && on?.type === 'character') reportGesture({ kind: 'location-set', character: on.id }, { fromAction: true });
@@ -124,7 +137,7 @@ export function resetJustNowForTests(): void {
   justNow = null;
 }
 
-/** Test seam: set what the last write said. */
+/** Test seam: set what the last write said (its element set the world's as it is, unless given). */
 export function setJustNowForTests(j: JustNow): void {
-  justNow = j;
+  justNow = { ids: idsNow(), ...j };
 }
