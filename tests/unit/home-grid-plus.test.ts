@@ -153,7 +153,6 @@ describe('where the grid acts', () => {
 
 describe('a hold never outlives the person\'s attention', () => {
   const sqOf = (section: HTMLElement) => section.querySelector<HTMLElement>('[data-grid-plus]')!.style.getPropertyValue('--sq');
-  const tick = () => new Promise<void>(r => setTimeout(r, 5));
   const openBox = (section: HTMLElement): HTMLInputElement => {
     section.querySelector<HTMLElement>('[data-grid-plus]')!.click();
     section.querySelector<HTMLElement>('[data-kind="character"]')!.click();
@@ -190,7 +189,8 @@ describe('a hold never outlives the person\'s attention', () => {
     resize(500);
     expect(sqOf(section)).toBe('64px');
     elsewhere.focus();
-    await tick();
+    // Wait for the held redraw itself, not a time: a busy machine runs the two timers late.
+    await vi.waitFor(() => expect(sqOf(section)).toBe('48px'));
     expect(section.querySelector('.atlas-home-grid-make')).toBeNull();
     expect(made).toEqual([]);
     expect(sqOf(section)).toBe('48px');
@@ -209,7 +209,8 @@ describe('a hold never outlives the person\'s attention', () => {
     expect(sqOf(section)).toBe('64px');
     window.dispatchEvent(new MouseEvent('pointerup'));
     mira.click();
-    await tick();
+    // Wait for the held redraw itself, not a time: a busy machine runs the two timers late.
+    await vi.waitFor(() => expect(sqOf(section)).toBe('48px'));
     expect(sqOf(section)).toBe('48px');
     expect(section.querySelector(`[data-grid-id="${uuid(1)}"]`)!.classList.contains('is-selected')).toBe(true);
   });
@@ -222,7 +223,8 @@ describe('a hold never outlives the person\'s attention', () => {
     section.querySelector<HTMLElement>('[data-grid-plus]')!.click();
     resize(500);
     elsewhere.focus();
-    await tick();
+    // Wait for the held redraw itself, not a time: a busy machine runs the two timers late.
+    await vi.waitFor(() => expect(sqOf(section)).toBe('48px'));
     expect(section.querySelector('[role="menu"]')).toBeNull();
     expect(sqOf(section)).toBe('48px');
   });
