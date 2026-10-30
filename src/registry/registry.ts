@@ -497,11 +497,6 @@ export function setFavorite(
  * per-world settings that don't warrant their own named setter (e.g. the
  * writing-font and context-pane prefs in the settings panel).
  */
-/**
- * Set (or clear, with null) a world's cast favorite (D2b): 'protagonist'
- * (character) or 'nexus' (the home location). Returns a NEW registry —
- * caller saves + patches state like every other setter here.
- */
 /** Persist a home-tour card dismissal. Idempotent; caller saves +
  *  patches state like every other setter here. */
 export function dismissTourCard(

@@ -63,7 +63,8 @@ describe('the cast is retired', () => {
     for (const file of files) {
       if (READERS(rel(file))) continue;
       readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-        if (/\.favorites\b|\bfavorites\?\./.test(line)) offenders.push(`${rel(file)}:${i + 1}`);
+        // The word in any shape: a read, an index, a destructure, a write of undefined all clear the picks.
+        if (/\bfavorites\b/.test(line)) offenders.push(`${rel(file)}:${i + 1}`);
       });
     }
     expect(offenders).toEqual([]);
