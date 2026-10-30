@@ -38,7 +38,7 @@ import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
 import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-detail-header';
-import { waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
+import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
 import { keptSetOf } from '../sync/sync-attach';
 import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
@@ -114,6 +114,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
   target.addEventListener('focusout', onFocusOut);
   // The OnlyWorlds mark beside the name: held open, a redraw waits for its fan-out to close (Waymark R7).
   let mark: WaymarkSlot | null = null;
+  let markHadFocus = false;
   const dropMark = (): void => { mark?.dispose(); mark = null; };
 
   // Rebuilt only when an input moved (conv. 146): a rebuild between a
@@ -131,6 +132,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       touring && document.body.classList.contains('atlas-tour-basefull'),
       pendingInlineNameEdit(), pendingCustomFieldEdit(), s.active ? keptSetOf(s.active.worldId) : undefined])) return;
     captureScrollBeforeRender();
+    markHadFocus = waymarkHasFocus(mark);
     dropMark();
     target.innerHTML = '';
     const state = getState();
@@ -176,6 +178,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
     if (name && worldId) {
       mark = waymarkSlot(worldId, el, onFocusOut);
       name.after(mark.el);
+      // A redraw held while the fan-out was open runs as it closes: focus stays on the mark it came back to.
+      if (markHadFocus) focusWaymark(mark);
+      markHadFocus = false;
     }
 
     const body = document.createElement('div');

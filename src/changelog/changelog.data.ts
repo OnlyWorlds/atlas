@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.112.0',
+    date: '2026-10-30',
+    theme: 'Open it elsewhere',
+    entries: [
+      {
+        id: 'waymark-open-with',
+        title: 'The OnlyWorlds mark beside a name',
+        body: 'In a world on OnlyWorlds, the mark beside the world\'s name on Home and beside an element\'s name opens a short menu: open it on onlyworlds.com or in another tool, or copy its link. It shows who last shaped the element, and only appears where that page exists for you.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.111.1',
     date: '2026-10-30',
     theme: 'Quieter squares',

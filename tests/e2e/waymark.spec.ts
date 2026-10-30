@@ -140,7 +140,10 @@ test.describe('the OnlyWorlds mark beside a name', () => {
 
     await mark(page).click();
     await expect(pop(page)).toBeVisible();
-    await expect(page.locator('.atlas-middle-header input')).toHaveCount(0);
+    // No rename started: the name is still the heading's text, and no input stands outside the fan-out.
+    await expect(page.locator('[data-role="element-name"]')).toHaveText('Ada');
+    expect(await page.evaluate(() =>
+      [...document.querySelectorAll('.atlas-middle-header input')].filter(i => !i.closest('.ow-waymark')).length)).toBe(0);
     await expect(pop(page)).toContainText('onlyworlds.com');
     await expect(pop(page)).toContainText('You are here');
 
@@ -165,6 +168,24 @@ test.describe('the OnlyWorlds mark beside a name', () => {
     await expect(pop(page)).toHaveCount(0);
     await page.waitForTimeout(300);
     expect(await page.evaluate(() => location.href)).toBe(href);
+  });
+
+  test('on Home, a change while the fan-out is open waits for it, and focus comes back to the mark', async ({ page }) => {
+    await setupWorld(page);
+    await pulledElement(page, ADA, 'Ada');
+    await linkWorld(page);
+    await goHome(page);
+    await mark(page).click();
+    await expect(pop(page)).toBeVisible();
+    await pulledElement(page, DEE, 'Dee');
+    await page.waitForTimeout(300);
+    await expect(pop(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(pop(page)).toHaveCount(0);
+    await expect(mark(page)).toHaveCount(1);
+    await expect(mark(page)).toBeFocused();
+    // The held redraw ran: Home counts Dee now.
+    await expect(page.locator('.atlas-home-name-row')).toHaveCount(1);
   });
 
   test('a read key\'s world: the mark only while its public page is on', async ({ page }) => {

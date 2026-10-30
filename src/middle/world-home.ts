@@ -63,7 +63,7 @@ import { hiddenRowWord } from '../core/hidden-mark';
 import { isMoppetopiaOpen } from '../core/moppetopia';
 import { buildHomePicture, type HomePicture } from './home-picture';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
-import { waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
+import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -149,7 +149,15 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       return false;
     });
   };
-  const onMark = (m: WaymarkSlot): void => { marks.push(m); };
+  // A redraw held while the fan-out was open runs as it closes: focus goes to the mark it came back to,
+  // once the cover is in the page (the end of this render).
+  let markHadFocus = false;
+  const onMark = (m: WaymarkSlot): void => {
+    marks.push(m);
+    if (!markHadFocus) return;
+    markHadFocus = false;
+    queueMicrotask(() => focusWaymark(m));
+  };
   // The path closed while this Home was open (Done, ×): the cover's doors come back under the grid in
   // this mount, so the close moves no square; a Home opened fresh draws them above again.
   let pathWasOpen: string | null = null;
@@ -168,6 +176,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     if (root.querySelector(`[${GRID_OPEN_ATTR}]`) || waymarkOpenIn(root)) { owed = true; return; }
     lastInputs = inputs;
+    markHadFocus = marks.some(waymarkHasFocus);
     dropMarks(true);
     picture?.destroy();
     picture = null;

@@ -27,6 +27,16 @@ export function waymarkOpenIn(root: ParentNode): boolean {
   return !!root.querySelector('.ow-waymark__mark[aria-expanded="true"]');
 }
 
+/** Focus is on a mark (or in its fan-out): a redraw that replaces the mark gives focus to the new one. */
+export function waymarkHasFocus(slot: WaymarkSlot | null | undefined): boolean {
+  return !!slot && slot.el.contains(document.activeElement);
+}
+
+/** Focus the slot's mark, when it drew one. */
+export function focusWaymark(slot: WaymarkSlot | null | undefined): void {
+  slot?.el.querySelector<HTMLElement>('.ow-waymark__mark')?.focus();
+}
+
 /** Once per world and element per session: a mount the component refused is said in the console, not on the page. */
 const refusedSaid = new Set<string>();
 
