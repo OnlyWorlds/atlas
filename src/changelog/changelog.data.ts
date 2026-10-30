@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.109.3',
+    date: '2026-10-30',
+    theme: 'A lens reads only what its fields can hold',
+    entries: [
+      {
+        id: 'lens-reads-by-target-type',
+        title: 'A lens and the Web follow a link only to its own kind',
+        body: 'A link that names an element of another kind than its field holds no longer draws a line or brings that element into a lens. A lens that points at something no longer in the world now counts it, and its line under the Web says missing or not yet accepted.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.109.2',
     date: '2026-10-30',
     theme: 'Enter makes it',

@@ -164,7 +164,8 @@ const CUT_WORDS: ReadonlyArray<[OwLensCutReason, string]> = [
   ['stale', 'not changed lately'],
   ['undated', 'with no date'],
   ['after_as_of', "after the world's now"],
-  ['anchor_not_visible', 'proposed, not yet accepted'],
+  // An anchor the reader cannot see: an id naming no element, one of another type than its field's, or a proposed one (serial 93).
+  ['anchor_not_visible', 'missing or not yet accepted'],
   ['not_visible', 'proposed, not yet accepted'],
   ['hops_not_served', 'more than one step away'],
 ];

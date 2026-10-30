@@ -96,6 +96,18 @@ describe('the reading is the lens kept, read by the SDK', () => {
     expect(lensLine(p, { name: 'Zed', kept: false })).toBe(`Short keeps 2. ${cut} left out: ${cut} past its limit. Zed is not in this lens.`);
   });
 
+  it('an anchor that names no element, or one of another type, is said as missing, never as proposed', () => {
+    const gone = el(17, 'construct', 'Gone', { supertype: 'Lens', characters: [id(1), id(99)] });
+    const wrong = el(18, 'construct', 'Wrong', { supertype: 'Lens', characters: [id(1), id(3)] });
+    setWorld([...world, gone, wrong]);
+    for (const l of [gone, wrong]) {
+      const p = readLensPicture(l);
+      expect(p.cut.anchor_not_visible).toBe(1);
+      expect(lensLine(p)).toMatch(/1 left out: 1 missing or not yet accepted\.$/);
+      expect(lensLine(p)).not.toMatch(/proposed/);
+    }
+  });
+
   it('reading a lens writes nothing', () => {
     setWorld(world);
     const before = JSON.stringify(world);
