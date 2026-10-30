@@ -136,6 +136,12 @@ export class MockFolderStore implements FolderStore {
     return { ...this.meta };
   }
 
+  async writeWorldMetaWith(mutate: (current: WorldMeta) => Partial<WorldMeta> | null): Promise<WorldMeta | null> {
+    this.assertWritable();
+    const patch = mutate(await this.readWorldMeta({ strict: true }));
+    return patch === null ? null : this.writeWorldMeta(patch);
+  }
+
   // ---- Elements (content + spatial unified) ----
 
   async listElements(type?: ElementType, _opts?: ListElementsOptions): Promise<Element[]> {

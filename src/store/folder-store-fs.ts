@@ -1400,30 +1400,41 @@ export class FsFolderStore implements FolderStore {
     // Serialized read-merge-write: the read and the
     // write happen atomically relative to every other meta writer, so a
     // background pull-apply can never erase a concurrent user edit.
+    return this.runWorldMetaOp(() => this.mergeWorldMeta(patch));
+  }
+
+  async writeWorldMetaWith(mutate: (current: WorldMeta) => Partial<WorldMeta> | null): Promise<WorldMeta | null> {
+    this.assertWritable();
     return this.runWorldMetaOp(async () => {
-      // Strict: a world.json that exists but will not parse must stop this
-      // write, or the merge below starts from nothing and the world loses its
-      // id (a git conflict in world.json was one save from that).
-      const born = (await readJsonStrict<WorldMeta>(this.requireRoot(), WORLD_META_FILE)) === null;
-      const current = await this.readWorldMeta();
-      // THE BIRTH STAMP (folder-format §4.2): a folder atlas creates
-      // records the spec version it was written against. Only when no
-      // world.json existed yet; a folder from another tool keeps whatever it
-      // carries, absent included (opening or editing is not capturing).
-      const stamp = born && patch.format_version === undefined
-        ? { format_version: FOLDER_FORMAT_VERSION }
-        : {};
-      // THE PRODUCER LINE (§4.2, v0.3.14): taken at birth only. After that the
-      // line the folder was born with stays, whoever writes (an import into
-      // this world, a pull, a restore): it says who made the folder, never who
-      // touched it last.
-      const { producer: offered, ...rest } = patch;
-      const producer = born && offered !== undefined ? { producer: offered } : {};
-      // A seat's secret never reaches the folder (#104): the folder travels.
-      const next: WorldMeta = withoutSeatSecret({ ...current, ...stamp, ...rest, ...producer });
-      await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
-      return next;
+      const patch = mutate(await this.readWorldMeta({ strict: true }));
+      return patch === null ? null : this.mergeWorldMeta(patch);
     });
+  }
+
+  /** The body of a meta write; runs only inside `runWorldMetaOp`. */
+  private async mergeWorldMeta(patch: Partial<WorldMeta>): Promise<WorldMeta> {
+    // Strict: a world.json that exists but will not parse must stop this
+    // write, or the merge below starts from nothing and the world loses its
+    // id (a git conflict in world.json was one save from that).
+    const born = (await readJsonStrict<WorldMeta>(this.requireRoot(), WORLD_META_FILE)) === null;
+    const current = await this.readWorldMeta();
+    // THE BIRTH STAMP (folder-format §4.2): a folder atlas creates
+    // records the spec version it was written against. Only when no
+    // world.json existed yet; a folder from another tool keeps whatever it
+    // carries, absent included (opening or editing is not capturing).
+    const stamp = born && patch.format_version === undefined
+      ? { format_version: FOLDER_FORMAT_VERSION }
+      : {};
+    // THE PRODUCER LINE (§4.2, v0.3.14): taken at birth only. After that the
+    // line the folder was born with stays, whoever writes (an import into
+    // this world, a pull, a restore): it says who made the folder, never who
+    // touched it last.
+    const { producer: offered, ...rest } = patch;
+    const producer = born && offered !== undefined ? { producer: offered } : {};
+    // A seat's secret never reaches the folder (#104): the folder travels.
+    const next: WorldMeta = withoutSeatSecret({ ...current, ...stamp, ...rest, ...producer });
+    await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
+    return next;
   }
 
   /** The file as it is on disk, or null when the folder has no world.json yet. */

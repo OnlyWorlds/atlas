@@ -13,8 +13,9 @@
  * The caller shows a locked modal for the whole run: no world switch, no map
  * gesture, no typing lands between the steps.
  */
-import { getState, setState, patchSlice } from '../core/state';
-import type { ElementType, WorldRegistryEntry } from '../core/types';
+import { getState, setState, patchSlice, patchActiveMeta } from '../core/state';
+import type { ElementType, WorldMeta, WorldRegistryEntry } from '../core/types';
+import { remapStrandMark, STRAND_KEY } from '../core/strand-mark';
 import type { FolderStore } from '../store/folder-store';
 import { startRekey, recoverRekey, rollbackRekey, repairRekeyedLinks, staleRekeyedLinks, RekeyRefusedError, type RekeyResult, type RekeyHooks } from '../store/rekey';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
@@ -124,6 +125,9 @@ export async function rekeyLiveUi(store: FolderStore, worldId: string, map: Read
     if (tab.kind === 'map' && map.has(tab.mapId)) disposeMapTab(tab.mapId);
   }
   const elements = await store.listElements();
+  // The kernel moved world.json's strand mark (step 5c); the mirror follows (conv. 169).
+  const strand = remapStrandMark((getState().active?.meta as unknown as Record<string, unknown> | undefined)?.[STRAND_KEY], map);
+  if (strand.changed) patchActiveMeta(worldId, { [STRAND_KEY]: strand.value } as Partial<WorldMeta>);
   const cur = getState();
   if (cur.active?.worldId !== worldId) return;
   const sw = (id: string | null | undefined) => (id && map.get(id)) || id;

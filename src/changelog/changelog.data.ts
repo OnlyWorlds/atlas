@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.113.1',
+    date: '2026-10-31',
+    theme: 'The world kept whole in its file',
+    entries: [
+      {
+        id: 'export-world-keys',
+        title: 'Saving a world to a file keeps its own keys',
+        body: 'Save to file and Copy JSON in the Data room now keep the extra keys a world carries, such as its own words for the element types, so bringing that file back in gives the world as it was.',
+        tags: ['data'],
+      },
+    ],
+  },
+  {
     version: '1.113.0',
     date: '2026-10-30',
     theme: 'A quieter Home',

@@ -18,6 +18,7 @@
  *   4  referrers    every other element, pre-filtered in memory, rewritten in its own chain
  *   5  charts       .atlas/charts.json scopes
  *   5b prefs        .atlas/world-prefs.json cast + calendar lens
+ *   5c strand       world.json's x_strand ids
  *   6p browser      persisted UI state (a caller hook), BEFORE O disappears
  *   6  remove O     silent (O never reached this server), then media/O; O leaves `foreign`
  *                   and joins `rekeyed` (the finished map, so links in files that could not
@@ -36,7 +37,8 @@
  * back. Adding a "give new ids" button to a
  * room that keeps an editor mounted reopens that.
  */
-import type { Element, ElementType } from '../core/types';
+import type { Element, ElementType, WorldMeta } from '../core/types';
+import { remapStrandMark, STRAND_KEY } from '../core/strand-mark';
 import type { FolderStore, RekeyJournal } from './folder-store';
 import { newElementId, nowIso } from './folder-store';
 import { arrivalOf } from '../core/home-grid';
@@ -221,6 +223,25 @@ async function remapWorldPrefsFile(store: FolderStore, map: ReadonlyMap<string, 
   }
 }
 
+/**
+ * world.json's strand mark (`x_strand`, profiles/strand.md) through `map`: its three ids name elements,
+ * so a re-key that left them behind would empty the strand here and push dead ids to the server.
+ * Idempotent (an id already moved is no longer in the map's keys). A world.json that will not parse is
+ * left alone, as the prefs file is.
+ */
+async function remapWorldStrand(store: FolderStore, map: ReadonlyMap<string, string>): Promise<void> {
+  if (map.size === 0) return;
+  try {
+    await store.writeWorldMetaWith(cur => {
+      const r = remapStrandMark((cur as unknown as Record<string, unknown>)[STRAND_KEY], map);
+      return r.changed ? ({ [STRAND_KEY]: r.value } as Partial<WorldMeta>) : null;
+    });
+  } catch (err) {
+    if (err instanceof CorruptFileError) return;
+    throw err;
+  }
+}
+
 /** Finish an interrupted re-key from its journal; null when there is none. */
 export async function recoverRekey(store: FolderStore, hooks: RekeyHooks = {}): Promise<RekeyResult | null> {
   const journal = await readJournal(store);
@@ -303,6 +324,8 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
   // the file in THIS browser, but a folder that travels (git, a shared drive)
   // opens elsewhere with the file's ids winning, so the file moves here.
   await remapWorldPrefsFile(store, map);
+  // 5c. world.json's strand mark names elements too (profiles/strand.md).
+  await remapWorldStrand(store, map);
 
   // 6p. Browser state that names old ids moves while both ids still exist.
   await hooks.rekeyPersistedState?.(journal.world_id, map);
@@ -375,6 +398,7 @@ export async function rollbackRekey(store: FolderStore, hooks: RekeyHooks = {}):
   }
   if (chartsChanged) await store.writeCharts(charts);
   await remapWorldPrefsFile(store, back);
+  await remapWorldStrand(store, back);
   await hooks.rekeyPersistedState?.(journal.world_id, back);
   for (const [n] of back) {
     await store.deleteElement(n, { silent: true, cascade: false });

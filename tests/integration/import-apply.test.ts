@@ -11,7 +11,7 @@ import { parsePayload } from '../../src/import/parse';
 import { reconcile } from '../../src/import/reconcile';
 import { applyImportPlan } from '../../src/import/apply-import-plan';
 import { buildWorldExport } from '../../src/import/export-world';
-import type { ElementType } from '../../src/core/types';
+import type { Element, ElementType } from '../../src/core/types';
 import type { ImportPlan } from '../../src/import/types';
 
 const U = {
@@ -210,6 +210,27 @@ describe('buildWorldExport — ow.com shape + round-trip', () => {
     expect(pin?.element_type).toBe('character'); // derived from referenced element
     expect(plan.worldMeta?.name).toBe('Barovia');
     expect(plan.worldMeta?.time_current).toBe(768);
+  });
+
+  it('keeps the World\'s x_ keys through export and re-import, and drops a removed (null) one', async () => {
+    const src = await seedSource();
+    const strand = { narrative: U.kid, event: null, location: U.loc };
+    await src.writeWorldMeta({ x_names: { character: 'Employee' }, x_strand: strand, x_gone: null } as never);
+    const json = await buildWorldExport(src) as Record<string, unknown>;
+    const world = json.world as Record<string, unknown>;
+    expect(world.x_names).toEqual({ character: 'Employee' });
+    expect(world.x_strand).toEqual(strand);
+    expect('x_gone' in world).toBe(false);
+
+    const plan = reconcile(parsePayload(json), [], { genId: genIdFactory() });
+    const meta = plan.worldMeta as Record<string, unknown>;
+    expect(meta.x_names).toEqual({ character: 'Employee' });
+    expect(meta.x_strand).toEqual(strand);
+
+    // An incoming id that collides with a different element here gets a fresh id; the mark follows it.
+    const clash = { id: U.kid, type: 'location', name: 'Not Strahd' } as unknown as Element;
+    const moved = reconcile(parsePayload(json), [clash], { genId: () => 'fresh-id' });
+    expect((moved.worldMeta as Record<string, unknown>).x_strand).toEqual({ ...strand, narrative: 'fresh-id' });
   });
 
   it('exports only the requested subset of types', async () => {

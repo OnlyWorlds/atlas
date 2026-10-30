@@ -93,6 +93,29 @@ describe('step 5b: world-prefs.json follows', () => {
     expect(store.worldPrefs).toMatchObject({ favorites: { protagonist_id: N }, active_calendar_id: N });
   });
 
+  it('step 5c: world.json\'s strand mark moves with its ids, and Discard puts it back', async () => {
+    await store.writeWorldMeta({ id: W, name: 'W', x_strand: { narrative: R, event: null, location: O2, extra: O } } as never);
+    const real = store.deleteElement.bind(store);
+    let armed = true;
+    vi.spyOn(store, 'deleteElement').mockImplementation(async (id, opts) => {
+      if (armed && id === O) { armed = false; throw new Error('tab closed'); }
+      return real(id, opts);
+    });
+    const pairs = new Map([[O, N], [R, '00000000-0000-4000-8000-000000000091']]);
+    await expect(startRekey(store, { worldId: W, pairs, allowStaleBaseline: true })).rejects.toThrow(/tab closed/);
+    const strandOf = async () => ((await store.readWorldMeta()) as unknown as Record<string, unknown>).x_strand;
+    // Only the three members move; a key that is not a member is left as it was.
+    expect(await strandOf()).toEqual({ narrative: '00000000-0000-4000-8000-000000000091', event: null, location: O2, extra: O });
+    await rollbackRekey(store);
+    expect(await strandOf()).toEqual({ narrative: R, event: null, location: O2, extra: O });
+  });
+
+  it('step 5c leaves a mark that is not an object as it was', async () => {
+    await store.writeWorldMeta({ id: W, name: 'W', x_strand: R } as never);
+    await startRekey(store, { worldId: W, pairs: new Map([[O, N]]), allowStaleBaseline: true });
+    expect(((await store.readWorldMeta()) as unknown as Record<string, unknown>).x_strand).toBe(R);
+  });
+
   it('a prefs file that will not parse never stops the re-key', async () => {
     store.worldPrefsCorrupt = true;
     const r = await startRekey(store, { worldId: W, pairs: new Map([[O, N]]), allowStaleBaseline: true });

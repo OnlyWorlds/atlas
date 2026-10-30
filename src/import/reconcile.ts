@@ -26,6 +26,7 @@
 
 import { relationFieldsFor } from '../editor/field-schema';
 import { rekeyBody } from '../store/rekey-body';
+import { remapStrandMark, STRAND_KEY } from '../core/strand-mark';
 import { newElementId } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type WorldMeta } from '../core/types';
 import { isUuid, keyNT, normName, normalizeRecord } from './normalize';
@@ -187,6 +188,10 @@ export function reconcile(
   // --- world metadata (full-world only) ---
   if (parsed.format === 'full-world' && parsed.world) {
     plan.worldMeta = mapWorldBlock(parsed.world);
+    // The strand's mark names elements: an id this import gave a fresh id follows it.
+    const meta = plan.worldMeta as Record<string, unknown>;
+    const strand = remapStrandMark(meta[STRAND_KEY], incomingIdRemap);
+    if (strand.changed) meta[STRAND_KEY] = strand.value;
   }
   if (parsed.envelope === true) plan.envelope = true;
 

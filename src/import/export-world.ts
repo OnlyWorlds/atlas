@@ -80,6 +80,11 @@ export async function buildWorldExport(
   if (lines.source && typeof lines.source === 'object') world.source = lines.source;
   if (lines.exported_as && typeof lines.exported_as === 'object') world.exported_as = lines.exported_as;
   if (lines.producer && typeof lines.producer === 'object') world.producer = lines.producer;
+  // A profile's keys on the World (`x_names`, `x_strand`): verbatim, as the import keeps them, or a
+  // world's own words and its strand are lost on every export and import. A null is a removed key.
+  for (const [key, value] of Object.entries(lines)) {
+    if (key.startsWith('x_') && value !== undefined && value !== null) world[key] = value;
+  }
 
   // THE ENVELOPE (converging on keel's `onlyworlds-world-export`, owed
   // to Skeld). One shape both ways now: keel exports it, atlas

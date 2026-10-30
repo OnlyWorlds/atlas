@@ -71,6 +71,12 @@ export interface FolderStore {
   readWorldMeta(opts?: { strict?: boolean }): Promise<WorldMeta>;
   /** `fromSync` bypasses the view-only guard — the engine's pull-apply channel. */
   writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta>;
+  /**
+   * A meta write computed from world.json as it is inside the write (the strand's mark: a write built
+   * from a mirror or a second tab's snapshot would put an older value back). `mutate` answers the patch,
+   * or null to write nothing (the answer is then null). A UI write: refused on a view-only world.
+   */
+  writeWorldMetaWith(mutate: (current: WorldMeta) => Partial<WorldMeta> | null): Promise<WorldMeta | null>;
 
   // ---- Content elements ----
 
