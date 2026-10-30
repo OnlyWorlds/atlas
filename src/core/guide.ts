@@ -126,7 +126,16 @@ export function laterStep(a: StepId | undefined, b: StepId): StepId {
   return a !== undefined && order(a) > order(b) ? a : b;
 }
 
-/** The step the card speaks for: the pointer when set, else the first unlit dot. */
+/**
+ * The step the home's card speaks for (the home that grows): read from the world on every draw, the
+ * first unlit dot, the copy card once all five are lit; `done` once the path was closed.
+ */
+export function cardStep(dots: Dots, pointer: StepId | undefined): StepId {
+  if (pointer === 'done') return 'done';
+  return DOTS.find(d => !dots[d.id])?.id ?? 'copy';
+}
+
+/** The step the card spoke for before the home grew: the pointer when set, else the first unlit dot. */
 export function currentStep(dots: Dots, pointer: StepId | undefined): StepId {
   if (pointer && order(pointer) >= 0) return pointer;
   return DOTS.find(d => !dots[d.id])?.id ?? 'done';

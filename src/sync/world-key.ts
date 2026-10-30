@@ -107,10 +107,10 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
 export async function putKeyInPlace(entry: WorldRegistryEntry, key: string, readOnly: boolean, keyMint: KeyMint | null = null): Promise<WorldRegistryEntry> {
   if (!canTakeNewKey(entry)) throw new PlainError('This world cannot take a new key here.');
   // The role belongs to the key: a new one (perhaps another account's) is read
-  // afresh (conv. 151). The mint record goes with the key it was made for, so
+  // afresh (conv. 151), and its membership with it. The mint record goes with the key it was made for, so
   // the old one never carries forward over a new key (#814): a pasted key
   // (keyMint null) clears it, a swap writes it fresh.
-  const { read_only: _was, member_role: _role, key_mint: _mint, ...rest } = entry.api;
+  const { read_only: _was, member_role: _role, membership: _membership, key_mint: _mint, ...rest } = entry.api;
   const freshMint = keyMint && keyMint.tail && key.endsWith(keyMint.tail) ? { key_mint: { id: keyMint.id, tail: keyMint.tail } } : {};
   const api = { ...rest, api_key: key, ...(readOnly ? { read_only: true } : {}), ...freshMint };
   const next = updateWorldEntry(getState().registry, entry.id, { api });

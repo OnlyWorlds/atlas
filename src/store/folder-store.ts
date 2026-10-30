@@ -431,7 +431,43 @@ export interface RekeyJournal {
 
 export function newId(): string {
   // RFC 4122 v4 via crypto API; available in Node 20+ and all modern browsers.
+  // Worlds, media and tabs stay on it: their names take the id's FIRST 8 hex
+  // (a folder, a renamed media file), which a v7 id shares for 65 seconds.
   return crypto.randomUUID();
+}
+
+/** The last milliseconds `newElementId()` minted at in this tab: it never mints at or below them again. */
+let lastElementMs = -1;
+
+const MS_LIMIT = 2 ** 48;
+
+/**
+ * A new element's id: an RFC 9562 UUIDv7, lowercase (as keel echoes it).
+ * 48 bits of milliseconds, version 7, then random bits with the variant, so
+ * the id carries when the element arrived (the home's grid reads it).
+ *
+ * Monotonic per tab: without `atMs` it mints at `max(Date.now(), last + 1)`,
+ * so a new element is after every one minted here, a clock step back
+ * included. With `atMs` (a re-key keeping an old element's arrival) it mints
+ * at exactly that moment, fresh random bits, and leaves the floor where it is.
+ * An `atMs` that is not a whole millisecond in the 48-bit range mints as new.
+ */
+export function newElementId(atMs?: number): string {
+  let ms: number;
+  if (atMs !== undefined && Number.isInteger(atMs) && atMs >= 0 && atMs < MS_LIMIT) {
+    ms = atMs;
+  } else {
+    ms = Math.max(Date.now(), lastElementMs + 1);
+    lastElementMs = ms;
+  }
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b.subarray(6));
+  let t = ms;
+  for (let i = 5; i >= 0; i--) { b[i] = t % 256; t = Math.floor(t / 256); }
+  b[6] = 0x70 | (b[6] & 0x0f);
+  b[8] = 0x80 | (b[8] & 0x3f);
+  const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
 export function nowIso(): string {

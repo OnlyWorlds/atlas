@@ -17,7 +17,7 @@
 
 import { getState, subscribe } from '../core/state';
 import { homeHash, navigate } from '../core/router';
-import { DOTS, currentStep, type DotId } from '../core/guide';
+import { DOTS, cardStep, type DotId } from '../core/guide';
 import { noteRoomVisit, pathDots, pathShowing } from '../core/guide-path';
 import { askFocusAfterHome } from './home-guide';
 
@@ -29,13 +29,15 @@ const ROOM_STEP: Record<GuideRoom, DotId> = { timeline: 'happened', writing: 'st
 export function roomBarStep(worldId: string | null | undefined, room: GuideRoom): DotId | null {
   if (!worldId) return null;
   const step = ROOM_STEP[room];
-  // The card stands at a lit step only by its pointer (unset, it reads the first unlit dot), so the
-  // pointer is read first and the world's walk runs only at this room's step (the gate's G3).
+  // The card is read from the dots (the home that grows): the bar shows while this room's dot is lit
+  // and the card stands at this step or the one after it, the step this room's line leads from.
   const entry = getState().registry.worlds.find(w => w.id === worldId);
-  if (entry?.guide_step !== step || !pathShowing(worldId)) return null;
+  if (entry?.guide_step === 'done' || !pathShowing(worldId)) return null;
   const dots = pathDots(worldId);
   if (!dots[step]) return null;
-  return currentStep(dots, entry.guide_step) === step ? step : null;
+  const at = cardStep(dots, entry?.guide_step);
+  const i = DOTS.findIndex(d => d.id === step);
+  return at === step || at === DOTS[i + 1]?.id ? step : null;
 }
 
 /**

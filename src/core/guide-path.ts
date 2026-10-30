@@ -15,7 +15,6 @@ import { saveRegistry, storedWorldEntry, updateWorldEntry } from '../registry/re
 import { worldIsViewOnly } from './view-only';
 import { isMoppetopiaOpen } from './moppetopia';
 import { isTourFlagActive } from '../tour/tour-flag';
-import { isNewcomerAnswered } from './newcomer';
 import { currentLore, loreWithAids } from './parlor-room';
 import { settledOf } from './review-mark';
 import { keepSafeCard } from '../middle/home-keepsafe';
@@ -77,16 +76,16 @@ function blockCanShow(worldId: string): boolean {
 
 /**
  * Whether the path shows in this world: the one predicate the home's block
- * and the notes' silence read. An empty world shows the doors, not the path,
- * unless Start from nothing is open or the world was answered on a Start
- * page. A world with a pointer shows it until `done`; one without (imported,
+ * and the notes' silence read. An empty world shows it unless it was closed.
+ * A world with a pointer shows it until `done`; one without (imported,
  * older) shows it while some dot is unlit, the copy left to the keep-safe card
  * while that card asks.
  */
 export function pathShowing(worldId: string): boolean {
   if (!blockCanShow(worldId)) return false;
-  if (worldEmptyForPath()) return doorOf(worldId) === 'nothing' || isNewcomerAnswered(worldId);
   const pointer = entryOf(worldId)?.guide_step;
+  // An empty world opens on the path (the home that grows: no doors), unless its path was closed.
+  if (worldEmptyForPath()) return pointer !== 'done';
   if (pointer) return pointer !== 'done';
   const keep = keepSafeWouldShow(worldId);
   const dots = pathDots(worldId);

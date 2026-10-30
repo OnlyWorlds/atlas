@@ -6,6 +6,7 @@
   "src/demo/demo-view.ts": 1,
   "src/main.ts": 2,
   "src/middle/element-detail-header.ts": 1,
+  "src/middle/home-grow.ts": 1,
   "src/middle/home-guide.ts": 4,
   "src/middle/import-room.ts": 4,
   "src/middle/knowledge-room.ts": 3,

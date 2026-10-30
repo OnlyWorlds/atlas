@@ -15478,7 +15478,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   margin-top: 18px;
   /* Reserved even when empty — the first element's count must not shift the
      tour cards below. */
-  min-height: 17px;
+  min-height: 18px;
   font-size: 13px;
   color: var(--atlas-text-muted);
 }
@@ -17929,4 +17929,100 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
   margin: -6px 0 18px;
   color: var(--atlas-text-soft);
   font-size: 0.86rem;
+}
+
+/* The home's grid (the home that grows, home-grid-view.ts): squares placed by core/home-grid.ts.
+   The type colour is the Web's (a graph surface); a loose square is dim and dashed. */
+.atlas-home-grid { position: relative; width: 100%; margin: 12px 0 8px; }
+.atlas-home-grid-lines { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.atlas-home-grid-chain { fill: none; stroke: var(--atlas-accent); stroke-width: 2; }
+.atlas-home-grid-link { fill: none; stroke: rgba(var(--atlas-accent-rgb), 0.75); stroke-width: 1.6; }
+.atlas-home-grid-cell {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.atlas-home-grid-square {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sq);
+  height: var(--sq);
+  border: 2px solid var(--type-color);
+  border-radius: 8px;
+  background: var(--atlas-bg);
+  color: var(--type-color);
+}
+.atlas-home-grid-square .material-symbols-outlined { font-size: calc(var(--sq) * 0.45); }
+.atlas-home-grid-name {
+  max-width: 100%;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  color: var(--atlas-text);
+  text-align: center;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.atlas-home-grid-cell.is-loose .atlas-home-grid-square { border-style: dashed; opacity: 0.55; }
+.atlas-home-grid-cell.is-loose .atlas-home-grid-name { color: var(--atlas-text-muted); }
+.atlas-home-grid-plus .atlas-home-grid-square { border: 2px dashed var(--type-color, var(--atlas-accent)); color: var(--type-color, var(--atlas-accent)); }
+.atlas-home-grid-plus-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--atlas-accent);
+  color: var(--atlas-bg);
+  font-size: 14px;
+  line-height: 18px;
+  text-align: center;
+  font-weight: 600;
+}
+.atlas-home-grid-plus-word { color: var(--atlas-accent-text); }
+
+/* The home that grows: the card (home-grow.ts) and the grid's acts (home-grid-acts.ts). */
+.atlas-home-grow { padding: 16px 18px 12px; }
+.atlas-home-grow-head { display: flex; align-items: center; gap: 10px; color: var(--atlas-text-muted); font-size: 0.8rem; }
+.atlas-home-grow-head .atlas-home-have-dismiss { margin-left: auto; }
+.atlas-home-grow-dots { display: inline-flex; gap: 4px; }
+.atlas-home-grow-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(var(--atlas-ink-rgb), 0.18); }
+.atlas-home-grow-dot.is-lit { background: var(--atlas-accent); }
+.atlas-home-grow-dot.is-next { box-shadow: 0 0 0 2px rgba(var(--atlas-accent-rgb), 0.45); }
+.atlas-home-grow-line { margin: 10px 0 2px; font-size: 1.05rem; font-weight: 600; color: var(--atlas-text); }
+.atlas-home-grow-hint { margin: 0 0 4px; color: var(--atlas-text-soft); font-size: 0.86rem; }
+.atlas-home-grow-recap, .atlas-home-grow-open, .atlas-home-grow-just { margin: 6px 0 0; color: var(--atlas-text-soft); font-size: 0.86rem; }
+.atlas-home-grow-open:empty { display: none; }
+.atlas-home-grow-just { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--atlas-text); }
+.atlas-home-grow-just-tag { padding: 1px 6px; border-radius: 4px; background: var(--atlas-accent); color: var(--atlas-bg); font-size: 0.72rem; }
+.atlas-home-grow-fallback { margin: 10px 0 4px; }
+.atlas-home-grow-keep { margin-top: 12px; }
+.atlas-home-grow-bring { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(var(--atlas-ink-rgb), 0.08); }
+.atlas-home-grow-bring-ask { margin: 0; color: var(--atlas-text-soft); font-size: 0.86rem; }
+.atlas-home-grow-picture { margin-top: 24px; }
+.atlas-home-grid-cell[data-grid-id], .atlas-home-grid-plus { cursor: pointer; border-radius: 10px; outline: none; touch-action: manipulation; }
+.atlas-home-grid-cell:focus-visible .atlas-home-grid-square { box-shadow: 0 0 0 3px var(--atlas-accent); }
+.atlas-home-grid-cell.is-selected .atlas-home-grid-square { box-shadow: 0 0 0 3px var(--atlas-accent); }
+.atlas-home-grid-cell.is-target .atlas-home-grid-square { box-shadow: 0 0 0 3px rgba(var(--atlas-accent-rgb), 0.55); }
+.atlas-home-grid.has-selection .atlas-home-grid-cell[data-grid-id]:not(.is-target):not(.is-selected) { opacity: 0.55; }
+.atlas-home-grid-cell.is-lifted { z-index: 2; cursor: grabbing; }
+.atlas-home-grid-cell.is-lifted .atlas-home-grid-square { transform: scale(1.08); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45), 0 0 0 3px var(--atlas-accent); }
+.atlas-home-grid-plus.is-making .atlas-home-grid-square, .atlas-home-grid-plus.is-making .atlas-home-grid-plus-word { display: none; }
+.atlas-home-grid-make { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.atlas-home-grid-make .atlas-input { width: 100%; min-height: 32px; font-size: 0.82rem; }
+.atlas-home-grid-make-note { font-size: 0.74rem; color: var(--atlas-text-soft); }
+@media (pointer: coarse) { .atlas-home-grid-make .atlas-input { min-height: 44px; } }
+/* A focused square's own mark, outside the selected and target rings, so a focused target reads apart (the code gate's C4). */
+.atlas-home-grid .atlas-home-grid-cell:focus-visible .atlas-home-grid-square { outline: 2px solid var(--atlas-text); outline-offset: 5px; }
+.atlas-home-grid .atlas-home-grid-plus:focus-visible .atlas-home-grid-square { outline: 2px solid var(--atlas-text); outline-offset: 5px; }
+/* Touch: the grow card's links take a thumb too (Bring it in, Undo, a recap's link, Open). */
+@media (pointer: coarse) {
+  .atlas-guide-block.atlas-home-grow .atlas-btn-link, .atlas-home-grow-picture .atlas-btn-link { min-height: 44px; display: inline-flex; align-items: center; }
 }

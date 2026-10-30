@@ -46,12 +46,17 @@ describe('roomBarStep', () => {
     expect(roomBarStep('w', 'timeline')).toBeNull();
   });
 
-  it('another step, done, or no pointer with an unlit dot draws nothing', () => {
+  it('the card read from the dots (the home that grows): the bar shows at its step and the one after, whatever the pointer', () => {
+    // The card at story (the step after the chart's): the chart's bar shows, a stale pointer ignored.
     world([ada, keep, ev], { guide_step: 'placed' });
+    expect(roomBarStep('w', 'timeline')).toBe('happened');
+    // The card past it (all lit, at the copy card): no bar in the chart, the writing room's still.
+    world([ada, keep, ev, tale], { guide_step: 'placed' });
     expect(roomBarStep('w', 'timeline')).toBeNull();
+    expect(roomBarStep('w', 'writing')).toBe('story');
     world([ada, keep, ev, tale], { guide_step: 'done' });
     expect(roomBarStep('w', 'timeline')).toBeNull();
-    world([ada, keep, ev]);
+    world([ada, keep, undated]);
     expect(roomBarStep('w', 'timeline')).toBeNull();
   });
 
@@ -76,17 +81,17 @@ describe('roomBarStep', () => {
 describe('Back\'s focus ask', () => {
   const homeBlock = () => {
     const block = document.createElement('section');
-    block.innerHTML = '<div data-role="guide-card"><button data-step-action="next">Next</button></div>';
+    block.innerHTML = '<div data-role="home-grid"><div data-grid-id="a" tabindex="-1">Ada</div><div data-grid-id="k" tabindex="0">Keep</div></div>';
     document.body.appendChild(block);
     return block;
   };
 
-  it('the asking world\'s home takes it: Next focused', () => {
+  it('the asking world\'s home takes it: the grid\'s own Tab stop focused (the home that grows)', () => {
     world([ada, keep, ev], { guide_step: 'happened' });
     askFocusAfterHome('w');
     const block = homeBlock();
     settleAfterDraw(block);
-    expect(document.activeElement?.getAttribute('data-step-action')).toBe('next');
+    expect(document.activeElement?.getAttribute('data-grid-id')).toBe('k');
     block.remove();
   });
 
@@ -95,10 +100,10 @@ describe('Back\'s focus ask', () => {
     askFocusAfterHome('elsewhere');
     const block = homeBlock();
     settleAfterDraw(block);
-    expect(document.activeElement?.getAttribute('data-step-action')).toBeNull();
+    expect(document.activeElement?.getAttribute('data-grid-id')).toBeNull();
     // The ask is spent: the next draw, now in the asking world, has nothing to take.
     settleAfterDraw(block);
-    expect(document.activeElement?.getAttribute('data-step-action')).toBeNull();
+    expect(document.activeElement?.getAttribute('data-grid-id')).toBeNull();
     block.remove();
   });
 });
@@ -113,8 +118,8 @@ describe('mountGuideRoomBar', () => {
     expect(bar.getAttribute('data-role')).toBe('guide-room-bar');
     expect(bar.hidden).toBe(false);
     expect(bar.querySelector('[data-action="guide-room-back"]')).not.toBeNull();
-    // Another tab's Next, merged: the bar leaves.
-    world([ada, keep, ev], { guide_step: 'story' });
+    // The world moves past the step after (a story made): the bar leaves; the story gone, it is back.
+    world([ada, keep, ev, tale], { guide_step: 'happened' });
     expect(bar.hidden).toBe(true);
     world([ada, keep, ev], { guide_step: 'happened' });
     expect(bar.hidden).toBe(false);

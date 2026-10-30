@@ -396,10 +396,11 @@ export class OwV2ClientAdapter implements OwApiClient {
    * guest) is what a resync and a guest's 404 are read against (conv. 151).
    * A read key's call too.
    */
-  async me(): Promise<{ role: string }> {
-    const response = await this.request('GET', '/me') as { role?: unknown } | undefined;
+  async me(): Promise<{ role: string; membership?: string | null }> {
+    const response = await this.request('GET', '/me') as { role?: unknown; membership?: unknown } | undefined;
     if (!response || typeof response.role !== 'string') throw new Error('v2 /me response missing role');
-    return { role: response.role };
+    const m = response.membership;
+    return { role: response.role, ...(typeof m === 'string' || m === null ? { membership: m } : {}) };
   }
 
   /**

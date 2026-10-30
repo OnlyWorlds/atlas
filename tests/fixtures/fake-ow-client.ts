@@ -447,11 +447,13 @@ export class FakeOwApiClient implements OwApiClient {
   keyRole = 'owner';
   meReads = 0;
   meFails = false;
-  async me(): Promise<{ role: string }> {
+  /** The key's membership id as /me serves it (null: the owner); undefined: not served. */
+  keyMembership: string | null | undefined = undefined;
+  async me(): Promise<{ role: string; membership?: string | null }> {
     this.throwIfAuthBlocked();
     this.meReads++;
     if (this.meFails) throw new Error('API Error 503: OnlyWorlds is busy.');
-    return { role: this.keyRole };
+    return { role: this.keyRole, ...(this.keyMembership !== undefined ? { membership: this.keyMembership } : {}) };
   }
 
   /**

@@ -38,7 +38,8 @@
  */
 import type { Element, ElementType } from '../core/types';
 import type { FolderStore, RekeyJournal } from './folder-store';
-import { newId, nowIso } from './folder-store';
+import { newElementId, nowIso } from './folder-store';
+import { arrivalOf } from '../core/home-grid';
 import { rekeyBody, type IdMap } from './rekey-body';
 import { CorruptFileError } from './fs-utils';
 import { PlainError } from '../core/plain-error';
@@ -94,8 +95,8 @@ export interface StartRekeyOpts {
    */
   allowStaleBaseline?: boolean;
   origin?: 'rekey' | 'merge';
-  /** Test seam. */
-  mintId?: () => string;
+  /** Test seam: given the old element's arrival in epoch ms, or undefined when it has none. */
+  mintId?: (atMs?: number) => string;
 }
 
 /**
@@ -114,7 +115,11 @@ export async function startRekey(
   if (await store.hasRekeyJournal()) {
     throw new RekeyRefusedError('An earlier id update in this world is unfinished. Finish it first.');
   }
-  const mint = opts.mintId ?? newId;
+  // The new id keeps the old element's arrival (its v7 time, the v1 draft's
+  // seconds, else `created_at`), so giving new ids moves no square in the home's
+  // grid. One with no arrival mints as new. A `given` id is the server twin's,
+  // and takes the twin's arrival.
+  const mint = opts.mintId ?? newElementId;
   const wanted: Array<[string, string | null]> = opts.pairs
     ? [...opts.pairs]
     : [...new Set(opts.ids ?? [])].map(id => [id, null]);
@@ -134,7 +139,8 @@ export async function startRekey(
     if (store.hasShadowCopy(id)) {
       throw new RekeyRefusedError(`${el.name || id} has two files, one under elements/ and one under spatial/. Remove the one you do not want, then try again.`);
     }
-    const n = given ?? mint();
+    const at = given ? undefined : arrivalOf(el);
+    const n = given ?? mint(at !== undefined && Number.isFinite(at) ? at : undefined);
     if (n === id || taken.has(n) || await store.getElement(n)) {
       throw new RekeyRefusedError(given ? `${el.name || id} cannot take the id ${n}: it is already in use.` : 'A new id was already taken. Try again.');
     }

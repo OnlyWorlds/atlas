@@ -20,6 +20,7 @@ import {
   updateWorldEntry,
 } from '../registry/registry';
 import { deleteHandle, loadHandle } from '../store/handle-vault';
+import { startPath } from '../core/guide-path';
 import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
 import { deleteWorldFolderUnderRoot, whyWorldFolderNotDeletable } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
@@ -242,6 +243,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         return line ? `<p class="atlas-settings-hint" data-role="slice-line">${escapeText(line)}</p>` : '';
       })()}
       ${apiActions}
+      ${worldIsViewOnly(world.id) ? '' : `<p class="atlas-settings-hint">The first steps on this world's Home: someone, somewhere, something that happened, a story, a copy. <button type="button" class="atlas-btn-link" data-action="first-steps-again">Show the first steps again</button></p>`}
       <div class="atlas-settings-dangling" data-role="rekey-interrupted" hidden>
         <p class="atlas-settings-hint" data-role="rekey-interrupted-text">An id update in this world did not finish, so it is not syncing.</p>
         <button class="atlas-btn-ghost" data-action="rekey-finish">Finish it</button>
@@ -292,6 +294,19 @@ function inviteLineHtml(world: WorldRegistryEntry): string {
 }
 
 export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
+  // The first steps again (the home that grows): the path from someone, and the card no longer hidden.
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="first-steps-again"]')
+    ?.addEventListener('click', () => {
+      startPath(world.id, { restart: true });
+      const reg = getState().registry;
+      const next = {
+        ...reg,
+        worlds: reg.worlds.map(w => w.id === world.id ? { ...w, tour_dismissed: (w.tour_dismissed ?? []).filter(c => c !== 'home-cards') } : w),
+      };
+      saveRegistry(next);
+      patchSlice('registry', next);
+      toasts.info('The first steps are back on Home.');
+    });
   document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="put-new-key"]')
     ?.addEventListener('click', () => {
       void import('../ui/world-key-modal').then(({ NewKeyModal }) => new NewKeyModal(world, toasts).open());

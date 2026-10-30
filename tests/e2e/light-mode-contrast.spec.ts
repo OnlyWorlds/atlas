@@ -61,17 +61,22 @@ const PROBES: Probe[] = [
   { name: 'zone draft strip', chain: ['atlas-zone-draft-overlay'] },
   { name: 'zone draft mode', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-mode'] },
   { name: 'zone draft button', chain: ['atlas-zone-draft-overlay', 'atlas-zone-draft-btn'] },
-  // The guide's note follows the theme (the toast it replaced kept a dark chip): its line,
-  // its action links and the strip's labels read the text family on the raised panel.
+  // The guide's note follows the theme (the toast it replaced kept a dark chip): its line
+  // and its action links read the text family on the raised panel.
   { name: 'guide note line', chain: ['atlas-guide-note', 'atlas-guide-note-line'] },
   { name: 'guide note action', chain: ['atlas-guide-note', 'button:atlas-guide-note-act'] },
-  { name: 'guide strip label', chain: ['atlas-home-onboarding', 'atlas-guide-strip', 'atlas-guide-marks', 'atlas-guide-mark', 'atlas-guide-mark-label'] },
-  // The first screen's doors and the path's card (#964): body text, the 4.5:1 floor.
-  { name: 'guide door title', chain: ['atlas-home-onboarding', 'atlas-guide-doors', 'atlas-guide-door', 'atlas-guide-door-title'], min: 4.5 },
-  { name: 'guide door line', chain: ['atlas-home-onboarding', 'atlas-guide-doors', 'atlas-guide-door', 'atlas-guide-door-line'], min: 4.5 },
-  { name: 'guide card line', chain: ['atlas-home-onboarding', 'atlas-guide-card', 'atlas-guide-card-line'], min: 4.5 },
-  { name: 'guide card hint', chain: ['atlas-home-onboarding', 'atlas-guide-card', 'atlas-guide-card-way', 'atlas-guide-card-hint'], min: 4.5 },
-  { name: 'guide way line', chain: ['atlas-home-onboarding', 'atlas-guide-ways', 'atlas-guide-way', 'atlas-home-have-line'], min: 4.5 },
+  // The home that grows: the card's head reads at the UI floor; its words, the grid's
+  // names and the ways to bring a world in are body text, the 4.5:1 floor.
+  { name: 'grow card step', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grow-head', 'atlas-home-grow-at'] },
+  { name: 'grow card line', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grow-line'], min: 4.5 },
+  { name: 'grow card hint', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grow-hint'], min: 4.5 },
+  { name: 'grow card recap', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grow-recap'], min: 4.5 },
+  { name: 'grow just now', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grow-just'], min: 4.5 },
+  { name: 'grow just now tag', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grow-just', 'atlas-home-grow-just-tag'], min: 4.5 },
+  { name: 'grow bring ask', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grow-bring', 'atlas-home-grow-bring-ask'], min: 4.5 },
+  { name: 'grid square name', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grid-picture', 'atlas-home-grid', 'atlas-home-grid-cell', 'atlas-home-grid-name'], min: 4.5 },
+  { name: 'grid plus word', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-home-grid-picture', 'atlas-home-grid', 'atlas-home-grid-cell atlas-home-grid-plus', 'atlas-home-grid-name atlas-home-grid-plus-word'], min: 4.5 },
+  { name: 'guide way line', chain: ['atlas-home-onboarding atlas-home-grow', 'atlas-guide-ways', 'atlas-guide-way', 'atlas-home-have-line'], min: 4.5 },
   // The family census: the map's placement hint paints the canvas floor; its Cancel read themed ink.
   { name: 'map placement hint', chain: ['atlas-map-placement-hint'] },
   { name: 'map placement hint cancel', chain: ['atlas-map-placement-hint', 'atlas-map-placement-hint-cancel'] },

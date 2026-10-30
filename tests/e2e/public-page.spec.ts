@@ -75,7 +75,7 @@ async function signInAndOpen(page: Page) {
     return st.registry.worlds.find((x: any) => x.api?.world_id === id)?.api?.api_key ?? null;
   }, WORLD_ID)).toBe(KEY);
   // The door ends at Home: wait for it, or its landing takes the address the tab was given.
-  await expect(page.getByText('What do you have?')).toBeVisible();
+  await expect(page.locator('[data-role="guide-block"][data-step="someone"]')).toBeVisible();
 }
 
 const openTab = (page: Page) =>

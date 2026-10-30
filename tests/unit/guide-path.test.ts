@@ -8,7 +8,6 @@ import { currentStep, laterStep, nextStep, stepDone, type Dots } from '../../src
 import {
   advancePath, noteRoomVisit, pathShowing, resetGuidePathForTests, setDoor, startPath, worldEmptyForPath,
 } from '../../src/core/guide-path';
-import { markNewcomerAnswered } from '../../src/core/newcomer';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
 
 const dots = (lit: string): Dots => ({
@@ -66,16 +65,16 @@ describe('the pointer, pure', () => {
 });
 
 describe('pathShowing', () => {
-  it('an empty world shows the doors, not the path; Start from nothing or a Start-page world shows it', () => {
+  it('an empty world opens on the path (the home that grows: no doors), whatever is folded open, until it was closed', () => {
     world([]);
-    expect(pathShowing('w')).toBe(false);
+    expect(pathShowing('w')).toBe(true);
     setDoor('w', 'bring');
-    expect(pathShowing('w')).toBe(false);
-    setDoor('w', 'nothing');
     expect(pathShowing('w')).toBe(true);
     setDoor('w', null);
-    markNewcomerAnswered('w');
+    world([], { guide_step: 'someone' });
     expect(pathShowing('w')).toBe(true);
+    world([], { guide_step: 'done' });
+    expect(pathShowing('w')).toBe(false);
   });
 
   it('a pointer keeps the block with all five lit until done (G1); an unset one hides it then', () => {
