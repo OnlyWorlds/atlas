@@ -6,6 +6,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { patchSlice } from '../../src/core/state';
 import { resetGuidePathForTests } from '../../src/core/guide-path';
 import { mountGuideRoomBar, roomBarStep, roomBarWords } from '../../src/middle/guide-room-bar';
+import { askFocusAfterHome, settleAfterDraw } from '../../src/middle/home-guide';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -69,6 +70,36 @@ describe('roomBarStep', () => {
   it('the words name the step, never the element', () => {
     expect(roomBarWords('happened')).toBe('Step 3 of 5, Something happened');
     expect(roomBarWords('story')).toBe('Step 4 of 5, A story');
+  });
+});
+
+describe('Back\'s focus ask', () => {
+  const homeBlock = () => {
+    const block = document.createElement('section');
+    block.innerHTML = '<div data-role="guide-card"><button data-step-action="next">Next</button></div>';
+    document.body.appendChild(block);
+    return block;
+  };
+
+  it('the asking world\'s home takes it: Next focused', () => {
+    world([ada, keep, ev], { guide_step: 'happened' });
+    askFocusAfterHome('w');
+    const block = homeBlock();
+    settleAfterDraw(block);
+    expect(document.activeElement?.getAttribute('data-step-action')).toBe('next');
+    block.remove();
+  });
+
+  it('another world\'s home drops it (a switch before the draw), and it is gone after', () => {
+    world([ada, keep, ev], { guide_step: 'happened' });
+    askFocusAfterHome('elsewhere');
+    const block = homeBlock();
+    settleAfterDraw(block);
+    expect(document.activeElement?.getAttribute('data-step-action')).toBeNull();
+    // The ask is spent: the next draw, now in the asking world, has nothing to take.
+    settleAfterDraw(block);
+    expect(document.activeElement?.getAttribute('data-step-action')).toBeNull();
+    block.remove();
   });
 });
 
