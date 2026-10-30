@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.109.1',
+    date: '2026-10-30',
+    theme: 'Named for a screen reader',
+    entries: [
+      {
+        id: 'element-box-name',
+        title: 'The element list\'s box keeps its name while you type',
+        body: 'The box beside the element list\'s + was named only by its placeholder, which a screen reader loses once text is typed. It now carries its own name, Search elements, or Create an element in an empty world.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.109.0',
     date: '2026-10-30',
     theme: 'A way back',

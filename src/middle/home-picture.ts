@@ -4,8 +4,9 @@
  * a world with one worth drawing.
  *
  *   The centre is ranked by the SDK (`degreeOf` over the owner's
- *   `worldGraph`: the room, proposed and hidden elements, map space and the
- *   reading aids are out), and the first of the top five the Web draws with
+ *   `worldGraph`: the room, proposed and hidden elements, map space (Maps,
+ *   Pins, Markers; a Zone is a node, as the Web draws it, since SDK 4.111.0)
+ *   and the reading aids are out), and the first of the top five the Web draws with
  *   at least three around it is the centre. None: no picture.
  *
  *   Ranked once per world, what its elements say, the lore's switches and the
