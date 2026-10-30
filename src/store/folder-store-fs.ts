@@ -70,7 +70,7 @@ import type {
 import type { FolderStore, ListElementsOptions, RekeyJournal, ApplyServerRecordOpts, DiskChange, RescanResult } from './folder-store';
 import { journalIds, RekeyPendingError } from './folder-store';
 import type { ChartConfig } from '../visualization/timeline/types';
-import { newId, nowIso } from './folder-store';
+import { newElementId, newId, nowIso } from './folder-store';
 import { normalizeDiskLinks, denormalizeDiskLinks, type LinkSpelling } from './disk-link-names';
 
 /**
@@ -1566,7 +1566,7 @@ export class FsFolderStore implements FolderStore {
 
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
-    const id = (data.id as string) ?? newId();
+    const id = (data.id as string) ?? newElementId();
     // ONE ELEMENT, ONE PIN, ONE MAP. Guarded HERE and not in
     // `createPin`, because the import applier bypasses that wrapper. Reads
     // the in-memory bodies rather than re-listing: a positive match is proof

@@ -501,6 +501,8 @@ export interface SyncResult {
   meta_pulled?: string[];
   /** The key's role, when the round read keel's `GET /me` (conv. 151). */
   own_role?: string;
+  /** The key's membership id from the same `GET /me` (null for the owner); reported with `own_role`, when /me served it. */
+  own_membership?: string | null;
   /** Elements a resync found outside this key's view and kept (conv. 151). */
   kept?: number;
   /** Local edits to kept elements: they stay here, unsent (conv. 151). */
@@ -597,6 +599,12 @@ export interface WorldRegistryEntry {
      * known role is said once; first sight is recorded silently.
      */
     member_role?: string;
+    /**
+     * This key's own membership id, as keel `GET /me` last answered it (what
+     * `created_by` holds for what this key creates); null for the owner.
+     * Kept and cleared beside `member_role`; absent until the first round reads it.
+     */
+    membership?: string | null;
     /** An agent seat (#104); mirrored in `WorldMeta.api.seat`. Read through `worldPin`. */
     seat?: { role?: string };
     /**

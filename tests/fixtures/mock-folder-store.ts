@@ -9,7 +9,7 @@
 import { PlainError } from '../../src/core/plain-error';
 import type { FolderStore, ListElementsOptions, RekeyJournal, RescanResult, ApplyServerRecordOpts } from '../../src/store/folder-store';
 import { journalIds, RekeyPendingError } from '../../src/store/folder-store';
-import { newId, nowIso } from '../../src/store/folder-store';
+import { newElementId, newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
 import { isKnownOf, KNOWN_OF_DROPS_LOCAL, KNOWN_OF_REFUSAL, stubShape } from '../../src/sync/known-of';
 import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS, FOLDER_FORMAT_VERSION } from '../../src/core/constants';
@@ -152,7 +152,7 @@ export class MockFolderStore implements FolderStore {
 
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
-    const id = (data.id as string) ?? newId();
+    const id = (data.id as string) ?? newElementId();
     // Mirrors FsFolderStore's pin-uniqueness guard. Convention 20: a
     // fake that accepts what production rejects produces confident-wrong
     // tests. Both stores read the SAME predicate so they cannot drift.

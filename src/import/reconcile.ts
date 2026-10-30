@@ -26,6 +26,7 @@
 
 import { relationFieldsFor } from '../editor/field-schema';
 import { rekeyBody } from '../store/rekey-body';
+import { newElementId } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type WorldMeta } from '../core/types';
 import { isUuid, keyNT, normName, normalizeRecord } from './normalize';
 import { metaList } from '../core/meta-list';
@@ -50,7 +51,8 @@ export function reconcile(
   const matchByName = opts.matchByName ?? true;
   const onConflict = opts.onConflict ?? 'skip';
   const mergeMultiLinks = opts.mergeMultiLinks ?? false;
-  const genId = opts.genId ?? (() => crypto.randomUUID());
+  // An element born by an import arrives now (the home's grid reads arrival from a v7 id).
+  const genId = opts.genId ?? (() => newElementId());
 
   const report: ImportReport = {
     created: 0,

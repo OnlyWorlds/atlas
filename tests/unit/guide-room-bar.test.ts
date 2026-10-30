@@ -46,12 +46,17 @@ describe('roomBarStep', () => {
     expect(roomBarStep('w', 'timeline')).toBeNull();
   });
 
-  it('another step, done, or no pointer with an unlit dot draws nothing', () => {
+  it('the card read from the dots (the home that grows): the bar shows at its step and the one after, whatever the pointer', () => {
+    // The card at story (the step after the chart's): the chart's bar shows, a stale pointer ignored.
     world([ada, keep, ev], { guide_step: 'placed' });
+    expect(roomBarStep('w', 'timeline')).toBe('happened');
+    // The card past it (all lit, at the copy card): no bar in the chart, the writing room's still.
+    world([ada, keep, ev, tale], { guide_step: 'placed' });
     expect(roomBarStep('w', 'timeline')).toBeNull();
+    expect(roomBarStep('w', 'writing')).toBe('story');
     world([ada, keep, ev, tale], { guide_step: 'done' });
     expect(roomBarStep('w', 'timeline')).toBeNull();
-    world([ada, keep, ev]);
+    world([ada, keep, undated]);
     expect(roomBarStep('w', 'timeline')).toBeNull();
   });
 
@@ -113,8 +118,8 @@ describe('mountGuideRoomBar', () => {
     expect(bar.getAttribute('data-role')).toBe('guide-room-bar');
     expect(bar.hidden).toBe(false);
     expect(bar.querySelector('[data-action="guide-room-back"]')).not.toBeNull();
-    // Another tab's Next, merged: the bar leaves.
-    world([ada, keep, ev], { guide_step: 'story' });
+    // The world moves past the step after (a story made): the bar leaves; the story gone, it is back.
+    world([ada, keep, ev, tale], { guide_step: 'happened' });
     expect(bar.hidden).toBe(true);
     world([ada, keep, ev], { guide_step: 'happened' });
     expect(bar.hidden).toBe(false);

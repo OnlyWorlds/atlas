@@ -417,10 +417,20 @@ async function noteRoleNews(worldId: string, folder: FolderStore, result: SyncRe
   const entry = getState().registry.worlds.find(w => w.id === worldId);
   if (!entry?.api) return;
   let roleSaid = false;
-  if (result.own_role !== undefined && result.own_role !== entry.api.member_role) {
-    const line = roleChangeLine(entry.name, entry.api.member_role, result.own_role, !!entry.api.read_only);
-    const next = updateWorldEntry(getState().registry, worldId, { api: { ...entry.api, member_role: result.own_role } });
+  const roleMoved = result.own_role !== undefined && result.own_role !== entry.api.member_role;
+  // The key's own membership, beside its role: what `created_by` holds for what this key makes (`may-change.ts`).
+  const membershipMoved = result.own_membership !== undefined && result.own_membership !== entry.api.membership;
+  if (roleMoved || membershipMoved) {
+    const api = {
+      ...entry.api,
+      ...(roleMoved ? { member_role: result.own_role } : {}),
+      ...(membershipMoved ? { membership: result.own_membership } : {}),
+    };
+    const next = updateWorldEntry(getState().registry, worldId, { api });
     if (saveRegistry(next)) patchSlice('registry', next);
+  }
+  if (roleMoved && result.own_role !== undefined) {
+    const line = roleChangeLine(entry.name, entry.api.member_role, result.own_role, !!entry.api.read_only);
     if (line) {
       toastManager.show(line, 'info', 12000);
       roleSaid = true;

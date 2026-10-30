@@ -170,7 +170,7 @@ export interface OwApiClient {
    */
   pullChanges?(since: string | null, limit?: number): Promise<ChangesPage>;
   /** GET /me: the key's role (conv. 151). Absent: the role is unknown, and a resync keeps. */
-  me?(): Promise<{ role: string }>;
+  me?(): Promise<{ role: string; membership?: string | null }>;
   /** keel's queue, the caller's own rows (conv. 163, P5). Absent: entries stay until it is. */
   listProposals?(): Promise<{ rows: import('./proposals').ProposalRow[]; complete: boolean }>;
   /** The proposer withdraws its own open row (conv. 163, P3). */
@@ -564,6 +564,14 @@ export class SyncEngine {
    */
   private roleRead: Promise<string | null> | null = null;
 
+  /** The key's membership id from the last `GET /me` that served it (null: the owner); undefined until then. Reported beside the role. */
+  private meMembership: string | null | undefined = undefined;
+
+  /** `own_membership` for a result that reports a role: the membership the same key's /me served. */
+  private membershipField(): Pick<SyncResult, 'own_membership'> {
+    return this.meMembership !== undefined ? { own_membership: this.meMembership } : {};
+  }
+
   /** The kept set as the running push or resolve read it: links to these never go out (`kept-links.ts`). */
   private roundKept: ReadonlySet<string> = new Set();
   /** What the running push found out of a guest's view (a 404, a peer keel says does not exist): kept at its end. */
@@ -665,7 +673,10 @@ export class SyncEngine {
     if (fresh || !this.roleRead) {
       const me = this.client.me?.bind(this.client);
       this.roleRead = me
-        ? me().then(r => r.role, (err: unknown) => {
+        ? me().then(r => {
+          if (r.membership !== undefined) this.meMembership = r.membership;
+          return r.role;
+        }, (err: unknown) => {
           console.info('[atlas:sync] the key\'s role could not be read', err);
           this.roleRead = null;
           return null;
@@ -2964,7 +2975,7 @@ export class SyncEngine {
       ...(keptEdits.length > 0 ? { kept_edit_ids: keptEdits } : {}),
       ...hiddenHeldReport(allChanged, hiddenHeld, this.roundHiddenRefused),
       ...(this.roundHiddenShown.length > 0 ? { hidden_shown_ids: [...new Set(this.roundHiddenShown)] } : {}),
-      ...(roundRole !== null ? { own_role: roundRole } : {}),
+      ...(roundRole !== null ? { own_role: roundRole, ...this.membershipField() } : {}),
       ...(proposedIds.length > 0 ? { proposed_ids: proposedIds } : {}),
       ...(refusedDeletes.length > 0 ? { delete_refused: refusedDeletes } : {}),
       ...(settled.accepted.length > 0 ? { proposals_accepted: settled.accepted } : {}),
@@ -3628,7 +3639,7 @@ export class SyncEngine {
     if (keptNow.length > 0) console.info(`[atlas:sync] resync: ${keptNow.length} element(s) left this key's view and are kept here`, { reason: resyncWhy, role: walkedAs ?? null });
     return {
       pushed: zero(), pulled: { creates, updates, deletes: deletes + hiddenDrops }, conflicts, failures, pulled_ids: pulledIds,
-      ...(walkedAs !== undefined ? { own_role: walkedAs } : {}),
+      ...(walkedAs !== undefined ? { own_role: walkedAs, ...this.membershipField() } : {}),
       ...(keptNow.length > 0 ? { kept: keptNow.length } : {}),
       // A hidden element's copy with an edit: said as a kept edit is.
       ...(keptHidden.size > 0 ? { kept_edit_ids: [...keptHidden] } : {}),
@@ -3992,8 +4003,9 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result; the latest phase's role wins. */
-function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted' | 'hidden_held_ids' | 'hidden_shown_ids'> {
+function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_membership' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted' | 'hidden_held_ids' | 'hidden_shown_ids'> {
   const role = parts.map(p => p.own_role).filter(r => r !== undefined).pop();
+  const membership = parts.map(p => p.own_membership).filter(m => m !== undefined).pop();
   const kept = parts.reduce((n, p) => n + (p.kept ?? 0), 0);
   const edits = [...new Set(parts.flatMap(p => p.kept_edit_ids ?? []))];
   // The round's proposal news rides the same way (conv. 163).
@@ -4004,6 +4016,7 @@ function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'kept
   const hiddenShown = [...new Set(parts.flatMap(p => p.hidden_shown_ids ?? []))];
   return {
     ...(role !== undefined ? { own_role: role } : {}),
+    ...(membership !== undefined ? { own_membership: membership } : {}),
     ...(kept > 0 ? { kept } : {}),
     ...(edits.length > 0 ? { kept_edit_ids: edits } : {}),
     ...(proposed.length > 0 ? { proposed_ids: proposed } : {}),

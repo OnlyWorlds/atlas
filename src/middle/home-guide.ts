@@ -150,7 +150,7 @@ export function buildGuideBlock(
   section.appendChild(headRow(title, back ? state.kind === 'bring' ? 'bring' : 'nothing' : null, worldId, onDismiss));
 
   if (state.kind === 'doors') section.appendChild(doors(worldId));
-  else if (state.kind === 'bring') section.appendChild(bringIn(worldId, toasts));
+  else if (state.kind === 'bring') section.appendChild(bringInWays(worldId, toasts));
   else {
     section.appendChild(bar(dots, state.step, toasts));
     if (state.step !== 'done') section.appendChild(card(state.step, dots, worldId, toasts));
@@ -227,7 +227,7 @@ function doors(worldId: string): HTMLElement {
   return wrap;
 }
 
-function bringIn(worldId: string, toasts: ToastManager): HTMLElement {
+export function bringInWays(worldId: string, toasts: ToastManager): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-guide-ways';
   let first = true;
