@@ -119,5 +119,6 @@ describe('raw error text never reaches user copy (ratchet)', () => {
       if (!(file in counts)) problems.push(`${file}: down to 0 from ${was}. Remove it from the baseline.`);
     }
     expect(problems).toEqual([]);
-  });
+    // It reads every source file: on a machine another suite holds, that has run past the default 15 s.
+  }, 60_000);
 });

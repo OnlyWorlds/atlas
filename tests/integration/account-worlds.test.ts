@@ -255,13 +255,13 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     const toasts = makeToasts();
 
     const pending = openAccountWorld(row, toasts);
-    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull(), { timeout: 10_000 });
     expect(document.querySelector<HTMLInputElement>('[data-modal="where-ask"] input[value="folder"]')!.checked).toBe(true);
     document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="go"]')!.click();
     await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).not.toBeNull(), { timeout: 10_000 });
     document.querySelector<HTMLButtonElement>('[data-modal="home-folder"] [data-action="cancel"]')!.click();
     // Back at the question (the browser row is still there to choose); Cancel it.
-    await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).toBeNull(), { timeout: 10_000 });
     expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull();
     document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="cancel"]')!.click();
     const ok = await pending;
@@ -279,7 +279,7 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     const toasts = makeToasts();
 
     const first = openAccountWorld(row, toasts);
-    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull(), { timeout: 10_000 });
     // `opening` is not set yet: before the guard, this started a second open.
     expect(getState().accountWorlds.opening).toBeNull();
     expect(await openAccountWorld(row, toasts)).toBe(false);
@@ -467,7 +467,7 @@ describe('openAccountWorld — a sign-in elsewhere while it asks (conv. 179, 202
     const row: AccountWorldRow = { id: 'srv-collab', name: 'Collab World', role: 'collaborator', public_read: true, keys: [] };
     const toasts = makeToasts();
     const pending = openAccountWorld(row, toasts);
-    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull(), { timeout: 10_000 });
     // Another tab signs in: the registry now holds another token.
     patchSlice('registry', setAccountToken(getState().registry, 'ow_a_another_tab_token', 'titus'));
     document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="go"]')!.click();
