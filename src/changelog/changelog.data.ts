@@ -63,7 +63,13 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'home-grows-quiet-press',
         title: 'A press on Home\'s squares reads cleanly',
-        body: 'On a phone, pressing a square no longer flashes a filled box over it. While a press says what it would write, the step\'s own hint steps aside, so the card reads one thing at a time.',
+        body: 'On a phone, pressing a square no longer flashes a filled box over it. While a press says what it would write, the step\'s own hint steps aside, so the card reads one thing at a time. Place and Undo are a thumb\'s size.',
+        tags: ['world', 'layout'],
+      },
+      {
+        id: 'home-grows-clear-lines',
+        title: 'Lines on Home go around the squares',
+        body: 'A link between two squares further apart runs above the row and down the gap between columns, so it never crosses another square or a name.',
         tags: ['world', 'layout'],
       },
     ],

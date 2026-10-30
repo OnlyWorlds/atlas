@@ -1,7 +1,7 @@
 /**
  * The home's grid, drawn (the home that grows): each element a square in
  * its type's colour and icon, a held one under its holder joined by a chain,
- * every other link a curve above its row, and the + square at the next
+ * every other link a line that keeps clear of the squares and names between, and the + square at the next
  * arrival. Where each square stands is `core/home-grid.ts`'s, derived on
  * every draw; this file only draws it.
  *
@@ -61,6 +61,53 @@ export interface PlusSquare {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** The second level indents a quarter column, so a Zone's own Creature never reads as in the Location above it. */
 const INDENT = 0.25;
+/** A lane link's run above its line's first row, and how much higher each next one runs. */
+const LANE_GAP = 8;
+const LANE_STEP = 4;
+
+type Pt = readonly [number, number];
+
+/**
+ * A link two or more columns apart on one line, as corner points: a square in the line's first row leaves
+ * from its top; one lower in a stack leaves from its side into the gap between columns and climbs there, so
+ * the line never passes through the squares or names above it. Then across the lane to the other end.
+ */
+export function laneRoute(
+  a: GridCell, b: GridCell, g: GridGeometry,
+  centreX: (pos: number, depth?: number) => number, topY: (line: number, row: number) => number, lane: number,
+): Pt[] {
+  const port = (e: GridCell, toward: GridCell): Pt[] => {
+    const cx = centreX(e.pos, e.depth);
+    if (e.row === 0) return [[cx, topY(e.line, 0)], [cx, lane]];
+    const s = Math.sign(centreX(toward.pos, toward.depth) - cx) || 1;
+    const edge = cx + s * g.sq / 2;
+    const boundary = g.colW * (e.pos + (s > 0 ? 1 : 0));
+    // A deep square can stand past its column's edge at the narrowest columns: the gap is then just beyond it.
+    const gx = s > 0 ? Math.max(boundary, edge + 4) : Math.min(boundary, edge - 4);
+    const mid = topY(e.line, e.row) + g.sq / 2;
+    return [[edge, mid], [gx, mid], [gx, lane]];
+  };
+  return [...port(a, b), ...port(b, a).reverse()];
+}
+
+/** Straight runs through the points, each corner rounded (at most 8 px, never past half a run). */
+export function roundedPath(pts: readonly Pt[], r = 8): string {
+  let d = `M${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1];
+    const [x, y] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    const inLen = Math.hypot(x - px, y - py);
+    const outLen = Math.hypot(nx - x, ny - y);
+    const k = Math.min(r, inLen / 2, outLen / 2);
+    if (k === 0) { d += ` L${x} ${y}`; continue; }
+    const ax = x - (x - px) / inLen * k, ay = y - (y - py) / inLen * k;
+    const bx = x + (nx - x) / outLen * k, by = y + (ny - y) / outLen * k;
+    d += ` L${ax} ${ay} Q ${x} ${y}, ${bx} ${by}`;
+  }
+  const [lx, ly] = pts[pts.length - 1];
+  return `${d} L${lx} ${ly}`;
+}
 
 export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: GridNames, plus: PlusSquare | null): void {
   host.innerHTML = '';
@@ -102,7 +149,8 @@ export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: 
     path(`M${railX} ${y1} L${railX} ${last}`, 'atlas-home-grid-chain');
     for (const c of list) path(`M${railX} ${mid(c)} L${centreX(c.pos, c.depth) - g.sq / 2} ${mid(c)}`, 'atlas-home-grid-chain');
   }
-  // Every other link: a curve that rises above the row, never straight behind a square.
+  // Every other link: kept clear of every square and name between its ends.
+  const lanes = new Map<number, number>();
   for (const l of grid.links) {
     const a = at.get(l.source)!;
     const b = at.get(l.target)!;
@@ -124,6 +172,12 @@ export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: 
       // Two in one column (a stack): the line bows out to the right, never straight through the squares between.
       const bow = Math.max(x1, x2) + g.sq / 2 + g.colW * 0.2;
       path(`M${x1 + g.sq / 2} ${y1} C ${bow} ${y1}, ${bow} ${y2}, ${x2 + g.sq / 2} ${y2}`, 'atlas-home-grid-link');
+    } else if (a.line === b.line) {
+      // Two or more columns apart on one line: up to a lane above the line's first row and across, so the line
+      // crosses no square or name between; each lane link a little higher, so two never share a run.
+      const lane = lineTop[a.line] - LANE_GAP - (lanes.get(a.line) ?? 0) % 3 * LANE_STEP;
+      lanes.set(a.line, (lanes.get(a.line) ?? 0) + 1);
+      path(roundedPath(laneRoute(a, b, g, centreX, topY, lane)), 'atlas-home-grid-link');
     } else {
       const lift = Math.min(y1, y2) - g.sq / 2 - 6;
       path(`M${x1} ${y1} C ${x1} ${lift}, ${x2} ${lift}, ${x2} ${y2}`, 'atlas-home-grid-link');

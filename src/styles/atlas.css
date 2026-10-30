@@ -18036,9 +18036,10 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 @media (pointer: coarse) { .atlas-home-grow-head .atlas-home-have-dismiss { min-width: 44px; height: 44px; } }
 .atlas-home-grow-picture[data-after-close] { margin-top: 0; padding: calc(17px + var(--atlas-grow-head-h)) 19px 0; }
 /* Undo takes a thumb at every width (Done is 44 too). */
-.atlas-home-grow-undo { min-height: 44px; display: inline-flex; align-items: center; padding: 0 6px; }
-/* A line target's first press: its promise in the line, with Place. */
+.atlas-home-grow-undo { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
+/* A line target's first press: its promise in the line, with Place (a thumb's height on touch). */
 .atlas-home-grow-place { margin-left: 6px; vertical-align: middle; }
+@media (pointer: coarse) { .atlas-home-grow-place { min-height: 44px; } }
 .atlas-home-grow-line .atlas-btn-link { font-size: inherit; font-weight: inherit; }
 .atlas-home-grid-say { margin: 4px 0 2px; font-size: 0.95rem; }
 .atlas-home-grid-say:empty { display: none; }
