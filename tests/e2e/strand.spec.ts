@@ -151,7 +151,11 @@ async function seeded(page: Page, mark: unknown, meta?: Record<string, unknown>)
   // World meta in place before Home's first draw past the path (a reader's slice, for one).
   if (meta) await writeMeta(page, meta);
   await pastPath(page);
+  // The path closed in the Home that was open: its tab waits for Home's next opening, so open it again.
+  await go(page, `#/w/${wid}/settings`);
+  await expect(page.locator('.atlas-world-home')).toHaveCount(0);
   await go(page, `#/w/${wid}`);
+  await expect(page.locator('.atlas-world-home')).toBeVisible();
   return wid;
 }
 
@@ -284,6 +288,35 @@ test.describe('the Strand tab', () => {
     await expect(offer).toContainText("This is the world's strand");
     await expect(offer.locator('[data-action="strand-open"]')).toHaveCount(0);
   });
+});
+
+test.describe('the tab and the path closing', () => {
+  for (const width of [390, 1440]) {
+    test(`the path closed by its ×: no tab head and no square moved in this visit; the next opening has the tab, at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width < 600 ? 844 : 900 });
+      const wid = await setupWorld(page);
+      await put(page, 'narrative', N1, 'The Long Road', { supertype: 'Book' });
+      await put(page, 'character', C1, 'Mira');
+      await go(page, `#/w/${wid}`);
+      const grid = page.locator('[data-role="home-grid"]').first();
+      await expect(page.locator('[data-role="guide-block"]')).toBeVisible();
+      await expect(grid).toBeVisible();
+      const top = async () => grid.evaluate(el => el.getBoundingClientRect().top);
+      const t0 = await top();
+      await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+      await page.locator('[data-role="guide-block"] [data-action="cards-dismiss"]').click();
+      await expect(page.locator('[data-role="guide-block"]')).toHaveCount(0);
+      await page.waitForTimeout(150);
+      expect(Math.abs((await top()) - t0)).toBeLessThanOrEqual(1);
+      await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+      // Another room and back: Home opened afresh draws the tab head above the picture.
+      await go(page, `#/w/${wid}/settings`);
+      await page.waitForTimeout(200);
+      await go(page, `#/w/${wid}/home`);
+      await expect(tab(page, 'picture')).toHaveAttribute('aria-selected', 'true');
+      await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(1);
+    });
+  }
 });
 
 test.describe('Make this the world\'s strand', () => {

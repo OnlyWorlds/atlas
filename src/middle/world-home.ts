@@ -322,10 +322,13 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // The card carries the grid while the path shows; Home's own picture draws only without it.
     const pathUp = !!tour;
     if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; }
-    else if (!quiet && strandTabShows(worldId, strandNow)) drawWithStrand();
+    // The path closed in this mount (`doors === 'below'`): the tab head waits for Home's next opening, as
+    // the count line does, so the close moves no square (DESIGN_HOME "Nothing above the squares moves").
+    else if (!quiet && doors !== 'below' && strandTabShows(worldId, strandNow)) drawWithStrand();
     else {
       // The picture with no head is this world's Picture tab: a strand pulled later never takes it (C4).
-      if (!quiet) notePictureShown(worldId);
+      // Not where the tab only waits for the next opening: that opening picks its tab by the rule.
+      if (!quiet && doors !== 'below') notePictureShown(worldId);
       drawPicture();
     }
     if (doors === 'below') {
