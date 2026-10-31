@@ -80,7 +80,13 @@ export function strandBodies(mark: unknown, byId: ReadonlyMap<string, Element>, 
   return [...out.values()];
 }
 
-/** One id index per elements array (a store patch makes a new array): built once, never per call (C7). */
+/**
+ * One id index per elements array (a store patch makes a new array): built once, never per call (C7).
+ * It rests on a rule the store keeps: an elements array, and every element in it, is never changed in
+ * place (no push, splice or assignment into `s.data.elements`; `listElements` hands out fresh copies).
+ * A change is a new array, so a new index; an array changed in place would keep a stale one, and the
+ * memo below, keyed on body identity, a stale answer.
+ */
 const indexes = new WeakMap<readonly Element[], Map<string, Element>>();
 
 /** The elements by id, for this array. */

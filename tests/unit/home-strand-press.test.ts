@@ -9,7 +9,7 @@ import { setActiveStore } from '../../src/core/active-store';
 import { defaultRegistry, type Element, type WorldMeta, type WorldRegistryEntry } from '../../src/core/types';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { buildStrandPanel, resetStrandTabForTests } from '../../src/middle/home-strand';
-import { makeThisTheStrand, resetStrandOfferForTests } from '../../src/middle/strand-offer';
+import { buildBarStrandOffer, buildPageStrandOffer, makeThisTheStrand, resetStrandOfferForTests } from '../../src/middle/strand-offer';
 import { toastManager } from '../../src/ui/toast-manager';
 
 const W = 'w-strand-press';
@@ -140,5 +140,100 @@ describe('the page\'s press twice writes once (C1)', () => {
     expect(metaWrites).toBe(1);
     expect(info).not.toHaveBeenCalled();
     expect(((await store.readWorldMeta()) as unknown as Record<string, { narrative: string }>).x_strand.narrative).toBe(N2);
+  });
+});
+
+describe('a write starting holds the whole panel (D1)', () => {
+  it('every act disabled and an open name box closed before the first await; nothing dropped unsaid, nothing "changed meanwhile"', async () => {
+    await put('narrative', N, { events: [] });
+    await put('character', C, { name: 'Mira' });
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    // A name typed in the Happening box, not yet given.
+    box('event').querySelector<HTMLButtonElement>('[data-act="make"]')!.click();
+    box('event').querySelector<HTMLInputElement>('input')!.value = 'The Flood';
+    // The hero's link waits until let go.
+    let release!: () => void;
+    const gate = new Promise<void>(r => { release = r; });
+    const update = store.updateElementWith.bind(store);
+    store.updateElementWith = async (id, mutate) => { await gate; return update(id, mutate); };
+    box('character').querySelector<HTMLButtonElement>('[data-act="pick"]')!.click();
+    [...box('character').querySelectorAll<HTMLElement>('[role="option"]')].find(o => o.textContent === 'Mira')!.click();
+    // At once, before any await: the panel is still for this press alone.
+    const acts = [...host.querySelectorAll<HTMLButtonElement>('[data-act]')];
+    expect(acts.length).toBeGreaterThan(0);
+    expect(acts.every(b => b.disabled)).toBe(true);
+    expect(host.querySelector('form')).toBeNull();
+    box('character').querySelector<HTMLButtonElement>('[data-act="make"]')?.click();
+    expect(host.querySelector('form')).toBeNull();
+    // Home redraws while the write runs (a store tick): the fresh panel holds every act too.
+    draw();
+    expect([...host.querySelectorAll<HTMLButtonElement>('[data-act]')].every(b => b.disabled)).toBe(true);
+    release();
+    await settle();
+    expect((await store.listElements()).find(e => e.id === N)!.protagonist).toBe(C);
+    expect((await store.listElements()).filter(e => e.type === 'event')).toEqual([]);
+    expect(said()).toBe('');
+    expect([...host.querySelectorAll<HTMLButtonElement>('[data-act]')].some(b => b.disabled)).toBe(false);
+  });
+});
+
+describe('the page and the bar after a press that did not land (D2)', () => {
+  const page = document.createElement('div');
+  beforeEach(() => {
+    vi.spyOn(toastManager, 'info').mockImplementation(() => {});
+    vi.spyOn(toastManager, 'show').mockImplementation(() => {});
+    vi.spyOn(toastManager, 'success').mockImplementation(() => {});
+    vi.spyOn(toastManager, 'problem').mockImplementation(() => {});
+  });
+  const offerOn = (id: string): void => {
+    page.innerHTML = '';
+    document.body.appendChild(page);
+    const block = buildPageStrandOffer(getState().data.elements.find(e => e.id === id)!, W);
+    if (block) page.appendChild(block);
+  };
+  const live = (sel: string) => page.querySelector<HTMLButtonElement>(sel);
+
+  it('Not the strand failing: the block is drawn again, Not the strand and Cancel live', async () => {
+    await put('narrative', N);
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    offerOn(N);
+    live('[data-action="strand-clear"]')!.click();
+    store.writeWorldMetaWith = async () => { throw new Error('disk'); };
+    live('[data-action="strand-clear-confirm"]')!.click();
+    await settle();
+    expect(live('[data-action="strand-clear"]')?.disabled).toBe(false);
+    expect([...page.querySelectorAll<HTMLButtonElement>('button')].some(b => b.disabled)).toBe(false);
+    expect(toastManager.problem).toHaveBeenCalled();
+  });
+
+  it('Not the strand refused: the same, beside the line that says it', async () => {
+    await put('narrative', N);
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    offerOn(N);
+    live('[data-action="strand-clear"]')!.click();
+    await store.writeWorldMeta({ x_strand: { narrative: N2, event: null, location: null } } as unknown as Partial<WorldMeta>);
+    live('[data-action="strand-clear-confirm"]')!.click();
+    await settle();
+    expect([...page.querySelectorAll<HTMLButtonElement>('button')].some(b => b.disabled)).toBe(false);
+    expect(live('[data-action="strand-clear"]')).not.toBeNull();
+    expect(toastManager.info).toHaveBeenCalledWith('The strand changed meanwhile.');
+  });
+
+  it('the bar redrawn mid-press: the button drawn now is live again after a refusal', async () => {
+    await put('narrative', N);
+    await put('narrative', N2);
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    const bar = document.createElement('div');
+    document.body.appendChild(bar);
+    const n2 = getState().data.elements.find(e => e.id === N2)!;
+    bar.appendChild(buildBarStrandOffer(n2, W)!);
+    await store.writeWorldMeta({ x_strand: { narrative: N2, event: GONE_E, location: GONE_L } } as unknown as Partial<WorldMeta>);
+    bar.querySelector<HTMLButtonElement>('[data-action="strand-make"]')!.click();
+    // The writing room redraws its bar while the press runs.
+    bar.innerHTML = '';
+    bar.appendChild(buildBarStrandOffer(n2, W)!);
+    expect(bar.querySelector<HTMLButtonElement>('[data-action="strand-make"]')!.disabled).toBe(true);
+    await settle();
+    expect(bar.querySelector<HTMLButtonElement>('[data-action="strand-make"]')!.disabled).toBe(false);
   });
 });

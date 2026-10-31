@@ -17,7 +17,7 @@ import { isStrandKeeper, memberIds, offerable, storedMark, strandView } from '..
 import { worldIsViewOnly } from '../core/view-only';
 import { pathShowing } from '../core/guide-path';
 import { isKeptHere } from '../sync/sync-attach';
-import { clearStrand, writeStrandSlot, STRAND_MOVED, type StrandDrawn } from '../ui/strand-write';
+import { clearStrand, writeStrandSlot, STRAND_MOVED, type StrandDrawn, type StrandWriteResult } from '../ui/strand-write';
 import { toastManager } from '../ui/toast-manager';
 import { openStrandTab } from './home-strand';
 
@@ -72,14 +72,32 @@ export function makeLabel(offer: { instead: string | null }): string {
   return offer.instead ? `Make this the world's strand instead of ${offer.instead}` : "Make this the world's strand";
 }
 
+/**
+ * After a press settles (D2): the page's block as it is drawn now is drawn again, so nothing stays
+ * disabled (a refusal or a failure patches no state, so the page's own render never comes), and the
+ * bar's Make button as drawn now is live again; never the button the press was made on, which a
+ * redraw may have taken.
+ */
+function drawAgain(el: Element, worldId: string): void {
+  const block = document.querySelector<HTMLElement>('[data-role="strand-offer"]');
+  if (block) {
+    const next = buildPageStrandOffer(el, worldId);
+    if (next) block.replaceWith(next); else block.remove();
+  }
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.atlas-writing-workspace-strand[data-action="strand-make"]')) b.disabled = false;
+}
+
 /** The press: S4's story change, then the line that says it. */
-export async function makeThisTheStrand(el: Element, worldId: string, drawn: StrandDrawn = drawnNow(worldId)): Promise<void> {
+export async function makeThisTheStrand(el: Element, worldId: string, drawn: StrandDrawn = drawnNow(worldId)): Promise<StrandWriteResult | 'held'> {
   const result = await hold(worldId, el, () => writeStrandSlot('narrative', drawn, el.id));
-  if (result === 'held') return;
-  if (result === 'refused') { toastManager.info(STRAND_MOVED); return; }
-  if (result !== 'wrote') return;
+  if (result === 'held') return result;
+  if (result !== 'wrote') drawAgain(el, worldId);
+  else for (const b of document.querySelectorAll<HTMLButtonElement>('[data-action="strand-make"]')) b.disabled = false;
+  if (result === 'refused') { toastManager.info(STRAND_MOVED); return result; }
+  if (result !== 'wrote') return result;
   if (pathShowing(worldId)) toastManager.success("The world's strand");
   else toastManager.show("The world's strand", 'success', 6000, { actions: [{ label: 'Open it', run: () => openStrandTab(worldId) }], dedupeKey: 'strand-made' });
+  return result;
 }
 
 /** Not the strand's promise, waiting for its second press: this tab's memory, by element. */
@@ -113,7 +131,7 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
   };
   if (offer.kind === 'make') {
     const drawn = drawnNow(worldId);
-    const b = btn(makeLabel(offer), 'strand-make', () => { b.disabled = true; void makeThisTheStrand(el, worldId, drawn).finally(() => { b.disabled = false; }); }, 'atlas-btn atlas-btn--secondary');
+    const b = btn(makeLabel(offer), 'strand-make', () => { b.disabled = true; void makeThisTheStrand(el, worldId, drawn); }, 'atlas-btn atlas-btn--secondary');
     box.appendChild(b);
     return box;
   }
@@ -147,7 +165,12 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
       if (strandPressing(worldId, el)) return;
       for (const b of row.querySelectorAll<HTMLButtonElement>('button')) b.disabled = true;
       confirming = null;
-      void hold(worldId, el, () => clearStrand(drawn)).then(r => { if (r === 'refused') toastManager.info(STRAND_MOVED); });
+      void hold(worldId, el, () => clearStrand(drawn)).then(r => {
+        if (r === 'held' || r === 'wrote') return;
+        // Refused or failed: the block is drawn again, Not the strand and Cancel live (D2).
+        drawAgain(el, worldId);
+        if (r === 'refused') toastManager.info(STRAND_MOVED);
+      });
     }, 'atlas-btn atlas-btn--secondary'),
     btn('Cancel', 'strand-clear-cancel', () => {
       confirming = null;
@@ -171,7 +194,7 @@ export function buildBarStrandOffer(el: Element, worldId: string): HTMLElement |
   b.textContent = makeLabel(offer);
   b.title = makeLabel(offer);
   if (strandPressing(worldId, el)) b.disabled = true;
-  b.addEventListener('click', () => { b.disabled = true; void makeThisTheStrand(el, worldId, drawn).finally(() => { b.disabled = false; }); });
+  b.addEventListener('click', () => { b.disabled = true; void makeThisTheStrand(el, worldId, drawn); });
   return b;
 }
 

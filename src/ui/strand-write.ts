@@ -160,6 +160,18 @@ export async function clearStrand(drawn: StrandDrawn): Promise<StrandWriteResult
   return 'wrote';
 }
 
+/**
+ * The list read back after a write landed (D3): a failure there is said, never a rejection that leaves
+ * the box held unsaid; what was written stays written.
+ */
+async function refreshSaid(store: Store): Promise<void> {
+  try {
+    await refreshElementsAfterWrite(store);
+  } catch (err) {
+    showProblem(err, { doing: 'reading the world back after saving the strand', toasts: toastManager });
+  }
+}
+
 /** The link in the folder first, then the mark (S4); the list and the mirror after. */
 async function linkThenMark(store: Store, slot: StrandSlot, drawn: StrandDrawn, id: string): Promise<StrandWriteResult> {
   const on = linkedOn(slot, drawn);
@@ -193,7 +205,7 @@ async function linkThenMark(store: Store, slot: StrandSlot, drawn: StrandDrawn, 
   if (linkMoved) return 'refused';
   // Hero and Where the hero is now are the link alone.
   if (slot === 'character' || slot === 'now') {
-    if (linked) await refreshElementsAfterWrite(store); else requestPushIfLinked();
+    if (linked) await refreshSaid(store); else requestPushIfLinked();
     return 'wrote';
   }
   let moved = false;
@@ -220,11 +232,11 @@ async function linkThenMark(store: Store, slot: StrandSlot, drawn: StrandDrawn, 
     return 'failed';
   }
   if (moved || !wrote) {
-    if (linked) await refreshElementsAfterWrite(store);
+    if (linked) await refreshSaid(store);
     return 'refused';
   }
   patchActiveMeta(drawn.worldId, { [STRAND_KEY]: wrote } as unknown as Partial<WorldMeta>);
-  await refreshElementsAfterWrite(store);
+  await refreshSaid(store);
   requestPushIfLinked();
   return 'wrote';
 }

@@ -372,20 +372,36 @@ export function buildStrandPanel(worldId: string, opts: StrandPanelOptions): HTM
   list.className = 'atlas-home-strand-boxes';
   for (const slot of STRAND_SLOTS) {
     const box = buildBox(slot, c, writable.includes(slot), opts);
-    // A write in flight from this box: its acts wait, so a second press never makes a second write (C1).
-    if (inFlight.has(flightKey(worldId, slot))) {
-      box.setAttribute('aria-busy', 'true');
-      for (const b of box.querySelectorAll<HTMLButtonElement>('[data-act]')) b.disabled = true;
-    }
+    if (inFlight.has(flightKey(worldId, slot))) box.setAttribute('aria-busy', 'true');
     list.appendChild(box);
   }
   section.append(list, sayLine);
+  // A write in flight anywhere in the panel: every act waits (C1, D1), so no other press races it.
+  if ([...inFlight].some(k => k.startsWith(`${worldId}\u0000`))) holdActs(section);
   return section;
 }
 
 /** The boxes with a write under way (C1): set before the write's first await, cleared after its redraw. */
 const inFlight = new Set<string>();
 const flightKey = (worldId: string, slot: StrandSlot): string => `${worldId}\u0000${slot}`;
+
+/** The open name boxes and pick lists, each with its quiet close (no focus move, no redraw asked). */
+const openClosers = new Set<() => void>();
+
+/** Every act in `panel` disabled. */
+function holdActs(panel: ParentNode): void {
+  for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-act]')) b.disabled = true;
+}
+
+/**
+ * A write starts (D1): every act in the panel as drawn now is disabled, and any open name box or pick
+ * list closes, before the write's first await, so no press races it and nothing typed meanwhile is
+ * dropped unsaid or answered with "changed meanwhile" about the person's own press.
+ */
+function quietPanel(): void {
+  for (const close of [...openClosers]) close();
+  for (const panel of document.querySelectorAll('[data-role="home-strand"]')) holdActs(panel);
+}
 
 function act(label: string, key: string, run: () => void, cls = 'atlas-btn-ghost'): HTMLButtonElement {
   const b = document.createElement('button');
@@ -548,6 +564,7 @@ async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn, how: 
   const key = flightKey(c.worldId, slot);
   if (inFlight.has(key)) return;
   inFlight.add(key);
+  quietPanel();
   askFocus = { worldId: c.worldId, key: `box:${slot}` };
   let result: StrandWriteResult = 'nothing';
   let made: Element | undefined;
@@ -586,9 +603,20 @@ function openNameBox(row: HTMLElement, slot: StrandSlot, back: HTMLElement, done
   note.setAttribute('role', 'status');
   form.append(input, note);
   let closed = false;
+  // Closed by a write starting elsewhere in the panel (D1): no focus moved, the write's redraw follows.
+  const quiet = (): void => {
+    if (closed) return;
+    closed = true;
+    openClosers.delete(quiet);
+    unwatch();
+    form.remove();
+    row.classList.remove('is-open');
+  };
+  openClosers.add(quiet);
   const close = (how: 'escape' | 'press' | 'blur'): void => {
     if (closed) return;
     closed = true;
+    openClosers.delete(quiet);
     unwatch();
     form.remove();
     row.classList.remove('is-open');
@@ -604,6 +632,7 @@ function openNameBox(row: HTMLElement, slot: StrandSlot, back: HTMLElement, done
     const n = input.value.trim();
     if (!n) { note.textContent = 'Type a name first'; input.focus(); return; }
     closed = true;
+    openClosers.delete(quiet);
     unwatch();
     input.disabled = true;
     form.removeAttribute(GRID_OPEN_ATTR);
@@ -695,9 +724,20 @@ function openPickList(row: HTMLElement, slot: StrandSlot, c: StrandContext, back
     setActive(0);
   };
   let closed = false;
+  // Closed by a write starting elsewhere in the panel (D1).
+  const quiet = (): void => {
+    if (closed) return;
+    closed = true;
+    openClosers.delete(quiet);
+    unwatch();
+    wrap.remove();
+    row.classList.remove('is-open');
+  };
+  openClosers.add(quiet);
   const close = (how: 'escape' | 'press' | 'blur' | 'picked'): void => {
     if (closed) return;
     closed = true;
+    openClosers.delete(quiet);
     unwatch();
     wrap.remove();
     row.classList.remove('is-open');
@@ -738,4 +778,6 @@ export function resetStrandTabForTests(): void {
   askFocus = null;
   opened = null;
   said = null;
+  inFlight.clear();
+  openClosers.clear();
 }

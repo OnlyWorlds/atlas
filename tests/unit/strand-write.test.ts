@@ -3,13 +3,14 @@
  * field per element write, the link landing before the mark, the guard refusing before anything is
  * made, compare-and-set on a single link, and the mark's guard asked again inside the meta op.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getState, patchSlice } from '../../src/core/state';
 import { setActiveStore } from '../../src/core/active-store';
 import { defaultRegistry } from '../../src/core/types';
 import type { Element, WorldMeta, WorldRegistryEntry } from '../../src/core/types';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { clearStrand, makeStrandSlot, writeStrandSlot, type StrandDrawn } from '../../src/ui/strand-write';
+import { toastManager } from '../../src/ui/toast-manager';
 
 const W = 'w-strand';
 const N = '0192a000-0000-7000-8000-000000000a01';
@@ -323,6 +324,20 @@ describe('C2: a change compares the member it replaces', () => {
     expect(await writeStrandSlot('location', box, GONE_L)).toBe('refused');
     expect(await markOnDisk()).toEqual({ narrative: N, event: E, location: L2 });
     expect((await onDisk(E)).locations).toEqual([L, L2]);
+  });
+});
+
+describe('a list that will not read back (D3)', () => {
+  it('a landed write whose read-back fails is said, never a rejection', async () => {
+    await put('narrative', N);
+    await put('character', C);
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    const problem = vi.spyOn(toastManager, 'problem').mockImplementation(() => {});
+    store.listElements = async () => { throw new Error('the folder went away'); };
+    await expect(writeStrandSlot('character', drawn({ on: N, raw: null }), C)).resolves.toBe('wrote');
+    expect(problem).toHaveBeenCalledTimes(1);
+    expect((await store.getElement(N) as unknown as Record<string, unknown>).protagonist).toBe(C);
+    problem.mockRestore();
   });
 });
 
