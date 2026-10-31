@@ -111,7 +111,9 @@ describe('what a box offers', () => {
     expect(offerable(n(), 'event')).toBe(false);
     expect(offerable(n({ known_of: true }), 'narrative')).toBe(false);
     expect(offerable(n({ x_review_proposed: { by: 'm', evidence: 'seat' } }), 'narrative')).toBe(false);
-    expect(offerable(n({ supertype: 'Message', x_room_of: 'w' }), 'narrative')).toBe(false);  });
+    expect(offerable(n({ supertype: 'Message', x_room_of: 'w' }), 'narrative')).toBe(false);
+    expect(offerable(n({ supertype: 'Message' }), 'narrative')).toBe(false);
+    expect(offerable(n({ supertype: 'Chapter' }), 'narrative')).toBe(true);  });
 });
 
 describe('the writes', () => {

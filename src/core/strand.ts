@@ -16,6 +16,7 @@ import { sliceOf } from './provenance';
 import { isKnownOf } from '../sync/known-of';
 import { handsOnAsProposed } from './review-mark';
 import { isRoomElement } from './parlor-room';
+import { isMessage } from './message-parties';
 import { canonicalExtValue } from '../sync/world-meta-sync';
 import { STRAND_KEY } from './strand-mark';
 
@@ -158,11 +159,12 @@ export function anySlotWritable(entry: WorldRegistryEntry | undefined, meta: unk
 
 /**
  * An element a box may offer or a press may make the strand's: of the box's kind, and never a known-of
- * stub, a proposed element (no reader's view holds it) or a room element (the public reads none; G6,
- * G12). No reading aid is one of the four kinds (the SDK's `CHARTER_PAIRS`). A chapter may be the story.
+ * stub, a proposed element (no reader's view holds it), a room element (the public reads none; G6,
+ * G12) or a Message, room mark or not (mail, never a world's story: the Wire's letters are Messages).
+ * No reading aid is one of the four kinds (the SDK's `CHARTER_PAIRS`). A chapter may be the story.
  */
 export function offerable(el: Element, type: string): boolean {
-  return el.type === type && !isKnownOf(el) && !handsOnAsProposed(el) && !isRoomElement(el);
+  return el.type === type && !isKnownOf(el) && !handsOnAsProposed(el) && !isRoomElement(el) && !isMessage(el);
 }
 
 // ---- The writes (S4) ----
