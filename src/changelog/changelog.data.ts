@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.115.1',
+    date: '2026-10-31',
+    theme: 'The OnlyWorlds mark, a little quieter',
+    entries: [
+      {
+        id: 'waymark-smaller-new-tab',
+        title: 'The OnlyWorlds mark beside a name is smaller, and its web links open in a new tab',
+        body: 'The globe beside a world or an element name is now about the height of the name\'s capitals, with the same space to tap. A place it offers on the web opens in a new tab, so Atlas stays open behind it, and the row for Atlas itself is grey, as where you already are.',
+        tags: ['sharing'],
+      },
+    ],
+  },
+  {
     version: '1.115.0',
     date: '2026-10-31',
     theme: 'A new world starts on its strand',
