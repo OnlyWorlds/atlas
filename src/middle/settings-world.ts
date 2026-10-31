@@ -20,7 +20,7 @@ import {
   updateWorldEntry,
 } from '../registry/registry';
 import { deleteHandle, loadHandle } from '../store/handle-vault';
-import { startPath } from '../core/guide-path';
+import { FIRST_STEPS_ON, startPath } from '../core/guide-path';
 import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
 import { deleteWorldFolderUnderRoot, whyWorldFolderNotDeletable } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
@@ -243,7 +243,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         return line ? `<p class="atlas-settings-hint" data-role="slice-line">${escapeText(line)}</p>` : '';
       })()}
       ${apiActions}
-      ${worldIsViewOnly(world.id) ? '' : `<p class="atlas-settings-hint">The first steps on this world's Home: someone, somewhere, something that happened, a story, a copy. <button type="button" class="atlas-btn-link" data-action="first-steps-again">Show the first steps again</button></p>`}
+      ${!FIRST_STEPS_ON || worldIsViewOnly(world.id) ? '' : `<p class="atlas-settings-hint">The first steps on this world's Home: someone, somewhere, something that happened, a story, a copy. <button type="button" class="atlas-btn-link" data-action="first-steps-again">Show the first steps again</button></p>`}
       <div class="atlas-settings-dangling" data-role="rekey-interrupted" hidden>
         <p class="atlas-settings-hint" data-role="rekey-interrupted-text">An id update in this world did not finish, so it is not syncing.</p>
         <button class="atlas-btn-ghost" data-action="rekey-finish">Finish it</button>

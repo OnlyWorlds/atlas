@@ -1,15 +1,13 @@
 /**
- * A new world's first steps on the home (#964, then the home that grows) e2e.
- * Drives the real flow: an empty world opens straight on the path (no doors,
- * no Next), its card read from the world on every draw, every act of the path
- * in the card's grid (a + square makes the step's kind, two presses place);
- * Bring it in opens today's ways in place; a step done by hand elsewhere
- * reads done on return; a pointer a stale tab holds never moves back. While
- * the path shows no path note draws; once it is done the notes speak again,
- * and their tests run in a world past the path. #975's room bar keeps a way
- * back from the chart and the writing room. Each negative stands beside its
- * positive twin in the same run. Plus the Start-page links and the desk rows.
- * The path end to end in a browser world, by drag and keyboard: home-grows.spec.ts.
+ * A new world's home e2e, after the first steps were retired (1.115.0: the
+ * card, its room bar and its silence are gone; a new world opens on its
+ * Strand tab, home-strand-first.spec.ts). Home's grid on the Picture tab: a
+ * press survives a data refresh, a redraw keeps the focus, a press that wrote
+ * nothing leaves no ask, phones fit it and every way in takes a thumb. The
+ * guide's notes speak (their tests keep a world past the path, harmless now).
+ * Each negative stands beside its positive twin in the same run. Plus the
+ * Start-page links and the desk rows. Home's grid by drag and keyboard:
+ * home-grows.spec.ts.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -72,10 +70,6 @@ async function patchEntry(page: Page, patch: Record<string, unknown>) {
     patchSlice('registry', next);
   }, patch);
 }
-const entryOf = (page: Page) => page.evaluate(() => {
-  const s = (window as any).__atlasTestApi.getState();
-  return s.registry.worlds.find((w: any) => w.id === s.active.worldId);
-});
 
 /** A world past the path (Done pressed): there the notes speak, as they did before the path. */
 async function pastThePath(page: Page) {
@@ -103,24 +97,29 @@ async function createInModal(page: Page, name: string, type?: string) {
 
 const element = (page: Page, name: string) => page.evaluate((n) =>
   (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.name === n), name);
-const block = (page: Page) => page.locator('[data-role="guide-block"]');
-const line = (page: Page) => block(page).locator('[data-role="grow-line"]');
-const act = (page: Page, verb: string) => block(page).locator(`[data-step-action="${verb}"]`);
-const plus = (page: Page) => block(page).locator('[data-grid-plus]');
+const plus = (page: Page) => page.locator('[data-grid-plus]');
 const just = (page: Page) => page.locator('[data-role="grow-just"]');
-const litOf = (page: Page) => block(page).locator('[data-dot]')
-  .evaluateAll(els => els.map(e => `${e.getAttribute('data-dot')}${e.getAttribute('data-lit') === 'true' ? '+' : ''}`));
+const grid = (page: Page) => page.locator('.atlas-world-home [data-role="home-grid"]').first();
 const note = (page: Page) => page.locator('[data-role="guide-note"]');
 /** A square by its element's name. */
 const square = (page: Page, name: string) =>
   page.locator('[data-grid-id]').filter({ has: page.locator('.atlas-home-grid-name', { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
-/** Focus is on the card's grid: its roving square or its + square. */
-const gridHasFocus = (page: Page) => page.evaluate(() =>
-  !!document.activeElement?.closest('[data-role="guide-block"] [data-role="home-grid"]'));
+/** The row a square stands in within its column. */
+const placeOfRow = (page: Page, name: string) => square(page, name).getAttribute('data-row');
 
-/** The + square: a press opens the name box in place; a year for an Event; Enter keeps. */
-async function make(page: Page, name: string, year?: number) {
+/** Home's Picture tab, where the world's grid draws (a new world opens on Strand, 1.115.0). */
+async function toPicture(page: Page) {
+  await expect(async () => {
+    const tab = page.locator('[data-role="home-tabs"] [data-tab="picture"]');
+    if (await tab.count() && (await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+    await expect(grid(page)).toBeVisible({ timeout: 1000 });
+  }).toPass();
+}
+
+/** Home's plain + square: a press opens its list, the kind picked opens the name box in place; a year for an Event; Enter keeps. */
+async function make(page: Page, name: string, kind: 'a character' | 'a location' | 'an event' | 'a story', year?: number) {
   await plus(page).click();
+  await page.getByRole('menu', { name: 'Add which kind' }).getByRole('menuitem', { name: kind }).click();
   const box = page.locator('.atlas-home-grid-make');
   await expect(box.locator('input').first()).toBeFocused();
   await box.locator('input').first().fill(name);
@@ -159,345 +158,11 @@ async function watchNotes(page: Page) {
 }
 const notesDrawn = (page: Page): Promise<string[]> => page.evaluate(() => (window as any).__notes);
 
-// ---- An empty world ----
-
-test('an empty world opens on the path: no doors, Bring it in opens the ways in place and folds them again', async ({ page }) => {
-  await setupWorld(page);
-  await expect(block(page)).toHaveAttribute('data-state', 'path');
-  await expect(block(page)).toHaveAttribute('data-step', 'someone');
-  await expect(line(page)).toHaveText('Start with someone.');
-  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'character');
-  await expect(block(page).locator('[data-guide-door], [data-step-action="next"], [data-action="guide-back"]')).toHaveCount(0);
-  await expect(block(page)).not.toContainText('What do you have?');
-  // "Just looking" stays gone: the first screen already offers Moppetopia and the tour.
-  await expect(block(page)).not.toContainText('Just looking');
-  await expect(block(page).locator('[data-action="cards-dismiss"]')).toBeVisible();
-
-  const bring = block(page).locator('[data-action="grow-bring"]');
-  await expect(block(page)).toContainText('Already have something written down?');
-  await expect(bring).toHaveAttribute('aria-expanded', 'false');
-  await expect(block(page).locator('[data-bring-action]')).toHaveCount(0);
-  await bring.click();
-  await expect(block(page).locator('[data-bring-action]')).toHaveText(['Bring in a file', 'Open a folder', 'Download a world']);
-  await expect.soft(block(page).locator('[data-bring-action="file"]')).toBeFocused();
-  // The path stays above the ways: the card is still the path's.
-  await expect(block(page)).toHaveAttribute('data-step', 'someone');
-  await expect(block(page).locator('[data-action="grow-bring"]')).toHaveAttribute('aria-expanded', 'true');
-  await block(page).locator('[data-action="grow-bring"]').click();
-  await expect(block(page).locator('[data-bring-action]')).toHaveCount(0);
-  await expect(block(page).locator('[data-action="grow-bring"]')).toBeFocused();
-  // Nothing was written by looking.
-  expect((await entryOf(page)).guide_step).toBeUndefined();
-});
-
-test('#972: the first Tab stop skips the chrome to the first steps; it goes with the block', async ({ page }) => {
-  await setupWorld(page);
-  const skip = page.locator('[data-role="guide-skip"]');
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('Tab');
-  await expect(skip).toBeFocused();
-  const box = await skip.boundingBox();
-  expect(box && box.y >= 0, 'seen once focused').toBe(true);
-  await page.keyboard.press('Enter');
-  // The first steps' first control is the + square, never the head's ×.
-  await expect(plus(page)).toBeFocused();
-  // Unseen until focused.
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  const away = await skip.boundingBox();
-  expect(away && away.y + away.height <= 0, 'off screen unfocused').toBe(true);
-  // The tab bar clips its overflow: a tab's keyboard ring is drawn inside it.
-  await page.keyboard.press('Shift');
-  await page.locator('.atlas-tab').first().focus();
-  expect(await page.locator('.atlas-tab').first().evaluate(e => getComputedStyle(e).outlineOffset)).toBe('-2px');
-  // The block dismissed: no skip, and the first Tab stop is the chrome's.
-  await page.click('[data-action="cards-dismiss"]');
-  await expect(block(page)).toHaveCount(0);
-  await expect(skip).toBeHidden();
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('Tab');
-  await expect(skip).not.toBeFocused();
-});
-
-test('the first make writes the pointer, never a render or an open box; the card keeps its place; a reload reads the world', async ({ page }) => {
-  await setupWorld(page);
-  const top = Math.round((await block(page).boundingBox())!.y);
-  await plus(page).click();
-  await expect(page.locator('.atlas-home-grid-make input').first()).toBeFocused();
-  // The open box wrote nothing: Escape leaves nothing made and nothing written.
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.atlas-home-grid-make')).toHaveCount(0);
-  expect((await entryOf(page)).guide_step).toBeUndefined();
-  await make(page, 'Ada');
-  expect((await entryOf(page)).guide_step).toBe('someone');
-  // Being born moves nothing above it: the card stays where it stood.
-  expect(Math.round((await block(page).boundingBox())!.y)).toBe(top);
-  await page.reload();
-  await page.waitForSelector('.atlas-world-home');
-  await expect(block(page)).toHaveAttribute('data-step', 'placed');
-  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'location');
-  await expect(block(page).locator('[data-guide-door]')).toHaveCount(0);
-});
-
-// ---- The path by the card ----
-
-test('the path by the card alone, a folder world: four steps by the grid, the copy card with Done alone, no path note drawn', async ({ page }) => {
-  await setupWorld(page);
-  await watchNotes(page);
-
-  await make(page, 'Ada');
-  await expect(block(page)).toHaveAttribute('data-step', 'placed');
-  await expect(line(page)).toHaveText('Now somewhere for Ada to be.');
-  // A folder world already has its copy outside the browser.
-  expect(await litOf(page)).toEqual(['someone+', 'placed', 'happened', 'story', 'copy+']);
-  await make(page, 'Hollow Keep');
-  const keepAt = await square(page, 'Hollow Keep').getAttribute('data-pos');
-  await expect(line(page)).toHaveText('Ada will be in Hollow Keep.');
-  await select(page, 'Ada');
-  await dropOn(page, 'Hollow Keep', 'Ada is in Hollow Keep');
-  const keep = await element(page, 'Hollow Keep');
-  expect((await element(page, 'Ada')).location).toBe(keep.id);
-
-  await expect(block(page)).toHaveAttribute('data-step', 'happened');
-  await expect(line(page)).toHaveText('Something happened in your world.');
-  await make(page, 'The Founding', 120);
-  await expect(block(page)).toHaveAttribute('data-step', 'story');
-  // The card says what the step before made possible: the chart, a press away.
-  await expect(block(page)).toContainText('The Founding is on the chart at year 120.');
-  await act(page, 'open-chart').click();
-  await expect(page).toHaveURL(/\/timeline/);
-  await expect.poll(async () => (await entryOf(page)).guide_visited).toEqual(['happened']);
-  await goHome(page);
-
-  await expect(line(page)).toHaveText('Tell a story in your world.');
-  await make(page, "Ada's Tale");
-  // The world's first writing label, so the story is a book in the writing room.
-  await expect.poll(async () => (await element(page, "Ada's Tale")).supertype).toBe('Book');
-  // All five lit: the copy card, with Done alone (the copy is already kept).
-  await expect(block(page)).toHaveAttribute('data-step', 'copy');
-  await expect(line(page)).toHaveText('That is a world. Keep making.');
-  await expect(block(page).locator('.atlas-home-grow-keep [data-step-action]')).toHaveText(['Done']);
-  await act(page, 'open-writing').click();
-  await expect(page).toHaveURL(/\/writing/);
-  await expect.poll(async () => (await entryOf(page)).guide_visited).toEqual(['happened', 'story']);
-  await goHome(page);
-  // No square drawn before moved for what came after.
-  await expect(square(page, 'Hollow Keep')).toHaveAttribute('data-pos', keepAt!);
-  await act(page, 'done').click();
-
-  // Done: the block goes, never dismissed (the reading and lens notes keep speaking).
-  await expect(block(page)).toHaveCount(0);
-  const entry = await entryOf(page);
-  expect(entry.guide_step).toBe('done');
-  expect(entry.tour_dismissed ?? []).not.toContain('home-cards');
-  // One voice: the card said every step; only the reward (not a path note) may have spoken.
-  expect((await notesDrawn(page)).filter(n => n !== 'reading')).toEqual([]);
-});
-
-// ---- #975: the card follows the person into the room ----
-
-const roomBar = (page: Page) => page.locator('[data-role="guide-room-bar"]');
-
-/** Ada placed at Hollow Keep, The Founding at year 120, and `extra`: the card stands at the step they leave. */
-async function worldAt(page: Page, extra: Array<[string, Record<string, unknown>]> = []) {
-  await setupWorld(page);
-  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
-  await createViaStore(page, 'character', { name: 'Ada', location: keep });
-  await createViaStore(page, 'event', { name: 'The Founding', start_date: 120 });
-  for (const [type, data] of extra) await createViaStore(page, type, data);
-  await patchEntry(page, { guide_step: 'someone' });
-  await goHome(page);
-}
-
-test('#975: Open the chart keeps a way back in the room; it stays through the chart\'s own moves; Back lands on the grid', async ({ page }) => {
-  await worldAt(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'story');
-  await act(page, 'open-chart').click();
-  await expect(page).toHaveURL(/\/timeline\//);
-  await expect(roomBar(page)).toBeVisible();
-  await expect(roomBar(page)).toContainText('Step 3 of 5, Something happened');
-  // The room's first child: nothing in the chart sits under it.
-  expect(await page.evaluate(() => document.querySelector('.atlas-timeline-room')!.firstElementChild!.getAttribute('data-role'))).toBe('guide-room-bar');
-  // The chart's own move (clear the focus) keeps it.
-  await page.locator('.atlas-chart-focus-clear').click();
-  await expect(page).toHaveURL(/\/timeline$/);
-  await expect(roomBar(page)).toBeVisible();
-  await roomBar(page).locator('[data-action="guide-room-back"]').click();
-  await expect(page.locator('.atlas-world-home')).toBeVisible();
-  await expect(block(page)).toHaveAttribute('data-step', 'story');
-  // Nothing written by the bar: the visit is the room mount's.
-  expect((await entryOf(page)).guide_visited).toEqual(['happened']);
-  await expect.poll(() => gridHasFocus(page)).toBe(true);
-});
-
-test('#975: the bar reads the world, not the press: shown while the card stands at the chart\'s step or the one after, gone past Done', async ({ page }) => {
-  await setupWorld(page);
-  await createViaStore(page, 'location', { name: 'Hollow Keep' });
-  const ada = await createViaStore(page, 'character', { name: 'Ada' });
-  await createViaStore(page, 'event', { name: 'The Founding', start_date: 120 });
-  await patchEntry(page, { guide_step: 'someone' });
-  const toChart = () => page.evaluate(() => {
-    const s = (window as any).__atlasTestApi.getState();
-    window.location.hash = `#/w/${s.active.worldId}/timeline`;
-  });
-  // The chart's dot is lit, but the card stands at the placing (Ada has no place): no bar.
-  await goHome(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'placed');
-  await toChart();
-  await expect(page.locator('.atlas-timeline-room')).toBeVisible();
-  await expect(roomBar(page)).toBeHidden();
-  // Ada placed (elsewhere): the card stands at the story, the step after the chart's; the bar shows without a remount.
-  await page.evaluate(async (id) => {
-    const api = (window as any).__atlasTestApi;
-    const store = api.getActiveStore();
-    const keep = (await store.listElements()).find((e: any) => e.name === 'Hollow Keep');
-    await store.updateElement(id, { location: keep.id });
-    api.patchData(await store.listElements());
-  }, ada);
-  await expect(roomBar(page)).toBeVisible();
-  // Done pressed in another tab, merged: the bar goes without a remount.
-  await patchEntry(page, { guide_step: 'done' });
-  await expect(roomBar(page)).toBeHidden();
-});
-
-test('#975: Open the writing room keeps a way back too, for a story the writing room does not list', async ({ page }) => {
-  // A Narrative with no writing label (made from the sidebar): the room shows its landing, and the bar names the step, not the story.
-  await worldAt(page, [['narrative', { name: 'Loose Tale' }]]);
-  await expect(block(page)).toHaveAttribute('data-step', 'copy');
-  await act(page, 'open-writing').click();
-  await expect(page).toHaveURL(/\/writing\//);
-  await expect(roomBar(page)).toBeVisible();
-  await expect(roomBar(page)).toContainText('Step 4 of 5, A story');
-  await expect(roomBar(page)).not.toContainText('Loose Tale');
-  await roomBar(page).locator('[data-action="guide-room-back"]').click();
-  await expect(page.locator('.atlas-world-home')).toBeVisible();
-  await expect.poll(() => gridHasFocus(page)).toBe(true);
-});
-
-test('#975: a step lit inside the room counts the room seen: Back lands on the grid (the gate\'s G1)', async ({ page }) => {
-  await setupWorld(page);
-  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
-  await createViaStore(page, 'character', { name: 'Ada', location: keep });
-  await patchEntry(page, { guide_step: 'someone' });
-  await page.evaluate(() => {
-    const s = (window as any).__atlasTestApi.getState();
-    window.location.hash = `#/w/${s.active.worldId}/timeline`;
-  });
-  await expect(page.locator('.atlas-timeline-room')).toBeVisible();
-  await expect(roomBar(page)).toBeHidden();
-  // The year given in the chart: the step lights while the room is mounted.
-  await createViaStore(page, 'event', { name: 'The Founding', start_date: 120 });
-  await expect(roomBar(page)).toBeVisible();
-  await expect.poll(async () => (await entryOf(page)).guide_visited).toEqual(['happened']);
-  await roomBar(page).locator('[data-action="guide-room-back"]').click();
-  await expect(page.locator('.atlas-world-home')).toBeVisible();
-  await expect.poll(() => gridHasFocus(page)).toBe(true);
-});
-
-test('#975: a reload in the room, the world reopening under it, still counts the room seen', async ({ page }) => {
-  await worldAt(page);
-  await page.evaluate(() => {
-    const s = (window as any).__atlasTestApi.getState();
-    window.location.hash = `#/w/${s.active.worldId}/timeline`;
-  });
-  await expect(roomBar(page)).toBeVisible();
-  // The mount's own write runs first: undo it, then reload, so only the reopened room can write it.
-  await patchEntry(page, { guide_visited: [] });
-  await page.reload();
-  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi?.getState().active?.worldId));
-  await expect(roomBar(page)).toBeVisible();
-  await expect.poll(async () => (await entryOf(page)).guide_visited).toEqual(['happened']);
-});
-
-test('a step done by hand elsewhere reads done on the card when the person comes back', async ({ page }) => {
-  await setupWorld(page);
-  await make(page, 'Ada');
-  await expect(block(page)).toHaveAttribute('data-step', 'placed');
-  await watchNotes(page);
-  const ada = (await element(page, 'Ada')).id;
-  await page.evaluate(id => { const s = (window as any).__atlasTestApi.getState(); window.location.hash = `#/w/${s.active.worldId}/element/${id}`; }, ada);
-  await page.locator('.atlas-field[data-field="location"] .atlas-link-pick').click();
-  await createInModal(page, 'Hollow Keep');
-  await page.waitForTimeout(300);
-  // The placed note stays silent while the path shows, in the element page too.
-  expect((await notesDrawn(page)).filter(n => n !== 'reading')).toEqual([]);
-  await goHome(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'happened');
-  expect(await litOf(page)).toEqual(['someone+', 'placed+', 'happened', 'story', 'copy+']);
-});
-
-test('Something happened with no dates in the world: the year starts empty, may stay empty, and the card asks for it', async ({ page }) => {
-  await setupWorld(page);
-  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
-  await createViaStore(page, 'character', { name: 'Ada', location: keep });
-  await expect(block(page)).toHaveAttribute('data-step', 'happened');
-  await plus(page).click();
-  const year = page.locator('.atlas-home-grid-make input[type="number"]');
-  await expect(year).toHaveValue('');
-  await expect(year).toHaveAttribute('placeholder', 'Year');
-  await page.locator('.atlas-home-grid-make input').first().fill('The Siege');
-  await year.focus();
-  await page.keyboard.press('Enter');
-  await expect(square(page, 'The Siege')).toHaveCount(1);
-  // Made without a year: still the step, and the card leads to it.
-  await expect(block(page)).toHaveAttribute('data-step', 'happened');
-  await expect(block(page)).toContainText('Give The Siege a year to see it on the chart.');
-  await expect(act(page, 'open-element')).toHaveText('Open The Siege');
-  // The year the person types lights it.
-  await make(page, 'The Founding', 7);
-  await expect(block(page)).toHaveAttribute('data-step', 'story');
-  expect(await litOf(page)).toContain('happened+');
-});
-
-test('a stale tab never moves the pointer back: a make after another tab\'s Done keeps done', async ({ page }) => {
-  await setupWorld(page);
-  await expect(plus(page)).toBeVisible();
-  // Another tab pressed Done while this one still shows the card: stored only, no storage event here.
-  await page.evaluate(() => {
-    const key = 'atlas_worlds_registry';
-    const reg = JSON.parse(localStorage.getItem(key)!);
-    const id = (window as any).__atlasTestApi.getState().active.worldId;
-    reg.worlds = reg.worlds.map((w: any) => (w.id === id ? { ...w, guide_step: 'done' } : w));
-    localStorage.setItem(key, JSON.stringify(reg));
-  });
-  await make(page, 'Ada');
-  await expect.poll(async () => (await entryOf(page)).guide_step).toBe('done');
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_worlds_registry')!).worlds[0].guide_step);
-  expect(stored).toBe('done');
-});
-
-test('Bring in a file, then back with nothing brought in: the card is still on the path, the ways folded', async ({ page }) => {
-  await setupWorld(page);
-  await block(page).locator('[data-action="grow-bring"]').click();
-  await page.click('[data-bring-action="file"]');
-  await expect(page).toHaveURL(/\/import$/);
-  await goHome(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'someone');
-  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'character');
-  await expect(block(page).locator('[data-action="grow-bring"]')).toHaveAttribute('aria-expanded', 'false');
-  await expect(block(page).locator('[data-bring-action]')).toHaveCount(0);
-  // The return is no press: nothing written.
-  expect((await entryOf(page)).guide_step).toBeUndefined();
-});
-
-test('a world never on the path (an older or imported one): the first unlit step, placed by the grid', async ({ page }) => {
-  await setupWorld(page);
-  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
-  await createViaStore(page, 'character', { name: 'Ada' });
-  await expect(block(page)).toHaveAttribute('data-step', 'placed');
-  await expect(line(page)).toHaveText('Ada will be in Hollow Keep.');
-  expect((await entryOf(page)).guide_step).toBeUndefined();
-  await select(page, 'Ada');
-  await dropOn(page, 'Hollow Keep', 'Ada is in Hollow Keep');
-  expect((await element(page, 'Ada')).location).toBe(keep);
-  await expect(block(page)).toHaveAttribute('data-step', 'happened');
-  // Its twin: with every dot lit and no pointer, no block at all.
-  await createViaStore(page, 'event', { name: 'The Founding', start_date: 1 });
-  await createViaStore(page, 'narrative', { name: 'Tale', supertype: 'Book' });
-  await expect(block(page)).toHaveCount(0);
-});
+// ---- Home's grid ----
 
 test('a press survives a data refresh between press and release (conv. 146): the + square and a square', async ({ page }) => {
   await setupWorld(page);
+  await toPicture(page);
   const refresh = () => page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;
     api.patchData([...(await api.getActiveStore().listElements())]);
@@ -510,9 +175,11 @@ test('a press survives a data refresh between press and release (conv. 146): the
     await page.waitForTimeout(100);
     await page.mouse.up();
   };
+  // Home's + is plain: the press opens its list of kinds.
   await pressAcross((await plus(page).boundingBox())!);
-  await expect(page.locator('.atlas-home-grid-make input').first()).toBeVisible();
+  await expect(page.getByRole('menu', { name: 'Add which kind' })).toBeVisible();
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu', { name: 'Add which kind' })).toHaveCount(0);
   await createViaStore(page, 'character', { name: 'Ada' });
   await createViaStore(page, 'location', { name: 'Hollow Keep' });
   await expect(square(page, 'Ada')).toBeVisible();
@@ -522,84 +189,26 @@ test('a press survives a data refresh between press and release (conv. 146): the
   await expect(square(page, 'Hollow Keep')).toHaveClass(/is-target/);
 });
 
-/** Every dot lit by the world's own elements but the copy: Ada placed, The Founding dated, a story. */
-async function allButCopy(page: Page) {
-  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
-  await createViaStore(page, 'character', { name: 'Ada', location: keep });
-  await createViaStore(page, 'event', { name: 'The Founding', start_date: 120 });
-  await createViaStore(page, 'narrative', { name: "Ada's Tale", supertype: 'Book' });
-}
-
-test('a browser world: the copy step carries the keep-safe ways and Done', async ({ page }) => {
-  await setupWorld(page, 'browser');
-  expect(await litOf(page)).toEqual(['someone', 'placed', 'happened', 'story', 'copy']);
-  await patchEntry(page, { guide_step: 'someone' });
-  await allButCopy(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'copy');
-  await expect(line(page)).toHaveText('That is a world. Keep it, or keep making.');
-  await expect(act(page, 'download')).toBeVisible();
-  await expect(act(page, 'online')).toBeVisible();
-  await expect(act(page, 'done')).toBeVisible();
-});
-
 // ---- The code gate's findings ----
 
-test('a browser world worth keeping, mid-path: the keep-safe card draws below the block, and waits only at the copy step (C2)', async ({ page }) => {
-  await setupWorld(page, 'browser');
-  await patchEntry(page, { guide_step: 'someone' });
-  await page.evaluate(async () => {
-    const api = (window as any).__atlasTestApi;
-    const store = api.getActiveStore();
-    for (let i = 0; i < 26; i++) await store.createElement('character', { name: `C${i}` });
-    api.patchData(await store.listElements());
-  });
-  await expect(block(page)).toHaveAttribute('data-step', 'placed');
-  const keep = page.locator('.atlas-home-keepsafe');
-  await expect(keep).toBeVisible();
-  // Below the block: the block never moves for it.
-  const [b, k] = [(await block(page).boundingBox())!, (await keep.boundingBox())!];
-  expect(k.y).toBeGreaterThan(b.y + b.height - 1);
-  // Its twin: at the copy step the card carries the same ways, and the keep-safe card waits.
-  await allButCopy(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'copy');
-  await expect(act(page, 'download')).toBeVisible();
-  await expect(keep).toHaveCount(0);
-});
-
-test('a browser world exported as JSON is not "kept only in this browser": its copy step reads done (C7)', async ({ page }) => {
-  await setupWorld(page, 'browser');
-  await patchEntry(page, { guide_step: 'someone', kept_export_at: new Date().toISOString() });
-  await allButCopy(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'copy');
-  await expect(line(page)).toHaveText('That is a world. Keep making.');
-  await expect(block(page).locator('.atlas-home-grow-keep [data-step-action]')).toHaveText(['Done']);
-});
-
-test('Something happened with an Event already made and no year: the card leads to it first (C6)', async ({ page }) => {
+test('focus: a redraw keeps it on the same control, an empty world\'s ways in under its strand (C9)', async ({ page }) => {
   await setupWorld(page);
-  const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
-  await createViaStore(page, 'character', { name: 'Ada', location: keep });
-  const ev = await createViaStore(page, 'event', { name: 'The Siege' });
-  await expect(block(page)).toHaveAttribute('data-step', 'happened');
-  await expect(block(page).locator('[data-step-action]:visible')).toHaveText(['Open The Siege']);
-  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'event');
-  await act(page, 'open-element').click();
-  await expect(page).toHaveURL(new RegExp(`/element/${ev}$`));
-});
-
-test('focus: a redraw keeps it on the same control (C9); a press that wrote nothing leaves no ask behind (C3)', async ({ page }) => {
-  await setupWorld(page);
-  await block(page).locator('[data-action="grow-bring"]').click();
-  await block(page).locator('[data-bring-action="download"]').focus();
+  const download = page.locator('[data-role="home-bring-in"] [data-bring-action="download"]');
+  await download.focus();
+  await expect(download).toBeFocused();
   // An unrelated change redraws the home.
   await patchEntry(page, { notes: 'a note' });
-  await expect(block(page).locator('[data-bring-action="download"]')).toBeFocused();
+  await expect(download).toBeFocused();
+});
 
+test('focus: a press that wrote nothing leaves no ask behind (C3), and a redraw leaves the focus where the person is', async ({ page }) => {
+  await setupWorld(page);
   const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
   const ada = await createViaStore(page, 'character', { name: 'Ada' });
+  await toPicture(page);
   await select(page, 'Ada');
   await expect(square(page, 'Hollow Keep')).toHaveClass(/is-target/);
-  // Placed on disk behind the card's back: the drop finds the field filled and writes nothing.
+  // Placed on disk behind the grid's back: the drop finds the field filled and writes nothing.
   await page.evaluate(async ({ ada, keep }) => {
     await (window as any).__atlasTestApi.getActiveStore().updateElement(ada, { location: keep });
   }, { ada, keep });
@@ -613,20 +222,21 @@ test('focus: a redraw keeps it on the same control (C9); a press that wrote noth
     const api = (window as any).__atlasTestApi;
     api.patchData(await api.getActiveStore().listElements());
   });
-  await expect(block(page)).toHaveAttribute('data-step', 'happened');
+  // The home redrew (Ada now placed, from disk), and the focus stayed in the search.
+  await expect.poll(() => placeOfRow(page, 'Ada')).toBe('1');
   await expect(search).toBeFocused();
 });
 
 // ---- Phones ----
 
 for (const [w, h] of [[360, 640], [390, 844]] as const) {
-  test(`a ${w} px phone: no sideways scroll, and the card's + square is in view`, async ({ page }) => {
+  test(`a ${w} px phone: no sideways scroll, and Home's + square is in view`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await setupWorld(page);
+    await toPicture(page);
     await expect(plus(page)).toBeInViewport({ ratio: 1 });
-    await expect(block(page).locator('[data-dot]')).toHaveCount(5);
     const overflow = await page.evaluate(() => {
-      const g = document.querySelector('[data-role="guide-block"] [data-role="home-grid"]') as HTMLElement;
+      const g = document.querySelector('.atlas-world-home [data-role="home-grid"]') as HTMLElement;
       return { grid: g.scrollWidth - g.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
     expect(overflow.grid).toBeLessThanOrEqual(0);
@@ -634,39 +244,14 @@ for (const [w, h] of [[360, 640], [390, 844]] as const) {
   });
 }
 
-test.describe('on a small touch phone', () => {
-  test.use({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true });
-
-  test('#975: Back lands on the grid, in view, once the home has settled (the gate\'s G2)', async ({ page }) => {
-    await worldAt(page);
-    await act(page, 'open-chart').click();
-    await roomBar(page).locator('[data-action="guide-room-back"]').click();
-    await expect.poll(() => gridHasFocus(page)).toBe(true);
-    // The home draws again when its saved charts arrive: read the view after that, not at the first draw.
-    await page.waitForTimeout(1000);
-    expect(await gridHasFocus(page)).toBe(true);
-    await expect(page.locator(':focus')).toBeInViewport({ ratio: 1 });
-  });
-});
-
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-  test('#975: the room\'s Back takes a thumb, and lands on the grid in view', async ({ page }) => {
-    await worldAt(page);
-    await act(page, 'open-chart').click();
-    const back = roomBar(page).locator('[data-action="guide-room-back"]');
-    await expect(back).toBeVisible();
-    expect(Math.round((await back.boundingBox())!.height)).toBeGreaterThanOrEqual(44);
-    await back.click();
-    await expect.poll(() => gridHasFocus(page)).toBe(true);
-    await expect(page.locator(':focus')).toBeInViewport();
-  });
-
-  test('the path by taps: make and place with two presses, the squares 44 px or more', async ({ page }) => {
+  test('Home\'s grid by taps: make and place with two presses, the squares 44 px or more', async ({ page }) => {
     await setupWorld(page, 'browser');
-    await make(page, 'Ada');
-    await make(page, 'Hollow Keep');
+    await toPicture(page);
+    await make(page, 'Ada', 'a character');
+    await make(page, 'Hollow Keep', 'a location');
     await square(page, 'Ada').tap();
     await expect(square(page, 'Ada')).toHaveClass(/is-selected/);
     await square(page, 'Hollow Keep').tap();
@@ -676,25 +261,27 @@ test.describe('on a touch phone', () => {
     expect(Math.min(...sides)).toBeGreaterThanOrEqual(44);
   });
 
-  test('every way in the block takes a thumb: the + square, Bring it in and its ways, Undo, the card\'s buttons are 44 px or more', async ({ page }) => {
+  /** Each way read on its own (soft), so one run names every one that falls short. */
+  const thumbs = (page: Page) => async (sel: string, what: string) => {
+    const hs = await page.locator('.atlas-world-home').locator(sel).evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
+    expect.soft(hs.length, `${what} drawn`).toBeGreaterThan(0);
+    expect.soft(Math.min(...hs), `${what} takes a thumb`).toBeGreaterThanOrEqual(44);
+  };
+
+  test('the ways to bring a world in under an empty world\'s strand take a thumb: 44 px or more', async ({ page }) => {
     await setupWorld(page, 'browser');
-    const heights = (sel: string) => block(page).locator(sel).evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
-    // Each way read on its own (soft), so one run names every one that falls short.
-    const thumb = async (sel: string, what: string) => {
-      const hs = await heights(sel);
-      expect.soft(hs.length, `${what} drawn`).toBeGreaterThan(0);
-      expect.soft(Math.min(...hs), `${what} takes a thumb`).toBeGreaterThanOrEqual(44);
-    };
-    await patchEntry(page, { guide_step: 'someone' });
+    // Quiet buttons: the rooms' own touch rule makes them 40 px unless Home's outranks it.
+    await thumbs(page)('[data-role="home-bring-in"] [data-bring-action]', 'the ways to bring a world in');
+  });
+
+  test('every way in Home\'s grid takes a thumb: the + square, the name box, Undo are 44 px or more', async ({ page }) => {
+    await setupWorld(page, 'browser');
+    const thumb = thumbs(page);
+    await toPicture(page);
     await thumb('[data-grid-plus] .atlas-home-grid-square', 'the + square');
-    // The card's one link, under everything: a strip a thumb can hit.
-    await thumb('[data-action="grow-bring"]', 'Bring it in');
-    await block(page).locator('[data-action="grow-bring"]').click();
-    // The ghost buttons too: the rooms' own touch rule makes them 40 px unless the block's outranks it.
-    await thumb('[data-bring-action]', 'the ways to bring a world in');
-    await block(page).locator('[data-action="grow-bring"]').click();
     // The name box, typed in place.
     await plus(page).click();
+    await page.getByRole('menuitem', { name: 'a character' }).click();
     await thumb('.atlas-home-grid-make input', 'the name box');
     await page.keyboard.press('Escape');
     // Undo, after a placing.
@@ -703,12 +290,6 @@ test.describe('on a touch phone', () => {
     await select(page, 'Ada');
     await dropOn(page, 'Hollow Keep', 'Ada is in Hollow Keep');
     await thumb('[data-action="grow-undo"]', 'Undo');
-    // The copy card's ways and Done, and the links that say what the step before made possible.
-    await createViaStore(page, 'event', { name: 'The Founding', start_date: 120 });
-    await createViaStore(page, 'narrative', { name: "Ada's Tale", supertype: 'Book' });
-    await expect(act(page, 'online')).toBeVisible();
-    await thumb('.atlas-home-grow-keep [data-step-action]', 'the keep ways and Done');
-    await thumb('.atlas-home-grow-recap [data-step-action]', 'the card\'s links');
   });
 });
 
@@ -743,15 +324,9 @@ test('past the path: a note survives the home rebuilding under a typed year', as
   await expect(input).toBeFocused();
 });
 
-test('negatives beside their twins: the store path, the switch and the path showing earn nothing, a gesture past it does', async ({ page }) => {
+test('negatives beside their twins: the store path and the switch earn nothing, a gesture does', async ({ page }) => {
   await setupWorld(page);
-  await expect(block(page)).toHaveAttribute('data-step', 'someone');
   await watchNotes(page);
-  // While the path shows: a gesture made by hand earns no path note.
-  await openCreate(page);
-  await createInModal(page, 'The Path One', 'event');
-  await page.waitForTimeout(300);
-  expect(await notesDrawn(page)).toEqual([]);
   await pastThePath(page);
   // Made by the store (an import, a sync, a world file): no gesture, no note.
   await createViaStore(page, 'character', { name: 'Imported' });
@@ -818,7 +393,7 @@ test('past the path: a typed year survives Were there, and keeps its focus', asy
 
 // ---- The Start-page links ----
 
-test('the Start-page links: #/start opens straight on the path; #/bring-in lands in the Data room', async ({ page }) => {
+test('the Start-page links: #/start opens straight on a new world\'s Strand; #/bring-in lands in the Data room', async ({ page }) => {
   await freshBoot(page);
   await page.goto('/#/start');
   await page.waitForSelector('.atlas-shell');
@@ -827,11 +402,11 @@ test('the Start-page links: #/start opens straight on the path; #/bring-in lands
   await expect(dialog).toContainText('Create a world');
   // The hash went first: a reload does not ask again.
   expect(await page.evaluate(() => window.location.hash)).toBe('#/');
-  // Count every moment a door is in the page, not just the end state.
+  // Count every moment a door or the first steps' card is in the page, not just the end state.
   await page.evaluate(() => {
     (window as any).__sawDoors = 0;
     new MutationObserver(() => {
-      if (document.querySelector('[data-guide-door]')) (window as any).__sawDoors++;
+      if (document.querySelector('[data-guide-door], [data-role="guide-block"]')) (window as any).__sawDoors++;
     }).observe(document.body, { childList: true, subtree: true });
   });
   const rows = dialog.locator('.atlas-where-row input');
@@ -839,9 +414,9 @@ test('the Start-page links: #/start opens straight on the path; #/bring-in lands
   await page.fill('input[name="world-name"]', 'From the site');
   await dialog.locator('[data-action="pick"]').click();
   await expect(page.locator('.atlas-world-home')).toBeVisible();
-  // Answered on onlyworlds.com: the path at its first step, and no door ever drawn.
-  await expect(block(page)).toHaveAttribute('data-step', 'someone');
-  await expect(plus(page)).toHaveAttribute('data-grid-plus', 'character');
+  // Answered on onlyworlds.com: the world's Home on its Strand tab, and no door or card ever drawn.
+  await expect(page.locator('[data-role="home-tabs"] [data-tab="strand"]')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-role="home-strand"] [data-slot]').first()).toBeVisible();
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => (window as any).__sawDoors)).toBe(0);
 

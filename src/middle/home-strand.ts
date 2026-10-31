@@ -35,6 +35,7 @@ import {
 import { canonicalExtValue } from '../sync/world-meta-sync';
 import { isKeptHere, keptSetOf } from '../sync/sync-attach';
 import { typeName } from '../core/type-words';
+import { worldEmptyForPath } from '../core/guide-path';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { makeStrandSlot, writeStrandSlot, STRAND_MOVED, type StrandDrawn, type StrandWriteResult } from '../ui/strand-write';
 
@@ -144,7 +145,8 @@ export function strandTabShows(worldId: string, c: StrandContext | null = strand
 export function chosenTab(worldId: string, c: StrandContext | null = strandContext(worldId)): HomeTab {
   let t = tabs.get(worldId);
   if (!t) {
-    t = c?.strand.narrative ? 'strand' : 'picture';
+    // A world with nothing in it yet opens on Strand: its five boxes are a new world's first steps (1.115.0).
+    t = c?.strand.narrative || worldEmptyForPath() ? 'strand' : 'picture';
     tabs.set(worldId, t);
   }
   return t;

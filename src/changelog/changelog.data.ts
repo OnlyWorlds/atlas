@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.115.0',
+    date: '2026-10-31',
+    theme: 'A new world starts on its strand',
+    entries: [
+      {
+        id: 'first-steps-are-the-strand',
+        title: 'A new world starts on its strand, and the first steps card is gone',
+        body: "Home no longer shows the five first steps (Step 1 of 5 and the rest), which stayed on any world whose events had no year. Every world's Home now has its Picture and Strand tabs from the first view, and a new world opens on Strand: its five boxes (Story, Happening, Where it happened, Hero, Where the hero is now) are where a world begins. Bring in a file sits under them while the world is empty.",
+        tags: ['world', 'home'],
+      },
+    ],
+  },
+  {
     version: '1.114.3',
     date: '2026-10-31',
     theme: 'Four buttons in their place',

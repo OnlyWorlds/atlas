@@ -75,7 +75,8 @@ async function signInAndOpen(page: Page) {
     return st.registry.worlds.find((x: any) => x.api?.world_id === id)?.api?.api_key ?? null;
   }, WORLD_ID)).toBe(KEY);
   // The door ends at Home: wait for it, or its landing takes the address the tab was given.
-  await expect(page.locator('[data-role="guide-block"][data-step="someone"]')).toBeVisible();
+  // An empty online world's Home: no tab head (no strand box is writable here), its grid's + alone (1.115.0).
+  await expect(page.locator('.atlas-world-home [data-role="home-grid"] [data-grid-plus]')).toBeVisible();
 }
 
 const openTab = (page: Page) =>

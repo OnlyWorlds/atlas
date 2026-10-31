@@ -6,7 +6,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { getState, patchSlice } from '../../src/core/state';
 import { currentStep, laterStep, nextStep, stepDone, type Dots } from '../../src/core/guide';
 import {
-  advancePath, noteRoomVisit, pathShowing, resetGuidePathForTests, setDoor, startPath, worldEmptyForPath,
+  FIRST_STEPS_ON, advancePath, noteRoomVisit, pathShowing, resetGuidePathForTests, setDoor, startPath, worldEmptyForPath,
 } from '../../src/core/guide-path';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
 
@@ -64,59 +64,54 @@ describe('the pointer, pure', () => {
   });
 });
 
-describe('pathShowing', () => {
-  it('an empty world opens on the path (the home that grows: no doors), whatever is folded open, until it was closed', () => {
+describe('pathShowing, the first steps retired (1.115.0)', () => {
+  it('the switch is off', () => {
+    expect(FIRST_STEPS_ON).toBe(false);
+  });
+
+  it('never shows: an empty world, whatever is folded open', () => {
     world([]);
-    expect(pathShowing('w')).toBe(true);
+    expect(pathShowing('w')).toBe(false);
     setDoor('w', 'bring');
-    expect(pathShowing('w')).toBe(true);
+    expect(pathShowing('w')).toBe(false);
     setDoor('w', null);
     world([], { guide_step: 'someone' });
-    expect(pathShowing('w')).toBe(true);
-    world([], { guide_step: 'done' });
     expect(pathShowing('w')).toBe(false);
   });
 
-  it('a pointer keeps the block with all five lit until done (G1); an unset one hides it then', () => {
+  it('never shows: a world with a pointer short of done', () => {
     const keep = E(2, 'location', 'Keep');
     const placed = { ...ada, location: keep.id } as Element;
     const ev = E(3, 'event', 'Founding', { start_date: 120 });
     const tale = E(4, 'narrative', 'Tale', { supertype: 'Book' });
     world([placed, keep, ev, tale], { guide_step: 'copy' });
-    expect(pathShowing('w')).toBe(true);
-    world([placed, keep, ev, tale], { guide_step: 'done' });
     expect(pathShowing('w')).toBe(false);
-    world([placed, keep, ev, tale]);
+    world([ada], { guide_step: 'placed' });
     expect(pathShowing('w')).toBe(false);
-    world([placed, keep]);
-    expect(pathShowing('w')).toBe(true);
   });
 
-  it('silent where no block speaks: the demo, view-only, the tour, dismissed, loading, another world', () => {
-    for (const [e, why] of [
-      [{ demo: true }, 'demo'], [{ tour_dismissed: ['home-cards'] }, 'dismissed'], [{ copy_of: { world_id: 'x' } }, 'view-only'],
-    ] as const) {
-      world([ada], { guide_step: 'placed', ...e } as never);
-      expect(pathShowing('w'), why).toBe(false);
-    }
-    world([ada], { guide_step: 'placed' });
-    localStorage.setItem('atlas_tour_v1', JSON.stringify({ active: true }));
-    expect(pathShowing('w'), 'tour').toBe(false);
-    localStorage.clear();
-    patchSlice('data', { elements: [ada], loading: true } as never);
-    expect(pathShowing('w'), 'loading').toBe(false);
-    patchSlice('data', { elements: [ada], loading: false } as never);
-    expect(pathShowing('other'), 'not the open world').toBe(false);
-    expect(pathShowing('w')).toBe(true);
+  it('never shows: a world with no pointer and unlit dots', () => {
+    const keep = E(2, 'location', 'Keep');
+    world([{ ...ada, location: keep.id } as Element, keep]);
+    expect(pathShowing('w')).toBe(false);
+    world([ada]);
+    expect(pathShowing('w')).toBe(false);
+  });
+
+  it('a room seen with its step lit is never recorded: no path shows', async () => {
+    const ev = E(3, 'event', 'Founding', { start_date: 120 });
+    world([ada, ev], { guide_step: 'happened' });
+    noteRoomVisit('timeline', 'w');
+    await tick();
+    expect(entry().guide_visited).toBeUndefined();
   });
 });
 
 describe('the code gate\'s findings', () => {
-  it('a world holding only its reading aids is not empty: no doors, the path (C1, the old G9)', () => {
+  it('a world holding only its reading aids is not empty (C1, the old G9)', () => {
     const charter = E(9, 'law', 'House Rules', { supertype: 'Charter', x_charter_of: 'mark' });
     world([charter]);
     expect(worldEmptyForPath()).toBe(false);
-    expect(pathShowing('w')).toBe(true);
     // Its twin: nothing at all is empty.
     world([]);
     expect(worldEmptyForPath()).toBe(true);
@@ -158,25 +153,4 @@ describe('the writes', () => {
     expect(entry().guide_step).toBe('story');
   });
 
-  it('a room seen counts once its step is lit, in the open world, while the path shows', async () => {
-    const ev = E(3, 'event', 'Founding', { start_date: 120 });
-    world([ada], { guide_step: 'happened' });
-    noteRoomVisit('timeline', 'w');
-    await tick();
-    expect(entry().guide_visited, 'an early look at the empty chart').toBeUndefined();
-    world([ada, ev], { guide_step: 'happened' });
-    noteRoomVisit('timeline', 'other');
-    noteRoomVisit('knowledge', 'w');
-    await tick();
-    expect(entry().guide_visited, 'another world, another room').toBeUndefined();
-    localStorage.setItem('atlas_tour_v1', JSON.stringify({ active: true }));
-    noteRoomVisit('timeline', 'w');
-    await tick();
-    expect(entry().guide_visited, 'the tour').toBeUndefined();
-    localStorage.clear();
-    noteRoomVisit('timeline', 'w');
-    noteRoomVisit('timeline', 'w');
-    await tick();
-    expect(entry().guide_visited).toEqual(['happened']);
-  });
 });

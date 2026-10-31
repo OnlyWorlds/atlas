@@ -32,31 +32,22 @@ afterEach(() => {
 });
 
 describe('roomBarStep', () => {
-  it('the chart at step 3 with a dated Event; the writing room at step 4 with a story', () => {
+  it('the first steps retired (1.115.0): no bar in the chart or the writing room, whatever the world holds', () => {
     world([ada, keep, ev], { guide_step: 'happened' });
-    expect(roomBarStep('w', 'timeline')).toBe('happened');
+    expect(roomBarStep('w', 'timeline')).toBeNull();
     expect(roomBarStep('w', 'writing')).toBeNull();
     world([ada, keep, ev, tale], { guide_step: 'story' });
-    expect(roomBarStep('w', 'writing')).toBe('story');
+    expect(roomBarStep('w', 'writing')).toBeNull();
     expect(roomBarStep('w', 'timeline')).toBeNull();
+    // No pointer at all: the dots alone once drew it.
+    world([ada, keep, ev]);
+    expect(roomBarStep('w', 'timeline')).toBeNull();
+    world([ada, keep, ev, tale]);
+    expect(roomBarStep('w', 'writing')).toBeNull();
   });
 
   it('the step unlit (no dated Event): the card offers Create, not the room', () => {
     world([ada, keep, undated], { guide_step: 'happened' });
-    expect(roomBarStep('w', 'timeline')).toBeNull();
-  });
-
-  it('the card read from the dots (the home that grows): the bar shows at its step and the one after, whatever the pointer', () => {
-    // The card at story (the step after the chart's): the chart's bar shows, a stale pointer ignored.
-    world([ada, keep, ev], { guide_step: 'placed' });
-    expect(roomBarStep('w', 'timeline')).toBe('happened');
-    // The card past it (all lit, at the copy card): no bar in the chart, the writing room's still.
-    world([ada, keep, ev, tale], { guide_step: 'placed' });
-    expect(roomBarStep('w', 'timeline')).toBeNull();
-    expect(roomBarStep('w', 'writing')).toBe('story');
-    world([ada, keep, ev, tale], { guide_step: 'done' });
-    expect(roomBarStep('w', 'timeline')).toBeNull();
-    world([ada, keep, undated]);
     expect(roomBarStep('w', 'timeline')).toBeNull();
   });
 
@@ -109,21 +100,20 @@ describe('Back\'s focus ask', () => {
 });
 
 describe('mountGuideRoomBar', () => {
-  it('first child, shown and hidden by the world, its node kept across ticks', () => {
-    world([ada, keep, ev], { guide_step: 'happened' });
-    const host = document.createElement('div');
-    host.appendChild(document.createElement('header'));
-    const unmount = mountGuideRoomBar(host, 'timeline');
-    const bar = host.firstElementChild as HTMLElement;
-    expect(bar.getAttribute('data-role')).toBe('guide-room-bar');
-    expect(bar.hidden).toBe(false);
-    expect(bar.querySelector('[data-action="guide-room-back"]')).not.toBeNull();
-    // The world moves past the step after (a story made): the bar leaves; the story gone, it is back.
-    world([ada, keep, ev, tale], { guide_step: 'happened' });
-    expect(bar.hidden).toBe(true);
-    world([ada, keep, ev], { guide_step: 'happened' });
-    expect(bar.hidden).toBe(false);
-    unmount();
-    expect(host.querySelector('[data-role="guide-room-bar"]')).toBeNull();
+  it('the first steps retired (1.115.0): in the chart and the writing room the bar never shows, across ticks, and unmounts clean', () => {
+    for (const [room, at] of [['timeline', 'happened'], ['writing', 'story']] as const) {
+      world([ada, keep, ev, ...(room === 'writing' ? [tale] : [])], { guide_step: at });
+      const host = document.createElement('div');
+      host.appendChild(document.createElement('header'));
+      const unmount = mountGuideRoomBar(host, room);
+      const bar = host.querySelector<HTMLElement>('[data-role="guide-room-bar"]');
+      expect(bar?.hidden ?? true, room).toBe(true);
+      expect(bar?.textContent ?? '', room).not.toContain('Step ');
+      // A tick that once drew it (the world at the step, the pointer gone) still draws nothing.
+      world([ada, keep, ev, ...(room === 'writing' ? [tale] : [])]);
+      expect(bar?.hidden ?? true, room).toBe(true);
+      unmount();
+      expect(host.querySelector('[data-role="guide-room-bar"]')).toBeNull();
+    }
   });
 });

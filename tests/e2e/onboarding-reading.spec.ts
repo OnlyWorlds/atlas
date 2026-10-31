@@ -136,25 +136,30 @@ async function adaPlaced(page: Page) {
 const square = (page: Page, name: string) =>
   page.locator('[data-grid-id]').filter({ has: page.locator('.atlas-home-grid-name', { hasText: new RegExp(`^${name}$`) }) });
 
-/** The card's + square: a name typed in place, Enter keeps. */
-async function makeFromPlus(page: Page, name: string) {
-  await page.locator('[data-role="guide-block"] [data-grid-plus]').click();
+/** Home's plain + square on its Picture tab (a new world opens on Strand, 1.115.0): the kind picked, a name typed in place, Enter keeps. */
+async function makeFromPlus(page: Page, name: string, kind: 'a character' | 'a location') {
+  await expect(async () => {
+    const tab = page.locator('[data-role="home-tabs"] [data-tab="picture"]');
+    if (await tab.count() && (await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+    await expect(page.locator('.atlas-world-home [data-grid-plus]')).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await page.locator('.atlas-world-home [data-grid-plus]').click();
+  await page.getByRole('menu', { name: 'Add which kind' }).getByRole('menuitem', { name: kind }).click();
   await page.locator('.atlas-home-grid-make input').first().fill(name);
   await page.keyboard.press('Enter');
   await expect(square(page, name)).toHaveCount(1);
 }
 
-test('on the path, by the grid: placing Ada gives her web, and the reward speaks alone (#964\'s G4)', async ({ page }) => {
+test('by Home\'s grid: placing Ada gives her web, and the reward speaks on the placing', async ({ page }) => {
   await setupWorld(page);
-  await watchNotes(page);
-  await makeFromPlus(page, 'Ada');
-  await makeFromPlus(page, 'Hollow Keep');
+  await makeFromPlus(page, 'Ada', 'a character');
+  await makeFromPlus(page, 'Hollow Keep', 'a location');
   // The Founding, dated and naming Ada, arrives from elsewhere (a world file): Ada's web is one.
   const adaId = (await element(page, 'Ada')).id;
   await createViaStore(page, 'event', { name: 'The Founding', start_date: 120, characters: [adaId] });
-  await expect(page.locator('[data-role="guide-block"]')).toHaveAttribute('data-step', 'placed');
-  // Made and dated, but no web of two yet, and no path note on the way.
-  await expect(note(page)).toHaveCount(0);
+  // Made and dated, but no web of two yet: no reward on the way.
+  await expect(seeWorld(page)).toHaveCount(0);
+  await watchNotes(page);
   // The placing by two presses is the gesture that takes Ada's web to two.
   await expect(async () => {
     if (!/is-selected/.test((await square(page, 'Ada').getAttribute('class')) ?? '')) await square(page, 'Ada').click();
@@ -162,10 +167,9 @@ test('on the path, by the grid: placing Ada gives her web, and the reward speaks
   }).toPass();
   await square(page, 'Hollow Keep').click();
   await expect(page.locator('[data-role="grow-just"]')).toContainText('Ada is in Hollow Keep');
-  await expect(note(page)).toHaveAttribute('data-note', 'reading');
-  await expect(note(page)).toContainText('Ada, Hollow Keep and The Founding are linked now.');
+  await expect(note(page)).toHaveAttribute('data-note', 'placed');
   await expect(seeWorld(page)).toHaveText("See Ada's world");
-  expect(await notesDrawn(page)).toEqual(['reading']);
+  expect(await notesDrawn(page)).toEqual(['placed']);
   const ada = await element(page, 'Ada');
   await seeWorld(page).click();
   await expect(page).toHaveURL(new RegExp(`/element/${ada.id}$`));
@@ -278,6 +282,15 @@ async function builtWorld(page: Page) {
  * Fifty loose Objects: a world past the grid's hand-over (the home that grows draws a small
  * world as its grid; past about 640 px of grid, or 48 elements, Home's picture is the Web's).
  */
+/**
+ * The world opened empty, and an empty world's first Home chose its Strand tab for the session
+ * (G13, 1.115.0): forget that choice, as a new session would, so the next Home picks its tab from
+ * the world brought in.
+ */
+async function freshTabs(page: Page) {
+  await page.evaluate(async () => { ((await import('/src/middle/home-strand.ts')) as any).resetStrandTabForTests(); });
+}
+
 async function pastTheGrid(page: Page) {
   await page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;
@@ -290,6 +303,7 @@ async function pastTheGrid(page: Page) {
 test('a world brought in whole: Home\'s picture, no note; its centre opens the Web; rebuilds keep one graph', async ({ page }) => {
   await setupWorld(page);
   const keep = await builtWorld(page);
+  await freshTabs(page);
   await pastTheGrid(page);
   await goHome(page);
   const picture = page.locator('[data-role="home-picture"]');
@@ -324,6 +338,7 @@ test('a world with nothing worth drawing has no picture, and its twin with a thi
   await setupWorld(page);
   const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
   for (const name of ['Ada', 'Bram']) await createViaStore(page, 'character', { name, location: keep });
+  await freshTabs(page);
   await pastTheGrid(page);
   await goHome(page);
   await expect(page.locator('.atlas-world-home')).toBeVisible();
@@ -335,6 +350,7 @@ test('a world with nothing worth drawing has no picture, and its twin with a thi
 test('Moppetopia: a create by hand speaks no note, and Home shows the picture', async ({ page }) => {
   await setupWorld(page);
   await builtWorld(page);
+  await freshTabs(page);
   await pastTheGrid(page);
   await pastThePath(page);
   // The open world is Moppetopia by its world id, as its copy carries it.

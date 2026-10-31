@@ -15999,7 +15999,8 @@ body.atlas-share-fullpreview > * {
 /* Touch: the doors, Back and the card's buttons take a thumb (1.105.1's precedent). */
 @media (pointer: coarse) {
   /* Scoped to the block: the rooms' own touch rule (`.atlas-middle .atlas-btn-ghost`, 40 px) would outrank a bare selector. */
-  .atlas-guide-block .atlas-guide-door, .atlas-guide-block .atlas-guide-card-actions button, .atlas-guide-block .atlas-guide-way > button { min-height: 44px; }
+  .atlas-guide-block .atlas-guide-door, .atlas-guide-block .atlas-guide-card-actions button, .atlas-guide-block .atlas-guide-way > button,
+  .atlas-home-have .atlas-guide-way > button { min-height: 44px; }
   .atlas-guide-back { min-height: 44px; padding: 0 8px 0 0; }
   .atlas-guide-head { height: 44px; }
   /* Anything else keeps its words where they are, in a strip a thumb can hit. */

@@ -75,6 +75,14 @@ function blockCanShow(worldId: string): boolean {
 }
 
 /**
+ * The first steps are retired (1.115.0): every world's Home draws its Picture and Strand tabs from the
+ * first view, and a new world's first steps are the strand's boxes. Read by every surface the path drove
+ * (the home's card, the rooms' step bar, the notes' silence, the strand's offer), so one switch turns
+ * them all off together; the old rule stays below it for the day the path is removed whole.
+ */
+export const FIRST_STEPS_ON = false;
+
+/**
  * Whether the path shows in this world: the one predicate the home's block
  * and the notes' silence read. An empty world shows it unless it was closed.
  * A world with a pointer shows it until `done`; one without (imported,
@@ -82,7 +90,7 @@ function blockCanShow(worldId: string): boolean {
  * while that card asks.
  */
 export function pathShowing(worldId: string): boolean {
-  if (!blockCanShow(worldId)) return false;
+  if (!FIRST_STEPS_ON || !blockCanShow(worldId)) return false;
   const pointer = entryOf(worldId)?.guide_step;
   // An empty world opens on the path (the home that grows: no doors), unless its path was closed.
   if (worldEmptyForPath()) return pointer !== 'done';

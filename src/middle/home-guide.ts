@@ -64,7 +64,8 @@ const FOCUS_KEYS = ['data-step-action', 'data-guide-door', 'data-bring-action', 
  */
 export function blockFocusKey(): string | null {
   const el = document.activeElement;
-  if (!(el instanceof HTMLElement) || !el.closest('[data-role="guide-block"]')) return null;
+  // The block, or an empty world's ways in under its strand (1.115.0), which a redraw rebuilds the same way.
+  if (!(el instanceof HTMLElement) || !el.closest('[data-role="guide-block"], [data-role="home-bring-in"]')) return null;
   for (const attr of FOCUS_KEYS) {
     const v = el.getAttribute(attr);
     if (v) return `[${attr}="${v}"]`;
@@ -247,10 +248,11 @@ function doors(worldId: string): HTMLElement {
   return wrap;
 }
 
-export function bringInWays(worldId: string, toasts: ToastManager): HTMLElement {
+/** The ways to bring a world in. `quiet`: every button Quiet, where another act on the screen is the main one (an empty world's strand). */
+export function bringInWays(worldId: string, toasts: ToastManager, quiet = false): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-guide-ways';
-  let first = true;
+  let first = !quiet;
   const way = (verb: string, label: string, line: string, run: () => void): void => {
     const row = document.createElement('div');
     row.className = 'atlas-guide-way';

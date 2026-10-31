@@ -40,7 +40,7 @@ import { downloadWorldFromClick } from '../ui/download-world';
 import { hasFolderMode } from '../core/capabilities';
 import { currentStep } from '../core/guide';
 import { doorOf, onDoorChange, pathDots, pathShowing, startPath, worldEmptyForPath } from '../core/guide-path';
-import { blockFocusKey, settleAfterDraw } from './home-guide';
+import { blockFocusKey, bringInWays, settleAfterDraw } from './home-guide';
 import { buildGrowBlock, buildHomeGrid, type GrowBlock } from './home-grow';
 import { isNewcomerAnswered } from '../core/newcomer';
 import { isTourFlagActive } from '../tour/tour-flag';
@@ -321,10 +321,26 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // carries its ways (the copy step, not yet done): one voice for a copy.
     // The card carries the grid while the path shows; Home's own picture draws only without it.
     const pathUp = !!tour;
+    let bringIn: HTMLElement | null = null;
     if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; }
     // The path closed in this mount (`doors === 'below'`): the tab head waits for Home's next opening, as
     // the count line does, so the close moves no square (DESIGN_HOME "Nothing above the squares moves").
-    else if (!quiet && doors !== 'below' && strandTabShows(worldId, strandNow)) drawWithStrand();
+    else if (!quiet && doors !== 'below' && strandTabShows(worldId, strandNow)) {
+      drawWithStrand();
+      // A world with nothing yet keeps its way in from what someone already has (the retired path's
+      // second door, #964), Quiet under the boxes: the strand's Make one is the screen's main act.
+      if (!viewOnly && worldEmptyForPath()) {
+        const have = document.createElement('section');
+        have.className = 'atlas-home-have';
+        have.setAttribute('data-role', 'home-bring-in');
+        const line = document.createElement('p');
+        line.className = 'atlas-home-have-line';
+        line.textContent = 'Already have a world file or notes?';
+        have.append(line, bringInWays(worldId, toasts, true));
+        root.appendChild(have);
+        bringIn = have;
+      }
+    }
     else {
       // The picture with no head is this world's Picture tab: a strand pulled later never takes it (C4).
       // Not where the tab only waits for the next opening: that opening picks its tab by the rule.
@@ -336,7 +352,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       if (under) root.appendChild(under);
     }
     if (keep && !tour?.section.hasAttribute('data-holds-copy')) root.appendChild(keep);
-    settleAfterDraw(tour?.section ?? null, guideFocus);
+    settleAfterDraw(tour?.section ?? bringIn, guideFocus);
     settleStrandFocus(root, strandKept);
     if (totalElements === 0) return;
     // The chart strip (the "starred chart") — the shape of the world's
