@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.114.0',
+    date: '2026-10-31',
+    theme: "The world's strand",
+    entries: [
+      {
+        id: 'world-strand',
+        title: "Choose your world's strand",
+        body: "Home has a Strand tab beside its picture: one story in five boxes, the story, a happening in it, where it happened, its hero and where the hero is now, each made or picked in place. A story's page and the writing room can make it the world's strand, and while you write it, its hero, happening and places sit beside the text.",
+        tags: ['world', 'writing'],
+      },
+    ],
+  },
+  {
     version: '1.113.1',
     date: '2026-10-31',
     theme: 'The world kept whole in its file',
