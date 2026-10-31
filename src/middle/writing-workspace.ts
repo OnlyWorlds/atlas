@@ -18,6 +18,7 @@
  */
 
 import { getState, subscribe } from '../core/state';
+import { strandMarkKey } from '../core/strand';
 import { worldIsViewOnly } from '../core/view-only';
 import { isKnownOf } from '../sync/known-of';
 import { onHashChange, parseHash } from '../core/router';
@@ -149,6 +150,9 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // Set by mountForNarrative on first paint; updated after each refresh.
   let lastRefreshEl: Element | null = null;
   let lastRefreshElementsRef: Element[] | null = null;
+  // The world's strand mark (S8, G4): a press, a pull or Not the strand changes the bar's offer and
+  // the frame without a keystroke, though no element moved.
+  let lastRefreshMark: string | null | undefined;
   // Singleton chip preview controller for this workspace mount — hover +
   // sticky-on-click peek of linked elements (DESIGN_WRITING.md §Click + hover).
   const chipPreview: ChipPreviewController = createChipPreview(root);
@@ -829,6 +833,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // either the active narrative or the elements array reference changes.
     lastRefreshEl = el;
     lastRefreshElementsRef = getState().data.elements;
+    lastRefreshMark = strandMarkKey(getState().active?.meta);
   }
 
   function refreshNonEditorSurfaces(el: Element): void {
@@ -846,9 +851,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // here. Typing ticks DO swap state.data.elements (debounced save → store
     // patch), so they fall through and refresh.
     const elementsRef = getState().data.elements;
-    if (el === lastRefreshEl && elementsRef === lastRefreshElementsRef) return;
+    const markKey = strandMarkKey(getState().active?.meta);
+    if (el === lastRefreshEl && elementsRef === lastRefreshElementsRef && markKey === lastRefreshMark) return;
     lastRefreshEl = el;
     lastRefreshElementsRef = elementsRef;
+    lastRefreshMark = markKey;
 
     // Replace header (cheap — the renderHeader function is the same one
     // element-detail uses; works fine to re-render on every state change).
@@ -901,6 +908,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     lastSavedMarkdown = null;
     lastRefreshEl = null;
     lastRefreshElementsRef = null;
+    lastRefreshMark = undefined;
   }
 
   // ============================================================================

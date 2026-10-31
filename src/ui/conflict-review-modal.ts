@@ -21,6 +21,8 @@ import { patchSlice, getState } from '../core/state';
 import type { Conflict } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { proposalReviewLine } from '../sync/proposal-lines';
+import { memberIds, storedMark } from '../core/strand';
+import { STRAND_KEY } from '../core/strand-mark';
 
 export class ConflictReviewModal extends BaseModal {
   private conflicts: Conflict[] = [];
@@ -89,7 +91,7 @@ export class ConflictReviewModal extends BaseModal {
     row.innerHTML = `
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">world setting</span>
-        <span class="atlas-conflict-name">${escapeText(field === 'x_names' ? "The world's words for the types" : field)}</span>
+        <span class="atlas-conflict-name">${escapeText(metaFieldWord(field))}</span>
         <span class="atlas-conflict-fields">changed here and on the server</span>
       </div>
       <div class="atlas-conflict-row-actions">
@@ -97,6 +99,8 @@ export class ConflictReviewModal extends BaseModal {
         <button class="atlas-btn-ghost" data-action="pull-theirs" title="Overwrite local with server">Pull (theirs wins)</button>
       </div>
     `;
+    // The world's strand (S9): each side's story by name, the server's read once the row is drawn.
+    if (field === STRAND_KEY) void this.nameStrandSides(row);
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const choice = btn.dataset.action === 'overwrite-mine' ? 'mine' as const : 'theirs' as const;
@@ -128,6 +132,22 @@ export class ConflictReviewModal extends BaseModal {
       });
     });
     return row;
+  }
+
+  /** The strand's row says which story each side names: here from world.json's mirror, the server's by a read. */
+  private async nameStrandSides(row: HTMLElement): Promise<void> {
+    const line = row.querySelector<HTMLElement>('.atlas-conflict-fields');
+    if (!line) return;
+    const here = strandStoryWord(storedMark(getState().active?.meta));
+    line.textContent = `Here: ${here}`;
+    try {
+      const engine = getCurrentSyncEngine();
+      if (!engine) return;
+      const theirs = strandStoryWord(await engine.serverExtValue(STRAND_KEY));
+      if (row.isConnected) line.textContent = `Here: ${here} · On OnlyWorlds: ${theirs}`;
+    } catch {
+      // The server's side stays unnamed; the two verbs still work.
+    }
   }
 
   private renderRow(c: Conflict): HTMLElement {
@@ -221,6 +241,21 @@ export class ConflictReviewModal extends BaseModal {
 function lookupName(id: string): string | null {
   const el = getState().data.elements.find((e) => e.id === id);
   return el?.name ?? null;
+}
+
+/** A contested world key in words: the world's own words for the types, the world's strand, else the key. */
+export function metaFieldWord(field: string): string {
+  if (field === 'x_names') return "The world's words for the types";
+  if (field === STRAND_KEY) return "The world's strand";
+  return field;
+}
+
+/** The story a strand mark names, by name where this copy holds it. */
+export function strandStoryWord(mark: unknown): string {
+  const id = memberIds(mark).narrative;
+  if (!id) return 'no strand';
+  const name = lookupName(id);
+  return name && name.trim() ? name.trim() : 'a story not in this copy';
 }
 
 

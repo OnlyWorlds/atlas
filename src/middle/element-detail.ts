@@ -47,6 +47,7 @@ import { proposedNoteFor } from './element-agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
 import { doorTrail, type TrailStep } from '../core/door-trail';
 import { buildCharterMarkOffer } from './element-detail-charter-mark';
+import { buildPageStrandOffer } from './strand-offer';
 
 /**
  * Per-element scroll position memory. Survives re-renders (field edits, link
@@ -229,6 +230,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
     if (activeId) {
       const offer = buildCharterMarkOffer(el, st.registry.worlds.find(w => w.id === activeId), st.active?.meta, activeId, st.data.elements);
       if (offer) detail.appendChild(offer);
+      // A story Narrative: the keeper's Make this the world's strand, or the line that it is (S7).
+      const strand = buildPageStrandOffer(el, activeId);
+      if (strand) detail.appendChild(strand);
     }
     body.appendChild(detail);
 

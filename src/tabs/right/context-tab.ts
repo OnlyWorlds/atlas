@@ -43,6 +43,8 @@ import type { ToolbarLens } from './context-pane-toolbar';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite } from '../../sync/sync-attach';
 import { showProblem } from '../../ui/problem-fixes';
+import { strandMarkKey } from '../../core/strand';
+import { buildStrandFrame } from './context-strand-frame';
 
 export interface MountContextTabOpts {
   pane: HTMLElement;
@@ -162,6 +164,12 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   root.className = 'atlas-context-pane';
   pane.appendChild(root);
 
+  // The strand's frame (S8): the writing context leads with it while the open
+  // Narrative is the world's strand's story; empty otherwise.
+  const strandHost = document.createElement('div');
+  strandHost.className = 'atlas-context-strand-host';
+  root.appendChild(strandHost);
+
   // Toolbar (above graph) — type filter chips + hop pill. Hidden when there's
   // no subject (empty state); shown otherwise.
   const toolbarHost = document.createElement('div');
@@ -214,6 +222,18 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   // syncPrefsToGraph without a full rebuild.
   let lastRouteKey: string | null = null;
   let lastElementsRef: readonly Element[] | null = null;
+  // The strand's mark (G4): a press, a pull or Not the strand redraws the frame, no keystroke needed.
+  let lastMarkKey: string | null | undefined;
+
+  /** The frame for the route's writing subject, or nothing. */
+  function renderFrame(route: Route): void {
+    strandHost.innerHTML = '';
+    if (route.mode !== 'writing') return;
+    const subject = resolveSubject(route, getState().data.elements);
+    if (subject.detailsMode !== 'writing' || !subject.element) return;
+    const frame = buildStrandFrame(subject.element);
+    if (frame) strandHost.appendChild(frame);
+  }
   let lastAppliedPrefs: ReturnType<typeof getWorldContextPrefs> | null = null;
 
   function routeKey(route: Route): string {
@@ -597,11 +617,18 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     // (core/parlor-room.ts), so showing or hiding the room redraws the Web.
     const elements = currentLore();
     const nextKey = routeKey(route);
+    const markKey = strandMarkKey(getState().active?.meta);
     if (nextKey !== lastRouteKey || elements !== lastElementsRef) {
       lastRouteKey = nextKey;
       lastElementsRef = elements;
+      lastMarkKey = markKey;
       renderAll(route);
+      renderFrame(route);
       return;
+    }
+    if (markKey !== lastMarkKey) {
+      lastMarkKey = markKey;
+      renderFrame(route);
     }
     // Route + elements unchanged — check if context-pane prefs changed
     // (toolbar persisted via patchWorldEntry, OR settings page edited).

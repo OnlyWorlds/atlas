@@ -21,6 +21,7 @@ import { narrativeHasChildren } from './writing-compiled';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { WritingViewMode } from './writing-workspace';
 import { isCoarsePointer } from '../core/pointer';
+import { buildBarStrandOffer } from './strand-offer';
 
 export interface StickyBarController {
   /** Build the sticky bar for `el`. */
@@ -151,6 +152,10 @@ export function createStickyBar(deps: {
 
       right.appendChild(toggle);
     }
+
+    // A keeper's Make this the world's strand, while this story is not the strand (S7).
+    const strand = buildBarStrandOffer(el, worldId);
+    if (strand) right.appendChild(strand);
 
     // Find on a touch screen (#301): with a mouse, Ctrl+F stays the way and
     // the bar is unchanged (the 1.37 rule: the desktop's copy and chrome hold).

@@ -63,6 +63,8 @@ import { isMoppetopiaOpen } from '../core/moppetopia';
 import { buildHomePicture, type HomePicture } from './home-picture';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
+import { buildStrandHead, buildStrandPanel, chosenTab, settleStrandFocus, strandFocusKey, strandTabShows, tabPanel } from './home-strand';
+import { keptSetOf } from '../sync/sync-attach';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -171,10 +173,12 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // patches a fresh array that changed nothing, and a rebuild then swallowed
     // a press on the guide's marks straddling it (conv. 146, the guide's code gate C3).
     const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, aidsHidden(), s.data.loading, s.data.loadingProgress?.done, s.registry,
-      savedCharts, isTourFlagActive(), s.active ? doorOf(s.active.worldId) : undefined];
+      savedCharts, isTourFlagActive(), s.active ? doorOf(s.active.worldId) : undefined, s.active ? keptSetOf(s.active.worldId) : undefined];
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     if (root.querySelector(`[${GRID_OPEN_ATTR}]`) || waymarkOpenIn(root)) { owed = true; return; }
     lastInputs = inputs;
+    // The strand's control that held the focus, by its key: put back after the draw (S6).
+    const strandKept = strandFocusKey(root);
     markHadFocus = marks.some(waymarkHasFocus);
     dropMarks(true);
     picture?.destroy();
@@ -250,14 +254,36 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       picture.mount();
     };
     // A view-only world draws the grid too, with no + square and no targets (home-grow's `gridActsIn`).
-    const drawPicture = (): void => {
+    const drawPicture = (host: HTMLElement = root): void => {
       if (quiet) return;
       grid = buildHomeGrid(worldId, centred(() => grid?.section ?? null));
-      if (!grid) { centred(() => null)(); return; }
+      if (!grid) { if (host === root) centred(() => null)(); else centredIn(host); return; }
       // Closed in this mount: the grid stands where the card's grid stood.
       if (doors === 'below') grid.section.setAttribute('data-after-close', '');
-      root.appendChild(grid.section);
+      host.appendChild(grid.section);
       grid.mount();
+    };
+    // The centred picture straight into the tab's panel (no grid for it to follow).
+    const centredIn = (host: HTMLElement): void => {
+      if (quiet || picture) return;
+      picture = buildHomePicture(worldId, said);
+      if (!picture) return;
+      host.appendChild(picture.section);
+      picture.mount();
+    };
+    // The strand (S5): its tab head above whichever picture draws, never inside it; the panel not
+    // chosen is not built. Where Home draws no picture, the strand draws alone under its heading.
+    const redrawNow = (): void => { lastInputs = null; render(); };
+    const drawWithStrand = (): void => {
+      const chosen = chosenTab(worldId);
+      const head = buildStrandHead(worldId, chosen, redrawNow);
+      const panel = tabPanel(chosen);
+      root.append(head, panel);
+      if (chosen === 'strand') { panel.appendChild(buildStrandPanel(worldId, { alone: false, redraw: redrawNow })); return; }
+      drawPicture(panel);
+      if ((grid && !grid.section.hidden) || picture) return;
+      head.remove();
+      panel.replaceWith(buildStrandPanel(worldId, { alone: true, redraw: redrawNow }));
     };
     // The tour: tutorial-state cards computed from world contents —
     // the core create pair, then the next wave / room CTAs. Renders nothing
@@ -291,13 +317,16 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // carries its ways (the copy step, not yet done): one voice for a copy.
     // The card carries the grid while the path shows; Home's own picture draws only without it.
     const pathUp = !!tour;
-    if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; } else drawPicture();
+    if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; }
+    else if (!quiet && strandTabShows(worldId)) drawWithStrand();
+    else drawPicture();
     if (doors === 'below') {
       const under = buildCoverDoors(meta, worldId, counts, toasts);
       if (under) root.appendChild(under);
     }
     if (keep && !tour?.section.hasAttribute('data-holds-copy')) root.appendChild(keep);
     settleAfterDraw(tour?.section ?? null, guideFocus);
+    settleStrandFocus(root, strandKept);
     if (totalElements === 0) return;
     // The chart strip (the "starred chart") — the shape of the world's
     // history between the cover and the desk (timeline-mini's old slot, now

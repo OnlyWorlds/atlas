@@ -1030,6 +1030,12 @@ export class SyncEngine {
     return [...(s.server_deletes ?? [])];
   }
 
+  /** An `x_` key's value as the server holds it now (the conflict review names each side's). */
+  async serverExtValue(key: string): Promise<unknown> {
+    const server = await this.client.getWorldMeta();
+    return (server as unknown as Record<string, unknown>)[key];
+  }
+
   /** Contested world-meta fields under pause-and-review. */
   async listMetaConflicts(): Promise<string[]> {
     const s = await this.folder.readSyncState();
