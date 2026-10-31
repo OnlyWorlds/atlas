@@ -45,7 +45,8 @@ import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { proposedNoteFor } from './element-agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
-import { doorTrail, type TrailStep } from '../core/door-trail';
+import { doorTrail, type DoorRead, type TrailStep } from '../core/door-trail';
+import { doorsNow, onDoorsChanged, refreshDoors } from '../sync/element-doors';
 import { buildCharterMarkOffer } from './element-detail-charter-mark';
 import { buildPageStrandOffer } from './strand-offer';
 
@@ -469,9 +470,27 @@ export function mountElementDetail(target: HTMLElement): () => void {
       <div>Updated locally: ${updated}</div>
       <div>Server: ${synced}</div>
     `;
-    const trail = trailLines(el);
-    if (trail) meta.append(...trail);
+    const trail = trailBox(el);
+    if (trail) meta.append(trail);
     return meta;
+  }
+
+  /**
+   * The trail's lines in a box that repaints itself when keel's read of the element answers
+   * (`sync/element-doors.ts`: a pulled copy holds no door record), and lets go once off the page.
+   */
+  function trailBox(el: Element): HTMLElement | null {
+    const state = getState();
+    const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
+    if (entry?.state !== 'api-linked' || !el.server_updated_at || isKnownOf(el)) return null;
+    const box = document.createElement('div');
+    box.style.display = 'contents';
+    const paint = () => box.replaceChildren(...(trailLines(el, doorsNow(entry, el.type, el.id)) ?? []));
+    paint();
+    // Built before the page attaches it; an answer lands in a later task, when the box is on the page.
+    onDoorsChanged(paint, () => box.isConnected);
+    void refreshDoors(entry, el.type, el.id, el.server_updated_at);
+    return box;
   }
 
   /**
@@ -480,11 +499,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
    * with no baseline is not on OnlyWorlds yet (never sent, or its baseline cleared), whatever
    * old fields it carries. A keel stub says nothing of the element's own writes.
    */
-  function trailLines(el: Element): HTMLElement[] | null {
-    const state = getState();
-    const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
-    if (entry?.state !== 'api-linked' || !el.server_updated_at || isKnownOf(el)) return null;
-    const steps = doorTrail(el);
+  function trailLines(el: Element, read: DoorRead | null): HTMLElement[] | null {
+    const steps = doorTrail(el, read);
     if (steps.length === 0) return null;
     const step = (s: TrailStep) => {
       const when = relativeTime(s.at);

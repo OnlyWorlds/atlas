@@ -99,6 +99,8 @@ describe('the author fields are the server\'s', () => {
     await engine.syncNow();
     client.__server_mutate('character', other.id, { description: 'from Lantern', doors });
     await engine.pullNow();
-    expect((await folder.getElement(other.id))!.doors).toEqual(doors);
+    // keel's feed serves no `doors` (the trail reads them from the element, sync/element-doors.ts),
+    // so a pulled copy holds none: never a field that went up or came in as a change.
+    expect((await folder.getElement(other.id))!.doors).toBeUndefined();
   });
 });

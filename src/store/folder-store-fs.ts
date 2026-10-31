@@ -2396,6 +2396,11 @@ export class FsFolderStore implements FolderStore {
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }
+      // keel's feed serves no `doors`: the echo of the write this copy already holds keel's
+      // answer for (the same stamp) keeps that answer's door record, so the trail reads whole
+      // with no signal (core/door-trail.ts).
+      const held = (existing as Record<string, unknown>).doors;
+      if (!stub && !('doors' in record) && held !== undefined && existing.server_updated_at === server_updated_at) preserved.doors = held;
       // A stub's wire fields are unknown, not kept from the whole copy (I1).
       for (const field of stub ? [] : ATLAS_WIRE_EXTENSION_FIELDS) {
         if (field in record) continue; // server value wins when present

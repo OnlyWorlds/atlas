@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.114.1',
+    date: '2026-10-31',
+    theme: 'Where an element has been, whole',
+    entries: [
+      {
+        id: 'door-trail-whole',
+        title: 'The trail names every tool again after a sync',
+        body: "An element's page says where it was last shaped on OnlyWorlds and the tools before that. After a change came in by sync it named only the last one; it now asks OnlyWorlds for the element when the page opens, so the whole trail shows.",
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.114.0',
     date: '2026-10-31',
     theme: "The world's strand",

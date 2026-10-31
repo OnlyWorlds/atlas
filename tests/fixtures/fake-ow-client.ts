@@ -55,6 +55,12 @@ interface V2ItemError {
 /** The membership keel names in a seat's proposed mark, in the fake. */
 export const FAKE_SEAT_ID = 'seat-0001';
 
+/** A feed body as keel serves it: `doors` left out (keel's `elements/doors.py` `without_doors`). */
+function withoutDoors(record: ServerRecord): ServerRecord {
+  const { doors: _doors, ...rest } = record as ServerRecord & { doors?: unknown };
+  return { ...rest } as ServerRecord;
+}
+
 export class FakeOwApiClient implements OwApiClient {
   private clock = () => new Date().toISOString();
   /** keel seam (`__propose_writes`): a seat on a reviewed world. */
@@ -724,7 +730,9 @@ export class FakeOwApiClient implements OwApiClient {
             id: o.id,
             changeSeq: o.seq,
             updatedAt: o.updated_at ?? '',
-            element: { ...(o.element as ServerRecord) },
+            // keel's feed bodies carry no `doors` (core/changes.py, `without_doors`: the feed is
+            // the trail already); only a read of the element and a write's answer serve them.
+            element: withoutDoors(o.element as ServerRecord),
           }
         : {
             op: 'delete' as const,

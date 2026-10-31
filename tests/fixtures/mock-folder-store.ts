@@ -684,6 +684,9 @@ export class MockFolderStore implements FolderStore {
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }
+      // Mirrors FsFolderStore: the feed's echo of the write this copy holds keel's answer for keeps its doors.
+      const held = (existing as Record<string, unknown>).doors;
+      if (!stub && !('doors' in record) && held !== undefined && existing.server_updated_at === server_updated_at) preserved.doors = held;
       for (const field of stub ? [] : ATLAS_WIRE_EXTENSION_FIELDS) {
         if (field in record) continue;
         const value = (existing as Record<string, unknown>)[field];

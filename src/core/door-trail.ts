@@ -27,11 +27,45 @@ export interface TrailStep {
   at: string;
 }
 
-/** The element's trail, newest first; empty when OnlyWorlds has said nothing of it. */
-export function doorTrail(el: Element): TrailStep[] {
+/** keel's answer to a read of the element: its door record and the time it was read at. */
+export interface DoorRead {
+  doors: Record<string, unknown> | null;
+  updated_at: string | null;
+  /** The last write's door, for an element keel has no door record on (written before `doors` existed). */
+  changed_client?: string | null;
+  changed_via?: string | null;
+}
+
+/** Is this read at least as new as the copy? (A copy with no time is older than any read.) */
+export function readCovers(read: DoorRead | null | undefined, copyUpdated: unknown): boolean {
+  if (!read || !read.updated_at) return false;
+  const copy = typeof copyUpdated === 'string' ? Date.parse(copyUpdated) : NaN;
+  return !Number.isFinite(copy) || Date.parse(read.updated_at) >= copy;
+}
+
+/**
+ * The element's trail, newest first, one step per phrase; empty when OnlyWorlds has said
+ * nothing of it.
+ *
+ * keel serves `doors` on a read and a write's answer, never in /changes, so a copy a pull
+ * wrote holds only its last write's door. `read` is keel's answer to reading the element
+ * (`sync/element-doors.ts`): the trail is the newer of the two records, whole, never a
+ * merge, since keel moves `updated_at` without a door when it scrubs a link to a deleted
+ * element, and the copy's last write read at that time would name a door keel never recorded.
+ */
+export function doorTrail(el: Element, read?: DoorRead | null): TrailStep[] {
   const rec = el as Record<string, unknown>;
-  const body = { ...rec, updated_at: rec.server_updated_at };
-  return doorsOf(body).map(d => ({ where: doorWhere(d), at: d.at }));
+  const updated_at = rec.server_updated_at;
+  const source = readCovers(read, updated_at) ? { updated_at: read!.updated_at, doors: read!.doors, changed_client: read!.changed_client, changed_via: read!.changed_via } : { ...rec, updated_at };
+  const seen = new Set<string>();
+  const out: TrailStep[] = [];
+  for (const d of doorsOf(source)) {
+    const where = doorWhere(d);
+    if (seen.has(where)) continue; // "in code" stands for many doors: its newest says it
+    seen.add(where);
+    out.push({ where, at: d.at });
+  }
+  return out;
 }
 
 /**
