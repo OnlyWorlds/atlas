@@ -42,8 +42,16 @@ export function storedMark(meta: WorldMeta | null | undefined): unknown {
   return meta ? (meta as unknown as Record<string, unknown>)[STRAND_KEY] : undefined;
 }
 
+/**
+ * The open world's mark as canonical JSON (null: none), for a render gate's inputs (S8, G4): a press,
+ * a pull or Not the strand moves it while no element changed.
+ */
+export function strandMarkKey(meta: WorldMeta | null | undefined): string | null {
+  return canonicalExtValue(storedMark(meta));
+}
+
 /** The mark's members as plain ids, for picking bodies and planning writes; never a reading. */
-function memberIds(mark: unknown): { narrative?: string; event?: string; location?: string } {
+export function memberIds(mark: unknown): { narrative?: string; event?: string; location?: string } {
   if (!mark || typeof mark !== 'object' || Array.isArray(mark)) return {};
   const m = mark as Record<string, unknown>;
   const s = (v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined);
