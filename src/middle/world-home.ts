@@ -63,7 +63,9 @@ import { isMoppetopiaOpen } from '../core/moppetopia';
 import { buildHomePicture, type HomePicture } from './home-picture';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
-import { buildStrandHead, buildStrandPanel, chosenTab, settleStrandFocus, strandFocusKey, strandTabShows, tabPanel } from './home-strand';
+import {
+  buildStrandHead, buildStrandPanel, chosenTab, notePictureShown, settleStrandFocus, strandContext, strandFocusKey, strandTabShows, tabPanel,
+} from './home-strand';
 import { keptSetOf } from '../sync/sync-attach';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
@@ -274,16 +276,18 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // The strand (S5): its tab head above whichever picture draws, never inside it; the panel not
     // chosen is not built. Where Home draws no picture, the strand draws alone under its heading.
     const redrawNow = (): void => { lastInputs = null; render(); };
+    // One reading of the strand per draw, handed to each part (the code gate's C7).
+    const strandNow = quiet ? null : strandContext(worldId);
     const drawWithStrand = (): void => {
-      const chosen = chosenTab(worldId);
+      const chosen = chosenTab(worldId, strandNow);
       const head = buildStrandHead(worldId, chosen, redrawNow);
       const panel = tabPanel(chosen);
       root.append(head, panel);
-      if (chosen === 'strand') { panel.appendChild(buildStrandPanel(worldId, { alone: false, redraw: redrawNow })); return; }
+      if (chosen === 'strand') { panel.appendChild(buildStrandPanel(worldId, { alone: false, redraw: redrawNow, context: strandNow })); return; }
       drawPicture(panel);
       if ((grid && !grid.section.hidden) || picture) return;
       head.remove();
-      panel.replaceWith(buildStrandPanel(worldId, { alone: true, redraw: redrawNow }));
+      panel.replaceWith(buildStrandPanel(worldId, { alone: true, redraw: redrawNow, context: strandNow }));
     };
     // The tour: tutorial-state cards computed from world contents —
     // the core create pair, then the next wave / room CTAs. Renders nothing
@@ -318,8 +322,12 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // The card carries the grid while the path shows; Home's own picture draws only without it.
     const pathUp = !!tour;
     if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; }
-    else if (!quiet && strandTabShows(worldId)) drawWithStrand();
-    else drawPicture();
+    else if (!quiet && strandTabShows(worldId, strandNow)) drawWithStrand();
+    else {
+      // The picture with no head is this world's Picture tab: a strand pulled later never takes it (C4).
+      if (!quiet) notePictureShown(worldId);
+      drawPicture();
+    }
     if (doors === 'below') {
       const under = buildCoverDoors(meta, worldId, counts, toasts);
       if (under) root.appendChild(under);

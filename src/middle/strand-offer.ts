@@ -31,7 +31,8 @@ export function strandOfferFor(el: Element, worldId: string): StrandOffer | null
   const s = getState();
   if (!s.active || s.active.worldId !== worldId || worldIsViewOnly(worldId)) return null;
   const entry = s.registry.worlds.find(w => w.id === worldId);
-  if (!isStrandKeeper(entry, s.active.meta) || !offerable(el, 'narrative')) return null;
+  // A kept-here copy is outside the key's view: a strand on it would read empty here (C9).
+  if (!isStrandKeeper(entry, s.active.meta) || !offerable(el, 'narrative') || isKeptHere(worldId, el.id)) return null;
   const strand = strandView(s.active.meta, s.data.elements, id => isKeptHere(worldId, id));
   if (strand.narrative?.id === el.id) return { kind: 'is' };
   return { kind: 'make', instead: strand.narrative ? nameOf(strand.narrative) : null };
@@ -40,7 +41,30 @@ export function strandOfferFor(el: Element, worldId: string): StrandOffer | null
 /** The drawn state a press writes against: the mark's ids as stored now. */
 function drawnNow(worldId: string): StrandDrawn {
   const ids = memberIds(storedMark(getState().active?.meta));
-  return { worldId, narrative: ids.narrative ?? null, event: ids.event ?? null };
+  return { worldId, narrative: ids.narrative ?? null, event: ids.event ?? null, location: ids.location ?? null };
+}
+
+/**
+ * The page's and the bar's writes under way, by world and story (C1): set before the first await, so a
+ * second press while one runs is dropped, never a second write and never "changed meanwhile".
+ */
+const pressing = new Set<string>();
+const pressKey = (worldId: string, el: Element): string => `${worldId}\u0000${el.id}`;
+
+/** Whether a press on this story's offer is under way (its buttons draw disabled). */
+export function strandPressing(worldId: string, el: Element): boolean {
+  return pressing.has(pressKey(worldId, el));
+}
+
+async function hold<T>(worldId: string, el: Element, run: () => Promise<T>): Promise<T | 'held'> {
+  const key = pressKey(worldId, el);
+  if (pressing.has(key)) return 'held';
+  pressing.add(key);
+  try {
+    return await run();
+  } finally {
+    pressing.delete(key);
+  }
 }
 
 /** The button's words. */
@@ -50,7 +74,8 @@ export function makeLabel(offer: { instead: string | null }): string {
 
 /** The press: S4's story change, then the line that says it. */
 export async function makeThisTheStrand(el: Element, worldId: string, drawn: StrandDrawn = drawnNow(worldId)): Promise<void> {
-  const result = await writeStrandSlot('narrative', drawn, el.id);
+  const result = await hold(worldId, el, () => writeStrandSlot('narrative', drawn, el.id));
+  if (result === 'held') return;
   if (result === 'refused') { toastManager.info(STRAND_MOVED); return; }
   if (result !== 'wrote') return;
   if (pathShowing(worldId)) toastManager.success("The world's strand");
@@ -75,6 +100,8 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
     b.dataset.action = action;
     b.textContent = label;
     b.addEventListener('click', run);
+    // A redraw while a press runs keeps its writes waiting (C1).
+    if (action !== 'strand-open' && strandPressing(worldId, el)) b.disabled = true;
     return b;
   };
   const sep = (): HTMLSpanElement => {
@@ -117,8 +144,10 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
   row.className = 'atlas-strand-offer-acts';
   row.append(
     btn('Not the strand', 'strand-clear-confirm', () => {
+      if (strandPressing(worldId, el)) return;
+      for (const b of row.querySelectorAll<HTMLButtonElement>('button')) b.disabled = true;
       confirming = null;
-      void clearStrand(drawn).then(r => { if (r === 'refused') toastManager.info(STRAND_MOVED); });
+      void hold(worldId, el, () => clearStrand(drawn)).then(r => { if (r === 'refused') toastManager.info(STRAND_MOVED); });
     }, 'atlas-btn atlas-btn--secondary'),
     btn('Cancel', 'strand-clear-cancel', () => {
       confirming = null;
@@ -141,6 +170,7 @@ export function buildBarStrandOffer(el: Element, worldId: string): HTMLElement |
   b.dataset.action = 'strand-make';
   b.textContent = makeLabel(offer);
   b.title = makeLabel(offer);
+  if (strandPressing(worldId, el)) b.disabled = true;
   b.addEventListener('click', () => { b.disabled = true; void makeThisTheStrand(el, worldId, drawn).finally(() => { b.disabled = false; }); });
   return b;
 }
@@ -148,4 +178,5 @@ export function buildBarStrandOffer(el: Element, worldId: string): HTMLElement |
 /** Test seam. */
 export function resetStrandOfferForTests(): void {
   confirming = null;
+  pressing.clear();
 }

@@ -63,11 +63,11 @@ export function memberIds(mark: unknown): { narrative?: string; event?: string; 
  * The bodies the answer depends on at the owner rung: the story, the mark's other two ids, the story's
  * `protagonist` and that one's `location` (G19: constant cost, the same answer as the whole world).
  */
-export function strandBodies(mark: unknown, byId: ReadonlyMap<string, Element>): Element[] {
+export function strandBodies(mark: unknown, byId: ReadonlyMap<string, Element>, kept: (id: string) => boolean = () => false): Element[] {
   const ids = memberIds(mark);
   const out = new Map<string, Element>();
   const take = (id: unknown): Element | undefined => {
-    if (typeof id !== 'string') return undefined;
+    if (typeof id !== 'string' || kept(id)) return undefined;
     const el = byId.get(id);
     if (el) out.set(id, el);
     return el;
@@ -80,19 +80,33 @@ export function strandBodies(mark: unknown, byId: ReadonlyMap<string, Element>):
   return [...out.values()];
 }
 
+/** One id index per elements array (a store patch makes a new array): built once, never per call (C7). */
+const indexes = new WeakMap<readonly Element[], Map<string, Element>>();
+
+/** The elements by id, for this array. */
+export function elementIndex(elements: readonly Element[]): ReadonlyMap<string, Element> {
+  let m = indexes.get(elements);
+  if (!m) {
+    m = new Map();
+    for (const el of elements) m.set(el.id, el);
+    indexes.set(elements, m);
+  }
+  return m;
+}
+
+/** The last answer, by the mark's canonical JSON and the five bodies it read (kept ones already left out). */
 let memo: { key: string; bodies: readonly Element[]; out: OwStrand } | null = null;
 
 /**
  * The world's strand as this copy holds it. `elements` is the store's array (`s.data.elements`, never the
  * lore: the room switch does not change the strand); `kept` answers whether an element is a kept-here copy
  * outside the key's view (conv. 151), left out so a member never draws a slot keel would serve as a stub.
+ * Constant cost per call (S2, C7): the index is the array's own, and `kept` is asked only of the bodies.
  */
 export function strandView(meta: WorldMeta | null | undefined, elements: readonly Element[], kept: (id: string) => boolean = () => false): OwStrand {
   const mark = storedMark(meta);
   if (mark === undefined || mark === null) return EMPTY_STRAND;
-  const byId = new Map<string, Element>();
-  for (const el of elements) if (!kept(el.id)) byId.set(el.id, el);
-  const bodies = strandBodies(mark, byId);
+  const bodies = strandBodies(mark, elementIndex(elements), kept);
   const key = canonicalExtValue(mark) ?? '';
   if (memo && memo.key === key && memo.bodies.length === bodies.length && memo.bodies.every((b, i) => b === bodies[i])) return memo.out;
   let out: OwStrand;
@@ -226,14 +240,41 @@ export function markForPlace(mark: unknown, strandNow: OwStrand, locationId: str
 }
 
 /**
- * The guard a mark write runs inside the store's meta op (G3): refused when the mark's story (and for a
- * place, its happening) is no longer the one the box was drawn for.
+ * The guard a mark write runs inside the store's meta op (G3): refused when the mark's story (and, when
+ * given, its happening or its place) is no longer the one the box was drawn for. A member left out of
+ * `drawn` is not compared.
  */
-export function markStillDrawn(markOnDisk: unknown, drawn: { narrative: string | null; event?: string | null }): boolean {
+export function markStillDrawn(
+  markOnDisk: unknown,
+  drawn: { narrative: string | null; event?: string | null; location?: string | null },
+): boolean {
   const ids = memberIds(markOnDisk);
   if ((ids.narrative ?? null) !== drawn.narrative) return false;
   if (drawn.event !== undefined && (ids.event ?? null) !== drawn.event) return false;
+  if (drawn.location !== undefined && (ids.location ?? null) !== drawn.location) return false;
   return true;
+}
+
+/** What a box was drawn with, as the mark's ids stored then. */
+export interface DrawnMark { narrative: string | null; event: string | null; location: string | null }
+
+/**
+ * Which of the mark's members a slot's write must find as drawn (C2): the story always; the happening
+ * for a happening write (the one it replaces) and a place write (the one it hangs on); the place for a
+ * place write (the one it replaces). Hero and Now ask the story only: their own value is the field's.
+ */
+export function guardFor(slot: StrandSlot, drawn: DrawnMark): { narrative: string | null; event?: string | null; location?: string | null } {
+  if (slot === 'event') return { narrative: drawn.narrative, event: drawn.event };
+  if (slot === 'location') return { narrative: drawn.narrative, event: drawn.event, location: drawn.location };
+  return { narrative: drawn.narrative };
+}
+
+/**
+ * Where the hero is now writes on the hero drawn: refused once the story's `protagonist` names someone
+ * else (C3), so a place is never written on a character who is no longer the hero.
+ */
+export function heroStillDrawn(story: Element | undefined, heroDrawn: string | null | undefined): boolean {
+  return !!heroDrawn && singleStillDrawn(rawSingle(story, 'protagonist'), heroDrawn);
 }
 
 /**

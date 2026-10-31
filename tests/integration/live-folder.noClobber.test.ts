@@ -13,6 +13,9 @@ vi.mock('../../src/sync/sync-attach', async () => {
     getCurrentSyncWorldId: () => null,
     requestPushIfLinked: () => {},
     refreshMetaCacheNow: async () => {},
+    // The writing room's strand offer asks whether a story is a kept-here copy (conv. 151): none here.
+    isKeptHere: () => false,
+    keptSetOf: () => undefined,
     refreshElementsAfterWrite: async (store: { listElements(): Promise<unknown[]> }) => {
       const elements = await store.listElements();
       state.patchSlice('data', { ...state.getState().data, elements } as never);

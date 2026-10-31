@@ -12,22 +12,20 @@ import { getState } from '../../core/state';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { openElementTarget } from '../../core/element-room';
 import { pathShowing } from '../../core/guide-path';
-import { maySetSlot, strandView, SLOT_TYPE, type StrandSlot } from '../../core/strand';
-import { isKeptHere } from '../../sync/sync-attach';
-import { openStrandTab, SLOT_WORD } from '../../middle/home-strand';
+import { hiddenRowWord } from '../../core/hidden-mark';
+import { maySetSlot, SLOT_TYPE, type StrandSlot } from '../../core/strand';
+import { openStrandTab, strandContext, SLOT_WORD } from '../../middle/home-strand';
 
 const FRAME_SLOTS: readonly StrandSlot[] = ['character', 'event', 'location', 'now'];
 
 /** The frame for `narrative`, or null when it is not the strand's story. */
 export function buildStrandFrame(narrative: Element): HTMLElement | null {
-  const s = getState();
-  const worldId = s.active?.worldId;
-  if (!worldId || !s.active) return null;
-  const kept = (id: string) => isKeptHere(worldId, id);
-  const strand = strandView(s.active.meta, s.data.elements, kept);
+  const worldId = getState().active?.worldId;
+  // The shared reading: constant cost, no walk of the world per draw (the code gate's C7).
+  const c = worldId ? strandContext(worldId) : null;
+  if (!worldId || !c) return null;
+  const { strand, entry, byId, meta } = c;
   if (strand.narrative?.id !== narrative.id) return null;
-  const entry = s.registry.worlds.find(w => w.id === worldId);
-  const byId = new Map(s.data.elements.filter(e => !kept(e.id)).map(e => [e.id, e] as const));
   const path = pathShowing(worldId);
 
   const block = document.createElement('section');
@@ -61,7 +59,10 @@ export function buildStrandFrame(narrative: Element): HTMLElement | null {
       chip.querySelector('.atlas-context-strand-name')!.textContent = filled.name.trim() || 'Unnamed';
       chip.addEventListener('click', () => openElementTarget(el, worldId));
       li.appendChild(chip);
-    } else if (!path && maySetSlot(slot, entry, s.active.meta, strand, byId)) {
+      // Hidden here: others read this slot empty (G23, the code gate's C10).
+      const hidden = hiddenRowWord(el, entry?.state);
+      if (hidden) li.insertAdjacentHTML('beforeend', hidden);
+    } else if (!path && maySetSlot(slot, entry, meta, strand, byId)) {
       const pick = document.createElement('button');
       pick.type = 'button';
       pick.className = 'atlas-btn-link atlas-context-strand-pick';

@@ -7,9 +7,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry, type Element, type WorldRegistryEntry } from '../../src/core/types';
 import {
-  buildStrandPanel, chosenTab, pickRows, rawWords, resetStrandTabForTests, strandContext, strandTabShows, READ_ONLY_LINE,
+  buildStrandPanel, chosenTab, notePictureShown, pickRows, rawHeld, rawWords, resetStrandTabForTests, strandContext, strandTabShows, READ_ONLY_LINE,
 } from '../../src/middle/home-strand';
 import { strandOfferFor } from '../../src/middle/strand-offer';
+import { buildStrandFrame } from '../../src/tabs/right/context-strand-frame';
 
 const W = 'w-home-strand';
 const N = '0192a000-0000-7000-8000-000000000a01';
@@ -133,5 +134,52 @@ describe('Make this the world\'s strand (S7)', () => {
     expect(strandOfferFor(el('narrative', N), W)).toBeNull();
     world([], undefined, {}, { copy_of: { world_id: 'x' } } as never);
     expect(strandOfferFor(el('narrative', N), W)).toBeNull();
+  });
+});
+
+describe('from the code gate', () => {
+  it('C4: a picture drawn with no head is the Picture tab, so a pulled strand never switches it', () => {
+    world([el('narrative', N)], undefined, contributor);
+    expect(strandTabShows(W)).toBe(false);
+    notePictureShown(W);
+    world([el('narrative', N)], full, contributor);
+    expect(strandTabShows(W)).toBe(true);
+    expect(chosenTab(W)).toBe('picture');
+  });
+
+  it('C5: a field holding another kind is labelled with its kind, and a promise names it in lower case', () => {
+    const L = '0192a000-0000-7000-8000-000000000c01';
+    world([el('narrative', N, { protagonist: L }), el('location', L, { name: 'The Harbour' }), el('character', C, { name: 'Ilse' })], full);
+    expect(rawHeld('character', strandContext(W)!)).toEqual({ label: 'A location: The Harbour', phrase: 'a location, The Harbour' });
+    world([el('narrative', N, { protagonist: GONE })], full);
+    expect(rawHeld('character', strandContext(W)!)?.phrase).toBe('an id that names nothing here');
+
+    world([el('narrative', N, { protagonist: L }), el('location', L, { name: 'The Harbour' }), el('character', C, { name: 'Ilse' })], full);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const draw = (): void => { host.innerHTML = ''; host.appendChild(buildStrandPanel(W, { alone: false, redraw: draw })); };
+    draw();
+    const hero = () => host.querySelector<HTMLElement>('[data-slot="character"]')!;
+    expect(hero().querySelector('[data-role="strand-held"]')!.textContent).toBe('A location: The Harbour');
+    hero().querySelector<HTMLButtonElement>('[data-act="pick"]')!.click();
+    [...hero().querySelectorAll<HTMLElement>('[role="option"]')].find(o => o.textContent === 'Ilse')!.click();
+    expect(hero().querySelector('[data-role="strand-promise"]')!.textContent).toBe('Ilse will be the hero in place of a location, The Harbour.');
+  });
+
+  it('C14: a Change never offers what the box already holds', () => {
+    const E2 = '0192a000-0000-7000-8000-000000000b02';
+    world([el('narrative', N, { events: [E, E2] }), el('event', E), el('event', E2)], { narrative: N, event: E, location: GONE });
+    const rows = pickRows('event', strandContext(W)!);
+    expect([...rows.own, ...rows.rest].map(e => e.id)).toEqual([E2]);
+  });
+});
+
+describe('the frame beside the story', () => {
+  it('C10: a hidden hero carries the hidden word in the frame too', () => {
+    world([el('narrative', N, { protagonist: C }), el('character', C, { hidden: true, name: 'Ana' })], full);
+    const frame = buildStrandFrame(el('narrative', N))!;
+    expect(frame.querySelector('[data-slot="character"] [data-action="strand-open"]')!.textContent).toContain('Ana');
+    expect(frame.querySelector('[data-slot="character"] [data-role="hidden-word"]')).not.toBeNull();
+    expect(buildStrandFrame(el('narrative', N2))).toBeNull();
   });
 });

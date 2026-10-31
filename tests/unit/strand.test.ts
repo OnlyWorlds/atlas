@@ -9,6 +9,7 @@ import fixture from '../fixtures/strand.fixture.json';
 import {
   strandView, strandBodies, isStrandKeeper, maySetSlot, anySlotWritable, offerable, appendId, listed,
   markForStory, markForEvent, markForPlace, markStillDrawn, rawSingle, singleStillDrawn, EMPTY_STRAND,
+  guardFor, heroStillDrawn,
 } from '../../src/core/strand';
 import type { Element, WorldMeta, WorldRegistryEntry } from '../../src/core/types';
 
@@ -170,5 +171,74 @@ describe('the writes', () => {
     expect(singleStillDrawn(undefined, null)).toBe(true);
     expect(singleStillDrawn('c2', 'c1')).toBe(false);
     expect(singleStillDrawn({ id: 'c' }, { id: 'c' })).toBe(true);
+  });
+});
+
+describe('the guard compares what a write replaces (the code gate C2, C3)', () => {
+  const drawn = { narrative: 'n1', event: 'e1', location: 'l1' };
+
+  it('the story for every slot; the happening for a happening and a place; the place for a place', () => {
+    expect(guardFor('narrative', drawn)).toEqual({ narrative: 'n1' });
+    expect(guardFor('event', drawn)).toEqual({ narrative: 'n1', event: 'e1' });
+    expect(guardFor('location', drawn)).toEqual({ narrative: 'n1', event: 'e1', location: 'l1' });
+    expect(guardFor('character', drawn)).toEqual({ narrative: 'n1' });
+    expect(guardFor('now', drawn)).toEqual({ narrative: 'n1' });
+  });
+
+  it('markStillDrawn refuses a moved happening or a moved place, absent and null alike', () => {
+    expect(markStillDrawn({ narrative: 'n1', event: 'e2', location: 'l1' }, guardFor('event', drawn))).toBe(false);
+    expect(markStillDrawn({ narrative: 'n1', event: 'e1', location: 'l2' }, guardFor('location', drawn))).toBe(false);
+    expect(markStillDrawn({ narrative: 'n1', event: 'e1', location: 'l1' }, guardFor('location', drawn))).toBe(true);
+    expect(markStillDrawn({ narrative: 'n1', event: 'e1' }, { narrative: 'n1', event: 'e1', location: null })).toBe(true);
+    expect(markStillDrawn({ narrative: 'n1', event: 'e1', location: 'l1' }, { narrative: 'n1', location: null })).toBe(false);
+    // A place left out of the guard is not compared.
+    expect(markStillDrawn({ narrative: 'n1', event: 'e1', location: 'l9' }, guardFor('event', drawn))).toBe(true);
+  });
+
+  it('heroStillDrawn: the story still names the hero the box was drawn for', () => {
+    const story = (p: unknown) => ({ id: 'n1', type: 'narrative', protagonist: p }) as unknown as Element;
+    expect(heroStillDrawn(story('c1'), 'c1')).toBe(true);
+    expect(heroStillDrawn(story('c2'), 'c1')).toBe(false);
+    expect(heroStillDrawn(story(undefined), 'c1')).toBe(false);
+    expect(heroStillDrawn(undefined, 'c1')).toBe(false);
+    expect(heroStillDrawn(story('c1'), null)).toBe(false);
+  });
+});
+
+describe('strandView costs the same on a large world (the code gate C7)', () => {
+  const N = 20000;
+  const big: Element[] = [];
+  for (let i = 0; i < N; i++) big.push({ id: `x${i}`, type: 'character', name: `C${i}` } as unknown as Element);
+  big.push({ id: 'n', type: 'narrative', name: 'The Long Road', events: ['e'], protagonist: 'h' } as unknown as Element);
+  big.push({ id: 'e', type: 'event', name: 'The Fire', locations: ['l'] } as unknown as Element);
+  big.push({ id: 'l', type: 'location', name: 'The Harbour' } as unknown as Element);
+  big.push({ id: 'h', type: 'character', name: 'Mira', location: 'l' } as unknown as Element);
+  const meta = { id: 'w', name: 'W', x_strand: { narrative: 'n', event: 'e', location: 'l' } } as unknown as WorldMeta;
+
+  it('walks the array once, asks `kept` only of the five bodies, and answers a thousand calls within a bound', () => {
+    let walks = 0;
+    const iterate = big[Symbol.iterator].bind(big);
+    (big as unknown as { [Symbol.iterator]: () => Iterator<Element> })[Symbol.iterator] = () => { walks++; return iterate(); };
+    let asked = 0;
+    const kept = (): boolean => { asked++; return false; };
+    const first = strandView(meta, big, kept);
+    expect(first.narrative?.id).toBe('n');
+    expect(first.now?.id).toBe('l');
+    expect(first.same).toBe(true);
+    const t0 = performance.now();
+    for (let i = 0; i < 1000; i++) strandView(meta, big, kept);
+    const ms = performance.now() - t0;
+    expect(walks).toBe(1);
+    expect(asked).toBeLessThanOrEqual(5 * 1001);
+    // Each call reads five bodies: a thousand stay far under one walk of a large world per call.
+    expect(ms).toBeLessThan(250);
+  });
+
+  it('a kept body is left out without walking the world again', () => {
+    const kept = (id: string): boolean => id === 'h';
+    const out = strandView(meta, big, kept);
+    expect(out.character).toBeNull();
+    expect(out.now).toBeNull();
+    expect(out.event?.id).toBe('e');
   });
 });

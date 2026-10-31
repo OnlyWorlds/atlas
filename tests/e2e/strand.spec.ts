@@ -139,7 +139,7 @@ async function expectFocusIn(page: Page, slot: string): Promise<void> {
 }
 
 /** A world with a story, a happening it lists and two places, past its first steps, on Home. */
-async function seeded(page: Page, mark: unknown): Promise<string> {
+async function seeded(page: Page, mark: unknown, meta?: Record<string, unknown>): Promise<string> {
   const wid = await setupWorld(page);
   await put(page, 'narrative', N1, 'The Long Road', { supertype: 'Book', events: [E1] });
   await put(page, 'event', E1, 'The Fire', { locations: [] });
@@ -148,6 +148,8 @@ async function seeded(page: Page, mark: unknown): Promise<string> {
   await put(page, 'character', C1, 'Mira');
   await put(page, 'character', C2, 'Ilse');
   if (mark !== undefined) await setMark(page, mark);
+  // World meta in place before Home's first draw past the path (a reader's slice, for one).
+  if (meta) await writeMeta(page, meta);
   await pastPath(page);
   await go(page, `#/w/${wid}`);
   return wid;
@@ -243,14 +245,16 @@ test.describe('the Strand tab', () => {
   });
 
   test('a contributor: no tab without a strand; with one, only the hero\'s box; a view-only world reads it with one line', async ({ page }) => {
-    const wid = await seeded(page, undefined);
-    await writeMeta(page, { exported_as: { kind: 'member', role: 'contributor' } });
-    await go(page, `#/w/${wid}`);
+    // A contributor from Home's first draw past the path: no tab head was ever drawn here.
+    await seeded(page, undefined, { exported_as: { kind: 'member', role: 'contributor' } });
     await expect(page.locator('.atlas-home-statline')).toBeVisible();
     await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
     await expect(page.locator('[data-role="home-strand"]')).toHaveCount(0);
 
     await setMark(page, { narrative: N1, event: E1, location: GONE_L });
+    // The picture this reader was looking at stays: the pulled strand gets its tab, not the page (C4).
+    await expect(tab(page, 'picture')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-role="home-strand"]')).toHaveCount(0);
     await tab(page, 'strand').click();
     await expect(box(page, 'narrative').locator('.atlas-home-strand-name')).toHaveText('The Long Road');
     await expect(box(page, 'narrative').locator('[data-act]')).toHaveCount(0);

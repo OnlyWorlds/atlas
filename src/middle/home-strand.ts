@@ -29,11 +29,12 @@ import { hiddenRowWord, isHiddenMark } from '../core/hidden-mark';
 import { handsOnAsProposed } from '../core/review-mark';
 import { markEscapeOwned } from '../core/escape-mark';
 import {
-  anySlotWritable, maySetSlot, memberIds, offerable, rawSingle, storedMark, strandView, SLOT_TYPE,
+  anySlotWritable, elementIndex, maySetSlot, memberIds, offerable, rawSingle, storedMark, strandView, SLOT_TYPE,
   STRAND_SLOTS, type OwStrand, type StrandSlot,
 } from '../core/strand';
 import { canonicalExtValue } from '../sync/world-meta-sync';
-import { isKeptHere } from '../sync/sync-attach';
+import { isKeptHere, keptSetOf } from '../sync/sync-attach';
+import { typeName } from '../core/type-words';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { makeStrandSlot, writeStrandSlot, STRAND_MOVED, type StrandDrawn, type StrandWriteResult } from '../ui/strand-write';
 
@@ -95,43 +96,67 @@ export interface StrandContext {
   worldId: string;
   entry: WorldRegistryEntry | undefined;
   meta: WorldMeta;
-  /** This copy's elements, less the kept-here copies (conv. 151). */
-  elements: Element[];
-  byId: Map<string, Element>;
+  /** The store's array, the kept-here copies included: read through `kept` (Pick filters it only when opened). */
+  all: readonly Element[];
+  /** Whether an element is a kept-here copy outside the key's view (conv. 151). */
+  kept: (id: string) => boolean;
+  /** This copy's elements by id, less the kept-here copies; the array's own index when none is kept (C7). */
+  byId: ReadonlyMap<string, Element>;
   strand: OwStrand;
 }
 
+/** The kept-filtered index, once per elements array and kept set (rare: a member's kept copies). */
+const filtered = new WeakMap<readonly Element[], { set: ReadonlySet<string>; byId: Map<string, Element> }>();
+
+function byIdLessKept(all: readonly Element[], keptSet: ReadonlySet<string> | undefined): ReadonlyMap<string, Element> {
+  if (!keptSet || keptSet.size === 0) return elementIndex(all);
+  const hit = filtered.get(all);
+  if (hit && hit.set === keptSet) return hit.byId;
+  const byId = new Map<string, Element>();
+  for (const el of all) if (!keptSet.has(el.id)) byId.set(el.id, el);
+  filtered.set(all, { set: keptSet, byId });
+  return byId;
+}
+
+/** The strand as this copy reads it, for one draw: Home computes it once and hands it to each part (C7). */
 export function strandContext(worldId: string): StrandContext | null {
   const s = getState();
   if (!s.active || s.active.worldId !== worldId) return null;
   const kept = (id: string) => isKeptHere(worldId, id);
-  const elements = s.data.elements.filter(e => !kept(e.id));
-  const byId = new Map(elements.map(e => [e.id, e] as const));
   return {
     worldId,
     entry: s.registry.worlds.find(w => w.id === worldId),
     meta: s.active.meta,
-    elements,
-    byId,
+    all: s.data.elements,
+    kept,
+    byId: byIdLessKept(s.data.elements, keptSetOf(worldId)),
     strand: strandView(s.active.meta, s.data.elements, kept),
   };
 }
 
 /** S3, G16: a tab when the strand has a story, or when some box is writable here. */
-export function strandTabShows(worldId: string): boolean {
-  const c = strandContext(worldId);
+export function strandTabShows(worldId: string, c: StrandContext | null = strandContext(worldId)): boolean {
   if (!c) return false;
   return !!c.strand.narrative || anySlotWritable(c.entry, c.meta, c.strand, c.byId);
 }
 
 /** The tab chosen for this world: the first draw in a session is recorded as if pressed (G13). */
-export function chosenTab(worldId: string): HomeTab {
+export function chosenTab(worldId: string, c: StrandContext | null = strandContext(worldId)): HomeTab {
   let t = tabs.get(worldId);
   if (!t) {
-    t = strandContext(worldId)?.strand.narrative ? 'strand' : 'picture';
+    t = c?.strand.narrative ? 'strand' : 'picture';
     tabs.set(worldId, t);
   }
   return t;
+}
+
+/**
+ * Home drew its picture with no tab head (no strand and nothing writable here, G16): recorded as the
+ * Picture tab if nothing is yet, so a strand pulled later never takes the picture from under the
+ * person (C4).
+ */
+export function notePictureShown(worldId: string): void {
+  if (!tabs.has(worldId)) tabs.set(worldId, 'picture');
 }
 
 /** Home on the Strand tab (S7's Open it, S8's Pick on Home). */
@@ -231,7 +256,7 @@ const nameOf = (el: { name?: unknown } | undefined | null, fallback = 'Unnamed')
 /** What a box was drawn with: the mark's ids as stored, and for Hero and Now the raw field. */
 export function drawnFor(slot: StrandSlot, c: StrandContext): StrandDrawn {
   const ids = memberIds(storedMark(c.meta));
-  const base: StrandDrawn = { worldId: c.worldId, narrative: ids.narrative ?? null, event: ids.event ?? null };
+  const base: StrandDrawn = { worldId: c.worldId, narrative: ids.narrative ?? null, event: ids.event ?? null, location: ids.location ?? null };
   if (slot === 'character') {
     const on = c.strand.narrative?.id ?? null;
     return { ...base, on, raw: rawSingle(on ? c.byId.get(on) : undefined, 'protagonist') };
@@ -249,20 +274,38 @@ function stampOf(slot: StrandSlot, c: StrandContext): string {
   return `${canonicalExtValue(storedMark(c.meta)) ?? ''}|${canonicalExtValue(d.raw ?? null) ?? ''}|${c.strand[slot]?.id ?? ''}`;
 }
 
+/** A kind word with its article: "a location", "an event". */
+const aKind = (type: string): string => {
+  const w = typeName(type);
+  return `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`;
+};
+
 /**
  * What a Hero or Now field holds that the strand does not read (G8), in words where it can: a proposed
- * or hidden element, one of another kind, or an id that names nothing here. Null when it holds nothing.
+ * or hidden element, one of another kind (C5), or an id that names nothing here; `label` for the box,
+ * `phrase` for the middle of a promise. Null when it holds nothing.
  */
-export function rawWords(slot: StrandSlot, c: StrandContext): string | null {
+export function rawHeld(slot: StrandSlot, c: StrandContext): { label: string; phrase: string } | null {
   if (slot !== 'character' && slot !== 'now') return null;
   if (c.strand[slot]) return null;
   const raw = drawnFor(slot, c).raw;
   if (raw === null || raw === undefined) return null;
   const el = typeof raw === 'string' ? c.byId.get(raw) : undefined;
-  if (!el) return 'An id that names nothing here';
-  if (handsOnAsProposed(el)) return `Proposed: ${nameOf(el)}`;
-  if (isHiddenMark(el)) return `Hidden: ${nameOf(el)}`;
-  return nameOf(el);
+  if (!el) return { label: 'An id that names nothing here', phrase: 'an id that names nothing here' };
+  const name = nameOf(el);
+  if (el.type !== SLOT_TYPE[slot]) {
+    const kind = aKind(el.type);
+    return { label: `${kind.charAt(0).toUpperCase()}${kind.slice(1)}: ${name}`, phrase: `${kind}, ${name}` };
+  }
+  if (handsOnAsProposed(el)) return { label: `Proposed: ${name}`, phrase: `the proposed ${name}` };
+  // Unreached at the owner rung (a hidden element is in view, so the slot fills); kept for a lower reading.
+  if (isHiddenMark(el)) return { label: `Hidden: ${name}`, phrase: `the hidden ${name}` };
+  return { label: name, phrase: name };
+}
+
+/** The box's words for what its field holds (`rawHeld`'s label). */
+export function rawWords(slot: StrandSlot, c: StrandContext): string | null {
+  return rawHeld(slot, c)?.label ?? null;
 }
 
 /** The parent a box waits for is empty. */
@@ -276,7 +319,9 @@ function waits(slot: StrandSlot, s: OwStrand): boolean {
 /** The pick list's elements: that kind's, the parent's own first (G12: `offerable`). */
 export function pickRows(slot: StrandSlot, c: StrandContext): { own: Element[]; rest: Element[]; ownWord: string | null } {
   const type = SLOT_TYPE[slot];
-  const all = c.elements.filter(e => offerable(e, type))
+  // What the box holds now is no pick for its Change (C14).
+  const holds = c.strand[slot]?.id;
+  const all = c.all.filter(e => offerable(e, type) && e.id !== holds && !c.kept(e.id))
     .sort((a, b) => nameOf(a, '').localeCompare(nameOf(b, ''), undefined, { sensitivity: 'base' }));
   const parent = slot === 'event' ? c.strand.narrative?.id : slot === 'location' ? c.strand.event?.id : slot === 'character' ? c.strand.narrative?.id : undefined;
   const field = slot === 'event' ? 'events' : slot === 'location' ? 'locations' : slot === 'character' ? 'characters' : null;
@@ -291,6 +336,8 @@ export interface StrandPanelOptions {
   alone: boolean;
   /** Redraw Home now (its inputs may not have moved: a refusal writes nothing). */
   redraw: () => void;
+  /** The draw's one reading (C7); read afresh when not given. */
+  context?: StrandContext | null;
 }
 
 /** The Strand panel: the five boxes. */
@@ -298,7 +345,7 @@ export function buildStrandPanel(worldId: string, opts: StrandPanelOptions): HTM
   const section = document.createElement('section');
   section.className = 'atlas-home-strand';
   section.setAttribute('data-role', 'home-strand');
-  const c = strandContext(worldId);
+  const c = opts.context !== undefined ? opts.context : strandContext(worldId);
   if (!c) return section;
   if (opts.alone) {
     const h = document.createElement('h2');
@@ -323,10 +370,22 @@ export function buildStrandPanel(worldId: string, opts: StrandPanelOptions): HTM
   sayLine.textContent = said && said.worldId === worldId ? said.text : '';
   const list = document.createElement('ol');
   list.className = 'atlas-home-strand-boxes';
-  for (const slot of STRAND_SLOTS) list.appendChild(buildBox(slot, c, writable.includes(slot), opts));
+  for (const slot of STRAND_SLOTS) {
+    const box = buildBox(slot, c, writable.includes(slot), opts);
+    // A write in flight from this box: its acts wait, so a second press never makes a second write (C1).
+    if (inFlight.has(flightKey(worldId, slot))) {
+      box.setAttribute('aria-busy', 'true');
+      for (const b of box.querySelectorAll<HTMLButtonElement>('[data-act]')) b.disabled = true;
+    }
+    list.appendChild(box);
+  }
   section.append(list, sayLine);
   return section;
 }
+
+/** The boxes with a write under way (C1): set before the write's first await, cleared after its redraw. */
+const inFlight = new Set<string>();
+const flightKey = (worldId: string, slot: StrandSlot): string => `${worldId}\u0000${slot}`;
 
 function act(label: string, key: string, run: () => void, cls = 'atlas-btn-ghost'): HTMLButtonElement {
   const b = document.createElement('button');
@@ -392,7 +451,7 @@ function buildBox(slot: StrandSlot, c: StrandContext, writable: boolean, opts: S
     body.appendChild(p);
     return box;
   } else {
-    const held = rawWords(slot, c);
+    const held = rawHeld(slot, c)?.label ?? null;
     const p = document.createElement('span');
     p.className = 'atlas-home-strand-empty';
     p.setAttribute('data-role', held ? 'strand-held' : 'strand-empty');
@@ -410,13 +469,13 @@ function buildBox(slot: StrandSlot, c: StrandContext, writable: boolean, opts: S
 
 /** A pick or a name needs its promise first: a filled box (Change), or a Hero or Now field already holding something (G8). */
 function needsPromise(slot: StrandSlot, c: StrandContext): boolean {
-  return !!c.strand[slot] || rawWords(slot, c) !== null;
+  return !!c.strand[slot] || rawHeld(slot, c) !== null;
 }
 
-/** What the box holds now, as a promise names it. */
+/** What the box holds now, as the middle of a promise names it (C5: lower case there). */
 function holdsWords(slot: StrandSlot, c: StrandContext): string {
   const f = c.strand[slot];
-  return f ? (f.name.trim() || 'Unnamed') : rawWords(slot, c) ?? 'nothing';
+  return f ? (f.name.trim() || 'Unnamed') : rawHeld(slot, c)?.phrase ?? 'nothing';
 }
 
 function actsRow(slot: StrandSlot, c: StrandContext, changing: boolean, opts: StrandPanelOptions): HTMLElement {
@@ -459,11 +518,14 @@ function promiseRow(slot: StrandSlot, c: StrandContext, o: Opened, opts: StrandP
   const next = o.name ?? nameOf(o.pick ? c.byId.get(o.pick) : undefined);
   line.textContent = `${next} will be ${SLOT_PHRASE[slot]} in place of ${holdsWords(slot, c)}.`;
   row.appendChild(line);
-  row.appendChild(act('Change', `${slot}:confirm`, () => {
+  const confirm = act('Change', `${slot}:confirm`, () => {
+    if (confirm.disabled) return;
+    confirm.disabled = true;
     const drawn = o.drawn ?? drawnFor(slot, c);
     opened = null;
     void run(slot, c, drawn, { pick: o.pick, name: o.name }, opts);
-  }, 'atlas-btn-primary'));
+  }, 'atlas-btn-primary');
+  row.appendChild(confirm);
   row.appendChild(act('Cancel', `${slot}:cancel`, () => {
     opened = null;
     askFocus = { worldId: c.worldId, key: `box:${slot}` };
@@ -481,15 +543,23 @@ function promiseRow(slot: StrandSlot, c: StrandContext, o: Opened, opts: StrandP
 
 /** Run the box's write and say what came of it; the focus goes back to the box it wrote. */
 async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn, how: { pick?: string; name?: string }, opts: StrandPanelOptions): Promise<void> {
+  // One write per box at a time (C1): a second Enter or press while this one runs is dropped, never a
+  // second write and never "changed meanwhile" about the person's own first press.
+  const key = flightKey(c.worldId, slot);
+  if (inFlight.has(key)) return;
+  inFlight.add(key);
   askFocus = { worldId: c.worldId, key: `box:${slot}` };
-  let result: StrandWriteResult;
+  let result: StrandWriteResult = 'nothing';
   let made: Element | undefined;
-  if (how.name !== undefined) {
-    const out = await makeStrandSlot(slot, drawn, how.name);
-    result = out.result;
-    made = out.made;
-  } else if (how.pick) result = await writeStrandSlot(slot, drawn, how.pick);
-  else return;
+  try {
+    if (how.name !== undefined) {
+      const out = await makeStrandSlot(slot, drawn, how.name);
+      result = out.result;
+      made = out.made;
+    } else if (how.pick) result = await writeStrandSlot(slot, drawn, how.pick);
+  } finally {
+    inFlight.delete(key);
+  }
   const kept = made && result !== 'wrote' ? ` ${nameOf(made)} was made and stays in the world.` : '';
   if (result === 'refused') said = { worldId: c.worldId, text: `${STRAND_MOVED}${kept}` };
   else if (kept) said = { worldId: c.worldId, text: kept.trim() };
@@ -529,10 +599,13 @@ function openNameBox(row: HTMLElement, slot: StrandSlot, back: HTMLElement, done
   const unwatch = watchLeave(form, t => form.contains(t), how => close(how));
   form.addEventListener('submit', e => {
     e.preventDefault();
+    // A second Enter while the first one's make runs (C1): nothing, the box already gave its name.
+    if (closed) return;
     const n = input.value.trim();
     if (!n) { note.textContent = 'Type a name first'; input.focus(); return; }
     closed = true;
     unwatch();
+    input.disabled = true;
     form.removeAttribute(GRID_OPEN_ATTR);
     done(n);
     gridClosed(row);
@@ -634,6 +707,8 @@ function openPickList(row: HTMLElement, slot: StrandSlot, c: StrandContext, back
     else if (how === 'blur') setTimeout(() => gridClosed(home), 0);
   };
   const pickIt = (eid: string): void => {
+    // A second press or Enter on a list already picked from (C1): nothing.
+    if (closed) return;
     close('picked');
     done(eid);
     gridClosed(row.isConnected ? row : document.querySelector<HTMLElement>('.atlas-world-home') ?? document.body);

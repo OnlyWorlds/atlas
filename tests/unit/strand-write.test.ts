@@ -41,7 +41,7 @@ async function open(mark: unknown, entry: Partial<WorldRegistryEntry> = {}): Pro
 /** What a box was drawn with, read off the mirror as Home reads it. */
 function drawn(extra: Partial<StrandDrawn> = {}): StrandDrawn {
   const m = (getState().active!.meta as unknown as Record<string, unknown>).x_strand as Record<string, string | null> | undefined;
-  return { worldId: W, narrative: m?.narrative ?? null, event: m?.event ?? null, ...extra };
+  return { worldId: W, narrative: m?.narrative ?? null, event: m?.event ?? null, location: m?.location ?? null, ...extra } as StrandDrawn;
 }
 
 const onDisk = async (id: string) => (await store.listElements()).find(e => e.id === id) as unknown as Record<string, unknown>;
@@ -220,13 +220,109 @@ describe('the hero and where the hero is now', () => {
     expect((await onDisk(C)).location).toBe(out.made!.id);
   });
 
-  it('a Make one whose link is refused keeps what it made', async () => {
+  it('C6: a Make one whose field already moved makes nothing, for the hero and for where the hero is now', async () => {
     await put('narrative', N, { protagonist: 'moved' });
+    await put('character', C, { location: 'moved-too' });
     await open({ narrative: N, event: GONE_E, location: GONE_L });
+    const before = (await store.listElements()).length;
+    expect(await makeStrandSlot('character', drawn({ on: N, raw: null }), 'Mira')).toEqual({ result: 'refused' });
+    await store.updateElement(N, { protagonist: C } as Partial<Element>);
+    await open(undefined);
+    expect(await makeStrandSlot('now', drawn({ on: C, raw: null }), 'The Mill')).toEqual({ result: 'refused' });
+    expect((await store.listElements()).length).toBe(before);
+    expect((await onDisk(N)).protagonist).toBe(C);
+    expect((await onDisk(C)).location).toBe('moved-too');
+  });
+
+  it('a Make one whose field moves while it makes keeps what it made, and writes nothing over the move', async () => {
+    await put('narrative', N);
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    const create = store.createElement.bind(store);
+    store.createElement = async (type, data) => {
+      const made = await create(type, data);
+      await store.updateElement(N, { protagonist: 'moved' } as Partial<Element>);
+      return made;
+    };
     const out = await makeStrandSlot('character', drawn({ on: N, raw: null }), 'Mira');
     expect(out.result).toBe('refused');
     expect(out.made && (await onDisk(out.made.id)).name).toBe('Mira');
     expect((await onDisk(N)).protagonist).toBe('moved');
+  });
+
+  it('C3: where the hero is now is refused once the story names another hero, before and right before the lock', async () => {
+    await put('narrative', N, { protagonist: C });
+    await put('character', C);
+    await put('character', '0192a000-0000-7000-8000-000000000d02');
+    await put('location', L);
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    const box = drawn({ on: C, raw: null });
+    await store.updateElement(N, { protagonist: '0192a000-0000-7000-8000-000000000d02' } as Partial<Element>);
+    expect(await writeStrandSlot('now', box, L)).toBe('refused');
+    expect((await onDisk(C)).location ?? null).toBeNull();
+    // A Make one for the old hero makes nothing (C6 with C3).
+    const before = (await store.listElements()).length;
+    expect(await makeStrandSlot('now', box, 'The Mill')).toEqual({ result: 'refused' });
+    expect((await store.listElements()).length).toBe(before);
+
+    // Moved after the first read: the read right before the hero's lock refuses it.
+    await store.updateElement(N, { protagonist: C } as Partial<Element>);
+    const get = store.getElement.bind(store);
+    let reads = 0;
+    store.getElement = async id => {
+      if (id === N && ++reads === 2) await store.updateElement(N, { protagonist: 'someone-else' } as Partial<Element>);
+      return get(id);
+    };
+    expect(await writeStrandSlot('now', box, L)).toBe('refused');
+    expect((await onDisk(C)).location ?? null).toBeNull();
+    expect(log.filter(l => l.kind === 'element' && l.id === C)).toEqual([]);
+  });
+});
+
+describe('C2: a change compares the member it replaces', () => {
+  const E2 = '0192a000-0000-7000-8000-000000000b02';
+  const E3 = '0192a000-0000-7000-8000-000000000b03';
+  const L2 = '0192a000-0000-7000-8000-000000000c02';
+
+  it('Change on the happening is refused when another tab moved it, before any write', async () => {
+    await put('narrative', N, { events: [E, E2] });
+    await put('event', E);
+    await put('event', E2);
+    await put('event', E3);
+    await open({ narrative: N, event: E, location: GONE_L });
+    const box = drawn();
+    await store.writeWorldMeta({ x_strand: { narrative: N, event: E2, location: GONE_L } } as unknown as Partial<WorldMeta>);
+    expect(await writeStrandSlot('event', box, E3)).toBe('refused');
+    expect((await onDisk(N)).events).toEqual([E, E2]);
+    expect(await markOnDisk()).toEqual({ narrative: N, event: E2, location: GONE_L });
+  });
+
+  it('and inside the meta op, when it moves after the link', async () => {
+    await put('narrative', N, { events: [E, E2] });
+    await put('event', E);
+    await put('event', E2);
+    await put('event', E3);
+    await open({ narrative: N, event: E, location: GONE_L });
+    const box = drawn();
+    const meta = store.writeWorldMetaWith.bind(store);
+    store.writeWorldMetaWith = async mutate => {
+      await store.writeWorldMeta({ x_strand: { narrative: N, event: E2, location: GONE_L } } as unknown as Partial<WorldMeta>);
+      return meta(mutate);
+    };
+    expect(await writeStrandSlot('event', box, E3)).toBe('refused');
+    expect(await markOnDisk()).toEqual({ narrative: N, event: E2, location: GONE_L });
+  });
+
+  it('Change on where it happened is refused when the place moved', async () => {
+    await put('narrative', N, { events: [E] });
+    await put('event', E, { locations: [L, L2] });
+    await put('location', L);
+    await put('location', L2);
+    await open({ narrative: N, event: E, location: L });
+    const box = drawn();
+    await store.writeWorldMeta({ x_strand: { narrative: N, event: E, location: L2 } } as unknown as Partial<WorldMeta>);
+    expect(await writeStrandSlot('location', box, GONE_L)).toBe('refused');
+    expect(await markOnDisk()).toEqual({ narrative: N, event: E, location: L2 });
+    expect((await onDisk(E)).locations).toEqual([L, L2]);
   });
 });
 
