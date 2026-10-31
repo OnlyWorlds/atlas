@@ -135,7 +135,9 @@ export function isStrandKeeper(entry: WorldRegistryEntry | undefined, meta: unkn
   if (entryIsViewOnly(entry)) return false;
   if (entry?.state === 'api-linked') {
     const role = entry.api?.member_role ?? entry.api?.seat?.role;
-    return role === 'owner' || role === 'co_builder';
+    // No role kept yet (a world just linked, before its first round's /me) reads as owned, as may-change.ts
+    // reads it: a new online world opens on its strand, and keel refuses a write this reader may not make.
+    return role === undefined || role === 'owner' || role === 'co_builder';
   }
   const slice = sliceOf(meta);
   return !slice || slice.kind === 'owner' || (slice.kind === 'member' && slice.role === 'co_builder');

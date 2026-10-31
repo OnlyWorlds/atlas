@@ -146,7 +146,10 @@ export function chosenTab(worldId: string, c: StrandContext | null = strandConte
   let t = tabs.get(worldId);
   if (!t) {
     // A world with nothing in it yet opens on Strand: its five boxes are a new world's first steps (1.115.0).
-    t = c?.strand.narrative || worldEmptyForPath() ? 'strand' : 'picture';
+    // Not recorded: once the world holds something made elsewhere (the sidebar, a file brought in, an AI
+    // writing the folder), the next draw reads it afresh; a press on a tab is recorded as always.
+    if (!c?.strand.narrative && worldEmptyForPath()) return 'strand';
+    t = c?.strand.narrative ? 'strand' : 'picture';
     tabs.set(worldId, t);
   }
   return t;
@@ -158,6 +161,8 @@ export function chosenTab(worldId: string, c: StrandContext | null = strandConte
  * person (C4).
  */
 export function notePictureShown(worldId: string): void {
+  // An empty world is never pinned to its picture: its first draw with the tabs opens on Strand (the 1.115.0 gate's M1).
+  if (worldEmptyForPath()) return;
   if (!tabs.has(worldId)) tabs.set(worldId, 'picture');
 }
 

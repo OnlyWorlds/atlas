@@ -151,8 +151,9 @@ async function seeded(page: Page, mark: unknown, meta?: Record<string, unknown>)
   // World meta in place before Home's first draw past the path (a reader's slice, for one).
   if (meta) await writeMeta(page, meta);
   await pastPath(page);
-  // The world opened empty, and an empty world's first draw chose Strand for the session (G13, 1.115.0):
-  // forget that choice, as a new session would, so Home's next opening picks its tab from what is here.
+  // The world was built one element at a time under a mounted Home, and the draws in between recorded a tab
+  // (G13) before the mark landed. A person opens this world once it is built: the session's tab memory is
+  // forgotten, as on a fresh opening, and Home's next draw picks its tab by the rule.
   await page.evaluate(async () => { ((await import('/src/middle/home-strand.ts')) as any).resetStrandTabForTests(); });
   await go(page, `#/w/${wid}/settings`);
   await expect(page.locator('.atlas-world-home')).toHaveCount(0);

@@ -68,7 +68,8 @@ describe('who writes', () => {
     expect(isStrandKeeper(linked(undefined, { seat: { role: 'co_builder' } }), {})).toBe(true);
     expect(isStrandKeeper(linked('contributor'), {})).toBe(false);
     expect(isStrandKeeper(linked('guest'), {})).toBe(false);
-    expect(isStrandKeeper(linked(undefined), {})).toBe(false);
+    // No role kept yet (before the first round's /me) reads as owned, as may-change.ts reads it (1.115.0's gate, M1).
+    expect(isStrandKeeper(linked(undefined), {})).toBe(true);
     expect(isStrandKeeper(local, {})).toBe(true);
     expect(isStrandKeeper(linked('owner', { read_only: true }), {})).toBe(false);
     expect(isStrandKeeper({ ...local, copy_of: 'x' } as never, {})).toBe(false);

@@ -287,9 +287,6 @@ async function builtWorld(page: Page) {
  * (G13, 1.115.0): forget that choice, as a new session would, so the next Home picks its tab from
  * the world brought in.
  */
-async function freshTabs(page: Page) {
-  await page.evaluate(async () => { ((await import('/src/middle/home-strand.ts')) as any).resetStrandTabForTests(); });
-}
 
 async function pastTheGrid(page: Page) {
   await page.evaluate(async () => {
@@ -303,7 +300,6 @@ async function pastTheGrid(page: Page) {
 test('a world brought in whole: Home\'s picture, no note; its centre opens the Web; rebuilds keep one graph', async ({ page }) => {
   await setupWorld(page);
   const keep = await builtWorld(page);
-  await freshTabs(page);
   await pastTheGrid(page);
   await goHome(page);
   const picture = page.locator('[data-role="home-picture"]');
@@ -338,7 +334,6 @@ test('a world with nothing worth drawing has no picture, and its twin with a thi
   await setupWorld(page);
   const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
   for (const name of ['Ada', 'Bram']) await createViaStore(page, 'character', { name, location: keep });
-  await freshTabs(page);
   await pastTheGrid(page);
   await goHome(page);
   await expect(page.locator('.atlas-world-home')).toBeVisible();
@@ -350,7 +345,6 @@ test('a world with nothing worth drawing has no picture, and its twin with a thi
 test('Moppetopia: a create by hand speaks no note, and Home shows the picture', async ({ page }) => {
   await setupWorld(page);
   await builtWorld(page);
-  await freshTabs(page);
   await pastTheGrid(page);
   await pastThePath(page);
   // The open world is Moppetopia by its world id, as its copy carries it.
