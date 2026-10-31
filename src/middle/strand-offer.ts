@@ -4,10 +4,10 @@
  * One predicate with the Strand tab's Pick (`offerable`): never a proposed Narrative, a known-of stub,
  * a room element or a reading aid; a chapter may be the story.
  *
- *   Not the strand: "Make this the world's strand" ("…instead of <name>" when another story is), one
+ *   Clear the strand: "Make this the world's strand" ("…instead of <name>" when another story is), one
  *   press writes the story change and says "The world's strand · Open it" (Home on the Strand tab;
  *   no Open it while the path shows, where Home draws no tab).
- *   Already the strand: the page says "This is the world's strand · Open it · Not the strand", Not the
+ *   Already the strand: the page says "This is the world's strand · Open it · Clear the strand", Not the
  *   strand after a promise line and a second press; the sticky bar shows nothing.
  */
 
@@ -100,7 +100,7 @@ export async function makeThisTheStrand(el: Element, worldId: string, drawn: Str
   return result;
 }
 
-/** Not the strand's promise, waiting for its second press: this tab's memory, by element. */
+/** Clear the strand's promise, waiting for its second press: this tab's memory, by element. */
 let confirming: string | null = null;
 
 /** The page's block under the name, or null. */
@@ -142,7 +142,7 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
   line.appendChild(word);
   if (!pathShowing(worldId)) line.append(sep(), btn('Open it', 'strand-open', () => openStrandTab(worldId)));
   if (confirming !== el.id) {
-    line.append(sep(), btn('Not the strand', 'strand-clear', () => {
+    line.append(sep(), btn('Clear the strand', 'strand-clear', () => {
       confirming = el.id;
       const now = box.parentElement;
       const next = buildPageStrandOffer(el, worldId);
@@ -161,13 +161,13 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
   const row = document.createElement('div');
   row.className = 'atlas-strand-offer-acts';
   row.append(
-    btn('Not the strand', 'strand-clear-confirm', () => {
+    btn('Clear the strand', 'strand-clear-confirm', () => {
       if (strandPressing(worldId, el)) return;
       for (const b of row.querySelectorAll<HTMLButtonElement>('button')) b.disabled = true;
       confirming = null;
       void hold(worldId, el, () => clearStrand(drawn)).then(r => {
         if (r === 'held' || r === 'wrote') return;
-        // Refused or failed: the block is drawn again, Not the strand and Cancel live (D2).
+        // Refused or failed: the block is drawn again, Clear the strand and Cancel live (D2).
         drawAgain(el, worldId);
         if (r === 'refused') toastManager.info(STRAND_MOVED);
       });

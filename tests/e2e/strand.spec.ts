@@ -320,7 +320,7 @@ test.describe('the tab and the path closing', () => {
 });
 
 test.describe('Make this the world\'s strand', () => {
-  test('from the page: "instead of", Open it on the Strand tab, and Not the strand after its promise', async ({ page }) => {
+  test('from the page: "instead of", Open it on the Strand tab, and Clear the strand after its promise', async ({ page }) => {
     const wid = await seeded(page, { narrative: N1, event: E1, location: L1 });
     await put(page, 'narrative', N2, 'The Short Road', { supertype: 'Book', events: [E1] });
     await page.evaluate(async ({ e1, l1 }) => {

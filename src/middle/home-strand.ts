@@ -534,7 +534,8 @@ function promiseRow(slot: StrandSlot, c: StrandContext, o: Opened, opts: StrandP
   const next = o.name ?? nameOf(o.pick ? c.byId.get(o.pick) : undefined);
   line.textContent = `${next} will be ${SLOT_PHRASE[slot]} in place of ${holdsWords(slot, c)}.`;
   row.appendChild(line);
-  const confirm = act('Change', `${slot}:confirm`, () => {
+  const held = c.strand[slot]?.name.trim();
+  const confirm = act(held ? `Replace ${held}` : 'Change', `${slot}:confirm`, () => {
     if (confirm.disabled) return;
     confirm.disabled = true;
     const drawn = o.drawn ?? drawnFor(slot, c);

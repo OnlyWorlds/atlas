@@ -150,7 +150,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // Set by mountForNarrative on first paint; updated after each refresh.
   let lastRefreshEl: Element | null = null;
   let lastRefreshElementsRef: Element[] | null = null;
-  // The world's strand mark (S8, G4): a press, a pull or Not the strand changes the bar's offer and
+  // The world's strand mark (S8, G4): a press, a pull or Clear the strand changes the bar's offer and
   // the frame without a keystroke, though no element moved.
   let lastRefreshMark: string | null | undefined;
   // Singleton chip preview controller for this workspace mount — hover +

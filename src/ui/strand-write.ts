@@ -139,7 +139,7 @@ export async function makeStrandSlot(slot: StrandSlot, drawn: StrandDrawn, name:
   return { result, made };
 }
 
-/** Not the strand: the key removed (written as absent), only while the mark still names the story drawn. */
+/** Clear the strand: the key removed (written as absent), only while the mark still names the story drawn. */
 export async function clearStrand(drawn: StrandDrawn): Promise<StrandWriteResult> {
   const store = storeFor(drawn.worldId);
   if (!store) return 'nothing';

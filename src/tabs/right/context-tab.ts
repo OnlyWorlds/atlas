@@ -222,7 +222,7 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   // syncPrefsToGraph without a full rebuild.
   let lastRouteKey: string | null = null;
   let lastElementsRef: readonly Element[] | null = null;
-  // The strand's mark (G4): a press, a pull or Not the strand redraws the frame, no keystroke needed.
+  // The strand's mark (G4): a press, a pull or Clear the strand redraws the frame, no keystroke needed.
   let lastMarkKey: string | null | undefined;
 
   /** The frame for the route's writing subject, or nothing. */

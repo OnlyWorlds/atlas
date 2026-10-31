@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.114.2',
+    date: '2026-10-31',
+    theme: 'The strand says what it does',
+    entries: [
+      {
+        id: 'strand-buttons-say',
+        title: 'The strand\'s buttons say what they do',
+        body: "On a story's page, Clear the strand takes the world's strand away, where it read Not the strand. Changing who fills a box now confirms with Replace and the name it replaces.",
+        tags: ['world', 'writing'],
+      },
+    ],
+  },
+  {
     version: '1.114.1',
     date: '2026-10-31',
     theme: 'Where an element has been, whole',

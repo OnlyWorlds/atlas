@@ -118,6 +118,7 @@ describe('a box pressed twice writes once (C1)', () => {
     option.click();
     const confirm = box('character').querySelector<HTMLButtonElement>('[data-act="confirm"]')!;
     expect(box('character').querySelector('[data-role="strand-promise"]')!.textContent).toBe('Ilse will be the hero in place of Mira.');
+    expect(confirm.textContent).toContain('Replace Mira');
     confirm.click();
     confirm.click();
     await settle();
@@ -193,7 +194,7 @@ describe('the page and the bar after a press that did not land (D2)', () => {
   };
   const live = (sel: string) => page.querySelector<HTMLButtonElement>(sel);
 
-  it('Not the strand failing: the block is drawn again, Not the strand and Cancel live', async () => {
+  it('Clear the strand failing: the block is drawn again, Clear the strand and Cancel live', async () => {
     await put('narrative', N);
     await open({ narrative: N, event: GONE_E, location: GONE_L });
     offerOn(N);
@@ -206,7 +207,7 @@ describe('the page and the bar after a press that did not land (D2)', () => {
     expect(toastManager.problem).toHaveBeenCalled();
   });
 
-  it('Not the strand refused: the same, beside the line that says it', async () => {
+  it('Clear the strand refused: the same, beside the line that says it', async () => {
     await put('narrative', N);
     await open({ narrative: N, event: GONE_E, location: GONE_L });
     offerOn(N);

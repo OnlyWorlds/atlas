@@ -45,7 +45,7 @@ export function storedMark(meta: WorldMeta | null | undefined): unknown {
 
 /**
  * The open world's mark as canonical JSON (null: none), for a render gate's inputs (S8, G4): a press,
- * a pull or Not the strand moves it while no element changed.
+ * a pull or Clear the strand moves it while no element changed.
  */
 export function strandMarkKey(meta: WorldMeta | null | undefined): string | null {
   return canonicalExtValue(storedMark(meta));

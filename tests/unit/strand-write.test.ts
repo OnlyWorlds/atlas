@@ -341,7 +341,7 @@ describe('a list that will not read back (D3)', () => {
   });
 });
 
-describe('Not the strand, and where nothing is written', () => {
+describe('Clear the strand, and where nothing is written', () => {
   it('removes the key while the mark still names the story drawn; refused once it moved', async () => {
     await put('narrative', N);
     await open({ narrative: N, event: GONE_E, location: GONE_L });
