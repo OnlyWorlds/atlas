@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'The globe beside a world or an element name is now about the height of the name\'s capitals, with the same space to tap. A place it offers on the web opens in a new tab, so Atlas stays open behind it, and the row for Atlas itself is grey, as where you already are.',
         tags: ['sharing'],
       },
+      {
+        id: 'download-a-world-words',
+        title: 'Download a world says whose key and PIN it asks for',
+        body: 'Under a new world\'s Strand, the line beside Download a world now says it asks for the API key and PIN of a world on OnlyWorlds. It read as if the world in front of you already had them.',
+        tags: ['home'],
+      },
     ],
   },
   {
