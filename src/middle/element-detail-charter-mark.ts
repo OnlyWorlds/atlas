@@ -121,7 +121,7 @@ export function buildCharterMarkOffer(el: Element, entry: WorldRegistryEntry | u
     line.textContent = offerLine(el, offer);
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'atlas-btn atlas-btn--secondary atlas-charter-mark-btn';
+    btn.className = 'atlas-btn-primary atlas-charter-mark-btn';
     btn.dataset.role = 'charter-mark-btn';
     btn.textContent = buttonLabel(offer.kind);
     btn.addEventListener('click', () => { void markAid(el, offer.kind, charterMarkValue(entry, meta, worldId), btn); });
@@ -159,7 +159,7 @@ function buildRetireOffer(el: Element, meta: unknown, elements: readonly Element
     : `Marked as a ${word}, but this world's ${word} is ${leading ? nameOf(leading, word) : 'another'}. Retiring this one takes its mark off: ${ordinary}.`;
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'atlas-btn atlas-btn--secondary';
+  btn.className = 'atlas-btn-ghost';
   btn.dataset.action = 'aid-retire';
   btn.textContent = 'Retire it';
   btn.addEventListener('click', () => { void retireAid(el, btn); });

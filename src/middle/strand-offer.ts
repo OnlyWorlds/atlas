@@ -131,7 +131,7 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
   };
   if (offer.kind === 'make') {
     const drawn = drawnNow(worldId);
-    const b = btn(makeLabel(offer), 'strand-make', () => { b.disabled = true; void makeThisTheStrand(el, worldId, drawn); }, 'atlas-btn atlas-btn--secondary');
+    const b = btn(makeLabel(offer), 'strand-make', () => { b.disabled = true; void makeThisTheStrand(el, worldId, drawn); }, 'atlas-btn-primary');
     box.appendChild(b);
     return box;
   }
@@ -171,7 +171,7 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
         drawAgain(el, worldId);
         if (r === 'refused') toastManager.info(STRAND_MOVED);
       });
-    }, 'atlas-btn atlas-btn--secondary'),
+    }, 'atlas-btn-primary'),
     btn('Cancel', 'strand-clear-cancel', () => {
       confirming = null;
       const next = buildPageStrandOffer(el, worldId);

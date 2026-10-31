@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.114.3',
+    date: '2026-10-31',
+    theme: 'Four buttons in their place',
+    entries: [
+      {
+        id: 'strand-charter-buttons-styled',
+        title: 'The strand\'s and the charter\'s buttons look like Atlas again',
+        body: "Make this the world's strand, Clear the strand, Mark as this world's charter and Retire it showed as the browser's own grey button, a different one in each browser, with a focus ring that was hard to see. They now wear Atlas's buttons: the first three the everyday one, Retire it the quiet one.",
+        tags: ['world', 'writing'],
+      },
+    ],
+  },
+  {
     version: '1.114.2',
     date: '2026-10-31',
     theme: 'The strand says what it does',

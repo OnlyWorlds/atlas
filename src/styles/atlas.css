@@ -17984,7 +17984,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-strand-offer-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--atlas-text); }
 .atlas-strand-offer-sep { color: var(--atlas-text-muted); }
 .atlas-strand-offer-acts { display: flex; flex-wrap: wrap; gap: 8px; }
-@media (pointer: coarse) { .atlas-strand-offer .atlas-btn-link, .atlas-strand-offer .atlas-btn-ghost, .atlas-strand-offer .atlas-btn { min-height: 44px; } }
+@media (pointer: coarse) { .atlas-strand-offer .atlas-btn-link, .atlas-strand-offer .atlas-btn-ghost, .atlas-strand-offer .atlas-btn-primary { min-height: 44px; } }
 .atlas-writing-workspace-strand { max-width: 260px; min-height: 26px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 @media (pointer: coarse) { .atlas-writing-workspace-crumb .atlas-writing-workspace-strand { min-height: 44px; } }
 .atlas-context-strand { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--atlas-divider-strong); border-radius: 8px; background: var(--atlas-bg-panel); }

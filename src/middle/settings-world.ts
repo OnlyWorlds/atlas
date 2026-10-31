@@ -890,7 +890,7 @@ function renderSyncIssues(world: WorldRegistryEntry): string {
         ? `<span class="atlas-settings-issue-name">${escapeText(issueName(i))}</span>`
         : `<button class="atlas-link-btn atlas-settings-issue-name" data-action="open-issue">${escapeText(issueName(i))}</button>`}
       <span class="atlas-settings-issue-line">${escapeText(syncIssueLine(i, filesWhereOf(world)))}</span>
-      ${i.kind === 'other' ? '<button class="atlas-btn-ghost atlas-btn-small" data-action="copy-issue">Copy details</button>' : ''}
+      ${i.kind === 'other' ? '<button class="atlas-btn-ghost" data-action="copy-issue">Copy details</button>' : ''}
     </li>`).join('');
   const more = issues.length > ISSUE_ROWS_SHOWN ? `<p class="atlas-settings-hint">And ${issues.length - ISSUE_ROWS_SHOWN} more.</p>` : '';
   // The engine's own sentence, as written; one full stop at the end.
