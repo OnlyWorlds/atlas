@@ -29,9 +29,10 @@ beforeAll(() => {
 
 const el = (n: number, type: string, name: string, extra: Record<string, unknown> = {}) =>
   ({ id: id(n), type, name, ...extra }) as unknown as Element;
-const ada = el(1, 'character', 'Ada');
-const keep = el(3, 'location', 'Hollow Keep', { characters: [id(1)] });
-const cy = el(5, 'character', 'Cy', { locations: [id(3)] });
+// The standard's own links (Character location): a fixture's links are claims about the schema.
+const ada = el(1, 'character', 'Ada', { location: id(3) });
+const keep = el(3, 'location', 'Hollow Keep');
+const cy = el(5, 'character', 'Cy', { location: id(3) });
 const heir = el(7, 'character', 'Secret Heir');
 const lens = el(10, 'construct', "Ada's world", { supertype: 'Lens', characters: [id(1)] });
 const world = [ada, keep, cy, heir, lens];

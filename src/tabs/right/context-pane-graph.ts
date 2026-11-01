@@ -39,6 +39,7 @@ import { pageLore } from '../../core/parlor-room';
 import { proposedMarkOf, proposedTitle, proposedWord } from '../../core/review-mark';
 import { hiddenMarkLine } from '../../core/hidden-mark';
 import type { LensPicture } from '../../core/web-lens';
+import { isCharterElement, worldGraph } from '@onlyworlds/sdk';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -226,104 +227,78 @@ interface SimEdge {
   mutual: boolean;
 }
 
-const MULTI_LINK_FIELDS = [
-  'characters', 'locations', 'objects', 'events', 'creatures',
-  'species', 'institutions', 'collectives', 'phenomena', 'languages',
-  'titles', 'traits', 'abilities', 'constructs', 'laws', 'families',
-  'narratives', 'relations',
-] as const;
+/**
+ * The Web reads its links through the SDK's one graph reader (`worldGraph`, the lens profile's graph
+ * section): each schema link field typed to its target, and the extension links a profile declares
+ * (`x_lens_leads_to`, `x_spine_depends_on`). A value in any other key is no link, however much it looks
+ * like an id: Atlas's own page and suggestion fields, an import's `x_` reference. A link to an element of
+ * another type than its field's target draws nothing.
+ *
+ * What stays Atlas's drawing, over the reader's links (named 2026-11-01, when the Web moved onto the reader):
+ *   1. Proposed and hidden elements are drawn and marked: Atlas is the keeper's copy (`paint`'s marks).
+ *   2. One line per pair, `mutual` when both ends hold the link; a link to itself draws nothing.
+ *   3. Map space is read as what it joins (conv. 138, `buildWebLinks`): a pin joins its map to its element,
+ *      a marker its map to its zone.
+ *   4. The reading aids are drawn where the page shows them (`pageLore`: an aid's own page, or the aids
+ *      shown in this world). The reader keeps an aid out with no flag to bring it back, so an aid is handed
+ *      to it without its mark (`x_charter_of`) and its links are read by the reader's rule like any other.
+ *   5. The writing tree is not drawn: `parent_narrative` is the sidebar's, and a chapter's web with every
+ *      scene in its first ring would crowd out the cast it exists to show (`WEB_UNDRAWN_FIELDS`).
+ */
+const READER_FLAGS = { rooms: true, hidden: true, proposed: true, mapSpace: true } as const;
+/** Link fields the reader reads and the Web leaves undrawn (choice 5). */
+const WEB_UNDRAWN_FIELDS: ReadonlySet<string> = new Set(['parent_narrative']);
 
-function readMultiLink(el: Element, field: string): string[] {
-  const raw = (el as Record<string, unknown>)[field];
-  if (!Array.isArray(raw)) return [];
-  const out: string[] = [];
-  for (const item of raw) {
-    if (typeof item === 'string') out.push(item);
-    else if (item && typeof item === 'object' && typeof (item as { id?: string }).id === 'string') {
-      out.push((item as { id: string }).id);
-    }
+type ReaderLinks = Map<string, string[]>;
+/** Per elements array (the store swaps the array on every write), as the label density's index is. */
+const readerLinksMemo = new WeakMap<readonly Element[], ReaderLinks>();
+
+/**
+ * Every element's outgoing links as the reader reads them, in the reader's order (field name, then the
+ * target's place in the list), each target once and never the element itself. The room, the hidden, the
+ * proposed and map space are all handed back by flag, so the caller's array (`pageLore`) alone decides
+ * who is in the world.
+ */
+export function readerLinksOf(elements: readonly Element[]): ReaderLinks {
+  const memo = readerLinksMemo.get(elements);
+  if (memo) return memo;
+  const handed = elements.map(el => {
+    if (!isCharterElement(el as never)) return el;
+    const { x_charter_of: _mark, ...rest } = el as Element & { x_charter_of?: unknown };
+    return rest as Element;
+  });
+  const out: ReaderLinks = new Map();
+  let graph: ReturnType<typeof worldGraph> | null = null;
+  try {
+    graph = worldGraph({ elements: handed as unknown as object[] }, { rung: 'owner' }, READER_FLAGS);
+  } catch (err) {
+    // A world the reader refuses draws every element alone rather than no Web at all.
+    console.warn('[atlas] the graph reader refused this world', err);
   }
+  for (const e of graph?.edges ?? []) {
+    if (e.source === e.target || WEB_UNDRAWN_FIELDS.has(e.field)) continue;
+    let list = out.get(e.source);
+    if (!list) { list = []; out.set(e.source, list); }
+    if (!list.includes(e.target)) list.push(e.target);
+  }
+  readerLinksMemo.set(elements, out);
   return out;
-}
-
-/**
- * Fields whose string values are never treated as single-link neighbors:
- * identity/sync metadata, and `parent_narrative` — the writing-tree hierarchy
- * lives in the sidebar; pulling parents into the flat context graph just adds
- * noise to every scene/chapter view.
- */
-const SINGLE_LINK_SKIP_KEYS = new Set([
-  'id', 'local_updated_at', 'server_updated_at', 'parent_narrative',
-]);
-
-/**
- * Plausible element-id shape — a 36-char hyphenated UUID. Keeps prose/text
- * field values out of the candidate set; final validity is the caller's
- * `byId.has` filter (same double-gate rationale as the engine's topo-sort).
- */
-export function looksLikeId(v: string): boolean {
-  return v.length === 36 && v.includes('-');
-}
-
-export function collectDirectNeighbors(el: Element): string[] {
-  const seen = new Set<string>();
-  for (const field of MULTI_LINK_FIELDS) {
-    for (const id of readMultiLink(el, field)) {
-      if (!seen.has(id)) seen.add(id);
-    }
-  }
-  // Single-link fields too (narrator / protagonist / birthplace / location /
-  // …) — generic id-shaped scan (convention #5). Without this, a knowledge
-  // entry's narrator (its primary holder channel) and every other single-link
-  // relation was invisible to the graph.
-  for (const [key, value] of Object.entries(el)) {
-    if (SINGLE_LINK_SKIP_KEYS.has(key)) continue;
-    if (typeof value === 'string') {
-      if (looksLikeId(value)) seen.add(value);
-    } else if (Array.isArray(value)) {
-      // Multi-links OUTSIDE the named list: `governs`, `populations`,
-      // `holders`, `allies`, `members`... the schema has dozens of multi-link
-      // names and the list above holds eighteen. A family that `governs` a
-      // regime was invisible to the regime's web. Any array of id-shaped
-      // strings is a link list; the caller's `byId` filter still decides.
-      for (const item of value) {
-        if (typeof item === 'string' && looksLikeId(item)) seen.add(item);
-      }
-    } else if (value && typeof value === 'object') {
-      const id = (value as { id?: unknown }).id;
-      if (typeof id === 'string' && looksLikeId(id)) seen.add(id);
-    }
-  }
-  seen.delete(el.id);
-  return Array.from(seen);
 }
 
 /**
  * Reverse adjacency for a world: for every element id, the ids of elements
- * whose fields point at it. Built once per render from the same
- * `collectDirectNeighbors` read that draws the forward edges, so a link
- * counts in exactly one direction per pair and the two never disagree.
- * O(N × fields) over the loaded world; a 600-element world is well under a
- * millisecond.
+ * whose link fields point at it, from the same reader the Web draws with.
  */
 export function buildReverseIndex(elements: readonly Element[]): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
-  for (const el of elements) {
-    for (const target of collectDirectNeighbors(el)) {
+  for (const [source, targets] of readerLinksOf(elements)) {
+    for (const target of targets) {
       let set = out.get(target);
       if (!set) { set = new Set(); out.set(target, set); }
-      set.add(el.id);
+      set.add(source);
     }
   }
   return out;
-}
-
-/** Ids of elements linking TO `targetId`, excluding itself. Test seam. */
-export function collectIncomingNeighbors(targetId: string, elements: readonly Element[]): string[] {
-  const set = buildReverseIndex(elements).get(targetId);
-  if (!set) return [];
-  set.delete(targetId);
-  return Array.from(set);
 }
 
 /**
@@ -390,13 +365,24 @@ export function buildWebLinks(elements: readonly Element[], centerId: string): W
     if (!i) { i = new Set(); inc.set(to, i); }
     i.add(from);
   };
+  const reader = readerLinksOf(elements);
   for (const el of elements) {
-    if (isSpatial(el) && el.id !== centerId) {
-      const mapId = (el as Pin | Marker).map_id;
-      const otherId = el.type === 'pin' ? (el as Pin).element_id : (el as Marker).zone_id;
+    if (isSpatial(el)) {
+      // Map space as what it joins (drawing choice 3). Both spellings of the map and zone links are read
+      // (`map_id` in memory, `map` as the standard writes it).
+      const rec = el as (Pin | Marker) & { map?: unknown; zone?: unknown };
+      const mapId = typeof rec.map_id === 'string' ? rec.map_id : rec.map;
+      const otherId = el.type === 'pin' ? (el as Pin).element_id : ((el as Marker).zone_id ?? rec.zone);
       const map = typeof mapId === 'string' ? byId.get(mapId) : undefined;
       const other = typeof otherId === 'string' ? byId.get(otherId) : undefined;
-      if (!map || !other || isSpatial(map) || isSpatial(other) || map.id === other.id) continue;
+      const usable = (x: Element | undefined): x is Element => !!x && !isSpatial(x) && x.id !== el.id;
+      if (el.id === centerId) {
+        // The center keeps what it joins as its own links.
+        if (usable(map)) add(el.id, map.id);
+        if (usable(other)) add(el.id, other.id);
+        continue;
+      }
+      if (!usable(map) || !usable(other) || map.id === other.id) continue;
       add(map.id, other.id);
       add(other.id, map.id);
       if (el.type === 'marker') {
@@ -405,7 +391,7 @@ export function buildWebLinks(elements: readonly Element[], centerId: string): W
       }
       continue;
     }
-    for (const t of collectDirectNeighbors(el)) {
+    for (const t of reader.get(el.id) ?? []) {
       const target = byId.get(t);
       if (!target || (isSpatial(target) && t !== centerId)) continue;
       add(el.id, t);

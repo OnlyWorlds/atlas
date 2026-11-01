@@ -17,7 +17,8 @@ beforeEach(() => clearContextGraphLayoutMemo());
 afterEach(() => { document.body.innerHTML = ''; });
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const center = { id: uuid(0), type: 'location', name: 'Harbour', characters: [uuid(1), uuid(2), uuid(3)] } as unknown as Element;
+// The standard's own link (Character friends): a fixture's links are claims about the schema.
+const center = { id: uuid(0), type: 'character', name: 'Dara', friends: [uuid(1), uuid(2), uuid(3)] } as unknown as Element;
 const proposed = { id: uuid(1), type: 'character', name: 'Ada', x_review_proposed: { by: 'm2' } } as unknown as Element;
 const hidden = { id: uuid(2), type: 'character', name: 'Bo', hidden: true } as unknown as Element;
 const plain = { id: uuid(3), type: 'character', name: 'Cy' } as unknown as Element;

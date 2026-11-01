@@ -25,13 +25,14 @@ afterEach(() => { document.body.innerHTML = ''; });
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 function worldWithHub(flood: number, locations = 0): { map: Element; elements: Element[] } {
-  const map = { id: uuid(0), type: 'map', name: 'Sikelia' } as unknown as Element;
+  // A hub the world names by the standard's own links (a fixture's links are claims about the schema).
+  const map = { id: uuid(0), type: 'location', name: 'Syrakousai' } as unknown as Element;
   const els: Element[] = [map];
   for (let i = 1; i <= flood; i++) {
-    els.push({ id: uuid(i), type: 'character', name: `c${i}`, maps: [map.id] } as unknown as Element);
+    els.push({ id: uuid(i), type: 'character', name: `c${i}`, location: map.id } as unknown as Element);
   }
   for (let i = 1; i <= locations; i++) {
-    els.push({ id: uuid(10_000 + i), type: 'location', name: `l${i}`, maps: [map.id] } as unknown as Element);
+    els.push({ id: uuid(10_000 + i), type: 'location', name: `l${i}`, parent_location: map.id } as unknown as Element);
   }
   return { map, elements: els };
 }
@@ -44,7 +45,7 @@ function mount(subject: Element, hiddenTypes?: ReadonlySet<ElementType>) {
 }
 
 describe('context graph ring 1 cap', () => {
-  it('a Map with 800 characters on it draws the center plus 60, and says how many were left out', () => {
+  it('a place with 800 characters in it draws the center plus 60, and says how many were left out', () => {
     const { map, elements } = worldWithHub(800);
     patchSlice('data', { elements });
     const { host, h } = mount(map);
@@ -98,7 +99,7 @@ describe('context graph layout memo', () => {
     patchSlice('data', { elements });
     mount(map).h.destroy();
     const before = contextGraphSimRuns();
-    patchSlice('data', { elements: [...elements, { id: uuid(99), type: 'character', name: 'new', maps: [map.id] } as unknown as Element] });
+    patchSlice('data', { elements: [...elements, { id: uuid(99), type: 'character', name: 'new', location: map.id } as unknown as Element] });
     mount(map).h.destroy();
     expect(contextGraphSimRuns()).toBe(before + 1);
   });

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.117.0',
+    date: '2026-11-01',
+    theme: 'The Web reads links the way every OnlyWorlds tool does',
+    entries: [
+      {
+        id: 'web-reads-the-standard-links',
+        title: 'The Web draws the links the standard names, and only those',
+        body: 'The Web around an element now reads its links with the same reader the other OnlyWorlds tools use: each link field of the standard, pointing at an element of the type the field names, and the links a profile declares, such as a lens\'s next lens. A value that only looks like an id is no longer a line: the elements a page\'s blocks show (the page itself still lists them), a suggestion you dismissed, or a reference an import kept under its own x_ name. A link to an element of another type than its field asks for draws nothing. Proposed and hidden elements are still drawn and marked, pins and markers still join their map to what they place, and a chapter\'s scenes stay in the writing sidebar rather than the Web.',
+        tags: ['web'],
+      },
+      {
+        id: 'mark-offers-only-tools-that-open-it',
+        title: 'The OnlyWorlds mark offers only the tools that open this element',
+        body: 'Beside a hidden, proposed or room element, the mark leaves out a tool whose element page would not show it, as the tools list says of each tool.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.116.1',
     date: '2026-11-01',
     theme: 'Records, read in one pass',
