@@ -91,21 +91,31 @@ describe('isWritingInitialized', () => {
 
   it('a tangle chronicle record chain never trips setup (recorded artifacts, 2026-07-19)', () => {
     const entry = { id: 'w', name: 'w', state: 'local-only' } as unknown as WorldRegistryEntry;
-    // The exact shape tangle's record writer mints: chronicle Narrative +
-    // Battle Story children chained via parent_narrative, all supertype
-    // 'Chronicle' — an unlabeled parent chain that used to hijack the room.
-    const elements = [
-      n('chron', 'The chronicle of the Two Rivers', { supertype: 'Chronicle' }),
-      n('s1', 'Lysandra at the Two Rivers', { supertype: 'Chronicle', parent_narrative: 'chron' }),
+    // The exact shape tangle's record writer mints: a battle Event, its
+    // chronicle Narrative and Battle Story children chained via
+    // parent_narrative — an unlabeled parent chain that used to hijack the
+    // room. Carved by belonging to the run, never by the word; a run landed
+    // for review (proposed) is carved too.
+    const battle = { id: 'ev', type: 'event', name: 'The Two Rivers', local_updated_at: '2026-01-01T00:00:00Z',
+      x_record: { tool: 'tangle', played_at: '2026-11-01T12:00:00Z' } } as unknown as Element;
+    const chain = [
+      n('chron', 'The chronicle of the Two Rivers', { supertype: 'Chronicle', events: ['ev'] } as never),
+      n('s1', 'Lysandra at the Two Rivers', { supertype: 'Chronicle', parent_narrative: 'chron', events: ['ev'] } as never),
       n('s2', 'Theron at the Two Rivers', { supertype: 'Chronicle', parent_narrative: 'chron' }),
     ];
-    expect(isWritingInitialized(entry, elements)).toBe(true);
+    expect(isWritingInitialized(entry, [battle, ...chain])).toBe(true);
+    const proposed = { ...battle, x_review_proposed: { by: 'm2' } } as unknown as Element;
+    expect(isWritingInitialized(entry, [proposed, ...chain])).toBe(true);
+    // The control: the same chain with no run is an ordinary foreign chain.
+    expect(isWritingInitialized(entry, chain)).toBe(false);
   });
 
   it('a chronicle chain beside a genuinely foreign chain still gates on the foreign one', () => {
     const entry = { id: 'w', name: 'w', state: 'local-only' } as unknown as WorldRegistryEntry;
     const elements = [
-      n('chron', 'Chronicle', { supertype: 'Chronicle' }),
+      { id: 'ev', type: 'event', name: 'Battle', local_updated_at: '2026-01-01T00:00:00Z',
+        x_record: { tool: 'tangle', played_at: '2026-11-01T12:00:00Z' } } as unknown as Element,
+      n('chron', 'Chronicle', { supertype: 'Chronicle', events: ['ev'] } as never),
       n('s1', 'Story', { supertype: 'Chronicle', parent_narrative: 'chron' }),
       n('tome', 'Tome A', { supertype: 'Tome' }), // foreign import, unlabeled tiers
       n('part', 'Part 1', { supertype: 'Part', parent_narrative: 'tome' }),

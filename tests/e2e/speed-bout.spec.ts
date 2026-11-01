@@ -156,11 +156,42 @@ test('object-valued extension fields render read-only, never as an editable row'
   await expect(page.locator('.atlas-field[data-field="x_other_tool"]')).toHaveCount(0);
   // The scalar custom field keeps its normal editable row.
   await expect(page.locator('.atlas-field[data-field="x_note"]')).toHaveCount(1);
-  // Chronicle sparkle: the sidebar row carries the quiet recorded-from-play mark.
+  // Recorded from play: the sidebar row carries the quiet mark (a Tangle battle from before the mark, by its tally).
   await expect(page.locator(`.atlas-row[data-element-id="${elementId}"] .atlas-row-chronicle`)).toHaveCount(1);
 });
 
-test('character war record lists recorded battles chronologically; absent without battles', async ({ page }) => {
+test('a record\'s mark is a profile key: read only, no remove', async ({ page }) => {
+  await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    api.setNextDirectory(root);
+  });
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Markville');
+  await page.click('[data-action="pick"]');
+  await page.waitForFunction(() => window.__atlasTestApi.getState().active?.opened);
+  const elementId = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const store = api.getActiveStore();
+    const el = await store.createElement('event', {
+      name: 'A Crossing', x_record: { tool: 'subs', played_at: '2026-11-01T12:00:00Z', outcome: 'survived' },
+    });
+    api.patchData(await store.listElements());
+    return el.id;
+  });
+  await page.evaluate((id) => {
+    const wid = window.__atlasTestApi.getState().active.worldId;
+    window.location.hash = `#/w/${wid}/element/${id}`;
+  }, elementId);
+  const row = page.locator('[data-profile-field="x_record"]');
+  await expect(row).toHaveCount(1);
+  await expect(row.locator('.atlas-custom-structured-remove')).toHaveCount(0);
+  await expect(page.locator('.atlas-field[data-field="x_record"]')).toHaveCount(0);
+  await expect(page.locator(`.atlas-row[data-element-id="${elementId}"] .atlas-row-chronicle`)).toHaveText('sports_esports');
+});
+
+test('a Character\'s Records: marked runs newest first with their stories, then Tangle\'s older battles; absent without', async ({ page }) => {
   await page.evaluate(async () => {
     const api = window.__atlasTestApi;
     const root = await api.opfsRoot();
@@ -177,27 +208,31 @@ test('character war record lists recorded battles chronologically; absent withou
     const store = api.getActiveStore();
     const veteran = await store.createElement('character', { name: 'Lysandra' });
     const civilian = await store.createElement('character', { name: 'Homebody' });
-    // Later battle created FIRST — the strip must sort by date, not creation.
-    const later = await store.createElement('event', {
-      name: 'Second Ford', supertype: 'Chronicle', subtype: 'Battle',
-      characters: [veteran.id], start_date: 320,
-    });
-    const earlier = await store.createElement('event', {
-      name: 'First Ford', supertype: 'Chronicle', subtype: 'Battle',
-      characters: [veteran.id], start_date: 300,
+    // The older run created FIRST: the list follows played_at, not creation.
+    const battle = await store.createElement('event', {
+      name: 'The Ford', supertype: 'Chronicle', subtype: 'Battle', characters: [veteran.id],
+      x_record: { tool: 'tangle', played_at: '2026-10-01T12:00:00Z', outcome: 'won', seats: { [veteran.id]: 'General' } },
       x_tangle_battle: {
         engineVersion: '1.0', seed: 1, durationSeconds: 60, winner: 'Left',
-        sides: [{ name: 'Left', fallen: 1 }, { name: 'Right', fallen: 2 }],
-        units: [],
+        sides: [{ name: 'Left', fallen: 1 }, { name: 'Right', fallen: 2 }], units: [],
       },
     });
-    // A non-battle chronicle event must NOT enter the record.
-    await store.createElement('event', {
-      name: 'Not A Battle', supertype: 'Chronicle', subtype: 'Festival',
-      characters: [veteran.id], start_date: 310,
+    const crossing = await store.createElement('event', {
+      name: 'The Crossing', characters: [veteran.id],
+      x_record: { tool: 'subs', played_at: '2026-10-20T12:00:00Z', outcome: 'survived', seats: { [veteran.id]: 'Commander, HMS Keeling' } },
     });
+    const log = await store.createElement('narrative', { name: 'The captain\'s log', events: [crossing.id], narrator: veteran.id });
+    const old = await store.createElement('event', {
+      name: 'The Old Ford', characters: [veteran.id],
+      x_tangle_battle: {
+        engineVersion: '1.0', seed: 2, durationSeconds: 60, winner: 'Left',
+        sides: [{ name: 'Left', fallen: 1 }, { name: 'Right', fallen: 2 }], units: [],
+      },
+    });
+    // A word is never a record.
+    await store.createElement('event', { name: 'Not A Record', supertype: 'Chronicle', subtype: 'Battle', characters: [veteran.id] });
     api.patchData(await store.listElements());
-    return { veteran: veteran.id, civilian: civilian.id, earlier: earlier.id, later: later.id };
+    return { veteran: veteran.id, civilian: civilian.id, battle: battle.id, crossing: crossing.id, log: log.id, old: old.id };
   });
 
   await page.evaluate((id) => {
@@ -205,18 +240,28 @@ test('character war record lists recorded battles chronologically; absent withou
     window.location.hash = `#/w/${wid}/element/${id}`;
   }, ids.veteran);
 
-  const section = page.locator('.atlas-war-record');
+  const section = page.locator('[data-role="records"]');
   await expect(section).toHaveCount(1);
-  const rows = section.locator('.atlas-war-record-row');
+  const rows = section.locator('[data-role="record"] .atlas-record-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0).locator('.atlas-war-record-name')).toHaveText('First Ford');
-  await expect(rows.nth(0).locator('.atlas-war-record-date')).toHaveText('300');
-  await expect(rows.nth(0).locator('.atlas-war-record-outcome')).toHaveText('Left held the field');
-  await expect(rows.nth(1).locator('.atlas-war-record-name')).toHaveText('Second Ford');
+  await expect(rows.nth(0).locator('.atlas-record-name')).toHaveText('The Crossing');
+  await expect(rows.nth(0).locator('.atlas-record-line')).toContainText('survived · as Commander, HMS Keeling');
+  await expect(rows.nth(1).locator('.atlas-record-name')).toHaveText('The Ford');
+  await expect(rows.nth(1).locator('.atlas-record-line')).toContainText('Tactical Tangle');
+  await expect(section.locator('[data-role="record-story"]')).toHaveText(/The captain's log\s*told by them/);
+  await expect(section.locator('[data-role="records-legacy-head"]')).toHaveText('Battles from Tactical Tangle');
+  await expect(section.locator('[data-role="record-legacy"] .atlas-record-name')).toHaveText('The Old Ford');
+  await expect(section).not.toContainText('Not A Record');
 
-  // Clicking a row opens the battle event.
-  await rows.nth(0).click();
-  await page.waitForFunction((eid) => window.location.hash.includes(`/element/${eid}`), ids.earlier);
+  // A row opens its Event, a story row its Narrative.
+  await section.locator('[data-role="record-story"]').click();
+  await page.waitForFunction((eid) => window.location.hash.includes(`/element/${eid}`), ids.log);
+  await page.evaluate((id) => {
+    const wid = window.__atlasTestApi.getState().active.worldId;
+    window.location.hash = `#/w/${wid}/element/${id}`;
+  }, ids.veteran);
+  await page.locator('[data-role="records"] [data-role="record"] .atlas-record-row').first().click();
+  await page.waitForFunction((eid) => window.location.hash.includes(`/element/${eid}`), ids.crossing);
 
   // A character with no recorded battles gets no section.
   await page.evaluate((id) => {
@@ -224,5 +269,5 @@ test('character war record lists recorded battles chronologically; absent withou
     window.location.hash = `#/w/${wid}/element/${id}`;
   }, ids.civilian);
   await expect(page.locator('.atlas-middle-header h2')).toContainText('Homebody');
-  await expect(page.locator('.atlas-war-record')).toHaveCount(0);
+  await expect(page.locator('[data-role="records"]')).toHaveCount(0);
 });

@@ -83,8 +83,8 @@ export interface TimelineNode {
   laneKey?: string;
   /**
    * Presentational icon override (Material Symbols name). Set by the
-   * normalizer for recorded-from-play artifacts (supertype 'Chronicle' →
-   * 'swords', the tangle seam — matches the sidebar sparkle). Renderers use
+   * normalizer for a record's Event or a legacy Tangle battle (core/records.ts
+   * `playGlyph`, the same glyph as the sidebar's). Renderers use
    * `glyph ?? ELEMENT_ICONS[elementType]`. A pure render cache, never
    * serialized; the publish payload keeps standard type icons.
    */

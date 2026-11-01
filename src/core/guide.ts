@@ -14,6 +14,7 @@
 import { dateOf, isLens } from '@onlyworlds/sdk';
 import type { Element, WorldRegistryEntry } from './types';
 import { isStoryNarrative } from './narrative-kind';
+import { playNarrativeIds } from './records';
 import { isBrowserWorld } from './browser-worlds';
 import { isRoomElement } from './parlor-room';
 import { isProposed } from './review-mark';
@@ -80,6 +81,7 @@ export function guideDots(
   let someone = false;
   let happened = false;
   let story = false;
+  const fromPlay = playNarrativeIds(all);
   for (const el of guideElements(all)) {
     switch (el.type) {
       case 'character': {
@@ -95,8 +97,8 @@ export function guideDots(
         if (!happened && dateOf(el) !== null) happened = true;
         break;
       case 'narrative':
-        // A Chronicle is a recorded artifact (Tangle's battles), not a story told.
-        if (!story && isStoryNarrative(el) && (el as { supertype?: unknown }).supertype !== 'Chronicle') story = true;
+        // A game's run told (core/records.ts) is a recorded artifact, not a story told.
+        if (!story && isStoryNarrative(el) && !fromPlay.has(el.id)) story = true;
         break;
     }
   }
@@ -273,7 +275,7 @@ export function noteEarned(gesture: Gesture, all: readonly Element[], speaksCale
       return { id: 'event', event: made.id, ...(pair ? { pair } : {}), ...(askYear ? { askYear } : {}) };
     }
     case 'narrative':
-      return isStoryNarrative(made) && (made as { supertype?: unknown }).supertype !== 'Chronicle'
+      return isStoryNarrative(made) && !playNarrativeIds(all).has(made.id)
         ? { id: 'story', narrative: made.id } : null;
     default:
       return null;

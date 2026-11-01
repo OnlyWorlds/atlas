@@ -31,6 +31,7 @@ import { elementHash, navigate, timelineHash, writingHash } from '../core/router
 import { DOTS, cardStep, guideElements, newestOf, placeIdOf, unplacedCharacters, type Dots, type StepId } from '../core/guide';
 import { advancePath, doorOf, pathShowing, setDoor, startPath } from '../core/guide-path';
 import { isStoryNarrative } from '../core/narrative-kind';
+import { playNarrativeIds } from '../core/records';
 import { isPartialSlice } from '../core/provenance';
 import { hasFolderMode } from '../core/capabilities';
 import { mayAdd, mayChange } from '../core/may-change';
@@ -147,7 +148,8 @@ function speak(step: StepId, dots: Dots, worldId: string): Speech {
         fallback: { label: 'Start a story', role: 'create-story', run: () => focusPlus() }, handOver: make('narrative') };
     }
     default: {
-      const tale = newestOf(ofType('narrative').filter(n => isStoryNarrative(n) && (n as { supertype?: unknown }).supertype !== 'Chronicle'));
+      const fromPlay = playNarrativeIds(getState().data.elements);
+      const tale = newestOf(ofType('narrative').filter(n => isStoryNarrative(n) && !fromPlay.has(n.id)));
       const event = newestOf(ofType('event'));
       if (tale && event && writeBetween(event.id, tale.id) && mine(tale)) {
         const w = writeBetween(event.id, tale.id)!;

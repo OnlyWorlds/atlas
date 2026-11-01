@@ -203,15 +203,40 @@ describe('timeline data-normalizer', () => {
     expect(nodes[0].endDate).toBe(200);
   });
 
-  it('stamps the swords glyph on Chronicle-supertype nodes only (the tangle seam)', () => {
+  it('stamps a glyph on record Events only, from the mark, never a word', () => {
     const elements: Element[] = [
       {
         id: 'e1',
         type: 'event',
         name: 'Battle of the Ford',
-        supertype: 'Chronicle',
+        x_record: { tool: 'tangle', played_at: '2026-11-01T12:00:00Z' },
         local_updated_at: '2026-01-01',
         start_date: 300,
+      } as Element & { start_date: number },
+      {
+        id: 'e3',
+        type: 'event',
+        name: 'A crossing',
+        x_record: { tool: 'subs', played_at: '2026-11-01T12:00:00Z' },
+        local_updated_at: '2026-01-01',
+        start_date: 305,
+      } as Element & { start_date: number },
+      {
+        id: 'e4',
+        type: 'event',
+        name: 'The word alone',
+        supertype: 'Chronicle',
+        subtype: 'Battle',
+        local_updated_at: '2026-01-01',
+        start_date: 306,
+      } as Element & { start_date: number },
+      {
+        id: 'n1',
+        type: 'narrative',
+        name: 'Told of the Ford',
+        events: ['e1'],
+        local_updated_at: '2026-01-01',
+        start_date: 307,
       } as Element & { start_date: number },
       {
         id: 'e2',
@@ -224,7 +249,10 @@ describe('timeline data-normalizer', () => {
     ];
     const nodes = extractTemporalNodes(elements);
     expect(nodes.find(n => n.id === 'e1')?.glyph).toBe('swords');
+    expect(nodes.find(n => n.id === 'e3')?.glyph).toBe('sports_esports');
     expect(nodes.find(n => n.id === 'e2')?.glyph).toBeUndefined();
+    expect(nodes.find(n => n.id === 'e4')?.glyph).toBeUndefined();
+    expect(nodes.find(n => n.id === 'n1')?.glyph).toBeUndefined();
   });
 
   it('drops an inverted end_date (end before start) rather than drawing backwards', () => {

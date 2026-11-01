@@ -31,6 +31,7 @@ import { isPartialSlice } from '../core/provenance';
 import { linkIdsOf } from '../core/link-ids';
 import { typeName } from '../core/type-words';
 import { isStoryNarrative } from '../core/narrative-kind';
+import { playNarrativeIds } from '../core/records';
 import { getTierForNarrative, getWritingLabels } from './writing-helpers';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { labelStoryFromCard, placeFromCard, stampPathNotesSeen, wereThereFromCard } from '../ui/guide-note';
@@ -462,7 +463,8 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
     }
     case 'story': {
       const labels = getWritingLabels(worldId);
-      const tale = newestOf(ofType('narrative').filter(n => isStoryNarrative(n) && (n as { supertype?: unknown }).supertype !== 'Chronicle'));
+      const fromPlay = playNarrativeIds(getState().data.elements);
+      const tale = newestOf(ofType('narrative').filter(n => isStoryNarrative(n) && !fromPlay.has(n.id)));
       if (!dots.story || !tale) {
         line = 'Tell a story in your world.';
         actions.push({

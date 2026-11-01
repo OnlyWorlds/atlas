@@ -34,7 +34,7 @@ import { buildFilesSection, filesWorld } from './element-detail-files';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildMessageParties } from './element-detail-message';
 import { buildWorkPacket } from './element-detail-packet';
-import { buildWarRecordSection } from './element-detail-war-record';
+import { buildRecordsSection } from './element-detail-records';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
 import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-detail-header';
@@ -402,10 +402,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const filesEntry = filesWorld();
     if (filesEntry && !isTourFlagActive()) detail.appendChild(buildFilesSection(el, filesEntry, toastManager));
 
-    // Character war record (2026-07-19): recorded battles as a curated strip,
-    // above the exhaustive reverse-reference scan.
-    const warRecord = buildWarRecordSection(el);
-    if (warRecord) detail.appendChild(warRecord);
+    // A Character's Records (the record profile): the runs of any game they
+    // took part in, above the exhaustive reverse-reference scan.
+    const records = buildRecordsSection(el);
+    if (records) detail.appendChild(records);
 
     const refs = renderReferencedBy(el);
     if (refs) detail.appendChild(refs);

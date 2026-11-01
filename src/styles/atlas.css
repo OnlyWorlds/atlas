@@ -2125,41 +2125,70 @@ html {
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
 
-/* Character war record — recorded battles as a service-record strip
-   (element-detail-war-record.ts, 2026-07-19). */
+/* A Character's Records (element-detail-records.ts, the record profile). */
 /* Header-scoped so the section-header's generic icon color loses the
    specificity race (it did — the swords rendered white at one class deep). */
-.atlas-detail-section-header .atlas-war-record-swords {
+.atlas-detail-section-header .atlas-records-glyph {
   font-size: 14px;
   color: var(--atlas-accent-text-soft);
   vertical-align: -2px;
   margin-right: 6px;
 }
-.atlas-war-record-row {
+.atlas-record + .atlas-record { margin-top: 2px; }
+.atlas-record-row,
+.atlas-record-story {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
   padding: 5px 8px;
+  border: 0;
   border-radius: 4px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   transition: background 120ms ease;
 }
-.atlas-war-record-row:hover {
+.atlas-record-story {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 8px 3px 22px;
+}
+.atlas-record-row:hover,
+.atlas-record-story:hover {
   background: rgba(var(--atlas-ink-rgb), 0.04);
 }
-.atlas-war-record-name {
+.atlas-record-row:focus-visible,
+.atlas-record-story:focus-visible {
+  outline: 2px solid var(--atlas-accent-text-soft);
+  outline-offset: -2px;
+}
+.atlas-record-name {
   color: rgba(var(--atlas-ink-rgb), 0.85);
   font-size: 12px;
 }
-.atlas-war-record-date {
+.atlas-record-story .atlas-record-name { font-size: 11.5px; }
+.atlas-record-line {
   color: var(--atlas-text-muted);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
 }
-.atlas-war-record-outcome {
+.atlas-record-as {
   color: var(--atlas-accent-text-soft);
   font-size: 10.5px;
-  margin-left: auto;
+}
+.atlas-records-subhead {
+  margin: 8px 8px 2px;
+  color: var(--atlas-text-muted);
+  font-size: 10.5px;
+}
+@media (pointer: coarse) {
+  .atlas-record-row { min-height: 44px; justify-content: center; }
+  .atlas-record-story { min-height: 44px; align-items: center; }
 }
 
 /* ===== Guided tour v2 (2026-07-19) — bare stage + floating narrator =====
@@ -2802,7 +2831,7 @@ body.atlas-preroot .atlas-middle {
   margin: 6px 0 18px;
 }
 
-/* Chronicle sparkle — sidebar rows for elements recorded from play. */
+/* Recorded from play: a run's Event in the element list (core/records.ts). */
 .atlas-row-chronicle {
   font-size: 12px;
   color: var(--atlas-accent-text-soft);

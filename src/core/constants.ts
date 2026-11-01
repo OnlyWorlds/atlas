@@ -333,8 +333,8 @@ export function isExtensionField(name: string): boolean {
  */
 export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_', 'x_spine_', 'x_charter_', 'x_lens_'] as const;
 
-/** Whole profile keys no prefix covers: a lens's recipe. */
-export const PROFILE_FIELD_NAMES = ['x_lens'] as const;
+/** Whole profile keys no prefix covers: a lens's recipe, a record's mark. */
+export const PROFILE_FIELD_NAMES = ['x_lens', 'x_record'] as const;
 
 export function isProfileField(name: string): boolean {
   return (PROFILE_FIELD_NAMES as readonly string[]).includes(name) || PROFILE_FIELD_PREFIXES.some(p => name.startsWith(p));

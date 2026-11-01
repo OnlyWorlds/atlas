@@ -100,8 +100,14 @@ describe('guideDots', () => {
     expect(lit([el('character', { location: [keep.id] }), keep])).toEqual(['someone', 'placed']);
   });
 
-  it('a Chronicle is a recorded artifact, not a story', () => {
-    expect(lit([el('narrative', { supertype: 'Chronicle' })])).toEqual([]);
+  it('a run told (a Narrative of a record) is a recorded artifact, not a story; the word Chronicle alone is the author\'s', () => {
+    const run = el('event', { x_record: { tool: 'tangle', played_at: '2026-11-01T12:00:00Z' } });
+    expect(lit([run, el('narrative', { events: [run.id] })])).toEqual([]);
+    // A legacy Tangle battle (its tally, no mark) carves its chronicle the same way.
+    const old = el('event', { x_tangle_battle: { winner: null, sides: [{ name: 'L', fallen: 1 }, { name: 'R', fallen: 2 }], units: [] } });
+    expect(lit([old, el('narrative', { events: [old.id] })])).toEqual([]);
+    // The control: a supertype is a word, never a record.
+    expect(lit([el('narrative', { supertype: 'Chronicle' })])).toEqual(['story']);
   });
 
   it('the parlor room never counts, whatever the home cover shows', () => {
@@ -186,11 +192,14 @@ describe('noteEarned', () => {
     expect(noteEarned({ kind: 'date-set', event: b.id }, [a, b], false)).toBeNull();
   });
 
-  it('a story earns story; a knowledge entry, a page and a Chronicle do not', () => {
-    for (const [extra, want] of [[{}, 'story'], [{ subtype: 'knowledge' }, null], [{ subtype: 'page' }, null], [{ supertype: 'Chronicle' }, null]] as const) {
+  it('a story earns story; a knowledge entry, a page and a run told do not', () => {
+    for (const [extra, want] of [[{}, 'story'], [{ subtype: 'knowledge' }, null], [{ subtype: 'page' }, null], [{ supertype: 'Chronicle' }, 'story']] as const) {
       const n = el('narrative', extra);
       expect(made([n], n.id)?.id ?? null).toBe(want);
     }
+    const run = el('event', { x_record: { tool: 'subs', played_at: '2026-11-01T12:00:00Z' } });
+    const told = el('narrative', { events: [run.id] });
+    expect(made([run, told], told.id)).toBeNull();
   });
 
   it('the parlor room earns nothing, and a proposed element is not there', () => {

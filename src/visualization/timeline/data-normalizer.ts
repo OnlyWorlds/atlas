@@ -16,6 +16,7 @@ import type { Element, ElementType } from '../../core/types';
 import { relationFieldsFor } from '../../editor/field-schema';
 import { ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { computeDegrees } from './degree';
+import { playGlyph, playKindOf } from '../../core/records';
 
 // Node colour is the ONE canonical per-type palette (`ELEMENT_TYPE_COLORS`),
 // shared with pins, the static share renderer (chart-static.ts) and the rest of
@@ -111,10 +112,10 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       // invented ongoing tenure), and the type means "runs until ended".
       openEnded: fields.openEnd === true && !endRecorded ? true : undefined,
       dateSpec: { kind: 'exact', value: startDate },
-      // Chronicle-supertype elements are recorded-from-play artifacts (the
-      // tangle seam); their dots carry the swords glyph the sidebar sparkle
-      // uses. Presentation-only — never persisted, not in the publish payload.
-      glyph: (el as Record<string, unknown>).supertype === 'Chronicle' ? 'swords' : undefined,
+      // A record's Event, or a Tactical Tangle battle from before the mark,
+      // carries the glyph the sidebar uses (core/records.ts). Events only.
+      // Presentation-only: never persisted, not in the publish payload.
+      glyph: (() => { const p = playKindOf(el); return p ? playGlyph(p) : undefined; })(),
       color: ELEMENT_TYPE_COLORS[el.type as ElementType] ?? FALLBACK_COLOR,
       links: resolveLinks(el, byId),
       degree: 0, // filled below once every node exists (bidirectional read)

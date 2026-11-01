@@ -76,8 +76,9 @@ const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /**
- * One-line outcome for a battle payload (plain TEXT, not HTML) — the war-record
- * strip's summary. Shares parseBattle + the wording of the card's outcome line
+ * One-line outcome for a battle payload (plain TEXT, not HTML): a legacy battle's
+ * line under a Character's Records, and the test of what a legacy battle is
+ * (core/records.ts). Shares parseBattle + the wording of the card's outcome line
  * so the two surfaces can't drift. Null when the shape surprises.
  */
 export function battleOutcomeLine(value: unknown): string | null {

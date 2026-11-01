@@ -43,7 +43,7 @@ afterEach(() => {
 describe('Custom fields on a view-only world', () => {
   it('shows the rows with no Add field and no ×', () => {
     openWorld(true);
-    const section = buildCustomFieldsSection(character({ x_mood: 'calm', x_record: { won: 3 } }))!;
+    const section = buildCustomFieldsSection(character({ x_mood: 'calm', x_tally: { won: 3 } }))!;
     expect(section).not.toBeNull();
     expect(section.querySelector('[data-field="x_mood"]')).not.toBeNull();
     expect(section.querySelector('.atlas-custom-structured-row')).not.toBeNull();
@@ -60,7 +60,7 @@ describe('Custom fields on a view-only world', () => {
   it('control: a writable world offers Add field and both ×', () => {
     openWorld(false);
     expect(getState().registry.worlds[0].api?.read_only).toBe(false);
-    const section = buildCustomFieldsSection(character({ x_mood: 'calm', x_record: { won: 3 } }))!;
+    const section = buildCustomFieldsSection(character({ x_mood: 'calm', x_tally: { won: 3 } }))!;
     expect(section.querySelector('.atlas-custom-add-btn')).not.toBeNull();
     expect(section.querySelector('.atlas-field-remove')).not.toBeNull();
     expect(section.querySelector('.atlas-custom-structured-remove')).not.toBeNull();

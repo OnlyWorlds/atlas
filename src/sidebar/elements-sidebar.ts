@@ -38,6 +38,7 @@ import { aidsHidden, currentLore, isRoomElement, toggleAids } from '../core/parl
 import { isReadingAid, readingAids } from '../core/charter';
 import { isProposed, proposedCount, proposedRowWord, settledOf } from '../core/review-mark';
 import { hiddenRowWord } from '../core/hidden-mark';
+import { LEGACY_TOOL_NAME, playGlyph, playKindOf, toolName } from '../core/records';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
@@ -1063,11 +1064,12 @@ function renderElementRow(
   const styleBadge = styled
     ? `<span class="atlas-row-style-swatch" style="background:${escapeAttr(styled.color)}" title="${escapeAttr(styled.title)}"></span>`
     : '';
-  // Chronicle sparkle (2026-07-19): elements recorded from play (tangle
-  // battle Events, tropaion Objects, chronicle Narratives — supertype
-  // 'Chronicle' by the registered convention) carry a quiet mark.
-  const chronicleBadge = (el as { supertype?: unknown }).supertype === 'Chronicle'
-    ? `<span class="material-symbols-outlined atlas-row-chronicle" title="A chronicle recorded from play">swords</span>`
+  // Recorded from play: a record's Event (the record profile's mark) or a
+  // Tactical Tangle battle from before the mark carries a quiet glyph. Events
+  // only: the stories that tell a run are the ordinary Narratives they are.
+  const play = playKindOf(el);
+  const chronicleBadge = play
+    ? `<span class="material-symbols-outlined atlas-row-chronicle" title="${escapeAttr(`Recorded from play in ${play.kind === 'legacy' ? LEGACY_TOOL_NAME : toolName(play.tool)}`)}">${playGlyph(play)}</span>`
     : '';
   return `
     <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}"${flashAttr} role="button" tabindex="0">

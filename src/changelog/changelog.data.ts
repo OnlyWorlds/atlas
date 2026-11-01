@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.116.0',
+    date: '2026-11-01',
+    theme: 'Records: what a character did in a game',
+    entries: [
+      {
+        id: 'character-records',
+        title: 'A Character\'s page shows their Records',
+        body: 'A game that keeps its runs in your world, such as a Tactical Tangle battle, marks each one, and the Character\'s page lists the runs they took part in, newest first, with the game, the day it was played, the outcome, their seat and the stories about them or told by them. A run still waiting for review shows once it is accepted. Battles Tactical Tangle wrote before the mark show below under their own heading.',
+        tags: ['editor'],
+      },
+      {
+        id: 'records-from-the-mark',
+        title: 'Recorded from play is read from the mark, not the label',
+        body: 'The quiet glyph in the element list and on the chart marks a run\'s Event from its record mark, for any game, and Tactical Tangle\'s older battles by their own battle data; it no longer marks the chronicle, the stories or the trophy, which are the ordinary elements they are. A story of yours labelled Chronicle now counts as your own story, while a story that names a run\'s Event belongs to that run: it shows under the Records of the Character it is about or told by, and is left out of Home\'s suggestions. Links written as objects with an id, as some other tools write them, do not count toward a record. The record mark, and any field of your own named Record, shows read only.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.115.2',
     date: '2026-11-01',
     theme: 'The OnlyWorlds mark: Little Lens, and the keyboard in Safari',

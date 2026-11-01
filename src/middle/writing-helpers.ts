@@ -17,6 +17,7 @@
 
 import { getState } from '../core/state';
 import { isStoryNarrative } from '../core/narrative-kind';
+import { playNarrativeIds } from '../core/records';
 import type { Element, WorldRegistryEntry } from '../core/types';
 
 export type WritingTier = 'l1' | 'l2' | 'l3' | 'l4' | null;
@@ -274,15 +275,15 @@ export function isWritingInitialized(
   // and sharing pages have their own rooms and must not trip the writing
   // setup heuristics (their subtypes never match writing labels, which would
   // otherwise make `allInTree` false forever).
-  // Chronicle records (supertype 'Chronicle' — tangle battle chronicles and
-  // their Battle Story children, the registered recorded-from-play
-  // convention) are recorded ARTIFACTS, not writing structure: they arrive
-  // as parent_narrative chains whose supertype can never match a writing
-  // label, so without this carve one recorded battle flipped the whole
-  // writing room to the setup screen (an old hijack class through a new
-  // door; caught 2026-07-19 checking the tangle seam).
-  const narratives = elements.filter(e =>
-    isStoryNarrative(e) && (e as Element & { supertype?: string | null }).supertype !== 'Chronicle');
+  // A game's runs (a record's chronicle and its stories, core/records.ts:
+  // a Narrative listing a record Event, or under one that does) are recorded
+  // ARTIFACTS, not writing structure: they arrive as parent_narrative chains
+  // whose supertype can never match a writing label, so without this carve
+  // one recorded battle flipped the whole writing room to the setup screen
+  // (an old hijack class through a new door; caught 2026-07-19 checking the
+  // tangle seam). Read by belonging, never by a word; proposed runs too.
+  const fromPlay = playNarrativeIds(elements);
+  const narratives = elements.filter(e => isStoryNarrative(e) && !fromPlay.has(e.id));
   if (narratives.length === 0) return true; // nothing to decide
   // Only CHAIN MEMBERS (a narrative with a parent, or one that IS a parent)
   // warrant a setup decision. A loose supertype-less narrative — e.g. the
