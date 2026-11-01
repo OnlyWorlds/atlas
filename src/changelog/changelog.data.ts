@@ -58,8 +58,14 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.115.2',
     date: '2026-11-01',
-    theme: 'The OnlyWorlds mark, by keyboard in Safari',
+    theme: 'The OnlyWorlds mark: Little Lens, and the keyboard in Safari',
     entries: [
+      {
+        id: 'waymark-little-lens',
+        title: 'The OnlyWorlds mark offers Little Lens',
+        body: 'The list beside a world or an element name now offers Little Lens, which shows the world as a web of its elements and links and opens the same world or element there.',
+        tags: ['sharing'],
+      },
       {
         id: 'waymark-tab-safari',
         title: 'The OnlyWorlds mark\'s list takes Tab in Safari',
