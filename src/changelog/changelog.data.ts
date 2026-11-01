@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.116.1',
+    date: '2026-11-01',
+    theme: 'Records, read in one pass',
+    entries: [
+      {
+        id: 'records-one-pass',
+        title: 'A Character\'s Records draw quickly on a large world',
+        body: 'The records are read in one pass over the world, however many runs a Character has, and two runs played at the same moment keep the same order in every tool.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.116.0',
     date: '2026-11-01',
     theme: 'Records: what a character did in a game',

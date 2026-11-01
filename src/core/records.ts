@@ -101,32 +101,28 @@ export interface LegacyRow {
 }
 
 /**
- * A Character's records, as the SDK reads them, and their legacy battles.
- * `recordsOf` runs on a pre-filtered list (the Events naming this Character
- * and the Narratives naming them that list a run): the same answer, without a rescan of the
- * whole world per record. Legacy stories come from `recordsOf` too, on a copy
+ * A Character's records, as the SDK reads them (`recordsOf` on the elements as
+ * this page reads them, one pass since SDK 4.124.1), and their legacy battles.
+ * Legacy stories come from `recordsOf` too, on a copy
  * of each legacy battle with a placeholder mark, so one reader decides which
  * stories are theirs, what proposed means and their order; that copy is never
  * shown as a record.
  */
 export function characterRecords(characterId: string, elements: readonly Element[]): { records: OwRecord[]; legacy: LegacyRow[] } {
   const events = playEventIds(elements);
+  const records = recordsOf(characterId, elements);
+
+  // Legacy battles naming this Character, and for each the stories naming them that list it (only a story naming
+  // them can be theirs, the profile's rule), handed to the reader one battle at a time.
   const named: Element[] = [];
-  // Only a story naming this Character can be theirs (protagonist or narrator, the profile's rule), so only those
-  // are handed to the reader; and each legacy battle is handed only the stories that list it.
-  const stories: Element[] = [];
   const storiesOf = new Map<string, Element[]>();
   for (const el of elements) {
     const r = el as Record<string, unknown>;
     if (el.type === 'event' && events.has(el.id) && ids(r.characters).includes(characterId)) named.push(el);
     else if (el.type === 'narrative' && (r.protagonist === characterId || r.narrator === characterId)) {
-      const runs = ids(r.events).filter(id => events.has(id));
-      if (runs.length === 0) continue;
-      stories.push(el);
-      for (const id of runs) storiesOf.set(id, [...(storiesOf.get(id) ?? []), el]);
+      for (const id of new Set(ids(r.events))) if (events.has(id)) storiesOf.set(id, [...(storiesOf.get(id) ?? []), el]);
     }
   }
-  const records = recordsOf(characterId, [...named, ...stories]);
 
   const legacy: LegacyRow[] = [];
   for (const ev of named) {

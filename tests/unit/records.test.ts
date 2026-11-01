@@ -84,7 +84,7 @@ describe('a Character\'s records', () => {
     ev('legacy-a', { x_tangle_battle: TALLY, characters: ['c1'], created_at: '2026-09-01T00:00:00Z' }),
     ev('legacy-b', { x_tangle_battle: TALLY, characters: ['c1'], created_at: '2026-09-05T00:00:00Z' }),
     ev('legacy-proposed', { x_tangle_battle: TALLY, characters: ['c1'], x_review_proposed: true }),
-    nar('legacy-story', { events: ['legacy-a'], protagonist: 'c1', parent_narrative: 'x' }),
+    nar('legacy-story', { events: ['legacy-a', 'legacy-a'], protagonist: 'c1', parent_narrative: 'x' }),
     nar('legacy-story-proposed', { events: ['legacy-a'], protagonist: 'c1', x_review_proposed: 'yes' }),
     ev('word-only', { supertype: 'Chronicle', subtype: 'Battle', characters: ['c1'] }),
     ev('both', { x_tangle_battle: TALLY, x_record: mark('tangle', '2026-09-20T12:00:00Z'), characters: ['c1'] }),
