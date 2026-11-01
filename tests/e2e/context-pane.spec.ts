@@ -125,7 +125,7 @@ test('element route: clicking a neighbor swaps the preview and shows "open in de
   const friendId = await createElement(page, 'character', { name: 'Wulfgar' });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
+    friends: [friendId],
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -162,7 +162,7 @@ test('breadcrumb appears after recenter; home chip returns to subject', async ({
   const friendId = await createElement(page, 'character', { name: 'Wulfgar' });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
+    friends: [friendId],
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -194,7 +194,7 @@ test('right-click node opens action menu', async ({ page }) => {
   const friendId = await createElement(page, 'character', { name: 'Wulfgar' });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
+    friends: [friendId],
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -223,7 +223,7 @@ test('toolbar: type chip toggles hide that type in the graph', async ({ page }) 
   const locId = await createElement(page, 'location', { name: 'The Tower' });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    locations: [locId],
+    location: locId,
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -266,11 +266,11 @@ test('toolbar: hop toggle 1-hop hides adjacent nodes', async ({ page }) => {
   const farTowerId = await createElement(page, 'location', { name: 'The Far Tower' });
   const friendId = await createElement(page, 'character', {
     name: 'Wulfgar',
-    locations: [farTowerId],
+    location: farTowerId,
   });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
+    friends: [friendId],
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -303,8 +303,8 @@ test('lock layout: surviving nodes do not move when a type is hidden', async ({ 
   const friendId = await createElement(page, 'character', { name: 'Wulfgar' });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
-    locations: [locId],
+    friends: [friendId],
+    location: locId,
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -347,7 +347,7 @@ test('toolbar: hop preference persists in registry', async ({ page }) => {
   const friendId = await createElement(page, 'character', { name: 'Wulfgar' });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
+    friends: [friendId],
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -371,7 +371,7 @@ test('zoom: wheel reveals fit-to-view button; click resets', async ({ page }) =>
   const friendId = await createElement(page, 'character', { name: 'Wulfgar' });
   const charId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
+    friends: [friendId],
   });
   await gotoElement(page, charId);
   await openContextTab(page);
@@ -405,15 +405,15 @@ test('hop: 3-hop reveals a node two rings out from the subject', async ({ page }
   const cattiId = await createElement(page, 'character', { name: 'Catti-brie' });
   const bruenorId = await createElement(page, 'character', {
     name: 'Bruenor',
-    characters: [cattiId],
+    friends: [cattiId],
   });
   const wulfgarId = await createElement(page, 'character', {
     name: 'Wulfgar',
-    characters: [bruenorId],
+    friends: [bruenorId],
   });
   const drizzleId = await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [wulfgarId],
+    friends: [wulfgarId],
   });
   await gotoElement(page, drizzleId);
   await openContextTab(page);
@@ -439,7 +439,7 @@ test('settings: edge coloring toggle persists and routes back to graph', async (
   const friendId = await createElement(page, 'character', { name: 'Wulfgar' });
   await createElement(page, 'character', {
     name: 'Drizzle',
-    characters: [friendId],
+    friends: [friendId],
   });
   await page.evaluate(() => {
     const m = window.location.hash.match(/#\/w\/([^/]+)/);

@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { worldGraph } from '@onlyworlds/sdk';
+import { isRoomElement, worldGraph } from '@onlyworlds/sdk';
 import { buildReverseIndex, buildWebLinks, readerLinksOf, ringOneOf } from '../../src/tabs/right/context-pane-graph';
 import type { Element } from '../../src/core/types';
 import hyperion from '../../src/demo/hyperion-world.json';
@@ -87,6 +87,14 @@ describe('the drawing choices over the reader', () => {
     const hidden = mk(ID.b, 'character', { birthplace: ID.loc, hidden: true });
     const links = buildWebLinks([proposed, hidden, loc], ID.loc);
     expect(ringOneOf(links, ID.loc).back.sort()).toEqual([ID.a, ID.b].sort());
+  });
+
+  it('1. reads a room element\'s links when the page holds the room (a Take on a Character)', () => {
+    const a = mk(ID.a, 'character');
+    const take = mk(ID.b, 'relation', { supertype: 'Take', x_room_of: ID.parent, characters: [ID.a] });
+    expect(isRoomElement(take as never)).toBe(true);
+    const links = buildWebLinks([a, take], ID.a);
+    expect(ringOneOf(links, ID.a).back).toEqual([ID.b]);
   });
 
   it('2. one line per pair: a link held at both ends is one neighbour each way', () => {

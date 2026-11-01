@@ -3,11 +3,14 @@
  * pane's Web, mounted small, centred on the world's best-linked element, for
  * a world with one worth drawing.
  *
- *   The centre is ranked by the SDK (`degreeOf` over the owner's
- *   `worldGraph`: the room, proposed and hidden elements, map space (Maps,
- *   Pins, Markers; a Zone is a node, as the Web draws it, since SDK 4.111.0)
- *   and the reading aids are out), and the first of the top five the Web draws with
- *   at least three around it is the centre. None: no picture.
+ *   Who may be the centre is the SDK's (`worldGraph`'s nodes for the owner:
+ *   the room, proposed and hidden elements, map space (Maps, Pins, Markers; a
+ *   Zone is a node, as the Web draws it, since SDK 4.111.0) and the reading
+ *   aids are out); how linked it is, is the Web's own count (its ring one,
+ *   less the switched-off types), so a link the Web leaves undrawn
+ *   (`parent_narrative`) never ranks a centre the Web then draws bare. The
+ *   most linked with at least three around it is the centre, a tie to the
+ *   first by id. None: no picture.
  *
  *   Ranked once per world, what its elements say, the lore's switches and the
  *   Web's switched-off types: never on an idle sync round or a loading tick.
@@ -15,16 +18,15 @@
  *   A press on the centre, or See <name>'s world, opens the Web on it.
  */
 
-import { degreeOf, worldGraph } from '@onlyworlds/sdk';
+import { worldGraph } from '@onlyworlds/sdk';
 import type { Element, ElementType } from '../core/types';
 import { getState } from '../core/state';
 import { currentLore, loreSwitches } from '../core/parlor-room';
-import { buildWebLinks, mountContextGraph, webRingOne, type GraphHandle } from '../tabs/right/context-pane-graph';
+import { buildWebLinks, mountContextGraph, ringOneOf, type GraphHandle } from '../tabs/right/context-pane-graph';
 import { openWebOn } from '../ui/open-web';
 import { typeName } from '../core/type-words';
 
 /** How many of the best-linked are tried, and how many the Web must draw around one. */
-const TRIED = 5;
 const AROUND = 3;
 /** Ring one's cap on Home: the picture is a glance, the Web is the room. */
 const HOME_RING_CAP = 12;
@@ -59,26 +61,31 @@ export function homeCentre(worldId: string, said: string): string | null {
 }
 
 function rankCentre(all: readonly Element[], hidden: ReadonlySet<string>): string | null {
-  let degree: Record<string, number>;
+  let nodes: string[];
   try {
-    degree = degreeOf(worldGraph({ elements: all }, { rung: 'owner' }));
+    nodes = worldGraph({ elements: all }, { rung: 'owner' }).nodes.map(n => n.id);
   } catch {
     return null;
   }
   const lore = currentLore();
   const byId = new Map(lore.map(e => [e.id, e] as const));
-  // Highest first; a tie keeps the graph's own order (by id), so the centre never flickers.
-  const top = Object.entries(degree)
-    .filter(([id, d]) => d > 0 && byId.has(id) && !hidden.has(byId.get(id)!.type))
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, TRIED);
-  // One build serves the five: none is a pin or a marker, the only centres that change it.
+  // One build serves every candidate: none is a pin or a marker, the only centres that change it.
   const links = buildWebLinks(lore, '');
-  for (const [id] of top) {
-    const el = byId.get(id)!;
-    if (webRingOne(el, hidden, links).length >= AROUND) return id;
+  let best: string | null = null;
+  let bestCount = AROUND - 1;
+  // The graph's own order (by id), so a tie keeps the first and the centre never flickers.
+  for (const id of nodes) {
+    const el = byId.get(id);
+    if (!el || hidden.has(el.type)) continue;
+    const { cast, back } = ringOneOf(links, id);
+    let around = 0;
+    for (const other of [...cast, ...back]) {
+      const t = byId.get(other)?.type;
+      if (t && !hidden.has(t)) around++;
+    }
+    if (around > bestCount) { best = id; bestCount = around; }
   }
-  return null;
+  return best;
 }
 
 export interface HomePicture {

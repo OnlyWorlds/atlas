@@ -67,6 +67,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['web'],
       },
       {
+        id: 'home-picture-ranks-by-the-web',
+        title: 'Home\'s picture centres on what the Web draws most around',
+        body: 'The element Home\'s picture is drawn around is now the one with the most around it in the Web itself. A world with many books and chapters no longer loses its picture to a book whose chapters the Web leaves to the writing sidebar.',
+        tags: ['home'],
+      },
+      {
         id: 'mark-offers-only-tools-that-open-it',
         title: 'The OnlyWorlds mark offers only the tools that open this element',
         body: 'Beside a hidden, proposed or room element, the mark leaves out a tool whose element page would not show it, as the tools list says of each tool.',

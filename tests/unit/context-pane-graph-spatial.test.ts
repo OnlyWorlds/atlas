@@ -11,7 +11,7 @@ import {
 import { patchSlice } from '../../src/core/state';
 import type { Element } from '../../src/core/types';
 
-// The graph only follows id-shaped values (looksLikeId).
+// The Web reads links through the graph reader, so fixture ids are full UUIDs.
 const u = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const mk = (n: number, type: string, name: string, extra: Record<string, unknown> = {}) =>
   ({ id: u(n), type, name, ...extra }) as unknown as Element;

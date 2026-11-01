@@ -286,6 +286,15 @@ describe('C3: Home\'s centre', () => {
     expect(homeCentre('w', 'a')).toBe(keep.id);
   });
 
+  it('ranks by the Web\'s own count: five books of six chapters never crowd out a Character with four friends', () => {
+    const books = Array.from({ length: 5 }, (_, i) => E(100 + i, 'narrative', `Book ${i}`, { supertype: 'Book' }));
+    const chapters = books.flatMap((b, i) => Array.from({ length: 6 }, (_, j) => E(200 + i * 10 + j, 'narrative', `Ch ${i}.${j}`, { parent_narrative: b.id })));
+    const friends = ['Ada', 'Bram', 'Cole', 'Dov'].map((n, i) => E(20 + i, 'character', n));
+    const hub = E(2, 'character', 'Mara', { friends: friends.map(f => f.id) });
+    world([...books, ...chapters, hub, ...friends]);
+    expect(homeCentre('w', 'books')).toBe(hub.id);
+  });
+
   it('none with three around it: no centre, and no picture', () => {
     const keep = E(2, 'location', 'Hollow Keep');
     world([keep, E(20, 'character', 'Ada', { location: keep.id }), E(21, 'character', 'Bram', { location: keep.id })]);
