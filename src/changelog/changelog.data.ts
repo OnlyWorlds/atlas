@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.115.2',
+    date: '2026-11-01',
+    theme: 'The OnlyWorlds mark, by keyboard in Safari',
+    entries: [
+      {
+        id: 'waymark-tab-safari',
+        title: 'The OnlyWorlds mark\'s list takes Tab in Safari',
+        body: 'With the list beside a name open, Tab now moves through its rows in Safari as it does in other browsers, and the list closes when focus leaves it.',
+        tags: ['sharing'],
+      },
+    ],
+  },
+  {
     version: '1.115.1',
     date: '2026-10-31',
     theme: 'The OnlyWorlds mark, a little quieter',
