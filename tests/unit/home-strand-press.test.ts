@@ -3,7 +3,8 @@
  * page's Make this the world's strand, each pressed twice before the first write lands, make one write
  * and never say "The strand changed meanwhile" about the person's own first press. And the journey's
  * presses through the panel (1.120.0): the Character card's second write on the strand's Event, who it
- * reaches and what it says, a card's memory cleared only by a Make that wrote, Edit's Save.
+ * reaches and what it says, a card's memory cleared only by a Make that wrote, Edit's Save. And from
+ * 1.121.0, the character asked before the event: the Event card's own write of the main character.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getState, patchSlice } from '../../src/core/state';
@@ -14,6 +15,14 @@ import { buildStrandPanel, resetStrandTabForTests } from '../../src/middle/home-
 import { draftOf } from '../../src/middle/home-strand-model';
 import { buildBarStrandOffer, buildPageStrandOffer, makeThisTheStrand, resetStrandOfferForTests } from '../../src/middle/strand-offer';
 import { toastManager } from '../../src/ui/toast-manager';
+
+// The ids this reader may not change, whatever their role says: a keeper's pick list offers only Events
+// they may change, so the Event card's own may-change guard is reached here by naming one.
+const refused = vi.hoisted(() => new Set<string>());
+vi.mock('../../src/core/may-change', async importOriginal => {
+  const real = await importOriginal<typeof import('../../src/core/may-change')>();
+  return { ...real, mayChange: (entry: never, el: { id: string }) => !refused.has(el.id) && real.mayChange(entry, el as never) };
+});
 
 const W = 'w-strand-press';
 const N = '0192a000-0000-7000-8000-000000000a01';
@@ -51,6 +60,7 @@ const cell = (slot: string) => host.querySelector<HTMLElement>(`[data-slot="${sl
 const card = () => host.querySelector<HTMLFormElement>('[data-role="strand-card"]')!;
 const settle = async () => { for (let i = 0; i < 40; i++) await new Promise(r => setTimeout(r, 0)); };
 const said = () => host.querySelector('[data-role="strand-say"]')?.textContent ?? '';
+const title = () => card().querySelector('.atlas-home-strand-card-title > span:last-child')!.textContent;
 const disk = async (id: string) => (await store.listElements()).find(e => e.id === id) as unknown as Record<string, unknown>;
 const typeIn = (field: string, value: string): void => {
   const input = card().querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-field="${field}"]`)!;
@@ -78,6 +88,7 @@ beforeEach(() => {
 afterEach(() => {
   resetStrandTabForTests();
   resetStrandOfferForTests();
+  refused.clear();
   setActiveStore(null);
   patchSlice('active', null);
   patchSlice('registry', defaultRegistry());
@@ -87,8 +98,10 @@ afterEach(() => {
 });
 
 describe('a press twice writes once (C1)', () => {
-  it('the Event card\'s Make, Enter twice: one Event made, listed once, and nothing said', async () => {
-    await put('narrative', N, { events: [] });
+  it('the Event card\'s Create, Enter twice: one Event made, listed once, the main character in it once, and nothing said', async () => {
+    // The main character is asked before the Event (1.121.0): a story that names one asks the Event next.
+    await put('narrative', N, { events: [], protagonist: C });
+    await put('character', C, { name: 'Odile' });
     await open({ narrative: N, event: GONE_E, location: GONE_L });
     expect(card().getAttribute('data-card-slot')).toBe('event');
     typeIn('name', 'The Flood');
@@ -99,6 +112,7 @@ describe('a press twice writes once (C1)', () => {
     const events = (await store.listElements()).filter(e => e.type === 'event');
     expect(events.map(e => e.name)).toEqual(['The Flood']);
     expect((await disk(N)).events).toEqual([events[0].id]);
+    expect((await disk(events[0].id)).characters).toEqual([C]);
     expect(metaWrites).toBe(1);
     expect(said()).toBe('');
   });
@@ -162,9 +176,11 @@ describe('the page\'s press twice writes once (C1)', () => {
 
 describe('a write starting holds the whole panel (D1)', () => {
   it('every act disabled and every field read-only before the first await; what was typed kept, nothing "changed meanwhile"', async () => {
-    await put('narrative', N, { events: [] });
+    await put('narrative', N, { events: [], protagonist: C });
+    await put('character', C, { name: 'Odile' });
     await put('event', E, { name: 'The Fire' });
     await open({ narrative: N, event: GONE_E, location: GONE_L });
+    expect(card().getAttribute('data-card-slot')).toBe('event');
     typeIn('name', 'The Flood');
     // The story's link waits until let go.
     let release!: () => void;
@@ -185,6 +201,7 @@ describe('a write starting holds the whole panel (D1)', () => {
     await settle();
     expect((await disk(N)).events).toEqual([E]);
     expect((await store.listElements()).filter(e => e.type === 'event').map(e => e.name)).toEqual(['The Fire']);
+    expect((await disk(E)).characters).toEqual([C]);
     expect(said()).toBe('');
     expect([...host.querySelectorAll<HTMLButtonElement>('[data-act]')].some(b => b.disabled)).toBe(false);
   });
@@ -201,7 +218,8 @@ describe('the Character card adds the main character to the strand\'s Event (R4)
 
   it('Make: the protagonist, then the Event lists them; the card\'s memory cleared once it wrote', async () => {
     await storyWithEvent({ characters: [{ id: D, name: 'Ana' }] });
-    expect(card().querySelector('.atlas-home-strand-card-title > span:last-child')!.textContent).toBe('Who was involved in The night crossing?');
+    // One question for the main character, whatever is filled before it (1.121.0).
+    expect(title()).toBe('Who is the story about?');
     typeIn('name', 'Odile');
     typeIn('text', 'A cartographer.');
     card().requestSubmit();
@@ -280,6 +298,112 @@ describe('the Character card adds the main character to the strand\'s Event (R4)
     expect(card().getAttribute('data-card-slot')).toBe('character');
     expect(card().querySelector<HTMLInputElement>('[data-field="name"]')!.value).toBe('Odile');
     expect(card().querySelector<HTMLTextAreaElement>('[data-field="text"]')!.value).toBe('Kept.');
+  });
+
+  it('a 1.120 half-made strand (the story and its event, no character): the character is asked next, and its Create puts them in the event', async () => {
+    await put('narrative', N, { events: [E], name: 'The Ferry' });
+    await put('event', E, { name: 'The night crossing' });
+    await open({ narrative: N, event: E });
+    expect(card().getAttribute('data-card-slot')).toBe('character');
+    expect(title()).toBe('Who is the story about?');
+    typeIn('name', 'Odile');
+    card().requestSubmit();
+    await settle();
+    const odile = (await store.listElements()).find(e => e.name === 'Odile')!;
+    expect((await disk(N)).protagonist).toBe(odile.id);
+    expect((await disk(E)).characters).toEqual([odile.id]);
+    expect(said()).toBe('');
+    // Then the order carries on from where the strand stands: where the event happened.
+    expect(card().getAttribute('data-card-slot')).toBe('location');
+  });
+});
+
+describe('the Event card puts the main character into its Event (1.121.0)', () => {
+  /** A story whose main character is set, its event not yet: the Event card is asked. */
+  async function storyWithHero(): Promise<void> {
+    await put('narrative', N, { events: [], name: 'The Ferry', protagonist: C });
+    await put('character', C, { name: 'Odile' });
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    expect(card().getAttribute('data-card-slot')).toBe('event');
+  }
+  /** Every element id an update reached, in order. */
+  function updatesSeen(): string[] {
+    const seen: string[] = [];
+    const update = store.updateElementWith.bind(store);
+    store.updateElementWith = async (id, mutate) => { seen.push(id); return update(id, mutate); };
+    return seen;
+  }
+
+  it('Create with a main character: the Event is written into the story, then its characters list the main character', async () => {
+    await storyWithHero();
+    expect(title()).toBe('What happens to Odile?');
+    typeIn('name', 'The Flood');
+    card().requestSubmit();
+    await settle();
+    const flood = (await store.listElements()).find(e => e.name === 'The Flood')!;
+    expect((await disk(N)).events).toEqual([flood.id]);
+    expect((await disk(flood.id)).characters).toEqual([C]);
+    expect(((await store.readWorldMeta()) as unknown as Record<string, { event: string }>).x_strand.event).toBe(flood.id);
+    expect(said()).toBe('');
+    expect(card().getAttribute('data-card-slot')).toBe('location');
+  });
+
+  it('no main character (skipped): the Event asks what happens in the story, and its Create writes no characters', async () => {
+    await put('narrative', N, { events: [], name: 'The Ferry' });
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    expect(card().getAttribute('data-card-slot')).toBe('character');
+    card().querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
+    expect(card().getAttribute('data-card-slot')).toBe('event');
+    expect(title()).toBe('What happens in The Ferry?');
+    const seen = updatesSeen();
+    typeIn('name', 'The Flood');
+    card().requestSubmit();
+    await settle();
+    const flood = (await store.listElements()).find(e => e.name === 'The Flood')!;
+    expect((await disk(N)).events).toEqual([flood.id]);
+    expect((await disk(flood.id)).characters).toBeUndefined();
+    expect(seen).not.toContain(flood.id);
+    expect(said()).toBe('');
+  });
+
+  it('Pick an Event this reader may change: the main character appended, what it listed kept', async () => {
+    await put('event', E, { name: 'The night crossing', characters: [{ id: D, name: 'Ana' }] });
+    await storyWithHero();
+    card().querySelector<HTMLButtonElement>('[data-act="pick"]')!.click();
+    pickIn(card(), 'The night crossing');
+    await settle();
+    expect((await disk(N)).events).toEqual([E]);
+    expect((await disk(E)).characters).toEqual([{ id: D, name: 'Ana' }, C]);
+    expect(said()).toBe('');
+  });
+
+  it('Pick an Event this reader may not change: the story lists it, the Event gets nothing added, nothing said', async () => {
+    await put('event', E, { name: 'The night crossing', characters: [] });
+    await storyWithHero();
+    refused.add(E);
+    const seen = updatesSeen();
+    card().querySelector<HTMLButtonElement>('[data-act="pick"]')!.click();
+    pickIn(card(), 'The night crossing');
+    await settle();
+    expect((await disk(N)).events).toEqual([E]);
+    expect((await disk(E)).characters).toEqual([]);
+    expect(seen).not.toContain(E);
+    expect(said()).toBe('');
+  });
+
+  it('the Event gone before its add: the story keeps it, and the line says adding the main character did not go through', async () => {
+    await put('event', E, { name: 'The night crossing', characters: [] });
+    await storyWithHero();
+    const update = store.updateElementWith.bind(store);
+    store.updateElementWith = async (id, mutate) => {
+      if (id === E) await store.deleteElement(E, { silent: true });
+      return update(id, mutate);
+    };
+    card().querySelector<HTMLButtonElement>('[data-act="pick"]')!.click();
+    pickIn(card(), 'The night crossing');
+    await settle();
+    expect((await disk(N)).events).toEqual([E]);
+    expect(said()).toBe("The night crossing is the story's event; adding Odile to it did not go through.");
   });
 });
 

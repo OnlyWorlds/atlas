@@ -44,6 +44,8 @@ const whole = (): Element[] => [
   el('narrative', N, { events: [E], protagonist: C }), el('event', E, { locations: [L], characters: [C] }),
   el('location', L, { name: 'The Quay' }), el('location', L2, { name: 'The Library' }), el('character', C, { location: L2, name: 'Odile' }),
 ];
+/** A story and its main character, no event yet: the Event card is the one asked (1.121.0). */
+const withHero = (...more: Element[]): Element[] => [el('narrative', N, { protagonist: C }), el('character', C, { name: 'Odile' }), ...more];
 
 let host: HTMLElement;
 function draw(): HTMLElement {
@@ -211,13 +213,22 @@ describe('R2: the reveal', () => {
     for (const icon of panel.querySelectorAll('.material-symbols-outlined')) expect(icon.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('with a story: the Event asked next, the main character not yet drawn', () => {
+  it('with a story: the main character asked next (1.121.0), the Event not yet drawn', () => {
     world([el('narrative', N, { name: 'The Ferry' })], full);
     draw();
-    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['event']);
+    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['character']);
+    expect(cards()[0].querySelector('.atlas-home-strand-card-title > span:last-child')?.textContent).toBe('Who is the story about?');
     expect(cellOf('narrative').querySelector('[data-box="narrative"]')).not.toBeNull();
-    expect(cellOf('character').childElementCount).toBe(0);
+    expect(cellOf('event').childElementCount).toBe(0);
     expect([...cards()[0].querySelectorAll('[data-act]')].map(b => b.getAttribute('data-act'))).toEqual(['make', 'skip']);
+  });
+
+  it('with a story and its main character: the Event asked next, in words that name them', () => {
+    world(withHero(), full);
+    draw();
+    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['event']);
+    expect(cards()[0].querySelector('.atlas-home-strand-card-title > span:last-child')?.textContent).toBe('What happens to Odile?');
+    expect(cellOf('location').childElementCount).toBe(0);
   });
 
   it('a contributor on a strand: the main character asked, in words with no event', () => {
@@ -230,19 +241,22 @@ describe('R2: the reveal', () => {
   it('Skip for now sets a slot aside behind "Add <slot>", and Add asks it again', () => {
     world([el('narrative', N)], full);
     draw();
-    cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
-    // The place needs the event: the main character is asked.
     expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['character']);
-    const add = cellOf('event').querySelector<HTMLButtonElement>('[data-act="add"]')!;
-    expect(add.textContent).toBe('Add event');
+    cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
+    // The main character skipped: the Event is asked, in words with no character.
+    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['event']);
+    expect(cards()[0].querySelector('.atlas-home-strand-card-title > span:last-child')?.textContent).toBe('What happens in narrative-01?');
+    const add = cellOf('character').querySelector<HTMLButtonElement>('[data-act="add"]')!;
+    expect(add.textContent).toBe('Add character');
     expect(cellOf('location').childElementCount).toBe(0);
     cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
+    // The place needs the event, where they are now the character: nothing more to ask.
     expect(cards()).toHaveLength(0);
-    expect(cellOf('character').querySelector('[data-act="add"]')!.textContent).toBe('Add character');
-    cellOf('character').querySelector<HTMLButtonElement>('[data-act="add"]')!.click();
-    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['character']);
-    add.isConnected ? add.click() : cellOf('event').querySelector<HTMLButtonElement>('[data-act="add"]')!.click();
+    expect(cellOf('event').querySelector('[data-act="add"]')!.textContent).toBe('Add event');
+    cellOf('event').querySelector<HTMLButtonElement>('[data-act="add"]')!.click();
     expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['event']);
+    add.isConnected ? add.click() : cellOf('character').querySelector<HTMLButtonElement>('[data-act="add"]')!.click();
+    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['character']);
   });
 
   it('C5: Skip for now on the last card it can ask: the focus goes to that slot\'s Add, never the page', () => {
@@ -254,7 +268,8 @@ describe('R2: the reveal', () => {
     cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
     expect(cards()).toHaveLength(0);
     settleStrandFocus(host, null);
-    expect(document.activeElement).toBe(cellOf('character').querySelector('[data-act="add"]'));
+    // The last card asked is the Event's (1.121.0): the focus goes to Add event.
+    expect(document.activeElement).toBe(cellOf('event').querySelector('[data-act="add"]'));
   });
 
   it('the frame\'s Pick on Home asks its slot out of order, its Name the focus asked for', () => {
@@ -268,23 +283,24 @@ describe('R2: the reveal', () => {
     world([el('narrative', N)], full);
     draw();
     cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
-    expect(cellOf('event').querySelector('[data-act="add"]')).not.toBeNull();
+    expect(cellOf('character').querySelector('[data-act="add"]')).not.toBeNull();
     world([], undefined, {}, {}, W2);
     world([el('narrative', N)], full);
     draw();
-    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['event']);
+    expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['character']);
   });
 });
 
 describe('R3: the cards and their memory', () => {
   it('what was typed survives every redraw; Escape empties the card, keeps the focus in Name and is owned', () => {
-    world([el('narrative', N)], full);
+    world(withHero(), full);
     draw();
+    expect(cards()[0].getAttribute('data-card-slot')).toBe('event');
     typeIn(cards()[0].querySelector<HTMLInputElement>('[data-field="name"]')!, 'The night crossing');
     typeIn(cards()[0].querySelector<HTMLTextAreaElement>('[data-field="text"]')!, 'A storm.\nThe ferry went.');
     typeIn(cards()[0].querySelector<HTMLInputElement>('[data-field="when"]')!, '1142');
     // A pull: a new elements array, the panel built again.
-    world([el('narrative', N), el('character', X)], full);
+    world(withHero(el('character', X)), full);
     draw();
     const card = cards()[0];
     expect(card.querySelector<HTMLInputElement>('[data-field="name"]')!.value).toBe('The night crossing');
@@ -322,9 +338,10 @@ describe('R3: the cards and their memory', () => {
   });
 
   it('an empty name is asked for; a When that is not a whole number is said', () => {
-    world([el('narrative', N)], full);
+    world(withHero(), full);
     draw();
     const card = cards()[0] as HTMLFormElement;
+    expect(card.getAttribute('data-card-slot')).toBe('event');
     card.requestSubmit();
     expect(card.querySelector('[data-role="strand-card-note"]')!.textContent).toBe('Type a name first');
     typeIn(card.querySelector<HTMLInputElement>('[data-field="name"]')!, 'X');
@@ -417,7 +434,7 @@ describe('R5, R7, R8: the boxes', () => {
     expect(document.activeElement).toBe(more);
     more.click();
     story.querySelector<HTMLButtonElement>('.atlas-home-strand-menu button')!.click();
-    expect([...cellOf('narrative').querySelectorAll('[data-act]')].map(b => b.textContent)).toEqual(['Make one', 'Pick from the world', 'Cancel']);
+    expect([...cellOf('narrative').querySelectorAll('[data-act]')].map(b => b.textContent)).toEqual(['Create one', 'Pick from the world', 'Cancel']);
   });
 
   it('Edit opens the card in place with the box\'s values; a story for the writing room gets no text field', () => {
@@ -480,10 +497,12 @@ describe('the words', () => {
   });
 
   it('S8: "Or pick one from your world" only when the pick list holds one', () => {
+    // The main character's card, the first asked on a story (1.121.0).
     world([el('narrative', N)], full);
     draw();
+    expect(cards()[0].getAttribute('data-card-slot')).toBe('character');
     expect(cards()[0].querySelector('[data-act="pick"]')).toBeNull();
-    world([el('narrative', N), el('event', E)], full);
+    world([el('narrative', N), el('character', X)], full);
     draw();
     expect(cards()[0].querySelector('[data-act="pick"]')!.textContent).toBe('Or pick one from your world');
   });

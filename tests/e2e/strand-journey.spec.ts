@@ -3,7 +3,9 @@
  * question at a time. The journey from an empty world to whole, each field read back from disk, in
  * Chromium, Firefox and at a phone's width; text typed surviving a pull and a redraw; Skip for now and
  * Add; Edit writing only what changed; the ⋯ menu's Use another; Escape writing nothing; an established
- * world's first Home unchanged; the writing room frame's Pick on Home.
+ * world's first Home unchanged; the writing room frame's Pick on Home. Since 1.121.0 the journey asks
+ * the story, its main character, what happens to them, where, and where they are now; the Event card puts
+ * the main character into its Event, and the whole strand draws as before on the Strand tab and Picture.
  */
 import { test, expect, type Page } from '@playwright/test';
 
@@ -151,15 +153,28 @@ async function journey(page: Page, still = false): Promise<string> {
   expect(await markOnDisk(page)).toEqual({ narrative: story, event: null, location: null });
   expect((await onDisk(page, story)).story).toBe('Every night a ferry crosses the black lake.\nThe ferryman never asks why.');
   expect('description' in (await onDisk(page, story))).toBe(false);
-  // The focus goes to the next question's Name.
+  // The focus goes to the next question's Name: who the story is about (1.121.0: before what happens).
   await expect(field(page, 'name')).toBeFocused();
-  await expect(cardTitle(page)).toHaveText('What happens in The Lantern Ferry?');
+  await expect(cardTitle(page)).toHaveText('Who is the story about?');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Its main character.');
+  await expect(card(page).locator('[data-act="make"]')).toHaveText('Create');
+
+  await answer(page, 'character', { name: 'Odile Varn', text: 'A cartographer who paid in maps.' });
+  const odile = await idByName(page, 'Odile Varn');
+  expect((await onDisk(page, story)).protagonist).toBe(odile);
+  expect((await onDisk(page, odile)).description).toBe('A cartographer who paid in maps.');
+  expect(await markOnDisk(page)).toEqual({ narrative: story, event: null, location: null });
+  await expect(field(page, 'name')).toBeFocused();
+  await expect(cardTitle(page)).toHaveText('What happens to Odile Varn?');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('One event in the story, of any size.');
 
   await answer(page, 'event', { name: 'The night crossing', text: 'A storm closed the lake.', when: '1142' });
   const event = await idByName(page, 'The night crossing');
   expect(await onDisk(page, event)).toMatchObject({ description: 'A storm closed the lake.', start_date: 1142 });
   expect((await onDisk(page, story)).events).toEqual([event]);
   expect(await markOnDisk(page)).toEqual({ narrative: story, event, location: null });
+  // The Event card's second write: the Event lists the story's main character.
+  await expect.poll(async () => (await onDisk(page, event)).characters).toEqual([odile]);
   await expect(cardTitle(page)).toHaveText('Where did The night crossing happen?');
   await expect(cell(page, 'location').locator('[data-role="strand-join"]')).toHaveText('happened in or at');
 
@@ -169,14 +184,7 @@ async function journey(page: Page, still = false): Promise<string> {
   expect(await markOnDisk(page)).toEqual({ narrative: story, event, location: quay });
   expect((await onDisk(page, quay)).description).toBe('The stone landing on the far shore.');
 
-  await expect(cardTitle(page)).toHaveText('Who was involved in The night crossing?');
-  await answer(page, 'character', { name: 'Odile Varn', text: 'A cartographer who paid in maps.' });
-  const odile = await idByName(page, 'Odile Varn');
-  expect((await onDisk(page, story)).protagonist).toBe(odile);
-  // The Character card's second write: the Event lists who was involved.
-  await expect.poll(async () => (await onDisk(page, event)).characters).toEqual([odile]);
-
-  await expect(cardTitle(page)).toHaveText('Where is Odile Varn now?');
+  await expect(cardTitle(page)).toHaveText('Is Odile Varn still at Saltmere Quay?');
   await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('After The night crossing.');
   await expect(card(page).locator('[data-act="same"]')).toHaveText('Still at Saltmere Quay');
   const lines = box(page, 'narrative').locator('[data-role="strand-lines"] p');
@@ -199,7 +207,18 @@ async function journey(page: Page, still = false): Promise<string> {
   // Whole, and still no head in this visit.
   await expect(page.locator('[data-role="strand-whole"]')).toContainText('The Lantern Ferry is whole.');
   await expect(head(page)).toHaveCount(0);
+  // Made in the new order, the whole strand holds the same links as before: the story names its main
+  // character, and its Event lists them once.
+  expect((await onDisk(page, story)).protagonist).toBe(odile);
+  expect((await onDisk(page, event)).characters).toEqual([odile]);
   return wid;
+}
+
+/** A square's place on Home's Picture. */
+async function squareAt(page: Page, id: string): Promise<{ line: string | null; pos: string | null; row: string | null }> {
+  const c = page.locator(`[data-role="home-grid"] [data-grid-id="${id}"]`);
+  await expect(c).toBeVisible();
+  return { line: await c.getAttribute('data-line'), pos: await c.getAttribute('data-pos'), row: await c.getAttribute('data-row') };
 }
 
 for (const tag of ['', ' @firefox']) {
@@ -207,27 +226,43 @@ for (const tag of ['', ' @firefox']) {
     const wid = await journey(page);
     await reopenHome(page, wid);
     await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
-    await expect(boxName(page, 'now')).toHaveText('The Drowned Library');
+    // The Strand tab draws the five boxes in their places, whatever order they were asked in.
+    for (const [slot, name] of [['narrative', 'The Lantern Ferry'], ['event', 'The night crossing'], ['location', 'Saltmere Quay'], ['character', 'Odile Varn'], ['now', 'The Drowned Library']]) {
+      await expect(boxName(page, slot)).toHaveText(name);
+    }
+    const lines = box(page, 'narrative').locator('[data-role="strand-lines"] p:not([aria-hidden])');
+    await expect(lines).toHaveText([/It tells of .*The night crossing, which happened in or at .*Saltmere Quay\./, /Its main character is .*Odile Varn, now in or at .*The Drowned Library\./]);
+    // And the Picture: the story, its event and place, its main character and where they are now in their cells.
+    await tab(page, 'picture').click();
+    expect(await squareAt(page, await idByName(page, 'The Lantern Ferry'))).toEqual({ line: '0', pos: '0', row: '0' });
+    expect(await squareAt(page, await idByName(page, 'The night crossing'))).toEqual({ line: '0', pos: '0', row: '1' });
+    expect(await squareAt(page, await idByName(page, 'Saltmere Quay'))).toEqual({ line: '0', pos: '1', row: '1' });
+    expect(await squareAt(page, await idByName(page, 'Odile Varn'))).toEqual({ line: '0', pos: '0', row: '2' });
+    expect(await squareAt(page, await idByName(page, 'The Drowned Library'))).toEqual({ line: '0', pos: '1', row: '2' });
+    // story-event, event-place, story-character, character-now, event-character: five lines, one each.
+    await expect(page.locator('[data-role="home-grid"] .atlas-home-grid-lines path')).toHaveCount(5);
   });
 
   test(`text typed in a card survives a pull while focused, and a redraw after it left${tag}`, async ({ page }) => {
     await setupWorld(page);
     await answer(page, 'narrative', { name: 'The Lantern Ferry' });
-    await field(page, 'name').fill('The night crossing');
-    await field(page, 'text').fill('A storm closed');
+    // The card asked next is the main character's (1.121.0).
+    await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
+    await field(page, 'name').fill('Odile Varn');
+    await field(page, 'text').fill('A cartographer who paid');
     await expect(field(page, 'text')).toBeFocused();
     // A pull lands mid-typing: an element made through the store.
     await createViaStore(page, 'character', { name: 'Bystander' });
     await page.waitForTimeout(300);
-    await field(page, 'text').pressSequentially(' the lake.');
-    await expect(field(page, 'text')).toHaveValue('A storm closed the lake.');
-    await expect(field(page, 'name')).toHaveValue('The night crossing');
+    await field(page, 'text').pressSequentially(' in maps.');
+    await expect(field(page, 'text')).toHaveValue('A cartographer who paid in maps.');
+    await expect(field(page, 'name')).toHaveValue('Odile Varn');
     // The focus leaves the card; the next pull redraws Home, and the card comes back from memory.
     await page.locator('[data-role="home-strand"] [data-box="narrative"] .atlas-home-strand-box-head').click();
     await createViaStore(page, 'location', { name: 'Somewhere' });
-    await expect(field(page, 'text')).toHaveValue('A storm closed the lake.');
-    await expect(field(page, 'name')).toHaveValue('The night crossing');
-    expect(await idByName(page, 'The night crossing')).toBe('');
+    await expect(field(page, 'text')).toHaveValue('A cartographer who paid in maps.');
+    await expect(field(page, 'name')).toHaveValue('Odile Varn');
+    expect(await idByName(page, 'Odile Varn')).toBe('');
   });
 
   test(`Escape writes nothing: the card empties, the focus stays in Name, Home stays${tag}`, async ({ page }) => {
@@ -245,26 +280,34 @@ for (const tag of ['', ' @firefox']) {
   });
 }
 
-test('Skip for now and Add: the main character asked without an event, the event brought back', async ({ page }) => {
+test('Skip for now and Add: the event asked without a main character, the main character brought back and put in it', async ({ page }) => {
   await setupWorld(page);
   await answer(page, 'narrative', { name: 'The Lantern Ferry' });
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
   await card(page).locator('[data-act="skip"]').click();
-  await expect(cardTitle(page)).toHaveText('Who is the story about?');
-  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Its main character.');
+  // No main character: the Event asks what happens in the story.
+  await expect(cardTitle(page)).toHaveText('What happens in The Lantern Ferry?');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('One event in the story, of any size.');
   await expect(field(page, 'name')).toBeFocused();
-  await expect(cell(page, 'event').locator('[data-act="add"]')).toHaveText('Add event');
-  await answer(page, 'character', { name: 'Mira' });
-  const story = await idByName(page, 'The Lantern Ferry');
-  expect((await onDisk(page, story)).protagonist).toBe(await idByName(page, 'Mira'));
-  await expect(cardTitle(page)).toHaveText('Where is Mira now?');
-  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveCount(0);
-  await cell(page, 'event').locator('[data-act="add"]').click();
-  await expect(card(page)).toHaveAttribute('data-card-slot', 'event');
-  await expect(field(page, 'name')).toBeFocused();
+  await expect(cell(page, 'character').locator('[data-act="add"]')).toHaveText('Add character');
   await answer(page, 'event', { name: 'The night crossing' });
-  expect((await onDisk(page, story)).events).toEqual([await idByName(page, 'The night crossing')]);
-  // An Event made after the main character is not their card's write: its characters stay as made.
-  expect((await onDisk(page, await idByName(page, 'The night crossing'))).characters ?? null).toBeNull();
+  const story = await idByName(page, 'The Lantern Ferry');
+  const event = await idByName(page, 'The night crossing');
+  expect((await onDisk(page, story)).events).toEqual([event]);
+  // An Event made with no main character writes no characters.
+  expect((await onDisk(page, event)).characters ?? null).toBeNull();
+  await expect(cardTitle(page)).toHaveText('Where did The night crossing happen?');
+  await cell(page, 'character').locator('[data-act="add"]').click();
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
+  await expect(field(page, 'name')).toBeFocused();
+  await expect(cardTitle(page)).toHaveText('Who is the story about?');
+  await answer(page, 'character', { name: 'Mira' });
+  const mira = await idByName(page, 'Mira');
+  expect((await onDisk(page, story)).protagonist).toBe(mira);
+  // The Character card made after the event puts them in it, as before.
+  await expect.poll(async () => (await onDisk(page, event)).characters).toEqual([mira]);
+  // Where it happened is still to come: no place, so where they are now is asked plainly after it.
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'location');
 });
 
 /** A world with a strand set and room around it, past its first opening. */
@@ -425,12 +468,12 @@ test('the writing room frame\'s Pick on Home asks for that part, its Name focuse
   await page.locator('.atlas-tab[data-tab-kind="context"]').click();
   const frame = page.locator('[data-role="strand-frame"]');
   await expect(frame.locator('[data-slot="character"] [data-action="strand-pick-on-home"]')).toHaveText('Pick on Home');
-  await frame.locator('[data-slot="character"] [data-action="strand-pick-on-home"]').click();
+  await frame.locator('[data-slot="location"] [data-action="strand-pick-on-home"]').click();
   await expect(page.locator('.atlas-world-home')).toBeVisible();
-  // Where it happened would be asked first; the frame asked for the main character.
-  await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
+  // The main character would be asked first (1.121.0); the frame asked for where it happened.
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'location');
   await expect(field(page, 'name')).toBeFocused();
-  await expect(cardTitle(page)).toHaveText('Who was involved in The Fire?');
+  await expect(cardTitle(page)).toHaveText('Where did The Fire happen?');
 });
 
 test.describe('on a phone', () => {

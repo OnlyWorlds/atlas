@@ -64,15 +64,21 @@ export function cardCopy(slot: StrandSlot, s: OwStrand): CardCopy {
     case 'narrative':
       return { title: 'Start with a story', what: 'The story your world tells, or the first of them.', text: 'The story' };
     case 'event':
-      return { title: `What happens in ${named(s.narrative)}?`, what: 'One event in the story: a night, a battle, a meeting.', text: 'What happens' };
+      return {
+        title: s.character ? `What happens to ${named(s.character)}?` : `What happens in ${named(s.narrative)}?`,
+        what: 'One event in the story, of any size.',
+        text: 'What happens',
+      };
     case 'location':
       return { title: `Where did ${named(s.event)} happen?`, what: 'A location in your world.', text: 'About this location' };
     case 'character':
-      return s.event
-        ? { title: `Who was involved in ${named(s.event)}?`, what: "Someone who was there. They become the story's main character.", text: 'About them' }
-        : { title: 'Who is the story about?', what: 'Its main character.', text: 'About them' };
+      return { title: 'Who is the story about?', what: 'Its main character.', text: 'About them' };
     case 'now':
-      return { title: `Where is ${named(s.character)} now?`, what: s.event ? `After ${named(s.event)}.` : null, text: 'About this location' };
+      return {
+        title: s.location ? `Is ${named(s.character)} still at ${named(s.location)}?` : `Where is ${named(s.character)} now?`,
+        what: s.event ? `After ${named(s.event)}.` : null,
+        text: 'About this location',
+      };
   }
 }
 
@@ -90,9 +96,12 @@ export function askedSlot(
   forced: StrandSlot | null = null,
 ): StrandSlot | null {
   if (forced && !s[forced] && may(forced)) return forced;
-  for (const slot of STRAND_SLOTS) if (!s[slot] && may(slot) && !skipped(slot)) return slot;
+  for (const slot of ASK_ORDER) if (!s[slot] && may(slot) && !skipped(slot)) return slot;
   return null;
 }
+
+/** The order the journey asks in (1.121.0): the story, who it is about, what happens to them, where, and where they are now. */
+export const ASK_ORDER: readonly StrandSlot[] = ['narrative', 'character', 'event', 'location', 'now'];
 
 /** All five slots filled. */
 export function strandWhole(s: OwStrand): boolean {

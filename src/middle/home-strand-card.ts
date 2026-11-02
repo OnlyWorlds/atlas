@@ -232,7 +232,7 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
   make.className = 'atlas-btn-primary atlas-home-strand-act';
   make.setAttribute('data-act', 'make');
   make.setAttribute('data-strand-key', `card:${slot}:make`);
-  make.textContent = 'Make';
+  make.textContent = 'Create';
   acts.appendChild(make);
   const picks = pickRows(slot, c);
   const pickHost = document.createElement('div');

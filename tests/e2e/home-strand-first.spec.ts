@@ -135,7 +135,8 @@ test('an empty world\'s story made on the strand keeps Home on the strand, after
   await expect(story.locator('.atlas-home-strand-name')).toHaveText('A Tale');
   // The redraw between the make and the mark saw one element and no strand: it must not leave the strand.
   await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
-  await expect(card(page)).toHaveAttribute('data-card-slot', 'event');
+  // The next question is who the story is about (1.121.0).
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
   await page.evaluate(() => {
     const s = (window as any).__atlasTestApi.getState();
     window.location.hash = `#/w/${s.active.worldId}/settings`;
@@ -145,5 +146,5 @@ test('an empty world\'s story made on the strand keeps Home on the strand, after
   // The world holds only its strand's story: still the strand alone, still asking.
   await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
   await expect(story.locator('.atlas-home-strand-name')).toHaveText('A Tale');
-  await expect(card(page)).toHaveAttribute('data-card-slot', 'event');
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
 });

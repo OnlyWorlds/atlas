@@ -188,6 +188,11 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
   const event = slot === 'character' && how.fromCard ? c.strand.event : null;
   const eventEl = event ? c.byId.get(event.id) : undefined;
   const mayEvent = !!eventEl && !isKnownOf(eventEl) && mayChange(c.entry, eventEl);
+  // The same pair from the other side (1.121.0, the story's character asked before its event): the
+  // Event card puts the main character into the Event it makes, or one it picks this person may change.
+  const hero = slot === 'event' && how.fromCard ? c.strand.character : null;
+  const pickedEl = hero && how.pick ? c.byId.get(how.pick) : undefined;
+  const mayPicked = !how.pick || (!!pickedEl && !isKnownOf(pickedEl) && mayChange(c.entry, pickedEl));
   let result: StrandWriteResult = 'nothing';
   let made: Element | undefined;
   let eventLine: string | null = null;
@@ -203,6 +208,14 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
       if (added === 'failed') {
         const name = made ? nameOf(made) : nameOf(c.byId.get(who));
         eventLine = `${name} is the story's main character; adding them to ${event.name.trim() || 'Unnamed'} did not go through.`;
+      }
+    }
+    if (result === 'wrote' && hero && mayPicked) {
+      const eventId = made?.id ?? how.pick!;
+      const added = await addCharacterToEvent(drawn, eventId, hero.id);
+      if (added === 'failed') {
+        const name = made ? nameOf(made) : nameOf(c.byId.get(eventId));
+        eventLine = `${name} is the story's event; adding ${hero.name.trim() || 'Unnamed'} to it did not go through.`;
       }
     }
   } finally {
@@ -238,7 +251,7 @@ export function actsRow(slot: StrandSlot, c: StrandContext, opts: StrandPanelOpt
     }
     void run(slot, c, drawnFor(slot, c), how, opts);
   };
-  const make = act('Make one', `${slot}:make`, () => openNameBox(row, slot, make, name => chosen({ name })));
+  const make = act('Create one', `${slot}:make`, () => openNameBox(row, slot, make, name => chosen({ name })));
   const pick = act('Pick from the world', `${slot}:pick`, () => openPickList(row, slot, c, pick, id => chosen({ pick: id })));
   row.append(make, pick);
   // Where they are now: the place it happened, offered once that slot is filled.

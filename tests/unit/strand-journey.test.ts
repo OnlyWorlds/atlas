@@ -25,24 +25,28 @@ const index = (...els: Element[]) => new Map(els.map(e => [e.id, e]));
 describe('R3: each card asks from what is filled', () => {
   it('the story, the event and the place', () => {
     expect(cardCopy('narrative', EMPTY_STRAND)).toEqual({ title: 'Start with a story', what: 'The story your world tells, or the first of them.', text: 'The story' });
-    expect(cardCopy('event', strand({ narrative: S }))).toEqual({ title: 'What happens in The Lantern Ferry?', what: 'One event in the story: a night, a battle, a meeting.', text: 'What happens' });
+    // The Event is asked after the main character (1.121.0): what happens to them; with the character
+    // skipped, what happens in the story.
+    expect(cardCopy('event', strand({ narrative: S, character: CH }))).toEqual({ title: 'What happens to Odile?', what: 'One event in the story, of any size.', text: 'What happens' });
+    expect(cardCopy('event', strand({ narrative: S }))).toEqual({ title: 'What happens in The Lantern Ferry?', what: 'One event in the story, of any size.', text: 'What happens' });
     expect(cardCopy('location', strand({ narrative: S, event: EV }))).toEqual({ title: 'Where did The night crossing happen?', what: 'A location in your world.', text: 'About this location' });
   });
 
-  it('the main character, with an event and without one', () => {
-    expect(cardCopy('character', strand({ narrative: S, event: EV }))).toEqual({
-      title: 'Who was involved in The night crossing?', what: "Someone who was there. They become the story's main character.", text: 'About them',
-    });
-    expect(cardCopy('character', strand({ narrative: S }))).toEqual({ title: 'Who is the story about?', what: 'Its main character.', text: 'About them' });
+  it('the main character: one question, with an event and without one (a 1.120 strand asks it after its event)', () => {
+    const asked = { title: 'Who is the story about?', what: 'Its main character.', text: 'About them' };
+    expect(cardCopy('character', strand({ narrative: S }))).toEqual(asked);
+    expect(cardCopy('character', strand({ narrative: S, event: EV }))).toEqual(asked);
+    expect(cardCopy('character', strand({ narrative: S, event: EV, location: PL }))).toEqual(asked);
   });
 
-  it('where they are now: "After" only with an event', () => {
+  it('where they are now: "still at" the place it happened when there is one, "After" only with an event', () => {
+    expect(cardCopy('now', strand({ narrative: S, event: EV, location: PL, character: CH }))).toEqual({ title: 'Is Odile still at Saltmere Quay?', what: 'After The night crossing.', text: 'About this location' });
     expect(cardCopy('now', strand({ narrative: S, event: EV, character: CH }))).toEqual({ title: 'Where is Odile now?', what: 'After The night crossing.', text: 'About this location' });
     expect(cardCopy('now', strand({ narrative: S, character: CH }))).toEqual({ title: 'Where is Odile now?', what: null, text: 'About this location' });
   });
 
   it('no word on any card says "hero", and none carries an em-dash', () => {
-    const fills = [EMPTY_STRAND, strand({ narrative: S }), strand({ narrative: S, event: EV }), strand({ narrative: S, character: CH }), strand({ narrative: S, event: EV, character: CH })];
+    const fills = [EMPTY_STRAND, strand({ narrative: S }), strand({ narrative: S, event: EV }), strand({ narrative: S, character: CH }), strand({ narrative: S, event: EV, character: CH }), strand({ narrative: S, event: EV, location: PL, character: CH })];
     for (const s of fills) for (const k of ['narrative', 'event', 'location', 'character', 'now'] as StrandSlot[]) {
       const words = JSON.stringify(cardCopy(k, s));
       expect(words).not.toMatch(/hero/i);
@@ -54,11 +58,11 @@ describe('R3: each card asks from what is filled', () => {
 describe('R2: the asked slot', () => {
   const all = () => true;
   const none = () => false;
-  it('the first empty slot in the story\'s order this reader may write', () => {
+  it('the first empty slot in the journey\'s order (story, character, event, location, now) this reader may write', () => {
     expect(askedSlot(EMPTY_STRAND, all, none)).toBe('narrative');
-    expect(askedSlot(strand({ narrative: S }), all, none)).toBe('event');
-    expect(askedSlot(strand({ narrative: S, event: EV }), all, none)).toBe('location');
-    expect(askedSlot(strand({ narrative: S, event: EV, location: PL }), all, none)).toBe('character');
+    expect(askedSlot(strand({ narrative: S }), all, none)).toBe('character');
+    expect(askedSlot(strand({ narrative: S, character: CH }), all, none)).toBe('event');
+    expect(askedSlot(strand({ narrative: S, character: CH, event: EV }), all, none)).toBe('location');
     expect(askedSlot(strand({ narrative: S, event: EV, location: PL, character: CH }), all, none)).toBe('now');
     expect(askedSlot(strand({ narrative: S, event: EV, location: PL, character: CH, now: NOW }), all, none)).toBeNull();
   });
@@ -71,10 +75,18 @@ describe('R2: the asked slot', () => {
 
   it('a skipped slot is passed over; a forced slot is asked out of order while it is empty and writable', () => {
     const skipped = (k: StrandSlot) => k === 'event';
-    expect(askedSlot(strand({ narrative: S }), k => k !== 'location', skipped)).toBe('character');
-    expect(askedSlot(strand({ narrative: S }), all, none, 'character')).toBe('character');
-    expect(askedSlot(strand({ narrative: S, character: CH }), all, none, 'character')).toBe('event');
-    expect(askedSlot(strand({ narrative: S }), k => k !== 'now', none, 'now')).toBe('event');
+    expect(askedSlot(strand({ narrative: S, character: CH }), k => k !== 'location', skipped)).toBe('now');
+    expect(askedSlot(strand({ narrative: S }), all, none, 'event')).toBe('event');
+    expect(askedSlot(strand({ narrative: S, event: EV }), all, none, 'event')).toBe('character');
+    expect(askedSlot(strand({ narrative: S }), k => k !== 'now', none, 'now')).toBe('character');
+  });
+
+  it('the character is asked before the event; with the character skipped, the event next (1.121.0)', () => {
+    expect(askedSlot(strand({ narrative: S }), all, none)).toBe('character');
+    expect(askedSlot(strand({ narrative: S }), all, k => k === 'character')).toBe('event');
+    // A half-made strand from 1.120 (the story and its event, no character) asks the character next.
+    expect(askedSlot(strand({ narrative: S, event: EV }), all, none)).toBe('character');
+    expect(askedSlot(strand({ narrative: S, event: EV, location: PL }), all, none)).toBe('character');
   });
 
   it('whole only with all five', () => {

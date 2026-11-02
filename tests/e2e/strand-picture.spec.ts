@@ -279,7 +279,7 @@ test('on a phone, the location\'s act opens its page with the map, and Back focu
   await expect(page.locator('[data-role="home-strand"] [data-strand-key="location:room"]')).toBeFocused();
 });
 
-test('W5: the story\'s box keeps room for its second line, so the Character make moves the Event box 0 px at 1440', async ({ page }) => {
+test('W5: the story\'s box keeps room for its second line, so the Event make moves the Event\'s row 0 px at 1440', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await setupWorld(page);
   const card = page.locator('[data-role="strand-card"][data-mode="make"]');
@@ -290,19 +290,20 @@ test('W5: the story\'s box keeps room for its second line, so the Character make
     await card.locator('[data-act="make"]').click();
     await expect(page.locator(`[data-role="home-strand"] [data-box="${slot}"] .atlas-home-strand-name`)).toHaveText(name);
   };
+  // The journey's order (1.121.0): the main character first brings the story's one line, its event the second.
   await answer('narrative', 'The Lantern Ferry');
-  await answer('event', 'The night crossing', '1142');
-  await answer('location', 'Saltmere Quay');
+  await answer('character', 'Odile Varn');
   const lines = page.locator('[data-role="home-strand"] [data-box="narrative"] [data-role="strand-lines"] p:not([aria-hidden])');
   await expect(lines).toHaveCount(1);
-  // The Event box's top within the Strand panel (the page scrolls to the next card, so never the viewport's).
+  // The Event cell's top within the Strand panel (the page scrolls to the next card, so never the
+  // viewport's): it holds the Event's card before the make and its box after, under the story's row.
   const eventTop = () => page.evaluate(() => {
     const panel = document.querySelector('[data-role="home-strand"]')!;
-    const box = panel.querySelector('[data-box="event"]')!;
-    return box.getBoundingClientRect().top - panel.getBoundingClientRect().top;
+    const cell = panel.querySelector('[data-slot="event"]')!;
+    return cell.getBoundingClientRect().top - panel.getBoundingClientRect().top;
   });
   const before = await eventTop();
-  await answer('character', 'Odile Varn');
+  await answer('event', 'The night crossing', '1142');
   await expect(lines).toHaveCount(2);
   expect(await eventTop() - before).toBe(0);
 });

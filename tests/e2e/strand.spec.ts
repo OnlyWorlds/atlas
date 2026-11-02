@@ -1,5 +1,6 @@
 /**
- * The world's strand (the strand profile; Atlas 1.114, the journey since 1.120.0): Home's Strand tab beside
+ * The world's strand (the strand profile; Atlas 1.114, the journey since 1.120.0, its main character asked
+ * before its event since 1.121.0): Home's Strand tab beside
  * its picture, each card's write read back from world.json and each element's one field, Use another with
  * its promise, a mark moved by a second tab refused, who is asked which card, Make this
  * the world's strand on a story's page and in the writing room's bar, the frame beside the story
@@ -137,7 +138,7 @@ async function make(page: Page, slot: string, name: string): Promise<void> {
   await card(page).locator('[data-field="name"]').fill(name);
   await card(page).locator('[data-field="name"]').press('Enter');
 }
-/** A filled box's ⋯, then Use another: the box offers Make one and Pick from the world. */
+/** A filled box's ⋯, then Use another: the box offers Create one and Pick from the world. */
 async function useAnother(page: Page, slot: string): Promise<void> {
   await actIn(page, slot, 'more').click();
   await actIn(page, slot, 'another').click();
@@ -190,30 +191,31 @@ test.describe('the Strand tab', () => {
     await expect(page.locator('#atlas-home-tabpanel [data-role="home-grow-picture"]')).toHaveCount(0);
     await expect(tab(page, 'strand')).toBeFocused();
 
-    // A world whose first draw has its story filled opens on Strand, the event asked next.
+    // A world whose first draw has its story filled opens on Strand, the main character asked next (1.121.0).
     await seeded(page, { narrative: N1, event: GONE_E, location: GONE_L });
     await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
     await expect(box(page, 'narrative').locator('.atlas-home-strand-name')).toHaveText('The Long Road');
-    await expect(card(page)).toHaveAttribute('data-card-slot', 'event');
+    await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
+    await expect(box(page, 'event')).toHaveAttribute('aria-hidden', 'true');
     await expect(box(page, 'location')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  test('where it happened, the main character and where they are now, by Pick, Make and Still at; each field read back, the focus on the next card', async ({ page }) => {
+  test('a story and its event (a 1.120 strand): the main character, where it happened and where they are now, by Make, Pick and Still at; each field read back, the focus on the next card', async ({ page }) => {
     await seeded(page, { narrative: N1, event: E1, location: GONE_L });
     await expect(box(page, 'event').locator('.atlas-home-strand-name')).toHaveText('The Fire');
-
-    await pick(page, 'location', 'The Harbour');
-    await expect(box(page, 'location').locator('.atlas-home-strand-name')).toHaveText('The Harbour');
-    expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: L1 });
-    expect(await fieldOf(page, E1, 'locations')).toEqual([L1]);
-    await expectFocusOnCard(page, 'character');
 
     await make(page, 'character', 'Arden');
     await expect(box(page, 'character').locator('.atlas-home-strand-name')).toHaveText('Arden');
     const arden = await idByName(page, 'Arden');
     expect(await fieldOf(page, N1, 'protagonist')).toBe(arden);
     await expect.poll(() => fieldOf(page, E1, 'characters')).toEqual([arden]);
+    expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: GONE_L });
+    await expectFocusOnCard(page, 'location');
+
+    await pick(page, 'location', 'The Harbour');
+    await expect(box(page, 'location').locator('.atlas-home-strand-name')).toHaveText('The Harbour');
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: L1 });
+    expect(await fieldOf(page, E1, 'locations')).toEqual([L1]);
     await expectFocusOnCard(page, 'now');
 
     await card(page).locator('[data-act="same"]').click();
@@ -257,6 +259,13 @@ test.describe('the Strand tab', () => {
 
   test('a mark another tab changed between the draw and the press is refused, and nothing is written', async ({ page }) => {
     await seeded(page, { narrative: N1, event: E1, location: GONE_L });
+    // With its main character named, the story asks where its event happened.
+    await page.evaluate(async ({ n1, c1 }) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      await store.updateElement(n1, { protagonist: c1 });
+      api.patchData(await store.listElements());
+    }, { n1: N1, c1: C1 });
     await expect(card(page)).toHaveAttribute('data-card-slot', 'location');
     await card(page).locator('[data-act="pick"]').click();
     // Another tab moves the strand on disk while this one still draws the old.
@@ -390,19 +399,22 @@ test.describe('story first to a full strand', () => {
     await pick(page, 'narrative', 'The Long Road');
     await filled(page, 'narrative', 'The Long Road');
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: null, location: null });
+    // The main character before the event (1.121.0).
+    await expectFocusOnCard(page, 'character');
+    await pick(page, 'character', 'Mira');
+    await filled(page, 'character', 'Mira');
+    expect(await fieldOf(page, N1, 'protagonist')).toBe(C1);
     await expectFocusOnCard(page, 'event');
     await pick(page, 'event', 'The Fire');
     await filled(page, 'event', 'The Fire');
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: null });
     expect(await fieldOf(page, N1, 'events')).toEqual([E1]);
+    // The Event card's second write: the picked Event lists the main character.
+    await expect.poll(() => fieldOf(page, E1, 'characters')).toEqual([C1]);
     await pick(page, 'location', 'The Harbour');
     await filled(page, 'location', 'The Harbour');
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: L1 });
     expect(await fieldOf(page, E1, 'locations')).toEqual([L1]);
-    await pick(page, 'character', 'Mira');
-    await filled(page, 'character', 'Mira');
-    expect(await fieldOf(page, N1, 'protagonist')).toBe(C1);
-    await expect.poll(() => fieldOf(page, E1, 'characters')).toEqual([C1]);
     await pick(page, 'now', 'The Lighthouse');
     await filled(page, 'now', 'The Lighthouse');
     expect(await fieldOf(page, C1, 'location')).toBe(L2);
@@ -437,8 +449,9 @@ test.describe('on a phone', () => {
   test('the boxes and the card fit 390 px and every act and tab takes a thumb', async ({ page }) => {
     await seeded(page, { narrative: N1, event: E1, location: GONE_L });
     await expect(card(page)).toBeVisible();
+    await expect(card(page).locator('[data-act="make"]')).toHaveText('Create');
     const targets: Array<[string, ReturnType<typeof tab>]> = [
-      ['Picture', tab(page, 'picture')], ['Strand', tab(page, 'strand')], ['Make', card(page).locator('[data-act="make"]')],
+      ['Picture', tab(page, 'picture')], ['Strand', tab(page, 'strand')], ['Create', card(page).locator('[data-act="make"]')],
       ['Or pick one from your world', card(page).locator('[data-act="pick"]')], ['Skip for now', card(page).locator('[data-act="skip"]')],
       ['the Name field', card(page).locator('[data-field="name"]')], ['Edit', actIn(page, 'event', 'edit')], ['the ⋯', actIn(page, 'event', 'more')],
       ['the event\'s name', box(page, 'event').locator('.atlas-home-strand-name')], ['the chip', box(page, 'narrative').locator('[data-chip="event"]')],

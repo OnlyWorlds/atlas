@@ -880,7 +880,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         ${proposedRowWord(row.el)}
         ${hiddenRowWord(row.el, worldState)}
         <span class="atlas-home-continue-kind">${escapeText(typeName(row.el.type, { supertype: row.el.supertype }))}</span>
-        <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
+        <span class="atlas-home-continue-time">${isFirst ? 'your first element · click here to edit' : relativeTime(row.el.local_updated_at)}</span>
       `;
       btn.addEventListener('click', () => openElementTarget(row.el, worldId));
       // Drag-onto-map: recent rows carry the same payload as sidebar
