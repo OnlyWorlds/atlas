@@ -11,8 +11,8 @@
  * highlight() emphasizes the matching row.
  *
  * Per-narrative dismissal (Suggested only): × on a row stores the dismissal
- * in `atlas_dismissed_suggestions` on the narrative. Dismissed rows hide
- * until manually re-shown via a "show N dismissed" footer link.
+ * in `atlas_dismissed_suggestions` on the narrative, and the row stays hidden.
+ * A dismissal is never a link (conv. 185).
  *
  * Empty state: when both lists are empty, a single inline hint suggests
  * starting with `@` in prose. Hidden when the narrative is brand-new.
@@ -26,7 +26,7 @@ import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { showProblem } from '../../ui/problem-fixes';
 import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink';
-import { currentLore } from '../../core/parlor-room';
+import { currentLore, pageLore } from '../../core/parlor-room';
 import { readerLinksOf } from './context-pane-graph';
 
 export interface ContextListsHandle {
@@ -52,7 +52,8 @@ function linksIn(el: Element, world: readonly Element[]): string[] {
 }
 
 function collectCastIds(narrative: Element): string[] {
-  return linksIn(narrative, getState().data.elements);
+  // The page's world, as the Web above reads it: a hidden room stays out of the Cast too (the 1.118.0 gate's S3).
+  return linksIn(narrative, pageLore(narrative));
 }
 
 /** Count ow:// mentions of each element in the narrative's story. */

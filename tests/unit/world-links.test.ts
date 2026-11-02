@@ -6,9 +6,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { atlasAdditionsOf, incomingOf, readerEdgesOf } from '../../src/core/world-links';
 import { readerLinksOf } from '../../src/tabs/right/context-pane-graph';
-import { collectReferencedIds } from '../../src/middle/element-detail-refs';
+import { collectReferencedIds, findIncomingReferences } from '../../src/middle/element-detail-refs';
 import { mountContextLists } from '../../src/tabs/right/context-pane-lists';
-import { patchSlice } from '../../src/core/state';
+import { looseIds } from '../../src/middle/home-grid-picture';
+import { getState, patchSlice } from '../../src/core/state';
 import type { Element } from '../../src/core/types';
 
 const R = (n: number) => `0698cccc-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -56,7 +57,67 @@ describe('the shared reading', () => {
   });
 });
 
+describe('Home\'s grid: loose means linked to nothing either way', () => {
+  it('a Character with one friend is not loose, nor is the friend; an element with no link is', () => {
+    const ada = mk(R(30), 'character', { friends: [R(31)] });
+    const bo = mk(R(31), 'character');
+    const cy = mk(R(32), 'character');
+    const keep = mk(R(33), 'location');
+    const dee = mk(R(34), 'character', { birthplace: R(33), atlas_dismissed_suggestions: [R(32)] });
+    expect([...looseIds([ada, bo, cy, keep, dee])]).toEqual([R(32)]);
+  });
+});
+
+describe('the room stays out of a lore page\'s references (pageLore)', () => {
+  afterEach(() => patchSlice('ui', { ...getState().ui, hideRoom: true }));
+
+  it('a hidden room\'s Take is not listed under a Character, and is once the room shows', () => {
+    const ada = mk(R(40), 'character');
+    const take = mk(R(41), 'relation', { supertype: 'Take', x_room_of: R(49), characters: [R(40)] });
+    const story = mk(R(42), 'narrative', { characters: [R(40)] });
+    patchSlice('data', { elements: [ada, take, story] });
+    patchSlice('ui', { ...getState().ui, hideRoom: true });
+    expect(findIncomingReferences(R(40)).map(e => e.id)).toEqual([R(42)]);
+    patchSlice('ui', { ...getState().ui, hideRoom: false });
+    expect(findIncomingReferences(R(40)).map(e => e.id).sort()).toEqual([R(41), R(42)].sort());
+  });
+});
+
+describe('the writing pane\'s Suggested', () => {
+  it('follows each cast member\'s typed links (via the member), never an id in another key', () => {
+    const keep = mk(R(50), 'location');
+    const bo = mk(R(51), 'character');
+    const stray = mk(R(52), 'character');
+    const hero = mk(R(53), 'character', { birthplace: R(50), friends: [R(51)], x_note_ref: R(52) });
+    const scene = mk(R(54), 'narrative', { supertype: 'Scene', protagonist: R(53) });
+    patchSlice('data', { elements: [keep, bo, stray, hero, scene] });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const h = mountContextLists({ host, narrative: scene, onSelect: () => {} });
+    const rows = [...host.querySelectorAll<HTMLElement>('.atlas-context-pane-list-suggested .atlas-context-pane-row')]
+      .map(r => `${r.dataset.elementId}|${r.querySelector('.atlas-context-pane-row-reason')?.textContent ?? ''}`).sort();
+    expect(rows).toEqual([`${R(50)}|via ${hero.name}`, `${R(51)}|via ${hero.name}`].sort());
+    h.destroy();
+  });
+});
+
 describe('the writing pane\'s Cast', () => {
+  afterEach(() => patchSlice('ui', { ...getState().ui, hideRoom: true }));
+
+  it('reads the page\'s world: a hidden room\'s Take is not cast, as the Web above leaves it out', () => {
+    const take = mk(R(60), 'relation', { supertype: 'Take', x_room_of: R(69) });
+    const hero = mk(R(61), 'character');
+    const scene = mk(R(62), 'narrative', { supertype: 'Scene', relations: [R(60)], characters: [R(61)] });
+    patchSlice('data', { elements: [take, hero, scene] });
+    patchSlice('ui', { ...getState().ui, hideRoom: true });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const h = mountContextLists({ host, narrative: scene, onSelect: () => {} });
+    const cast = [...host.querySelectorAll<HTMLElement>('.atlas-context-pane-list-cast .atlas-context-pane-row')].map(r => r.dataset.elementId);
+    expect(cast).toEqual([R(61)]);
+    h.destroy();
+  });
+
   const castIds = (host: HTMLElement) =>
     [...host.querySelectorAll<HTMLElement>('.atlas-context-pane-list-cast .atlas-context-pane-row')].map(r => r.dataset.elementId).sort();
 

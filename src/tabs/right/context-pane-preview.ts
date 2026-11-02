@@ -379,12 +379,9 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Everything that links TO this element, narratives first. This used
- * to be narratives only, read through a private copy of the graph's
- * eighteen-name multi-link list, so a title held by a character or a family
- * governing a regime never appeared here while the element page's
- * "Referenced by" section listed them. One reader now: the same
- * all-fields scan the element page uses.
+ * Everything that links TO this element, narratives first: the same reading
+ * the element page's references use (`findIncomingReferences`, the shared
+ * links of core/world-links.ts, conv. 185).
  */
 function findBacklinkingElements(elementId: string): Element[] {
   const incoming = findIncomingReferences(elementId);

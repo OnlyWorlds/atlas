@@ -95,7 +95,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
   // route to their own rooms (not the writing room) — partition both out
   // (K6 for knowledge; "Featured in" for pages). Pages reach this scan via
   // their flat `atlas_page_refs` mirror (the element-card bindings, DESIGN_
-  // SHARING #75): the generic all-fields walk picks it up, so a card-bound
+  // SHARING #75): one of Atlas's named links (core/world-links.ts), so a card-bound
   // element lists its pages here with zero page-specific scan code. Page
   // prose never derives Involves fields (convention #76) — the mirror IS the
   // page→element link surface.

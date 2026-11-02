@@ -15,7 +15,7 @@
 import { worldGraph } from '@onlyworlds/sdk';
 import type { Element } from '../core/types';
 import { gridOf, type Grid } from '../core/home-grid';
-import { collectReferencedIds } from './element-detail-refs';
+import { incomingOf } from '../core/world-links';
 import { drawGrid, geometryFor, gridHeight, withoutPlusLine, type PlusSquare } from './home-grid-view';
 import { typeName } from '../core/type-words';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
@@ -27,15 +27,16 @@ const MAP_SPACE = new Set(['map', 'pin', 'marker']);
 
 /** Elements linked to nothing in the world, either way: the loose threads band's reader (pins and every reference counted). */
 export function looseIds(elements: readonly Element[]): Set<string> {
-  const ids = new Set(elements.map(e => e.id));
-  const referenced = collectReferencedIds(elements);
-  const linksOut = new Set<string>();
-  for (const el of elements) {
-    for (const ref of collectReferencedIds([el])) {
-      if (ids.has(ref)) { linksOut.add(el.id); break; }
-    }
+  // One reading of the whole array (core/world-links.ts): a link out is only seen with its target in the
+  // world read, so never ask about one element alone (the 1.118.0 gate's M1).
+  const incoming = incomingOf(elements);
+  const linked = new Set<string>();
+  for (const [target, sources] of incoming) {
+    if (sources.size === 0) continue;
+    linked.add(target);
+    for (const source of sources.keys()) linked.add(source);
   }
-  return new Set(elements.filter(e => !referenced.has(e.id) && !linksOut.has(e.id)).map(e => e.id));
+  return new Set(elements.filter(e => !linked.has(e.id)).map(e => e.id));
 }
 
 export interface GridInput {
