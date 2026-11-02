@@ -246,6 +246,25 @@ for (const tag of ['', ' @firefox']) {
   });
 }
 
+test('a strand with no event keeps its cells: the story, an empty row, then the main character and where they are now', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const wid = await setupWorld(page);
+  await put(page, 'narrative', S, 'The Lantern Ferry', { supertype: 'Book', protagonist: C });
+  await put(page, 'character', C, 'Odile Varn', { location: N });
+  await put(page, 'location', N, 'The Drowned Library');
+  await put(page, 'character', BRAM, 'Bram the ferryman');
+  await setMark(page, { narrative: S, event: null, location: null });
+  await reopenHome(page, wid);
+  await tab(page, 'picture').click();
+  await expect(square(page, S)).toBeVisible();
+  expect(await cellOf(page, S)).toEqual({ line: '0', pos: '0', row: '0' });
+  expect(await cellOf(page, C)).toEqual({ line: '0', pos: '0', row: '2' });
+  expect(await cellOf(page, N)).toEqual({ line: '0', pos: '1', row: '2' });
+  expect(await cellOf(page, BRAM)).toEqual({ line: '0', pos: '2', row: '0' });
+  expect(await crossings(page)).toEqual([]);
+  if (SNAPS) await snap(page, `${SNAPS}/strand-picture-partial-1440-chromium.png`);
+});
+
 test('on a phone, the location\'s act opens its page with the map, and Back focuses the act', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const wid = await wholeStrand(page, { map: true });
