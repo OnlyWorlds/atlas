@@ -72,6 +72,33 @@ describe('Linked from, grouped by field (N12, the 1.118.0 gate\'s G7)', () => {
   });
 });
 
+describe('foreign shapes (the 1.118.0 gate\'s N6 and N7)', () => {
+  it('a marker holding both spellings links only the zone and map Atlas holds, once each', () => {
+    const map = mk(R(70), 'map');
+    const held = mk(R(71), 'zone');
+    const stray = mk(R(72), 'zone');
+    const marker = mk(R(73), 'marker', { map_id: R(70), map: R(70), zone_id: R(71), zone: R(72) });
+    const inc = incomingOf([map, held, stray, marker]);
+    expect(inc.get(R(71))?.get(R(73))).toEqual(['zone_id']);
+    expect(inc.get(R(72))).toBeUndefined();
+    expect(inc.get(R(70))?.get(R(73))).toEqual(['map_id']);
+  });
+
+  it('an empty Atlas spelling still reads the standard one', () => {
+    const zone = mk(R(74), 'zone');
+    const marker = mk(R(75), 'marker', { zone_id: '', zone: R(74) });
+    expect(incomingOf([zone, marker]).get(R(74))?.has(R(75))).toBe(true);
+  });
+
+  it('a null in the elements array is passed over, never thrown on', () => {
+    const place = mk(R(76), 'location');
+    const ada = mk(R(77), 'character', { birthplace: R(76) });
+    const world = [null, place, ada] as unknown as Element[];
+    expect(() => incomingOf(world)).not.toThrow();
+    expect(incomingOf(world).get(R(76))?.get(R(77))).toEqual(['birthplace']);
+  });
+});
+
 describe('Home\'s grid: loose means linked to nothing either way', () => {
   it('a Character with one friend is not loose, nor is the friend; an element with no link is', () => {
     const ada = mk(R(30), 'character', { friends: [R(31)] });

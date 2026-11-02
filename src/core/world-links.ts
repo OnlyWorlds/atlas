@@ -21,6 +21,7 @@
  */
 import { isCharterElement, worldGraph } from '@onlyworlds/sdk';
 import type { Element } from './types';
+import { diskRenamesFor } from '../store/disk-link-names';
 
 export interface WorldLink { target: string; field: string }
 
@@ -36,11 +37,7 @@ const readerMemo = new WeakMap<readonly Element[], Map<string, WorldLink[]>>();
 export function readerEdgesOf(elements: readonly Element[]): Map<string, WorldLink[]> {
   const memo = readerMemo.get(elements);
   if (memo) return memo;
-  const handed = elements.map(el => {
-    if (!isCharterElement(el as never)) return el;
-    const { x_charter_of: _mark, ...rest } = el as Element & { x_charter_of?: unknown };
-    return rest as Element;
-  });
+  const handed = elements.filter(isBody).map(el => withoutStraySpellings(withoutCharterMark(el)));
   const out = new Map<string, WorldLink[]>();
   let graph: ReturnType<typeof worldGraph> | null = null;
   try {
@@ -60,6 +57,34 @@ export function readerEdgesOf(elements: readonly Element[]): Map<string, WorldLi
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
+
+/** A body at all: the array is the store's, but a foreign or damaged one may hold a null (the 1.118.0 gate's N7). */
+function isBody(el: unknown): el is Element { return typeof el === 'object' && el !== null; }
+
+/** A reading aid without its mark, since the reader keeps a marked aid out with no flag to bring it back. */
+function withoutCharterMark(el: Element): Element {
+  if (!isCharterElement(el as never)) return el;
+  const { x_charter_of: _mark, ...rest } = el as Element & { x_charter_of?: unknown };
+  return rest as Element;
+}
+
+/**
+ * A pin or marker without the standard spelling of a link Atlas holds in its own (`map` beside `map_id`,
+ * `zone` beside `zone_id`): in memory Atlas's spelling is the link, and a file that carried both keeps the
+ * other as a stray (`normalizeDiskLinks`). Handed both, the reader read the stray and the additions the
+ * link, so one marker linked two zones (the 1.118.0 gate's N6). Only the stray goes, and only where Atlas's
+ * spelling holds a value: an empty one still reads the other, as the additions do.
+ */
+function withoutStraySpellings(el: Element): Element {
+  const renames = diskRenamesFor(el.type);
+  if (renames.length === 0) return el;
+  const r = el as unknown as Record<string, unknown>;
+  const strays = renames.filter(({ schema, disk }) => schema in r && str(r[disk]) !== null);
+  if (strays.length === 0) return el;
+  const copy = { ...r };
+  for (const { schema } of strays) delete copy[schema];
+  return copy as unknown as Element;
+}
 
 /** A pin's or marker's map, in either spelling. */
 export function spatialMapOf(el: Element): string | null {
@@ -106,6 +131,7 @@ export function incomingOf(elements: readonly Element[]): Map<string, Map<string
   if (memo) return memo;
   const out = new Map<string, Map<string, string[]>>();
   for (const el of elements) {
+    if (!isBody(el)) continue;
     for (const l of linksOf(el, elements)) {
       let bySource = out.get(l.target);
       if (!bySource) { bySource = new Map(); out.set(l.target, bySource); }

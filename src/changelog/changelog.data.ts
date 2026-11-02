@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.118.2',
+    date: '2026-11-02',
+    theme: 'A marker from another tool links one zone',
+    entries: [
+      {
+        id: 'marker-both-spellings-one-zone',
+        title: 'A marker or pin that names its map or zone twice links only the one the map draws',
+        body: 'A file from another tool can name a marker\'s zone both as zone and as zone_id, with different values. The references, the Web and Home now read only the one the map draws, so the marker no longer shows under two zones, and its map is listed once.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.118.1',
     date: '2026-11-02',
     theme: 'Linked from, grouped by relationship, lists each link once',
