@@ -52,6 +52,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'already have notes or a file? While the world is empty, Bring it in, under the strand',
       'in a world on OnlyWorlds, press the OnlyWorlds mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
       "once the world holds more than its strand, press Strand beside the picture to see it: the story, an event in it, where it happened, its main character and where they are now; Edit a part in place, or use another from its menu",
+      "each part of the strand says in one line where it goes next and opens it: the writing room, the timeline, a map or its page",
+      "on the Picture the strand's parts stand first, in the same places every time, with everything else beside and below them",
     ],
   },
   element: {

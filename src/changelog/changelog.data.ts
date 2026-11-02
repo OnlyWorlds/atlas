@@ -56,6 +56,43 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.121.0',
+    date: '2026-11-02',
+    theme: 'The strand draws in its own shape',
+    entries: [
+      {
+        id: 'strand-on-the-picture',
+        title: 'The story and its parts stand first on Home\'s Picture, in the same places every time',
+        body: 'The story sits at the top left, its event under it with the location beside it, the main character under the event with where they are now beside them. Everything else in the world starts beside and below them, and no line runs through a square or a name.',
+        tags: ['home'],
+      },
+      {
+        id: 'picture-hold-line',
+        title: 'Something standing under another is joined to it by one short line',
+        body: 'A character under their location, or an event under its story, was joined by a rail down the side of the column with a tick to each one. Each now has one straight line from the square above it.',
+        tags: ['home'],
+      },
+      {
+        id: 'strand-boxes-open-rooms',
+        title: 'Each part of the strand says where it goes next',
+        body: 'On the Strand tab every filled box has one line under its text with a way there: the story opens in the writing room, an event with a year on the timeline, a location with the map (where you can pin it), a character on their page. Back returns to the same box.',
+        tags: ['home'],
+      },
+      {
+        id: 'empty-book-line',
+        title: 'A book with no chapters yet says what a chapter can be',
+        body: 'Open a book in the writing room before it has a chapter and one line at the top says a chapter can be any part you like, in your world\'s own words for its parts. It goes once the first one exists.',
+        tags: ['writing'],
+      },
+      {
+        id: 'story-card-holds-still',
+        title: 'The story\'s box keeps room for its second line',
+        body: 'Once the story\'s box says what it tells of, it keeps room for the line about its main character, so making the character no longer pushes the boxes below it down.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.120.2',
     date: '2026-11-02',
     theme: 'Open with, for a reader without an account',
