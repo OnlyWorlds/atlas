@@ -7,7 +7,7 @@
  * detail, which is where the gap gets closed (add a date, place it on a map,
  * give the map art, link it in). Renders nothing when the world is fully woven.
  *
- * Deliberately cheap: one reference-set pass (collectReferencedIds) plus direct
+ * Deliberately cheap: one links pass (looseIds, the rule Home's grid draws by) plus direct
  * field checks. No schema walk, no per-element O(N) scans. Excludes map
  * artifacts (pin/marker/zone) from the "content" it judges.
  */
@@ -17,7 +17,7 @@ import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { ELEMENT_ICONS } from '../core/constants';
 import { typeName } from '../core/type-words';
-import { collectReferencedIds } from './element-detail-refs';
+import { looseIds } from '../core/world-links';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { findDateConflicts, type DateConflict, type DatedRef } from '../core/date-continuity';
 import { worldDateFormatter } from '../core/world-date-text';
@@ -49,7 +49,8 @@ function field(el: Element, name: string): unknown {
  * classes, in a fixed reading order. Cheap enough to run every home render.
  */
 export function computeLooseThreads(elements: readonly Element[]): LooseThread[] {
-  const referenced = collectReferencedIds(elements);
+  // Linked either way, as the grid draws it: a character with only a link out is not unlinked.
+  const loose = looseIds(elements);
 
   // Which content elements is a pin/marker placing on some map?
   const placed = new Set<string>();
@@ -61,7 +62,7 @@ export function computeLooseThreads(elements: readonly Element[]): LooseThread[]
   }
 
   const unlinkedCharacters = elements.filter(
-    el => el.type === 'character' && !referenced.has(el.id),
+    el => el.type === 'character' && loose.has(el.id),
   );
   const unmappedLocations = elements.filter(
     el => el.type === 'location' && !placed.has(el.id),

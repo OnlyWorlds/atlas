@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeLooseThreads } from '../../src/middle/home-loose-threads';
+import { looseIds } from '../../src/core/world-links';
 import type { Element } from '../../src/core/types';
 
 /** Minimal element factory — only the fields the compute reads. */
@@ -65,5 +66,18 @@ describe('computeLooseThreads', () => {
     const elements: Element[] = [el('character', 'c-self', { rival: 'c-self' })];
     const threads = computeLooseThreads(elements);
     expect(threads.find(t => t.key === 'unlinked-characters')?.elements.map(e => e.id)).toEqual(['c-self']);
+  });
+
+  it('counts a link out as much as a link in: unlinked means what the grid draws as loose', () => {
+    // Seethe's read of 1.118.2 (N6): Bo's only link is his own friends field; the grid drew him linked
+    // while the band listed him as unlinked.
+    const elements: Element[] = [
+      el('character', 'bo', { friends: ['ines'] }),
+      el('character', 'ines'),
+      el('character', 'wren'),
+    ];
+    const unlinked = computeLooseThreads(elements).find(t => t.key === 'unlinked-characters')?.elements.map(e => e.id);
+    expect(unlinked).toEqual(['wren']);
+    expect([...looseIds(elements)]).toEqual(['wren']);
   });
 });

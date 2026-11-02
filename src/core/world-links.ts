@@ -134,3 +134,19 @@ export function incomingOf(elements: readonly Element[]): Map<string, Map<string
   incomingMemo.set(elements, out);
   return out;
 }
+
+/**
+ * Elements linked to nothing in the world, either way (a link out counts as much as a link in; pins and every
+ * reference counted): Home's loose squares and the loose threads band's unlinked characters, one rule. One reading
+ * of the whole array: a link out is only seen with its target in the world read, so never ask about one element
+ * alone (the 1.118.0 gate's M1).
+ */
+export function looseIds(elements: readonly Element[]): Set<string> {
+  const linked = new Set<string>();
+  for (const [target, sources] of incomingOf(elements)) {
+    if (sources.size === 0) continue;
+    linked.add(target);
+    for (const source of sources.keys()) linked.add(source);
+  }
+  return new Set(elements.filter(e => !linked.has(e.id)).map(e => e.id));
+}

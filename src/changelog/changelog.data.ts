@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.120.1',
+    date: '2026-11-02',
+    theme: 'Unlinked means unlinked',
+    entries: [
+      {
+        id: 'unlinked-counts-links-out',
+        title: 'A character with a link of their own is no longer listed as unlinked',
+        body: 'Home\'s unlinked characters counted only the links pointing at a character, so someone whose only link was their own (a friend named on their page) was listed as unlinked while Home\'s grid drew them connected. Both now read one rule: a link out counts as much as a link in.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.120.0',
     date: '2026-11-02',
     theme: 'The strand as a journey',
