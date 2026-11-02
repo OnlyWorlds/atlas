@@ -5,9 +5,9 @@
  * documented in DESIGN.md convention #6 — keep this test in sync if the set
  * changes.
  *
- * refersTo / findIncomingReferences: SDK-shape-agnostic reverse-link scan
- * (convention #5). Critical for the "Referenced By" section — a regression
- * here would silently break backlinks across all element types.
+ * refersTo / findIncomingReferences: the reverse links through the graph
+ * reader and Atlas's named links (conv. 185). Critical for the "Referenced by"
+ * section: a regression here would silently break backlinks across all types.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -84,152 +84,110 @@ describe('formatValue', () => {
   });
 });
 
+// The reverse links behind Referenced by, Linked from and Home's loose threads (conv. 185): the graph
+// reader's links (the standard's typed link fields and the declared x_ links) and Atlas's own, named in
+// core/world-links.ts (map space as Atlas keeps it, a page's bound elements); an id in any other key,
+// or a link to the wrong type, is no reference.
+const R = (n: number) => `0698bbbb-0000-7000-8000-${String(n).padStart(12, '0')}`;
+const T = R(1);
+const mkR = (id: string, type: string, extra: Record<string, unknown> = {}): Element =>
+  ({ id, type, name: `${type} ${id.slice(-2)}`, ...extra }) as unknown as Element;
+
 describe('refersTo', () => {
+  const place = mkR(T, 'location');
+  const person = mkR(T, 'character');
+
   it('returns false when no field references the target id', () => {
-    const el = { id: 'a', type: 'character', name: 'Alice' } as Element;
-    expect(refersTo(el, 'target-id')).toBe(false);
+    const el = mkR(R(2), 'character');
+    expect(refersTo(el, T, [el, place])).toBe(false);
   });
 
-  it('detects scalar string id references', () => {
-    const el = { id: 'a', type: 'character', name: 'Alice', birthplace: 'target-id' } as unknown as Element;
-    expect(refersTo(el, 'target-id')).toBe(true);
+  it('detects a typed single link and a multi link', () => {
+    const born = mkR(R(2), 'character', { birthplace: T });
+    expect(refersTo(born, T, [born, place])).toBe(true);
+    const friend = mkR(R(3), 'character', { friends: [R(9), T] });
+    expect(refersTo(friend, T, [friend, person])).toBe(true);
   });
 
-  it('detects array-of-strings references (multi-link)', () => {
-    const el = {
-      id: 'a',
-      type: 'character',
-      name: 'Alice',
-      friends: ['x', 'target-id', 'y'],
-    } as unknown as Element;
-    expect(refersTo(el, 'target-id')).toBe(true);
+  it('a link to the wrong type is no reference (a birthplace naming a Character)', () => {
+    const el = mkR(R(2), 'character', { birthplace: T });
+    expect(refersTo(el, T, [el, person])).toBe(false);
   });
 
-  it('detects array-of-objects with id (SDK nested shape)', () => {
-    const el = {
-      id: 'a',
-      type: 'character',
-      name: 'Alice',
-      friends: [{ id: 'x' }, { id: 'target-id' }],
-    } as unknown as Element;
-    expect(refersTo(el, 'target-id')).toBe(true);
+  it('an id kept in another key is no reference: a dismissed suggestion, an undeclared x_ key, a text field', () => {
+    const el = mkR(R(2), 'narrative', { atlas_dismissed_suggestions: [T], x_survey_ref: T, description: T, supertype: T });
+    expect(refersTo(el, T, [el, place])).toBe(false);
   });
 
-  it('detects object-with-id reference (single-link nested shape)', () => {
-    const el = {
-      id: 'a',
-      type: 'character',
-      name: 'Alice',
-      birthplace: { id: 'target-id', name: 'Shire' },
-    } as unknown as Element;
-    expect(refersTo(el, 'target-id')).toBe(true);
-  });
-
-  it('ignores metadata fields (id, name, description, type, timestamps)', () => {
-    // None of these should be scanned even though the id field literally
-    // contains the target string.
-    const el = {
-      id: 'target-id',
-      type: 'character',
-      name: 'target-id',
-      description: 'target-id',
-      local_updated_at: 'target-id',
-      server_updated_at: 'target-id',
-    } as unknown as Element;
-    expect(refersTo(el, 'target-id')).toBe(false);
-  });
-
-  it('returns false on close-but-not-equal strings', () => {
-    const el = {
-      id: 'a',
-      type: 'character',
-      name: 'Alice',
-      birthplace: 'target-i',
-    } as unknown as Element;
-    expect(refersTo(el, 'target-id')).toBe(false);
+  it('the {id} object form is not a link the standard writes', () => {
+    const el = mkR(R(2), 'character', { friends: [{ id: T }], birthplace: { id: T } });
+    expect(refersTo(el, T, [el, person])).toBe(false);
   });
 
   it('detects a page\'s element-card binding via the atlas_page_refs mirror ("Featured in")', () => {
-    // The refs mirror (DESIGN_SHARING #75) is a flat string array on the page
-    // element, so the generic all-fields walk picks it up with zero
-    // page-specific code — a card-bound element shows its pages under
-    // "Featured in". Locked here so a future META_KEYS/scan change can't
-    // silently kill the section.
-    const page = {
-      id: 'p1',
-      type: 'narrative',
-      name: 'barovia primer',
+    // The refs mirror (DESIGN_SHARING #75) is one of Atlas's named links (core/world-links.ts).
+    const page = mkR(R(2), 'narrative', {
       subtype: 'page',
-      atlas_page_blocks: [
-        { id: 'b1', kind: 'element-card', elementId: 'target-id', variant: 'compact', fields: [] },
-      ],
-      atlas_page_refs: ['target-id'],
-    } as unknown as Element;
-    expect(refersTo(page, 'target-id')).toBe(true);
+      atlas_page_blocks: [{ id: 'b1', kind: 'element-card', elementId: T, variant: 'compact', fields: [] }],
+      atlas_page_refs: [T],
+    });
+    expect(refersTo(page, T, [page, place])).toBe(true);
+  });
+
+  it('map space as Atlas keeps it: a pin names its element and its map, a marker its map and zone, in either spelling', () => {
+    const map = mkR(R(5), 'map');
+    const zone = mkR(R(6), 'zone');
+    const pin = mkR(R(2), 'pin', { element_id: T, map_id: R(5), x: 1, y: 1 });
+    const world = [pin, place, map, zone];
+    expect(refersTo(pin, T, world)).toBe(true);
+    expect(refersTo(pin, R(5), world)).toBe(true);
+    // An empty zone_id reads the bare spelling (the 1.117.0 gate's N8).
+    const marker = mkR(R(3), 'marker', { map: R(5), zone_id: '', zone: R(6), x: 1, y: 1 });
+    expect(refersTo(marker, R(6), [marker, map, zone])).toBe(true);
+    expect(refersTo(marker, R(5), [marker, map, zone])).toBe(true);
   });
 });
 
 describe('findIncomingReferences', () => {
   beforeEach(() => {
-    // Reset state.data.elements to a known fixture.
     patchSlice('data', { elements: [] });
   });
 
   it('returns empty when no elements reference the target', () => {
-    patchSlice('data', {
-      elements: [
-        { id: 'target', type: 'location', name: 'Shire' } as Element,
-        { id: 'a', type: 'character', name: 'Alice' } as Element,
-      ],
-    });
-    expect(findIncomingReferences('target')).toEqual([]);
+    patchSlice('data', { elements: [mkR(T, 'location'), mkR(R(2), 'character')] });
+    expect(findIncomingReferences(T)).toEqual([]);
   });
 
   it('excludes the target element itself even when self-referential', () => {
-    patchSlice('data', {
-      elements: [
-        // Self-referential element should NOT appear in its own backlinks.
-        { id: 'target', type: 'character', name: 'Loop', friends: ['target'] } as unknown as Element,
-      ],
-    });
-    expect(findIncomingReferences('target')).toEqual([]);
+    patchSlice('data', { elements: [mkR(T, 'character', { friends: [T] })] });
+    expect(findIncomingReferences(T)).toEqual([]);
   });
 
-  it('finds elements that scalar-reference the target', () => {
+  it('finds elements that link to the target, in the world\'s order', () => {
     patchSlice('data', {
       elements: [
-        { id: 'target', type: 'location', name: 'Shire' } as Element,
-        { id: 'a', type: 'character', name: 'Frodo', birthplace: 'target' } as unknown as Element,
-        { id: 'b', type: 'character', name: 'Sam' } as Element,
+        mkR(T, 'location'),
+        mkR(R(2), 'character', { birthplace: T }),
+        mkR(R(3), 'character'),
+        mkR(R(4), 'character', { location: T }),
       ],
     });
-    const hits = findIncomingReferences('target');
-    expect(hits.map(e => e.id)).toEqual(['a']);
+    expect(findIncomingReferences(T).map(e => e.id)).toEqual([R(2), R(4)]);
   });
 
-  it('finds elements with multi-link references', () => {
+  it('aggregates across types: typed links, a pin, a page; never a dismissed suggestion', () => {
     patchSlice('data', {
       elements: [
-        { id: 'target', type: 'character', name: 'Bob' } as Element,
-        { id: 'a', type: 'character', name: 'Alice', friends: ['target', 'other'] } as unknown as Element,
-        { id: 'b', type: 'character', name: 'Carol', friends: ['target'] } as unknown as Element,
+        mkR(T, 'location'),
+        mkR(R(2), 'character', { birthplace: T }),
+        mkR(R(3), 'pin', { element_id: T, map_id: R(7), x: 1, y: 1 }),
+        mkR(R(4), 'family', { estates: [T] }),
+        mkR(R(5), 'narrative', { subtype: 'page', atlas_page_refs: [T] }),
+        mkR(R(6), 'narrative', { atlas_dismissed_suggestions: [T] }),
+        mkR(R(7), 'map'),
       ],
     });
-    const hits = findIncomingReferences('target');
-    expect(hits.map(e => e.id).sort()).toEqual(['a', 'b']);
-  });
-
-  it('aggregates references across multiple element types', () => {
-    patchSlice('data', {
-      elements: [
-        { id: 'target', type: 'location', name: 'Shire' } as Element,
-        { id: 'c1', type: 'character', name: 'Frodo', birthplace: 'target' } as unknown as Element,
-        { id: 'p1', type: 'pin', name: '', element_id: 'target', map_id: 'm1' } as unknown as Element,
-        { id: 'i1', type: 'institution', name: 'Council', locations: ['target'] } as unknown as Element,
-      ],
-    });
-    const hits = findIncomingReferences('target');
-    expect(hits.map(e => e.id).sort()).toEqual(['c1', 'i1', 'p1']);
+    expect(findIncomingReferences(T).map(e => e.id).sort()).toEqual([R(2), R(3), R(4), R(5)].sort());
   });
 });
 
@@ -322,7 +280,7 @@ describe('REF_SECTION_SPLITS - Located here', () => {
     const planet = mk('loc1', 'location', 'Planet');
     const consul = mk('c1', 'character', 'Consul', { location: 'loc1' });
     const beast = mk('cr1', 'creature', 'Beast', { location: 'loc1' });
-    const perf = mk('e1', 'event', 'Perf', { location: 'loc1' }); // context, not presence
+    const perf = mk('e1', 'event', 'Perf', { locations: ['loc1'] }); // context, not presence (an Event's link is locations)
     const dual = mk('c2', 'character', 'Dual', { location: 'loc1', birthplace: 'loc1' });
     patchSlice('data', { elements: [planet, consul, beast, perf, dual] });
 
@@ -362,10 +320,8 @@ describe('REF_SECTION_SPLITS - Located here', () => {
 
   it('non-location pages never grow the section', () => {
     const hero = mk('h1', 'character', 'Hero');
-    const fan = mk('f1', 'character', 'Fan', { location: 'h1' }); // nonsense link, but generic scan sees it
+    const fan = mk('f1', 'character', 'Fan', { location: 'h1' }); // a location naming a Character: no link at all (conv. 185)
     patchSlice('data', { elements: [hero, fan] });
-    const wrap = renderReferencedBy(hero)!;
-    const labels = [...wrap.querySelectorAll('.atlas-detail-section')].map(s => s.getAttribute('data-section'));
-    expect(labels).not.toContain('Located here');
+    expect(renderReferencedBy(hero)).toBeNull();
   });
 });

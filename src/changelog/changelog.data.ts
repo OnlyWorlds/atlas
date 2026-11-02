@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.118.0',
+    date: '2026-11-02',
+    theme: 'References read the same links as the Web',
+    entries: [
+      {
+        id: 'references-read-the-standard-links',
+        title: 'Referenced by, Linked from and Home\'s loose threads read the links the standard names',
+        body: 'An element\'s page lists what links to it the way the Web now draws it: the standard\'s link fields pointing at the right type, and the links a profile declares. Pins and markers still show under their map and zone, and pages still show under Featured in. A suggestion you dismissed in the writing room no longer lists the element under Mentioned in, and a reference an import kept under its own x_ name no longer counts as a link, so Home\'s loose threads count the same way.',
+        tags: ['editor'],
+      },
+      {
+        id: 'writing-cast-every-link',
+        title: 'The writing pane\'s Cast holds every element the scene links',
+        body: 'The protagonist, antagonist, narrator, conservator, zones and every other link of the scene now show in its Cast, and Suggested follows the same links of each cast member. The parent chapter stays in the writing sidebar.',
+        tags: ['writing'],
+      },
+    ],
+  },
+  {
     version: '1.117.0',
     date: '2026-11-01',
     theme: 'The Web reads links the way every OnlyWorlds tool does',

@@ -17,13 +17,14 @@ const mk = (id: string, type: string, name: string, extra: Record<string, unknow
 
 // A small Space Map: two places with pins (one pin unnamed, as on the live
 // demo), a third pin pointing at nothing, two zones drawn by unnamed markers,
-// one stray marker with no zone, and two story links (a zone, a narrative).
+// one stray marker with no zone, and one story link (a submap).
 const map = mk('map1', 'map', 'Space Map');
 const felt = mk('loc1', 'location', 'Feltropolis');
 const sog = mk('loc2', 'location', 'Soggia');
-const crumble = mk('z1', 'zone', 'Crumblefields', { map: 'map1' });
+const crumble = mk('z1', 'zone', 'Crumblefields');
 const border = mk('z2', 'zone', 'Naval Patrol Border');
-const tale = mk('n1', 'narrative', 'The Voyage', { maps: ['map1'] });
+// The one standard link into a Map is another Map's parent_map: a submap is the map's story.
+const tale = mk('n1', 'map', 'The Harbour', { parent_map: 'map1' });
 const pinFelt = mk('p1', 'pin', '', { map_id: 'map1', element_id: 'loc1', x: 1, y: 1 });
 const pinSog = mk('p2', 'pin', 'Soggia pin', { map_id: 'map1', element_id: 'loc2', x: 2, y: 2 });
 const pinLost = mk('p3', 'pin', '', { map_id: 'map1', element_id: 'gone', x: 3, y: 3 });
@@ -86,7 +87,7 @@ describe("the map's element page (Referenced by)", () => {
     // The story's links keep their type groups; pins and markers close the section.
     const labels = [...refby.querySelectorAll('.atlas-field-label')].map(l => l.textContent);
     expect(labels.slice(-2)).toEqual(['Pins', 'Markers']);
-    expect(labels).toContain('Zones');
+    expect(labels).toContain('Maps');
   });
 });
 
@@ -98,7 +99,7 @@ describe("the Web tab's card (Linked from)", () => {
     handle.show(map);
     const lines = [...host.querySelectorAll('.atlas-context-preview-backlinks')].map(l => l.textContent);
     expect(lines).toEqual([
-      'Linked from (2): The Voyage, Crumblefields',
+      'Linked from (1): The Harbour',
       'Pins (3): Feltropolis, Soggia, unnamed pin',
       'Markers (6): Crumblefields (3), Naval Patrol Border (2), no zone (1)',
     ]);

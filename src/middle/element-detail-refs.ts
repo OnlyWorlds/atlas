@@ -1,10 +1,11 @@
 /**
  * "Mentioned in" + "Referenced by" sections for element-detail.
  *
- * Scans `state.data.elements` for any element whose fields point back at the
- * target element's id. SDK-shape-agnostic (convention #5): walks all property
- * values whose item shape resembles an id (string, array of strings, array of
- * objects with an `id`, object with an `id`).
+ * Lists every element whose links point back at the target: the links the
+ * SDK's graph reader reads (the standard's typed link fields and the declared
+ * `x_` links) and Atlas's own, named in core/world-links.ts (map space as Atlas
+ * keeps it, a page's bound elements). An id in any other key is no reference
+ * (conv. 184 and 185).
  *
  * Two sections:
  *   - "Mentioned in" — incoming narratives, grouped by writing tier (the
@@ -33,9 +34,7 @@ import { humanizeFieldName } from './element-detail-fields';
 import { getEditorSettings } from '../registry/registry';
 import { foldBacklinks, markerFoldLabel } from '../core/spatial-backlinks';
 import { pageLore } from '../core/parlor-room';
-
-/** Field names that never encode a relationship — skipped by the reverse scan. */
-const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
+import { incomingOf } from '../core/world-links';
 
 /**
  * REF SECTION SPLITS (Titus): named sections that pull specific
@@ -88,6 +87,7 @@ interface RefGroup {
  * nothing references it.
  */
 export function renderReferencedBy(el: Element): HTMLElement | null {
+  const world = pageLore(el);
   const incoming = findIncomingReferences(el.id);
   if (incoming.length === 0) return null;
 
@@ -161,7 +161,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
     if (!split.targetTypes.includes(el.type)) continue;
     const qualified = remaining.filter(src =>
       split.sourceTypes.includes(src.type)
-      && matchingFields(src, el.id).some(f => split.viaFields.includes(f)));
+      && matchingFields(src, el.id, world).some(f => split.viaFields.includes(f)));
     if (qualified.length === 0) continue;
     const groups: RefGroup[] = [];
     for (const type of split.sourceTypes) {
@@ -181,7 +181,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
     // Keep a source in Referenced by only for its OTHER referencing fields.
     remaining = remaining.filter(src => {
       if (!qualified.includes(src)) return true;
-      return matchingFields(src, el.id).some(f => !split.viaFields.includes(f));
+      return matchingFields(src, el.id, world).some(f => !split.viaFields.includes(f));
     });
   }
 
@@ -192,7 +192,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
     // one chip per zone. A map's page listed 131 "(unnamed)" markers.
     const byId = new Map(getState().data.elements.map(e => [e.id, e] as const));
     const folded = foldBacklinks(remaining, el.id, byId);
-    const groups = groupByField ? groupOthersByField(el.id, folded.story) : groupOthersByType(folded.story);
+    const groups = groupByField ? groupOthersByField(el.id, folded.story, world) : groupOthersByType(folded.story);
     if (folded.pins.length > 0) {
       groups.push({
         label: 'Pins',
@@ -268,10 +268,10 @@ function groupOthersByType(others: Element[]): RefGroup[] {
  * "Rival of"). A source referencing the target through multiple fields appears
  * under each. Alphabetical by label for a stable read.
  */
-function groupOthersByField(targetId: string, others: Element[]): RefGroup[] {
+function groupOthersByField(targetId: string, others: Element[], world: readonly Element[]): RefGroup[] {
   const byField = new Map<string, Element[]>();
   for (const src of others) {
-    for (const field of matchingFields(src, targetId)) {
+    for (const field of matchingFields(src, targetId, world)) {
       const arr = byField.get(field) ?? [];
       arr.push(src);
       byField.set(field, arr);
@@ -395,48 +395,17 @@ function buildEntryChip(iconName: string, label: string, title: string, navId: s
 // ====== Scanning ======
 
 /**
- * Every element id referenced by SOME OTHER element, collected in one pass.
- * The inverse of findIncomingReferences done wholesale: an id absent from this
- * set is referenced by nothing (a "loose thread"). Shape-agnostic like the rest
- * of this module (convention #5); self-references don't count. Text-field
- * strings land in the set too, but they can't collide with a real id, so
- * membership tests (`has(el.id)`) stay correct. O(N · fields), not O(N²).
+ * Every element id some OTHER element links to, from the shared reading (the
+ * reader's links and Atlas's own, core/world-links.ts): an id absent from this
+ * set is referenced by nothing (a "loose thread"). One reading per elements array.
  */
 export function collectReferencedIds(elements: readonly Element[]): Set<string> {
-  const out = new Set<string>();
-  for (const el of elements) {
-    for (const [key, value] of Object.entries(el)) {
-      if (META_KEYS.has(key)) continue;
-      collectIdsFromValue(value, el.id, out);
-    }
-  }
-  return out;
-}
-
-function collectIdsFromValue(value: unknown, selfId: string, out: Set<string>): void {
-  if (typeof value === 'string') {
-    if (value !== selfId) out.add(value);
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      if (typeof item === 'string') { if (item !== selfId) out.add(item); }
-      else if (item && typeof item === 'object') {
-        const id = (item as { id?: string }).id;
-        if (id && id !== selfId) out.add(id);
-      }
-    }
-    return;
-  }
-  if (value && typeof value === 'object') {
-    const id = (value as { id?: string }).id;
-    if (id && id !== selfId) out.add(id);
-  }
+  return new Set(incomingOf(elements).keys());
 }
 
 /**
- * Find all elements in `state.data.elements` that reference `targetId` somewhere
- * in their field values. Excludes the target itself. Exported for unit testing.
+ * Every element of the target's world (`pageLore`) that links to `targetId`, in
+ * the world's order. Excludes the target itself.
  */
 export function findIncomingReferences(targetId: string): Element[] {
   // A lore element's references leave the parlor's room out while it is
@@ -444,47 +413,19 @@ export function findIncomingReferences(targetId: string): Element[] {
   const whole = getState().data.elements;
   const target = whole.find(e => e.id === targetId);
   const all = pageLore(target);
-  const hits: Element[] = [];
-  for (const el of all) {
-    if (el.id === targetId) continue;
-    if (refersTo(el, targetId)) hits.push(el);
-  }
-  return hits;
+  const sources = incomingOf(all).get(targetId);
+  if (!sources) return [];
+  return all.filter(el => el.id !== targetId && sources.has(el.id));
 }
 
-/** True iff any field on `el` references `targetId`. Exported for unit testing. */
-export function refersTo(el: Element, targetId: string): boolean {
-  for (const [key, value] of Object.entries(el)) {
-    if (META_KEYS.has(key)) continue;
-    if (valueRefersTo(value, targetId)) return true;
-  }
-  return false;
+/** True iff `el` links to `targetId` in `world`. */
+export function refersTo(el: Element, targetId: string, world: readonly Element[]): boolean {
+  return matchingFields(el, targetId, world).length > 0;
 }
 
-/** Every field name on `el` whose value references `targetId`. */
-function matchingFields(el: Element, targetId: string): string[] {
-  const fields: string[] = [];
-  for (const [key, value] of Object.entries(el)) {
-    if (META_KEYS.has(key)) continue;
-    if (valueRefersTo(value, targetId)) fields.push(key);
-  }
-  return fields;
-}
-
-/** Whether a single field value (string / array / object) references `targetId`. */
-function valueRefersTo(value: unknown, targetId: string): boolean {
-  if (typeof value === 'string') return value === targetId;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      if (typeof item === 'string' && item === targetId) return true;
-      if (item && typeof item === 'object' && (item as { id?: string }).id === targetId) return true;
-    }
-    return false;
-  }
-  if (value && typeof value === 'object') {
-    return (value as { id?: string }).id === targetId;
-  }
-  return false;
+/** Every field of `el` that links it to `targetId` in `world`, the reader's first. */
+function matchingFields(el: Element, targetId: string, world: readonly Element[]): string[] {
+  return incomingOf(world).get(targetId)?.get(el.id) ?? [];
 }
 
 // ====== Small label helpers ======

@@ -11,6 +11,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/problems.ts`: ERRORS (conv. 125): `classifyError` / `problemFor` / `buildDetails` / `scrubForReport`; UI never shows `err.message`.
 - `src/core/plain-error.ts`: `PlainError`, a message already written for users (the refusal classes extend it).
 - `src/core/date-continuity.ts`: `findDateConflicts`, the dates to check (two kinds cannot be true, the rest are links across a birth), pure; Home's loose threads list them (DESIGN_HOME §6). `src/core/world-date-text.ts`: a date as the world's active calendar says it. `src/core/link-ids.ts`: `linkIdsOf`, the tolerant link reader (conv. 94).
+- `src/core/world-links.ts`: which values are links (conv. 185): `readerEdgesOf` (the SDK's `worldGraph`, one reading per elements array), `atlasAdditionsOf` (map space as Atlas keeps it, a page's `atlas_page_refs`), `incomingOf`; the Web, the references, Home's loose threads and the writing lists read it.
 - `src/core/types.ts`: Element, Conflict, SyncEngineState, Registry types, `SyncResult.pulled_ids`.
 - `src/core/constants.ts`: storage keys, folder layout, `ATLAS_WIRE_EXTENSION_FIELDS` (sent) + `ATLAS_LOCAL_ONLY_FIELDS` (stripped) + `SERVER_AUTHOR_FIELDS` (who wrote it: kept, never sent, never a change; 1.47.1); see ATLAS_FIELDS.md.
 - `src/core/made-by.ts`: `madeByOf`, who made an element first: keel's `created_by` with the roster's kind, for the list's Made by filter.

@@ -39,7 +39,7 @@ import { pageLore } from '../../core/parlor-room';
 import { proposedMarkOf, proposedTitle, proposedWord } from '../../core/review-mark';
 import { hiddenMarkLine } from '../../core/hidden-mark';
 import type { LensPicture } from '../../core/web-lens';
-import { isCharterElement, worldGraph } from '@onlyworlds/sdk';
+import { readerEdgesOf, spatialMapOf, spatialOtherOf } from '../../core/world-links';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -238,48 +238,36 @@ interface SimEdge {
  *   1. Proposed and hidden elements are drawn and marked: Atlas is the keeper's copy (`paint`'s marks).
  *   2. One line per pair, `mutual` when both ends hold the link; a link to itself draws nothing.
  *   3. Map space is read as what it joins (conv. 138, `buildWebLinks`): a pin joins its map to its element,
- *      a marker its map to its zone.
+ *      a marker its map to its zone, read through the shared spelling helpers of core/world-links.ts.
  *   4. The reading aids are drawn where the page shows them (`pageLore`: an aid's own page, or the aids
  *      shown in this world). The reader keeps an aid out with no flag to bring it back, so an aid is handed
  *      to it without its mark (`x_charter_of`) and its links are read by the reader's rule like any other.
  *   5. The writing tree is not drawn: `parent_narrative` is the sidebar's, and a chapter's web with every
  *      scene in its first ring would crowd out the cast it exists to show (`WEB_UNDRAWN_FIELDS`).
  */
-const READER_FLAGS = { rooms: true, hidden: true, proposed: true, mapSpace: true } as const;
 /** Link fields the reader reads and the Web leaves undrawn (choice 5). */
 const WEB_UNDRAWN_FIELDS: ReadonlySet<string> = new Set(['parent_narrative']);
 
 type ReaderLinks = Map<string, string[]>;
-/** Per elements array (the store swaps the array on every write), as the label density's index is. */
+/** Per elements array, beside the one reading it derives from (`readerEdgesOf`, core/world-links.ts). */
 const readerLinksMemo = new WeakMap<readonly Element[], ReaderLinks>();
 
 /**
- * Every element's outgoing links as the reader reads them, in the reader's order (field name, then the
- * target's place in the list), each target once and never the element itself. The room, the hidden, the
- * proposed and map space are all handed back by flag, so the caller's array (`pageLore`) alone decides
- * who is in the world.
+ * Every element's outgoing links as the Web draws them: the reader's (`readerEdgesOf`, one reading per
+ * elements array shared with the references, Home and the writing pane), less the undrawn fields, each
+ * target once, in the reader's order. The caller's array (`pageLore`) alone decides who is in the world.
  */
 export function readerLinksOf(elements: readonly Element[]): ReaderLinks {
   const memo = readerLinksMemo.get(elements);
   if (memo) return memo;
-  const handed = elements.map(el => {
-    if (!isCharterElement(el as never)) return el;
-    const { x_charter_of: _mark, ...rest } = el as Element & { x_charter_of?: unknown };
-    return rest as Element;
-  });
   const out: ReaderLinks = new Map();
-  let graph: ReturnType<typeof worldGraph> | null = null;
-  try {
-    graph = worldGraph({ elements: handed as unknown as object[] }, { rung: 'owner' }, READER_FLAGS);
-  } catch (err) {
-    // A world the reader refuses draws every element alone rather than no Web at all.
-    console.warn('[atlas] the graph reader refused this world', err);
-  }
-  for (const e of graph?.edges ?? []) {
-    if (e.source === e.target || WEB_UNDRAWN_FIELDS.has(e.field)) continue;
-    let list = out.get(e.source);
-    if (!list) { list = []; out.set(e.source, list); }
-    if (!list.includes(e.target)) list.push(e.target);
+  for (const [source, links] of readerEdgesOf(elements)) {
+    for (const l of links) {
+      if (WEB_UNDRAWN_FIELDS.has(l.field)) continue;
+      let list = out.get(source);
+      if (!list) { list = []; out.set(source, list); }
+      if (!list.includes(l.target)) list.push(l.target);
+    }
   }
   readerLinksMemo.set(elements, out);
   return out;
@@ -370,11 +358,10 @@ export function buildWebLinks(elements: readonly Element[], centerId: string): W
     if (isSpatial(el)) {
       // Map space as what it joins (drawing choice 3). Both spellings of the map and zone links are read
       // (`map_id` in memory, `map` as the standard writes it).
-      const rec = el as (Pin | Marker) & { map?: unknown; zone?: unknown };
-      const mapId = typeof rec.map_id === 'string' ? rec.map_id : rec.map;
-      const otherId = el.type === 'pin' ? (el as Pin).element_id : ((el as Marker).zone_id ?? rec.zone);
-      const map = typeof mapId === 'string' ? byId.get(mapId) : undefined;
-      const other = typeof otherId === 'string' ? byId.get(otherId) : undefined;
+      const mapId = spatialMapOf(el);
+      const otherId = spatialOtherOf(el);
+      const map = mapId ? byId.get(mapId) : undefined;
+      const other = otherId ? byId.get(otherId) : undefined;
       const usable = (x: Element | undefined): x is Element => !!x && !isSpatial(x) && x.id !== el.id;
       if (el.id === centerId) {
         // The center keeps what it joins as its own links.

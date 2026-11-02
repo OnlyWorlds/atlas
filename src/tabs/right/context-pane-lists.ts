@@ -27,6 +27,7 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-
 import { showProblem } from '../../ui/problem-fixes';
 import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink';
 import { currentLore } from '../../core/parlor-room';
+import { readerLinksOf } from './context-pane-graph';
 
 export interface ContextListsHandle {
   /** Visually emphasize a row whose element id matches (or clear). */
@@ -40,34 +41,18 @@ export interface ContextListsOpts {
   onSelect: (elementId: string | null) => void;
 }
 
-const MULTI_LINK_FIELDS = [
-  'characters', 'locations', 'objects', 'events', 'creatures',
-  'species', 'institutions', 'collectives', 'phenomena', 'languages',
-  'titles', 'traits', 'abilities', 'constructs', 'laws', 'families',
-  'narratives', 'relations',
-] as const;
-
-function readMultiLink(el: Element, field: string): string[] {
-  const raw = (el as Record<string, unknown>)[field];
-  if (!Array.isArray(raw)) return [];
-  const out: string[] = [];
-  for (const item of raw) {
-    if (typeof item === 'string') out.push(item);
-    else if (item && typeof item === 'object' && typeof (item as { id?: string }).id === 'string') {
-      out.push((item as { id: string }).id);
-    }
-  }
-  return out;
+/**
+ * An element's links as the Web draws them (`readerLinksOf`: the SDK's graph reader, less the writing tree),
+ * read in `world`: every typed link field (protagonist, narrator, zones and the rest), never an id kept in
+ * another key, never an element of the wrong type, never the parent chapter. Empty when `el` is not in
+ * `world` (conv. 185).
+ */
+function linksIn(el: Element, world: readonly Element[]): string[] {
+  return readerLinksOf(world).get(el.id) ?? [];
 }
 
 function collectCastIds(narrative: Element): string[] {
-  const seen = new Set<string>();
-  for (const f of MULTI_LINK_FIELDS) {
-    for (const id of readMultiLink(narrative, f)) {
-      seen.add(id);
-    }
-  }
-  return Array.from(seen);
+  return linksIn(narrative, getState().data.elements);
 }
 
 /** Count ow:// mentions of each element in the narrative's story. */
@@ -112,17 +97,15 @@ function buildSuggested(narrative: Element, dismissed: Set<string>): SuggestedRo
   for (const cid of castIds) {
     const c = byId.get(cid);
     if (!c) continue;
-    for (const f of MULTI_LINK_FIELDS) {
-      for (const adjId of readMultiLink(c, f)) {
-        if (seen.has(adjId) || dismissed.has(adjId)) continue;
-        const adj = byId.get(adjId);
-        if (!adj) continue;
-        seen.add(adjId);
-        out.push({
-          el: adj,
-          reason: `via ${c.name || '(unnamed)'}`,
-        });
-      }
+    for (const adjId of linksIn(c, elements)) {
+      if (seen.has(adjId) || dismissed.has(adjId)) continue;
+      const adj = byId.get(adjId);
+      if (!adj) continue;
+      seen.add(adjId);
+      out.push({
+        el: adj,
+        reason: `via ${c.name || '(unnamed)'}`,
+      });
     }
   }
 
@@ -147,17 +130,15 @@ function buildSuggested(narrative: Element, dismissed: Set<string>): SuggestedRo
     return ancestorChain.has(ep) || ep === (narrative as Element & { parent_narrative?: string }).parent_narrative;
   });
   for (const s of siblingNarratives) {
-    for (const f of MULTI_LINK_FIELDS) {
-      for (const sid of readMultiLink(s, f)) {
-        if (seen.has(sid) || dismissed.has(sid)) continue;
-        const sEl = byId.get(sid);
-        if (!sEl) continue;
-        seen.add(sid);
-        out.push({
-          el: sEl,
-          reason: `in ${s.name || '(unnamed)'}`,
-        });
-      }
+    for (const sid of linksIn(s, elements)) {
+      if (seen.has(sid) || dismissed.has(sid)) continue;
+      const sEl = byId.get(sid);
+      if (!sEl) continue;
+      seen.add(sid);
+      out.push({
+        el: sEl,
+        reason: `in ${s.name || '(unnamed)'}`,
+      });
     }
   }
 
