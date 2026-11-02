@@ -42,6 +42,7 @@ import { currentStep } from '../core/guide';
 import { doorOf, onDoorChange, pathDots, pathShowing, startPath, worldEmptyForPath } from '../core/guide-path';
 import { blockFocusKey, bringInWays, settleAfterDraw } from './home-guide';
 import { buildGrowBlock, buildHomeGrid, type GrowBlock } from './home-grow';
+import { pinsOf, type GridPins } from '../core/home-grid';
 import { isNewcomerAnswered } from '../core/newcomer';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { timelineHash } from '../core/router';
@@ -262,9 +263,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       picture.mount();
     };
     // A view-only world draws the grid too, with no + square and no targets (home-grow's `gridActsIn`).
-    const drawPicture = (host: HTMLElement = root): void => {
+    // `strand`: the strand's block, only where this opening's latch drew the strand head (1.121.0).
+    const drawPicture = (host: HTMLElement = root, strand: GridPins | null = null): void => {
       if (quiet) return;
-      grid = buildHomeGrid(worldId, centred(() => grid?.section ?? null));
+      grid = buildHomeGrid(worldId, centred(() => grid?.section ?? null), strand);
       if (!grid) { if (host === root) centred(() => null)(); else centredIn(host); return; }
       // Closed in this mount: the grid stands where the card's grid stood.
       if (doors === 'below') grid.section.setAttribute('data-after-close', '');
@@ -292,7 +294,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       const panel = tabPanel(chosen);
       root.append(head, panel);
       if (chosen === 'strand') { panel.appendChild(buildStrandPanel(worldId, { alone: false, redraw: redrawNow, context: strandNow, showPicture })); return; }
-      drawPicture(panel);
+      drawPicture(panel, strandNow ? pinsOf(strandNow.strand) : null);
       if ((grid && !grid.section.hidden) || picture) return;
       head.remove();
       panel.replaceWith(buildStrandPanel(worldId, { alone: true, redraw: redrawNow, context: strandNow, showPicture }));

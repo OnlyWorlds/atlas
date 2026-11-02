@@ -10,13 +10,18 @@
  *
  *   The grid reads no per-browser setting (the Web's switched-off types are
  *   not read), so two browsers draw the same grid.
+ *
+ *   The strand's block (1.121.0): Home's Picture hands in this opening's
+ *   strand as read, and its slots are pinned to line 0 (`core/home-grid.ts`).
+ *   While the block draws, the hand-over threshold is `HAND_OVER_PX` plus
+ *   the block's height, and the cheap exit counts the block's rows.
  */
 
 import { worldGraph } from '@onlyworlds/sdk';
 import type { Element } from '../core/types';
-import { gridOf, type Grid } from '../core/home-grid';
+import { gridOf, strandPinsOf, STRAND_CELL, STRAND_COLS, type Grid, type GridPins } from '../core/home-grid';
 import { looseIds } from '../core/world-links';
-import { drawGrid, geometryFor, gridHeight, withoutPlusLine, type PlusSquare } from './home-grid-view';
+import { drawGrid, geometryFor, gridHeight, withoutPlusLine, type GridGeometry, type PlusSquare } from './home-grid-view';
 import { typeName } from '../core/type-words';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 
@@ -34,10 +39,33 @@ export interface GridInput {
   count: number;
   /** The picture's element ids. */
   ids: string[];
+  /** Rows the strand's block takes (0: no block), and how many squares are pinned in it. */
+  blockRows: number;
+  pinned: number;
 }
 
-/** The grid's input from the lore (no room, no proposed, no hidden, no map space, no reading aids: `worldGraph`'s nodes at the owner's rung). */
-export function gridInput(lore: readonly Element[], all: readonly Element[]): GridInput | null {
+/** The hand-over's height at a geometry: past it the grid gives way. While the block draws, the block's height is added. */
+export function handOverAt(blockRows: number, g: Pick<GridGeometry, 'rowH'>): number {
+  return HAND_OVER_PX + blockRows * g.rowH;
+}
+
+/**
+ * The cheap exit's height (gate 2's H19), never more than the grid's own: every square on top rows, the
+ * block's two columns first and line 0 as tall as the block.
+ */
+export function cheapHeight(input: Pick<GridInput, 'count' | 'blockRows' | 'pinned'>, plus: boolean, g: Pick<GridGeometry, 'rowH' | 'lineGap'> & { perLine: number }): number {
+  const block = input.blockRows > 0;
+  const tops = (block ? STRAND_COLS : 0) + (input.count - input.pinned) + (plus ? 1 : 0);
+  const lines = Math.max(1, Math.ceil(tops / Math.max(block ? 3 : 1, g.perLine)));
+  return lines * g.rowH + (lines - 1) * g.lineGap + Math.max(0, input.blockRows - 1) * g.rowH;
+}
+
+/**
+ * The grid's input from the lore (no room, no proposed, no hidden, no map space, no reading aids: `worldGraph`'s
+ * nodes at the owner's rung). `pins`: the strand as this opening read it, for Home's Picture only (never the
+ * guide card's grid); a slot whose element is not a node of this read leaves its cell empty.
+ */
+export function gridInput(lore: readonly Element[], all: readonly Element[], pins: GridPins | null = null): GridInput | null {
   // No grid of this many fits the height at any width (eight columns, five lines): the graph is not read.
   if (lore.filter(e => !MAP_SPACE.has(e.type)).length > TOO_MANY) return null;
   let graph: ReturnType<typeof worldGraph>;
@@ -50,10 +78,12 @@ export function gridInput(lore: readonly Element[], all: readonly Element[]): Gr
   const nodes = graph.nodes.map(n => ({ id: n.id, type: n.type, created_at: (byId.get(n.id) as { created_at?: unknown } | undefined)?.created_at }));
   const loose = looseIds(all);
   const memo = new Map<number, Grid>();
+  const pinnedNow = strandPinsOf(nodes, pins);
+  const blockRows = Math.max(0, ...[...pinnedNow.values()].map(slot => STRAND_CELL[slot].row + 1));
   return {
     grid: perLine => {
       let g = memo.get(perLine);
-      if (!g) { g = gridOf(nodes, graph.edges, perLine); memo.set(perLine, g); }
+      if (!g) { g = gridOf(nodes, graph.edges, perLine, pins); memo.set(perLine, g); }
       return g;
     },
     names: {
@@ -67,6 +97,8 @@ export function gridInput(lore: readonly Element[], all: readonly Element[]): Gr
     },
     count: nodes.length,
     ids: nodes.map(n => n.id),
+    blockRows,
+    pinned: pinnedNow.size,
   };
 }
 
@@ -104,11 +136,10 @@ export function buildGridPicture(
     if (width <= 0 || width === lastWidth) return !handedOver;
     lastWidth = width;
     const geo = geometryFor(width);
-    // The cheap exit (gate 2's H19): the top row alone past the height, the grid is never laid out.
-    const topLines = Math.ceil((input.count + (plus ? 1 : 0)) / geo.perLine);
+    // The cheap exit (gate 2's H19): the top rows alone past the height, the grid is never laid out.
     const laid = (): Grid => (plus ? input.grid(geo.perLine) : withoutPlusLine(input.grid(geo.perLine)));
-    const tooTall = topLines * geo.rowH + (topLines - 1) * geo.lineGap > HAND_OVER_PX
-      || gridHeight(laid(), geo) > HAND_OVER_PX;
+    const limit = handOverAt(input.blockRows, geo);
+    const tooTall = cheapHeight(input, !!plus, geo) > limit || gridHeight(laid(), geo) > limit;
     if (tooTall) {
       unwire?.();
       unwire = undefined;

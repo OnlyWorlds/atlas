@@ -18,6 +18,14 @@
  *   Columns wrap onto lines at the card's width; a line is as tall as its
  *   deepest stack.
  *
+ *   The strand (1.121.0): Home's Picture hands in the strand as read, and
+ *   its slots are pinned to fixed cells of line 0 (`STRAND_CELL`): the story
+ *   at pos 0 row 0, the event under it, the event's place beside the event,
+ *   the main character under the event, where they are now beside them. A
+ *   slot draws only when its element is a node of this read; an empty one
+ *   keeps its cell. Everything else flows from pos 2 under the rules above.
+ *   A pinned square is never held: an edge with a pinned end is a line.
+ *
  * Pure: nodes and edges as the SDK's `worldGraph` answers them.
  */
 
@@ -42,6 +50,41 @@ export function holdOf(sourceType: string, field: string, targetType: string): {
 export interface GridNode { id: string; type: string; created_at?: unknown }
 export interface GridEdge { source: string; field: string; target: string; index: number }
 
+/** A strand slot, as `core/strand.ts` names them. */
+export type GridSlot = 'narrative' | 'event' | 'location' | 'character' | 'now';
+
+/** The strand as this opening read it: each slot's element id (null: empty), and whether now is the event's place. */
+export interface GridPins {
+  narrative?: string | null;
+  event?: string | null;
+  location?: string | null;
+  character?: string | null;
+  now?: string | null;
+  same?: boolean | null;
+}
+
+/** The strand as read (the SDK's `strandOf` shape), as the grid pins it: each slot's id, and whether now is the event's place. */
+export function pinsOf(s: { [K in GridSlot]: { id: string } | null } & { same: boolean | null }): GridPins {
+  return {
+    narrative: s.narrative?.id ?? null, event: s.event?.id ?? null, location: s.location?.id ?? null,
+    character: s.character?.id ?? null, now: s.now?.id ?? null, same: s.same === true,
+  };
+}
+
+/** Each slot's fixed cell on line 0: its position and row. */
+export const STRAND_CELL: Record<GridSlot, { pos: number; row: number }> = {
+  narrative: { pos: 0, row: 0 },
+  event: { pos: 0, row: 1 },
+  location: { pos: 1, row: 1 },
+  character: { pos: 0, row: 2 },
+  now: { pos: 1, row: 2 },
+};
+
+/** The columns the strand's block takes on line 0; the rest starts after them. */
+export const STRAND_COLS = 2;
+
+const SLOT_ORDER: readonly GridSlot[] = ['narrative', 'event', 'location', 'character', 'now'];
+
 export interface GridCell {
   id: string;
   /** Arrival rank: the column before wrapping. */
@@ -55,6 +98,8 @@ export interface GridCell {
   depth: number;
   /** The square above it in its chain, for a held one. */
   holder: string | null;
+  /** The strand slot this square is pinned to, for a square in the strand's block. */
+  slot?: GridSlot;
 }
 
 export interface GridLink { source: string; target: string; field: string }
@@ -68,6 +113,10 @@ export interface Grid {
   perLine: number;
   /** Rows in each line, the + square's line included. */
   lineRows: number[];
+  /** Rows the strand's block takes on line 0 (0 or absent: no block). */
+  blockRows?: number;
+  /** Whether where they are now is the event's place (it draws once, at the place's cell). */
+  same?: boolean;
 }
 
 const V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -100,15 +149,40 @@ const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 
 /** Holder types, narrowest first: a Location before a Zone. */
 const HOLDER_RANK: Record<string, number> = { location: 0, zone: 1 };
 
+/**
+ * The strand's pinned squares: each filled slot whose element is a node, at its fixed cell. None unless the
+ * story itself is a node (a mark with no story drawn is today's grid). Where they are now, when it is the
+ * event's place, is not pinned twice.
+ */
+export function strandPinsOf(nodes: readonly GridNode[], pins: GridPins | null | undefined): Map<string, GridSlot> {
+  const out = new Map<string, GridSlot>();
+  if (!pins?.narrative) return out;
+  const ids = new Set(nodes.map(n => n.id));
+  if (!ids.has(pins.narrative)) return out;
+  for (const slot of SLOT_ORDER) {
+    const id = pins[slot];
+    if (!id || !ids.has(id) || out.has(id)) continue;
+    if (slot === 'now' && pins.same === true) continue;
+    out.set(id, slot);
+  }
+  return out;
+}
+
 export function gridOf(
   nodes: readonly GridNode[],
   edges: readonly GridEdge[],
   perLine: number,
+  pins?: GridPins | null,
 ): Grid {
-  const per = Math.max(1, Math.floor(perLine));
-  const order = [...nodes].sort((a, b) => arrivalOf(a) - arrivalOf(b) || byCodePoint(a.id, b.id));
+  const pinned = strandPinsOf(nodes, pins);
+  const block = pinned.size > 0;
+  // The block's two columns and one more for the rest: a line with the block is never narrower than three.
+  const per = Math.max(block ? 3 : 1, Math.floor(perLine));
+  const offset = block ? STRAND_COLS : 0;
+  const order = nodes.filter(n => !pinned.has(n.id)).sort((a, b) => arrivalOf(a) - arrivalOf(b) || byCodePoint(a.id, b.id));
   const rank = new Map(order.map((n, i) => [n.id, i] as const));
   const typeOf = new Map(nodes.map(n => [n.id, n.type] as const));
+  const isNode = (id: string): boolean => rank.has(id) || pinned.has(id);
 
   // Each element's holding candidates, with the edge that makes each (its index orders a list holder's stack).
   const candidates = new Map<string, { holder: string; index: number; list: boolean }[]>();
@@ -163,6 +237,14 @@ export function gridOf(
 
   const cells: GridCell[] = [];
   const stackRows = new Map<number, number>(); // line -> deepest row used
+  // The block: each pinned slot at its own cell; line 0 at least as tall as the block's lowest filled row.
+  let blockRows = 0;
+  for (const [id, slot] of pinned) {
+    const { pos, row } = STRAND_CELL[slot];
+    cells.push({ id, col: pos, line: 0, pos, row, depth: 0, holder: null, slot });
+    blockRows = Math.max(blockRows, row + 1);
+  }
+  if (block) stackRows.set(0, blockRows - 1);
   const place = (id: string, col: number, row: number, depth: number, holder: string | null): number => {
     const line = Math.floor(col / per);
     cells.push({ id, col, line, pos: col % per, row, depth, holder });
@@ -173,22 +255,29 @@ export function gridOf(
   };
   for (const n of order) {
     if (holderOf.has(n.id)) continue;
-    place(n.id, rank.get(n.id)!, 0, 0, null);
+    place(n.id, rank.get(n.id)! + offset, 0, 0, null);
   }
-  cells.sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+  // The block's squares first, in the story's order, then the rest by arrival.
+  const sortKey = (c: GridCell): number => (c.slot ? SLOT_ORDER.indexOf(c.slot) - SLOT_ORDER.length : rank.get(c.id)!);
+  cells.sort((a, b) => sortKey(a) - sortKey(b));
 
-  const plusCol = order.length;
+  const plusCol = order.length + offset;
   const plusLine = Math.floor(plusCol / per);
   const lines = Math.max(plusLine + 1, ...cells.map(c => c.line + 1));
   const lineRows = Array.from({ length: lines }, (_, i) => (stackRows.get(i) ?? 0) + 1);
 
+  // Every edge between two drawn squares that is not a hold drawn as a stack: a hold with a pinned end
+  // (a Character standing in the strand's place, another Event the story lists) is a line to the block.
   const links: GridLink[] = [];
   for (const e of edges) {
-    if (!rank.has(e.source) || !rank.has(e.target) || e.source === e.target) continue;
+    if (!isNode(e.source) || !isNode(e.target) || e.source === e.target) continue;
     const h = holdEdge(e);
     if (h && holderOf.get(h.held)?.holder === h.holder) continue;
     links.push({ source: e.source, target: e.target, field: e.field });
   }
 
-  return { cells, plus: { col: plusCol, line: plusLine, pos: plusCol % per }, links, perLine: per, lineRows };
+  return {
+    cells, plus: { col: plusCol, line: plusLine, pos: plusCol % per }, links, perLine: per, lineRows,
+    blockRows, same: block && pins?.same === true,
+  };
 }

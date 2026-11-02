@@ -41,7 +41,7 @@ import { labelStoryFromCard, stampPathNotesSeen } from '../ui/guide-note';
 import { makeFromSquare } from '../ui/home-grid-make';
 import { justNowIn, placeIn, promiseFor, undoJustNow, writeBetween } from '../ui/home-grid-place';
 import { buildGridPicture, gridInput, type GridPicture } from './home-grid-picture';
-import { arrivalOf } from '../core/home-grid';
+import { arrivalOf, type GridPins } from '../core/home-grid';
 import { plusWord, type PlusSquare } from './home-grid-view';
 import { selectedIn, wireGridActs } from './home-grid-acts';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, openKindList, watchLeave } from './home-grid-kinds';
@@ -449,11 +449,13 @@ function wireActs(host: HTMLElement, worldId: string, input: Input, section: HTM
 /**
  * Home's picture after the path (or with the card closed): the same grid with its acts and a plain +;
  * past its height, `onHandOver` draws today's centred picture in its place. Null when the world is too
- * big for a grid at any width, or has nothing to draw and no + to offer.
+ * big for a grid at any width, or has nothing to draw and no + to offer. `strand`: this opening's strand
+ * as read, handed in only where this opening's latch drew the strand head (1.121.0): its slots are pinned
+ * to the grid's first two columns.
  */
-export function buildHomeGrid(worldId: string, onHandOver: () => void): GrowBlock | null {
+export function buildHomeGrid(worldId: string, onHandOver: () => void, strand: GridPins | null = null): GrowBlock | null {
   const els = getState().data.elements;
-  const input = gridInput(els, els);
+  const input = gridInput(els, els, strand);
   const acts = gridActsIn(worldId);
   if (!input || (input.count === 0 && !acts)) return null;
   const section = document.createElement('section');
