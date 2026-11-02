@@ -187,6 +187,8 @@ async function journey(page: Page, still = false): Promise<string> {
   await expect(cardTitle(page)).toHaveText('Is Odile Varn still at Saltmere Quay?');
   await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('After The night crossing.');
   await expect(card(page).locator('[data-act="same"]')).toHaveText('Still at Saltmere Quay');
+  // The question's other answer comes before the form, so Create reads as making the new place.
+  await expect(card(page).locator('[data-role="strand-card-else"]')).toHaveText('Or somewhere else:');
   const lines = box(page, 'narrative').locator('[data-role="strand-lines"] p');
   await expect(lines.nth(0)).toHaveText(/It tells of .*The night crossing, which happened in or at .*Saltmere Quay\./);
   if (still) {

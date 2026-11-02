@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.121.1',
+    date: '2026-11-03',
+    theme: 'Still there, or somewhere else',
+    entries: [
+      {
+        id: 'now-card-somewhere-else',
+        title: 'Asked whether the main character is still there, the card says both answers',
+        body: 'Under "Still at" the card now says "Or somewhere else:" before the fields for a new location, so Create reads as making the new place, not as a yes.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.121.0',
     date: '2026-11-02',
     theme: 'The strand draws in its own shape',

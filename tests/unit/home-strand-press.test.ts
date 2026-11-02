@@ -136,6 +136,35 @@ describe('a press twice writes once (C1)', () => {
     expect(said()).toBe('');
   });
 
+  it('the Now card answers its question both ways: Still at, then "Or somewhere else:" before the form', async () => {
+    await put('narrative', N, { events: [E], protagonist: C });
+    await put('event', E, { locations: [L] });
+    await put('location', L, { name: 'The Quay' });
+    await put('character', C);
+    await open({ narrative: N, event: E, location: L });
+    const kids = [...card().children];
+    const same = kids.findIndex(k => k.querySelector('[data-act="same"]'));
+    const other = kids.findIndex(k => k.getAttribute('data-role') === 'strand-card-else');
+    const name = kids.findIndex(k => k.querySelector('[data-field="name"]'));
+    expect(kids[other].textContent).toBe('Or somewhere else:');
+    expect(same).toBeLessThan(other);
+    expect(other).toBeLessThan(name);
+  });
+
+  it('the Now card with no place to be still at asks only where: no "Or somewhere else:"', async () => {
+    await put('narrative', N, { events: [E], protagonist: C });
+    await put('event', E, {});
+    await put('character', C);
+    await open({ narrative: N, event: E, location: GONE_L });
+    // Where it happened skipped: the Now card asks only where they are.
+    expect(card().getAttribute('data-card-slot')).toBe('location');
+    card().querySelector<HTMLButtonElement>('[data-strand-key="card:location:skip"]')!.click();
+    expect(card().getAttribute('data-card-slot')).toBe('now');
+    expect(title()).toBe('Where is character 01 now?');
+    expect(card().querySelector('[data-act="same"]')).toBeNull();
+    expect(card().querySelector('[data-role="strand-card-else"]')).toBeNull();
+  });
+
   it('Use another\'s promise pressed twice: one write, and never "changed meanwhile"', async () => {
     await put('narrative', N, { protagonist: C });
     await put('character', C, { name: 'Mira' });

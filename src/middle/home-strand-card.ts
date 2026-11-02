@@ -2,8 +2,9 @@
  * The strand's cards (R3): the one question Home asks next, and a filled box's Edit in place.
  *
  *   A Make card: a heading asking the question, one line saying what it is, what a held Character or Now
- *   field holds ("Proposed: Mira"), Still at <place> on the Now card, Name (required), the text, When on
- *   the Event's card (a whole number, its calendar reading under it), Make, "Or pick one from your world"
+ *   field holds ("Proposed: Mira"), Still at <place> and "Or somewhere else:" on the Now card, Name
+ *   (required), the text, When on the Event's card (a whole number, its calendar reading under it), Create,
+ *   "Or pick one from your world"
  *   (only when there is one to pick) and "Skip for now" (never on the story's card). Enter in Name makes;
  *   Enter in the text is a newline; Escape empties the card and keeps the focus in Name.
  *
@@ -205,6 +206,12 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
     row.className = 'atlas-home-strand-card-same';
     row.appendChild(still);
     form.appendChild(row);
+    // The question's other answer, said before the form, so Create reads as making the new place.
+    const other = document.createElement('p');
+    other.className = 'atlas-home-strand-card-else';
+    other.setAttribute('data-role', 'strand-card-else');
+    other.textContent = 'Or somewhere else:';
+    form.appendChild(other);
   }
   const name = textInput(`card:${slot}:name`, 'name', draft.name);
   name.required = true;
