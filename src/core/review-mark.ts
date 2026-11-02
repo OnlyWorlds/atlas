@@ -56,13 +56,17 @@ export function keptOnCreate(response: unknown): Record<string, unknown> | undef
 /**
  * The world as its counts read it: without proposed elements. Memoised on the
  * array, so a render gate keyed on the result redraws exactly when it moves, and
- * a world with nothing proposed returns its own array.
+ * a world with nothing proposed returns its own array. One slot per array: Home
+ * hands it the lore and the lore with the aids, and a single slot evicted the
+ * other each render, so every reading memoised on the result read again (the
+ * 1.118.0 gate's N8: the graph reader re-run on each Home render).
  */
-let settledMemo: { from: readonly Element[]; out: Element[] } | null = null;
+const settledMemo = new WeakMap<readonly Element[], Element[]>();
 export function settledOf(elements: Element[]): Element[] {
-  if (settledMemo && settledMemo.from === elements) return settledMemo.out;
+  const memo = settledMemo.get(elements);
+  if (memo) return memo;
   const out = elements.some(isProposed) ? elements.filter(el => !isProposed(el)) : elements;
-  settledMemo = { from: elements, out };
+  settledMemo.set(elements, out);
   return out;
 }
 

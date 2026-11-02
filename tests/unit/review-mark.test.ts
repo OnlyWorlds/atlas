@@ -82,6 +82,14 @@ describe('R3, the settled world', () => {
     expect(settledOf(mixed)).toBe(settledOf(mixed));
     expect(proposedCount(mixed)).toBe(1);
   });
+
+  it('keeps one answer per array, so two arrays read in turn never evict each other (Home\'s lore and lore with aids)', () => {
+    const lore = [el('b', 'Ada'), el('a', 'Quill', { x_review_proposed: MARK })];
+    const withAids = [...lore, el('c', 'Guide')];
+    const first = settledOf(lore);
+    settledOf(withAids);
+    expect(settledOf(lore)).toBe(first);
+  });
 });
 
 describe('R4, a published page hands the world on', () => {
