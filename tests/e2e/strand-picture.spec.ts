@@ -4,7 +4,7 @@
  * any square (its own two ends aside) or any name, sampled along each SVG path with getPointAtLength
  * against the squares' and names' boxes, at 1440 and 390, in Chromium and Firefox; the same with four more
  * elements (a Character standing in the strand's place, another Event in the story, a Location holding a
- * Creature). Each box's room act lands where it says and Back puts the focus on it, in both engines and on
+ * Creature, the story and its event naming the Location too). Each box's room act lands where it says and Back puts the focus on it, in both engines and on
  * a phone. The story's box keeps its second line's room, so the Character make moves nothing (W5).
  *
  * Screenshots for a look: ATLAS_SNAPS=<dir> writes each Picture there.
@@ -92,8 +92,11 @@ async function wholeStrand(page: Page, opts: { rest?: boolean; map?: boolean } =
   const wid = await setupWorld(page);
   await put(page, 'narrative', S, 'The Lantern Ferry', {
     supertype: 'Book', story: 'Every night a ferry crosses the black lake.', events: opts.rest ? [E, THAW] : [E], protagonist: C,
+    // The marsh is a place in the story and in its event too: at 390 it wraps to line 1, so these two lines
+    // climb to the block (the channel into the story's right side, the left gutter into the event's).
+    ...(opts.rest ? { locations: [MARSH] } : {}),
   });
-  await put(page, 'event', E, 'The night crossing', { locations: [L], characters: [C], start_date: 1142 });
+  await put(page, 'event', E, 'The night crossing', { locations: opts.rest ? [L, MARSH] : [L], characters: [C], start_date: 1142 });
   await put(page, 'location', L, 'Saltmere Quay');
   await put(page, 'character', C, 'Odile Varn', { location: N });
   await put(page, 'location', N, 'The Drowned Library');
@@ -196,6 +199,9 @@ for (const tag of ['', ' @firefox']) {
       expect(ends).toContainEqual(`${BRAM} ${L}`);
       expect(ends).toContainEqual(`${S} ${THAW}`);
       expect(ends).toContainEqual(`${MARSH} ${HEN}`);
+      expect(ends).toContainEqual(`${S} ${MARSH}`);
+      expect(ends).toContainEqual(`${E} ${MARSH}`);
+      if (width === 390) expect((await cellOf(page, MARSH)).line).toBe('1');
       expect(await crossings(page)).toEqual([]);
       if (SNAPS) await snap(page, `${SNAPS}/strand-picture-rest-${width}-${browserName}.png`);
     });
@@ -206,7 +212,14 @@ for (const tag of ['', ' @firefox']) {
     const wid = await wholeStrand(page, { map: true });
     await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
     const lands: Array<[string, string, (p: Page) => Promise<void>]> = [
-      ['narrative', `#/w/${wid}/writing/${S}`, async p => { await expect(p.locator('.atlas-writing-workspace')).toBeVisible(); }],
+      ['narrative', `#/w/${wid}/writing/${S}`, async p => {
+        await expect(p.locator('.atlas-writing-workspace')).toBeVisible();
+        // R4: the empty Book's line at the body's top, gone once its first chapter lands.
+        const empty = p.locator('.atlas-writing-workspace-body > [data-role="writing-empty-book"]');
+        await expect(empty).toHaveText('A chapter can be any part you like: a chapter, an act, a session. Press + to add one.');
+        await put(p, 'narrative', '0192a000-0000-7000-8000-000000950031', 'Chapter one', { supertype: 'Chapter', parent_narrative: S });
+        await expect(empty).toHaveCount(0);
+      }],
       ['event', `#/w/${wid}/timeline/${E}`, async p => { await expect(p.locator('.atlas-world-home')).toHaveCount(0); }],
       ['location', `#/w/${wid}/map/${MAP}/element/${L}`, async p => {
         await expect(p.locator('.atlas-middle-header')).toContainText('Saltmere Quay');

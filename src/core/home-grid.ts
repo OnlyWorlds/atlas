@@ -151,8 +151,8 @@ const HOLDER_RANK: Record<string, number> = { location: 0, zone: 1 };
 
 /**
  * The strand's pinned squares: each filled slot whose element is a node, at its fixed cell. None unless the
- * story itself is a node (a mark with no story drawn is today's grid). Where they are now, when it is the
- * event's place, is not pinned twice.
+ * story itself is a node (a mark with no story drawn is today's grid). An element pins once, at its first
+ * slot: where they are now, when it is the event's place, stays at the place's cell.
  */
 export function strandPinsOf(nodes: readonly GridNode[], pins: GridPins | null | undefined): Map<string, GridSlot> {
   const out = new Map<string, GridSlot>();
@@ -162,7 +162,6 @@ export function strandPinsOf(nodes: readonly GridNode[], pins: GridPins | null |
   for (const slot of SLOT_ORDER) {
     const id = pins[slot];
     if (!id || !ids.has(id) || out.has(id)) continue;
-    if (slot === 'now' && pins.same === true) continue;
     out.set(id, slot);
   }
   return out;

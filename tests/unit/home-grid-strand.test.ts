@@ -323,7 +323,9 @@ describe('lines between the block and the rest', () => {
   it('a rest square in the next column runs through the gap between them', () => {
     const g = geometryFor(690);
     const d = pathOf(world(690), 690, ODILE, L)!;
-    expect(sample(d).some(p => Math.abs(p[0] - 2 * g.colW) < 0.001)).toBe(true);
+    // A run up the gap at 2·colW, never a curve that only touches it, and never up over the line to a lane.
+    expect(sample(d).filter(p => Math.abs(p[0] - (2 * g.colW + 3)) < 0.001).length).toBeGreaterThan(10);
+    expect(Math.min(...sample(d).map(p => p[1]))).toBeGreaterThanOrEqual(0);
   });
 
   it('from line 1: up the channel at 2·colW into the right side of a column-1 square or the story', () => {
@@ -405,6 +407,9 @@ describe('the hand-over with the block', () => {
     expect(cheapHeight({ count: 6, pinned: 5, blockRows: 3 }, true, g)).toBe(3 * g.rowH);
     // Without the block the same six and the + read as one line of one row.
     expect(cheapHeight({ count: 6, pinned: 0, blockRows: 0 }, true, g)).toBe(g.rowH);
+    // Nine with five pinned at a phone's four columns: the block's two, four more and the + are two lines, not three.
+    const p = geometryFor(350);
+    expect(cheapHeight({ count: 9, pinned: 5, blockRows: 3 }, true, p)).toBe(4 * p.rowH + p.lineGap);
   });
 
   it('the cheap exit is never more than the grid as laid out', () => {

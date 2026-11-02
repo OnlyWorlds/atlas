@@ -55,6 +55,8 @@ const LANE_STEP = 4;
 /** A line from a lower line to the block runs in the gap above its own line, under the lanes. */
 const CHANNEL_GAP = 22;
 const CHANNEL_STEP = 4;
+/** A line beside another in one gap runs this far apart (both inside the 6 px the names keep clear). */
+const RUN_STEP = 3;
 
 /** The frame of a grid at a geometry: each line's top, and where a column's centre and a row's top are. */
 export function frameOf(grid: Grid, g: RouteGeometry): Frame {
@@ -175,7 +177,7 @@ export function channelRoute(rest: GridCell, target: GridCell, f: Frame, n: Rout
   const gapY = f.lineTop[rest.line] - CHANNEL_GAP - (k % 3) * CHANNEL_STEP;
   let x: number;
   if (fromRight) {
-    x = 2 * f.g.colW + [0, -3, 3][n.channel % 3];
+    x = 2 * f.g.colW + [0, -RUN_STEP, RUN_STEP][n.channel % 3];
     n.channel++;
   } else {
     x = GUTTER_X - GUTTER_STEP * (1 + n.gutter % 3);
@@ -253,7 +255,8 @@ export function strandPath(a: GridCell, b: GridCell, f: Frame, n: RouteCounters)
   const [t, r] = a.slot ? [a, b] : [b, a];
   if (r.line === 0) {
     if (Math.abs(r.pos - t.pos) === 1) {
-      const pts = gapRoute(t, r, f, f.g.colW * Math.max(r.pos, t.pos));
+      // 3 px to the rest's side of the boundary, so it never shares a run with the channel at 2·colW.
+      const pts = gapRoute(t, r, f, f.g.colW * Math.max(r.pos, t.pos) + RUN_STEP);
       return pts.length === 2 ? `M${pts[0][0]} ${pts[0][1]} L${pts[1][0]} ${pts[1][1]}` : roundedPath(pts);
     }
     return roundedPath(laneRoute(t, r, f, laneY(0, f, n)));
