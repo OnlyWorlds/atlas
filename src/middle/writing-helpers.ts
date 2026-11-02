@@ -36,11 +36,6 @@ export const DEFAULT_WRITING_LABELS: WritingLabels = {
   l4: 'Draft',
 };
 
-/**
- * Resolve writing labels for a world. Always returns a complete set —
- * missing fields fall back to defaults, so callers can rely on l1-l4 being
- * present strings.
- */
 /** A label's plural, as the writing room says it ("chapters", "stories"). */
 export function pluralize(word: string): string {
   if (word.endsWith('s')) return word;
@@ -48,6 +43,11 @@ export function pluralize(word: string): string {
   return word + 's';
 }
 
+/**
+ * Resolve writing labels for a world. Always returns a complete set —
+ * missing fields fall back to defaults, so callers can rely on l1-l4 being
+ * present strings.
+ */
 export function getWritingLabels(worldId: string): WritingLabels {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
   return mergeLabels(entry?.writing_labels);

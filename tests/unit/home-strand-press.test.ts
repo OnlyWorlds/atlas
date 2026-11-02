@@ -286,6 +286,25 @@ describe('the Character card adds the main character to the strand\'s Event (R4)
     expect(said()).toBe("Odile is the story's main character; adding them to The night crossing did not go through.");
   });
 
+  it('the strand\'s event changed by another tab after the story names them: the strand\'s words, never "did not go through"', async () => {
+    await put('event', '0192a000-0000-7000-8000-000000000b02', { name: 'The thaw' });
+    await storyWithEvent({ characters: [] });
+    const update = store.updateElementWith.bind(store);
+    store.updateElementWith = async (id, mutate) => {
+      const out = await update(id, mutate);
+      // The story's protagonist lands; another tab then makes the thaw the strand's event.
+      if (id === N) await store.writeWorldMeta({ x_strand: { narrative: N, event: '0192a000-0000-7000-8000-000000000b02', location: L } } as unknown as Partial<WorldMeta>);
+      return out;
+    };
+    typeIn('name', 'Odile');
+    card().requestSubmit();
+    await settle();
+    const odile = (await store.listElements()).find(e => e.name === 'Odile')!;
+    expect((await disk(N)).protagonist).toBe(odile.id);
+    expect((await disk(E)).characters).toEqual([]);
+    expect(said()).toBe('The strand changed meanwhile. Odile was not added to The night crossing.');
+  });
+
   it('a refused Make keeps what was typed, and the focus asked for the card\'s Name', async () => {
     await storyWithEvent({ characters: [] });
     typeIn('name', 'Odile');
@@ -389,6 +408,23 @@ describe('the Event card puts the main character into its Event (1.121.0)', () =
     expect((await disk(E)).characters).toEqual([]);
     expect(seen).not.toContain(E);
     expect(said()).toBe('');
+  });
+
+  it('another tab makes someone else the main character before Create: the Event is made, the strand\'s words say who was not added', async () => {
+    await put('character', D, { name: 'Mira' });
+    await storyWithHero();
+    expect(title()).toBe('What happens to Odile?');
+    // The second tab: Mira is the story's main character now, after this card was drawn.
+    await store.updateElement(N, { protagonist: D } as Partial<Element>);
+    typeIn('name', 'The Flood');
+    card().requestSubmit();
+    await settle();
+    const flood = (await store.listElements()).find(e => e.name === 'The Flood')!;
+    expect((await disk(N)).events).toEqual([flood.id]);
+    expect((await disk(N)).protagonist).toBe(D);
+    expect((await disk(flood.id)).characters).toBeUndefined();
+    expect(said()).toBe('The strand changed meanwhile. Odile was not added to The Flood.');
+    expect(said()).not.toContain('did not go through');
   });
 
   it('the Event gone before its add: the story keeps it, and the line says adding the main character did not go through', async () => {

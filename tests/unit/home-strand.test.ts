@@ -395,6 +395,28 @@ describe('R5, R7, R8: the boxes', () => {
     expect(panel.querySelector('[data-role="strand-whole"]')!.getAttribute('tabindex')).toBe('-1');
   });
 
+  it('the story\'s one line keeps the second\'s room only while it can still come (the code gate\'s C7)', () => {
+    const room = () => host.querySelectorAll('[data-role="strand-lines"] .atlas-home-strand-lines-room').length;
+    // The owner, the event still to ask: kept.
+    world(withHero(), full);
+    draw();
+    expect(host.querySelectorAll('[data-role="strand-lines"] p:not([aria-hidden])').length).toBe(1);
+    expect(room()).toBe(1);
+    // The same strand, its event skipped: no room kept for a line that will not come.
+    cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
+    draw();
+    expect(room()).toBe(0);
+    resetStrandTabForTests();
+    // A view-only reader of the same half strand: none either.
+    world(withHero(), full, {}, viewOnly);
+    draw();
+    expect(room()).toBe(0);
+    // A 1.120 half (the event, no character yet), the owner: kept for the character's line.
+    world([el('narrative', N, { events: [E] }), el('event', E, { name: 'The Flood' })], { narrative: N, event: E, location: GONE2 });
+    draw();
+    expect(room()).toBe(1);
+  });
+
   it('two places: "now in or at", the join word in the Now cell, the Now box with its own ⋯', () => {
     world(whole(), { narrative: N, event: E, location: L });
     draw();

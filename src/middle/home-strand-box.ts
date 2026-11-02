@@ -22,7 +22,7 @@ import {
 import { typeNameStart } from '../core/type-words';
 import { openWebOn } from '../ui/open-web';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
-import { memory, type StrandContext } from './home-strand-model';
+import { isSkipped, memory, type StrandContext } from './home-strand-model';
 import { act, actsRow, promiseRow, stampOf, type StrandPanelOptions } from './home-strand-acts';
 import { buildRoomLine } from './home-strand-room';
 
@@ -160,8 +160,10 @@ function linesOf(c: StrandContext): HTMLElement | null {
     wrap.appendChild(p);
   }
   // One line shown: the second line's room is kept (no text, just a line box as tall as a line with a
-  // chip), so the make that brings it moves nothing below.
-  if (lines.length === 1) {
+  // chip), so the make that brings it moves nothing below; only while that line can still come (this
+  // reader may set its slot and has not skipped it).
+  const missing: StrandSlot = c.strand.event ? 'character' : 'event';
+  if (lines.length === 1 && !isSkipped(c.worldId, missing) && maySetSlot(missing, c.entry, c.meta, c.strand, c.byId)) {
     const room = document.createElement('p');
     room.className = 'atlas-home-strand-lines-room';
     room.setAttribute('aria-hidden', 'true');

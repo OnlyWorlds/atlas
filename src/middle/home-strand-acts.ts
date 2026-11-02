@@ -205,18 +205,19 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
     if (result === 'wrote' && event && mayEvent) {
       const who = made?.id ?? how.pick!;
       const added = await addCharacterToEvent(drawn, event.id, who);
-      if (added === 'failed') {
-        const name = made ? nameOf(made) : nameOf(c.byId.get(who));
-        eventLine = `${name} is the story's main character; adding them to ${event.name.trim() || 'Unnamed'} did not go through.`;
-      }
+      const name = made ? nameOf(made) : nameOf(c.byId.get(who));
+      const eventName = event.name.trim() || 'Unnamed';
+      // The strand moved between the draw and this write: said as the strand's change, never as a failure.
+      if (added === 'moved') eventLine = `${STRAND_MOVED} ${name} was not added to ${eventName}.`;
+      else if (added === 'failed') eventLine = `${name} is the story's main character; adding them to ${eventName} did not go through.`;
     }
     if (result === 'wrote' && hero && mayPicked) {
       const eventId = made?.id ?? how.pick!;
       const added = await addCharacterToEvent(drawn, eventId, hero.id);
-      if (added === 'failed') {
-        const name = made ? nameOf(made) : nameOf(c.byId.get(eventId));
-        eventLine = `${name} is the story's event; adding ${hero.name.trim() || 'Unnamed'} to it did not go through.`;
-      }
+      const name = made ? nameOf(made) : nameOf(c.byId.get(eventId));
+      const heroName = hero.name.trim() || 'Unnamed';
+      if (added === 'moved') eventLine = `${STRAND_MOVED} ${heroName} was not added to ${name}.`;
+      else if (added === 'failed') eventLine = `${name} is the story's event; adding ${heroName} to it did not go through.`;
     }
   } finally {
     memory.inFlight.delete(key);

@@ -415,14 +415,14 @@ describe('the Event\'s characters (R4)', () => {
     expect((await onDisk(E)).characters).toEqual({ id: D });
   });
 
-  it('never on an Event that is no longer the strand\'s, nor for a character no longer its main one', async () => {
+  it('never on an Event that is no longer the strand\'s, nor for a character no longer its main one: moved, not failed', async () => {
     const box = await heroOn([]);
     await store.writeWorldMeta({ x_strand: { narrative: N, event: GONE_E, location: GONE_L } } as unknown as Partial<WorldMeta>);
-    expect(await addCharacterToEvent(box, E, C)).toBe('failed');
+    expect(await addCharacterToEvent(box, E, C)).toBe('moved');
     expect((await onDisk(E)).characters).toEqual([]);
     await store.writeWorldMeta({ x_strand: { narrative: N, event: E, location: GONE_L } } as unknown as Partial<WorldMeta>);
     await store.updateElement(N, { protagonist: D } as Partial<Element>);
-    expect(await addCharacterToEvent(box, E, C)).toBe('failed');
+    expect(await addCharacterToEvent(box, E, C)).toBe('moved');
     expect((await onDisk(E)).characters).toEqual([]);
   });
 

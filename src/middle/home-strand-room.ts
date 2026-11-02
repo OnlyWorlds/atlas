@@ -10,7 +10,8 @@
  *   for a reader who may change it).
  *   Location (either box): with a map in a world where the grid acts and a reader who may change it, the
  *   map that holds a pin of it (else the world's first map by name), opened with the location's page,
- *   whose header offers +pin; else its page.
+ *   whose header offers +pin; else its page. On a narrow window the map is the right drawer: it opens
+ *   once the page has settled, since every change of address closes the drawers first (`openWebOn`'s way).
  *   Character: their page.
  *
  *   A press keeps the focus key `<slot>:room`, so Back puts the focus (and the scroll) on the act.
@@ -27,6 +28,7 @@ import type { StrandSlot } from '../core/strand';
 import { getState } from '../core/state';
 import { getTierForNarrative, getWritingLabels, isWritingInitialized, pluralize, type WritingLabels, type WritingTier } from './writing-helpers';
 import { gridActsIn } from './home-grow';
+import { isNarrow, openDrawer } from '../layout/narrow-layout';
 import { memory, type StrandContext } from './home-strand-model';
 import { act } from './home-strand-acts';
 
@@ -129,9 +131,27 @@ export function roomFacts(slot: StrandSlot, el: Element, c: StrandContext): Room
   return f;
 }
 
+/**
+ * Go to a map act's address; on a narrow window, open the right drawer (the map) once that page has
+ * settled. The listener is added before the navigation: `navigate` always fires a hashchange, a
+ * synthetic one when the address is already the act's.
+ */
+function navigateWithMap(to: string): void {
+  if (isNarrow()) {
+    const once = (e: HashChangeEvent): void => {
+      window.removeEventListener('hashchange', once);
+      // A synthetic event (the address did not change) carries no newURL.
+      if ((e.newURL || window.location.href).endsWith(to) && isNarrow()) openDrawer('right');
+    };
+    window.addEventListener('hashchange', once);
+  }
+  navigate(to);
+}
+
 /** The box's line: its words, and its act (a link-styled button; a write in flight holds it as every act). */
 export function buildRoomLine(slot: StrandSlot, el: Element, c: StrandContext): HTMLElement {
-  const line = roomLine(roomFacts(slot, el, c));
+  const facts = roomFacts(slot, el, c);
+  const line = roomLine(facts);
   const p = document.createElement('p');
   p.className = 'atlas-home-strand-room';
   p.setAttribute('data-role', 'strand-room');
@@ -141,9 +161,11 @@ export function buildRoomLine(slot: StrandSlot, el: Element, c: StrandContext): 
   p.appendChild(text);
   if (line.act) {
     const to = line.act.hash;
+    const withMap = !!facts.map && to === mapHash(facts.worldId, facts.map.id, facts.id);
     p.append(' ', act(line.act.label, `${slot}:room`, () => {
       memory.askFocus = { worldId: c.worldId, key: `${slot}:room` };
-      navigate(to);
+      if (withMap) navigateWithMap(to);
+      else navigate(to);
     }, 'atlas-btn-link'));
   }
   return p;

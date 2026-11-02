@@ -271,13 +271,17 @@ async function linkThenMark(store: Store, slot: StrandSlot, drawn: StrandDrawn, 
   return 'wrote';
 }
 
-/** What came of adding the main character to the strand's Event: listed now, left as it was, or said. */
-export type EventAdd = 'added' | 'skipped' | 'failed';
+/**
+ * What came of adding the main character to the strand's Event: listed now, left as it was, refused
+ * because the strand changed meanwhile (`moved`), or a write that did not go through (`failed`).
+ */
+export type EventAdd = 'added' | 'skipped' | 'moved' | 'failed';
 
 /**
- * The Character card's second write (R4): after the story's `protagonist` names `characterId`, the
- * strand's Event lists them in its `characters`. Asked again first: the mark's event is still `eventId`
- * and the story still names this character. Then inside the Event's lock: already listed in either
+ * The Character card's second write (R4), and the Event card's (1.121.0): after the story's `protagonist`
+ * names `characterId` and the mark's event is `eventId`, that Event lists them in its `characters`. Asked
+ * again first: the mark's event is still `eventId` and the story still names this character; else
+ * `moved`, nothing written. Then inside the Event's lock: already listed in either
  * spelling is nothing; absent, null or an array gets the bare id appended (every entry kept); any other
  * shape is left alone. The `added` flag is set inside the mutate, so a deleted Event (the mutate never
  * runs) reads as not gone through. The caller asks whether this person may change the Event first.
@@ -290,9 +294,9 @@ export async function addCharacterToEvent(drawn: StrandDrawn, eventId: string, c
   try {
     const meta = await store.readWorldMeta({ strict: true });
     const ids = memberIds(storedMark(meta));
-    if (ids.narrative !== drawn.narrative || ids.event !== eventId) return 'failed';
+    if (ids.narrative !== drawn.narrative || ids.event !== eventId) return 'moved';
     const story = drawn.narrative ? await store.getElement(drawn.narrative) : null;
-    if (!heroStillDrawn(story ?? undefined, characterId)) return 'failed';
+    if (!heroStillDrawn(story ?? undefined, characterId)) return 'moved';
     await store.updateElementWith(eventId, ex => {
       ran = true;
       const plan = appendToList((ex as unknown as Record<string, unknown>).characters, characterId);
