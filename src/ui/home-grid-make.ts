@@ -18,12 +18,18 @@ export interface Made { id: string; type: ElementType }
 /** Make an element of `type` named `name`; an Event takes `year` in its start field when given. Null when no world is open. */
 export async function makeFromSquare(type: ElementType, name: string, year?: number | null): Promise<Made | null> {
   const store = getActiveStore();
+  const worldId = getState().active?.worldId;
   // A view-only world draws no + square; this is the write's own refusal too.
-  if (!store || !getState().active || worldIsViewOnly()) return null;
+  if (!store || !worldId || worldIsViewOnly()) return null;
   const start = TEMPORAL_TYPE_FIELDS[type]?.start;
   const dated = start && typeof year === 'number' && Number.isFinite(year) ? { [start]: year } : {};
   const el = await store.createElement(type, { ...dated, name } as Partial<Element>);
-  patchSlice('data', { elements: await store.listElements() });
+  // A world switched while the make ran: the old world's list never patches the new one's state.
+  const here = (): boolean => getState().active?.worldId === worldId && getActiveStore() === store;
+  if (!here()) return null;
+  const elements = await store.listElements();
+  if (!here()) return null;
+  patchSlice('data', { elements });
   requestPushIfLinked();
   reportGesture({ kind: 'created', id: el.id });
   return { id: el.id, type };

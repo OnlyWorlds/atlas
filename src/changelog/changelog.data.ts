@@ -56,6 +56,37 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.120.0',
+    date: '2026-11-02',
+    theme: 'The strand as a journey',
+    entries: [
+      {
+        id: 'strand-journey',
+        title: 'A new world\'s Home asks for its story, one question at a time',
+        body: 'An empty world\'s Home is now the strand alone: it asks for a story (a name and its text), then one event in it, where that happened, who was involved and where they are now. Each answer becomes a box beside the one it joins, and the story\'s box says in two lines how the parts link, each name a chip that brings its box into view.',
+        tags: ['home'],
+      },
+      {
+        id: 'strand-journey-cards',
+        title: 'Each step takes a name and a few lines, and can wait',
+        body: 'Each card takes a name and a text, written where the kind keeps it (a story\'s text, everything else\'s description), and the event takes When. What you type stays while Home redraws, until you make it or press Escape. Skip for now sets a step aside; Add brings it back. Or pick one from your world appears when there is one to pick.',
+        tags: ['home'],
+      },
+      {
+        id: 'strand-journey-boxes',
+        title: 'Edit a part in place, or use another from its menu',
+        body: 'A filled box shows the first lines of its text, Edit opens it in place and saves only what you changed (if it changed meanwhile, nothing is written and Home says so), and its menu holds Use another. Making the main character on the event\'s step also lists them on that event.',
+        tags: ['home'],
+      },
+      {
+        id: 'strand-plain-words',
+        title: 'The strand\'s words: Event, Character, main character',
+        body: 'The strand now says Event and Character, its main character and where they are now, and an event "happened in or at" its place. Picture and Strand appear as tabs once the world holds more than the strand, from the next time Home opens; Pick on Home beside the writing room asks for that very part.',
+        tags: ['home', 'writing'],
+      },
+    ],
+  },
+  {
     version: '1.119.1',
     date: '2026-11-02',
     theme: 'Home stays on the strand',

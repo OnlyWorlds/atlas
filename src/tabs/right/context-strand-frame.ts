@@ -1,8 +1,8 @@
 /**
  * The strand's frame beside its story (Atlas's contract S8): in the writing room, while the open
  * Narrative is the world's strand's story, the right pane's writing context leads with one block,
- * "This story is the world's strand", with Hero, Happening, Where it happened and Where the hero is
- * now, each a chip that opens its element. An empty one offers "Pick on Home" (the Strand tab) where
+ * "This story is the world's strand", with Character, Event, Where it happened and Where they are
+ * now, each a chip that opens its element. An empty one offers "Pick on Home" (Home asking that slot) where
  * this person may fill it, and says "Empty" otherwise, or while the path shows (Home draws no tab
  * then: G5). The context tab redraws on the mark (`strandMarkKey` among its inputs, G4).
  */
@@ -68,8 +68,8 @@ export function buildStrandFrame(narrative: Element): HTMLElement | null {
       pick.className = 'atlas-btn-link atlas-context-strand-pick';
       pick.dataset.action = 'strand-pick-on-home';
       pick.textContent = 'Pick on Home';
-      pick.title = 'Opens Home on the Strand tab';
-      pick.addEventListener('click', () => openStrandTab(worldId));
+      pick.title = 'Opens Home, asking for this one';
+      pick.addEventListener('click', () => openStrandTab(worldId, slot));
       li.appendChild(pick);
     } else {
       const empty = document.createElement('span');

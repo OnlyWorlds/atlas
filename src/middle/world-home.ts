@@ -64,7 +64,8 @@ import { buildHomePicture, type HomePicture } from './home-picture';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
 import {
-  buildStrandHead, buildStrandPanel, chosenTab, notePictureShown, settleStrandFocus, strandContext, strandFocusKey, strandTabShows, tabPanel,
+  buildStrandHead, buildStrandPanel, choosePicture, chosenTab, notePictureShown, openHeadLatch, settleStrandFocus, strandContext,
+  strandFocusKey, strandTabShows, tabPanel,
 } from './home-strand';
 import { keptSetOf } from '../sync/sync-attach';
 
@@ -165,6 +166,9 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   // this mount, so the close moves no square; a Home opened fresh draws them above again.
   let pathWasOpen: string | null = null;
   let closedHere: string | null = null;
+  // The strand's tab head, decided once per world in this opening (R1): nothing made during the visit
+  // adds or removes it. The whole line's Picture shows it on a press.
+  const headLatch = openHeadLatch(() => { lastInputs = null; render(); });
 
   function render(): void {
     const s = getState();
@@ -278,16 +282,18 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const redrawNow = (): void => { lastInputs = null; render(); };
     // One reading of the strand per draw, handed to each part (the code gate's C7).
     const strandNow = quiet ? null : strandContext(worldId);
+    // The whole line's Picture: the Picture tab, the head shown for the rest of the visit (R8).
+    const showPicture = (): void => { choosePicture(worldId); headLatch.reveal(worldId); redrawNow(); };
     const drawWithStrand = (): void => {
       const chosen = chosenTab(worldId, strandNow);
       const head = buildStrandHead(worldId, chosen, redrawNow);
       const panel = tabPanel(chosen);
       root.append(head, panel);
-      if (chosen === 'strand') { panel.appendChild(buildStrandPanel(worldId, { alone: false, redraw: redrawNow, context: strandNow })); return; }
+      if (chosen === 'strand') { panel.appendChild(buildStrandPanel(worldId, { alone: false, redraw: redrawNow, context: strandNow, showPicture })); return; }
       drawPicture(panel);
       if ((grid && !grid.section.hidden) || picture) return;
       head.remove();
-      panel.replaceWith(buildStrandPanel(worldId, { alone: true, redraw: redrawNow, context: strandNow }));
+      panel.replaceWith(buildStrandPanel(worldId, { alone: true, redraw: redrawNow, context: strandNow, showPicture }));
     };
     // The tour: tutorial-state cards computed from world contents —
     // the core create pair, then the next wave / room CTAs. Renders nothing
@@ -325,8 +331,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; }
     // The path closed in this mount (`doors === 'below'`): the tab head waits for Home's next opening, as
     // the count line does, so the close moves no square (DESIGN_HOME "Nothing above the squares moves").
-    else if (!quiet && doors !== 'below' && strandTabShows(worldId, strandNow)) {
-      drawWithStrand();
+    else if (!quiet && doors !== 'below' && strandNow && strandTabShows(worldId, strandNow)) {
+      // R1: the head as this opening decided it; without one, the strand alone, its card the first heading.
+      if (headLatch.read(strandNow)) drawWithStrand();
+      else root.appendChild(buildStrandPanel(worldId, { alone: true, heading: false, redraw: redrawNow, context: strandNow, showPicture }));
       // A world with nothing yet keeps its way in from what someone already has (the retired path's
       // second door, #964), Quiet under the boxes: the strand's Make one is the screen's main act.
       if (!viewOnly && worldEmptyForPath()) {

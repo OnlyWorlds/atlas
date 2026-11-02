@@ -9,7 +9,7 @@ import { setActiveStore } from '../../src/core/active-store';
 import { defaultRegistry } from '../../src/core/types';
 import type { Element, WorldMeta, WorldRegistryEntry } from '../../src/core/types';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
-import { clearStrand, makeStrandSlot, writeStrandSlot, type StrandDrawn } from '../../src/ui/strand-write';
+import { addCharacterToEvent, clearStrand, editStrandElement, makeStrandSlot, writeStrandSlot, type StrandDrawn } from '../../src/ui/strand-write';
 import { toastManager } from '../../src/ui/toast-manager';
 
 const W = 'w-strand';
@@ -338,6 +338,129 @@ describe('a list that will not read back (D3)', () => {
     expect(problem).toHaveBeenCalledTimes(1);
     expect((await store.getElement(N) as unknown as Record<string, unknown>).protagonist).toBe(C);
     problem.mockRestore();
+  });
+});
+
+describe('the journey\'s Make (1.120.0, R4)', () => {
+  it('one create carries the text where the type keeps it and When; an empty text or When is left out', async () => {
+    await put('narrative', N, { events: [] });
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    const out = await makeStrandSlot('event', drawn(), 'The Flood', { name: 'The Flood', text: 'Water everywhere.', when: '1142' });
+    expect(out.result).toBe('wrote');
+    const made = await onDisk(out.made!.id);
+    expect(made.description).toBe('Water everywhere.');
+    expect(made.start_date).toBe(1142);
+
+    const bare = await makeStrandSlot('location', { ...drawn(), event: out.made!.id }, 'The Weir', { name: 'The Weir', text: '  ', when: '' });
+    const weir = await onDisk(bare.made!.id);
+    expect('description' in weir).toBe(false);
+    expect('start_date' in weir).toBe(false);
+  });
+
+  it('a story\'s text goes to its `story`', async () => {
+    await open(undefined);
+    const out = await makeStrandSlot('narrative', drawn(), 'A Tale', { name: 'A Tale', text: 'Once, *there* was a ferry.', when: '' });
+    const made = await onDisk(out.made!.id);
+    expect(made.story).toBe('Once, *there* was a ferry.');
+    expect('description' in made).toBe(false);
+  });
+
+  it('S3: a world switched while the make runs takes none of the old world\'s list', async () => {
+    await put('narrative', N, { events: [] });
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    const create = store.createElement.bind(store);
+    store.createElement = async (type, data) => {
+      const made = await create(type, data);
+      patchSlice('active', { worldId: 'w-other', meta: { id: 'w-other', name: 'Other' } } as never);
+      patchSlice('data', { elements: [], loading: false } as never);
+      return made;
+    };
+    await makeStrandSlot('event', drawn(), 'The Flood');
+    expect(getState().data.elements).toEqual([]);
+    expect(getState().active!.worldId).toBe('w-other');
+  });
+});
+
+describe('the Event\'s characters (R4)', () => {
+  const D = '0192a000-0000-7000-8000-000000000d02';
+  async function heroOn(list: unknown): Promise<StrandDrawn> {
+    await put('narrative', N, { events: [E], protagonist: C });
+    await put('event', E, list === undefined ? {} : { characters: list });
+    await put('character', C);
+    await open({ narrative: N, event: E, location: GONE_L });
+    return drawn();
+  }
+
+  it('absent, null or a list: the bare id appended, every entry kept', async () => {
+    expect(await addCharacterToEvent(await heroOn(undefined), E, C)).toBe('added');
+    expect((await onDisk(E)).characters).toEqual([C]);
+    store = new MockFolderStore(); setActiveStore(store as never);
+    expect(await addCharacterToEvent(await heroOn(null), E, C)).toBe('added');
+    expect((await onDisk(E)).characters).toEqual([C]);
+    store = new MockFolderStore(); setActiveStore(store as never);
+    expect(await addCharacterToEvent(await heroOn(['a', { id: D, name: 'Ana' }]), E, C)).toBe('added');
+    expect((await onDisk(E)).characters).toEqual(['a', { id: D, name: 'Ana' }, C]);
+  });
+
+  it('already listed, in either spelling: nothing written; another shape: left alone', async () => {
+    expect(await addCharacterToEvent(await heroOn([{ id: C }]), E, C)).toBe('skipped');
+    expect((await onDisk(E)).characters).toEqual([{ id: C }]);
+    store = new MockFolderStore(); setActiveStore(store as never);
+    expect(await addCharacterToEvent(await heroOn([C]), E, C)).toBe('skipped');
+    store = new MockFolderStore(); setActiveStore(store as never);
+    expect(await addCharacterToEvent(await heroOn('ana'), E, C)).toBe('skipped');
+    expect((await onDisk(E)).characters).toBe('ana');
+    store = new MockFolderStore(); setActiveStore(store as never);
+    expect(await addCharacterToEvent(await heroOn({ id: D }), E, C)).toBe('skipped');
+    expect((await onDisk(E)).characters).toEqual({ id: D });
+  });
+
+  it('never on an Event that is no longer the strand\'s, nor for a character no longer its main one', async () => {
+    const box = await heroOn([]);
+    await store.writeWorldMeta({ x_strand: { narrative: N, event: GONE_E, location: GONE_L } } as unknown as Partial<WorldMeta>);
+    expect(await addCharacterToEvent(box, E, C)).toBe('failed');
+    expect((await onDisk(E)).characters).toEqual([]);
+    await store.writeWorldMeta({ x_strand: { narrative: N, event: E, location: GONE_L } } as unknown as Partial<WorldMeta>);
+    await store.updateElement(N, { protagonist: D } as Partial<Element>);
+    expect(await addCharacterToEvent(box, E, C)).toBe('failed');
+    expect((await onDisk(E)).characters).toEqual([]);
+  });
+
+  it('a deleted Event never runs the write, and reads as not gone through', async () => {
+    const box = await heroOn([]);
+    await store.deleteElement(E, { silent: true });
+    expect(await addCharacterToEvent(box, E, C)).toBe('failed');
+  });
+});
+
+describe('Edit (R7): only what changed, against what the card opened with', () => {
+  it('writes the changed fields alone, in one write', async () => {
+    await put('event', E, { name: 'The Flood', description: 'Water.', start_date: 1142 });
+    await open(undefined);
+    const out = await editStrandElement(W, E, { name: 'The Great Flood' }, { name: 'The Flood', description: 'Water.', start_date: 1142 });
+    expect(out).toBe('wrote');
+    expect(log).toEqual([{ kind: 'element', id: E, fields: ['name'] }]);
+    expect((await onDisk(E)).description).toBe('Water.');
+  });
+
+  it('a field changed meanwhile: nothing written', async () => {
+    await put('event', E, { name: 'The Flood', description: 'Water, now a sea.' });
+    await open(undefined);
+    expect(await editStrandElement(W, E, { description: 'Mine.', name: 'Mine' }, { name: 'The Flood', description: 'Water.' })).toBe('moved');
+    expect(log).toEqual([]);
+    expect((await onDisk(E)).name).toBe('The Flood');
+    // A field opened absent compares equal to an empty one written since.
+    await store.updateElement(E, { start_date: '' } as unknown as Partial<Element>);
+    expect(await editStrandElement(W, E, { start_date: 9 }, { start_date: undefined })).toBe('wrote');
+  });
+
+  it('nothing changed, or a view-only world: nothing written', async () => {
+    await put('event', E, { name: 'The Flood' });
+    await open(undefined);
+    expect(await editStrandElement(W, E, {}, {})).toBe('nothing');
+    await open(undefined, { copy_of: { world_id: 'x' } } as never);
+    expect(await editStrandElement(W, E, { name: 'X' }, { name: 'The Flood' })).toBe('nothing');
+    expect(log).toEqual([]);
   });
 });
 

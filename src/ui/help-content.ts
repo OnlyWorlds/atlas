@@ -48,10 +48,10 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
         mouse: 'on a small world\'s Picture, press the + square to make something, then drag one square onto another (or press one, then the other) to put it there',
         touch: 'on a small world\'s Picture, tap the + square to make something, then tap one square and then another to put it there',
       },
-      'a new world opens on its Strand: start with Make one in the Story box',
-      'already have notes or a file? While the world is empty, Bring it in, under the strand\'s boxes',
+      'a new world opens on its strand and asks one question at a time: a story, an event in it, where it happened, who was involved and where they are now, each a name and a few lines',
+      'already have notes or a file? While the world is empty, Bring it in, under the strand',
       'in a world on OnlyWorlds, press the OnlyWorlds mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
-      "press Strand beside the picture to choose the world's strand, one story in five boxes: the story, a happening in it, where it happened, its hero and where the hero is now",
+      "once the world holds more than its strand, press Strand beside the picture to see it: the story, an event in it, where it happened, its main character and where they are now; Edit a part in place, or use another from its menu",
     ],
   },
   element: {
@@ -87,7 +87,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       { mouse: 'find a word with Ctrl+F and link every match to one element; on a chapter or book this reaches every scene inside', touch: 'find a word with the search button over the text, and link every match to one element; on a chapter or book this reaches every scene inside' },
       { mouse: 'create a chapter or scene inside a row with its hover +', touch: 'create a chapter or scene inside a row with its +' },
       'split a long piece into siblings at the cursor',
-      "make the story you are writing the world's strand from the bar above it, and keep its hero, happening and places in view beside it",
+      "make the story you are writing the world's strand from the bar above it, and keep its main character, event and places in view beside it",
     ],
   },
   knowledge: {
