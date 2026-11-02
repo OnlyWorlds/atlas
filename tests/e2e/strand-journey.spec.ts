@@ -303,12 +303,77 @@ test('Edit writes only the fields changed; a change meanwhile writes nothing and
     await api.getActiveStore().updateElement(id, { description: 'Theirs.' });
   }, E1);
   await edit.locator('[data-act="save"]').click();
-  await expect(said(page)).toHaveText('The Great Fire changed meanwhile.');
+  await expect(said(page)).toHaveText('The Great Fire changed meanwhile. What you typed is kept: Save again to write it.');
   expect((await onDisk(page, E1)).description).toBe('Theirs.');
   await expect(edit.locator('[data-field="text"]')).toHaveValue('Mine.');
+  // The second Save is a knowing choice: it writes (the code gate's C4).
+  await edit.locator('[data-act="save"]').click();
+  await expect(edit).toHaveCount(0);
+  expect((await onDisk(page, E1)).description).toBe('Mine.');
+
+  // Escape on an Edit: back to the box, the focus on Edit, nothing written.
+  await box(page, 'event').locator('[data-act="edit"]').click();
+  await edit.locator('[data-field="text"]').fill('Never saved.');
   await edit.locator('[data-field="text"]').press('Escape');
   await expect(edit).toHaveCount(0);
   await expect(box(page, 'event').locator('[data-act="edit"]')).toBeFocused();
+  expect((await onDisk(page, E1)).description).toBe('Mine.');
+});
+
+test('C1 and C2: a reopened Edit takes a change made meanwhile; a typed name never crosses to the next main character', async ({ page }) => {
+  await seeded(page, { narrative: N1, event: E1, location: L1 }, { protagonist: C1 });
+  const edit = page.locator('[data-role="strand-card"][data-mode="edit"]');
+  // C1: a name typed on the Event, another box's Edit opened and cancelled, the description changed elsewhere.
+  await box(page, 'event').locator('[data-act="edit"]').click();
+  await edit.locator('[data-field="name"]').fill('The Great Fire');
+  await box(page, 'character').locator('[data-act="edit"]').click();
+  await edit.locator('[data-act="cancel"]').click();
+  await page.evaluate(async (id) => {
+    const api = (window as any).__atlasTestApi;
+    await api.getActiveStore().updateElement(id, { description: 'Ash everywhere.' });
+    api.patchData(await api.getActiveStore().listElements());
+  }, E1);
+  await box(page, 'event').locator('[data-act="edit"]').click();
+  await expect(edit.locator('[data-field="text"]')).toHaveValue('Ash everywhere.');
+  await edit.locator('[data-act="save"]').click();
+  await expect(edit).toHaveCount(0);
+  expect(await onDisk(page, E1)).toMatchObject({ name: 'The Great Fire', description: 'Ash everywhere.' });
+
+  // C2: a name typed on Mira; the story's main character becomes Ilse elsewhere.
+  await box(page, 'character').locator('[data-act="edit"]').click();
+  await edit.locator('[data-field="name"]').fill('Mira the Bold');
+  await box(page, 'event').locator('[data-act="edit"]').click();
+  await edit.locator('[data-act="cancel"]').click();
+  await page.evaluate(async ({ n, c }) => {
+    const api = (window as any).__atlasTestApi;
+    await api.getActiveStore().updateElement(n, { protagonist: c });
+    api.patchData(await api.getActiveStore().listElements());
+  }, { n: N1, c: C2 });
+  await expect(boxName(page, 'character')).toHaveText('Ilse');
+  await box(page, 'character').locator('[data-act="edit"]').click();
+  await expect(edit.locator('[data-field="name"]')).toHaveValue('Ilse');
+  await edit.locator('[data-act="save"]').click();
+  await expect(edit).toHaveCount(0);
+  expect((await onDisk(page, C2)).name).toBe('Ilse');
+  expect((await onDisk(page, C1)).name).toBe('Mira');
+});
+
+test('C3: a view-only world\'s pull takes its strand, and the head stays for the visit', async ({ page }) => {
+  const wid = await seeded(page, { narrative: N1, event: E1, location: L1 });
+  await patchEntry(page, { copy_of: { world_id: 'elsewhere' } });
+  await reopenHome(page, wid);
+  await expect(head(page)).toBeVisible();
+  await expect(page.locator('[data-role="strand-read-only"]')).toBeVisible();
+  // A pull takes the mark away.
+  await page.evaluate(async () => {
+    const { getState, patchActiveMeta } = await import('/src/core/state.ts');
+    patchActiveMeta(getState().active!.worldId, { x_strand: undefined } as never);
+  });
+  await page.waitForTimeout(300);
+  await expect(head(page)).toBeVisible();
+  // Home's next opening reads afresh: nothing to show here, the picture alone.
+  await reopenHome(page, wid);
+  await expect(head(page)).toHaveCount(0);
 });
 
 test('the ⋯ menu\'s Use another: the promise first, the second press writes, the Event untouched', async ({ page }) => {
@@ -388,6 +453,26 @@ test.describe('on a phone', () => {
     const heights = await targets.evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent !== null).map(e => Math.round(e.getBoundingClientRect().height)));
     expect(heights.length).toBeGreaterThan(10);
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+  });
+
+  test('C6: the same line\'s ⋯ menu stays on screen at 390 with a long place name', async ({ page }) => {
+    const wid = await seeded(page, { narrative: N1, event: E1, location: L1 }, { protagonist: C1 });
+    await page.evaluate(async ({ l1, c1 }) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      await store.updateElement(l1, { name: 'The Long Harbour Under the Seven Grey Lighthouses of Saltmere' });
+      await store.updateElement(c1, { location: l1 });
+      api.patchData(await store.listElements());
+    }, { l1: L1, c1: C1 });
+    await reopenHome(page, wid);
+    const more = cell(page, 'now').locator('[data-act="more"]');
+    await more.click();
+    const menu = cell(page, 'now').locator('.atlas-home-strand-menu');
+    await expect(menu).toBeVisible();
+    const r = await menu.evaluate(el => { const b = el.getBoundingClientRect(); return { left: b.left, right: b.right, w: window.innerWidth }; });
+    expect(r.left).toBeGreaterThanOrEqual(0);
+    expect(r.right).toBeLessThanOrEqual(r.w);
+    await expect(menu.getByRole('button', { name: 'Use another place' })).toBeVisible();
   });
 
   test('an asked card at 390: the empty cells take no space, the fields and acts a thumb', async ({ page }) => {

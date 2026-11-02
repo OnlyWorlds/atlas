@@ -75,7 +75,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'strand-journey-boxes',
         title: 'Edit a part in place, or use another from its menu',
-        body: 'A filled box shows the first lines of its text, Edit opens it in place and saves only what you changed (if it changed meanwhile, nothing is written and Home says so), and its menu holds Use another. Making the main character on the event\'s step also lists them on that event.',
+        body: 'A filled box shows the first lines of its text, Edit opens it in place and saves only what you changed (if it changed meanwhile, nothing is written, Home says so and keeps what you typed for a second Save), and its menu holds Use another. Making or picking the main character on its step also lists them on the strand\'s event.',
         tags: ['home'],
       },
       {

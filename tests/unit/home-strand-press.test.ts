@@ -283,17 +283,47 @@ describe('the Character card adds the main character to the strand\'s Event (R4)
   });
 });
 
+describe('a Make refused after its create (C14)', () => {
+  it('the element stays and is said; the card\'s name is spent, so a second Make makes no twin', async () => {
+    await put('narrative', N, { events: [E], name: 'The Ferry' });
+    await put('event', E, { locations: [L], name: 'The night crossing' });
+    await put('location', L, { name: 'The Quay' });
+    await open({ narrative: N, event: E, location: L });
+    const create = store.createElement.bind(store);
+    store.createElement = async (type, data) => {
+      const made = await create(type, data);
+      await store.updateElement(N, { protagonist: D } as Partial<Element>);
+      return made;
+    };
+    typeIn('name', 'Odile');
+    card().requestSubmit();
+    await settle();
+    expect(said()).toBe('The strand changed meanwhile. Odile was made and stays in the world.');
+    expect(card().querySelector<HTMLInputElement>('[data-field="name"]')!.value).toBe('');
+  });
+});
+
 describe('Edit\'s Save (R7)', () => {
-  it('writes the changed name alone; a change meanwhile is said and writes nothing', async () => {
+  const edit = () => host.querySelector<HTMLFormElement>('[data-mode="edit"]')!;
+  const typeInto = (field: string, value: string): void => {
+    const input = edit().querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-field="${field}"]`)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  /** Another pane or tab writes the element, and the pull lands in Home's list. */
+  const meanwhile = async (id: string, patch: Record<string, unknown>): Promise<void> => {
+    await store.updateElement(id, patch as Partial<Element>);
+    patchSlice('data', { elements: await store.listElements(), loading: false } as never);
+    draw();
+  };
+
+  it('writes the changed name alone; a change meanwhile writes nothing, keeps what was typed, and the second Save writes it (C4)', async () => {
     await put('narrative', N, { events: [E], name: 'The Ferry' });
     await put('event', E, { name: 'The Flood', description: 'Water.', start_date: 1142 });
     await open({ narrative: N, event: E, location: GONE_L });
     cell('event').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
-    const edit = () => host.querySelector<HTMLFormElement>('[data-mode="edit"]')!;
     expect(edit().querySelector<HTMLInputElement>('[data-field="when"]')!.value).toBe('1142');
-    const name = edit().querySelector<HTMLInputElement>('[data-field="name"]')!;
-    name.value = 'The Great Flood';
-    name.dispatchEvent(new Event('input', { bubbles: true }));
+    typeInto('name', 'The Great Flood');
     let fields: string[] = [];
     const update = store.updateElementWith.bind(store);
     store.updateElementWith = async (id, mutate) => update(id, ex => { const p = mutate(ex); if (p) fields = Object.keys(p); return p; });
@@ -304,18 +334,91 @@ describe('Edit\'s Save (R7)', () => {
     expect(host.querySelector('[data-mode="edit"]')).toBeNull();
 
     cell('event').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
-    const text = edit().querySelector<HTMLTextAreaElement>('[data-field="text"]')!;
-    text.value = 'Mine.';
-    text.dispatchEvent(new Event('input', { bubbles: true }));
+    typeInto('text', 'Mine.');
     await store.updateElement(E, { description: 'Theirs.' } as Partial<Element>);
     fields = [];
     edit().requestSubmit();
     await settle();
     expect(fields).toEqual([]);
     expect((await disk(E)).description).toBe('Theirs.');
-    expect(said()).toBe('The Great Flood changed meanwhile.');
-    // The card stays, what was typed in it kept.
+    expect(said()).toBe('The Great Flood changed meanwhile. What you typed is kept: Save again to write it.');
     expect(edit().querySelector<HTMLTextAreaElement>('[data-field="text"]')!.value).toBe('Mine.');
+    // The second Save is a knowing choice: it writes.
+    edit().requestSubmit();
+    await settle();
+    expect(fields).toEqual(['description']);
+    expect((await disk(E)).description).toBe('Mine.');
+    expect(host.querySelector('[data-mode="edit"]')).toBeNull();
+  });
+
+  it('C1: a reopened Edit shows the element as it is now for every field not typed, and never writes one back', async () => {
+    await put('narrative', N, { events: [E], name: 'The Ferry', protagonist: C });
+    await put('event', E, { name: 'The Fire', description: 'Smoke over the hills.', start_date: 40 });
+    await put('character', C, { name: 'Mira' });
+    await open({ narrative: N, event: E, location: GONE_L });
+    cell('event').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    typeInto('name', 'The Great Fire');
+    // Another box's Edit, then Cancel: the Event's typed name stays kept, nothing else of it.
+    cell('character').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    edit().querySelector<HTMLButtonElement>('[data-act="cancel"]')!.click();
+    await meanwhile(E, { description: 'Ash everywhere.' });
+    cell('event').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    expect(edit().querySelector<HTMLTextAreaElement>('[data-field="text"]')!.value).toBe('Ash everywhere.');
+    expect(edit().querySelector<HTMLInputElement>('[data-field="name"]')!.value).toBe('The Great Fire');
+    edit().requestSubmit();
+    await settle();
+    expect(await disk(E)).toMatchObject({ name: 'The Great Fire', description: 'Ash everywhere.', start_date: 40 });
+  });
+
+  it('C2: a typed name never crosses to another element in the slot', async () => {
+    await put('narrative', N, { events: [E], name: 'The Ferry', protagonist: C });
+    await put('event', E, { name: 'The Fire' });
+    await put('character', C, { name: 'Mira' });
+    await put('character', D, { name: 'Ilse' });
+    await open({ narrative: N, event: E, location: GONE_L });
+    cell('character').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    typeInto('name', 'Mira the Bold');
+    cell('event').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    edit().querySelector<HTMLButtonElement>('[data-act="cancel"]')!.click();
+    // The story's main character becomes Ilse elsewhere; the pull lands.
+    await meanwhile(N, { protagonist: D });
+    cell('character').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    expect(edit().querySelector<HTMLInputElement>('[data-field="name"]')!.value).toBe('Ilse');
+    edit().requestSubmit();
+    await settle();
+    expect((await disk(D)).name).toBe('Ilse');
+    expect((await disk(C)).name).toBe('Mira');
+    // Mira back in the slot: her old draft went when she left it.
+    await meanwhile(N, { protagonist: C });
+    cell('character').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    expect(edit().querySelector<HTMLInputElement>('[data-field="name"]')!.value).toBe('Mira');
+  });
+
+  it('C7: "Write it in the writing room" saves a typed name first; refused, the card stays and says why', async () => {
+    const long = '1\n2\n3\n4\n5\n6\n7';
+    await put('narrative', N, { events: [], name: 'The Ferry', story: long });
+    await put('character', C, { name: 'Mira' });
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    cell('narrative').querySelector<HTMLButtonElement>('[data-act="edit"]')!.click();
+    expect(edit().querySelector('[data-field="text"]')).toBeNull();
+    typeInto('name', 'The Night Ferry');
+    // Refused first: the name changed elsewhere.
+    await store.updateElement(N, { name: 'The Old Ferry' } as Partial<Element>);
+    edit().querySelector<HTMLButtonElement>('[data-act="writing"]')!.click();
+    await settle();
+    expect(edit()).not.toBeNull();
+    expect(said()).toBe('The Ferry changed meanwhile. What you typed is kept: Save again to write it.');
+    expect((await disk(N)).name).toBe('The Old Ferry');
+    expect(edit().querySelector<HTMLInputElement>('[data-field="name"]')!.value).toBe('The Night Ferry');
+    // Pressed again: the name is written, then the writing room opens.
+    edit().querySelector<HTMLButtonElement>('[data-act="writing"]')!.click();
+    await settle();
+    expect((await disk(N)).name).toBe('The Night Ferry');
+    expect((await disk(N)).story).toBe(long);
+    // The Edit closed behind the door (Home itself goes with the navigation; here it is drawn again).
+    draw();
+    expect(host.querySelector('[data-mode="edit"]')).toBeNull();
+    expect(window.location.hash).toContain(N);
   });
 });
 

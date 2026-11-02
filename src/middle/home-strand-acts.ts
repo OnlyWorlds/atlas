@@ -212,6 +212,8 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
   if (result === 'refused') memory.said = { worldId: c.worldId, text: `${STRAND_MOVED}${kept}` };
   else if (kept) memory.said = { worldId: c.worldId, text: kept.trim() };
   else if (eventLine) memory.said = { worldId: c.worldId, text: eventLine };
+  // Made and kept after a refusal: the card's name is spent, so a second Make never makes a twin (C14).
+  if (made && result !== 'wrote') clearDraft(c.worldId, slot);
   if (result === 'wrote') {
     clearDraft(c.worldId, slot);
     if (memory.forced?.worldId === c.worldId && memory.forced.slot === slot) memory.forced = null;

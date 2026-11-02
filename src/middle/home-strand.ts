@@ -25,7 +25,7 @@ import { anySlotWritable, maySetSlot, STRAND_SLOTS, type StrandSlot } from '../c
 import { askedSlot, countedOutsideStrand, strandWhole, JOIN_NOW, JOIN_PLACE, SLOT_WORD } from '../core/strand-journey';
 import { worldEmptyForPath } from '../core/guide-path';
 import {
-  askSlot, flightKey, flying, forcedSlot, isSkipped, memory, resetStrandMemoryForTests, strandContext,
+  askSlot, dropEditDraftsNotOn, flightKey, flying, forcedSlot, isSkipped, memory, resetStrandMemoryForTests, strandContext,
   type HomeTab, type StrandContext,
 } from './home-strand-model';
 import { act, holdActs, stampOf as stampNow, type StrandPanelOptions } from './home-strand-acts';
@@ -52,25 +52,35 @@ export function strandHeadShows(c: StrandContext): boolean {
   return strandTabShows(c.worldId, c) && (countedOutsideStrand(c.all, c.kept, c.strand) || strandWhole(c.strand));
 }
 
+/** What a Home opening draws: the strand with its tab head, the strand alone, or the picture alone. */
+export type HomeShape = 'head' | 'alone' | 'picture';
+
+/** R1 whole: no strand to show here, the picture; else the head when it is earned, else the strand alone. */
+export function homeShapeOf(c: StrandContext): HomeShape {
+  if (!strandTabShows(c.worldId, c)) return 'picture';
+  return strandHeadShows(c) ? 'head' : 'alone';
+}
+
 /**
- * R1's latch: one per Home opening (Home's mount). The first reading of a world decides its head for
- * the visit; a make during it changes nothing; another world, or Home opened again, reads afresh. The
- * whole line's Picture shows the head on a press (`reveal`).
+ * R1's latch: one per Home opening (Home's mount). The first loaded reading of a world decides the whole
+ * shape for the visit, `strandTabShows` included (the code gate's C3): a make, a pull giving or taking
+ * the strand, or a role kept by the first round changes nothing; another world, or Home opened again,
+ * reads afresh. The whole line's Picture shows the head on a press (`reveal`).
  */
 export class StrandHeadLatch {
   private worldId: string | null = null;
-  private head = false;
+  private shape: HomeShape = 'picture';
   constructor(private readonly onReveal: () => void = () => {}) {}
-  read(c: StrandContext): boolean {
+  read(c: StrandContext): HomeShape {
     if (this.worldId !== c.worldId) {
       this.worldId = c.worldId;
-      this.head = strandHeadShows(c);
+      this.shape = homeShapeOf(c);
     }
-    return this.head;
+    return this.shape;
   }
   reveal(worldId: string): void {
-    if (this.worldId !== worldId || this.head) return;
-    this.head = true;
+    if (this.worldId !== worldId || this.shape !== 'alone') return;
+    this.shape = 'head';
     this.onReveal();
   }
 }
@@ -136,14 +146,20 @@ export function strandFocusKey(root: HTMLElement): string | null {
   return a.closest<HTMLElement>('[data-strand-key]')?.getAttribute('data-strand-key') ?? null;
 }
 
+/** A key for a selector: the browser's escape where there is one (jsdom has no `CSS`); the keys are Atlas's own words. */
+const cssEscape = (s: string): string => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&'));
+
 const panelFirst = (root: ParentNode): HTMLElement | null =>
   root.querySelector<HTMLElement>('[data-role="home-strand"] input:not([type="hidden"]), [data-role="home-strand"] textarea, [data-role="home-strand"] button');
 
 /** The journey's next stop after a write on `slot` (S10): the asked card's Name, else the box, else the whole line. */
 function nextStop(root: ParentNode, slot: string): HTMLElement | null {
   return root.querySelector<HTMLElement>('[data-role="strand-card"][data-mode="make"] [data-field="name"]')
-    ?? root.querySelector<HTMLElement>(`[data-strand-key="${CSS.escape(slot)}:open"]`)
-    ?? root.querySelector<HTMLElement>('[data-role="strand-whole"]');
+    ?? root.querySelector<HTMLElement>(`[data-strand-key="${cssEscape(slot)}:open"]`)
+    ?? root.querySelector<HTMLElement>('[data-role="strand-whole"]')
+    // Skip for now on the last card it could ask: the slot's own "Add" that just appeared (the code gate's C5).
+    ?? root.querySelector<HTMLElement>(`[data-strand-key="${cssEscape(slot)}:add"]`)
+    ?? panelFirst(root);
 }
 
 /** After a draw: the control a press asked for, else the one that held the focus before it. */
@@ -156,9 +172,9 @@ export function settleStrandFocus(root: HTMLElement, kept: string | null): void 
   let target: HTMLElement | null;
   if (key.startsWith('next:')) target = nextStop(root, key.slice(5));
   else if (key.startsWith('box:')) {
-    const cell = root.querySelector<HTMLElement>(`[data-role="home-strand"] [data-slot="${CSS.escape(key.slice(4))}"]`);
+    const cell = root.querySelector<HTMLElement>(`[data-role="home-strand"] [data-slot="${cssEscape(key.slice(4))}"]`);
     target = cell ? cell.querySelector<HTMLElement>('[data-strand-key]') ?? null : null;
-  } else target = root.querySelector<HTMLElement>(`[data-strand-key="${CSS.escape(key)}"]`);
+  } else target = root.querySelector<HTMLElement>(`[data-strand-key="${cssEscape(key)}"]`);
   // An asked control not drawn (no head for "tab-strand", a slot not asked): the panel's first control.
   if (!target && ask && (key.startsWith('tab-') || key.startsWith('card:'))) target = panelFirst(root);
   if (!target) return;
@@ -267,6 +283,8 @@ export function buildStrandPanel(worldId: string, opts: StrandPanelOptions): HTM
   // An Edit lets go once its box holds another element, or none.
   const ed = memory.editing;
   if (ed && (ed.worldId !== worldId || c.strand[ed.slot]?.id !== ed.id || !c.byId.get(ed.id))) memory.editing = null;
+  // An Edit draft lives only while its slot holds that element (the code gate's C2).
+  for (const slot of STRAND_SLOTS) dropEditDraftsNotOn(worldId, slot, c.strand[slot]?.id ?? null);
   const asked = askedSlot(c.strand, may, s => isSkipped(worldId, s), forcedSlot(worldId));
 
   const grid = document.createElement('ol');

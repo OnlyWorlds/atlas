@@ -101,6 +101,8 @@ export const memory = {
   /** The panel's own line (a refusal, an element made and kept), for this world, until the next act. */
   said: null as { worldId: string; text: string } | null,
   drafts: new Map<string, CardValues>(),
+  /** An Edit card's typed fields, keyed by world, slot and the element's id: only what the person typed (C1, C2). */
+  editDrafts: new Map<string, Partial<CardValues>>(),
   skips: new Map<string, Set<StrandSlot>>(),
   forced: null as { worldId: string; slot: StrandSlot } | null,
   editing: null as Editing | null,
@@ -110,19 +112,41 @@ export const memory = {
   openClosers: new Set<() => void>(),
 };
 
-export const draftKey = (worldId: string, slot: StrandSlot, edit: boolean): string => `${worldId}\u0000${slot}${edit ? '\u0000edit' : ''}`;
+const draftKey = (worldId: string, slot: StrandSlot): string => `${worldId}\u0000${slot}`;
 
-/** A card's fields as last typed (empty when none). */
-export function draftOf(worldId: string, slot: StrandSlot, edit = false): CardValues {
-  return memory.drafts.get(draftKey(worldId, slot, edit)) ?? EMPTY_VALUES;
+/** A Make card's fields as last typed (empty when none). */
+export function draftOf(worldId: string, slot: StrandSlot): CardValues {
+  return memory.drafts.get(draftKey(worldId, slot)) ?? EMPTY_VALUES;
 }
 
-export function keepDraft(worldId: string, slot: StrandSlot, edit: boolean, v: CardValues): void {
-  memory.drafts.set(draftKey(worldId, slot, edit), { ...v });
+export function keepDraft(worldId: string, slot: StrandSlot, v: CardValues): void {
+  memory.drafts.set(draftKey(worldId, slot), { ...v });
 }
 
-export function clearDraft(worldId: string, slot: StrandSlot, edit = false): void {
-  memory.drafts.delete(draftKey(worldId, slot, edit));
+export function clearDraft(worldId: string, slot: StrandSlot): void {
+  memory.drafts.delete(draftKey(worldId, slot));
+}
+
+const editKey = (worldId: string, slot: StrandSlot, id: string): string => `${worldId}\u0000${slot}\u0000${id}`;
+
+/** What the person typed in an Edit card for this element: only the fields typed in, never one left alone. */
+export function editDraftOf(worldId: string, slot: StrandSlot, id: string): Partial<CardValues> {
+  return memory.editDrafts.get(editKey(worldId, slot, id)) ?? {};
+}
+
+export function typeInEdit(worldId: string, slot: StrandSlot, id: string, field: keyof CardValues, value: string): void {
+  const key = editKey(worldId, slot, id);
+  memory.editDrafts.set(key, { ...memory.editDrafts.get(key), [field]: value });
+}
+
+export function clearEditDraft(worldId: string, slot: StrandSlot, id: string): void {
+  memory.editDrafts.delete(editKey(worldId, slot, id));
+}
+
+/** An Edit draft lives only while its slot holds that element: every other draft for the slot goes. */
+export function dropEditDraftsNotOn(worldId: string, slot: StrandSlot, id: string | null): void {
+  const head = `${worldId}\u0000${slot}\u0000`;
+  for (const key of [...memory.editDrafts.keys()]) if (key.startsWith(head) && key !== `${head}${id ?? ''}`) memory.editDrafts.delete(key);
 }
 
 export function isSkipped(worldId: string, slot: StrandSlot): boolean {
@@ -165,6 +189,7 @@ function noteWorld(worldId: string | null): void {
 /** Every card's fields, the skips, the ask and the edit (a world switch, a reload). */
 export function clearJourney(): void {
   memory.drafts.clear();
+  memory.editDrafts.clear();
   memory.skips.clear();
   memory.forced = null;
   memory.editing = null;

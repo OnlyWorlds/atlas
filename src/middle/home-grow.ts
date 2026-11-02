@@ -605,7 +605,9 @@ function wirePlus(host: HTMLElement, worldId: string, plus: PlusSquare | null): 
       // Asked after that redraw, so the draw that shows the new square is the one that takes it.
       focusAfter = '[data-grid-plus], [data-role="home-grid"] [data-grid-id]:last-of-type';
       void makeFromSquare(type, n, Number.isFinite(y) ? y : null).then(made => {
-        if (made && type === 'narrative') {
+        // Nothing made here (a world switched while it ran): no focus asked of the next world's grid.
+        if (!made) { focusAfter = null; return; }
+        if (type === 'narrative') {
           // The label is a second write and a second redraw: the focus is asked for it too.
           focusAfter = '[data-grid-plus], [data-role="home-grid"] [data-grid-id]:last-of-type';
           // A label that wrote nothing drew nothing: the ask goes, so no later draw takes the focus.

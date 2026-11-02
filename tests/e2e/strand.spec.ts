@@ -275,8 +275,16 @@ test.describe('the Strand tab', () => {
     await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
     await expect(page.locator('[data-role="home-strand"]')).toHaveCount(0);
 
+    const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId as string);
     await setMark(page, { narrative: N1, event: E1, location: GONE_L });
-    // The picture this reader was looking at stays: the pulled strand gets its tab, not the page (C4).
+    // The pull brings a strand: this visit keeps its shape, the picture and no head (R1, the 1.120.0 code gate's C3).
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+    await expect(page.locator('[data-role="home-strand"]')).toHaveCount(0);
+    // Home's next opening: the head, the picture this reader was looking at still chosen (C4).
+    await go(page, `#/w/${wid}/settings`);
+    await expect(page.locator('.atlas-world-home')).toHaveCount(0);
+    await go(page, `#/w/${wid}`);
     await expect(tab(page, 'picture')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('[data-role="home-strand"]')).toHaveCount(0);
     await tab(page, 'strand').click();

@@ -10,7 +10,7 @@ import { patchSlice } from '../../src/core/state';
 import { defaultRegistry, type Element, type WorldRegistryEntry } from '../../src/core/types';
 import {
   buildStrandPanel, chosenTab, notePictureShown, openStrandTab, pickRows, rawHeld, rawWords, resetStrandTabForTests, strandContext,
-  strandHeadShows, strandTabShows, StrandHeadLatch, READ_ONLY_LINE, SLOT_WORD,
+  settleStrandFocus, strandHeadShows, strandTabShows, StrandHeadLatch, READ_ONLY_LINE, SLOT_WORD,
 } from '../../src/middle/home-strand';
 import { strandOfferFor } from '../../src/middle/strand-offer';
 import { buildStrandFrame } from '../../src/tabs/right/context-strand-frame';
@@ -107,35 +107,55 @@ describe('R1: the tab head, as a Home opening decides it', () => {
   it('the latch: a make during the visit adds no head; Home opened again, or another world, reads afresh', () => {
     const latch = new StrandHeadLatch();
     world([]);
-    expect(latch.read(strandContext(W)!)).toBe(false);
+    expect(latch.read(strandContext(W)!)).toBe('alone');
     // The story made, its mark not yet written: an element outside the strand for a moment.
     world([el('narrative', N)]);
-    expect(latch.read(strandContext(W)!)).toBe(false);
+    expect(latch.read(strandContext(W)!)).toBe('alone');
     // Made in the sidebar mid-journey: still none this visit.
     world([el('narrative', N), el('character', X)], full);
-    expect(latch.read(strandContext(W)!)).toBe(false);
-    expect(new StrandHeadLatch().read(strandContext(W)!)).toBe(true);
+    expect(latch.read(strandContext(W)!)).toBe('alone');
+    expect(new StrandHeadLatch().read(strandContext(W)!)).toBe('head');
     world([], undefined, {}, {}, W2);
-    expect(latch.read(strandContext(W2)!)).toBe(false);
+    expect(latch.read(strandContext(W2)!)).toBe('alone');
   });
 
   it('the latch: an established world keeps its head through a strand made whole or cleared', () => {
     const latch = new StrandHeadLatch();
     world([el('narrative', N), el('character', X)]);
-    expect(latch.read(strandContext(W)!)).toBe(true);
+    expect(latch.read(strandContext(W)!)).toBe('head');
     world([el('narrative', N)]);
-    expect(latch.read(strandContext(W)!)).toBe(true);
+    expect(latch.read(strandContext(W)!)).toBe('head');
+  });
+
+  it('C3: the whole shape holds for the visit: a view-only world\'s pull takes its strand, the head stays; a contributor\'s pull gives one, no head comes', () => {
+    const latch = new StrandHeadLatch();
+    world([el('narrative', N), el('character', X)], full, {}, viewOnly);
+    expect(latch.read(strandContext(W)!)).toBe('head');
+    // The pull takes the mark away: nothing here to show or write, and still the head this visit.
+    world([el('narrative', N), el('character', X)], undefined, {}, viewOnly);
+    expect(strandTabShows(W)).toBe(false);
+    expect(latch.read(strandContext(W)!)).toBe('head');
+    expect(new StrandHeadLatch().read(strandContext(W)!)).toBe('picture');
+
+    const other = new StrandHeadLatch();
+    world([el('narrative', N), el('character', X)], undefined, contributor);
+    expect(other.read(strandContext(W)!)).toBe('picture');
+    // The owner sets a strand elsewhere and the pull lands: the picture stays the visit's.
+    world([el('narrative', N), el('character', X)], full, contributor);
+    expect(strandTabShows(W)).toBe(true);
+    expect(other.read(strandContext(W)!)).toBe('picture');
+    expect(new StrandHeadLatch().read(strandContext(W)!)).toBe('head');
   });
 
   it('the whole line\'s Picture reveals the head on a press, only for the world read', () => {
     let redraws = 0;
     const latch = new StrandHeadLatch(() => { redraws++; });
     world([]);
-    expect(latch.read(strandContext(W)!)).toBe(false);
+    expect(latch.read(strandContext(W)!)).toBe('alone');
     latch.reveal(W2);
     expect(redraws).toBe(0);
     latch.reveal(W);
-    expect(latch.read(strandContext(W)!)).toBe(true);
+    expect(latch.read(strandContext(W)!)).toBe('head');
     expect(redraws).toBe(1);
   });
 });
@@ -223,6 +243,18 @@ describe('R2: the reveal', () => {
     expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['event']);
   });
 
+  it('C5: Skip for now on the last card it can ask: the focus goes to that slot\'s Add, never the page', () => {
+    world([el('narrative', N)], full);
+    draw();
+    cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
+    settleStrandFocus(host, null);
+    expect(document.activeElement).toBe(cards()[0].querySelector('[data-field="name"]'));
+    cards()[0].querySelector<HTMLButtonElement>('[data-act="skip"]')!.click();
+    expect(cards()).toHaveLength(0);
+    settleStrandFocus(host, null);
+    expect(document.activeElement).toBe(cellOf('character').querySelector('[data-act="add"]'));
+  });
+
   it('the frame\'s Pick on Home asks its slot out of order, its Name the focus asked for', () => {
     world([el('narrative', N)], full);
     openStrandTab(W, 'character');
@@ -295,6 +327,13 @@ describe('R3: the cards and their memory', () => {
     expect(card.querySelector('[data-role="strand-card-note"]')!.textContent).toBe('Type a name first');
     typeIn(card.querySelector<HTMLInputElement>('[data-field="name"]')!, 'X');
     card.querySelector<HTMLInputElement>('[data-field="when"]')!.value = '1.5';
+    card.requestSubmit();
+    expect(card.querySelector('[data-role="strand-card-note"]')!.textContent).toBe('When is a whole number.');
+    // C9: a letter in a number input reads '' in the browser; its validity says it was no number.
+    card.querySelector<HTMLElement>('[data-role="strand-card-note"]')!.textContent = '';
+    const when = card.querySelector<HTMLInputElement>('[data-field="when"]')!;
+    when.value = '';
+    Object.defineProperty(when, 'validity', { value: { badInput: true }, configurable: true });
     card.requestSubmit();
     expect(card.querySelector('[data-role="strand-card-note"]')!.textContent).toBe('When is a whole number.');
   });

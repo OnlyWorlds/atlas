@@ -31,7 +31,20 @@ const openedFor = (slot: StrandSlot, c: StrandContext) =>
   (memory.opened && memory.opened.worldId === c.worldId && memory.opened.slot === slot && !memory.opened.card ? memory.opened : null);
 
 /**
- * The ⋯ disclosure: a plain list of buttons under its opener (`aria-expanded`), holding Home's redraws
+ * A menu opened under its ⋯ stays inside Home: anchored at the button's end by default, it flips to
+ * open from the button's start when that end would run past Home's left edge (the same line's ⋯ wraps
+ * to the cell's start at 390; the 1.120.0 code gate's C6).
+ */
+function keepInView(list: HTMLElement): void {
+  list.style.left = '';
+  list.style.right = '';
+  const bounds = (list.closest('.atlas-world-home') ?? document.documentElement).getBoundingClientRect();
+  const r = list.getBoundingClientRect();
+  if (r.left < bounds.left) { list.style.left = '0'; list.style.right = 'auto'; }
+}
+
+/**
+ * The ⋯ disclosure:a plain list of buttons under its opener (`aria-expanded`), holding Home's redraws
  * while open, closed by a press outside or the focus leaving, Escape owned with the focus back on ⋯.
  */
 function moreMenu(slot: StrandSlot, label: string, items: Array<{ label: string; key: string; run: () => void }>): HTMLElement {
@@ -83,6 +96,7 @@ function moreMenu(slot: StrandSlot, label: string, items: Array<{ label: string;
     btn.setAttribute('aria-expanded', 'true');
     memory.openClosers.add(quiet);
     unwatch = watchLeave(wrap, t => wrap.contains(t), how => close(how));
+    keepInView(list);
     list.querySelector<HTMLButtonElement>('button')?.focus();
   });
   wrap.addEventListener('keydown', e => {

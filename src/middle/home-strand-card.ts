@@ -26,12 +26,13 @@ import { resolveCalendarLens } from '../core/calendar-lens';
 import { calendarDateText } from './element-detail-fields';
 import { SLOT_TYPE, type StrandSlot } from '../core/strand';
 import {
-  cardCopy, changedFields, parseWhen, storyForWritingRoom, type CardValues,
+  cardCopy, changedFields, editOpening, parseWhen, storyForWritingRoom, type CardValues,
 } from '../core/strand-journey';
+import { getActiveStore } from '../core/active-store';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { editStrandElement } from '../ui/strand-write';
 import {
-  clearDraft, draftKey, draftOf, flying, keepDraft, memory, skip, type StrandContext,
+  clearDraft, clearEditDraft, draftOf, editDraftOf, flying, keepDraft, memory, skip, typeInEdit, type StrandContext,
 } from './home-strand-model';
 import {
   act, drawnFor, holdActs, needsPromise, openPickList, pickRows, promiseRow, rawHeld, run, stampOf, nameOf,
@@ -140,8 +141,19 @@ function whenField(c: StrandContext, key: string, value: string, onInput: () => 
   return { wrap, input };
 }
 
+/** What a number input holds that is no number (a letter in Firefox, "1e" in Chromium): its value reads '' (C9). */
+const NOT_A_NUMBER = 'not a number';
+
+/** A field's value as typed; a When the browser could not read as a number says so, never "no When". */
+function fieldValue(form: HTMLElement, f: keyof CardValues): string | undefined {
+  const control = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-field="${f}"]`);
+  if (!control) return undefined;
+  if (control instanceof HTMLInputElement && control.validity?.badInput) return NOT_A_NUMBER;
+  return control.value;
+}
+
 const valuesIn = (form: HTMLElement, base: CardValues): CardValues => {
-  const get = (f: keyof CardValues): string => form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-field="${f}"]`)?.value ?? base[f];
+  const get = (f: keyof CardValues): string => fieldValue(form, f) ?? base[f];
   return { name: get('name'), text: get('text'), when: get('when') };
 };
 
@@ -165,7 +177,7 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
     form.appendChild(p);
   }
   const draft = draftOf(c.worldId, slot);
-  const remember = (): void => keepDraft(c.worldId, slot, false, valuesIn(form, draft));
+  const remember = (): void => keepDraft(c.worldId, slot, valuesIn(form, draft));
   const note = document.createElement('p');
   note.className = 'atlas-home-strand-card-note';
   note.setAttribute('role', 'status');
@@ -244,7 +256,7 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
     e.preventDefault();
     if (flying(c.worldId) || promise) return;
     const v = valuesIn(form, draft);
-    keepDraft(c.worldId, slot, false, v);
+    keepDraft(c.worldId, slot, v);
     if (!v.name.trim()) { note.textContent = 'Type a name first'; name.focus(); return; }
     if (slot === 'event' && parseWhen(v.when) === 'bad') {
       note.textContent = 'When is a whole number.';
@@ -268,22 +280,72 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
   return form;
 }
 
-/** A filled box's Edit, in place (R7). */
+/**
+ * A filled box's Edit, in place (R7). What the person typed is kept per element (world, slot and the
+ * element's id), only the fields typed in: a reopened Edit shows the element as it is now for every
+ * field left alone, and never carries a typed name to another element in the slot (the code gate's C1,
+ * C2). Save writes only the fields typed that differ from what the card opened with, all in one write,
+ * each compared with its opened value. A change meanwhile writes nothing; the card then takes the
+ * element as it is as its new baseline, keeps what was typed, and a second Save writes it (C4).
+ */
 export function buildEditCard(slot: StrandSlot, c: StrandContext, el: Element, opts: StrandPanelOptions, level: 2 | 3): HTMLElement {
   const ed = memory.editing!;
   const form = frame(slot, 'edit', `Edit ${nameOf(el)}`, level);
   const letGo = holdWhileFocused(form, c.worldId);
-  const draft = { ...ed.opened, ...memory.drafts.get(draftKey(c.worldId, slot, true)) };
-  const remember = (): void => keepDraft(c.worldId, slot, true, valuesIn(form, draft));
+  const typed = editDraftOf(c.worldId, slot, ed.id);
+  const shown: CardValues = { ...ed.opened, ...typed };
+  const remember = (f: keyof CardValues) => (): void => {
+    const v = fieldValue(form, f);
+    if (v !== undefined) typeInEdit(c.worldId, slot, ed.id, f, v);
+  };
+  const close = (): void => {
+    clearEditDraft(c.worldId, slot, ed.id);
+    memory.editing = null;
+  };
   const back = (): void => {
     letGo();
-    clearDraft(c.worldId, slot, true);
-    memory.editing = null;
+    close();
     memory.askFocus = { worldId: c.worldId, key: `${slot}:edit` };
     opts.redraw();
   };
-  const name = textInput(`edit:${slot}:name`, 'name', draft.name);
-  name.addEventListener('input', remember);
+  const note = document.createElement('p');
+  note.className = 'atlas-home-strand-card-note';
+  note.setAttribute('role', 'status');
+  note.setAttribute('data-role', 'strand-card-note');
+
+  let saving = false;
+  /**
+   * The one save path (Save, and the writing room's door with a name typed): the typed fields that
+   * differ, compared at the write. Wrote: `then`. Changed meanwhile: the new baseline, the typed kept.
+   */
+  const save = (room: boolean, then: (wrote: boolean) => void): void => {
+    if (saving) return;
+    const patch = changedFields(el.type, ed.opened, { ...ed.opened, ...editDraftOf(c.worldId, slot, ed.id) }, !room);
+    if (patch === 'bad-when') { note.textContent = 'When is a whole number.'; return; }
+    if (Object.keys(patch).length === 0) { then(false); return; }
+    saving = true;
+    letGo();
+    holdActs(form);
+    const was = ed.opened.name.trim() || 'Unnamed';
+    void editStrandElement(c.worldId, ed.id, patch, ed.raw).then(async out => {
+      saving = false;
+      if (out === 'wrote') {
+        memory.said = null;
+        then(true);
+        return;
+      }
+      if (out === 'moved') {
+        const now = await getActiveStore()?.getElement(ed.id).catch(() => null);
+        if (now && memory.editing === ed) memory.editing = { ...ed, ...editOpening(now) };
+        memory.said = { worldId: c.worldId, text: `${was} changed meanwhile. What you typed is kept: Save again to write it.` };
+      }
+      memory.askFocus = { worldId: c.worldId, key: `edit:${slot}:name` };
+      opts.redraw();
+    });
+  };
+
+  const name = textInput(`edit:${slot}:name`, 'name', shown.name);
+  name.addEventListener('input', remember('name'));
   form.appendChild(field('Name', name));
   const room = storyForWritingRoom(el);
   if (room) {
@@ -295,65 +357,45 @@ export function buildEditCard(slot: StrandSlot, c: StrandContext, el: Element, o
     go.setAttribute('data-act', 'writing');
     go.setAttribute('data-strand-key', `edit:${slot}:writing`);
     go.textContent = 'Write it in the writing room';
-    // The writing room takes the story's text: the Edit closes behind it, nothing written here.
-    go.addEventListener('click', () => {
+    // The writing room takes the story's text: a name typed here is saved first, through the same
+    // compare; refused, the card stays and says why (the code gate's C7).
+    go.addEventListener('click', () => save(true, () => {
       letGo();
-      clearDraft(c.worldId, slot, true);
-      memory.editing = null;
+      close();
       openElementTarget(el, c.worldId);
-    });
+    }));
     p.appendChild(go);
     form.appendChild(p);
   } else {
     const text = document.createElement('textarea');
     text.className = 'atlas-input atlas-home-strand-text';
     text.rows = 3;
-    text.value = draft.text;
+    text.value = shown.text;
     text.setAttribute('data-field', 'text');
     text.setAttribute('data-strand-key', `edit:${slot}:text`);
-    text.addEventListener('input', remember);
+    text.addEventListener('input', remember('text'));
     form.appendChild(field(cardCopy(slot, c.strand).text, text));
   }
-  if (slot === 'event') form.appendChild(whenField(c, 'edit:event:when', draft.when, remember).wrap);
-  const note = document.createElement('p');
-  note.className = 'atlas-home-strand-card-note';
-  note.setAttribute('role', 'status');
-  note.setAttribute('data-role', 'strand-card-note');
+  if (slot === 'event') form.appendChild(whenField(c, 'edit:event:when', shown.when, remember('when')).wrap);
   form.appendChild(note);
   const acts = document.createElement('div');
   acts.className = 'atlas-home-strand-card-acts';
-  const save = document.createElement('button');
-  save.type = 'submit';
-  save.className = 'atlas-btn-primary atlas-home-strand-act';
-  save.setAttribute('data-act', 'save');
-  save.setAttribute('data-strand-key', `edit:${slot}:save`);
-  save.textContent = 'Save';
-  acts.append(save, act('Cancel', `edit:${slot}:cancel`, back, 'atlas-btn-ghost'));
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.className = 'atlas-btn-primary atlas-home-strand-act';
+  saveBtn.setAttribute('data-act', 'save');
+  saveBtn.setAttribute('data-strand-key', `edit:${slot}:save`);
+  saveBtn.textContent = 'Save';
+  acts.append(saveBtn, act('Cancel', `edit:${slot}:cancel`, back, 'atlas-btn-ghost'));
   form.appendChild(acts);
 
-  let saving = false;
   form.addEventListener('submit', e => {
     e.preventDefault();
-    if (saving) return;
-    const v = valuesIn(form, draft);
-    keepDraft(c.worldId, slot, true, v);
-    const patch = changedFields(el.type, ed.opened, v, !room);
-    if (patch === 'bad-when') { note.textContent = 'When is a whole number.'; return; }
-    if (Object.keys(patch).length === 0) { back(); return; }
-    saving = true;
-    letGo();
-    holdActs(form);
-    void editStrandElement(c.worldId, ed.id, patch, ed.raw).then(out => {
-      saving = false;
-      if (out === 'wrote') {
-        clearDraft(c.worldId, slot, true);
-        memory.editing = null;
-        memory.said = null;
-        memory.askFocus = { worldId: c.worldId, key: `${slot}:open` };
-      } else {
-        if (out === 'moved') memory.said = { worldId: c.worldId, text: `${nameOf(el)} changed meanwhile.` };
-        memory.askFocus = { worldId: c.worldId, key: `edit:${slot}:name` };
-      }
+    save(room, wrote => {
+      // Written: the focus on the box's name; nothing typed differs: closed as Cancel closes it.
+      letGo();
+      close();
+      memory.askFocus = { worldId: c.worldId, key: wrote ? `${slot}:open` : `${slot}:edit` };
       opts.redraw();
     });
   });

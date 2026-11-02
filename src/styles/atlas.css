@@ -18028,7 +18028,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-more { position: relative; margin-left: auto; }
 .atlas-home-strand-more-btn { min-width: 30px; padding: 0 6px; display: inline-grid; place-items: center; }
 .atlas-home-strand-more-btn .material-symbols-outlined { font-size: 18px; }
-.atlas-home-strand-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; display: flex; flex-direction: column; min-width: 200px; padding: 4px; border: 1px solid var(--atlas-divider-strong); border-radius: 8px; background: var(--atlas-bg-raised); }
+.atlas-home-strand-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; display: flex; flex-direction: column; min-width: 200px; max-width: calc(100vw - 24px); padding: 4px; border: 1px solid var(--atlas-divider-strong); border-radius: 8px; background: var(--atlas-bg-raised); }
 .atlas-home-strand-menu[hidden] { display: none; }
 .atlas-home-strand-menu-item { min-height: 32px; padding: 0 10px; border: 0; border-radius: 4px; background: none; color: var(--atlas-text); font: inherit; font-size: 0.88rem; text-align: left; cursor: pointer; }
 .atlas-home-strand-menu-item:hover, .atlas-home-strand-menu-item:focus-visible { background: var(--atlas-bg-hover); }

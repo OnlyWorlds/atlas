@@ -65,7 +65,7 @@ import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
 import {
   buildStrandHead, buildStrandPanel, choosePicture, chosenTab, notePictureShown, openHeadLatch, settleStrandFocus, strandContext,
-  strandFocusKey, strandTabShows, tabPanel,
+  strandFocusKey, tabPanel,
 } from './home-strand';
 import { keptSetOf } from '../sync/sync-attach';
 
@@ -331,9 +331,12 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     if (tour) { root.appendChild(tour.section); tour.mount(); grow = tour; }
     // The path closed in this mount (`doors === 'below'`): the tab head waits for Home's next opening, as
     // the count line does, so the close moves no square (DESIGN_HOME "Nothing above the squares moves").
-    else if (!quiet && doors !== 'below' && strandNow && strandTabShows(worldId, strandNow)) {
-      // R1: the head as this opening decided it; without one, the strand alone, its card the first heading.
-      if (headLatch.read(strandNow)) drawWithStrand();
+    // R1: this opening's shape, decided at its first loaded draw on any branch and held for the visit,
+    // `strandTabShows` included (the 1.120.0 code gate's C3): a pull that gives or takes the strand, or
+    // a role kept by the first round, never adds or takes the head mid-visit.
+    else if (!quiet && doors !== 'below' && strandNow && headLatch.read(strandNow) !== 'picture') {
+      // The head as this opening decided it; without one, the strand alone, its card the first heading.
+      if (headLatch.read(strandNow) === 'head') drawWithStrand();
       else root.appendChild(buildStrandPanel(worldId, { alone: true, heading: false, redraw: redrawNow, context: strandNow, showPicture }));
       // A world with nothing yet keeps its way in from what someone already has (the retired path's
       // second door, #964), Quiet under the boxes: the strand's Make one is the screen's main act.
