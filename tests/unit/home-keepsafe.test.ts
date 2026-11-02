@@ -34,6 +34,19 @@ describe('keepSafeCard', () => {
     expect(card(entry(), [{ ...map, image_url: undefined, image_media_id: 'media-1' } as unknown as Element])).toEqual({ reduced: null });
   });
 
+  it('the story of a strand still being made does not ask for a copy; another written story, a map or the count still do', () => {
+    const story = { id: 'n', name: 'Moppets', type: 'narrative', story: 'It began.', local_updated_at: iso(NOW) } as unknown as Element;
+    const other = { ...story, id: 'n2', name: 'Another' } as Element;
+    const making = (els: Element[]) => keepSafeCard({ entry: entry(), elements: els, loading: false, now: NOW, strandStory: 'n' });
+    expect(making([story])).toBeNull();
+    expect(making([story, other])).toEqual({ reduced: null });
+    expect(making([story, ...chars(KEEPSAFE_THRESHOLD - 1)])).toEqual({ reduced: null });
+    const map = { id: 'm', name: 'Map', type: 'map', image_url: 'https://x/y.png', local_updated_at: iso(NOW) } as unknown as Element;
+    expect(making([story, map])).toEqual({ reduced: null });
+    // The strand whole (no story passed): its text counts again.
+    expect(keepSafeCard({ entry: entry(), elements: [story], loading: false, now: NOW, strandStory: null })).toEqual({ reduced: null });
+  });
+
   it('never for a folder world, the tour, a view-only world, a cleared one, or while loading', () => {
     const els = chars(30);
     expect(card(entry({ where: undefined }), els)).toBeNull();

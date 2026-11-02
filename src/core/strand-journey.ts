@@ -40,9 +40,9 @@ export const SLOT_PHRASE: Record<StrandSlot, string> = {
 export const SLOT_OTHER: Record<StrandSlot, string> = {
   narrative: 'story',
   event: 'event',
-  location: 'place',
+  location: 'location',
   character: 'character',
-  now: 'place',
+  now: 'location',
 };
 
 /** The Event to its place, and the main character to where they are now: the words between two boxes. */
@@ -66,13 +66,13 @@ export function cardCopy(slot: StrandSlot, s: OwStrand): CardCopy {
     case 'event':
       return { title: `What happens in ${named(s.narrative)}?`, what: 'One event in the story: a night, a battle, a meeting.', text: 'What happens' };
     case 'location':
-      return { title: `Where did ${named(s.event)} happen?`, what: 'A place in your world.', text: 'About this place' };
+      return { title: `Where did ${named(s.event)} happen?`, what: 'A location in your world.', text: 'About this location' };
     case 'character':
       return s.event
         ? { title: `Who was involved in ${named(s.event)}?`, what: "Someone who was there. They become the story's main character.", text: 'About them' }
         : { title: 'Who is the story about?', what: 'Its main character.', text: 'About them' };
     case 'now':
-      return { title: `Where is ${named(s.character)} now?`, what: s.event ? `After ${named(s.event)}.` : null, text: 'About this place' };
+      return { title: `Where is ${named(s.character)} now?`, what: s.event ? `After ${named(s.event)}.` : null, text: 'About this location' };
   }
 }
 

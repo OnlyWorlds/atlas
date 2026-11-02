@@ -246,7 +246,7 @@ export function buildSameLine(c: StrandContext, opts: StrandPanelOptions): HTMLE
   }
   if (another) {
     wrap.appendChild(moreMenu('now', `More for where ${c.strand.character?.name.trim() || 'they'} are now`, [
-      { label: 'Use another place', key: 'now:another', run: useAnother('now', c, opts) },
+      { label: 'Use another location', key: 'now:another', run: useAnother('now', c, opts) },
     ]));
   }
   return wrap;

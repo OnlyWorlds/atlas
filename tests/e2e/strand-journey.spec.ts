@@ -472,7 +472,7 @@ test.describe('on a phone', () => {
     const r = await menu.evaluate(el => { const b = el.getBoundingClientRect(); return { left: b.left, right: b.right, w: window.innerWidth }; });
     expect(r.left).toBeGreaterThanOrEqual(0);
     expect(r.right).toBeLessThanOrEqual(r.w);
-    await expect(menu.getByRole('button', { name: 'Use another place' })).toBeVisible();
+    await expect(menu.getByRole('button', { name: 'Use another location' })).toBeVisible();
   });
 
   test('an asked card at 390: the empty cells take no space, the fields and acts a thumb', async ({ page }) => {

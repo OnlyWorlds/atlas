@@ -61,6 +61,18 @@ export const CHANGELOG: ChangelogRelease[] = [
     theme: 'Open with, for a reader without an account',
     entries: [
       {
+        id: 'keep-safe-after-the-strand',
+        title: 'A new browser world asks for a copy once its story is whole',
+        body: 'The card that says this world lives only in this browser showed as soon as the story had its first words. It now waits until the story, its event, the location and the main character are all filled in, unless the world has another written story, a map with a picture, or 25 elements.',
+        tags: ['onboarding'],
+      },
+      {
+        id: 'strand-says-location',
+        title: 'The story journey says location, the name of the type',
+        body: 'The journey\'s questions called a Location a place. They now say location, as everywhere else in Atlas.',
+        tags: ['home'],
+      },
+      {
         id: 'open-with-needs-an-account',
         title: 'A world opened with a read key or a player\'s link lists every tool in Open with',
         body: 'The OnlyWorlds mark\'s Open with now shows Atlas as where you are, and Lantern greyed with the words Needs an account, since its link opens only for someone signed in. Before, both rows were left out for a reader without an account.',

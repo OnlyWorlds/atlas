@@ -4,7 +4,7 @@
  * matters. Pure: the home renders what this answers.
  *
  * Shown past the threshold (25 elements, or a scene with words, or a map with
- * an image), never for a folder world, the tour, a view-only world, a cleared
+ * an image; the story of a strand still being made does not count), never for a folder world, the tour, a view-only world, a cleared
  * one, or while the world is still loading. A download hides it until the
  * world changed since AND a week has passed; × hides it for a week. A world
  * that is online, or exported as JSON, still gets it, reduced: the account or
@@ -26,11 +26,15 @@ export interface KeepSafeCard {
   reduced: 'online' | 'export' | null;
 }
 
-function worthKeeping(elements: Element[]): boolean {
+/**
+ * `strandStory`: the story of a strand still being made. Its text is the journey's first answer, so it
+ * alone does not ask for a copy until the strand is whole; any other written story still does.
+ */
+function worthKeeping(elements: Element[], strandStory: string | null): boolean {
   if (elements.length >= KEEPSAFE_THRESHOLD) return true;
   return elements.some(el => {
     const e = el as Element & { story?: unknown; image_url?: unknown; image_media_id?: unknown };
-    if (el.type === 'narrative') return typeof e.story === 'string' && e.story.trim() !== '';
+    if (el.type === 'narrative') return el.id !== strandStory && typeof e.story === 'string' && e.story.trim() !== '';
     if (el.type === 'map') return !!e.image_url || !!e.image_media_id;
     return false;
   });
@@ -50,12 +54,14 @@ export function keepSafeCard(input: {
   elements: Element[];
   loading: boolean;
   now: number;
+  /** The story's id while the world's strand is not whole; null or absent otherwise. */
+  strandStory?: string | null;
 }): KeepSafeCard | null {
   const { entry, elements, loading, now } = input;
   if (!entry || loading || !isBrowserWorld(entry) || entry.demo === true || entry.cleared_at) return null;
   // A view-only copy (conv. 177) is kept safe by the world it copies.
   if (entryIsViewOnly(entry)) return null;
-  if (!worthKeeping(elements)) return null;
+  if (!worthKeeping(elements, input.strandStory ?? null)) return null;
   const snoozed = Date.parse(entry.keep_nudge_snoozed_until ?? '');
   if (Number.isFinite(snoozed) && now < snoozed) return null;
   const downloaded = Date.parse(entry.kept_download_at ?? '');

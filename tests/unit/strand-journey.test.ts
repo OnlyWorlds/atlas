@@ -26,7 +26,7 @@ describe('R3: each card asks from what is filled', () => {
   it('the story, the event and the place', () => {
     expect(cardCopy('narrative', EMPTY_STRAND)).toEqual({ title: 'Start with a story', what: 'The story your world tells, or the first of them.', text: 'The story' });
     expect(cardCopy('event', strand({ narrative: S }))).toEqual({ title: 'What happens in The Lantern Ferry?', what: 'One event in the story: a night, a battle, a meeting.', text: 'What happens' });
-    expect(cardCopy('location', strand({ narrative: S, event: EV }))).toEqual({ title: 'Where did The night crossing happen?', what: 'A place in your world.', text: 'About this place' });
+    expect(cardCopy('location', strand({ narrative: S, event: EV }))).toEqual({ title: 'Where did The night crossing happen?', what: 'A location in your world.', text: 'About this location' });
   });
 
   it('the main character, with an event and without one', () => {
@@ -37,8 +37,8 @@ describe('R3: each card asks from what is filled', () => {
   });
 
   it('where they are now: "After" only with an event', () => {
-    expect(cardCopy('now', strand({ narrative: S, event: EV, character: CH }))).toEqual({ title: 'Where is Odile now?', what: 'After The night crossing.', text: 'About this place' });
-    expect(cardCopy('now', strand({ narrative: S, character: CH }))).toEqual({ title: 'Where is Odile now?', what: null, text: 'About this place' });
+    expect(cardCopy('now', strand({ narrative: S, event: EV, character: CH }))).toEqual({ title: 'Where is Odile now?', what: 'After The night crossing.', text: 'About this location' });
+    expect(cardCopy('now', strand({ narrative: S, character: CH }))).toEqual({ title: 'Where is Odile now?', what: null, text: 'About this location' });
   });
 
   it('no word on any card says "hero", and none carries an em-dash', () => {
