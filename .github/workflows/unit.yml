@@ -1,0 +1,25 @@
+# Atlas's typecheck and unit suite, off the maintainers' machine. Manual only, like e2e.yml:
+# it runs when someone dispatches it (`gh workflow run unit.yml --ref master`), never on a push
+# or a pull request, so a fork cannot start it. It reads the repository and nothing else.
+name: unit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit -p .
+      # `npx vitest run`, never `npm test` (bare vitest watches and never exits).
+      - run: npx vitest run
