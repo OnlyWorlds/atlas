@@ -11,6 +11,7 @@ import { setActiveStore } from '../../src/core/active-store';
 import { defaultRegistry, type Element, type WorldMeta, type WorldRegistryEntry } from '../../src/core/types';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { buildStrandPanel, resetStrandTabForTests } from '../../src/middle/home-strand';
+import { draftOf } from '../../src/middle/home-strand-model';
 import { buildBarStrandOffer, buildPageStrandOffer, makeThisTheStrand, resetStrandOfferForTests } from '../../src/middle/strand-offer';
 import { toastManager } from '../../src/ui/toast-manager';
 
@@ -212,6 +213,7 @@ describe('the Character card adds the main character to the strand\'s Event (R4)
     expect(said()).toBe('');
     // The next card asks; the Character's card, were it asked again, starts empty.
     expect(card().getAttribute('data-card-slot')).toBe('now');
+    expect(draftOf(W, 'character')).toEqual({ name: '', text: '', when: '' });
   });
 
   it('Pick: the same second write', async () => {

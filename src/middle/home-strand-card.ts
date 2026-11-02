@@ -295,7 +295,13 @@ export function buildEditCard(slot: StrandSlot, c: StrandContext, el: Element, o
     go.setAttribute('data-act', 'writing');
     go.setAttribute('data-strand-key', `edit:${slot}:writing`);
     go.textContent = 'Write it in the writing room';
-    go.addEventListener('click', () => { letGo(); openElementTarget(el, c.worldId); });
+    // The writing room takes the story's text: the Edit closes behind it, nothing written here.
+    go.addEventListener('click', () => {
+      letGo();
+      clearDraft(c.worldId, slot, true);
+      memory.editing = null;
+      openElementTarget(el, c.worldId);
+    });
     p.appendChild(go);
     form.appendChild(p);
   } else {
