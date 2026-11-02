@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Element } from '../../src/core/types';
+import { recordsOf } from '@onlyworlds/sdk';
 import {
   characterRecords, isLegacyBattle, isProposedForRecords, playGlyph, playKindOf, playNarrativeIds, toolName,
 } from '../../src/core/records';
@@ -45,16 +46,22 @@ describe('what is from play', () => {
     expect(playGlyph({ kind: 'record', tool: 'subs' })).toBe('sports_esports');
   });
 
-  it('a game is named from the tools list, then Atlas\'s own word, then its id', () => {
+  it('a game is named from the tools list, then its id (Tangle\'s row since SDK 4.127.0)', () => {
     expect(toolName('atlas')).toBe('Atlas');
     expect(toolName('tangle')).toBe('Tactical Tangle');
     expect(toolName('subs')).toBe('subs');
     expect(toolName('constructor')).toBe('constructor');
   });
 
-  it('proposed is any value but null, as recordsOf reads it', () => {
-    for (const v of ['', {}, 'yes', true, { by: 'x' }]) expect(isProposedForRecords({ x_review_proposed: v })).toBe(true);
-    for (const v of [null, undefined]) expect(isProposedForRecords({ x_review_proposed: v })).toBe(false);
+  it('proposed exactly as recordsOf reads it (serial 103: an empty mark, or no object, is settled)', () => {
+    const values: unknown[] = ['', '  ', {}, [], 'yes', true, 0, { by: 'x' }, { by: 'x', expires: '2099-01-01' }, null, undefined];
+    for (const v of values) {
+      const run = ev('r', { x_record: mark('tangle', '2026-11-01T12:00:00Z'), x_review_proposed: v, characters: ['c'] });
+      const read = recordsOf('c', [run]).length === 1;
+      expect(isProposedForRecords({ x_review_proposed: v }), JSON.stringify(v)).toBe(!read);
+    }
+    expect(isProposedForRecords({ x_review_proposed: { by: 'x' } })).toBe(true);
+    expect(isProposedForRecords({ x_review_proposed: {} })).toBe(false);
   });
 });
 
@@ -83,9 +90,9 @@ describe('a Character\'s records', () => {
     nar('chronicle', { events: ['new'] }),
     ev('legacy-a', { x_tangle_battle: TALLY, characters: ['c1'], created_at: '2026-09-01T00:00:00Z' }),
     ev('legacy-b', { x_tangle_battle: TALLY, characters: ['c1'], created_at: '2026-09-05T00:00:00Z' }),
-    ev('legacy-proposed', { x_tangle_battle: TALLY, characters: ['c1'], x_review_proposed: true }),
+    ev('legacy-proposed', { x_tangle_battle: TALLY, characters: ['c1'], x_review_proposed: { by: 'm' } }),
     nar('legacy-story', { events: ['legacy-a', 'legacy-a'], protagonist: 'c1', parent_narrative: 'x' }),
-    nar('legacy-story-proposed', { events: ['legacy-a'], protagonist: 'c1', x_review_proposed: 'yes' }),
+    nar('legacy-story-proposed', { events: ['legacy-a'], protagonist: 'c1', x_review_proposed: { by: 'm' } }),
     ev('word-only', { supertype: 'Chronicle', subtype: 'Battle', characters: ['c1'] }),
     ev('both', { x_tangle_battle: TALLY, x_record: mark('tangle', '2026-09-20T12:00:00Z'), characters: ['c1'] }),
   ];

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.119.0',
+    date: '2026-11-02',
+    theme: 'A place inside a ship',
+    entries: [
+      {
+        id: 'location-vehicle',
+        title: 'A Location can name the vehicle it is inside',
+        body: 'A Location has a new link, Vehicle, right after Parent location: the Object a place is the inside of, such as a ship, a train or a walking city, so the place moves with it. A place inside another place still uses Parent location. The link is part of the OnlyWorlds standard from version 00.34.00, which a world downloaded from Atlas now names.',
+        tags: ['editor'],
+      },
+      {
+        id: 'records-review-mark-settled',
+        title: 'A record whose review mark holds no proposal is listed',
+        body: 'A game\'s run or story whose review mark is empty, or holds no proposal, now shows under the Character\'s Records, as the OnlyWorlds record rules read it. Only a real proposal holds one back.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.118.2',
     date: '2026-11-02',
     theme: 'A marker from another tool links one zone',

@@ -229,6 +229,7 @@ const LOCATION: FieldMap = {
   function: 'Main use or purpose',
   founding_date: 'When established',
   parent_location: 'Containing location',
+  vehicle: 'The object it is the inside of (a ship, a train)',
   populations: 'Residing groups',
   political_climate: 'Political structure and dynamics',
   primary_power: 'Controlling institution',

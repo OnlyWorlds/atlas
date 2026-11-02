@@ -118,7 +118,7 @@ describe('the drawing choices over the reader', () => {
     expect(ringOneOf(asCenter, ID.a).cast.sort()).toEqual([ID.loc, ID.parent].sort());
   });
 
-  it('4. a marked reading aid’s links are read like any other (the reader alone keeps aids out)', () => {
+  it('4. a marked reading aid’s links are read like any other (the reader’s readingAids flag brings it back)', () => {
     const domain = mk(ID.a, 'construct', { supertype: 'Domain', x_charter_of: 'mark' });
     const guide = mk(ID.self, 'construct', { supertype: 'Guide', x_charter_of: 'mark', constructs: [ID.a] });
     expect(outOf([guide, domain], ID.self)).toEqual([ID.a]);

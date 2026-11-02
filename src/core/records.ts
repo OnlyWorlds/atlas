@@ -15,19 +15,18 @@
  * `===`), so belonging here and `recordsOf` agree on every element.
  */
 
-import { recordMarkOf, recordsOf, TOOLS, type OwRecord } from '@onlyworlds/sdk';
+import { proposedMarkOf, recordMarkOf, recordsOf, TOOLS, type OwRecord } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { battleOutcomeLine } from '../middle/tangle-cards';
 
 /**
- * Whether a record reader holds an element back as proposed: any value but
- * null (record profile reader rule 1, and `recordsOf`'s own test). The review
- * profile reads an empty mark as settled; the question is with the profile's
- * owner, and Atlas follows the SDK until one of them moves.
+ * Whether a record reader holds an element back as proposed: exactly when
+ * `proposedMarkOf` reads a mark, as `recordsOf` does since serial 103 (SDK
+ * 4.127.0): an empty mark, or one that is no object, is settled. One rule, the
+ * SDK's, so the legacy battles and the records agree.
  */
 export function isProposedForRecords(el: unknown): boolean {
-  const v = (el as { x_review_proposed?: unknown } | null)?.x_review_proposed;
-  return v !== undefined && v !== null;
+  return proposedMarkOf(el) !== null;
 }
 
 /** A Tactical Tangle battle from before the mark: its tally reads, and it has no valid mark. */
@@ -80,11 +79,9 @@ export function playNarrativeIds(elements: readonly Element[]): Set<string> {
   return out;
 }
 
-/** The game's name for a tool id: the tools list's row, else Atlas's own word, else the id. */
-// Until the game has a row on the tools list (a row is the only place a name lives for the SDK).
-const KNOWN_GAMES = new Map<string, string>([['tangle', 'Tactical Tangle']]);
+/** The game's name for a tool id: the tools list's row (Tactical Tangle's since SDK 4.127.0), else the id. */
 export function toolName(tool: string): string {
-  return TOOLS.find(t => t.id === tool)?.name ?? KNOWN_GAMES.get(tool) ?? tool;
+  return TOOLS.find(t => t.id === tool)?.name ?? tool;
 }
 export const LEGACY_TOOL_NAME = toolName('tangle');
 

@@ -5,9 +5,8 @@
  * to its target, and the extension links a profile declares (`x_lens_leads_to`, `x_spine_depends_on`). An
  * id-shaped value in any other key is no link (Atlas's own `atlas_` fields, an import's `x_` reference),
  * and a link to an element of another type than its field's target is no link. Read for the owner with
- * every flag back (room, hidden, proposed, map space), so the caller's elements array alone decides who is
- * in the world; the reading aids are handed in without their mark (`x_charter_of`), since the reader keeps
- * an aid out with no flag to bring it back.
+ * every flag back (room, hidden, proposed, map space, and the reading aids since serial 104's flag), so the
+ * caller's elements array alone decides who is in the world.
  *
  * Beside the reader, Atlas's own links, named here and nowhere else (`atlasAdditionsOf`):
  *   - map space as Atlas keeps it: a pin's element (`element_id`, its placement, which the reader never
@@ -19,13 +18,13 @@
  * element page's references and the preview's Linked from (`element-detail-refs.ts`), Home's loose threads
  * and grid, the writing pane's Cast and Suggested (`context-pane-lists.ts`), the map labels' weight.
  */
-import { isCharterElement, worldGraph } from '@onlyworlds/sdk';
+import { worldGraph } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { diskRenamesFor } from '../store/disk-link-names';
 
 export interface WorldLink { target: string; field: string }
 
-const READER_FLAGS = { rooms: true, hidden: true, proposed: true, mapSpace: true } as const;
+const READER_FLAGS = { rooms: true, hidden: true, proposed: true, mapSpace: true, readingAids: true } as const;
 
 /** Per elements array (the store swaps the array on every write, and never mutates one in place). */
 const readerMemo = new WeakMap<readonly Element[], Map<string, WorldLink[]>>();
@@ -37,7 +36,7 @@ const readerMemo = new WeakMap<readonly Element[], Map<string, WorldLink[]>>();
 export function readerEdgesOf(elements: readonly Element[]): Map<string, WorldLink[]> {
   const memo = readerMemo.get(elements);
   if (memo) return memo;
-  const handed = elements.filter(isBody).map(el => withoutStraySpellings(withoutCharterMark(el)));
+  const handed = elements.filter(isBody).map(withoutStraySpellings);
   const out = new Map<string, WorldLink[]>();
   let graph: ReturnType<typeof worldGraph> | null = null;
   try {
@@ -60,13 +59,6 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : nul
 
 /** A body at all: the array is the store's, but a foreign or damaged one may hold a null (the 1.118.0 gate's N7). */
 function isBody(el: unknown): el is Element { return typeof el === 'object' && el !== null; }
-
-/** A reading aid without its mark, since the reader keeps a marked aid out with no flag to bring it back. */
-function withoutCharterMark(el: Element): Element {
-  if (!isCharterElement(el as never)) return el;
-  const { x_charter_of: _mark, ...rest } = el as Element & { x_charter_of?: unknown };
-  return rest as Element;
-}
 
 /**
  * A pin or marker without the standard spelling of a link Atlas holds in its own (`map` beside `map_id`,

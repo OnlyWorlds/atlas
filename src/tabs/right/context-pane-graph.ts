@@ -240,8 +240,8 @@ interface SimEdge {
  *   3. Map space is read as what it joins (conv. 138, `buildWebLinks`): a pin joins its map to its element,
  *      a marker its map to its zone, read through the shared spelling helpers of core/world-links.ts.
  *   4. The reading aids are drawn where the page shows them (`pageLore`: an aid's own page, or the aids
- *      shown in this world). The reader keeps an aid out with no flag to bring it back, so an aid is handed
- *      to it without its mark (`x_charter_of`) and its links are read by the reader's rule like any other.
+ *      shown in this world). The reader brings the aids back with its `readingAids` flag (serial 104), so an
+ *      aid's links are read by the reader's rule like any other.
  *   5. The writing tree is not drawn: `parent_narrative` is the sidebar's, and a chapter's web with every
  *      scene in its first ring would crowd out the cast it exists to show (`WEB_UNDRAWN_FIELDS`).
  */
