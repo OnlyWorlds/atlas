@@ -3,9 +3,10 @@
  * with fixed numbers, so two browsers draw the same lines, and no line crosses a square or a name.
  *
  *   The hold mark: one straight vertical at the lower square's own centre, from under the upper
- *   square's name (`top + sq + 36`, a fixed number, never a measured name) to the lower square's top.
- *   A held square joins the square directly above it in its stack; the depth-two indent is the nesting
- *   cue. Two strand squares one above the other (story and event, event and character, the place and
+ *   square's name (`top + sq + nameClear`: the name's two lines at the root font size, read once per
+ *   draw, never a measured name; 36 at 16 px) to the lower square's top. A held square joins the
+ *   square directly above it in its stack; the depth-two indent is the nesting cue, never so wide that
+ *   the square leaves its column (`indentOf`). Two strand squares one above the other (story and event, event and character, the place and
  *   where they are now) take the same mark.
  *
  *   The strand's block (line 0, pos 0 and 1): neighbours in a row, edge to edge at mid-height; the story
@@ -27,6 +28,8 @@ export interface RouteGeometry {
   colW: number;
   rowH: number;
   lineGap: number;
+  /** Under a square to under its name (`nameClearFor`); absent, the 16 px root's `NAME_CLEAR`. */
+  nameClear?: number;
 }
 
 export interface Frame {
@@ -41,8 +44,26 @@ export type Pt = readonly [number, number];
 
 /** The second level indents a quarter column, so a Zone's own Creature never reads as in the Location above it. */
 export const INDENT = 0.25;
-/** Under a square's name: the name ends by `sq + 34` (two lines at 0.78rem), so the mark starts at `sq + 36`. */
-export const NAME_CLEAR = 36;
+/** What a square and a name keep clear of their column's edge: the routes climb on that edge. */
+export const EDGE_CLEAR = 6;
+/**
+ * The depth-two indent: a quarter column, at most so far that the square keeps `EDGE_CLEAR` inside its
+ * column's right edge (a narrow column gets less: the channel and the side climbs run on that edge).
+ */
+export function indentOf(g: Pick<RouteGeometry, 'sq' | 'colW'>): number {
+  return Math.max(0, Math.min(g.colW * INDENT, (g.colW - g.sq) / 2 - EDGE_CLEAR));
+}
+/** The name's font size and line height (`atlas.css` `.atlas-home-grid-name`: 0.78rem, 1.2, two lines), and the gap above it. */
+const NAME_REM = 0.78;
+const NAME_LINE = 1.2;
+const NAME_GAP = 4;
+/** Under a square to under its name, two lines at the root font size, plus 2 px: 36 at a 16 px root. */
+export function nameClearFor(rootPx: number): number {
+  const px = Number.isFinite(rootPx) && rootPx > 0 ? rootPx : 16;
+  return Math.ceil(NAME_GAP + 2 * NAME_REM * NAME_LINE * px + 2);
+}
+/** Under a square's name at the default 16 px root: the name ends by `sq + 34`, so the mark starts at `sq + 36`. */
+export const NAME_CLEAR = nameClearFor(16);
 /** The story-to-character bow's x: left of column 0, inside the card's padding (no square or name reaches below 6). */
 export const GUTTER_X = -8;
 /** Other lines in the left gutter run further out, a step each, so none shares the bow's run. */
@@ -69,7 +90,7 @@ export function frameOf(grid: Grid, g: RouteGeometry): Frame {
   return {
     g,
     lineTop,
-    centreX: (pos, depth = 0) => g.colW * (pos + 0.5) + (depth >= 2 ? g.colW * INDENT : 0),
+    centreX: (pos, depth = 0) => g.colW * (pos + 0.5) + (depth >= 2 ? indentOf(g) : 0),
     topY: (line, row) => lineTop[line] + row * g.rowH,
   };
 }
@@ -81,7 +102,7 @@ const rightOf = (c: GridCell, f: Frame): number => f.centreX(c.pos, c.depth) + f
 /** The hold mark (and two strand squares one above the other): from under the upper's name to the lower's top, at the lower's centre. */
 export function verticalMark(upper: GridCell, lower: GridCell, f: Frame): Pt[] {
   const x = f.centreX(lower.pos, lower.depth);
-  return [[x, f.topY(upper.line, upper.row) + f.g.sq + NAME_CLEAR], [x, f.topY(lower.line, lower.row)]];
+  return [[x, f.topY(upper.line, upper.row) + f.g.sq + (f.g.nameClear ?? NAME_CLEAR)], [x, f.topY(lower.line, lower.row)]];
 }
 
 /** Every held square's mark: each joins the square directly above it in its stack (its holder, or the sibling above). */
@@ -141,12 +162,10 @@ export function laneRoute(a: GridCell, b: GridCell, f: Frame, lane: number): Pt[
   return [...port(a, b), ...port(b, a).reverse()];
 }
 
-/** A square's side toward `s` (1 right, -1 left), and the gap beyond it: its column's edge, or just past a deep square that stands over it. */
+/** A square's side toward `s` (1 right, -1 left), and the gap beyond it: its column's edge (no square stands over it, `indentOf`). */
 function sidePort(e: GridCell, s: number, f: Frame): [number, number] {
-  const cx = f.centreX(e.pos, e.depth);
-  const edge = cx + s * f.g.sq / 2;
-  const boundary = f.g.colW * (e.pos + (s > 0 ? 1 : 0));
-  return [edge, s > 0 ? Math.max(boundary, edge + 4) : Math.min(boundary, edge - 4)];
+  const edge = f.centreX(e.pos, e.depth) + s * f.g.sq / 2;
+  return [edge, f.g.colW * (e.pos + (s > 0 ? 1 : 0))];
 }
 
 /** Which of the line's lanes and gutters a line has taken, so two never share a run. */

@@ -121,7 +121,7 @@ export function buildGridPicture(
   const host = document.createElement('div');
   section.appendChild(host);
   let observer: ResizeObserver | null = null;
-  let lastWidth = -1;
+  let lastKey = '';
   let handedOver = false;
   let unwire: (() => void) | void = undefined;
 
@@ -133,9 +133,12 @@ export function buildGridPicture(
   const draw = (): boolean => {
     if (host.querySelector(`[${GRID_OPEN_ATTR}]`)) { owed = true; return !handedOver; }
     const width = host.clientWidth || section.clientWidth;
-    if (width <= 0 || width === lastWidth) return !handedOver;
-    lastWidth = width;
-    const geo = geometryFor(width);
+    // The root font size, read once per draw: the name's room under each square follows it (C2).
+    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const key = `${width}:${rootPx}`;
+    if (width <= 0 || key === lastKey) return !handedOver;
+    lastKey = key;
+    const geo = geometryFor(width, rootPx);
     // The cheap exit (gate 2's H19): the top rows alone past the height, the grid is never laid out.
     const laid = (): Grid => (plus ? input.grid(geo.perLine) : withoutPlusLine(input.grid(geo.perLine)));
     const limit = handOverAt(input.blockRows, geo);

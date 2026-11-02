@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { gridOf, pinsOf, type Grid, type GridEdge, type GridNode, type GridPins } from '../../src/core/home-grid';
 import { drawGrid, geometryFor, type GridNames } from '../../src/middle/home-grid-view';
-import { ENTRY, GUTTER_X, NAME_CLEAR, frameOf } from '../../src/middle/home-grid-route';
+import { EDGE_CLEAR, ENTRY, GUTTER_X, NAME_CLEAR, frameOf, indentOf, nameClearFor } from '../../src/middle/home-grid-route';
 import { cheapHeight, handOverAt, HAND_OVER_PX } from '../../src/middle/home-grid-picture';
 
 let seq = 0;
@@ -136,17 +136,21 @@ describe('gridOf with the strand pinned', () => {
 
 type Box = { id: string; kind: 'square' | 'name'; x0: number; y0: number; x1: number; y1: number };
 
-/** Every square (the + too) and every name's widest ink (the name keeps 6 px of each column's edge, two lines tall). */
-function boxes(grid: Grid, width: number): Box[] {
-  const g = geometryFor(width);
+/**
+ * Every square (the + too) and every name's widest ink (the name keeps 6 px of each column's edge, two
+ * lines tall at the root font size: 0.78rem at a line height of 1.2, 4 px under the square).
+ */
+function boxes(grid: Grid, width: number, rootPx = 16): Box[] {
+  const g = geometryFor(width, rootPx);
   const f = frameOf(grid, g);
   const out: Box[] = [];
+  const nameH = 2 * 0.78 * 1.2 * rootPx;
   for (const c of grid.cells) {
     const cx = f.centreX(c.pos, c.depth);
     const top = f.topY(c.line, c.row);
-    const w = c.depth >= 2 ? g.colW / 2 : g.colW;
+    const w = c.depth >= 2 ? g.colW - 2 * indentOf(g) : g.colW;
     out.push({ id: c.id, kind: 'square', x0: cx - g.sq / 2, y0: top, x1: cx + g.sq / 2, y1: top + g.sq });
-    out.push({ id: c.id, kind: 'name', x0: cx - w / 2 + 6, y0: top + g.sq + 4, x1: cx + w / 2 - 6, y1: top + g.sq + 34 });
+    out.push({ id: c.id, kind: 'name', x0: cx - w / 2 + 6, y0: top + g.sq + 4, x1: cx + w / 2 - 6, y1: top + g.sq + 4 + nameH });
   }
   const px = f.centreX(grid.plus.pos);
   const pt = f.topY(grid.plus.line, 0);
@@ -199,17 +203,17 @@ function sample(d: string): Array<[number, number]> {
 
 const NAMES: GridNames = { nameOf: id => id, typeOf: id => TYPES[id] ?? '', isLoose: () => false };
 
-function drawn(grid: Grid, width: number): Array<{ d: string; ends: string[]; cls: string }> {
+function drawn(grid: Grid, width: number, rootPx = 16): Array<{ d: string; ends: string[]; cls: string }> {
   const host = document.createElement('div');
-  drawGrid(host, grid, geometryFor(width), NAMES, { type: null, word: null });
+  drawGrid(host, grid, geometryFor(width, rootPx), NAMES, { type: null, word: null });
   return [...host.querySelectorAll('path')].map(p => ({ d: p.getAttribute('d')!, ends: p.getAttribute('data-ends')!.split(' '), cls: p.getAttribute('class')! }));
 }
 
 /** Each line that passes through a square other than its own ends, or through any name (its ends' own included). */
-function crossings(grid: Grid, width: number): string[] {
-  const all = boxes(grid, width);
+function crossings(grid: Grid, width: number, rootPx = 16): string[] {
+  const all = boxes(grid, width, rootPx);
   const out: string[] = [];
-  for (const p of drawn(grid, width)) {
+  for (const p of drawn(grid, width, rootPx)) {
     const hit = new Set<string>();
     for (const [x, y] of sample(p.d)) {
       for (const b of all) {
@@ -391,6 +395,76 @@ describe('the hold mark (every grid)', () => {
     it(`a two-deep stack with a sibling after it crosses no square or name at ${w}`, () => {
       expect(crossings(gridOf(ns, es, geometryFor(w).perLine), w)).toEqual([]);
     });
+  }
+});
+
+describe('a depth-two square stays inside its column (the code gate\'s C1)', () => {
+  // The grid's own idiom: a Zone with a Location with a Character, beside the strand.
+  const LANTERN = v7(20000), OAR = v7(20100), LEDGER = v7(20200), LOWTOWN = v7(20300), WARD = v7(20400), TAMSIN = v7(20500), BRAM = v7(20600);
+  // The second world's arrival puts the Zone's stack and the Inn's side by side on one line.
+  const WARD2 = v7(30000), TAMSIN2 = v7(30100), WIM = v7(30200), YSOLDE = v7(30300), LANTERN2 = v7(30400), OAR2 = v7(30500), LOWTOWN2 = v7(30600), INN = v7(30700);
+  Object.assign(TYPES, {
+    [LANTERN]: 'object', [OAR]: 'object', [LEDGER]: 'object', [LOWTOWN]: 'zone', [WARD]: 'location', [TAMSIN]: 'character', [BRAM]: 'character',
+    [WARD2]: 'location', [TAMSIN2]: 'character', [WIM]: 'character', [YSOLDE]: 'character', [LANTERN2]: 'object', [OAR2]: 'object', [LOWTOWN2]: 'zone', [INN]: 'location',
+  });
+  // Bram stands in the strand's place, three lines down; the channel up to it passes the Zone's stack.
+  const channel = (w: number) => gridOf(nodes([S, E, L, C, N, LANTERN, OAR, LEDGER, LOWTOWN, WARD, TAMSIN, BRAM]),
+    [...STRAND_EDGES, edge(WARD, 'zone', LOWTOWN), edge(TAMSIN, 'location', WARD), edge(BRAM, 'location', L)], geometryFor(w).perLine, WHOLE);
+  // Ysolde, under the Inn and listed by the story, climbs by her side past the Zone's stack beside her.
+  const side = (w: number) => gridOf(nodes([S, E, L, C, N, WARD2, TAMSIN2, WIM, YSOLDE, LANTERN2, OAR2, LOWTOWN2, INN]),
+    [...STRAND_EDGES, edge(WARD2, 'zone', LOWTOWN2), edge(TAMSIN2, 'location', WARD2), edge(WIM, 'location', INN), edge(YSOLDE, 'location', INN), edge(S, 'characters', YSOLDE)],
+    geometryFor(w).perLine, WHOLE);
+
+  it('the channel world at a phone\'s width: Tamsin two deep in column 1 under the channel\'s line', () => {
+    const grid = channel(350);
+    expect(grid.cells.find(c => c.id === TAMSIN)).toMatchObject({ line: 1, pos: 1, depth: 2 });
+    expect(grid.cells.find(c => c.id === BRAM)!.line).toBe(2);
+  });
+
+  it('the side world at 1440\'s card: Tamsin two deep beside Ysolde, in one row', () => {
+    const grid = side(690);
+    const t = grid.cells.find(c => c.id === TAMSIN2)!;
+    const y = grid.cells.find(c => c.id === YSOLDE)!;
+    expect([t.line, t.row, t.depth]).toEqual([y.line, y.row, 2]);
+    expect(y.pos - t.pos).toBe(1);
+  });
+
+  for (const w of [350, 690]) {
+    it(`no line crosses a square or a name in either world at ${w}`, () => {
+      expect(crossings(channel(w), w)).toEqual([]);
+      expect(crossings(side(w), w)).toEqual([]);
+    });
+  }
+
+  it(`every depth-two square keeps ${EDGE_CLEAR} px inside its column's right edge at every width, and still indents`, () => {
+    for (let w = 280; w <= 1400; w += 10) {
+      const g = geometryFor(w);
+      const f = frameOf({ lineRows: [1] } as Grid, g);
+      for (let pos = 0; pos < g.perLine; pos++) {
+        expect(f.centreX(pos, 2) + g.sq / 2).toBeLessThanOrEqual(g.colW * (pos + 1) - EDGE_CLEAR + 1e-9);
+        expect(f.centreX(pos, 2)).toBeGreaterThan(f.centreX(pos, 1));
+      }
+    }
+  });
+});
+
+describe('the name\'s room follows the root font size (the code gate\'s C2)', () => {
+  const whole = (w: number, rootPx: number) => gridOf(nodes([S, E, L, C, N]), STRAND_EDGES, geometryFor(w, rootPx).perLine, WHOLE);
+
+  it('36 px at a 16 px root, more at a larger one; a row grows only once the mark would be short', () => {
+    expect(nameClearFor(16)).toBe(36);
+    expect(nameClearFor(20)).toBe(44);
+    expect(geometryFor(690, 16).rowH).toBe(64 + 52);
+    expect(geometryFor(690, 20).rowH).toBe(64 + 52);
+    expect(geometryFor(690, 24).rowH).toBe(64 + nameClearFor(24) + 8);
+  });
+
+  for (const rootPx of [20, 24]) {
+    for (const w of WIDTHS) {
+      it(`a whole strand at a ${rootPx} px root crosses no square or name at ${w}`, () => {
+        expect(crossings(whole(w, rootPx), w, rootPx)).toEqual([]);
+      });
+    }
   }
 });
 

@@ -10,7 +10,7 @@
  */
 
 import type { Grid } from '../core/home-grid';
-import { frameOf, holdMarks, INDENT, newCounters, restPath, strandPath } from './home-grid-route';
+import { frameOf, holdMarks, indentOf, nameClearFor, newCounters, restPath, strandPath } from './home-grid-route';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
 import type { ElementType } from '../core/types';
 import { aTypeName } from '../core/type-words';
@@ -24,14 +24,21 @@ export interface GridGeometry {
   rowH: number;
   /** Between two lines. */
   lineGap: number;
+  /** Under a square to under its name, at this draw's root font size (`nameClearFor`). */
+  nameClear?: number;
 }
 
-/** 64 px squares on a wide card, 48 below 600 px (the drawings' sizes); columns as many as fit the card. */
-export function geometryFor(cardWidth: number): GridGeometry & { perLine: number } {
+/**
+ * 64 px squares on a wide card, 48 below 600 px (the drawings' sizes); columns as many as fit the card.
+ * The name's room under a square follows the root font size (`rootPx`, read once per draw): at 16 px it
+ * is today's 36, and a row grows only once the hold mark under a name would be shorter than 8 px.
+ */
+export function geometryFor(cardWidth: number, rootPx = 16): GridGeometry & { perLine: number } {
   const sq = cardWidth >= 600 ? 64 : 48;
   const minCol = sq + 28;
   const perLine = Math.max(3, Math.min(8, Math.floor(cardWidth / minCol)));
-  return { sq, colW: cardWidth / perLine, rowH: sq + 52, lineGap: 18, perLine };
+  const nameClear = nameClearFor(rootPx);
+  return { sq, colW: cardWidth / perLine, rowH: sq + Math.max(52, nameClear + 8), lineGap: 18, perLine, nameClear };
 }
 
 /** The grid without the + square's own line, when no + is drawn (a line that holds only the + would stand empty). */
@@ -115,8 +122,8 @@ export function drawGrid(host: HTMLElement, grid: Grid, g: GridGeometry, names: 
     cell.setAttribute('data-pos', String(c.pos));
     cell.setAttribute('data-row', String(c.row));
     if (c.slot) cell.setAttribute('data-strand-slot', c.slot);
-    // A depth-two name's box narrows by the step on each side, so it stops short of the next column.
-    const width = c.depth >= 2 ? g.colW - 2 * g.colW * INDENT : g.colW;
+    // A depth-two name's box narrows by the indent on each side, so it stops at its column's edge.
+    const width = c.depth >= 2 ? g.colW - 2 * indentOf(g) : g.colW;
     cell.style.left = `${centreX(c.pos, c.depth) - width / 2}px`;
     cell.style.top = `${topY(c.line, c.row)}px`;
     cell.style.width = `${width}px`;
