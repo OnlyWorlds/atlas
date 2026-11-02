@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'references-read-the-standard-links',
         title: 'Referenced by, Linked from and Home\'s loose threads read the links the standard names',
-        body: 'An element\'s page lists what links to it the way the Web now draws it: the standard\'s link fields pointing at the right type, and the links a profile declares. Pins and markers still show under their map and zone, and pages still show under Featured in. A suggestion you dismissed in the writing room no longer lists the element under Mentioned in, and a reference an import kept under its own x_ name no longer counts as a link, so Home\'s loose threads count the same way.',
+        body: 'An element\'s page lists what links to it by the same links the Web reads: the standard\'s link fields pointing at the right type, and the links a profile declares. Pins and markers still show under their map and zone, pages under Featured in, and a chapter\'s scenes under Mentioned in. A suggestion you dismissed in the writing room no longer lists the element under Mentioned in, and a reference an import kept under its own x_ name no longer counts as a link, so Home\'s loose threads count the same way.',
         tags: ['editor'],
       },
       {
