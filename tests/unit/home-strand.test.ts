@@ -177,7 +177,9 @@ describe('the tab (S3, G16)', () => {
     expect(strandTabShows(W)).toBe(true);
     const panel = draw();
     expect(panel.querySelector('[data-role="strand-read-only"]')?.textContent).toBe(READ_ONLY_LINE);
-    expect(panel.querySelectorAll('[data-act]').length).toBe(0);
+    // Only each box's room act (1.121.0), which navigates and never writes.
+    expect(panel.querySelectorAll('[data-act]:not([data-act="room"])').length).toBe(0);
+    expect(panel.querySelectorAll('[data-act="room"]').length).toBeGreaterThan(0);
     expect(cards()).toHaveLength(0);
     expect(panel.querySelectorAll('[data-box]').length).toBe(5);
   });

@@ -53,6 +53,7 @@ import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
 import { onLeaveWorld } from '../core/leave-flush';
 import { currentLore } from '../core/parlor-room';
+import { emptyBookLine } from './writing-helpers';
 
 /**
  * Public reset (was used to clear per-narrative disclosure state). Disclosures
@@ -703,6 +704,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     body.className = 'atlas-writing-workspace-body';
     body.dataset.elementId = el.id;
     root.appendChild(body);
+    paintEmptyBook(body, el);
 
     // Cast strip / Details disclosure / References disclosure moved to the
     // right-pane writing-context tab. The writing room is now
@@ -836,6 +838,19 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     lastRefreshMark = strandMarkKey(getState().active?.meta);
   }
 
+  /** The empty Book's line at the body's top, under the sticky bar: drawn, kept or taken as the world now reads. */
+  function paintEmptyBook(body: HTMLElement, el: Element): void {
+    const text = emptyBookLine(el, getState().data.elements, getState().active?.worldId ?? '', viewOnly);
+    const had = body.querySelector<HTMLElement>(':scope > [data-role="writing-empty-book"]');
+    if (!text) { had?.remove(); return; }
+    if (had) { if (had.textContent !== text) had.textContent = text; return; }
+    const p = document.createElement('p');
+    p.className = 'atlas-writing-empty-book';
+    p.setAttribute('data-role', 'writing-empty-book');
+    p.textContent = text;
+    body.prepend(p);
+  }
+
   function refreshNonEditorSurfaces(el: Element): void {
     // Update header, breadcrumb, disclosures, ambient word count — but DON'T
     // touch the editor. The editor's DOM stays because we never wipe
@@ -869,6 +884,9 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     const oldCrumb = root.querySelector<HTMLElement>(':scope > .atlas-writing-workspace-crumb');
     const newCrumb = stickyBar.render(el);
     if (oldCrumb) oldCrumb.replaceWith(newCrumb);
+
+    // The empty Book's line comes and goes with its first part (derived each refresh).
+    paintEmptyBook(body, el);
 
     // Cast / Details / References surfaces moved to the context pane (right
     // pane writing-context tab). No replacements needed here anymore.

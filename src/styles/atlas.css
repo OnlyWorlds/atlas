@@ -9216,6 +9216,15 @@ svg .atlas-zone-ink.atlas-zone-hovered {
   --atlas-writing-content-width: 760px;
 }
 
+/* The empty Book's line (1.121.0, writing-helpers.ts emptyBookLine): one quiet line at the body's top. */
+.atlas-writing-empty-book {
+  width: 100%;
+  max-width: var(--atlas-writing-content-width);
+  margin: 0 auto -4px;
+  color: var(--atlas-text-soft);
+  font-size: 0.9rem;
+}
+
 /* Sticky bar directly below the 36px element header. Single horizontal row:
    [crumb › crumb › current  · date]                    [focus][read][open]
    Always visible. Brighter text than the prior muted gray for legibility. */
@@ -18018,6 +18027,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-box-text { margin: 0; color: var(--atlas-text-soft); font-size: 0.9rem; white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .atlas-home-strand-lines { margin: 2px 0 0; padding: 8px 0 0; border-top: 1px solid var(--atlas-divider-strong); display: flex; flex-direction: column; gap: 4px; color: var(--atlas-text); font-size: 0.92rem; }
 .atlas-home-strand-lines p { margin: 0; line-height: 1.9; overflow-wrap: anywhere; }
+/* The second line's room while one shows: a strut as tall as a chip, so the line box is a chip line's. */
+.atlas-home-strand-lines-strut { display: inline-block; width: 0; min-height: 26px; vertical-align: middle; }
+/* Each box's room (1.121.0, home-strand-room.ts): one quiet line, its act a link. */
+.atlas-home-strand-room { margin: 6px 0 0; color: var(--atlas-text-soft); font-size: 0.86rem; line-height: 1.5; }
+.atlas-home-strand-room .atlas-btn-link { font-size: inherit; }
 .atlas-home-strand-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 26px; padding: 0 8px; vertical-align: middle; border: 1px solid var(--type-color, var(--atlas-divider-strong)); border-radius: 13px; background: transparent; color: var(--atlas-text); font: inherit; font-size: 0.88rem; line-height: 1.3; text-align: left; cursor: pointer; }
 .atlas-home-strand-chip:hover { background: var(--atlas-bg-hover); }
 .atlas-home-strand-chip .material-symbols-outlined { flex: 0 0 auto; font-size: 15px; color: var(--type-color, var(--atlas-accent)); }
@@ -18070,9 +18084,9 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 @media (pointer: coarse) {
   .atlas-home-tabs .atlas-home-tab, .atlas-home-strand .atlas-home-strand-act, .atlas-home-strand .atlas-home-strand-name,
   .atlas-home-strand .atlas-home-strand-option, .atlas-home-strand .atlas-home-strand-chip, .atlas-home-strand .atlas-home-strand-menu-item,
-  .atlas-home-strand .atlas-home-strand-whole-link { min-height: 44px; }
+  .atlas-home-strand .atlas-home-strand-whole-link, .atlas-home-strand .atlas-home-strand-lines-strut { min-height: 44px; }
   .atlas-home-strand .atlas-home-strand-more-btn { min-width: 44px; }
-  .atlas-home-strand .atlas-home-strand-whole-link { display: inline-flex; align-items: center; }
+  .atlas-home-strand .atlas-home-strand-whole-link, .atlas-home-strand .atlas-home-strand-room .atlas-home-strand-act { display: inline-flex; align-items: center; }
   .atlas-home-strand-make .atlas-input, .atlas-home-strand-pick .atlas-input, .atlas-home-strand-field .atlas-input { min-height: 44px; }
 }
 .atlas-strand-offer { margin: 4px 0 10px; max-width: 680px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }

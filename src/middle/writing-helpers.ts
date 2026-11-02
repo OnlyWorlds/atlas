@@ -41,6 +41,13 @@ export const DEFAULT_WRITING_LABELS: WritingLabels = {
  * missing fields fall back to defaults, so callers can rely on l1-l4 being
  * present strings.
  */
+/** A label's plural, as the writing room says it ("chapters", "stories"). */
+export function pluralize(word: string): string {
+  if (word.endsWith('s')) return word;
+  if (word.endsWith('y')) return word.slice(0, -1) + 'ies';
+  return word + 's';
+}
+
 export function getWritingLabels(worldId: string): WritingLabels {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
   return mergeLabels(entry?.writing_labels);
@@ -194,6 +201,23 @@ export function buildNarrativeIndex(elements: Element[], worldId: string): Narra
   };
   sortTree(roots);
   return { roots, byId };
+}
+
+/**
+ * The empty Book's line (1.121.0), derived, no stored flag: while an opened Narrative at tier l1 has no child
+ * at tier l2 (a Draft does not count), in a world that is not view-only, the workspace body's top says what
+ * a part can be, in the world's own labels. Null for a Chapter, a Scene, a Draft, a Book with a part, or a
+ * view-only world.
+ */
+export function emptyBookLine(el: Element, elements: readonly Element[], worldId: string, viewOnly: boolean): string | null {
+  if (viewOnly || el.type !== 'narrative' || getTierForNarrative(el, worldId) !== 'l1') return null;
+  const hasPart = elements.some(e => e.type === 'narrative'
+    && (e as Element & { parent_narrative?: string }).parent_narrative === el.id
+    && getTierForNarrative(e, worldId) === 'l2');
+  if (hasPart) return null;
+  const part = getWritingLabels(worldId).l2.trim().toLowerCase() || 'chapter';
+  const article = /^[aeiou]/.test(part) ? 'An' : 'A';
+  return `${article} ${part} can be any part you like: a chapter, an act, a session. Press + to add one.`;
 }
 
 /** Walk up `parent_narrative` from `id`, returning ancestor ids closest-first. */

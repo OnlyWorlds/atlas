@@ -28,6 +28,7 @@ import {
   isWritingInitialized,
   supertypeForTier,
   buildNarrativeIndex,
+  pluralize,
 } from './writing-helpers';
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -335,8 +336,3 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
   };
 }
 
-function pluralize(word: string): string {
-  if (word.endsWith('s')) return word;
-  if (word.endsWith('y')) return word.slice(0, -1) + 'ies';
-  return word + 's';
-}

@@ -2,7 +2,8 @@
  * The strand's filled boxes (R5, R7, R8): each names its element (a press opens it), shows the first
  * lines of its text, and offers Edit in place and a ⋯ disclosure holding "Use another <kind>" (today's
  * Change flow, its promise before the second press). The story's box says in two lines how the parts
- * join, each part a chip that brings its box into view. Where they are now, when it is where it
+ * join, each part a chip that brings its box into view. Each box says in one line what its type is for
+ * and offers its room (`home-strand-room.ts`). Where they are now, when it is where it
  * happened, is one line in its cell with its own ⋯. Once all five are filled, one line says the
  * strand is whole.
  */
@@ -23,6 +24,7 @@ import { openWebOn } from '../ui/open-web';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { memory, type StrandContext } from './home-strand-model';
 import { act, actsRow, promiseRow, stampOf, type StrandPanelOptions } from './home-strand-acts';
+import { buildRoomLine } from './home-strand-room';
 
 const homeRoot = (): HTMLElement => document.querySelector<HTMLElement>('.atlas-world-home') ?? document.body;
 
@@ -157,6 +159,17 @@ function linesOf(c: StrandContext): HTMLElement | null {
     }
     wrap.appendChild(p);
   }
+  // One line shown: the second line's room is kept (no text, just a line box as tall as a line with a
+  // chip), so the make that brings it moves nothing below.
+  if (lines.length === 1) {
+    const room = document.createElement('p');
+    room.className = 'atlas-home-strand-lines-room';
+    room.setAttribute('aria-hidden', 'true');
+    const strut = document.createElement('span');
+    strut.className = 'atlas-home-strand-lines-strut';
+    room.appendChild(strut);
+    wrap.appendChild(room);
+  }
   return wrap;
 }
 
@@ -206,6 +219,8 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
     box.appendChild(o.mode === 'promise' ? promiseRow(slot, c, o, opts) : actsRow(slot, c, opts));
     return box;
   }
+  // The box's room (1.121.0): one line and one act, between the text and Edit; never while open for a change.
+  if (el) box.appendChild(buildRoomLine(slot, el, c));
   const canEdit = !!el && !isKnownOf(el) && mayChange(c.entry, el);
   if (canEdit || another) {
     const acts = document.createElement('div');
