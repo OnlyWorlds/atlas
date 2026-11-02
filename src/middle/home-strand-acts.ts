@@ -168,7 +168,7 @@ export interface RunHow {
   name?: string;
   /** A card's fields: its text and When go into the Make's one create. */
   values?: CardValues;
-  /** Pressed on the slot's card (Make, Pick, Still at), not Use another: the Character card's second write. */
+  /** Pressed on the slot's card (Create, Pick, Still at), not Use another: the Character card's and the Event card's second write (the pair's other end). */
   fromCard?: boolean;
 }
 
@@ -237,7 +237,7 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
 
 // ---- Use another: the acts and the promise (today's Change flow) ----
 
-/** A filled slot's ways to another element: Make one, Pick from the world (and Still at, for now), Cancel. */
+/** A filled slot's ways to another element: Create one, Pick from the world (and Still at, for now), Cancel. */
 export function actsRow(slot: StrandSlot, c: StrandContext, opts: StrandPanelOptions): HTMLElement {
   const row = document.createElement('div');
   row.className = 'atlas-home-strand-acts';
