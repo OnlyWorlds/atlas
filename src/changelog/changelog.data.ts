@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.120.2',
+    date: '2026-11-02',
+    theme: 'Open with, for a reader without an account',
+    entries: [
+      {
+        id: 'open-with-needs-an-account',
+        title: 'A world opened with a read key or a player\'s link lists every tool in Open with',
+        body: 'The OnlyWorlds mark\'s Open with now shows Atlas as where you are, and Lantern greyed with the words Needs an account, since its link opens only for someone signed in. Before, both rows were left out for a reader without an account.',
+        tags: ['sharing'],
+      },
+    ],
+  },
+  {
     version: '1.120.1',
     date: '2026-11-02',
     theme: 'Unlinked means unlinked',

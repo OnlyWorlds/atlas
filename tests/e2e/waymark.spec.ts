@@ -278,6 +278,21 @@ test.describe('the OnlyWorlds mark beside a name', () => {
     await expect(mark(page)).toHaveCount(1);
     await mark(page).click();
     await expect(pop(page)).toContainText('Copy link');
+
+    // A read key has no account behind it: Atlas's own row says where the reader is, and
+    // Lantern's is there, greyed, opening nothing (a tool whose link needs an account).
+    await expect(pop(page)).toContainText('You are here');
+    const lantern = pop(page).locator('[aria-disabled="true"]').filter({ hasText: 'Lantern' });
+    await expect(lantern).toHaveCount(1);
+    await expect(lantern).toContainText('Needs an account');
+    const href = await page.evaluate(() => location.href);
+    const opened: string[] = [];
+    page.context().on('page', p => opened.push(p.url()));
+    // aria-disabled reads as not enabled to Playwright; a person's press still lands on it.
+    await lantern.click({ force: true });
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => location.href)).toBe(href);
+    expect(opened).toEqual([]);
   });
 
   for (const width of [1280, 820, 412]) {
