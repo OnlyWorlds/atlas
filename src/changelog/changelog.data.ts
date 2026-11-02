@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.119.1',
+    date: '2026-11-02',
+    theme: 'Home stays on the strand',
+    entries: [
+      {
+        id: 'new-world-story-keeps-strand',
+        title: 'Making a new world\'s story keeps Home on the strand',
+        body: 'In a new, empty world, making the story from Home\'s Strand tab switched Home to the Picture tab, and it stayed there. Home now stays on the strand you are filling.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.119.0',
     date: '2026-11-02',
     theme: 'A place inside a ship',

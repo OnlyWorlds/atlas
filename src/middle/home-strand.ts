@@ -572,6 +572,10 @@ async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn, how: 
   const key = flightKey(c.worldId, slot);
   if (inFlight.has(key)) return;
   inFlight.add(key);
+  // A write pressed on the Strand tab records the tab as pressed: an empty world's unrecorded Strand
+  // would otherwise be read afresh on the redraw between the make and the mark, a world with one
+  // element and no strand yet, and settle on Picture for the visit.
+  if (!tabs.has(c.worldId)) tabs.set(c.worldId, 'strand');
   quietPanel();
   askFocus = { worldId: c.worldId, key: `box:${slot}` };
   let result: StrandWriteResult = 'nothing';

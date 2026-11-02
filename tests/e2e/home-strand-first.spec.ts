@@ -125,3 +125,22 @@ test('an empty world\'s Bring in a file lands in the Data room', async ({ page }
   await expect(bringIn(page)).toHaveCount(1);
   expect(await cardsDrawn(page)).toBe(0);
 });
+
+test('an empty world\'s story made on Strand keeps Home on Strand, after the press and after Home is opened again', async ({ page }) => {
+  await setupWorld(page);
+  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+  const story = page.locator('[data-role="home-strand"] [data-slot="narrative"]');
+  await story.locator('[data-act="make"]').click();
+  await story.locator('[data-role="strand-name"]').fill('A Tale');
+  await story.locator('[data-role="strand-name"]').press('Enter');
+  await expect(story.locator('.atlas-home-strand-name')).toHaveText('A Tale');
+  // The redraw between the make and the mark saw one element and no strand: it must not settle on Picture.
+  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+  await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/settings`;
+  });
+  await expect(page.locator('.atlas-world-home')).toHaveCount(0);
+  await goHome(page);
+  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+});
