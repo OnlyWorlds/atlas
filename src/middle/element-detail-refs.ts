@@ -66,7 +66,8 @@ const REF_SECTION_SPLITS: readonly RefSectionSplit[] = [
     headerLabel: 'Located here',
     targetTypes: ['location'],
     viaFields: ['location'],
-    sourceTypes: ['character', 'creature', 'collective', 'object'],
+    // The types the standard gives a `location` field (Collective has none: N3).
+    sourceTypes: ['character', 'creature', 'object'],
   },
 ];
 
@@ -157,12 +158,16 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
   // generic bucket. A qualified source leaves Referenced by unless it also
   // references the target through non-split fields.
   let remaining = others;
+  // The fields a split section above already shows, by source id: Linked from
+  // groups a source only under its other fields (N12, the 1.118.0 gate).
+  const shownAbove = new Map<string, readonly string[]>();
   for (const split of REF_SECTION_SPLITS) {
     if (!split.targetTypes.includes(el.type)) continue;
     const qualified = remaining.filter(src =>
       split.sourceTypes.includes(src.type)
       && matchingFields(src, el.id, world).some(f => split.viaFields.includes(f)));
     if (qualified.length === 0) continue;
+    for (const src of qualified) shownAbove.set(src.id, [...(shownAbove.get(src.id) ?? []), ...split.viaFields]);
     const groups: RefGroup[] = [];
     for (const type of split.sourceTypes) {
       const sources = qualified.filter(src => src.type === type);
@@ -192,7 +197,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
     // one chip per zone. A map's page listed 131 "(unnamed)" markers.
     const byId = new Map(getState().data.elements.map(e => [e.id, e] as const));
     const folded = foldBacklinks(remaining, el.id, byId);
-    const groups = groupByField ? groupOthersByField(el.id, folded.story, world) : groupOthersByType(folded.story);
+    const groups = groupByField ? groupOthersByField(el.id, folded.story, world, shownAbove) : groupOthersByType(folded.story);
     if (folded.pins.length > 0) {
       groups.push({
         label: 'Pins',
@@ -266,21 +271,29 @@ function groupOthersByType(others: Element[]): RefGroup[] {
  * Group incoming elements by the relationship field that points at the target,
  * labelled "<Field> of" (a Character whose `rival` is the target lands under
  * "Rival of"). A source referencing the target through multiple fields appears
- * under each. Alphabetical by label for a stable read.
+ * under each, but never under a field a split section above already shows it
+ * by. Fields that read the same ("location", "locations") share one group, each
+ * source once. Alphabetical by label for a stable read.
  */
-function groupOthersByField(targetId: string, others: Element[], world: readonly Element[]): RefGroup[] {
-  const byField = new Map<string, Element[]>();
+export function groupOthersByField(
+  targetId: string,
+  others: Element[],
+  world: readonly Element[],
+  shownAbove: ReadonlyMap<string, readonly string[]> = new Map(),
+): RefGroup[] {
+  const byLabel = new Map<string, Element[]>();
   for (const src of others) {
+    const above = shownAbove.get(src.id) ?? [];
     for (const field of matchingFields(src, targetId, world)) {
-      const arr = byField.get(field) ?? [];
-      arr.push(src);
-      byField.set(field, arr);
+      if (above.includes(field)) continue;
+      const label = `${singularizeLabel(humanizeFieldName(field))} of`;
+      const arr = byLabel.get(label) ?? [];
+      if (!arr.includes(src)) arr.push(src);
+      byLabel.set(label, arr);
     }
   }
   const groups: RefGroup[] = [];
-  for (const [field, sources] of byField.entries()) {
-    groups.push({ label: `${singularizeLabel(humanizeFieldName(field))} of`, sources });
-  }
+  for (const [label, sources] of byLabel.entries()) groups.push({ label, sources });
   groups.sort((a, b) => a.label.localeCompare(b.label));
   return groups;
 }

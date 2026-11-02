@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.118.1',
+    date: '2026-11-02',
+    theme: 'Linked from, grouped by relationship, lists each link once',
+    entries: [
+      {
+        id: 'linked-from-one-group-per-relationship',
+        title: 'Linked from lists each relationship once, and no element twice',
+        body: 'With Linked from grouped by relationship (Settings, Elements), an Event and a Character that both name a place as their location now share one Location of group. A Character already listed under Located here appears in Linked from only for its other links, such as Birthplace of.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.118.0',
     date: '2026-11-02',
     theme: 'References read the same links as the Web',

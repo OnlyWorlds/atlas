@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { atlasAdditionsOf, incomingOf, readerEdgesOf } from '../../src/core/world-links';
 import { readerLinksOf } from '../../src/tabs/right/context-pane-graph';
-import { collectReferencedIds, findIncomingReferences } from '../../src/middle/element-detail-refs';
+import { collectReferencedIds, findIncomingReferences, groupOthersByField } from '../../src/middle/element-detail-refs';
 import { mountContextLists } from '../../src/tabs/right/context-pane-lists';
 import { looseIds } from '../../src/middle/home-grid-picture';
 import { getState, patchSlice } from '../../src/core/state';
@@ -54,6 +54,21 @@ describe('the shared reading', () => {
     expect(referenced.has(R(2))).toBe(false);
     const quiet = [mk(R(1), 'location'), mk(R(3), 'narrative', { atlas_dismissed_suggestions: [R(1)] })];
     expect(collectReferencedIds(quiet).has(R(1))).toBe(false);
+  });
+});
+
+describe('Linked from, grouped by field (N12, the 1.118.0 gate\'s G7)', () => {
+  const place = mk(R(40), 'location');
+  const ada = mk(R(41), 'character', { location: R(40), birthplace: R(40) });
+  const fair = mk(R(42), 'event', { locations: [R(40)] });
+  const world = [place, ada, fair];
+  const read = (groups: { label: string; sources: Element[] }[]) => groups.map(g => `${g.label}: ${g.sources.map(s => s.id.slice(-2)).join(',')}`);
+  it('fields that read the same share one group, each source once', () => {
+    expect(read(groupOthersByField(place.id, [ada, fair], world))).toEqual(['Birthplace of: 41', 'Location of: 41,42']);
+  });
+  it('a source Located here already shows by its location is grouped only by its other fields', () => {
+    expect(read(groupOthersByField(place.id, [ada, fair], world, new Map([[ada.id, ['location']]]))))
+      .toEqual(['Birthplace of: 41', 'Location of: 42']);
   });
 });
 
