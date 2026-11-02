@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'strand-on-the-picture',
         title: 'The story and its parts stand first on Home\'s Picture, in the same places every time',
-        body: 'The story sits at the top left, its event under it with the location beside it, the main character under the event with where they are now beside them. Everything else in the world starts beside and below them, and no line runs through a square or a name.',
+        body: 'The story sits at the top left, its event under it with the location beside it, the main character under the event with where they are now beside them. Everything else in the world starts beside and below them, and no line runs through a square or a name, at a larger browser font too. While the story itself is hidden, the Picture is drawn as before.',
         tags: ['home'],
       },
       {
@@ -87,7 +87,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'story-card-holds-still',
         title: 'The story\'s box keeps room for its second line',
-        body: 'Once the story\'s box says what it tells of, it keeps room for the line about its main character, so making the character no longer pushes the boxes below it down.',
+        body: 'Once the story\'s box has its first line, it keeps room for the second while that one can still come, so creating the event no longer pushes the boxes below it down.',
         tags: ['home'],
       },
       {

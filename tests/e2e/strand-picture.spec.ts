@@ -4,8 +4,11 @@
  * any square (its own two ends aside) or any name, sampled along each SVG path with getPointAtLength
  * against the squares' and names' boxes, at 1440 and 390, in Chromium and Firefox; the same with four more
  * elements (a Character standing in the strand's place, another Event in the story, a Location holding a
- * Creature, the story and its event naming the Location too). Each box's room act lands where it says and Back puts the focus on it, in both engines and on
- * a phone. The story's box keeps its second line's room, so the Character make moves nothing (W5).
+ * Creature, the story and its event naming the Location too). A Zone's Location's Character two deep beside
+ * the lines that climb to the block, at 390 and 1440 (the code gate's C1), and a whole strand at a 20 px
+ * root font (C2). Each box's room act lands where it says and Back puts the focus on it, in both engines
+ * and on a phone, where the map opens in its drawer (C3). The story's box keeps its second line's room, so
+ * the Event make moves nothing (W5).
  *
  * Screenshots for a look: ATLAS_SNAPS=<dir> writes each Picture there.
  */
@@ -87,19 +90,21 @@ async function reopenHome(page: Page, wid: string): Promise<void> {
   await expect(page.locator('.atlas-world-home')).toBeVisible();
 }
 
-/** A whole strand, written as the journey writes it; `rest` adds four elements after it. */
-async function wholeStrand(page: Page, opts: { rest?: boolean; map?: boolean } = {}): Promise<string> {
+/** A whole strand, written as the journey writes it; `rest` adds four elements after it; `names` renames its five; `story` adds to the story. */
+async function wholeStrand(page: Page, opts: { rest?: boolean; map?: boolean; names?: string[]; story?: Record<string, unknown> } = {}): Promise<string> {
   const wid = await setupWorld(page);
-  await put(page, 'narrative', S, 'The Lantern Ferry', {
+  const [sName, eName, lName, cName, nName] = opts.names ?? ['The Lantern Ferry', 'The night crossing', 'Saltmere Quay', 'Odile Varn', 'The Drowned Library'];
+  await put(page, 'narrative', S, sName, {
     supertype: 'Book', story: 'Every night a ferry crosses the black lake.', events: opts.rest ? [E, THAW] : [E], protagonist: C,
     // The marsh is a place in the story and in its event too: at 390 it wraps to line 1, so these two lines
     // climb to the block (the channel into the story's right side, the left gutter into the event's).
     ...(opts.rest ? { locations: [MARSH] } : {}),
+    ...opts.story,
   });
-  await put(page, 'event', E, 'The night crossing', { locations: opts.rest ? [L, MARSH] : [L], characters: [C], start_date: 1142 });
-  await put(page, 'location', L, 'Saltmere Quay');
-  await put(page, 'character', C, 'Odile Varn', { location: N });
-  await put(page, 'location', N, 'The Drowned Library');
+  await put(page, 'event', E, eName, { locations: opts.rest ? [L, MARSH] : [L], characters: [C], start_date: 1142 });
+  await put(page, 'location', L, lName);
+  await put(page, 'character', C, cName, { location: N });
+  await put(page, 'location', N, nName);
   if (opts.rest) {
     await put(page, 'character', BRAM, 'Bram the ferryman', { location: L });
     await put(page, 'event', THAW, 'The thaw', { start_date: 1143 });
@@ -207,6 +212,51 @@ for (const tag of ['', ' @firefox']) {
     });
   }
 
+  // The code gate's C1: a depth-two square used to stand over its column's right edge, where the channel
+  // and a held square's side climb run. The ids arrive in the order written (one millisecond, then by id).
+  test(`a Zone's Location's Character two deep under the channel's line: the line to the block passes clear, at 390${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    const wid = await wholeStrand(page);
+    const id = (n: number) => `0192a000-0000-7000-8000-0000009500${n}`;
+    await put(page, 'object', id(41), 'Lantern');
+    await put(page, 'object', id(42), 'Oar');
+    await put(page, 'object', id(43), 'Ledger');
+    await put(page, 'zone', id(44), 'The Lowtown');
+    await put(page, 'location', id(45), 'Fishers Ward', { zone: id(44) });
+    await put(page, 'character', id(46), 'Night guard Tamsin', { location: id(45) });
+    await put(page, 'character', id(47), 'Bram the ferryman', { location: L });
+    await reopenHome(page, wid);
+    await tab(page, 'picture').click();
+    await expect(square(page, id(47))).toBeVisible();
+    expect(await cellOf(page, id(46))).toEqual({ line: '1', pos: '1', row: '2' });
+    expect(await cellOf(page, id(47))).toEqual({ line: '2', pos: '0', row: '0' });
+    expect(await crossings(page)).toEqual([]);
+    if (SNAPS) await snap(page, `${SNAPS}/strand-picture-deep-390${tag ? '-firefox' : ''}.png`);
+  });
+
+  test(`a Character two deep beside a held one that climbs by its side to the story: clear, at 1440${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const id = (n: number) => `0192a000-0000-7000-8000-0000009500${n}`;
+    const wid = await wholeStrand(page, { story: { characters: [id(54)] } });
+    await put(page, 'location', id(51), 'Fishers Ward', { zone: id(57) });
+    await put(page, 'character', id(52), 'Night guard Tamsin', { location: id(51) });
+    await put(page, 'character', id(53), 'Old Wim', { location: id(58) });
+    await put(page, 'character', id(54), 'Ysolde', { location: id(58) });
+    await put(page, 'object', id(55), 'Lantern');
+    await put(page, 'object', id(56), 'Oar');
+    await put(page, 'zone', id(57), 'The Lowtown');
+    await put(page, 'location', id(58), 'The Inn');
+    await reopenHome(page, wid);
+    await tab(page, 'picture').click();
+    await expect(square(page, id(54))).toBeVisible();
+    const t = await cellOf(page, id(52));
+    const y = await cellOf(page, id(54));
+    expect([t.line, t.row, y.line, y.row]).toEqual(['1', '2', '1', '2']);
+    expect(Number(y.pos) - Number(t.pos)).toBe(1);
+    expect(await crossings(page)).toEqual([]);
+    if (SNAPS) await snap(page, `${SNAPS}/strand-picture-deep-1440${tag ? '-firefox' : ''}.png`);
+  });
+
   test(`each box's room act lands where it says, and Back puts the focus on it${tag}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const wid = await wholeStrand(page, { map: true });
@@ -265,7 +315,7 @@ test('a strand with no event keeps its cells: the story, an empty row, then the 
   if (SNAPS) await snap(page, `${SNAPS}/strand-picture-partial-1440-chromium.png`);
 });
 
-test('on a phone, the location\'s act opens its page with the map, and Back focuses the act', async ({ page }) => {
+test('on a phone, the location\'s act opens its page with the map in its drawer, and Back focuses the act', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const wid = await wholeStrand(page, { map: true });
   const act = page.locator('[data-role="home-strand"] [data-strand-key="location:room"]');
@@ -275,8 +325,41 @@ test('on a phone, the location\'s act opens its page with the map, and Back focu
   await act.click();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(`#/w/${wid}/map/${MAP}/element/${L}`);
   await expect(page.locator('.atlas-middle-header')).toContainText('Saltmere Quay');
+  // The map is the right drawer on a phone: open once the page has settled, on the map, on screen (C3).
+  await expect(page.locator('body.atlas-drawer-right-open')).toHaveCount(1);
+  await page.waitForTimeout(600);
+  await expect(page.locator('body.atlas-drawer-right-open')).toHaveCount(1);
+  const pane = page.locator('.atlas-right');
+  await expect(pane).toBeVisible();
+  const box = (await pane.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x).toBeLessThan(390);
+  expect(await page.evaluate(() => {
+    const ui = (window as any).__atlasTestApi.getState().ui;
+    return ui.rightTabs[ui.rightActiveIndex]?.mapId ?? null;
+  })).toBe(MAP);
   await page.goBack();
   await expect(page.locator('[data-role="home-strand"] [data-strand-key="location:room"]')).toBeFocused();
+});
+
+// The code gate's C2: the name's room under a square follows the root font size, so a larger default
+// font (Chrome's "Large" is 20 px) never puts a hold mark through the name above it.
+test('a whole strand with two-line names at a 20 px root font: no line through a square or a name, at 1440', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const wid = await wholeStrand(page, { names: [
+    'The Lantern Ferry of the Black Lake', 'The night crossing at the quay', 'Saltmere Quay by the old salt road',
+    'Odile Varn the young cartographer', 'The Drowned Library under the water',
+  ] });
+  await page.evaluate(() => { document.documentElement.style.fontSize = '20px'; });
+  await reopenHome(page, wid);
+  await tab(page, 'picture').click();
+  await expect(square(page, S)).toBeVisible();
+  // Two lines of the name at 20 px: past the 36 px a 16 px root leaves under a square.
+  const nameH = await square(page, S).locator('.atlas-home-grid-name').evaluate(n => n.getBoundingClientRect().height);
+  expect(nameH).toBeGreaterThan(34);
+  expect(await lineCount(page)).toBe(5);
+  expect(await crossings(page)).toEqual([]);
+  if (SNAPS) await snap(page, `${SNAPS}/strand-picture-root20-1440-chromium.png`);
 });
 
 test('W5: the story\'s box keeps room for its second line, so the Event make moves the Event\'s row 0 px at 1440', async ({ page }) => {
