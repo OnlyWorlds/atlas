@@ -297,7 +297,9 @@ test.describe('the Strand tab', () => {
 
     await patchEntry(page, { copy_of: { world_id: 'elsewhere' } });
     await expect(page.locator('[data-role="strand-read-only"]')).toHaveText('The owner or a co-builder chooses the strand.');
-    await expect(page.locator('[data-role="home-strand"] [data-act]')).toHaveCount(0);
+    // Only each box's room act (1.121.0), which navigates and never writes.
+    await expect(page.locator('[data-role="home-strand"] [data-act]:not([data-act="room"])')).toHaveCount(0);
+    await expect(page.locator('[data-role="home-strand"] [data-act="room"]').first()).toBeVisible();
     await expect(page.locator('[data-role="strand-card"]')).toHaveCount(0);
   });
 });
