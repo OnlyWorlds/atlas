@@ -111,6 +111,10 @@ const placeOfRow = (page: Page, name: string) => square(page, name).getAttribute
 async function toPicture(page: Page) {
   await expect(async () => {
     const tab = page.locator('[data-role="home-tabs"] [data-tab="picture"]');
+    // An empty world's Home is the strand alone, no head (1.120.0, R1): the head shown as the whole line's Picture shows it.
+    if (!(await tab.count()) && await page.locator('[data-role="home-strand"]').count()) {
+      await page.evaluate(async () => { ((await import('/src/middle/home-strand.ts')) as any).showStrandHeadForTests(); });
+    }
     if (await tab.count() && (await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
     await expect(grid(page)).toBeVisible({ timeout: 1000 });
   }).toPass();
@@ -414,9 +418,9 @@ test('the Start-page links: #/start opens straight on a new world\'s Strand; #/b
   await page.fill('input[name="world-name"]', 'From the site');
   await dialog.locator('[data-action="pick"]').click();
   await expect(page.locator('.atlas-world-home')).toBeVisible();
-  // Answered on onlyworlds.com: the world's Home on its Strand tab, and no door or card ever drawn.
-  await expect(page.locator('[data-role="home-tabs"] [data-tab="strand"]')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('[data-role="home-strand"] [data-slot]').first()).toBeVisible();
+  // Answered on onlyworlds.com: the world's Home is its strand alone, asking for its story (1.120.0), and no door or card ever drawn.
+  await expect(page.locator('[data-role="home-strand"] [data-role="strand-card"][data-card-slot="narrative"]')).toBeVisible();
+  await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => (window as any).__sawDoors)).toBe(0);
 

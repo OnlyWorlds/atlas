@@ -1,8 +1,8 @@
 /**
- * A new world's Home with the first steps retired (1.115.0): no card, ever; the Picture and
- * Strand tabs from the first view, a world with nothing in it opening on Strand with its five
- * boxes, and under them the Quiet ways to bring a world in. Once the world holds something,
- * still no card, and the two tabs. Bring in a file lands in the Data room.
+ * A new world's Home with the first steps retired (1.115.0): no card, ever. Since 1.120.0 a world
+ * with nothing in it is the strand alone, no tab head, asking for its story, and under it the Quiet
+ * ways to bring a world in. Once the world holds more than its strand, Home's next opening has the
+ * two tabs. Bring in a file lands in the Data room.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -76,30 +76,30 @@ async function createViaStore(page: Page, type: string, data: Record<string, unk
 }
 
 const tabs = (page: Page) => page.locator('[data-role="home-tabs"] [data-tab]');
-const tab = (page: Page, t: 'picture' | 'strand') => page.locator(`[data-role="home-tabs"] [data-tab="${t}"]`);
 const bringIn = (page: Page) => page.locator('[data-role="home-bring-in"]');
+const card = (page: Page) => page.locator('[data-role="strand-card"][data-mode="make"]');
 
-test('a new world opens on Strand with its five boxes and the ways in, never a card; with two elements, still no card and both tabs', async ({ page }) => {
+test('a new world opens on the strand alone: no tab head, the story\'s card and the ways in, never a first-steps card; with two elements, Home opened again has both tabs', async ({ page }) => {
   await setupWorld(page);
-  // The tabs from the first view, Strand chosen.
-  await expect(tabs(page)).toHaveCount(2);
-  expect(await tabs(page).evaluateAll(els => els.map(e => e.getAttribute('data-tab')))).toEqual(['picture', 'strand']);
-  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
-  await expect(tab(page, 'picture')).toHaveAttribute('aria-selected', 'false');
-  // The five boxes, in the strand's order.
+  // No tab head (1.120.0, R1): an empty world's Home is the strand, asking for its story.
+  await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'narrative');
+  // The grid's five cells, in the strand's order; only the story's is drawn.
   const slots = page.locator('[data-role="home-strand"] [data-slot]');
   await expect(slots).toHaveCount(5);
   expect(await slots.evaluateAll(els => els.map(e => e.getAttribute('data-slot')))).toEqual(['narrative', 'event', 'location', 'character', 'now']);
-  // Under them, the ways in from what someone already has: Quiet, the strand's Make one the main act.
+  // Under it, the ways in from what someone already has: Quiet, the card's Make the main act.
   await expect(bringIn(page)).toHaveCount(1);
   await expect(bringIn(page)).toContainText('Already have a world file or notes?');
   await expect(bringIn(page).locator('[data-bring-action="file"]')).toHaveText('Bring in a file');
   await expect(bringIn(page).locator('.atlas-btn-primary')).toHaveCount(0);
   expect(await cardsDrawn(page), 'no first-steps card, not for a frame').toBe(0);
 
-  // Two elements made (a Character, an Event with no date), Home drawn again.
+  // Two elements made (a Character, an Event with no date): no head in this visit.
   await createViaStore(page, 'character', { name: 'Mira' });
   await createViaStore(page, 'event', { name: 'The Founding' });
+  await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+  // Home opened again: the world holds more than a strand, so both tabs.
   await page.evaluate(() => {
     const s = (window as any).__atlasTestApi.getState();
     window.location.hash = `#/w/${s.active.worldId}/settings`;
@@ -120,27 +120,30 @@ test('an empty world\'s Bring in a file lands in the Data room', async ({ page }
   await bringIn(page).locator('[data-bring-action="file"]').click();
   await expect(page).toHaveURL(/\/import$/);
   await goHome(page);
-  // Back with nothing brought in: the same Home, Strand and its ways in.
-  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+  // Back with nothing brought in: the same Home, the story's card and its ways in.
+  await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'narrative');
   await expect(bringIn(page)).toHaveCount(1);
   expect(await cardsDrawn(page)).toBe(0);
 });
 
-test('an empty world\'s story made on Strand keeps Home on Strand, after the press and after Home is opened again', async ({ page }) => {
+test('an empty world\'s story made on the strand keeps Home on the strand, after the press and after Home is opened again', async ({ page }) => {
   await setupWorld(page);
-  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+  await card(page).locator('[data-field="name"]').fill('A Tale');
+  await card(page).locator('[data-field="name"]').press('Enter');
   const story = page.locator('[data-role="home-strand"] [data-slot="narrative"]');
-  await story.locator('[data-act="make"]').click();
-  await story.locator('[data-role="strand-name"]').fill('A Tale');
-  await story.locator('[data-role="strand-name"]').press('Enter');
   await expect(story.locator('.atlas-home-strand-name')).toHaveText('A Tale');
-  // The redraw between the make and the mark saw one element and no strand: it must not settle on Picture.
-  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+  // The redraw between the make and the mark saw one element and no strand: it must not leave the strand.
+  await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'event');
   await page.evaluate(() => {
     const s = (window as any).__atlasTestApi.getState();
     window.location.hash = `#/w/${s.active.worldId}/settings`;
   });
   await expect(page.locator('.atlas-world-home')).toHaveCount(0);
   await goHome(page);
-  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+  // The world holds only its strand's story: still the strand alone, still asking.
+  await expect(page.locator('[data-role="home-tabs"]')).toHaveCount(0);
+  await expect(story.locator('.atlas-home-strand-name')).toHaveText('A Tale');
+  await expect(card(page)).toHaveAttribute('data-card-slot', 'event');
 });

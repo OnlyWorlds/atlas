@@ -75,8 +75,8 @@ async function signInAndOpen(page: Page) {
     return st.registry.worlds.find((x: any) => x.api?.world_id === id)?.api?.api_key ?? null;
   }, WORLD_ID)).toBe(KEY);
   // The door ends at Home: wait for it, or its landing takes the address the tab was given.
-  // An empty online world's Home opens on its Strand (1.115.0), before its first round has kept a role.
-  await expect(page.locator('.atlas-world-home [data-role="home-tabs"] [data-tab="strand"][aria-selected="true"]')).toBeVisible();
+  // An empty online world's Home is its strand, asking for its story (1.120.0), before its first round has kept a role.
+  await expect(page.locator('.atlas-world-home [data-role="home-strand"] [data-role="strand-card"][data-card-slot="narrative"]')).toBeVisible();
 }
 
 const openTab = (page: Page) =>

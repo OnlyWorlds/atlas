@@ -1,7 +1,7 @@
 /**
- * The world's strand (the strand profile; Atlas 1.114): Home's Strand tab beside its picture, the five
- * boxes and their writes read back from world.json and each element's one field, Change with its
- * promise, a mark moved by a second tab refused, who gets which box, Make this
+ * The world's strand (the strand profile; Atlas 1.114, the journey since 1.120.0): Home's Strand tab beside
+ * its picture, each card's write read back from world.json and each element's one field, Use another with
+ * its promise, a mark moved by a second tab refused, who is asked which card, Make this
  * the world's strand on a story's page and in the writing room's bar, the frame beside the story
  * changing without a keystroke, the focus after a write, the tab's keys in Firefox, and a phone.
  *
@@ -118,27 +118,39 @@ async function idByName(page: Page, name: string): Promise<string> {
 
 const go = (page: Page, hash: string) => page.evaluate((h) => { window.location.hash = h; }, hash);
 const tab = (page: Page, t: 'picture' | 'strand') => page.locator(`[data-role="home-tabs"] [data-tab="${t}"]`);
+/** A slot's cell in the grid: its box, its card, its Add or nothing. */
 const box = (page: Page, slot: string) => page.locator(`[data-role="home-strand"] [data-slot="${slot}"]`);
 const actIn = (page: Page, slot: string, a: string) => box(page, slot).locator(`[data-act="${a}"]`);
+/** The card asked for now (1.120.0: one slot at a time). */
+const card = (page: Page) => page.locator('[data-role="strand-card"][data-mode="make"]');
 
+/** The asked card's "Or pick one from your world", the name filtered and pressed. */
 async function pick(page: Page, slot: string, name: string): Promise<void> {
-  await actIn(page, slot, 'pick').click();
-  await box(page, slot).locator('[data-role="strand-filter"]').fill(name);
-  await box(page, slot).locator('[role="option"]', { hasText: name }).first().click();
+  await expect(card(page)).toHaveAttribute('data-card-slot', slot);
+  await card(page).locator('[data-act="pick"]').click();
+  await card(page).locator('[data-role="strand-filter"]').fill(name);
+  await card(page).locator('[role="option"]', { hasText: name }).first().click();
 }
+/** The asked card's Make, a name typed and Enter. */
 async function make(page: Page, slot: string, name: string): Promise<void> {
-  await actIn(page, slot, 'make').click();
-  await box(page, slot).locator('[data-role="strand-name"]').fill(name);
-  await box(page, slot).locator('[data-role="strand-name"]').press('Enter');
+  await expect(card(page)).toHaveAttribute('data-card-slot', slot);
+  await card(page).locator('[data-field="name"]').fill(name);
+  await card(page).locator('[data-field="name"]').press('Enter');
+}
+/** A filled box's ⋯, then Use another: the box offers Make one and Pick from the world. */
+async function useAnother(page: Page, slot: string): Promise<void> {
+  await actIn(page, slot, 'more').click();
+  await actIn(page, slot, 'another').click();
 }
 /** The box names its element: the write has landed, so the disk can be read. */
 const filled = (page: Page, slot: string, name: string) => expect(box(page, slot).locator('.atlas-home-strand-name')).toHaveText(name);
-/** The focus is in the box the write wrote (S6, G13). */
-async function expectFocusIn(page: Page, slot: string): Promise<void> {
-  await expect.poll(() => page.evaluate((s) => !!document.activeElement?.closest(`[data-slot="${s}"]`), slot)).toBe(true);
+/** The focus is in the next card's Name (S10). */
+async function expectFocusOnCard(page: Page, slot: string): Promise<void> {
+  await expect(card(page)).toHaveAttribute('data-card-slot', slot);
+  await expect(card(page).locator('[data-field="name"]')).toBeFocused();
 }
 
-/** A world with a story, a happening it lists and two places, past its first steps, on Home. */
+/** A world with a story, an event it lists and two places, past its first steps, on Home. */
 async function seeded(page: Page, mark: unknown, meta?: Record<string, unknown>): Promise<string> {
   const wid = await setupWorld(page);
   await put(page, 'narrative', N1, 'The Long Road', { supertype: 'Book', events: [E1] });
@@ -153,7 +165,7 @@ async function seeded(page: Page, mark: unknown, meta?: Record<string, unknown>)
   await pastPath(page);
   // The world was built one element at a time under a mounted Home, and the draws in between recorded a tab
   // (G13) before the mark landed. A person opens this world once it is built: the session's tab memory is
-  // forgotten, as on a fresh opening, and Home's next draw picks its tab by the rule.
+  // forgotten, as on a fresh opening, and Home's next draw picks its tab (and its head, R1) by the rule.
   await page.evaluate(async () => { ((await import('/src/middle/home-strand.ts')) as any).resetStrandTabForTests(); });
   await go(page, `#/w/${wid}/settings`);
   await expect(page.locator('.atlas-world-home')).toHaveCount(0);
@@ -178,15 +190,15 @@ test.describe('the Strand tab', () => {
     await expect(page.locator('#atlas-home-tabpanel [data-role="home-grow-picture"]')).toHaveCount(0);
     await expect(tab(page, 'strand')).toBeFocused();
 
-    // A world whose first draw has its story filled opens on Strand.
+    // A world whose first draw has its story filled opens on Strand, the event asked next.
     await seeded(page, { narrative: N1, event: GONE_E, location: GONE_L });
     await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
     await expect(box(page, 'narrative').locator('.atlas-home-strand-name')).toHaveText('The Long Road');
-    await expect(box(page, 'event')).toContainText('Empty');
-    await expect(box(page, 'location')).toContainText('After the happening');
+    await expect(card(page)).toHaveAttribute('data-card-slot', 'event');
+    await expect(box(page, 'location')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  test('where it happened, the hero and where the hero is now, by Pick, Make one and Same place; each field read back, the focus on the box it wrote', async ({ page }) => {
+  test('where it happened, the main character and where they are now, by Pick, Make and Still at; each field read back, the focus on the next card', async ({ page }) => {
     await seeded(page, { narrative: N1, event: E1, location: GONE_L });
     await expect(box(page, 'event').locator('.atlas-home-strand-name')).toHaveText('The Fire');
 
@@ -194,23 +206,23 @@ test.describe('the Strand tab', () => {
     await expect(box(page, 'location').locator('.atlas-home-strand-name')).toHaveText('The Harbour');
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: L1 });
     expect(await fieldOf(page, E1, 'locations')).toEqual([L1]);
-    await expectFocusIn(page, 'location');
+    await expectFocusOnCard(page, 'character');
 
     await make(page, 'character', 'Arden');
     await expect(box(page, 'character').locator('.atlas-home-strand-name')).toHaveText('Arden');
     const arden = await idByName(page, 'Arden');
     expect(await fieldOf(page, N1, 'protagonist')).toBe(arden);
+    await expect.poll(() => fieldOf(page, E1, 'characters')).toEqual([arden]);
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: L1 });
-    await expectFocusIn(page, 'character');
+    await expectFocusOnCard(page, 'now');
 
-    await actIn(page, 'now', 'same').click();
-    await expect(box(page, 'now').locator('.atlas-home-strand-name')).toHaveText('The Harbour');
-    await expect(box(page, 'now').locator('[data-role="strand-same"]')).toHaveText('The same place');
+    await card(page).locator('[data-act="same"]').click();
+    await expect(box(page, 'now').locator('[data-role="strand-same"] p')).toHaveText('is still in or at The Harbour');
     expect(await fieldOf(page, arden, 'location')).toBe(L1);
-    await expectFocusIn(page, 'now');
+    await expect(page.locator('[data-role="strand-whole"]')).toBeFocused();
   });
 
-  test('Change on a filled box says what it will do, and only the second press writes', async ({ page }) => {
+  test('Use another on a filled box says what it will do, and only the second press writes', async ({ page }) => {
     await seeded(page, { narrative: N1, event: E1, location: GONE_L });
     await page.evaluate(async ({ n1, c1 }) => {
       const api = (window as any).__atlasTestApi;
@@ -219,39 +231,44 @@ test.describe('the Strand tab', () => {
       api.patchData(await store.listElements());
     }, { n1: N1, c1: C1 });
     await expect(box(page, 'character').locator('.atlas-home-strand-name')).toHaveText('Mira');
-    await actIn(page, 'character', 'change').click();
-    await pick(page, 'character', 'Ilse');
-    await expect(box(page, 'character').locator('[data-role="strand-promise"]')).toHaveText('Ilse will be the hero in place of Mira.');
+    await useAnother(page, 'character');
+    await actIn(page, 'character', 'pick').click();
+    await box(page, 'character').locator('[data-role="strand-filter"]').fill('Ilse');
+    await box(page, 'character').locator('[role="option"]', { hasText: 'Ilse' }).first().click();
+    await expect(box(page, 'character').locator('[data-role="strand-promise"]')).toHaveText('Ilse will be the main character in place of Mira.');
     expect(await fieldOf(page, N1, 'protagonist')).toBe(C1);
     await expect(actIn(page, 'character', 'confirm')).toBeFocused();
     await actIn(page, 'character', 'confirm').click();
     await expect(box(page, 'character').locator('.atlas-home-strand-name')).toHaveText('Ilse');
     expect(await fieldOf(page, N1, 'protagonist')).toBe(C2);
 
-    // The story: a new one that lists the same happening keeps it (and its place).
+    // The story: a new one that lists the same event keeps it (and its place).
     await put(page, 'narrative', N2, 'The Short Road', { supertype: 'Book', events: [E1] });
-    await actIn(page, 'narrative', 'change').click();
-    await pick(page, 'narrative', 'The Short Road');
+    await useAnother(page, 'narrative');
+    await actIn(page, 'narrative', 'pick').click();
+    await box(page, 'narrative').locator('[data-role="strand-filter"]').fill('The Short Road');
+    await box(page, 'narrative').locator('[role="option"]', { hasText: 'The Short Road' }).first().click();
     await expect(box(page, 'narrative').locator('[data-role="strand-promise"]')).toHaveText('The Short Road will be the story in place of The Long Road.');
     await actIn(page, 'narrative', 'cancel').click();
     await expect(box(page, 'narrative').locator('.atlas-home-strand-name')).toHaveText('The Long Road');
+    await expect(actIn(page, 'narrative', 'more')).toBeFocused();
     expect((await markOnDisk(page) as any).narrative).toBe(N1);
   });
 
   test('a mark another tab changed between the draw and the press is refused, and nothing is written', async ({ page }) => {
     await seeded(page, { narrative: N1, event: E1, location: GONE_L });
-    await expect(box(page, 'location')).toContainText('Empty');
-    await actIn(page, 'location', 'pick').click();
+    await expect(card(page)).toHaveAttribute('data-card-slot', 'location');
+    await card(page).locator('[data-act="pick"]').click();
     // Another tab moves the strand on disk while this one still draws the old.
     await put(page, 'narrative', N2, 'The Short Road', { supertype: 'Book' });
     await setMark(page, { narrative: N2, event: GONE_E, location: GONE_L }, false);
-    await box(page, 'location').locator('[role="option"]', { hasText: 'The Harbour' }).click();
+    await card(page).locator('[role="option"]', { hasText: 'The Harbour' }).click();
     await expect(page.locator('[data-role="strand-say"]')).toHaveText('The strand changed meanwhile.');
     expect(await fieldOf(page, E1, 'locations')).toEqual([]);
     expect(await markOnDisk(page)).toEqual({ narrative: N2, event: GONE_E, location: GONE_L });
   });
 
-  test('a contributor: no tab without a strand; with one, only the hero\'s box; a view-only world reads it with one line', async ({ page }) => {
+  test('a contributor: no tab without a strand; with one, only the main character asked; a view-only world reads it with one line', async ({ page }) => {
     // A contributor from Home's first draw past the path: no tab head was ever drawn here.
     await seeded(page, undefined, { exported_as: { kind: 'member', role: 'contributor' } });
     await expect(page.locator('.atlas-home-statline')).toBeVisible();
@@ -264,13 +281,16 @@ test.describe('the Strand tab', () => {
     await expect(page.locator('[data-role="home-strand"]')).toHaveCount(0);
     await tab(page, 'strand').click();
     await expect(box(page, 'narrative').locator('.atlas-home-strand-name')).toHaveText('The Long Road');
-    await expect(box(page, 'narrative').locator('[data-act]')).toHaveCount(0);
-    await expect(box(page, 'location').locator('[data-act]')).toHaveCount(0);
-    await expect(box(page, 'character').locator('[data-act="make"]')).toBeVisible();
+    // The story and its event are a keeper's to set: no ⋯ on them, and no card for where it happened.
+    await expect(actIn(page, 'narrative', 'more')).toHaveCount(0);
+    await expect(actIn(page, 'event', 'more')).toHaveCount(0);
+    await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
+    await expect(card(page).locator('[data-act="make"]')).toBeVisible();
 
     await patchEntry(page, { copy_of: { world_id: 'elsewhere' } });
     await expect(page.locator('[data-role="strand-read-only"]')).toHaveText('The owner or a co-builder chooses the strand.');
     await expect(page.locator('[data-role="home-strand"] [data-act]')).toHaveCount(0);
+    await expect(page.locator('[data-role="strand-card"]')).toHaveCount(0);
   });
 });
 
@@ -308,7 +328,7 @@ test.describe('Make this the world\'s strand', () => {
   test('from the writing room\'s bar: the bar and the frame change without a keystroke, on a press and on a pull', async ({ page }) => {
     const wid = await seeded(page, { narrative: N1, event: E1, location: GONE_L });
     await put(page, 'narrative', N2, 'The Short Road', { supertype: 'Book', events: [E1] });
-    // The happening lists the mark's place (an id that names nothing here), so a story change keeps all
+    // The event lists the mark's place (an id that names nothing here), so a story change keeps all
     // three members and the mark reads as a strand on every SDK serial.
     await page.evaluate(async ({ e1, gone }) => {
       const api = (window as any).__atlasTestApi;
@@ -328,6 +348,7 @@ test.describe('Make this the world\'s strand', () => {
     const frame = page.locator('[data-role="strand-frame"]');
     await expect(frame).toContainText("This story is the world's strand");
     await expect(frame.locator('[data-slot="event"] [data-action="strand-open"]')).toHaveText(/The Fire/);
+    await expect(frame.locator('[data-slot="character"]')).toContainText('Character');
     await expect(frame.locator('[data-slot="character"] [data-action="strand-pick-on-home"]')).toHaveText('Pick on Home');
     expect(await markOnDisk(page)).toEqual({ narrative: N2, event: E1, location: GONE_L });
 
@@ -352,14 +373,14 @@ test.describe('Make this the world\'s strand', () => {
 });
 
 test.describe('story first to a full strand', () => {
-  test('[half-mark] by Pick from the world, each press read back', async ({ page }) => {
+  test('[half-mark] by each card\'s Or pick one from your world, each press read back', async ({ page }) => {
     await halfMark(page);
     await seeded(page, undefined);
     await tab(page, 'strand').click();
     await pick(page, 'narrative', 'The Long Road');
-    await expect(box(page, 'narrative').locator('.atlas-home-strand-name')).toHaveText('The Long Road');
+    await filled(page, 'narrative', 'The Long Road');
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: null, location: null });
-    await expectFocusIn(page, 'narrative');
+    await expectFocusOnCard(page, 'event');
     await pick(page, 'event', 'The Fire');
     await filled(page, 'event', 'The Fire');
     expect(await markOnDisk(page)).toEqual({ narrative: N1, event: E1, location: null });
@@ -371,37 +392,11 @@ test.describe('story first to a full strand', () => {
     await pick(page, 'character', 'Mira');
     await filled(page, 'character', 'Mira');
     expect(await fieldOf(page, N1, 'protagonist')).toBe(C1);
+    await expect.poll(() => fieldOf(page, E1, 'characters')).toEqual([C1]);
     await pick(page, 'now', 'The Lighthouse');
     await filled(page, 'now', 'The Lighthouse');
     expect(await fieldOf(page, C1, 'location')).toBe(L2);
-  });
-
-  test('[half-mark] by Make one, each press read back', async ({ page }) => {
-    await halfMark(page);
-    await seeded(page, undefined);
-    await tab(page, 'strand').click();
-    await make(page, 'narrative', 'A New Tale');
-    await filled(page, 'narrative', 'A New Tale');
-    const tale = await idByName(page, 'A New Tale');
-    expect(await fieldOf(page, tale, 'supertype')).toBe('Book');
-    expect(await markOnDisk(page)).toEqual({ narrative: tale, event: null, location: null });
-    await make(page, 'event', 'The Flood');
-    await filled(page, 'event', 'The Flood');
-    const flood = await idByName(page, 'The Flood');
-    expect(await fieldOf(page, tale, 'events')).toEqual([flood]);
-    await make(page, 'location', 'The Weir');
-    await filled(page, 'location', 'The Weir');
-    const weir = await idByName(page, 'The Weir');
-    expect(await markOnDisk(page)).toEqual({ narrative: tale, event: flood, location: weir });
-    expect(await fieldOf(page, flood, 'locations')).toEqual([weir]);
-    await make(page, 'character', 'Ottilie');
-    await filled(page, 'character', 'Ottilie');
-    const ottilie = await idByName(page, 'Ottilie');
-    expect(await fieldOf(page, tale, 'protagonist')).toBe(ottilie);
-    await make(page, 'now', 'The Mill');
-    await filled(page, 'now', 'The Mill');
-    expect(await fieldOf(page, ottilie, 'location')).toBe(await idByName(page, 'The Mill'));
-    await expectFocusIn(page, 'now');
+    await expect(box(page, 'now').locator('.atlas-home-strand-name')).toBeFocused();
   });
 });
 
@@ -429,13 +424,14 @@ for (const tag of ['', ' @firefox']) {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-  test('the boxes fit 390 px and every act and tab takes a thumb', async ({ page }) => {
+  test('the boxes and the card fit 390 px and every act and tab takes a thumb', async ({ page }) => {
     await seeded(page, { narrative: N1, event: E1, location: GONE_L });
-    await expect(box(page, 'location')).toBeVisible();
+    await expect(card(page)).toBeVisible();
     const targets: Array<[string, ReturnType<typeof tab>]> = [
-      ['Picture', tab(page, 'picture')], ['Strand', tab(page, 'strand')], ['Make one', actIn(page, 'location', 'make')],
-      ['Pick from the world', actIn(page, 'location', 'pick')], ['Change', actIn(page, 'event', 'change')],
-      ['the happening\'s name', box(page, 'event').locator('.atlas-home-strand-name')],
+      ['Picture', tab(page, 'picture')], ['Strand', tab(page, 'strand')], ['Make', card(page).locator('[data-act="make"]')],
+      ['Or pick one from your world', card(page).locator('[data-act="pick"]')], ['Skip for now', card(page).locator('[data-act="skip"]')],
+      ['the Name field', card(page).locator('[data-field="name"]')], ['Edit', actIn(page, 'event', 'edit')], ['the ⋯', actIn(page, 'event', 'more')],
+      ['the event\'s name', box(page, 'event').locator('.atlas-home-strand-name')], ['the chip', box(page, 'narrative').locator('[data-chip="event"]')],
     ];
     for (const [word, target] of targets) {
       expect(Math.round((await target.boundingBox())!.height), word).toBeGreaterThanOrEqual(44);
@@ -455,7 +451,7 @@ test('pictures of the tab at 1280 and 390, light and dark', async ({ page }) => 
   test.skip(!dir, 'STRAND_SHOTS not set');
   await page.setViewportSize({ width: 1280, height: 900 });
   await seeded(page, { narrative: N1, event: E1, location: GONE_L });
-  await expect(box(page, 'location')).toBeVisible();
+  await expect(card(page)).toBeVisible();
   for (const theme of ['dark', 'light'] as const) {
     await page.evaluate((t) => { if (t === 'light') document.documentElement.setAttribute('data-theme', 'light'); else document.documentElement.removeAttribute('data-theme'); }, theme);
     for (const width of [1280, 390]) {

@@ -50,6 +50,20 @@ async function goHome(page: Page) {
   await expect(page.locator('.atlas-world-home')).toBeVisible();
 }
 
+/**
+ * Home opened again (another room, then back), as a world brought in through the Data room comes
+ * back to it: Home decides its tab head once per opening (1.120.0), so a world filled under an
+ * open empty Home draws its picture from the next opening.
+ */
+async function reopenHome(page: Page) {
+  await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/settings`;
+  });
+  await expect(page.locator('.atlas-world-home')).toHaveCount(0);
+  await goHome(page);
+}
+
 async function createViaStore(page: Page, type: string, data: Record<string, unknown>): Promise<string> {
   return page.evaluate(async ({ type, data }) => {
     const api = (window as any).__atlasTestApi;
@@ -140,6 +154,10 @@ const square = (page: Page, name: string) =>
 async function makeFromPlus(page: Page, name: string, kind: 'a character' | 'a location') {
   await expect(async () => {
     const tab = page.locator('[data-role="home-tabs"] [data-tab="picture"]');
+    // An empty world's Home is the strand alone, no head (1.120.0, R1): the head shown as the whole line's Picture shows it.
+    if (!(await tab.count()) && await page.locator('[data-role="home-strand"]').count()) {
+      await page.evaluate(async () => { ((await import('/src/middle/home-strand.ts')) as any).showStrandHeadForTests(); });
+    }
     if (await tab.count() && (await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
     await expect(page.locator('.atlas-world-home [data-grid-plus]')).toBeVisible({ timeout: 1000 });
   }).toPass();
@@ -301,7 +319,7 @@ test('a world brought in whole: Home\'s picture, no note; its centre opens the W
   await setupWorld(page);
   const keep = await builtWorld(page);
   await pastTheGrid(page);
-  await goHome(page);
+  await reopenHome(page);
   const picture = page.locator('[data-role="home-picture"]');
   await expect(picture).toBeVisible();
   await expect(picture.locator('.atlas-home-picture-title')).toHaveText('Hollow Keep and what it touches');
@@ -335,7 +353,7 @@ test('a world with nothing worth drawing has no picture, and its twin with a thi
   const keep = await createViaStore(page, 'location', { name: 'Hollow Keep' });
   for (const name of ['Ada', 'Bram']) await createViaStore(page, 'character', { name, location: keep });
   await pastTheGrid(page);
-  await goHome(page);
+  await reopenHome(page);
   await expect(page.locator('.atlas-world-home')).toBeVisible();
   await expect(page.locator('[data-role="home-picture"]')).toHaveCount(0);
   await createViaStore(page, 'character', { name: 'Cole', location: keep });
@@ -353,7 +371,7 @@ test('Moppetopia: a create by hand speaks no note, and Home shows the picture', 
     const a = getState().active!;
     patchSlice('active', { ...a, meta: { ...a.meta, id: demoId } });
   }, DEMO_WORLD_ID);
-  await goHome(page);
+  await reopenHome(page);
   await expect(page.locator('[data-role="home-picture"]')).toBeVisible();
   await page.click('[data-action="create-element"]');
   // An Event made by hand earns its note in any other world (the twin below).

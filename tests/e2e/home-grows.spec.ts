@@ -98,6 +98,10 @@ const grid = (page: Page) => page.locator('.atlas-world-home [data-role="home-gr
 async function toPicture(page: Page) {
   await expect(async () => {
     const tab = page.locator('[data-role="home-tabs"] [data-tab="picture"]');
+    // An empty world's Home is the strand alone, no head (1.120.0, R1): the head shown as the whole line's Picture shows it.
+    if (!(await tab.count()) && await page.locator('[data-role="home-strand"]').count()) {
+      await page.evaluate(async () => { ((await import('/src/middle/home-strand.ts')) as any).showStrandHeadForTests(); });
+    }
     if (await tab.count() && (await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
     await expect(grid(page)).toBeVisible({ timeout: 1000 });
   }).toPass();
