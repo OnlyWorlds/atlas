@@ -48,7 +48,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
         mouse: 'on a small world\'s Picture, press the + square to make something, then drag one square onto another (or press one, then the other) to put it there',
         touch: 'on a small world\'s Picture, tap the + square to make something, then tap one square and then another to put it there',
       },
-      'a new world opens on its strand and asks one question at a time: a story, an event in it, where it happened, who was involved and where they are now, each a name and a few lines',
+      'a new world opens on its strand and asks one question at a time: a story, who it is about, what happens to them, where it happened and where they are now, each a name and a few lines',
       'already have notes or a file? While the world is empty, Bring it in, under the strand',
       'in a world on OnlyWorlds, press the OnlyWorlds mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
       "once the world holds more than its strand, press Strand beside the picture to see it: the story, an event in it, where it happened, its main character and where they are now; Edit a part in place, or use another from its menu",

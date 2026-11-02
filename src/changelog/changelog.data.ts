@@ -90,6 +90,18 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Once the story\'s box says what it tells of, it keeps room for the line about its main character, so making the character no longer pushes the boxes below it down.',
         tags: ['home'],
       },
+      {
+        id: 'strand-asks-who-first',
+        title: 'A new world asks who its story is about before what happens',
+        body: 'The strand\'s questions now come in this order: the story, who it is about, what happens to them, where it happened, and whether they are still there. The event you then create or pick lists the main character among its characters. The button on each question now says Create.',
+        tags: ['home'],
+      },
+      {
+        id: 'first-element-click-to-edit',
+        title: 'Your first element says how to open it',
+        body: 'In Home\'s recent list, the line under a world\'s first element now reads "click here to edit".',
+        tags: ['home'],
+      },
     ],
   },
   {
