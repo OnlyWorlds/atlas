@@ -1,7 +1,8 @@
 /**
- * The writing room's empty Book (1.121.0, `emptyBookLine`): derived, no stored flag. A Book with no part at
- * the second tier says what a part can be, in the world's own labels; nothing once a part exists, for a
- * Book with only a Draft still something, and nothing for a Chapter, a Scene, a Draft or a view-only world.
+ * The writing room's empty Book (1.121.0, `emptyBookLine`; its words W8 of 1.122.0): derived, no stored flag.
+ * A Book with no part at the second tier says how narratives nest and that the tiers can be renamed, in the
+ * world's own tier names; nothing once a part exists, for a Book with only a Draft still something, and
+ * nothing for a Chapter, a Scene, a Draft or a view-only world.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { patchSlice } from '../../src/core/state';
@@ -17,10 +18,10 @@ function world(entry: Partial<WorldRegistryEntry> = {}): void {
 afterEach(() => patchSlice('registry', defaultRegistry()));
 
 describe('emptyBookLine', () => {
-  it('a Book with no chapter says what a chapter can be', () => {
+  it('a Book with no chapter says how narratives nest, and where the tiers are renamed', () => {
     world();
     const book = n('b', 'Book');
-    expect(emptyBookLine(book, [book], W, false)).toBe('A chapter can be any part you like: a chapter, an act, a session. Press + to add one.');
+    expect(emptyBookLine(book, [book], W, false)).toBe('Narratives nest as books, chapters and scenes, and you can rename these tiers in Settings. Press + to add the first.');
   });
   it('goes once a chapter exists', () => {
     world();
@@ -32,11 +33,20 @@ describe('emptyBookLine', () => {
     const book = n('b', 'Book');
     expect(emptyBookLine(book, [book, n('d', 'Draft', 'b')], W, false)).not.toBeNull();
   });
-  it('the world\'s own labels, with their article', () => {
-    world({ writing_labels: { l1: 'Saga', l2: 'Act', l3: 'Scene', l4: 'Draft' } } as never);
+  it('the world\'s own tier names, plural and lower case; a blank one reads as its default', () => {
+    world({ writing_labels: { l1: 'Saga', l2: 'Act', l3: 'Story', l4: 'Draft' } } as never);
     const saga = n('s', 'Saga');
-    expect(emptyBookLine(saga, [saga], W, false)).toBe('An act can be any part you like: a chapter, an act, a session. Press + to add one.');
+    expect(emptyBookLine(saga, [saga], W, false)).toBe('Narratives nest as sagas, acts and stories, and you can rename these tiers in Settings. Press + to add the first.');
     expect(emptyBookLine(saga, [saga, n('a', 'Act', 's')], W, false)).toBeNull();
+    world({ writing_labels: { l1: 'Saga', l2: '  ', l3: 'Story', l4: 'Draft' } } as never);
+    expect(emptyBookLine(saga, [saga], W, false)).toBe('Narratives nest as sagas, chapters and stories, and you can rename these tiers in Settings. Press + to add the first.');
+  });
+
+  it('no em-dash, no "year"', () => {
+    world();
+    const line = emptyBookLine(n('b', 'Book'), [n('b', 'Book')], W, false)!;
+    expect(line).not.toContain('\u2014');
+    expect(line).not.toMatch(/\byears?\b/i);
   });
   it('any Book, not only the strand\'s story; nothing for a Chapter, a Scene, a Draft or a narrative outside the tree', () => {
     world();

@@ -85,6 +85,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['home'],
       },
       {
+        id: 'writing-empty-book-tiers',
+        title: 'An empty book in the writing room says how narratives nest',
+        body: 'Before a book has its first chapter, the line at its top now reads "Narratives nest as books, chapters and scenes, and you can rename these tiers in Settings. Press + to add the first.", in your world\'s own names for the three tiers.',
+        tags: ['writing'],
+      },
+      {
         id: 'strand-event-no-character',
         title: 'Making the event no longer adds the main character to it',
         body: 'The main character is the story\'s, and the event keeps only what you put in it, whichever you make first. Worlds that already have the character in the event keep it. When the main character is now where the event happened, the story always says they are still there.',

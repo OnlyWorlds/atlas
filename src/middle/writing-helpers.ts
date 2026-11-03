@@ -204,9 +204,9 @@ export function buildNarrativeIndex(elements: Element[], worldId: string): Narra
 }
 
 /**
- * The empty Book's line (1.121.0), derived, no stored flag: while an opened Narrative at tier l1 has no child
- * at tier l2 (a Draft does not count), in a world that is not view-only, the workspace body's top says what
- * a part can be, in the world's own labels. Null for a Chapter, a Scene, a Draft, a Book with a part, or a
+ * The empty Book's line (1.121.0; its words 1.122.0), derived, no stored flag: while an opened Narrative at tier l1 has no child
+ * at tier l2 (a Draft does not count), in a world that is not view-only, the workspace body's top says how
+ * narratives nest and that the tiers can be renamed, in the world's own labels. Null for a Chapter, a Scene, a Draft, a Book with a part, or a
  * view-only world.
  */
 export function emptyBookLine(el: Element, elements: readonly Element[], worldId: string, viewOnly: boolean): string | null {
@@ -215,9 +215,10 @@ export function emptyBookLine(el: Element, elements: readonly Element[], worldId
     && (e as Element & { parent_narrative?: string }).parent_narrative === el.id
     && getTierForNarrative(e, worldId) === 'l2');
   if (hasPart) return null;
-  const part = getWritingLabels(worldId).l2.trim().toLowerCase() || 'chapter';
-  const article = /^[aeiou]/.test(part) ? 'An' : 'A';
-  return `${article} ${part} can be any part you like: a chapter, an act, a session. Press + to add one.`;
+  // 1.122.0 (W8): the three tiers in the world's own names, plural and lower case, a blank one its default.
+  const l = getWritingLabels(worldId);
+  const tier = (label: string | undefined, fallback: string): string => pluralize((label ?? '').trim().toLowerCase() || fallback);
+  return `Narratives nest as ${tier(l.l1, 'book')}, ${tier(l.l2, 'chapter')} and ${tier(l.l3, 'scene')}, and you can rename these tiers in Settings. Press + to add the first.`;
 }
 
 /** Walk up `parent_narrative` from `id`, returning ancestor ids closest-first. */
