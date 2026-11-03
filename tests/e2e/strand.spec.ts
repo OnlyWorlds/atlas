@@ -299,17 +299,19 @@ test.describe('the Strand tab', () => {
     await expect(page.locator('[data-role="home-strand"]')).toHaveCount(0);
     await tab(page, 'strand').click();
     await expect(box(page, 'narrative').locator('.atlas-home-strand-name')).toHaveText('The Long Road');
-    // The story and its event are a keeper's to set: no ⋯ on them, and no card for where it happened.
-    await expect(actIn(page, 'narrative', 'more')).toHaveCount(0);
-    await expect(actIn(page, 'event', 'more')).toHaveCount(0);
+    // The story and its event are a keeper's to set: no Use another in their ⋯ (it holds Edit here, the room
+    // door: 1.122.0), and no card for where it happened.
+    await expect(actIn(page, 'narrative', 'another')).toHaveCount(0);
+    await expect(actIn(page, 'event', 'another')).toHaveCount(0);
+    await expect(actIn(page, 'event', 'edit')).toHaveCount(1);
     await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
     await expect(card(page).locator('[data-act="make"]')).toBeVisible();
 
     await patchEntry(page, { copy_of: { world_id: 'elsewhere' } });
     await expect(page.locator('[data-role="strand-read-only"]')).toHaveText('The owner or a co-builder chooses the strand.');
-    // Only each box's doors (1.122.0: Open its page, a room's), which navigate and never write; no line (G3).
-    await expect(page.locator('[data-role="home-strand"] [data-act]:not([data-act="room"]):not([data-act="page"])')).toHaveCount(0);
-    await expect(page.locator('[data-role="home-strand"] [data-act="page"]').first()).toBeVisible();
+    // Only a room's door in a box's ⋯ (1.122.0), which navigates and never writes; each title opens its page; no line (G3).
+    await expect(page.locator('[data-role="home-strand"] [data-act]:not([data-act="room"]):not([data-act="more"])')).toHaveCount(0);
+    await expect(page.locator('[data-role="home-strand"] [data-box] [data-strand-key$=":open"]').first()).toBeVisible();
     await expect(page.locator('[data-role="home-strand"] [data-role="strand-line"]')).toHaveCount(0);
     await expect(page.locator('[data-role="strand-card"]')).toHaveCount(0);
   });
@@ -455,11 +457,18 @@ test.describe('on a phone', () => {
     const targets: Array<[string, ReturnType<typeof tab>]> = [
       ['Picture', tab(page, 'picture')], ['Strand', tab(page, 'strand')], ['Create', card(page).locator('[data-act="make"]')],
       ['Or pick one from your world', card(page).locator('[data-act="pick"]')], ['Skip for now', card(page).locator('[data-act="skip"]')],
-      ['the Name field', card(page).locator('[data-field="name"]')], ['Edit here', actIn(page, 'event', 'edit')], ['Open its page', actIn(page, 'event', 'page')], ['Edit in Charts', actIn(page, 'event', 'room')], ['the ⋯', actIn(page, 'event', 'more')],
+      ['the Name field', card(page).locator('[data-field="name"]')], ['the ⋯', actIn(page, 'event', 'more')],
       ['the event\'s name', box(page, 'event').locator('.atlas-home-strand-name')], ['the chip', box(page, 'narrative').locator('[data-chip="event"]')],
     ];
     for (const [word, target] of targets) {
       expect(Math.round((await target.boundingBox())!.height), word).toBeGreaterThanOrEqual(44);
+    }
+    // The box's acts in its ⋯ (1.122.0): each a thumb once the menu is open.
+    await actIn(page, 'event', 'more').tap();
+    for (const [word, a] of [['Edit here', 'edit'], ['Edit in Charts', 'room'], ['Use another event', 'another']]) {
+      const item = actIn(page, 'event', a);
+      await expect(item, word).toHaveText(word);
+      expect(Math.round((await item.boundingBox())!.height), word).toBeGreaterThanOrEqual(44);
     }
     const over = await page.evaluate(() => {
       const r = document.querySelector('[data-role="home-strand"]')!.getBoundingClientRect();

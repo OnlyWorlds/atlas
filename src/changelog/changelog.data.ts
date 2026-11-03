@@ -62,14 +62,20 @@ export const CHANGELOG: ChangelogRelease[] = [
     entries: [
       {
         id: 'strand-lines-above-boxes',
-        title: 'A short line above each part of the strand says what you can do with it next',
-        body: 'On the Strand tab each box you have made has an italic line above it: the story can be shaped in the writing room, the event can be given a date for the timeline in Charts, a location can be pinned on a map (or a map made first), the main character\'s page shows them in full. A line goes once its job is done (the date given, the pin placed, the room or page opened) or when you press its ×, only in this world and this browser. The space it took stays until you next open Home, so nothing below it moves. Readers who cannot change an element see no line.',
+        title: 'A short line above each part of the strand takes you where it can grow',
+        body: 'On the Strand tab the story, the event, where it happened and the main character each have an italic line above their box, and the words in it are the link: "In the writing room you can shape it into chapters and scenes.", "Their page holds everything about them.", "Give it a date to place it on the timeline in Charts." (once the event has a date: "Its year puts it on the timeline in Charts."), and "Create a map to pin it in place." or "Pin it on a map." for the location. The story\'s line goes once you open the writing room on it, the main character\'s once you open their page, the location\'s once it is pinned on a map, and any line when you press its ×, only in this world and this browser. The space a line took stays until you next open Home, so nothing below it moves. Readers who cannot change an element see no line.',
         tags: ['home'],
       },
       {
         id: 'strand-box-buttons',
-        title: 'Each box offers Edit here, Open its page, and the room that edits it',
-        body: 'Every box on the Strand tab has Edit here (in place, as before), Open its page, and where a room edits it a third: Edit in the writing room for the story, Edit in Charts for the event, and Pin it on a map for where it happened (Create a map while the world has none, with nothing filled in). Someone who can only read the world sees Open its page, Open in the writing room, and See it in Charts for an event with a date.',
+        title: 'Each box keeps its actions in its ⋯ menu',
+        body: 'A box on the Strand tab no longer has a row of buttons under it. Its name still opens its page, and the ⋯ beside the name holds Edit here (in place, as before), the room that edits it (Edit in the writing room for the story, Edit in Charts for the event, Pin it on a map for where it happened, or Create a map while the world has none, with nothing filled in), then Use another. Someone who can only read the world finds Open in the writing room, or See it in Charts for an event with a date.',
+        tags: ['home'],
+      },
+      {
+        id: 'home-tabs-keep-scroll',
+        title: 'Switching between Picture and Strand keeps your place on Home',
+        body: 'Pressing Picture or Strand on Home used to throw the page back toward the top. Home now stays where you had scrolled it, or at the end of the shorter tab when the new one is shorter.',
         tags: ['home'],
       },
       {

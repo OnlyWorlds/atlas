@@ -6,12 +6,13 @@
  * elements (a Character standing in the strand's place, another Event in the story, a Location holding a
  * Creature, the story and its event naming the Location too). A Zone's Location's Character two deep beside
  * the lines that climb to the block, at 390 and 1440 (the code gate's C1), and a whole strand at a 20 px
- * root font (C2). Each box's doors (1.122.0: Open its page, the room that edits it) and the lines' links
- * land where they say and Back puts the focus on them, in both engines and on a phone, where the map opens
- * in its drawer (C3); the story's and the character's lines go once their room was opened. The story's box
- * keeps its second line's room, so the Event make moves nothing (W5). G2 (1.122.0): no filled box moves when
- * a line goes (its x, a date saved in Edit here or arriving from elsewhere) or a map is made, at 1440 and
- * 390.
+ * root font (C2). Each box's doors (1.122.0: the room that edits it, in the box's menu) and the lines'
+ * links (the writing room, their page, Charts, the map) land where they say and Back puts the focus on
+ * them, or on the menu that holds a door, in both engines and on a phone, where the map opens in its
+ * drawer (C3); the story's and the character's lines go once their room was opened. The story's box keeps
+ * its second line's room, so the Event make moves nothing (W5). G2 (1.122.0): no filled box moves when a
+ * line goes or changes its words (its x, a date saved in Edit here or arriving from elsewhere, a pin) or a
+ * map is made, at 1440 and 390. A switch between Picture and Strand keeps Home's scroll, both ways.
  *
  * Screenshots for a look: ATLAS_SNAPS=<dir> writes each Picture there.
  */
@@ -266,37 +267,46 @@ for (const tag of ['', ' @firefox']) {
     const wid = await wholeStrand(page, { map: true });
     await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
     const header = (p: Page, name: string) => expect(p.locator('.atlas-middle-header')).toContainText(name);
-    const lands: Array<[string, string, string, (p: Page) => Promise<void>]> = [
-      ['narrative:room', 'Edit in the writing room', `#/w/${wid}/writing/${S}`, async p => {
-        await expect(p.locator('.atlas-writing-workspace')).toBeVisible();
+    const writingRoom = async (p: Page) => { await expect(p.locator('.atlas-writing-workspace')).toBeVisible(); };
+    const onMap = async (p: Page) => {
+      await header(p, 'Saltmere Quay');
+      await expect.poll(() => p.evaluate(() => {
+        const ui = (window as any).__atlasTestApi.getState().ui;
+        return [ui.rightTabs[ui.rightActiveIndex]?.mapId ?? null, ui.pinPlacement ?? null];
+      })).toEqual([MAP, null]);
+    };
+    // [the control's key, its words, where it lands, what is there, the key the focus is on after Back].
+    // A door in a box's menu (1.122.0's amendment) is pressed through its menu, and Back focuses the menu's
+    // button; a line's link whose line went once its room opened gives the focus to the box's name.
+    const lands: Array<[string, string, string, (p: Page) => Promise<void>, string]> = [
+      ['line:narrative:writing', 'the writing room', `#/w/${wid}/writing/${S}`, async p => {
+        await writingRoom(p);
         // W8: the empty Book's line at the body's top, gone once its first chapter lands.
         const empty = p.locator('.atlas-writing-workspace-body > [data-role="writing-empty-book"]');
         await expect(empty).toHaveText('Narratives nest as books, chapters and scenes, and you can rename these tiers in Settings. Press + to add the first.');
         await put(p, 'narrative', '0192a000-0000-7000-8000-000000950031', 'Chapter one', { supertype: 'Chapter', parent_narrative: S });
         await expect(empty).toHaveCount(0);
-      }],
-      ['narrative:page', 'Open its page', `#/w/${wid}/element/${S}`, async p => { await header(p, 'The Lantern Ferry'); }],
-      ['event:room', 'Edit in Charts', `#/w/${wid}/timeline/${E}`, async p => { await expect(p.locator('.atlas-world-home')).toHaveCount(0); }],
-      ['event:page', 'Open its page', `#/w/${wid}/element/${E}`, async p => { await header(p, 'The night crossing'); }],
-      ['location:page', 'Open its page', `#/w/${wid}/element/${L}`, async p => { await header(p, 'Saltmere Quay'); }],
-      // C3: the location's way to a map on its box too, the line's own landing.
-      ['location:room', 'Pin it on a map', `#/w/${wid}/map/${MAP}/element/${L}`, async p => { await header(p, 'Saltmere Quay'); }],
-      ['line:location:pin-map', 'Pin it on a map', `#/w/${wid}/map/${MAP}/element/${L}`, async p => {
-        await header(p, 'Saltmere Quay');
-        await expect.poll(() => p.evaluate(() => {
-          const ui = (window as any).__atlasTestApi.getState().ui;
-          return [ui.rightTabs[ui.rightActiveIndex]?.mapId ?? null, ui.pinPlacement ?? null];
-        })).toEqual([MAP, null]);
-      }],
-      ['character:page', 'Open its page', `#/w/${wid}/element/${C}`, async p => { await header(p, 'Odile Varn'); }],
-      ['now:page', 'Open its page', `#/w/${wid}/element/${N}`, async p => { await header(p, 'The Drowned Library'); }],
+      }, 'narrative:open'],
+      ['narrative:room', 'Edit in the writing room', `#/w/${wid}/writing/${S}`, writingRoom, 'narrative:more'],
+      ['event:room', 'Edit in Charts', `#/w/${wid}/timeline/${E}`, async p => { await expect(p.locator('.atlas-world-home')).toHaveCount(0); }, 'event:more'],
+      // Dated: the line's Charts goes to its place on the timeline.
+      ['line:event:charts', 'Charts', `#/w/${wid}/timeline/${E}`, async p => { await expect(p.locator('.atlas-world-home')).toHaveCount(0); }, 'line:event:charts'],
+      ['event:open', 'The night crossing', `#/w/${wid}/element/${E}`, async p => { await header(p, 'The night crossing'); }, ''],
+      // C3: the location's way to a map in its box's menu too, the line's own landing.
+      ['location:room', 'Pin it on a map', `#/w/${wid}/map/${MAP}/element/${L}`, onMap, 'location:more'],
+      ['line:location:pin-map', 'Pin it on a map', `#/w/${wid}/map/${MAP}/element/${L}`, onMap, 'line:location:pin-map'],
+      ['line:character:page', 'Their page', `#/w/${wid}/element/${C}`, async p => { await header(p, 'Odile Varn'); }, 'character:open'],
+      ['now:open', 'The Drowned Library', `#/w/${wid}/element/${N}`, async p => { await header(p, 'The Drowned Library'); }, ''],
     ];
     // The story's line is there until the writing room opens on it, the character's until their page opens.
     await expect(page.locator('[data-slot="narrative"] [data-role="strand-line"]')).toHaveCount(1);
     await expect(page.locator('[data-slot="character"] [data-role="strand-line"]')).toHaveCount(1);
-    for (const [key, label, hash, landed] of lands) {
+    await expect(page.locator('[data-slot="event"] [data-role="strand-line"] .atlas-home-strand-line-text')).toHaveText('Its year puts it on the timeline in Charts.');
+    for (const [key, label, hash, landed, back] of lands) {
       const act = page.locator(`[data-role="home-strand"] [data-strand-key="${key}"]`);
       await expect(act, key).toHaveText(label);
+      const slot = key.split(':')[0];
+      if (key.endsWith(':room')) await page.locator(`[data-role="home-strand"] [data-strand-key="${slot}:more"]`).click();
       await act.click();
       await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(hash);
       await landed(page);
@@ -305,7 +315,9 @@ for (const tag of ['', ' @firefox']) {
       await page.goBack();
       await expect(page.locator('.atlas-world-home')).toBeVisible();
       await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
-      await expect(page.locator(`[data-role="home-strand"] [data-strand-key="${key}"]`)).toBeFocused();
+      if (back) await expect(page.locator(`[data-role="home-strand"] [data-strand-key="${back}"]`), `Back after ${key}`).toBeFocused();
+      // The line's link opened its room: on return the line is gone.
+      if (key === 'line:character:page' || key === 'line:narrative:writing') await expect(page.locator(`[data-slot="${slot === 'line' ? key.split(':')[1] : slot}"] [data-role="strand-line"]`)).toHaveCount(0);
     }
     // W4: the rooms were opened, so those two lines have gone, for good in this world and this browser.
     await expect(page.locator('[data-slot="narrative"] [data-role="strand-line"]')).toHaveCount(0);
@@ -314,6 +326,41 @@ for (const tag of ['', ' @firefox']) {
       const s = (window as any).__atlasTestApi.getState();
       return s.registry.worlds.find((w: any) => w.id === s.active.worldId)?.strand_lines?.opened?.length ?? 0;
     })).toBe(2);
+  });
+}
+
+// 1.122.0's amendment, A3: Home is its own scroller, and a draw builds it in steps; a layout read part
+// way clamped the scroll to the part built so far, so a switch of tabs threw the person toward the top.
+for (const tag of ['', ' @firefox']) {
+  test(`a switch between Picture and Strand keeps Home's scroll, both ways, never past the end${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await wholeStrand(page, { rest: true, map: true });
+    await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+    const home = page.locator('.atlas-world-home');
+    const read = () => home.evaluate(h => ({ top: h.scrollTop, max: h.scrollHeight - h.clientHeight, ch: h.clientHeight, panel: Math.round(h.querySelector('.atlas-home-tabpanel')!.getBoundingClientRect().height) }));
+    for (const to of ['picture', 'strand', 'picture'] as const) {
+      // Scrolled as far as the tab head allows while it stays in view (near the top), as a person
+      // scrolls before pressing it.
+      await home.evaluate((h, t) => {
+        const el = h.querySelector(`[data-role="home-tabs"] [data-tab="${t}"]`)!;
+        h.scrollTop += el.getBoundingClientRect().top - h.getBoundingClientRect().top - 16;
+      }, to);
+      const before = await read();
+      expect(before.top, `scrolled before ${to}`).toBeGreaterThan(100);
+      const at = (await tab(page, to).boundingBox())!;
+      await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+      await expect(tab(page, to)).toHaveAttribute('aria-selected', 'true');
+      // The focus lands on the tab pressed, as before.
+      await expect(tab(page, to)).toBeFocused();
+      const after = await read();
+      if (process.env.ATLAS_W5_LOG) console.log(`A3 to ${to}: ${JSON.stringify({ before, after })}`);
+      // Promise 5: kept, or the new content's end when it is shorter; never past it.
+      expect.soft(after.top, `the scroll after the switch to ${to}`).toBeCloseTo(Math.min(before.top, after.max), 0);
+      expect(after.top).toBeLessThanOrEqual(after.max + 0.5);
+      // The picture's grid draws a frame after its mount: the scroll stays where it was put.
+      await page.waitForTimeout(400);
+      expect(Math.abs((await read()).top - after.top), `still after the switch to ${to}`).toBeLessThan(1);
+    }
   });
 }
 
@@ -580,7 +627,7 @@ const lineWordsIn = (page: Page, slot: string) => lineIn(page, slot).locator('.a
 async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number>; date: Record<string, number>; dateBack: Record<string, number>; dateIn: Record<string, number>; map: Record<string, number>; pin: Record<string, number> }> {
   // The event undated, no map: every line drawn.
   await wholeStrand(page, { event: { start_date: null } });
-  await expect(lineWordsIn(page, 'event')).toHaveText('Give it a date to place it in a timeline in Charts.');
+  await expect(lineWordsIn(page, 'event')).toHaveText('Give it a date to place it on the timeline in Charts.');
   await expect(lineWordsIn(page, 'location')).toHaveText('Create a map to pin it in place.');
   // 1. The character's x.
   let before = await boxTops(page);
@@ -590,17 +637,18 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
   // G8: the focus on the box's first control.
   await expect(page.locator('[data-role="home-strand"] [data-strand-key="character:open"]')).toBeFocused();
   const hide = movedBetween(before, await boxTops(page));
-  // 2. A date saved in Edit here: the event's line goes; its box stands where its Edit card stood, and
-  // (the strand whole, so no row is held: 1.122.0) every box below returns to where it stood before Edit
-  // here opened the card, the line's strut keeping the line's height.
+  // 2. A date saved in Edit here (from the box's menu): the event's line changes its words; its box stands
+  // where its Edit card stood, and (the strand whole, so no row is held: 1.122.0) every box below returns to
+  // where it stood before Edit here opened the card, the line's slot keeping its tallest height.
   const beforeEdit = await boxTops(page);
-  await page.locator('[data-role="home-strand"] [data-box="event"] [data-act="edit"]').click();
+  await page.locator('[data-role="home-strand"] [data-box="event"] [data-act="more"]').click();
+  await page.locator('[data-role="home-strand"] [data-box="event"] .atlas-home-strand-menu [data-act="edit"]').click();
   const edit = page.locator('[data-role="strand-card"][data-mode="edit"]');
   await edit.locator('[data-field="when"]').fill('1142');
   before = await boxTops(page);
   await edit.locator('[data-act="save"]').click();
   await expect(page.locator('[data-role="home-strand"] [data-box="event"]')).toBeVisible();
-  await expect(lineIn(page, 'event')).toHaveCount(0);
+  await expect(lineWordsIn(page, 'event')).toHaveText('Its year puts it on the timeline in Charts.');
   const afterSave = await boxTops(page);
   const date = movedBetween(before, afterSave);
   const dateBack = movedBetween(beforeEdit, afterSave);
@@ -627,14 +675,14 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
     await api.getActiveStore().updateElement(e, { start_date: null });
     api.patchData(await api.getActiveStore().listElements());
   }, E);
-  await expect(lineIn(page, 'event')).toHaveCount(1);
+  await expect(lineWordsIn(page, 'event')).toHaveText('Give it a date to place it on the timeline in Charts.');
   before = await boxTops(page);
   await page.evaluate(async (e) => {
     const api = (window as any).__atlasTestApi;
     await api.getActiveStore().updateElement(e, { start_date: 1150 });
     api.patchData(await api.getActiveStore().listElements());
   }, E);
-  await expect(lineIn(page, 'event')).toHaveCount(0);
+  await expect(lineWordsIn(page, 'event')).toHaveText('Its year puts it on the timeline in Charts.');
   const dateIn = movedBetween(before, await boxTops(page));
   // 5. A pin placed while Home shows (the map pane beside it, another tab, a pull): the location's line
   // goes to its strut (the code gate's C10).
@@ -668,7 +716,7 @@ for (const tag of ['', ' @firefox']) {
     await expect(page.locator('[data-role="home-strand"] [data-box="now"]')).toBeVisible();
     await expect(page.locator('[data-role="strand-line-strut"]')).toHaveCount(0);
     // W4 (the code gate's C10): a line hidden by its x stays hidden across a reload; the others are drawn.
-    await expect(lineIn(page, 'now')).toHaveCount(1);
+    await expect(lineIn(page, 'event')).toHaveCount(1);
     await page.reload();
     await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
     await page.evaluate(async (w) => {
@@ -678,7 +726,8 @@ for (const tag of ['', ' @firefox']) {
       window.location.hash = `#/w/${w}`;
     }, wid);
     await expect(page.locator('[data-role="home-strand"] [data-box="now"]')).toBeVisible();
-    await expect(lineIn(page, 'now')).toHaveCount(1);
+    await expect(lineIn(page, 'event')).toHaveCount(1);
+    await expect(lineIn(page, 'now')).toHaveCount(0);
     await expect(lineIn(page, 'character')).toHaveCount(0);
     await expect(page.locator('[data-role="strand-line-strut"]')).toHaveCount(0);
   });
@@ -699,8 +748,8 @@ for (const tag of ['', ' @firefox']) {
       await api.getActiveStore().updateElement(s, { protagonist: c });
       api.patchData(await api.getActiveStore().listElements());
     }, [S, C]);
-    await expect(lineWordsIn(page, 'character')).toHaveText('Open their page to see and edit them in full.');
-    await page.locator('[data-role="home-strand"] [data-strand-key="character:page"]').click();
+    await expect(lineWordsIn(page, 'character')).toHaveText('Their page holds everything about them.');
+    await page.locator('[data-role="home-strand"] [data-strand-key="line:character:page"]').click();
     await expect(page.locator('.atlas-middle-header')).toContainText('Odile Varn');
     await page.goBack();
     await expect(page.locator('.atlas-world-home')).toBeVisible();

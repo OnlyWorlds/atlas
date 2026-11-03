@@ -126,6 +126,11 @@ const box = (page: Page, slot: string) => page.locator(`[data-role="home-strand"
 const boxName = (page: Page, slot: string) => box(page, slot).locator('.atlas-home-strand-name');
 const cell = (page: Page, slot: string) => page.locator(`[data-role="home-strand"] [data-slot="${slot}"]`);
 const said = (page: Page) => page.locator('[data-role="strand-say"]');
+/** Edit here, from the box's menu (1.122.0: the box draws no row of buttons). */
+async function editHere(page: Page, slot: string): Promise<void> {
+  await box(page, slot).locator('[data-act="more"]').click();
+  await box(page, slot).locator('.atlas-home-strand-menu [data-act="edit"]').click();
+}
 /** The line above a filled box (1.122.0): its words, without the ×. */
 const line = (page: Page, slot: string) => cell(page, slot).locator('[data-role="strand-line"] .atlas-home-strand-line-text');
 /** A make card's field label, by the field it names. */
@@ -172,7 +177,7 @@ async function journey(page: Page, still = false): Promise<string> {
   // G9: Born written to birth_date in the one create; the box says it on a line of its own.
   expect(await onDisk(page, odile)).toMatchObject({ description: 'A cartographer who paid in maps.', birth_date: 1119 });
   await expect(box(page, 'character').locator('[data-role="strand-box-date"]')).toHaveText('Born 1119');
-  await expect(line(page, 'character')).toHaveText('Open their page to see and edit them in full.');
+  await expect(line(page, 'character')).toHaveText('Their page holds everything about them.');
   expect(await markOnDisk(page)).toEqual({ narrative: story, event: null, location: null });
   await expect(field(page, 'name')).toBeFocused();
   await expect(cardTitle(page)).toHaveText('What happens in The Lantern Ferry?');
@@ -186,8 +191,8 @@ async function journey(page: Page, still = false): Promise<string> {
   expect(await markOnDisk(page)).toEqual({ narrative: story, event, location: null });
   // W2: the Event card writes no character into the Event.
   expect((await onDisk(page, event)).characters).toBeUndefined();
-  // Dated as the timeline reads it: no line asks for a date.
-  await expect(line(page, 'event')).toHaveCount(0);
+  // Dated as the timeline reads it: the line says where its year puts it, Charts its link (the amendment's A1).
+  await expect(line(page, 'event')).toHaveText('Its year puts it on the timeline in Charts.');
   await expect(cardTitle(page)).toHaveText('Where did The night crossing happen?');
   await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Locations are where your stories happen.');
   await expect(fieldLabel(page, 'when')).toHaveText('Founded');
@@ -222,16 +227,25 @@ async function journey(page: Page, still = false): Promise<string> {
   } else {
     await answer(page, 'now', { name: 'The Drowned Library' });
     expect((await onDisk(page, odile)).location).toBe(await idByName(page, 'The Drowned Library'));
-    await expect(line(page, 'now')).toHaveText('Their location is where they are now.');
-    // Every line in the journey's order, top to bottom as drawn (the event's gone: it is dated).
+    // Where they are now has no line (the amendment's A1).
+    await expect(cell(page, 'now').locator('[data-role="strand-line"]')).toHaveCount(0);
+    // Every line in the journey's order, top to bottom as drawn, and each one's link.
     await expect(page.locator('[data-role="home-strand"] [data-role="strand-line"] .atlas-home-strand-line-text')).toHaveText([
-      'In the writing room you can shape it into chapters and scenes.', 'Create a map to pin it in place.',
-      'Open their page to see and edit them in full.', 'Their location is where they are now.',
+      'In the writing room you can shape it into chapters and scenes.', 'Its year puts it on the timeline in Charts.', 'Create a map to pin it in place.',
+      'Their page holds everything about them.',
+    ]);
+    await expect(page.locator('[data-role="home-strand"] [data-role="strand-line"] [data-line-link]')).toHaveText([
+      'the writing room', 'Charts', 'Create a map', 'Their page',
     ]);
     await expect(lines.nth(1)).toHaveText(/Its main character is .*Odile Varn, now in or at .*The Drowned Library\./);
     // Nothing more to ask: the focus goes to the box written.
     await expect(boxName(page, 'now')).toBeFocused();
   }
+  // 1.122.0's amendment, A2: no box draws a row of buttons; each ⋯ holds Edit here, the room door, Use another.
+  await expect(page.locator('[data-role="home-strand"] .atlas-home-strand-box-acts')).toHaveCount(0);
+  await expect(box(page, 'event').locator('.atlas-home-strand-menu > button')).toHaveText(['Edit here', 'Edit in Charts', 'Use another event']);
+  await expect(box(page, 'narrative').locator('.atlas-home-strand-menu > button')).toHaveText(['Edit here', 'Edit in the writing room', 'Use another story']);
+  await expect(box(page, 'character').locator('.atlas-home-strand-menu > button')).toHaveText(['Edit here', 'Use another character']);
   // Whole, and still no head in this visit.
   await expect(page.locator('[data-role="strand-whole"]')).toContainText('The Lantern Ferry is whole.');
   await expect(head(page)).toHaveCount(0);
@@ -355,7 +369,7 @@ async function seeded(page: Page, mark: unknown, storyExtra: Record<string, unkn
 test('Edit writes only the fields changed; a change meanwhile writes nothing and is said', async ({ page }) => {
   await seeded(page, { narrative: N1, event: E1, location: L1 });
   await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
-  await box(page, 'event').locator('[data-act="edit"]').click();
+  await editHere(page, 'event');
   const edit = page.locator('[data-role="strand-card"][data-mode="edit"]');
   await expect(edit.locator('[data-field="name"]')).toBeFocused();
   await expect(edit.locator('[data-field="when"]')).toHaveValue('40');
@@ -365,7 +379,7 @@ test('Edit writes only the fields changed; a change meanwhile writes nothing and
   await expect(boxName(page, 'event')).toBeFocused();
   expect(await onDisk(page, E1)).toMatchObject({ name: 'The Great Fire', description: 'Smoke over the hills.', start_date: 40 });
 
-  await box(page, 'event').locator('[data-act="edit"]').click();
+  await editHere(page, 'event');
   await edit.locator('[data-field="text"]').fill('Mine.');
   // Another tab or pane writes the description meanwhile.
   await page.evaluate(async (id) => {
@@ -382,11 +396,12 @@ test('Edit writes only the fields changed; a change meanwhile writes nothing and
   expect((await onDisk(page, E1)).description).toBe('Mine.');
 
   // Escape on an Edit: back to the box, the focus on Edit, nothing written.
-  await box(page, 'event').locator('[data-act="edit"]').click();
+  await editHere(page, 'event');
   await edit.locator('[data-field="text"]').fill('Never saved.');
   await edit.locator('[data-field="text"]').press('Escape');
   await expect(edit).toHaveCount(0);
-  await expect(box(page, 'event').locator('[data-act="edit"]')).toBeFocused();
+  // Edit here sits in the closed menu: the focus on the menu's button (1.122.0).
+  await expect(box(page, 'event').locator('[data-act="more"]')).toBeFocused();
   expect((await onDisk(page, E1)).description).toBe('Mine.');
 });
 
@@ -394,25 +409,25 @@ test('C1 and C2: a reopened Edit takes a change made meanwhile; a typed name nev
   await seeded(page, { narrative: N1, event: E1, location: L1 }, { protagonist: C1 });
   const edit = page.locator('[data-role="strand-card"][data-mode="edit"]');
   // C1: a name typed on the Event, another box's Edit opened and cancelled, the description changed elsewhere.
-  await box(page, 'event').locator('[data-act="edit"]').click();
+  await editHere(page, 'event');
   await edit.locator('[data-field="name"]').fill('The Great Fire');
-  await box(page, 'character').locator('[data-act="edit"]').click();
+  await editHere(page, 'character');
   await edit.locator('[data-act="cancel"]').click();
   await page.evaluate(async (id) => {
     const api = (window as any).__atlasTestApi;
     await api.getActiveStore().updateElement(id, { description: 'Ash everywhere.' });
     api.patchData(await api.getActiveStore().listElements());
   }, E1);
-  await box(page, 'event').locator('[data-act="edit"]').click();
+  await editHere(page, 'event');
   await expect(edit.locator('[data-field="text"]')).toHaveValue('Ash everywhere.');
   await edit.locator('[data-act="save"]').click();
   await expect(edit).toHaveCount(0);
   expect(await onDisk(page, E1)).toMatchObject({ name: 'The Great Fire', description: 'Ash everywhere.' });
 
   // C2: a name typed on Mira; the story's main character becomes Ilse elsewhere.
-  await box(page, 'character').locator('[data-act="edit"]').click();
+  await editHere(page, 'character');
   await edit.locator('[data-field="name"]').fill('Mira the Bold');
-  await box(page, 'event').locator('[data-act="edit"]').click();
+  await editHere(page, 'event');
   await edit.locator('[data-act="cancel"]').click();
   await page.evaluate(async ({ n, c }) => {
     const api = (window as any).__atlasTestApi;
@@ -420,7 +435,7 @@ test('C1 and C2: a reopened Edit takes a change made meanwhile; a typed name nev
     api.patchData(await api.getActiveStore().listElements());
   }, { n: N1, c: C2 });
   await expect(boxName(page, 'character')).toHaveText('Ilse');
-  await box(page, 'character').locator('[data-act="edit"]').click();
+  await editHere(page, 'character');
   await expect(edit.locator('[data-field="name"]')).toHaveValue('Ilse');
   await edit.locator('[data-act="save"]').click();
   await expect(edit).toHaveCount(0);
