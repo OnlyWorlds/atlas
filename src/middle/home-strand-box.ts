@@ -1,9 +1,10 @@
 /**
- * The strand's filled boxes (R5, R7, R8): each names its element (a press opens its page), shows the
- * first lines of its text (and a Character's Born or a Location's Founded on a line of its own), and
- * holds its acts in a ⋯ beside the name (1.122.0's amendment, A2), each only where it applies: Edit
- * here, the room door where a room edits it (`home-strand-room.ts`), then "Use another <kind>" (today's
- * Change flow, its promise before the second press). The ⋯ shows when it holds anything; the box draws
+ * The strand's filled boxes (R5, R7, R8): each names its element (a press opens its page; a story that
+ * lives in a room, its room), shows the first lines of its text (and a Character's Born or a Location's
+ * Founded on a line of its own), and holds its acts in a ⋯ beside the name (1.122.0's amendment, A2),
+ * each only where it applies: Edit here, the room door where a room edits it and, for a story whose title
+ * opens its room, Open its page (`home-strand-room.ts`), then "Use another <kind>" (today's Change flow,
+ * its promise before the second press). The ⋯ shows when it holds anything; the box draws
  * no row of buttons.
  * The story's box says in two lines how the parts join, each part a chip that brings its box into view.
  * The line above each box is its cell's, never the box's (`buildStrandLine`). Where they are now, when
@@ -96,8 +97,14 @@ function moreMenu(slot: StrandSlot, label: string, items: MenuItem[]): HTMLEleme
     b.setAttribute('data-strand-key', it.key);
     b.textContent = it.label;
     // The focus goes to ⋯ before the item runs: a closed list hides the item, so a dialog it opens (Create
-    // a map) would have nowhere to give the focus back to on Cancel.
-    b.addEventListener('click', () => { close('quiet'); btn.focus({ preventScroll: true }); it.run(); });
+    // a map) would have nowhere to give the focus back to on Cancel. Once it ran, a redraw held while the
+    // menu was open is let go (an item that neither redraws nor navigates, Create a map, left it owed).
+    b.addEventListener('click', () => {
+      close('quiet');
+      btn.focus({ preventScroll: true });
+      it.run();
+      gridClosed(homeRoot());
+    });
     list.appendChild(b);
   }
   btn.addEventListener('click', () => {
@@ -254,8 +261,9 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
     box.appendChild(o.mode === 'promise' ? promiseRow(slot, c, o, opts) : actsRow(slot, c, opts));
     return box;
   }
-  // The box's ⋯ (the amendment's A2): Edit here, the room door where a room edits it, then Use another;
-  // each only where it applies, the ⋯ only when it holds something. The title is the page's way in.
+  // The box's ⋯ (the amendment's A2): Edit here, the room door where a room edits it (and Open its page for
+  // a story whose title opens its room), then Use another; each only where it applies, the ⋯ only when it
+  // holds something. Every other title is the page's way in.
   const items: MenuItem[] = [];
   if (el && !isKnownOf(el) && mayChange(c.entry, el)) {
     items.push({ label: 'Edit here', key: `${slot}:edit`, run: () => {

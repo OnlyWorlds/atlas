@@ -244,7 +244,7 @@ async function journey(page: Page, still = false): Promise<string> {
   // 1.122.0's amendment, A2: no box draws a row of buttons; each ⋯ holds Edit here, the room door, Use another.
   await expect(page.locator('[data-role="home-strand"] .atlas-home-strand-box-acts')).toHaveCount(0);
   await expect(box(page, 'event').locator('.atlas-home-strand-menu > button')).toHaveText(['Edit here', 'Edit in Charts', 'Use another event']);
-  await expect(box(page, 'narrative').locator('.atlas-home-strand-menu > button')).toHaveText(['Edit here', 'Edit in the writing room', 'Use another story']);
+  await expect(box(page, 'narrative').locator('.atlas-home-strand-menu > button')).toHaveText(['Edit here', 'Edit in the writing room', 'Open its page', 'Use another story']);
   await expect(box(page, 'character').locator('.atlas-home-strand-menu > button')).toHaveText(['Edit here', 'Use another character']);
   // Whole, and still no head in this visit.
   await expect(page.locator('[data-role="strand-whole"]')).toContainText('The Lantern Ferry is whole.');

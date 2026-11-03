@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'strand-box-buttons',
         title: 'Each box keeps its actions in its ⋯ menu',
-        body: 'A box on the Strand tab no longer has a row of buttons under it. Its name still opens its page, and the ⋯ beside the name holds Edit here (in place, as before), the room that edits it (Edit in the writing room for the story, Edit in Charts for the event, Pin it on a map for where it happened, or Create a map while the world has none, with nothing filled in), then Use another. Someone who can only read the world finds Open in the writing room, or See it in Charts for an event with a date.',
+        body: 'A box on the Strand tab no longer has a row of buttons under it. Its name still opens its page (a story kept in the writing room, Knowledge or Pages opens there), and the ⋯ beside the name holds Edit here (in place, as before), the room that edits it (Edit in the writing room for the story, Edit in Charts for the event, Pin it on a map for where it happened, or Create a map while the world has none, with nothing filled in), Open its page for a story whose name opens its room, then Use another. Someone who can only read the world finds Open in the writing room and Open its page on such a story, and See it in Charts on an event with a date.',
         tags: ['home'],
       },
       {

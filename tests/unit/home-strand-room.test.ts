@@ -12,6 +12,7 @@ import { mapFor, placedOn, boxDoors } from '../../src/middle/home-strand-room';
 import { bornOrFounded } from '../../src/middle/home-strand-box';
 import { buildStrandPanel, holdStrandRows, openHeadLatch, resetStrandTabForTests, settleStrandFocus, strandContext } from '../../src/middle/home-strand';
 import { memory } from '../../src/middle/home-strand-model';
+import { GRID_CLOSED } from '../../src/middle/home-grid-kinds';
 import { linesOf } from '../../src/core/strand-lines';
 
 const dialogs = vi.hoisted(() => [] as unknown[][]);
@@ -305,7 +306,7 @@ describe('readers who may not change an element (G3)', () => {
       // The title stays the page's way in.
       expect(box(slot).querySelector('[data-strand-key$=":open"]'), slot).not.toBeNull();
     }
-    expect(menuLabels('narrative')).toEqual(['Open in the writing room']);
+    expect(menuLabels('narrative')).toEqual(['Open in the writing room', 'Open its page']);
     expect(menuLabels('event')).toEqual(['See it in Charts']);
     expect(menuLabels('location')).toBeNull();
     expect(menuLabels('character')).toBeNull();
@@ -366,7 +367,7 @@ describe('the box\'s ⋯ (W6, G6; the amendment\'s A2)', () => {
       const buttons = [...box(slot).querySelectorAll<HTMLElement>('button')].filter(b => !b.closest('.atlas-home-strand-menu') && !b.closest('[data-role="strand-lines"]'));
       expect(buttons.map(b => b.getAttribute('data-strand-key')), slot).toEqual([`${slot}:open`, `${slot}:more`]);
     }
-    expect(menuLabels('narrative')).toEqual(['Edit here', 'Edit in the writing room', 'Use another story']);
+    expect(menuLabels('narrative')).toEqual(['Edit here', 'Edit in the writing room', 'Open its page', 'Use another story']);
     expect(menuLabels('event')).toEqual(['Edit here', 'Edit in Charts', 'Use another event']);
     // C3: the location's way to a map, as its line's, kept on the box.
     expect(menuLabels('location')).toEqual(['Edit here', 'Create a map', 'Use another location']);
@@ -409,12 +410,59 @@ describe('the box\'s ⋯ (W6, G6; the amendment\'s A2)', () => {
     expect(focusAtDialog).toEqual(['location:more']);
   });
 
-  it('the title opens the element\'s page in every box (the page\'s way in once Open its page went)', () => {
+  it('the title opens the element\'s page in every box but a story in a room, whose title opens the room', () => {
     world(whole({ start_date: 5 }));
     for (const slot of ['event', 'location', 'character', 'now']) {
       draw();
       box(slot).querySelector<HTMLButtonElement>(`[data-strand-key="${slot}:open"]`)!.click();
       expect(window.location.hash, slot).toBe(`#/w/${W}/element/${IDS[slot]}`);
+    }
+    // A story outside every room: its title is its page, and its ⋯ has no page door.
+    world(whole().map(e => (e.id === N ? el('narrative', N, { supertype: 'Legend', events: [E], protagonist: C }) : e)));
+    draw();
+    box('narrative').querySelector<HTMLButtonElement>('[data-strand-key="narrative:open"]')!.click();
+    expect(window.location.hash).toBe(`#/w/${W}/element/${N}`);
+    expect(menuLabels('narrative')).not.toContain('Open its page');
+  });
+
+  // The amendment's code gate, M1: a story whose title opens its room keeps a way to its page in its ⋯.
+  it('a story in the writing room, Knowledge or Pages: the title opens the room, the ⋯ holds Open its page to the page; for every reader', () => {
+    const story = (extra: Record<string, unknown>) => whole().map(e => (e.id === N ? el('narrative', N, { events: [E], protagonist: C, ...extra }) : e));
+    const rooms: Array<[string, Record<string, unknown>, string, string[]]> = [
+      ['writing', { supertype: 'Book' }, `#/w/${W}/writing/${N}`, ['Edit here', 'Edit in the writing room', 'Open its page', 'Use another story']],
+      ['knowledge', { subtype: 'knowledge' }, `#/w/${W}/knowledge/${N}`, ['Edit here', 'Open in Knowledge', 'Open its page', 'Use another story']],
+      ['pages', { subtype: 'page' }, `#/w/${W}/share/${N}`, ['Edit here', 'Open in Pages', 'Open its page', 'Use another story']],
+    ];
+    for (const [room, extra, roomHash, menu] of rooms) {
+      world(story(extra));
+      draw();
+      box('narrative').querySelector<HTMLButtonElement>('[data-strand-key="narrative:open"]')!.click();
+      expect(window.location.hash, `${room}: the title`).toBe(roomHash);
+      draw();
+      expect(menuLabels('narrative'), room).toEqual(menu);
+      menuItem('narrative', 'Open its page').click();
+      expect(window.location.hash, `${room}: Open its page`).toBe(`#/w/${W}/element/${N}`);
+      expect(memory.askFocus).toEqual({ worldId: W, key: 'narrative:page' });
+      // A reader who may not change it keeps the page door too.
+      world(story(extra), { copy_of: { world_id: 'x' } } as never);
+      draw();
+      expect(menuLabels('narrative'), `${room}, view-only`).toContain('Open its page');
+      expect(menuLabels('narrative'), `${room}, view-only`).not.toContain('Edit here');
+    }
+  });
+
+  it('a press on a ⋯ item lets go of the redraw held while the menu was open, after the item ran', () => {
+    world(whole());
+    draw();
+    const seen: string[] = [];
+    const onClosed = (): void => { seen.push(`closed after ${dialogs.length} dialog(s)`); };
+    document.addEventListener(GRID_CLOSED, onClosed);
+    try {
+      box('location').querySelector<HTMLButtonElement>('[data-act="more"]')!.click();
+      menuItem('location', 'Create a map').click();
+      expect(seen).toEqual(['closed after 1 dialog(s)']);
+    } finally {
+      document.removeEventListener(GRID_CLOSED, onClosed);
     }
   });
 
@@ -468,7 +516,8 @@ describe('the box\'s ⋯ (W6, G6; the amendment\'s A2)', () => {
     // A foreign chain of narratives: the writing room asks its setup first.
     world([...whole(), el('narrative', 'x-saga', { supertype: 'Saga' }), el('narrative', 'x-part', { supertype: 'Part', parent_narrative: 'x-saga' })]);
     draw();
-    expect(menuLabels('narrative')).toEqual(['Edit here', 'Use another story']);
+    // Its title still opens the writing room (which asks its setup first), so its page is a door of its own.
+    expect(menuLabels('narrative')).toEqual(['Edit here', 'Open its page', 'Use another story']);
     expect(line('narrative')).toBeNull();
   });
 
@@ -478,11 +527,12 @@ describe('the box\'s ⋯ (W6, G6; the amendment\'s A2)', () => {
     expect(boxDoors('event', c.byId.get(E)!, c).map(d => d.hash)).toEqual([`#/w/${W}/timeline`]);
   });
 
-  it('a story in Knowledge: Open in Knowledge, and no Open its page among the doors (the title is the page); no story line', () => {
+  it('a story in Knowledge: Open in Knowledge, then Open its page (its title opens Knowledge); no story line', () => {
     world(whole().map(e => (e.id === N ? el('narrative', N, { subtype: 'knowledge', events: [E], protagonist: C }) : e)));
     const c = strandContext(W)!;
     expect(boxDoors('narrative', c.byId.get(N)!, c)).toEqual([
       { label: 'Open in Knowledge', key: 'narrative:room', hash: `#/w/${W}/knowledge/${N}` },
+      { label: 'Open its page', key: 'narrative:page', hash: `#/w/${W}/element/${N}` },
     ]);
     draw();
     expect(line('narrative')).toBeNull();

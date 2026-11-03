@@ -31,14 +31,16 @@
  *   room edits it: Edit in the writing room (a writing story), Edit in Charts (the event), Open in
  *   Knowledge or Open in Pages (a story that lives there), and for the location, where its line could
  *   be, Pin it on a map (a map in view) or Create a map (none), the line's own acts, so its way to a map
- *   stays once the line has gone. The element's page is the box's title. A reader who may not change it
- *   gets the reading words: Open in the writing room, See it in Charts (a dated event). Every door only
+ *   stays once the line has gone. The box's title opens the element's page, except a story that lives in a
+ *   room (the writing room, Knowledge, Pages), whose title opens that room: that story's ⋯ also holds
+ *   Open its page, for every reader. A reader who may not change it gets the reading words: Open in the
+ *   writing room, See it in Charts (a dated event). Every door only
  *   navigates; a press keeps its focus key, so Back puts the focus (and the scroll) on the ⋯ that holds
  *   it.
  */
 
 import type { Element } from '../core/types';
-import { mapHash, navigate, timelineHash, writingHash } from '../core/router';
+import { elementHash, mapHash, navigate, timelineHash, writingHash } from '../core/router';
 import { openElementTarget, roomOf } from '../core/element-room';
 import { mayChange } from '../core/may-change';
 import { isProposed } from '../core/review-mark';
@@ -275,8 +277,11 @@ export interface BoxDoor {
 }
 
 /**
- * A filled box's room door for its ⋯ (W6, G3, G6; the amendment's A2): only where a room edits it, in
- * reading words for a reader who may not change it. The element's page is the box's title, not a door.
+ * A filled box's doors for its ⋯ (W6, G3, G6; the amendment's A2): the room door only where a room edits
+ * it, in reading words for a reader who may not change it. The box's title opens the element as
+ * `openElementTarget` does: the page for every slot but a story that lives in a room (the writing room,
+ * Knowledge, Pages), whose title opens that room; so that story's ⋯ also holds Open its page
+ * (`elementHash`), for every reader. Every other box carries no page door: its title is the page.
  */
 export function boxDoors(slot: StrandSlot, el: Element, c: StrandContext): BoxDoor[] {
   const writer = writerOf(el, c);
@@ -287,6 +292,8 @@ export function boxDoors(slot: StrandSlot, el: Element, c: StrandContext): BoxDo
       doors.push({ label: writer ? 'Edit in the writing room' : 'Open in the writing room', key: `${slot}:room`, hash: writingHash(c.worldId, el.id) });
     } else if (room.label === 'knowledge') doors.push({ label: 'Open in Knowledge', key: `${slot}:room`, hash: room.hash });
     else if (room.label === 'share') doors.push({ label: 'Open in Pages', key: `${slot}:room`, hash: room.hash });
+    // The title opens the room, not the page: the page is a door of its own (the amendment's code gate, M1).
+    if (room.label !== '') doors.push({ label: 'Open its page', key: `${slot}:page`, hash: elementHash(c.worldId, el.id) });
   } else if (slot === 'event') {
     const dated = datedOnTimeline(el);
     // Its place on the timeline; undated, the timeline's own rail, where a date is given.

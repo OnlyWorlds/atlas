@@ -310,7 +310,9 @@ test.describe('the Strand tab', () => {
     await patchEntry(page, { copy_of: { world_id: 'elsewhere' } });
     await expect(page.locator('[data-role="strand-read-only"]')).toHaveText('The owner or a co-builder chooses the strand.');
     // Only a room's door in a box's ⋯ (1.122.0), which navigates and never writes; each title opens its page; no line (G3).
-    await expect(page.locator('[data-role="home-strand"] [data-act]:not([data-act="room"]):not([data-act="more"])')).toHaveCount(0);
+    await expect(page.locator('[data-role="home-strand"] [data-act]:not([data-act="room"]):not([data-act="more"]):not([data-act="page"])')).toHaveCount(0);
+    // Only a story whose title opens its room carries Open its page (the code gate of the amendment, M1).
+    await expect(page.locator('[data-role="home-strand"] [data-box]:not([data-box="narrative"]) [data-act="page"]')).toHaveCount(0);
     await expect(page.locator('[data-role="home-strand"] [data-box] [data-strand-key$=":open"]').first()).toBeVisible();
     await expect(page.locator('[data-role="home-strand"] [data-role="strand-line"]')).toHaveCount(0);
     await expect(page.locator('[data-role="strand-card"]')).toHaveCount(0);

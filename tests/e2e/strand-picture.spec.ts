@@ -263,6 +263,8 @@ for (const tag of ['', ' @firefox']) {
   });
 
   test(`each box's doors and the lines' links land where they say, and Back puts the focus on them${tag}`, async ({ page }) => {
+    // Eleven round trips to a room and back: more than the default budget on a loaded machine.
+    test.slow();
     await page.setViewportSize({ width: 1440, height: 900 });
     const wid = await wholeStrand(page, { map: true });
     await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
@@ -288,6 +290,9 @@ for (const tag of ['', ' @firefox']) {
         await expect(empty).toHaveCount(0);
       }, 'narrative:open'],
       ['narrative:room', 'Edit in the writing room', `#/w/${wid}/writing/${S}`, writingRoom, 'narrative:more'],
+      // The story's title opens its room, so its page is a door in its menu (the amendment's code gate, M1).
+      ['narrative:open', 'The Lantern Ferry', `#/w/${wid}/writing/${S}`, writingRoom, ''],
+      ['narrative:page', 'Open its page', `#/w/${wid}/element/${S}`, async p => { await header(p, 'The Lantern Ferry'); }, 'narrative:more'],
       ['event:room', 'Edit in Charts', `#/w/${wid}/timeline/${E}`, async p => { await expect(p.locator('.atlas-world-home')).toHaveCount(0); }, 'event:more'],
       // Dated: the line's Charts goes to its place on the timeline.
       ['line:event:charts', 'Charts', `#/w/${wid}/timeline/${E}`, async p => { await expect(p.locator('.atlas-world-home')).toHaveCount(0); }, 'line:event:charts'],
@@ -306,7 +311,7 @@ for (const tag of ['', ' @firefox']) {
       const act = page.locator(`[data-role="home-strand"] [data-strand-key="${key}"]`);
       await expect(act, key).toHaveText(label);
       const slot = key.split(':')[0];
-      if (key.endsWith(':room')) await page.locator(`[data-role="home-strand"] [data-strand-key="${slot}:more"]`).click();
+      if (!key.startsWith('line:') && (key.endsWith(':room') || key.endsWith(':page'))) await page.locator(`[data-role="home-strand"] [data-strand-key="${slot}:more"]`).click();
       await act.click();
       await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(hash);
       await landed(page);
@@ -326,6 +331,32 @@ for (const tag of ['', ' @firefox']) {
       const s = (window as any).__atlasTestApi.getState();
       return s.registry.worlds.find((w: any) => w.id === s.active.worldId)?.strand_lines?.opened?.length ?? 0;
     })).toBe(2);
+  });
+}
+
+// 1.122.0's amendment, A2: the ⋯ sits at the end of its box's name row, beside a long name that wraps inside
+// its button, never pushed onto a row of its own.
+for (const [w, h] of [[1440, 900], [390, 844]] as const) {
+  test(`each box's ⋯ sits beside its name, on the name's row, with long names, at ${w}`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await wholeStrand(page, { names: [
+      'The Lantern Ferry Across the Black Lake of the North', 'The night crossing in the great storm of the year',
+      'Saltmere Quay under the Seven Grey Lighthouses', 'Odile Varn, cartographer of the drowned coast', 'The Drowned Library beneath the harbour',
+    ] });
+    await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+    const rows = await page.locator('[data-role="home-strand"] [data-box]').evaluateAll(boxes => boxes.map(b => {
+      const name = b.querySelector('.atlas-home-strand-name')!.getBoundingClientRect();
+      const more = b.querySelector('[data-act="more"]')?.getBoundingClientRect();
+      return { slot: b.getAttribute('data-box'), nameH: Math.round(name.height), more: !!more,
+        sameRow: !!more && more.top < name.bottom && more.bottom > name.top, beside: !!more && more.left >= name.right - 1 };
+    }));
+    expect(rows.length).toBe(5);
+    // Each long name wraps (taller than one line), and its ⋯ stays beside it on its row.
+    for (const r of rows) {
+      expect(r.more, r.slot!).toBe(true);
+      expect(r.sameRow && r.beside, `${r.slot}: the ⋯ beside the name, on its row (${JSON.stringify(r)})`).toBe(true);
+    }
+    expect(rows.some(r => r.nameH > 40), JSON.stringify(rows)).toBe(true);
   });
 }
 

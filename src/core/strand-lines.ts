@@ -76,7 +76,8 @@ const lower = (label: string | undefined, fallback: string): string => pluralize
 
 /**
  * The line above a filled box, or null for none. Every way a line goes loses no door: the box's title
- * opens its page, and its ⋯ holds the room and map doors (1.122.0's amendment, Promise 1).
+ * opens its page (a story in a room: its ⋯ holds Open its page), and its ⋯ holds the room and map doors
+ * (1.122.0's amendment, Promise 1).
  */
 export function strandLine(f: LineFacts, rec: StrandLines): LinePiece[] | null {
   if (!f.writer) return null;
