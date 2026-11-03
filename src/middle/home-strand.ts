@@ -172,12 +172,19 @@ export function settleStrandFocus(root: HTMLElement, kept: string | null): void 
   memory.askFocus = null;
   const key = ask ?? kept;
   if (!key) return;
+  const firstIn = (slot: string): HTMLElement | null => {
+    const cell = root.querySelector<HTMLElement>(`[data-role="home-strand"] [data-slot="${cssEscape(slot)}"]`);
+    return cell ? cell.querySelector<HTMLElement>('[data-strand-key]') ?? null : null;
+  };
   let target: HTMLElement | null;
   if (key.startsWith('next:')) target = nextStop(root, key.slice(5));
-  else if (key.startsWith('box:')) {
-    const cell = root.querySelector<HTMLElement>(`[data-role="home-strand"] [data-slot="${cssEscape(key.slice(4))}"]`);
-    target = cell ? cell.querySelector<HTMLElement>('[data-strand-key]') ?? null : null;
-  } else target = root.querySelector<HTMLElement>(`[data-strand-key="${cssEscape(key)}"]`);
+  else if (key.startsWith('box:')) target = firstIn(key.slice(4));
+  else target = root.querySelector<HTMLElement>(`[data-strand-key="${cssEscape(key)}"]`);
+  // A line's link whose line has gone (its page or room opened): the box's first control (1.122.0).
+  if (!target && key.startsWith('line:')) target = firstIn(key.split(':')[1] ?? '');
+  // An item of a closed ⋯ (Edit here, a room door, after Back or Cancel): the ⋯ that holds it (A2).
+  const menu = target?.closest<HTMLElement>('.atlas-home-strand-menu');
+  if (menu?.hidden) target = menu.parentElement?.querySelector<HTMLElement>('[data-act="more"]') ?? null;
   // An asked control not drawn (no head for "tab-strand", a slot not asked): the panel's first control.
   if (!target && ask && (key.startsWith('tab-') || key.startsWith('card:'))) target = panelFirst(root);
   if (!target) return;

@@ -1,8 +1,10 @@
 /**
- * The strand's filled boxes (R5, R7, R8): each names its element (a press opens it), shows the first
- * lines of its text (and a Character's Born or a Location's Founded on a line of its own), and offers
- * Edit here, Open its page, a third door where a room edits it (`home-strand-room.ts`, 1.122.0) and a ⋯
- * disclosure holding "Use another <kind>" (today's Change flow, its promise before the second press).
+ * The strand's filled boxes (R5, R7, R8): each names its element (a press opens its page), shows the
+ * first lines of its text (and a Character's Born or a Location's Founded on a line of its own), and
+ * holds its acts in a ⋯ beside the name (1.122.0's amendment, A2), each only where it applies: Edit
+ * here, the room door where a room edits it (`home-strand-room.ts`), then "Use another <kind>" (today's
+ * Change flow, its promise before the second press). The ⋯ shows when it holds anything; the box draws
+ * no row of buttons.
  * The story's box says in two lines how the parts join, each part a chip that brings its box into view.
  * The line above each box is its cell's, never the box's (`buildStrandLine`). Where they are now, when
  * it is where it happened, is one line in its cell with its own ⋯. Once all five are filled, one line
@@ -28,8 +30,8 @@ import { typeNameStart } from '../core/type-words';
 import { openWebOn } from '../ui/open-web';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { isSkipped, memory, type StrandContext } from './home-strand-model';
-import { act, actsRow, promiseRow, stampOf, type StrandPanelOptions } from './home-strand-acts';
-import { buildBoxDoors } from './home-strand-room';
+import { actsRow, promiseRow, stampOf, type StrandPanelOptions } from './home-strand-acts';
+import { buildBoxDoors, type MenuItem } from './home-strand-room';
 
 const homeRoot = (): HTMLElement => document.querySelector<HTMLElement>('.atlas-world-home') ?? document.body;
 
@@ -51,10 +53,11 @@ function keepInView(list: HTMLElement): void {
 }
 
 /**
- * The ⋯ disclosure:a plain list of buttons under its opener (`aria-expanded`), holding Home's redraws
+ * The ⋯ disclosure: a plain list of buttons under its opener (`aria-expanded`), holding Home's redraws
  * while open, closed by a press outside or the focus leaving, Escape owned with the focus back on ⋯.
+ * Each item's `data-act` is its key's last word (edit, room, another), so a write in flight holds it.
  */
-function moreMenu(slot: StrandSlot, label: string, items: Array<{ label: string; key: string; run: () => void }>): HTMLElement {
+function moreMenu(slot: StrandSlot, label: string, items: MenuItem[]): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-home-strand-more';
   const btn = document.createElement('button');
@@ -89,7 +92,7 @@ function moreMenu(slot: StrandSlot, label: string, items: Array<{ label: string;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'atlas-home-strand-menu-item';
-    b.setAttribute('data-act', 'another');
+    b.setAttribute('data-act', it.key.split(':').pop()!);
     b.setAttribute('data-strand-key', it.key);
     b.textContent = it.label;
     b.addEventListener('click', () => { close('quiet'); it.run(); });
@@ -249,29 +252,21 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
     box.appendChild(o.mode === 'promise' ? promiseRow(slot, c, o, opts) : actsRow(slot, c, opts));
     return box;
   }
-  // The box's doors (1.122.0, W6): Edit here, Open its page, and a room's where one edits it.
-  const canEdit = !!el && !isKnownOf(el) && mayChange(c.entry, el);
-  const doors = el ? buildBoxDoors(slot, el, c, opts.redraw) : [];
-  if (canEdit || another || doors.length > 0) {
-    const acts = document.createElement('div');
-    acts.className = 'atlas-home-strand-box-acts';
-    if (canEdit) {
-      acts.appendChild(act('Edit here', `${slot}:edit`, () => {
-        memory.said = null;
-        const { values, raw } = editOpening(el!);
-        memory.editing = { worldId: c.worldId, slot, id: el!.id, opened: values, raw };
-        memory.askFocus = { worldId: c.worldId, key: `edit:${slot}:name` };
-        opts.redraw();
-      }, 'atlas-btn-ghost'));
-    }
-    for (const d of doors) acts.appendChild(d);
-    if (another) {
-      acts.appendChild(moreMenu(slot, `More for ${name.textContent}`, [
-        { label: `Use another ${SLOT_OTHER[slot]}`, key: `${slot}:another`, run: useAnother(slot, c, opts) },
-      ]));
-    }
-    box.appendChild(acts);
+  // The box's ⋯ (the amendment's A2): Edit here, the room door where a room edits it, then Use another;
+  // each only where it applies, the ⋯ only when it holds something. The title is the page's way in.
+  const items: MenuItem[] = [];
+  if (el && !isKnownOf(el) && mayChange(c.entry, el)) {
+    items.push({ label: 'Edit here', key: `${slot}:edit`, run: () => {
+      memory.said = null;
+      const { values, raw } = editOpening(el);
+      memory.editing = { worldId: c.worldId, slot, id: el.id, opened: values, raw };
+      memory.askFocus = { worldId: c.worldId, key: `edit:${slot}:name` };
+      opts.redraw();
+    } });
   }
+  if (el) items.push(...buildBoxDoors(slot, el, c, opts.redraw));
+  if (another) items.push({ label: `Use another ${SLOT_OTHER[slot]}`, key: `${slot}:another`, run: useAnother(slot, c, opts) });
+  if (items.length > 0) nameRow.appendChild(moreMenu(slot, `More for ${name.textContent}`, items));
   return box;
 }
 

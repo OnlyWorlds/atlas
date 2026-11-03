@@ -1,13 +1,13 @@
 /**
- * The strand's lines (Atlas 1.122.0): one italic line above each filled box that asks for a fact or
- * points at a room, and the record of which lines are done with in this browser.
+ * The strand's lines (Atlas 1.122.0): one italic line above a filled box that points at a room and
+ * carries its link inline, and the record of which lines are done with in this browser.
  *
  *   `strandLine` is the whole rule, pure: given what the box knows (its slot, the reader, the facts read
- *   from the world on this draw) and the record, either no line or its pieces. A line that asks for a
- *   fact goes once the fact holds (the event dated as the timeline reads it, the location placed by a
- *   settled pin on a map in view); the story's goes once the writing room was opened on it, the main
- *   character's once their page was opened; any line goes on its ×; where they are now goes on its ×
- *   only. A reader who may not change the element sees no line.
+ *   from the world on this draw) and the record, either no line or its pieces, the link among them. The
+ *   story's goes once the writing room was opened on it, the main character's once their page was
+ *   opened, the location's once a settled pin places it on a map in view; the event's changes its words
+ *   once the timeline places it and goes on its × only; any line goes on its ×. Where they are now has
+ *   no line. A reader who may not change the element sees no line.
  *
  *   The record (`strand_lines` on this browser's registry entry for the world) holds keys
  *   `<slot>:<element id>`: `hidden` (the ×) and `opened` (the room or the page). It never enters
@@ -63,14 +63,20 @@ export interface LineFacts {
   placed?: boolean;
 }
 
+/**
+ * Where a line's link goes: the element's page, the writing room on the story, the timeline in Charts,
+ * or the location's map acts. Each only navigates or opens a dialog.
+ */
+export type LineLink = 'page' | 'writing' | 'charts' | 'create-map' | 'pin-map';
+
 /** A run of words, or a link the box draws as a button that only navigates or opens a dialog. */
-export type LinePiece = { text: string } | { link: 'charts' | 'create-map' | 'pin-map'; text: string };
+export type LinePiece = { text: string } | { link: LineLink; text: string };
 
 const lower = (label: string | undefined, fallback: string): string => pluralize((label ?? '').trim().toLowerCase() || fallback);
 
 /**
- * The line above a filled box, or null for none. Every way a line goes keeps the box's buttons, which
- * carry the same doors (the contract's Promise 4).
+ * The line above a filled box, or null for none. Every way a line goes loses no door: the box's title
+ * opens its page, and its ⋯ holds the room and map doors (1.122.0's amendment, Promise 1).
  */
 export function strandLine(f: LineFacts, rec: StrandLines): LinePiece[] | null {
   if (!f.writer) return null;
@@ -80,21 +86,23 @@ export function strandLine(f: LineFacts, rec: StrandLines): LinePiece[] | null {
     case 'narrative': {
       if (!f.writing || rec.opened.includes(key)) return null;
       const l = f.writing.labels;
-      if (f.writing.tier === 'l1') return [{ text: `In the writing room you can shape it into ${lower(l.l2, 'chapter')} and ${lower(l.l3, 'scene')}.` }];
-      if (f.writing.tier === 'l2') return [{ text: `In the writing room you can shape it into ${lower(l.l3, 'scene')}.` }];
-      return null;
+      const into = f.writing.tier === 'l1' ? `${lower(l.l2, 'chapter')} and ${lower(l.l3, 'scene')}`
+        : f.writing.tier === 'l2' ? lower(l.l3, 'scene') : null;
+      return into ? [{ text: 'In ' }, { link: 'writing', text: 'the writing room' }, { text: ` you can shape it into ${into}.` }] : null;
     }
     case 'character':
-      return rec.opened.includes(key) ? null : [{ text: 'Open their page to see and edit them in full.' }];
+      return rec.opened.includes(key) ? null : [{ link: 'page', text: 'Their page' }, { text: ' holds everything about them.' }];
     case 'event':
-      return f.dated ? null : [{ text: 'Give it a date to place it in a timeline in ' }, { link: 'charts', text: 'Charts' }, { text: '.' }];
+      return f.dated
+        ? [{ text: 'Its year puts it on the timeline in ' }, { link: 'charts', text: 'Charts' }, { text: '.' }]
+        : [{ text: 'Give it a date to place it on the timeline in ' }, { link: 'charts', text: 'Charts' }, { text: '.' }];
     case 'location':
       if (!f.acts || f.placed) return null;
       return f.hasMap
         ? [{ link: 'pin-map', text: 'Pin it on a map' }, { text: '.' }]
         : [{ link: 'create-map', text: 'Create a map' }, { text: ' to pin it in place.' }];
     case 'now':
-      return [{ text: 'Their location is where they are now.' }];
+      return null;
   }
 }
 

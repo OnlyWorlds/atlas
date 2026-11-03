@@ -7,41 +7,46 @@
  *   reader who may not change the element gets no line, and the location's only where the grid acts
  *   (never the demo, Moppetopia or a view-only world, so no map dialog there: conv. 149).
  *
- *     Story: "In the writing room you can shape it into <l2s> and <l3s>." (the world's tiers), while the
- *       story is in the writing room and writing is set up.
- *     Event: "Give it a date to place it in a timeline in Charts.", Charts a link to the timeline;
- *       gone once the timeline itself places it (its own parse of `start_date`).
- *     Location: no map in view, "Create a map to pin it in place." (Create a map opens the Maps panel's
- *       own New map dialog, nothing filled in); a map, "Pin it on a map." (the map `mapFor` names,
- *       opened with the location's page, whose header offers +pin; on a narrow window the right drawer);
- *       gone once a settled pin places it on a map in view.
- *     Character: "Open their page to see and edit them in full."; gone once that page was opened.
- *     Now: "Their location is where they are now."; gone on its × only.
+ *   Each line carries its link inline (1.122.0's amendment, A1); the link is the words in brackets:
+ *     Story: "In [the writing room] you can shape it into <l2s> and <l3s>." (the world's tiers), while
+ *       the story is in the writing room and writing is set up; the link opens the writing room on it.
+ *       Gone once the writing room was opened on it.
+ *     Character: "[Their page] holds everything about them."; the link opens their page, as the box's
+ *       title does. Gone once that page was opened.
+ *     Event: undated, "Give it a date to place it on the timeline in [Charts]." (the timeline, where a
+ *       date is given); dated (the timeline's own parse of `start_date`), "Its year puts it on the
+ *       timeline in [Charts]." (its place there). It changes words, and goes on its × only.
+ *     Location: no map in view, "[Create a map] to pin it in place." (the Maps panel's own New map
+ *       dialog, nothing filled in); a map, "[Pin it on a map]." (the map `mapFor` names, opened with the
+ *       location's page, whose header offers +pin; on a narrow window the right drawer); gone once a
+ *       settled pin places it on a map in view.
+ *     Where they are now: no line.
  *
- *   A line that goes during a visit (×, a date saved, a pin placed, a room opened in another tab) keeps
- *   its height as an empty `aria-hidden` strut until Home's next opening, and a line whose words change
- *   keeps its tallest height: the words and the × go at once, the space stays, so no box below moves
- *   (`lineHold`, read after each draw by `holdStrandLines`, let go where the rows' hold is).
+ *   A line that goes during a visit (×, a pin placed, a room opened in another tab) keeps its height as
+ *   an empty `aria-hidden` strut until Home's next opening, and a line whose words change keeps its
+ *   tallest height: the words and the × go at once, the space stays, so no box below moves (`lineHold`,
+ *   read after each draw by `holdStrandLines`, let go where the rows' hold is).
  *
- *   The doors: each filled box offers Edit here (a reader who may change it), Open its page (the
- *   element's page, `elementHash`), and a third only where a room edits it: Edit in the writing room
- *   (a writing story), Edit in Charts (the event), Open in Knowledge or Open in Pages (a story that
- *   lives there), and for the location, where its line could be, Pin it on a map (a map in view) or
- *   Create a map (none), the line's own acts, so its way to a map stays once the line has gone. A reader who may not change it gets the reading words: Open in the writing room, See
- *   it in Charts (a dated event). Every door only navigates; a press keeps its focus key, so Back puts
- *   the focus (and the scroll) on it.
+ *   The doors (`boxDoors`), drawn in the box's ⋯ after Edit here (`home-strand-box.ts`): only where a
+ *   room edits it: Edit in the writing room (a writing story), Edit in Charts (the event), Open in
+ *   Knowledge or Open in Pages (a story that lives there), and for the location, where its line could
+ *   be, Pin it on a map (a map in view) or Create a map (none), the line's own acts, so its way to a map
+ *   stays once the line has gone. The element's page is the box's title. A reader who may not change it
+ *   gets the reading words: Open in the writing room, See it in Charts (a dated event). Every door only
+ *   navigates; a press keeps its focus key, so Back puts the focus (and the scroll) on the ⋯ that holds
+ *   it.
  */
 
 import type { Element } from '../core/types';
-import { elementHash, mapHash, navigate, timelineHash, writingHash } from '../core/router';
-import { roomOf } from '../core/element-room';
+import { mapHash, navigate, timelineHash, writingHash } from '../core/router';
+import { openElementTarget, roomOf } from '../core/element-room';
 import { mayChange } from '../core/may-change';
 import { isProposed } from '../core/review-mark';
 import { isKnownOf } from '../sync/known-of';
 import { spatialMapOf, spatialOtherOf } from '../core/world-links';
 import type { StrandSlot } from '../core/strand';
 import { getState } from '../core/state';
-import { lineKey, linesOf, noteStrandLine, strandLine, type LineFacts } from '../core/strand-lines';
+import { lineKey, linesOf, noteStrandLine, strandLine, type LineFacts, type LineLink } from '../core/strand-lines';
 import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { getTierForNarrative, getWritingLabels, isWritingInitialized } from './writing-helpers';
 import { gridActsIn } from './home-grow';
@@ -240,12 +245,19 @@ function mapAct(kind: 'create-map' | 'pin-map', el: Element, c: StrandContext, t
   if (map) navigateWithMap(mapHash(c.worldId, map.id, el.id));
 }
 
-/** A link inside a line: navigation, or the Maps panel's own New map dialog; never a write of its own. */
-function lineLink(kind: 'charts' | 'create-map' | 'pin-map', label: string, slot: StrandSlot, el: Element, c: StrandContext, redraw: () => void): HTMLElement {
+/**
+ * A link inside a line: navigation (the element's page as its box's title opens it, the writing room
+ * on the story, the timeline: an undated event's rail, a dated one's place), or the Maps panel's own
+ * New map dialog; never a write of its own. Back asks the focus for the link; once the line went (the
+ * page or the room opened), `settleStrandFocus` falls back to the box.
+ */
+function lineLink(kind: LineLink, label: string, slot: StrandSlot, el: Element, c: StrandContext, redraw: () => void): HTMLElement {
   const focusKey = `line:${slot}:${kind}`;
   const b = act(label, focusKey, () => {
     memory.askFocus = { worldId: c.worldId, key: focusKey };
-    if (kind === 'charts') navigate(timelineHash(c.worldId));
+    if (kind === 'page') openElementTarget(el, c.worldId);
+    else if (kind === 'writing') navigate(writingHash(c.worldId, el.id));
+    else if (kind === 'charts') navigate(datedOnTimeline(el) ? timelineHash(c.worldId, el.id) : timelineHash(c.worldId));
     else mapAct(kind, el, c, `line:${slot}:pin-map`, redraw);
   }, 'atlas-btn-link atlas-home-strand-line-link');
   b.setAttribute('data-line-link', kind);
@@ -263,12 +275,12 @@ export interface BoxDoor {
 }
 
 /**
- * A filled box's ways out beside Edit here (W6, G3, G6): Open its page in every box, and a third only
- * where a room edits it, in reading words for a reader who may not change it.
+ * A filled box's room door for its ⋯ (W6, G3, G6; the amendment's A2): only where a room edits it, in
+ * reading words for a reader who may not change it. The element's page is the box's title, not a door.
  */
 export function boxDoors(slot: StrandSlot, el: Element, c: StrandContext): BoxDoor[] {
   const writer = writerOf(el, c);
-  const doors: BoxDoor[] = [{ label: 'Open its page', key: `${slot}:page`, hash: elementHash(c.worldId, el.id) }];
+  const doors: BoxDoor[] = [];
   if (slot === 'narrative') {
     const room = roomOf(el, c.worldId);
     if (room.label === 'writing' && writingRoomOf(el, c)) {
@@ -290,11 +302,22 @@ export function boxDoors(slot: StrandSlot, el: Element, c: StrandContext): BoxDo
   return doors;
 }
 
-/** The doors as buttons (link-styled; held as every act while a write is in flight). */
-export function buildBoxDoors(slot: StrandSlot, el: Element, c: StrandContext, redraw: () => void): HTMLElement[] {
-  return boxDoors(slot, el, c).map(d => act(d.label, d.key, () => {
-    memory.askFocus = { worldId: c.worldId, key: d.key };
-    if (d.map) mapAct(d.map, el, c, d.key, redraw);
-    else if (d.hash) navigate(d.hash);
-  }, 'atlas-btn-link'));
+/** A ⋯ menu's item: its words, its focus key, and what a press does. */
+export interface MenuItem {
+  label: string;
+  key: string;
+  run: () => void;
+}
+
+/** The doors as the ⋯ menu's items (held as every act while a write is in flight: `data-act`). */
+export function buildBoxDoors(slot: StrandSlot, el: Element, c: StrandContext, redraw: () => void): MenuItem[] {
+  return boxDoors(slot, el, c).map(d => ({
+    label: d.label,
+    key: d.key,
+    run: () => {
+      memory.askFocus = { worldId: c.worldId, key: d.key };
+      if (d.map) mapAct(d.map, el, c, d.key, redraw);
+      else if (d.hash) navigate(d.hash);
+    },
+  }));
 }

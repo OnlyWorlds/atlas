@@ -18030,7 +18030,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-box { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 12px; border: 1px solid var(--atlas-divider-strong); border-left: 3px solid var(--type-color, var(--atlas-accent)); border-radius: 8px; background: var(--atlas-bg-panel); }
 .atlas-home-strand-box-head { display: flex; align-items: center; gap: 6px; color: var(--atlas-text-muted); font-size: 0.78rem; letter-spacing: 0.04em; }
 .atlas-home-strand-box-head .material-symbols-outlined { font-size: 18px; color: var(--type-color, var(--atlas-accent)); }
-.atlas-home-strand-box-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+/* The name row holds the box's ⋯ at its end (1.122.0): a long name wraps inside its button, never pushing the ⋯ to a row of its own. */
+.atlas-home-strand-box-name { display: flex; align-items: center; gap: 6px 10px; min-width: 0; }
+.atlas-home-strand-box-name > .atlas-home-strand-name { flex: 0 1 auto; min-width: 0; }
+.atlas-home-strand-box-name > .atlas-home-strand-more { flex: 0 0 auto; }
+.atlas-home-strand-box-name .atlas-home-strand-more-btn { min-height: 28px; }
 .atlas-home-strand-name { min-height: 28px; max-width: 100%; font-size: 1rem; font-weight: 600; color: var(--atlas-text); text-align: left; text-decoration: none; overflow-wrap: anywhere; }
 .atlas-home-strand-name:hover { text-decoration: underline; }
 .atlas-home-strand-box.is-story .atlas-home-strand-name { font-size: 1.2rem; }
@@ -18053,11 +18057,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-chip:hover { background: var(--atlas-bg-hover); }
 .atlas-home-strand-chip .material-symbols-outlined { flex: 0 0 auto; font-size: 15px; color: var(--type-color, var(--atlas-accent)); }
 .atlas-home-strand-chip-name { min-width: 0; overflow-wrap: anywhere; }
-.atlas-home-strand-box-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-/* The location's map door is as wide for "Create a map" as for "Pin it on a map", so a map made never
-   re-wraps the box's buttons and moves the boxes below (1.122.0). */
-.atlas-home-strand-box-acts > [data-strand-key="location:room"] { min-width: 6.6rem; text-align: left; }
-.atlas-home-strand-box-acts > .atlas-btn-link, .atlas-home-strand-card-acts > .atlas-btn-link, .atlas-home-strand-cell.is-add > .atlas-btn-link, .atlas-home-strand-card-same > .atlas-btn-link { min-height: 30px; font-size: 0.86rem; }
+.atlas-home-strand-card-acts > .atlas-btn-link, .atlas-home-strand-cell.is-add > .atlas-btn-link, .atlas-home-strand-card-same > .atlas-btn-link { min-height: 30px; font-size: 0.86rem; }
 .atlas-home-strand-quiet { color: var(--atlas-text-soft); }
 .atlas-home-strand-more { position: relative; margin-left: auto; }
 .atlas-home-strand-more-btn { min-width: 30px; padding: 0 6px; display: inline-grid; place-items: center; }

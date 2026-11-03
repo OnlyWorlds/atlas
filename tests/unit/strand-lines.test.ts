@@ -29,6 +29,10 @@ describe('strandLine: each slot\'s line, and when it goes', () => {
   const writing = { tier: 'l1' as const, labels: DEFAULT_WRITING_LABELS };
 
   it('the story: in the writing room\'s words by the world\'s tiers; gone once the room was opened on it, or on its ×', () => {
+    // The amendment's A1: "the writing room" is the line's link to the room on the story.
+    expect(strandLine(f('narrative', { writing }), NO_LINES)).toEqual([
+      { text: 'In ' }, { link: 'writing', text: 'the writing room' }, { text: ' you can shape it into chapters and scenes.' },
+    ]);
     expect(words(f('narrative', { writing }))).toBe('In the writing room you can shape it into chapters and scenes.');
     expect(words(f('narrative', { writing: { tier: 'l1', labels: { l1: 'Saga', l2: 'Act', l3: 'Story', l4: 'Draft' } } }))).toBe('In the writing room you can shape it into acts and stories.');
     expect(words(f('narrative', { writing: { tier: 'l2', labels: DEFAULT_WRITING_LABELS } }))).toBe('In the writing room you can shape it into scenes.');
@@ -41,20 +45,26 @@ describe('strandLine: each slot\'s line, and when it goes', () => {
     expect(words(f('narrative', { writing }), hidden('narrative'))).toBeNull();
   });
 
-  it('the main character: their page; gone once it was opened, or on its ×', () => {
-    expect(words(f('character'))).toBe('Open their page to see and edit them in full.');
+  it('the main character: their page, the link; gone once it was opened, or on its ×', () => {
+    expect(strandLine(f('character'), NO_LINES)).toEqual([{ link: 'page', text: 'Their page' }, { text: ' holds everything about them.' }]);
+    expect(words(f('character'))).toBe('Their page holds everything about them.');
     expect(words(f('character'), opened('character'))).toBeNull();
     expect(words(f('character'), hidden('character'))).toBeNull();
   });
 
-  it('the event: a date asked, Charts a link; gone once the timeline places it, or on its ×', () => {
+  it('the event: undated, a date asked; dated, other words; Charts the link in both; gone on its × only', () => {
     expect(strandLine(f('event', { dated: false }), NO_LINES)).toEqual([
-      { text: 'Give it a date to place it in a timeline in ' }, { link: 'charts', text: 'Charts' }, { text: '.' },
+      { text: 'Give it a date to place it on the timeline in ' }, { link: 'charts', text: 'Charts' }, { text: '.' },
     ]);
-    expect(words(f('event', { dated: true }))).toBeNull();
+    // The amendment's A1: a date no longer takes the line, it changes its words.
+    expect(strandLine(f('event', { dated: true }), NO_LINES)).toEqual([
+      { text: 'Its year puts it on the timeline in ' }, { link: 'charts', text: 'Charts' }, { text: '.' },
+    ]);
     expect(words(f('event', { dated: false }), hidden('event'))).toBeNull();
-    // Opened marks never take the event's line: only its fact or its ×.
+    expect(words(f('event', { dated: true }), hidden('event'))).toBeNull();
+    // Opened marks never take the event's line: only its ×.
     expect(words(f('event', { dated: false }), opened('event'))).not.toBeNull();
+    expect(words(f('event', { dated: true }), opened('event'))).not.toBeNull();
   });
 
   it('the location in its three states: no map, a map it is not on, placed', () => {
@@ -70,10 +80,9 @@ describe('strandLine: each slot\'s line, and when it goes', () => {
     expect(words(f('location', { acts: false, hasMap: false }))).toBeNull();
   });
 
-  it('where they are now: one line, gone on its × only', () => {
-    expect(words(f('now'))).toBe('Their location is where they are now.');
-    expect(words(f('now'), opened('now'))).toBe('Their location is where they are now.');
-    expect(words(f('now'), hidden('now'))).toBeNull();
+  it('where they are now: no line (the amendment retires it)', () => {
+    expect(strandLine(f('now'), NO_LINES)).toBeNull();
+    expect(strandLine(f('now', { acts: true, hasMap: true, dated: false }), NO_LINES)).toBeNull();
   });
 
   it('a reader who may not change the element sees no line, in every slot', () => {
@@ -83,18 +92,30 @@ describe('strandLine: each slot\'s line, and when it goes', () => {
   });
 
   it('a × is per element: another element in the slot has its own line', () => {
-    expect(words(f('character', { id: 'x2' }), hidden('character'))).toBe('Open their page to see and edit them in full.');
+    expect(words(f('character', { id: 'x2' }), hidden('character'))).toBe('Their page holds everything about them.');
   });
 
-  it('no line has an em-dash or the word "year"', () => {
+  it('no line has an em-dash; only the dated event\'s says "year" (the amendment\'s words)', () => {
     const all = [
       f('narrative', { writing }), f('narrative', { writing: { tier: 'l2', labels: DEFAULT_WRITING_LABELS } }), f('character'), f('event', { dated: false }),
-      f('location', { acts: true, hasMap: false }), f('location', { acts: true, hasMap: true }), f('now'),
+      f('location', { acts: true, hasMap: false }), f('location', { acts: true, hasMap: true }),
     ];
     for (const facts of all) {
       const w = words(facts)!;
       expect(w).not.toContain('—');
       expect(w).not.toMatch(/\byears?\b/i);
+    }
+    expect(words(f('event', { dated: true }))!).not.toContain('—');
+  });
+
+  it('every link a line carries is one of its kinds, and each line holds exactly one', () => {
+    const cases: Array<[LineFacts, string]> = [
+      [f('narrative', { writing }), 'writing'], [f('character'), 'page'], [f('event', { dated: false }), 'charts'], [f('event', { dated: true }), 'charts'],
+      [f('location', { acts: true, hasMap: false }), 'create-map'], [f('location', { acts: true, hasMap: true }), 'pin-map'],
+    ];
+    for (const [facts, link] of cases) {
+      const links = strandLine(facts, NO_LINES)!.filter(p => 'link' in p);
+      expect(links.map(p => (p as { link: string }).link), facts.slot).toEqual([link]);
     }
   });
 });

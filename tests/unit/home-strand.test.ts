@@ -179,9 +179,10 @@ describe('the tab (S3, G16)', () => {
     expect(strandTabShows(W)).toBe(true);
     const panel = draw();
     expect(panel.querySelector('[data-role="strand-read-only"]')?.textContent).toBe(READ_ONLY_LINE);
-    // Only each box's doors (1.122.0: Open its page, a room's), which navigate and never write; no line.
-    expect(panel.querySelectorAll('[data-act]:not([data-act="room"]):not([data-act="page"])').length).toBe(0);
-    expect(panel.querySelectorAll('[data-act="page"]').length).toBe(5);
+    // Only a room's door in a box's ⋯ (1.122.0), which navigates and never writes; each title opens its page; no line.
+    expect(panel.querySelectorAll('[data-act]:not([data-act="room"]):not([data-act="more"])').length).toBe(0);
+    for (const m of panel.querySelectorAll('[data-act="more"]')) expect(m.parentElement!.querySelector('[data-act="room"]')).not.toBeNull();
+    expect(panel.querySelectorAll('[data-box] [data-strand-key$=":open"]').length).toBe(5);
     expect(panel.querySelectorAll('[data-role="strand-line"]').length).toBe(0);
     expect(cards()).toHaveLength(0);
     expect(panel.querySelectorAll('[data-box]').length).toBe(5);
@@ -436,7 +437,7 @@ describe('R5, R7, R8: the boxes', () => {
     expect(document.activeElement).toBe(cellOf('event').querySelector('[data-strand-key="event:open"]'));
   });
 
-  it('a box: its kind\'s words, the first lines of its text, Edit and the ⋯ holding Use another', () => {
+  it('a box: its kind\'s words, the first lines of its text, the ⋯ holding Edit here first and Use another last', () => {
     world([el('narrative', N, { name: 'The Ferry', description: 'Only a description.' }), el('character', X)], full);
     draw();
     const story = cellOf('narrative');
@@ -446,7 +447,10 @@ describe('R5, R7, R8: the boxes', () => {
     expect(more.getAttribute('aria-label')).toBe('More for The Ferry');
     more.click();
     expect(more.getAttribute('aria-expanded')).toBe('true');
-    const item = story.querySelector<HTMLButtonElement>('.atlas-home-strand-menu button')!;
+    const items = [...story.querySelectorAll<HTMLButtonElement>('.atlas-home-strand-menu button')];
+    expect(items[0].textContent).toBe('Edit here');
+    expect(document.activeElement).toBe(items[0]);
+    const item = items[items.length - 1];
     expect(item.textContent).toBe('Use another story');
     expect(story.querySelector(`[${GRID_OPEN_ATTR}]`)).not.toBeNull();
     // Escape closes it, owned, the focus back on ⋯.
@@ -456,7 +460,7 @@ describe('R5, R7, R8: the boxes', () => {
     expect(more.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(more);
     more.click();
-    story.querySelector<HTMLButtonElement>('.atlas-home-strand-menu button')!.click();
+    story.querySelector<HTMLButtonElement>('.atlas-home-strand-menu button[data-act="another"]')!.click();
     expect([...cellOf('narrative').querySelectorAll('[data-act]')].map(b => b.textContent)).toEqual(['Create one', 'Pick from the world', 'Cancel']);
   });
 
@@ -472,13 +476,14 @@ describe('R5, R7, R8: the boxes', () => {
     expect(host.querySelector('[data-mode="edit"]')).toBeNull();
   });
 
-  it('a contributor: Edit only on what they may change, no ⋯ where they may not set the slot', () => {
+  it('a contributor: Edit only on what they may change, no Use another where they may not set the slot', () => {
     world([el('narrative', N, { name: 'The Ferry' }), el('character', X)], full, contributor);
     draw();
     const story = cellOf('narrative');
     // A folder world's member slice changes every element (mayChange); the story slot is a keeper's.
     expect(story.querySelector('[data-act="edit"]')).not.toBeNull();
-    expect(story.querySelector('[data-act="more"]')).toBeNull();
+    expect(story.querySelector('[data-act="more"]')).not.toBeNull();
+    expect(story.querySelector('[data-act="another"]')).toBeNull();
   });
 });
 
