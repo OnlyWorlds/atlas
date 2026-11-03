@@ -1,11 +1,12 @@
 /**
  * The strand's filled boxes (R5, R7, R8): each names its element (a press opens it), shows the first
- * lines of its text, and offers Edit in place and a ⋯ disclosure holding "Use another <kind>" (today's
- * Change flow, its promise before the second press). The story's box says in two lines how the parts
- * join, each part a chip that brings its box into view. Each box says in one line what its type is for
- * and offers its room (`home-strand-room.ts`). Where they are now, when it is where it
- * happened, is one line in its cell with its own ⋯. Once all five are filled, one line says the
- * strand is whole.
+ * lines of its text (and a Character's Born or a Location's Founded on a line of its own), and offers
+ * Edit here, Open its page, a third door where a room edits it (`home-strand-room.ts`, 1.122.0) and a ⋯
+ * disclosure holding "Use another <kind>" (today's Change flow, its promise before the second press).
+ * The story's box says in two lines how the parts join, each part a chip that brings its box into view.
+ * The line above each box is its cell's, never the box's (`buildStrandLine`). Where they are now, when
+ * it is where it happened, is one line in its cell with its own ⋯. Once all five are filled, one line
+ * says the strand is whole.
  */
 
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
@@ -28,7 +29,7 @@ import { openWebOn } from '../ui/open-web';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { isSkipped, memory, type StrandContext } from './home-strand-model';
 import { act, actsRow, promiseRow, stampOf, type StrandPanelOptions } from './home-strand-acts';
-import { buildRoomLine } from './home-strand-room';
+import { buildBoxDoors } from './home-strand-room';
 
 const homeRoot = (): HTMLElement => document.querySelector<HTMLElement>('.atlas-world-home') ?? document.body;
 
@@ -248,21 +249,22 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
     box.appendChild(o.mode === 'promise' ? promiseRow(slot, c, o, opts) : actsRow(slot, c, opts));
     return box;
   }
-  // The box's room (1.121.0): one line and one act, between the text and Edit; never while open for a change.
-  if (el) box.appendChild(buildRoomLine(slot, el, c));
+  // The box's doors (1.122.0, W6): Edit here, Open its page, and a room's where one edits it.
   const canEdit = !!el && !isKnownOf(el) && mayChange(c.entry, el);
-  if (canEdit || another) {
+  const doors = el ? buildBoxDoors(slot, el, c) : [];
+  if (canEdit || another || doors.length > 0) {
     const acts = document.createElement('div');
     acts.className = 'atlas-home-strand-box-acts';
     if (canEdit) {
-      acts.appendChild(act('Edit', `${slot}:edit`, () => {
+      acts.appendChild(act('Edit here', `${slot}:edit`, () => {
         memory.said = null;
         const { values, raw } = editOpening(el!);
         memory.editing = { worldId: c.worldId, slot, id: el!.id, opened: values, raw };
         memory.askFocus = { worldId: c.worldId, key: `edit:${slot}:name` };
         opts.redraw();
-      }, 'atlas-btn-link'));
+      }, 'atlas-btn-ghost'));
     }
+    for (const d of doors) acts.appendChild(d);
     if (another) {
       acts.appendChild(moreMenu(slot, `More for ${name.textContent}`, [
         { label: `Use another ${SLOT_OTHER[slot]}`, key: `${slot}:another`, run: useAnother(slot, c, opts) },

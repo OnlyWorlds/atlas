@@ -1,95 +1,33 @@
 /**
- * Each strand box opens its room (1.121.0, `src/middle/home-strand-room.ts`): the table's every row for a
- * reader who may change the element and one who may not, the map to open a location with, and the line as
- * the box draws it (between the text and Edit, the act never a write, never while the box is open for a
- * change, the focus kept for Back).
+ * The strand's lines and doors (1.122.0, `src/middle/home-strand-room.ts`): the line above each filled
+ * box (a sibling of the box in its cell, the join words between it and a place's box), its × and the
+ * record it writes, the strut a line leaves for the rest of the visit (G2), the readers who see no line
+ * (G3), the location's three states and its links (G4, G7), and each box's doors (W6, G6).
  */
-import { describe, it, expect, afterEach } from 'vitest';
-import { patchSlice } from '../../src/core/state';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { getState, patchSlice } from '../../src/core/state';
 import { defaultRegistry, type Element, type WorldRegistryEntry } from '../../src/core/types';
-import { mapFor, roomLine, type RoomFacts } from '../../src/middle/home-strand-room';
-import { buildStrandPanel, resetStrandTabForTests } from '../../src/middle/home-strand';
+import { mapFor, placedOn, boxDoors } from '../../src/middle/home-strand-room';
+import { buildStrandPanel, holdStrandRows, openHeadLatch, resetStrandTabForTests, strandContext } from '../../src/middle/home-strand';
 import { memory } from '../../src/middle/home-strand-model';
-import { DEFAULT_WRITING_LABELS } from '../../src/middle/writing-helpers';
+import { linesOf } from '../../src/core/strand-lines';
+
+const dialogs = vi.hoisted(() => [] as unknown[][]);
+vi.mock('../../src/ui/map-create-modal', () => ({ createMapDialog: (...args: unknown[]) => { dialogs.push(args); return Promise.resolve(null); } }));
 
 const W = 'w-strand-room';
-const base = (slot: RoomFacts['slot'], extra: Partial<RoomFacts> = {}): RoomFacts => ({ slot, worldId: W, id: 'x1', writer: true, ...extra });
-const MAP = { id: 'm1', name: 'The Coast', pinned: false };
-
-describe('roomLine: the table', () => {
-  const writing = { hash: `#/w/${W}/writing/x1`, label: 'writing' };
-  const rows: Array<[string, RoomFacts, string, { label: string; hash: string } | null]> = [
-    ['story in the writing room, a Book', base('narrative', { room: writing, writingReady: true, labels: DEFAULT_WRITING_LABELS, tier: 'l1' }),
-      'Its chapters and scenes are written in the writing room.', { label: 'Open in the writing room', hash: `#/w/${W}/writing/x1` }],
-    ['story in the writing room, the world\'s own labels', base('narrative', { room: writing, writingReady: true, labels: { l1: 'Saga', l2: 'Act', l3: 'Story', l4: 'Draft' }, tier: 'l1' }),
-      'Its acts and stories are written in the writing room.', { label: 'Open in the writing room', hash: `#/w/${W}/writing/x1` }],
-    ['story that is a Chapter', base('narrative', { room: writing, writingReady: true, labels: DEFAULT_WRITING_LABELS, tier: 'l2' }),
-      'Its scenes are written in the writing room.', { label: 'Open in the writing room', hash: `#/w/${W}/writing/x1` }],
-    ['story in the tree, writing not set up', base('narrative', { room: writing, writingReady: false, labels: DEFAULT_WRITING_LABELS, tier: 'l1' }),
-      'Its page holds everything about it.', { label: 'Open its page', hash: `#/w/${W}/element/x1` }],
-    ['story not in the tree', base('narrative', { room: { hash: `#/w/${W}/element/x1`, label: '' }, writingReady: true }),
-      'Its page holds everything about it.', { label: 'Open its page', hash: `#/w/${W}/element/x1` }],
-    ['story that is a knowledge entry', base('narrative', { room: { hash: `#/w/${W}/knowledge/x1`, label: 'knowledge' }, writingReady: true }),
-      'Its page holds everything about it.', { label: 'Open in Knowledge', hash: `#/w/${W}/knowledge/x1` }],
-    ['story that is a page', base('narrative', { room: { hash: `#/w/${W}/share/x1`, label: 'share' }, writingReady: true }),
-      'Its page holds everything about it.', { label: 'Open in Pages', hash: `#/w/${W}/share/x1` }],
-    ['event with a year', base('event', { dated: true }),
-      'Its year puts it on the timeline in Charts.', { label: 'See it on the timeline', hash: `#/w/${W}/timeline/x1` }],
-    ['event with a year, a reader who may not', base('event', { dated: true, writer: false }),
-      'Its year puts it on the timeline in Charts.', { label: 'See it on the timeline', hash: `#/w/${W}/timeline/x1` }],
-    ['event with no year', base('event', { dated: false }), 'Give it a year and it goes on the timeline in Charts.', null],
-    ['event with no year, a reader who may not', base('event', { dated: false, writer: false }), 'It has no year yet, so it is not on the timeline.', null],
-    ['location, a map, not pinned', base('location', { acts: true, map: MAP }),
-      'A location can be pinned on a map.', { label: 'Open it with the map', hash: `#/w/${W}/map/m1/element/x1` }],
-    ['location, pinned', base('now', { acts: true, map: { ...MAP, pinned: true } }),
-      'It is on The Coast.', { label: 'See it on the map', hash: `#/w/${W}/map/m1/element/x1` }],
-    ['location, a map, a reader who may not', base('location', { acts: true, map: MAP, writer: false }),
-      'Its page shows everything that is in or at it.', { label: 'Open its page', hash: `#/w/${W}/element/x1` }],
-    ['location, a map, where the grid does not act', base('location', { acts: false, map: MAP }),
-      'Its page shows everything that is in or at it.', { label: 'Open its page', hash: `#/w/${W}/element/x1` }],
-    ['location, no map', base('location', { acts: true, map: null }),
-      'Its page shows everything that is in or at it.', { label: 'Open its page', hash: `#/w/${W}/element/x1` }],
-    ['character', base('character'), 'Their page holds everything about them.', { label: 'Open their page', hash: `#/w/${W}/element/x1` }],
-    ['character, a reader who may not', base('character', { writer: false }), 'Their page holds everything about them.', { label: 'Open their page', hash: `#/w/${W}/element/x1` }],
-  ];
-  for (const [name, facts, text, act] of rows) {
-    it(name, () => expect(roomLine(facts)).toEqual({ text, act }));
-  }
-
-  it('no line has an em-dash', () => {
-    for (const [, facts] of rows) expect(roomLine(facts).text).not.toMatch(/—/);
-  });
-});
-
-describe('mapFor', () => {
-  const m = (id: string, name: string) => ({ id, type: 'map', name }) as unknown as Element;
-  const pin = (id: string, map: string, element: string) => ({ id, type: 'pin', name: 'p', map_id: map, element_id: element }) as unknown as Element;
-  it('no map: none', () => expect(mapFor('L', [])).toBeNull());
-  it('the world\'s first map by name when no map holds a pin of it', () => {
-    expect(mapFor('L', [m('b', 'Zeal'), m('a', 'Atoll')])).toEqual({ id: 'a', name: 'Atoll', pinned: false });
-  });
-  it('the map that holds a pin of it, before an earlier name', () => {
-    expect(mapFor('L', [m('a', 'Atoll'), m('b', 'Zeal'), pin('p1', 'b', 'L'), pin('p2', 'a', 'OTHER')])).toEqual({ id: 'b', name: 'Zeal', pinned: true });
-  });
-  it('a pin in the map spelling counts', () => {
-    const p = { id: 'p', type: 'pin', name: 'p', map: 'b', element_id: 'L' } as unknown as Element;
-    expect(mapFor('L', [m('a', 'Atoll'), m('b', 'Zeal'), p])!.id).toBe('b');
-  });
-});
-
-// ---- The line as the box draws it ----
-
 const N = '0192a000-0000-7000-8000-000000000a01';
 const E = '0192a000-0000-7000-8000-000000000b01';
 const L = '0192a000-0000-7000-8000-000000000c01';
 const L2 = '0192a000-0000-7000-8000-000000000c02';
 const C = '0192a000-0000-7000-8000-000000000d01';
 const M = '0192a000-0000-7000-8000-000000000e01';
+const P = '0192a000-0000-7000-8000-000000000f01';
 const el = (type: string, id: string, extra: Record<string, unknown> = {}) => ({ id, type, name: `${type}-${id.slice(-2)}`, ...extra }) as unknown as Element;
-const whole = (): Element[] => [
-  el('narrative', N, { supertype: 'Book', events: [E], protagonist: C, story: 'A tale.' }), el('event', E, { locations: [L], characters: [C], start_date: 12 }),
+/** A whole strand: the event undated, no map, the story a Book. */
+const whole = (eventExtra: Record<string, unknown> = {}): Element[] => [
+  el('narrative', N, { supertype: 'Book', events: [E], protagonist: C, story: 'A tale.' }), el('event', E, { locations: [L], ...eventExtra }),
   el('location', L, { name: 'The Quay' }), el('location', L2, { name: 'The Library' }), el('character', C, { location: L2, name: 'Odile' }),
-  el('map', M, { name: 'The Coast' }),
 ];
 function world(elements: Element[], entry: Partial<WorldRegistryEntry> = {}): void {
   patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: W, name: 'W', state: 'local-only', ...entry } as WorldRegistryEntry] });
@@ -103,79 +41,264 @@ function draw(): HTMLElement {
   host.appendChild(buildStrandPanel(W, { alone: false, redraw: draw }));
   return host;
 }
+const cellOf = (slot: string) => host.querySelector<HTMLElement>(`[data-slot="${slot}"]`)!;
 const box = (slot: string) => host.querySelector<HTMLElement>(`[data-box="${slot}"]`)!;
-const line = (slot: string) => box(slot).querySelector<HTMLElement>('[data-role="strand-room"]');
+const line = (slot: string) => cellOf(slot).querySelector<HTMLElement>('[data-role="strand-line"]');
+const lineText = (slot: string) => line(slot)?.querySelector('.atlas-home-strand-line-text')?.textContent ?? null;
+const IDS: Record<string, string> = { narrative: N, event: E, location: L, character: C, now: L2 };
+const doorLabels = (slot: string) => [...box(slot).querySelectorAll<HTMLElement>('.atlas-home-strand-box-acts > button')].map(b => b.textContent);
 
 afterEach(() => {
   resetStrandTabForTests();
+  dialogs.length = 0;
   patchSlice('active', null);
   patchSlice('registry', defaultRegistry());
   patchSlice('data', { elements: [] } as never);
   document.body.innerHTML = '';
   host = undefined as unknown as HTMLElement;
+  localStorage.clear();
+  vi.restoreAllMocks();
 });
 
-describe('the room line in each box', () => {
-  it('every filled box has one, between its text (and the story\'s two lines) and Edit', () => {
+describe('mapFor and placedOn', () => {
+  const m = (id: string, name: string, extra: Record<string, unknown> = {}) => ({ id, type: 'map', name, ...extra }) as unknown as Element;
+  const pin = (id: string, map: string, element: string, extra: Record<string, unknown> = { x: 10, y: 20 }) =>
+    ({ id, type: 'pin', name: 'p', map_id: map, element_id: element, ...extra }) as unknown as Element;
+  const idx = (...els: Element[]) => new Map(els.map(e => [e.id, e]));
+  it('mapFor: no map, none; the map holding a pin of it, else the first by name', () => {
+    expect(mapFor('L', [])).toBeNull();
+    expect(mapFor('L', [m('b', 'Zeal'), m('a', 'Atoll')])).toEqual({ id: 'a', name: 'Atoll', pinned: false });
+    expect(mapFor('L', [m('a', 'Atoll'), m('b', 'Zeal'), pin('p1', 'b', 'L'), pin('p2', 'a', 'OTHER')])).toEqual({ id: 'b', name: 'Zeal', pinned: true });
+  });
+  it('placedOn (G7): a settled pin with a point, on a map in view; a proposed pin, a pin with no point, a pin on a missing or proposed map: not placed', () => {
+    expect(placedOn('L', idx(m('a', 'A'), pin('p', 'a', 'L')))).toBe(true);
+    expect(placedOn('L', idx(m('a', 'A'), { ...pin('p', 'a', 'L'), map: 'a', map_id: undefined } as unknown as Element))).toBe(true);
+    expect(placedOn('L', idx(m('a', 'A'), pin('p', 'a', 'L', { x: 1, y: 2, x_review_proposed: { by: 'm', evidence: 'seat' } })))).toBe(false);
+    expect(placedOn('L', idx(m('a', 'A'), pin('p', 'a', 'L', { x: null, y: null })))).toBe(false);
+    expect(placedOn('L', idx(pin('p', 'gone', 'L')))).toBe(false);
+    expect(placedOn('L', idx(m('a', 'A', { x_review_proposed: { by: 'm', evidence: 'seat' } }), pin('p', 'a', 'L')))).toBe(false);
+    // A map of the place (`location`) is no pin of it.
+    expect(placedOn('L', idx(m('a', 'A', { location: 'L' })))).toBe(false);
+  });
+});
+
+describe('the line above each filled box (W3)', () => {
+  it('a sibling of the box in its cell, above it; the join words between a place\'s line and its box (G11); each line\'s words', () => {
     world(whole());
     draw();
     for (const slot of ['narrative', 'event', 'location', 'character', 'now']) {
       const l = line(slot)!;
       expect(l, slot).not.toBeNull();
-      const kids = [...box(slot).children];
-      const acts = box(slot).querySelector('.atlas-home-strand-box-acts')!;
-      expect(kids.indexOf(l)).toBeLessThan(kids.indexOf(acts));
-      expect(kids.indexOf(l)).toBeGreaterThan(kids.indexOf(box(slot).querySelector('.atlas-home-strand-box-name')!));
+      expect(box(slot).contains(l)).toBe(false);
+      const kids = [...cellOf(slot).children];
+      const lineSlot = l.closest('[data-line-key]')!;
+      expect(kids.indexOf(lineSlot as HTMLElement)).toBeLessThan(kids.indexOf(box(slot)));
+      expect(lineSlot.getAttribute('data-line-key')).toBe(`${slot}:${IDS[slot]}`);
     }
-    const story = [...box('narrative').children];
-    expect(story.indexOf(line('narrative')!)).toBeGreaterThan(story.indexOf(box('narrative').querySelector('[data-role="strand-lines"]')!));
-    expect(line('narrative')!.textContent).toBe('Its chapters and scenes are written in the writing room. Open in the writing room');
-    expect(line('event')!.textContent).toBe('Its year puts it on the timeline in Charts. See it on the timeline');
-    expect(line('location')!.textContent).toBe('A location can be pinned on a map. Open it with the map');
-    expect(line('character')!.textContent).toBe('Their page holds everything about them. Open their page');
+    for (const slot of ['location', 'now']) {
+      const kids = [...cellOf(slot).children];
+      const join = cellOf(slot).querySelector('[data-role="strand-join"]')!;
+      expect(kids.indexOf(line(slot)!.parentElement!)).toBeLessThan(kids.indexOf(join as HTMLElement));
+      expect(kids.indexOf(join as HTMLElement)).toBeLessThan(kids.indexOf(box(slot)));
+    }
+    expect(lineText('narrative')).toBe('In the writing room you can shape it into chapters and scenes.');
+    expect(lineText('event')).toBe('Give it a date to place it in a timeline in Charts.');
+    expect(lineText('location')).toBe('Create a map to pin it in place.');
+    expect(lineText('character')).toBe('Open their page to see and edit them in full.');
+    expect(lineText('now')).toBe('Their location is where they are now.');
+    // Each ends with its ×.
+    for (const slot of ['narrative', 'event', 'location', 'character', 'now']) {
+      const x = line(slot)!.lastElementChild!;
+      expect(x.getAttribute('aria-label')).toBe('Hide this line');
+      expect(x.querySelector('[aria-hidden="true"]')!.textContent).toBe('×');
+    }
   });
 
-  it('a press only navigates, after keeping the focus key for Back', () => {
+  it('the event\'s line goes once the timeline places it (a whole number, or a number the timeline reads)', () => {
+    world(whole({ start_date: 1142 }));
+    draw();
+    expect(line('event')).toBeNull();
+    world(whole({ start_date: '12' }));
+    draw();
+    expect(line('event')).toBeNull();
+  });
+
+  it('the location in three states: no map, a map it is not on, pinned', () => {
     world(whole());
     draw();
-    const before = JSON.stringify(whole());
-    line('location')!.querySelector<HTMLButtonElement>('[data-strand-key="location:room"]')!.click();
+    expect(lineText('location')).toBe('Create a map to pin it in place.');
+    world([...whole(), el('map', M, { name: 'The Coast' })]);
+    draw();
+    expect(lineText('location')).toBe('Pin it on a map.');
+    world([...whole(), el('map', M, { name: 'The Coast' }), el('pin', P, { map_id: M, element_id: L, x: 5, y: 5 })]);
+    draw();
+    expect(line('location')).toBeNull();
+  });
+
+  it('Create a map opens the panel\'s own New map dialog with nothing filled in, and writes nothing', () => {
+    world(whole());
+    draw();
+    const before = JSON.stringify(getState().data.elements);
+    line('location')!.querySelector<HTMLButtonElement>('[data-line-link="create-map"]')!.click();
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0][1]).toEqual({});
+    expect(JSON.stringify(getState().data.elements)).toBe(before);
+    expect(memory.askFocus).toEqual({ worldId: W, key: 'line:location:create-map' });
+  });
+
+  it('Pin it on a map opens mapFor\'s map with the location\'s page; Charts opens the timeline; both only navigate', () => {
+    world([...whole(), el('map', M, { name: 'The Coast' })]);
+    draw();
+    line('location')!.querySelector<HTMLButtonElement>('[data-line-link="pin-map"]')!.click();
     expect(window.location.hash).toBe(`#/w/${W}/map/${M}/element/${L}`);
-    expect(memory.askFocus).toEqual({ worldId: W, key: 'location:room' });
-    expect(JSON.stringify(whole())).toBe(before);
+    draw();
+    line('event')!.querySelector<HTMLButtonElement>('[data-line-link="charts"]')!.click();
+    expect(window.location.hash).toBe(`#/w/${W}/timeline`);
+    expect(dialogs).toHaveLength(0);
   });
 
-  it('a view-only world reads every line, and no act would write (the map\'s becomes the page\'s)', () => {
-    world(whole(), { copy_of: { world_id: 'x' } } as never);
+  it('the story\'s and the character\'s lines go once their room was opened (the record\'s `opened`)', () => {
+    world(whole(), { strand_lines: { hidden: [], opened: [`narrative:${N}`, `character:${C}`] } });
     draw();
-    expect(line('location')!.textContent).toBe('Its page shows everything that is in or at it. Open its page');
-    for (const slot of ['narrative', 'event', 'character', 'now']) expect(line(slot)).not.toBeNull();
-    expect(box('event').querySelector('[data-act="edit"]')).toBeNull();
-  });
-
-  it('an event with no year: a writer is told to give it one; a reader who may not, that it is not on the timeline', () => {
-    const els = whole().map(e => (e.id === E ? el('event', E, { locations: [L], characters: [C] }) : e));
-    world(els);
-    draw();
-    expect(line('event')!.textContent).toBe('Give it a year and it goes on the timeline in Charts.');
-    world(els, { copy_of: { world_id: 'x' } } as never);
-    draw();
-    expect(line('event')!.textContent).toBe('It has no year yet, so it is not on the timeline.');
-  });
-
-  it('not drawn while the box is open for Use another', () => {
-    world(whole());
-    draw();
-    box('character').querySelector<HTMLButtonElement>('[data-strand-key="character:more"]')!.click();
-    host.querySelector<HTMLButtonElement>('[data-strand-key="character:another"]')!.click();
+    expect(line('narrative')).toBeNull();
     expect(line('character')).toBeNull();
     expect(line('event')).not.toBeNull();
   });
 
-  it('the act waits while a write is in flight', () => {
-    world(whole());
-    memory.inFlight.add(`${W}\u0000event`);
+  it('a story in Knowledge or Pages, or a writing room not set up: no story line', () => {
+    world(whole().map(e => (e.id === N ? el('narrative', N, { supertype: 'Legend', events: [E], protagonist: C }) : e)));
     draw();
-    expect(line('character')!.querySelector<HTMLButtonElement>('[data-act="room"]')!.disabled).toBe(true);
+    expect(line('narrative')).toBeNull();
+  });
+
+  it('the links wait while a write is in flight; the × does not (it writes only this browser\'s record)', () => {
+    world(whole());
+    memory.inFlight.add(`${W}\u0000now`);
+    draw();
+    expect(line('event')!.querySelector<HTMLButtonElement>('[data-line-link="charts"]')!.disabled).toBe(true);
+    expect(line('event')!.querySelector<HTMLButtonElement>('.atlas-home-strand-line-x')!.disabled).toBe(false);
+  });
+});
+
+describe('the × (W4, G2, G8)', () => {
+  it('hides only its line, records it for this world in this browser, asks the focus for the box', () => {
+    world(whole());
+    draw();
+    line('event')!.querySelector<HTMLButtonElement>('.atlas-home-strand-line-x')!.click();
+    expect(line('event')).toBeNull();
+    for (const slot of ['narrative', 'location', 'character', 'now']) expect(line(slot), slot).not.toBeNull();
+    const entry = getState().registry.worlds.find(w => w.id === W);
+    expect(linesOf(entry)).toEqual({ hidden: [`event:${E}`], opened: [] });
+    // Nothing of it in the world's elements.
+    expect(JSON.stringify(getState().data.elements)).not.toContain('strand_lines');
+  });
+
+  it('a line that goes during the visit leaves an empty aria-hidden strut its height, until Home is opened again', () => {
+    // jsdom lays nothing out: every box reads 20 px tall in a 600 px grid.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ x: 0, y: 0, top: 0, left: 0, right: 600, bottom: 20, width: 600, height: 20, toJSON: () => ({}) }) as DOMRect);
+    world(whole());
+    draw();
+    holdStrandRows(host, W);
+    line('character')!.querySelector<HTMLButtonElement>('.atlas-home-strand-line-x')!.click();
+    const strut = cellOf('character').querySelector<HTMLElement>('[data-role="strand-line-strut"]')!;
+    expect(strut).not.toBeNull();
+    expect(strut.getAttribute('aria-hidden')).toBe('true');
+    expect(strut.textContent).toBe('');
+    expect(strut.style.minHeight).toBe('20px');
+    expect(strut.querySelector('button')).toBeNull();
+    // The date given: the event's line goes the same way.
+    patchSlice('data', { elements: whole({ start_date: 3 }), loading: false } as never);
+    draw();
+    expect(cellOf('event').querySelector('[data-role="strand-line-strut"]')).not.toBeNull();
+    // Home opened again: no strut.
+    openHeadLatch(() => {});
+    draw();
+    expect(cellOf('character').querySelector('[data-line-key]')).toBeNull();
+    expect(cellOf('event').querySelector('[data-line-key]')).toBeNull();
+  });
+});
+
+describe('readers who may not change an element (G3)', () => {
+  it('a view-only world: no lines, no Edit here, the doors in reading words', () => {
+    world(whole({ start_date: 5 }), { copy_of: { world_id: 'x' } } as never);
+    draw();
+    for (const slot of ['narrative', 'event', 'location', 'character', 'now']) {
+      expect(line(slot), slot).toBeNull();
+      expect(box(slot).querySelector('[data-act="edit"]'), slot).toBeNull();
+    }
+    expect(doorLabels('narrative')).toEqual(['Open its page', 'Open in the writing room']);
+    expect(doorLabels('event')).toEqual(['Open its page', 'See it in Charts']);
+    expect(doorLabels('location')).toEqual(['Open its page']);
+  });
+
+  it('an undated event read by one who may not: no "See it in Charts"', () => {
+    world(whole(), { copy_of: { world_id: 'x' } } as never);
+    draw();
+    expect(doorLabels('event')).toEqual(['Open its page']);
+  });
+
+  it('a member who may not change one element: that box has no line and reading doors; their own box keeps its line', () => {
+    const entry = { state: 'api-linked', api: { world_id: 'a', api_key: 'k', member_role: 'contributor', membership: 'mine' } } as never;
+    world(whole().map(e => (e.id === C ? el('character', C, { location: L2, name: 'Odile', created_by: 'mine' }) : el(e.type, e.id, { ...e, created_by: 'someone-else' }))), entry);
+    draw();
+    expect(line('event')).toBeNull();
+    expect(box('event').querySelector('[data-act="edit"]')).toBeNull();
+    expect(line('character')).not.toBeNull();
+    expect(box('character').querySelector('[data-act="edit"]')!.textContent).toBe('Edit here');
+  });
+
+  it('the demo world: no location line, so no map dialog (conv. 149)', () => {
+    world(whole(), { demo: true } as never);
+    draw();
+    expect(line('location')).toBeNull();
+  });
+});
+
+describe('the box\'s doors (W6, G6)', () => {
+  it('a reader who may change it: Edit here, Open its page, and the room that edits it', () => {
+    world(whole({ start_date: 5 }));
+    draw();
+    expect(doorLabels('narrative')).toEqual(['Edit here', 'Open its page', 'Edit in the writing room']);
+    expect(doorLabels('event')).toEqual(['Edit here', 'Open its page', 'Edit in Charts']);
+    expect(doorLabels('location')).toEqual(['Edit here', 'Open its page']);
+    expect(doorLabels('character')).toEqual(['Edit here', 'Open its page']);
+    expect(doorLabels('now')).toEqual(['Edit here', 'Open its page']);
+  });
+
+  it('each door lands where it says and only navigates, its focus kept for Back', () => {
+    world(whole({ start_date: 5 }));
+    draw();
+    const before = JSON.stringify(getState().data.elements);
+    const lands: Array<[string, string, string]> = [
+      ['narrative', 'Open its page', `#/w/${W}/element/${N}`],
+      ['narrative', 'Edit in the writing room', `#/w/${W}/writing/${N}`],
+      ['event', 'Edit in Charts', `#/w/${W}/timeline/${E}`],
+      ['character', 'Open its page', `#/w/${W}/element/${C}`],
+      ['now', 'Open its page', `#/w/${W}/element/${L2}`],
+    ];
+    for (const [slot, label, hash] of lands) {
+      draw();
+      [...box(slot).querySelectorAll<HTMLButtonElement>('.atlas-home-strand-box-acts > button')].find(b => b.textContent === label)!.click();
+      expect(window.location.hash, `${slot} ${label}`).toBe(hash);
+      expect(memory.askFocus?.key).toMatch(new RegExp(`^${slot}:(page|room)$`));
+    }
+    expect(JSON.stringify(getState().data.elements)).toBe(before);
+  });
+
+  it('an undated event\'s Edit in Charts opens the timeline, where a date is given', () => {
+    world(whole());
+    const c = strandContext(W)!;
+    expect(boxDoors('event', c.byId.get(E)!, c).map(d => d.hash)).toEqual([`#/w/${W}/element/${E}`, `#/w/${W}/timeline`]);
+  });
+
+  it('a story in Knowledge: Open in Knowledge beside Open its page, the element\'s page; no story line', () => {
+    world(whole().map(e => (e.id === N ? el('narrative', N, { subtype: 'knowledge', events: [E], protagonist: C }) : e)));
+    const c = strandContext(W)!;
+    expect(boxDoors('narrative', c.byId.get(N)!, c)).toEqual([
+      { label: 'Open its page', key: 'narrative:page', hash: `#/w/${W}/element/${N}` },
+      { label: 'Open in Knowledge', key: 'narrative:room', hash: `#/w/${W}/knowledge/${N}` },
+    ]);
+    draw();
+    expect(line('narrative')).toBeNull();
   });
 });

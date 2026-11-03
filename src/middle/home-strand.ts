@@ -31,6 +31,7 @@ import {
 import { act, holdActs, stampOf as stampNow, type StrandPanelOptions } from './home-strand-acts';
 import { buildEditCard, buildMakeCard } from './home-strand-card';
 import { buildFilledBox, buildSameLine, buildWholeLine } from './home-strand-box';
+import { buildStrandLine, holdStrandLines, resetLineHold } from './home-strand-room';
 
 export { SLOT_WORD } from '../core/strand-journey';
 export { strandContext, type HomeTab, type StrandContext } from './home-strand-model';
@@ -87,10 +88,11 @@ export class StrandHeadLatch {
 
 let currentLatch: StrandHeadLatch | null = null;
 
-/** Home opened: its latch for this visit, and the rows' held heights let go (W5). */
+/** Home opened: its latch for this visit, and the rows' and the lines' held heights let go (W5, G2). */
 export function openHeadLatch(onReveal: () => void): StrandHeadLatch {
   currentLatch = new StrandHeadLatch(onReveal);
   rowHold = null;
+  resetLineHold();
   return currentLatch;
 }
 
@@ -316,8 +318,11 @@ function cell(slot: StrandSlot, c: StrandContext, opts: StrandPanelOptions, aske
       li.appendChild(buildSameLine(c, opts));
       return li;
     }
-    if (joinWords) li.appendChild(join(joinWords));
     const el = c.byId.get(filled.id);
+    // The line above the box (1.122.0), the cell's and never the box's; the join words between them (G11).
+    const line = el ? buildStrandLine(slot, el, c, opts.redraw) : null;
+    if (line) li.appendChild(line);
+    if (joinWords) li.appendChild(join(joinWords));
     const ed = memory.editing;
     if (ed && ed.worldId === c.worldId && ed.slot === slot && el) li.appendChild(buildEditCard(slot, c, el, opts, level));
     else li.appendChild(buildFilledBox(slot, c, opts));
@@ -373,6 +378,8 @@ export function holdStrandRows(root: ParentNode, worldId: string): void {
   if (!grid) return;
   const width = grid.getBoundingClientRect().width;
   if (width <= 0) return;
+  // The lines above the boxes keep their tallest height too, at every width, one column included (G2).
+  holdStrandLines(grid, worldId, width);
   if (!rowHold || rowHold.worldId !== worldId || Math.abs(width - rowHold.width) > 0.5) rowHold = { worldId, width, tallest: new Map() };
   const cells = [...grid.querySelectorAll<HTMLElement>(':scope > .atlas-home-strand-cell')];
   for (const li of cells) {
@@ -393,4 +400,5 @@ export function resetStrandTabForTests(): void {
   resetStrandMemoryForTests();
   currentLatch = null;
   rowHold = null;
+  resetLineHold();
 }

@@ -17998,7 +17998,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
    the left, their places on the right, the joining words in a column of their own between (a subgrid, so
    the words stay inside the place's cell, never a child of the list). An empty cell keeps its place and
    takes no height; the cells' own top margin, not a row gap, spaces them, so an empty row adds nothing. */
-.atlas-home-strand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 10px; align-items: start; }
+.atlas-home-strand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 6px; align-items: start; }
 /* W5 at every make (1.121.2): a cell keeps the tallest it stood this visit while a filled box lay below it
    (`--strand-hold`, set by home-strand.ts), so a card giving way to a shorter box moves no box below; the
    room stays under what the cell holds (align-content: start, never stretched rows). */
@@ -18007,17 +18007,18 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-cell.is-event, .atlas-home-strand-cell.is-character { grid-column: 1; margin-top: 12px; }
 .atlas-home-strand-cell.is-location, .atlas-home-strand-cell.is-now { grid-column: 2 / 4; display: grid; grid-template-columns: subgrid; align-items: center; align-content: start; margin-top: 12px; }
 .atlas-home-strand-cell.is-location > *, .atlas-home-strand-cell.is-now > * { grid-column: 2; min-width: 0; }
-.atlas-home-strand-cell.is-location > .atlas-home-strand-join, .atlas-home-strand-cell.is-now > .atlas-home-strand-join { grid-column: 1; }
+/* 1.122.0 (G11): the joining words stand in the box's column, between its line and the box, as the place's own head. */
+.atlas-home-strand-cell.is-location > .atlas-home-strand-join, .atlas-home-strand-cell.is-now > .atlas-home-strand-join { grid-column: 2; justify-self: start; }
 .atlas-home-strand-cell.is-same > .atlas-home-strand-same { grid-column: 1 / -1; }
 .atlas-home-strand-cell.is-empty { margin-top: 0; }
 .atlas-home-strand-cell.is-add { align-items: flex-start; }
-.atlas-home-strand-join { justify-self: center; padding: 1px 10px; border: 1px solid var(--atlas-divider-strong); border-radius: 12px; color: var(--atlas-text-soft); font-size: 0.78rem; white-space: nowrap; }
+.atlas-home-strand-join { justify-self: start; padding: 0; color: var(--atlas-text-soft); font-size: 0.78rem; white-space: nowrap; }
 @container (max-width: 560px) {
   .atlas-home-strand-grid { grid-template-columns: minmax(0, 1fr); }
   .atlas-home-strand-cell { min-height: 0; }
   .atlas-home-strand-cell.is-event, .atlas-home-strand-cell.is-character,
   .atlas-home-strand-cell.is-location, .atlas-home-strand-cell.is-now { grid-column: 1; display: flex; flex-direction: column; align-items: stretch; }
-  .atlas-home-strand-cell.is-location > .atlas-home-strand-join, .atlas-home-strand-cell.is-now > .atlas-home-strand-join { align-self: flex-start; margin-left: 14px; white-space: normal; }
+  .atlas-home-strand-cell.is-location > .atlas-home-strand-join, .atlas-home-strand-cell.is-now > .atlas-home-strand-join { align-self: flex-start; white-space: normal; }
   .atlas-home-strand-cell.is-add { align-items: flex-start; }
   .atlas-home-strand-cell.is-empty { display: none; }
 }
@@ -18035,13 +18036,19 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 /* The second line's room while one shows: a strut as tall as a chip, so the line box is a chip line's. */
 .atlas-home-strand-lines-strut { display: inline-block; width: 0; min-height: 26px; vertical-align: middle; }
 /* Each box's room (1.121.0, home-strand-room.ts): one quiet line, its act a link. */
-.atlas-home-strand-room { margin: 6px 0 0; color: var(--atlas-text-soft); font-size: 0.86rem; line-height: 1.5; }
-.atlas-home-strand-room .atlas-btn-link { font-size: inherit; }
+/* The line above a filled box (1.122.0): italic, its × at its end; a line gone this visit leaves its strut (G2). */
+.atlas-home-strand-line-slot { min-width: 0; }
+.atlas-home-strand-line { margin: 0; display: flex; align-items: flex-start; gap: 4px; color: var(--atlas-text-soft); font-size: 0.86rem; font-style: italic; line-height: 1.45; }
+.atlas-home-strand-line-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.atlas-home-strand .atlas-home-strand-line .atlas-home-strand-line-link { min-height: 0; padding: 0; font-size: inherit; font-style: inherit; line-height: inherit; vertical-align: baseline; }
+.atlas-home-strand-line-x { flex: 0 0 auto; display: inline-grid; place-items: center; width: 18px; height: calc(0.86rem * 1.45); padding: 0; border: 0; border-radius: 4px; background: none; color: var(--atlas-text-muted); font: inherit; font-style: normal; font-size: 0.95rem; line-height: 1; cursor: pointer; }
+.atlas-home-strand-line-x:hover { color: var(--atlas-text); background: var(--atlas-bg-hover); }
+.atlas-home-strand-line-x:focus-visible { outline: 2px solid var(--atlas-accent); outline-offset: 1px; }
 .atlas-home-strand-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 26px; padding: 0 8px; vertical-align: middle; border: 1px solid var(--type-color, var(--atlas-divider-strong)); border-radius: 13px; background: transparent; color: var(--atlas-text); font: inherit; font-size: 0.88rem; line-height: 1.3; text-align: left; cursor: pointer; }
 .atlas-home-strand-chip:hover { background: var(--atlas-bg-hover); }
 .atlas-home-strand-chip .material-symbols-outlined { flex: 0 0 auto; font-size: 15px; color: var(--type-color, var(--atlas-accent)); }
 .atlas-home-strand-chip-name { min-width: 0; overflow-wrap: anywhere; }
-.atlas-home-strand-box-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.atlas-home-strand-box-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .atlas-home-strand-box-acts > .atlas-btn-link, .atlas-home-strand-card-acts > .atlas-btn-link, .atlas-home-strand-cell.is-add > .atlas-btn-link, .atlas-home-strand-card-same > .atlas-btn-link { min-height: 30px; font-size: 0.86rem; }
 .atlas-home-strand-quiet { color: var(--atlas-text-soft); }
 .atlas-home-strand-more { position: relative; margin-left: auto; }
@@ -18092,7 +18099,9 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
   .atlas-home-strand .atlas-home-strand-option, .atlas-home-strand .atlas-home-strand-chip, .atlas-home-strand .atlas-home-strand-menu-item,
   .atlas-home-strand .atlas-home-strand-whole-link, .atlas-home-strand .atlas-home-strand-lines-strut { min-height: 44px; }
   .atlas-home-strand .atlas-home-strand-more-btn { min-width: 44px; }
-  .atlas-home-strand .atlas-home-strand-whole-link, .atlas-home-strand .atlas-home-strand-room .atlas-home-strand-act { display: inline-flex; align-items: center; }
+  .atlas-home-strand .atlas-home-strand-whole-link { display: inline-flex; align-items: center; }
+  .atlas-home-strand .atlas-home-strand-line .atlas-home-strand-line-link { display: inline-block; min-height: 0; line-height: 20px; padding: 12px 4px; margin: -12px -4px; }
+  .atlas-home-strand .atlas-home-strand-line-x { width: 44px; height: 44px; margin: -12px -13px -12px -13px; }
   .atlas-home-strand-make .atlas-input, .atlas-home-strand-pick .atlas-input, .atlas-home-strand-field .atlas-input { min-height: 44px; }
 }
 .atlas-strand-offer { margin: 4px 0 10px; max-width: 680px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }

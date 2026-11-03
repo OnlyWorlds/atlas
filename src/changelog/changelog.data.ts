@@ -61,6 +61,18 @@ export const CHANGELOG: ChangelogRelease[] = [
     theme: 'The strand says what each part is for',
     entries: [
       {
+        id: 'strand-lines-above-boxes',
+        title: 'A short line above each part of the strand says what you can do with it next',
+        body: 'On the Strand tab each box you have made has an italic line above it: the story can be shaped in the writing room, the event can be given a date for the timeline in Charts, a location can be pinned on a map (or a map made first), the main character\'s page shows them in full. A line goes once its job is done (the date given, the pin placed, the room or page opened) or when you press its ×, only in this world and this browser. The space it took stays until you next open Home, so nothing below it moves. Readers who cannot change an element see no line.',
+        tags: ['home'],
+      },
+      {
+        id: 'strand-box-buttons',
+        title: 'Each box offers Edit here, Open its page, and the room that edits it',
+        body: 'Every box on the Strand tab has Edit here (in place, as before), Open its page, and where a room edits it a third: Edit in the writing room for the story, Edit in Charts for the event. Someone who can only read the world sees Open its page, Open in the writing room, and See it in Charts for an event with a date.',
+        tags: ['home'],
+      },
+      {
         id: 'strand-card-words',
         title: 'Each question on the Strand tab says what its kind of element is for',
         body: 'Under each question one line now says what it asks for: "Narratives are stories or tellings of any kind.", "Characters drive your stories: start with its main character.", "Events are happenings of any size, each a part of a larger story.", "Locations are where your stories happen." The event\'s question is always "What happens in" the story, and the last one asks "Where is" the main character now, noting that the event may be long past.',
