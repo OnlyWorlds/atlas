@@ -87,9 +87,10 @@ export class StrandHeadLatch {
 
 let currentLatch: StrandHeadLatch | null = null;
 
-/** Home opened: its latch for this visit. */
+/** Home opened: its latch for this visit, and the rows' held heights let go (W5). */
 export function openHeadLatch(onReveal: () => void): StrandHeadLatch {
   currentLatch = new StrandHeadLatch(onReveal);
+  rowHold = null;
   return currentLatch;
 }
 
@@ -342,8 +343,54 @@ function cell(slot: StrandSlot, c: StrandContext, opts: StrandPanelOptions, aske
   return li;
 }
 
+// ---- W5: a row never gets shorter within a visit ----
+
+/**
+ * The grid's rows as this visit to Home has drawn them (1.121.2): per cell, the tallest it stood while a
+ * filled box lay below it, read at the grid's width. A card giving way to a shorter box (the Event's card
+ * beside the Location's, a Location's card) would shorten its row and lift every filled box below; the
+ * cell keeps that height instead, so no filled box moves when another is made. A row may still grow. Read
+ * only where a filled box lies below, so the story's card never holds its row once it is a box, and the
+ * last row never holds. Let go at Home's next opening, another world or another width; never stored. One
+ * column holds nothing (the stylesheet), where each make draws the next card above the boxes anyway.
+ */
+let rowHold: { worldId: string; width: number; tallest: Map<string, number> } | null = null;
+
+const HOLD_VAR = '--strand-hold';
+
+function strandGridIn(root: ParentNode): HTMLElement | null {
+  const g = root.querySelector<HTMLElement>('[data-role="home-strand"] .atlas-home-strand-grid');
+  return g && g.isConnected ? g : null;
+}
+
+/**
+ * After Home's draw: each cell held at its tallest this visit (the stylesheet reads it as a min-height),
+ * then the draw read. A draw while a write runs is read too: its card keeps the Pick it had when pressed
+ * (`pickAtPress`), so it stands as tall as it did, never a passing height.
+ */
+export function holdStrandRows(root: ParentNode, worldId: string): void {
+  const grid = strandGridIn(root);
+  if (!grid) return;
+  const width = grid.getBoundingClientRect().width;
+  if (width <= 0) return;
+  if (!rowHold || rowHold.worldId !== worldId || Math.abs(width - rowHold.width) > 0.5) rowHold = { worldId, width, tallest: new Map() };
+  const cells = [...grid.querySelectorAll<HTMLElement>(':scope > .atlas-home-strand-cell')];
+  for (const li of cells) {
+    const h = rowHold.tallest.get(li.getAttribute('data-slot') ?? '');
+    if (h) li.style.setProperty(HOLD_VAR, `${h}px`);
+  }
+  const boxTops = [...grid.querySelectorAll<HTMLElement>('[data-box]')].map(b => b.getBoundingClientRect().top);
+  for (const li of cells) {
+    const slot = li.getAttribute('data-slot');
+    const r = li.getBoundingClientRect();
+    if (!slot || r.height <= 0 || !boxTops.some(t => t >= r.bottom - 0.5)) continue;
+    if (r.height > (rowHold.tallest.get(slot) ?? 0)) rowHold.tallest.set(slot, r.height);
+  }
+}
+
 /** Test seam. */
 export function resetStrandTabForTests(): void {
   resetStrandMemoryForTests();
   currentLatch = null;
+  rowHold = null;
 }

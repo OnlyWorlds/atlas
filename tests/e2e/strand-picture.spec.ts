@@ -390,3 +390,122 @@ test('W5: the story\'s box keeps room for its second line, so the Event make mov
   await expect(lines).toHaveCount(2);
   expect(await eventTop() - before).toBe(0);
 });
+
+/** How far each box filled before a make moved: after the make settled, and the most in any frame drawn meanwhile. */
+type Moves = Record<string, { end: Record<string, number>; frame: Record<string, number> }>;
+
+/**
+ * The journey on a new world, each make answered with a name (and a text where the card has one), every
+ * filled box's top read within the Strand panel (the page scrolls to the next card, so never the
+ * viewport's) before the press, at every animation frame while the write runs, and once it settled.
+ * `snapTo` keeps the screen after the Event make. ATLAS_W5_LOG prints the moves.
+ */
+async function movesAtEachMake(page: Page, snapTo?: string): Promise<Moves> {
+  await setupWorld(page);
+  const card = page.locator('[data-role="strand-card"][data-mode="make"]');
+  const tops = () => page.evaluate(() => {
+    const panel = document.querySelector('[data-role="home-strand"]')!;
+    const top = panel.getBoundingClientRect().top;
+    return Object.fromEntries([...panel.querySelectorAll<HTMLElement>('[data-box]')].map(b => [b.getAttribute('data-box')!, b.getBoundingClientRect().top - top]));
+  });
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const moves: Moves = {};
+  const steps: [string, string, string][] = [
+    ['narrative', 'The Lantern Ferry', 'Every night a ferry crosses the black lake.\nThe ferryman never asks why.'],
+    ['character', 'Odile Varn', 'A cartographer who paid in maps.'],
+    ['event', 'The night crossing', 'A storm closed the lake.'],
+    ['location', 'Saltmere Quay', 'The stone landing on the far shore.'],
+    ['now', 'The Drowned Library', ''],
+  ];
+  for (const [slot, name, text] of steps) {
+    await expect(card).toHaveAttribute('data-card-slot', slot);
+    await card.locator('[data-field="name"]').fill(name);
+    if (text) await card.locator('[data-field="text"]').fill(text);
+    const before = await tops();
+    await page.evaluate(() => {
+      const w = window as unknown as { w5Frames: Record<string, number>[]; w5Stop: boolean };
+      w.w5Frames = [];
+      w.w5Stop = false;
+      const tick = () => {
+        const panel = document.querySelector('[data-role="home-strand"]');
+        if (panel) {
+          const top = panel.getBoundingClientRect().top;
+          w.w5Frames.push(Object.fromEntries([...panel.querySelectorAll<HTMLElement>('[data-box]')].map(b => [b.getAttribute('data-box')!, b.getBoundingClientRect().top - top])));
+        }
+        if (!w.w5Stop) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await card.locator('[data-act="make"]').click();
+    await expect(page.locator(`[data-role="home-strand"] [data-box="${slot}"] .atlas-home-strand-name`)).toHaveText(name);
+    // The next card drawn (or the whole line), so the layout read is the settled one.
+    if (slot === 'now') await expect(page.locator('[data-role="strand-whole"]')).toBeVisible();
+    else {
+      await expect(card).not.toHaveAttribute('data-card-slot', slot);
+      // The focus went on to the next card's Name, as always (the hold draws before the focus moves).
+      await expect(card.locator('[data-field="name"]')).toBeFocused();
+    }
+    const after = await tops();
+    const frames = await page.evaluate(() => {
+      const w = window as unknown as { w5Frames: Record<string, number>[]; w5Stop: boolean };
+      w.w5Stop = true;
+      return w.w5Frames;
+    });
+    const boxes = Object.keys(before);
+    moves[slot] = {
+      end: Object.fromEntries(boxes.map(b => [b, round(after[b] - before[b])])),
+      frame: Object.fromEntries(boxes.map(b => [b, round(Math.max(0, ...frames.filter(f => b in f).map(f => Math.abs(f[b] - before[b]))))])),
+    };
+    if (slot === 'event' && snapTo) await page.screenshot({ path: snapTo, fullPage: true });
+  }
+  if (process.env.ATLAS_W5_LOG) console.log(`W5 moves ${test.info().title}: ${JSON.stringify(moves)}`);
+  return moves;
+}
+
+// W5 at every make (1.121.2): within one visit to Home a strand row never gets shorter when a card in it
+// gives way to a box, so no box already filled moves when another is made. 1.121.1 moved the main
+// character's box 42 px up at the Event make (the Event's card taller than the Location's card beside
+// it) and 116 px at the Location make; and while a make's write ran, its card drew a Pick for the element
+// just made, so that box dropped 38 px for a few frames and came back.
+for (const tag of ['', ' @firefox']) {
+  test(`W5 at every make: no filled box moves when another is made, nor while it is made, at 1440; Home opened again holds nothing${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const moves = await movesAtEachMake(page, SNAPS ? `${SNAPS}/strand-w5-event-1440${tag ? '-firefox' : '-chromium'}.png` : undefined);
+    for (const [make, m] of Object.entries(moves)) {
+      for (const [b, d] of Object.entries(m.end)) expect(Math.abs(d), `the ${b} box after the ${make} make`).toBeLessThan(0.5);
+      for (const [b, d] of Object.entries(m.frame)) expect(d, `the ${b} box while the ${make} make ran`).toBeLessThan(0.5);
+    }
+    // What the holds changed, read by taking every hold off: only the Event's row is held (its two
+    // cells taller), the room stays under what a cell holds (no box taller, none lower in its cell), and
+    // Home opened again holds nothing.
+    const tallerHeld = () => page.evaluate(() => {
+      const parts = [...document.querySelectorAll<HTMLElement>('[data-role="home-strand"] .atlas-home-strand-cell, [data-role="home-strand"] [data-box]')];
+      const name = (e: HTMLElement) => e.hasAttribute('data-box') ? `box ${e.getAttribute('data-box')}` : `cell ${e.getAttribute('data-slot')}`;
+      const read = () => parts.map(e => {
+        const r = e.getBoundingClientRect();
+        const cell = e.closest('.atlas-home-strand-cell')!.getBoundingClientRect();
+        return { h: r.height, inCell: r.top - cell.top };
+      });
+      const held = read();
+      for (const e of parts) e.style.removeProperty('--strand-hold');
+      const free = read();
+      return parts.map((e, i) => [name(e), held[i].h - free[i].h > 0.5 || Math.abs(held[i].inCell - free[i].inCell) > 0.5] as const).filter(([, moved]) => moved).map(([n]) => n);
+    });
+    expect(await tallerHeld()).toEqual(['cell event', 'cell location']);
+    const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId as string);
+    await reopenHome(page, wid);
+    await expect(page.locator('[data-role="home-strand"] [data-box="now"]')).toBeVisible();
+    expect(await tallerHeld()).toEqual([]);
+  });
+}
+
+test.describe('W5 on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  // One column holds no row: the Event make draws the Location's card above the main character's box, so
+  // that box moves down there whatever is held, and a held row would leave a gap the column never has.
+  test('W5 at 390: the moves read and reported; no cell held taller than what it holds', async ({ page }) => {
+    await movesAtEachMake(page, SNAPS ? `${SNAPS}/strand-w5-event-390.png` : undefined);
+    const held = await page.locator('.atlas-home-strand-cell').evaluateAll(els => els.map(e => getComputedStyle(e).minHeight).filter(h => h !== '0px' && h !== 'auto'));
+    expect(held).toEqual([]);
+  });
+});

@@ -65,8 +65,8 @@ import { buildHomePicture, type HomePicture } from './home-picture';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
 import {
-  buildStrandHead, buildStrandPanel, choosePicture, chosenTab, notePictureShown, openHeadLatch, settleStrandFocus, strandContext,
-  strandFocusKey, tabPanel,
+  buildStrandHead, buildStrandPanel, choosePicture, chosenTab, holdStrandRows, notePictureShown, openHeadLatch,
+  settleStrandFocus, strandContext, strandFocusKey, tabPanel,
 } from './home-strand';
 import { isKeptHere, keptSetOf } from '../sync/sync-attach';
 import { strandView } from '../core/strand';
@@ -368,6 +368,8 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }
     if (keep && !tour?.section.hasAttribute('data-holds-copy')) root.appendChild(keep);
     settleAfterDraw(tour?.section ?? bringIn, guideFocus);
+    // The strand's rows held at their tallest this visit (W5), before the focus scrolls to the next card.
+    holdStrandRows(root, worldId);
     settleStrandFocus(root, strandKept);
     if (totalElements === 0) return;
     // The chart strip (the "starred chart") — the shape of the world's

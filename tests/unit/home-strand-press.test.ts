@@ -234,6 +234,31 @@ describe('a write starting holds the whole panel (D1)', () => {
     expect(said()).toBe('');
     expect([...host.querySelectorAll<HTMLButtonElement>('[data-act]')].some(b => b.disabled)).toBe(false);
   });
+
+  // W5 (1.121.2): the Event just made is pickable before the strand names it; a Pick drawn for it on a
+  // redraw while the write runs made the card a line taller for those frames, moving the boxes below.
+  it('a card redrawn while its own write runs offers Pick only as it did when pressed', async () => {
+    await put('narrative', N, { events: [], protagonist: C });
+    await put('character', C, { name: 'Odile' });
+    await open({ narrative: N, event: GONE_E, location: GONE_L });
+    expect(card().querySelector('[data-act="pick"]')).toBeNull();
+    typeIn('name', 'The Flood');
+    // The mark's write waits, the Event already made: Home redraws from the store meanwhile.
+    let release!: () => void;
+    const gate = new Promise<void>(r => { release = r; });
+    const meta = store.writeWorldMetaWith.bind(store);
+    store.writeWorldMetaWith = async mutate => { await gate; return meta(mutate); };
+    card().requestSubmit();
+    await settle();
+    patchSlice('data', { elements: await store.listElements(), loading: false } as never);
+    expect((await store.listElements()).some(e => e.name === 'The Flood')).toBe(true);
+    draw();
+    expect(card().getAttribute('data-card-slot')).toBe('event');
+    expect(card().querySelector('[data-act="pick"]')).toBeNull();
+    release();
+    await settle();
+    expect(card().getAttribute('data-card-slot')).toBe('location');
+  });
 });
 
 describe('the Character card adds the main character to the strand\'s Event (R4)', () => {

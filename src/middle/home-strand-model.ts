@@ -108,6 +108,8 @@ export const memory = {
   editing: null as Editing | null,
   /** The slots with a write under way (C1): set before the write's first await, cleared after its redraw. */
   inFlight: new Set<string>(),
+  /** Per write under way, whether its card offered a Pick when pressed: the card keeps that while the write flies (W5). */
+  pickAtPress: new Map<string, boolean>(),
   /** The open name boxes, pick lists, menus and held cards, each with its quiet close. */
   openClosers: new Set<() => void>(),
 };
@@ -206,6 +208,7 @@ export function resetStrandMemoryForTests(): void {
   memory.tabs.clear();
   memory.askFocus = null;
   memory.inFlight.clear();
+  memory.pickAtPress.clear();
   memory.openClosers.clear();
   clearJourney();
   lastWorld = null;

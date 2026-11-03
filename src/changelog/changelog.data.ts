@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.121.2',
+    date: '2026-11-03',
+    theme: 'The boxes stay where they are',
+    entries: [
+      {
+        id: 'strand-rows-keep-their-height',
+        title: 'Making the next part of a story no longer moves the boxes already made',
+        body: 'On Home\'s Strand tab, making the Event or the location pulled the main character\'s box below it up the page, since the question gave way to a shorter box. Each row now keeps its height until you next open Home, so the boxes stay put, and none of them jumps for a moment while a part is being made.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.121.1',
     date: '2026-11-03',
     theme: 'Still there, or somewhere else',

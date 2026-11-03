@@ -179,6 +179,8 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
   const key = flightKey(c.worldId, slot);
   if (memory.inFlight.has(key)) return;
   memory.inFlight.add(key);
+  const picks = pickRows(slot, c);
+  memory.pickAtPress.set(key, picks.own.length + picks.rest.length > 0);
   // A write pressed on the Strand tab records the tab as pressed: an empty world's unrecorded Strand
   // would otherwise be read afresh on the redraw between the make and the mark.
   if (!memory.tabs.has(c.worldId)) memory.tabs.set(c.worldId, 'strand');
@@ -221,6 +223,7 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
     }
   } finally {
     memory.inFlight.delete(key);
+    memory.pickAtPress.delete(key);
   }
   const kept = made && result !== 'wrote' ? ` ${nameOf(made)} was made and stays in the world.` : '';
   if (result === 'refused') memory.said = { worldId: c.worldId, text: `${STRAND_MOVED}${kept}` };

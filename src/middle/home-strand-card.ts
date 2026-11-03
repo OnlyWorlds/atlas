@@ -33,7 +33,7 @@ import { getActiveStore } from '../core/active-store';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { editStrandElement } from '../ui/strand-write';
 import {
-  clearDraft, clearEditDraft, draftOf, editDraftOf, flying, keepDraft, memory, skip, typeInEdit, type StrandContext,
+  clearDraft, clearEditDraft, draftOf, editDraftOf, flightKey, flying, keepDraft, memory, skip, typeInEdit, type StrandContext,
 } from './home-strand-model';
 import {
   act, drawnFor, holdActs, needsPromise, openPickList, pickRows, promiseRow, rawHeld, run, stampOf, nameOf,
@@ -244,7 +244,10 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
   const picks = pickRows(slot, c);
   const pickHost = document.createElement('div');
   pickHost.className = 'atlas-home-strand-card-pick';
-  if (picks.own.length + picks.rest.length > 0) {
+  // While the card's own write flies, its Pick stays as it was pressed: the element just made is pickable
+  // before the strand names it, and a Pick drawn for those frames lifted the boxes below and dropped them (W5).
+  const atPress = memory.pickAtPress.get(flightKey(c.worldId, slot));
+  if (atPress ?? picks.own.length + picks.rest.length > 0) {
     const pick = act('Or pick one from your world', `card:${slot}:pick`, () => openPickList(pickHost, slot, c, pick, id => chosen({ pick: id })), 'atlas-btn-link');
     acts.appendChild(pick);
   }
