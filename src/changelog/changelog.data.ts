@@ -73,6 +73,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['home'],
       },
       {
+        id: 'strand-whole-rows-close',
+        title: 'Once the strand is whole, its rows close up',
+        body: 'While the Strand tab still asks, each row keeps its height so the boxes already made stay put. Once the last part is made there is nothing left to ask, so the rows now close up in a short slide (at once if your system reduces motion), leaving no empty band between the event and the main character.',
+        tags: ['home'],
+      },
+      {
         id: 'strand-card-words',
         title: 'Each question on the Strand tab says what its kind of element is for',
         body: 'Under each question one line now says what it asks for: "Narratives are stories or tellings of any kind.", "Characters drive your stories: start with its main character.", "Events are happenings of any size, each a part of a larger story.", "Locations are where your stories happen." The event\'s question is always "What happens in" the story, and the last one asks "Where is" the main character now, noting that the event may be long past.',

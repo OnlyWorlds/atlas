@@ -384,6 +384,24 @@ export function holdStrandRows(root: ParentNode, worldId: string): void {
   holdStrandLines(grid, worldId, width);
   if (!rowHold || rowHold.worldId !== worldId || Math.abs(width - rowHold.width) > 0.5) rowHold = { worldId, width, tallest: new Map() };
   const cells = [...grid.querySelectorAll<HTMLElement>(':scope > .atlas-home-strand-cell')];
+  // Whole (1.122.0, the lead's ruling): nothing is left to ask, so no make can move a box any more; the
+  // rows let go of what they held in one settle, closing with a short transition (`is-letting-go`, none
+  // under reduced motion), and hold nothing more while the strand stays whole. The lines' struts stay (G2).
+  if (grid.parentElement?.querySelector(':scope > [data-role="strand-whole"]')) {
+    if (rowHold.tallest.size > 0) {
+      const held = rowHold.tallest;
+      for (const li of cells) {
+        const h = held.get(li.getAttribute('data-slot') ?? '');
+        if (h) li.style.setProperty(HOLD_VAR, `${h}px`);
+      }
+      grid.classList.add('is-letting-go');
+      void grid.offsetHeight;
+      const letGo = (): void => { for (const li of cells) li.style.removeProperty(HOLD_VAR); };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(letGo); else letGo();
+    }
+    rowHold = { worldId, width, tallest: new Map() };
+    return;
+  }
   for (const li of cells) {
     const h = rowHold.tallest.get(li.getAttribute('data-slot') ?? '');
     if (h) li.style.setProperty(HOLD_VAR, `${h}px`);

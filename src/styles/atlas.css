@@ -18005,6 +18005,9 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
    (`--strand-hold`, set by home-strand.ts), so a card giving way to a shorter box moves no box below; the
    room stays under what the cell holds (align-content: start, never stretched rows). */
 .atlas-home-strand-cell { min-width: 0; display: flex; flex-direction: column; gap: 6px; min-height: var(--strand-hold, 0px); }
+/* Whole (1.122.0): the rows let go of their holds in one settle, closing over about 250 ms; at once under reduced motion. */
+.atlas-home-strand-grid.is-letting-go > .atlas-home-strand-cell { transition: min-height 250ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .atlas-home-strand-grid.is-letting-go > .atlas-home-strand-cell { transition: none; } }
 .atlas-home-strand-cell.is-narrative { grid-column: 1 / -1; }
 .atlas-home-strand-cell.is-event, .atlas-home-strand-cell.is-character { grid-column: 1; margin-top: 12px; }
 .atlas-home-strand-cell.is-location, .atlas-home-strand-cell.is-now { grid-column: 2 / 4; display: grid; grid-template-columns: subgrid; align-items: center; align-content: start; margin-top: 12px; }
@@ -18051,6 +18054,9 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-chip .material-symbols-outlined { flex: 0 0 auto; font-size: 15px; color: var(--type-color, var(--atlas-accent)); }
 .atlas-home-strand-chip-name { min-width: 0; overflow-wrap: anywhere; }
 .atlas-home-strand-box-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+/* The location's map door is as wide for "Create a map" as for "Pin it on a map", so a map made never
+   re-wraps the box's buttons and moves the boxes below (1.122.0). */
+.atlas-home-strand-box-acts > [data-strand-key="location:room"] { min-width: 6.6rem; text-align: left; }
 .atlas-home-strand-box-acts > .atlas-btn-link, .atlas-home-strand-card-acts > .atlas-btn-link, .atlas-home-strand-cell.is-add > .atlas-btn-link, .atlas-home-strand-card-same > .atlas-btn-link { min-height: 30px; font-size: 0.86rem; }
 .atlas-home-strand-quiet { color: var(--atlas-text-soft); }
 .atlas-home-strand-more { position: relative; margin-left: auto; }

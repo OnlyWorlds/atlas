@@ -496,16 +496,21 @@ async function movesAtEachMake(page: Page, snapTo?: string): Promise<Moves> {
 // it) and 116 px at the Location make; and while a make's write ran, its card drew a Pick for the element
 // just made, so that box dropped 38 px for a few frames and came back.
 for (const tag of ['', ' @firefox']) {
-  test(`W5 at every make: no filled box moves when another is made, nor while it is made, at 1440; Home opened again holds nothing${tag}`, async ({ page }) => {
+  test(`W5 at every make: no filled box moves when another is made, nor while it is made, at 1440; once whole the rows close up to a fresh opening's${tag}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const moves = await movesAtEachMake(page, SNAPS ? `${SNAPS}/strand-w5-event-1440${tag ? '-firefox' : '-chromium'}.png` : undefined);
     for (const [make, m] of Object.entries(moves)) {
-      for (const [b, d] of Object.entries(m.end)) expect(Math.abs(d), `the ${b} box after the ${make} make`).toBeLessThan(0.5);
-      for (const [b, d] of Object.entries(m.frame)) expect(d, `the ${b} box while the ${make} make ran`).toBeLessThan(0.5);
+      // The make that makes the strand whole lets the rows go (1.122.0, the lead's ruling): only the rows
+      // below a held row close up; nothing above it moves, and nothing moves down.
+      const free = make === 'now' ? new Set(['character']) : new Set<string>();
+      for (const [b, d] of Object.entries(m.end)) {
+        if (free.has(b)) expect(d, `the ${b} box after the ${make} make closes up, never down`).toBeLessThan(0.5);
+        else expect(Math.abs(d), `the ${b} box after the ${make} make`).toBeLessThan(0.5);
+      }
+      for (const [b, d] of Object.entries(m.frame)) if (!free.has(b)) expect(d, `the ${b} box while the ${make} make ran`).toBeLessThan(0.5);
     }
-    // What the holds changed, read by taking every hold off: only the Event's row is held (its two
-    // cells taller), the room stays under what a cell holds (no box taller, none lower in its cell), and
-    // Home opened again holds nothing.
+    // Whole: once settled, no hold is left and every box stands where a fresh opening of the same world
+    // draws it, so no gap between rows is wider than the ordinary spacing (the 1.121.2 band gone).
     const tallerHeld = () => page.evaluate(() => {
       const parts = [...document.querySelectorAll<HTMLElement>('[data-role="home-strand"] .atlas-home-strand-cell, [data-role="home-strand"] [data-box]')];
       const name = (e: HTMLElement) => e.hasAttribute('data-box') ? `box ${e.getAttribute('data-box')}` : `cell ${e.getAttribute('data-slot')}`;
@@ -519,10 +524,26 @@ for (const tag of ['', ' @firefox']) {
       const free = read();
       return parts.map((e, i) => [name(e), held[i].h - free[i].h > 0.5 || Math.abs(held[i].inCell - free[i].inCell) > 0.5] as const).filter(([, moved]) => moved).map(([n]) => n);
     });
-    expect(await tallerHeld()).toEqual(['cell event', 'cell location']);
+    const topsNow = () => page.evaluate(() => {
+      const panel = document.querySelector('[data-role="home-strand"]')!;
+      const top = panel.getBoundingClientRect().top;
+      return Object.fromEntries([...panel.querySelectorAll<HTMLElement>('[data-box]')].map(b => [b.getAttribute('data-box')!, Math.round((b.getBoundingClientRect().top - top) * 10) / 10]));
+    });
+    // Settled: the closing transition is over (two reads 300 ms apart agree).
+    let settled = await topsNow();
+    for (let i = 0; i < 20; i++) {
+      await page.waitForTimeout(300);
+      const again = await topsNow();
+      if (JSON.stringify(again) === JSON.stringify(settled)) break;
+      settled = again;
+    }
+    expect(await tallerHeld()).toEqual([]);
     const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId as string);
     await reopenHome(page, wid);
     await expect(page.locator('[data-role="home-strand"] [data-box="now"]')).toBeVisible();
+    await page.waitForTimeout(300);
+    const fresh = await topsNow();
+    for (const [slot, t] of Object.entries(fresh)) expect(Math.abs(settled[slot] - t), `the ${slot} box once whole, against a fresh opening`).toBeLessThan(1);
     expect(await tallerHeld()).toEqual([]);
   });
 }
@@ -556,7 +577,7 @@ const lineIn = (page: Page, slot: string) => page.locator(`[data-role="home-stra
 const lineWordsIn = (page: Page, slot: string) => lineIn(page, slot).locator('.atlas-home-strand-line-text');
 
 /** The three ways a line goes or changes during a visit, each read as every box's move. */
-async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number>; date: Record<string, number>; dateIn: Record<string, number>; map: Record<string, number>; pin: Record<string, number> }> {
+async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number>; date: Record<string, number>; dateBack: Record<string, number>; dateIn: Record<string, number>; map: Record<string, number>; pin: Record<string, number> }> {
   // The event undated, no map: every line drawn.
   await wholeStrand(page, { event: { start_date: null } });
   await expect(lineWordsIn(page, 'event')).toHaveText('Give it a date to place it in a timeline in Charts.');
@@ -569,7 +590,10 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
   // G8: the focus on the box's first control.
   await expect(page.locator('[data-role="home-strand"] [data-strand-key="character:open"]')).toBeFocused();
   const hide = movedBetween(before, await boxTops(page));
-  // 2. A date saved in Edit here: the event's line goes; its box stands where its Edit card stood.
+  // 2. A date saved in Edit here: the event's line goes; its box stands where its Edit card stood, and
+  // (the strand whole, so no row is held: 1.122.0) every box below returns to where it stood before Edit
+  // here opened the card, the line's strut keeping the line's height.
+  const beforeEdit = await boxTops(page);
   await page.locator('[data-role="home-strand"] [data-box="event"] [data-act="edit"]').click();
   const edit = page.locator('[data-role="strand-card"][data-mode="edit"]');
   await edit.locator('[data-field="when"]').fill('1142');
@@ -577,7 +601,9 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
   await edit.locator('[data-act="save"]').click();
   await expect(page.locator('[data-role="home-strand"] [data-box="event"]')).toBeVisible();
   await expect(lineIn(page, 'event')).toHaveCount(0);
-  const date = movedBetween(before, await boxTops(page));
+  const afterSave = await boxTops(page);
+  const date = movedBetween(before, afterSave);
+  const dateBack = movedBetween(beforeEdit, afterSave);
   // 3. A map made with the line's own link: its words change, nothing below moves.
   const locationDoor = page.locator('[data-role="home-strand"] [data-strand-key="location:room"]');
   await expect(locationDoor).toHaveText('Create a map');
@@ -623,18 +649,20 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
   await expect(lineIn(page, 'location')).toHaveCount(0);
   await expect(page.locator('[data-slot="location"] [data-role="strand-line-strut"]')).toHaveCount(1);
   const pin = movedBetween(before, await boxTops(page));
-  if (process.env.ATLAS_W5_LOG) console.log(`G2 moves ${test.info().title}: ${JSON.stringify({ hide, date, dateIn, map, pin })}`);
-  return { hide, date, dateIn, map, pin };
+  if (process.env.ATLAS_W5_LOG) console.log(`G2 moves ${test.info().title}: ${JSON.stringify({ hide, date, dateBack, dateIn, map, pin })}`);
+  return { hide, date, dateBack, dateIn, map, pin };
 }
 
 for (const tag of ['', ' @firefox']) {
   test(`G2 at 1440: no filled box moves when a line goes by its x, by a date saved or arriving, or when a map is made; Home opened again lets the struts go${tag}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const moves = await movesAsLinesGo(page);
-    for (const [way, m] of Object.entries(moves)) {
-      expect(Object.keys(m).length, way).toBeGreaterThanOrEqual(4);
-      for (const [slot, d] of Object.entries(m)) expect(Math.abs(d), `the ${slot} box when ${way}`).toBeLessThan(0.5);
+    for (const way of ['hide', 'dateBack', 'dateIn', 'map', 'pin'] as const) {
+      expect(Object.keys(moves[way]).length, way).toBeGreaterThanOrEqual(4);
+      for (const [slot, d] of Object.entries(moves[way])) expect(Math.abs(d), `the ${slot} box when ${way}`).toBeLessThan(0.5);
     }
+    expect(Math.abs(moves.date.event), 'the event box when a date is saved').toBeLessThan(0.5);
+    expect(Math.abs(moves.date.narrative), 'the story box when a date is saved').toBeLessThan(0.5);
     const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId as string);
     await reopenHome(page, wid);
     await expect(page.locator('[data-role="home-strand"] [data-box="now"]')).toBeVisible();
@@ -683,11 +711,11 @@ for (const tag of ['', ' @firefox']) {
 
 test.describe('G2 on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  // One column holds no row (1.121.2): the Edit card giving way to the shorter box lifts the boxes below it by
-  // the card's own shrink, so for the date saved in Edit here the guard is the event's own box and those above.
+  // One column holds no row (1.121.2), and a whole strand holds none (1.122.0): the Edit card giving way to the
+  // shorter box lifts the boxes below it back to where they stood before Edit here opened it.
   test('G2 at 390: no filled box moves when a line goes by its x, by a date arriving, or when a map is made; a date saved keeps the event\'s box where its card stood', async ({ page }) => {
     const moves = await movesAsLinesGo(page);
-    for (const way of ['hide', 'dateIn', 'map', 'pin'] as const) {
+    for (const way of ['hide', 'dateBack', 'dateIn', 'map', 'pin'] as const) {
       for (const [slot, d] of Object.entries(moves[way])) expect(Math.abs(d), `the ${slot} box when ${way}`).toBeLessThan(0.5);
     }
     expect(Math.abs(moves.date.event), 'the event box when a date is saved').toBeLessThan(0.5);
