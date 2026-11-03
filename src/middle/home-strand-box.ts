@@ -95,7 +95,9 @@ function moreMenu(slot: StrandSlot, label: string, items: MenuItem[]): HTMLEleme
     b.setAttribute('data-act', it.key.split(':').pop()!);
     b.setAttribute('data-strand-key', it.key);
     b.textContent = it.label;
-    b.addEventListener('click', () => { close('quiet'); it.run(); });
+    // The focus goes to ⋯ before the item runs: a closed list hides the item, so a dialog it opens (Create
+    // a map) would have nowhere to give the focus back to on Cancel.
+    b.addEventListener('click', () => { close('quiet'); btn.focus({ preventScroll: true }); it.run(); });
     list.appendChild(b);
   }
   btn.addEventListener('click', () => {

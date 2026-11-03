@@ -17,7 +17,13 @@ import { linesOf } from '../../src/core/strand-lines';
 const dialogs = vi.hoisted(() => [] as unknown[][]);
 /** What the next New map dialog answers: null (Cancel), or a map made. */
 const dialogAnswer = vi.hoisted(() => ({ next: null as unknown }));
-vi.mock('../../src/ui/map-create-modal', () => ({ createMapDialog: (...args: unknown[]) => { dialogs.push(args); return Promise.resolve(dialogAnswer.next); } }));
+/** Where the focus stood as each dialog opened (the control a Cancel gives it back to). */
+const focusAtDialog = vi.hoisted(() => [] as Array<string | null>);
+vi.mock('../../src/ui/map-create-modal', () => ({ createMapDialog: (...args: unknown[]) => {
+  dialogs.push(args);
+  focusAtDialog.push((document.activeElement as HTMLElement | null)?.getAttribute?.('data-strand-key') ?? null);
+  return Promise.resolve(dialogAnswer.next);
+} }));
 
 const W = 'w-strand-room';
 const N = '0192a000-0000-7000-8000-000000000a01';
@@ -61,6 +67,7 @@ const menuItem = (slot: string, label: string) =>
 afterEach(() => {
   resetStrandTabForTests();
   dialogs.length = 0;
+  focusAtDialog.length = 0;
   dialogAnswer.next = null;
   patchSlice('active', null);
   patchSlice('registry', defaultRegistry());
@@ -391,6 +398,15 @@ describe('the box\'s ⋯ (W6, G6; the amendment\'s A2)', () => {
     memory.askFocus = { worldId: W, key: 'line:character:page' };
     settleStrandFocus(host, null);
     expect(document.activeElement).toBe(box('character').querySelector('[data-strand-key="character:open"]'));
+  });
+
+  it('Create a map from the location\'s ⋯: the dialog opens with the focus on the ⋯, so a Cancel gives it back there', () => {
+    world(whole());
+    draw();
+    box('location').querySelector<HTMLButtonElement>('[data-act="more"]')!.click();
+    menuItem('location', 'Create a map').click();
+    expect(dialogs).toHaveLength(1);
+    expect(focusAtDialog).toEqual(['location:more']);
   });
 
   it('the title opens the element\'s page in every box (the page\'s way in once Open its page went)', () => {
