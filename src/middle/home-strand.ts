@@ -329,7 +329,9 @@ function cell(slot: StrandSlot, c: StrandContext, opts: StrandPanelOptions, aske
     return li;
   }
   if (slot === asked) {
-    if (joinWords) li.appendChild(join(joinWords));
+    // 1.122.0: no join words over an asked card (its question already says them). Above the card in the
+    // box's column (G11) they made the Location's card taller than the Event's card beside it, so the
+    // Event make grew the row and moved the main character's box below (W5).
     li.appendChild(buildMakeCard(slot, c, opts, level));
     return li;
   }

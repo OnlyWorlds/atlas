@@ -126,6 +126,10 @@ const box = (page: Page, slot: string) => page.locator(`[data-role="home-strand"
 const boxName = (page: Page, slot: string) => box(page, slot).locator('.atlas-home-strand-name');
 const cell = (page: Page, slot: string) => page.locator(`[data-role="home-strand"] [data-slot="${slot}"]`);
 const said = (page: Page) => page.locator('[data-role="strand-say"]');
+/** The line above a filled box (1.122.0): its words, without the ×. */
+const line = (page: Page, slot: string) => cell(page, slot).locator('[data-role="strand-line"] .atlas-home-strand-line-text');
+/** A make card's field label, by the field it names. */
+const fieldLabel = (page: Page, f: 'name' | 'text' | 'when') => card(page).locator('.atlas-home-strand-field').filter({ has: page.locator(`[data-field="${f}"]`) }).locator('label');
 
 /** The asked card, answered: name, text and When typed, then Make (Enter in Name, or the button). */
 async function answer(page: Page, slot: string, values: { name: string; text?: string; when?: string }, by: 'enter' | 'press' = 'press'): Promise<void> {
@@ -156,43 +160,59 @@ async function journey(page: Page, still = false): Promise<string> {
   // The focus goes to the next question's Name: who the story is about (1.121.0: before what happens).
   await expect(field(page, 'name')).toBeFocused();
   await expect(cardTitle(page)).toHaveText('Who is the story about?');
-  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Its main character.');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Characters drive your stories: start with its main character.');
   await expect(card(page).locator('[data-act="make"]')).toHaveText('Create');
+  // 1.122.0: the story's line above its box, in the world's tier names.
+  await expect(line(page, 'narrative')).toHaveText('In the writing room you can shape it into chapters and scenes.');
+  await expect(fieldLabel(page, 'when')).toHaveText('Born');
 
-  await answer(page, 'character', { name: 'Odile Varn', text: 'A cartographer who paid in maps.' });
+  await answer(page, 'character', { name: 'Odile Varn', text: 'A cartographer who paid in maps.', when: '1119' });
   const odile = await idByName(page, 'Odile Varn');
   expect((await onDisk(page, story)).protagonist).toBe(odile);
-  expect((await onDisk(page, odile)).description).toBe('A cartographer who paid in maps.');
+  // G9: Born written to birth_date in the one create; the box says it on a line of its own.
+  expect(await onDisk(page, odile)).toMatchObject({ description: 'A cartographer who paid in maps.', birth_date: 1119 });
+  await expect(box(page, 'character').locator('[data-role="strand-box-date"]')).toHaveText('Born 1119');
+  await expect(line(page, 'character')).toHaveText('Open their page to see and edit them in full.');
   expect(await markOnDisk(page)).toEqual({ narrative: story, event: null, location: null });
   await expect(field(page, 'name')).toBeFocused();
-  await expect(cardTitle(page)).toHaveText('What happens to Odile Varn?');
-  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('One event in the story, of any size.');
+  await expect(cardTitle(page)).toHaveText('What happens in The Lantern Ferry?');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Events are happenings of any size, each a part of a larger story.');
+  await expect(fieldLabel(page, 'when')).toHaveText('When');
 
   await answer(page, 'event', { name: 'The night crossing', text: 'A storm closed the lake.', when: '1142' });
   const event = await idByName(page, 'The night crossing');
   expect(await onDisk(page, event)).toMatchObject({ description: 'A storm closed the lake.', start_date: 1142 });
   expect((await onDisk(page, story)).events).toEqual([event]);
   expect(await markOnDisk(page)).toEqual({ narrative: story, event, location: null });
-  // The Event card's second write: the Event lists the story's main character.
-  await expect.poll(async () => (await onDisk(page, event)).characters).toEqual([odile]);
+  // W2: the Event card writes no character into the Event.
+  expect((await onDisk(page, event)).characters).toBeUndefined();
+  // Dated as the timeline reads it: no line asks for a date.
+  await expect(line(page, 'event')).toHaveCount(0);
   await expect(cardTitle(page)).toHaveText('Where did The night crossing happen?');
-  await expect(cell(page, 'location').locator('[data-role="strand-join"]')).toHaveText('happened in or at');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Locations are where your stories happen.');
+  await expect(fieldLabel(page, 'when')).toHaveText('Founded');
+  // The asked card has no join words (its question says them); the box will, between its line and itself.
+  await expect(cell(page, 'location').locator('[data-role="strand-join"]')).toHaveCount(0);
 
-  await answer(page, 'location', { name: 'Saltmere Quay', text: 'The stone landing on the far shore.' });
+  await answer(page, 'location', { name: 'Saltmere Quay', text: 'The stone landing on the far shore.', when: '1102' });
   const quay = await idByName(page, 'Saltmere Quay');
   expect((await onDisk(page, event)).locations).toEqual([quay]);
   expect(await markOnDisk(page)).toEqual({ narrative: story, event, location: quay });
-  expect((await onDisk(page, quay)).description).toBe('The stone landing on the far shore.');
+  expect(await onDisk(page, quay)).toMatchObject({ description: 'The stone landing on the far shore.', founding_date: 1102 });
+  await expect(box(page, 'location').locator('[data-role="strand-box-date"]')).toHaveText('Founded 1102');
+  await expect(cell(page, 'location').locator('[data-role="strand-join"]')).toHaveText('happened in or at');
+  // No map in the world: the location's line asks for one.
+  await expect(line(page, 'location')).toHaveText('Create a map to pin it in place.');
 
-  await expect(cardTitle(page)).toHaveText('Is Odile Varn still at Saltmere Quay?');
-  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('After The night crossing.');
+  await expect(cardTitle(page)).toHaveText('Where is Odile Varn now?');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('The night crossing may be long past; Odile Varn is still somewhere.');
   await expect(card(page).locator('[data-act="same"]')).toHaveText('Still at Saltmere Quay');
   // The question's other answer comes before the form, so Create reads as making the new place.
   await expect(card(page).locator('[data-role="strand-card-else"]')).toHaveText('Or somewhere else:');
   const lines = box(page, 'narrative').locator('[data-role="strand-lines"] p');
   await expect(lines.nth(0)).toHaveText(/It tells of .*The night crossing, which happened in or at .*Saltmere Quay\./);
   if (still) {
-    // Still at: where they are now is where it happened, and the Event lists them, so "still".
+    // Still at: where they are now is where it happened, so "still" (G5: the strand's `same` alone).
     await card(page).locator('[data-act="same"]').click();
     await expect(cell(page, 'now').locator('[data-role="strand-same"] p')).toHaveText('is still in or at Saltmere Quay');
     expect((await onDisk(page, odile)).location).toBe(quay);
@@ -202,6 +222,12 @@ async function journey(page: Page, still = false): Promise<string> {
   } else {
     await answer(page, 'now', { name: 'The Drowned Library' });
     expect((await onDisk(page, odile)).location).toBe(await idByName(page, 'The Drowned Library'));
+    await expect(line(page, 'now')).toHaveText('Their location is where they are now.');
+    // Every line in the journey's order, top to bottom as drawn (the event's gone: it is dated).
+    await expect(page.locator('[data-role="home-strand"] [data-role="strand-line"] .atlas-home-strand-line-text')).toHaveText([
+      'In the writing room you can shape it into chapters and scenes.', 'Create a map to pin it in place.',
+      'Open their page to see and edit them in full.', 'Their location is where they are now.',
+    ]);
     await expect(lines.nth(1)).toHaveText(/Its main character is .*Odile Varn, now in or at .*The Drowned Library\./);
     // Nothing more to ask: the focus goes to the box written.
     await expect(boxName(page, 'now')).toBeFocused();
@@ -209,10 +235,9 @@ async function journey(page: Page, still = false): Promise<string> {
   // Whole, and still no head in this visit.
   await expect(page.locator('[data-role="strand-whole"]')).toContainText('The Lantern Ferry is whole.');
   await expect(head(page)).toHaveCount(0);
-  // Made in the new order, the whole strand holds the same links as before: the story names its main
-  // character, and its Event lists them once.
+  // The whole strand's links: the story names its main character; the Event lists no one (W2).
   expect((await onDisk(page, story)).protagonist).toBe(odile);
-  expect((await onDisk(page, event)).characters).toEqual([odile]);
+  expect((await onDisk(page, event)).characters).toBeUndefined();
   return wid;
 }
 
@@ -241,8 +266,8 @@ for (const tag of ['', ' @firefox']) {
     expect(await squareAt(page, await idByName(page, 'Saltmere Quay'))).toEqual({ line: '0', pos: '1', row: '1' });
     expect(await squareAt(page, await idByName(page, 'Odile Varn'))).toEqual({ line: '0', pos: '0', row: '2' });
     expect(await squareAt(page, await idByName(page, 'The Drowned Library'))).toEqual({ line: '0', pos: '1', row: '2' });
-    // story-event, event-place, story-character, character-now, event-character: five lines, one each.
-    await expect(page.locator('[data-role="home-grid"] .atlas-home-grid-lines path')).toHaveCount(5);
+    // story-event, event-place, story-character, character-now: four lines, one each (W2: no event-character link made).
+    await expect(page.locator('[data-role="home-grid"] .atlas-home-grid-lines path')).toHaveCount(4);
   });
 
   test(`text typed in a card survives a pull while focused, and a redraw after it left${tag}`, async ({ page }) => {
@@ -289,7 +314,7 @@ test('Skip for now and Add: the event asked without a main character, the main c
   await card(page).locator('[data-act="skip"]').click();
   // No main character: the Event asks what happens in the story.
   await expect(cardTitle(page)).toHaveText('What happens in The Lantern Ferry?');
-  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('One event in the story, of any size.');
+  await expect(card(page).locator('.atlas-home-strand-card-what')).toHaveText('Events are happenings of any size, each a part of a larger story.');
   await expect(field(page, 'name')).toBeFocused();
   await expect(cell(page, 'character').locator('[data-act="add"]')).toHaveText('Add character');
   await answer(page, 'event', { name: 'The night crossing' });
@@ -306,8 +331,8 @@ test('Skip for now and Add: the event asked without a main character, the main c
   await answer(page, 'character', { name: 'Mira' });
   const mira = await idByName(page, 'Mira');
   expect((await onDisk(page, story)).protagonist).toBe(mira);
-  // The Character card made after the event puts them in it, as before.
-  await expect.poll(async () => (await onDisk(page, event)).characters).toEqual([mira]);
+  // W2: the Character card made after the event leaves the Event as it was.
+  expect((await onDisk(page, event)).characters ?? null).toBeNull();
   // Where it happened is still to come: no place, so where they are now is asked plainly after it.
   await expect(card(page)).toHaveAttribute('data-card-slot', 'location');
 });
@@ -494,7 +519,8 @@ test.describe('on a phone', () => {
     expect(fits.scroll).toBeLessThanOrEqual(fits.width);
     expect(fits.gridRight).toBeLessThanOrEqual(fits.width);
     expect(fits.oneColumn).toBe(true);
-    const targets = page.locator('[data-role="home-strand"]').locator('.atlas-home-strand-act, .atlas-home-strand-name, .atlas-home-strand-chip, .atlas-home-strand-whole-link');
+    // 1.122.0: the lines' × and links too (Promise 7), a thumb by padding while the line keeps its text height.
+    const targets = page.locator('[data-role="home-strand"]').locator('.atlas-home-strand-act, .atlas-home-strand-name, .atlas-home-strand-chip, .atlas-home-strand-whole-link, .atlas-home-strand-line-x');
     const heights = await targets.evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent !== null).map(e => Math.round(e.getBoundingClientRect().height)));
     expect(heights.length).toBeGreaterThan(10);
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
