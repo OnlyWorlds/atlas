@@ -207,6 +207,10 @@ describe('the cards\' fields', () => {
     expect(editOpening(el('narrative', 'n', { name: 'A', story: 'Once.' })).raw).toEqual({ name: 'A', story: 'Once.' });
     expect(editOpening(el('character', 'c', { name: 'O', birth_date: 1119 }))).toEqual({ values: { name: 'O', text: '', when: '1119' }, raw: { name: 'O', description: undefined, birth_date: 1119 } });
     expect(editOpening(el('location', 'l', { name: 'Q' })).raw).toEqual({ name: 'Q', description: undefined, founding_date: undefined });
+    // The code gate's C7: a date stored as a numeric string opens as the box and the timeline read it; the
+    // raw value stays as stored for the compare.
+    expect(editOpening(el('character', 'c', { name: 'O', birth_date: '1119' }))).toEqual({ values: { name: 'O', text: '', when: '1119' }, raw: { name: 'O', description: undefined, birth_date: '1119' } });
+    expect(editOpening(el('location', 'l', { name: 'Q', founding_date: 'that winter' })).values.when).toBe('');
   });
 
   it('a story with the writing room\'s rich text, or past six lines, goes to the writing room', () => {

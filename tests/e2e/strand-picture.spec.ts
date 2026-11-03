@@ -279,6 +279,8 @@ for (const tag of ['', ' @firefox']) {
       ['event:room', 'Edit in Charts', `#/w/${wid}/timeline/${E}`, async p => { await expect(p.locator('.atlas-world-home')).toHaveCount(0); }],
       ['event:page', 'Open its page', `#/w/${wid}/element/${E}`, async p => { await header(p, 'The night crossing'); }],
       ['location:page', 'Open its page', `#/w/${wid}/element/${L}`, async p => { await header(p, 'Saltmere Quay'); }],
+      // C3: the location's way to a map on its box too, the line's own landing.
+      ['location:room', 'Pin it on a map', `#/w/${wid}/map/${MAP}/element/${L}`, async p => { await header(p, 'Saltmere Quay'); }],
       ['line:location:pin-map', 'Pin it on a map', `#/w/${wid}/map/${MAP}/element/${L}`, async p => {
         await header(p, 'Saltmere Quay');
         await expect.poll(() => p.evaluate(() => {
@@ -554,7 +556,7 @@ const lineIn = (page: Page, slot: string) => page.locator(`[data-role="home-stra
 const lineWordsIn = (page: Page, slot: string) => lineIn(page, slot).locator('.atlas-home-strand-line-text');
 
 /** The three ways a line goes or changes during a visit, each read as every box's move. */
-async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number>; date: Record<string, number>; dateIn: Record<string, number>; map: Record<string, number> }> {
+async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number>; date: Record<string, number>; dateIn: Record<string, number>; map: Record<string, number>; pin: Record<string, number> }> {
   // The event undated, no map: every line drawn.
   await wholeStrand(page, { event: { start_date: null } });
   await expect(lineWordsIn(page, 'event')).toHaveText('Give it a date to place it in a timeline in Charts.');
@@ -577,6 +579,8 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
   await expect(lineIn(page, 'event')).toHaveCount(0);
   const date = movedBetween(before, await boxTops(page));
   // 3. A map made with the line's own link: its words change, nothing below moves.
+  const locationDoor = page.locator('[data-role="home-strand"] [data-strand-key="location:room"]');
+  await expect(locationDoor).toHaveText('Create a map');
   before = await boxTops(page);
   await lineIn(page, 'location').locator('[data-line-link="create-map"]').click();
   const dialog = page.locator('[data-modal="create-map"]');
@@ -586,6 +590,10 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
   await dialog.locator('[data-action="submit"]').click();
   await expect(dialog).toHaveCount(0);
   await expect(lineWordsIn(page, 'location')).toHaveText('Pin it on a map.');
+  // The code gate's C2: the focus on the link that now pins it, never the page.
+  await expect(lineIn(page, 'location').locator('[data-line-link="pin-map"]')).toBeFocused();
+  // C3: the box's door follows the line.
+  await expect(locationDoor).toHaveText('Pin it on a map');
   const map = movedBetween(before, await boxTops(page));
   // 4. A date that arrives from elsewhere (Charts, a pull) on an event not being edited: the same strut.
   await page.evaluate(async (e) => {
@@ -602,8 +610,21 @@ async function movesAsLinesGo(page: Page): Promise<{ hide: Record<string, number
   }, E);
   await expect(lineIn(page, 'event')).toHaveCount(0);
   const dateIn = movedBetween(before, await boxTops(page));
-  if (process.env.ATLAS_W5_LOG) console.log(`G2 moves ${test.info().title}: ${JSON.stringify({ hide, date, dateIn, map })}`);
-  return { hide, date, dateIn, map };
+  // 5. A pin placed while Home shows (the map pane beside it, another tab, a pull): the location's line
+  // goes to its strut (the code gate's C10).
+  before = await boxTops(page);
+  await page.evaluate(async (l) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = (await store.listElements()).find((e: any) => e.type === 'map');
+    await store.createElement('pin', { name: 'Saltmere Quay', map_id: map.id, element_id: l, element_type: 'location', x: 120, y: 80 });
+    api.patchData(await store.listElements());
+  }, L);
+  await expect(lineIn(page, 'location')).toHaveCount(0);
+  await expect(page.locator('[data-slot="location"] [data-role="strand-line-strut"]')).toHaveCount(1);
+  const pin = movedBetween(before, await boxTops(page));
+  if (process.env.ATLAS_W5_LOG) console.log(`G2 moves ${test.info().title}: ${JSON.stringify({ hide, date, dateIn, map, pin })}`);
+  return { hide, date, dateIn, map, pin };
 }
 
 for (const tag of ['', ' @firefox']) {
@@ -618,6 +639,45 @@ for (const tag of ['', ' @firefox']) {
     await reopenHome(page, wid);
     await expect(page.locator('[data-role="home-strand"] [data-box="now"]')).toBeVisible();
     await expect(page.locator('[data-role="strand-line-strut"]')).toHaveCount(0);
+    // W4 (the code gate's C10): a line hidden by its x stays hidden across a reload; the others are drawn.
+    await expect(lineIn(page, 'now')).toHaveCount(1);
+    await page.reload();
+    await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+    await page.evaluate(async (w) => {
+      const { activateWorld } = await import('/src/sidebar/worlds-sidebar.ts');
+      const { toastManager } = await import('/src/ui/toast-manager.ts');
+      if ((window as any).__atlasTestApi.getState().active?.worldId !== w) await (activateWorld as any)(w, toastManager);
+      window.location.hash = `#/w/${w}`;
+    }, wid);
+    await expect(page.locator('[data-role="home-strand"] [data-box="now"]')).toBeVisible();
+    await expect(lineIn(page, 'now')).toHaveCount(1);
+    await expect(lineIn(page, 'character')).toHaveCount(0);
+    await expect(page.locator('[data-role="strand-line-strut"]')).toHaveCount(0);
+  });
+}
+
+// The code gate's C1: a page opened before it was the main character's is noted when opened after.
+for (const tag of ['', ' @firefox']) {
+  test(`the character's page opened before they were the main character, then after: their line goes${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const wid = await wholeStrand(page, { story: { protagonist: null } });
+    await go(page, `#/w/${wid}/element/${C}`);
+    await expect(page.locator('.atlas-middle-header')).toContainText('Odile Varn');
+    await go(page, `#/w/${wid}`);
+    await expect(page.locator('.atlas-world-home')).toBeVisible();
+    // The story names her now (the Character card's Pick, another tab, a pull).
+    await page.evaluate(async ([s, c]) => {
+      const api = (window as any).__atlasTestApi;
+      await api.getActiveStore().updateElement(s, { protagonist: c });
+      api.patchData(await api.getActiveStore().listElements());
+    }, [S, C]);
+    await expect(lineWordsIn(page, 'character')).toHaveText('Open their page to see and edit them in full.');
+    await page.locator('[data-role="home-strand"] [data-strand-key="character:page"]').click();
+    await expect(page.locator('.atlas-middle-header')).toContainText('Odile Varn');
+    await page.goBack();
+    await expect(page.locator('.atlas-world-home')).toBeVisible();
+    await expect(page.locator('[data-role="home-strand"] [data-box="character"]')).toBeVisible();
+    await expect(lineIn(page, 'character')).toHaveCount(0);
   });
 }
 
@@ -627,7 +687,7 @@ test.describe('G2 on a phone', () => {
   // the card's own shrink, so for the date saved in Edit here the guard is the event's own box and those above.
   test('G2 at 390: no filled box moves when a line goes by its x, by a date arriving, or when a map is made; a date saved keeps the event\'s box where its card stood', async ({ page }) => {
     const moves = await movesAsLinesGo(page);
-    for (const way of ['hide', 'dateIn', 'map'] as const) {
+    for (const way of ['hide', 'dateIn', 'map', 'pin'] as const) {
       for (const [slot, d] of Object.entries(moves[way])) expect(Math.abs(d), `the ${slot} box when ${way}`).toBeLessThan(0.5);
     }
     expect(Math.abs(moves.date.event), 'the event box when a date is saved').toBeLessThan(0.5);

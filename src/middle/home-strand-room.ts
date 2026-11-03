@@ -26,7 +26,8 @@
  *   The doors: each filled box offers Edit here (a reader who may change it), Open its page (the
  *   element's page, `elementHash`), and a third only where a room edits it: Edit in the writing room
  *   (a writing story), Edit in Charts (the event), Open in Knowledge or Open in Pages (a story that
- *   lives there). A reader who may not change it gets the reading words: Open in the writing room, See
+ *   lives there), and for the location, where its line could be, Pin it on a map (a map in view) or
+ *   Create a map (none), the line's own acts, so its way to a map stays once the line has gone. A reader who may not change it gets the reading words: Open in the writing room, See
  *   it in Charts (a dated event). Every door only navigates; a press keeps its focus key, so Back puts
  *   the focus (and the scroll) on it.
  */
@@ -53,12 +54,16 @@ import { act } from './home-strand-acts';
 const byName = (a: Element, b: Element): number =>
   (a.name ?? '').localeCompare(b.name ?? '', 'en') || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-/** The map to open a location with: the one holding a pin of it (the first by name), else the world's first map by name. */
+/**
+ * The map to open a location with: the one holding a pin of it (the first by name), else the world's
+ * first map by name. Settled maps only (1.122.0's code gate, C6): a proposed map is neither counted
+ * (`hasMapIn`) nor opened.
+ */
 export function mapFor(locationId: string, elements: Iterable<Element>): { id: string; name: string; pinned: boolean } | null {
   const maps: Element[] = [];
   const pinnedOn = new Set<string>();
   for (const e of elements) {
-    if (e.type === 'map') maps.push(e);
+    if (e.type === 'map') { if (!isProposed(e)) maps.push(e); }
     else if (e.type === 'pin' && spatialOtherOf(e) === locationId) {
       const m = spatialMapOf(e);
       if (m) pinnedOn.add(m);
@@ -196,7 +201,7 @@ export function buildStrandLine(slot: StrandSlot, el: Element, c: StrandContext,
   const text = document.createElement('span');
   text.className = 'atlas-home-strand-line-text';
   for (const piece of pieces) {
-    if ('link' in piece) text.appendChild(lineLink(piece.link, piece.text, slot, el, c));
+    if ('link' in piece) text.appendChild(lineLink(piece.link, piece.text, slot, el, c, redraw));
     else text.appendChild(document.createTextNode(piece.text));
   }
   const x = document.createElement('button');
@@ -216,17 +221,32 @@ export function buildStrandLine(slot: StrandSlot, el: Element, c: StrandContext,
   return wrap;
 }
 
+/**
+ * The map acts a location's line and its box share. Create a map: the Maps panel's own New map dialog,
+ * nothing filled in; once it made a map, the focus goes to `then` (the control that now pins it: the
+ * code gate's C2), else the dialog puts it back itself. Pin it on a map: `mapFor`'s map with the
+ * location's page (the drawer on a narrow window). Neither writes anything of its own.
+ */
+function mapAct(kind: 'create-map' | 'pin-map', el: Element, c: StrandContext, then: string, redraw: () => void): void {
+  if (kind === 'create-map') {
+    void createMapDialog(toastManager, {}).then(made => {
+      if (!made || getState().active?.worldId !== c.worldId) return;
+      memory.askFocus = { worldId: c.worldId, key: then };
+      redraw();
+    });
+    return;
+  }
+  const map = mapFor(el.id, c.byId.values());
+  if (map) navigateWithMap(mapHash(c.worldId, map.id, el.id));
+}
+
 /** A link inside a line: navigation, or the Maps panel's own New map dialog; never a write of its own. */
-function lineLink(kind: 'charts' | 'create-map' | 'pin-map', label: string, slot: StrandSlot, el: Element, c: StrandContext): HTMLElement {
+function lineLink(kind: 'charts' | 'create-map' | 'pin-map', label: string, slot: StrandSlot, el: Element, c: StrandContext, redraw: () => void): HTMLElement {
   const focusKey = `line:${slot}:${kind}`;
   const b = act(label, focusKey, () => {
     memory.askFocus = { worldId: c.worldId, key: focusKey };
     if (kind === 'charts') navigate(timelineHash(c.worldId));
-    else if (kind === 'create-map') void createMapDialog(toastManager, {});
-    else {
-      const map = mapFor(el.id, c.byId.values());
-      if (map) navigateWithMap(mapHash(c.worldId, map.id, el.id));
-    }
+    else mapAct(kind, el, c, `line:${slot}:pin-map`, redraw);
   }, 'atlas-btn-link atlas-home-strand-line-link');
   b.setAttribute('data-line-link', kind);
   return b;
@@ -237,7 +257,9 @@ function lineLink(kind: 'charts' | 'create-map' | 'pin-map', label: string, slot
 export interface BoxDoor {
   label: string;
   key: string;
-  hash: string;
+  /** Where it navigates; a map act instead for the location's third door. */
+  hash?: string;
+  map?: 'create-map' | 'pin-map';
 }
 
 /**
@@ -258,14 +280,21 @@ export function boxDoors(slot: StrandSlot, el: Element, c: StrandContext): BoxDo
     // Its place on the timeline; undated, the timeline's own rail, where a date is given.
     if (writer) doors.push({ label: 'Edit in Charts', key: `${slot}:room`, hash: dated ? timelineHash(c.worldId, el.id) : timelineHash(c.worldId) });
     else if (dated) doors.push({ label: 'See it in Charts', key: `${slot}:room`, hash: timelineHash(c.worldId, el.id) });
+  } else if (slot === 'location' && writer && gridActsIn(c.worldId)) {
+    // The code gate's C3 (the lead's ruling): the location's way to a map stays on its box once its line
+    // has gone (Promise 4), for a reader who may act on it, as the line's (G3); others get nothing new.
+    doors.push(hasMapIn(c.byId)
+      ? { label: 'Pin it on a map', key: `${slot}:room`, map: 'pin-map' }
+      : { label: 'Create a map', key: `${slot}:room`, map: 'create-map' });
   }
   return doors;
 }
 
 /** The doors as buttons (link-styled; held as every act while a write is in flight). */
-export function buildBoxDoors(slot: StrandSlot, el: Element, c: StrandContext): HTMLElement[] {
+export function buildBoxDoors(slot: StrandSlot, el: Element, c: StrandContext, redraw: () => void): HTMLElement[] {
   return boxDoors(slot, el, c).map(d => act(d.label, d.key, () => {
     memory.askFocus = { worldId: c.worldId, key: d.key };
-    navigate(d.hash);
+    if (d.map) mapAct(d.map, el, c, d.key, redraw);
+    else if (d.hash) navigate(d.hash);
   }, 'atlas-btn-link'));
 }

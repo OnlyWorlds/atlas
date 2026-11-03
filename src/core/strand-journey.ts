@@ -15,6 +15,7 @@ import { aidKind } from './charter';
 import { isMessage } from './message-parties';
 import { isKnownOf } from '../sync/known-of';
 import { canonicalExtValue } from '../sync/world-meta-sync';
+import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
 
 // ---- The words ----
 
@@ -250,8 +251,12 @@ export function editOpening(el: Element): { values: CardValues; raw: Record<stri
   const when = w ? rec[w.field] : undefined;
   const raw: Record<string, unknown> = { name: rec.name, [field]: rec[field] };
   if (w) raw[w.field] = when;
+  // A date stored as a numeric string ("1119") opens as the timeline and the box read it (the code gate's
+  // C7); a number as it is; anything else opens empty, and Save compares against the raw value stored.
+  const read = parseTemporalValue(when);
+  const shown = typeof when === 'number' && Number.isFinite(when) ? String(when) : read !== null && Number.isInteger(read) ? String(read) : '';
   return {
-    values: { name: str(rec.name), text: str(rec[field]), when: typeof when === 'number' && Number.isFinite(when) ? String(when) : '' },
+    values: { name: str(rec.name), text: str(rec[field]), when: shown },
     raw,
   };
 }

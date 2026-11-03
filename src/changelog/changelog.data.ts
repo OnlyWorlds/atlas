@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'strand-box-buttons',
         title: 'Each box offers Edit here, Open its page, and the room that edits it',
-        body: 'Every box on the Strand tab has Edit here (in place, as before), Open its page, and where a room edits it a third: Edit in the writing room for the story, Edit in Charts for the event. Someone who can only read the world sees Open its page, Open in the writing room, and See it in Charts for an event with a date.',
+        body: 'Every box on the Strand tab has Edit here (in place, as before), Open its page, and where a room edits it a third: Edit in the writing room for the story, Edit in Charts for the event, and Pin it on a map for where it happened (Create a map while the world has none, with nothing filled in). Someone who can only read the world sees Open its page, Open in the writing room, and See it in Charts for an event with a date.',
         tags: ['home'],
       },
       {

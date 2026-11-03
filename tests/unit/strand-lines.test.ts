@@ -191,6 +191,30 @@ describe('noteStrandOpened: only the strand\'s own story and main character', ()
     expect(linesOf(stored().worlds[0]).opened).toEqual([lineKey('narrative', N), lineKey('character', C)]);
   });
 
+  // The code gate's C1: a page (or the writing room) opened before it was the strand's is noted when it is
+  // opened again after the strand named it.
+  it('a page opened before it was the main character\'s, then again after: noted; the story the same way', async () => {
+    open();
+    const els = () => getState().data.elements as unknown as Array<Record<string, unknown>>;
+    // The story names no one yet; the character's page is opened.
+    patchSlice('data', { loading: false, elements: els().map(e => (e.id === N ? { ...e, protagonist: undefined } : e)) as unknown as Element[] } as never);
+    noteStrandOpened(W, 'character', C);
+    await settle();
+    expect(linesOf(getState().registry.worlds[0]).opened).toEqual([]);
+    // The story names them (Pick on the Character card); the same page opened again, nothing in between.
+    patchSlice('data', { loading: false, elements: els().map(e => (e.id === N ? { ...e, protagonist: C } : e)) as unknown as Element[] } as never);
+    noteStrandOpened(W, 'character', C);
+    await settle();
+    expect(linesOf(getState().registry.worlds[0]).opened).toEqual([lineKey('character', C)]);
+    // The writing room on a narrative before it was the story, then after it became the story.
+    noteStrandOpened(W, 'narrative', 'other-story');
+    await settle();
+    patchSlice('active', { worldId: W, meta: { id: W, name: 'W', x_strand: { narrative: 'other-story', event: null, location: null } } } as never);
+    noteStrandOpened(W, 'narrative', 'other-story');
+    await settle();
+    expect(linesOf(getState().registry.worlds[0]).opened).toContain(lineKey('narrative', 'other-story'));
+  });
+
   it('a world still loading is asked again on the next draw', async () => {
     open();
     patchSlice('data', { ...getState().data, loading: true } as never);

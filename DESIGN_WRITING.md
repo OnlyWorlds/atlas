@@ -137,7 +137,7 @@ The collapsibles below the prose (Details + References) keep the full schema edi
 9. **Collapsible "References"** — wraps `element-detail-refs.ts` unchanged. Collapsed by default.
 10. **Footer** — live word count, reading-time estimate (words / 250), save state derived from sync pill state, "Open as element →" link.
 
-**The empty Book's line** (1.121.0, `emptyBookLine` in `src/middle/writing-helpers.ts`): derived, no stored flag. While the opened narrative is at tier l1 and has no child at tier l2 (a Draft does not count), in a world that is not view-only, the workspace body's top, under the sticky bar, says "A chapter can be any part you like: a chapter, an act, a session. Press + to add one." with the world's own l2 label; any Book, not only the strand's story. Nothing for a Chapter, a Scene, a Draft or a view-only world; it goes on the refresh after the first part lands. Guard: `tests/unit/writing-empty-book.test.ts`.
+**The empty Book's line** (1.121.0, its words 1.122.0; `emptyBookLine` in `src/middle/writing-helpers.ts`): derived, no stored flag. While the opened narrative is at tier l1 and has no child at tier l2 (a Draft does not count), in a world that is not view-only, the workspace body's top, under the sticky bar, says "Narratives nest as books, chapters and scenes, and you can rename these tiers in Settings. Press + to add the first." with the world's own l1, l2 and l3 labels in place of books, chapters and scenes (plural, lower case; a blank label reads as its default); any Book, not only the strand's story. Nothing for a Chapter, a Scene, a Draft or a view-only world; it goes on the refresh after the first part lands. Guard: `tests/unit/writing-empty-book.test.ts`.
 
 ### Storage model
 

@@ -17995,9 +17995,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-say { margin: 8px 0 0; color: var(--atlas-text); font-size: 0.9rem; }
 .atlas-home-strand-say:empty { display: none; }
 /* The journey's grid (1.120.0, Seethe's): the story across the top; the Event and the main character on
-   the left, their places on the right, the joining words in a column of their own between (a subgrid, so
-   the words stay inside the place's cell, never a child of the list). An empty cell keeps its place and
-   takes no height; the cells' own top margin, not a row gap, spaces them, so an empty row adds nothing. */
+   the left, their places on the right. The places' cells span the middle `auto` column and the right one
+   as a subgrid; since 1.122.0 (G11) the joining words stand in the box's own column, between its line and
+   the box, so the middle column is empty and the half columns sit 12 px apart (6 + 0 + 6), kept so the
+   subgrid's placement stays as it was. An empty cell keeps its place and takes no height; the cells' own
+   top margin, not a row gap, spaces them, so an empty row adds nothing. */
 .atlas-home-strand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 6px; align-items: start; }
 /* W5 at every make (1.121.2): a cell keeps the tallest it stood this visit while a filled box lay below it
    (`--strand-hold`, set by home-strand.ts), so a card giving way to a shorter box moves no box below; the

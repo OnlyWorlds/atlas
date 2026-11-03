@@ -251,7 +251,7 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
   }
   // The box's doors (1.122.0, W6): Edit here, Open its page, and a room's where one edits it.
   const canEdit = !!el && !isKnownOf(el) && mayChange(c.entry, el);
-  const doors = el ? buildBoxDoors(slot, el, c) : [];
+  const doors = el ? buildBoxDoors(slot, el, c, opts.redraw) : [];
   if (canEdit || another || doors.length > 0) {
     const acts = document.createElement('div');
     acts.className = 'atlas-home-strand-box-acts';

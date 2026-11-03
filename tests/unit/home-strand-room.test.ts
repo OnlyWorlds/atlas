@@ -8,12 +8,15 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { getState, patchSlice } from '../../src/core/state';
 import { defaultRegistry, type Element, type WorldRegistryEntry } from '../../src/core/types';
 import { mapFor, placedOn, boxDoors } from '../../src/middle/home-strand-room';
+import { bornOrFounded } from '../../src/middle/home-strand-box';
 import { buildStrandPanel, holdStrandRows, openHeadLatch, resetStrandTabForTests, strandContext } from '../../src/middle/home-strand';
 import { memory } from '../../src/middle/home-strand-model';
 import { linesOf } from '../../src/core/strand-lines';
 
 const dialogs = vi.hoisted(() => [] as unknown[][]);
-vi.mock('../../src/ui/map-create-modal', () => ({ createMapDialog: (...args: unknown[]) => { dialogs.push(args); return Promise.resolve(null); } }));
+/** What the next New map dialog answers: null (Cancel), or a map made. */
+const dialogAnswer = vi.hoisted(() => ({ next: null as unknown }));
+vi.mock('../../src/ui/map-create-modal', () => ({ createMapDialog: (...args: unknown[]) => { dialogs.push(args); return Promise.resolve(dialogAnswer.next); } }));
 
 const W = 'w-strand-room';
 const N = '0192a000-0000-7000-8000-000000000a01';
@@ -51,6 +54,7 @@ const doorLabels = (slot: string) => [...box(slot).querySelectorAll<HTMLElement>
 afterEach(() => {
   resetStrandTabForTests();
   dialogs.length = 0;
+  dialogAnswer.next = null;
   patchSlice('active', null);
   patchSlice('registry', defaultRegistry());
   patchSlice('data', { elements: [] } as never);
@@ -79,6 +83,11 @@ describe('mapFor and placedOn', () => {
     expect(placedOn('L', idx(m('a', 'A', { x_review_proposed: { by: 'm', evidence: 'seat' } }), pin('p', 'a', 'L')))).toBe(false);
     // A map of the place (`location`) is no pin of it.
     expect(placedOn('L', idx(m('a', 'A', { location: 'L' })))).toBe(false);
+  });
+  it('mapFor (the code gate\'s C6): a proposed map is never the one opened', () => {
+    const proposed = { x_review_proposed: { by: 'm', evidence: 'seat' } };
+    expect(mapFor('L', [m('a', 'Atoll', proposed), m('b', 'Zeal')])).toEqual({ id: 'b', name: 'Zeal', pinned: false });
+    expect(mapFor('L', [m('a', 'Atoll', proposed)])).toBeNull();
   });
 });
 
@@ -133,6 +142,26 @@ describe('the line above each filled box (W3)', () => {
     world([...whole(), el('map', M, { name: 'The Coast' }), el('pin', P, { map_id: M, element_id: L, x: 5, y: 5 })]);
     draw();
     expect(line('location')).toBeNull();
+  });
+
+  it('only a proposed map in the world: still "Create a map" (C6), on the line and the box', () => {
+    world([...whole(), el('map', M, { name: 'The Coast', x_review_proposed: { by: 'm', evidence: 'seat' } })]);
+    draw();
+    expect(lineText('location')).toBe('Create a map to pin it in place.');
+    expect(doorLabels('location')).toEqual(['Edit here', 'Open its page', 'Create a map']);
+  });
+
+  it('once Create a map made a map, the focus is asked for the Pin it on a map that replaces it (C2); a Cancel asks nothing', async () => {
+    world(whole());
+    draw();
+    line('location')!.querySelector<HTMLButtonElement>('[data-line-link="create-map"]')!.click();
+    await Promise.resolve(); await Promise.resolve();
+    expect(memory.askFocus).toEqual({ worldId: W, key: 'line:location:create-map' });
+    dialogAnswer.next = { map: { id: M, name: 'The Coast' } };
+    draw();
+    line('location')!.querySelector<HTMLButtonElement>('[data-line-link="create-map"]')!.click();
+    await Promise.resolve(); await Promise.resolve();
+    expect(memory.askFocus).toEqual({ worldId: W, key: 'line:location:pin-map' });
   });
 
   it('Create a map opens the panel\'s own New map dialog with nothing filled in, and writes nothing', () => {
@@ -256,15 +285,63 @@ describe('readers who may not change an element (G3)', () => {
   });
 });
 
+describe('Born and Founded on a box (G9; the code gate\'s C5)', () => {
+  const CAL = { id: 'cal-1', type: 'construct', name: 'Reckoning', supertype: 'calendar', atlas_calendar: { version: 1, grain: 'year', eras: [{ name: 'Third Age', abbrev: 'TA', start: 0 }], format: '{year} {era}' } };
+  it('in a calendar world: the world calendar\'s reading; without one, the whole number; not a whole number: no line', () => {
+    world([...whole(), CAL as unknown as Element]);
+    const c = strandContext(W)!;
+    const odile = el('character', C, { birth_date: 1119 });
+    const said = bornOrFounded(odile, c)!;
+    expect(said.startsWith('Born ')).toBe(true);
+    expect(said).not.toBe('Born 1119');
+    expect(said).toMatch(/TA/);
+    expect(bornOrFounded(el('location', L, { founding_date: 1102 }), c)).toMatch(/^Founded .*TA/);
+    world(whole());
+    const plain = strandContext(W)!;
+    expect(bornOrFounded(odile, plain)).toBe('Born 1119');
+    expect(bornOrFounded(el('character', C, { birth_date: '1119' }), plain)).toBe('Born 1119');
+    expect(bornOrFounded(el('character', C, { birth_date: 11.5 }), plain)).toBeNull();
+    expect(bornOrFounded(el('character', C, { birth_date: 'that winter' }), plain)).toBeNull();
+    expect(bornOrFounded(el('event', E, { start_date: 5 }), plain)).toBeNull();
+  });
+});
+
 describe('the box\'s doors (W6, G6)', () => {
   it('a reader who may change it: Edit here, Open its page, and the room that edits it', () => {
     world(whole({ start_date: 5 }));
     draw();
     expect(doorLabels('narrative')).toEqual(['Edit here', 'Open its page', 'Edit in the writing room']);
     expect(doorLabels('event')).toEqual(['Edit here', 'Open its page', 'Edit in Charts']);
-    expect(doorLabels('location')).toEqual(['Edit here', 'Open its page']);
+    // C3: the location's way to a map, as its line's, kept on the box.
+    expect(doorLabels('location')).toEqual(['Edit here', 'Open its page', 'Create a map']);
     expect(doorLabels('character')).toEqual(['Edit here', 'Open its page']);
     expect(doorLabels('now')).toEqual(['Edit here', 'Open its page']);
+  });
+
+  it('C3: the location\'s third door: Pin it on a map with a map in view (mapFor\'s landing), Create a map without (the dialog, nothing filled, the focus back on the door once made); placed, still the map; never where the grid does not act', async () => {
+    world([...whole(), el('map', M, { name: 'The Coast' })]);
+    draw();
+    const door = () => box('location').querySelector<HTMLButtonElement>('[data-strand-key="location:room"]')!;
+    expect(door().textContent).toBe('Pin it on a map');
+    door().click();
+    expect(window.location.hash).toBe(`#/w/${W}/map/${M}/element/${L}`);
+    expect(memory.askFocus).toEqual({ worldId: W, key: 'location:room' });
+    // Hidden line, the door stays (Promise 4).
+    world([...whole(), el('map', M, { name: 'The Coast' })], { strand_lines: { hidden: [`location:${L}`], opened: [] } });
+    draw();
+    expect(line('location')).toBeNull();
+    expect(door().textContent).toBe('Pin it on a map');
+    world(whole());
+    dialogAnswer.next = { map: { id: M, name: 'The Coast' } };
+    draw();
+    expect(door().textContent).toBe('Create a map');
+    door().click();
+    expect(dialogs[dialogs.length - 1][1]).toEqual({});
+    await Promise.resolve(); await Promise.resolve();
+    expect(memory.askFocus).toEqual({ worldId: W, key: 'location:room' });
+    world(whole(), { demo: true } as never);
+    draw();
+    expect(box('location').querySelector('[data-strand-key="location:room"]')).toBeNull();
   });
 
   it('each door lands where it says and only navigates, its focus kept for Back', () => {

@@ -18,7 +18,7 @@
 
 import type { WorldRegistryEntry } from './types';
 import type { StrandSlot } from './strand';
-import { memberIds, storedMark } from './strand';
+import { elementIndex, memberIds, storedMark } from './strand';
 import { getState, patchSlice } from './state';
 import { saveRegistry, storedWorldEntry, updateWorldEntry } from '../registry/registry';
 import { pluralize, type WritingLabels, type WritingTier } from '../middle/writing-helpers';
@@ -124,8 +124,15 @@ export function noteStrandLine(worldId: string, list: keyof StrandLines, key: st
   patchSlice('registry', nextReg);
 }
 
-/** What was last noted as opened, per world: a room's every redraw asks once. */
+/**
+ * What was last checked, per world, with what it was checked against (the strand's story and main
+ * character then): a room's every redraw asks once, and asks again once the strand names someone else
+ * (the code gate's C1: a page opened before it was the main character's is noted when it is opened
+ * after it became theirs).
+ */
 const lastOpened = new Map<string, string>();
+
+const idOf = (v: unknown): string => (typeof v === 'string' ? v : v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string' ? (v as { id: string }).id : '');
 
 /**
  * A room opened on an element (the writing room on a story, the element page on a character): noted
@@ -134,23 +141,17 @@ const lastOpened = new Map<string, string>();
  */
 export function noteStrandOpened(worldId: string, slot: 'narrative' | 'character', id: string | null | undefined): void {
   if (!id) return;
-  const seen = `${slot}:${id}`;
+  const s = getState();
+  // Not yet readable (another world, still loading): asked again on the next draw.
+  if (s.active?.worldId !== worldId || s.data.loading) return;
+  const story = memberIds(storedMark(s.active.meta)).narrative ?? '';
+  const hero = slot === 'character' && story ? idOf((elementIndex(s.data.elements).get(story) as unknown as Record<string, unknown> | undefined)?.protagonist) : '';
+  const seen = `${slot}:${id}:${story}:${hero}`;
   if (lastOpened.get(worldId) === seen) return;
   lastOpened.set(worldId, seen);
+  if (!story || (slot === 'narrative' ? id !== story : hero !== id)) return;
   queueMicrotask(() => {
-    const s = getState();
-    // Not yet readable (another world, still loading): asked again on the next draw.
-    if (s.active?.worldId !== worldId || s.data.loading) { lastOpened.delete(worldId); return; }
-    const story = memberIds(storedMark(s.active.meta)).narrative;
-    if (!story) return;
-    if (slot === 'narrative' && id !== story) return;
-    if (slot === 'character') {
-      const el = s.data.elements.find(e => e.id === story) as unknown as Record<string, unknown> | undefined;
-      const hero = el?.protagonist;
-      const heroId = typeof hero === 'string' ? hero : hero && typeof hero === 'object' ? (hero as { id?: unknown }).id : null;
-      if (heroId !== id) return;
-    }
-    noteStrandLine(worldId, 'opened', lineKey(slot, id));
+    if (getState().active?.worldId === worldId) noteStrandLine(worldId, 'opened', lineKey(slot, id));
   });
 }
 
