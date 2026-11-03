@@ -173,7 +173,28 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   // adds or removes it. The whole line's Picture shows it on a press.
   const headLatch = openHeadLatch(() => { lastInputs = null; render(); });
 
+  // A switch between Picture and Strand keeps Home's scroll (1.122.0). Home is its own scroller, and a
+  // draw empties it and builds it again in steps: a layout read part way (the rows' hold, the focus on
+  // the tab, the grid's mount) clamps the scroll to the part built so far, so it fell toward the top.
+  // The position read before the draw is put back once all of it is built; the browser clamps it to
+  // the new content's end. Only a switch asks: every other draw keeps today's way.
+  let keepScroll = false;
+  let draws = 0;
   function render(): void {
+    const keptTop = keepScroll ? root.scrollTop : null;
+    const before = draws;
+    drawHome();
+    if (keptTop === null || draws === before) return;
+    keepScroll = false;
+    root.scrollTop = keptTop;
+    // The tab pressed stays in view, as the focus's own scroll put it (a press from the keyboard on a
+    // tab half out of view): nothing moves when it is already in view.
+    const a = document.activeElement;
+    if (a instanceof HTMLElement && root.contains(a) && a.matches('[data-role="home-tabs"] [data-tab]')) a.scrollIntoView?.({ block: 'nearest' });
+  }
+  const switchTab = (): void => { keepScroll = true; lastInputs = null; render(); };
+
+  function drawHome(): void {
     const s = getState();
     // The lore (core/parlor-room.ts): the world without the parlor's room while
     // it is hidden; its identity moves with the elements and with the switch.
@@ -186,6 +207,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
     if (root.querySelector(`[${GRID_OPEN_ATTR}]`) || waymarkOpenIn(root)) { owed = true; return; }
     lastInputs = inputs;
+    draws++;
     // The strand's control that held the focus, by its key: put back after the draw (S6).
     const strandKept = strandFocusKey(root);
     markHadFocus = marks.some(waymarkHasFocus);
@@ -287,10 +309,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // One reading of the strand per draw, handed to each part (the code gate's C7).
     const strandNow = quiet ? null : strandContext(worldId);
     // The whole line's Picture: the Picture tab, the head shown for the rest of the visit (R8).
-    const showPicture = (): void => { choosePicture(worldId); headLatch.reveal(worldId); redrawNow(); };
+    const showPicture = (): void => { keepScroll = true; choosePicture(worldId); headLatch.reveal(worldId); switchTab(); };
     const drawWithStrand = (): void => {
       const chosen = chosenTab(worldId, strandNow);
-      const head = buildStrandHead(worldId, chosen, redrawNow);
+      const head = buildStrandHead(worldId, chosen, switchTab);
       const panel = tabPanel(chosen);
       root.append(head, panel);
       if (chosen === 'strand') { panel.appendChild(buildStrandPanel(worldId, { alone: false, redraw: redrawNow, context: strandNow, showPicture })); return; }
