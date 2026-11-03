@@ -189,6 +189,8 @@ describe('the × (W4, G2, G8)', () => {
     for (const slot of ['narrative', 'location', 'character', 'now']) expect(line(slot), slot).not.toBeNull();
     const entry = getState().registry.worlds.find(w => w.id === W);
     expect(linesOf(entry)).toEqual({ hidden: [`event:${E}`], opened: [] });
+    // G8: the focus asked for the box's first control once the line is gone.
+    expect(memory.askFocus).toEqual({ worldId: W, key: 'box:event' });
     // Nothing of it in the world's elements.
     expect(JSON.stringify(getState().data.elements)).not.toContain('strand_lines');
   });
@@ -283,6 +285,17 @@ describe('the box\'s doors (W6, G6)', () => {
       expect(memory.askFocus?.key).toMatch(new RegExp(`^${slot}:(page|room)$`));
     }
     expect(JSON.stringify(getState().data.elements)).toBe(before);
+  });
+
+  it('G6: a story outside the writing tree, or in a world whose writing is not set up: no story line, no writing room door', () => {
+    world(whole().map(e => (e.id === N ? el('narrative', N, { supertype: 'Legend', events: [E], protagonist: C }) : e)));
+    draw();
+    expect(doorLabels('narrative')).toEqual(['Edit here', 'Open its page']);
+    // A foreign chain of narratives: the writing room asks its setup first.
+    world([...whole(), el('narrative', 'x-saga', { supertype: 'Saga' }), el('narrative', 'x-part', { supertype: 'Part', parent_narrative: 'x-saga' })]);
+    draw();
+    expect(doorLabels('narrative')).toEqual(['Edit here', 'Open its page']);
+    expect(line('narrative')).toBeNull();
   });
 
   it('an undated event\'s Edit in Charts opens the timeline, where a date is given', () => {
