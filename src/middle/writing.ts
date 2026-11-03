@@ -33,6 +33,7 @@ import {
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { mountGuideRoomBar } from './guide-room-bar';
+import { noteStrandOpened } from '../core/strand-lines';
 
 // Re-export for backward compat with any callers still importing from writing.
 export { getWritingLabels } from './writing-helpers';
@@ -264,6 +265,8 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
     // had selected before entering writing — switching to writing no longer
     // clobbers selection.
     const targetId = activeNode.el.id;
+    // The strand's story opened here: its line above Home's box has done its work (1.122.0).
+    noteStrandOpened(active.worldId, 'narrative', targetId);
 
     // Remember the selected narrative for this world so the writing icon in
     // the room nav can restore this view when the user returns from another

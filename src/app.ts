@@ -23,6 +23,7 @@ import { mountShareRoom } from './middle/share-room';
 import { mountImportRoom } from './middle/import-room';
 import { mountRoomNav } from './middle/room-nav';
 import { noteRoomVisit } from './core/guide-path';
+import { noteStrandOpened } from './core/strand-lines';
 import { mountRightPane } from './tabs/right/right-pane';
 import { installContextTabLifecycle } from './tabs/right/context-tab-lifecycle';
 import { openMapTab } from './tabs/right/map-index-tab';
@@ -418,6 +419,9 @@ export function startApp(container: HTMLElement): AppHandle {
     // user gesture, requestPermission would fail and we'd downgrade the URL to
     // a confusing "welcome" view. Sidebar click is the explicit permission
     // path. Boot-time silent activation is handled by `tryAutoActivateFromUrl`.
+
+    // An element's page opened on the strand's main character: its line above Home's box has done its work (1.122.0).
+    if (nextMode === 'element' && route.elementId && nextWorldId && route.worldId === nextWorldId) noteStrandOpened(nextWorldId, 'character', route.elementId);
 
     // If the route names an element id, mirror it in selection.
     if (route.elementId && getState().ui.selectedElementId !== route.elementId) {

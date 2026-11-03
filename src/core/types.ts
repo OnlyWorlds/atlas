@@ -871,6 +871,14 @@ export interface WorldRegistryEntry {
   /** The path's rooms seen once their step was lit (#964): `happened` (the chart), `story` (the writing room). */
   guide_visited?: string[];
   /**
+   * The strand's lines above its boxes (1.122.0, `core/strand-lines.ts`): each key `<slot>:<element id>`.
+   * `hidden`: lines put away with their ×; `opened`: the story opened in the writing room, the main
+   * character's page opened. Kept in this browser only, never in `WORLD_PREF_KEYS` (so never in the
+   * world folder, keel or an export); written as a union with what is stored, so two tabs never undo
+   * each other.
+   */
+  strand_lines?: { hidden: string[]; opened: string[] };
+  /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
    * survives reloads without depending on the world's folder being granted

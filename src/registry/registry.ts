@@ -569,7 +569,7 @@ export function toggleWritingTreeCollapsed(
 /**
  * The re-key moves ids; stored state follows. Remaps the element ids a
  * world entry carries (favourites, calendar lens, writing-tree collapse, last
- * writing narrative, the Web's lens). Returns the SAME registry when nothing matched; the
+ * writing narrative, the Web's lens, the strand's lines). Returns the SAME registry when nothing matched; the
  * caller saves.
  */
 export function rekeyRegistryEntry(
@@ -602,6 +602,16 @@ export function rekeyRegistryEntry(
     if (last !== w.last_writing_narrative_id) next = { ...next, last_writing_narrative_id: last as string };
     const lens = one(w.context_lens);
     if (lens !== w.context_lens) next = { ...next, context_lens: lens as string };
+    // The strand's lines (1.122.0): each key `<slot>:<element id>` follows its element.
+    const lines = w.strand_lines;
+    const moveKey = (k: string): string => {
+      const at = k.indexOf(':');
+      const id = k.slice(at + 1);
+      return at > 0 && map.has(id) ? `${k.slice(0, at)}:${map.get(id)}` : k;
+    };
+    if (lines && [...(lines.hidden ?? []), ...(lines.opened ?? [])].some(k => moveKey(k) !== k)) {
+      next = { ...next, strand_lines: { hidden: (lines.hidden ?? []).map(moveKey), opened: (lines.opened ?? []).map(moveKey) } };
+    }
     if (next !== w) changed = true;
     return next;
   });
