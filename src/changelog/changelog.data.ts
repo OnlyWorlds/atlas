@@ -85,6 +85,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['home'],
       },
       {
+        id: 'open-with-tangle',
+        title: 'Tactical Tangle is in the OnlyWorlds mark\'s Open with',
+        body: 'In a world on OnlyWorlds, the mark beside the world\'s name on Home and beside a character\'s name on their page now offers Tactical Tangle among the tools that open it.',
+        tags: ['sharing'],
+      },
+      {
         id: 'writing-empty-book-tiers',
         title: 'An empty book in the writing room says how narratives nest',
         body: 'Before a book has its first chapter, the line at its top now reads "Narratives nest as books, chapters and scenes, and you can rename these tiers in Settings. Press + to add the first.", in your world\'s own names for the three tiers.',
