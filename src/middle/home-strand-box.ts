@@ -17,8 +17,12 @@ import { mayChange } from '../core/may-change';
 import { isKnownOf } from '../sync/known-of';
 import { maySetSlot, SLOT_TYPE, type StrandSlot } from '../core/strand';
 import {
-  boxTextOf, editOpening, sameCellWords, storyLines, SLOT_OTHER, SLOT_WORD,
+  boxTextOf, editOpening, sameCellWords, storyLines, whenOf, SLOT_OTHER, SLOT_WORD,
 } from '../core/strand-journey';
+import type { Element } from '../core/types';
+import { resolveCalendarLens } from '../core/calendar-lens';
+import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
+import { calendarDateText } from './element-detail-fields';
 import { typeNameStart } from '../core/type-words';
 import { openWebOn } from '../ui/open-web';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
@@ -146,7 +150,7 @@ function chip(slot: StrandSlot, id: string, name: string, c: StrandContext): HTM
 
 /** The story's two lines (R5): only what is filled, never more than the links hold. */
 function linesOf(c: StrandContext): HTMLElement | null {
-  const lines = storyLines(c.strand, c.byId);
+  const lines = storyLines(c.strand);
   if (lines.length === 0) return null;
   const wrap = document.createElement('div');
   wrap.className = 'atlas-home-strand-lines';
@@ -173,6 +177,21 @@ function linesOf(c: StrandContext): HTMLElement | null {
     wrap.appendChild(room);
   }
   return wrap;
+}
+
+/**
+ * A Character's Born or a Location's Founded, as its box says it (1.122.0, G9): "Born <reading>" in the
+ * world's calendar when it has one, else the whole number; its own line, outside the text's clamp. An
+ * Event's date is the timeline's to show; none for a value that is no whole number.
+ */
+export function bornOrFounded(el: Element, c: StrandContext): string | null {
+  const w = whenOf(el.type);
+  if (!w || w.label === 'When') return null;
+  const n = parseTemporalValue((el as unknown as Record<string, unknown>)[w.field]);
+  if (n === null || !Number.isInteger(n)) return null;
+  const lens = resolveCalendarLens(c.all as Element[], c.entry?.active_calendar_id, { fallbackToOnly: true });
+  const reading = calendarDateText({ name: w.field, widget: 'number' } as never, n, lens);
+  return `${w.label} ${reading ?? String(n)}`;
 }
 
 /** A filled slot's box. */
@@ -209,6 +228,14 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
     const p = document.createElement('p');
     p.className = 'atlas-home-strand-box-text';
     p.textContent = text;
+    box.appendChild(p);
+  }
+  const dated = el ? bornOrFounded(el, c) : null;
+  if (dated) {
+    const p = document.createElement('p');
+    p.className = 'atlas-home-strand-box-date';
+    p.setAttribute('data-role', 'strand-box-date');
+    p.textContent = dated;
     box.appendChild(p);
   }
   if (slot === 'narrative') {
@@ -253,7 +280,7 @@ export function buildSameLine(c: StrandContext, opts: StrandPanelOptions): HTMLE
   wrap.setAttribute('data-role', 'strand-same');
   const p = document.createElement('p');
   p.className = 'atlas-home-strand-same-line';
-  p.textContent = sameCellWords(c.strand, c.byId);
+  p.textContent = sameCellWords(c.strand);
   wrap.appendChild(p);
   const another = maySetSlot('now', c.entry, c.meta, c.strand, c.byId);
   const o = openedFor('now', c);

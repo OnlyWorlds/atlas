@@ -1,19 +1,19 @@
 /**
  * The strand as a journey (Atlas 1.120.0): the pure rules behind Home's Strand tab, so the surfaces only
  * draw and press. The words for each slot, which slot is asked next (the reveal), each card's question
- * read from what is filled, the story card's two lines, whether Home opens with its tab head, the Event's
- * `characters` append, and an Edit's changed fields.
+ * read from what is filled, the story card's two lines, whether Home opens with its tab head, each card's
+ * date (When, Born, Founded: 1.122.0) and an Edit's changed fields.
  *
  * Every reading is the strand as `strandView` gives it (`core/strand.ts`), never the stored mark: a mark
  * whose event the story does not list reads as no event here too.
  */
+import { DATE_FIELD } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { STRAND_SLOTS, type OwStrand, type StrandSlot } from './strand';
 import { guideElements } from './guide';
 import { aidKind } from './charter';
 import { isMessage } from './message-parties';
 import { isKnownOf } from '../sync/known-of';
-import { linkIdsOf } from './link-ids';
 import { canonicalExtValue } from '../sync/world-meta-sync';
 
 // ---- The words ----
@@ -58,25 +58,25 @@ export interface CardCopy {
   text: string;
 }
 
-/** The card's words, read from what is filled (the strand as read, never the stored mark). */
+/**
+ * The card's words, read from what is filled (the strand as read, never the stored mark). 1.122.0: each
+ * line under a title says what its kind is for; the Event's title is always the story's, never the main
+ * character's.
+ */
 export function cardCopy(slot: StrandSlot, s: OwStrand): CardCopy {
   switch (slot) {
     case 'narrative':
-      return { title: 'Start with a story', what: 'The story your world tells, or the first of them.', text: 'The story' };
+      return { title: 'Start with a story', what: 'Narratives are stories or tellings of any kind.', text: 'The story' };
     case 'event':
-      return {
-        title: s.character ? `What happens to ${named(s.character)}?` : `What happens in ${named(s.narrative)}?`,
-        what: 'One event in the story, of any size.',
-        text: 'What happens',
-      };
+      return { title: `What happens in ${named(s.narrative)}?`, what: 'Events are happenings of any size, each a part of a larger story.', text: 'What happens' };
     case 'location':
-      return { title: `Where did ${named(s.event)} happen?`, what: 'A location in your world.', text: 'About this location' };
+      return { title: `Where did ${named(s.event)} happen?`, what: 'Locations are where your stories happen.', text: 'About this location' };
     case 'character':
-      return { title: 'Who is the story about?', what: 'Its main character.', text: 'About them' };
+      return { title: 'Who is the story about?', what: 'Characters drive your stories: start with its main character.', text: 'About them' };
     case 'now':
       return {
-        title: s.location ? `Is ${named(s.character)} still at ${named(s.location)}?` : `Where is ${named(s.character)} now?`,
-        what: s.event ? `After ${named(s.event)}.` : null,
+        title: `Where is ${named(s.character)} now?`,
+        what: s.event ? `${named(s.event)} may be long past; ${named(s.character)} is still somewhere.` : null,
         text: 'About this location',
       };
   }
@@ -131,23 +131,17 @@ export function countedOutsideStrand(all: readonly Element[], kept: (id: string)
 /** A run of words, or a chip naming a filled slot's element. */
 export type LinePart = { text: string } | { chip: StrandSlot; id: string; name: string };
 
-/** Does the strand's Event list its main character (`characters`, either spelling)? */
-export function eventListsCharacter(s: OwStrand, byId: ReadonlyMap<string, Element>): boolean {
-  if (!s.event || !s.character) return false;
-  const ev = byId.get(s.event.id) as Record<string, unknown> | undefined;
-  return linkIdsOf(ev?.characters).includes(s.character.id);
-}
-
 /**
- * Where they are now is where it happened, and the links say they were there: only then "still". The
- * SDK's `same` is the two ids alone; "still" also needs the Event to list the character.
+ * Where they are now is where it happened: "still" (1.122.0, one rule in every world). The SDK's `same`
+ * alone: the strand's cards no longer put the main character into the Event, so its `characters` list
+ * says nothing of the strand, in old worlds or new.
  */
-export function stillThere(s: OwStrand, byId: ReadonlyMap<string, Element>): boolean {
-  return s.same === true && eventListsCharacter(s, byId);
+export function stillThere(s: OwStrand): boolean {
+  return s.same === true;
 }
 
-/** The story card's two lines, only what is filled; never more than the links hold. */
-export function storyLines(s: OwStrand, byId: ReadonlyMap<string, Element>): LinePart[][] {
+/** The story card's two lines, only what is filled. */
+export function storyLines(s: OwStrand): LinePart[][] {
   const lines: LinePart[][] = [];
   const chip = (slot: StrandSlot): LinePart => ({ chip: slot, id: s[slot]!.id, name: named(s[slot]) });
   if (s.event) {
@@ -159,7 +153,7 @@ export function storyLines(s: OwStrand, byId: ReadonlyMap<string, Element>): Lin
   if (s.character) {
     const line: LinePart[] = [{ text: 'Its main character is ' }, chip('character')];
     if (s.now) {
-      if (stillThere(s, byId)) line.push({ text: ', still in or at ' }, chip('location'));
+      if (stillThere(s)) line.push({ text: ', still in or at ' }, chip('location'));
       else line.push({ text: ', now in or at ' }, chip('now'));
     }
     line.push({ text: '.' });
@@ -169,25 +163,8 @@ export function storyLines(s: OwStrand, byId: ReadonlyMap<string, Element>): Lin
 }
 
 /** The Now cell's words when where they are now is where it happened (R7, by R5's rule). */
-export function sameCellWords(s: OwStrand, byId: ReadonlyMap<string, Element>): string {
-  return `${stillThere(s, byId) ? 'is still in or at' : 'is in or at'} ${named(s.location)}`;
-}
-
-// ---- The Event's characters (R4) ----
-
-/** What appending `id` to a link list does: the next value, already listed, or a shape left alone. */
-export type ListAppend = { next: unknown[] } | 'listed' | 'shape';
-
-/**
- * The Event's `characters` with `id` appended: already listed in either spelling is nothing; absent, null
- * or an array gets the bare id at its end, every entry kept as it is (an `{id}` object stays); any other
- * shape (a lone id, a lone object) is left alone, never replaced.
- */
-export function appendToList(list: unknown, id: string): ListAppend {
-  if (linkIdsOf(list).includes(id)) return 'listed';
-  if (list === undefined || list === null) return { next: [id] };
-  if (Array.isArray(list)) return { next: [...list, id] };
-  return 'shape';
+export function sameCellWords(s: OwStrand): string {
+  return `${stillThere(s) ? 'is still in or at' : 'is in or at'} ${named(s.location)}`;
 }
 
 // ---- The cards' fields ----
@@ -234,14 +211,33 @@ export function parseWhen(typed: string): number | null | 'bad' {
   return Number.isSafeInteger(n) ? n : 'bad';
 }
 
-/** A Make's create: the name, the text where the type keeps it and When, each only when given. */
+/**
+ * The date a card asks for, by the element's type (1.122.0, G9): an Event's When, a Character's Born, a
+ * Location's Founded, each written to the SDK's `DATE_FIELD` for the type (`start_date`, `birth_date`,
+ * `founding_date`). A Narrative's card asks none (the SDK maps it to `start_date`, which no card writes).
+ */
+const WHEN_LABEL: Readonly<Record<string, 'When' | 'Born' | 'Founded'>> = { event: 'When', character: 'Born', location: 'Founded' };
+
+export function whenOf(type: string): { field: string; label: 'When' | 'Born' | 'Founded' } | null {
+  const label = WHEN_LABEL[type];
+  const field = DATE_FIELD[type];
+  return label && field ? { field, label } : null;
+}
+
+/** A card's refusal of a date that is no whole number, naming its field ("Born is a whole number."). */
+export function badWhenWords(type: string): string {
+  return `${whenOf(type)?.label ?? 'When'} is a whole number.`;
+}
+
+/** A Make's create: the name, the text where the type keeps it and its date, each only when given. */
 export function createFields(type: string, v: CardValues): Record<string, unknown> | 'bad-when' {
   const out: Record<string, unknown> = { name: v.name.trim() };
   if (v.text.trim() !== '') out[textFieldOf(type)] = v.text;
-  if (type === 'event') {
+  const w = whenOf(type);
+  if (w) {
     const when = parseWhen(v.when);
     if (when === 'bad') return 'bad-when';
-    if (when !== null) out.start_date = when;
+    if (when !== null) out[w.field] = when;
   }
   return out;
 }
@@ -250,9 +246,10 @@ export function createFields(type: string, v: CardValues): Record<string, unknow
 export function editOpening(el: Element): { values: CardValues; raw: Record<string, unknown> } {
   const rec = el as unknown as Record<string, unknown>;
   const field = textFieldOf(el.type);
-  const when = rec.start_date;
+  const w = whenOf(el.type);
+  const when = w ? rec[w.field] : undefined;
   const raw: Record<string, unknown> = { name: rec.name, [field]: rec[field] };
-  if (el.type === 'event') raw.start_date = when;
+  if (w) raw[w.field] = when;
   return {
     values: { name: str(rec.name), text: str(rec[field]), when: typeof when === 'number' && Number.isFinite(when) ? String(when) : '' },
     raw,
@@ -267,10 +264,11 @@ export function changedFields(type: string, opened: CardValues, now: CardValues,
   const out: Record<string, unknown> = {};
   if (now.name.trim() !== '' && now.name !== opened.name && now.name.trim() !== opened.name.trim()) out.name = now.name.trim();
   if (textShown && now.text !== opened.text) out[textFieldOf(type)] = now.text.trim() === '' ? null : now.text;
-  if (type === 'event' && now.when.trim() !== opened.when.trim()) {
+  const w = whenOf(type);
+  if (w && now.when.trim() !== opened.when.trim()) {
     const when = parseWhen(now.when);
     if (when === 'bad') return 'bad-when';
-    out.start_date = when;
+    out[w.field] = when;
   }
   return out;
 }

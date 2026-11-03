@@ -1,15 +1,15 @@
 /**
  * The strand as a journey, its pure rules (`src/core/strand-journey.ts`, Atlas 1.120.0): each card's
- * question for every fill pattern (R3), which slot is asked (R2), what counts toward Home's tab head
- * (R1), the story card's two lines (R5), the Event's `characters` append (R4), and an Edit's changed
- * fields (R7).
+ * question for every fill pattern (R3, 1.122.0's words), which slot is asked (R2), what counts toward
+ * Home's tab head (R1), the story card's two lines (R5, "still" by `same` alone: G5), and the cards'
+ * fields with their dates (When, Born, Founded: G9) and an Edit's changed fields (R7).
  */
 import { describe, it, expect } from 'vitest';
 import type { Element } from '../../src/core/types';
 import { EMPTY_STRAND, type OwStrand, type StrandSlot } from '../../src/core/strand';
 import {
-  appendToList, askedSlot, boxTextOf, cardCopy, changedFields, countedOutsideStrand, createFields, editOpening, parseWhen,
-  sameCellWords, storyForWritingRoom, storyLines, strandWhole, type LinePart,
+  askedSlot, badWhenWords, boxTextOf, cardCopy, changedFields, countedOutsideStrand, createFields, editOpening, parseWhen,
+  sameCellWords, storyForWritingRoom, storyLines, strandWhole, whenOf, type LinePart,
 } from '../../src/core/strand-journey';
 
 const slot = (id: string, name: string) => ({ id, name });
@@ -22,35 +22,43 @@ const strand = (p: Partial<OwStrand>): OwStrand => ({ ...EMPTY_STRAND, ...p });
 const el = (type: string, id: string, extra: Record<string, unknown> = {}) => ({ id, type, name: id, ...extra }) as unknown as Element;
 const index = (...els: Element[]) => new Map(els.map(e => [e.id, e]));
 
-describe('R3: each card asks from what is filled', () => {
+describe('R3: each card asks from what is filled (1.122.0, W1)', () => {
   it('the story, the event and the place', () => {
-    expect(cardCopy('narrative', EMPTY_STRAND)).toEqual({ title: 'Start with a story', what: 'The story your world tells, or the first of them.', text: 'The story' });
-    // The Event is asked after the main character (1.121.0): what happens to them; with the character
-    // skipped, what happens in the story.
-    expect(cardCopy('event', strand({ narrative: S, character: CH }))).toEqual({ title: 'What happens to Odile?', what: 'One event in the story, of any size.', text: 'What happens' });
-    expect(cardCopy('event', strand({ narrative: S }))).toEqual({ title: 'What happens in The Lantern Ferry?', what: 'One event in the story, of any size.', text: 'What happens' });
-    expect(cardCopy('location', strand({ narrative: S, event: EV }))).toEqual({ title: 'Where did The night crossing happen?', what: 'A location in your world.', text: 'About this location' });
+    expect(cardCopy('narrative', EMPTY_STRAND)).toEqual({ title: 'Start with a story', what: 'Narratives are stories or tellings of any kind.', text: 'The story' });
+    // The Event's title is the story's, with the main character made or not (W1: never "to <character>").
+    const event = { title: 'What happens in The Lantern Ferry?', what: 'Events are happenings of any size, each a part of a larger story.', text: 'What happens' };
+    expect(cardCopy('event', strand({ narrative: S, character: CH }))).toEqual(event);
+    expect(cardCopy('event', strand({ narrative: S }))).toEqual(event);
+    expect(cardCopy('location', strand({ narrative: S, event: EV }))).toEqual({ title: 'Where did The night crossing happen?', what: 'Locations are where your stories happen.', text: 'About this location' });
   });
 
   it('the main character: one question, with an event and without one (a 1.120 strand asks it after its event)', () => {
-    const asked = { title: 'Who is the story about?', what: 'Its main character.', text: 'About them' };
+    const asked = { title: 'Who is the story about?', what: 'Characters drive your stories: start with its main character.', text: 'About them' };
     expect(cardCopy('character', strand({ narrative: S }))).toEqual(asked);
     expect(cardCopy('character', strand({ narrative: S, event: EV }))).toEqual(asked);
     expect(cardCopy('character', strand({ narrative: S, event: EV, location: PL }))).toEqual(asked);
   });
 
-  it('where they are now: "still at" the place it happened when there is one, "After" only with an event', () => {
-    expect(cardCopy('now', strand({ narrative: S, event: EV, location: PL, character: CH }))).toEqual({ title: 'Is Odile still at Saltmere Quay?', what: 'After The night crossing.', text: 'About this location' });
-    expect(cardCopy('now', strand({ narrative: S, event: EV, character: CH }))).toEqual({ title: 'Where is Odile now?', what: 'After The night crossing.', text: 'About this location' });
+  it('where they are now: one title, its line naming the event and the main character; no event, no line', () => {
+    const line = 'The night crossing may be long past; Odile is still somewhere.';
+    expect(cardCopy('now', strand({ narrative: S, event: EV, location: PL, character: CH }))).toEqual({ title: 'Where is Odile now?', what: line, text: 'About this location' });
+    expect(cardCopy('now', strand({ narrative: S, event: EV, character: CH }))).toEqual({ title: 'Where is Odile now?', what: line, text: 'About this location' });
     expect(cardCopy('now', strand({ narrative: S, character: CH }))).toEqual({ title: 'Where is Odile now?', what: null, text: 'About this location' });
   });
 
-  it('no word on any card says "hero", and none carries an em-dash', () => {
+  it('a blank name reads Unnamed, as everywhere', () => {
+    const blank = { id: 'x', name: '  ' };
+    expect(cardCopy('event', strand({ narrative: blank }))).toMatchObject({ title: 'What happens in Unnamed?' });
+    expect(cardCopy('now', strand({ narrative: S, event: blank, character: blank })).what).toBe('Unnamed may be long past; Unnamed is still somewhere.');
+  });
+
+  it('no word on any card says "hero" or "year", and none carries an em-dash', () => {
     const fills = [EMPTY_STRAND, strand({ narrative: S }), strand({ narrative: S, event: EV }), strand({ narrative: S, character: CH }), strand({ narrative: S, event: EV, character: CH }), strand({ narrative: S, event: EV, location: PL, character: CH })];
     for (const s of fills) for (const k of ['narrative', 'event', 'location', 'character', 'now'] as StrandSlot[]) {
       const words = JSON.stringify(cardCopy(k, s));
       expect(words).not.toMatch(/hero/i);
-      expect(words).not.toContain('—');
+      expect(words).not.toMatch(/\byears?\b/i);
+      expect(words).not.toContain('\u2014');
     }
   });
 });
@@ -127,48 +135,47 @@ describe('R5: the story card\'s lines', () => {
   const chips = (lines: LinePart[][]) => lines.flat().filter((p): p is Extract<LinePart, { chip: StrandSlot }> => 'chip' in p).map(p => p.chip);
 
   it('only what is filled', () => {
-    expect(storyLines(strand({ narrative: S }), index())).toEqual([]);
-    expect(words(storyLines(strand({ narrative: S, event: EV }), index()))).toEqual(['It tells of [The night crossing].']);
-    expect(words(storyLines(strand({ narrative: S, event: EV, location: PL }), index()))).toEqual(['It tells of [The night crossing], which happened in or at [Saltmere Quay].']);
-    expect(words(storyLines(strand({ narrative: S, character: CH }), index()))).toEqual(['Its main character is [Odile].']);
-    expect(words(storyLines(strand({ narrative: S, character: CH, now: NOW, same: null }), index()))).toEqual(['Its main character is [Odile], now in or at [The Drowned Library].']);
+    expect(storyLines(strand({ narrative: S }))).toEqual([]);
+    expect(words(storyLines(strand({ narrative: S, event: EV })))).toEqual(['It tells of [The night crossing].']);
+    expect(words(storyLines(strand({ narrative: S, event: EV, location: PL })))).toEqual(['It tells of [The night crossing], which happened in or at [Saltmere Quay].']);
+    expect(words(storyLines(strand({ narrative: S, character: CH })))).toEqual(['Its main character is [Odile].']);
+    expect(words(storyLines(strand({ narrative: S, character: CH, now: NOW, same: null })))).toEqual(['Its main character is [Odile], now in or at [The Drowned Library].']);
   });
 
-  it('"still" only when where they are now is where it happened and the Event lists them', () => {
+  // G5 (1.122.0): one rule in every world, the strand's `same` alone; the Event's characters say nothing.
+  it('"still" whenever where they are now is where it happened; "now" otherwise', () => {
     const s = strand({ narrative: S, event: EV, location: PL, character: CH, now: PL, same: true });
-    const listing = index(el('event', 'e', { characters: [{ id: 'c' }] }));
-    const silent = index(el('event', 'e', { characters: ['someone-else'] }));
-    expect(words(storyLines(s, listing))[1]).toBe('Its main character is [Odile], still in or at [Saltmere Quay].');
-    expect(chips(storyLines(s, listing))).toEqual(['event', 'location', 'character', 'location']);
-    expect(words(storyLines(s, silent))[1]).toBe('Its main character is [Odile], now in or at [Saltmere Quay].');
-    expect(sameCellWords(s, listing)).toBe('is still in or at Saltmere Quay');
-    expect(sameCellWords(s, silent)).toBe('is in or at Saltmere Quay');
-  });
-});
-
-describe('R4: the Event\'s characters', () => {
-  it('appends the bare id to an absent, null or array value, every entry kept', () => {
-    expect(appendToList(undefined, 'c')).toEqual({ next: ['c'] });
-    expect(appendToList(null, 'c')).toEqual({ next: ['c'] });
-    expect(appendToList(['a', { id: 'b', name: 'B' }], 'c')).toEqual({ next: ['a', { id: 'b', name: 'B' }, 'c'] });
-  });
-
-  it('already listed in either spelling is nothing; another shape is left alone', () => {
-    expect(appendToList(['c'], 'c')).toBe('listed');
-    expect(appendToList([{ id: 'c' }], 'c')).toBe('listed');
-    expect(appendToList('c', 'c')).toBe('listed');
-    expect(appendToList('ana', 'c')).toBe('shape');
-    expect(appendToList({ id: 'ana' }, 'c')).toBe('shape');
-    expect(appendToList(7, 'c')).toBe('shape');
+    expect(words(storyLines(s))[1]).toBe('Its main character is [Odile], still in or at [Saltmere Quay].');
+    expect(chips(storyLines(s))).toEqual(['event', 'location', 'character', 'location']);
+    expect(sameCellWords(s)).toBe('is still in or at Saltmere Quay');
+    const elsewhere = strand({ narrative: S, event: EV, location: PL, character: CH, now: NOW, same: false });
+    expect(words(storyLines(elsewhere))[1]).toBe('Its main character is [Odile], now in or at [The Drowned Library].');
+    expect(sameCellWords({ ...s, same: null })).toBe('is in or at Saltmere Quay');
   });
 });
 
 describe('the cards\' fields', () => {
-  it('a Make carries the text where the type keeps it and When, and leaves out what is empty', () => {
+  it('a Make carries the text where the type keeps it and its date where the type keeps it, and leaves out what is empty', () => {
     expect(createFields('narrative', { name: ' A Tale ', text: 'Once.', when: '' })).toEqual({ name: 'A Tale', story: 'Once.' });
+    // A story's card asks no date: a When in its values is never written (the SDK's start_date for a Narrative).
+    expect(createFields('narrative', { name: 'A Tale', text: '', when: '12' })).toEqual({ name: 'A Tale' });
     expect(createFields('event', { name: 'The Flood', text: '', when: '1142' })).toEqual({ name: 'The Flood', start_date: 1142 });
-    expect(createFields('location', { name: 'The Weir', text: '  ', when: '9' })).toEqual({ name: 'The Weir' });
+    expect(createFields('location', { name: 'The Weir', text: '  ', when: '9' })).toEqual({ name: 'The Weir', founding_date: 9 });
+    expect(createFields('character', { name: 'Odile', text: '', when: '1119' })).toEqual({ name: 'Odile', birth_date: 1119 });
+    expect(createFields('character', { name: 'Odile', text: '', when: '' })).toEqual({ name: 'Odile' });
     expect(createFields('event', { name: 'X', text: '', when: '11.5' })).toBe('bad-when');
+    expect(createFields('character', { name: 'X', text: '', when: 'once' })).toBe('bad-when');
+    expect(createFields('location', { name: 'X', text: '', when: '1e3' })).toBe('bad-when');
+  });
+
+  it('G9: each dated kind\'s field and label from the SDK\'s DATE_FIELD; the refusal names the field', () => {
+    expect(whenOf('event')).toEqual({ field: 'start_date', label: 'When' });
+    expect(whenOf('character')).toEqual({ field: 'birth_date', label: 'Born' });
+    expect(whenOf('location')).toEqual({ field: 'founding_date', label: 'Founded' });
+    expect(whenOf('narrative')).toBeNull();
+    expect(badWhenWords('event')).toBe('When is a whole number.');
+    expect(badWhenWords('character')).toBe('Born is a whole number.');
+    expect(badWhenWords('location')).toBe('Founded is a whole number.');
   });
 
   it('When is a whole number or nothing', () => {
@@ -188,13 +195,18 @@ describe('the cards\' fields', () => {
     expect(changedFields('event', opened, { ...opened, when: '1150' })).toEqual({ start_date: 1150 });
     expect(changedFields('narrative', { name: 'A', text: 'x', when: '' }, { name: 'A', text: 'y', when: '' })).toEqual({ story: 'y' });
     expect(changedFields('narrative', { name: 'A', text: 'x', when: '' }, { name: 'A', text: 'y', when: '' }, false)).toEqual({});
-    expect(changedFields('location', { name: 'A', text: '', when: '' }, { name: 'A', text: '', when: '7' })).toEqual({});
+    expect(changedFields('location', { name: 'A', text: '', when: '' }, { name: 'A', text: '', when: '7' })).toEqual({ founding_date: 7 });
+    expect(changedFields('character', { name: 'A', text: '', when: '7' }, { name: 'A', text: '', when: '' })).toEqual({ birth_date: null });
+    expect(changedFields('character', { name: 'A', text: '', when: '7' }, { name: 'A', text: '', when: 'x' })).toBe('bad-when');
+    expect(changedFields('narrative', { name: 'A', text: '', when: '' }, { name: 'A', text: '', when: '7' })).toEqual({});
   });
 
   it('an Edit opens on the element as it is, the raw values kept for the compare', () => {
     const e = el('event', 'e', { name: 'The Flood', description: 'Water.', start_date: 1142 });
     expect(editOpening(e)).toEqual({ values: { name: 'The Flood', text: 'Water.', when: '1142' }, raw: { name: 'The Flood', description: 'Water.', start_date: 1142 } });
     expect(editOpening(el('narrative', 'n', { name: 'A', story: 'Once.' })).raw).toEqual({ name: 'A', story: 'Once.' });
+    expect(editOpening(el('character', 'c', { name: 'O', birth_date: 1119 }))).toEqual({ values: { name: 'O', text: '', when: '1119' }, raw: { name: 'O', description: undefined, birth_date: 1119 } });
+    expect(editOpening(el('location', 'l', { name: 'Q' })).raw).toEqual({ name: 'Q', description: undefined, founding_date: undefined });
   });
 
   it('a story with the writing room\'s rich text, or past six lines, goes to the writing room', () => {

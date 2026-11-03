@@ -9,7 +9,8 @@ import { setActiveStore } from '../../src/core/active-store';
 import { defaultRegistry } from '../../src/core/types';
 import type { Element, WorldMeta, WorldRegistryEntry } from '../../src/core/types';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
-import { addCharacterToEvent, clearStrand, editStrandElement, makeStrandSlot, writeStrandSlot, type StrandDrawn } from '../../src/ui/strand-write';
+import { changedFields, editOpening } from '../../src/core/strand-journey';
+import { clearStrand, editStrandElement, makeStrandSlot, writeStrandSlot, type StrandDrawn } from '../../src/ui/strand-write';
 import { toastManager } from '../../src/ui/toast-manager';
 
 const W = 'w-strand';
@@ -381,58 +382,6 @@ describe('the journey\'s Make (1.120.0, R4)', () => {
   });
 });
 
-describe('the Event\'s characters (R4)', () => {
-  const D = '0192a000-0000-7000-8000-000000000d02';
-  async function heroOn(list: unknown): Promise<StrandDrawn> {
-    await put('narrative', N, { events: [E], protagonist: C });
-    await put('event', E, list === undefined ? {} : { characters: list });
-    await put('character', C);
-    await open({ narrative: N, event: E, location: GONE_L });
-    return drawn();
-  }
-
-  it('absent, null or a list: the bare id appended, every entry kept', async () => {
-    expect(await addCharacterToEvent(await heroOn(undefined), E, C)).toBe('added');
-    expect((await onDisk(E)).characters).toEqual([C]);
-    store = new MockFolderStore(); setActiveStore(store as never);
-    expect(await addCharacterToEvent(await heroOn(null), E, C)).toBe('added');
-    expect((await onDisk(E)).characters).toEqual([C]);
-    store = new MockFolderStore(); setActiveStore(store as never);
-    expect(await addCharacterToEvent(await heroOn(['a', { id: D, name: 'Ana' }]), E, C)).toBe('added');
-    expect((await onDisk(E)).characters).toEqual(['a', { id: D, name: 'Ana' }, C]);
-  });
-
-  it('already listed, in either spelling: nothing written; another shape: left alone', async () => {
-    expect(await addCharacterToEvent(await heroOn([{ id: C }]), E, C)).toBe('skipped');
-    expect((await onDisk(E)).characters).toEqual([{ id: C }]);
-    store = new MockFolderStore(); setActiveStore(store as never);
-    expect(await addCharacterToEvent(await heroOn([C]), E, C)).toBe('skipped');
-    store = new MockFolderStore(); setActiveStore(store as never);
-    expect(await addCharacterToEvent(await heroOn('ana'), E, C)).toBe('skipped');
-    expect((await onDisk(E)).characters).toBe('ana');
-    store = new MockFolderStore(); setActiveStore(store as never);
-    expect(await addCharacterToEvent(await heroOn({ id: D }), E, C)).toBe('skipped');
-    expect((await onDisk(E)).characters).toEqual({ id: D });
-  });
-
-  it('never on an Event that is no longer the strand\'s, nor for a character no longer its main one: moved, not failed', async () => {
-    const box = await heroOn([]);
-    await store.writeWorldMeta({ x_strand: { narrative: N, event: GONE_E, location: GONE_L } } as unknown as Partial<WorldMeta>);
-    expect(await addCharacterToEvent(box, E, C)).toBe('moved');
-    expect((await onDisk(E)).characters).toEqual([]);
-    await store.writeWorldMeta({ x_strand: { narrative: N, event: E, location: GONE_L } } as unknown as Partial<WorldMeta>);
-    await store.updateElement(N, { protagonist: D } as Partial<Element>);
-    expect(await addCharacterToEvent(box, E, C)).toBe('moved');
-    expect((await onDisk(E)).characters).toEqual([]);
-  });
-
-  it('a deleted Event never runs the write, and reads as not gone through', async () => {
-    const box = await heroOn([]);
-    await store.deleteElement(E, { silent: true });
-    expect(await addCharacterToEvent(box, E, C)).toBe('failed');
-  });
-});
-
 describe('Edit (R7): only what changed, against what the card opened with', () => {
   it('writes the changed fields alone, in one write', async () => {
     await put('event', E, { name: 'The Flood', description: 'Water.', start_date: 1142 });
@@ -452,6 +401,34 @@ describe('Edit (R7): only what changed, against what the card opened with', () =
     // A field opened absent compares equal to an empty one written since.
     await store.updateElement(E, { start_date: '' } as unknown as Partial<Element>);
     expect(await editStrandElement(W, E, { start_date: 9 }, { start_date: undefined })).toBe('wrote');
+  });
+
+  // G9 (1.122.0): Born and Founded ride the same compare-and-set as the Event's When.
+  it('Born and Founded: written from the card\'s values, compared with what the card opened with', async () => {
+    await put('character', C, { name: 'Odile', birth_date: 1119 });
+    await put('location', L, { name: 'The Quay' });
+    await open(undefined);
+    const odile = (await store.listElements()).find(e => e.id === C)!;
+    const { values, raw } = editOpening(odile);
+    expect(values.when).toBe('1119');
+    expect(raw).toEqual({ name: 'Odile', description: undefined, birth_date: 1119 });
+    const patch = changedFields('character', values, { ...values, when: '1120' });
+    expect(patch).toEqual({ birth_date: 1120 });
+    expect(await editStrandElement(W, C, patch as Record<string, unknown>, raw)).toBe('wrote');
+    expect((await onDisk(C)).birth_date).toBe(1120);
+    // Another tab dated it meanwhile: the opened value no longer holds, nothing written.
+    expect(await editStrandElement(W, C, { birth_date: 1200 }, raw)).toBe('moved');
+    expect((await onDisk(C)).birth_date).toBe(1120);
+    const quay = editOpening((await store.listElements()).find(e => e.id === L)!);
+    expect(quay.raw).toEqual({ name: 'The Quay', description: undefined, founding_date: undefined });
+    const founded = changedFields('location', quay.values, { ...quay.values, when: '1102' });
+    expect(founded).toEqual({ founding_date: 1102 });
+    await store.updateElement(L, { founding_date: 900 } as unknown as Partial<Element>);
+    expect(await editStrandElement(W, L, founded as Record<string, unknown>, quay.raw)).toBe('moved');
+    expect((await onDisk(L)).founding_date).toBe(900);
+    await store.updateElement(L, { founding_date: null } as unknown as Partial<Element>);
+    expect(await editStrandElement(W, L, founded as Record<string, unknown>, quay.raw)).toBe('wrote');
+    expect((await onDisk(L)).founding_date).toBe(1102);
   });
 
   it('nothing changed, or a view-only world: nothing written', async () => {

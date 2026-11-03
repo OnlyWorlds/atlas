@@ -3,13 +3,14 @@
  *
  *   A Make card: a heading asking the question, one line saying what it is, what a held Character or Now
  *   field holds ("Proposed: Mira"), Still at <place> and "Or somewhere else:" on the Now card, Name
- *   (required), the text, When on the Event's card (a whole number, its calendar reading under it), Create,
+ *   (required), the text, its date where the kind has one (When on the Event's card, Born on the main
+ *   character's, Founded on a location's: 1.122.0; a whole number, its calendar reading under it), Create,
  *   "Or pick one from your world"
  *   (only when there is one to pick) and "Skip for now" (never on the story's card). Enter in Name makes;
  *   Enter in the text is a newline; Escape empties the card and keeps the focus in Name.
  *
  *   An Edit card: Name, the text (a story with the writing room's rich text, or past six lines, says
- *   "Write it in the writing room" instead), When for an Event; Save writes only what changed, against
+ *   "Write it in the writing room" instead), the date as the Make card asks it; Save writes only what changed, against
  *   what the card opened with; Escape and Cancel go back to the box, the focus on Edit.
  *
  *   What was typed lives in memory (`home-strand-model.ts`), so every draw restores it. The card holds
@@ -27,7 +28,7 @@ import { resolveCalendarLens } from '../core/calendar-lens';
 import { calendarDateText } from './element-detail-fields';
 import { SLOT_TYPE, type StrandSlot } from '../core/strand';
 import {
-  cardCopy, changedFields, editOpening, parseWhen, storyForWritingRoom, type CardValues,
+  badWhenWords, cardCopy, changedFields, editOpening, parseWhen, storyForWritingRoom, whenOf, type CardValues,
 } from '../core/strand-journey';
 import { getActiveStore } from '../core/active-store';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
@@ -113,8 +114,12 @@ function frame(slot: StrandSlot, mode: 'make' | 'edit', title: string, level: 2 
   return form;
 }
 
-/** The When field and its calendar reading (the world's calendar, when it has one). */
-function whenField(c: StrandContext, key: string, value: string, onInput: () => void): { wrap: HTMLElement; input: HTMLInputElement } {
+/**
+ * The card's date field and its calendar reading (the world's calendar, when it has one): When on an
+ * Event, Born on a Character, Founded on a Location (`whenOf`, 1.122.0).
+ */
+function whenField(c: StrandContext, type: string, key: string, value: string, onInput: () => void): { wrap: HTMLElement; input: HTMLInputElement } {
+  const w = whenOf(type) ?? { field: 'start_date', label: 'When' };
   const input = document.createElement('input');
   input.type = 'number';
   input.step = '1';
@@ -124,7 +129,7 @@ function whenField(c: StrandContext, key: string, value: string, onInput: () => 
   input.value = value;
   input.setAttribute('data-field', 'when');
   input.setAttribute('data-strand-key', key);
-  const wrap = field('When', input);
+  const wrap = field(w.label, input);
   const lens = resolveCalendarLens(c.all as Element[], c.entry?.active_calendar_id, { fallbackToOnly: true });
   if (lens) {
     const reading = document.createElement('p');
@@ -132,7 +137,7 @@ function whenField(c: StrandContext, key: string, value: string, onInput: () => 
     reading.setAttribute('data-role', 'strand-when-reading');
     const read = (): void => {
       const n = parseWhen(input.value);
-      reading.textContent = typeof n === 'number' ? calendarDateText({ name: 'start_date', widget: 'number' } as never, n, lens) ?? '' : '';
+      reading.textContent = typeof n === 'number' ? calendarDateText({ name: w.field, widget: 'number' } as never, n, lens) ?? '' : '';
     };
     read();
     input.addEventListener('input', read);
@@ -226,7 +231,7 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
   text.setAttribute('data-strand-key', `card:${slot}:text`);
   text.addEventListener('input', remember);
   form.appendChild(field(copy.text, text));
-  if (slot === 'event') form.appendChild(whenField(c, 'card:event:when', draft.when, remember).wrap);
+  if (whenOf(SLOT_TYPE[slot])) form.appendChild(whenField(c, SLOT_TYPE[slot], `card:${slot}:when`, draft.when, remember).wrap);
   form.appendChild(note);
 
   const promise = memory.opened && memory.opened.worldId === c.worldId && memory.opened.slot === slot && memory.opened.card && memory.opened.mode === 'promise'
@@ -268,8 +273,8 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
     const v = valuesIn(form, draft);
     keepDraft(c.worldId, slot, v);
     if (!v.name.trim()) { note.textContent = 'Type a name first'; name.focus(); return; }
-    if (slot === 'event' && parseWhen(v.when) === 'bad') {
-      note.textContent = 'When is a whole number.';
+    if (whenOf(SLOT_TYPE[slot]) && parseWhen(v.when) === 'bad') {
+      note.textContent = badWhenWords(SLOT_TYPE[slot]);
       form.querySelector<HTMLInputElement>('[data-field="when"]')?.focus();
       return;
     }
@@ -331,7 +336,7 @@ export function buildEditCard(slot: StrandSlot, c: StrandContext, el: Element, o
   const save = (room: boolean, then: (wrote: boolean) => void): void => {
     if (saving) return;
     const patch = changedFields(el.type, ed.opened, { ...ed.opened, ...editDraftOf(c.worldId, slot, ed.id) }, !room);
-    if (patch === 'bad-when') { note.textContent = 'When is a whole number.'; return; }
+    if (patch === 'bad-when') { note.textContent = badWhenWords(el.type); return; }
     if (Object.keys(patch).length === 0) { then(false); return; }
     saving = true;
     letGo();
@@ -386,7 +391,7 @@ export function buildEditCard(slot: StrandSlot, c: StrandContext, el: Element, o
     text.addEventListener('input', remember('text'));
     form.appendChild(field(cardCopy(slot, c.strand).text, text));
   }
-  if (slot === 'event') form.appendChild(whenField(c, 'edit:event:when', shown.when, remember('when')).wrap);
+  if (whenOf(el.type)) form.appendChild(whenField(c, el.type, `edit:${slot}:when`, shown.when, remember('when')).wrap);
   form.appendChild(note);
   const acts = document.createElement('div');
   acts.className = 'atlas-home-strand-card-acts';

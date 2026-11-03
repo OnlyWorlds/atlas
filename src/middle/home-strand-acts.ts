@@ -6,8 +6,8 @@
  *   One write per slot at a time (C1), every act in the panel held while one runs (D1). After a write
  *   the focus goes to the next card's Name, else the box written, else the whole line (`next:<slot>`,
  *   resolved by `settleStrandFocus`); a refusal keeps it on the card that asked, its line said by the
- *   panel's status line. The Character card also adds the main character to the strand's Event
- *   (`addCharacterToEvent`), where this person may change that Event; Use another never does.
+ *   panel's status line. Each press writes its slot's one link (and a Make its one create), nothing
+ *   more: since 1.122.0 no card puts the main character into the strand's Event.
  */
 
 import type { Element } from '../core/types';
@@ -15,16 +15,12 @@ import { escapeText } from '../core/dom-utils';
 import { handsOnAsProposed } from '../core/review-mark';
 import { isHiddenMark } from '../core/hidden-mark';
 import { markEscapeOwned } from '../core/escape-mark';
-import { mayChange } from '../core/may-change';
-import { isKnownOf } from '../sync/known-of';
 import { memberIds, offerable, rawSingle, storedMark, SLOT_TYPE, type StrandSlot } from '../core/strand';
 import { SLOT_PHRASE, SLOT_WORD, type CardValues } from '../core/strand-journey';
 import { canonicalExtValue } from '../sync/world-meta-sync';
 import { typeName } from '../core/type-words';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
-import {
-  addCharacterToEvent, makeStrandSlot, writeStrandSlot, STRAND_MOVED, type StrandDrawn, type StrandWriteResult,
-} from '../ui/strand-write';
+import { makeStrandSlot, writeStrandSlot, STRAND_MOVED, type StrandDrawn, type StrandWriteResult } from '../ui/strand-write';
 import { clearDraft, draftOf, flightKey, memory, type Opened, type StrandContext } from './home-strand-model';
 
 export interface StrandPanelOptions {
@@ -166,9 +162,9 @@ const homeRoot = (): HTMLElement => document.querySelector<HTMLElement>('.atlas-
 export interface RunHow {
   pick?: string;
   name?: string;
-  /** A card's fields: its text and When go into the Make's one create. */
+  /** A card's fields: its text and date go into the Make's one create. */
   values?: CardValues;
-  /** Pressed on the slot's card (Create, Pick, Still at), not Use another: the Character card's and the Event card's second write (the pair's other end). */
+  /** Pressed on the slot's card (Create, Pick, Still at), not Use another: a refusal keeps the focus in the card's Name. */
   fromCard?: boolean;
 }
 
@@ -185,42 +181,14 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
   // would otherwise be read afresh on the redraw between the make and the mark.
   if (!memory.tabs.has(c.worldId)) memory.tabs.set(c.worldId, 'strand');
   quietPanel();
-  // The Event's characters (R4): only from the Character card, only for an Event set when it was drawn
-  // and this person may change it (a known-of stub never); else skipped with nothing said.
-  const event = slot === 'character' && how.fromCard ? c.strand.event : null;
-  const eventEl = event ? c.byId.get(event.id) : undefined;
-  const mayEvent = !!eventEl && !isKnownOf(eventEl) && mayChange(c.entry, eventEl);
-  // The same pair from the other side (1.121.0, the story's character asked before its event): the
-  // Event card puts the main character into the Event it makes, or one it picks this person may change.
-  const hero = slot === 'event' && how.fromCard ? c.strand.character : null;
-  const pickedEl = hero && how.pick ? c.byId.get(how.pick) : undefined;
-  const mayPicked = !how.pick || (!!pickedEl && !isKnownOf(pickedEl) && mayChange(c.entry, pickedEl));
   let result: StrandWriteResult = 'nothing';
   let made: Element | undefined;
-  let eventLine: string | null = null;
   try {
     if (how.name !== undefined) {
       const out = await makeStrandSlot(slot, drawn, how.name, how.values);
       result = out.result;
       made = out.made;
     } else if (how.pick) result = await writeStrandSlot(slot, drawn, how.pick);
-    if (result === 'wrote' && event && mayEvent) {
-      const who = made?.id ?? how.pick!;
-      const added = await addCharacterToEvent(drawn, event.id, who);
-      const name = made ? nameOf(made) : nameOf(c.byId.get(who));
-      const eventName = event.name.trim() || 'Unnamed';
-      // The strand moved between the draw and this write: said as the strand's change, never as a failure.
-      if (added === 'moved') eventLine = `${STRAND_MOVED} ${name} was not added to ${eventName}.`;
-      else if (added === 'failed') eventLine = `${name} is the story's main character; adding them to ${eventName} did not go through.`;
-    }
-    if (result === 'wrote' && hero && mayPicked) {
-      const eventId = made?.id ?? how.pick!;
-      const added = await addCharacterToEvent(drawn, eventId, hero.id);
-      const name = made ? nameOf(made) : nameOf(c.byId.get(eventId));
-      const heroName = hero.name.trim() || 'Unnamed';
-      if (added === 'moved') eventLine = `${STRAND_MOVED} ${heroName} was not added to ${name}.`;
-      else if (added === 'failed') eventLine = `${name} is the story's event; adding ${heroName} to it did not go through.`;
-    }
   } finally {
     memory.inFlight.delete(key);
     memory.pickAtPress.delete(key);
@@ -228,7 +196,6 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
   const kept = made && result !== 'wrote' ? ` ${nameOf(made)} was made and stays in the world.` : '';
   if (result === 'refused') memory.said = { worldId: c.worldId, text: `${STRAND_MOVED}${kept}` };
   else if (kept) memory.said = { worldId: c.worldId, text: kept.trim() };
-  else if (eventLine) memory.said = { worldId: c.worldId, text: eventLine };
   // Made and kept after a refusal: the card's name is spent, so a second Make never makes a twin (C14).
   if (made && result !== 'wrote') clearDraft(c.worldId, slot);
   if (result === 'wrote') {

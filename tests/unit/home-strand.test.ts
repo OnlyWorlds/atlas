@@ -223,11 +223,11 @@ describe('R2: the reveal', () => {
     expect([...cards()[0].querySelectorAll('[data-act]')].map(b => b.getAttribute('data-act'))).toEqual(['make', 'skip']);
   });
 
-  it('with a story and its main character: the Event asked next, in words that name them', () => {
+  it('with a story and its main character: the Event asked next, in the story\'s words (W1)', () => {
     world(withHero(), full);
     draw();
     expect(cards().map(c => c.getAttribute('data-card-slot'))).toEqual(['event']);
-    expect(cards()[0].querySelector('.atlas-home-strand-card-title > span:last-child')?.textContent).toBe('What happens to Odile?');
+    expect(cards()[0].querySelector('.atlas-home-strand-card-title > span:last-child')?.textContent).toBe('What happens in narrative-01?');
     expect(cellOf('location').childElementCount).toBe(0);
   });
 

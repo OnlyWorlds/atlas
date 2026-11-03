@@ -17,10 +17,10 @@
  * A failure after the link leaves an ordinary link and the box empty, with the problem said
  * (`showProblem`, never the error's text: conv. 125).
  *
- * The journey (1.120.0) adds three writes: a Make carries the card's text and When in its one create;
- * the Character card adds the main character to the strand's Event (`addCharacterToEvent`, its own
- * guards); an Edit writes only the fields changed, compared with what the card opened with
- * (`editStrandElement`). Every patch of Home's state asks first that the world drawn is still the open
+ * The journey (1.120.0) adds two writes: a Make carries the card's text and date (an Event's When, a
+ * Character's Born, a Location's Founded: 1.122.0) in its one create; an Edit writes only the fields
+ * changed, compared with what the card opened with (`editStrandElement`). No card writes the Event's
+ * `characters` (1.122.0: the pair 1.120 and 1.121 added there is gone; a link already made stays). Every patch of Home's state asks first that the world drawn is still the open
  * one and its store the active store, so a world switched mid-write takes none of the old world's list.
  */
 
@@ -30,9 +30,9 @@ import { getActiveStore } from '../core/active-store';
 import { worldIsViewOnly } from '../core/view-only';
 import {
   appendId, elementIndex, guardFor, heroStillDrawn, markForEvent, markForPlace, markForStory, markStillDrawn,
-  markValue, memberIds, rawSingle, singleStillDrawn, storedMark, strandView, SLOT_TYPE, type MarkMembers, type StrandSlot,
+  markValue, rawSingle, singleStillDrawn, storedMark, strandView, SLOT_TYPE, type MarkMembers, type StrandSlot,
 } from '../core/strand';
-import { appendToList, createFields, sameStored, EMPTY_VALUES, type CardValues } from '../core/strand-journey';
+import { createFields, sameStored, EMPTY_VALUES, type CardValues } from '../core/strand-journey';
 import { STRAND_KEY } from '../core/strand-mark';
 import { isKeptHere, requestPushIfLinked } from '../sync/sync-attach';
 import { getWritingLabels } from '../middle/writing-helpers';
@@ -137,8 +137,8 @@ export async function writeStrandSlot(slot: StrandSlot, drawn: StrandDrawn, id: 
 
 /**
  * Make: the guard first, then the element in one create, with the typed name, the card's text where the
- * type keeps it (a Narrative's `story`, every other type's `description`) and an Event's When in its
- * `start_date`, each only when given; a story takes the world's first writing label, as the grid's +
+ * type keeps it (a Narrative's `story`, every other type's `description`) and its date where the type
+ * keeps it (`whenOf`), each only when given; a story takes the world's first writing label, as the grid's +
  * makes one. Then the slot's write.
  */
 export async function makeStrandSlot(slot: StrandSlot, drawn: StrandDrawn, name: string, values: CardValues = EMPTY_VALUES): Promise<StrandOutcome> {
@@ -269,48 +269,6 @@ async function linkThenMark(store: Store, slot: StrandSlot, drawn: StrandDrawn, 
   await refreshSaid(store, drawn.worldId);
   requestPushIfLinked();
   return 'wrote';
-}
-
-/**
- * What came of adding the main character to the strand's Event: listed now, left as it was, refused
- * because the strand changed meanwhile (`moved`), or a write that did not go through (`failed`).
- */
-export type EventAdd = 'added' | 'skipped' | 'moved' | 'failed';
-
-/**
- * The Character card's second write (R4), and the Event card's (1.121.0): after the story's `protagonist`
- * names `characterId` and the mark's event is `eventId`, that Event lists them in its `characters`. Asked
- * again first: the mark's event is still `eventId` and the story still names this character; else
- * `moved`, nothing written. Then inside the Event's lock: already listed in either
- * spelling is nothing; absent, null or an array gets the bare id appended (every entry kept); any other
- * shape is left alone. The `added` flag is set inside the mutate, so a deleted Event (the mutate never
- * runs) reads as not gone through. The caller asks whether this person may change the Event first.
- */
-export async function addCharacterToEvent(drawn: StrandDrawn, eventId: string, characterId: string): Promise<EventAdd> {
-  const store = storeFor(drawn.worldId);
-  if (!store) return 'failed';
-  let ran = false;
-  let added = false;
-  try {
-    const meta = await store.readWorldMeta({ strict: true });
-    const ids = memberIds(storedMark(meta));
-    if (ids.narrative !== drawn.narrative || ids.event !== eventId) return 'moved';
-    const story = drawn.narrative ? await store.getElement(drawn.narrative) : null;
-    if (!heroStillDrawn(story ?? undefined, characterId)) return 'moved';
-    await store.updateElementWith(eventId, ex => {
-      ran = true;
-      const plan = appendToList((ex as unknown as Record<string, unknown>).characters, characterId);
-      if (plan === 'listed' || plan === 'shape') return null;
-      added = true;
-      return { characters: plan.next } as Partial<Element>;
-    });
-  } catch {
-    // Said by the caller in the strand's own line ("adding them to … did not go through"), never the error's text.
-    return 'failed';
-  }
-  if (!ran) return 'failed';
-  if (added) await refreshSaid(store, drawn.worldId);
-  return added ? 'added' : 'skipped';
 }
 
 /** What an Edit's Save came to: written, refused for a change meanwhile, nothing to write, or failed. */

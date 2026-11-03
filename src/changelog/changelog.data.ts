@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.122.0',
+    date: '2026-11-03',
+    theme: 'The strand says what each part is for',
+    entries: [
+      {
+        id: 'strand-card-words',
+        title: 'Each question on the Strand tab says what its kind of element is for',
+        body: 'Under each question one line now says what it asks for: "Narratives are stories or tellings of any kind.", "Characters drive your stories: start with its main character.", "Events are happenings of any size, each a part of a larger story.", "Locations are where your stories happen." The event\'s question is always "What happens in" the story, and the last one asks "Where is" the main character now, noting that the event may be long past.',
+        tags: ['home'],
+      },
+      {
+        id: 'strand-born-founded',
+        title: 'Born and Founded on the main character\'s and the location\'s cards',
+        body: 'The main character\'s card has an optional Born and each location\'s card an optional Founded, read in your world\'s calendar as the event\'s When is. Edit here shows and changes them, and their boxes say "Born" or "Founded" under the text. A date given puts the element on the timeline in Charts, and a location\'s Founded also hides its pin before that date on the map\'s date bar.',
+        tags: ['home'],
+      },
+      {
+        id: 'strand-event-no-character',
+        title: 'Making the event no longer adds the main character to it',
+        body: 'The main character is the story\'s, and the event keeps only what you put in it, whichever you make first. Worlds that already have the character in the event keep it. When the main character is now where the event happened, the story always says they are still there.',
+        tags: ['home'],
+      },
+    ],
+  },
+  {
     version: '1.121.2',
     date: '2026-11-03',
     theme: 'The boxes stay where they are',
