@@ -12,7 +12,9 @@
  * drawer (C3); the story's and the character's lines go once their room was opened. The story's box keeps
  * its second line's room, so the Event make moves nothing (W5). G2 (1.122.0): no filled box moves when a
  * line goes or changes its words (its x, a date saved in Edit here or arriving from elsewhere, a pin) or a
- * map is made, at 1440 and 390. A switch between Picture and Strand keeps Home's scroll, both ways.
+ * map is made, at 1440 and 390. A switch between Picture and Strand keeps Home's scroll, both ways, and
+ * (1.122.1) so does every redraw on the same world (a pull on either tab, a line's ×, the last make far
+ * down); a tab reached by the keyboard half out of view comes into view; another world lands at the top.
  *
  * Screenshots for a look: ATLAS_SNAPS=<dir> writes each Picture there.
  */
@@ -94,8 +96,8 @@ async function reopenHome(page: Page, wid: string): Promise<void> {
   await expect(page.locator('.atlas-world-home')).toBeVisible();
 }
 
-/** A whole strand, written as the journey writes it; `rest` adds four elements after it; `names` renames its five; `story` adds to the story. */
-async function wholeStrand(page: Page, opts: { rest?: boolean; map?: boolean; names?: string[]; story?: Record<string, unknown>; event?: Record<string, unknown> } = {}): Promise<string> {
+/** A whole strand, written as the journey writes it; `rest` adds four elements after it; `names` renames its five; `story` adds to the story; `noNow` leaves where they are now unasked (its card the last). */
+async function wholeStrand(page: Page, opts: { rest?: boolean; map?: boolean; names?: string[]; story?: Record<string, unknown>; event?: Record<string, unknown>; noNow?: boolean } = {}): Promise<string> {
   const wid = await setupWorld(page);
   const [sName, eName, lName, cName, nName] = opts.names ?? ['The Lantern Ferry', 'The night crossing', 'Saltmere Quay', 'Odile Varn', 'The Drowned Library'];
   await put(page, 'narrative', S, sName, {
@@ -108,8 +110,8 @@ async function wholeStrand(page: Page, opts: { rest?: boolean; map?: boolean; na
   // An Event that lists the main character: a world made before 1.122.0 keeps the link, and the Picture draws it.
   await put(page, 'event', E, eName, { locations: opts.rest ? [L, MARSH] : [L], characters: [C], start_date: 1142, ...opts.event });
   await put(page, 'location', L, lName);
-  await put(page, 'character', C, cName, { location: N });
-  await put(page, 'location', N, nName);
+  await put(page, 'character', C, cName, opts.noNow ? {} : { location: N });
+  if (!opts.noNow) await put(page, 'location', N, nName);
   if (opts.rest) {
     await put(page, 'character', BRAM, 'Bram the ferryman', { location: L });
     await put(page, 'event', THAW, 'The thaw', { start_date: 1143 });
@@ -392,6 +394,171 @@ for (const tag of ['', ' @firefox']) {
       await page.waitForTimeout(400);
       expect(Math.abs((await read()).top - after.top), `still after the switch to ${to}`).toBeLessThan(1);
     }
+  });
+}
+
+// 1.122.1: the same clamp pulled Home up on every redraw while scrolled down (a pull bringing a change, a
+// make, a line's ×), not only on a tab's press; at 1440 x 900 on this world the Picture tab fell to 0 at
+// a pull, and a line's × or the last make fell 168 px, in both engines. Every redraw on the same world
+// now keeps the scroll. Kept means within 2 px; the browser's own clamp to a shorter end is allowed.
+const TOLERANCE = 2;
+const homeScroll = (page: Page) => page.locator('.atlas-world-home').evaluate(h => ({ top: h.scrollTop, max: h.scrollHeight - h.clientHeight }));
+/** Scroll Home so that `sel`'s top sits `y` px below Home's top (or as near as Home scrolls). */
+const scrollToPut = (page: Page, sel: string, y: number) => page.locator('.atlas-world-home').evaluate((h, a) => {
+  const el = h.querySelector(a.sel)!;
+  h.scrollTop += el.getBoundingClientRect().top - h.getBoundingClientRect().top - a.y;
+}, { sel, y });
+/** A pull bringing one changed element: a new elements array, one description changed, as a sync tick patches it. */
+const pullOneChange = (page: Page, id: string, words: string) => page.evaluate(({ id, words }) => {
+  const api = (window as any).__atlasTestApi;
+  api.patchData(api.getState().data.elements.map((e: any) => e.id === id ? { ...e, description: words } : e));
+}, { id, words });
+
+/** Home's next draw: its first child replaced (a draw empties Home and builds it again). */
+const markDraw = (page: Page) => page.locator('.atlas-world-home').evaluate(h => { (h.firstElementChild as any).__before = true; });
+const redrawn = (page: Page) => page.waitForFunction(() => !(document.querySelector('.atlas-world-home')!.firstElementChild as any)?.__before);
+
+async function expectKept(page: Page, label: string, before: { top: number }, drawn: () => Promise<void>): Promise<void> {
+  await markDraw(page);
+  await drawn();
+  await redrawn(page);
+  const after = await homeScroll(page);
+  expect.soft(Math.abs(after.top - Math.min(before.top, after.max)), `${label}: ${before.top} kept (now ${after.top} of ${after.max})`).toBeLessThanOrEqual(TOLERANCE);
+  await page.waitForTimeout(400);
+  const later = await homeScroll(page);
+  expect.soft(Math.abs(later.top - after.top), `${label}: still kept 400 ms later (${after.top}, then ${later.top})`).toBeLessThanOrEqual(1);
+}
+
+for (const tag of ['', ' @firefox']) {
+  test(`Home keeps its scroll when a pull redraws it, on either tab, scrolled to the end or half way${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await wholeStrand(page, { rest: true, map: true });
+    const home = page.locator('.atlas-world-home');
+    let n = 0;
+    for (const t of ['picture', 'strand'] as const) {
+      if ((await tab(page, t).getAttribute('aria-selected')) !== 'true') await tab(page, t).click();
+      await expect(tab(page, t)).toHaveAttribute('aria-selected', 'true');
+      for (const at of ['end', 'half'] as const) {
+        const max = (await homeScroll(page)).max;
+        await home.evaluate((h, y) => { h.scrollTop = y; }, at === 'end' ? max : Math.round(max / 2));
+        const before = await homeScroll(page);
+        expect(before.top, `scrolled on ${t} (${at})`).toBeGreaterThan(100);
+        const words = `Changed elsewhere, ${++n}.`;
+        await expectKept(page, `a pull on ${t} at the ${at}`, before, async () => {
+          await pullOneChange(page, BRAM, words);
+        });
+      }
+    }
+  });
+
+  // S2: a focus a press asks for wins over the kept position only when its control would be out of view.
+  test(`a tab reached by the keyboard while half out of view is brought into view, and the page moves only that far${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await wholeStrand(page, { rest: true, map: true });
+    await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+    // The tab head's top 12 px above Home's top, the Strand tab focused without a scroll, as after a wheel.
+    await scrollToPut(page, '[data-role="home-tabs"] [data-tab="strand"]', -12);
+    await tab(page, 'strand').evaluate((b: HTMLElement) => b.focus({ preventScroll: true }));
+    const before = await homeScroll(page);
+    expect(before.top, 'scrolled before the arrow').toBeGreaterThan(100);
+    await page.keyboard.press('ArrowLeft');
+    await expect(tab(page, 'picture')).toHaveAttribute('aria-selected', 'true');
+    await expect(tab(page, 'picture')).toBeFocused();
+    await expect(tab(page, 'picture')).toBeInViewport({ ratio: 0.99 });
+    const after = await homeScroll(page);
+    expect(before.top - after.top, `the page moved up only to show the tab (${before.top} to ${after.top})`).toBeGreaterThan(5);
+    expect(before.top - after.top).toBeLessThan(60);
+  });
+
+  test(`Home keeps its scroll when a line's × redraws it, and the focus goes to the box${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await wholeStrand(page, { rest: true, map: true });
+    await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+    const x = page.locator('[data-role="home-strand"] [data-slot="character"] [aria-label="Hide this line"]');
+    await expect(x).toBeVisible();
+    await scrollToPut(page, '[data-role="home-strand"] [data-slot="character"] [aria-label="Hide this line"]', 300);
+    const before = await homeScroll(page);
+    expect(before.top, 'scrolled before the ×').toBeGreaterThan(100);
+    await expectKept(page, "the character's line ×", before, async () => {
+      await x.click();
+      await expect(x).toHaveCount(0);
+    });
+    // The focus lands on the box's first control, in view (it was already).
+    const name = page.locator('[data-role="home-strand"] [data-slot="character"] [data-strand-key]').first();
+    await expect(name).toBeFocused();
+    await expect(name).toBeInViewport();
+  });
+
+  test(`Home keeps its scroll when the last make redraws it far down, and the focus goes to the box made${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await wholeStrand(page, { rest: true, map: true, noNow: true });
+    const card = page.locator('[data-role="strand-card"][data-mode="make"]');
+    await expect(card).toHaveAttribute('data-card-slot', 'now');
+    await scrollToPut(page, '[data-role="strand-card"][data-mode="make"] [data-act="make"]', 700);
+    await card.locator('[data-field="name"]').fill('The Drowned Library');
+    const before = await homeScroll(page);
+    expect(before.top, 'scrolled before the make').toBeGreaterThan(100);
+    await expectKept(page, 'the Now make', before, async () => {
+      await card.locator('[data-act="make"]').click();
+      await expect(page.locator('[data-role="home-strand"] [data-box="now"] .atlas-home-strand-name')).toHaveText('The Drowned Library');
+    });
+    const made = page.locator('[data-role="home-strand"] [data-strand-key="now:open"]');
+    await expect(made).toBeFocused();
+    await expect(made).toBeInViewport();
+  });
+}
+
+// Promise 2 (1.122.1): where the page means to move it still moves. Another world, and the same world
+// opened again, land at the top.
+for (const tag of ['', ' @firefox']) {
+  test(`another world, and the same world opened again, land at the top of Home${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const wid = await wholeStrand(page, { rest: true, map: true });
+    const home = page.locator('.atlas-world-home');
+    const down = async () => {
+      await home.evaluate(h => { h.scrollTop = h.scrollHeight; });
+      expect((await homeScroll(page)).top).toBeGreaterThan(100);
+    };
+    await down();
+    await reopenHome(page, wid);
+    await expect(page.locator('[data-role="home-strand"]')).toBeVisible();
+    expect((await homeScroll(page)).top, 'the same world opened again').toBe(0);
+    // A second world, registered as the app registers a browser world, then opened from the first's Home.
+    await down();
+    const other = await page.evaluate(async () => {
+      const { getState, patchSlice } = await import('/src/core/state.ts');
+      const reg = await import('/src/registry/registry.ts');
+      const root = await navigator.storage.getDirectory();
+      const dir = await (await root.getDirectoryHandle('browser-worlds', { create: true })).getDirectoryHandle('second-0192c000-5e6f', { create: true });
+      const w = await (await dir.getFileHandle('world.json', { create: true })).createWritable();
+      await w.write(JSON.stringify({ id: '0192c000-0000-7000-8000-00000000cccc', name: 'Second Hollow' }) + '\n');
+      await w.close();
+      const { next, entry } = (reg as any).createLocalWorld(getState().registry, {
+        name: 'Second Hollow', folderName: 'second-0192c000-5e6f', handleKey: 'world-0192c000-0000-7000-8000-00000000cccc', pathHint: 'browser storage/second-0192c000-5e6f',
+      });
+      const withWhere = (reg as any).updateWorldEntry(next, entry.id, { where: 'browser' });
+      (reg as any).saveRegistry(withWhere);
+      patchSlice('registry', withWhere);
+      return entry.id as string;
+    });
+    await page.evaluate(async (id) => {
+      const { activateWorld } = await import('/src/sidebar/worlds-sidebar.ts');
+      const { toastManager } = await import('/src/ui/toast-manager.ts');
+      await (activateWorld as any)(id, toastManager);
+    }, other);
+    await expect.poll(() => page.evaluate(() => (window as any).__atlasTestApi.getState().active?.worldId)).toBe(other);
+    await go(page, `#/w/${other}/home`);
+    await expect(page.locator('.atlas-home-world-name')).toHaveText('Second Hollow');
+    expect((await homeScroll(page)).top, 'another world').toBe(0);
+    // And back to the first: its Home at the top, not where it was left.
+    await page.evaluate(async (id) => {
+      const { activateWorld } = await import('/src/sidebar/worlds-sidebar.ts');
+      const { toastManager } = await import('/src/ui/toast-manager.ts');
+      await (activateWorld as any)(id, toastManager);
+    }, wid);
+    await go(page, `#/w/${wid}/home`);
+    await expect(page.locator('[data-role="home-strand"]')).toBeVisible();
+    expect((await homeScroll(page)).top, 'the first world again').toBe(0);
   });
 }
 
