@@ -71,6 +71,7 @@ import {
 import { isKeptHere, keptSetOf } from '../sync/sync-attach';
 import { strandView } from '../core/strand';
 import { strandWhole } from '../core/strand-journey';
+import { homeScrollKeeper, type HomeDraw } from './home-scroll';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -173,28 +174,14 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   // adds or removes it. The whole line's Picture shows it on a press.
   const headLatch = openHeadLatch(() => { lastInputs = null; render(); });
 
-  // A switch between Picture and Strand keeps Home's scroll (1.122.0). Home is its own scroller, and a
-  // draw empties it and builds it again in steps: a layout read part way (the rows' hold, the focus on
-  // the tab, the grid's mount) clamps the scroll to the part built so far, so it fell toward the top.
-  // The position read before the draw is put back once all of it is built; the browser clamps it to
-  // the new content's end. Only a switch asks: every other draw keeps today's way.
-  let keepScroll = false;
-  let draws = 0;
-  function render(): void {
-    const keptTop = keepScroll ? root.scrollTop : null;
-    const before = draws;
-    drawHome();
-    if (keptTop === null || draws === before) return;
-    keepScroll = false;
-    root.scrollTop = keptTop;
-    // The tab pressed stays in view, as the focus's own scroll put it (a press from the keyboard on a
-    // tab half out of view): nothing moves when it is already in view.
-    const a = document.activeElement;
-    if (a instanceof HTMLElement && root.contains(a) && a.matches('[data-role="home-tabs"] [data-tab]')) a.scrollIntoView?.({ block: 'nearest' });
-  }
-  const switchTab = (): void => { keepScroll = true; lastInputs = null; render(); };
+  // Every redraw keeps Home's scroll (1.122.1; 1.122.0 kept it for a tab's press only): read before the
+  // draw empties Home, put back once all of it is built and the rows are held, then the draw's focus
+  // settles (`home-scroll.ts`). Another world, or a first open, lands at the top.
+  const keepScroll = homeScrollKeeper(root, () => getState().active?.worldId ?? null);
+  function render(): void { keepScroll(drawHome); }
+  const switchTab = (): void => { lastInputs = null; render(); };
 
-  function drawHome(): void {
+  function drawHome(): HomeDraw {
     const s = getState();
     // The lore (core/parlor-room.ts): the world without the parlor's room while
     // it is hidden; its identity moves with the elements and with the switch.
@@ -204,10 +191,9 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // a press on the guide's marks straddling it (conv. 146, the guide's code gate C3).
     const inputs = [s.active, elementsSaid(s.data.elements), s.ui.hideRoom, aidsHidden(), s.data.loading, s.data.loadingProgress?.done, s.registry,
       savedCharts, isTourFlagActive(), s.active ? doorOf(s.active.worldId) : undefined, s.active ? keptSetOf(s.active.worldId) : undefined];
-    if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
-    if (root.querySelector(`[${GRID_OPEN_ATTR}]`) || waymarkOpenIn(root)) { owed = true; return; }
+    if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return { drew: false };
+    if (root.querySelector(`[${GRID_OPEN_ATTR}]`) || waymarkOpenIn(root)) { owed = true; return { drew: false }; }
     lastInputs = inputs;
-    draws++;
     // The strand's control that held the focus, by its key: put back after the draw (S6).
     const strandKept = strandFocusKey(root);
     markHadFocus = marks.some(waymarkHasFocus);
@@ -221,7 +207,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     const active = s.active;
     if (!active) {
       root.innerHTML = '<div class="atlas-pane-empty">No world open. Pick one from the sidebar.</div>';
-      return;
+      return { drew: true };
     }
     const elements = lore;
     // What the world holds is counted without proposed elements (conv. 168):
@@ -267,7 +253,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       loadingEl.className = 'atlas-home-loading';
       loadingEl.innerHTML = `<p class="atlas-home-loading-copy">${copy}</p>`;
       root.appendChild(loadingEl);
-      return;
+      return { drew: true };
     }
     // The world's picture: after the cover and its lines, above the guide's block, or below it while
     // the path shows, so the card never moves down mid-path (#964's G7).
@@ -309,7 +295,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // One reading of the strand per draw, handed to each part (the code gate's C7).
     const strandNow = quiet ? null : strandContext(worldId);
     // The whole line's Picture: the Picture tab, the head shown for the rest of the visit (R8).
-    const showPicture = (): void => { keepScroll = true; choosePicture(worldId); headLatch.reveal(worldId); switchTab(); };
+    const showPicture = (): void => { choosePicture(worldId); headLatch.reveal(worldId); switchTab(); };
     const drawWithStrand = (): void => {
       const chosen = chosenTab(worldId, strandNow);
       const head = buildStrandHead(worldId, chosen, switchTab);
@@ -389,11 +375,16 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       if (under) root.appendChild(under);
     }
     if (keep && !tour?.section.hasAttribute('data-holds-copy')) root.appendChild(keep);
-    settleAfterDraw(tour?.section ?? bringIn, guideFocus);
-    // The strand's rows held at their tallest this visit (W5), before the focus scrolls to the next card.
+    if (totalElements > 0) drawLower(settled, elements, worldId);
+    // The strand's rows held at their tallest this visit (W5), on the whole draw, so the scroll put back
+    // after it is never clamped short; the focus settles after that, its own scroll then moving the page
+    // only to bring a control into view (1.122.1).
     holdStrandRows(root, worldId);
-    settleStrandFocus(root, strandKept);
-    if (totalElements === 0) return;
+    return { drew: true, settle: () => { settleAfterDraw(tour?.section ?? bringIn, guideFocus); settleStrandFocus(root, strandKept); } };
+  }
+
+  /** Below Home's picture: the chart strip, the desk and the loose threads, for a world holding something. */
+  function drawLower(settled: readonly Element[], elements: readonly Element[], worldId: string): void {
     // The chart strip (the "starred chart") — the shape of the world's
     // history between the cover and the desk (timeline-mini's old slot, now
     // the real chart pipeline: first saved chart, else the recipe default).
