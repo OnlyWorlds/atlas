@@ -8682,6 +8682,10 @@ svg .atlas-zone-ink.atlas-zone-hovered {
 .atlas-world-home {
   padding: 20px 24px 32px 24px;
   overflow-y: auto;
+  /* The scrollbar's room kept whether Home overflows or not: with classic scrollbars the strand's
+     grid would narrow as Home first overflows, and the rows' hold, keyed on its width, let go of
+     what it held at that make (a box jumped 250 px at 1440 x 1300). */
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: 28px;

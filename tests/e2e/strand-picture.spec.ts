@@ -19,6 +19,7 @@
  * Screenshots for a look: ATLAS_SNAPS=<dir> writes each Picture there.
  */
 import { test, expect, type Page } from '@playwright/test';
+import moppetopiaKeel from '../fixtures/moppetopia-keel.json';
 
 const AT = '2026-11-02T00:00:00.000Z';
 const S = '0192a000-0000-7000-8000-000000950001';
@@ -508,6 +509,58 @@ for (const tag of ['', ' @firefox']) {
   });
 }
 
+// The registry's redraw (a landing ending, a role kept, a line's record written) while scrolled down: Firefox
+// clamps on any layout read part way, and fell 475 to 135 here before 1.122.1.
+test(`Home keeps its scroll when the registry redraws it, as a landing ends @firefox`, async ({ page }) => {
+  test.slow();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await wholeStrand(page, { rest: true, map: true });
+  await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+  for (const at of ['end', 'half'] as const) {
+    const max = (await homeScroll(page)).max;
+    await page.locator('.atlas-world-home').evaluate((h, y) => { h.scrollTop = y; }, at === 'end' ? max : Math.round(max / 2));
+    const before = await homeScroll(page);
+    expect(before.top, `scrolled (${at})`).toBeGreaterThan(100);
+    await expectKept(page, `a registry redraw at the ${at}`, before, () => page.evaluate(async () => {
+      const { getState, patchSlice } = await import('/src/core/state.ts');
+      const reg = getState().registry;
+      patchSlice('registry', { ...reg, worlds: reg.worlds.map(w => ({ ...w })) });
+    }));
+  }
+});
+
+// Moppetopia as Try a demo world brings it down (keel replayed from a recording of 2026-11-04,
+// `tests/fixtures/moppetopia-keel.json`): its Strand tab fell 844 to 227 at a pull before 1.122.1.
+const MOPPETOPIA = moppetopiaKeel as { world: unknown; elements: Record<string, unknown[]> };
+for (const tag of ['', ' @firefox']) {
+  test(`Home keeps its scroll on Moppetopia's Strand tab when a pull redraws it${tag}`, async ({ page }) => {
+    test.slow();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Keel's CORS answered too: Firefox sends the preflight for the demo key's headers to the route.
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, OPTIONS' };
+    await page.route('https://www.onlyworlds.com/**', async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      const path = new URL(route.request().url()).pathname;
+      if (!path.startsWith('/api/v2/')) return route.fulfill({ status: 404, headers: cors, body: '' });
+      const type = path.slice('/api/v2/'.length).replace(/\/$/, '');
+      if (type === 'world') return route.fulfill({ headers: cors, json: MOPPETOPIA.world });
+      return route.fulfill({ headers: cors, json: { data: MOPPETOPIA.elements[type] ?? [], has_more: false, next_cursor: null } });
+    });
+    await freshBoot(page);
+    await page.locator('[data-action="try-demo"]').first().click();
+    await expect(page.locator('.atlas-home-world-name')).toHaveText('Moppetopia', { timeout: 30_000 });
+    await expect(tab(page, 'strand')).toBeVisible();
+    if ((await tab(page, 'strand').getAttribute('aria-selected')) !== 'true') await tab(page, 'strand').click();
+    await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
+    const home = page.locator('.atlas-world-home');
+    await home.evaluate(h => { h.scrollTop = h.scrollHeight; });
+    const before = await homeScroll(page);
+    expect(before.top, 'scrolled to the end').toBeGreaterThan(300);
+    const one = await page.evaluate(() => (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.type === 'object').id as string);
+    await expectKept(page, "a pull on Moppetopia's Strand tab", before, () => pullOneChange(page, one, 'Changed elsewhere.'));
+  });
+}
+
 // Promise 2 (1.122.1): where the page means to move it still moves. Another world, and the same world
 // opened again, land at the top.
 for (const tag of ['', ' @firefox']) {
@@ -792,6 +845,38 @@ for (const tag of ['', ' @firefox']) {
     expect(await tallerHeld()).toEqual([]);
   });
 }
+
+// W5 with classic scrollbars (1.122.1's code gate, M1). Playwright's Chromium hides scrollbars, so the
+// suite never met one; Chrome and Edge on Windows draw them. Without a gutter kept for it, the strand's
+// grid narrowed by the scrollbar's width at the make where Home first overflowed, the rows' hold (keyed
+// on that width) let go, and the main character's box jumped 250 px up at the Location make (1440 x 1300
+// on 1.122.1's first build, 1440 x 1100 on 1.122.0). Home keeps the gutter (`scrollbar-gutter: stable`).
+// A browser of its own, launched without Playwright's --hide-scrollbars (a launch option cannot be set
+// per describe group); Chromium only (the Firefox project runs the tagged tests alone).
+test.describe('W5 with classic scrollbars', () => {
+  for (const height of [1100, 1300]) {
+    test(`W5 at every make with classic scrollbars shown, at 1440 x ${height}: no filled box moves beyond the whole strand's let-go`, async ({ playwright }, info) => {
+      const browser = await playwright.chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
+      try {
+        const page = await (await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 1440, height } })).newPage();
+        const moves = await movesAtEachMake(page);
+        // The scrollbar is really drawn: Home's border box is wider than its client box.
+        expect(await page.locator('.atlas-world-home').evaluate(h => h.offsetWidth - h.clientWidth), 'a classic scrollbar on Home').toBeGreaterThan(0);
+        if (process.env.ATLAS_W5_LOG) console.log(`W5 classic ${height}: ${JSON.stringify(moves)}`);
+        for (const [make, m] of Object.entries(moves)) {
+          const free = make === 'now' ? new Set(['character']) : new Set<string>();
+          for (const [b, d] of Object.entries(m.end)) {
+            if (free.has(b)) expect.soft(d, `the ${b} box after the ${make} make closes up, never down`).toBeLessThan(0.5);
+            else expect.soft(Math.abs(d), `the ${b} box after the ${make} make`).toBeLessThan(0.5);
+          }
+          for (const [b, d] of Object.entries(m.frame)) if (!free.has(b)) expect.soft(d, `the ${b} box while the ${make} make ran`).toBeLessThan(0.5);
+        }
+      } finally {
+        await browser.close();
+      }
+    });
+  }
+});
 
 test.describe('W5 on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'home-keeps-scroll-on-redraw',
         title: 'Home keeps your place when it redraws',
-        body: 'Scrolled down on Home, a change arriving from elsewhere, making a part of the strand or hiding one of its lines could throw the page back toward the top. Home now stays where you had scrolled it whenever it redraws, as it already did when you switched between Picture and Strand. Opening another world still starts at the top.',
+        body: 'Scrolled down on Home, a change arriving from elsewhere, making a part of the strand or hiding one of its lines could throw the page back toward the top. Home now keeps your place through each of these, as it already did when you switched between Picture and Strand. Opening another world still starts at the top.',
         tags: ['home'],
       },
     ],
