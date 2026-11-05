@@ -67,6 +67,7 @@ export function buildStrandFrame(narrative: Element): HTMLElement | null {
       pick.type = 'button';
       pick.className = 'atlas-btn-link atlas-context-strand-pick';
       pick.dataset.action = 'strand-pick-on-home';
+      pick.setAttribute('role', 'link');
       pick.textContent = 'Pick on Home';
       pick.title = 'Opens Home, asking for this one';
       pick.addEventListener('click', () => openStrandTab(worldId, slot));

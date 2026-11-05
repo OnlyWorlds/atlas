@@ -335,6 +335,27 @@ for (const tag of ['', ' @firefox']) {
       return s.registry.worlds.find((w: any) => w.id === s.active.worldId)?.strand_lines?.opened?.length ?? 0;
     })).toBe(2);
   });
+
+  test(`the strand's links that go somewhere are heard as links, Enter opens one, and Create a map stays a button${tag}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const wid = await wholeStrand(page, { map: true });
+    const strand = page.locator('[data-role="home-strand"]');
+    // The lines' links and the boxes' names navigate: a screen reader hears each as a link, none as a button.
+    for (const name of ['the writing room', 'Charts', 'Pin it on a map', 'Their page', 'Odile Varn', 'The night crossing', 'The Drowned Library']) {
+      await expect(strand.getByRole('link', { name, exact: true }).first(), name).toBeVisible();
+    }
+    await expect(strand.locator('[data-role="strand-line"] [data-line-link]:not([role="link"])')).toHaveCount(0);
+    // Enter on a link opens it, as a click does.
+    await strand.getByRole('link', { name: 'Their page', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(`#/w/${wid}/element/${C}`);
+    // A world with no map: the location's line offers Create a map, which opens a dialog and stays a button.
+    await wholeStrand(page);
+    const make = page.locator('[data-role="home-strand"] [data-role="strand-line"] [data-line-link="create-map"]');
+    await expect(make).toHaveText('Create a map');
+    await expect(make).not.toHaveAttribute('role', 'link');
+    await expect(page.locator('[data-role="home-strand"]').getByRole('button', { name: 'Create a map', exact: true }).first()).toBeVisible();
+  });
 }
 
 // 1.122.0's amendment, A2: the ⋯ sits at the end of its box's name row, beside a long name that wraps inside

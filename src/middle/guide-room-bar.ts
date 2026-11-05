@@ -72,6 +72,7 @@ export function mountGuideRoomBar(host: HTMLElement, room: GuideRoom): () => voi
   back.type = 'button';
   back.className = 'atlas-btn-link atlas-guide-room-back';
   back.setAttribute('data-action', 'guide-room-back');
+  back.setAttribute('role', 'link');
   back.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">chevron_left</span><span>Back to Grow your world</span>';
   const words = document.createElement('span');
   words.className = 'atlas-guide-room-step';

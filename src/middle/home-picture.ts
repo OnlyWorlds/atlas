@@ -116,6 +116,7 @@ export function buildHomePicture(worldId: string, said: string): HomePicture | n
   see.type = 'button';
   see.className = 'atlas-btn-link atlas-home-picture-see';
   see.setAttribute('data-action', 'home-picture-see');
+  see.setAttribute('role', 'link');
   see.textContent = `See ${name}'s world`;
   see.addEventListener('click', () => openWebOn(worldId, centre.id));
   head.append(title, see);

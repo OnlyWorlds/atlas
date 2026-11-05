@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.122.2',
+    date: '2026-11-05',
+    theme: 'Links a screen reader hears as links',
+    entries: [
+      {
+        id: 'link-buttons-heard-as-links',
+        title: 'Links in a sentence that take you somewhere are announced as links',
+        body: 'Words drawn as a link inside a line, such as a strand line\'s "the writing room" or "Their page", a box\'s name, "the Web", "Pick on Home" or "Open Settings, OnlyWorlds", were announced as buttons by a screen reader. Each one that takes you to a page, a room or a tab is now announced as a link, and Enter opens it. Those that act where you are, such as Undo, Copy our prompt or Create a map, stay buttons.',
+        tags: ['accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.122.1',
     date: '2026-11-04',
     theme: 'Home keeps your place',

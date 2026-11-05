@@ -370,6 +370,7 @@ export function buildEditCard(slot: StrandSlot, c: StrandContext, el: Element, o
     go.type = 'button';
     go.className = 'atlas-btn-link atlas-home-strand-act';
     go.setAttribute('data-act', 'writing');
+    go.setAttribute('role', 'link');
     go.setAttribute('data-strand-key', `edit:${slot}:writing`);
     go.textContent = 'Write it in the writing room';
     // The writing room takes the story's text: a name typed here is saved first, through the same

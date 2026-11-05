@@ -140,7 +140,11 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
   const word = document.createElement('span');
   word.textContent = "This is the world's strand";
   line.appendChild(word);
-  if (!pathShowing(worldId)) line.append(sep(), btn('Open it', 'strand-open', () => openStrandTab(worldId)));
+  if (!pathShowing(worldId)) {
+    const open = btn('Open it', 'strand-open', () => openStrandTab(worldId));
+    open.setAttribute('role', 'link');
+    line.append(sep(), open);
+  }
   if (confirming !== el.id) {
     line.append(sep(), btn('Clear the strand', 'strand-clear', () => {
       confirming = el.id;

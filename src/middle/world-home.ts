@@ -938,7 +938,7 @@ function buildDemoLine(worldId: string, toasts: ToastManager): HTMLElement | nul
   p.innerHTML = `A demo world, your own copy to change.
     <button type="button" class="atlas-btn-link" data-action="demo-start-own">Start your own world</button>
     <span aria-hidden="true">·</span>
-    <button type="button" class="atlas-btn-link" data-action="demo-delete">Delete this copy</button>`;
+    <button type="button" class="atlas-btn-link" role="link" data-action="demo-delete">Delete this copy</button>`;
   p.querySelector('[data-action="demo-start-own"]')!.addEventListener('click', () => {
     void import('../setup/world-doors').then(m => m.runAddWorldAction('create-local', toasts));
   });

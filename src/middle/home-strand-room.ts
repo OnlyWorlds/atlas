@@ -263,6 +263,8 @@ function lineLink(kind: LineLink, label: string, slot: StrandSlot, el: Element, 
     else mapAct(kind, el, c, `line:${slot}:pin-map`, redraw);
   }, 'atlas-btn-link atlas-home-strand-line-link');
   b.setAttribute('data-line-link', kind);
+  // Every line link but Create a map takes the person somewhere: a screen reader hears a link.
+  if (kind !== 'create-map') b.setAttribute('role', 'link');
   return b;
 }
 

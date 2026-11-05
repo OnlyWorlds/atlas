@@ -226,6 +226,7 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
   name.type = 'button';
   name.className = 'atlas-btn-link atlas-home-strand-name';
   name.setAttribute('data-strand-key', `${slot}:open`);
+  name.setAttribute('role', 'link');
   name.textContent = filled.name.trim() || 'Unnamed';
   name.title = `Open ${name.textContent}`;
   name.addEventListener('click', () => { if (el) openElementTarget(el, c.worldId); });
@@ -315,6 +316,7 @@ export function buildWholeLine(c: StrandContext, opts: StrandPanelOptions): HTML
     b.type = 'button';
     b.className = 'atlas-btn-link atlas-home-strand-whole-link';
     b.setAttribute('data-role', role);
+    b.setAttribute('role', 'link');
     b.textContent = label;
     b.addEventListener('click', run);
     return b;

@@ -316,6 +316,7 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
     web.type = 'button';
     web.className = 'atlas-btn-link';
     web.setAttribute('data-action', 'grow-web');
+    web.setAttribute('role', 'link');
     web.textContent = 'the Web';
     web.addEventListener('click', () => { const id = webCentre(worldId); if (id) openWebOn(worldId, id); });
     line.append(web, document.createTextNode('.'));
@@ -344,6 +345,7 @@ export function buildGrowBlock(dots: Dots, worldId: string, toasts: ToastManager
       b.type = 'button';
       b.className = 'atlas-btn-link';
       b.setAttribute('data-step-action', r.link.role);
+      b.setAttribute('role', 'link');
       b.textContent = r.link.label;
       b.addEventListener('click', r.link.run);
       p.appendChild(b);

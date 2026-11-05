@@ -26,7 +26,7 @@ export function landingAccountWorldsHtml(state: AppState): string {
     // A token keel refused fails every retry: the way out is Settings, where
     // a new one is pasted (this screen has no other way there).
     const action = aw.errorKind === 'auth'
-      ? '<button type="button" class="atlas-btn-link" data-role="landing-worlds-settings">Open Settings, OnlyWorlds</button>'
+      ? '<button type="button" class="atlas-btn-link" role="link" data-role="landing-worlds-settings">Open Settings, OnlyWorlds</button>'
       : '<button type="button" class="atlas-btn-link" data-role="landing-worlds-retry">Try again</button>';
     return `
       <p class="atlas-landing-worlds-head">${LANDING_WORLDS_HEAD}</p>
