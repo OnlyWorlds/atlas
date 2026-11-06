@@ -61,6 +61,13 @@ describe('R7: the defaults read a view-only world\'s tree', () => {
     expect(isWritingInitialized(copy, parts)).toBe(false);
   });
 
+  it('Writing settings asks for the setup back (writing_initialized false), and the setup shows', () => {
+    const asked = { ...copy, writing_initialized: false } as unknown as WorldRegistryEntry;
+    expect(isWritingInitialized(asked, bloodMeridian)).toBe(false);
+    // Never asked (undefined) or set up (true) reads as before.
+    expect(isWritingInitialized({ ...copy, writing_initialized: undefined } as unknown as WorldRegistryEntry, bloodMeridian)).toBe(true);
+  });
+
   it('labels of the world\'s own are not the defaults: the setup', () => {
     const relabelled = { ...copy, writing_labels: { l1: 'Volume' } } as unknown as WorldRegistryEntry;
     expect(isWritingInitialized(relabelled, bloodMeridian)).toBe(false);
@@ -86,12 +93,12 @@ describe('a writing link\'s landing in the room', () => {
     const place = writingLandingFor(bloodMeridian, TELLING, W);
     expect(place).toEqual({ narrativeId: 's2', line: 'outside', name: "The father's telling", under: 'The night he was born' });
     expect(writingOutsideLine("The father's telling", 'The night he was born'))
-      .toBe('"The father\'s telling" is not in the book\'s tree, so the writing room opens on "The night he was born", the part it sits under.');
+      .toBe('"The father\'s telling" is not in the book\'s outline, so the writing room opens on "The night he was born", where it sits.');
   });
 
   it('one outside any chain lands on the start, and says so', () => {
     expect(writingLandingFor(bloodMeridian, 'memoir', W)).toEqual({ narrativeId: null, line: 'outside', name: 'My Confession', under: null });
-    expect(writingOutsideLine('My Confession', null)).toBe('"My Confession" is not in the book\'s tree, so the writing room opens at its start.');
+    expect(writingOutsideLine('My Confession', null)).toBe('"My Confession" is not in the book\'s outline, so the writing room opens at its start.');
   });
 
   it('one not in the world is missing', () => {

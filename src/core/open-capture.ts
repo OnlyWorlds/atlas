@@ -32,7 +32,7 @@ export function captureOpenWorld(
   loc: Pick<Location, 'hash'> = window.location,
   hist: Pick<History, 'replaceState' | 'state'> = history,
 ): boolean {
-  const m = /^#\/?open(?:$|\/([^/?#]*)(?:\/(element|elements)\/([^/?#]*)|\/(writing)(?:\/([^/?#]*))?)?)/.exec(loc.hash);
+  const m = /^#\/?open(?:$|\/([^/?#]*)(?:\/(element|elements)\/([^/?#]*)|\/(writing)(?=$|[/?#])(?:\/([^/?#]*))?)?)/.exec(loc.hash);
   if (!m) return false;
   hist.replaceState(hist.state, '', '#/');
   const id = (m[1] ?? '').toLowerCase();
@@ -45,6 +45,11 @@ export function captureOpenWorld(
     if (raw === '') pendingWriting = { narrativeId: null };
     else if (UUID_RE.test(raw)) pendingWriting = { narrativeId: raw };
     else pending = '';
+    return true;
+  }
+  // A writing ending that does not end where `writing` does (`/writingfoo`) is the malformed link too.
+  if (pending && /^\/writing/.test(loc.hash.slice(m[0].length))) {
+    pending = '';
     return true;
   }
   if (pending && m[3]) {

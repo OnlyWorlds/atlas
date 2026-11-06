@@ -41,7 +41,7 @@ const CHARACTERS = [{ id: '01a1b17c-0000-7000-8000-000000000001', type: 'charact
 
 interface Keel { worldReads: number; lists: number; keyed: number; requests: Array<{ method: string; url: string; key: boolean }> }
 
-async function playKeel(page: Page, opts: { ownerRows?: boolean } = {}): Promise<Keel> {
+async function playKeel(page: Page, opts: { ownerRows?: boolean; readerOff?: boolean } = {}): Promise<Keel> {
   const keel: Keel = { worldReads: 0, lists: 0, keyed: 0, requests: [] };
   const noStore = { 'Cache-Control': 'no-store' };
   const notFound = (route: Route) => route.fulfill({ status: 404, headers: noStore, json: { error: { type: 'not_found', code: 'not_found', message: 'World not found.', param: null } } });
@@ -53,11 +53,13 @@ async function playKeel(page: Page, opts: { ownerRows?: boolean } = {}): Promise
     const keyless = !headers['api-key'] && !headers['authorization'];
     keel.requests.push({ method: req.method(), url: req.url(), key: !keyless });
     if (keyless) {
+      // keel with PUBLIC_READER off: a keyless `world` is today's 401 (api-v2-spec, "the public reader").
+      if (opts.readerOff) return route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.', param: null, doc_url: 'https://onlyworlds.github.io/api/errors/#invalid_credentials' } } });
       const world = url.searchParams.get('world');
       if (!world || path === '/changes' || path === '/members' || path === '/me') {
-        return route.fulfill({ status: 401, headers: noStore, json: { error: { type: 'authentication_error', code: 'missing_credentials', message: 'Authentication credentials were not provided.', param: null } } });
+        return route.fulfill({ status: 401, headers: noStore, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.', param: null } } });
       }
-      if (req.method() !== 'GET') return route.fulfill({ status: 401, headers: noStore, json: { error: { type: 'authentication_error', code: 'missing_credentials', message: 'No key.', param: null } } });
+      if (req.method() !== 'GET') return route.fulfill({ status: 401, headers: noStore, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.', param: null } } });
       if (world !== PUB) return notFound(route);
       if (path === '/world') {
         keel.worldReads++;
@@ -213,6 +215,17 @@ test('a world the public cannot read keeps the sign-in line, and nothing is made
   await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
   await expect(page.locator('input[name="account-login"]')).toBeVisible();
   await expect(page.locator('.ow-toast', { hasText: 'view-only copy' })).toHaveCount(0);
+  expect(keel.lists).toBe(0);
+  expect((await copies(page)).worlds).toBe(0);
+});
+
+test('with keel\'s public reader switched off, a signed-out link keeps the sign-in line', async ({ page }) => {
+  const keel = await playKeel(page, { readerOff: true });
+  await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
+  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
+  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'view-only copy' })).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'could not reach OnlyWorlds' })).toHaveCount(0);
   expect(keel.lists).toBe(0);
   expect((await copies(page)).worlds).toBe(0);
 });

@@ -11,7 +11,7 @@
  * decoder (`adaptWorldMetaBody`).
  *
  * The budget (keel: 60 keyless requests a minute per address): pages of
- * 1000, and a 429 pauses on its `Retry-After` (seconds; 30 when absent) and
+ * 1000, and a 429 pauses on its `Retry-After` (seconds; 30 when absent, 120 at most) and
  * sends the same request again, at most `PUBLIC_MAX_WAITS` times in one
  * reader's life (one open). The next 429 is `PublicWaitsSpent`.
  */
@@ -28,6 +28,8 @@ export const PUBLIC_PAGE_SIZE = 1000;
 export const PUBLIC_MAX_WAITS = 3;
 /** A 429 that names no wait waits this long (seconds). */
 export const PUBLIC_DEFAULT_WAIT_S = 30;
+/** The longest one pause waits, whatever keel asks (seconds). */
+export const PUBLIC_MAX_WAIT_S = 120;
 /** A keyless read that has not answered in this long is given up (as the demo's). */
 export const PUBLIC_READ_TIMEOUT_MS = 30_000;
 /** A cursor walk longer than this is no real world's type (1000 a page). */
@@ -63,6 +65,8 @@ export interface PublicReaderOpts {
   fetch?: typeof globalThis.fetch;
   /** Told before each pause, with its length in whole seconds. */
   onWait?: (seconds: number) => void;
+  /** Told when a pause has ended and the request goes again. */
+  onResume?: () => void;
   /** Test seam: the pause itself. */
   sleep?: (ms: number) => Promise<void>;
   /** Pauses this reader may take (`PUBLIC_MAX_WAITS` by default; 0: a 429 is `PublicWaitsSpent` at once). */
@@ -85,10 +89,25 @@ export function isPublicNotFound(err: unknown): boolean {
   return err instanceof OwApiError && err.status === 404;
 }
 
+/**
+ * A 401 on a keyless `?world=` read: keel's public reader is switched off
+ * (`PUBLIC_READER`, its own switch: "Off: a keyless `world` is the `401`").
+ * No world can be read without a key then.
+ */
+export function isPublicReaderOff(err: unknown): boolean {
+  return err instanceof OwApiError && err.status === 401;
+}
+
+/** The public cannot read this world, now: a 404 (not public), or the reader switched off (401). */
+export function isPublicClosed(err: unknown): boolean {
+  return isPublicNotFound(err) || isPublicReaderOff(err);
+}
+
 export class PublicWorldReader implements OwApiClient {
   readonly worldId: string;
   private readonly client: OwV2Client;
   private readonly onWait?: (seconds: number) => void;
+  private readonly onResume?: () => void;
   private readonly sleep: (ms: number) => Promise<void>;
   private waits = 0;
   private readonly maxWaits: number;
@@ -104,6 +123,7 @@ export class PublicWorldReader implements OwApiClient {
       fetch: fetchWithin(base, PUBLIC_READ_TIMEOUT_MS),
     });
     this.onWait = opts.onWait;
+    this.onResume = opts.onResume;
     this.sleep = opts.sleep ?? sleepFor;
     this.maxWaits = opts.maxWaits ?? PUBLIC_MAX_WAITS;
   }
@@ -120,9 +140,11 @@ export class PublicWorldReader implements OwApiClient {
         if (!(err instanceof OwApiError) || err.status !== 429) throw err;
         if (this.waits >= this.maxWaits) throw new PublicWaitsSpent();
         this.waits++;
-        const secs = Math.max(1, Math.ceil(err.retryAfter ?? PUBLIC_DEFAULT_WAIT_S));
+        // keel's budget is per minute; a longer ask is capped (the overlay has no Cancel).
+        const secs = Math.min(PUBLIC_MAX_WAIT_S, Math.max(1, Math.ceil(err.retryAfter ?? PUBLIC_DEFAULT_WAIT_S)));
         this.onWait?.(secs);
         await this.sleep(secs * 1000);
+        this.onResume?.();
       }
     }
   }

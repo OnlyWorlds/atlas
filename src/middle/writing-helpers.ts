@@ -328,7 +328,10 @@ export function isWritingInitialized(
   if (chainMembers.length === 0) return true; // narratives exist but no hierarchy
   // A view-only world cannot run the setup's writes: when the default labels
   // read its tree, the room reads with them and nothing is written (1.123).
-  if (entryIsViewOnly(entry) && defaultsReadTree(narratives, chainMembers, entry?.writing_labels)) return true;
+  // Writing settings asks for the setup back (`writing_initialized: false`),
+  // and then the setup shows, its "Use these labels" within reach.
+  if (entryIsViewOnly(entry) && entry?.writing_initialized !== false
+    && defaultsReadTree(narratives, chainMembers, entry?.writing_labels)) return true;
   const labels = mergeLabels(entry?.writing_labels);
   const writingValues = new Set([labels.l1, labels.l2, labels.l3, labels.l4]);
   return chainMembers.every(n => {
@@ -424,6 +427,6 @@ export function writingLandingFor(elements: readonly Element[], narrativeId: str
 export function writingOutsideLine(name: string, under: string | null): string {
   const what = name ? `"${name}"` : 'The story this link names';
   return under !== null
-    ? `${what} is not in the book's tree, so the writing room opens on ${under ? `"${under}", ` : ''}the part it sits under.`
-    : `${what} is not in the book's tree, so the writing room opens at its start.`;
+    ? `${what} is not in the book's outline, so the writing room opens on ${under ? `"${under}"` : 'the part'}, where it sits.`
+    : `${what} is not in the book's outline, so the writing room opens at its start.`;
 }

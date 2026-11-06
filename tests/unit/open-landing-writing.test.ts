@@ -46,6 +46,14 @@ describe('captureOpenWorld with a writing ending', () => {
     }
   });
 
+  it('refuses an ending that only starts with writing (/writingfoo)', () => {
+    for (const bad of ['writingfoo', `writings/${N}`]) {
+      expect(captureOpenWorld({ hash: `#/open/${W}/${bad}` }, hist)).toBe(true);
+      expect(takePendingOpen()).toBe('');
+      expect(takePendingOpenWriting()).toBeNull();
+    }
+  });
+
   it('a link with no writing ending carries none', () => {
     captureOpenWorld({ hash: `#/open/${W}/element/${N}` }, hist);
     expect(takePendingOpenWriting()).toBeNull();

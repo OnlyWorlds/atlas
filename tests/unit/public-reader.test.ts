@@ -9,7 +9,7 @@
  * world the public cannot read, 401 on a keyless /changes.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { PublicWorldReader, PublicWaitsSpent, isPublicNotFound, PUBLIC_PAGE_SIZE } from '../../src/sync/public-reader';
+import { PublicWorldReader, PublicWaitsSpent, isPublicNotFound, isPublicReaderOff, isPublicClosed, PUBLIC_PAGE_SIZE, PUBLIC_MAX_WAIT_S } from '../../src/sync/public-reader';
 import { ALL_ELEMENT_TYPES } from '../../src/core/types';
 
 const W = '721d154b-43f3-4cc1-b7b4-7ea2b83c401e';
@@ -19,7 +19,7 @@ const T = '2026-11-06T10:00:00.000Z';
 interface Seen { method: string; url: URL; headers: Headers }
 
 /** keel's keyless door, played: 2 pages of markers, one character. */
-function keel(opts: { tooMany?: number; retryAfter?: string | null } = {}) {
+function keel(opts: { tooMany?: number; retryAfter?: string | null; readerOff?: boolean } = {}) {
   const seen: Seen[] = [];
   let tooMany = opts.tooMany ?? 0;
   const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
@@ -31,9 +31,11 @@ function keel(opts: { tooMany?: number; retryAfter?: string | null } = {}) {
     seen.push({ method: init?.method ?? 'GET', url, headers });
     const world = url.searchParams.get('world');
     const keyless = !headers.has('API-Key') && !headers.has('Authorization');
-    if (keyless && !world) return json(401, { error: { type: 'authentication_error', code: 'missing_credentials', message: 'No key.' } });
+    // keel with PUBLIC_READER off: a keyless `world` is today's 401 (api-v2-spec, "the public reader").
+    if (keyless && opts.readerOff) return json(401, { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.', param: null, doc_url: 'https://onlyworlds.github.io/api/errors/#invalid_credentials' } });
+    if (keyless && !world) return json(401, { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.' } });
     const path = url.pathname.replace('/api/v2', '').replace(/\/$/, '');
-    if (path === '/changes') return json(401, { error: { type: 'authentication_error', code: 'missing_credentials', message: 'No key.' } });
+    if (path === '/changes') return json(401, { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.' } });
     if (world !== W) return json(404, { error: { type: 'not_found', code: 'not_found', message: 'World not found.' } });
     if (tooMany > 0) {
       tooMany--;
@@ -93,6 +95,15 @@ describe('the public reader sends nothing but keyless GETs that name the world',
     const k = keel();
     const err = await new PublicWorldReader(PRIVATE, { fetch: k.fetch }).readWorld().catch(e => e);
     expect(isPublicNotFound(err)).toBe(true);
+    expect(isPublicClosed(err)).toBe(true);
+  });
+
+  it('with keel\'s public reader switched off, every keyless read is its 401, read as closed', async () => {
+    const k = keel({ readerOff: true });
+    const err = await new PublicWorldReader(W, { fetch: k.fetch }).readWorld().catch(e => e);
+    expect(isPublicReaderOff(err)).toBe(true);
+    expect(isPublicNotFound(err)).toBe(false);
+    expect(isPublicClosed(err)).toBe(true);
   });
 });
 
@@ -109,6 +120,16 @@ describe('a 429 paces the walk', () => {
     // The first page three times (two 429s, then the page), then the second.
     expect(k.seen.map(s => s.url.searchParams.get('cursor'))).toEqual([null, null, null, 'p2']);
     expect(reader.waitsTaken).toBe(2);
+  });
+
+  it('a wait longer than two minutes is cut to two, and the end of each wait is told', async () => {
+    const k = keel({ tooMany: 1, retryAfter: '900' });
+    const said: string[] = [];
+    const sleep = vi.fn(async () => { said.push('sleep'); });
+    await new PublicWorldReader(W, { fetch: k.fetch, sleep, onWait: s => said.push(`wait ${s}`), onResume: () => said.push('resume') }).readWorld();
+    expect(PUBLIC_MAX_WAIT_S).toBe(120);
+    expect(sleep).toHaveBeenCalledWith(120_000);
+    expect(said).toEqual(['wait 120', 'sleep', 'resume']);
   });
 
   it('waits 30 seconds when keel names no wait', async () => {

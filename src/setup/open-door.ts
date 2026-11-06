@@ -113,7 +113,7 @@ function publicCtx(id: string, token: string | null, toasts: ToastManager): Publ
     token,
     saySignIn: () => saySignIn(id, toasts),
     sayNotAmong: () => sayNotAmong(toasts),
-    openHere: async (entry, said) => { await openEntryHere(entry, toasts, said); },
+    openHere: (entry, said) => openEntryHere(entry, toasts, said),
   };
 }
 

@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'public-world-open-link',
         title: 'A link opens a public world, with no account',
-        body: 'A link to open a world in Atlas now works without an account when the world\'s owner has made it public on OnlyWorlds. Atlas asks first, then brings the world into this browser as a view-only copy: you can read and explore all of it, and nothing goes back to OnlyWorlds. If the world is yours, Sign in opens it as your own instead. The same link again opens the copy you already have, and says so if the world is no longer public.',
+        body: 'A link to open a world in Atlas now works without an account when the world\'s owner has made it public on OnlyWorlds. Atlas asks first, then brings the world into this browser as a view-only copy: you can read and explore what its owner made public (hidden elements and files are left out), and nothing goes back to OnlyWorlds. If the world is yours, Sign in opens it as your own instead. The same link again opens the copy you already have, and says so if the world is no longer public.',
         tags: ['world'],
       },
       {
@@ -75,7 +75,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'view-only-writing-without-setup',
         title: 'A view-only world reads its stories without the writing setup',
-        body: 'A world you can only read stopped at "Set up writing" when one of its stories carried a label of its own, and it could not be set up from there. When the usual Book, Chapter and Scene labels read its stories, the writing room now opens straight onto them, and the other stories stay outside the tree.',
+        body: 'A world you can only read stopped at "Set up writing" when one of its stories carried a label of its own. When the usual Book, Chapter and Scene labels read its stories, the writing room now opens straight onto them, and the other stories stay outside the outline. Writing settings still brings the setup back.',
         tags: ['writing'],
       },
     ],

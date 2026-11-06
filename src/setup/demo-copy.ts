@@ -133,7 +133,7 @@ export interface WorldFileSource {
 
 /** The words for a world that did not come down whole. */
 export function notWholeLine(name: string): string {
-  return `${name} did not download whole, so Atlas did not open it. Try again.`;
+  return `"${name}" did not download completely, so Atlas did not open it. Try again.`;
 }
 
 /** Did the walk bring down exactly what keel counts? Every type, and the total. */

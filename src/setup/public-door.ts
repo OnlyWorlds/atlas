@@ -8,9 +8,10 @@
  *      alone: `copy_of.world_id`, whatever its time) opens as it is, after
  *      one keyless `GET /world`: a 404 there adds one line that the world is
  *      no longer public; nothing else is read.
- *   2  Otherwise one keyless `GET /world`. 200: the ask. 404: the open
- *      door's own words for a world it cannot see. Anything else: one line,
- *      nothing made, nothing held.
+ *   2  Otherwise (or when that copy's folder is gone) the same one read
+ *      decides. 200: the ask. 404, or 401 with keel's public reader switched
+ *      off: the open door's own words for a world it cannot see. Anything
+ *      else: one line, nothing made, nothing held.
  *   3  The ask's Open checks again (the tour, the sign-in it was asked
  *      under, a copy made meanwhile), then builds under a Web Lock per world
  *      across tabs, looking for a copy once more inside it: the whole world
@@ -23,18 +24,19 @@
  * Nothing is written before Open, and nothing goes up, ever
  * (`sync/public-reader.ts`).
  */
-import { getState } from '../core/state';
+import { getState, patchSlice } from '../core/state';
 import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import type { ToastManager } from '../ui/toast-manager';
-import { PublicWaitsSpent, PublicWorldReader, isPublicNotFound, type PublicReaderOpts } from '../sync/public-reader';
+import { PublicWaitsSpent, PublicWorldReader, isPublicClosed, isPublicNotFound, type PublicReaderOpts, type PublicWorld } from '../sync/public-reader';
+import { adoptStoredRegistry } from '../registry/registry';
 import { buildWorldFile, notWholeLine } from './demo-copy';
 import { requestPersistOnFirstBrowserWorld } from './world-parent';
 import { copyDay, copyLine } from '../core/world-copy';
 
-export const PUBLIC_UNREAD_LINE = 'OnlyWorlds could not be read just now. Try the link again in a moment.';
-export const PUBLIC_SIGN_IN_CHANGED_LINE = 'The sign-in changed since Atlas asked. Open the world again from onlyworlds.com.';
+export const PUBLIC_UNREAD_LINE = 'Atlas could not reach OnlyWorlds just now. Try the link again in a moment.';
+export const PUBLIC_SIGN_IN_CHANGED_LINE = 'You signed in or out while Atlas was opening this world. Open the link again.';
 const OPEN_TOUR_LINE = 'Finish the tour first, then open the world again from onlyworlds.com.';
 
 /** The ask, signed out: the copy, or a sign-in for a person whose world it is. */
@@ -44,7 +46,9 @@ export function publicAskLine(name: string): string {
 
 /** The ask, signed in with an account that has no row for the world. */
 export function publicAskSignedInLine(name: string, who: string | null | undefined): string {
-  return `"${name}" is not among the worlds of ${who ? who : 'the account Atlas is signed in with'} on OnlyWorlds. Open a view-only copy of it in this browser?`;
+  return who
+    ? `"${name}" is not one of your worlds (you are signed in as ${who}). Open a view-only copy in this browser?`
+    : `"${name}" is not one of the worlds of the account Atlas is signed in with. Open a view-only copy in this browser?`;
 }
 
 /** Said on the progress line while keel's 429 is waited out. */
@@ -54,13 +58,13 @@ export function publicWaitLine(seconds: number): string {
 
 /** The fourth 429 in one open. */
 export function publicSpentLine(name: string): string {
-  return `${name} did not download whole, so Atlas did not open it. Try again in a minute.`;
+  return `"${name}" did not download completely, so Atlas did not open it. Try again in a minute.`;
 }
 
 /** A copy here of a world that is no longer public. */
 export function publicGoneLine(name: string, at: string | undefined): string {
   const day = copyDay(at);
-  return `${name} is no longer public on OnlyWorlds. This copy is as it was ${day ? `on ${day}` : 'when it was taken'}.`;
+  return `"${name}" is no longer public on OnlyWorlds. This copy is as it was ${day ? `on ${day}` : 'when it was taken'}.`;
 }
 
 /** The public slice's mark (folder spec §4.2): the public rung, no role, no Character. */
@@ -81,8 +85,12 @@ export interface PublicDoorCtx {
   saySignIn: () => void;
   /** Signed in, a world the public cannot read: the open door's not-among words. */
   sayNotAmong: () => void;
-  /** Open a world already here as the open door does (silently with no world open, else its click). */
-  openHere: (entry: WorldRegistryEntry, said?: () => void) => Promise<void>;
+  /**
+   * Open a world already here as the open door does (silently with no world
+   * open, else its click). False when it could not: the registry forgot it
+   * (its folder gone), so the door goes on to the ask.
+   */
+  openHere: (entry: WorldRegistryEntry, said?: () => void) => Promise<boolean>;
   /** Test seam: the reader's options (fetch, sleep, base). */
   readerOpts?: PublicReaderOpts;
 }
@@ -102,31 +110,32 @@ export async function runPublicDoor(id: string, toasts: ToastManager, ctx: Publi
   const found = findPublicCopy(getState().registry, id);
   // One request, never paced: a 429 here is "anything else".
   const reader = new PublicWorldReader(id, { ...ctx.readerOpts, maxWaits: 0 });
-  if (found) {
-    let gone = false;
-    try {
-      await reader.readWorld();
-    } catch (err) {
-      gone = isPublicNotFound(err);
-      if (!gone) console.warn('[public-door] the world was not read; the copy opens as it is', err);
-    }
-    await ctx.openHere(found, gone ? () => toasts.info(publicGoneLine(found.name, found.copy_of?.at), 12_000) : undefined);
-    return;
-  }
-  let name: string;
+  let world: PublicWorld | null = null;
+  let failure: unknown = null;
   try {
-    const world = await reader.readWorld();
-    name = world.meta.name?.trim() || 'this world';
+    world = await reader.readWorld();
   } catch (err) {
-    if (isPublicNotFound(err)) {
+    failure = err;
+  }
+  if (found) {
+    // Not public any more (404): the copy opens with a line. The reader
+    // switched off (401) or anything else: the copy opens as it is, no line.
+    const gone = isPublicNotFound(failure);
+    if (failure && !gone) console.warn('[public-door] the world was not read; the copy opens as it is', failure);
+    if (await ctx.openHere(found, gone ? () => toasts.info(publicGoneLine(found.name, found.copy_of?.at), 12_000) : undefined)) return;
+    // Its folder was gone and the registry forgot it: the door goes on, on the same read.
+  }
+  if (!world) {
+    // The public cannot read it: not public (404), or keel's reader switched off (401).
+    if (isPublicClosed(failure)) {
       if (ctx.token) ctx.sayNotAmong(); else ctx.saySignIn();
       return;
     }
-    console.warn('[public-door] the world was not read:', err);
+    console.warn('[public-door] the world was not read:', failure);
     toasts.error(PUBLIC_UNREAD_LINE, 12_000);
     return;
   }
-  askForCopy(id, name, toasts, ctx);
+  askForCopy(id, world.meta.name?.trim() || 'this world', toasts, ctx);
 }
 
 /** The ask: nothing is made before its Open, and its click is the gesture the storage request needs. */
@@ -162,9 +171,13 @@ export async function openPublicCopy(id: string, name: string, toasts: ToastMana
 }
 
 async function buildAndOpen(id: string, name: string, toasts: ToastManager, ctx: PublicDoorCtx): Promise<void> {
-  // A copy made meanwhile (this tab or another) opens instead: one build per world.
+  // A copy made meanwhile (this tab or another) opens instead: one build per
+  // world. Read from storage, not only this tab's memory: another tab's save
+  // can land before its storage event reaches this one.
+  const stored = adoptStoredRegistry(getState().registry);
+  if (stored) patchSlice('registry', stored);
   const here = findPublicCopy(getState().registry, id);
-  if (here) { await ctx.openHere(here); return; }
+  if (here && await ctx.openHere(here)) return;
   const { opfsStatus, NO_BROWSER_STORAGE_LINE } = await import('../core/capabilities');
   const status = await opfsStatus();
   if (status !== 'ok') {
@@ -177,7 +190,12 @@ async function buildAndOpen(id: string, name: string, toasts: ToastManager, ctx:
   const overlay = showLoadingOverlay(`Downloading ${name}`);
   overlay.update('Asking OnlyWorlds for it…');
   try {
-    const reader = new PublicWorldReader(id, { ...ctx.readerOpts, onWait: s => overlay.update(publicWaitLine(s)) });
+    const reader = new PublicWorldReader(id, {
+      ...ctx.readerOpts,
+      onWait: s => overlay.update(publicWaitLine(s)),
+      // The wait is over: the line no longer says to wait.
+      onResume: () => overlay.update('Asking OnlyWorlds for it…'),
+    });
     const built = await buildWorldFile({
       worldId: id,
       client: reader,
@@ -208,8 +226,8 @@ async function sayFailure(err: unknown, name: string, toasts: ToastManager, ctx:
   const { isCodeLoadError } = await import('../core/reload-offer');
   if (isCodeLoadError(err)) return; // its reload banner already says it (conv. 121)
   if (err instanceof PublicWaitsSpent) { toasts.error(publicSpentLine(name), 15_000); return; }
-  // Turned private between the ask and the build: the door's own words for a world it cannot see.
-  if (isPublicNotFound(err)) { if (ctx.token) ctx.sayNotAmong(); else ctx.saySignIn(); return; }
+  // Turned private, or the reader switched off, between the ask and the build: the door's own words for a world it cannot see.
+  if (isPublicClosed(err)) { if (ctx.token) ctx.sayNotAmong(); else ctx.saySignIn(); return; }
   if (err instanceof PlainError || (err as { name?: unknown } | null)?.name === 'QuotaExceededError') {
     const { showProblem } = await import('../ui/problem-fixes');
     showProblem(err, { doing: 'opening a copy of this world', where: 'browser', toasts });
