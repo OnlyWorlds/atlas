@@ -570,6 +570,10 @@ for (const tag of ['', ' @firefox']) {
     await freshBoot(page);
     await page.locator('[data-action="try-demo"]').first().click();
     await expect(page.locator('.atlas-home-world-name')).toHaveText('Moppetopia', { timeout: 30_000 });
+    // The copy's files land behind the open, under a line on Home that goes when they have landed:
+    // scrolled to the end before then, its going clamps the scroll, which is not a redraw losing it.
+    await page.evaluate(async () => { await (window as any).__atlasTestApi.landed(); });
+    await expect(page.locator('[data-role="landing-line"]')).toHaveCount(0);
     await expect(tab(page, 'strand')).toBeVisible();
     if ((await tab(page, 'strand').getAttribute('aria-selected')) !== 'true') await tab(page, 'strand').click();
     await expect(tab(page, 'strand')).toHaveAttribute('aria-selected', 'true');
