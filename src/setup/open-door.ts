@@ -6,9 +6,13 @@
  * already here opens; signed in, the account's row for that id opens through
  * the same `openAccountWorld` as a click in the Worlds list (#199), after the
  * person says Open (the click the browser-storage request needs, and the
- * confirm that names the world); signed out, the id waits in memory for the
- * sign-in in Settings, as a person's invitation does. Only ever a download:
- * nothing here uploads into the world the link names (contract R7).
+ * confirm that names the world); signed out, or signed in with no row for
+ * that id, the public path runs (1.123, `setup/public-door.ts`): a world
+ * anyone may read opens as a view-only copy after an ask, and a world the
+ * public cannot read gets this door's own words (signed out, the id waits in
+ * memory for the sign-in in Settings, as a person's invitation does). Only
+ * ever a download: nothing here uploads into the world the link names
+ * (contract R7).
  */
 
 import { getState } from '../core/state';
@@ -19,7 +23,8 @@ import { accountWorldsWhenFetched, openAccountWorld } from '../sync/account-worl
 import { activateWorld } from '../sidebar/worlds-sidebar';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { WAITS_FOR_SIGN_IN, type ToastManager } from '../ui/toast-manager';
-import type { AccountWorldRow } from '../core/types';
+import type { AccountWorldRow, WorldRegistryEntry } from '../core/types';
+import { runPublicDoor, type PublicDoorCtx } from './public-door';
 
 export const OPEN_MALFORMED_LINE = 'This link to open a world is not complete. Open the world again from onlyworlds.com.';
 export const OPEN_SIGN_IN_LINE = 'To open this world from onlyworlds.com, sign in to Atlas with your OnlyWorlds account, under Account. The world opens after that, in this tab; if you reload, open it again from onlyworlds.com.';
@@ -67,11 +72,8 @@ async function openWorldById(id: string, toasts: ToastManager): Promise<void> {
   if (await openHere(id, toasts)) return;
   const token = getState().registry.account_token;
   if (!token) {
-    heldForSignIn = id;
-    navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
-    // Taken down by the sign-in itself (settings-account), never left up
-    // through the Open question it leads to (Kael's walk, 2026-10-16).
-    toasts.show(OPEN_SIGN_IN_LINE, 'info', 20_000, { dedupeKey: WAITS_FOR_SIGN_IN });
+    // Signed out: a world anyone may read takes the public path (1.123).
+    await runPublicDoor(id, toasts, publicCtx(id, null, toasts));
     return;
   }
   // A fresh read: a world made or shared since this tab last asked is on it,
@@ -84,11 +86,35 @@ async function openWorldById(id: string, toasts: ToastManager): Promise<void> {
   }
   const row = rows.find(r => r.id === id);
   if (!row) {
-    const who = getState().registry.account_username;
-    toasts.error(`This world is not among the worlds of ${who ? who : 'the account Atlas is signed in with'} on OnlyWorlds. Sign in to Atlas with the account that owns it or was invited into it.`, 15_000);
+    // No row for it on this account: a world anyone may read takes the public path (1.123).
+    await runPublicDoor(id, toasts, publicCtx(id, token, toasts));
     return;
   }
   askToOpen(row, token, toasts);
+}
+
+/** Signed out, a world the door cannot open: the id waits for the sign-in in Settings. */
+function saySignIn(id: string, toasts: ToastManager): void {
+  heldForSignIn = id;
+  navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
+  // Taken down by the sign-in itself (settings-account), never left up
+  // through the Open question it leads to (a walk, 2026-10-16).
+  toasts.show(OPEN_SIGN_IN_LINE, 'info', 20_000, { dedupeKey: WAITS_FOR_SIGN_IN });
+}
+
+function sayNotAmong(toasts: ToastManager): void {
+  const who = getState().registry.account_username;
+  toasts.error(`This world is not among the worlds of ${who ? who : 'the account Atlas is signed in with'} on OnlyWorlds. Sign in to Atlas with the account that owns it or was invited into it.`, 15_000);
+}
+
+/** The public path's hooks into this door: its words for a world it cannot see, and its open of a world already here. */
+function publicCtx(id: string, token: string | null, toasts: ToastManager): PublicDoorCtx {
+  return {
+    token,
+    saySignIn: () => saySignIn(id, toasts),
+    sayNotAmong: () => sayNotAmong(toasts),
+    openHere: async (entry, said) => { await openEntryHere(entry, toasts, said); },
+  };
 }
 
 /** The confirm: nothing is made before this Open (P1), and its click is the gesture. */
@@ -129,6 +155,15 @@ async function openHere(id: string, toasts: ToastManager): Promise<boolean> {
   const said = () => {
     if (!linked) toasts.info(`${here.name} is already here, no longer linked to OnlyWorlds, so Atlas opened it as it is.`, 10_000);
   };
+  return openEntryHere(here, toasts, said);
+}
+
+/**
+ * Open a world already here as the door does (a world it names, or the
+ * public path's copy): `said` once it opened. False when the registry forgot
+ * it (its folder gone), so the caller may find another way.
+ */
+async function openEntryHere(here: WorldRegistryEntry, toasts: ToastManager, said: () => void = () => {}): Promise<boolean> {
   const active = getState().active?.worldId ?? null;
   if (active === here.id) {
     navigate(homeHash(here.id));

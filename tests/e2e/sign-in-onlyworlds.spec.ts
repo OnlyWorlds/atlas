@@ -146,3 +146,25 @@ test('a sign-in over a token Atlas minted revokes the old one by its id', async 
   expect(reg.account_token_id).toBe('5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d');
   expect(keel.tokenBodies).toHaveLength(1);
 });
+
+// An Open link that waits for a sign-in keeps where it lands across the round trip (1.123): the
+// landing is parked beside the held id in the resume, and is held again on the return.
+test('an Open link waiting for the sign-in keeps its writing landing through the round trip', async ({ page }) => {
+  const world = '33333333-4444-4555-8666-777777777777';
+  const chapter = '01a1b17c-f4a2-7537-ba96-b51d6eb4cc6c';
+  await serveAtlasAtItsOrigin(page, 'code');
+  // keel's public reader: this world is not public, its one 404.
+  await page.route('https://www.onlyworlds.com/api/v2/world/**', async (route) => {
+    if (route.request().headers()['authorization'] || route.request().headers()['api-key']) return route.fallback();
+    await route.fulfill({ status: 404, headers: { 'Cache-Control': 'no-store' }, contentType: 'application/json', body: '{"error":{"type":"not_found","code":"not_found","message":"World not found.","param":null}}' });
+  });
+  await boot(page, `#/open/${world}/writing/${chapter}`);
+  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
+  await page.locator('[data-action="sign-in-onlyworlds"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'Signed in as wren' })).toBeVisible();
+  const landing = await page.evaluate(async () => {
+    const m = await import('/src/core/open-landing.ts');
+    return m.peekOpenLanding();
+  });
+  expect(landing).toMatchObject({ serverWorldId: world, elementIds: [], writing: { kind: 'writing', narrativeId: chapter } });
+});

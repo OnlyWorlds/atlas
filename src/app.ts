@@ -36,7 +36,7 @@ import { beginBootReconciliation, reconcileAtBoot } from './core/browser-home';
 import { REGISTRY_STORAGE_KEY } from './core/constants';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
 import { loadUiPrefs } from './core/ui-prefs';
-import { onHashChange, parseHash, navigate, homeHash, elementHash, importHash, BRING_IN_HASH } from './core/router';
+import { onHashChange, parseHash, navigate, homeHash, elementHash, importHash, writingHash, BRING_IN_HASH } from './core/router';
 import { isTourFlagActive } from './tour/tour-flag';
 import { markBringInAsWorld } from './core/bring-in-intent';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
@@ -48,9 +48,10 @@ import type { WorldMap } from './core/types';
 import { installLiveFolder } from './core/live-folder';
 import { installWorldPrefsSync } from './core/world-prefs';
 import { captureJoinCode, hasPendingJoin } from './core/join-capture';
-import { captureOpenWorld, takePendingOpen, takePendingOpenElements } from './core/open-capture';
+import { captureOpenWorld, takePendingOpen, takePendingOpenElements, takePendingOpenWriting } from './core/open-capture';
 import { openHashOfAddress, pasteIsForAField } from './core/open-address';
-import { clearOpenLanding, landingStep, peekOpenLanding, setOpenLanding } from './core/open-landing';
+import { LANDING_MISSING_ONE_LINE, clearOpenLanding, landingStep, peekOpenLanding, setOpenLanding } from './core/open-landing';
+import { writingLandingFor, writingOutsideLine } from './middle/writing-helpers';
 import { openPacketBar } from './ui/open-packet-bar';
 import { installForgetPresence } from './setup/forget-browser';
 import { dropHeldSeat, heldSeatsChanged, isHeldSeatStorageKey, settleHeldSeats, spareHeldLine } from './core/held-seats';
@@ -262,9 +263,17 @@ export function startApp(container: HTMLElement): AppHandle {
     if (step.kind === 'wait') return;
     clearOpenLanding();
     if (step.kind === 'expired') return;
+    if (step.kind === 'writing') {
+      // A writing link (1.123): its narrative in the tree, the part it sits under, or the room's start.
+      const place = writingLandingFor(s.data.elements, step.narrativeId, step.localWorldId);
+      navigate(writingHash(step.localWorldId, place.narrativeId ?? undefined));
+      if (place.line === 'outside') toasts.info(writingOutsideLine(place.name, place.under), 10_000);
+      else if (place.line === 'missing') toasts.info(LANDING_MISSING_ONE_LINE, 10_000);
+      return;
+    }
     if (step.found.length === 0) {
       toasts.info(step.missing === 1
-        ? 'The element this link names is not in this world, or not in your view of it.'
+        ? LANDING_MISSING_ONE_LINE
         : 'The elements this link names are not in this world, or not in your view of it.', 10_000);
       return;
     }
@@ -302,7 +311,8 @@ export function startApp(container: HTMLElement): AppHandle {
     if (openId !== null) {
       // Where the link lands (#487): a new link replaces any landing still waiting.
       const landOn = takePendingOpenElements();
-      if (openId) setOpenLanding(openId, landOn); else clearOpenLanding();
+      const writingOn = takePendingOpenWriting();
+      if (openId) setOpenLanding(openId, writingOn ? { kind: 'writing', narrativeId: writingOn.narrativeId } : landOn); else clearOpenLanding();
       void import('./setup/open-door').then(m => m.runOpenLink(openId, toasts)).then(() => applyOpenLanding());
     }
     applyOpenLanding();

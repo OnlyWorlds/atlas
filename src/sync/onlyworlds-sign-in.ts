@@ -16,7 +16,8 @@ import { OwV2Client, OwSignInError } from '@onlyworlds/sdk';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
 import { JOIN_CODE_RE } from '../core/join-capture';
-import { UUID_RE } from '../core/open-capture';
+import { OPEN_PACKET_MAX, UUID_RE } from '../core/open-capture';
+import type { ParkedLanding } from '../core/open-landing';
 
 /** keel's registry: `GET /api/v2/auth/clients` lists `atlas` with exactly this address (production only). */
 export const SIGN_IN_CLIENT_ID = 'atlas';
@@ -38,6 +39,26 @@ export interface SignInResume {
   open?: string;
   /** A person's invitation code held for the sign-in (join-door). */
   join?: string;
+  /** Where the held Open link lands once its world opens (core/open-landing), beside `open`. */
+  landing?: ResumeLanding;
+}
+
+/** An Open link's landing as the resume carries it (`core/open-landing`'s parked shape). */
+export type ResumeLanding = ParkedLanding;
+
+function readLanding(v: unknown): ResumeLanding | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.at !== 'number' || !Number.isFinite(o.at) || o.at <= 0) return null;
+  if (o.kind === 'writing') {
+    if (o.narrativeId === null) return { kind: 'writing', narrativeId: null, at: o.at };
+    return typeof o.narrativeId === 'string' && UUID_RE.test(o.narrativeId) ? { kind: 'writing', narrativeId: o.narrativeId, at: o.at } : null;
+  }
+  if (o.kind === 'elements' && Array.isArray(o.ids) && o.ids.length > 0 && o.ids.length <= OPEN_PACKET_MAX
+    && o.ids.every(id => typeof id === 'string' && UUID_RE.test(id))) {
+    return { kind: 'elements', ids: o.ids as string[], at: o.at };
+  }
+  return null;
 }
 
 /**
@@ -64,7 +85,12 @@ export function readResume(raw: string | null | undefined): SignInResume {
     && !/[\s<>"]/.test(o.hash) ? o.hash : '#/';
   const out: SignInResume = { hash };
   if (o.door === 'make-online' || o.door === 'new-api') out.door = o.door;
-  if (typeof o.open === 'string' && UUID_RE.test(o.open)) out.open = o.open;
+  if (typeof o.open === 'string' && UUID_RE.test(o.open)) {
+    out.open = o.open;
+    // A landing rides only beside the open id it belongs to.
+    const landing = readLanding(o.landing);
+    if (landing) out.landing = landing;
+  }
   if (typeof o.join === 'string' && JOIN_CODE_RE.test(o.join)) out.join = o.join;
   return out;
 }

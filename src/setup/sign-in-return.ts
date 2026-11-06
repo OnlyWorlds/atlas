@@ -13,6 +13,7 @@ import type { SignInOutcome } from '../sync/onlyworlds-sign-in';
 import { signInCallbackLine } from '../sync/onlyworlds-sign-in';
 import { keepSignIn } from '../sync/after-sign-in';
 import { enqueueActivationTask } from '../core/activation-chain';
+import { restoreParkedLanding } from '../core/open-landing';
 import { getState } from '../core/state';
 import { navigate, parseHash, settingsHash } from '../core/router';
 import type { ToastManager } from '../ui/toast-manager';
@@ -30,7 +31,11 @@ export async function applySignInOutcome(outcome: SignInOutcome, toasts: ToastMa
     return;
   }
   if (resume.join) (await import('./join-door')).holdJoinForSignIn(resume.join);
-  if (resume.open) (await import('./open-door')).holdOpenForSignIn(resume.open);
+  if (resume.open) {
+    (await import('./open-door')).holdOpenForSignIn(resume.open);
+    // Where that link lands waits again beside it (1.123).
+    if (resume.landing) restoreParkedLanding(resume.open, resume.landing);
+  }
   const heldDoorRuns = outcome.ok && Boolean(resume.join || resume.open);
   if (outcome.ok) {
     // keepSignIn saves the token before its first await, so a door reopened

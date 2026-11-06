@@ -9,8 +9,10 @@
  *
  * The link can name where to land too: `#/open/<world id>/element/<id>`
  * for one element, `#/open/<world id>/elements/<id>,<id>,…` for a work packet (a
- * parlor work item, the doctor's list). The world opens by the same door; the
- * landing waits for it (`core/open-landing.ts`).
+ * parlor work item, the doctor's list), `#/open/<world id>/writing[/<id>]` for
+ * the writing room, on one narrative or at its start. The world opens by the
+ * same door; the landing waits for it (`core/open-landing.ts`). A writing
+ * ending whose narrative is not an id is the malformed link: nothing opens.
  */
 
 /** keel's world ids and element ids are UUIDs. */
@@ -22,18 +24,29 @@ export const OPEN_PACKET_MAX = 200;
 /** '' = an open link whose id did not look like one (a truncated paste). */
 let pending: string | null = null;
 let pendingElements: string[] = [];
+/** The writing room's landing: a narrative id, or null for the room's start. */
+let pendingWriting: { narrativeId: string | null } | null = null;
 
-/** Takes `#/open/<id>[/element/<id> | /elements/<ids>]` out of the address bar. True when one was there. */
+/** Takes `#/open/<id>[/element/<id> | /elements/<ids> | /writing[/<id>]]` out of the address bar. True when one was there. */
 export function captureOpenWorld(
   loc: Pick<Location, 'hash'> = window.location,
   hist: Pick<History, 'replaceState' | 'state'> = history,
 ): boolean {
-  const m = /^#\/?open(?:$|\/([^/?#]*)(?:\/(element|elements)\/([^/?#]*))?)/.exec(loc.hash);
+  const m = /^#\/?open(?:$|\/([^/?#]*)(?:\/(element|elements)\/([^/?#]*)|\/(writing)(?:\/([^/?#]*))?)?)/.exec(loc.hash);
   if (!m) return false;
   hist.replaceState(hist.state, '', '#/');
   const id = (m[1] ?? '').toLowerCase();
   pending = UUID_RE.test(id) ? id : '';
   pendingElements = [];
+  pendingWriting = null;
+  if (pending && m[4]) {
+    let raw: string;
+    try { raw = decodeURIComponent(m[5] ?? '').trim().toLowerCase(); } catch { raw = '-'; }
+    if (raw === '') pendingWriting = { narrativeId: null };
+    else if (UUID_RE.test(raw)) pendingWriting = { narrativeId: raw };
+    else pending = '';
+    return true;
+  }
   if (pending && m[3]) {
     const raw = decodeURIComponent(m[3]).toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
     const ids = m[2] === 'element' ? raw.slice(0, 1) : raw;
@@ -62,4 +75,11 @@ export function takePendingOpenElements(): string[] {
   const ids = pendingElements;
   pendingElements = [];
   return ids;
+}
+
+/** The writing landing the captured link named, handed over once; null when it named none. */
+export function takePendingOpenWriting(): { narrativeId: string | null } | null {
+  const w = pendingWriting;
+  pendingWriting = null;
+  return w;
 }

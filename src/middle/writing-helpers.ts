@@ -19,6 +19,7 @@ import { getState } from '../core/state';
 import { isStoryNarrative } from '../core/narrative-kind';
 import { playNarrativeIds } from '../core/records';
 import type { Element, WorldRegistryEntry } from '../core/types';
+import { entryIsViewOnly } from '../core/view-only';
 
 export type WritingTier = 'l1' | 'l2' | 'l3' | 'l4' | null;
 
@@ -325,10 +326,104 @@ export function isWritingInitialized(
   const chainMembers = narratives.filter(n =>
     Boolean((n as Element & { parent_narrative?: string }).parent_narrative) || parentIds.has(n.id));
   if (chainMembers.length === 0) return true; // narratives exist but no hierarchy
+  // A view-only world cannot run the setup's writes: when the default labels
+  // read its tree, the room reads with them and nothing is written (1.123).
+  if (entryIsViewOnly(entry) && defaultsReadTree(narratives, chainMembers, entry?.writing_labels)) return true;
   const labels = mergeLabels(entry?.writing_labels);
   const writingValues = new Set([labels.l1, labels.l2, labels.l3, labels.l4]);
   return chainMembers.every(n => {
     const supertype = (n as Element & { supertype?: string | null }).supertype;
     return supertype != null && writingValues.has(supertype);
   });
+}
+
+const parentOf = (n: Element): string | null => (n as Element & { parent_narrative?: string | null }).parent_narrative || null;
+const supertypeOf = (n: Element): string | null => (n as Element & { supertype?: string | null }).supertype ?? null;
+
+/**
+ * Do the default labels read this tree (1.123, a view-only world)? Only
+ * with the labels as the defaults (none of the world's own), and when:
+ *   - every chain's root carries the default first label (Book), matched exactly;
+ *   - every chain member carries a default label or sits under an ancestor that does;
+ *   - no member carrying a default label sits under one that carries none.
+ * The third keeps a middle tier in other words ("Book › Part › Scene") from
+ * cutting the tree, which would draw its Scenes as stray roots; the second
+ * alone holds for every member of a chain rooted in a Book. A member with no
+ * label under the tree (a Telling under a Scene) stays out of the tree, as on
+ * a writer's world before a setup.
+ */
+export function defaultsReadTree(
+  narratives: readonly Element[],
+  chainMembers: readonly Element[],
+  worldLabels: Partial<WritingLabels> | undefined,
+): boolean {
+  const labels = mergeLabels(worldLabels);
+  const d = DEFAULT_WRITING_LABELS;
+  if (labels.l1 !== d.l1 || labels.l2 !== d.l2 || labels.l3 !== d.l3 || labels.l4 !== d.l4) return false;
+  const known = new Set([d.l1, d.l2, d.l3, d.l4]);
+  const byId = new Map(narratives.map(n => [n.id, n]));
+  const labelled = (n: Element) => { const s = supertypeOf(n); return s !== null && known.has(s); };
+  for (const n of chainMembers) {
+    const parent = parentOf(n);
+    const isRoot = !parent || !byId.has(parent);
+    if (isRoot) {
+      if (supertypeOf(n) !== d.l1) return false;
+      continue;
+    }
+    if (labelled(n)) {
+      // Its parent must be in the tree too, or the tree is cut here.
+      if (!labelled(byId.get(parent)!)) return false;
+      continue;
+    }
+    // An ancestor that carries a default label (a cycle is no ancestor).
+    let found = false;
+    const seen = new Set<string>([n.id]);
+    let at = byId.get(parent);
+    while (at && !seen.has(at.id)) {
+      if (labelled(at)) { found = true; break; }
+      seen.add(at.id);
+      const up = parentOf(at);
+      at = up ? byId.get(up) : undefined;
+    }
+    if (!found) return false;
+  }
+  return true;
+}
+
+/** Where a writing link lands in the room, and what is said: pure over the world's elements. */
+export type WritingLandingPlace =
+  | { narrativeId: string | null; line: null }
+  /** In the world, not in the tree: on its nearest ancestor in the tree, or at the room's start. */
+  | { narrativeId: string | null; line: 'outside'; name: string; under: string | null }
+  /** Not in this world, or not in this reader's view of it. */
+  | { narrativeId: null; line: 'missing' };
+
+export function writingLandingFor(elements: readonly Element[], narrativeId: string | null, worldId: string): WritingLandingPlace {
+  if (narrativeId === null) return { narrativeId: null, line: null };
+  const idx = buildNarrativeIndex(elements as Element[], worldId);
+  if (idx.byId.has(narrativeId)) return { narrativeId, line: null };
+  const el = elements.find(e => e.id === narrativeId);
+  if (!el) return { narrativeId: null, line: 'missing' };
+  const name = (typeof el.name === 'string' && el.name.trim()) ? el.name.trim() : '';
+  if (el.type === 'narrative') {
+    const byId = new Map(elements.filter(e => e.type === 'narrative').map(e => [e.id, e]));
+    const seen = new Set<string>([el.id]);
+    let up = parentOf(el);
+    while (up && !seen.has(up)) {
+      const node = idx.byId.get(up);
+      if (node) return { narrativeId: node.el.id, line: 'outside', name, under: (typeof node.el.name === 'string' && node.el.name.trim()) || '' };
+      seen.add(up);
+      const at = byId.get(up);
+      up = at ? parentOf(at) : null;
+    }
+  }
+  return { narrativeId: null, line: 'outside', name, under: null };
+}
+
+/** The line for a writing link's narrative that is not in the tree (`writingLandingFor`'s `outside`). */
+export function writingOutsideLine(name: string, under: string | null): string {
+  const what = name ? `"${name}"` : 'The story this link names';
+  return under !== null
+    ? `${what} is not in the book's tree, so the writing room opens on ${under ? `"${under}", ` : ''}the part it sits under.`
+    : `${what} is not in the book's tree, so the writing room opens at its start.`;
 }

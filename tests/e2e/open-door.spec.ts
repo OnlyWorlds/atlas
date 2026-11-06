@@ -39,6 +39,12 @@ async function mockKeel(page: Page): Promise<Keel> {
   const now = '2026-10-16T00:00:00.000Z';
   await page.route(`${V2}/**`, async (route: Route) => {
     const path = new URL(route.request().url()).pathname.replace('/api/v2', '');
+    // keel's public reader (1.123's door asks it): these worlds are not public, so a
+    // keyless read is its one 404, as keel answers a private world today.
+    const headers = route.request().headers();
+    if (!headers['api-key'] && !headers['authorization'] && new URL(route.request().url()).searchParams.get('world')) {
+      return route.fulfill({ status: 404, headers: { 'Cache-Control': 'no-store' }, json: { error: { type: 'not_found', code: 'not_found', message: 'World not found.', param: null } } });
+    }
     if (path === '/account') return route.fulfill({ json: { username: 'e2e-owner' } });
     if (path === '/account/worlds') {
       keel.lists++;

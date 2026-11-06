@@ -34,6 +34,14 @@ beforeEach(() => {
     lists++;
     return HttpResponse.json({ data: [{ id: ID, name: 'Fresh World', role: 'owner', member_role: null, public_read: false, keys: [] }] });
   }));
+  // keel's public reader (1.123's door asks it when the account path cannot):
+  // this world is not public, so a keyless read is its one 404.
+  mswServer.use(http.get('*/api/v2/world/', ({ request }) => {
+    if (request.headers.has('API-Key') || request.headers.has('Authorization') || !new URL(request.url).searchParams.get('world')) {
+      return HttpResponse.json({ error: { type: 'authentication_error', code: 'missing_credentials', message: 'No key.', param: null } }, { status: 401 });
+    }
+    return HttpResponse.json({ error: { type: 'not_found', code: 'not_found', message: 'World not found.', param: null } }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }));
 });
 
 function signedIn() {

@@ -12,6 +12,7 @@ import { problemFor } from '../core/problems';
 import type { ToastManager } from './toast-manager';
 import { devV2Base } from '../sync/dev-api-base';
 import { isTourFlagActive } from '../tour/tour-flag';
+import { parkedLandingFor } from '../core/open-landing';
 
 const LABEL = 'Sign in with OnlyWorlds';
 
@@ -48,7 +49,12 @@ export function wireOnlyWorldsSignIn(root: ParentNode, toasts: ToastManager, doo
         const resume: SignInResume = { hash: location.hash || '#/' };
         if (door) resume.door = door;
         const open = openHeldForSignIn();
-        if (open) resume.open = open;
+        if (open) {
+          resume.open = open;
+          // Where that link lands goes with it (1.123): the page unload drops memory.
+          const landing = parkedLandingFor(open);
+          if (landing) resume.landing = landing;
+        }
         const join = joinHeldForSignIn();
         if (join) resume.join = join;
         await flushBeforeUnloading();

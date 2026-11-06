@@ -72,7 +72,7 @@ Atlas also reads canon fields in ways other tools cannot see:
 
 **Per browser, other localStorage keys**: `atlas_ui_prefs` (sidebar mode, default create type, where the last new world went, the name the last invite link was signed with), `atlas_shell_ratios_v2`, `atlas_right_tabs`, `atlas_map_view_defaults`, `atlas_map_view_prefs`, `atlas_map_camera_state`, `atlas_world_prefs_synced` (the world-prefs three-way base), `atlas_disk_held` (a standing big-batch question), `atlas-held-seat:<server world id>` (a join link's seat kept until its world lands, with an agent seat's secret, conv. 178; never synced, never on disk), plus small UI memories (`atlas_nav_labels`, the tour flags, drafts). Storage keys are constants in `src/core/constants.ts` or at the top of their owning module.
 
-**Per tab, sessionStorage**: `atlas-signin-resume` (Sign in with OnlyWorlds' round trip, conv. 171: the route, the open door, a held Open id or invitation code; written at the press, read once and removed on `/signin/callback`, and removed on any other boot), beside the SDK's own pending record (state and PKCE verifier) under its own key.
+**Per tab, sessionStorage**: `atlas-signin-resume` (Sign in with OnlyWorlds' round trip, conv. 171: the route, the open door, a held Open id or invitation code, and beside a held Open id where its link lands (1.123, conv. 188: element ids or the writing room, with the capture time); written at the press, read once and removed on `/signin/callback`, and removed on any other boot), beside the SDK's own pending record (state and PKCE verifier) under its own key.
 
 ## Why keep this register
 

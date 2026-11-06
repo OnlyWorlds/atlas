@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.0',
+    date: '2026-11-06',
+    theme: 'Open a public world from a link',
+    entries: [
+      {
+        id: 'public-world-open-link',
+        title: 'A link opens a public world, with no account',
+        body: 'A link to open a world in Atlas now works without an account when the world\'s owner has made it public on OnlyWorlds. Atlas asks first, then brings the world into this browser as a view-only copy: you can read and explore all of it, and nothing goes back to OnlyWorlds. If the world is yours, Sign in opens it as your own instead. The same link again opens the copy you already have, and says so if the world is no longer public.',
+        tags: ['world'],
+      },
+      {
+        id: 'open-link-writing-room',
+        title: 'A link can open the writing room on a chapter',
+        body: 'A link can now open a world straight into its writing room, on one chapter or scene or at the start, and it still lands there after you sign in with OnlyWorlds on the way.',
+        tags: ['writing'],
+      },
+      {
+        id: 'view-only-writing-without-setup',
+        title: 'A view-only world reads its stories without the writing setup',
+        body: 'A world you can only read stopped at "Set up writing" when one of its stories carried a label of its own, and it could not be set up from there. When the usual Book, Chapter and Scene labels read its stories, the writing room now opens straight onto them, and the other stories stay outside the tree.',
+        tags: ['writing'],
+      },
+    ],
+  },
+  {
     version: '1.122.2',
     date: '2026-11-05',
     theme: 'Links a screen reader hears as links',
