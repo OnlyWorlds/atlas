@@ -191,7 +191,7 @@ for (const tag of ['', ' @firefox']) {
     await expect(askCard(page)).toHaveCount(0);
   });
 
-  test(`Not now and Escape put the card down, and nothing is made${tag}`, async ({ page }) => {
+  test(`Not now, Escape and a move of the address put the card down, and nothing is made${tag}`, async ({ page }) => {
     const keel = await playKeel(page);
     await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
     await expect(askCard(page)).toBeVisible();
@@ -204,6 +204,13 @@ for (const tag of ['', ' @firefox']) {
     await expect(askCard(page)).toBeVisible();
     await askCard(page).locator('[data-action="not-now"]').click();
     await expect(askCard(page)).toHaveCount(0);
+    // A move of the address (the Back button, another world) puts it down too, and frees the page.
+    await page.evaluate(() => { location.hash = '#/settings/general'; });
+    await page.evaluate((id) => { location.hash = `#/open/${id}`; }, PUB);
+    await expect(askCard(page)).toBeVisible();
+    await page.evaluate(() => { location.hash = '#/settings/general'; });
+    await expect(askCard(page)).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => !!document.querySelector('.atlas-shell')?.closest('[inert]'))).toBe(false);
     expect(keel.lists).toBe(0);
     expect((await copies(page)).worlds).toBe(0);
   });
@@ -212,7 +219,7 @@ for (const tag of ['', ' @firefox']) {
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-  test('the card\'s buttons and every toast action take a finger: 44 px or more', async ({ page }) => {
+  test('the card\'s buttons, every toast action, the close and Details take a finger: 44 px or more', async ({ page }) => {
     await playKeel(page);
     await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
     await expect(askCard(page)).toBeVisible();
@@ -231,6 +238,14 @@ test.describe('on a touch phone', () => {
     const toast = await heights('.ow-toast .ow-toast-action');
     expect(toast).toHaveLength(5);
     expect(Math.min(...toast)).toBeGreaterThanOrEqual(44);
+    // The close (x) and Details too: the close at least 44 by 44.
+    const closeH = await heights('.ow-toast .ow-toast-close');
+    const closeW = await page.locator('.ow-toast .ow-toast-close').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().width * 10) / 10));
+    const details = await heights('.ow-toast-details summary');
+    expect(closeH).toHaveLength(2);
+    expect(details).toHaveLength(1);
+    expect(Math.min(...closeH, ...closeW, ...details)).toBeGreaterThanOrEqual(44);
+    console.log(`[touch] close ${closeW.map((w, i) => `${w}x${closeH[i]}`).join(', ')} | details ${details.join(', ')}`);
     // The smallest measured is the size reported.
     console.log(`[touch] card ${card.join(', ')} | toast actions ${toast.join(', ')}`);
   });

@@ -108,6 +108,8 @@ function withPublicLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
 
 /** The public path, once the account path said no. Never rejects. */
 export async function runPublicDoor(id: string, toasts: ToastManager, ctx: PublicDoorCtx): Promise<void> {
+  // Where the page was when the door ran: the ask is for this place only.
+  const where = window.location.hash;
   const found = findPublicCopy(getState().registry, id);
   // One request, never paced: a 429 here is "anything else".
   const reader = new PublicWorldReader(id, { ...ctx.readerOpts, maxWaits: 0 });
@@ -136,15 +138,20 @@ export async function runPublicDoor(id: string, toasts: ToastManager, ctx: Publi
     toasts.error(PUBLIC_UNREAD_LINE, 12_000);
     return;
   }
-  askForCopy(id, world.meta.name?.trim() || 'this world', toasts, ctx);
+  askForCopy(id, world.meta.name?.trim() || 'this world', toasts, ctx, where);
 }
 
 /**
  * The ask, a card in the middle of the page (1.123.1): nothing is made before
  * its Open, and its click is the gesture the storage request needs. Not now,
- * Escape or an outside click leaves nothing made and nothing held.
+ * Escape or an outside click leaves nothing made and nothing held. A modal
+ * blocks the page, so it never asks out of place: not when the tour started
+ * or the page moved on while the world was read (a Back press, another
+ * world), and the card itself goes down on the next move or the tour's
+ * start, as Not now does.
  */
-function askForCopy(id: string, name: string, toasts: ToastManager, ctx: PublicDoorCtx): void {
+function askForCopy(id: string, name: string, toasts: ToastManager, ctx: PublicDoorCtx, where: string): void {
+  if (isTourFlagActive() || window.location.hash !== where) return;
   const line = ctx.token
     ? publicAskSignedInLine(name, getState().registry.account_username)
     : publicAskLine(name);

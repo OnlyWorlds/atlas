@@ -42,6 +42,7 @@ import { mergeHealArray } from './tour-heal';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { PlainError } from '../core/plain-error';
 import { rekeyRouteHash } from '../sync/rekey-route';
+import { TOUR_STARTED_EVENT } from './tour-flag';
 
 const TOUR_STATE_KEY = 'atlas_tour_v1';
 const TOUR_DONE_KEY = 'atlas_tour_done_v1';
@@ -946,6 +947,7 @@ export async function startTour(returnHash?: string): Promise<void> {
   }
   await clearStageForTour();
   writeTourState({ active: true, step: 0, worldId: '', returnHash });
+  document.dispatchEvent(new CustomEvent(TOUR_STARTED_EVENT));
   await enterStep(0);
 }
 

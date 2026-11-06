@@ -17672,6 +17672,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
    Two classes, so no room's own touch rule for ghost buttons (40 px) outranks it. */
 @media (pointer: coarse) {
   .ow-toast .ow-toast-action { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  /* The close and Details take a finger too, by the same rule. The close grows into the toast's
+     own padding (negative margins), so the toast's first row keeps its height. */
+  .ow-toast .ow-toast-close { min-width: 44px; min-height: 44px; margin: -6px -10px -6px 0; display: inline-flex; align-items: center; justify-content: center; }
+  /* Padding, not flex: a summary keeps its disclosure marker only as a list item. */
+  .ow-toast .ow-toast-details summary { line-height: 16px; padding: 14px 0; }
 }
 .ow-toast-close {
   background: transparent;

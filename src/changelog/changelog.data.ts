@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'public-link-asks-in-the-middle',
         title: 'A link to a public world asks in the middle of the page',
-        body: 'A link that opens a public world now asks in a card in the middle of the page, with Not now beside Open, instead of in a small message in a corner. On a touch screen, the buttons on a message and on this card are now large enough for a finger. The line that says the copy opened puts the world\'s name in quotes, and so do the copy\'s lines on Home and in the list of worlds. A chapter\'s compiled view now shows only the stories in the book\'s outline, so a story kept outside it, such as a telling under a scene, no longer repeats inside the chapter or adds to its word count.',
+        body: 'A link that opens a public world now asks in a card in the middle of the page, with Not now beside Open, instead of in a small message in a corner. On a touch screen, the buttons on a message and on this card are now large enough for a finger. The line that says the copy opened puts the world\'s name in quotes, and so do the copy\'s lines on Home and in the list of worlds. A chapter\'s compiled view now shows only the stories in the book\'s outline, so a story kept outside it, such as a telling under a scene, no longer repeats inside the chapter or adds to its word count. Give such a story a writing label, such as Scene, to bring it back.',
         tags: ['world', 'writing'],
       },
     ],

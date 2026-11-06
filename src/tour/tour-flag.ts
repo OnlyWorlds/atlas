@@ -4,6 +4,9 @@
  * the tour chunk into its bundle (welcome panel, world home, worlds sidebar).
  */
 
+/** Sent on `document` when the tour starts (`startTour`): what asks over the page (the public door's card) steps aside. */
+export const TOUR_STARTED_EVENT = 'atlas:tour-started';
+
 export function isTourFlagActive(): boolean {
   try {
     const tour = JSON.parse(localStorage.getItem('atlas_tour_v1') ?? 'null') as { active?: boolean } | null;

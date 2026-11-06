@@ -16,6 +16,7 @@ import {
   PUBLIC_UNREAD_LINE, PUBLIC_SIGN_IN_CHANGED_LINE, publicSpentLine, publicWaitLine, type PublicDoorCtx,
 } from '../../src/setup/public-door';
 import { installFakeLocks } from '../fixtures/fake-locks';
+import { TOUR_STARTED_EVENT } from '../../src/tour/tour-flag';
 import { __setRegistryTabBaseForTests } from '../../src/registry/registry';
 import { REGISTRY_STORAGE_KEY } from '../../src/core/constants';
 import type { WorldRegistryEntry } from '../../src/core/types';
@@ -64,7 +65,7 @@ const cardLine = () => card()?.querySelector('[data-role="line"]')?.textContent 
 const cardActions = () => Array.from(card()?.querySelectorAll<HTMLButtonElement>('.atlas-modal-actions button') ?? []).map(b => b.textContent?.trim());
 const cardButton = (action: string) => card()!.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!;
 /** Down by its own Not now, so the house modal's stack stays true between tests. */
-afterEach(() => { if (card()) cardButton('not-now').click(); });
+afterEach(() => { if (card()) cardButton('not-now').click(); localStorage.removeItem('atlas_tour_v1'); });
 
 function ctxFor(k: ReturnType<typeof keel>, token: string | null = null, opens = true) {
   const opened: Array<{ entry: WorldRegistryEntry; said?: () => void }> = [];
@@ -188,6 +189,47 @@ describe('no copy here', () => {
       expect(getState().registry.worlds).toHaveLength(0);
     }
     opener.remove();
+  });
+
+  it('never asks out of place: the tour started, or the page moved on, while the world was read', async () => {
+    const start = window.location.hash;
+    for (const meanwhile of ['tour', 'back'] as const) {
+      const k = keel(200);
+      // The visitor acts while the one keyless read is out: Take the tour, or Back to another world.
+      const fetch = (async (input: RequestInfo | URL) => {
+        if (meanwhile === 'tour') localStorage.setItem('atlas_tour_v1', JSON.stringify({ active: true, step: 0, worldId: '' }));
+        else window.location.hash = '#/w/another-world';
+        return k.fetch(input);
+      }) as typeof globalThis.fetch;
+      const { ctx } = ctxFor(k);
+      ctx.readerOpts = { fetch, sleep: async () => {} };
+      const t = fakeToasts();
+      await runPublicDoor(W, t as never, ctx);
+      expect(card(), meanwhile).toBeNull();
+      expect(t.show).not.toHaveBeenCalled();
+      expect(ctx.saySignIn).not.toHaveBeenCalled();
+      expect(getState().registry.worlds).toHaveLength(0);
+      localStorage.removeItem('atlas_tour_v1');
+      window.location.hash = start;
+      // Let jsdom's own hashchange events land here, not on the next test's card.
+      await new Promise(r => setTimeout(r, 0));
+    }
+  });
+
+  it('the card goes down when the address moves on, and when the tour starts, as Not now', async () => {
+    for (const move of ['hashchange', 'tour'] as const) {
+      const { ctx } = ctxFor(keel(200));
+      await runPublicDoor(W, fakeToasts() as never, ctx);
+      expect(card(), move).not.toBeNull();
+      if (move === 'hashchange') window.dispatchEvent(new HashChangeEvent('hashchange'));
+      else document.dispatchEvent(new CustomEvent(TOUR_STARTED_EVENT));
+      expect(card(), move).toBeNull();
+      expect(ctx.saySignIn).not.toHaveBeenCalled();
+      expect(getState().registry.worlds).toHaveLength(0);
+    }
+    // Down for good: a later move finds no listener left behind.
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(card()).toBeNull();
   });
 
   it('a second ask replaces the card on screen rather than stacking it', async () => {

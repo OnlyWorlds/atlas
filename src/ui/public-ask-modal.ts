@@ -7,10 +7,12 @@
  * One sentence (`publicAskLine` / `publicAskSignedInLine`, the dialog's
  * accessible name), and its actions: Open, Sign in when signed out, Not now.
  * Not now, Escape and a full outside click dismiss it: nothing made, nothing
- * held. Open runs inside its own click (the storage request needs the
+ * held. So does any move of the address and the tour's start (`TOUR_STARTED_EVENT`):
+ * a modal must not sit over another world or the tour. Open runs inside its own click (the storage request needs the
  * gesture); focus goes to Open when the card shows and back when it closes.
  */
 import { BaseModal } from './modal-base';
+import { TOUR_STARTED_EVENT } from '../tour/tour-flag';
 
 export interface PublicAskOpts {
   line: string;
@@ -58,7 +60,12 @@ export class PublicAskModal extends BaseModal {
       this.opts.onOpen();
     });
     open.focus();
+    window.addEventListener('hashchange', this.putDown);
+    document.addEventListener(TOUR_STARTED_EVENT, this.putDown);
   }
+
+  /** The page moved on, or the tour began: down, as Not now. */
+  private readonly putDown = (): void => { this.close(); };
 
   close(): void {
     this.hide();
@@ -67,6 +74,8 @@ export class PublicAskModal extends BaseModal {
   /** Every way down (a button, Escape, an outside click) passes here. */
   protected override hide(): void {
     if (shown === this) shown = null;
+    window.removeEventListener('hashchange', this.putDown);
+    document.removeEventListener(TOUR_STARTED_EVENT, this.putDown);
     super.hide();
   }
 }

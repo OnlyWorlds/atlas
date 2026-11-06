@@ -1570,6 +1570,11 @@ test('compiled view: find searches every scene and "Link to element" writes them
     name: 'Scene B', supertype: 'Scene', parent_narrative: book,
     story: `No orcs here, only an [orc](ow://character/${chief}) already linked.`,
   });
+  // Outside the writing tree (no writing label): the view does not print it, so Link to element must not write it (1.123.1).
+  const telling = await createElement(page, 'narrative', {
+    name: 'A telling', supertype: 'Telling', parent_narrative: sceneA,
+    story: 'The orc told it again.',
+  });
   await markWritingInitialized(page);
   await gotoWriting(page, book);
 
@@ -1617,6 +1622,7 @@ test('compiled view: find searches every scene and "Link to element" writes them
   expect(a.story).toBe(`The [orc](ow://character/${chief}) marched. Nobody saw the [orc](ow://character/${chief}) leave.`);
   const b = await getNarrative(page, sceneB);
   expect(b.story).toBe(`No orcs here, only an [orc](ow://character/${chief}) already linked.`);
+  expect((await getNarrative(page, telling)).story).toBe('The orc told it again.');
   // Linking derives the relation field on each changed narrative (conv. #50).
   expect(a.characters).toContain(chief);
   const chiefEl = await getNarrative(page, chief);
