@@ -1,6 +1,7 @@
 /**
- * Compiled view — assembles a parent narrative + all its descendants into a
- * single read-only rendering.
+ * Compiled view — assembles a parent narrative + its descendants in the
+ * writing tree (the sidebar's, nothing beside it) into a single read-only
+ * rendering.
  *
  * Recursive structure: parent's own `story` first (if non-empty), then each
  * child's compiled rendering in order. Between children, a clickable section
@@ -23,7 +24,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { getState } from '../core/state';
 import { navigate, writingHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
-import { getTierForNarrative, getWritingLabels, iconForTier } from './writing-helpers';
+import { buildNarrativeIndex, getTierForNarrative, getWritingLabels, iconForTier, type NarrativeNode } from './writing-helpers';
 import { countMarkdownWords } from './writing-word-count';
 
 export interface CompiledSection {
@@ -44,25 +45,32 @@ export function resetCompiledCollapseState(): void {
 }
 
 /**
- * Walk the narrative tree from `root` and assemble a CompiledSection. Child
- * order honors the `order` field; ties broken by name for stability. Exported
- * for unit tests; mountCompiledView is the production entry point.
+ * Assemble a CompiledSection from `root` down THE WRITING TREE
+ * (`buildNarrativeIndex`, the sidebar's own): the compiled view prints the
+ * tree, nothing beside it (1.123.1). A Narrative the tree leaves out (no
+ * writing tier, such as Blood Meridian's Telling under its Scene) is not
+ * printed, nor counted; a writer who gives it a tier gets it in both. Child
+ * order is the tree's (`order`, then name). A root outside the tree has no
+ * children in it: its tiered children are roots of their own there, so its
+ * view is its own prose (the writing room never mounts one). Exported for
+ * unit tests; mountCompiledView is the production entry point.
  */
-export function buildCompiledTree(root: Element, allElements: readonly Element[]): CompiledSection {
-  const kids = allElements
-    .filter(e => e.type === 'narrative' && (e as Element & { parent_narrative?: string }).parent_narrative === root.id)
-    .slice()
-    .sort((a, b) => {
-      const ao = (a as Element & { order?: number }).order ?? 0;
-      const bo = (b as Element & { order?: number }).order ?? 0;
-      if (ao !== bo) return ao - bo;
-      return (a.name ?? '').localeCompare(b.name ?? '');
-    });
-  return {
-    el: root,
-    prose: typeof root.story === 'string' ? root.story : '',
-    children: kids.map(child => buildCompiledTree(child, allElements)),
-  };
+export function buildCompiledTree(root: Element, allElements: readonly Element[], worldId: string): CompiledSection {
+  const idx = buildNarrativeIndex(allElements as Element[], worldId);
+  const fromNode = (el: Element, kids: readonly NarrativeNode[]): CompiledSection => ({
+    el,
+    prose: typeof el.story === 'string' ? el.story : '',
+    children: kids.map(k => fromNode(k.el, k.children)),
+  });
+  return fromNode(root, idx.byId.get(root.id)?.children ?? []);
+}
+
+/** The ids a compiled view prints, the root first: what its find bar may write. */
+export function compiledIds(root: Element, allElements: readonly Element[], worldId: string): string[] {
+  const out: string[] = [];
+  const walk = (s: CompiledSection): void => { out.push(s.el.id); s.children.forEach(walk); };
+  walk(buildCompiledTree(root, allElements, worldId));
+  return out;
 }
 
 /**
@@ -75,19 +83,20 @@ export function buildCompiledTree(root: Element, allElements: readonly Element[]
  * "0 words" under a fully assembled manuscript. Pure and store-free so it can
  * be unit-tested on a plain element list.
  */
-export function compiledWordCount(root: Element, allElements: readonly Element[]): number {
+export function compiledWordCount(root: Element, allElements: readonly Element[], worldId: string): number {
   const walk = (section: CompiledSection): number =>
     countMarkdownWords(section.prose)
     + section.children.reduce((sum, child) => sum + walk(child), 0);
-  return walk(buildCompiledTree(root, allElements));
+  return walk(buildCompiledTree(root, allElements, worldId));
 }
 
-/** Does this narrative have any narrative children? */
-export function narrativeHasChildren(narrative: Element, allElements: readonly Element[]): boolean {
-  return allElements.some(e =>
-    e.type === 'narrative'
-    && (e as Element & { parent_narrative?: string }).parent_narrative === narrative.id,
-  );
+/**
+ * Does this narrative have children in the writing tree? The same one tree
+ * the compiled view prints: a Scene whose only child is outside the tree is
+ * a leaf (it opens to write, with no compiled view of only itself).
+ */
+export function narrativeHasChildren(narrative: Element, allElements: readonly Element[], worldId: string): boolean {
+  return (buildNarrativeIndex(allElements as Element[], worldId).byId.get(narrative.id)?.children.length ?? 0) > 0;
 }
 
 /**
@@ -104,7 +113,7 @@ export function mountCompiledView(host: HTMLElement, narrative: Element): () => 
   host.innerHTML = '';
   host.className = 'atlas-writing-compiled';
 
-  const tree = buildCompiledTree(narrative, elements);
+  const tree = buildCompiledTree(narrative, elements, worldId);
   // Resolve the element map ONCE so chip rendering can look up display names.
   const elementMap = new Map<string, Element>();
   for (const e of elements) elementMap.set(e.id, e);

@@ -1,6 +1,7 @@
 /**
  * The open door for a public world (1.123): a visitor with no account opens
- * `#/open/<world>/writing/<chapter>`, says Open to the ask, and lands in a
+ * `#/open/<world>/writing/<chapter>`, says Open to the ask (a card in the
+ * middle of the page, the welcome dimmed behind it), and lands in a
  * view-only copy's writing room on that chapter, its scenes in order, no
  * setup and no edit control; the same link again opens the copy with one
  * keyless world read; the owner signed in takes the account path; a held
@@ -112,6 +113,11 @@ function copies(page: Page) {
 
 const ASK = 'Open a view-only copy of "Blood Meridian" in this browser?';
 
+/** The ask: the house dialog in the middle of the page (1.123.1), never a corner toast. */
+function askCard(page: Page) {
+  return page.locator('[data-modal="public-ask"]', { hasText: ASK });
+}
+
 test.beforeEach(async ({ page }) => { await freshBoot(page); });
 
 for (const tag of ['', ' @firefox']) {
@@ -119,20 +125,30 @@ for (const tag of ['', ' @firefox']) {
     const keel = await playKeel(page);
     await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
     expect(await page.evaluate(() => location.hash)).not.toContain('/open/');
-    const ask = page.locator('.ow-toast', { hasText: ASK });
+    const ask = askCard(page);
     await expect(ask).toBeVisible();
-    await expect(ask.locator('.ow-toast-action', { hasText: 'Sign in' })).toBeVisible();
+    await expect(page.locator('.ow-toast', { hasText: ASK })).toHaveCount(0);
+    await expect(ask).toHaveAttribute('role', 'dialog');
+    await expect(ask.locator('[data-action="sign-in"]')).toBeVisible();
+    // In the middle of the page, over the welcome, which is dimmed and inert behind it; focus on Open.
+    const box = (await ask.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(Math.abs(box.x + box.width / 2 - view.width / 2)).toBeLessThan(2);
+    expect(Math.abs(box.y + box.height / 2 - view.height / 2)).toBeLessThan(2);
+    await expect.poll(() => page.evaluate(() => !!document.querySelector('.atlas-shell')?.closest('[inert]'))).toBe(true);
+    await expect(ask.locator('[data-action="open"]')).toBeFocused();
     // Nothing made before Open: one world read, no list, no copy.
     expect(keel.worldReads).toBe(1);
     expect(keel.lists).toBe(0);
     expect((await copies(page)).count).toBe(0);
-    await ask.locator('.ow-toast-action', { hasText: /^Open$/ }).click();
+    await ask.locator('[data-action="open"]').click();
+    await expect(ask).toHaveCount(0);
 
     await expect.poll(async () => (await copies(page)).count).toBe(1);
     const { ids: [copyId] } = await copies(page);
     expect(copyId).not.toBe(PUB);
     await expect.poll(() => page.evaluate(() => location.hash)).toBe(`#/w/${copyId}/writing/${CH1}`);
-    await expect(page.locator('.ow-toast', { hasText: /Opened a copy of Blood Meridian from .*, view only\./ })).toBeVisible();
+    await expect(page.locator('.ow-toast', { hasText: /Opened a view-only copy of "Blood Meridian" from .*\d{4}\./ })).toBeVisible();
 
     // The room reads with the default labels: no setup, Chapter I chosen, its six scenes in order.
     await expect(page.getByRole('heading', { name: 'Set up writing' })).toHaveCount(0);
@@ -172,9 +188,53 @@ for (const tag of ['', ' @firefox']) {
     expect(keel.worldReads - before.reads).toBe(1);
     expect(keel.lists - before.lists).toBe(0);
     expect((await copies(page)).count).toBe(1);
-    await expect(page.locator('.ow-toast', { hasText: ASK })).toHaveCount(0);
+    await expect(askCard(page)).toHaveCount(0);
+  });
+
+  test(`Not now and Escape put the card down, and nothing is made${tag}`, async ({ page }) => {
+    const keel = await playKeel(page);
+    await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
+    await expect(askCard(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(askCard(page)).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => !!document.querySelector('.atlas-shell')?.closest('[inert]'))).toBe(false);
+    // The same link again asks again; Not now puts it down too.
+    await page.evaluate(() => { location.hash = '#/settings/general'; });
+    await page.evaluate((id) => { location.hash = `#/open/${id}`; }, PUB);
+    await expect(askCard(page)).toBeVisible();
+    await askCard(page).locator('[data-action="not-now"]').click();
+    await expect(askCard(page)).toHaveCount(0);
+    expect(keel.lists).toBe(0);
+    expect((await copies(page)).worlds).toBe(0);
   });
 }
+
+test.describe('on a touch phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('the card\'s buttons and every toast action take a finger: 44 px or more', async ({ page }) => {
+    await playKeel(page);
+    await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
+    await expect(askCard(page)).toBeVisible();
+    const heights = (sel: string) => page.locator(sel).evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height * 10) / 10));
+    const card = await heights('[data-modal="public-ask"] .atlas-modal-actions button');
+    expect(card).toHaveLength(3);
+    expect(Math.min(...card)).toBeGreaterThanOrEqual(44);
+    await askCard(page).locator('[data-action="not-now"]').click();
+    // Every kind of toast action: a door's action, and a problem's Copy details and Send feedback.
+    await page.evaluate(async () => {
+      const { toastManager } = await import('/src/ui/toast-manager.ts');
+      toastManager.show('Open "Blood Meridian", from your worlds on OnlyWorlds?', 'info', 0, { actions: [{ label: 'Open', run: () => {} }, { label: 'Sign in', run: () => {} }] });
+      toastManager.show('Atlas could not save.', 'error', 0, { actions: [{ label: 'Retry', run: () => {} }], details: 'trace' });
+    });
+    await page.locator('.ow-toast-details summary').click();
+    const toast = await heights('.ow-toast .ow-toast-action');
+    expect(toast).toHaveLength(5);
+    expect(Math.min(...toast)).toBeGreaterThanOrEqual(44);
+    // The smallest measured is the size reported.
+    console.log(`[touch] card ${card.join(', ')} | toast actions ${toast.join(', ')}`);
+  });
+});
 
 test('signed in as the owner, the account path opens it, and no copy is offered', async ({ page }) => {
   const keel = await playKeel(page, { ownerRows: true });
@@ -187,6 +247,7 @@ test('signed in as the owner, the account path opens it, and no copy is offered'
   await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
   await expect(page.locator('.ow-toast', { hasText: 'Open "Blood Meridian", from your worlds on OnlyWorlds?' })).toBeVisible();
   await expect(page.locator('.ow-toast', { hasText: ASK })).toHaveCount(0);
+  await expect(page.locator('[data-modal="public-ask"]')).toHaveCount(0);
   expect(keel.worldReads).toBe(0);
   expect((await copies(page)).count).toBe(0);
 });
@@ -197,9 +258,9 @@ test('a held seat for the world stays held beside a public copy of it', async ({
   const seat = { v: 1, world_id: PUB, world_name: 'Blood Meridian', kind: 'player', key: 'ow_r_' + 'P'.repeat(32), character: { id: CHARACTERS[0].id, name: 'The kid' }, held_at: T, code_tail: 'ab12' };
   await page.evaluate(([k, v]) => localStorage.setItem(k, v), [seatKey, JSON.stringify(seat)] as const);
   await arriveAt(page, `#/open/${PUB}`);
-  const ask = page.locator('.ow-toast', { hasText: ASK });
+  const ask = askCard(page);
   await expect(ask).toBeVisible();
-  await ask.locator('.ow-toast-action', { hasText: /^Open$/ }).click();
+  await ask.locator('[data-action="open"]').click();
   await expect.poll(async () => (await copies(page)).count).toBe(1);
   await page.evaluate(async () => { await (window as any).__atlasTestApi.landed(); });
   // A fresh load settles held seats again against the registry with the copy in it.
@@ -215,6 +276,7 @@ test('a world the public cannot read keeps the sign-in line, and nothing is made
   await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
   await expect(page.locator('input[name="account-login"]')).toBeVisible();
   await expect(page.locator('.ow-toast', { hasText: 'view-only copy' })).toHaveCount(0);
+  await expect(page.locator('[data-modal="public-ask"]')).toHaveCount(0);
   expect(keel.lists).toBe(0);
   expect((await copies(page)).worlds).toBe(0);
 });
@@ -225,6 +287,7 @@ test('with keel\'s public reader switched off, a signed-out link keeps the sign-
   await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
   await expect(page.locator('input[name="account-login"]')).toBeVisible();
   await expect(page.locator('.ow-toast', { hasText: 'view-only copy' })).toHaveCount(0);
+  await expect(page.locator('[data-modal="public-ask"]')).toHaveCount(0);
   await expect(page.locator('.ow-toast', { hasText: 'could not reach OnlyWorlds' })).toHaveCount(0);
   expect(keel.lists).toBe(0);
   expect((await copies(page)).worlds).toBe(0);

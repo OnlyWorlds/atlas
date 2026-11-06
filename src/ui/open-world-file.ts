@@ -218,7 +218,7 @@ async function openCopyBeside(bytes: Uint8Array, toasts: ToastManager): Promise<
   try {
     const { openWorldFile } = await import('../setup/world-file-open');
     const { activateWorld } = await import('../sidebar/worlds-sidebar');
-    const { copyLine } = await import('../core/world-copy');
+    const { openedCopyLine } = await import('../core/world-copy');
     const out = await openWorldFile(bytes, { asCopy: true });
     if (out.kind === 'already') {
       toasts.show('This copy is already in Atlas.', 'info', 8000, {
@@ -229,7 +229,7 @@ async function openCopyBeside(bytes: Uint8Array, toasts: ToastManager): Promise<
     if (out.kind !== 'copied') return;
     const entry = getState().registry.worlds.find(w => w.id === out.worldId);
     if (await activateWorld(out.worldId, toasts) && entry?.copy_of) {
-      toasts.success(`Opened ${copyLine(entry.name, entry.copy_of, false).replace(/^A copy/, 'a copy')}`);
+      toasts.success(openedCopyLine(entry.name, entry.copy_of));
     }
   } catch (err) {
     console.warn('[open-world-file] copy failed:', err);

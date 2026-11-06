@@ -33,7 +33,8 @@ import { PublicWaitsSpent, PublicWorldReader, isPublicClosed, isPublicNotFound, 
 import { adoptStoredRegistry } from '../registry/registry';
 import { buildWorldFile, notWholeLine } from './demo-copy';
 import { requestPersistOnFirstBrowserWorld } from './world-parent';
-import { copyDay, copyLine } from '../core/world-copy';
+import { copyDay, openedCopyLine } from '../core/world-copy';
+import { PublicAskModal } from '../ui/public-ask-modal';
 
 export const PUBLIC_UNREAD_LINE = 'Atlas could not reach OnlyWorlds just now. Try the link again in a moment.';
 export const PUBLIC_SIGN_IN_CHANGED_LINE = 'You signed in or out while Atlas was opening this world. Open the link again.';
@@ -138,22 +139,25 @@ export async function runPublicDoor(id: string, toasts: ToastManager, ctx: Publi
   askForCopy(id, world.meta.name?.trim() || 'this world', toasts, ctx);
 }
 
-/** The ask: nothing is made before its Open, and its click is the gesture the storage request needs. */
+/**
+ * The ask, a card in the middle of the page (1.123.1): nothing is made before
+ * its Open, and its click is the gesture the storage request needs. Not now,
+ * Escape or an outside click leaves nothing made and nothing held.
+ */
 function askForCopy(id: string, name: string, toasts: ToastManager, ctx: PublicDoorCtx): void {
   const line = ctx.token
     ? publicAskSignedInLine(name, getState().registry.account_username)
     : publicAskLine(name);
-  toasts.show(line, 'info', 0, {
-    actions: [
-      { label: 'Open', run: () => { void openPublicCopy(id, name, toasts, ctx); } },
-      ...(ctx.token ? [] : [{ label: 'Sign in', run: () => ctx.saySignIn() }]),
-    ],
-  });
+  new PublicAskModal({
+    line,
+    onOpen: () => { void openPublicCopy(id, name, toasts, ctx); },
+    ...(ctx.token ? {} : { onSignIn: () => ctx.saySignIn() }),
+  }).open();
 }
 
 /** The ask's Open. Never rejects. */
 export async function openPublicCopy(id: string, name: string, toasts: ToastManager, ctx: PublicDoorCtx): Promise<void> {
-  // The toast stays until clicked: the tour may have started, the sign-in moved.
+  // The card stays until answered: the tour may have started, the sign-in moved.
   if (isTourFlagActive()) { toasts.info(OPEN_TOUR_LINE); return; }
   if ((getState().registry.account_token ?? null) !== ctx.token) { toasts.info(PUBLIC_SIGN_IN_CHANGED_LINE); return; }
   if (building.has(id)) return;
@@ -215,7 +219,7 @@ async function buildAndOpen(id: string, name: string, toasts: ToastManager, ctx:
     const entry = getState().registry.worlds.find(w => w.id === out.worldId);
     const opened = await activateWorld(out.worldId, toasts);
     if (opened && out.kind === 'copied' && entry?.copy_of) {
-      toasts.success(`Opened ${copyLine(entry.name, entry.copy_of, false).replace(/^A copy/, 'a copy')}`);
+      toasts.success(openedCopyLine(entry.name, entry.copy_of));
     }
   } finally {
     overlay.close();

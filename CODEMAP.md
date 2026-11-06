@@ -172,6 +172,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/ui/download-progress.ts`: the one progress line for a world coming down (link, view, account open, Bring it down again); a big world into this browser says it takes a while.
 - `src/ui/move-browser-world-modal.ts`: Move to a folder: step 1 inside the click (the home folder, writable), then a locked run with progress; `start(ready)` runs it at once with a home folder readied in an earlier click (a world file opened into a folder).
 - `src/ui/bring-down-again-modal.ts`: the Cleared row's "Bring it down again": what comes back and what does not, then the restore with progress.
+- `src/ui/public-ask-modal.ts`: the public door's ask (1.123.1): a card in the middle of the page on `BaseModal`, its sentence, Open, Sign in when signed out, Not now; a second ask replaces it.
 - `src/ui/download-world.ts`: Download the whole world from a click (the save picker inside the gesture), one path for Settings, the keep-safe card and Delete's "Download it first".
 - `src/ui/open-world-file.ts`: the Open a world file door: the file input inside the click, `isWorldFile`, `openWorldFileFrom` (on Chromium with a home folder, a new world asks where through `askWhereWithHome`; a folder answer is the move after it opens).
 - `src/ui/unexpected-errors.ts`: unhandled rejections said once, max 3 a session.

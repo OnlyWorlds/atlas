@@ -4,7 +4,7 @@
  * said, `writable: false`, every other key kept, never a link.
  */
 import { describe, expect, it } from 'vitest';
-import { copyChip, copyLine, copyMarkOnOpen, copyOfMeta, copyWorldJson, sameCopy, worldIsCopiedBy } from '../../src/core/world-copy';
+import { copyChip, copyLine, copyMarkOnOpen, copyOfMeta, copyWorldJson, openedCopyLine, sameCopy, worldIsCopiedBy } from '../../src/core/world-copy';
 import { entryIsViewOnly } from '../../src/core/view-only';
 import type { WorldRegistryEntry } from '../../src/core/types';
 
@@ -76,9 +76,12 @@ describe('the same copy, and the words', () => {
   });
 
   it('says the day when it has one, and where the world itself is', () => {
-    expect(copyLine('Hollow Reach', { world_id: WID }, false)).toBe('A copy of Hollow Reach, view only.');
+    expect(copyLine('Hollow Reach', { world_id: WID }, false)).toBe('A view-only copy of "Hollow Reach".');
     const dated = copyLine('Hollow Reach', { world_id: WID, at: AT }, true);
-    expect(dated).toMatch(/^A copy of Hollow Reach from .*2026, view only\. The world itself is Hollow Reach in your list of worlds\.$/);
+    expect(dated).toMatch(/^A view-only copy of "Hollow Reach" from .*2026\. The world itself is "Hollow Reach" in your list of worlds\.$/);
+    // The doors' success line is the same family, the name quoted (a colon in it read as the sentence's).
+    expect(openedCopyLine('Blood Meridian: the scalp country, 1849-50', { world_id: WID })).toBe('Opened a view-only copy of "Blood Meridian: the scalp country, 1849-50".');
+    expect(openedCopyLine('Blood Meridian: the scalp country, 1849-50', { world_id: WID, at: AT })).toMatch(/^Opened a view-only copy of "Blood Meridian: the scalp country, 1849-50" from .*2026\.$/);
     expect(copyChip({})).toBe('copy');
     expect(copyChip({ at: AT })).toMatch(/^copy, /);
   });

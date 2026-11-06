@@ -58,6 +58,14 @@ function fakeToasts() {
   return { show: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn(), dismiss: vi.fn() };
 }
 
+/** The ask is a card in the middle of the page (1.123.1), never a toast. */
+const card = () => document.querySelector<HTMLElement>('[data-modal="public-ask"]');
+const cardLine = () => card()?.querySelector('[data-role="line"]')?.textContent ?? null;
+const cardActions = () => Array.from(card()?.querySelectorAll<HTMLButtonElement>('.atlas-modal-actions button') ?? []).map(b => b.textContent?.trim());
+const cardButton = (action: string) => card()!.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!;
+/** Down by its own Not now, so the house modal's stack stays true between tests. */
+afterEach(() => { if (card()) cardButton('not-now').click(); });
+
 function ctxFor(k: ReturnType<typeof keel>, token: string | null = null, opens = true) {
   const opened: Array<{ entry: WorldRegistryEntry; said?: () => void }> = [];
   const ctx: PublicDoorCtx = {
@@ -102,6 +110,7 @@ describe('a copy already here, found by the world alone', () => {
     expect(k.seen[0].searchParams.get('world')).toBe(W);
     expect(t.info).not.toHaveBeenCalled();
     expect(t.show).not.toHaveBeenCalled();
+    expect(card()).toBeNull();
   });
 
   it('keel\'s 404: the copy opens as it is, with one line that the world is no longer public', async () => {
@@ -134,19 +143,57 @@ describe('a copy already here, found by the world alone', () => {
 describe('no copy here', () => {
   beforeEach(() => { patchSlice('registry', { ...before, worlds: [] }); });
 
-  it('signed out, a public world: the ask with Open and Sign in, nothing made', async () => {
+  it('signed out, a public world: the ask is a card in the middle with Open and Sign in, nothing made', async () => {
     const k = keel(200);
     const { ctx } = ctxFor(k);
     const t = fakeToasts();
     await runPublicDoor(W, t as never, ctx);
-    expect(t.show).toHaveBeenCalledTimes(1);
-    expect(t.show.mock.calls[0][0]).toBe(publicAskLine('Blood Meridian'));
-    expect(t.show.mock.calls[0][3].actions.map((a: { label: string }) => a.label)).toEqual(['Open', 'Sign in']);
+    // A card, not a corner toast: the house dialog, modal, named by its sentence, focus on Open.
+    expect(t.show).not.toHaveBeenCalled();
+    const panel = card()!;
+    expect(panel.getAttribute('role')).toBe('dialog');
+    expect(panel.getAttribute('aria-modal')).toBe('true');
+    expect(cardLine()).toBe(publicAskLine('Blood Meridian'));
+    expect(document.getElementById(panel.getAttribute('aria-labelledby')!)?.textContent).toBe(publicAskLine('Blood Meridian'));
+    expect(cardActions()).toEqual(['Not now', 'Sign in', 'Open']);
+    expect(document.activeElement).toBe(cardButton('open'));
     // Sign in is the door's own: the id held, Settings.
-    t.show.mock.calls[0][3].actions[1].run();
+    cardButton('sign-in').click();
+    expect(card()).toBeNull();
     expect(ctx.saySignIn).toHaveBeenCalledTimes(1);
     expect(k.seen).toHaveLength(1);
     expect(getState().registry.worlds).toHaveLength(0);
+  });
+
+  it('Not now, Escape or a full outside click: the card goes, nothing made and nothing held, focus back where it was', async () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    for (const dismiss of ['not-now', 'escape', 'outside'] as const) {
+      opener.focus();
+      const k = keel(200);
+      const { ctx } = ctxFor(k);
+      await runPublicDoor(W, fakeToasts() as never, ctx);
+      expect(card()).not.toBeNull();
+      if (dismiss === 'not-now') cardButton('not-now').click();
+      else if (dismiss === 'escape') document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      else {
+        const overlay = card()!.parentElement!;
+        overlay.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        overlay.dispatchEvent(new Event('pointerup', { bubbles: true }));
+      }
+      expect(card(), dismiss).toBeNull();
+      expect(document.activeElement, dismiss).toBe(opener);
+      expect(ctx.saySignIn).not.toHaveBeenCalled();
+      expect(k.seen).toHaveLength(1);
+      expect(getState().registry.worlds).toHaveLength(0);
+    }
+    opener.remove();
+  });
+
+  it('a second ask replaces the card on screen rather than stacking it', async () => {
+    await runPublicDoor(W, fakeToasts() as never, ctxFor(keel(200)).ctx);
+    await runPublicDoor(W, fakeToasts() as never, ctxFor(keel(200)).ctx);
+    expect(document.querySelectorAll('[data-modal="public-ask"]')).toHaveLength(1);
   });
 
   it('signed in with no row: the line says this account has none, and offers the copy, no Sign in', async () => {
@@ -155,8 +202,8 @@ describe('no copy here', () => {
     const { ctx } = ctxFor(k, 'ow_a_x');
     const t = fakeToasts();
     await runPublicDoor(W, t as never, ctx);
-    expect(t.show.mock.calls[0][0]).toBe(publicAskSignedInLine('Blood Meridian', 'e2e-guest'));
-    expect(t.show.mock.calls[0][3].actions.map((a: { label: string }) => a.label)).toEqual(['Open']);
+    expect(cardLine()).toBe(publicAskSignedInLine('Blood Meridian', 'e2e-guest'));
+    expect(cardActions()).toEqual(['Not now', 'Open']);
   });
 
   it('keel\'s 404 keeps the door\'s own words: signed out the sign-in, signed in the not-among line', async () => {
@@ -187,8 +234,7 @@ describe('no copy here', () => {
     const t = fakeToasts();
     await runPublicDoor(W, t as never, ctx);
     expect(opened.map(o => o.entry.id)).toEqual(['gone']);
-    expect(t.show).toHaveBeenCalledTimes(1);
-    expect(t.show.mock.calls[0][0]).toBe(publicAskLine('Blood Meridian'));
+    expect(cardLine()).toBe(publicAskLine('Blood Meridian'));
     expect(k.seen).toHaveLength(1);
   });
 
@@ -200,6 +246,7 @@ describe('no copy here', () => {
       await runPublicDoor(W, t as never, ctx);
       expect(t.error).toHaveBeenCalledWith(PUBLIC_UNREAD_LINE, 12_000);
       expect(t.show).not.toHaveBeenCalled();
+      expect(card()).toBeNull();
       expect(ctx.saySignIn).not.toHaveBeenCalled();
     }
   });

@@ -118,7 +118,7 @@ export function createStickyBar(deps: {
     // View-mode toggle — only when this narrative has descendants. Lets the
     // user switch between editing THIS narrative's prose and a read-only
     // compiled view of self + descendants.
-    if (narrativeHasChildren(el, state.data.elements)) {
+    if (narrativeHasChildren(el, state.data.elements, worldId)) {
       const mode = getViewMode(el);
       const toggle = document.createElement('div');
       toggle.className = 'atlas-writing-workspace-viewmode';

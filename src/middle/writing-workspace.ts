@@ -32,7 +32,7 @@ import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderHeader, isEditingIn } from './element-detail-header';
 import { mountWorkspaceEditor, linkTermInEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
 import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
-import { compiledWordCount, mountCompiledView, narrativeHasChildren } from './writing-compiled';
+import { compiledIds, compiledWordCount, mountCompiledView, narrativeHasChildren } from './writing-compiled';
 import { handleAddToCast, type AddToCastDetail } from './writing-workspace-add-to-cast';
 import { computeRelationPatch, linkTargetsIn } from './writing-workspace-derive';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
@@ -47,7 +47,6 @@ import { createLinkAllCorner } from './prose-linkall-corner';
 import { createCompiledSearch } from './writing-compiled-search';
 import { bulkLinkTerm } from './writing-bulk-link';
 import { recordAliasIfForeign } from './prose-link-existing';
-import { collectNarrativeDescendants } from '../core/narrative-delete';
 import { pickElement } from '../ui/element-picker-modal';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
@@ -81,7 +80,7 @@ const viewModeByNarrative = new Map<string, WritingViewMode>();
 function resolveViewMode(el: Element, allElements: readonly Element[]): WritingViewMode {
   const stored = viewModeByNarrative.get(el.id);
   if (stored) return stored;
-  return narrativeHasChildren(el, allElements) ? 'compiled' : 'this-level';
+  return narrativeHasChildren(el, allElements, getState().active?.worldId ?? '') ? 'compiled' : 'this-level';
 }
 
 /**
@@ -170,7 +169,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   const wordCount = createWordCount({
     root,
     getCount: () => (compiledCountFor
-      ? compiledWordCount(compiledCountFor, getState().data.elements)
+      ? compiledWordCount(compiledCountFor, getState().data.elements, getState().active?.worldId ?? '')
       : editorHandle?.getWordCount() ?? 0),
     getMountedForId: () => mountedForId,
   });
@@ -257,7 +256,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     const rootEl = compiledCountFor;
     if (!rootEl) return;
-    const ids = [rootEl.id, ...collectNarrativeDescendants(getState().data.elements, rootEl.id)];
+    // What the compiled view prints, and nothing beside it: a narrative the tree leaves out is not shown, so not written.
+    const ids = compiledIds(rootEl, getState().data.elements, getState().active?.worldId ?? '');
     await recordAliasIfForeign(picked, term);
     const { changed, count } = await bulkLinkTerm(ids, info.query, target, opts);
     if (count === 0) {

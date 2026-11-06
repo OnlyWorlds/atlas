@@ -52,7 +52,7 @@ for (const engine of ['chromium', 'firefox'] as const) {
     const toast = page.locator('.ow-toast', { hasText: 'This world is already in Atlas.' });
     await expect(toast).toBeVisible();
     await toast.getByRole('button', { name: 'Open a copy beside it' }).click();
-    await expect(page.locator('.ow-toast', { hasText: /Opened a copy of Hollow Reach from .*2026, view only\./ })).toBeVisible();
+    await expect(page.locator('.ow-toast', { hasText: /Opened a view-only copy of "Hollow Reach" from .*2026\./ })).toBeVisible();
     await expect.poll(() => activeId(page)).not.toBe(firstId);
     const copyId = (await activeId(page))!;
 
@@ -64,7 +64,7 @@ for (const engine of ['chromium', 'firefox'] as const) {
     // Home and the pill say what it is and where the world itself is; nothing offers an edit or Make online.
     await page.evaluate((wid) => { window.location.hash = `#/w/${wid}`; }, copyId);
     const note = page.locator('[data-role="copy-note"]');
-    await expect(note).toHaveText(/^A copy of Hollow Reach from .*2026, view only\. The world itself is Hollow Reach in your list of worlds\.$/);
+    await expect(note).toHaveText(/^A view-only copy of "Hollow Reach" from .*2026\. The world itself is "Hollow Reach" in your list of worlds\.$/);
     await expect(page.locator('.atlas-home-world-name[data-edit]')).toHaveCount(0);
     await expect(page.locator('[data-action="keepsafe-online"]')).toHaveCount(0);
     await expect(page.locator('.atlas-sync-pill', { hasText: 'Copy, view only' })).toBeVisible();

@@ -99,9 +99,19 @@ export function worldIsCopiedBy(w: { folder?: { handle_key?: string }; api?: { w
   return w.folder?.handle_key === `world-${copy.world_id}` || w.api?.world_id === copy.world_id;
 }
 
+/** "a view-only copy of "<name>" from <day>": the one phrase every copy line is built on (the name quoted: a colon in it read as the sentence's). */
+function copyPhrase(name: string, copy: CopyOf): string {
+  const day = copyDay(copy.at);
+  return day ? `a view-only copy of "${name}" from ${day}` : `a view-only copy of "${name}"`;
+}
+
 /** The copy line on Home and in the right pane: what this is, and where the world itself is. */
 export function copyLine(name: string, copy: CopyOf, worldHere: boolean): string {
-  const day = copyDay(copy.at);
-  const what = day ? `A copy of ${name} from ${day}, view only.` : `A copy of ${name}, view only.`;
-  return worldHere ? `${what} The world itself is ${name} in your list of worlds.` : what;
+  const what = `A${copyPhrase(name, copy).slice(1)}.`;
+  return worldHere ? `${what} The world itself is "${name}" in your list of worlds.` : what;
+}
+
+/** The success line of every door that opens a copy (the world file's, the public link's). */
+export function openedCopyLine(name: string, copy: CopyOf): string {
+  return `Opened ${copyPhrase(name, copy)}.`;
 }

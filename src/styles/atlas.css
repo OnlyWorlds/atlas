@@ -5803,6 +5803,13 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 /* One width for both steps: the long link would otherwise widen the panel
    between the choice and the link. */
 .atlas-modal-panel.atlas-invite-panel { width: min(580px, calc(100vw - 32px)); min-width: 0; }
+/* The public door's ask (1.123.1): one sentence and its actions, in the middle of the page. */
+.atlas-modal-panel.atlas-public-ask-panel { width: min(460px, calc(100vw - 32px)); min-width: 0; }
+.atlas-public-ask-line { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: var(--atlas-text); overflow-wrap: anywhere; }
+.atlas-public-ask-panel .atlas-modal-actions { flex-wrap: wrap; }
+@media (pointer: coarse) {
+  .atlas-public-ask-panel .atlas-modal-actions button { min-height: 44px; }
+}
 .atlas-invite-choices {
   display: flex;
   flex-direction: column;
@@ -17661,6 +17668,11 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .ow-toast-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
 .ow-toast-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .ow-toast-action { font-size: 11px; padding: 2px 8px; text-decoration: none; }
+/* Touch: every toast action takes a finger (1.123.1, 1.108.1's rule); a fine pointer's toasts are unchanged.
+   Two classes, so no room's own touch rule for ghost buttons (40 px) outranks it. */
+@media (pointer: coarse) {
+  .ow-toast .ow-toast-action { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+}
 .ow-toast-close {
   background: transparent;
   border: 0;

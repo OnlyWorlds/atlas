@@ -13,15 +13,20 @@ import { countWords, countMarkdownWords, markdownToPlainText } from '../../src/m
 import { compiledWordCount } from '../../src/middle/writing-compiled';
 import type { Element } from '../../src/core/types';
 
+/** A narrative in the writing tree (a Scene: the default labels; the tree links any tier under any tier). */
 function narrative(id: string, name: string, story: string, parent?: string): Element {
   return {
     id,
     name,
     type: 'narrative',
+    supertype: 'Scene',
     story,
     ...(parent ? { parent_narrative: parent } : {}),
   } as unknown as Element;
 }
+
+/** A world with no registry row: the default writing labels. */
+const WID = 'w-count';
 
 describe('countWords', () => {
   it('counts whitespace-delimited words', () => {
@@ -83,22 +88,22 @@ describe('compiledWordCount', () => {
 
   it('sums the root prose and every descendant', () => {
     // 5 + 3 + 2
-    expect(compiledWordCount(book, all)).toBe(10);
+    expect(compiledWordCount(book, all, WID)).toBe(10);
   });
 
   it('excludes narratives outside the tree', () => {
-    expect(compiledWordCount(chapter, all)).toBe(5);
+    expect(compiledWordCount(chapter, all, WID)).toBe(5);
   });
 
   it('is not zero for a parent whose own prose is empty', () => {
     const emptyParent = narrative('p', 'Parent', '');
     const child = narrative('c', 'Child', 'Some real prose lives down here.', 'p');
-    expect(compiledWordCount(emptyParent, [emptyParent, child])).toBe(6);
+    expect(compiledWordCount(emptyParent, [emptyParent, child], WID)).toBe(6);
   });
 
   it('counts chip labels as the words a reader sees', () => {
     const withChips = narrative('w', 'W', 'He met [Admiral Fluffington](ow://character/x-1) today.');
-    expect(compiledWordCount(withChips, [withChips])).toBe(5);
+    expect(compiledWordCount(withChips, [withChips], WID)).toBe(5);
   });
 
   it('agrees with the editor rule on a leaf, so switching views cannot change the number', () => {
@@ -106,6 +111,6 @@ describe('compiledWordCount', () => {
     // What the editor would count: its plain text, which renders the chip as
     // its label. Same rule, same source text, same number.
     const editorSideCount = countWords('The Consul waited.');
-    expect(compiledWordCount(leaf, [leaf])).toBe(editorSideCount);
+    expect(compiledWordCount(leaf, [leaf], WID)).toBe(editorSideCount);
   });
 });

@@ -279,7 +279,7 @@ Big-picture context-pane work moved into `DESIGN_SHELL.md` "The context pane" �
 - ✅ **Context tab** — was writing-only and ephemeral at first, now tool-global and permanent. Writing route shows Cast + Potentials; element route shows element preview; other routes show empty state.
 - ✅ **Force-directed graph** with click-recenter, recent-centers breadcrumb, mouse-back intercept, right-click menu, free zoom/pan, fit-to-view button, hover-fade, hop-depth 1-4 with per-ring caps, element-type filter chips, lock-layout mode, optional element-type edge coloring.
 - ✅ **Featured/Planned distinction** in Cast — Featured = in field AND in prose (chip or name/alias text match), Planned = in field only.
-- ✅ **Compiled view for parent narratives** — read-only assembly + clickable section markers + collapsible chevrons + tier-specific icons.
+- ✅ **Compiled view for parent narratives** — read-only assembly + clickable section markers + collapsible chevrons + tier-specific icons. It prints the writing tree and nothing beside it (1.123.1): its sections, its word count, whether a narrative has a compiled view at all (`narrativeHasChildren`) and what its find bar's "Link to element" writes (`compiledIds`) all read `buildNarrativeIndex`, so a Narrative with no writing tier (a Telling under a Scene) is neither printed nor written; a writer who names it in a tier gets it in both. Guard: `tests/unit/writing-compiled.test.ts` "the tree, nothing beside it".
 - ✅ **Sticky bar below element header** — breadcrumb + date + focus/reading/open action icons.
 - ✅ **Ambient word-count widget** — bottom-right corner, replaces legacy footer.
 - ✅ **Reading mode redesign** — hides right pane, disables link visuals, keeps writer's font.
