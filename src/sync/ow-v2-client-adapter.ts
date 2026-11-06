@@ -735,9 +735,10 @@ export class OwV2ClientAdapter implements OwApiClient {
 
 /**
  * Wire /world body → WorldMetaWire in DISK names, canonicalized. Shared by
- * getWorldMeta + patchWorldMeta (keel echoes the full GET body after a PATCH).
+ * getWorldMeta + patchWorldMeta (keel echoes the full GET body after a PATCH),
+ * and the public reader's world read (`sync/public-reader.ts`).
  */
-function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
+export function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
   const text = (v: unknown): string => canonicalMetaValue('text', v) as string;
   const list = (v: unknown): Array<string | number> => canonicalMetaValue('list', v) as Array<string | number>;
   // Names are words; a stray number in them reads as its digits.

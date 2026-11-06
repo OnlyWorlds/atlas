@@ -24,6 +24,11 @@
  * Its elements keep their ids too; a copy taken online later meets
  * the foreign-id step every world file meets. Demo keys are read scope on the
  * server, so this path cannot write there.
+ *
+ * The same builder (`buildWorldFile`) makes a public world's file for the
+ * open door's view-only copy (`setup/public-door.ts`): its own world id, the
+ * keyless reader, the public slice's mark, and keel's counts as the measure
+ * of whole. That file opens as a copy (conv. 177), never under the world's id.
  */
 import { PlainError } from '../core/plain-error';
 import { opfsRoot } from '../core/browser-worlds';
@@ -32,7 +37,9 @@ import { initialDownloadAll, type InitialDownloadProgress, type DownloadStop } f
 import { pickSyncedMeta, isMetaEmpty } from '../sync/world-meta-sync';
 import { keyCheckError } from './key-check-errors';
 import type { OwApiClient, WorldMetaWire } from '../sync/sync-engine';
-import type { WorldMeta } from '../core/types';
+import type { ElementType, WorldMeta } from '../core/types';
+import { ALL_ELEMENT_TYPES } from '../core/types';
+import { DEMO_WORLD_ID } from '../core/moppetopia';
 import { serverOrigin } from '../sync/export-provenance';
 import { atlasProducer } from '../core/provenance';
 
@@ -54,7 +61,7 @@ const SCRATCH = 'atlas-scratch';
 const LOCK = 'atlas-demo-copy';
 
 /** The client this needs: the element reads, plus the world's own fields. */
-type DemoClient = OwApiClient & { getWorldMeta(): Promise<WorldMetaWire> };
+export type DemoClient = OwApiClient & { getWorldMeta(): Promise<WorldMetaWire> };
 
 export type DemoWorldFile =
   | { kind: 'file'; bytes: Uint8Array; worldId: string; name: string }
@@ -80,15 +87,84 @@ export async function buildDemoWorldFile(opts: DemoCopyOpts = {}): Promise<DemoW
 
 async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
   const client = opts.client ?? (await import('../sync/make-online')).buildV2Adapter(DEMO_WORLD_KEY, '', undefined, { readTimeoutMs: DEMO_READ_TIMEOUT_MS });
-  let meta: WorldMetaWire;
-  try {
-    meta = await client.getWorldMeta();
-  } catch (err) {
-    throw keyCheckError(err, { readOnly: true });
+  return buildWorldFile({
+    worldId: DEMO_WORLD_ID,
+    client,
+    fallbackName: DEMO_WORLD_NAME,
+    read: async () => {
+      try {
+        return { meta: await client.getWorldMeta(), counts: null };
+      } catch (err) {
+        throw keyCheckError(err, { readOnly: true });
+      }
+    },
+    // The demo key names its world: the copy is whatever world it answers with.
+    anyId: true,
+    isHere: opts.isHere,
+    onProgress: opts.onProgress,
+    shouldStop: opts.shouldStop,
+  });
+}
+
+/** keel's count of what a reader may read: `{total, types: {type: n}}` (GET /world's `counts`). */
+export interface ReadCounts { total: number; types: Record<string, number> }
+
+/** A world file made from a server read: the demo's (#113), and a public world's view-only copy. */
+export interface WorldFileSource {
+  /** The world asked for. Its answer must name it, unless `anyId`. */
+  worldId: string;
+  client: DemoClient;
+  /** The name when the server sends none. */
+  fallbackName: string;
+  /** The world read: its fields, and the counts the copy must match (null: none to match). */
+  read: () => Promise<{ meta: WorldMetaWire; counts: ReadCounts | null }>;
+  /** The demo's: the copy is whatever world the key answers with. */
+  anyId?: boolean;
+  /** The slice this read is (folder spec §4.2): `{kind: "public", ...}` for the public reader. */
+  exportedAs?: Record<string, unknown>;
+  /** Whole means keel's counts match, type by type; with no counts sent, nothing opens. */
+  requireCounts?: boolean;
+  /** Type lists at once (the public reader's is 1; every other door keeps the walker's 6). */
+  listConcurrency?: number;
+  isHere?: (worldId: string) => boolean;
+  onProgress?: (p: InitialDownloadProgress) => void;
+  shouldStop?: () => DownloadStop;
+}
+
+/** The words for a world that did not come down whole. */
+export function notWholeLine(name: string): string {
+  return `${name} did not download whole, so Atlas did not open it. Try again.`;
+}
+
+/** Did the walk bring down exactly what keel counts? Every type, and the total. */
+export function matchesCounts(listed: Partial<Record<ElementType, number>>, counts: ReadCounts): boolean {
+  let sum = 0;
+  for (const type of ALL_ELEMENT_TYPES) {
+    const got = listed[type] ?? 0;
+    if (got !== (counts.types[type] ?? 0)) return false;
+    sum += got;
   }
-  if (!meta?.id) throw new PlainError(`OnlyWorlds did not send ${DEMO_WORLD_NAME} as expected. Try again later.`);
-  if (opts.isHere?.(meta.id)) return { kind: 'here', worldId: meta.id };
-  const name = meta.name?.trim() || DEMO_WORLD_NAME;
+  // A count for a type the copy cannot hold is a shortfall too.
+  for (const [type, n] of Object.entries(counts.types)) {
+    if (n > 0 && !(ALL_ELEMENT_TYPES as readonly string[]).includes(type)) return false;
+  }
+  return sum === counts.total;
+}
+
+/**
+ * A world as a world file's bytes, made in memory: world.json (the world's
+ * id and name, its own fields as the server holds them, where it came from),
+ * every element through the link door's download, the portable copy zipped.
+ * Throws a `PlainError` when it did not come down whole; nothing is written
+ * outside memory.
+ */
+export async function buildWorldFile(src: WorldFileSource): Promise<DemoWorldFile> {
+  const { client } = src;
+  const { meta, counts } = await src.read();
+  if (!meta?.id || (!src.anyId && meta.id !== src.worldId)) throw new PlainError(`OnlyWorlds did not send ${src.fallbackName} as expected. Try again later.`);
+  if (src.isHere?.(meta.id)) return { kind: 'here', worldId: meta.id };
+  const name = meta.name?.trim() || src.fallbackName;
+  if (src.requireCounts && !counts) throw new PlainError(notWholeLine(name));
 
   // Up to 1.25 the scratch lived in OPFS: inside the lock nothing else
   // builds, so a scratch folder still there was left by a try that never
@@ -103,22 +179,29 @@ async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
     await store.open(dir);
     let failed = 0;
     let stopped = false;
+    let whole = true;
     try {
       const own: Record<string, unknown> = {};
       for (const [field, value] of Object.entries(pickSyncedMeta(meta as unknown as Record<string, unknown>))) {
         if (!isMetaEmpty(field, value)) own[field] = value;
       }
-      // Where the copy came from (folder spec §4.2); a demo key's slice is none of the four, so no exported_as.
+      // Where the copy came from (folder spec §4.2), at the read's time; the
+      // demo key's slice is none of the four, so the demo writes no exported_as.
       const source = { server: serverOrigin(), world: String(meta.id), at: new Date().toISOString() };
-      await store.writeWorldMeta({ id: meta.id, name, ...own, source, producer: atlasProducer('server') } as Partial<WorldMeta>);
-      const result = await initialDownloadAll(store, client, opts.onProgress, opts.shouldStop, { stopOnQuota: true });
+      await store.writeWorldMeta({ id: meta.id, name, ...own, source, ...(src.exportedAs ? { exported_as: src.exportedAs } : {}), producer: atlasProducer('server') } as Partial<WorldMeta>);
+      const result = await initialDownloadAll(store, client, src.onProgress, src.shouldStop, {
+        stopOnQuota: true,
+        ...(src.listConcurrency ? { listConcurrency: src.listConcurrency } : {}),
+      });
       failed = result.failures.length;
       stopped = !!result.stoppedEarly;
+      // Whole by keel's own count of what this reader may read (a short page the cursor accepted).
+      if (src.requireCounts && counts) whole = matchesCounts(result.listed, counts);
     } finally {
       await store.close().catch(() => {});
     }
-    if (failed > 0 || stopped) {
-      throw new PlainError(`${name} did not download whole, so Atlas did not open it. Try again.`);
+    if (failed > 0 || stopped || !whole) {
+      throw new PlainError(notWholeLine(name));
     }
     const ws = await import('../store/world-file');
     const collected = await ws.collectWorldFiles(dir);

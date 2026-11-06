@@ -52,6 +52,8 @@ export interface InitialDownloadProgress {
 export interface InitialDownloadResult {
   totalDownloaded: number;
   failures: PerElementFailure[];
+  /** How many records each listed type's walk returned (a type never listed is absent). */
+  listed: Partial<Record<ElementType, number>>;
   /**
    * Set when the user stopped early and kept what had arrived. The
    * folder is a valid, partial world; the first pull (a cold /changes replay
@@ -122,8 +124,11 @@ export async function initialDownloadAll(
    * Into browser storage a full origin is fatal (contract §2.2):
    * rethrow the first `QuotaExceededError` instead of recording it and
    * writing on over 0-byte files.
+   * `listConcurrency`: type lists at once (6 by default). The public reader
+   * walks one at a time, so the first failed type stops the walk and no
+   * other list is in flight behind a 429.
    */
-  opts: { stopOnQuota?: boolean } = {},
+  opts: { stopOnQuota?: boolean; listConcurrency?: number } = {},
 ): Promise<InitialDownloadResult> {
   // ---- List phase: gather all records per type so we know the total ----
   // Type walks run concurrently in a bounded pool (2026-07-19):
@@ -135,7 +140,7 @@ export async function initialDownloadAll(
   // behavior.
   const recordsByType = new Map<ElementType, Array<{ id: string; updated_at: string } & Record<string, unknown>>>();
   let total = 0;
-  const LIST_CONCURRENCY = 6;
+  const LIST_CONCURRENCY = Math.max(1, opts.listConcurrency ?? 6);
   let nextType = 0;
   const listWorker = async () => {
     while (nextType < ALL_ELEMENT_TYPES.length) {
@@ -189,9 +194,12 @@ export async function initialDownloadAll(
     }
   }
 
+  const listed: Partial<Record<ElementType, number>> = {};
+  for (const [type, records] of recordsByType) listed[type] = records.length;
   return {
     totalDownloaded: done - failures.length,
     failures,
+    listed,
     ...(stoppedEarly ? { stoppedEarly: { total } } : {}),
   };
 }

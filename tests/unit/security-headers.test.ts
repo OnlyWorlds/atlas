@@ -103,10 +103,11 @@ describe('public/_headers (#302)', () => {
   it('counts the fetch call sites (a new one checks connect-src first)', () => {
     const sites = tsFiles('src').flatMap((f) =>
       read(f).split(/\r?\n/).filter((l) => /\bfetch\(/.test(l) && !/^\s*(\*|\/\/)/.test(l)).map((l) => `${f}: ${l.trim()}`));
-    // eight today: keel v2 (adapter, account, join, and the sign-in exchange's
-    // timed fetch), the media edge twice, and the tour's own pictures
-    // twice (same origin). worldsync's has since left.
-    expect(sites, sites.join('\n')).toHaveLength(8);
+    // nine today: keel v2 (adapter, account, join, the sign-in exchange's
+    // timed fetch, and the public reader's keyless reads, 1.123), the media
+    // edge twice, and the tour's own pictures twice (same origin).
+    // worldsync's has since left.
+    expect(sites, sites.join('\n')).toHaveLength(9);
   });
 });
 
