@@ -230,6 +230,23 @@ export class MergeRefusedError extends Error {
 }
 
 /**
+ * Make online, before anything is sent: an element that will go up as a
+ * create but carries a server baseline (a downloaded copy such as Explore
+ * Moppetopia, a world file exported from a linked world, a folder copied out
+ * of an api world, an unlink without reset) holds a stamp from some other
+ * world. It never reached THIS server, so it becomes never-synced here.
+ * Left stamped, a clean one is not sent at all (the store lists it as
+ * unchanged), and a failed create reads as synced, then as deleted online,
+ * for good. Both routes use it: the link route on its planned creates, the
+ * create route on every element (the new world is empty).
+ */
+export async function clearForeignBaselines(folder: FolderStore, elements: readonly Element[]): Promise<void> {
+  for (const e of elements) {
+    if (e.server_updated_at) await folder.clearServerBaseline(e.id);
+  }
+}
+
+/**
  * Bidirectional merge between a local folder and an existing api world
  * (Route 2, rebuilt onto the re-key kernel). Three buckets after
  * `planMerge` (per type: ids first, then unique names):
@@ -335,13 +352,9 @@ export async function mergeLocalIntoApi(
   // A file the kernel could not rewrite still names old ids; its cached body
   // must not go up. It stays local, named in `unrewritten`.
   const unreadable = new Set(unrewritten);
-  // A planned create carrying a stale baseline (a folder copied out of an api
-  // world, an unlink without reset) would, if its create failed, read as
-  // synced or as deleted on the server forever. It never reached
-  // THIS server, so it is never-synced before anything is sent.
-  for (const c of plan.creates) {
-    if (c.local.server_updated_at && !unreadable.has(c.local.id)) await folder.clearServerBaseline(c.local.id);
-  }
+  // A planned create carrying a stale baseline never reached THIS server, so
+  // it is never-synced before anything is sent (`clearForeignBaselines`).
+  await clearForeignBaselines(folder, plan.creates.map(c => c.local).filter(l => !unreadable.has(l.id)));
   // Ids an earlier, unfinished run of this route created: on a
   // rerun they meet their own upload as a same-id match.
   const ownUploads = new Set((await folder.readSyncState()).route2_created ?? []);

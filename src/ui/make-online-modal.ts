@@ -35,6 +35,7 @@ import {
   createApiWorld,
   buildV2Adapter,
   worldOriginLines,
+  clearForeignBaselines,
   type MergePolicy,
   type MergeProgress,
 } from '../sync/make-online';
@@ -353,6 +354,12 @@ export class MakeOnlineModal extends BaseModal {
       //    registry transition.
       detachSyncEngine();
       const folder = getActiveStore()!;
+      // This world was never linked (`open()` refuses a linked one) and the
+      // new world is empty, so a baseline any element carries is from another
+      // world (an Explore Moppetopia copy, a world file from a linked world).
+      // Cleared, every element goes up as a create; left, a clean one was not
+      // sent at all and the copy linked to an empty world.
+      await clearForeignBaselines(folder, await folder.listElements());
       let pushDone = 0;
       let pushTotal = 0;
       const engine = new SyncEngine({
