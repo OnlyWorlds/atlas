@@ -51,6 +51,10 @@ export interface StatefulAccountOptions {
    * account is pinless, so a body WITHOUT `pin` is rejected 422 param=pin.
    */
   accountHasPin?: boolean;
+  /** The pinned account's PIN a sent `pin` is checked against (default '4242'). */
+  accountPin?: string;
+  /** keel before 2026-11-07: a pinned account's sent `pin` is a 422, never checked. */
+  pinOmitOnly?: boolean;
 }
 
 export interface AccountHandlerState {
@@ -59,6 +63,10 @@ export interface AccountHandlerState {
   minted: Array<{ worldId: string; key: string; name: string; scope: 'READ' | 'WRITE'; keep: boolean }>;
   /** Every world created via POST /account/worlds, in order. */
   created: Array<{ name: string; id: string; key: string; origin?: { source: unknown; producer: unknown } }>;
+  /** The `pin` each made world's create carried (null: none sent). */
+  createPins: Array<string | null>;
+  /** Creates refused for a wrong PIN (nothing made). */
+  pinRefused: number;
   /** GET /account/worlds hit count — lets the caller assert fetch de-dup. */
   listCount: number;
   /** GET /account hit count. */
@@ -94,7 +102,7 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
   state: AccountHandlerState;
 } {
   const base = (options.base ?? V2_DEFAULT_BASE).replace(/\/$/, '');
-  const state: AccountHandlerState = { minted: [], created: [], listCount: 0, profileCount: 0 };
+  const state: AccountHandlerState = { minted: [], created: [], createPins: [], pinRefused: 0, listCount: 0, profileCount: 0 };
   let mintCounter = 0;
   const worlds = [...options.worlds];
 
@@ -148,13 +156,22 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
         if (bad) return envelope(422, 'invalid_request', `'${k}' must be an object or null.`, k);
       }
       const hasPin = 'pin' in body && body.pin !== undefined;
-      // The dance: pinned account REJECTS a sent pin; pinless account REQUIRES one.
+      // keel since 2026-11-07 (_clean_new_world, core.auth.enforce_account_pin):
+      // a pinned account's sent pin is checked before anything is written, a
+      // malformed one counting as wrong (401 param=pin); `pinOmitOnly` plays the
+      // keel before it (a sent pin 422 param=pin). A pinless account REQUIRES a
+      // valid new PIN (1000-9999).
       if (options.accountHasPin && hasPin) {
-        return envelope(422, 'invalid_request', 'This account already has a PIN.', 'pin');
+        if (options.pinOmitOnly) return envelope(422, 'invalid_request', 'This account already has a PIN.', 'pin');
+        if (String(body.pin) !== (options.accountPin ?? '4242')) {
+          state.pinRefused += 1;
+          return envelope(401, 'invalid_credentials', 'Incorrect PIN.', 'pin');
+        }
       }
-      if (!options.accountHasPin && !hasPin) {
+      if (!options.accountHasPin && !/^[1-9]\d{3}$/.test(String(body.pin ?? ''))) {
         return envelope(422, 'invalid_request', 'A PIN is required to create your first world.', 'pin');
       }
+      state.createPins.push(hasPin ? String(body.pin) : null);
       mintCounter += 1;
       const id = `srv-created-${mintCounter}`;
       const key = `ow_w_test${mintCounter}`;

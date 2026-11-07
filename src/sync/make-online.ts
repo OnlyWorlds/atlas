@@ -19,6 +19,7 @@ import { OwApiError, OwV2Client } from '@onlyworlds/sdk';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE, OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { accountErrorMessage } from './account-client';
 import { PlainError } from '../core/plain-error';
+import { isSeatSecret } from '../core/seat';
 import { getState } from '../core/state';
 import { devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
@@ -94,11 +95,11 @@ export interface CreateApiWorldResult {
 
 /**
  * Create a new api world on the signed-in account:
- * `POST /api/v2/account/worlds` with the PIN dance — try WITHOUT `pin` first
- * (an account that already has a PIN rejects one, even the correct value);
- * on 422 param=pin retry WITH the caller's PIN (fresh accounts require it,
- * and it becomes the account PIN). The 201 carries the world row + full
- * WRITE key in one round-trip.
+ * `POST /api/v2/account/worlds` with the PIN: a PIN (never a seat secret)
+ * goes with the create, checked against an account's PIN before anything is written (401
+ * param=pin on a mismatch) or set as a pinless account's PIN; an older keel's
+ * 422 param=pin for a pinned account gets the create without it. The 201
+ * carries the world row + full WRITE key in one round-trip.
  *
  * Signed out it refuses: the v1 `create-world-external` lane (name + email +
  * PIN) is retired; the forms sign in first.
@@ -132,14 +133,37 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
         return client.createAccountWorld(input());
       }
     };
+    // The PIN goes with the create, so keel checks it against the account's
+    // before the world exists (keel, 2026-11-07): a wrong PIN makes nothing,
+    // where it used to make an empty world and fail at the push. A pinless
+    // account takes it as its PIN. A seat secret is never an account PIN, so
+    // it is not sent here.
+    const sendPin = pin && !isSeatSecret(pin) ? pin : undefined;
     let created;
     try {
-      created = await create();
+      created = await create(sendPin);
     } catch (err) {
+      if (err instanceof OwApiError && err.status === 401 && err.param === 'pin') {
+        throw new PlainError('That PIN does not match your account. Nothing was made.');
+      }
       if (err instanceof OwApiError && err.status === 422 && err.param === 'pin') {
-        // Fresh account: the PIN is required and becomes the account PIN.
-        if (!pin) throw new PlainError('Enter your PIN first. A new account sets its PIN here.');
-        created = await create(pin);
+        if (sendPin !== undefined) {
+          // A keel that refuses a pinned account's PIN (before 2026-11-07, or
+          // rolled back) makes the world without it, as before; a pinless
+          // account refuses digits it cannot take as its PIN (0123).
+          try {
+            created = await create();
+          } catch (err2) {
+            if (err2 instanceof OwApiError && err2.status === 422 && err2.param === 'pin') {
+              throw new PlainError('A new account sets its PIN here: four digits, from 1000 to 9999.');
+            }
+            throw err2;
+          }
+        } else {
+          // Fresh account: the PIN is required and becomes the account PIN.
+          if (!pin) throw new PlainError('Enter your PIN first. A new account sets its PIN here.');
+          created = await create(pin);
+        }
       } else {
         // Only the account refusals Atlas has words for pass as refusals;
         // anything else keeps its kind and details.

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.3',
+    date: '2026-11-07',
+    theme: 'A wrong PIN makes no world',
+    entries: [
+      {
+        id: 'make-online-wrong-pin',
+        title: 'Make online checks your PIN before it makes the world',
+        body: 'With Create new, a mistyped PIN used to make the world on your account and then fail to send its elements, leaving an empty world behind. Atlas now sends the PIN with the request to make the world, so OnlyWorlds checks it first: a wrong PIN says so and nothing is made.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.2',
     date: '2026-11-07',
     theme: 'Make online sends a copied world',

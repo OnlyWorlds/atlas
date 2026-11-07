@@ -390,7 +390,7 @@ describe('createApiWorld — the signed-in v2 lane; signed out it refuses', () =
     expect(state.created[0].name).toBe('Fresh World');
   });
 
-  it('signed in, account already has a pin: the no-pin attempt succeeds without a retry', async () => {
+  it('signed in, account already has a pin: the PIN goes with the create and the world is made at once', async () => {
     const state = mount({ accountHasPin: true });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
 
@@ -399,6 +399,44 @@ describe('createApiWorld — the signed-in v2 lane; signed out it refuses', () =
     expect(result.apiKey).toMatch(/^ow_w_/);
     expect(result.worldName).toBe('Second World');
     expect(state.created).toHaveLength(1);
+    expect(state.createPins).toEqual(['4242']);
+  });
+
+  it('a wrong PIN: refused at the create, nothing made (keel checks it before the world exists)', async () => {
+    const state = mount({ accountHasPin: true });
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+
+    await expect(createApiWorld({ name: 'Typo World', pin: '1111' })).rejects.toThrow('That PIN does not match your account. Nothing was made.');
+    await expect(createApiWorld({ name: 'Typo World', pin: '42420' })).rejects.toThrow('That PIN does not match your account. Nothing was made.');
+    expect(state.pinRefused).toBe(2);
+    expect(state.created).toHaveLength(0);
+  });
+
+  it('a keel that refuses a pinned account its PIN on the create (before the check, or rolled back): made without it, as before', async () => {
+    const state = mount({ accountHasPin: true, pinOmitOnly: true });
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+
+    const result = await createApiWorld({ name: 'Old Keel World', pin: '4242' });
+
+    expect(result.worldName).toBe('Old Keel World');
+    expect(state.createPins).toEqual([null]);
+  });
+
+  it('a pinless account and digits keel cannot take as a PIN: asks for 1000 to 9999, nothing made', async () => {
+    const state = mount({ accountHasPin: false });
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+
+    await expect(createApiWorld({ name: 'Zero World', pin: '0123' })).rejects.toThrow('A new account sets its PIN here: four digits, from 1000 to 9999.');
+    expect(state.created).toHaveLength(0);
+  });
+
+  it('a seat secret in the PIN field never goes with the create', async () => {
+    const state = mount({ accountHasPin: true });
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+
+    await createApiWorld({ name: 'Seat World', pin: 'ow_s_' + 'x'.repeat(40) });
+
+    expect(state.createPins).toEqual([null]);
   });
 
   it('sends the folder\'s producer and source lines, which keel keeps as the world\'s origin', async () => {

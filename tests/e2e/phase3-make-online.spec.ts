@@ -115,7 +115,8 @@ test('Signed in, Make online asks only the PIN and makes the world on the accoun
   await pane.locator('input[name="create-pin"]').fill('1234');
   await pane.locator('[data-action="create-submit"]').click();
   await expect(page.locator('[data-modal="make-online"]')).toHaveCount(0, { timeout: 15_000 });
-  expect(made).toEqual(expect.objectContaining({ name: 'Sandbox' }));
+  // The PIN goes with the create, so keel checks it before the world exists.
+  expect(made).toEqual(expect.objectContaining({ name: 'Sandbox', pin: '1234' }));
 });
 
 test('Tab switching toggles the active route pane', async ({ page }) => {
