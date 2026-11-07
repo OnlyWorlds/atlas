@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.4',
+    date: '2026-11-07',
+    theme: 'What the first steps did, kept',
+    entries: [
+      {
+        id: 'whole-strand-asks-copy',
+        title: 'A whole strand asks you to keep a copy',
+        body: 'A world that lives only in this browser now asks for a copy once its strand is whole, however small the world is. The first steps used to ask this as their last step; since they made way for the strand, a small world went unasked until it held 25 elements.',
+        tags: ['home', 'onboarding'],
+      },
+      {
+        id: 'skip-to-the-strand',
+        title: 'Skip to the strand',
+        body: 'While Home\'s strand asks for something, the first press of Tab offers Skip to the strand, which goes straight to the question past the toolbar and the lists. In a new world it reaches the story\'s name.',
+        tags: ['home', 'onboarding'],
+      },
+      {
+        id: 'notes-speak-after-old-card',
+        title: 'Notes speak again in worlds where the old first steps card was closed',
+        body: 'Closing the old first steps card with its × also kept every small note quiet in that world, and the way to undo it went with the card. That close no longer silences anything.',
+        tags: ['home', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.3',
     date: '2026-11-07',
     theme: 'A wrong PIN makes no world',

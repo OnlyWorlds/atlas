@@ -163,6 +163,15 @@ describe('#964 retired with the first steps (1.115.0): no path holds the notes s
     expect(shown()?.querySelector('[data-note-action="see-world"]')?.textContent).toBe("See Ada's world");
   });
 
+  it('a world whose old first steps card was closed by × (home-cards): the notes speak, and stay when the flag is written', () => {
+    const { ev } = adaReady({ tour_dismissed: ['home-cards'] } as never);
+    reportGesture({ kind: 'date-set', event: ev.id });
+    expect(shown()?.dataset.note).toBe('dated');
+    const reg = getState().registry;
+    patchSlice('registry', { ...reg, worlds: reg.worlds.map(w => ({ ...w, tour_dismissed: ['home-cards', 'other'] })) } as never);
+    expect(shown()?.dataset.note).toBe('dated');
+  });
+
   it('a path note showing stays when the pointer moves back onto the path', () => {
     const { ev } = adaReady();
     reportGesture({ kind: 'date-set', event: ev.id });

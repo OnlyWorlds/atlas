@@ -17531,7 +17531,7 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
   outline-offset: -2px;
 }
 
-/* #972: the first Tab stop while a new world's first steps show; unseen until focused, gone with the block. */
+/* #972: the first Tab stop while Home's strand asks (a card in make mode, or a new world's ways in); unseen until focused, gone with them. */
 .atlas-guide-skip {
   position: fixed;
   top: 8px;
@@ -17551,7 +17551,7 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 .atlas-guide-skip:focus-visible {
   transform: none;
 }
-.atlas-shell:not(:has([data-role="guide-block"])) .atlas-guide-skip {
+.atlas-shell:not(:has([data-role="strand-card"][data-mode="make"], [data-role="home-bring-in"])) .atlas-guide-skip {
   display: none;
 }
 

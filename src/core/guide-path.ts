@@ -18,6 +18,7 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import { currentLore, loreWithAids } from './parlor-room';
 import { settledOf } from './review-mark';
 import { keepSafeCard } from '../middle/home-keepsafe';
+import { keepSafeStrand } from '../middle/keepsafe-strand';
 import {
   DOTS, guideDots, laterStep, worldIsEmptyForGuide, type DotId, type Dots, type StepId,
 } from './guide';
@@ -48,7 +49,7 @@ const entryOf = (worldId: string) => getState().registry.worlds.find(w => w.id =
 /** Whether the keep-safe card would ask in this world, by the home's own inputs. */
 export function keepSafeWouldShow(worldId: string): boolean {
   const s = getState();
-  return !!keepSafeCard({ entry: entryOf(worldId), elements: settledOf(loreWithAids()), loading: !!s.data.loading, now: Date.now() });
+  return !!keepSafeCard({ entry: entryOf(worldId), elements: settledOf(loreWithAids()), loading: !!s.data.loading, now: Date.now(), strand: keepSafeStrand(worldId) });
 }
 
 /**

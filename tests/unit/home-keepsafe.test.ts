@@ -37,14 +37,25 @@ describe('keepSafeCard', () => {
   it('the story of a strand still being made does not ask for a copy; another written story, a map or the count still do', () => {
     const story = { id: 'n', name: 'Moppets', type: 'narrative', story: 'It began.', local_updated_at: iso(NOW) } as unknown as Element;
     const other = { ...story, id: 'n2', name: 'Another' } as Element;
-    const making = (els: Element[]) => keepSafeCard({ entry: entry(), elements: els, loading: false, now: NOW, strandStory: 'n' });
+    const making = (els: Element[]) => keepSafeCard({ entry: entry(), elements: els, loading: false, now: NOW, strand: { story: 'n', whole: false } });
     expect(making([story])).toBeNull();
     expect(making([story, other])).toEqual({ reduced: null });
     expect(making([story, ...chars(KEEPSAFE_THRESHOLD - 1)])).toEqual({ reduced: null });
     const map = { id: 'm', name: 'Map', type: 'map', image_url: 'https://x/y.png', local_updated_at: iso(NOW) } as unknown as Element;
     expect(making([story, map])).toEqual({ reduced: null });
-    // The strand whole (no story passed): its text counts again.
-    expect(keepSafeCard({ entry: entry(), elements: [story], loading: false, now: NOW, strandStory: null })).toEqual({ reduced: null });
+    // Not the open world (no strand read): its text counts again.
+    expect(keepSafeCard({ entry: entry(), elements: [story], loading: false, now: NOW, strand: null })).toEqual({ reduced: null });
+  });
+
+  it('a whole strand asks for a copy whatever its size (the first steps\' last step, handed on); a strand still being made does not', () => {
+    const quiet = { id: 'n', name: 'Moppets', type: 'narrative', local_updated_at: iso(NOW - 3 * DAY) } as unknown as Element;
+    const five = [quiet, ...chars(4)];
+    expect(keepSafeCard({ entry: entry(), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: true } })).toEqual({ reduced: null });
+    expect(keepSafeCard({ entry: entry(), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: false } })).toBeNull();
+    expect(keepSafeCard({ entry: entry(), elements: five, loading: false, now: NOW, strand: null })).toBeNull();
+    // Still never for a folder world, and a download still hides it.
+    expect(keepSafeCard({ entry: entry({ where: undefined }), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: true } })).toBeNull();
+    expect(keepSafeCard({ entry: entry({ kept_download_at: iso(NOW) }), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: true } })).toBeNull();
   });
 
   it('never for a folder world, the tour, a view-only world, a cleared one, or while loading', () => {

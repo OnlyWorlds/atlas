@@ -100,25 +100,28 @@ export function middleCapFor(shellWidthPx: number, sidebarFraction: number, frac
 }
 
 /**
- * The first Tab stop while a new world's first steps show (#972): one press past the chrome
- * (the toolbar, the rail's kind icons, the list) to the block's first control. Shown only while
- * the home holds the guide block (CSS `:has`, so it never outlives the block); unseen until focused.
+ * The first Tab stop while Home's strand asks for something (#972, kept when the first steps became
+ * the strand: 1.115.0's gate, S3): one press past the chrome (the toolbar, the rail's kind icons, the
+ * list) to the asking card's first field, or a new world's ways to bring one in. Shown only while Home
+ * holds an asking card or the ways in (CSS `:has`, so it never outlives them); unseen until focused.
  */
-function buildGuideSkip(): HTMLElement {
+export const STRAND_SKIP_TARGETS = [
+  '[data-role="strand-card"][data-mode="make"] [data-field="name"]',
+  '[data-role="strand-card"][data-mode="make"] input:not([type="hidden"]), [data-role="strand-card"][data-mode="make"] textarea',
+  '[data-role="home-bring-in"] button:not([disabled])',
+] as const;
+
+function buildStrandSkip(): HTMLElement {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'atlas-guide-skip';
-  b.setAttribute('data-role', 'guide-skip');
-  b.textContent = 'Skip to the first steps';
+  b.setAttribute('data-role', 'strand-skip');
+  b.textContent = 'Skip to the strand';
   b.addEventListener('click', () => {
-    const block = document.querySelector<HTMLElement>('[data-role="guide-block"]');
-    if (!block) return;
-    // In this order, never the head's Back or ×: a door, the card's first button, a way to bring a world in.
-    const target = ['[data-grid-plus]', '[data-role="home-grid"] [data-grid-id][tabindex="0"]', '[data-guide-door]', '[data-role="guide-card"] [data-step-action]', '[data-bring-action]', 'button:not([disabled])']
-      .map(s => block.querySelector<HTMLElement>(s)).find(Boolean);
+    const target = STRAND_SKIP_TARGETS.map(s => document.querySelector<HTMLElement>(s)).find(Boolean);
     if (!target) return;
     target.focus({ preventScroll: true });
-    block.scrollIntoView({ block: 'nearest' });
+    target.scrollIntoView({ block: 'nearest' });
   });
   return b;
 }
@@ -183,7 +186,7 @@ export function mountAppShell(container: HTMLElement): AppShell {
   rightPane.className = 'atlas-pane atlas-right-pane';
   right.appendChild(rightPane);
 
-  shell.appendChild(buildGuideSkip());
+  shell.appendChild(buildStrandSkip());
   shell.appendChild(sidebar);
   shell.appendChild(divider1);
   shell.appendChild(middle);

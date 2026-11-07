@@ -36,6 +36,7 @@ import { resolveCalendarLens } from '../core/calendar-lens';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { getTierForNarrative, getWritingLabels } from '../middle/writing-helpers';
 import { keepSafeCard } from '../middle/home-keepsafe';
+import { keepSafeStrand } from '../middle/keepsafe-strand';
 import { anyModalOpen } from './modal-base';
 import { linkIdsOf } from '../core/link-ids';
 import { toastManager } from './toast-manager';
@@ -88,7 +89,8 @@ function silent(worldId: string, noteId?: NoteId): boolean {
   const entry = entryOf(worldId);
   // The tour's sandbox and Moppetopia are worlds to look at: no note speaks in either (#840's gate, G2).
   if (!entry || entry.demo === true || isMoppetopiaOpen(worldId) || worldIsViewOnly(worldId) || isTourFlagActive()) return true;
-  if (entry.tour_dismissed?.includes('home-cards')) return true;
+  // The old first steps card's × (`home-cards` in tour_dismissed) silences nothing: the card is gone,
+  // and with it Settings' way to undo the flag (1.115.0's gate, S4).
   return !!noteId && PATH_NOTES.includes(noteId) && pathShowing(worldId);
 }
 
@@ -235,7 +237,7 @@ function offer(note: EarnedNote, worldId: string, how: { fromAction: boolean; fo
 /** The keep-safe card asks for the same copy: while it would show, `copy` stays quiet (the two never offer at once). */
 function keepSafeShowing(worldId: string): boolean {
   const els = getState().data.elements;
-  return !!keepSafeCard({ entry: entryOf(worldId), elements: guideElements(els), loading: !!getState().data.loading, now: Date.now() });
+  return !!keepSafeCard({ entry: entryOf(worldId), elements: guideElements(els), loading: !!getState().data.loading, now: Date.now(), strand: keepSafeStrand(worldId) });
 }
 
 /**
@@ -638,8 +640,7 @@ function wire(): void {
       clear();
       return;
     }
-    if (showing && (worldIsViewOnly(worldId) || isTourFlagActive()
-      || entryOf(showing.worldId)?.tour_dismissed?.includes('home-cards'))) { clear(); return; }
+    if (showing && (worldIsViewOnly(worldId) || isTourFlagActive())) { clear(); return; }
     // The path started (a delete brought its block back): a path note showing gives way to the card (#964's G9).
     if (showing && PATH_NOTES.includes(showing.note.id) && pathShowing(showing.worldId)) { clear(); return; }
     const els = getState().data.elements;

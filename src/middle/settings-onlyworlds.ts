@@ -21,6 +21,7 @@ import { buildV2Adapter } from '../sync/make-online';
 import { PATH_WAYPOINTS, RING_WAYPOINTS, OW_COUNCIL_URL, waypointsLit, type WaypointDef } from '../core/waypoints';
 import { guideElements, loadGuideState, setNotesOff, showNotesAgain } from '../core/guide';
 import { keepSafeCard } from './home-keepsafe';
+import { keepSafeStrand } from './keepsafe-strand';
 
 const OW_SITE_URL = 'https://onlyworlds.com';
 const OW_TOOLKIT_URL = 'https://onlyworlds.github.io';
@@ -74,7 +75,7 @@ function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): st
   const s = getState();
   const open = !!activeWorld && s.active?.worldId === activeWorld.id;
   const els = open ? s.data.elements : [];
-  const keepSafeShowing = open && !!keepSafeCard({ entry: activeWorld, elements: guideElements(els), loading: !!s.data.loading, now: Date.now() });
+  const keepSafeShowing = open && !!keepSafeCard({ entry: activeWorld, elements: guideElements(els), loading: !!s.data.loading, now: Date.now(), strand: keepSafeStrand(activeWorld.id) });
   const lit = open ? waypointsLit(els, activeWorld, keepSafeShowing) : null;
   const row = (w: WaypointDef): string => {
     const met = !!lit?.[w.id];

@@ -68,9 +68,8 @@ import {
   buildStrandHead, buildStrandPanel, choosePicture, chosenTab, holdStrandRows, notePictureShown, openHeadLatch,
   settleStrandFocus, strandContext, strandFocusKey, tabPanel,
 } from './home-strand';
-import { isKeptHere, keptSetOf } from '../sync/sync-attach';
-import { strandView } from '../core/strand';
-import { strandWhole } from '../core/strand-journey';
+import { keptSetOf } from '../sync/sync-attach';
+import { keepSafeStrand } from './keepsafe-strand';
 import { homeScrollKeeper, type HomeDraw } from './home-scroll';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
@@ -957,10 +956,7 @@ function persistDismiss(worldId: string, cardId: string): void {
 function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManager): HTMLElement | null {
   const s = getState();
   const entry = s.registry.worlds.find(w => w.id === worldId);
-  // A strand still being made: its story's text is the journey's first answer, not yet a world to copy.
-  const strand = s.active?.worldId === worldId ? strandView(s.active.meta, s.data.elements, id => isKeptHere(worldId, id)) : null;
-  const strandStory = strand && !strandWhole(strand) ? strand.narrative?.id ?? null : null;
-  const card = keepSafeCard({ entry, elements, loading: !!s.data.loading, now: Date.now(), strandStory });
+  const card = keepSafeCard({ entry, elements, loading: !!s.data.loading, now: Date.now(), strand: keepSafeStrand(worldId) });
   if (!card || !entry) return null;
   const line = card.reduced
     ? `${card.reduced === 'online' ? 'Your OnlyWorlds account holds' : 'Your JSON file holds'} this world's elements, but not its pages, aliases, notes, writing formatting, saved charts or images kept in Atlas. A download holds all of it.`

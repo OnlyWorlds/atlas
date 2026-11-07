@@ -148,3 +148,28 @@ test('an empty world\'s story made on the strand keeps Home on the strand, after
   await expect(story.locator('.atlas-home-strand-name')).toHaveText('A Tale');
   await expect(card(page)).toHaveAttribute('data-card-slot', 'character');
 });
+
+test('the first Tab offers Skip to the strand while the strand asks; Enter lands in the asking card; gone once Home asks nothing', async ({ page }) => {
+  await setupWorld(page);
+  const skip = page.locator('[data-role="strand-skip"]');
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Tab');
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeVisible();
+  await expect(skip).toHaveText('Skip to the strand');
+  await page.keyboard.press('Enter');
+  await expect(card(page).locator('[data-field="name"]')).toBeFocused();
+
+  // A world with more than its strand opens on Picture: no asking card, no ways in, no skip.
+  await createViaStore(page, 'character', { name: 'Mira' });
+  await createViaStore(page, 'event', { name: 'The Founding' });
+  await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/settings`;
+  });
+  await expect(page.locator('.atlas-world-home')).toHaveCount(0);
+  await goHome(page);
+  await expect(tabs(page)).toHaveCount(2);
+  await expect(card(page)).toHaveCount(0);
+  await expect(skip).toBeHidden();
+});

@@ -573,3 +573,30 @@ test.describe('on a phone', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 });
+
+test('a whole strand in a small browser world asks for a copy, though its story has no text; four of five do not', async ({ page }) => {
+  await setupWorld(page, 'Quiet Ferry');
+  const ids = { n: '00000000-0000-4000-8000-0000000000a1', e: '00000000-0000-4000-8000-0000000000a2', l: '00000000-0000-4000-8000-0000000000a3', c: '00000000-0000-4000-8000-0000000000a4', now: '00000000-0000-4000-8000-0000000000a5' };
+  const keepsafe = page.locator('[data-role="keepsafe"]');
+  await put(page, 'location', ids.l, 'Saltmere Quay');
+  await put(page, 'location', ids.now, 'The Drowned Library');
+  await put(page, 'event', ids.e, 'The night crossing', { locations: [ids.l] });
+  await put(page, 'narrative', ids.n, 'The Lantern Ferry', { events: [ids.e] });
+  await put(page, 'character', ids.c, 'Odile Varn', { location: ids.now });
+  await setMark(page, { narrative: ids.n, event: ids.e, location: ids.l });
+  // Four of five: the story names no main character yet. Five elements, no text, no map: nothing asks.
+  await expect(page.locator('[data-role="home-strand"]')).toBeVisible();
+  await expect(keepsafe).toHaveCount(0);
+  // The story's main character, already somewhere: the strand is whole, and the copy is asked.
+  await page.evaluate(async ({ n, c }) => {
+    const api = (window as any).__atlasTestApi;
+    await api.getActiveStore().updateElement(n, { protagonist: c });
+    api.patchData(await api.getActiveStore().listElements());
+  }, { n: ids.n, c: ids.c });
+  await expect(boxName(page, 'character')).toHaveText('Odile Varn');
+  await expect(boxName(page, 'now')).toHaveText('The Drowned Library');
+  await expect(boxName(page, 'event')).toHaveText('The night crossing');
+  await expect(boxName(page, 'location')).toHaveText('Saltmere Quay');
+  await expect(keepsafe).toBeVisible();
+  await expect(keepsafe).toContainText('This world lives only in this browser');
+});
