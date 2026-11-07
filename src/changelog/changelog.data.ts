@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'whole-strand-asks-copy',
         title: 'A whole strand asks you to keep a copy',
-        body: 'A world that lives only in this browser now asks for a copy once its strand is whole, however small the world is. The first steps used to ask this as their last step; since they made way for the strand, a small world went unasked until it held 25 elements.',
+        body: 'A world that lives only in this browser, with no copy online or exported, now asks for a copy once its strand is whole, however small the world is. The first steps used to ask this as their last step; since they made way for the strand, a small world went unasked until it held 25 elements or a written scene.',
         tags: ['home', 'onboarding'],
       },
       {

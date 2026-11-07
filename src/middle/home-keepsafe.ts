@@ -33,13 +33,15 @@ export interface KeepSafeStrand {
 }
 
 /**
- * A whole strand asks for a copy whatever its size: it took the place of the first steps, whose last
- * step was the copy. The story of a strand still being made does not ask: its text is the journey's
- * first answer. Any other written story still does.
+ * A whole strand asks for a copy whatever its size where the first steps' last step, the copy, would
+ * have asked: a world with no copy anywhere, neither online nor exported (`guideDots`' copy dot), so
+ * a member of someone's online world is not asked because the owner finished the strand (1.123.4's
+ * gate). The story of a strand still being made does not ask: its text is the journey's first answer.
+ * Any other written story still does.
  */
-function worthKeeping(elements: Element[], strand: KeepSafeStrand | null): boolean {
+function worthKeeping(entry: WorldRegistryEntry, elements: Element[], strand: KeepSafeStrand | null): boolean {
   if (elements.length >= KEEPSAFE_THRESHOLD) return true;
-  if (strand?.whole) return true;
+  if (strand?.whole && entry.state !== 'api-linked' && !entry.kept_export_at) return true;
   const strandStory = strand ? strand.story : null;
   return elements.some(el => {
     const e = el as Element & { story?: unknown; image_url?: unknown; image_media_id?: unknown };
@@ -70,7 +72,7 @@ export function keepSafeCard(input: {
   if (!entry || loading || !isBrowserWorld(entry) || entry.demo === true || entry.cleared_at) return null;
   // A view-only copy (conv. 177) is kept safe by the world it copies.
   if (entryIsViewOnly(entry)) return null;
-  if (!worthKeeping(elements, input.strand ?? null)) return null;
+  if (!worthKeeping(entry, elements, input.strand ?? null)) return null;
   const snoozed = Date.parse(entry.keep_nudge_snoozed_until ?? '');
   if (Number.isFinite(snoozed) && now < snoozed) return null;
   const downloaded = Date.parse(entry.kept_download_at ?? '');

@@ -53,6 +53,12 @@ describe('keepSafeCard', () => {
     expect(keepSafeCard({ entry: entry(), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: true } })).toEqual({ reduced: null });
     expect(keepSafeCard({ entry: entry(), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: false } })).toBeNull();
     expect(keepSafeCard({ entry: entry(), elements: five, loading: false, now: NOW, strand: null })).toBeNull();
+    // Only where the first steps' copy step would have asked: not an online world (a member of someone's
+    // world whose owner finished the strand), not one exported as JSON. Their 25 and their texts still ask.
+    const whole = { story: 'n', whole: true };
+    expect(keepSafeCard({ entry: entry({ state: 'api-linked', api: { world_id: 's', api_key: 'k' } } as never), elements: five, loading: false, now: NOW, strand: whole })).toBeNull();
+    expect(keepSafeCard({ entry: entry({ kept_export_at: iso(NOW - DAY) }), elements: five, loading: false, now: NOW, strand: whole })).toBeNull();
+    expect(keepSafeCard({ entry: entry({ state: 'api-linked', api: { world_id: 's', api_key: 'k' } } as never), elements: [...five, ...chars(25)], loading: false, now: NOW, strand: whole })).toEqual({ reduced: 'online' });
     // Still never for a folder world, and a download still hides it.
     expect(keepSafeCard({ entry: entry({ where: undefined }), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: true } })).toBeNull();
     expect(keepSafeCard({ entry: entry({ kept_download_at: iso(NOW) }), elements: five, loading: false, now: NOW, strand: { story: 'n', whole: true } })).toBeNull();
