@@ -355,6 +355,18 @@ test('a line pair: two Characters cannot be linked; Mira onto The Founding by tw
   await expect(page.locator('.atlas-middle-content')).toContainText('Mira');
 });
 
+test('a story made by the plain +, then an Event made and dropped onto it: the story lists the Event', async ({ page }) => {
+  await setupWorld(page);
+  await toPicture(page);
+  await make(page, 'How the Harbour began', 'a story');
+  await make(page, 'The Founding', 'an event', 1);
+  const founding = await idOf(page, 'The Founding');
+  await select(page, 'The Founding');
+  await expect(square(page, 'How the Harbour began')).toHaveClass(/is-target/);
+  await dropOn(page, 'How the Harbour began', 'How the Harbour began now lists The Founding');
+  await expect.poll(async () => (await element(page, 'How the Harbour began')).events ?? []).toEqual([founding]);
+});
+
 test('a browse by presses writes nothing: press Mira, press The Founding, press a third square', async ({ page }) => {
   await setupWorld(page);
   await createViaStore(page, 'character', { name: 'Mira' });

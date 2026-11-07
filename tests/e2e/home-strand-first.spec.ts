@@ -93,6 +93,10 @@ test('a new world opens on the strand alone: no tab head, the story\'s card and 
   await expect(bringIn(page)).toContainText('Already have a world file or notes?');
   await expect(bringIn(page).locator('[data-bring-action="file"]')).toHaveText('Bring in a file');
   await expect(bringIn(page).locator('.atlas-btn-primary')).toHaveCount(0);
+  // The three ways in their order, the folder only where this browser opens one (the old path's test, kept).
+  const folders = await page.evaluate(() => 'showDirectoryPicker' in window);
+  expect(await bringIn(page).locator('[data-bring-action]').evaluateAll(els => els.map(e => [e.getAttribute('data-bring-action'), e.textContent])))
+    .toEqual([['file', 'Bring in a file'], ...(folders ? [['folder', 'Open a folder']] : []), ['download', 'Download a world']]);
   expect(await cardsDrawn(page), 'no first-steps card, not for a frame').toBe(0);
 
   // Two elements made (a Character, an Event with no date): no head in this visit.
@@ -108,6 +112,14 @@ test('a new world opens on the strand alone: no tab head, the story\'s card and 
   await goHome(page);
   await expect(tabs(page)).toHaveCount(2);
   expect(await tabs(page).evaluateAll(els => els.map(e => e.getAttribute('data-tab')))).toEqual(['picture', 'strand']);
+  // Home's tabs draw a keyboard ring when reached by Tab (`.atlas-home-tab:focus-visible`).
+  await tabs(page).nth(1).focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(tabs(page).first()).toBeFocused();
+  expect(await tabs(page).first().evaluate(e => {
+    const s = getComputedStyle(e);
+    return [e.matches(':focus-visible'), s.outlineStyle, s.outlineWidth, s.outlineOffset];
+  })).toEqual([true, 'solid', '2px', '1px']);
   // No longer empty: the ways in under the strand are gone.
   await expect(bringIn(page)).toHaveCount(0);
   await page.waitForTimeout(300);
