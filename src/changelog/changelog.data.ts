@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'make-online-copied-world',
         title: 'Make online sends the elements of a copied world',
-        body: 'A world copied from OnlyWorlds, such as the Moppetopia copy from Explore Moppetopia or a world file saved from an online world, made online with Create new sent none of its elements: Atlas said 0 elements uploaded and linked it to an empty world. Its elements now go up. When their ids already belong to another OnlyWorlds world, as the Moppetopia copy\'s do, Atlas says so, they stay in your copy, and Settings can give them new ids.',
+        body: 'A world copied from OnlyWorlds, such as the Moppetopia copy from Explore Moppetopia or a world file saved from an online world, made online with Create new sent none of its elements: Atlas said 0 elements uploaded and linked it to an empty world. Its elements now go up. When their ids already belong to another OnlyWorlds world, as the Moppetopia copy\'s do, Atlas says so, they stay in your copy, and Settings can give them new ids. While an id update in the world is unfinished, Create new now says to finish or undo it first, instead of making an empty world.',
         tags: ['sync', 'fix'],
       },
     ],

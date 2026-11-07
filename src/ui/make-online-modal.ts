@@ -315,7 +315,13 @@ export class MakeOnlineModal extends BaseModal {
     this.setBusy(true);
 
     try {
-      // 0. Signed out: sign in first, so the account makes the world.
+      // 0. An unfinished id update owns this world until it is finished or undone: its push sends
+      // nothing (the engine skips a round while the journal stands), so a world made now would go
+      // online empty under "is online". The link route refuses the same way.
+      if (await getActiveStore()?.hasRekeyJournal()) {
+        throw new PlainError('An id update in this world did not finish. In Settings, under This world, use Finish it or Undo it, then make it online.');
+      }
+      // Signed out: sign in first, so the account makes the world.
       if (signInInputs(form)) {
         progressBox.textContent = 'Signing in to OnlyWorlds…';
         progressBox.hidden = false;
