@@ -427,6 +427,21 @@ test('the held world landing by another door (here, the account list\'s key) dro
   await expect(page.locator('.ow-toast', { hasText: 'The seat an earlier link made for Moppetopia is unused now' })).toBeVisible();
 });
 
+test('a folder whose only world is a held seat: the middle names it, not "make a world"', async ({ page }) => {
+  await freshBoot(page);
+  await mockKeel(page);
+  await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    (window as any).__atlasTestApi.setNextDirectory(await root.getDirectoryHandle('held-only-root', { create: true }));
+    await (window as any).__atlasTestApi.setupHomeFolder();
+  });
+  await expect(page.locator('.atlas-grounded-next')).toContainText('Now make a world');
+  await seedHeld(page);
+  await expect(page.locator('[data-held-seat] [data-role="held-download"]')).toHaveText('Moppetopia');
+  await expect(page.locator('[data-role="no-world-line"]')).toHaveText('Moppetopia waits in the sidebar, not downloaded yet. Press it there to download it.');
+  await expect(page.locator('.atlas-grounded-next')).toHaveCount(0);
+});
+
 test('Remove on a held row asks, then says the seat stays on onlyworlds.com', async ({ page }) => {
   await freshBoot(page);
   await mockKeel(page);

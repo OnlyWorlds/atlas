@@ -18,6 +18,7 @@ import { getState, subscribe } from '../core/state';
 import { recoverAtlasRoot, setupAtlasRoot } from '../setup/atlas-root-flow';
 import { finishSetupDoor, openAddWorldChooser, runAddWorldAction } from '../setup/world-doors';
 import { isAtlasGrounded } from '../core/grounded';
+import { heldSeats } from '../core/held-seats';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -330,7 +331,10 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           if (!getState().active && !isTourFlagActive() && isNarrowSidebar()) openDrawer('sidebar');
         }, 0);
       }
-      const hasWorlds = state.registry.worlds.length > 0;
+      // A held seat (a link redeemed, its world not downloaded yet) is a
+      // world in the list: the next step is its Download, not a new world.
+      const held = state.registry.worlds.length === 0 ? heldSeats(state.registry) : [];
+      const hasWorlds = state.registry.worlds.length > 0 || held.length > 0;
       if (!hasWorlds) {
         // Zero worlds = the grounding beat, minimal (Titus's call):
         // just the confirmation + path. The three sidebar + buttons are the
@@ -416,7 +420,11 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         <div class="atlas-landing atlas-grounded">
           <div class="atlas-landing-hero">
             <div class="atlas-landing-mark atlas-landing-mark-sm">Atlas</div>
-            <p class="atlas-landing-tag">No world open. Pick one from the sidebar.</p>
+            <p class="atlas-landing-tag" data-role="no-world-line">${held.length === 0
+              ? 'No world open. Pick one from the sidebar.'
+              : held.length === 1
+                ? `${escapeText(held[0].world_name || 'Untitled world')} waits in the sidebar, not downloaded yet. Press it there to download it.`
+                : `${held.length} worlds wait in the sidebar, not downloaded yet. Press one there to download it.`}</p>
             ${pathLine}
           </div>
         </div>

@@ -58,13 +58,19 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.123.5',
     date: '2026-11-07',
-    theme: 'The fix beside the sentence',
+    theme: 'The next step, said where it is',
     entries: [
       {
         id: 'make-online-new-ids-button',
         title: 'Give new ids from the Make online message',
         body: 'When Make online cannot upload elements because their ids already belong to another OnlyWorlds world, its message now carries a Give new ids button, as the sync message does, and says where the fix lives: Settings, under This world.',
         tags: ['sync', 'fix'],
+      },
+      {
+        id: 'held-seat-middle',
+        title: 'A world waiting to download is named on the first screen',
+        body: 'When the only world in the list is one you joined by a link and have not downloaded yet, the middle of the screen now says it waits in the sidebar and that pressing it downloads it. It used to say to make a world.',
+        tags: ['worlds', 'fix'],
       },
     ],
   },
