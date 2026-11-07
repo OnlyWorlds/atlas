@@ -51,7 +51,7 @@ describe('sync failure copy, one foreign id', () => {
     expect(text).toBe(
       '1 element could not upload because its id already belongs to another OnlyWorlds world. '
       + 'This happens with a copied or imported folder, or a world taken online a second time. '
-      + 'It stays safe on your disk, and Settings can give it a new id.',
+      + 'It stays safe on your disk, and Settings, under This world, can give it a new id.',
     );
     expect(text).toContain('its id');
     expect(text).toContain('It stays');

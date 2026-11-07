@@ -53,7 +53,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   const parts: string[] = [];
   const foreign = byKind.get('foreign_id');
   if (foreign) {
-    parts.push(`${plural(foreign.length, 'element', 'elements')} could not upload because ${foreign.length === 1 ? 'its id already belongs' : 'their ids already belong'} to another OnlyWorlds world. This happens with ${inBrowser ? 'a copied or imported world' : 'a copied or imported folder'}, or a world taken online a second time. ${foreign.length === 1 ? 'It stays safe' : 'They stay safe'} ${inBrowser ? 'in this browser' : 'on your disk'}, and Settings can give ${foreign.length === 1 ? 'it a new id' : 'them new ids'}.`);
+    parts.push(`${plural(foreign.length, 'element', 'elements')} could not upload because ${foreign.length === 1 ? 'its id already belongs' : 'their ids already belong'} to another OnlyWorlds world. This happens with ${inBrowser ? 'a copied or imported world' : 'a copied or imported folder'}, or a world taken online a second time. ${foreign.length === 1 ? 'It stays safe' : 'They stay safe'} ${inBrowser ? 'in this browser' : 'on your disk'}, and Settings, under This world, can give ${foreign.length === 1 ? 'it a new id' : 'them new ids'}.`);
   }
   const large = byKind.get('too_large');
   if (large) {

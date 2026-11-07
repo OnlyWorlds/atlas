@@ -44,12 +44,22 @@ import { owWorldUrl } from '../core/ow-site';
 import { signInFieldsHtml, signedInLineHtml, missingSignIn, signInInputs, signInFromFields, PIN_REASON_HTML } from './sign-in-fields';
 import { wireOnlyWorldsSignIn } from './onlyworlds-sign-in-button';
 
-import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
+import { classifyFailure, describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
+import { resolveFixes } from './problem-fixes';
+import type { PerElementFailure } from '../core/types';
 import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
 import { keyCheckError } from '../setup/key-check-errors';
 import { slicePushRefusal } from '../core/provenance';
 // view-only-ok: a view-only world is already online, and Make online is for a local world (conv. 149).
+
+/**
+ * The fix that goes with a foreign-id sentence: the button the round's own
+ * toast carries (sync-attach), since this toast stands in for that one.
+ */
+function newIdsFix(failures: readonly PerElementFailure[], worldId: string) {
+  return failures.some(f => classifyFailure(f) === 'foreign_id') ? resolveFixes(['new-ids'], { worldId }) : [];
+}
 
 /** Where the world being taken online keeps its files: the open world (1.17). */
 function activeFilesWhere(): 'folder' | 'browser' {
@@ -417,7 +427,8 @@ export class MakeOnlineModal extends BaseModal {
         // Registered as shown: the flush-on-attach
         // round re-sends the same failing set a moment later and must not
         // repeat the paragraph.
-        this.toasts.error(`${name} is online. ${failureToastOnce(pushResult.failures, activeFilesWhere()) ?? describeFailures(pushResult.failures, activeFilesWhere())}`);
+        this.toasts.show(`${name} is online. ${failureToastOnce(pushResult.failures, activeFilesWhere()) ?? describeFailures(pushResult.failures, activeFilesWhere())}`,
+          'error', 8000, { actions: newIdsFix(pushResult.failures, active.worldId) });
       } else {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
         // The way back to the site: the world's own page there, where its members, keys and invites live.
@@ -582,7 +593,9 @@ export class MakeOnlineModal extends BaseModal {
       if (downloaded) parts.push(`${downloaded} downloaded`);
       if (failed) parts.push(`${failed} failed`);
       const summary = parts.length ? parts.join(', ') : 'Nothing to merge';
-      const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
+      const verb = failed > 0
+        ? (m: string) => this.toasts.show(m, 'error', 8000, { actions: newIdsFix(failures, worldId) })
+        : this.toasts.success.bind(this.toasts);
       const unmatched = ambiguousLine(mergeResult.ambiguous);
       const spatial = childClashLine(mergeResult.childClashes);
       const hiddenLeft = hiddenOnlineLine(mergeResult.hiddenOnline ?? []);

@@ -119,6 +119,65 @@ test('Signed in, Make online asks only the PIN and makes the world on the accoun
   expect(made).toEqual(expect.objectContaining({ name: 'Sandbox', pin: '1234' }));
 });
 
+// A copied world (Explore Moppetopia, a linked world's file) carries keel's
+// stamps and ids another world holds: Create new says so, the toast carries
+// the fix, and Settings, already open under it, offers Give them new ids at
+// once (the button used to wait for the element list's next reload).
+test('Create new on a copy whose ids keel refuses: the fix on the toast and in Settings at once', async ({ page }) => {
+  const V2 = 'https://www.onlyworlds.com/api/v2';
+  await page.route(`${V2}/**`, async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname.replace('/api/v2', '');
+    if (path === '/account/worlds' && req.method() === 'POST') {
+      return route.fulfill({ status: 201, json: { id: '0e2e0000-0000-4000-8000-0000000000c9', name: 'Copy', key: 'ow_w_' + 'c'.repeat(40) } });
+    }
+    if (path === '/account') return route.fulfill({ json: { username: 'e2e-member', email: null } });
+    if (path === '/world') return route.fulfill({ json: { id: '0e2e0000-0000-4000-8000-0000000000c9', name: 'Copy', updated_at: '2026-11-07T00:00:00.000Z' } });
+    if (path === '/bulk' && req.method() === 'POST') {
+      const body = req.postDataJSON() as { items: Array<{ element: { id: string } }> };
+      return route.fulfill({
+        status: 207,
+        json: { errors: true, items: body.items.map(it => ({ status: 409, id: it.element.id, error: { code: 'id_conflict', message: 'This id already exists in another world: a copied world folder needs fresh ids.', param: 'id' } })) },
+      });
+    }
+    if (/^\/(character|location)\/[0-9a-f-]+\/?$/.test(path)) return route.fulfill({ status: 404, json: { error: { code: 'not_found' } } });
+    return route.fulfill({ json: { data: [] } });
+  });
+  await setupAtlasRoot(page);
+  await createLocalWorld(page, 'Copy');
+  await page.evaluate(async () => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    const L = await store.createElement('location', { name: 'Rivendell' });
+    const C = await store.createElement('character', { name: 'Elrond', location: L.id });
+    await store.stampServerUpdatedAt(L.id, 'location', '2026-01-01T00:00:00.000Z');
+    await store.stampServerUpdatedAt(C.id, 'character', '2026-01-01T00:00:00.000Z');
+    const reg = JSON.parse(localStorage.getItem('atlas_worlds_registry')!);
+    reg.account_token = 'ow_a_' + 'e'.repeat(40);
+    reg.account_username = 'e2e-member';
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
+  });
+  // The stamps load into memory as a copied world's do.
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="world"]');
+  await page.click('[data-action="make-online"]');
+  const pane = page.locator('[data-route-pane="create"]');
+  await pane.locator('input[name="create-pin"]').fill('1234');
+  await pane.locator('[data-action="create-submit"]').click();
+  await expect(page.locator('[data-modal="make-online"]')).toHaveCount(0, { timeout: 15_000 });
+  const toast = page.locator('.ow-toast', { hasText: 'already belong to another OnlyWorlds world' });
+  await expect(toast).toContainText('Settings, under This world, can give them new ids');
+  await expect(toast.getByRole('button', { name: 'Give new ids' })).toBeVisible();
+  // Settings stayed open under the modal: the row is there now, not after a reload.
+  await expect(page.locator('[data-role="foreign-ids"]')).toBeVisible({ timeout: 5_000 });
+  // From another tab, the toast's button lands on it.
+  await page.click('[data-settings-tab="general"]');
+  await expect(page.locator('[data-action="give-new-ids"]')).toHaveCount(0);
+  await toast.getByRole('button', { name: 'Give new ids' }).click();
+  await expect(page.locator('[data-action="give-new-ids"]')).toHaveText('Give them new ids');
+});
+
 test('Tab switching toggles the active route pane', async ({ page }) => {
   await setupAtlasRoot(page);
   await createLocalWorld(page, 'Sandbox');

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.5',
+    date: '2026-11-07',
+    theme: 'The fix beside the sentence',
+    entries: [
+      {
+        id: 'make-online-new-ids-button',
+        title: 'Give new ids from the Make online message',
+        body: 'When Make online cannot upload elements because their ids already belong to another OnlyWorlds world, its message now carries a Give new ids button, as the sync message does, and says where the fix lives: Settings, under This world.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.4',
     date: '2026-11-07',
     theme: 'What the first steps did, kept',
@@ -3027,7 +3040,7 @@ export const CHANGELOG: ChangelogRelease[] = [
         id: 'account-one-sign-in',
         title: 'One way to sign in, and where your PIN comes from',
         body: 'Settings, OnlyWorlds, Account opens with the account token, the one way to sign in. Below it, the PIN says it is one for all your worlds and that you set it on onlyworlds.com, in Account settings under World PIN, and the email says Make online uses it.',
-        tags: ['sync', 'copy'],
+        tags: ['sync', 'fix'],
       },
       {
         id: 'picture-once-online',

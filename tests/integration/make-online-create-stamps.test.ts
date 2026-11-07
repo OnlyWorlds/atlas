@@ -55,7 +55,7 @@ describe('Make online, Create new, on a copy carrying another world\'s stamps', 
     const text = toast.textContent ?? '';
     expect(text).not.toMatch(/0 elements uploaded/);
     expect(text).toMatch(/2 elements could not upload because their ids already belong to another OnlyWorlds world/);
-    expect(text).toMatch(/Settings can give them new ids/);
+    expect(text).toMatch(/Settings, under This world, can give them new ids/);
     expect(onServer(keel, 'character', A)).toBe(false);
 
     // Not believed synced: no baseline, so the store lists them as waiting to go up,
