@@ -414,6 +414,9 @@ function appendOpenAndJustNow(section: HTMLElement, worldId: string): void {
   undo.addEventListener('click', () => {
     focusAfter = '[data-role="grow-line"], [data-role="home-grid"] [data-grid-id]';
     void undoJustNow(worldId).then(r => {
+      // Only a write that landed here keeps the focus asked for: a failed one, or one whose world left the
+      // screen, would hand it to the next world's Home.
+      if (r !== 'wrote') focusAfter = null;
       // The field moved since the line was drawn: say so, and draw again without the line.
       if (r === 'nothing') { focusAfter = null; toastManager.info('Nothing to undo: that changed since.'); patchSlice('data', { ...getState().data }); }
     });
