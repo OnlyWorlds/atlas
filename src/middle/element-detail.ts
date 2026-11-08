@@ -567,6 +567,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
     renderDeferred = false;
     target.removeEventListener('focusout', onFocusOut);
     target.removeEventListener('blur', onBlurCapture, true);
+    // Leaving the room with a field focused: the room is taken down before this page's render
+    // hears the route, so blur the field here, its commit running while it is on the page (after
+    // the listeners above are off, so no redraw is queued on a page that is gone).
+    if (isEditingIn(target)) (document.activeElement as HTMLElement | null)?.blur();
     dropMark();
   };
 }

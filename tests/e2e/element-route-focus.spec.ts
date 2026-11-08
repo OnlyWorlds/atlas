@@ -87,4 +87,26 @@ for (const tag of ['', ' @firefox']) {
       return els.find((e: any) => e.id === z)?.atlas_color ?? null;
     }, z)).toBe('#ff0000');
   });
+
+  // Back out of the element room altogether: the room is taken down before the page's own render
+  // runs, so the take-down blurs the field itself.
+  test(`a value typed but not committed is saved when Back leaves for Home${tag}`, async ({ page }) => {
+    await setupWorld(page);
+    const z = await createElement(page, 'zone', { name: 'Zed Zone' });
+    const w = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
+    await page.evaluate((w) => { window.location.hash = `#/w/${w}`; }, w);
+    await expect(page.locator('[data-role="element-name"]')).toHaveCount(0);
+    await go(page, z);
+    await expect(page.locator('[data-role="element-name"]')).toHaveText('Zed Zone');
+    const input = page.locator('input[data-field="atlas_color_text"]');
+    await input.scrollIntoViewIfNeeded();
+    await input.click();
+    await input.fill('#00ff00');
+    await page.goBack();
+    await expect(page.locator('[data-role="element-name"]')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(async (z) => {
+      const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+      return els.find((e: any) => e.id === z)?.atlas_color ?? null;
+    }, z)).toBe('#00ff00');
+  });
 }
