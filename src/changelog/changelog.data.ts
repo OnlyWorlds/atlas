@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.9',
+    date: '2026-11-08',
+    theme: 'A press on an element that lands',
+    entries: [
+      {
+        id: 'element-page-keeps-press',
+        title: 'A press on an element\'s page no longer lost to a change elsewhere',
+        body: 'An element\'s page redrew whenever anything in the world changed (another element saved, a sync marking this one as sent, the folder edited outside Atlas), so a press on its name, a field or a link that fell on that moment did nothing. The page now waits for the press to finish. A change to the element you are on still shows at once, so you never edit a value someone else has just replaced.',
+        tags: ['editor', 'fix'],
+      },
+      {
+        id: 'rename-escape-keeps-change',
+        title: 'A change that arrives while you rename shows when you stop',
+        body: 'A change that arrived while you were renaming an element waited for the rename to end, and a rename ended with Escape or left unchanged dropped it until the next change. It now shows as soon as the rename closes.',
+        tags: ['editor', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.8',
     date: '2026-11-08',
     theme: 'One key per world',

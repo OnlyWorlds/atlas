@@ -42,6 +42,8 @@ import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type Waymark
 import { keptSetOf, proposedSetOf } from '../sync/sync-attach';
 import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
+import { afterPress, pressHeld } from '../ui/press';
+import { sameButStamps } from './held-element';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { proposedNoteFor } from './element-agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
@@ -116,6 +118,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
     queueMicrotask(render);
   };
   target.addEventListener('focusout', onFocusOut);
+  // A rename that ends with Escape or an unchanged name puts the title back inside its own blur
+  // handler, so the input is off the page before its focusout and the page never hears it: the
+  // deferred redraw was lost until the next change. Heard here before that handler runs, the
+  // input's own focusout carries it (once; the page's copy is a no-op after the first).
+  const onBlurCapture = (e: FocusEvent): void => {
+    if (renderDeferred && e.target instanceof HTMLElement) e.target.addEventListener('focusout', onFocusOut, { once: true });
+  };
+  target.addEventListener('blur', onBlurCapture, true);
   // The OnlyWorlds mark beside the name: held open, a redraw waits for its fan-out to close (Waymark R7).
   let mark: WaymarkSlot | null = null;
   let markHadFocus = false;
@@ -129,16 +139,37 @@ export function mountElementDetail(target: HTMLElement): () => void {
   // tour's two switches and the two pending edit requests.
   const gate = renderGate();
 
+  // A real change elsewhere in the world (another element saved, a round's stamps, the folder
+  // written outside Atlas) rebuilds the page, and a rebuild under a press loses the click. The
+  // redraw waits for the press, but only while the element drawn is the element now, stamps
+  // aside, on the same address, world and registry: every handler on the held picture captured
+  // the drawn element, so it may act only while that copy is still true. A change to the element
+  // itself rebuilds at once, as before (a lost press, never a stale write).
+  let drawn: { el: Element; active: unknown; registry: unknown } | null = null;
+  let alive = true;
+  const heldRender = (): void => { if (alive) render(); };
+  function holdForPress(s: ReturnType<typeof getState>): boolean {
+    if (!drawn || !pressHeld() || window.location.hash !== drawnHash) return false;
+    if (s.active !== drawn.active || s.registry !== drawn.registry) return false;
+    const el = getSelectedElement();
+    if (!el || !sameButStamps(drawn.el, el)) return false;
+    gate.reset();
+    afterPress(heldRender);
+    return true;
+  }
+
   function render(): void {
     // An open fan-out holds a redraw, but never a route change: the page follows the address.
     if (isEditingIn(target) || (waymarkOpenIn(target) && window.location.hash === drawnHash)) { renderDeferred = true; return; }
-    drawnHash = window.location.hash;
     const s = getState();
     const touring = isTourFlagActive();
     if (!gate.changed([window.location.hash, s.active, s.data, s.ui, s.registry, s.styles, touring,
       touring && document.body.classList.contains('atlas-tour-basefull'),
       pendingInlineNameEdit(), pendingCustomFieldEdit(), s.active ? keptSetOf(s.active.worldId) : undefined,
       s.active ? proposedSetOf(s.active.worldId) : undefined])) return;
+    if (holdForPress(s)) return;
+    drawnHash = window.location.hash;
+    drawn = null;
     captureScrollBeforeRender();
     markHadFocus = waymarkHasFocus(mark);
     dropMark();
@@ -174,6 +205,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       return;
     }
     renderDetail(el);
+    drawn = { el, active: state.active, registry: state.registry };
   }
 
   function renderDetail(el: Element): void {
@@ -523,10 +555,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
   const unsubHash = onHashChange(render);
   render();
   return () => {
+    alive = false;
     unsubState();
     unsubHash();
     renderDeferred = false;
     target.removeEventListener('focusout', onFocusOut);
+    target.removeEventListener('blur', onBlurCapture, true);
     dropMark();
   };
 }
