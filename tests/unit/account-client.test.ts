@@ -218,6 +218,28 @@ describe('AccountClient.mintWorldKey, a lost answer', () => {
     expect(k.calls).toEqual(['POST keys']);
   });
 
+  it('sends no revoke for a key keel already shows revoked', async () => {
+    const k = fakeKeel({ lose: 'network' });
+    mswServer.use(http.get(`${BASE}/account/worlds/${W}/keys/made`, () => {
+      k.calls.push('GET made');
+      return HttpResponse.json({ id: 'k1', last4: 'abcd', name: '', scope: 'write', revoked: true, kept: true });
+    }));
+    await expect(new AccountClient(TOKEN).mintWorldKey(W)).rejects.toBeTruthy();
+    expect(k.calls).toEqual(['POST keys', 'GET made']);
+  });
+
+  it('a take-back that fails leaves the caller the mint\'s own error', async () => {
+    const k = fakeKeel({ lose: '502' });
+    mswServer.use(http.delete(`${BASE}/account/worlds/${W}/keys/:id`, () => {
+      k.calls.push('DELETE failed');
+      return HttpResponse.json({ error: { code: 'server_error' } }, { status: 500 });
+    }));
+    const err = await new AccountClient(TOKEN).mintWorldKey(W).catch(e => e);
+    expect(err).toBeInstanceOf(OwV2Error);
+    expect((err as OwV2Error).status).toBe(502);
+    expect(k.calls).toEqual(['POST keys', 'GET made', 'DELETE failed']);
+  });
+
   it('on a keel before the lookup (405) is no worse than before: nothing taken back, the error goes on', async () => {
     const k = fakeKeel({ lose: '502', madeRoute: false });
     await expect(new AccountClient(TOKEN).mintWorldKey(W)).rejects.toMatchObject({ status: 502 });
