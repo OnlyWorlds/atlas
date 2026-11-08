@@ -202,4 +202,25 @@ for (const tag of ['', ' @firefox']) {
     await expect(page.locator('[data-role="element-name"]')).toHaveText('Ada');
     await expect.poll(body).not.toContain('Not synced');
   });
+
+  // A marker moved while its Delete is pressed: the held picture keeps the old row, and the confirm
+  // names the marker where it is now, never where the row drew it.
+  test(`a marker's Delete pressed while it moves confirms its point now${tag}`, async ({ page }) => {
+    await setupWorld(page);
+    const map = await createElement(page, 'map', { name: 'Coast' });
+    const z = await createElement(page, 'zone', { name: 'Shoal' });
+    const m = await createElement(page, 'marker', { name: 'm1', zone_id: z, map_id: map, x: 10, y: 20, order: 0 });
+    await openElement(page, z, 'Shoal');
+    const del = page.locator(`.atlas-zone-markers-row[data-marker-id="${m}"] [data-action="delete"]`);
+    await del.scrollIntoViewIfNeeded();
+    let asked = '';
+    page.once('dialog', async (d) => { asked = d.message(); await d.dismiss(); });
+    const box = (await del.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await writeElsewhere(page, m, { x: 99, y: 77 });
+    await page.evaluate(() => new Promise(r => setTimeout(r, 50)));
+    await page.mouse.up();
+    await expect.poll(() => asked).toBe('Delete marker (99, 77)?');
+  });
 }

@@ -354,12 +354,15 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
   // Delegate clicks for the whole section body.
   body.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
+    // The world as it is at the press, not as this section drew it: the page can hold its old
+    // picture for a press (conv. 146), and a marker moved meanwhile pans and confirms where it is.
+    const now = getState().data.elements;
     const panZone = target.closest<HTMLElement>('[data-action="pan-zone"]');
     if (panZone) {
       e.preventDefault(); // a button inside <summary> must not toggle the fold
       const mapId = panZone.getAttribute('data-map-id') ?? '';
-      const map = elements.find((el): el is WorldMap => el.type === 'map' && el.id === mapId);
-      const list = markers.filter(m => m.map_id === mapId);
+      const map = now.find((el): el is WorldMap => el.type === 'map' && el.id === mapId);
+      const list = now.filter((m): m is Marker => m.type === 'marker' && (m as Marker).zone_id === zone.id && (m as Marker).map_id === mapId);
       if (!map || list.length === 0) return;
       openMapTab(map);
       panMapTabTo(map.id, list.reduce((s, m) => s + m.x, 0) / list.length, list.reduce((s, m) => s + m.y, 0) / list.length);
@@ -369,12 +372,12 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
     if (!row) return;
     const markerId = row.getAttribute('data-marker-id');
     if (!markerId) return;
-    const marker = elements.find((el): el is Marker => el.type === 'marker' && el.id === markerId);
+    const marker = now.find((el): el is Marker => el.type === 'marker' && el.id === markerId);
     if (!marker) return;
 
     if (target.closest('[data-action="pan"]')) {
       // Open the map tab if not already open, then pan.
-      const map = elements.find((el): el is WorldMap => el.type === 'map' && el.id === marker.map_id);
+      const map = now.find((el): el is WorldMap => el.type === 'map' && el.id === marker.map_id);
       if (!map) {
         toasts.error('The map this marker belongs to is not in this world any more.');
         return;

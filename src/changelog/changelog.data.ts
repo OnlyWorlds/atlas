@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.11',
+    date: '2026-11-08',
+    theme: 'A zone\'s markers where they are',
+    entries: [
+      {
+        id: 'zone-marker-buttons-read-now',
+        title: 'A zone\'s marker buttons use the marker as it is now',
+        body: 'On a zone\'s page, a marker\'s Delete asked about its point and Pan went to it as the list had drawn them, so a marker moved at the moment you pressed was named, or panned to, at its old place. Both now read the marker when you press. Delete always removed the right marker.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.10',
     date: '2026-11-08',
     theme: 'Back means back',
