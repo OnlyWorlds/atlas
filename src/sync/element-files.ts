@@ -175,16 +175,18 @@ const readClient = (entry: WorldRegistryEntry): FilesClient => factory(entry.api
 /**
  * Read the element's files (and the world's total and who this key is) when
  * they are not known or a minute old. Resolves when done; the cards hear it
- * through `onFilesChanged`. Never rejects.
+ * through `onFilesChanged`. Never rejects. `again` (the card's Try again)
+ * reads a list that failed at once, whatever its age; a page rebuild never
+ * does, so a failing server is not asked on every redraw.
  */
-export function refreshFiles(entry: WorldRegistryEntry, type: string, id: string, now: () => number = Date.now): Promise<void> {
+export function refreshFiles(entry: WorldRegistryEntry, type: string, id: string, now: () => number = Date.now, again = false): Promise<void> {
   const ek = elementKey(entry, type, id);
   const wk = worldKey(entry);
   if (!ek || !wk) return Promise.resolve();
   const reads: Promise<void>[] = [];
 
   const e = elementSlot(ek);
-  if (!e.pending && (e.readAt === 0 || now() - e.readAt > STALE_AFTER_MS)) {
+  if (!e.pending && (e.readAt === 0 || now() - e.readAt > STALE_AFTER_MS || (again && e.failed))) {
     e.pending = withTimeout(Promise.resolve().then(() => readClient(entry).listFiles(type, id)), 'the files read').then(
       rows => { e.rows = rows; e.missing = false; e.failed = false; },
       (err: unknown) => {

@@ -29,7 +29,17 @@ const fileRow = (id: string, over: Record<string, unknown> = {}) => ({
   added_by: { name: 'Judge Holden', membership: null, agent: false }, added_at: '2026-10-19T10:00:00Z', ...over,
 });
 
-async function onlineWorld(page: Page): Promise<Seen> {
+/** Holds the first read of the world's total until `open()`; `landed` resolves once its answer is back. */
+function holdFirst() {
+  let open!: () => void;
+  let answered!: () => void;
+  const gate = new Promise<void>(r => { open = r; });
+  const landed = new Promise<void>(r => { answered = r; });
+  return { gate, open: () => open(), landed, answered: () => answered(), used: false };
+}
+type Hold = ReturnType<typeof holdFirst>;
+
+async function onlineWorld(page: Page, holdTotal?: Hold): Promise<Seen> {
   const seen: Seen = { tickets: [], host: [], links: [], deletes: [] };
   const now = '2026-10-10T00:00:00.000Z';
   let files = [
@@ -50,7 +60,15 @@ async function onlineWorld(page: Page): Promise<Seen> {
       with_character: false, character: null, key: KEY, pin: SECRET } });
     if (path === '/me' || path === '/me/') return route.fulfill({ json: {
       world: { id: WORLD_ID, name: 'Blood Meridian' }, scope: 'write', kind: 'agent', role: 'contributor', membership: 'm-seat', character: null } });
-    if (path === '/world/files') return route.fulfill({ json: { data: [], used_bytes: 41 * MB + files.length, cap_bytes: 250 * MB } });
+    if (path === '/world/files') {
+      const json = { data: [], used_bytes: 41 * MB + files.length, cap_bytes: 250 * MB };
+      if (!holdTotal || holdTotal.used) return route.fulfill({ json });
+      holdTotal.used = true;
+      await holdTotal.gate;
+      await route.fulfill({ json });
+      holdTotal.answered();
+      return;
+    }
     if (path === '/world' || path === '/world/') return route.fulfill({ json: { id: WORLD_ID, name: 'Blood Meridian', updated_at: now } });
     if (parts[0] === 'character' && parts[2] === 'files') {
       if (parts.length === 3 && req.method() === 'GET') return route.fulfill({ json: { data: files } });
@@ -157,6 +175,37 @@ test('Remove asks first, then the row leaves', async ({ page }) => {
   await expect(notes).toHaveCount(0);
   expect(seen.deletes).toEqual(['notes']);
 });
+
+/** Press `button`, let the world's total land while the press is down, then lift. */
+async function pressWhileTotalLands(page: Page, button: ReturnType<Page['locator']>, hold: Hold): Promise<void> {
+  await expect(button).toBeVisible();
+  // The rows are drawn and the total is still on its way: the moment a late read used to rebuild the card.
+  await expect(page.locator('.atlas-files-meta')).toHaveText('2');
+  // A mouse press goes where the pointer is: bring the button into view first, as a click would.
+  await button.scrollIntoViewIfNeeded();
+  const box = await button.boundingBox();
+  if (!box) throw new Error('no box for the button');
+  await button.evaluate((n) => { (n as any).__pressed = true; });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  hold.open();
+  await hold.landed;
+  await page.waitForTimeout(300); // the answer's repaint has run, or is held
+  // Held: the button the finger is on is still the one it went down on.
+  expect(await button.evaluate((n) => (n as any).__pressed === true)).toBe(true);
+  await page.mouse.up();
+}
+
+for (const tag of ['', ' @firefox']) {
+  test(`Download pressed while the world's total lands fetches the file${tag}`, async ({ page }) => {
+    const hold = holdFirst();
+    const seen = await onlineWorld(page, hold);
+    const card = page.locator('.atlas-files-section');
+    await pressWhileTotalLands(page, card.locator('[data-file-id="scan"] [data-action="download-file"]'), hold);
+    await expect.poll(() => seen.links).toEqual(['scan']);
+    await expect(card.locator('.atlas-files-meta')).toHaveText('2 · this world 41 MB of 250 MB');
+  });
+}
 
 test('a local world\'s element has no Files card', async ({ page }) => {
   await page.goto('/');

@@ -21,6 +21,7 @@ import {
 } from '../sync/element-files';
 import type { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
+import { afterPress } from '../ui/press';
 import { humanizeFieldName } from './element-detail-fields';
 
 const MAX_LABEL = 80;
@@ -108,7 +109,7 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
       again.type = 'button';
       again.className = 'atlas-btn-ghost';
       again.textContent = 'Try again';
-      again.addEventListener('click', () => { void refreshFiles(entry, el.type, el.id); });
+      again.addEventListener('click', () => { void refreshFiles(entry, el.type, el.id, Date.now, true); });
       line.appendChild(again);
       body.appendChild(line);
     } else if (view.rows && rows.length === 0 && view.uploads.length === 0) {
@@ -299,6 +300,8 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
   }
 
   async function download(row: OwFileRow, btn: HTMLButtonElement): Promise<void> {
+    // A held press may land on a row the newest read no longer holds (removed elsewhere).
+    if (!filesNow(entry, el.type, el.id).rows?.some(r => r.id === row.id)) { paint(); return; }
     btn.disabled = true;
     try {
       const url = await fileLink(entry, el.type, el.id, row.id);
@@ -318,6 +321,11 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
   }
 
   async function remove(row: OwFileRow): Promise<void> {
+    // A press held through a read lands on the row the last paint drew: ask the newest read
+    // whether the file is still here and still this key's to remove before asking the person.
+    const view = filesNow(entry, el.type, el.id);
+    const now = view.rows?.find(r => r.id === row.id);
+    if (!now || !mayRemove(now, view.me, readOnly)) { paint(); return; }
     if (!window.confirm(`Remove ${row.name} from OnlyWorlds for good?\n\nIt leaves this element and the world at once, for everyone.`)) return;
     try {
       await removeFile(entry, getState().registry, el.type, el.id, row.id);
@@ -327,12 +335,15 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
     }
   }
 
-  // Repaint in place while on the page; let go once the page is rebuilt.
+  // Repaint in place while on the page; let go once the page is rebuilt. A read that lands (the
+  // list, the world's total, another upload's progress) waits for a press in flight, so a press on
+  // Download or Remove is not rebuilt away under the finger; the card's own buttons repaint at once.
   let wasConnected = false;
+  const repaint = (): void => { if (section.isConnected) paint(); };
   const stop = onFilesChanged(() => {
     if (!section.isConnected) { if (wasConnected) stop(); return; }
     wasConnected = true;
-    paint();
+    afterPress(repaint);
   });
   paint();
   queueMicrotask(() => { wasConnected ||= section.isConnected; });

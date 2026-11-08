@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.7',
+    date: '2026-11-08',
+    theme: 'A press on a file that lands',
+    entries: [
+      {
+        id: 'files-card-keeps-press',
+        title: 'Download and Remove on a file no longer lost to a late read',
+        body: 'An element\'s Files card redrew itself whenever a read landed (its list, the world\'s total, another file\'s upload), so a press on Download or Remove that fell on that moment did nothing. The card now waits for the press to finish before it redraws.',
+        tags: ['files', 'fix'],
+      },
+      {
+        id: 'files-try-again-reads',
+        title: 'Try again on the Files card reads the files at once',
+        body: 'When the files could not be read, Try again did nothing for a minute after the failed read. It now asks OnlyWorlds again straight away.',
+        tags: ['files', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.6',
     date: '2026-11-08',
     theme: 'A click that lands',

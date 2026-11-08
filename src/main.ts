@@ -22,6 +22,7 @@ import { hasFolderMode, hasOpfsMode } from './core/capabilities';
 import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
 import { installIconA11y } from './ui/icon-a11y';
 import { watchFailedLandings } from './setup/landing-failed';
+import { watchPresses } from './ui/press';
 import { installDocumentTitle } from './ui/document-title';
 import { installTruncationTitles } from './ui/truncation-title';
 import { applyTheme } from './core/theme';
@@ -100,6 +101,8 @@ function boot(): void {
   // ui/icon-a11y.ts for the demolition plan.
   installIconA11y();
   watchFailedLandings();
+  // A redraw driven by data waits for a press in flight (ui/press.ts): seen from the first press.
+  watchPresses();
   // The tab title follows the route; clipped names show whole on hover.
   installDocumentTitle();
   installTruncationTitles();

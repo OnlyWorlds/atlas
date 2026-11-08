@@ -122,6 +122,22 @@ describe('refreshFiles', () => {
     await expect(refreshFiles(entry, 'character', 'e1')).resolves.toBeUndefined();
     expect(filesNow(entry, 'character', 'e1').failed).toBe(true);
   });
+
+  it('Try again reads a failed list at once; a redraw within the minute does not', async () => {
+    let down = true;
+    const f = fake({ listFiles: vi.fn(async () => { f.calls.push('list'); if (down) throw new OwNetworkError('down', null); return [row('f1')]; }) });
+    const t = () => 1_000_000;
+    await refreshFiles(entry, 'character', 'e1', t);
+    await refreshFiles(entry, 'character', 'e1', t); // a page rebuild: the failing server is not asked again
+    expect(f.calls.filter(c => c === 'list')).toHaveLength(1);
+    down = false;
+    await refreshFiles(entry, 'character', 'e1', t, true);
+    expect(f.calls.filter(c => c === 'list')).toHaveLength(2);
+    expect(filesNow(entry, 'character', 'e1').failed).toBe(false);
+    expect(filesNow(entry, 'character', 'e1').rows?.map(r => r.id)).toEqual(['f1']);
+    await refreshFiles(entry, 'character', 'e1', t, true); // a list that was read is not read again early
+    expect(f.calls.filter(c => c === 'list')).toHaveLength(2);
+  });
 });
 
 describe('addFile', () => {
