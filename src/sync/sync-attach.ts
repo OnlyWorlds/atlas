@@ -20,6 +20,7 @@ import { adoptPersistedDiskHold, forgetPersistedDiskHold, holdBigBatchAtOpen, is
 import { OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
+import { sameElements } from './same-elements';
 import { patchSlice, getState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
 import type { FolderStore } from '../store/folder-store';
@@ -467,6 +468,17 @@ export function isProposedHere(worldId: string, elementId: string): boolean {
   return proposedSets[worldId]?.has(elementId) ?? false;
 }
 
+/** The proposed set itself, a new object only when it changed: the element page's gate part for its sync mark
+ *  (a proposal leaves the element's file as it was, so no elements patch redraws the page). */
+export function proposedSetOf(worldId: string): ReadonlySet<string> | undefined {
+  return proposedSets[worldId];
+}
+
+/** Test-only: read the world's proposed set from its sync state, as a round does. */
+export function __test_refreshProposedSet(worldId: string, folder: FolderStore): Promise<void> {
+  return refreshProposedSet(worldId, folder);
+}
+
 async function refreshProposedSet(worldId: string, folder: FolderStore): Promise<void> {
   try {
     const ids = ((await folder.readSyncState()).proposed ?? []).map(e => e.element_id);
@@ -712,10 +724,12 @@ export async function pullNowAndRefresh(): Promise<import('../core/types').SyncR
     updates: result.pulled.updates,
     conflicts: result.conflicts.length,
   });
-  // Re-read folder elements to reflect any creates/updates from the pull.
+  // Re-read folder elements to reflect any creates/updates from the pull. A pull that changed
+  // nothing (the open's pull, every cadence tick of a quiet world) keeps the store's array, so
+  // nothing redraws under a click in flight (same-elements.ts).
   try {
     const elements = await currentFolder.listElements();
-    patchSlice('data', { elements });
+    if (!sameElements(getState().data.elements, elements)) patchSlice('data', { elements });
   } catch (err) {
     console.warn('[sync-attach] refresh-after-pull failed:', err);
   }
@@ -971,7 +985,8 @@ async function refreshElementsCache(): Promise<void> {
   if (!currentFolder) return;
   try {
     const elements = await currentFolder.listElements();
-    patchSlice('data', { elements });
+    // Every round ends here: a round that wrote nothing keeps the store's array (same-elements.ts).
+    if (!sameElements(getState().data.elements, elements)) patchSlice('data', { elements });
   } catch (err) {
     console.warn('[sync-attach] refresh elements cache failed:', err);
   }

@@ -39,7 +39,7 @@ import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
 import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-detail-header';
 import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
-import { keptSetOf } from '../sync/sync-attach';
+import { keptSetOf, proposedSetOf } from '../sync/sync-attach';
 import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
 import { escapeText, relativeTime } from '../core/dom-utils';
@@ -137,7 +137,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const touring = isTourFlagActive();
     if (!gate.changed([window.location.hash, s.active, s.data, s.ui, s.registry, s.styles, touring,
       touring && document.body.classList.contains('atlas-tour-basefull'),
-      pendingInlineNameEdit(), pendingCustomFieldEdit(), s.active ? keptSetOf(s.active.worldId) : undefined])) return;
+      pendingInlineNameEdit(), pendingCustomFieldEdit(), s.active ? keptSetOf(s.active.worldId) : undefined,
+      s.active ? proposedSetOf(s.active.worldId) : undefined])) return;
     captureScrollBeforeRender();
     markHadFocus = waymarkHasFocus(mark);
     dropMark();

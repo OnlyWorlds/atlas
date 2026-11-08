@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.6',
+    date: '2026-11-08',
+    theme: 'A click that lands',
+    entries: [
+      {
+        id: 'quiet-sync-keeps-list',
+        title: 'A click in the element list no longer lost to a sync check',
+        body: 'In a world synced with OnlyWorlds, every check for changes redrew the element list and the open element, even when nothing had changed, so a click that fell on that moment did nothing. A check that finds nothing new now leaves both as they are.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.5',
     date: '2026-11-07',
     theme: 'The next step, said where it is',
