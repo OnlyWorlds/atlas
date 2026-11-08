@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.8',
+    date: '2026-11-08',
+    theme: 'One key per world',
+    entries: [
+      {
+        id: 'lost-mint-taken-back',
+        title: 'A key whose answer was lost is taken back',
+        body: 'When Atlas makes a world\'s key from your account and the answer never arrives (the connection drops at that moment), OnlyWorlds had still made the key, and trying again made a second. Atlas now asks OnlyWorlds which key that try made and takes it back, so your account\'s keys page keeps one key for this browser, not a spare nobody holds.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.7',
     date: '2026-11-08',
     theme: 'A press on a file that lands',

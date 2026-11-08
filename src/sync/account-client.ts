@@ -90,16 +90,19 @@ export class AccountClient {
   private async request(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     path: string,
-    body?: unknown
+    body?: unknown,
+    extra?: { headers?: Record<string, string>; signal?: AbortSignal },
   ): Promise<unknown> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.token}`,
+      ...extra?.headers,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     const response = await fetch(`${this.base}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: extra?.signal,
     });
     if (response.status === 204) return undefined;
     const text = await response.text();
@@ -147,16 +150,51 @@ export class AccountClient {
    * Every key Atlas mints is kept on this device (`keep: true`): keel's sweep
    * of a revoked token's keys passes it by, so Sign out lets go of the account
    * and the worlds here keep syncing with their own keys.
+   *
+   * A mint whose answer is lost on the way back (no answer, a 5xx, a body
+   * without the key) may have made a key nobody here holds: the mint goes
+   * under an Idempotency-Key, and keel's `GET .../keys/made?key=` names the
+   * row that call made (keel since 2026-11-08: a hash on the row, never the secret), so
+   * that key is taken back by its id before the error goes on. A 4xx made
+   * nothing. Only this call's own key is ever asked for; a reload while the
+   * mint is in flight is not covered (no ask outlives the page).
    */
   async mintWorldKey(worldId: string, name?: string, scope: 'write' | 'read' = 'write'): Promise<MintedWorldKey> {
     const body: Record<string, string | boolean> = { keep: true };
     if (name) body.name = name;
     if (scope === 'read') body.scope = 'read';
-    const raw = await this.request('POST', `/account/worlds/${worldId}/keys`, body) as MintedWorldKey;
+    const idempotencyKey = crypto.randomUUID();
+    let raw: MintedWorldKey;
+    try {
+      raw = await this.request('POST', `/account/worlds/${worldId}/keys`, body, { headers: { 'Idempotency-Key': idempotencyKey } }) as MintedWorldKey;
+    } catch (err) {
+      if (!(err instanceof OwV2Error && err.status >= 400 && err.status < 500)) {
+        await this.takeBackLostMint(worldId, idempotencyKey);
+      }
+      throw err;
+    }
     if (!raw || typeof raw.key !== 'string' || !raw.key) {
+      await this.takeBackLostMint(worldId, idempotencyKey);
       throw new Error('key mint response missing the full key');
     }
     return raw;
+  }
+
+  /**
+   * The key a lost mint made, asked by its Idempotency-Key and taken back by
+   * the id keel names. Quiet and bounded (8 s each): a keel that cannot say
+   * (offline, 404 none made, 405 from a keel before that lookup) leaves it as it was.
+   */
+  private async takeBackLostMint(worldId: string, idempotencyKey: string): Promise<void> {
+    try {
+      const row = await this.request('GET', `/account/worlds/${worldId}/keys/made?key=${encodeURIComponent(idempotencyKey)}`, undefined,
+        { signal: AbortSignal.timeout(8000) }) as { id?: string; revoked?: boolean } | undefined;
+      if (!row?.id || row.revoked === true) return;
+      await this.request('DELETE', `/account/worlds/${worldId}/keys/${encodeURIComponent(row.id)}`, undefined,
+        { signal: AbortSignal.timeout(8000) });
+    } catch {
+      // The key stays listed on the account's keys page, where it can be removed.
+    }
   }
 
   /**

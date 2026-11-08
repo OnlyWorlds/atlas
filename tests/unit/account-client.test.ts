@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { mswServer } from '../setup';
 import { statefulAccountHandlers, type StatefulAccountOptions } from '../msw-account-handlers';
 import {
@@ -146,6 +147,82 @@ describe('AccountClient.mintWorldKey', () => {
     expect(caught).toBeInstanceOf(OwV2Error);
     expect((caught as OwV2Error).status).toBe(422);
     expect((caught as OwV2Error).param).toBe('name');
+  });
+});
+
+/**
+ * A mint whose answer is lost, against keel's rules for world keys (since 2026-11-08):
+ * a mint is never replayed, its row keeps a hash of the
+ * Idempotency-Key, GET .../keys/made?key= names the first row made under it
+ * (a revoked one too, `revoked` true) or one 404, and a keel before it answers
+ * that GET 405 (its path was the revoke's).
+ */
+describe('AccountClient.mintWorldKey, a lost answer', () => {
+  const BASE = 'https://www.onlyworlds.com/api/v2';
+  const W = 'srv-owned';
+
+  function fakeKeel(opts: { lose?: 'network' | '502' | 'no-key'; refuse?: boolean; madeRoute?: boolean } = {}) {
+    const rows: Array<{ id: string; madeBy: string | null; live: boolean }> = [];
+    const calls: string[] = [];
+    let n = 0;
+    mswServer.use(
+      http.post(`${BASE}/account/worlds/${W}/keys`, ({ request }) => {
+        calls.push('POST keys');
+        if (opts.refuse) return HttpResponse.json({ error: { code: 'pin_required', message: 'x' } }, { status: 409 });
+        const row = { id: `k${++n}`, madeBy: request.headers.get('Idempotency-Key'), live: true };
+        rows.push(row);
+        if (opts.lose === 'network') return HttpResponse.error();
+        if (opts.lose === '502') return HttpResponse.json({ error: { code: 'bad_gateway' } }, { status: 502 });
+        if (opts.lose === 'no-key') return HttpResponse.json({ id: row.id }, { status: 201 });
+        return HttpResponse.json({ id: row.id, last4: 'abcd', name: '', revoked: false, key: `ow_w_secret_${row.id}` }, { status: 201 });
+      }),
+      http.get(`${BASE}/account/worlds/${W}/keys/made`, ({ request }) => {
+        calls.push('GET made');
+        if (opts.madeRoute === false) return HttpResponse.json({ detail: 'Method not allowed' }, { status: 405 });
+        const key = new URL(request.url).searchParams.get('key');
+        const row = rows.find(r => key && r.madeBy === key);
+        if (!row) return HttpResponse.json({ error: { code: 'not_found', message: 'x' } }, { status: 404 });
+        return HttpResponse.json({ id: row.id, last4: 'abcd', name: '', scope: 'write', revoked: !row.live, kept: true });
+      }),
+      http.delete(`${BASE}/account/worlds/${W}/keys/:id`, ({ params }) => {
+        calls.push(`DELETE ${String(params.id)}`);
+        const row = rows.find(r => r.id === params.id);
+        if (!row) return HttpResponse.json({ error: { code: 'not_found', message: 'x' } }, { status: 404 });
+        row.live = false;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    return { rows, calls, live: () => rows.filter(r => r.live).map(r => r.id) };
+  }
+
+  it('goes under an Idempotency-Key and asks nothing more when the answer is in', async () => {
+    const k = fakeKeel();
+    const minted = await new AccountClient(TOKEN).mintWorldKey(W, 'atlas · test');
+    expect(minted.key).toBe('ow_w_secret_k1');
+    expect(k.rows[0].madeBy).toMatch(/^[0-9a-f-]{36}$/);
+    expect(k.calls).toEqual(['POST keys']);
+  });
+
+  for (const lose of ['network', '502', 'no-key'] as const) {
+    it(`whose answer is lost (${lose}) takes back the key that call made, by the id keel names`, async () => {
+      const k = fakeKeel({ lose });
+      await expect(new AccountClient(TOKEN).mintWorldKey(W)).rejects.toBeTruthy();
+      expect(k.calls).toEqual(['POST keys', 'GET made', 'DELETE k1']);
+      expect(k.live()).toEqual([]);
+    });
+  }
+
+  it('refused (4xx) made nothing: no lookup', async () => {
+    const k = fakeKeel({ refuse: true });
+    await expect(new AccountClient(TOKEN).mintWorldKey(W)).rejects.toBeInstanceOf(OwV2Error);
+    expect(k.calls).toEqual(['POST keys']);
+  });
+
+  it('on a keel before the lookup (405) is no worse than before: nothing taken back, the error goes on', async () => {
+    const k = fakeKeel({ lose: '502', madeRoute: false });
+    await expect(new AccountClient(TOKEN).mintWorldKey(W)).rejects.toMatchObject({ status: 502 });
+    expect(k.calls).toEqual(['POST keys', 'GET made']);
+    expect(k.live()).toEqual(['k1']);
   });
 });
 
