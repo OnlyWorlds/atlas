@@ -15,7 +15,7 @@
 
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
-import { getActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import type { Zone, Marker, WorldMap, Element } from '../core/types';
 import { openMapTab } from '../tabs/right/map-index-tab';
@@ -201,8 +201,11 @@ async function deleteZone(zone: Zone, toasts: ToastManager): Promise<void> {
   if (decision.needed && !window.confirm(decision.message)) return;
   try {
     await store.deleteElement(zone.id);
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
+    if (!patchElementsFrom(store, await store.listElements())) {
+      // The world switched during the delete: the selection, the push and the page belong to the world on screen now.
+      toasts.success(`Deleted ${zone.name || 'zone'}`);
+      return;
+    }
     patchSlice('ui', { ...getState().ui, selectedElementId: null });
     requestPushIfLinked();
     toasts.success(`Deleted ${zone.name || 'zone'}`);

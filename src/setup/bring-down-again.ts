@@ -21,7 +21,7 @@
 
 import { getState, patchSlice } from '../core/state';
 import { diskApiBlock, isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
-import { setActiveStore, evictParkedStore, awaitEviction } from '../core/active-store';
+import { setActiveStore, evictParkedStore, awaitEviction, patchElementsFrom } from '../core/active-store';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { withWorldLock } from '../core/browser-home';
 import { PlainError } from '../core/plain-error';
@@ -159,19 +159,23 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   if (readOnly) store.setViewOnly(true);
   setActiveStore(store);
   patchSlice('active', { worldId, meta: await store.readWorldMeta().catch(() => ({ id: ownId, name: entry.name })), opened: true });
+  let here: boolean;
   try {
     // A cold read of what landed: counted, since in Firefox it takes seconds for a big world.
     const onProgress = (done: number, total: number) => opts.onProgress?.({ done, total, phase: 'open' });
-    patchSlice('data', { elements: await store.listElements(undefined, { onProgress }) });
+    here = patchElementsFrom(store, await store.listElements(undefined, { onProgress }));
   } catch (err) {
     console.warn('[bring-down-again] could not prime the elements:', err);
-    patchSlice('data', { elements: [] });
+    here = patchElementsFrom(store, []);
   }
-  patchSlice('ui', { ...getState().ui, selectedElementId: null });
-  attachSyncEngine(restored, store);
+  // A newer open took the screen meanwhile: it owns the selection and the engine now.
+  if (here) {
+    patchSlice('ui', { ...getState().ui, selectedElementId: null });
+    attachSyncEngine(restored, store);
+  }
   // Why sync did not start, asked of the pill's own diagnosis: a world back
-  // without its PIN (or seat secret) waits on it.
-  const why = diagnoseSyncUnavailable()?.kind;
+  // without its PIN (or seat secret) waits on it. (The diagnosis reads the world on screen.)
+  const why = here ? diagnoseSyncUnavailable()?.kind : undefined;
   const syncWaits = why === 'pin-missing' ? 'pin' : why === 'seat-secret-missing' ? 'seat' : null;
   // Failed between its open and the commit (contract G6): settled once the door has opened it, never under it.
   if (landing) void settleIfLandingFailed(landing);

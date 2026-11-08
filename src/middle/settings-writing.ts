@@ -113,7 +113,7 @@ export function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager):
     // Run rename migration: rewrite supertype on every narrative carrying the
     // old label value.
     const { applyLabelRenameMigration } = await import('./writing-promote');
-    const { getActiveStore } = await import('../core/active-store');
+    const { getActiveStore, patchElementsFrom } = await import('../core/active-store');
     const folder = getActiveStore();
     if (folder) {
       const renamed = await applyLabelRenameMigration(
@@ -124,10 +124,12 @@ export function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager):
       );
       if (renamed > 0) {
         const fresh = await folder.listElements();
-        patchSlice('data', { elements: fresh });
+        const here = patchElementsFrom(folder, fresh);
         toasts.success(`${key.toUpperCase()} label saved (${renamed} narrative${renamed === 1 ? '' : 's'} migrated)`);
-        const { requestPushIfLinked } = await import('../sync/sync-attach');
-        requestPushIfLinked();
+        if (here) { // a world switched during the migration: the push is for the world on screen
+          const { requestPushIfLinked } = await import('../sync/sync-attach');
+          requestPushIfLinked();
+        }
         return;
       }
     }

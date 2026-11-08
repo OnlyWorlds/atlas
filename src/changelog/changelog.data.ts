@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.13',
+    date: '2026-11-08',
+    theme: 'Each world keeps its own',
+    entries: [
+      {
+        id: 'write-after-world-switch',
+        title: 'A change that finishes after you switch worlds stays in its own world',
+        body: 'When a change (a new element, an edit, a delete, a pin moved) was still being saved as you opened another world, the world you left could show its elements in the new one\'s lists and pickers until the next refresh. The change is still saved where you made it; the world on screen now shows only its own.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.12',
     date: '2026-11-08',
     theme: 'A book under its own chapter',

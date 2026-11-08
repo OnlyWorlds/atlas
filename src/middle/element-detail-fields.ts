@@ -26,7 +26,7 @@ import { CONTENT_ELEMENT_TYPES, type Element, type ElementType, type WorldMap } 
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { typeName, aTypeName } from '../core/type-words';
 import { ELEMENT_ICONS, EXTENSION_FIELD_NAMESPACES, isExtensionField, isCustomEditableField } from '../core/constants';
-import { getActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { openFieldEditInline } from '../ui/field-edit-inline';
 import { AliasesEditModal } from '../ui/aliases-edit-modal';
@@ -686,8 +686,9 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
   const was = (el as Record<string, unknown>)[fieldName];
   try {
     await store.updateElement(el.id, { [fieldName]: valueToPersist } as Partial<Element>);
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
+    // The world switched during the write: the guide, the push and the map's image read below all
+    // act on the world on screen, which is another one now.
+    if (!patchElementsFrom(store, await store.listElements())) return;
     // Local write succeeded — schedule a debounced push. No-op for local-only.
     requestPushIfLinked();
 

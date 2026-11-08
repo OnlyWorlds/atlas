@@ -12,7 +12,7 @@ import { hasFolderMode } from '../core/capabilities';
 import { isAtlasGrounded } from '../core/grounded';
 import { addWorldLabel, newWorldGlyph, openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
 import { currentActivationGen, enqueueActivation } from '../core/activation-chain';
-import { awaitEviction, evictParkedStore, getActiveStore, parkStore, setActiveStore, takeParkedStore } from '../core/active-store';
+import { awaitEviction, evictParkedStore, getActiveStore, parkStore, patchElementsFrom, setActiveStore, takeParkedStore } from '../core/active-store';
 import { escapeAttr, escapeText, installRowKeydownActivation } from '../core/dom-utils';
 import {
   importHash,
@@ -1189,11 +1189,12 @@ async function doActivateWorld(
       // Re-prime elements after an ACTUAL revert so UI reflects the rollback
       // (cheap now — the body cache absorbed the revert writes).
       const fresh = await store.listElements();
-      patchSlice('data', { elements: fresh });
+      patchElementsFrom(store, fresh);
     }
   } catch (err) {
     console.warn('[worlds-sidebar] orphan-snapshot recovery failed:', err);
   }
+  if (!stillActive()) return true; // superseded during the recovery: the newer activation owns the sync engine
   // No tab hydration — tabs are global across world switches (see comment
   // earlier in this function).
 

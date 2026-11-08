@@ -38,7 +38,7 @@ import { isSeatSecret, seatFromFile } from '../core/seat';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
-import { getActiveStore, setActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
 import { initialDownloadAll, seedLinkedWorldMeta, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
@@ -840,10 +840,11 @@ export async function createWorldFromImportedData(
   // sync round to fill in the imported description and dates later.
   patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta(), opened: true });
   const elements = await store.listElements();
-  patchSlice('data', { elements });
-  patchSlice('ui', { ...getState().ui, selectedElementId: null });
+  // A newer open took the screen while the list was read: it owns the selection and the engine now.
+  const here = patchElementsFrom(store, elements);
+  if (here) patchSlice('ui', { ...getState().ui, selectedElementId: null });
 
-  attachSyncEngine(entry, store); // local-only → no-op/detach
+  if (here) attachSyncEngine(entry, store); // local-only → no-op/detach
 
   return { entry, applied };
 }
@@ -1155,17 +1156,19 @@ export async function linkExistingApiWorldInRoot(
   patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: localWorldUuid, name: displayName })), opened: true });
 
   // Prime the elements cache from the newly-downloaded folder.
+  let here: boolean;
   try {
     const elements = await store.listElements();
-    patchSlice('data', { elements });
+    here = patchElementsFrom(store, elements);
   } catch (err) {
     console.warn('[link-api] failed to prime elements after download:', err);
-    patchSlice('data', { elements: [] });
+    here = patchElementsFrom(store, []);
   }
-  patchSlice('ui', { ...getState().ui, selectedElementId: null });
+  // A newer open took the screen meanwhile: it owns the selection and the engine now.
+  if (here) patchSlice('ui', { ...getState().ui, selectedElementId: null });
 
   // Attach SyncEngine — api-linked entry, so the engine spins up.
-  attachSyncEngine(entry, store);
+  if (here) attachSyncEngine(entry, store);
 
   return {
     entry,
@@ -1225,16 +1228,20 @@ async function linkIntoBrowser(
   if (readOnly) store.setViewOnly(true);
   setActiveStore(store);
   patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: serverWorldId, name: displayName })), opened: true });
+  let here: boolean;
   try {
     // A cold read of what landed: counted, since in Firefox it takes seconds for a big world.
     const onProgress = (done: number, total: number) => opts.onProgress?.({ done, total, phase: 'open' });
-    patchSlice('data', { elements: await store.listElements(undefined, { onProgress }) });
+    here = patchElementsFrom(store, await store.listElements(undefined, { onProgress }));
   } catch (err) {
     console.warn('[link-api] failed to prime elements after download:', err);
-    patchSlice('data', { elements: [] });
+    here = patchElementsFrom(store, []);
   }
-  patchSlice('ui', { ...getState().ui, selectedElementId: null });
-  attachSyncEngine(entry, store);
+  // A newer open took the screen meanwhile: it owns the selection and the engine now.
+  if (here) {
+    patchSlice('ui', { ...getState().ui, selectedElementId: null });
+    attachSyncEngine(entry, store);
+  }
   // Failed between its open and the commit (contract G6): settled once the door has opened it, never under it.
   if (landing) void settleIfLandingFailed(landing);
   return {

@@ -24,7 +24,7 @@ import { mapStyleOf, overPicture, zoneKindOf, PLAIN_ZONE_LAYER, MAP_STYLE_IDS, t
 import { renderZonePanel, wireZonePanel } from './map-zone-panel';
 import type { Zone, WorldMap } from '../../core/types';
 import { pickMapImageSource } from './map-image-source';
-import { getActiveStore } from '../../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { ToastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
@@ -217,8 +217,11 @@ async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise
   if (!ok) return;
   try {
     await store.deleteZone(zoneId);
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
+    if (!patchElementsFrom(store, await store.listElements())) {
+      // The world switched during the delete: the selection and the push belong to the world on screen now.
+      toasts.success(`Zone deleted`);
+      return;
+    }
     // Clear selection if we just deleted the selected zone.
     if (getState().ui.selectedElementId === zoneId) {
       patchSlice('ui', { ...getState().ui, selectedElementId: null });

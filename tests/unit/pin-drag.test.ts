@@ -37,6 +37,8 @@ vi.mock('../../src/sync/sync-attach', () => ({
 vi.mock('../../src/core/active-store', () => ({
   getActiveStore: () => ({ updatePin: spies.updatePin, listElements: spies.listElements }),
   setActiveStore: () => {},
+  // The real one patches only while the store is the open world's; here it always is.
+  patchElementsFrom: (_store: unknown, elements: unknown[]) => { spies.patchSlice('data', { elements }); return true; },
 }));
 
 vi.mock('../../src/core/state', () => ({

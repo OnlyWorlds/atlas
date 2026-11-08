@@ -23,7 +23,8 @@
  * kernel runs, so a refusal or a failure before it leaves the app as it was
  * (the old route moved the UI in its match phase).
  */
-import { getState, patchSlice } from '../core/state';
+import { getState } from '../core/state';
+import { patchElementsFrom } from '../core/active-store';
 import type { FolderStore } from '../store/folder-store';
 import { recoverRekey, RekeyRefusedError } from '../store/rekey';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
@@ -116,7 +117,7 @@ export function runRoute2(opts: Route2RunOpts): Promise<MergeResult> {
     } finally {
       if (diskTouched) {
         try {
-          patchSlice('data', { elements: await opts.store.listElements() });
+          patchElementsFrom(opts.store, await opts.store.listElements());
         } catch (err) {
           console.warn('[atlas:make-online] refresh after the merge failed:', err);
         }

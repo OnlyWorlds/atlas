@@ -11,13 +11,14 @@ import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { getState, setState, patchSlice } from '../../src/core/state';
+import { setActiveStore } from '../../src/core/active-store';
 import { defaultRegistry, type Element, type WorldRegistryEntry } from '../../src/core/types';
 import { __setRegistryTabBaseForTests } from '../../src/registry/registry';
 import { runRoute2, ambiguousLine, childClashLine, MergeRefusedError } from '../../src/sync/make-online-run';
 import { giveForeignElementsNewIds, isRekeyRunning } from '../../src/sync/rekey-run';
 
 // One jsdom document for every file (vitest singleFork): leave it empty.
-afterEach(() => { document.body.innerHTML = ''; });
+afterEach(() => { document.body.innerHTML = ''; setActiveStore(null); });
 
 const W = 'w1';
 const O = '11111111-1111-4111-8111-111111111111'; // local Alice
@@ -33,6 +34,7 @@ beforeEach(async () => {
   store = new MockFolderStore();
   store.setClock(new MonotonicClock('2026-03-01T00:00:00.000Z').next);
   await store.open(null);
+  setActiveStore(store as never); // the world is open: the run's refresh patches only the open world's store
   await store.createElement('character', { id: O, name: 'Alice', description: 'local' } as Partial<Element>);
   await store.createElement('narrative', { id: R, name: 'Tale', characters: [O] } as Partial<Element>);
   client = new FakeOwApiClient();

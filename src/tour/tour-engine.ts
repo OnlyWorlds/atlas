@@ -30,7 +30,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { awaitEviction, evictParkedStore, getActiveStore, setActiveStore } from '../core/active-store';
+import { awaitEviction, evictParkedStore, getActiveStore, patchElementsFrom, setActiveStore } from '../core/active-store';
 import { navigate, elementHash, mapHash, writingHash, timelineHash } from '../core/router';
 import { saveRegistry, deleteWorldEntry, updateWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
@@ -463,7 +463,7 @@ async function revealUpTo(stepIndex: number): Promise<void> {
 async function refreshElements(): Promise<void> {
   const store = getActiveStore();
   if (!store) return;
-  patchSlice('data', { elements: await store.listElements() });
+  patchElementsFrom(store, await store.listElements());
 }
 
 /** Navigate per the step's route directive. */

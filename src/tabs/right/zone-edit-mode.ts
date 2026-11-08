@@ -31,7 +31,7 @@
 
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
-import { getActiveStore } from '../../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../../core/active-store';
 import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
@@ -914,7 +914,8 @@ async function optimisticInsertMarker(args: {
     });
     // Reconcile state with disk for the canonical timestamps + any drift.
     const fresh = await store.listElements();
-    patchSlice('data', { elements: fresh });
+    // The world switched during the writes: the push and the handles belong to the world on screen now.
+    if (!patchElementsFrom(store, fresh)) return;
     requestPushIfLinked();
     rebuildHandles();
   } catch (err) {
@@ -924,8 +925,7 @@ async function optimisticInsertMarker(args: {
     // Re-prime from disk (truth) and re-render handles.
     try {
       const fresh = await store.listElements();
-      patchSlice('data', { elements: fresh });
-      rebuildHandles();
+      if (patchElementsFrom(store, fresh)) rebuildHandles();
     } catch {
       /* if even the re-prime fails, leave the UI as-is; reload will recover */
     }

@@ -22,6 +22,7 @@ import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
 import { sameElements } from './same-elements';
 import { patchSlice, getState } from '../core/state';
+import { patchElementsFrom } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import type { FolderStore } from '../store/folder-store';
 import type { Element, WorldRegistryEntry, SyncEngineState } from '../core/types';
@@ -519,7 +520,7 @@ async function noteProposalNews(worldId: string, folder: FolderStore, result: Sy
   }
   // The elements keel gave back or settled, read from the folder (no push: nothing here is new).
   if (accepted.length > 0 || refused.length > 0) {
-    try { patchSlice('data', { elements: await folder.listElements() }); } catch { /* the next round reads them */ }
+    try { patchElementsFrom(folder, await folder.listElements()); } catch { /* the next round reads them */ }
   }
 }
 
@@ -631,7 +632,9 @@ export function requestPushIfLinked(): void {
  */
 export async function refreshElementsAfterWrite(store: FolderStore): Promise<Element[]> {
   const elements = await store.listElements();
-  patchSlice('data', { elements });
+  // A world switched while the write ran: this store's world is no longer on screen, and its elements
+  // must not become the open world's (they would show in its lists and pickers until the next refresh).
+  if (!patchElementsFrom(store, elements)) return elements;
   requestPushIfLinked();
   return elements;
 }
@@ -727,9 +730,10 @@ export async function pullNowAndRefresh(): Promise<import('../core/types').SyncR
   // Re-read folder elements to reflect any creates/updates from the pull. A pull that changed
   // nothing (the open's pull, every cadence tick of a quiet world) keeps the store's array, so
   // nothing redraws under a click in flight (same-elements.ts).
+  const pulledFolder = currentFolder;
   try {
-    const elements = await currentFolder.listElements();
-    if (!sameElements(getState().data.elements, elements)) patchSlice('data', { elements });
+    const elements = await pulledFolder.listElements();
+    if (!sameElements(getState().data.elements, elements)) patchElementsFrom(pulledFolder, elements);
   } catch (err) {
     console.warn('[sync-attach] refresh-after-pull failed:', err);
   }
@@ -982,11 +986,12 @@ export function __test_emitConflictToasts(
 
 /** Re-prime `state.data.elements` from the active folder. Fire-and-forget. */
 async function refreshElementsCache(): Promise<void> {
-  if (!currentFolder) return;
+  const folder = currentFolder;
+  if (!folder) return;
   try {
-    const elements = await currentFolder.listElements();
+    const elements = await folder.listElements();
     // Every round ends here: a round that wrote nothing keeps the store's array (same-elements.ts).
-    if (!sameElements(getState().data.elements, elements)) patchSlice('data', { elements });
+    if (!sameElements(getState().data.elements, elements)) patchElementsFrom(folder, elements);
   } catch (err) {
     console.warn('[sync-attach] refresh elements cache failed:', err);
   }

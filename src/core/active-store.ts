@@ -11,6 +11,8 @@
  */
 
 import type { FsFolderStore } from '../store/folder-store-fs';
+import type { Element } from './types';
+import { patchSlice } from './state';
 
 let activeStore: FsFolderStore | null = null;
 
@@ -20,6 +22,18 @@ export function setActiveStore(store: FsFolderStore | null): void {
 
 export function getActiveStore(): FsFolderStore | null {
   return activeStore;
+}
+
+/**
+ * The on-screen elements, read from `store`, only while `store` is the open world's: a write that finishes
+ * after a world switch or a close must not put its world's elements into another world's lists and
+ * pickers. True when patched. Every write that reads its store's list back into state after an await goes
+ * through here (S577, the S521 strand gate's D4 carried to every writer).
+ */
+export function patchElementsFrom(store: unknown, elements: Element[]): boolean {
+  if (store === null || activeStore !== store) return false;
+  patchSlice('data', { elements });
+  return true;
 }
 
 // ---- Parked stores (2026-07-19) ----

@@ -18,7 +18,7 @@ import { problemFor } from '../core/problems';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { findUnlinkedMentions, createdToastText } from '../core/unlinked-mentions';
-import { getActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { reportGesture } from './guide-note';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
@@ -486,8 +486,12 @@ export class ElementCreateModal extends BaseModal {
         const startField = this.opts.temporalContext ? this.startFieldOf(this.selected) : null;
         const temporalData = startField && temporalDate != null ? { [startField]: temporalDate } : {};
         const el = await store.createElement(this.selected, { ...this.opts.extraData, ...temporalData, name } as Partial<Element>);
-        const elements = await store.listElements();
-        patchSlice('data', { elements });
+        // The world switched while it was made: the element is in the old world's folder, and nothing below
+        // (selection, toast, callbacks, navigation) belongs to the world on screen now.
+        if (!patchElementsFrom(store, await store.listElements())) {
+          this.hide();
+          return;
+        }
         // Creating an element flips the sidebar to elements mode so the new
         // row is visible (mirrors the create-world flip). Persisted
         // as the user's preference, same as the world flow.

@@ -32,7 +32,7 @@ import { WritingCreateModal } from '../ui/writing-create-modal';
 import type { Element, Pin, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
 import { typeName } from '../core/type-words';
-import { getActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { WORLD_NOT_OPEN } from './element-detail-fields';
@@ -994,8 +994,11 @@ async function onDelete(el: Element): Promise<void> {
   if (decision.needed && !window.confirm(decision.message)) return;
   try {
     await store.deleteElement(el.id);
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
+    if (!patchElementsFrom(store, await store.listElements())) {
+      // The world switched during the delete: the selection, the tabs, the push and the page belong to the world on screen now.
+      toastManager.success(`Deleted ${el.name || 'element'}`);
+      return;
+    }
     // Deleting a MAP has to take its right-pane tab with it (Titus):
     // the tab survived the delete and fell through to the stale card reading
     // "Map from another world", which is both wrong (it was this world's) and

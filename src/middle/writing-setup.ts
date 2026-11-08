@@ -18,7 +18,7 @@
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { saveRegistry } from '../registry/registry';
-import { getActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -303,6 +303,8 @@ export function mountWritingSetup(
     // Apply rename migration if labels changed FROM existing initialized state.
     // Never on a view-only world: it rewrites narratives (conv. 149).
     const reg = getState().registry;
+    // False once a read-back finds the world switched away: the push at the end is for the world on screen.
+    let here = true;
     const entry = reg.worlds.find(w => w.id === worldId);
     const wasInitialized = entry?.writing_initialized === true;
     if (wasInitialized && entry?.writing_labels && !viewOnly) {
@@ -315,7 +317,7 @@ export function mountWritingSetup(
       const renamed = await applyLabelRenameMigration(folder, getState().data.elements, oldLabels, labels);
       if (renamed > 0) {
         const fresh = await folder.listElements();
-        patchSlice('data', { elements: fresh });
+        here = patchElementsFrom(folder, fresh) && here;
         toasts.info(`Renamed ${renamed} narrative${renamed === 1 ? '' : 's'} to match new labels.`);
       }
     }
@@ -352,7 +354,7 @@ export function mountWritingSetup(
         }
       }
       const fresh = await folder.listElements();
-      patchSlice('data', { elements: fresh });
+      here = patchElementsFrom(folder, fresh) && here;
       if (written > 0) {
         toasts.success(`Added ${written} narrative${written === 1 ? '' : 's'} to the writing tree.`);
       }
@@ -368,10 +370,10 @@ export function mountWritingSetup(
     } else {
       // Even when not promoting we re-list to ensure state is fresh.
       const fresh = await folder.listElements();
-      patchSlice('data', { elements: fresh });
+      here = patchElementsFrom(folder, fresh) && here;
     }
 
-    if (!viewOnly) requestPushIfLinked();
+    if (here && !viewOnly) requestPushIfLinked();
     onFinish();
   }
 

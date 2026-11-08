@@ -22,7 +22,8 @@ import { typeName } from '../core/type-words';
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder } from '../sync/sync-attach';
-import { patchSlice, getState } from '../core/state';
+import { getState } from '../core/state';
+import { patchElementsFrom } from '../core/active-store';
 import { surfaceSyncUnavailable } from './sync-toasts';
 import { showProblem } from './problem-fixes';
 import { PlainError } from '../core/plain-error';
@@ -309,8 +310,7 @@ export class ServerDeleteReviewModal extends BaseModal {
     try {
       const folder = getCurrentSyncFolder();
       if (folder) {
-        const elements = await folder.listElements();
-        patchSlice('data', { elements });
+        patchElementsFrom(folder, await folder.listElements());
       }
     } catch (e) {
       console.warn('[server-delete-modal] refresh failed:', e);

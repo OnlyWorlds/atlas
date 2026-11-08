@@ -21,7 +21,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { getActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { navigate } from '../core/router';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { isBrowserWorld } from '../core/browser-worlds';
@@ -127,7 +127,7 @@ export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean;
     // world is consistent: commit it, with the screen reloaded from disk
     // when the disk answers (a failed read here is the next activation's).
     try {
-      patchSlice('data', { ...getState().data, elements: await store.listElements() });
+      patchElementsFrom(store, await store.listElements());
     } catch (readErr) {
       console.warn('[tour] could not reload the kept world\'s elements:', readErr);
     }

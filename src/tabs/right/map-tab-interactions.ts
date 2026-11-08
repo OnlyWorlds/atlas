@@ -14,7 +14,7 @@
 
 import { typeName } from '../../core/type-words';
 import { getState, patchSlice } from '../../core/state';
-import { getActiveStore } from '../../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../../core/active-store';
 import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
@@ -126,9 +126,9 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         y: clampToCanvas(Math.round(ev.point.y), height),
         ...(bake ?? {}),
       });
-      const elements = await store.listElements();
-      patchSlice('data', { elements });
-      patchSlice('ui', { ...getState().ui, pinPlacement: null });
+      const here = patchElementsFrom(store, await store.listElements());
+      patchSlice('ui', { ...getState().ui, pinPlacement: null }); // the armed placement is the old world's element: always cleared
+      if (!here) return; // the world switched during the write: the push and the toast belong to the world on screen now
       requestPushIfLinked();
       toasts.success('Pin placed');
       // (The bespoke `notifyTourPinPlaced()` call was removed: the

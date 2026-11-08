@@ -17,7 +17,8 @@ import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount, refr
 import { surfaceSyncUnavailable } from './sync-toasts';
 import { showProblem } from './problem-fixes';
 import { PlainError } from '../core/plain-error';
-import { patchSlice, getState } from '../core/state';
+import { getState } from '../core/state';
+import { patchElementsFrom } from '../core/active-store';
 import type { Conflict } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { proposalReviewLine } from '../sync/proposal-lines';
@@ -191,8 +192,7 @@ export class ConflictReviewModal extends BaseModal {
             try {
               const folder = getCurrentSyncFolder();
               if (folder) {
-                const elements = await folder.listElements();
-                patchSlice('data', { elements });
+                patchElementsFrom(folder, await folder.listElements());
               }
             } catch (e) {
               console.warn('[conflict-modal] refresh-after-resolve failed:', e);

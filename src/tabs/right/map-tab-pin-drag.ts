@@ -14,7 +14,7 @@
 
 import { getState, patchSlice } from '../../core/state';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
-import { getActiveStore } from '../../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../../core/active-store';
 import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { MapTabCacheEntry } from './map-tab-cache';
@@ -99,8 +99,7 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
         x: clampToCanvas(Math.round(point.x), dragCanvasW),
         y: clampToCanvas(Math.round(point.y), dragCanvasH),
       });
-      const elements = await store.listElements();
-      patchSlice('data', { elements });
+      if (!patchElementsFrom(store, await store.listElements())) return; // the world switched: no push for the screen's world
       // Local write succeeded — schedule autosave. Without this, dragged pins
       // never propagate server-side until another folder edit triggers a push
       // (or the user manually clicks sync). Parity with map-click + contextual-
