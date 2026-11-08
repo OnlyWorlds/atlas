@@ -124,6 +124,64 @@ for (const tag of ['', ' @firefox']) {
     if (await input.count()) await expect(input).toHaveValue('Ada Lovelace');
   });
 
+  // A held picture's offer was drawn from the world as it was: the Mark press asks again, so a charter
+  // marked elsewhere during the press never leaves two marked with this one not leading.
+  test(`a Mark pressed on a held page asks again before it writes${tag}`, async ({ page }) => {
+    await setupWorld(page);
+    const own = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.meta.id as string);
+    const put = (id: string, name: string, created: string) => page.evaluate(async ({ id, name, created }) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      await store.createElementVerbatim('law', { id, type: 'law', name, supertype: 'Charter', created_at: created, local_updated_at: created });
+      api.patchData(await store.listElements());
+    }, { id, name, created });
+    const R1 = '0192a000-0000-7000-8000-000000575001';
+    const R2 = '0192a000-0000-7000-8000-000000575002';
+    await put(R1, 'Old Rules', '2026-10-01T00:00:00.000Z');
+    await put(R2, 'New Rules', '2026-10-02T00:00:00.000Z');
+    await openElement(page, R1, 'Old Rules');
+    const btn = page.locator('[data-role="charter-mark-btn"]');
+    await expect(btn).toBeVisible();
+    await btn.scrollIntoViewIfNeeded();
+    const box = (await btn.boundingBox())!;
+    await page.mouse.move(box.x + 8, box.y + box.height / 2);
+    await page.mouse.down();
+    await writeElsewhere(page, R2, { x_charter_of: own });
+    await page.evaluate(() => new Promise(r => setTimeout(r, 50)));
+    await page.mouse.up();
+    // The held redraw draws the blocked line at once; a write the press made would land after it.
+    await page.waitForTimeout(1500);
+    await expect(page.locator('[data-role="charter-mark-blocked"]')).toBeVisible();
+    const written = await page.evaluate(async (id) => {
+      const store = (window as any).__atlasTestApi.getActiveStore();
+      return (await store.listElements()).find((e: { id: string }) => e.id === id)?.x_charter_of ?? null;
+    }, R1);
+    expect(written).toBeNull();
+  });
+
+  // The same for "+ Add field": Escape removed its input while focused, and Firefox then sends no
+  // focusout at all.
+  test(`a change held while a field name is typed shows once Escape closes it${tag}`, async ({ page }) => {
+    await setupWorld(page);
+    const a = await createElement(page, 'character', { name: 'Ada' });
+    await openElement(page, a, 'Ada');
+    await page.locator('.atlas-custom-add-btn').click();
+    const input = page.locator('.atlas-custom-add-input');
+    await expect(input).toBeFocused();
+    await input.fill('mood');
+    const body = () => page.evaluate(() => document.body.textContent ?? '');
+    expect(await body()).toContain('Not synced');
+    await page.evaluate(async (id) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      await store.stampServerUpdatedAt(id, 'character', new Date().toISOString());
+      api.patchData(await store.listElements());
+    }, a);
+    await input.press('Escape');
+    await expect(input).toHaveCount(0);
+    await expect.poll(body).not.toContain('Not synced');
+  });
+
   // A change that lands while a rename is open waits for the rename to end; a rename ended with
   // Escape took its input off the page before the page heard focus leave, so the change was lost.
   test(`a change held during an open rename shows once the rename is escaped${tag}`, async ({ page }) => {

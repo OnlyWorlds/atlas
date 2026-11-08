@@ -89,6 +89,9 @@ function drawAgain(el: Element, worldId: string): void {
 
 /** The press: S4's story change, then the line that says it. */
 export async function makeThisTheStrand(el: Element, worldId: string, drawn: StrandDrawn = drawnNow(worldId)): Promise<StrandWriteResult | 'held'> {
+  // The offer was drawn before the press, and a page can hold its picture for a press (conv. 146): a
+  // copy kept here since then, outside the key's view, is no strand online (C9), so it asks again.
+  if (isKeptHere(worldId, el.id)) { drawAgain(el, worldId); return 'nothing'; }
   const result = await hold(worldId, el, () => writeStrandSlot('narrative', drawn, el.id));
   if (result === 'held') return result;
   if (result !== 'wrote') drawAgain(el, worldId);

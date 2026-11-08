@@ -28,6 +28,7 @@ import { handsOnAsProposed } from '@onlyworlds/sdk';
 import type { Element, WorldRegistryEntry } from '../core/types';
 import { aidKind, findCharter, isReadingAid, leadingGuideId, markWouldLead, readingAids, type AidKind } from '../core/charter';
 import { getActiveStore } from '../core/active-store';
+import { getState } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { readsWholeWorld } from './element-detail-message';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
@@ -124,7 +125,16 @@ export function buildCharterMarkOffer(el: Element, entry: WorldRegistryEntry | u
     btn.className = 'atlas-btn-primary atlas-charter-mark-btn';
     btn.dataset.role = 'charter-mark-btn';
     btn.textContent = buttonLabel(offer.kind);
-    btn.addEventListener('click', () => { void markAid(el, offer.kind, charterMarkValue(entry, meta, worldId), btn); });
+    btn.addEventListener('click', () => {
+      // The page can hold its picture for a press while another element changes (conv. 146): the
+      // offer was drawn from the world as it was, so the press asks again. A guide or charter marked
+      // elsewhere since then would leave this one marked and not leading; the redraw that follows
+      // the press shows the line that says so instead.
+      const st = getState();
+      const now = markOfferFor(st.data.elements.find(e => e.id === el.id) ?? el, st.active?.meta, st.data.elements);
+      if (!now || now.kind !== offer.kind || (!now.wouldLead && now.leading)) return;
+      void markAid(el, offer.kind, charterMarkValue(entry, meta, worldId), btn);
+    });
     box.append(line, btn);
     return box;
   }

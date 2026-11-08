@@ -29,7 +29,7 @@ import {
   getTierForNarrative, getWritingLabels, supertypeForTier, writingHashForNarrative,
 } from './writing-helpers';
 import { WritingCreateModal } from '../ui/writing-create-modal';
-import type { Element, WorldMap } from '../core/types';
+import type { Element, Pin, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
 import { typeName } from '../core/type-words';
 import { getActiveStore } from '../core/active-store';
@@ -924,6 +924,10 @@ function buildPinAffordance(
   });
   if (!worldIsViewOnly()) btn.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    // The chip can be a held picture's (conv. 146): the pin is read again, and deleted only while it
+    // still places the element it was drawn for.
+    const now = getState().data.elements.find(e => e.id === pin.id) as Pin | undefined;
+    if (!now || now.element_id !== pin.element_id) return;
     void deletePinFromHeader(pin.id, mapName);
   });
   return btn;

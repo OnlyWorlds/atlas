@@ -3,8 +3,9 @@ import type { Element } from '../core/types';
 /**
  * The keys a sync round writes into an element without changing what a person reads or edits
  * there: keel's stamp, the edit stamp moved past it, the last writer's words (dropped by a push
- * that landed) and the door record (`store/sync-stamp.ts`). No press on the element page acts on
- * them: the page shows them as text, and the trail box repaints itself.
+ * that landed) and the door record (`store/sync-stamp.ts`). No press on the element page writes
+ * them or decides a write by them: the page shows them as text (the meta lines, the Files card's
+ * not-yet-online line, the agent mark's words), and the trail box repaints itself.
  */
 const STAMP_KEYS = new Set<string>([
   'server_updated_at',

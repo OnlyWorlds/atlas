@@ -348,7 +348,9 @@ function buildAddRow(el: Element): HTMLElement {
     row.appendChild(form);
     input.focus();
 
-    const close = () => { form.remove(); btn.style.display = ''; };
+    // Blurred before it goes: a removed input sends the page no focusout (Firefox none at all), and a
+    // redraw the page deferred while it was typed in would wait for the next change.
+    const close = () => { if (document.activeElement === input) input.blur(); form.remove(); btn.style.display = ''; };
 
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { close(); return; }
