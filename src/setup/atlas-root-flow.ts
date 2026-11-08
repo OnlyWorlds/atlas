@@ -833,12 +833,14 @@ export async function createWorldFromImportedData(
   const activated = setActiveWorld(placed, entry.id);
   const commit = () => { saveRegistry(activated); patchSlice('registry', activated); };
   if (make) await make.finish(commit); else commit();
+  // The whole world.json, as an ordinary open reads it: a local world has no
+  // sync round to fill in the imported description and dates later. Read
+  // before the store moves, so the store and `active` change together.
+  const meta = await store.readWorldMeta();
   // The store first: a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
-  // The whole world.json, as an ordinary open reads it: a local world has no
-  // sync round to fill in the imported description and dates later.
-  patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta(), opened: true });
+  patchSlice('active', { worldId: entry.id, meta, opened: true });
   const elements = await store.listElements();
   // A newer open took the screen while the list was read: it owns the selection and the engine now.
   const here = patchElementsFrom(store, elements);
@@ -1152,8 +1154,9 @@ export async function linkExistingApiWorldInRoot(
   if (readOnly) store.setViewOnly(true);
   // The store first: a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
+  const meta = await store.readWorldMeta().catch(() => ({ id: localWorldUuid, name: displayName }));
   setActiveStore(store);
-  patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: localWorldUuid, name: displayName })), opened: true });
+  patchSlice('active', { worldId: entry.id, meta, opened: true });
 
   // Prime the elements cache from the newly-downloaded folder.
   let here: boolean;
@@ -1226,8 +1229,9 @@ async function linkIntoBrowser(
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }
   if (readOnly) store.setViewOnly(true);
+  const meta = await store.readWorldMeta().catch(() => ({ id: serverWorldId, name: displayName }));
   setActiveStore(store);
-  patchSlice('active', { worldId: entry.id, meta: await store.readWorldMeta().catch(() => ({ id: serverWorldId, name: displayName })), opened: true });
+  patchSlice('active', { worldId: entry.id, meta, opened: true });
   let here: boolean;
   try {
     // A cold read of what landed: counted, since in Firefox it takes seconds for a big world.

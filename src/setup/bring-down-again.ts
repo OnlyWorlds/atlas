@@ -157,8 +157,9 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   patchSlice('registry', activated);
   const restored = activated.worlds.find(w => w.id === worldId)!;
   if (readOnly) store.setViewOnly(true);
+  const meta = await store.readWorldMeta().catch(() => ({ id: ownId, name: entry.name }));
   setActiveStore(store);
-  patchSlice('active', { worldId, meta: await store.readWorldMeta().catch(() => ({ id: ownId, name: entry.name })), opened: true });
+  patchSlice('active', { worldId, meta, opened: true });
   let here: boolean;
   try {
     // A cold read of what landed: counted, since in Firefox it takes seconds for a big world.

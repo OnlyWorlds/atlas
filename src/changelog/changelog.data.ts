@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.14',
+    date: '2026-11-08',
+    theme: 'A world opens whole',
+    entries: [
+      {
+        id: 'open-store-and-world-together',
+        title: 'Opening a world moves its data and its name on screen in one step',
+        body: 'When a world was opened from OnlyWorlds, a world file or a link, there was a brief moment where its data had arrived while the screen still named the world before it. The two now change in one step.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.13',
     date: '2026-11-08',
     theme: 'Each world keeps its own',
