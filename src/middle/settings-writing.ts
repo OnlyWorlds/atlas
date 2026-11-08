@@ -10,6 +10,7 @@ import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 import { escapeAttr } from '../core/dom-utils';
 import { worldIsViewOnly } from '../core/view-only';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 
 export function renderWritingTab(entry: WorldRegistryEntry): string {
   const labels = {
@@ -86,6 +87,9 @@ export function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager):
   const save = async (key: 'l1' | 'l2' | 'l3' | 'l4', value: string): Promise<void> => {
     const trimmed = value.trim();
     if (!trimmed || worldIsViewOnly(entry.id)) return;
+    // This world's store, taken now: the save runs on a blur, often the click that opens another world, so
+    // after the awaits below the open store can be that other world's.
+    const folder = getState().active?.worldId === entry.id ? getActiveStore() : null;
     const reg = getState().registry;
     const idx = reg.worlds.findIndex(w => w.id === entry.id);
     if (idx < 0) return;
@@ -113,12 +117,10 @@ export function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager):
     // Run rename migration: rewrite supertype on every narrative carrying the
     // old label value.
     const { applyLabelRenameMigration } = await import('./writing-promote');
-    const { getActiveStore, patchElementsFrom } = await import('../core/active-store');
-    const folder = getActiveStore();
     if (folder) {
       const renamed = await applyLabelRenameMigration(
         folder,
-        getState().data.elements,
+        await folder.listElements(),
         current,
         nextLabels,
       );

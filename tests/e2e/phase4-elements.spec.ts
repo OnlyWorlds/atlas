@@ -439,6 +439,44 @@ test('deleting an element removes it from every link that named it (keel parity)
   expect(await storeField(page, feast, 'locations')).toEqual([]);
 });
 
+for (const during of [false, true]) {
+  test(`deleting a map takes its right tab down${during ? ', also when the world leaves the screen during the delete' : ''}`, async ({ page }) => {
+    await setupWorldA(page);
+    const mapId = await storeCreate(page, 'map', { name: 'Old map' });
+    const worldId = await page.evaluate((id) => {
+      const api = (window as any).__atlasTestApi;
+      const ui = api.getState().ui;
+      api.patchSlice('ui', { ...ui, rightTabs: [...ui.rightTabs, { kind: 'map', mapId: id, label: 'Old map' }], rightActiveIndex: ui.rightTabs.length });
+      return api.getState().active.worldId;
+    }, mapId);
+    if (during) {
+      // The world leaves the screen between the delete and its read back (a switch, staged): the store is
+      // no longer the open one when its list comes back.
+      await page.evaluate(async () => {
+        const api = (window as any).__atlasTestApi;
+        const store = api.getActiveStore();
+        const { setActiveStore } = await import('/src/core/active-store.ts');
+        const del = store.deleteElement.bind(store);
+        const list = store.listElements.bind(store);
+        let deleted = false;
+        store.deleteElement = async (...a: unknown[]) => { const r = await del(...a); deleted = true; return r; };
+        store.listElements = async (...a: unknown[]) => { const r = await list(...a); if (deleted) setActiveStore(null); return r; };
+      });
+    }
+    await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [worldId, mapId]);
+    await expect(page.locator('.atlas-middle-header h2')).toContainText('Old map');
+    page.on('dialog', d => d.accept());
+    await page.click('[data-action="delete-element"]');
+    await expect(page.locator('.ow-toast', { hasText: 'Deleted Old map' })).toBeVisible();
+    const tabs = await page.evaluate(() => (window as any).__atlasTestApi.getState().ui.rightTabs);
+    expect(tabs.some((t: { kind: string; mapId?: string }) => t.kind === 'map' && t.mapId === mapId)).toBe(false);
+    if (during) {
+      // Nothing of the world that left is patched in as the screen's.
+      expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().data.elements.some((e: { name: string }) => e.name === 'Old map'))).toBe(true);
+    }
+  });
+}
+
 test('Settings → World offers to remove links to elements that are gone (local world)', async ({ page }) => {
   await setupWorldA(page);
   const kept = await storeCreate(page, 'location', { name: 'Village' });

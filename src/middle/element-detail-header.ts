@@ -994,18 +994,16 @@ async function onDelete(el: Element): Promise<void> {
   if (decision.needed && !window.confirm(decision.message)) return;
   try {
     await store.deleteElement(el.id);
-    if (!patchElementsFrom(store, await store.listElements())) {
-      // The world switched during the delete: the selection, the tabs, the push and the page belong to the world on screen now.
-      toastManager.success(`Deleted ${el.name || 'element'}`);
-      return;
-    }
+    // False when the world switched during the delete: the selection, the push and the page belong to the
+    // world on screen then, but a deleted map's tab is still taken down (the right tabs outlive a switch).
+    const here = patchElementsFrom(store, await store.listElements());
     // Deleting a MAP has to take its right-pane tab with it (Titus):
     // the tab survived the delete and fell through to the stale card reading
     // "Map from another world", which is both wrong (it was this world's) and
     // unclosable-looking. Land on the map index instead — the room that lists
     // what is left — rather than an arbitrary neighbour.
     const uiNow = getState().ui;
-    let nextUi = { ...uiNow, selectedElementId: null };
+    let nextUi = here ? { ...uiNow, selectedElementId: null } : { ...uiNow };
     if (el.type === 'map') {
       const doomed = uiNow.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === el.id);
       if (doomed >= 0) {
@@ -1022,6 +1020,10 @@ async function onDelete(el: Element): Promise<void> {
       }
     }
     patchSlice('ui', nextUi);
+    if (!here) {
+      toastManager.success(`Deleted ${el.name || 'element'}`);
+      return;
+    }
     // Local delete + tombstones written — schedule a push to DELETE on server.
     requestPushIfLinked();
     toastManager.success(`Deleted ${el.name || 'element'}`);

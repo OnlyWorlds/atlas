@@ -314,7 +314,8 @@ export function mountWritingSetup(
         l3: entry.writing_labels.l3 ?? DEFAULT_WRITING_LABELS.l3,
         l4: (entry.writing_labels as Partial<WritingLabels>).l4 ?? DEFAULT_WRITING_LABELS.l4,
       };
-      const renamed = await applyLabelRenameMigration(folder, getState().data.elements, oldLabels, labels);
+      // This world's own elements, read from its folder: after an await the state can hold another world's.
+      const renamed = await applyLabelRenameMigration(folder, await folder.listElements(), oldLabels, labels);
       if (renamed > 0) {
         const fresh = await folder.listElements();
         here = patchElementsFrom(folder, fresh) && here;
@@ -326,18 +327,21 @@ export function mountWritingSetup(
     // writing_initialized=true and switches to tree mode cleanly. If we
     // saved after the promote, the data-side patchSlice would trigger a
     // re-mount with stale registry state and fight us.
-    const nextWorlds = reg.worlds.map(w =>
+    // The registry as it stands now, not as it was read before the migration's awaits (another change
+    // made meanwhile, a world switch's included, is kept).
+    const regNow = getState().registry;
+    const nextWorlds = regNow.worlds.map(w =>
       w.id === worldId
         ? { ...w, writing_labels: labels, writing_initialized: true }
         : w,
     );
-    const nextReg = { ...reg, worlds: nextWorlds };
+    const nextReg = { ...regNow, worlds: nextWorlds };
     saveRegistry(nextReg);
     patchSlice('registry', nextReg);
 
     // Promote candidates. Each failure is logged but doesn't abort the batch.
     if (opts.promote && candidates.length > 0 && !viewOnly) {
-      const finalCandidates = buildPromoteCandidates(getState().data.elements, labels);
+      const finalCandidates = buildPromoteCandidates(await folder.listElements(), labels);
       let written = 0;
       const failures: Array<{ id: string; error: unknown }> = [];
       for (const c of finalCandidates) {
