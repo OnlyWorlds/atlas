@@ -438,8 +438,9 @@ function fill(): void {
       act('write', `Write it as a ${labels.l1.toLowerCase()}`, async () => {
         const id = note.narrative!;
         const made = await writeIfEmpty(worldId, id, ex => (isFilled((ex as { supertype?: unknown }).supertype) ? null : { supertype: labels.l1 } as Partial<Element>));
-        // A write that failed has said so (showProblem): no move to a room that cannot hold it.
-        if (made === 'failed') { if (showing?.note === note) leave(); return; }
+        // A write that failed has said so (showProblem): no move to a room that cannot hold it. Nor
+        // into a world that left the screen.
+        if (made === 'failed' || made === 'away') { if (showing?.note === note) leave(); return; }
         const el = elementOf(id);
         navigate(writingHash(worldId, id));
         if (el && getTierForNarrative(el, worldId) === 'l1') {
@@ -605,7 +606,7 @@ function addYear(actions: HTMLElement, note: EarnedNote, worldId: string): void 
  * is on disk, inside its lock, and returns null to write nothing. A failure
  * is said (showProblem) and answered 'failed', so no action moves on from it.
  */
-async function writeIfEmpty(worldId: string, id: string, mutate: (existing: Element) => Partial<Element> | null): Promise<'wrote' | 'nothing' | 'failed'> {
+async function writeIfEmpty(worldId: string, id: string, mutate: (existing: Element) => Partial<Element> | null): Promise<'wrote' | 'nothing' | 'failed' | 'away'> {
   const store = getActiveStore();
   // The world the caller drew in (a note's, the card's), and only while it is still the open one.
   if (!store || activeWorldId() !== worldId) return 'nothing';
@@ -621,7 +622,8 @@ async function writeIfEmpty(worldId: string, id: string, mutate: (existing: Elem
     return 'failed';
   }
   if (!wrote) return 'nothing';
-  await refreshElementsAfterWrite(store);
+  // 'away': it landed, but its world left the screen meanwhile, so no gesture, move or note follows.
+  if (!(await refreshElementsAfterWrite(store))) return 'away';
   requestPushIfLinked();
   return 'wrote';
 }

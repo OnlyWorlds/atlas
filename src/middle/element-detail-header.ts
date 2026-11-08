@@ -468,12 +468,14 @@ export function openWritingChildCreate(el: Element, childTier: 'l1' | 'l2' | 'l3
         order: maxOrder + 1,
       } as Partial<Element>);
       const all = await refreshElementsAfterWrite(store);
-      // Navigate to the created narrative — stay in the current room.
-      const currentRoute = parseHash(window.location.hash);
-      if (currentRoute.mode === 'writing') {
-        navigate(writingHashForNarrative(worldId, created.id, all));
-      } else {
-        navigate(elementHash(worldId, created.id));
+      // Navigate to the created narrative — stay in the current room (not once its world left the screen).
+      if (all) {
+        const currentRoute = parseHash(window.location.hash);
+        if (currentRoute.mode === 'writing') {
+          navigate(writingHashForNarrative(worldId, created.id, all));
+        } else {
+          navigate(elementHash(worldId, created.id));
+        }
       }
       toastManager.info(`${childLabel} created`);
     },

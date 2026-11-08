@@ -388,7 +388,9 @@ class MapCreateModal extends BaseModal {
 
         this.toasts.success(isConfigure ? `Updated map "${name}"` : `Created map "${name}"`);
         this.resolved = true;
-        this.onDone({ map });
+        // Its world left the screen: the map is not the open world's, so the dialog answers null (it must
+        // still answer, a promise waits on it) and no tab opens for it.
+        this.onDone(elements ? { map } : null);
         this.hide();
       } catch (err) {
         console.error(isConfigure ? '[map-configure] failed:' : '[map-create] failed:', err);

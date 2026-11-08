@@ -299,7 +299,8 @@ async function createField(el: Element, key: string): Promise<void> {
   try {
     pendingEdit = { elementId: el.id, fieldName: key };
     await store.updateElement(el.id, { [key]: '' } as Partial<Element>);
-    await refreshElementsAfterWrite(store);
+    // The world left the screen: the armed focus belongs to it, so disarm.
+    if (!(await refreshElementsAfterWrite(store))) pendingEdit = null;
   } catch (err) {
     pendingEdit = null;
     console.error('[custom-fields] create failed:', err);

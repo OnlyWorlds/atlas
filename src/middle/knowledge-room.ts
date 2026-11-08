@@ -447,7 +447,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     }
     try {
       const created = await folder.createElement('narrative', data as Partial<Element>);
-      await refreshElementsAfterWrite(folder);
+      const fresh = await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
       draft = null;
       clearDraftStash(worldId);
@@ -458,7 +458,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       // this race, reproduced 3/3 with a hash logger). The refresh stays
       // BEFORE the navigate so the entry route never renders not-found.
       const route = parseHash(window.location.hash);
-      if (route.mode === 'knowledge' && route.knowledgeId === NEW) {
+      if (fresh && route.mode === 'knowledge' && route.knowledgeId === NEW) {
         navigate(knowledgeHash(worldId, created.id));
       }
     } catch (err) {
@@ -988,9 +988,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
             atlas_page_intent: 'reference',
             ...pageBlocksPatch(blocks, resolveName),
           } as Partial<Element>);
-          await refreshElementsAfterWrite(folder);
+          const fresh = await refreshElementsAfterWrite(folder);
           requestPushIfLinked();
-          navigate(shareHash(worldId, created.id));
+          if (fresh) navigate(shareHash(worldId, created.id));
         } catch (err) {
           console.error('[knowledge-room] create page failed', err);
           showProblem(err, { doing: 'creating the page', toasts });

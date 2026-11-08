@@ -191,10 +191,12 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         atlas_page_blocks: [],
         atlas_page_refs: [],
       } as Partial<Element>);
-      await refreshElementsAfterWrite(folder);
+      const fresh = await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
-      renameOnOpen = created.id;
-      navigate(shareHash(worldId, created.id));
+      if (fresh) {
+        renameOnOpen = created.id;
+        navigate(shareHash(worldId, created.id));
+      }
     } catch (err) {
       console.error('[share-room] create failed', err);
       showProblem(err, { doing: 'creating the page', toasts });

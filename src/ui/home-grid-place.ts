@@ -86,7 +86,7 @@ async function writeLocked(
   mutate: (ex: Element) => Record<string, unknown> | null,
   /** Run once the write landed, before the list refreshes: the refresh redraws the home, which reads it. */
   onWrote: () => void = () => {},
-): Promise<'wrote' | 'nothing' | 'failed'> {
+): Promise<'wrote' | 'nothing' | 'failed' | 'away'> {
   const store = getActiveStore();
   // A view-only world lights no target; this is the write's own refusal too.
   if (!store || getState().active?.worldId !== worldId || worldIsViewOnly(worldId)) return 'nothing';
@@ -103,13 +103,14 @@ async function writeLocked(
   }
   if (!wrote) return 'nothing';
   onWrote();
-  await refreshElementsAfterWrite(store);
+  // 'away': it landed, but its world left the screen meanwhile, so no gesture or focus follows.
+  if (!(await refreshElementsAfterWrite(store))) return 'away';
   requestPushIfLinked();
   return 'wrote';
 }
 
 /** Drop `a` on `b`: the pair's one write, or nothing when the pair is no target now. */
-export async function placeIn(worldId: string, aId: string, bId: string): Promise<'wrote' | 'nothing' | 'failed'> {
+export async function placeIn(worldId: string, aId: string, bId: string): Promise<'wrote' | 'nothing' | 'failed' | 'away'> {
   const w = writeBetween(aId, bId);
   if (!w) return 'nothing';
   const els = getState().data.elements;
@@ -124,7 +125,7 @@ export async function placeIn(worldId: string, aId: string, bId: string): Promis
 }
 
 /** Undo the last write: only while its field still holds what it wrote. */
-export async function undoJustNow(worldId: string): Promise<'wrote' | 'nothing' | 'failed'> {
+export async function undoJustNow(worldId: string): Promise<'wrote' | 'nothing' | 'failed' | 'away'> {
   const j = justNowIn(worldId);
   if (!j || j.undone) return 'nothing';
   const result = await writeLocked(worldId, j.write.on, ex => undoPatchFor(j.write, recordOf(ex)), () => { justNow = null; });

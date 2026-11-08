@@ -508,10 +508,11 @@ export class CalendarBuilderModal extends BaseModal {
         id = el.id;
         this.createdId = el.id;
       }
-      await refreshElementsAfterWrite(store);
+      const fresh = await refreshElementsAfterWrite(store);
       this.hide();
       this.toasts.success(this.opts.elementId ? 'Calendar saved' : `“${this.draft.name.trim()}” is your calendar now`);
-      this.opts.onSaved?.(id);
+      // Its world left the screen: the host's follow-up (a lens, a redraw) belongs to the world on screen.
+      if (fresh) this.opts.onSaved?.(id);
     } catch (err) {
       // The builder stays open, so Save again is the retry (a create retried
       // from a toast could make a second calendar).

@@ -56,7 +56,11 @@ async function createNarrativeAtTier(
     ...(parentId ? { parent_narrative: parentId } : {}),
     order: nextOrder(idx, parentId),
   } as Partial<Element>);
-  const all = await refreshElementsAfterWrite(folder);
+  // Its world left the screen meanwhile: the caller selects and navigates only on a non-null result.
+  if (!(await refreshElementsAfterWrite(folder))) {
+    toasts.info(`Created ${name}`);
+    return null;
+  }
   return created;
 }
 

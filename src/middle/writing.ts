@@ -131,7 +131,11 @@ async function createNarrativeAtRoot(
     supertype,
     order: 0,
   } as Partial<Element>);
-  const all = await refreshElementsAfterWrite(folder);
+  // Its world left the screen meanwhile: the caller navigates only on a non-null result.
+  if (!(await refreshElementsAfterWrite(folder))) {
+    toasts.info(`Created ${name}`);
+    return null;
+  }
   return created;
 }
 

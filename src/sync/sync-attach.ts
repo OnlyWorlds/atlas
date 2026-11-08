@@ -628,13 +628,14 @@ export function requestPushIfLinked(): void {
  * state AND wants the change to flow to the server (for api-linked worlds).
  * This three-liner used to appear at ~25 call sites — see SWEEP-2026-05-20.md
  * F8. Returns the fresh element list so callers that need it (e.g. for
- * building a writingHash from the new state) can chain.
+ * building a writingHash from the new state) can chain; null when the store's world is no longer on
+ * screen (nothing was patched: a caller selects, navigates or focuses only on a non-null result).
  */
-export async function refreshElementsAfterWrite(store: FolderStore): Promise<Element[]> {
+export async function refreshElementsAfterWrite(store: FolderStore): Promise<Element[] | null> {
   const elements = await store.listElements();
   // A world switched while the write ran: this store's world is no longer on screen, and its elements
   // must not become the open world's (they would show in its lists and pickers until the next refresh).
-  if (!patchElementsFrom(store, elements)) return elements;
+  if (!patchElementsFrom(store, elements)) return null;
   requestPushIfLinked();
   return elements;
 }

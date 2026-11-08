@@ -440,9 +440,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
     try {
       await store.updateElement(id, { [field]: date });
-      await refreshElementsAfterWrite(store);
-      // Deferred so the re-render's lastScoped is fresh.
-      queueMicrotask(() => showDatedElement(id, el.name, date));
+      const fresh = await refreshElementsAfterWrite(store);
+      // Deferred so the re-render's lastScoped is fresh (and only while the world is on screen).
+      if (fresh) queueMicrotask(() => showDatedElement(id, el.name, date));
     } catch (err) {
       console.error('[charts] drag-to-date write failed:', err);
       // Writing the same date again is safe (the bounds are checked again too).

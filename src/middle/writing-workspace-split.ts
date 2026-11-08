@@ -229,11 +229,13 @@ async function performSplit(args: PerformSplitArgs): Promise<void> {
     // writer guessing whether anything happened.
   }
 
-  await refreshElementsAfterWrite(folder);
+  const fresh = await refreshElementsAfterWrite(folder);
   requestPushIfLinked();
 
   // A failed truncate already toasted; "split" would claim more than happened.
   if (truncated) toastManager.success(`Split into new narrative.`);
+  // Its world left the screen: no callback, no navigation into the other world.
+  if (!fresh) return;
   args.onDone?.(created.id);
   navigate(writingHash(args.worldId, created.id));
 }

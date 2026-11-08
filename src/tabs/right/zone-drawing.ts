@@ -317,10 +317,13 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
 
     // 4. Select the new zone + navigate to its element-detail. No inline
     // rename prompt — modal already captured the name.
-    patchSlice('ui', { ...getState().ui, selectedElementId: zone.id });
-    const worldId = getState().active?.worldId;
-    if (worldId) {
-      navigate(elementHash(worldId, zone.id));
+    // Not once its world left the screen (the zone is another world's): teardown below still runs.
+    if (elements) {
+      patchSlice('ui', { ...getState().ui, selectedElementId: zone.id });
+      const worldId = getState().active?.worldId;
+      if (worldId) {
+        navigate(elementHash(worldId, zone.id));
+      }
     }
   } catch (err) {
     console.error('[zone-drawing] finish failed:', err);
