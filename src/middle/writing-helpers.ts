@@ -157,6 +157,8 @@ export interface NarrativeNode {
 export interface NarrativeIndex {
   roots: NarrativeNode[];
   byId: Map<string, NarrativeNode>;
+  /** The narratives a parent cycle was cut at: roots of the tree, though their stored parent says otherwise. */
+  cut?: ReadonlySet<string>;
 }
 
 /**
@@ -167,6 +169,55 @@ export interface NarrativeIndex {
  *
  * Used by both the sidebar tree and the writing-room dispatcher.
  */
+const TIER_RANK: Record<string, number> = { l1: 0, l2: 1, l3: 2, l4: 3 };
+
+/**
+ * A parent cycle in world data (a book set under its own chapter: the element page's Containing narrative
+ * takes any narrative) leaves every narrative in it, and everything under them, out of the tree's roots, and
+ * every walk down the tree recurses without end. Each cycle is cut at its highest member (tier, then order,
+ * name, id), which becomes a root; the stored links are left as they are.
+ */
+function cutParentCycles(byId: Map<string, NarrativeNode>, roots: NarrativeNode[]): Set<string> {
+  const cutIds = new Set<string>();
+  const reached = new Set<NarrativeNode>();
+  const mark = (from: NarrativeNode): void => {
+    const stack = [from];
+    while (stack.length) {
+      const n = stack.pop()!;
+      if (reached.has(n)) continue;
+      reached.add(n);
+      stack.push(...n.children);
+    }
+  };
+  roots.forEach(mark);
+  const parentOf = (n: NarrativeNode): NarrativeNode | undefined =>
+    byId.get((n.el as Element & { parent_narrative?: string }).parent_narrative ?? '');
+  const rank = (a: NarrativeNode, b: NarrativeNode): number =>
+    (TIER_RANK[a.tier ?? ''] ?? 9) - (TIER_RANK[b.tier ?? ''] ?? 9)
+    || ((a.el as Element & { order?: number }).order ?? 0) - ((b.el as Element & { order?: number }).order ?? 0)
+    || (a.el.name ?? '').localeCompare(b.el.name ?? '')
+    || a.el.id.localeCompare(b.el.id);
+  for (const start of byId.values()) {
+    if (reached.has(start)) continue;
+    // Not reached from a root, so its parent chain never ends at one: walk up to the first repeat, the cycle.
+    const path: NarrativeNode[] = [];
+    let cur: NarrativeNode | undefined = start;
+    while (cur && !path.includes(cur)) {
+      path.push(cur);
+      cur = parentOf(cur);
+    }
+    if (!cur) continue; // cannot happen: a chain that ends at no parent began at a root
+    const cycle = path.slice(path.indexOf(cur));
+    const cut = [...cycle].sort(rank)[0];
+    const parent = parentOf(cut)!;
+    parent.children = parent.children.filter(c => c !== cut);
+    roots.push(cut);
+    cutIds.add(cut.el.id);
+    mark(cut);
+  }
+  return cutIds;
+}
+
 export function buildNarrativeIndex(elements: Element[], worldId: string): NarrativeIndex {
   const writingNarratives = elements.filter(e => isWritingNarrative(e, worldId));
   const byId = new Map<string, NarrativeNode>();
@@ -182,6 +233,7 @@ export function buildNarrativeIndex(elements: Element[], worldId: string): Narra
       roots.push(node);
     }
   }
+  const cut = cutParentCycles(byId, roots);
   const queue: NarrativeNode[] = roots.map(r => { r.depth = 0; return r; });
   while (queue.length > 0) {
     const n = queue.shift()!;
@@ -201,7 +253,7 @@ export function buildNarrativeIndex(elements: Element[], worldId: string): Narra
     for (const n of nodes) sortTree(n.children);
   };
   sortTree(roots);
-  return { roots, byId };
+  return { roots, byId, ...(cut.size ? { cut } : {}) };
 }
 
 /**
@@ -229,10 +281,12 @@ export function ancestorIds(idx: NarrativeIndex, id: string): string[] {
   // the first repeat.
   const seen = new Set<string>([id]);
   const cur = idx.byId.get(id);
-  let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
+  // A narrative a cycle was cut at is a root of the tree: the breadcrumb ends there, as the sidebar does.
+  let parentId = cur && !idx.cut?.has(id) ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
   while (parentId && !seen.has(parentId)) {
     seen.add(parentId);
     out.push(parentId);
+    if (idx.cut?.has(parentId)) break;
     const parent = idx.byId.get(parentId);
     if (!parent) break;
     parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;

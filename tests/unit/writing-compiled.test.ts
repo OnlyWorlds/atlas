@@ -34,6 +34,15 @@ describe('writing-compiled / buildCompiledTree', () => {
     expect(tree.children).toEqual([]);
   });
 
+  it('a parent cycle compiles once, cut at its highest member, instead of recursing without end', () => {
+    const book = makeNarrative('book', 'Book', { supertype: 'Book', parent: 'ch', story: 'b' });
+    const ch = makeNarrative('ch', 'Chapter', { supertype: 'Chapter', parent: 'book', story: 'c' });
+    const all = [book, ch];
+    expect(compiledIds(book, all, WID)).toEqual(['book', 'ch']);
+    expect(compiledIds(ch, all, WID)).toEqual(['ch']);
+    expect(narrativeHasChildren(ch, all, WID)).toBe(false);
+  });
+
   it('nests children in order, respecting the order field', () => {
     const book = makeNarrative('book', 'Book', { story: 'preface' });
     const ch1 = makeNarrative('ch1', 'Chapter 1', { parent: 'book', order: 1, story: 'ch1 prose' });

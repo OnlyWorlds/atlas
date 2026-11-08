@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.12',
+    date: '2026-11-08',
+    theme: 'A book under its own chapter',
+    entries: [
+      {
+        id: 'writing-parent-cycle',
+        title: 'A book set under its own chapter stays in the writing room',
+        body: 'A narrative\'s Containing narrative can name any narrative, even one below it. When a book was set under its own chapter, both left the writing room\'s tree with everything under them, and opening either one stopped the room. The tree now keeps them: the highest of the two stays at the top, the other under it, and the compiled view reads them once. Nothing in the world is changed.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.11',
     date: '2026-11-08',
     theme: 'A zone\'s markers where they are',

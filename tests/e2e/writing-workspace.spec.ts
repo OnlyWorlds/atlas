@@ -993,6 +993,34 @@ test('link-all corner never covers the prose: no text rect under the pill', asyn
   expect(hits).toBe(0);
 });
 
+test('a parent cycle (a book set under its own chapter) keeps both in the tree, and the book compiles', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'cycle-root');
+  await createWorld(page, 'cycle world');
+  const bookId = await createElement(page, 'narrative', { name: 'the loop book', supertype: 'Book', story: 'Book prose.' });
+  const chapId = await createElement(page, 'narrative', {
+    name: 'the loop chapter', supertype: 'Chapter', parent_narrative: bookId, story: 'Chapter prose.',
+  });
+  // The element page's Containing narrative takes any narrative: the book is set under its own chapter.
+  await page.evaluate(async ({ bookId, chapId }) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    await store.updateElement(bookId, { parent_narrative: chapId });
+    api.patchData(await store.listElements());
+  }, { bookId, chapId });
+
+  await gotoWriting(page, chapId);
+  await expect(page.locator('.atlas-writing-tree-row', { hasText: 'the loop book' })).toBeVisible();
+  await expect(page.locator('.atlas-writing-tree-row', { hasText: 'the loop chapter' })).toBeVisible();
+
+  await gotoWriting(page, bookId);
+  await expect(page.locator('.atlas-writing-compiled')).toContainText('Chapter prose.');
+  await expect(page.locator('.atlas-writing-workspace-crumb')).not.toContainText('the loop chapter');
+  expect(errors).toEqual([]);
+});
+
 test('tree bulk link: right-click a book links mentions in its closed scenes, story + sidecar + derive', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'bulklink-root');

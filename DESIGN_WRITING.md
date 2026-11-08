@@ -254,7 +254,7 @@ The original v1 deferral list (hover preview, focus mode, outline view, backlink
 #/w/<id>/writing/<narrativeId>    → narrative selected (any tier)
 ```
 
-Ancestry is NOT encoded in the URL — it's derived at render time from the `parent_narrative` chain via `buildNarrativeIndex` + `ancestorIds`. Atlas always has the world's narratives in memory by the time the writing room mounts, so deriving on render has no real cost.
+Ancestry is NOT encoded in the URL — it's derived at render time from the `parent_narrative` chain via `buildNarrativeIndex` + `ancestorIds`. Atlas always has the world's narratives in memory by the time the writing room mounts, so deriving on render has no real cost. A parent cycle in the data (a book set under its own chapter: Containing narrative takes any narrative) is cut where the tree is built, at its highest member (tier, then order, name, id), which becomes a root and ends `ancestorIds`; the stored links stay as they are (1.123.12).
 
 **Legacy form back-compat**: URLs from before the shortening still parse. The parser picks the deepest segment as `narrativeId` and re-emits the short form on next navigation:
 

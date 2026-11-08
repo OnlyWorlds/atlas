@@ -390,6 +390,36 @@ describe('buildNarrativeIndex', () => {
     expect(children).toEqual(['ch4', 'ch1', 'ch2', 'ch3']);
   });
 
+  it('a parent cycle is cut at its highest member, which becomes a root: nothing in or under it leaves the tree', () => {
+    // A book set under its own chapter (the element page's Containing narrative takes any narrative).
+    const elements = [
+      n('book', 'B', { supertype: 'Book', parent_narrative: 'ch1' }),
+      n('ch1', 'C1', { supertype: 'Chapter', parent_narrative: 'book' }),
+      n('sc1', 'S1', { supertype: 'Scene', parent_narrative: 'ch1' }),
+      // A self-parent, and a two-cycle of equal tiers cut by order.
+      n('self', 'Self', { supertype: 'Scene', parent_narrative: 'self' }),
+      n('x', 'X', { supertype: 'Chapter', parent_narrative: 'y', order: 2 }),
+      n('y', 'Y', { supertype: 'Chapter', parent_narrative: 'x', order: 1 }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    expect(idx.roots.map(r => r.el.id)).toEqual(['book', 'self', 'y']);
+    expect(idx.byId.get('book')!.children.map(c => c.el.id)).toEqual(['ch1']);
+    expect(idx.byId.get('ch1')!.children.map(c => c.el.id)).toEqual(['sc1']);
+    expect(idx.byId.get('sc1')!.depth).toBe(2);
+    expect(idx.byId.get('self')!.children).toEqual([]);
+    expect(idx.byId.get('y')!.children.map(c => c.el.id)).toEqual(['x']);
+    // Every node is reachable from a root exactly once.
+    const seen: string[] = [];
+    const walk = (nodes: typeof idx.roots): void => nodes.forEach(x => { seen.push(x.el.id); walk(x.children); });
+    walk(idx.roots);
+    expect(seen.sort()).toEqual(['book', 'ch1', 'sc1', 'self', 'x', 'y']);
+    // The breadcrumb follows the tree: it ends at the narrative the cycle was cut at.
+    expect(ancestorIds(idx, 'book')).toEqual([]);
+    expect(ancestorIds(idx, 'sc1')).toEqual(['ch1', 'book']);
+    expect(ancestorIds(idx, 'x')).toEqual(['y']);
+    expect(ancestorIds(idx, 'self')).toEqual([]);
+  });
+
   it('treats narratives with a missing parent as roots (broken-parent recovery)', () => {
     const elements = [
       n('orphan', 'Orphan', { supertype: 'Scene', parent_narrative: 'gone' }),
