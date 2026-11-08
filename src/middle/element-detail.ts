@@ -159,8 +159,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
   }
 
   function render(): void {
-    // An open fan-out holds a redraw, but never a route change: the page follows the address.
-    if (isEditingIn(target) || (waymarkOpenIn(target) && window.location.hash === drawnHash)) { renderDeferred = true; return; }
+    // A field being typed in and an open fan-out hold a redraw, but never a route change: the
+    // page follows the address. Holding it (Back with a field focused) drew the old element
+    // under the new address until focus left, its Delete button included.
+    if (window.location.hash === drawnHash && (isEditingIn(target) || waymarkOpenIn(target))) { renderDeferred = true; return; }
+    // Leaving with a field focused: blur it first, so its own commit (blur, change) runs while it
+    // is on the page. Firefox fires neither for a focused input the rebuild removes, and the text
+    // typed into it was dropped.
+    if (window.location.hash !== drawnHash && isEditingIn(target)) (document.activeElement as HTMLElement | null)?.blur();
     const s = getState();
     const touring = isTourFlagActive();
     if (!gate.changed([window.location.hash, s.active, s.data, s.ui, s.registry, s.styles, touring,

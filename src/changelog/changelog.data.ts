@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.10',
+    date: '2026-11-08',
+    theme: 'Back means back',
+    entries: [
+      {
+        id: 'element-page-follows-back',
+        title: 'Back with a field selected shows the element you went back to',
+        body: 'Going back (a mouse\'s back button, Alt and Left) while a field on an element\'s page was selected kept the old element on the page under the new one\'s name in the address and the list, its Delete button included, until you clicked elsewhere. The page now follows at once, and what you had typed in the field is saved first.',
+        tags: ['editor', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.9',
     date: '2026-11-08',
     theme: 'A press on an element that lands',

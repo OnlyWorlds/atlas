@@ -228,7 +228,10 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
  * the inline field editors the same way. Every surface
  * that rebuilds on a background tick asks this first and defers the rebuild
  * until focus leaves (the commit re-renders anyway). Same rule as
- * editable-title's sync().
+ * editable-title's sync(). Any input counts, not only text: a checkbox or
+ * slider saved by Space or an arrow key keeps its focus because its own
+ * save's redraw waits (`typingInside` is the text-only test). A route
+ * change never waits on this (element-detail's render).
  */
 export function isEditingIn(root: ParentNode): boolean {
   const active = document.activeElement as HTMLElement | null;
