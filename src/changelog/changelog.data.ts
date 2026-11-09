@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.16',
+    date: '2026-11-09',
+    theme: 'A laid-out map says how',
+    entries: [
+      {
+        id: 'layout-recipe-card',
+        title: 'A map laid out by a method says how its pins were placed',
+        body: 'Some maps are laid out by a method rather than by hand: each pin placed by a rule, on the ground of another map. Such a map\'s page used to show the method\'s recipe as raw data under Custom fields. It now reads as a short card: the method, the map it stands on, and that Atlas draws the map flat. The recipe as written is one press away, and Atlas never rewrites it.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.123.15',
     date: '2026-11-09',
     theme: 'One name for a published page',

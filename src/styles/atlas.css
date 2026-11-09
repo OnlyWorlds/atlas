@@ -2072,6 +2072,17 @@ html {
   margin-left: auto;
   margin-right: 16px;
 }
+.atlas-layout-card {
+  overflow-wrap: anywhere;
+}
+.atlas-layout-card-recipe summary {
+  cursor: pointer;
+  color: var(--atlas-text-muted);
+  font-size: 10.5px;
+}
+.atlas-layout-card-recipe pre {
+  margin-top: 6px;
+}
 .atlas-tangle-outcome {
   color: rgba(var(--atlas-ink-rgb), 0.70);
   margin-bottom: 8px;

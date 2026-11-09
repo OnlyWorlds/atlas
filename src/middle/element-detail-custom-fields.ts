@@ -28,6 +28,14 @@ import { customFieldNameSuggestions } from '../core/taxonomy';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { TANGLE_CARD_RENDERERS } from './tangle-cards';
+import { renderLayoutCard } from './layout-card';
+
+/** Another tool's record that Atlas draws as a read-only card instead of raw JSON, by its field name
+ *  (null: the generic row). A layout recipe is a Map's: on any other type it keeps the generic row. */
+const RECORD_CARD_RENDERERS: Record<string, (value: unknown, el: Element) => HTMLElement | null> = {
+  ...TANGLE_CARD_RENDERERS,
+  x_layout: (value, el) => (el.type === 'map' ? renderLayoutCard(value) : null),
+};
 import { WORLD_NOT_OPEN } from './element-detail-fields';
 
 const SECTION_NAME = 'Custom fields';
@@ -186,8 +194,8 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
     for (const entry of structured) {
       // Known tool records get a real card (tangle battles, tropaia) —
       // still read-only, still deletable below via the same confirmed ×.
-      const renderCard = TANGLE_CARD_RENDERERS[entry.name];
-      const cardEl = renderCard ? renderCard(entry.value) : null;
+      const renderCard = RECORD_CARD_RENDERERS[entry.name];
+      const cardEl = renderCard ? renderCard(entry.value, el) : null;
       if (cardEl) {
         const wrap = document.createElement('div');
         wrap.className = 'atlas-custom-structured-row atlas-custom-structured-card';
