@@ -23,7 +23,7 @@ import { escapeText, hexColourOr } from '../../core/dom-utils';
 import { inkPoints, inkMinSegment, inkPatternId, type InkTreatment, type InkPattern } from '../../core/map-ink';
 // view-only-ok: its updateZone is the overlay's own redraw, not a store write (conv. 149).
 
-const DEFAULT_COLOR = '#22d3ee';
+export const DEFAULT_COLOR = '#22d3ee';
 const DEFAULT_OPACITY = 0.4;
 const SELECTED_WEIGHT = 3;
 const UNSELECTED_WEIGHT = 2;

@@ -29,12 +29,26 @@ import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { TANGLE_CARD_RENDERERS } from './tangle-cards';
 import { renderLayoutCard } from './layout-card';
+import { getState } from '../core/state';
+import { layoutUnderlayFor } from '../tabs/right/layout-underlay';
+import type { WorldMap } from '../core/types';
+
+/** The card's view of the ground, from the world: its name, and whether the canvas draws its picture (the canvas's own rule). */
+function layoutGroundFor(map: Element): (mapId: string) => { name: string | null; drawn: boolean } | null {
+  return (mapId) => {
+    const elements = getState().data.elements;
+    const ground = elements.find((e) => e.id === mapId && e.type === 'map');
+    if (!ground) return null;
+    const name = typeof ground.name === 'string' && ground.name.trim() ? ground.name.trim() : null;
+    return { name, drawn: layoutUnderlayFor(map as WorldMap, elements) !== null };
+  };
+}
 
 /** Another tool's record that Atlas draws as a read-only card instead of raw JSON, by its field name
  *  (null: the generic row). A layout recipe is a Map's: on any other type it keeps the generic row. */
 const RECORD_CARD_RENDERERS: Record<string, (value: unknown, el: Element) => HTMLElement | null> = {
   ...TANGLE_CARD_RENDERERS,
-  x_layout: (value, el) => (el.type === 'map' ? renderLayoutCard(value) : null),
+  x_layout: (value, el) => (el.type === 'map' ? renderLayoutCard(value, layoutGroundFor(el)) : null),
 };
 import { WORLD_NOT_OPEN } from './element-detail-fields';
 

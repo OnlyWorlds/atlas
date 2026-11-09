@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.17',
+    date: '2026-11-09',
+    theme: 'A laid-out map stands on its ground',
+    entries: [
+      {
+        id: 'layout-ground-underlay',
+        title: 'A laid-out map draws its ground map under its pins',
+        body: 'A map laid out by a method names the map it stands on. When the laid-out map has no picture of its own, Atlas now draws that ground map under its pins: its picture, and its rivers, roads and regions as faint lines and areas, where the layout placed them. A map with its own picture keeps it. The card on the map\'s page says when the ground is drawn.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.123.16',
     date: '2026-11-09',
     theme: 'A laid-out map says how',

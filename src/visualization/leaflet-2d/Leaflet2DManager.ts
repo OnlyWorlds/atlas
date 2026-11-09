@@ -206,6 +206,11 @@ export class Leaflet2DManager {
     this.map.createPane('atlasBgImagePane');
     const bgPane = this.map.getPane('atlasBgImagePane');
     if (bgPane) bgPane.style.zIndex = '180';
+    // A laid-out map's ground picture: above the flat backdrop (an opaque sea included), still below
+    // zones, the grid and pins.
+    this.map.createPane('atlasBgUnderlayPane');
+    const underPane = this.map.getPane('atlasBgUnderlayPane');
+    if (underPane) underPane.style.zIndex = '190';
 
     // Create layer groups (order matters for z-index)
     this.backgroundLayer = L.layerGroup().addTo(this.map);
@@ -261,6 +266,35 @@ export class Leaflet2DManager {
     if (onError) overlay.once('error', onError);
     overlay.addTo(this.backgroundLayer);
     this.log('Background image set:', url);
+  }
+
+  /**
+   * Draw a picture inside the backdrop, at a rectangle of the map's own pixels (bottom-left origin): a laid-out
+   * map's ground (`tabs/right/layout-underlay.ts`). Adds to the background without clearing it, so it is set after
+   * the backdrop; the next backdrop set clears it with the rest. `onError` fires once if the picture cannot load.
+   */
+  addBackgroundUnderlay(url: string, sw: { x: number; y: number }, ne: { x: number; y: number }, onError?: () => void): void {
+    if (!this.map || !this.backgroundLayer) return;
+    const bounds: L.LatLngBoundsExpression = [[sw.y, sw.x], [ne.y, ne.x]];
+    const overlay = L.imageOverlay(url, bounds, { pane: 'atlasBgUnderlayPane', interactive: false });
+    if (onError) overlay.once('error', onError);
+    overlay.addTo(this.backgroundLayer);
+    this.log('Background underlay set:', url);
+  }
+
+  /**
+   * Draw shapes inside the backdrop, faint and never pressable: a laid-out map's ground zones (rivers, roads,
+   * regions), in the map's own pixels. Added like `addBackgroundUnderlay`, cleared with the next backdrop.
+   */
+  addBackgroundUnderlayShapes(shapes: ReadonlyArray<{ points: ReadonlyArray<{ x: number; y: number }>; line: boolean }>, color: string): void {
+    if (!this.map || !this.backgroundLayer) return;
+    for (const s of shapes) {
+      const latlngs = s.points.map((p) => L.latLng(p.y, p.x));
+      const opts = { pane: 'atlasBgUnderlayPane', interactive: false, color, weight: s.line ? 2 : 1, opacity: 0.45 };
+      if (s.line) L.polyline(latlngs, opts).addTo(this.backgroundLayer);
+      else L.polygon(latlngs, { ...opts, fillColor: color, fillOpacity: 0.06 }).addTo(this.backgroundLayer);
+    }
+    this.log('Background underlay shapes set:', shapes.length);
   }
 
   /**

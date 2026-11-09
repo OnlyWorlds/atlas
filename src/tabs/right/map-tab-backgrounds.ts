@@ -20,6 +20,8 @@ import { pickMapImageSource } from './map-image-source';
 import { mapStyleOf } from '../../core/map-ink';
 import { extractEdgeColor } from './edge-color';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
+import { layoutUnderlayFor, layoutUnderlayKey } from './layout-underlay';
+import { DEFAULT_COLOR as ZONE_DEFAULT_COLOR } from '../../visualization/leaflet-2d/ZoneOverlay';
 
 /**
  * Serialize the picked image source to a comparable key. Used by the
@@ -38,8 +40,15 @@ export function sourceKey(map: WorldMap): string {
   // Flat canvas: background_color is part of the render, so an edit to it
   // must drift the key (the subscriber re-applies live).
   // The map's style paints the sea when it has no colour of its own.
-  return `flat:${typeof map.background_color === 'string' ? map.background_color : ''}:${mapStyleOf(map)?.id ?? ''}`;
+  // A laid-out map's ground picture is part of the render too: its source and its place drift the key.
+  return `flat:${typeof map.background_color === 'string' ? map.background_color : ''}:${mapStyleOf(map)?.id ?? ''}`
+    + layoutUnderlayKey(layoutUnderlayFor(map, getState().data.elements));
 }
+
+/** Each tab's latest background apply: an apply that awaited a picture draws nothing once a newer one began. */
+const applyGen = new WeakMap<MapTabCacheEntry, number>();
+/** The object URL of each tab's drawn local ground picture, released when the next one replaces it. */
+const underlayUrl = new WeakMap<MapTabCacheEntry, string>();
 
 /**
  * Guarded fire-and-forget elements refresh after a background-path dims
@@ -70,6 +79,8 @@ export async function applyMapBackground(
   const manager = entry.manager;
   const container = entry.container;
   let backgroundApplied = false;
+  const gen = (applyGen.get(entry) ?? 0) + 1;
+  applyGen.set(entry, gen);
 
   // A prior apply's failure chip is stale the moment we re-apply.
   container.querySelector('.atlas-map-imgfail-hint')?.remove();
@@ -175,6 +186,39 @@ export async function applyMapBackground(
     // sized flat backdrop; the ⚙ grid overlay composes on top for users who
     // want scaffolding.
     applyFlat();
+    // A laid-out map draws its ground map under its pins, where its recipe says the ground lies: the
+    // ground's picture first, then its zones on it (the shapes added after the picture, so they stack above it).
+    const under = layoutUnderlayFor(map, getState().data.elements);
+    if (under) {
+      const failed = () => {
+        const hint = document.createElement('div');
+        hint.className = 'atlas-map-loading-hint atlas-map-imgfail-hint';
+        hint.textContent = 'The ground map\'s picture did not load; the pins stay where they are';
+        container.appendChild(hint);
+      };
+      if (under.source?.kind === 'url') {
+        manager.addBackgroundUnderlay(under.source.url, under.sw, under.ne, failed);
+      } else if (under.source?.kind === 'local') {
+        try {
+          const store = getActiveStore();
+          const blob = store ? await store.getMediaBlob(under.source.mediaId) : null;
+          // A newer apply began while the picture was read: it owns the background now (its backdrop cleared ours).
+          if (applyGen.get(entry) !== gen) return;
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            // The previous apply's ground URL is no longer drawn: release it rather than hold it until the tab closes.
+            const prev = underlayUrl.get(entry);
+            if (prev) { URL.revokeObjectURL(prev); entry.objectUrls = entry.objectUrls.filter((u) => u !== prev); }
+            underlayUrl.set(entry, url);
+            entry.objectUrls.push(url);
+            manager.addBackgroundUnderlay(url, under.sw, under.ne, failed);
+          }
+        } catch (err) {
+          console.warn('[map-tab] failed to load the ground map\'s local picture:', err);
+        }
+      }
+      if (under.shapes.length > 0) manager.addBackgroundUnderlayShapes(under.shapes, ZONE_DEFAULT_COLOR);
+    }
     // Durable coordinate space: legacy imageless maps predate the stored-dims
     // contract — persist the runtime default ONCE so future renders can't
     // drift (new imageless maps get dims stamped at create). LOCAL-ONLY
