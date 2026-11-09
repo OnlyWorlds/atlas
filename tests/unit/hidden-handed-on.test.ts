@@ -95,7 +95,7 @@ describe('a published page leaves the hidden out', () => {
 
   it('a hidden page is not published at all, and says so', () => {
     const p = page([blocks[0]], { hidden: true });
-    expect(pageNotPublishedLine(p)).toBe('This page is hidden, so it is not published: a published page is read by anyone with its link.');
+    expect(pageNotPublishedLine(p)).toBe('This page is hidden, so it is not published: a published page is read by anyone with its address.');
     expect(leftOutPageLine(p, world())).toBe(pageNotPublishedLine(p));
     expect(pageNotPublishedLine(page([blocks[0]]))).toBeNull();
   });

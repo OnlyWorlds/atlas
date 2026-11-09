@@ -135,7 +135,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     can: [
       'stack blocks: headings, text, cards, collections, maps, charts, circles',
       'preview exactly what a visitor will see',
-      'publish to a public URL when the world is online',
+      'publish a page at its own address when the world is online',
       'copy any page as JSON to use elsewhere',
     ],
   },

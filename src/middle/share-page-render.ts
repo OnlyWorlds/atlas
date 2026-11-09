@@ -863,7 +863,7 @@ export function renderPayloadCard(
 
   if (!entry) {
     // B3 (2026-07-03): a dangling card is author information, not visitor
-    // content — the public page (and the preview, which must match it)
+    // content — the published page (and the preview, which must match it)
     // renders NOTHING. The author still sees the block in the builder's
     // edit rows.
     card.classList.add('is-missing');

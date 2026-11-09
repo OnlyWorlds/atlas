@@ -218,15 +218,15 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // the slug — without a revoke-first, the server row would stay live and
     // count against the quota with NO recovery path in the UI. Always confirm
     // (regardless of the confirm_before_delete setting — this is a public,
-    // destructive action) and take the public page down before the local delete.
+    // destructive action) and take the published page down before the local delete.
     const pub = el ? pagePubOf(el) : null;
     let publishConfirmed = false;
     if (pub && !pub.revoked) {
       const client = sharingClientForActiveWorld();
       const url = publicUrlFor(pub.slug);
       const msg = client
-        ? `"${el?.name || 'This page'}" is published at ${url}. Deleting it also takes the public page down. Continue?`
-        : `"${el?.name || 'This page'}" is published at ${url}, but Atlas has no key or PIN for this world, so the public page would stay up with no way to revoke it from here. Delete anyway?`;
+        ? `"${el?.name || 'This page'}" is published at ${url}. Deleting it also takes the published page down. Continue?`
+        : `"${el?.name || 'This page'}" is published at ${url}, but Atlas has no key or PIN for this world, so the published page would stay up with no way to revoke it from here. Delete anyway?`;
       if (!window.confirm(msg)) return;
       publishConfirmed = true;
       if (client) {
@@ -234,7 +234,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           await client.revoke(pub.slug);
         } catch (err) {
           if (!(err instanceof SharingApiError && err.code === 'not_found')) {
-            surfaceSharingError(err, 'taking the public page down');
+            surfaceSharingError(err, 'taking the published page down');
             return; // abort: retry the delete once the server is reachable
           }
           // not_found = already gone server-side; the delete may proceed.
@@ -1489,7 +1489,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       } else {
         // The page IS live; only the local record failed. Don't claim success,
         // don't lose the URL. The one toast for it (patchPage stays quiet).
-        toasts.error(`Published at ${publicUrlFor(res.slug)}, but Atlas could not record it in the world. Keep that URL.`);
+        toasts.error(`Published at ${publicUrlFor(res.slug)}, but Atlas could not record it in the world. Keep that address.`);
       }
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
@@ -1523,11 +1523,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         },
       }, undefined, { quiet: true });
       if (mirrored) {
-        toasts.success('Republished; the public page is up to date');
+        toasts.success('Republished; the published page is up to date');
       } else {
-        // Same rule as publishPage: the public page IS updated; only the
+        // Same rule as publishPage: the published page IS updated; only the
         // local record failed. Don't claim the mirror is current.
-        toasts.error('Republished; the public page is up to date, but Atlas could not record it in the world.');
+        toasts.error('Republished; the published page is up to date, but Atlas could not record it in the world.');
       }
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
@@ -1551,13 +1551,13 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     const pub = page ? pagePubOf(page) : null;
     if (!page || !pub) return;
-    if (!window.confirm(`Revoke "${page.name || 'this page'}"? The public link will show "no longer shared". You keep the URL and can republish later.`)) return;
+    if (!window.confirm(`Revoke "${page.name || 'this page'}"? Its address will show "no longer shared". You keep the address and can republish later.`)) return;
     try {
       await client.revoke(pub.slug);
       await patchPage(pageId, {
         atlas_page_pub: { ...pub, revoked: true, updated_at: new Date().toISOString() },
       });
-      toasts.success('Revoked; the link no longer serves this page');
+      toasts.success('Revoked; its address no longer serves this page');
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       if (err instanceof SharingApiError && err.code === 'not_found') {
@@ -1706,9 +1706,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
       if (isPartialSlice(getState().active?.meta)) {
         // One Character's view never goes online (folder spec §4.2), so there is no Make online to point at.
-        hint.append('Publishing to a public URL needs an online world, and this copy is one view of a world, which can\'t go online.');
+        hint.append('Publishing a page needs an online world, and this copy is one view of a world, which can\'t go online.');
       } else {
-        hint.append('Publishing to a public URL needs an online world. Use ');
+        hint.append('Publishing a page needs an online world. Use ');
         // Not "Settings → World": that tab wears the WORLD'S OWN NAME in the
         // settings nav (Titus, 2026-07-24), so the label named a tab nobody
         // can see. Describe the destination instead of restating a label that
@@ -1750,11 +1750,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const copy = document.createElement('button');
       copy.type = 'button';
       copy.className = 'atlas-share-block-ctrl';
-      copy.title = 'Copy public link';
+      copy.title = 'Copy the page\'s address';
       copy.innerHTML = `<span class="material-symbols-outlined">content_copy</span>`;
       copy.addEventListener('click', () => {
         void navigator.clipboard.writeText(url)
-          .then(() => toasts.success('Link copied'))
+          .then(() => toasts.success('Address copied'))
           .catch(() => toasts.info(url));
       });
       row.appendChild(copy);
@@ -1787,7 +1787,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       repub.className = 'atlas-btn-ghost';
       repub.dataset.action = 'republish';
       repub.textContent = 'Republish';
-      repub.title = 'Push the current composition to the public URL';
+      repub.title = 'Push the current composition to the page\'s address';
       repub.addEventListener('click', () => {
         repub.disabled = true; // in-flight guard (same as publish)
         void republishPage(page.id).finally(() => { repub.disabled = false; });
@@ -1798,7 +1798,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       rev.className = 'atlas-btn-ghost';
       rev.dataset.action = 'revoke';
       rev.textContent = 'Revoke';
-      rev.title = 'Take the page down. The link shows "no longer shared"; you keep the slug';
+      rev.title = 'Take the page down. Its address shows "no longer shared", and you keep the address';
       rev.addEventListener('click', () => {
         rev.disabled = true;
         void revokePage(page.id).finally(() => { rev.disabled = false; });
@@ -1812,8 +1812,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const hint = document.createElement('p');
     hint.className = 'atlas-share-section-hint';
     hint.textContent = pub?.revoked
-      ? 'Revoked. Republishing restores this URL with the current composition.'
-      : 'Publish a frozen snapshot to a public URL. Only what the blocks include is shared.';
+      ? 'Revoked. Republishing restores this address with the current composition.'
+      : 'Publish a frozen snapshot at an address of its own. Only what the blocks include is shared.';
     section.appendChild(hint);
 
     const row = document.createElement('div');
@@ -1825,7 +1825,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const slugInput = document.createElement('input');
     slugInput.type = 'text';
     slugInput.className = 'atlas-input atlas-share-slug';
-    slugInput.placeholder = 'your-page-url';
+    slugInput.placeholder = 'your-page';
     slugInput.value = pub?.revoked ? pub.slug : suggestSlug(page.name || '');
     slugInput.disabled = Boolean(pub?.revoked); // revival reuses the owned slug
     row.appendChild(slugInput);
@@ -1837,7 +1837,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     publishBtn.addEventListener('click', () => {
       const slug = slugInput.value.trim();
       if (!isValidSlug(slug)) {
-        toasts.error('URL must be 4–40 characters: a–z, 0–9, single hyphens, not at the edges.');
+        toasts.error('The page\'s part of the address must be 4 to 40 characters: a–z, 0–9, single hyphens, not at the edges.');
         slugInput.focus();
         return;
       }
@@ -2170,7 +2170,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const pubNow = pagePubOf(page);
     publishBtn.title = pubNow && !pubNow.revoked
       ? 'Publish settings: republish or take the live page down'
-      : 'Publish this page to a public link';
+      : 'Publish this page at an address of its own';
     publishBtn.innerHTML = `<span class="material-symbols-outlined">public</span> ${pubNow && !pubNow.revoked ? 'Published' : 'Publish'}`;
     publishBtn.addEventListener('click', () => {
       void (async () => {

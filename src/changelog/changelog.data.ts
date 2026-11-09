@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.15',
+    date: '2026-11-09',
+    theme: 'One name for a published page',
+    entries: [
+      {
+        id: 'published-page-words',
+        title: 'Pages call what they publish a published page, at its own address',
+        body: 'The Pages room named one published thing four ways: a public page, a published page, a public link and a public URL. It now says a published page, and where it lives is its address. "Public page" is kept for a world\'s own page on onlyworlds.com, the one Settings links to.',
+        tags: ['copy', 'pages'],
+      },
+    ],
+  },
+  {
     version: '1.123.14',
     date: '2026-11-08',
     theme: 'A world opens whole',

@@ -85,8 +85,8 @@ export function sharingErrorMessage(err: SharingApiError): string {
       // slug passes the format rules — "must be 4–40 chars" would gaslight).
       const detail = err.message && err.message !== 'slug_invalid' ? err.message : ''; // raw-error-ok: the sharing server's slug detail is written for users (a reserved word)
       return detail
-        ? `URL not accepted: ${detail}`
-        : 'URL must be 4–40 characters: a–z, 0–9, single hyphens, not at the edges.';
+        ? `Address not accepted: ${detail}`
+        : 'The page\'s part of the address must be 4 to 40 characters: a–z, 0–9, single hyphens, not at the edges.';
     }
     case 'quota_exceeded': return 'Page limit reached. Revoke an old page to publish a new one.';
     case 'payload_too_large': return 'This page is over the 256KB publish limit. Remove some blocks to fit.';

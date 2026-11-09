@@ -284,7 +284,7 @@ export function hiddenLeftOut(page: Element, elements: Element[], charts: ChartC
 
 /** A page that is itself left out is not published at all: its own text would go out. */
 export function pageNotPublishedLine(page: Element): string | null {
-  if (isHiddenMark(page)) return 'This page is hidden, so it is not published: a published page is read by anyone with its link.';
+  if (isHiddenMark(page)) return 'This page is hidden, so it is not published: a published page is read by anyone with its address.';
   if (handsOnAsProposed(page)) return 'This page is proposed and not yet reviewed, so it can be published once a keeper accepts it.';
   return null;
 }
