@@ -1,7 +1,7 @@
 /**
  * The parlor's room inside a world (the parlor's design sheet, §1):
  * its lines, board entries, work items,
- * specs, hearts, votes, sittings and member cards are elements of the world
+ * specs, hearts, votes, sittings, reports and member cards are elements of the world
  * itself, each a type with its own supertype. "A tool that shows a world
  * whole filters the room's supertypes out": the element list's "Hide the
  * room" (#350's companion; PROGRESS NEXT 1).

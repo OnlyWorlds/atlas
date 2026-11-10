@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.20',
+    date: '2026-11-10',
+    theme: "A room's reports stay with the room",
+    entries: [
+      {
+        id: 'room-reports',
+        title: "A report the parlor's room left stays with the room",
+        body: "A report a talk in the parlor's room left behind is now part of the room: hidden from the lists, Charts and Search with its messages and work items until you show the room. A story that is simply called a report stays in the world.",
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.19',
     date: '2026-11-10',
     theme: "A report's key is kept for it",

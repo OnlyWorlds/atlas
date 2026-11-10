@@ -686,7 +686,7 @@ function appendCoverLines(cover: HTMLElement, worldId: string): void {
     roomLine.setAttribute('data-action', 'home-room');
     roomLine.setAttribute('aria-pressed', hidden ? 'true' : 'false');
     roomLine.title = hidden
-      ? "Show the parlor's room (its messages, board entries, work items, specs, hearts, votes, sittings and member cards) in the lists, Charts and Search"
+      ? "Show the parlor's room (its messages, board entries, work items, specs, hearts, votes, sittings, reports and member cards) in the lists, Charts and Search"
       : "Hide the parlor's room from the lists, Charts and Search";
     roomLine.innerHTML = hidden
       ? `The parlor's room, <b>${room}</b>, is hidden · Show it`

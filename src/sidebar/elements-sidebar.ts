@@ -403,7 +403,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
     if (o.room > 0) {
       originRow.appendChild(chip('Hide the room',
-        'Hide the parlor\'s room: its messages, board entries, work items, specs, hearts, votes, sittings and member cards',
+        'Hide the parlor\'s room: its messages, board entries, work items, specs, hearts, votes, sittings, reports and member cards',
         o.hideRoom, 'hide-room', () => {
           const ui = getState().ui;
           patchSlice('ui', { ...ui, hideRoom: !ui.hideRoom });
