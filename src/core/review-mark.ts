@@ -111,7 +111,9 @@ export function proposedLine(
 ): string {
   const row = roster && mark.by ? roster.find(m => m.id === mark.by) ?? null : null;
   const name = row ? memberNameOf(mark.by, roster, nameOf) : null;
-  const who = name ? `${name}${row?.kind === 'agent' ? ', an agent,' : ''}` : 'a member';
+  // A seat chooses its own name ("the owner" included), so an agent or a player is said with its kind.
+  const kind = row?.kind === 'agent' ? ', an agent,' : row?.kind === 'player' ? ', a player,' : '';
+  const who = name ? `${name}${kind}` : 'a member';
   const head = `Proposed by ${who} and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it.`;
   if (!mark.expires) return head;
   return mark.lapsed

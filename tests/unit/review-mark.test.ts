@@ -67,6 +67,12 @@ describe('R1, the readings', () => {
     expect(proposedLine(mark, null, () => undefined)).toContain('Proposed by a member and not yet reviewed');
   });
 
+  it('a player seat says its kind too: a seat names itself, "the owner" included', () => {
+    const roster = [{ id: SEAT, kind: 'player', name: 'the owner', role: 'guest' }] as unknown as OwMember[];
+    const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
+    expect(proposedLine(mark, roster, () => undefined)).toContain('Proposed by the owner, a player, and not yet reviewed');
+  });
+
   it('a row word is the word in its span, and nothing for a settled element', () => {
     expect(proposedRowWord(el('b', 'Ada'))).toBe('');
     expect(proposedRowWord(el('a', 'Quill', { x_review_proposed: MARK }))).toContain('>Proposed<');
