@@ -41,6 +41,9 @@ import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue, isWorldExtensio
 import { isKnownOf, refuseKnownOfBody, stubShape } from './known-of';
 import { OwProposed, proposalOf, type ProposalRow } from './proposals';
 import { PROPOSED_MARK } from '../core/review-mark';
+
+/** The review profile's checked mark (who checked an element, when, against what): a keeper's, never Atlas's. */
+const CHECKED_MARK = 'x_review_checked';
 import { isHiddenMark } from '../core/hidden-mark';
 import { publicPageUrl } from '../core/public-page';
 
@@ -207,7 +210,9 @@ export function toV2WireShape(
     // The review mark is keel's to settle (conv. 168): an update never carries it,
     // so a copy holding a mark keel has since cleared cannot put it back. A create still does, so a
     // folder's marks survive Make online.
-    if (op === 'update' && k === PROPOSED_MARK) continue;
+    // The checked mark the same way: a keeper writes it, so an older copy pushed back over a newer check
+    // would rewrite who checked it (and keel refuses that from a writer below co-builder).
+    if (op === 'update' && (k === PROPOSED_MARK || k === CHECKED_MARK)) continue;
     out[rename.get(k) ?? k] = v;
   }
   // The hidden mark goes up on the create only (folder spec §4.8; keel takes it there and ignores

@@ -189,4 +189,12 @@ describe('gate F2: the wire shape', () => {
     expect(toV2WireShape(body, 'character', 'update')).toEqual({ name: 'Quill', x_other: 1 });
     expect(toV2WireShape(body, 'character', 'create')).toMatchObject({ x_review_proposed: MARK });
   });
+
+  it('nor the checked mark: an older copy never rewrites who checked it; a create still carries it', async () => {
+    const { toV2WireShape } = await import('../../src/sync/ow-v2-client-adapter');
+    const checked = { by: 'm-keeper', at: '2026-11-10' };
+    const body = { id: 'a', name: 'Quill', x_review_checked: checked, x_other: 1 };
+    expect(toV2WireShape(body, 'character', 'update')).toEqual({ name: 'Quill', x_other: 1 });
+    expect(toV2WireShape(body, 'character', 'create')).toMatchObject({ x_review_checked: checked });
+  });
 });

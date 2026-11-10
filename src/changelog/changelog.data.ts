@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.22',
+    date: '2026-11-10',
+    theme: 'Who checked an element stays as it was',
+    entries: [
+      {
+        id: 'checked-mark-kept',
+        title: 'Saving an element no longer sends who checked it',
+        body: 'When someone with the right to check marks an element as checked on onlyworlds.com, Atlas keeps that mark as it is: saving an edit sends your changes and never an older copy of the check, so a save after the check can no longer undo it or be refused for it.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.123.21',
     date: '2026-11-10',
     theme: 'A picture can be a file on an element',
