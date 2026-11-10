@@ -40,10 +40,11 @@ export function layoutMethodOf(value: unknown): string | null {
 /**
  * Rule 10's writer half: what a hand placement or a hand move of a Pin on this Map writes beside its point.
  * `{ x_hand: true }` on a layout map; nothing on any other Map (every Pin there is placed by hand already).
- * A machine move (a rescale onto a new picture) is no hand move and takes none.
+ * A machine move (a rescale onto a new picture) is no hand move and takes none. The whole row is read, so a Map row
+ * without a string id is no Map and takes none either (reading H, serial 111).
  */
-export function handMarkFor(map: { x_layout?: unknown } | undefined): { x_hand?: true } {
-  return map && layoutMethodOf(map.x_layout) !== null ? { x_hand: true } : {};
+export function handMarkFor(map: { id?: unknown; x_layout?: unknown } | undefined): { x_hand?: true } {
+  return map && layoutOf({ ...map, type: 'map' }, [], []).layout !== null ? { x_hand: true } : {};
 }
 
 /** The Pin fields a person types on its page that move it: its point. (The page's Map row writes `map`, which never

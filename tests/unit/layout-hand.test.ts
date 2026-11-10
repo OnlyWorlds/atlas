@@ -1,6 +1,6 @@
 /**
  * The map-space profile's layout keys (schema-dist profiles/map-space.fixture.json, copied whole at
- * v0.34.0-dist.110): rule 8, a layout map is a Map whose `x_layout` has a non-empty string `method`; rule 10,
+ * v0.34.0-dist.111): rule 8, a layout map is a Map whose `x_layout` has a non-empty string `method`; rule 10,
  * a Pin placed or moved by hand on a layout map carries `x_hand: true`, a plain map's Pins carry nothing, and
  * removing the mark hands the Pin back to the next lay-out. Atlas writes the mark at every hand placement and
  * shows it as a card with its own remove, never as a field to type into (only `true` is the mark).
@@ -15,18 +15,25 @@ import { buildCustomFieldsSection, customFieldMetasFor, structuredFieldEntriesFo
 import { patchSlice } from '../../src/core/state';
 import type { Element } from '../../src/core/types';
 
-type Row = { type: string; id: string; x_layout?: unknown };
-const cases = (fixture as unknown as { layout_cases: { name: string; map: string; elements: Row[]; want: { layout: string | null } }[] }).layout_cases;
+type Row = { type: string; id?: unknown; x_layout?: unknown };
+type Case = { name: string; map?: string; map_index?: number[]; elements: Row[]; want: { layout: string | null } };
+const cases = (fixture as unknown as { layout_cases: Case[] }).layout_cases;
 
 describe('rule 8, every layout case of the fixture', () => {
-  it('the fixture holds the seventeen cases serial 110 published', () => {
-    expect(cases.length).toBe(17);
+  it('the fixture holds the twenty-one cases serial 111 published', () => {
+    expect(cases.length).toBe(21);
   });
   for (const c of cases) {
     it(`${c.name}: the method is the fixture's layout`, () => {
-      const map = c.elements.find((e) => e.id === c.map && e.type === 'map')!;
-      expect(layoutMethodOf(map.x_layout)).toBe(c.want.layout);
-      expect(handMarkFor(map)).toEqual(c.want.layout === null ? {} : { x_hand: true });
+      // A case names its Map by `map`, or, for a Map row with no string id, by its positions in `map_index`.
+      const maps = typeof c.map === 'string'
+        ? c.elements.filter((e) => e.id === c.map && e.type === 'map').slice(-1)
+        : (c.map_index ?? []).map((i) => c.elements[i]);
+      expect(maps.length, `${c.name} names no Map`).toBeGreaterThan(0);
+      for (const map of maps) {
+        if (typeof c.map === 'string') expect(layoutMethodOf(map.x_layout)).toBe(c.want.layout);
+        expect(handMarkFor(map)).toEqual(c.want.layout === null ? {} : { x_hand: true });
+      }
     });
   }
   it('the card reads the same rule: a method of spaces is a layout map, as the page says', () => {
@@ -38,11 +45,14 @@ describe('rule 8, every layout case of the fixture', () => {
 
 describe('rule 10, the writer: a hand placement on a layout map carries the mark', () => {
   it('a method, a board, a plain map, no map', () => {
-    expect(handMarkFor({ x_layout: { method: 'trail-by-place' } })).toEqual({ x_hand: true });
-    expect(handMarkFor({ x_layout: { method: 'hand' } })).toEqual({ x_hand: true });
-    expect(handMarkFor({})).toEqual({});
-    expect(handMarkFor({ x_layout: { settings: { ground: { map: 'g' } } } })).toEqual({});
+    expect(handMarkFor({ id: 'm', x_layout: { method: 'trail-by-place' } })).toEqual({ x_hand: true });
+    expect(handMarkFor({ id: 'm', x_layout: { method: 'hand' } })).toEqual({ x_hand: true });
+    expect(handMarkFor({ id: 'm' })).toEqual({});
+    expect(handMarkFor({ id: 'm', x_layout: { settings: { ground: { map: 'g' } } } })).toEqual({});
     expect(handMarkFor(undefined)).toEqual({});
+    // Reading H: a Map row with no string id is no Map, whatever it carries.
+    expect(handMarkFor({ x_layout: { method: 'trail-by-place' } })).toEqual({});
+    expect(handMarkFor({ id: 7, x_layout: { method: 'trail-by-place' } })).toEqual({});
   });
 
   // Every place Atlas writes a Pin's point is a hand placement but one: a rescale onto a new picture moves every
@@ -91,7 +101,7 @@ describe('rule 10, the writer: a hand placement on a layout map carries the mark
 });
 
 describe('rule 10, a Pin edited on its page', () => {
-  const maps: Record<string, { x_layout?: unknown }> = { laid: { x_layout: { method: 'trail-by-place' } }, plain: {} };
+  const maps: Record<string, { id?: unknown; x_layout?: unknown }> = { laid: { id: 'laid', x_layout: { method: 'trail-by-place' } }, plain: { id: 'plain' } };
   const byId = (id: string) => maps[id];
   const pin = { type: 'pin', map_id: 'laid' };
   it('a typed x, y or z on a layout map carries the mark', () => {
