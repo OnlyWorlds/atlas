@@ -8,6 +8,7 @@
  *
  * Pure. Another tool's value: every field is re-checked, and what does not hold reads as absent.
  */
+import { layoutOf } from '@onlyworlds/sdk';
 import type { Element, WorldMap } from './types';
 
 /** The key in `settings.ground` that names the ground Map's element id. */
@@ -29,12 +30,11 @@ export interface LayoutRecipe {
 
 /**
  * The map-space profile's rule 8 (schema-dist serial 110): a Map whose `x_layout` is an object with a non-empty
- * string `method` is a layout map, and this is its method (`"hand"` is a board); anything else is null. Exactly
- * the page's words, no trim: `"  "` is a method no page names, which still makes a layout map.
+ * string `method` is a layout map, and this is its method (`"hand"` is a board); anything else is null. The SDK's
+ * reading (`layoutOf`, 4.142.0) answers it, so Atlas holds no second copy of the rule; no trim, as the page says.
  */
 export function layoutMethodOf(value: unknown): string | null {
-  const v = obj(value);
-  return v && typeof v.method === 'string' && v.method.length > 0 ? v.method : null;
+  return layoutOf({ type: 'map', id: '-', x_layout: value }, [], []).layout;
 }
 
 /**
