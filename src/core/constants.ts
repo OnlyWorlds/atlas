@@ -330,8 +330,10 @@ export function isExtensionField(name: string): boolean {
  * that makes a Charter, Guide or Domain the world's reading aid.
  * `x_lens_` is the lens profile's (dist.74), beside its recipe key `x_lens`
  * itself (PROFILE_FIELD_NAMES).
+ * `x_report_` is the report profile's (dist.112): `x_report_answers`, the work
+ * items a report answers.
  */
-export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_', 'x_spine_', 'x_charter_', 'x_lens_'] as const;
+export const PROFILE_FIELD_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_', 'x_room_', 'x_checks_', 'x_spine_', 'x_charter_', 'x_lens_', 'x_report_'] as const;
 
 /** Whole profile keys no prefix covers: a lens's recipe, a record's mark. */
 export const PROFILE_FIELD_NAMES = ['x_lens', 'x_record'] as const;
@@ -346,7 +348,8 @@ export function isProfileField(name: string): boolean {
  * the source world's as they were) and the review marks. Every other profile
  * key is an `x_` value like any other, so a value that is exactly a moved id
  * moves with it (§3.3): the spine's `x_spine_depends_on`, the room's sitting in
- * `x_room_of` and its Take's `x_room_item` are ids in this world.
+ * `x_room_of` and its Take's `x_room_item` are ids in this world, and so are a
+ * report's `x_report_answers`, each also in its `relations`, which move too.
  */
 export const REKEY_EXEMPT_PREFIXES = ['x_identity_', 'x_packet_', 'x_review_'] as const;
 

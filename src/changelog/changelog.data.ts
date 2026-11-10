@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.19',
+    date: '2026-11-10',
+    theme: "A report's key is kept for it",
+    entries: [
+      {
+        id: 'report-keys-kept',
+        title: "The report profile's key is kept for it",
+        body: 'Custom field names that start with x_report_ are kept for the report profile other tools read: shown read only, never typed as a custom field. When a world gets new ids, the work items a report answers follow them, as its other links do.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.123.18',
     date: '2026-11-10',
     theme: 'A pin you place by hand stays put',

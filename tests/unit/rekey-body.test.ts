@@ -185,4 +185,10 @@ describe('rekeyBody: a published profile key is never an id (identity profile ru
     expect(body.x_room_of).toBe(map.get(O2));
     expect(body.x_room_item).toBe(N);
   });
+
+  it('a report\'s answers move with their work items, as its relations do (dist.112)', () => {
+    const { body } = rekeyBody(el('narrative', { relations: [O, X], x_report_answers: [O, X] }), map);
+    expect(body.x_report_answers).toEqual([N, X]);
+    expect(body.x_report_answers).toEqual(body.relations);
+  });
 });
