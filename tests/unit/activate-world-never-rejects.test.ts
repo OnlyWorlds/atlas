@@ -5,7 +5,7 @@
  * reporter as background work. The open says it as itself and resolves false;
  * a silent open (boot's auto-activate) only logs.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 
 // The registry read at the open's first line throws, once: something the open's
 // own catches never wrap. Once only, since the problem reporter reads the
@@ -31,8 +31,14 @@ const toasts = () => ({
 });
 
 describe('activateWorld: a failure the open did not catch', () => {
+  // The sidebar's module graph is imported once, outside the tests' own budgets: the first test paid for it
+  // (1.7 s alone, 2 ms for the test itself) and timed out at 15 s once in a full run on a loaded machine.
+  let activateWorld: typeof import('../../src/sidebar/worlds-sidebar').activateWorld;
+  beforeAll(async () => {
+    ({ activateWorld } = await import('../../src/sidebar/worlds-sidebar'));
+  }, 120000);
+
   it('resolves false and says it as opening this world', async () => {
-    const { activateWorld } = await import('../../src/sidebar/worlds-sidebar');
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     problems.length = 0;
     failNext = true;
@@ -43,7 +49,6 @@ describe('activateWorld: a failure the open did not catch', () => {
   });
 
   it('a silent open resolves false and says nothing', async () => {
-    const { activateWorld } = await import('../../src/sidebar/worlds-sidebar');
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     problems.length = 0;
     failNext = true;
