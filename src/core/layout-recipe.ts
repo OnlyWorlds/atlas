@@ -27,10 +27,49 @@ export interface LayoutRecipe {
   margin: number | null;
 }
 
+/**
+ * The map-space profile's rule 8 (schema-dist serial 110): a Map whose `x_layout` is an object with a non-empty
+ * string `method` is a layout map, and this is its method (`"hand"` is a board); anything else is null. Exactly
+ * the page's words, no trim: `"  "` is a method no page names, which still makes a layout map.
+ */
+export function layoutMethodOf(value: unknown): string | null {
+  const v = obj(value);
+  return v && typeof v.method === 'string' && v.method.length > 0 ? v.method : null;
+}
+
+/**
+ * Rule 10's writer half: what a hand placement or a hand move of a Pin on this Map writes beside its point.
+ * `{ x_hand: true }` on a layout map; nothing on any other Map (every Pin there is placed by hand already).
+ * A machine move (a rescale onto a new picture) is no hand move and takes none.
+ */
+export function handMarkFor(map: { x_layout?: unknown } | undefined): { x_hand?: true } {
+  return map && layoutMethodOf(map.x_layout) !== null ? { x_hand: true } : {};
+}
+
+/** The Pin fields a person types on its page that move it: its point. (The page's Map row writes `map`, which never
+ *  moves a Pin to another Map, so it places nothing.) */
+export const PIN_PLACE_FIELDS = ['x', 'y', 'z'] as const;
+
+/**
+ * Rule 10 for a Pin edited on its own page: typing a new x, y or z is a hand move, so it carries the mark when the
+ * Pin's Map is a layout map. A cleared value or an unchanged one places nothing.
+ */
+export function handMarkForPinEdit(
+  pin: { type: string; map_id?: unknown },
+  fieldName: string,
+  was: unknown,
+  next: unknown,
+  mapById: (id: string) => { x_layout?: unknown } | undefined,
+): { x_hand?: true } {
+  if (pin.type !== 'pin' || !(PIN_PLACE_FIELDS as readonly string[]).includes(fieldName)) return {};
+  if (next === null || next === undefined || next === '' || next === was) return {};
+  return typeof pin.map_id === 'string' ? handMarkFor(mapById(pin.map_id)) : {};
+}
+
 export function parseLayoutRecipe(value: unknown): LayoutRecipe | null {
   const v = obj(value);
   if (!v) return null;
-  const method = str(v.method);
+  const method = layoutMethodOf(v);
   if (!method) return null;
   const settings = obj(v.settings);
   const g = obj(settings?.ground);

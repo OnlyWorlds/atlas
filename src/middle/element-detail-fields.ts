@@ -17,6 +17,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { handMarkForPinEdit } from '../core/layout-recipe';
 import { loreFor } from '../core/parlor-room';
 import { worldIsViewOnly } from '../core/view-only';
 import { isKnownOf } from '../sync/known-of';
@@ -684,8 +685,11 @@ export async function persistFieldPatch(el: Element, fieldName: string, nextValu
   // The field before this commit, read before the write: a move or a changed year is
   // never read by the guide as the link or the date that made a web (conv. 182).
   const was = (el as Record<string, unknown>)[fieldName];
+  // A Pin's point or Map typed here is a hand move: on a layout map it carries the mark (map-space rule 10).
+  const hand = handMarkForPinEdit(el, fieldName, was, valueToPersist,
+    (id) => getState().data.elements.find((e) => e.id === id && e.type === 'map') as { x_layout?: unknown } | undefined);
   try {
-    await store.updateElement(el.id, { [fieldName]: valueToPersist } as Partial<Element>);
+    await store.updateElement(el.id, { [fieldName]: valueToPersist, ...hand } as Partial<Element>);
     // The world switched during the write: the guide, the push and the map's image read below all
     // act on the world on screen, which is another one now.
     if (!patchElementsFrom(store, await store.listElements())) return;

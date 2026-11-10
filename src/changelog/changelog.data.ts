@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.18',
+    date: '2026-11-10',
+    theme: 'A pin you place by hand stays put',
+    entries: [
+      {
+        id: 'layout-hand-pin',
+        title: 'A pin you place or move on a laid-out map is marked as placed by hand',
+        body: 'On a map laid out by a method, a pin you place, create or drag in Atlas is now marked as placed by hand, so the next time the map is laid out again it stays where you put it. A pin\'s page shows the mark as a card, and removing it lets the layout place that pin again. On an ordinary map nothing changes: every pin there is yours already.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.123.17',
     date: '2026-11-09',
     theme: 'A laid-out map stands on its ground',

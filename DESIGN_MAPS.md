@@ -807,7 +807,7 @@ Titus's lead (2026-10-17). This section holds the decisions.
 - **Not taken** (from Seethe's tables): her pin ring and dot, the wall's ticks, the sea's rhumb lines. EB Garamond is not bundled (Georgia stands in). **Later, only when asked**: "Download as picture" with a key box; never "set as the map's picture".
 - **Guards**: `tests/e2e/map-ink.spec.ts` (the style row, Plain restoring, rivers ending at the coast, a name sliding clear, capitals never over a pin, a hatched map), units `map-ink`, `zone-clip-to-land`, `map-label-along`, `zone-label-pole`, `zone-trace-simplify`.
 
-## 16. A laid-out map: its recipe and its ground (1.123.16 and 1.123.17)
+## 16. A laid-out map: its recipe, its ground and its hand Pins (1.123.16 to 1.123.18)
 
 Since 2026-11-09 a layout method (the SDK's `trailByPlace`) places every element of a world as a Pin on a Map, with x, y and z, and writes its recipe on the Map as `x_layout` (`{ method, settings }`).
 
@@ -815,7 +815,8 @@ Since 2026-11-09 a layout method (the SDK's `trailByPlace`) places every element
 - **The card** (1.123.16, `middle/layout-card.ts`): the recipe on the Map's page reads as a read-only card (the method, the ground map's name, how Atlas draws it) with the recipe as written in a fold; a non-Map keeps the generic row. Atlas never writes the recipe.
 - **The ground** (1.123.17, `tabs/right/layout-underlay.ts`): a laid-out Map with no picture of its own draws its ground under its pins, at `[margin, margin]` to `[margin + width, margin + height]`: the ground's picture (url or local), then the ground's zones as faint lines and areas in the zone default colour, in their own pane (`atlasBgUnderlayPane`, z 190: above the flat backdrop, below zones, grid and pins), never pressable. A Map with its own picture keeps it. The background key carries the underlay, so an edit to the ground's picture or zones redraws the open tab. The card and the canvas read the same rule (`layoutUnderlayFor`).
 - **Flat**: depth and each Pin's z are kept and not drawn; a tilted view waits on its own design.
-- **Guards**: `tests/unit/layout-card.test.ts`, `tests/unit/layout-underlay-apply.test.ts`.
+- **A Pin placed by hand** (1.123.18, the map-space profile's rules 8 and 10, schema-dist serial 110): a layout map is exactly a Map whose `x_layout` has a non-empty string `method` (`layoutMethodOf`, no trim; `"hand"` is a board). Every place a person places or moves a Pin on a layout map writes `x_hand: true` in the same write (`handMarkFor`: a tap, Create here, a drag from the list, a marker drag; `handMarkForPinEdit`: x, y or z typed on the Pin's page), the Map read at the press, before any await, so a re-lay keeps it; on any other Map nothing is written, and a rescale onto a new picture or a map flip is no hand move. On the Pin's page `x_hand` exactly `true` is a card (`renderHandCard`, three sentences: laid out, a board, plain) with the field's own ×, never a field to type into; the × stores null, which the profile reads as the method's.
+- **Guards**: `tests/unit/layout-card.test.ts`, `tests/unit/layout-underlay-apply.test.ts`, `tests/unit/layout-hand.test.ts` (the profile's 17 layout cases replayed, and a census: every `createPin`/`updatePin` call carries the mark or is a named machine move).
 
 ---
 

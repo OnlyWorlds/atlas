@@ -28,7 +28,8 @@ import { customFieldNameSuggestions } from '../core/taxonomy';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { TANGLE_CARD_RENDERERS } from './tangle-cards';
-import { renderLayoutCard } from './layout-card';
+import { renderHandCard, renderLayoutCard, type HandMapKind } from './layout-card';
+import { layoutMethodOf } from '../core/layout-recipe';
 import { getState } from '../core/state';
 import { layoutUnderlayFor } from '../tabs/right/layout-underlay';
 import type { WorldMap } from '../core/types';
@@ -49,7 +50,22 @@ function layoutGroundFor(map: Element): (mapId: string) => { name: string | null
 const RECORD_CARD_RENDERERS: Record<string, (value: unknown, el: Element) => HTMLElement | null> = {
   ...TANGLE_CARD_RENDERERS,
   x_layout: (value, el) => (el.type === 'map' ? renderLayoutCard(value, layoutGroundFor(el)) : null),
+  x_hand: (value, el) => (el.type === 'pin' ? renderHandCard(value, handMapKind(el)) : null),
 };
+
+/** What a Pin's own Map is for its hand mark (rule 8), read from the world on screen. */
+function handMapKind(pin: Element): HandMapKind {
+  const mapId = (pin as { map_id?: unknown }).map_id;
+  const map = getState().data.elements.find((e) => e.id === mapId && e.type === 'map') as { x_layout?: unknown } | undefined;
+  const method = map ? layoutMethodOf(map.x_layout) : null;
+  return method === null ? 'plain' : method === 'hand' ? 'board' : 'method';
+}
+
+/** A scalar shown as a card rather than an editable field: a Pin's `x_hand` mark, exactly `true` (rule 10). Any
+ *  other value is no mark and stays an ordinary field of its own. */
+function isCardScalar(el: Element, k: string, v: unknown): boolean {
+  return k === 'x_hand' && v === true && el.type === 'pin';
+}
 import { WORLD_NOT_OPEN } from './element-detail-fields';
 
 const SECTION_NAME = 'Custom fields';
@@ -81,6 +97,7 @@ export function customFieldMetasFor(el: Element): FieldMeta[] {
     if (!isCustomEditableField(k)) continue;
     if (v === null || v === undefined) continue;
     if (typeof v === 'object') continue; // structured — read-only row below
+    if (isCardScalar(el, k, v)) continue; // a mark: its card below, deletable, never typed into
     out.push({ name: k, widget: inferWidget(v) });
   }
   return out;
@@ -91,7 +108,7 @@ export function structuredFieldEntriesFor(el: Element): Array<{ name: string; va
   const out: Array<{ name: string; value: unknown }> = [];
   for (const [k, v] of Object.entries(el)) {
     if (!isCustomEditableField(k)) continue;
-    if (v === null || v === undefined || typeof v !== 'object') continue;
+    if (v === null || v === undefined || (typeof v !== 'object' && !isCardScalar(el, k, v))) continue;
     out.push({ name: k, value: v });
   }
   return out;

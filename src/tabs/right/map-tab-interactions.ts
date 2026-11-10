@@ -27,7 +27,8 @@ import { showProblem } from '../../ui/problem-fixes';
 import { ElementCreateModal } from '../../ui/element-create-modal';
 import { toggleGhostsAtSourcePin } from './ghost-pins';
 import { buildPinTooltipHtml } from './map-tab-tooltip';
-import { clampToCanvas } from './map-tab-pin-drag';
+import { clampToCanvas, mapOnScreen } from './map-tab-pin-drag';
+import { handMarkFor } from '../../core/layout-recipe';
 import type { MapTabCacheEntry } from './map-tab-cache';
 import { revealPinsOnMap } from './map-tab-pins';
 import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing } from './zone-drawing';
@@ -101,6 +102,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     try {
       const store = getActiveStore();
       if (!store) return;
+      const hand = handMarkFor(mapOnScreen(entry.mapId)); // the Map as seen at the press, read before any await
       // Resolve element_type from the pinned element. The OW server rejects
       // pin CREATE with 400 ("element_type must be provided when element_id
       // is specified") if this field is absent. Look it up from state cache;
@@ -124,6 +126,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         element_type: pinned.type,
         x: clampToCanvas(Math.round(ev.point.x), width),
         y: clampToCanvas(Math.round(ev.point.y), height),
+        ...hand,
         ...(bake ?? {}),
       });
       const here = patchElementsFrom(store, await store.listElements());
@@ -214,6 +217,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     const writePin = async (elementId: string, elementType: string): Promise<void> => {
       const store = getActiveStore();
       if (!store) return;
+      const hand = handMarkFor(mapOnScreen(entry.mapId)); // the Map as seen at the press, read before any await
       // A pin just placed shows, whatever the map's date;
       // revealed before the write, so an element already pinned here,
       // refused as a duplicate, shows the pin it has.
@@ -224,6 +228,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         element_type: elementType,
         x: clampToCanvas(Math.round(point.x), width),
         y: clampToCanvas(Math.round(point.y), height),
+        ...hand,
       });
       await refreshElementsAfterWrite(store);
     };
@@ -343,6 +348,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     try {
       const store = getActiveStore();
       if (!store) return;
+      const hand = handMarkFor(mapOnScreen(entry.mapId)); // the Map as seen at the press, read before any await
       // Tour beat: the map step's copy offers BOTH gestures ("clicking
       // the + pin icon ... or dragging him in from the sidebar"), but only the
       // click path adopted the bundle pin's identity — a dragged-in pin was an
@@ -359,6 +365,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         element_type: payload.type,
         x: clampToCanvas(Math.round(point.x), width),
         y: clampToCanvas(Math.round(point.y), height),
+        ...hand,
         ...(bake ?? {}),
       });
       await refreshElementsAfterWrite(store);

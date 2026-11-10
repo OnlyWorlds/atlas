@@ -90,3 +90,36 @@ export function renderLayoutCard(value: unknown, groundOf?: (mapId: string) => {
   card.append(head, line, flat, fold);
   return card;
 }
+
+/** What the Pin's own Map is, for the hand mark (rules 8 and 10): no layout, a board (`"hand"`), or laid out by a method. */
+export type HandMapKind = 'plain' | 'board' | 'method';
+
+/** The hand card's sentence (the map-space profile's rule 10): what `x_hand: true` does, read against the Pin's own Map. */
+export function handLine(kind: HandMapKind): string {
+  if (kind === 'method') return 'When this map is laid out again, this pin stays where it is. Remove this mark to let the layout place it.';
+  if (kind === 'board') return 'This map is a board, so every pin on it stays where it is placed, with or without this mark.';
+  return 'This map is not laid out, so the mark changes nothing here.';
+}
+
+/** Card for a Pin's `x_hand`, or null when the value is not exactly `true` (then it is no mark: the generic row). */
+export function renderHandCard(value: unknown, kind: HandMapKind): HTMLElement | null {
+  if (value !== true) return null;
+  const card = document.createElement('div');
+  card.className = 'atlas-tangle-card atlas-layout-card';
+  card.dataset.role = 'hand-card';
+  const head = document.createElement('div');
+  head.className = 'atlas-tangle-card-head';
+  const icon = document.createElement('span');
+  icon.className = 'material-symbols-outlined';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = 'pan_tool';
+  const title = document.createElement('span');
+  title.className = 'atlas-tangle-card-title';
+  title.textContent = 'Placed by hand';
+  head.append(icon, title);
+  const line = document.createElement('div');
+  line.className = 'atlas-tangle-outcome';
+  line.textContent = handLine(kind);
+  card.append(head, line);
+  return card;
+}

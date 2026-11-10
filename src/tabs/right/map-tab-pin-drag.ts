@@ -19,6 +19,7 @@ import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { MapTabCacheEntry } from './map-tab-cache';
 import { showProblem } from '../../ui/problem-fixes';
+import { handMarkFor } from '../../core/layout-recipe';
 
 /**
  * Clamp a pin coord to [0, max]. Defense-in-depth alongside Leaflet's
@@ -32,6 +33,14 @@ export function clampToCanvas(value: number, max: number): number {
   if (value < 0) return 0;
   if (value > max) return max;
   return value;
+}
+
+/**
+ * The Map a hand placement lands on, as the person sees it at the press: the mark a placement writes
+ * (`handMarkFor`, the map-space profile's rule 10) is read from it.
+ */
+export function mapOnScreen(mapId: string): { x_layout?: unknown } | undefined {
+  return getState().data.elements.find((e) => e.id === mapId && e.type === 'map') as { x_layout?: unknown } | undefined;
 }
 
 export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: string): void {
@@ -82,6 +91,7 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
     try {
       const store = getActiveStore();
       if (!store) return;
+      const hand = handMarkFor(mapOnScreen(entry.mapId)); // the Map as seen at the press, read before any await
 
       if (droppedOnTrash) {
         await store.deletePin(pinId);
@@ -98,6 +108,7 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
       await store.updatePin(pinId, {
         x: clampToCanvas(Math.round(point.x), dragCanvasW),
         y: clampToCanvas(Math.round(point.y), dragCanvasH),
+        ...hand,
       });
       if (!patchElementsFrom(store, await store.listElements())) return; // the world switched: no push for the screen's world
       // Local write succeeded — schedule autosave. Without this, dragged pins
