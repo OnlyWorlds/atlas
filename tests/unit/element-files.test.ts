@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OwApiError, OwNetworkError, type OwFileRow, type OwFileTicket, type OwMe } from '@onlyworlds/sdk';
 import {
-  addFile, addRefusal, fileLink, filesNow, formatBytes, formatQuota, mayRemove, onFilesChanged, refreshFiles, removeFile,
+  FILES_ACCEPT, addFile, addRefusal, fileLink, filesNow, formatBytes, formatQuota, mayRemove, onFilesChanged, refreshFiles, removeFile,
   resetFilesCache, setFileUploadOriginsForTests, setFilesClientFactoryForTests, type FilesClient,
 } from '../../src/sync/element-files';
 import { isPlainError } from '../../src/core/plain-error';
@@ -212,10 +212,17 @@ describe('addFile', () => {
     await expect(addFile(entry, reg, 'character', 'e1', file(), null)).resolves.toBeUndefined();
   });
 
+  it('an image is a file on an element (SDK 4.148.0): a .webp goes up, and the picker takes every image kind', async () => {
+    const f = fake();
+    await addFile(entry, reg, 'character', 'e1', file('map.webp'), null);
+    expect(f.uploadFile).toHaveBeenCalledTimes(1);
+    expect(FILES_ACCEPT.split(',')).toEqual(expect.arrayContaining(['.png', '.jpg', '.jpeg', '.webp', '.avif']));
+  });
+
   it('a kind keel never takes is refused before anything is sent, in the SDK\'s list', async () => {
     const f = fake();
-    const got = await addFile(entry, reg, 'character', 'e1', file('map.png'), null).catch(e => e);
-    expect((got as Error).message).toMatch(/\.pdf .*\.zip\)\. This file is none of those/);
+    const got = await addFile(entry, reg, 'character', 'e1', file('map.gif'), null).catch(e => e);
+    expect((got as Error).message).toMatch(/\.pdf .*\.zip .*\.avif\)\. This file is none of those/);
     expect(f.calls).toHaveLength(0);
   });
 

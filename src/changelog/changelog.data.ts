@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.21',
+    date: '2026-11-10',
+    theme: 'A picture can be a file on an element',
+    entries: [
+      {
+        id: 'image-files',
+        title: 'An image can be added to an element as a file',
+        body: 'In an online world, the Files section of an element now takes images too: png, jpg, webp and avif, up to 25 MB each, as OnlyWorlds now keeps them.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.123.20',
     date: '2026-11-10',
     theme: "A room's reports stay with the room",

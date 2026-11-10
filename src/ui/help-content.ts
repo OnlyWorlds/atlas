@@ -67,7 +67,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'label it your way with supertype and subtype',
       'add your own fields in the Custom fields section',
       "see a Character's Records: the runs of a game they took part in, such as a Tactical Tangle battle, newest first with the stories about them or told by them",
-      'keep files with it in an online world, in the Files section: text, pdf, or a world\'s own bundle, up to 25 MB each',
+      'keep files with it in an online world, in the Files section: text, pdf, an image, or a world\'s own bundle, up to 25 MB each',
       'place it on a map from the header pin button',
       'once it is on OnlyWorlds, press the mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
       { mouse: 'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)', touch: 'tap Hide types at the end of the sidebar strip, then tap a type to keep it out of the full list (pins and markers start that way)' },

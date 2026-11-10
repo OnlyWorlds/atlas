@@ -39,7 +39,7 @@ const defaultFactory: ClientFactory = (apiKey, apiPin) =>
 let factory: ClientFactory = defaultFactory;
 export function setFilesClientFactoryForTests(f: ClientFactory | null): void { factory = f ?? defaultFactory; }
 
-export const FILES_KINDS_LINE = 'text, pdf, or a world\'s own bundle';
+export const FILES_KINDS_LINE = 'text, pdf, an image, or a world\'s own bundle';
 /** The SDK's extensions (keel's list), never a copy: the picker's accept list and the refusal read the same. */
 const EXTENSIONS = Object.keys(FILE_EXTENSIONS).map(e => `.${e}`);
 export const FILES_ACCEPT = EXTENSIONS.join(',');
@@ -278,7 +278,7 @@ export function addRefusal(err: unknown, file: { size: number }): string {
   if (err.isQuotaExceeded) return `This world has added as many files as it can today. Try again in ${minutes(err.retryAfter)}.`;
   if (err.code === 'rate_limited') return `OnlyWorlds is holding writes back after wrong PINs. Try again in ${minutes(err.retryAfter)}.`;
   if (err.code === 'not_author') return 'As a contributor, you can add files only to elements you made.';
-  if (err.code === 'unsupported_type') return `The file's contents are not what its name says: a .pdf must be a PDF, a text file must be text, and a .zip must be a world's own bundle. Nothing was added.`;
+  if (err.code === 'unsupported_type') return `The file's contents are not what its name says: a .pdf must be a PDF, an image must be a picture of the kind its name says, a text file must be text, and a .zip must be a world's own bundle. Nothing was added.`;
   if (err.code === 'media_unavailable') return 'Files are not available on OnlyWorlds right now. Try again later.';
   if (err.code === 'write_failed') return 'OnlyWorlds could not store the file just now. Nothing was kept; try again.';
   if (err.status === 404) return FILES_NOT_SYNCED_LINE;
