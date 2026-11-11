@@ -92,11 +92,12 @@ test.describe('proposed, not yet reviewed', () => {
     await expect(chip).toHaveAttribute('aria-pressed', 'false');
     await expect(rowNames(page)).toHaveText(['Ada', 'Bo', 'Old Quay', 'Quill']);
 
-    // Its own page: the word in the header, the line as its label.
+    // Its own page: the word in the header, the line as its label. A folder world has no roster, so the
+    // line names nobody and puts nothing in a name's place (serial 116: never "a member").
     await go(`#/w/${wid}/element/${QUILL}`);
     const mark = page.locator('.atlas-middle-header [data-role="proposed-mark"]');
     await expect(mark).toHaveText('Proposed');
-    await expect(mark).toHaveAttribute('aria-label', /^Proposed by a member and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it\. It lapses on 22 November 2099\.$/);
+    await expect(mark).toHaveAttribute('aria-label', /^Proposed and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it\. It lapses on 22 November 2099\.$/);
     // 1.84.1: the same said in a sentence under the name (Seethe 2026-10-23), and nothing on a settled page.
     await expect(page.locator('[data-role="proposed-note"]')).toHaveText(/not yet reviewed.*A keeper accepts or declines it on OnlyWorlds; a change made here is saved as any other\.$/);
     await go(`#/w/${wid}/element/0192a000-0000-7000-8000-000000056503`);

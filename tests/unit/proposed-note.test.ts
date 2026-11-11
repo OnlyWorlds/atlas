@@ -42,6 +42,6 @@ describe("the proposed page's sentence", () => {
     expect(buildProposedMark(proposed('2099-11-22'))!.textContent).toBe('Proposed');
     const lapsed = buildProposedMark(proposed('2000-01-01'))!;
     expect(lapsed.textContent).toBe('Lapsed');
-    expect(lapsed.getAttribute('aria-label')).toMatch(/^Proposed by a member .* The proposal lapsed on /);
+    expect(lapsed.getAttribute('aria-label')).toMatch(/^Proposed and not yet reviewed: .* The proposal lapsed on /);
   });
 });

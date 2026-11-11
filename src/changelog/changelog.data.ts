@@ -58,8 +58,14 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.123.24',
     date: '2026-11-11',
-    theme: 'A message reads its words first',
+    theme: 'A message reads its words first, and a review mark says only what it holds',
     entries: [
+      {
+        id: 'review-mark-names',
+        title: 'A proposed element says whom its mark names, never who proposed it',
+        body: 'A review mark records the writer\'s own word for who made it, which is a claim and not proof. The line on a proposed element now reads "Proposed and not yet reviewed", then "The mark names Ada" only when Atlas can place the name: a member of the online world, with its kind if it is an AI\'s seat or a player\'s seat, the world\'s owner, or a Character of the world. Any other value is left in the mark itself, and Atlas no longer says "a member" when it cannot tell.',
+        tags: ['sync'],
+      },
       {
         id: 'message-story-leads',
         title: 'A message shows its words right under its description',

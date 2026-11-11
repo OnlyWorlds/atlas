@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import type { OwMember } from '@onlyworlds/sdk';
 import {
   proposedMarkOf, isProposed, handsOnAsProposed, settledOf, proposedCount, keptOnCreate,
-  proposedLine, proposedWord, proposedRowWord, todayDay,
+  proposedLine, proposedWord, proposedRowWord, todayDay, rawProposedBy,
 } from '../../src/core/review-mark';
 import { buildPagePayload, proposedLeftOut, leftOutPageLine, type PayloadCircleBlock, type RelationToken } from '../../src/core/share-payload';
 import { stampedBody } from '../../src/store/sync-stamp';
@@ -58,27 +58,69 @@ describe('R1, the readings', () => {
     expect(() => proposedMarkOf(el('a', 'A', { x_review_proposed: MARK }), '22 Nov')).toThrow(TypeError);
   });
 
-  it('the line names the seat from the roster, says an agent, and the day it lapses', () => {
+  it('the line never says "proposed by": the mark names the seat from the roster, with its kind, and the day it lapses', () => {
     const roster = [{ id: SEAT, kind: 'agent', name: 'Scribe', role: 'contributor' }] as unknown as OwMember[];
     const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
-    const line = proposedLine(mark, roster, () => undefined);
-    expect(line).toContain('Proposed by Scribe, an agent, and not yet reviewed');
+    const line = proposedLine(mark, SEAT, roster, () => undefined);
+    expect(line).toContain("Proposed and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it. The mark names Scribe, an AI's seat.");
     expect(line).toContain('lapses on 22 November 2026');
-    expect(proposedLine(mark, null, () => undefined)).toContain('Proposed by a member and not yet reviewed');
+    expect(line).not.toMatch(/proposed by/i);
+    // No roster: no name and no stand-in for one (never "a member").
+    const bare = proposedLine(mark, SEAT, null, () => undefined);
+    expect(bare).not.toContain('names');
+    expect(bare).not.toContain('a member');
   });
 
   it('a player seat says its kind too: a seat names itself, "the owner" included', () => {
     const roster = [{ id: SEAT, kind: 'player', name: 'the owner', role: 'guest' }] as unknown as OwMember[];
     const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
-    expect(proposedLine(mark, roster, () => undefined)).toContain('Proposed by the owner, a player, and not yet reviewed');
+    expect(proposedLine(mark, SEAT, roster, () => undefined)).toContain("The mark names the owner, a player's seat.");
   });
 
-  it("the word owner as by is the world's owner, roster or not; a seat named owner stays its own id", () => {
-    const owners = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: 'owner' } }), '2026-10-23')!;
-    expect(proposedLine(owners, null, () => undefined)).toContain("Proposed by the world's owner and not yet reviewed");
-    expect(proposedLine(owners, [] as unknown as OwMember[], () => undefined)).toContain("Proposed by the world's owner and not yet reviewed");
-    const other = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: 'Owner' } }), '2026-10-23')!;
-    expect(proposedLine(other, null, () => undefined)).toContain('Proposed by a member'); // the control: only the exact word
+  it("the word owner is the world's owner, by the roster's name when served; only the exact word", () => {
+    const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: 'owner' } }), '2026-10-23')!;
+    expect(proposedLine(mark, 'owner', null, () => undefined)).toContain("The mark names the world's owner.");
+    const roster = [{ id: null, kind: 'owner', name: 'titus', role: 'owner' }] as unknown as OwMember[];
+    expect(proposedLine(mark, 'owner', roster, () => undefined)).toContain("The mark names titus, the world's owner.");
+    expect(proposedLine(mark, 'Owner', roster, () => undefined)).not.toContain('names'); // the control
+    expect(proposedLine(mark, ' owner', roster, () => undefined)).not.toContain('names'); // never trimmed
+  });
+
+  it('ids compare as ids: any spelling of the UUID, never with White_Space around it', () => {
+    const roster = [{ id: SEAT, kind: 'person', name: 'ada', role: 'contributor' }] as unknown as OwMember[];
+    const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
+    for (const spelling of [SEAT.toUpperCase(), SEAT.replace(/-/g, ''), `{${SEAT}}`, `urn:uuid:${SEAT}`]) {
+      expect(proposedLine(mark, spelling, roster, () => undefined)).toContain('The mark names ada.');
+    }
+    expect(proposedLine(mark, ` ${SEAT}`, roster, () => undefined)).not.toContain('names');
+    expect(proposedLine(mark, `${SEAT}\t`, roster, () => undefined)).not.toContain('names');
+  });
+
+  it("a Character of the world is said as that Character, with its type, never as a member", () => {
+    const CH = '01a1c97b-7437-7320-992e-663936319af1';
+    const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: CH } }), '2026-10-23')!;
+    const names = (key: string) => (key === CH.replace(/-/g, '') ? 'Rachmaninov' : undefined);
+    expect(proposedLine(mark, CH, [], names)).toContain('The mark names the Character Rachmaninov.');
+    // A member first: the roster's row wins over a Character with the same id.
+    const roster = [{ id: CH, kind: 'agent', name: 'Rook', role: 'contributor' }] as unknown as OwMember[];
+    expect(proposedLine(mark, CH, roster, names)).toContain("The mark names Rook, an AI's seat.");
+  });
+
+  it('a by that names nobody, or one this reader cannot place, says no name at all', () => {
+    const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
+    const roster = [{ id: SEAT, kind: 'person', name: 'ada', role: 'contributor' }] as unknown as OwMember[];
+    for (const by of [null, undefined, 42, true, ['x'], { a: 1 }, '', '   ', '  ', 'Ada', 'someone typed this']) {
+      const line = proposedLine(mark, by, roster, () => 'Rachmaninov');
+      expect(line).not.toContain('names');
+      expect(line).toContain('Proposed and not yet reviewed');
+    }
+  });
+
+  it("the raw by is the element's own, never trimmed (the SDK's reader trims it)", () => {
+    expect(rawProposedBy(el('a', 'A', { x_review_proposed: { by: '  m-1\t' } }))).toBe('  m-1\t');
+    expect(rawProposedBy(el('a', 'A', { x_review_proposed: { by: 7 } }))).toBe(7);
+    expect(rawProposedBy(el('a', 'A', { x_review_proposed: ['by'] }))).toBeUndefined();
+    expect(rawProposedBy(el('a', 'A'))).toBeUndefined();
   });
 
   it('a row word is the word in its span, and nothing for a settled element', () => {

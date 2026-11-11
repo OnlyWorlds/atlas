@@ -11,7 +11,12 @@ import { getState } from '../core/state';
 import type { Element } from '../core/types';
 import { agentMarkFor, type AgentMark } from '../core/agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
-import { proposedLine, proposedMarkOf, proposedWord } from '../core/review-mark';
+import { proposedLine, proposedMarkOf, proposedWord, rawProposedBy, uuidKey } from '../core/review-mark';
+
+/** A Character of the open world by its id, any spelling (`uuidKey`): the review mark's Character case. */
+function characterNameByKey(key: string): string | undefined {
+  return getState().data.elements.find(e => e.type === 'character' && uuidKey(e.id) === key)?.name;
+}
 import { rosterFor, rosterNow } from '../sync/world-roster';
 import { toastManager } from '../ui/toast-manager';
 
@@ -54,7 +59,6 @@ export function buildProposedMark(el: Element): HTMLElement | null {
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
   const linked = entry?.state === 'api-linked';
-  const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'atlas-proposed-mark' + (mark.lapsed ? ' atlas-proposed-mark-lapsed' : '');
@@ -63,8 +67,8 @@ export function buildProposedMark(el: Element): HTMLElement | null {
   // 2026-10-23: "Proposed, lapsed" left a name 8 px of 68 at 390); the label carries the line.
   btn.textContent = mark.lapsed ? 'Lapsed' : proposedWord(mark);
   let line = '';
-  const say = (roster: Parameters<typeof proposedLine>[1]): void => {
-    line = proposedLine(mark, roster, nameOf);
+  const say = (roster: Parameters<typeof proposedLine>[2]): void => {
+    line = proposedLine(mark, rawProposedBy(el), roster, characterNameByKey);
     btn.title = line;
     btn.setAttribute('aria-label', line);
   };
@@ -88,10 +92,9 @@ export function proposedNoteFor(el: Element): string | null {
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
   const roster = entry?.state === 'api-linked' ? rosterNow(entry) : null;
-  const nameOf = (id: string) => state.data.elements.find(e => e.id === id && e.type === 'character')?.name;
   // Only a linked world sends a change; a folder world saves it (Seethe 2026-10-23).
   const change = entry?.state === 'api-linked' ? 'sent' : 'saved';
-  return `${proposedLine(mark, roster, nameOf)} A keeper accepts or declines it on OnlyWorlds; a change made here is ${change} as any other.`;
+  return `${proposedLine(mark, rawProposedBy(el), roster, characterNameByKey)} A keeper accepts or declines it on OnlyWorlds; a change made here is ${change} as any other.`;
 }
 
 /**

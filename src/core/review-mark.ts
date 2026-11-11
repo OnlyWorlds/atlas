@@ -20,7 +20,6 @@
  */
 import { handsOnAsProposed, proposedMarkOf, PROPOSED_MARK, type OwMember, type OwProposedMark } from '@onlyworlds/sdk';
 import type { Element } from './types';
-import { memberNameOf } from './agent-mark';
 import { escapeAttr, escapeText } from './dom-utils';
 
 export { handsOnAsProposed, proposedMarkOf, PROPOSED_MARK };
@@ -100,24 +99,74 @@ export function proposedRowWord(el: unknown): string {
 }
 
 /**
- * The one line, for the label, the tooltip and a tap: who proposed it (the
- * roster's name when there is one), that no keeper has reviewed it, and when it
- * lapses.
+ * An id as the platform's ids are compared (the review profile's "Who `by` names", serial 116:
+ * "comparing ids as ids, both parsed"): keel's are UUIDs and keel reads any spelling of one, as
+ * Python's `uuid.UUID` parses it (urn: and uuid: dropped, braces at the ends, hyphens anywhere,
+ * either case). Null for anything that is not one, White_Space around it included.
+ */
+export function uuidKey(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const hex = v.replace('urn:', '').replace('uuid:', '').replace(/^[{}]+|[{}]+$/g, '').replace(/-/g, '');
+  return /^[0-9a-fA-F]{32}$/.test(hex) ? hex.toLowerCase() : null;
+}
+
+/** Unicode White_Space, as the profiles read it (U+FEFF is not White_Space, U+0085 is). */
+const WHITE_SPACE_ONLY = /^[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$/;
+
+/**
+ * Who a mark's `by` names, said as the mark's word (the review profile, serial 116): only a member
+ * on the roster or the world's owner (by the platform's name, its kind beside it), or a Character
+ * of this world ("the Character Rachmaninov"). Anything else, or a `by` that names nobody (not a
+ * string, White_Space alone), is null: the line then says no name, and the raw value stays in the
+ * mark's own read-only row, as data. `by` is read as stored, never trimmed. `characterName` is
+ * asked with a `uuidKey`, so it compares the world's Character ids by `uuidKey` too.
+ */
+export function markNames(
+  by: unknown,
+  roster: readonly OwMember[] | null,
+  characterName: (id: string) => string | undefined,
+): string | null {
+  if (typeof by !== 'string' || WHITE_SPACE_ONLY.test(by)) return null;
+  const served = (row: OwMember | undefined) => (typeof row?.name === 'string' && row.name.trim() ? row.name.trim() : null);
+  // keel writes the exact word `owner` as the `by` of the world's owner, who has no membership.
+  if (by === 'owner') {
+    const name = served(roster?.find(m => m.kind === 'owner'));
+    return name ? `${name}, the world's owner` : "the world's owner";
+  }
+  const key = uuidKey(by);
+  if (!key) return null;
+  const row = roster?.find(m => uuidKey(m.id) === key);
+  if (row) {
+    // A seat chooses its own name ("the owner" included), so a seat is said with its kind.
+    const kind = row.kind === 'agent' ? ", an AI's seat" : row.kind === 'player' ? ", a player's seat" : '';
+    return `${served(row) ?? by}${kind}`;
+  }
+  const character = characterName(key);
+  return character && character.trim() ? `the Character ${character.trim()}` : null;
+}
+
+/**
+ * The one line, for the label, the tooltip and a tap: that no keeper has reviewed it, whom the
+ * mark names when it names someone this reader knows (`markNames`), and when it lapses. Never
+ * "proposed by": a `by` is the writer's word, not a fact (serial 116).
  */
 export function proposedLine(
   mark: ProposedMark,
+  by: unknown,
   roster: readonly OwMember[] | null,
-  nameOf: (id: string) => string | undefined,
+  characterName: (id: string) => string | undefined,
 ): string {
-  const row = roster && mark.by ? roster.find(m => m.id === mark.by) ?? null : null;
-  const name = row ? memberNameOf(mark.by, roster, nameOf) : null;
-  // A seat chooses its own name ("the owner" included), so an agent or a player is said with its kind.
-  const kind = row?.kind === 'agent' ? ', an agent,' : row?.kind === 'player' ? ', a player,' : '';
-  // keel writes the word `owner` as the `by` of the world's owner, who has no membership (the review profile, serial 115).
-  const who = name ? `${name}${kind}` : mark.by === 'owner' ? "the world's owner" : 'a member';
-  const head = `Proposed by ${who} and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it.`;
-  if (!mark.expires) return head;
+  const head = 'Proposed and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it.';
+  const who = markNames(by, roster, characterName);
+  const named = who ? `${head} The mark names ${who}.` : head;
+  if (!mark.expires) return named;
   return mark.lapsed
-    ? `${head} The proposal lapsed on ${dayWords(mark.expires)}.`
-    : `${head} It lapses on ${dayWords(mark.expires)}.`;
+    ? `${named} The proposal lapsed on ${dayWords(mark.expires)}.`
+    : `${named} It lapses on ${dayWords(mark.expires)}.`;
+}
+
+/** A mark's `by` as stored on the element, never trimmed (the SDK's reader trims it). */
+export function rawProposedBy(el: unknown): unknown {
+  const v = el && typeof el === 'object' ? (el as Record<string, unknown>)[PROPOSED_MARK] : undefined;
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>).by : undefined;
 }
