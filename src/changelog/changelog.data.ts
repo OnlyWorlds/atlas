@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'A proposed element\'s line names the person its review mark records only when Atlas can place them. Someone removed from the world is no longer one of its members, so a mark that records them now says no name, as for any value Atlas cannot place; the value stays in the mark itself. A Character of the world with that id is still named.',
         tags: ['sync'],
       },
+      {
+        id: 'review-mark-id-spellings',
+        title: 'A mark\'s id is read the way OnlyWorlds reads it',
+        body: 'Atlas matched a review mark\'s id to a member in more spellings than OnlyWorlds itself reads, such as a doubled "urn:" prefix or hyphens in odd places. It now reads the same four as OnlyWorlds: the id as given, without hyphens, in one pair of braces, or after "urn:uuid:". Any other spelling names nobody.',
+        tags: ['sync'],
+      },
     ],
   },
   {

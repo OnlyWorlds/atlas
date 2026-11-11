@@ -88,11 +88,18 @@ describe('R1, the readings', () => {
     expect(proposedLine(mark, ' owner', roster, () => undefined)).not.toContain('names'); // never trimmed
   });
 
-  it('ids compare as ids: any spelling of the UUID, never with White_Space around it', () => {
+  it('ids compare as ids, in the spellings keel reads, never with White_Space around it', () => {
     const roster = [{ id: SEAT, kind: 'person', name: 'ada', role: 'contributor' }] as unknown as OwMember[];
     const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
-    for (const spelling of [SEAT.toUpperCase(), SEAT.replace(/-/g, ''), `{${SEAT}}`, `urn:uuid:${SEAT}`, `urn:urn:uuid:${SEAT}`]) {
+    // keel's four spellings: bare, hyphen-free, in one pair of braces, after a lower-case urn:uuid:.
+    for (const spelling of [SEAT, SEAT.toUpperCase(), SEAT.replace(/-/g, ''), `{${SEAT}}`, `{${SEAT.replace(/-/g, '')}}`, `urn:uuid:${SEAT}`, `urn:uuid:${SEAT.toUpperCase()}`]) {
       expect(proposedLine(mark, spelling, roster, () => undefined)).toContain('The mark names ada.');
+    }
+    // What Python's uuid.UUID reads and keel does not: each names nobody.
+    const hexOnly = SEAT.replace(/-/g, '');
+    for (const spelling of [`urn:urn:uuid:${SEAT}`, `URN:UUID:${SEAT}`, `uuid:${SEAT}`, `urn:${SEAT}`, `{{${SEAT}}}`, `{${SEAT}`, `${SEAT}}`,
+      `${hexOnly.slice(0, 4)}-${hexOnly.slice(4)}`, `+${SEAT}`, `urn:uuid:{${SEAT}}`]) {
+      expect(proposedLine(mark, spelling, roster, () => undefined)).not.toContain('names');
     }
     expect(proposedLine(mark, ` ${SEAT}`, roster, () => undefined)).not.toContain('names');
     expect(proposedLine(mark, `${SEAT}\t`, roster, () => undefined)).not.toContain('names');

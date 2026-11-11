@@ -98,16 +98,20 @@ export function proposedRowWord(el: unknown): string {
   return `<span class="atlas-row-proposed" data-role="proposed-word" title="${escapeAttr(proposedTitle(mark))}">${escapeText(proposedWord(mark))}</span>`;
 }
 
+/** A UUID as keel reads one in a review mark's `by`: 32 hex digits, or the 8-4-4-4-12 form. */
+const BARE_ID = '(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})';
+const ID_FORM = new RegExp(`^(?:${BARE_ID}|[{]${BARE_ID}[}]|urn:uuid:${BARE_ID})$`);
+
 /**
  * An id as the platform's ids are compared (the review profile's "Who `by` names", serial 116:
- * "comparing ids as ids, both parsed"): keel's are UUIDs and keel reads any spelling of one, as
- * Python's `uuid.UUID` parses it (urn: and uuid: dropped, braces at the ends, hyphens anywhere,
- * either case). Null for anything that is not one, White_Space around it included.
+ * "comparing ids as ids, both parsed"), in the spellings keel itself reads (since 2026-11-11,
+ * `elements/review_by.py` `_ID_FORM`): the bare form alone, in one pair of braces, or after a
+ * lower-case `urn:uuid:`, hex in either case. Anything else names nobody: White_Space or a sign
+ * around it, a doubled prefix, a lone brace, hyphens elsewhere.
  */
 export function uuidKey(v: unknown): string | null {
-  if (typeof v !== 'string') return null;
-  const hex = v.replace(/urn:/g, '').replace(/uuid:/g, '').replace(/^[{}]+|[{}]+$/g, '').replace(/-/g, '');
-  return /^[0-9a-fA-F]{32}$/.test(hex) ? hex.toLowerCase() : null;
+  if (typeof v !== 'string' || !ID_FORM.test(v)) return null;
+  return v.replace(/^urn:uuid:/, '').replace(/[{}-]/g, '').toLowerCase();
 }
 
 /** Unicode White_Space, as the profiles read it (U+FEFF is not White_Space, U+0085 is). */
