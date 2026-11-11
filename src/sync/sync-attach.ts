@@ -296,8 +296,9 @@ async function flushPendingOnAttach(
     // World settings waiting in world.json count as pending too: Make online's
     // first round only seeds them, and another tool can write them into the
     // folder while Atlas is closed; without this they waited for an
-    // unrelated element edit (the pull at open is off by default).
-    if (pending === 0 && !(await engine.worldSettingsWaiting())) return;
+    // unrelated element edit (the pull at open is off by default). One state of
+    // them is sent at open once, so a refusal is not resent at every open.
+    if (pending === 0 && !(await engine.claimWorldSettingsAtOpen())) return;
     // A batch too big to upload unasked waits for the user, as it would with
     // the window open (`holdBigBatchAtOpen`). A hold already persisted
     // was adopted before this ran and refuses the round by itself. Never for

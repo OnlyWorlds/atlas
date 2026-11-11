@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'When a world opens, Atlas now sends the settings its world.json holds that onlyworlds.com does not have yet: its description and time settings, and its own x_ keys such as a time unit. Two cases waited before: a world just made online, whose settings stayed in the folder, and a world.json changed by another tool while Atlas was closed. Both waited until you changed an element.',
         tags: ['sync'],
       },
+      {
+        id: 'web-backlink-label-contrast',
+        title: 'The small Web\'s labels for links in are easier to read',
+        body: 'On a world\'s home, the names of the elements that link to the one in the middle of the small Web were faint enough to fall under the contrast a reader needs. They are a step stronger now, beside the names it links to.',
+        tags: ['ui'],
+      },
     ],
   },
   {

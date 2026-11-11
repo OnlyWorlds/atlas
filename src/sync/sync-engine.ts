@@ -1270,12 +1270,26 @@ export class SyncEngine {
   /**
    * True when world.json holds settings this world never sent: after Make
    * online (its first round only seeds), or written into the folder by
-   * another tool while Atlas was closed. The attach flush reads it, so these
-   * go up at open as pending element writes do.
+   * another tool while Atlas was closed. The attach flush asks, so these go up
+   * at open as pending element writes do. A yes is claimed: the state of the
+   * settings it answered for is recorded (`meta_attach_sent`), and the same
+   * state is never claimed again, so what keel refuses or cannot take (a
+   * member's owner_only, a field too long, a contested key) is not resent at
+   * every open; a new change to world.json is a new state and goes up.
    */
-  async worldSettingsWaiting(): Promise<boolean> {
+  async claimWorldSettingsAtOpen(): Promise<boolean> {
     if (this.stopped || this.blocked) return false;
-    return (await this.localMetaAgainstBaseline()) === 'dirty';
+    if ((await this.localMetaAgainstBaseline()) !== 'dirty') return false;
+    try {
+      const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
+      const state = canonicalExtValue({ fields: pickSyncedMeta(local), ext: pickExtensionBaseline(local) });
+      if ((await this.folder.readSyncState()).meta_attach_sent === state) return false;
+      await this.folder.updateSyncState(() => ({ meta_attach_sent: state }));
+      return true;
+    } catch (err) {
+      console.warn('[atlas:sync] world settings at open: not claimed', err);
+      return false;
+    }
   }
 
   private async executeMetaStep(opts?: { skipIfLocalClean?: boolean }): Promise<{

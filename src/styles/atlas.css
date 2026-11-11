@@ -14283,7 +14283,8 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-accent-text);
 }
 .atlas-context-graph-node.is-backlink .atlas-context-graph-node-label {
-  opacity: 0.62;
+  /* 0.70: 10 px labels at 5.4:1; 0.62 read 4.42:1, under AA (style read of 1.123.25). */
+  opacity: 0.70;
 }
 /* A proposed or hidden node keeps its ring's meaning (dashed is ring 2) and
    adds a dotted warn ring outside it, with the word in its label. */

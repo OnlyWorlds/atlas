@@ -179,6 +179,27 @@ describe('sync-attach: world settings waiting in world.json count as pending', (
     expect(pushSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('sends one state of the settings at open once: a refused state is not resent at every open, a new change is', async () => {
+    // A member's description edit keel refuses owner_only leaves the baseline where it was:
+    // without the claim, every open would PATCH it again and toast the refusal again.
+    const folder = await seededFolder({ description: 'Refused for a member' });
+    const opens: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      attachSyncEngine(makeEntry(), folder);
+      const spy = vi.spyOn(getCurrentSyncEngine()!, 'pushOnce').mockResolvedValue(noopResult);
+      await settle();
+      opens.push(spy.mock.calls.length);
+      detachSyncEngine();
+    }
+    expect(opens).toEqual([1, 0, 0]);
+
+    await folder.writeWorldMeta({ description: 'Changed again' } as never);
+    attachSyncEngine(makeEntry(), folder);
+    const after = vi.spyOn(getCurrentSyncEngine()!, 'pushOnce').mockResolvedValue(noopResult);
+    await settle();
+    expect(after).toHaveBeenCalledTimes(1);
+  });
+
   it('does not fire when the settings match the baseline, nor before any seed', async () => {
     const clean = new MockFolderStore();
     await clean.open(null);

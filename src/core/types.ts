@@ -344,6 +344,17 @@ export interface SyncState {
    */
   meta_ext_baseline?: Record<string, string> | null;
   /**
+   * world.json's settings as the attach flush last sent them (one canonical
+   * signature of the synced fields and the x_ keys): an open sends one state of
+   * them at most once, so a refusal (a member's owner_only), a field too long or
+   * a contested key is not resent and re-toasted at every open, while any new
+   * change goes up again (`SyncEngine.claimWorldSettingsAtOpen`). Recorded
+   * before the round runs: a round that fails for the network leaves the same
+   * state to the next edit, Sync or pull, as every setting waited before.
+   * Cleared by resetSyncBaseline.
+   */
+  meta_attach_sent?: string | null;
+  /**
    * Elements whose CREATE keel refused because the id already lives in
    * another OnlyWorlds world (a copied or imported folder, a world taken
    * online twice): the re-key's worklist (`sync/foreign-ids.ts`).
