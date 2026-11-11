@@ -106,7 +106,7 @@ export function proposedRowWord(el: unknown): string {
  */
 export function uuidKey(v: unknown): string | null {
   if (typeof v !== 'string') return null;
-  const hex = v.replace('urn:', '').replace('uuid:', '').replace(/^[{}]+|[{}]+$/g, '').replace(/-/g, '');
+  const hex = v.replace(/urn:/g, '').replace(/uuid:/g, '').replace(/^[{}]+|[{}]+$/g, '').replace(/-/g, '');
   return /^[0-9a-fA-F]{32}$/.test(hex) ? hex.toLowerCase() : null;
 }
 
@@ -124,12 +124,15 @@ const WHITE_SPACE_ONLY = /^[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u20
 export function markNames(
   by: unknown,
   roster: readonly OwMember[] | null,
-  characterName: (id: string) => string | undefined,
+  characterName: (id: string) => unknown,
 ): string | null {
   if (typeof by !== 'string' || WHITE_SPACE_ONLY.test(by)) return null;
   const served = (row: OwMember | undefined) => (typeof row?.name === 'string' && row.name.trim() ? row.name.trim() : null);
-  // keel writes the exact word `owner` as the `by` of the world's owner, who has no membership.
+  // keel writes the exact word `owner` as the `by` of the world's owner, who has no membership. Only a
+  // platform resolves it: a world with no roster (a folder, an unlinked world, a roster not read) has
+  // nobody to resolve it to, so there the word is the mark's raw value (the S591 gate's M1).
   if (by === 'owner') {
+    if (!roster) return null;
     const name = served(roster?.find(m => m.kind === 'owner'));
     return name ? `${name}, the world's owner` : "the world's owner";
   }
@@ -142,7 +145,7 @@ export function markNames(
     return `${served(row) ?? by}${kind}`;
   }
   const character = characterName(key);
-  return character && character.trim() ? `the Character ${character.trim()}` : null;
+  return typeof character === 'string' && character.trim() ? `the Character ${character.trim()}` : null;
 }
 
 /**
@@ -154,7 +157,7 @@ export function proposedLine(
   mark: ProposedMark,
   by: unknown,
   roster: readonly OwMember[] | null,
-  characterName: (id: string) => string | undefined,
+  characterName: (id: string) => unknown,
 ): string {
   const head = 'Proposed and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it.';
   const who = markNames(by, roster, characterName);

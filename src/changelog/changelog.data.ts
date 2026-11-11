@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'review-mark-names',
         title: 'A proposed element says whom its mark names, never who proposed it',
-        body: 'A review mark records the writer\'s own word for who made it, which is a claim and not proof. The line on a proposed element now reads "Proposed and not yet reviewed", then "The mark names Ada" only when Atlas can place the name: a member of the online world, with its kind if it is an AI\'s seat or a player\'s seat, the world\'s owner, or a Character of the world. Any other value is left in the mark itself, and Atlas no longer says "a member" when it cannot tell.',
+        body: 'A review mark records the writer\'s own word for who made it, which is a claim and not proof. The line on a proposed element now reads "Proposed and not yet reviewed", then "The mark names Ada" only when Atlas can place the name: a member of the online world, with its kind if it is an AI\'s seat or a player\'s seat, the world\'s owner, or a Character of the world. Any other value is left in the mark itself, and Atlas no longer says "a member" when it cannot tell. This replaces the "Proposed by Name, a player" wording of 1.123.23.',
         tags: ['sync'],
       },
       {

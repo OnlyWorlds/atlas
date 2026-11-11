@@ -79,7 +79,9 @@ describe('R1, the readings', () => {
 
   it("the word owner is the world's owner, by the roster's name when served; only the exact word", () => {
     const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: 'owner' } }), '2026-10-23')!;
-    expect(proposedLine(mark, 'owner', null, () => undefined)).toContain("The mark names the world's owner.");
+    // No roster, no platform to resolve it: the word stays the mark's raw value (the S591 gate's M1).
+    expect(proposedLine(mark, 'owner', null, () => undefined)).not.toContain('names');
+    expect(proposedLine(mark, 'owner', [], () => undefined)).toContain("The mark names the world's owner.");
     const roster = [{ id: null, kind: 'owner', name: 'titus', role: 'owner' }] as unknown as OwMember[];
     expect(proposedLine(mark, 'owner', roster, () => undefined)).toContain("The mark names titus, the world's owner.");
     expect(proposedLine(mark, 'Owner', roster, () => undefined)).not.toContain('names'); // the control
@@ -89,7 +91,7 @@ describe('R1, the readings', () => {
   it('ids compare as ids: any spelling of the UUID, never with White_Space around it', () => {
     const roster = [{ id: SEAT, kind: 'person', name: 'ada', role: 'contributor' }] as unknown as OwMember[];
     const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
-    for (const spelling of [SEAT.toUpperCase(), SEAT.replace(/-/g, ''), `{${SEAT}}`, `urn:uuid:${SEAT}`]) {
+    for (const spelling of [SEAT.toUpperCase(), SEAT.replace(/-/g, ''), `{${SEAT}}`, `urn:uuid:${SEAT}`, `urn:urn:uuid:${SEAT}`]) {
       expect(proposedLine(mark, spelling, roster, () => undefined)).toContain('The mark names ada.');
     }
     expect(proposedLine(mark, ` ${SEAT}`, roster, () => undefined)).not.toContain('names');
@@ -104,6 +106,8 @@ describe('R1, the readings', () => {
     // A member first: the roster's row wins over a Character with the same id.
     const roster = [{ id: CH, kind: 'agent', name: 'Rook', role: 'contributor' }] as unknown as OwMember[];
     expect(proposedLine(mark, CH, roster, names)).toContain("The mark names Rook, an AI's seat.");
+    // A Character whose name is not a string (a foreign folder) says no name, and throws nothing.
+    expect(proposedLine(mark, CH, [], () => 5)).not.toContain('names');
   });
 
   it('a by that names nobody, or one this reader cannot place, says no name at all', () => {
