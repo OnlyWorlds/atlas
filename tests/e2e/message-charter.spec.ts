@@ -67,21 +67,28 @@ test.describe('#526 messages and the charter', () => {
     const bb = await createElement(page, 'character', { name: 'BB' });
     const kael = await createElement(page, 'character', { name: 'Kael' });
     const msg = await createElement(page, 'narrative', {
-      name: 'Re: the partner lines', supertype: 'Message', narrator: codex, characters: [bb, kael], story: 'Checked.',
+      name: 'Re: the partner lines', supertype: 'Message', narrator: codex, characters: [bb, kael], story: 'Checked.', description: 'About the partner lines',
     });
-    const saga = await createElement(page, 'narrative', { name: 'A saga', narrator: codex, characters: [bb] });
+    const saga = await createElement(page, 'narrative', { name: 'A saga', narrator: codex, characters: [bb], description: 'A long tale', story: 'Once.' });
     const w = await worldId(page);
 
     await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, msg]);
     const line = page.locator('[data-role="message-parties"]');
     // A folder world has no roster, so the sender is a claim (the message profile).
     await expect(line).toHaveText('Claims to be from Codex · To BB, Kael');
+    // A message's words lead: its story stands right after the description, before the narrative's
+    // own sections (the views file's message row).
+    const order = await page.locator('[data-field]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.field));
+    expect(order.indexOf('story')).toBe(order.indexOf('description') + 1);
     await line.getByRole('link', { name: 'BB' }).click();
     await expect(page).toHaveURL(new RegExp(`#/w/${w}/element/${bb}$`));
 
     await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, saga]);
     await expect(page.locator('[data-role="element-name"]')).toHaveText('A saga');
     await expect(page.locator('[data-role="message-parties"]')).toHaveCount(0);
+    // A story that is not a message keeps the schema's place for its story.
+    const sagaOrder = await page.locator('[data-field]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.field));
+    expect(sagaOrder.indexOf('story')).toBeGreaterThan(sagaOrder.indexOf('description') + 1);
 
     // An empty Characters list is addressed to everyone.
     const all = await createElement(page, 'narrative', { name: 'To the crew', supertype: 'Message', narrator: kael, characters: [] });

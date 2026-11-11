@@ -23,7 +23,8 @@ import { onHashChange, parseHash, worldHash } from '../core/router';
 import type { Element } from '../core/types';
 import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
 import { toastManager } from '../ui/toast-manager';
-import { sectionsFor } from '../editor/field-schema';
+import { sectionsFor, withMessageLead } from '../editor/field-schema';
+import { isMessage } from '../core/message-parties';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { buildCustomFieldsSection, pendingCustomFieldEdit } from './element-detail-custom-fields';
@@ -336,7 +337,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       }
       // Only filled rows, never filledSections' fallback of a whole first section.
       const shown = new Set(['name', 'description', 'image_url']);
-      const shared = sectionsFor(el.type)
+      const shared = (isMessage(el) ? withMessageLead(sectionsFor(el.type)) : sectionsFor(el.type))
         .map(section => ({ ...section, fields: section.fields.filter(f => !shown.has(f.name) && isFieldFilled(el, f.name)) }))
         .filter(section => section.fields.length > 0);
       for (const section of shared) {
@@ -351,7 +352,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     // The element NAME is the header's click-to-edit title (convention #80) — so
     // drop the duplicate "Name" field from the schema-rendered Base section.
-    let sections = sectionsFor(el.type)
+    // A message's story leads, right after its description (withMessageLead).
+    let sections = (isMessage(el) ? withMessageLead(sectionsFor(el.type)) : sectionsFor(el.type))
       .map(section => ({ ...section, fields: section.fields.filter(f => f.name !== 'name') }))
       .filter(section => section.fields.length > 0);
     // During the tour, all-empty sections HIDE (not collapse — a tester's

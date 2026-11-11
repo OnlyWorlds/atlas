@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.24',
+    date: '2026-11-11',
+    theme: 'A message reads its words first',
+    entries: [
+      {
+        id: 'message-story-leads',
+        title: 'A message shows its words right under its description',
+        body: 'A message keeps its words in its story, and the story row used to sit lower down the page with the other story fields. On a message the story now stands right after the description, below From and To. Other stories keep their order.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.123.23',
     date: '2026-11-11',
     theme: 'Review marks: who made them, and who may send them',

@@ -102,6 +102,27 @@ export function sectionsFor(type: ElementType): SectionLayout[] {
   return [base, ...schemaSections.sort((a, b) => a.order - b.order), aliases];
 }
 
+/**
+ * A message's words are its story (the message profile; the views file's message row leads with
+ * `story`): on a message's page the story row moves up from its schema section to stand right after
+ * the description in Base, the page's head. Every other row keeps its section and order, and a
+ * section left with no rows is dropped. Sections without a Base or a story come back unchanged.
+ */
+export function withMessageLead(sections: SectionLayout[]): SectionLayout[] {
+  const base = sections.find(s => s.name === 'Base');
+  const from = sections.find(s => s !== base && s.fields.some(f => f.name === 'story'));
+  if (!base || !from) return sections;
+  const story = from.fields.find(f => f.name === 'story')!;
+  const at = base.fields.findIndex(f => f.name === 'description') + 1;
+  return sections
+    .map(s => {
+      if (s === base) return { ...s, fields: [...s.fields.slice(0, at), story, ...s.fields.slice(at)] };
+      if (s === from) return { ...s, fields: s.fields.filter(f => f !== story) };
+      return s;
+    })
+    .filter(s => s.fields.length > 0);
+}
+
 /** Known field names across this element type (base + schema). */
 export function knownFieldsFor(type: ElementType): Set<string> {
   const names = new Set<string>(BASE_FIELDS.map(f => f.name));
