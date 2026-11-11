@@ -394,9 +394,13 @@ test('a name along a river moves along it, clear of an area\'s name on its middl
     return { name: document.querySelector('.atlas-map-pane .atlas-ink-line-label')!.getBoundingClientRect().right, river: river.right };
   });
   expect(ends.name).toBeLessThanOrEqual(ends.river + 2);
-  // The control: at the middle the two names would print over each other.
-  await along.locator('textPath').evaluate(t => t.setAttribute('startOffset', '50%'));
-  expect(await overlap()).toBe(true);
+  // The control: at the middle the two names would print over each other. Set and read in one poll,
+  // so a redraw of the labels between the set and the read cannot leave the read on the old place
+  // (the single set and read failed once on 2026-11-11 and passed on retry; the cause not confirmed).
+  await expect.poll(async () => {
+    await along.locator('textPath').evaluate(t => t.setAttribute('startOffset', '50%'));
+    return overlap();
+  }).toBe(true);
 });
 
 const readTransform = (page: Page) =>
