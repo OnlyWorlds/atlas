@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.25',
+    date: '2026-11-11',
+    theme: 'A review mark names only someone still in the world',
+    entries: [
+      {
+        id: 'review-mark-removed-member',
+        title: 'A mark that names a former member says no name',
+        body: 'A proposed element\'s line names the person its review mark records only when Atlas can place them. Someone removed from the world is no longer one of its members, so a mark that records them now says no name, as for any value Atlas cannot place; the value stays in the mark itself. A Character of the world with that id is still named.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.123.24',
     date: '2026-11-11',
     theme: 'A message reads its words first, and a review mark says only what it holds',

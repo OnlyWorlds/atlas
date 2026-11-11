@@ -11,7 +11,7 @@ import { getState } from '../core/state';
 import type { Element } from '../core/types';
 import { agentMarkFor, type AgentMark } from '../core/agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
-import { proposedLine, proposedMarkOf, proposedWord, rawProposedBy, uuidKey } from '../core/review-mark';
+import { proposedLine, proposedMarkOf, proposedWord, uuidKey } from '../core/review-mark';
 
 /** A Character of the open world by its id, any spelling (`uuidKey`): the review mark's Character case. */
 function characterNameByKey(key: string): string | undefined {
@@ -68,7 +68,7 @@ export function buildProposedMark(el: Element): HTMLElement | null {
   btn.textContent = mark.lapsed ? 'Lapsed' : proposedWord(mark);
   let line = '';
   const say = (roster: Parameters<typeof proposedLine>[2]): void => {
-    line = proposedLine(mark, rawProposedBy(el), roster, characterNameByKey);
+    line = proposedLine(mark, mark.by, roster, characterNameByKey);
     btn.title = line;
     btn.setAttribute('aria-label', line);
   };
@@ -94,7 +94,7 @@ export function proposedNoteFor(el: Element): string | null {
   const roster = entry?.state === 'api-linked' ? rosterNow(entry) : null;
   // Only a linked world sends a change; a folder world saves it (Seethe 2026-10-23).
   const change = entry?.state === 'api-linked' ? 'sent' : 'saved';
-  return `${proposedLine(mark, rawProposedBy(el), roster, characterNameByKey)} A keeper accepts or declines it on OnlyWorlds; a change made here is ${change} as any other.`;
+  return `${proposedLine(mark, mark.by, roster, characterNameByKey)} A keeper accepts or declines it on OnlyWorlds; a change made here is ${change} as any other.`;
 }
 
 /**

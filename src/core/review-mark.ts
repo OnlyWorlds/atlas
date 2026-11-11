@@ -15,8 +15,8 @@
  * the element out rather than handing it on as fact).
  *
  * Both readings are the SDK's since 4.84 (the profile's readers: `proposedMarkOf`
- * shows, `handsOnAsProposed` hands on; trimmed by the profile's white space, so a
- * byte order mark stays, and a `today` not shaped YYYY-MM-DD is refused).
+ * shows, `handsOnAsProposed` hands on; `by` read as stored since 4.155.0, and a
+ * `today` not shaped YYYY-MM-DD is refused).
  */
 import { handsOnAsProposed, proposedMarkOf, PROPOSED_MARK, type OwMember, type OwProposedMark } from '@onlyworlds/sdk';
 import type { Element } from './types';
@@ -118,15 +118,18 @@ const WHITE_SPACE_ONLY = /^[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u20
  * on the roster or the world's owner (by the platform's name, its kind beside it), or a Character
  * of this world ("the Character Rachmaninov"). Anything else, or a `by` that names nobody (not a
  * string, White_Space alone), is null: the line then says no name, and the raw value stays in the
- * mark's own read-only row, as data. `by` is read as stored, never trimmed. `characterName` is
- * asked with a `uuidKey`, so it compares the world's Character ids by `uuidKey` too.
+ * mark's own read-only row, as data. `by` is read as stored, never trimmed (the SDK's `mark.by`
+ * since 4.155.0). `characterName` is asked with a `uuidKey`, so it compares the world's Character
+ * ids by `uuidKey` too. A removed member is no longer on the roster: keel still serves its row
+ * (status `removed`), and a mark naming it says no name, as for anyone this reader cannot place.
  */
 export function markNames(
   by: unknown,
-  roster: readonly OwMember[] | null,
+  rows: readonly OwMember[] | null,
   characterName: (id: string) => unknown,
 ): string | null {
   if (typeof by !== 'string' || WHITE_SPACE_ONLY.test(by)) return null;
+  const roster = rows ? rows.filter(m => m.status !== 'removed') : null;
   const served = (row: OwMember | undefined) => (typeof row?.name === 'string' && row.name.trim() ? row.name.trim() : null);
   // keel writes the exact word `owner` as the `by` of the world's owner, who has no membership. Only a
   // platform resolves it: a world with no roster (a folder, an unlinked world, a roster not read) has
@@ -168,8 +171,3 @@ export function proposedLine(
     : `${named} It lapses on ${dayWords(mark.expires)}.`;
 }
 
-/** A mark's `by` as stored on the element, never trimmed (the SDK's reader trims it). */
-export function rawProposedBy(el: unknown): unknown {
-  const v = el && typeof el === 'object' ? (el as Record<string, unknown>)[PROPOSED_MARK] : undefined;
-  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>).by : undefined;
-}

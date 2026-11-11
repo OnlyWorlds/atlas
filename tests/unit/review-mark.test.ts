@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import type { OwMember } from '@onlyworlds/sdk';
 import {
   proposedMarkOf, isProposed, handsOnAsProposed, settledOf, proposedCount, keptOnCreate,
-  proposedLine, proposedWord, proposedRowWord, todayDay, rawProposedBy,
+  proposedLine, proposedWord, proposedRowWord, todayDay,
 } from '../../src/core/review-mark';
 import { buildPagePayload, proposedLeftOut, leftOutPageLine, type PayloadCircleBlock, type RelationToken } from '../../src/core/share-payload';
 import { stampedBody } from '../../src/store/sync-stamp';
@@ -52,8 +52,8 @@ describe('R1, the readings', () => {
     expect(todayDay(new Date('2026-11-22T04:30:00.000Z'))).toBe('2026-11-22');
   });
 
-  it('is the SDK\'s reader: the profile\'s white space trimmed, a byte order mark kept, a bad day refused', () => {
-    expect(proposedMarkOf(el('a', 'A', { x_review_proposed: { by: '  m-1\t' } }))!.by).toBe('m-1');
+  it('is the SDK\'s reader: by read as stored, a byte order mark kept, a bad day refused', () => {
+    expect(proposedMarkOf(el('a', 'A', { x_review_proposed: { by: '  m-1\t' } }))!.by).toBe(String.fromCharCode(32, 160) + 'm-1' + String.fromCharCode(9)); // by, as stored (4.155.0)
     expect(proposedMarkOf(el('a', 'A', { x_review_proposed: { by: '﻿m-1' } }))!.by).toBe('﻿m-1');
     expect(() => proposedMarkOf(el('a', 'A', { x_review_proposed: MARK }), '22 Nov')).toThrow(TypeError);
   });
@@ -120,11 +120,22 @@ describe('R1, the readings', () => {
     }
   });
 
-  it("the raw by is the element's own, never trimmed (the SDK's reader trims it)", () => {
-    expect(rawProposedBy(el('a', 'A', { x_review_proposed: { by: '  m-1\t' } }))).toBe('  m-1\t');
-    expect(rawProposedBy(el('a', 'A', { x_review_proposed: { by: 7 } }))).toBe(7);
-    expect(rawProposedBy(el('a', 'A', { x_review_proposed: ['by'] }))).toBeUndefined();
-    expect(rawProposedBy(el('a', 'A'))).toBeUndefined();
+  it("the mark's by is the element's own, never trimmed (the SDK's reader since 4.155.0)", () => {
+    const by = (v: unknown) => proposedMarkOf(el('a', 'A', { x_review_proposed: { by: v } }), '2026-10-23')?.by;
+    expect(by('  m-1  ')).toBe('  m-1  ');
+    expect(by(' owner')).toBe(' owner');
+    expect(by(7)).toBeNull();
+    expect(by('   ')).toBeNull();
+  });
+
+  it('a removed member is no longer on the roster: its mark says no name', () => {
+    const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: MARK }), '2026-10-23')!;
+    const row = { id: SEAT, kind: 'person', name: 'ada', role: 'contributor' };
+    expect(proposedLine(mark, SEAT, [{ ...row, status: 'active' }] as unknown as OwMember[], () => undefined)).toContain('The mark names ada.');
+    const gone = [{ ...row, status: 'removed' }] as unknown as OwMember[];
+    expect(proposedLine(mark, SEAT, gone, () => undefined)).not.toContain('names');
+    // A Character with the same id still answers once the member is gone.
+    expect(proposedLine(mark, SEAT, gone, () => 'Rachmaninov')).toContain('The mark names the Character Rachmaninov.');
   });
 
   it('a row word is the word in its span, and nothing for a settled element', () => {

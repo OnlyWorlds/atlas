@@ -20,7 +20,7 @@ const reg = { worlds: [entry], pin: '1234' } as unknown as WorldsRegistry;
 
 const row = (id: string, over: Partial<OwFileRow> = {}): OwFileRow => ({
   id, name: `${id}.pdf`, kind: 'pdf', size: 1000, label: null,
-  added_by: { name: 'crew-walk-a', membership: 'm-a', agent: false }, added_at: '2026-10-19T12:00:00Z', ...over,
+  added_by: { name: 'crew-walk-a', membership: 'm-a', agent: false, owner: false }, added_at: '2026-10-19T12:00:00Z', ...over,
 });
 const ticket = (fileId = 'f-new'): OwFileTicket => ({
   ticket: 't', upload_url: 'https://upload.test/v1/file', prefix: 'w/w1/e1/', key: `w/w1/e1/${fileId}.pdf`,
