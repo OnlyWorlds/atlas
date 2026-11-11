@@ -113,7 +113,8 @@ export function proposedLine(
   const name = row ? memberNameOf(mark.by, roster, nameOf) : null;
   // A seat chooses its own name ("the owner" included), so an agent or a player is said with its kind.
   const kind = row?.kind === 'agent' ? ', an agent,' : row?.kind === 'player' ? ', a player,' : '';
-  const who = name ? `${name}${kind}` : 'a member';
+  // keel writes the word `owner` as the `by` of the world's owner, who has no membership (the review profile, serial 115).
+  const who = name ? `${name}${kind}` : mark.by === 'owner' ? "the world's owner" : 'a member';
   const head = `Proposed by ${who} and not yet reviewed: it is not part of the world, or its counts, until a keeper accepts it.`;
   if (!mark.expires) return head;
   return mark.lapsed

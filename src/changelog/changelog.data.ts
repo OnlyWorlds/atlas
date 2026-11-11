@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'proposed-by-player',
         title: 'A proposal from a player says so',
-        body: 'An element proposed by a player in an online world now reads "Proposed by Name, a player," as one proposed by an agent already said "an agent". A player names itself, so the kind beside the name tells you what wrote it.',
+        body: 'An element proposed by a player in an online world now reads "Proposed by Name, a player," as one proposed by an agent already said "an agent". A player names itself, so the kind beside the name tells you what wrote it. One proposed by the world\'s owner says "Proposed by the world\'s owner".',
         tags: ['sync'],
       },
       {

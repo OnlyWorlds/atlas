@@ -73,6 +73,14 @@ describe('R1, the readings', () => {
     expect(proposedLine(mark, roster, () => undefined)).toContain('Proposed by the owner, a player, and not yet reviewed');
   });
 
+  it("the word owner as by is the world's owner, roster or not; a seat named owner stays its own id", () => {
+    const owners = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: 'owner' } }), '2026-10-23')!;
+    expect(proposedLine(owners, null, () => undefined)).toContain("Proposed by the world's owner and not yet reviewed");
+    expect(proposedLine(owners, [] as unknown as OwMember[], () => undefined)).toContain("Proposed by the world's owner and not yet reviewed");
+    const other = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: 'Owner' } }), '2026-10-23')!;
+    expect(proposedLine(other, null, () => undefined)).toContain('Proposed by a member'); // the control: only the exact word
+  });
+
   it('a row word is the word in its span, and nothing for a settled element', () => {
     expect(proposedRowWord(el('b', 'Ada'))).toBe('');
     expect(proposedRowWord(el('a', 'Quill', { x_review_proposed: MARK }))).toContain('>Proposed<');
