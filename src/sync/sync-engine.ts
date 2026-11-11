@@ -1242,6 +1242,42 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Whether the folder holds world settings (the synced fields and the x_ keys
+   * in world.json) that were never sent, decided from disk and the baseline
+   * alone, with no server read. 'unknown' when there is no baseline yet (the
+   * seed round has not run) or the read failed: never a reason to skip a push.
+   */
+  private async localMetaAgainstBaseline(): Promise<'clean' | 'dirty' | 'unknown'> {
+    try {
+      const syncState = await this.folder.readSyncState();
+      const baseline = syncState.meta_baseline ?? null;
+      const extBaseline = syncState.meta_ext_baseline ?? null;
+      if (!baseline || !extBaseline) return 'unknown';
+      const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
+      const dirty = META_SYNC_FIELD_NAMES.some(
+        f => !metaEquals(META_SYNC_FIELDS[f], local[f], baseline[f])
+      ) || extDirty(local, extBaseline);
+      return dirty ? 'dirty' : 'clean';
+    } catch (err) {
+      // Precheck failure falls through to the normal step: never let an
+      // optimization turn into a skipped push.
+      console.warn('[atlas:sync] meta precheck failed — running full meta step', err);
+      return 'unknown';
+    }
+  }
+
+  /**
+   * True when world.json holds settings this world never sent: after Make
+   * online (its first round only seeds), or written into the folder by
+   * another tool while Atlas was closed. The attach flush reads it, so these
+   * go up at open as pending element writes do.
+   */
+  async worldSettingsWaiting(): Promise<boolean> {
+    if (this.stopped || this.blocked) return false;
+    return (await this.localMetaAgainstBaseline()) === 'dirty';
+  }
+
   private async executeMetaStep(opts?: { skipIfLocalClean?: boolean }): Promise<{
     meta_pushed: string[];
     meta_pulled: string[];
@@ -1258,24 +1294,7 @@ export class SyncEngine {
     // every debounced autosave). Pull/sync rounds never pass this flag: pull
     // freshness IS the meta GET (world-meta design). An absent
     // baseline never skips — the seed round must run.
-    if (opts?.skipIfLocalClean) {
-      try {
-        const syncState = await this.folder.readSyncState();
-        const baseline = syncState.meta_baseline ?? null;
-        const extBaseline = syncState.meta_ext_baseline ?? null;
-        if (baseline && extBaseline) {
-          const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
-          const dirty = META_SYNC_FIELD_NAMES.some(
-            f => !metaEquals(META_SYNC_FIELDS[f], local[f], baseline[f])
-          ) || extDirty(local, extBaseline);
-          if (!dirty) return empty;
-        }
-      } catch (err) {
-        // Precheck failure falls through to the normal step — never let an
-        // optimization turn into a skipped push.
-        console.warn('[atlas:sync] meta precheck failed — running full meta step', err);
-      }
-    }
+    if (opts?.skipIfLocalClean && (await this.localMetaAgainstBaseline()) === 'clean') return empty;
 
     const metaFailure = (operation: 'read' | 'update', err: unknown): PerElementFailure =>
       failureOf('world', 'world', operation, err);

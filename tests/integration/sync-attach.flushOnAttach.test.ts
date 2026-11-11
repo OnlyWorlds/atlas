@@ -136,3 +136,66 @@ describe('sync-attach: flush pending writes on engine attach', () => {
     expect(pushSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('sync-attach: world settings waiting in world.json count as pending', () => {
+  // Make online's own round only seeds the settings, and another tool can write
+  // world.json while Atlas is closed: with no element pending, the flush used to
+  // return, and the settings waited for an unrelated element edit.
+  async function seededFolder(meta: Record<string, unknown>): Promise<MockFolderStore> {
+    const folder = new MockFolderStore();
+    await folder.open(null);
+    // What a seed round leaves against a new, empty world: baselines that hold nothing.
+    await folder.updateSyncState(() => ({ meta_baseline: {}, meta_ext_baseline: {} }));
+    await folder.writeWorldMeta(meta as never);
+    return folder;
+  }
+
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 40; i++) await Promise.resolve();
+    await new Promise(r => setTimeout(r, 0));
+    for (let i = 0; i < 40; i++) await Promise.resolve();
+  }
+
+  it('fires pushOnce for an x_ key the world never sent, with no element pending', async () => {
+    const folder = await seededFolder({ x_time_unit: 'spring' });
+    expect((await folder.listLocallyChangedSince(null)).length).toBe(0);
+
+    attachSyncEngine(makeEntry(), folder, { justLinked: true });
+    const engine = getCurrentSyncEngine()!;
+    const pushSpy = vi.spyOn(engine, 'pushOnce').mockResolvedValue(noopResult);
+
+    await settle();
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires pushOnce for a setting field the world never sent', async () => {
+    const folder = await seededFolder({ description: 'A tidal road' });
+
+    attachSyncEngine(makeEntry(), folder);
+    const engine = getCurrentSyncEngine()!;
+    const pushSpy = vi.spyOn(engine, 'pushOnce').mockResolvedValue(noopResult);
+
+    await settle();
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire when the settings match the baseline, nor before any seed', async () => {
+    const clean = new MockFolderStore();
+    await clean.open(null);
+    await clean.updateSyncState(() => ({ meta_baseline: {}, meta_ext_baseline: {} }));
+    attachSyncEngine(makeEntry(), clean);
+    const spyClean = vi.spyOn(getCurrentSyncEngine()!, 'pushOnce').mockResolvedValue(noopResult);
+    await settle();
+    expect(spyClean).not.toHaveBeenCalled();
+    detachSyncEngine();
+
+    // No baseline yet: the seed has not run, so nothing is known to be waiting.
+    const unseeded = new MockFolderStore();
+    await unseeded.open(null);
+    await unseeded.writeWorldMeta({ x_time_unit: 'spring' } as never);
+    attachSyncEngine(makeEntry(), unseeded);
+    const spyUnseeded = vi.spyOn(getCurrentSyncEngine()!, 'pushOnce').mockResolvedValue(noopResult);
+    await settle();
+    expect(spyUnseeded).not.toHaveBeenCalled();
+  });
+});

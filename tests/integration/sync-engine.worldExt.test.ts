@@ -274,3 +274,28 @@ describe('the world\'s first import (origin), as keel serves it', () => {
     expect(patchBodies()).toEqual([]);
   });
 });
+
+describe('settings the folder held before its world went online', () => {
+  // Make online, and a folder another tool wrote while Atlas was closed: the
+  // keys are in world.json before the first round, which only seeds.
+  it('the seed sends nothing and then names them as waiting; the next push round sends them', async () => {
+    await folder.writeWorldMeta({ x_time_unit: 'spring', description: 'A tidal road' } as never);
+    const engine = makeEngine();
+    expect(await engine.worldSettingsWaiting()).toBe(false); // no baseline yet: the seed must run first
+    await engine.pushOnce(); // Make online's own round: the seed
+    expect(patchBodies()).toEqual([]);
+    expect(await engine.worldSettingsWaiting()).toBe(true);
+    await engine.pushOnce(); // the attach flush's round
+    // The settings and the x_ keys go as the engine always sends them, in their own PATCHes.
+    expect(Object.assign({}, ...patchBodies())).toEqual({ description: 'A tidal road', x_time_unit: 'spring' });
+    expect((await serverMeta()).x_time_unit).toBe('spring');
+    expect(await engine.worldSettingsWaiting()).toBe(false);
+  });
+
+  it('a world whose settings match what keel holds has none waiting', async () => {
+    client.__server_mutate_world_meta({ x_time_unit: 'spring' });
+    const engine = makeEngine();
+    await engine.syncNow();
+    expect(await engine.worldSettingsWaiting()).toBe(false);
+  });
+});

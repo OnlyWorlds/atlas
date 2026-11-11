@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.26',
+    date: '2026-11-12',
+    theme: 'A world\'s own settings go online when it opens',
+    entries: [
+      {
+        id: 'world-settings-at-open',
+        title: 'Settings in world.json go up at open, not at the next edit',
+        body: 'When a world opens, Atlas now sends the settings its world.json holds that onlyworlds.com does not have yet: its description and time settings, and its own x_ keys such as a time unit. Two cases waited before: a world just made online, whose settings stayed in the folder, and a world.json changed by another tool while Atlas was closed. Both waited until you changed an element.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.123.25',
     date: '2026-11-11',
     theme: 'A review mark names only someone still in the world',
