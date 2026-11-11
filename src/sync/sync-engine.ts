@@ -4152,6 +4152,9 @@ export function isAuthError(err: unknown): boolean {
     if (t.code === 'hidden_not_allowed') return false;
     // keel would not take the charter mark from this key (the charter profile): about the element, not the key.
     if (t.code === 'keeper_only') return false;
+    // keel would not take a review mark whose `by` is someone else's from this key (403 `review_by_another`, below
+    // co-builder): about the element, not the key.
+    if (t.code === 'review_by_another') return false;
     return t.status === 401 || t.status === 403
       || t.code === 'invalid_credentials' || t.code === 'key_revoked';
   }

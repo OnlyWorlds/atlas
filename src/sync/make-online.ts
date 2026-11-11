@@ -437,7 +437,7 @@ export async function mergeLocalIntoApi(
       await folder.stampServerUpdatedAt(c.local.id, c.type, response.updated_at, s.sent, stampWordOf(response));
       counts.creates++;
     } catch (err) {
-      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err) });
+      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err), ...serverOf(err) });
     } finally {
       tick();
     }
@@ -472,8 +472,9 @@ export async function mergeLocalIntoApi(
       });
     } catch (err) {
       const message = errText(err);
+      const server = serverOf(err);
       for (const b of batch) {
-        failures.push({ element_id: b.dec.local.id, type: b.dec.type, operation: 'create', message });
+        failures.push({ element_id: b.dec.local.id, type: b.dec.type, operation: 'create', message, ...server });
         tick();
       }
       return;
@@ -576,6 +577,8 @@ export async function mergeLocalIntoApi(
         type: b.dec.type,
         operation: 'create',
         message: it.error?.message || 'bulk item failed',
+        status: it.status,
+        ...(typeof it.error?.code === 'string' ? { code: it.error.code } : {}),
       });
       tick();
     });
@@ -677,6 +680,12 @@ export async function mergeLocalIntoApi(
     ...counts, failures, ambiguous: plan.ambiguous, childClashes: plan.childClashes,
     rekeyed, unrewritten, idClashes: plan.idClashes, hiddenOnline: plan.hiddenOnline,
   };
+}
+
+/** keel's status and code on a failure record, so the words for a refusal (`classifyFailure`) reach Make online too. */
+function serverOf(err: unknown): { status?: number; code?: string } {
+  const e = err as { status?: unknown; code?: unknown } | null;
+  return e && typeof e.status === 'number' && typeof e.code === 'string' ? { status: e.status, code: e.code } : {};
 }
 
 function errText(err: unknown): string {

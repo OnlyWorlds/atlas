@@ -14,7 +14,7 @@
 import type { PerElementFailure } from '../core/types';
 import { isFileBusyError } from '../store/fs-utils';
 
-export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'not_yours' | 'keeper_mark' | 'other';
+export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'not_yours' | 'keeper_mark' | 'review_mark' | 'other';
 
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
@@ -30,6 +30,9 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   if (f.status === 403 && (f.code === 'not_author' || f.code === 'owner_only')) return 'not_yours';
   // keel takes the charter mark (`x_charter_of`) only from the owner or a co-builder (the charter profile).
   if (f.status === 403 && f.code === 'keeper_only') return 'keeper_mark';
+  // Below co-builder, keel takes a review mark only as the element already holds it or with the writer's own id as its `by`
+  // (403 `review_by_another`): a folder's pack-written mark names a Character, so it goes up through the owner or a co-builder.
+  if (f.status === 403 && f.code === 'review_by_another') return 'review_mark';
   return 'other';
 }
 
@@ -87,6 +90,11 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   if (keeperMark) {
     const n = new Set(keeperMark.map(f => f.element_id)).size;
     parts.push(`${plural(n, 'change', 'changes')} could not sync because only the world's owner or a co-builder can mark its charter. ${n === 1 ? 'The change stays' : 'The changes stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+  }
+  const reviewMark = byKind.get('review_mark');
+  if (reviewMark) {
+    const n = new Set(reviewMark.map(f => f.element_id)).size;
+    parts.push(`${plural(n, 'element', 'elements')} could not sync because ${n === 1 ? 'it carries a review mark' : 'they carry review marks'} made by someone else, and only the world's owner or a co-builder can send such a mark. Settings, under This world, ${n === 1 ? 'names it' : 'names them'}. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
   }
   const other = byKind.get('other');
   if (other) {

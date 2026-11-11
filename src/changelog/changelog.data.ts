@@ -57,13 +57,19 @@ export interface ChangelogRelease {
 export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.123.23',
-    date: '2026-11-10',
-    theme: 'Who proposed it, said with what they are',
+    date: '2026-11-11',
+    theme: 'Review marks: who made them, and who may send them',
     entries: [
       {
         id: 'proposed-by-player',
         title: 'A proposal from a player says so',
         body: 'An element proposed by a player in an online world now reads "Proposed by Name, a player," as one proposed by an agent already said "an agent". A player names itself, so the kind beside the name tells you what wrote it.',
+        tags: ['sync'],
+      },
+      {
+        id: 'review-mark-by-another',
+        title: 'A review mark made by someone else no longer stops the sync',
+        body: 'In an online world where you are a contributor, OnlyWorlds now takes a review mark (proposed or checked) only with your own name on it. An element whose mark was made by someone else used to stop the whole sync with a message about your PIN. Now only that element waits, Settings, under This world, says why (the owner or a co-builder can send such a mark), and the rest syncs.',
         tags: ['sync'],
       },
     ],
