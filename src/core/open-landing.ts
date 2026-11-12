@@ -35,7 +35,7 @@ export interface OpenLanding {
 /** A link's one element (or narrative) that this world does not hold for this reader. */
 export const LANDING_MISSING_ONE_LINE = 'The element this link names is not in this world, or not in your view of it.';
 
-/** Long enough for a sign-in and a download; short enough that a later open of the same world is never moved by an old link. */
+/** From the capture, or the door's Open since: long enough for a sign-in and a download; short enough that a later open of the same world is never moved by an old link. */
 export const OPEN_LANDING_TTL_MS = 15 * 60_000;
 
 let landing: OpenLanding | null = null;
@@ -48,6 +48,16 @@ export function setOpenLanding(serverWorldId: string, target: readonly string[] 
   }
   const elementIds = target as readonly string[];
   landing = elementIds.length > 0 ? { serverWorldId, elementIds: [...elementIds], at: now } : null;
+}
+
+/**
+ * The person answered the door's question (its Open, the copy's Open): the
+ * clock starts again there. The door's questions wait as long as the person
+ * does, so a TTL from the capture alone dropped a landing its own door was
+ * still opening.
+ */
+export function touchOpenLanding(serverWorldId: string, now = Date.now()): void {
+  if (landing && landing.serverWorldId === serverWorldId) landing = { ...landing, at: now };
 }
 
 export function clearOpenLanding(): void {

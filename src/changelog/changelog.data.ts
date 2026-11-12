@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.123.27',
+    date: '2026-11-12',
+    theme: 'A link to an element waits for your answer',
+    entries: [
+      {
+        id: 'open-landing-waits-for-answer',
+        title: 'An element link still lands on its element when you answer later',
+        body: 'A link to one element of a world opens that world and then shows the element. If you took more than fifteen minutes to answer Atlas\'s question to open the world, it opened at its home and the element was not shown. The wait now starts again when you press Open.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.123.26',
     date: '2026-11-12',
     theme: 'A world\'s own settings go online when it opens',

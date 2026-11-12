@@ -27,6 +27,7 @@
 import { getState, patchSlice } from '../core/state';
 import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
+import { touchOpenLanding } from '../core/open-landing';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import type { ToastManager } from '../ui/toast-manager';
 import { PublicWaitsSpent, PublicWorldReader, isPublicClosed, isPublicNotFound, type PublicReaderOpts, type PublicWorld } from '../sync/public-reader';
@@ -168,6 +169,7 @@ export async function openPublicCopy(id: string, name: string, toasts: ToastMana
   if (isTourFlagActive()) { toasts.info(OPEN_TOUR_LINE); return; }
   if ((getState().registry.account_token ?? null) !== ctx.token) { toasts.info(PUBLIC_SIGN_IN_CHANGED_LINE); return; }
   if (building.has(id)) return;
+  touchOpenLanding(id);
   // The copy lands in this browser: ask it to keep worlds inside the click, before the first await.
   requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
   building.add(id);

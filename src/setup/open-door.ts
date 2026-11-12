@@ -22,6 +22,7 @@ import { findLinkedWorld, findWorldByServerId } from '../registry/registry';
 import { accountWorldsWhenFetched, openAccountWorld } from '../sync/account-worlds';
 import { activateWorld } from '../sidebar/worlds-sidebar';
 import { isTourFlagActive } from '../tour/tour-flag';
+import { touchOpenLanding } from '../core/open-landing';
 import { WAITS_FOR_SIGN_IN, type ToastManager } from '../ui/toast-manager';
 import type { AccountWorldRow, WorldRegistryEntry } from '../core/types';
 import { runPublicDoor, type PublicDoorCtx } from './public-door';
@@ -131,6 +132,7 @@ function askToOpen(row: AccountWorldRow, token: string, toasts: ToastManager): v
           toasts.info('Atlas is signed in with another account now. Open the world again from onlyworlds.com.');
           return;
         }
+        touchOpenLanding(row.id);
         void openAccountWorld(row, toasts);
       },
     }],
