@@ -46,10 +46,11 @@ describe('what is from play', () => {
     expect(playGlyph({ kind: 'record', tool: 'subs' })).toBe('sports_esports');
   });
 
-  it('a game is named from the tools list, then its id (Tangle\'s row since SDK 4.127.0)', () => {
+  it('a game is named from the tools list, then its id (Tangle\'s row since SDK 4.127.0, Subs\'s since 4.158.1)', () => {
     expect(toolName('atlas')).toBe('Atlas');
     expect(toolName('tangle')).toBe('Tactical Tangle');
-    expect(toolName('subs')).toBe('subs');
+    expect(toolName('subs')).toBe('Subs');
+    expect(toolName('a-game-not-listed')).toBe('a-game-not-listed');
     expect(toolName('constructor')).toBe('constructor');
   });
 
@@ -117,7 +118,7 @@ describe('a Character\'s records', () => {
 
   it('the line: the game, the day played, the outcome, the seat', () => {
     const { records } = characterRecords('c1', world());
-    expect(recordLine(records[0])).toMatch(/^subs · .*2026.* · survived · as Commander, HMS Keeling$/);
+    expect(recordLine(records[0])).toMatch(/^Subs · .*2026.* · survived · as Commander, HMS Keeling$/);
     expect(recordLine(records[1])).toMatch(/^Tactical Tangle · .*2026.* · won · as General$/);
   });
 });

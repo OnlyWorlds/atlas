@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.0',
+    date: '2026-11-13',
+    theme: 'The OnlyWorlds mark in true curves',
+    entries: [
+      {
+        id: 'sdk-4-160-mark-in-curves',
+        title: 'The OnlyWorlds mark beside a name is drawn in true curves',
+        body: 'Atlas moves to the newest OnlyWorlds SDK. The mark beside a world\'s or an element\'s name is drawn with exact curves instead of short straight lines, so it stays smooth at any size. A Character\'s records name Subs by its name, and the mark\'s Open with list can offer Subs beside a Character.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.123.27',
     date: '2026-11-12',
     theme: 'A link to an element waits for your answer',
