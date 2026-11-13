@@ -31,6 +31,7 @@
 
 import { compareInstants, dragField, instantOf, type OwInstant } from '@onlyworlds/sdk';
 import { linkKind } from './home-grid-pair';
+import { compareCodePoints } from './code-point';
 
 /**
  * Whether a link from an element of `sourceType` through `field` to one of
@@ -177,7 +178,7 @@ export function latestArrivalOf<T extends GridNode>(nodes: readonly T[]): T | un
   return best;
 }
 
-const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+const byCodePoint = compareCodePoints;
 
 /** Holder types, narrowest first: a Location before a Zone. */
 const HOLDER_RANK: Record<string, number> = { location: 0, zone: 1 };

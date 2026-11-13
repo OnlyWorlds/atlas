@@ -20,6 +20,7 @@ import { isStoryNarrative } from '../core/narrative-kind';
 import { playNarrativeIds } from '../core/records';
 import type { Element, WorldRegistryEntry } from '../core/types';
 import { entryIsViewOnly } from '../core/view-only';
+import { compareCodePoints } from '../core/code-point';
 
 export type WritingTier = 'l1' | 'l2' | 'l3' | 'l4' | null;
 
@@ -196,7 +197,7 @@ function cutParentCycles(byId: Map<string, NarrativeNode>, roots: NarrativeNode[
     (TIER_RANK[a.tier ?? ''] ?? 9) - (TIER_RANK[b.tier ?? ''] ?? 9)
     || ((a.el as Element & { order?: number }).order ?? 0) - ((b.el as Element & { order?: number }).order ?? 0)
     || (a.el.name ?? '').localeCompare(b.el.name ?? '')
-    || (a.el.id < b.el.id ? -1 : a.el.id > b.el.id ? 1 : 0); // by code point, no folding: 'B' before 'a'
+    || compareCodePoints(a.el.id, b.el.id); // by code point, no folding: 'B' before 'a'
   for (const start of byId.values()) {
     if (reached.has(start)) continue;
     // Not reached from a root, so its parent chain never ends at one: walk up to the first repeat, the cycle.

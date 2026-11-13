@@ -15,6 +15,7 @@
  */
 
 import type { Element, Pin, Marker, WorldMap } from '../../core/types';
+import { compareCodePoints } from '../../core/code-point';
 
 /**
  * Whether an element has a Map element anchored to it via `map.location`.
@@ -79,7 +80,7 @@ export function mapPickOrder(elements: readonly Element[]): (a: WorldMap, b: Wor
     if (hA !== hB) return hA - hB;
     const byName = (typeof a.name === 'string' ? a.name : '').localeCompare(typeof b.name === 'string' ? b.name : '');
     if (byName !== 0) return byName;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    return compareCodePoints(a.id, b.id);
   };
 }
 
