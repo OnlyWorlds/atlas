@@ -142,7 +142,7 @@ export async function startRekey(
       throw new RekeyRefusedError(`${el.name || id} has two files, one under elements/ and one under spatial/. Remove the one you do not want, then try again.`);
     }
     const at = given ? undefined : arrivalOf(el);
-    const n = given ?? mint(at !== undefined && Number.isFinite(at) ? at : undefined);
+    const n = given ?? mint(at !== undefined && Number.isFinite(at) ? Math.floor(at) : undefined);
     if (n === id || taken.has(n) || await store.getElement(n)) {
       throw new RekeyRefusedError(given ? `${el.name || id} cannot take the id ${n}: it is already in use.` : 'A new id was already taken. Try again.');
     }

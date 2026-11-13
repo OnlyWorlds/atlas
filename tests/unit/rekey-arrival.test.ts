@@ -82,6 +82,29 @@ describe('re-key keeps arrival', () => {
     expect(msOf(n)).toBeGreaterThanOrEqual(t0);
   });
 
+  it('keel\'s microsecond stamp mints at its millisecond, floored, and the grid stands as it stood', async () => {
+    const s = freshStore();
+    const MICRO = '00000000-0000-4000-8000-000000000004';
+    const LATER = '00000000-0000-4000-8000-000000000005';
+    await s.createElement('location', { id: MICRO, name: 'Quay', created_at: '2025-03-04T05:06:07.089123Z' } as Partial<Element>);
+    await s.createElement('object', { id: LATER, name: 'Not re-keyed', created_at: '2025-06-01T00:00:00.000Z' } as Partial<Element>);
+    const cols = async (rename: (id: string) => string) => {
+      const g = gridOf((await s.listElements()).map(e => ({ id: e.id, type: e.type, created_at: e.created_at })), [], 10);
+      return new Map(g.cells.map(c => [rename(c.id), c.col] as const));
+    };
+    const was = await cols(id => id);
+    const seen: Array<number | undefined> = [];
+    const { map } = await startRekey(s, { worldId: 'w', ids: [MICRO] });
+    expect(msOf(map.get(MICRO)!)).toBe(Date.parse('2025-03-04T05:06:07.089Z'));
+    const back = new Map([...map].map(([o, n]) => [n, o] as const));
+    expect(await cols(id => back.get(id) ?? id)).toEqual(was);
+    // The seam is handed a whole millisecond.
+    const s2 = freshStore();
+    await s2.createElement('location', { id: MICRO, name: 'Quay', created_at: '2025-03-04T05:06:07.089123Z' } as Partial<Element>);
+    await startRekey(s2, { worldId: 'w', ids: [MICRO], mintId: at => { seen.push(at); return '00000000-0000-4000-8000-0000000000cc'; } });
+    expect(seen).toEqual([Date.parse('2025-03-04T05:06:07.089Z')]);
+  });
+
   it('the test seam is handed the arrival; a given id is taken as given', async () => {
     const s = freshStore();
     await seed(s);
