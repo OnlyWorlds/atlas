@@ -41,7 +41,7 @@ import { labelStoryFromCard, stampPathNotesSeen } from '../ui/guide-note';
 import { makeFromSquare } from '../ui/home-grid-make';
 import { justNowIn, placeIn, promiseFor, undoJustNow, writeBetween } from '../ui/home-grid-place';
 import { buildGridPicture, gridInput, type GridPicture } from './home-grid-picture';
-import { arrivalOf, type GridPins } from '../core/home-grid';
+import { latestArrivalOf, type GridPins } from '../core/home-grid';
 import { plusWord, type PlusSquare } from './home-grid-view';
 import { selectedIn, wireGridActs } from './home-grid-acts';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, openKindList, watchLeave } from './home-grid-kinds';
@@ -477,11 +477,11 @@ export function buildHomeGrid(worldId: string, onHandOver: () => void, strand: G
     return wireActs(host, worldId, input, section, say);
   });
   section.append(picture.section, sayLine);
-  // The newest element linked to nothing in the world, said once (the dim squares are the list).
-  const loose = input.ids.filter(id => input.names.isLoose(id))
+  // The newest element linked to nothing in the world, said once (the dim squares are the list);
+  // one whose arrival cannot be read is never the newest.
+  const loose = latestArrivalOf(input.ids.filter(id => input.names.isLoose(id))
     .map(id => els.find(e => e.id === id)!)
-    .filter(Boolean)
-    .sort((a, b) => arrivalOf(b) - arrivalOf(a))[0];
+    .filter(Boolean));
   if (loose) {
     const p = document.createElement('p');
     p.className = 'atlas-home-grow-recap';

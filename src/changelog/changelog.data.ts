@@ -85,6 +85,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['sync'],
       },
       {
+        id: 'home-grid-times-as-instants',
+        title: 'Home\'s grid reads when an element was made to the microsecond',
+        body: 'Home\'s grid places elements in the order they were made. Two made within the same millisecond now keep their true order, and a creation time written as a date alone counts as unknown. An element with no readable time still stands first, so a new element never moves the others, and the line about the newest element linked to nothing never names one with no readable time.',
+        tags: ['home'],
+      },
+      {
         id: 'rekey-nested-x-ids',
         title: 'New ids reach links kept deep inside custom fields',
         body: 'When elements get new ids (making a world online, an import, or a merge), a link to one of them kept inside a custom x_ field\'s nested values now moves too. A laid-out map keeps standing on its ground map, where before it lost it.',

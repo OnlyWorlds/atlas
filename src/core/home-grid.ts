@@ -29,7 +29,7 @@
  * Pure: nodes and edges as the SDK's `worldGraph` answers them.
  */
 
-import { dragField } from '@onlyworlds/sdk';
+import { compareInstants, dragField, instantOf, type OwInstant } from '@onlyworlds/sdk';
 import { linkKind } from './home-grid-pair';
 
 /**
@@ -125,23 +125,56 @@ const V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}
 const RFC_V7_BEFORE = Date.UTC(2100, 0, 1);
 
 /**
- * When an element arrived, in epoch milliseconds: an RFC UUIDv7 id's own
- * time; the v1 server's draft ids (also version 7, `06…`) carry 36-bit
- * seconds first, read as such; else its `created_at`; else minus infinity
- * (first). Pure: no clock is read.
+ * When an element arrived, as an instant: an RFC UUIDv7 id's own time; the
+ * v1 server's draft ids (also version 7, `06…`) carry 36-bit seconds first,
+ * read as such; else its `created_at` as the SDK's `instantOf` reads a time
+ * (the message profile's grammar, to the microsecond); else null, a time that
+ * cannot be read. Pure: no clock is read.
  */
-export function arrivalOf(node: GridNode): number {
+export function arrivalInstantOf(node: GridNode): OwInstant | null {
   if (V7.test(node.id)) {
     const hex = node.id.slice(0, 8) + node.id.slice(9, 13);
     const ms = parseInt(hex, 16);
-    if (ms < RFC_V7_BEFORE) return ms;
-    return parseInt(hex.slice(0, 9), 16) * 1000;
+    if (ms < RFC_V7_BEFORE) return { seconds: Math.floor(ms / 1000), microseconds: (ms % 1000) * 1000 };
+    return { seconds: parseInt(hex.slice(0, 9), 16), microseconds: 0 };
   }
-  if (typeof node.created_at === 'string') {
-    const t = Date.parse(node.created_at);
-    if (Number.isFinite(t)) return t;
+  return instantOf(node.created_at);
+}
+
+/**
+ * Two arrivals, earlier first: two readable ones as `compareInstants` orders
+ * them; one that cannot be read before every readable one, so a folder whose
+ * elements carry no time keeps its squares where they stand when an element
+ * is born (being born moves nothing drawn before).
+ */
+export function compareArrivals(a: OwInstant | null, b: OwInstant | null): number {
+  if (a === null || b === null) return a === b ? 0 : a === null ? -1 : 1;
+  return compareInstants(a, b);
+}
+
+/**
+ * `arrivalInstantOf` in epoch milliseconds (a fraction carries the
+ * microseconds); minus infinity for an arrival that cannot be read (first).
+ */
+export function arrivalOf(node: GridNode): number {
+  const at = arrivalInstantOf(node);
+  return at ? at.seconds * 1000 + at.microseconds / 1000 : -Infinity;
+}
+
+/**
+ * The element that arrived last, among those whose arrival can be read: an
+ * element with no readable time is never the newest. Equal arrivals keep the
+ * order given (the first wins). Undefined when none can be read.
+ */
+export function latestArrivalOf<T extends GridNode>(nodes: readonly T[]): T | undefined {
+  let best: T | undefined;
+  let bestAt: OwInstant | null = null;
+  for (const n of nodes) {
+    const at = arrivalInstantOf(n);
+    if (at === null) continue;
+    if (bestAt === null || compareInstants(at, bestAt) > 0) { best = n; bestAt = at; }
   }
-  return -Infinity;
+  return best;
 }
 
 const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -178,7 +211,9 @@ export function gridOf(
   // The block's two columns and one more for the rest: a line with the block is never narrower than three.
   const per = Math.max(block ? 3 : 1, Math.floor(perLine));
   const offset = block ? STRAND_COLS : 0;
-  const order = nodes.filter(n => !pinned.has(n.id)).sort((a, b) => arrivalOf(a) - arrivalOf(b) || byCodePoint(a.id, b.id));
+  const arrival = new Map(nodes.map(n => [n.id, arrivalInstantOf(n)] as const));
+  const order = nodes.filter(n => !pinned.has(n.id))
+    .sort((a, b) => compareArrivals(arrival.get(a.id) ?? null, arrival.get(b.id) ?? null) || byCodePoint(a.id, b.id));
   const rank = new Map(order.map((n, i) => [n.id, i] as const));
   const typeOf = new Map(nodes.map(n => [n.id, n.type] as const));
   const isNode = (id: string): boolean => rank.has(id) || pinned.has(id);

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { arrivalOf, gridOf, type GridEdge, type GridNode } from '../../src/core/home-grid';
+import { arrivalOf, gridOf, latestArrivalOf, type GridEdge, type GridNode } from '../../src/core/home-grid';
 
 /** A UUIDv7 at a given millisecond, its random part from a counter (so ties are known). */
 let seq = 0;
@@ -43,14 +43,40 @@ describe('arrivalOf', () => {
     for (const n of old) expect(at(after, n.id)).toEqual(at(before, n.id));
     expect(at(after, born.id).col).toBe(3);
   });
-  it('reads created_at as a time, across offsets and precisions, for any other id', () => {
+  it('reads created_at as an instant, across offsets and to the microsecond, for any other id', () => {
     const a = arrivalOf(node('a', 'x', '2026-10-30T10:00:00.000Z'));
-    const b = arrivalOf(node('b', 'x', '2026-10-30T11:00:00.000001+01:00'));
+    const b = arrivalOf(node('b', 'x', '2026-10-30T11:00:00+01:00'));
+    const c = arrivalOf(node('c', 'x', '2026-10-30T11:00:00.000001+01:00'));
     expect(a).toBe(b);
+    expect(c).toBeGreaterThan(b);
+  });
+  it('orders two readable times as instants: across offsets, and apart inside one millisecond', () => {
+    // Offsets: 10:00+02:00 is 08:00Z, before 09:00Z (Date.parse already ordered this right).
+    const byOffset = gridOf([node('a', 'x', '2026-11-13T09:00:00Z'), node('b', 'x', '2026-11-13T10:00:00+02:00')], [], 4);
+    expect(at(byOffset, 'b').col).toBe(0);
+    expect(at(byOffset, 'a').col).toBe(1);
+    // A fraction past the millisecond: Date.parse reads both as 09:00:00.000 and the id decided ('a' first);
+    // as instants the earlier one comes first.
+    const byFraction = gridOf([node('a', 'x', '2026-11-13T09:00:00.0009Z'), node('b', 'x', '2026-11-13T09:00:00.0001Z')], [], 4);
+    expect(at(byFraction, 'b').col).toBe(0);
+    expect(at(byFraction, 'a').col).toBe(1);
   });
   it('an element with no stamp, or one that does not parse, arrives first', () => {
     expect(arrivalOf(node('a', 'x'))).toBe(-Infinity);
     expect(arrivalOf(node('a', 'x', 'yesterday'))).toBe(-Infinity);
+    const g = gridOf([node('n1', 'x', '2026-10-30T10:00:00Z'), node('n0', 'x', 'yesterday'), node('N2', 'x')], [], 4);
+    // Unreadable first, by id by code point ('N2' before 'n0'), then the readable one.
+    expect(['N2', 'n0', 'n1'].map(id => at(g, id).col)).toEqual([0, 1, 2]);
+  });
+  it('the newest is the latest readable arrival: an element with no readable time is never it', () => {
+    const early = node('e', 'x', '2026-11-13T08:00:00Z');
+    const late = node('l', 'x', '2026-11-13T10:00:00+02:00'); // 08:00Z too: equal, the first given wins
+    const later = node('m', 'x', '2026-11-13T09:00:00.0001Z');
+    const unknown = node('u', 'x', 'yesterday');
+    expect(latestArrivalOf([early, late, unknown])).toBe(early);
+    expect(latestArrivalOf([unknown, early, later])).toBe(later);
+    expect(latestArrivalOf([unknown, node('v', 'x')])).toBeUndefined();
+    expect(latestArrivalOf([])).toBeUndefined();
   });
 });
 
