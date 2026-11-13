@@ -47,7 +47,7 @@ export default defineConfig({
       // app, then a reload mid-click). Now the new version waits and offers
       // itself (core/offline.ts); closing every Atlas tab also picks it up.
       registerType: 'prompt',
-      includeAssets: ['favicon.ico', 'favicon.png', 'owlogo.png'],
+      includeAssets: ['favicon.ico', 'favicon.png', 'owlogo.png', 'owlogo-maskable.png'],
       manifest: {
         name: 'Atlas · OnlyWorlds',
         short_name: 'Atlas',
@@ -62,7 +62,16 @@ export default defineConfig({
             src: 'owlogo.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable',
+            purpose: 'any',
+          },
+          {
+            // The mark at 60% of the box on the app's ground, so a launcher's
+            // mask (at its tightest a circle of 80% of the width) never cuts
+            // the ring; owlogo.png fills its box, so it is declared 'any' only.
+            src: 'owlogo-maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },

@@ -2886,6 +2886,12 @@ body.atlas-preroot .atlas-middle {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* A structured value that holds nothing, said in words ("an empty list"). */
+.atlas-custom-structured-value.is-empty {
+  font-family: inherit;
+  font-size: 12px;
+  font-style: italic;
+}
 
 .atlas-custom-add-row {
   padding: 4px 0 2px;
@@ -15908,11 +15914,16 @@ body.atlas-share-fullpreview > * {
 .atlas-footer-ow-icon {
   width: 15px;
   height: 15px;
-  opacity: 0.55;
+  /* 0.7, not 0.55: at rest the thin 15 px mark reads 3:1 or more on the
+     rail, level with its neighbours (0.55 painted 2.77 to 2.93:1). */
+  opacity: 0.7;
   transition: opacity 120ms ease;
   display: block;
 }
 .atlas-footer-owmark:hover .atlas-footer-ow-icon { opacity: 1; }
+/* Light mode: the PNG's bright cyan read 1.46:1 on paper at rest; halved, it
+   lands near the light accent text (#155e75), 3:1 or more at rest. */
+:root[data-theme='light'] .atlas-footer-ow-icon { filter: brightness(0.5); }
 
 /* ==== The guide (onboarding step 1): the strip on the home, the one note ====
    The strip: five unnumbered marks on a hairline, filled when the world has

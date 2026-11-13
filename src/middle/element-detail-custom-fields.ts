@@ -114,6 +114,14 @@ export function structuredFieldEntriesFor(el: Element): Array<{ name: string; va
   return out;
 }
 
+/** Words for a structured value that holds nothing, or null when it holds something: an empty list reads
+ *  "an empty list" and an empty object "an empty set of fields", never the raw `[]` or `{}`. */
+export function emptyStructuredWords(v: unknown): string | null {
+  if (Array.isArray(v)) return v.length === 0 ? 'an empty list' : null;
+  if (v !== null && typeof v === 'object' && Object.keys(v as object).length === 0) return 'an empty set of fields';
+  return null;
+}
+
 /** Published profile keys (`x_identity_key`): shown read-only, never editable or deletable here. */
 export function profileFieldEntriesFor(el: Element): Array<{ name: string; value: unknown }> {
   const out: Array<{ name: string; value: unknown }> = [];
@@ -243,9 +251,16 @@ export function buildCustomFieldsSection(el: Element): HTMLElement | null {
       label.title = `${entry.name}: structured data written by another tool. Atlas shows it read-only so it cannot be damaged here.`;
       const pre = document.createElement('pre');
       pre.className = 'atlas-custom-structured-value';
-      let text: string;
-      try { text = JSON.stringify(entry.value, null, 2); } catch { text = String(entry.value); }
-      pre.textContent = text;
+      const empty = emptyStructuredWords(entry.value);
+      if (empty) {
+        // A value, never hidden: an empty list is often the true state ("nothing amended yet").
+        pre.classList.add('is-empty');
+        pre.textContent = empty;
+      } else {
+        let text: string;
+        try { text = JSON.stringify(entry.value, null, 2); } catch { text = String(entry.value); }
+        pre.textContent = text;
+      }
       row.appendChild(label);
       if (!viewOnly) row.appendChild(structuredRemoveButton(el, entry.name));
       row.appendChild(pre);
