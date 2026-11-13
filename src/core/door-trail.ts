@@ -16,7 +16,7 @@
  * Pure. Atlas keeps keel's `updated_at` as `server_updated_at`, so the trail
  * reads it under keel's name.
  */
-import { doorsOf, doorWhere } from '@onlyworlds/sdk';
+import { compareInstants, doorsOf, doorWhere, instantOf } from '@onlyworlds/sdk';
 import { hiddenKeptOf, hiddenWordOf } from './hidden-mark';
 import type { Element } from './types';
 
@@ -36,11 +36,18 @@ export interface DoorRead {
   changed_via?: string | null;
 }
 
-/** Is this read at least as new as the copy? (A copy with no time is older than any read.) */
+/**
+ * Is this read at least as new as the copy? Both times are read as instants
+ * (the SDK's `instantOf`, to the microsecond keel writes). A copy whose time
+ * cannot be read is older than any read; a read whose time cannot be read
+ * covers only such a copy.
+ */
 export function readCovers(read: DoorRead | null | undefined, copyUpdated: unknown): boolean {
   if (!read || !read.updated_at) return false;
-  const copy = typeof copyUpdated === 'string' ? Date.parse(copyUpdated) : NaN;
-  return !Number.isFinite(copy) || Date.parse(read.updated_at) >= copy;
+  const copy = instantOf(copyUpdated);
+  if (copy === null) return true;
+  const at = instantOf(read.updated_at);
+  return at !== null && compareInstants(at, copy) >= 0;
 }
 
 /**

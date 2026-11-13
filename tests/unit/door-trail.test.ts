@@ -25,6 +25,19 @@ describe('the copy and keel\'s read together', () => {
     expect(doorTrail(pulled, read)).toEqual([{ where: 'in Atlas', at: '2026-10-31T05:58:00+00:00' }]);
   });
 
+  it('the two times are read as instants, to the microsecond, by the message profile\'s grammar', () => {
+    const at = (updated_at: string) => ({ doors: null, updated_at });
+    // The same millisecond, a read 800 microseconds older than the copy: it does not cover it.
+    expect(readCovers(at('2026-10-31T05:58:00.000100+00:00'), '2026-10-31T05:58:00.000900+00:00')).toBe(false);
+    expect(readCovers(at('2026-10-31T05:58:00.000900+00:00'), '2026-10-31T05:58:00.000100+00:00')).toBe(true);
+    // The same instant in two offsets covers.
+    expect(readCovers(at('2026-10-31T06:58:00+01:00'), '2026-10-31T05:58:00Z')).toBe(true);
+    // A copy whose time is not read (a date alone) is older than any read.
+    expect(readCovers(at('2026-10-30T23:00:00Z'), '2026-10-31')).toBe(true);
+    // A read whose time is not read covers no readable copy.
+    expect(readCovers(at('2026-10-31 06:00:00Z'), '2026-10-31T05:58:00Z')).toBe(false);
+  });
+
   it('a scrub moves the time and no door: once read, the door keeps its own time', () => {
     const scrubbed = el({ server_updated_at: '2026-10-31T05:59:00+00:00', changed_client: 'atlas', changed_via: 'api' });
     const read = { doors: { atlas: '2026-10-21T06:00:00+00:00' }, updated_at: '2026-10-31T05:59:00+00:00' };

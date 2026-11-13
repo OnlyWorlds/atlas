@@ -79,6 +79,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['maps'],
       },
       {
+        id: 'times-as-instants',
+        title: 'Times are compared as exact instants',
+        body: 'The list of tools that wrote an element now compares its times to the microsecond, as other OnlyWorlds tools do, so a newer write within the same millisecond is no longer taken for the one already read. In the writing tree, two narratives set under each other that tie on everything else are now told apart by id in one fixed order, whatever your language settings.',
+        tags: ['sync'],
+      },
+      {
         id: 'folder-format-0-3-22',
         title: 'New world folders are format 0.3.22',
         body: 'Atlas writes new world folders as format 0.3.22, the newest version of the OnlyWorlds folder format. No file changes its shape.',

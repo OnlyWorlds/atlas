@@ -420,6 +420,17 @@ describe('buildNarrativeIndex', () => {
     expect(ancestorIds(idx, 'self')).toEqual([]);
   });
 
+  it('a cycle whose members tie on tier, order and name is cut at the id first by code point, never folded', () => {
+    // 'B' (U+0042) is before 'a' (U+0061) by code point; a locale order folds case and puts 'a' first.
+    const elements = [
+      n('a-twin', 'Twin', { supertype: 'Chapter', parent_narrative: 'B-twin', order: 1 }),
+      n('B-twin', 'Twin', { supertype: 'Chapter', parent_narrative: 'a-twin', order: 1 }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    expect(idx.roots.map(r => r.el.id)).toEqual(['B-twin']);
+    expect(idx.byId.get('B-twin')!.children.map(c => c.el.id)).toEqual(['a-twin']);
+  });
+
   it('treats narratives with a missing parent as roots (broken-parent recovery)', () => {
     const elements = [
       n('orphan', 'Orphan', { supertype: 'Scene', parent_narrative: 'gone' }),

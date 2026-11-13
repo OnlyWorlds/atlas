@@ -196,7 +196,7 @@ function cutParentCycles(byId: Map<string, NarrativeNode>, roots: NarrativeNode[
     (TIER_RANK[a.tier ?? ''] ?? 9) - (TIER_RANK[b.tier ?? ''] ?? 9)
     || ((a.el as Element & { order?: number }).order ?? 0) - ((b.el as Element & { order?: number }).order ?? 0)
     || (a.el.name ?? '').localeCompare(b.el.name ?? '')
-    || a.el.id.localeCompare(b.el.id);
+    || (a.el.id < b.el.id ? -1 : a.el.id > b.el.id ? 1 : 0); // by code point, no folding: 'B' before 'a'
   for (const start of byId.values()) {
     if (reached.has(start)) continue;
     // Not reached from a root, so its parent chain never ends at one: walk up to the first repeat, the cycle.
