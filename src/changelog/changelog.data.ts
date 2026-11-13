@@ -56,6 +56,37 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.1',
+    date: '2026-11-14',
+    theme: 'The maps tree in the standard\'s groups, an empty list said in words, and an icon safe to mask',
+    entries: [
+      {
+        id: 'map-tree-standard-groups',
+        title: 'The maps tree orders maps in the groups the standard names',
+        body: 'Under a map, the maps whose parent map is that map come first, then the maps Atlas places there by their location, each location\'s maps together. At the top of the list, the world\'s own maps come first, then maps of a place with no map above them, then maps whose parent map is missing. The hierarchy number orders the maps inside each group, as the OnlyWorlds standard now says, and dragging a map in the list reorders it within its own group. Before, one sort by the number mixed the groups. When two places are each set inside the other, the list of their maps now draws, with every map in it once; before, it could not draw.',
+        tags: ['maps'],
+      },
+      {
+        id: 'empty-list-in-words',
+        title: 'A custom field holding an empty list says so',
+        body: 'A custom field written by another tool that holds an empty list now reads "an empty list" on the element\'s page, and an empty group of fields reads "an empty set of fields". Before, it showed the raw [] or {}. It is still shown: an empty list can be true, such as nothing amended yet.',
+        tags: ['editor'],
+      },
+      {
+        id: 'icon-safe-to-mask',
+        title: 'The installed app\'s icon keeps its whole ring',
+        body: 'An installed Atlas now has an icon made for phones that crop icons to a circle or a rounded square: the OnlyWorlds mark sits inside the crop on Atlas\'s dark ground. Before, the crop cut off the ring. The OnlyWorlds mark in the sidebar footer is also easier to see at rest, in the dark and the light theme, so it reads as clearly as the buttons beside it.',
+        tags: ['layout'],
+      },
+      {
+        id: 'sdk-4-162-standard-00-34-01',
+        title: 'A downloaded world names the standard 00.34.01',
+        body: 'Atlas moves to the newest OnlyWorlds SDK, which carries the standard\'s version 00.34.01. Its one change is the description of a map\'s hierarchy, and the text Atlas shows when you hover the field\'s name now says the same. A world downloaded from Atlas now names this version.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.124.0',
     date: '2026-11-13',
     theme: 'The OnlyWorlds mark in true curves, the most detailed map first, and new ids that reach every link',

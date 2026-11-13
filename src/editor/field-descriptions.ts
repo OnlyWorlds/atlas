@@ -261,7 +261,7 @@ const LOCATION: FieldMap = {
 
 const MAP: FieldMap = {
   background_color: 'Fallback canvas color (atlas auto-extracts an edge color from the image when one is set)',
-  hierarchy: 'Sibling ordering within a parent_map group or among co-located maps. Lower comes first; ties broken alphabetically.',
+  hierarchy: 'Orders the maps that stand side by side (floors, decks, layers): the maps with the same parent map; without one, the maps of the same location; without either, the maps of the world itself. Lower is deeper or earlier; ties go by name. Nesting is said by parent map and location, not by this number.',
   width: 'Width in pixels',
   height: 'Height in pixels',
   depth: 'Depth in pixels (reserved, unused)',
