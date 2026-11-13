@@ -22,7 +22,12 @@
  *     `parsePageBlocks`, which drops unknown kinds, nor `pageBlocksPatch`,
  *     which recompiles story): card/circle/collection/map ids, `fullPinIds`,
  *     and prose blocks' markdown + richtext. Block ids, chart ids and any
- *     unknown kind are left alone.
+ *     unknown kind are left alone;
+ *   - inside an `x_` value that is an object or a list, at any depth, a
+ *     string that IS an old id, whole and as written (folder spec §3.3: the
+ *     one edit a tool may make inside a foreign value), e.g. a layout Map's
+ *     `x_layout.settings.ground.map`. Never a substring, an `ow://` link or
+ *     an object's key; every other value, and the order of keys, kept.
  * Never touched: `id`, `type`, `name`, stamps, `image_media_id` (a media id),
  * `atlas_page_pub` (the published page's own id), `atlas_calendar`,
  * `atlas_page_theme`, `atlas_page_intent`, `atlas_aliases`, and the profile
@@ -143,6 +148,38 @@ function rekeyIdString(value: unknown, map: IdMap): unknown {
   return typeof value === 'string' ? map.get(value) ?? value : value;
 }
 
+/**
+ * An `x_` value's ids at any depth: a string equal to an old id, whole, in a
+ * list or as an object's value. Keys, numbers, booleans, nulls and every
+ * other string stay as they are; an untouched branch comes back as the same
+ * object, and a touched object keeps its keys in their order.
+ */
+function rekeyNested(value: unknown, map: IdMap): unknown {
+  if (typeof value === 'string') return map.get(value) ?? value;
+  if (Array.isArray(value)) {
+    let changed = false;
+    const out = value.map(v => {
+      const next = rekeyNested(v, map);
+      if (next !== v) changed = true;
+      return next;
+    });
+    return changed ? out : value;
+  }
+  if (value && typeof value === 'object') {
+    const src = value as Record<string, unknown>;
+    let out: Record<string, unknown> | null = null;
+    for (const [k, v] of Object.entries(src)) {
+      const next = rekeyNested(v, map);
+      if (next !== v) {
+        if (!out) out = { ...src };
+        out[k] = next;
+      }
+    }
+    return out ?? value;
+  }
+  return value;
+}
+
 /** Raw walk of `atlas_page_blocks`, by kind and named field only. */
 function rekeyBlocks(value: unknown, map: IdMap): unknown {
   if (!Array.isArray(value)) return value;
@@ -192,7 +229,8 @@ export function rekeyBody(body: Element, map: IdMap): { body: Element; changed: 
     else if (key === BLOCKS) next = rekeyBlocks(value, map);
     else if (typeof value === 'string') {
       next = !prose.has(key) && map.has(value) ? map.get(value)! : rekeyOwLinks(value, map);
-    } else if (Array.isArray(value)) next = rekeyIdArray(value, map);
+    } else if (key.startsWith('x_') && value !== null && typeof value === 'object') next = rekeyNested(value, map);
+    else if (Array.isArray(value)) next = rekeyIdArray(value, map);
     if (next !== value) {
       if (!out) out = { ...src };
       out[key] = next;

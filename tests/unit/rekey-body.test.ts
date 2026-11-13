@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { rekeyBody } from '../../src/store/rekey-body';
+import { layoutGroundOf } from '../../src/core/layout-recipe';
 import { blocksOf } from '../../src/core/sharing';
 import { computeRelationPatch, extractProseLinks } from '../../src/middle/writing-workspace-derive';
 import { serializeDocToMarkdown } from '../../src/middle/writing-workspace-markdown';
@@ -163,6 +164,94 @@ describe('rekeyBody: page blocks, walked raw', () => {
     const healed = blocksOf(rekeyBody(before, map).body)[0] as { pinIds: string[]; fullPinIds: string[] };
     expect(healed.pinIds).toEqual([N]);
     expect(healed.fullPinIds).toEqual([N]);
+  });
+});
+
+describe('rekeyBody: ids nested in x_ values, at any depth (folder spec §3.3)', () => {
+  const layout = (ground: string) => ({
+    method: 'trail-by-place',
+    settings: { ground: { map: ground, width: 800, height: 600, name: 'Ground' }, margin: 40, note: `see ${ground}` },
+    tiers: [1, 2],
+  });
+
+  it('a layout Map\'s ground follows its Map; every other byte of the value kept, key order included', () => {
+    const before = el('map', { x_layout: layout(O) });
+    const { body, changed } = rekeyBody(before, map);
+    expect(changed).toBe(true);
+    // The ground moves; the note that only mentions the id inside its text does not.
+    expect(body.x_layout).toEqual({ ...layout(N), settings: { ...layout(N).settings, note: `see ${O}` } });
+    // Byte for byte: the serialised value differs only where the whole string was the old id.
+    const was = JSON.stringify(before.x_layout);
+    const now = JSON.stringify(body.x_layout);
+    expect(now).toBe(was.replace(`"map":"${O}"`, `"map":"${N}"`));
+    // Untouched branches are the same objects.
+    expect((body.x_layout as { tiers: unknown }).tiers).toBe((before.x_layout as { tiers: unknown }).tiers);
+  });
+
+  it('after a re-key the laid-out Map still stands on its ground', () => {
+    const ground = el('map', { id: N, name: 'Ground' }) as Element;
+    const laid = rekeyBody(el('map', { id: 'laid', x_layout: layout(O) }), map).body;
+    expect(layoutGroundOf(laid as Element & { x_layout?: unknown }, [ground, laid])?.ground.id).toBe(N);
+  });
+
+  it('lists of objects and lists of lists; never a substring, an ow:// link, a padded copy or a key', () => {
+    const value = {
+      cedes: [{ place: O, by: X }, { place: [O2, 'other'] }],
+      grid: [[O], [O2, 7, true, null]],
+      [O]: 'a key that is an id stays a key',
+      near: `${O}-copy`,
+      link: `ow://location/${O}`,
+      padded: ` ${O}`,
+    };
+    const { body } = rekeyBody(el('event', { x_war: value }), map);
+    expect(body.x_war).toEqual({
+      cedes: [{ place: N, by: X }, { place: [N2, 'other'] }],
+      grid: [[N], [N2, 7, true, null]],
+      [O]: 'a key that is an id stays a key',
+      near: `${O}-copy`,
+      link: `ow://location/${O}`,
+      padded: ` ${O}`,
+    });
+  });
+
+  it('an id is matched as written: the same id in upper case is another string', () => {
+    const lower = '0192abcd-ef01-7abc-8def-0123456789ab';
+    const moved = new Map([[lower, N]]);
+    const { body } = rekeyBody(el('event', { x_war: { here: lower, there: lower.toUpperCase() } }), moved);
+    expect(body.x_war).toEqual({ here: N, there: lower.toUpperCase() });
+  });
+
+  it('an x_ list carries its ids at any depth too; a report\'s answers stay a plain list of ids', () => {
+    const { body } = rekeyBody(el('narrative', { x_report_answers: [O, X, O2], x_steps: [{ at: O }, 'note'] }), map);
+    expect(body.x_report_answers).toEqual([N, X, N2]);
+    expect(body.x_steps).toEqual([{ at: N }, 'note']);
+  });
+
+  it('an exempt profile key stays whole, nested ids included; a value that names no old id is the same object', () => {
+    const review = { by: O, checked: { by: O2, at: '2026-11-01T00:00:00Z' } };
+    const packet = { elements: [{ id: O }] };
+    const plain = { ground: { map: X } };
+    const before = el('character', { x_review_proposed: review, x_packet_source: packet, x_identity_key: O, x_plain: plain });
+    const { body, changed } = rekeyBody(before, map);
+    expect(changed).toBe(false);
+    expect(body).toBe(before);
+    expect(body.x_review_proposed).toBe(review);
+    expect(body.x_packet_source).toBe(packet);
+    expect(body.x_plain).toBe(plain);
+  });
+
+  it('only x_ values are walked: another object field is left as it is', () => {
+    const before = el('construct', { atlas_calendar: { eras: [{ start: O }] }, foreign_obj: { id: O } });
+    const { body } = rekeyBody(before, map);
+    expect(body.atlas_calendar).toEqual({ eras: [{ start: O }] });
+    expect((body as Record<string, unknown>).foreign_obj).toEqual({ id: O });
+  });
+
+  it('idempotent under the map', () => {
+    const once = rekeyBody(el('map', { x_layout: layout(O) }), map).body;
+    const twice = rekeyBody(once, map);
+    expect(twice.changed).toBe(false);
+    expect(twice.body).toBe(once);
   });
 });
 

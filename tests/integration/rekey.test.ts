@@ -107,6 +107,20 @@ describe('the re-key kernel', () => {
     expect(await store.hasRekeyJournal()).toBe(false);
   });
 
+  it('a laid-out Map\'s ground follows its Map: x_layout.settings.ground.map is re-keyed in place', async () => {
+    const GROUND = id(40), LAID = id(41);
+    await store.createElement('map', { id: GROUND, name: 'Ground' } as Partial<Element>);
+    await store.createElement('map', {
+      id: LAID, name: 'Laid out',
+      x_layout: { method: 'trail-by-place', settings: { ground: { map: GROUND, width: 800, height: 600 }, margin: 40 } },
+    } as Partial<Element>);
+    const r = await startRekey(store, { worldId: W, ids: [GROUND], mintId: minter() });
+    const nGround = r.map.get(GROUND)!;
+    const laid = (await store.getElement(LAID))!;
+    expect(laid.x_layout).toEqual({ method: 'trail-by-place', settings: { ground: { map: nGround, width: 800, height: 600 }, margin: 40 } });
+    expect(await store.getElement(GROUND)).toBeNull();
+  });
+
   it('a pin re-keyed without its element: no duplicate-pin refusal (lens 1 F2)', async () => {
     const r = await startRekey(store, { worldId: W, ids: [id(12)], mintId: minter() });
     const pin = (await store.getElement(r.map.get(id(12))!))!;

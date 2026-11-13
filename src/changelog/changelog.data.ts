@@ -58,7 +58,7 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.124.0',
     date: '2026-11-13',
-    theme: 'The OnlyWorlds mark in true curves',
+    theme: 'The OnlyWorlds mark in true curves, the most detailed map first, and new ids that reach every link',
     entries: [
       {
         id: 'sdk-4-160-mark-in-curves',
@@ -89,6 +89,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         title: 'Home\'s grid puts elements with no readable time after the rest',
         body: 'Home\'s grid places elements in the order they were made, read to the microsecond. An element whose creation time is missing or cannot be read now stands after every element whose time can be read, where it used to stand first.',
         tags: ['home'],
+      },
+      {
+        id: 'rekey-nested-x-ids',
+        title: 'New ids reach links kept deep inside custom fields',
+        body: 'When elements get new ids (making a world online, an import, or a merge), a link to one of them kept inside a custom x_ field\'s nested values now moves too. A laid-out map keeps standing on its ground map, where before it lost it.',
+        tags: ['sync', 'fix'],
       },
       {
         id: 'folder-format-0-3-22',
