@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'sdk-4-160-mark-in-curves',
         title: 'The OnlyWorlds mark beside a name is drawn in true curves',
-        body: 'Atlas moves to the newest OnlyWorlds SDK. The mark beside a world\'s or an element\'s name is drawn with exact curves instead of short straight lines, so it stays smooth at any size. A Character\'s records name Subs by its name, and the mark\'s Open with list can offer Subs beside a Character. In this version the mark is not drawn beside an element whose id is written in capital letters (OnlyWorlds ids are written in small letters; such ids come only from files made elsewhere).',
+        body: 'Atlas moves to the newest OnlyWorlds SDK. The mark beside a world\'s or an element\'s name is drawn with exact curves instead of short straight lines, so it stays smooth at any size. A Character\'s records name Subs by its name, and the mark\'s Open with list can offer Subs beside a Character and the OnlyWorlds mapper beside a world. Beside an element whose id is written in capital letters (such ids come only from files made elsewhere) the mark is drawn with no Open with rows, since no address can name it.',
         tags: ['world'],
       },
       {

@@ -33,4 +33,28 @@ describe('the Waymark beside a name', () => {
       slot.remove();
     }
   });
+
+  // From SDK 4.161.0: an element whose own id is held in capital letters (only files made elsewhere carry one)
+  // is one no address can name, so its menu has no rows and the mark is still drawn. On 4.160.x the mount threw
+  // and `waymark-slot.ts` drew nothing beside such an element.
+  it('draws the mark beside an element whose id is held in capital letters', () => {
+    const slot = document.createElement('span');
+    document.body.appendChild(slot);
+    const unmount = mountWaymark(slot, {
+      world: { id: '0192a000-0000-7000-8000-000000000001', name: 'Hollow Reach' },
+      element: { id: '0192A000-0000-7000-8000-0000000000AB', type: 'character', name: 'Ada' },
+      reader: 'member',
+      tool: 'atlas',
+      signedIn: null,
+      phone: false,
+      ground: 'dark',
+      entry: 'mark',
+    });
+    try {
+      expect(slot.querySelector('svg path')).not.toBeNull();
+    } finally {
+      unmount();
+      slot.remove();
+    }
+  });
 });
