@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { guideDots, DOTS, isFilled, noteEarned, loadGuideState, markNoteSeen, setNotesOff, rewardEarned, lensNoteEarned, type Dots } from '../../src/core/guide';
+import { guideDots, DOTS, isFilled, newestOf, noteEarned, loadGuideState, markNoteSeen, setNotesOff, rewardEarned, lensNoteEarned, type Dots } from '../../src/core/guide';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
 
 let n = 0;
@@ -294,5 +294,26 @@ describe('lensNoteEarned (#841 P5: a world this size hears of lenses once)', () 
 
   it('with no Character the note has no one to open', () => {
     expect(lensNoteEarned({ kind: 'created', id: 'x' }, big(40), undefined)).toEqual({ id: 'lens' });
+  });
+});
+
+describe('newestOf: when an element was made, read as an instant', () => {
+  const made = (id: string, created_at?: string, local_updated_at = '2026-01-01T00:00:00Z'): Element =>
+    ({ id, type: 'character', name: id, local_updated_at, ...(created_at === undefined ? {} : { created_at }) }) as unknown as Element;
+
+  it('across offsets: 10:00+02:00 is 08:00Z, older than 09:30Z, though its text sorts after', () => {
+    expect(newestOf([made('a', '2026-11-13T10:00:00+02:00'), made('b', '2026-11-13T09:30:00Z')])?.id).toBe('b');
+    expect(newestOf([made('b', '2026-11-13T09:30:00Z'), made('a', '2026-11-13T10:00:00+02:00')])?.id).toBe('b');
+  });
+
+  it('a time that cannot be read is never the newest while one can be; with none readable, the last in the list', () => {
+    expect(newestOf([made('a', '2026-11-13T09:30:00Z'), made('y', 'yesterday')])?.id).toBe('a');
+    expect(newestOf([made('y', 'yesterday'), made('z', '2026-11-13')])?.id).toBe('z');
+    expect(newestOf([])).toBeNull();
+  });
+
+  it('no created_at reads local_updated_at; an equal instant goes to the later in the list', () => {
+    expect(newestOf([made('a', '2026-11-13T09:30:00Z'), made('l', undefined, '2026-11-13T09:31:00Z')])?.id).toBe('l');
+    expect(newestOf([made('a', '2026-11-13T09:30:00Z'), made('b', '2026-11-13T10:30:00+01:00')])?.id).toBe('b');
   });
 });

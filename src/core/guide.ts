@@ -11,7 +11,7 @@
  * Contract: a design note of 2026-10-27 (the guide, step 1).
  */
 
-import { dateOf, isLens } from '@onlyworlds/sdk';
+import { compareInstants, dateOf, instantOf, isLens, type OwInstant } from '@onlyworlds/sdk';
 import type { Element, WorldRegistryEntry } from './types';
 import { isStoryNarrative } from './narrative-kind';
 import { playNarrativeIds } from './records';
@@ -212,16 +212,27 @@ export type Gesture =
   | { kind: 'location-set'; character: string }
   | { kind: 'date-set'; event: string };
 
-const stampOf = (el: Element): string => {
+/** When it was made, as an instant: its `created_at`, else its `local_updated_at`; null when that cannot be read. */
+const stampOf = (el: Element): OwInstant | null => {
   const r = el as { created_at?: unknown; local_updated_at?: unknown };
-  return typeof r.created_at === 'string' ? r.created_at : typeof r.local_updated_at === 'string' ? r.local_updated_at : '';
+  return instantOf(typeof r.created_at === 'string' ? r.created_at : r.local_updated_at);
 };
 
-/** The newest of a list, by when it was made (the store's order breaks a tie: last wins). */
+/**
+ * The newest of a list, by when it was made, read as instants (the SDK's `instantOf` and
+ * `compareInstants`, so offsets and microseconds count); the store's order breaks a tie: last wins.
+ * One whose time cannot be read is never the newest while any time can be read. When none can, the
+ * store's order alone answers (the last), so a world with no readable times still gets its offers.
+ */
 export function newestOf<T extends Element>(list: readonly T[]): T | null {
   let best: T | null = null;
-  for (const el of list) if (!best || stampOf(el) >= stampOf(best)) best = el;
-  return best;
+  let bestAt: OwInstant | null = null;
+  for (const el of list) {
+    const at = stampOf(el);
+    if (at === null) continue;
+    if (bestAt === null || compareInstants(at, bestAt) >= 0) { best = el; bestAt = at; }
+  }
+  return best ?? list[list.length - 1] ?? null;
 }
 
 /** Characters an offer may place: no place at all (a gone place is not empty, and is never overwritten). */

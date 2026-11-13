@@ -105,6 +105,18 @@ describe('a Character\'s records', () => {
     expect(records[0].stories.map(s => [s.id, s.as])).toEqual([['about', 'both'], ['told', 'narrator']]);
   });
 
+  it('legacy battles are ordered by when they were made as instants: offsets count, an unreadable time last', () => {
+    const els = [
+      ch('c1'),
+      ev('a', { x_tangle_battle: TALLY, characters: ['c1'], created_at: '2026-09-05T00:00:00Z' }),
+      // 02:00+05:00 is 21:00Z the day before: older than 'a', though its text sorts after.
+      ev('b', { x_tangle_battle: TALLY, characters: ['c1'], created_at: '2026-09-05T02:00:00+05:00' }),
+      ev('c', { x_tangle_battle: TALLY, characters: ['c1'], created_at: 'yesterday' }),
+      ev('d', { x_tangle_battle: TALLY, characters: ['c1'], created_at: '2026-09-01T00:00:00Z' }),
+    ];
+    expect(characterRecords('c1', els).legacy.map(l => l.event.id)).toEqual(['a', 'b', 'd', 'c']);
+  });
+
   it('legacy battles: newest made first, their own stories, never proposed ones, never a word', () => {
     const { legacy } = characterRecords('c1', world());
     expect(legacy.map(l => l.event.id)).toEqual(['legacy-b', 'legacy-a']);

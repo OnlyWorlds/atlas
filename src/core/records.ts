@@ -15,7 +15,7 @@
  * `===`), so belonging here and `recordsOf` agree on every element.
  */
 
-import { proposedMarkOf, recordMarkOf, recordsOf, TOOLS, type OwRecord } from '@onlyworlds/sdk';
+import { compareInstants, instantOf, proposedMarkOf, recordMarkOf, recordsOf, TOOLS, type OwRecord } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { battleOutcomeLine } from '../middle/tangle-cards';
 
@@ -132,15 +132,14 @@ export function characterRecords(characterId: string, elements: readonly Element
       stories: read[0]?.stories ?? [],
     });
   }
-  // Newest first by the server's stamp when the world has one, then by name (an Atlas display order, never a reading).
-  const made = (e: Element): string => {
-    const v = (e as Record<string, unknown>).created_at;
-    return typeof v === 'string' ? v : '';
-  };
+  // Newest first by the server's stamp when the world has one, read as an instant (one that cannot be read
+  // last), then by name (an Atlas display order, never a reading).
+  const made = (e: Element) => instantOf((e as Record<string, unknown>).created_at);
   legacy.sort((a, b) => {
     const ca = made(a.event), cb = made(b.event);
-    if (ca !== cb) return ca < cb ? 1 : -1;
-    return (a.event.name ?? '').localeCompare(b.event.name ?? '');
+    const byTime = ca === null || cb === null ? (ca === cb ? 0 : ca === null ? 1 : -1) : compareInstants(cb, ca);
+    if (byTime !== 0) return byTime;
+    return (typeof a.event.name === 'string' ? a.event.name : '').localeCompare(typeof b.event.name === 'string' ? b.event.name : '');
   });
   return { records, legacy };
 }
