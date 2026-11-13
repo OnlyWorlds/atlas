@@ -130,12 +130,12 @@ describe('buildMapTree — World C (messy mix)', () => {
     expect(tree).toHaveLength(4);
   });
 
-  it('roots are alpha-sorted at same hierarchy', () => {
+  it('roots stand in the standard groups: the world\'s own map, located roots, then a broken parent', () => {
     expect(tree.map(n => n.map.name)).toEqual([
-      'Broken Child',
+      'World Overview',
       'Eldoria City',
       'Orphan Map',
-      'World Overview',
+      'Broken Child',
     ]);
   });
 
@@ -182,20 +182,19 @@ describe('buildMapTree — World C (messy mix)', () => {
   });
 
   it('full shape snapshot', () => {
-    // Sibling sort under Eldoria City: hierarchy primary, alpha secondary.
-    //   h=0: Castle Floor 1, Free-floating Tavern   (alpha-tied)
-    //   h=1: Castle Floor 2
-    //   h=2: Throne Room
+    // Under Eldoria City: its parent_map child first (Free-floating Tavern),
+    // then the Castle location's inferred set by hierarchy 0, 1, 2. At the
+    // top: the world's own map, the located roots, the broken parent last.
     expect(shape(tree)).toBe(
       [
-        'Broken Child [!broken]',
+        'World Overview',
         'Eldoria City',
-        '  Castle Floor 1 [@inferred]',
         '  Free-floating Tavern',
+        '  Castle Floor 1 [@inferred]',
         '  Castle Floor 2 [@inferred]',
         '  Throne Room [@inferred]',
         'Orphan Map',
-        'World Overview',
+        'Broken Child [!broken]',
       ].join('\n'),
     );
   });

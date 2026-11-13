@@ -23,7 +23,7 @@ import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../core/active-store';
 import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
-import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
+import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
 import { renderGate, keepingFocus } from '../../ui/render-gate';
@@ -202,11 +202,19 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       toasts.info('Drag only reorders maps under the same parent. To move a map, set its Parent map in Configure map.');
       return;
     }
+    // Hierarchy orders only inside one of the standard's groups (map-tree.ts
+    // siblingGroupOf): a map set under this parent by Parent map, or the maps
+    // of one place. A drop across groups would rewrite numbers and move nothing.
+    const sourceGroup = sourceRow?.getAttribute('data-sibling-group') ?? '';
+    if (sourceGroup !== (row.getAttribute('data-sibling-group') ?? '')) {
+      toasts.info('Drag only reorders maps in the same group: the maps set under this map by Parent map, or the maps of one place. To move a map, set its Parent map in Configure map.');
+      return;
+    }
 
-    // Gather siblings in their current document order from the rendered DOM.
-    // This already reflects hierarchy + alpha ordering from buildMapTree.
+    // Gather the group's rows in their current document order from the
+    // rendered DOM, which already reflects buildMapTree's order.
     const siblingRows = Array.from(
-      root.querySelectorAll<HTMLElement>(`.atlas-map-tree-row[data-parent-id="${CSS.escape(sourceParentId)}"]`),
+      root.querySelectorAll<HTMLElement>(`.atlas-map-tree-row[data-sibling-group="${CSS.escape(sourceGroup)}"]`),
     );
     const orderedIds = siblingRows
       .map(r => r.getAttribute('data-map-id'))
@@ -338,6 +346,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
         return {
           id: e.id,
           parent_location: typeof raw === 'string' ? raw : undefined,
+          name: typeof e.name === 'string' ? e.name : undefined,
         };
       });
 
@@ -443,6 +452,10 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   // an explicit `parent_map` whose tree position came from location inference
   // sits under the inferred parent's id here.
   row.setAttribute('data-parent-id', parentId ?? '');
+  // The standard's group among those siblings (siblingGroupOf): hierarchy
+  // orders only inside one, so a drag reorders only inside one.
+  const group = siblingGroupOf(node);
+  row.setAttribute('data-sibling-group', `${parentId ?? ''}|${group.kind}:${group.key}`);
   // Drag re-stamps `hierarchy`: no drag on a view-only world (conv. 149).
   if (!ctx.viewOnly) row.setAttribute('draggable', 'true');
   if (depth > 0) row.setAttribute('data-depth', String(depth));

@@ -36,7 +36,11 @@ export function parentMapFor(mapId: string, elements: readonly Element[]): World
   const maps = elements.filter((e): e is WorldMap => e.type === 'map');
   const locations: LocationLike[] = elements
     .filter(e => e.type === 'location')
-    .map(e => ({ id: e.id, parent_location: typeof e['parent_location'] === 'string' ? e['parent_location'] as string : undefined }));
+    .map(e => ({
+      id: e.id,
+      parent_location: typeof e['parent_location'] === 'string' ? e['parent_location'] as string : undefined,
+      name: typeof e.name === 'string' ? e.name : undefined,
+    }));
   const walk = (nodes: MapTreeNode[], parent: WorldMap | null): WorldMap | null | undefined => {
     for (const n of nodes) {
       if (n.map.id === mapId) return parent;

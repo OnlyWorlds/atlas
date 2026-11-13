@@ -74,8 +74,11 @@ A map can have `parent_map`, `location`, both, or neither.
 
 `hierarchy` is a number on each map. Its only meaning: ordering among siblings.
 
-- **Siblings under a `parent_map`** are sorted by ascending `hierarchy`. Ties broken alphabetically.
-- **Siblings co-located** (multiple maps with the same `location` and no `parent_map`) are sorted the same way.
+The standard's sentence (Map.hierarchy, serial 124) names the groups the number orders: the maps with the same `parent_map`; without one, the maps of the same `location`; without either, the maps of the world itself. The tree is a display that also places maps by inference (§2), so since 1.124.1 every sibling list is cut into those groups first and the number orders inside each (`sortRecursively`, `src/tabs/right/map-tree.ts`):
+
+- **Under a map**: the maps whose `parent_map` is that map, then the maps placed there by location, one set per location (sets ordered by the location's name).
+- **At the top of the list**: the world's own maps (neither field), then located maps that found no map up their chain, one set per location, then maps whose `parent_map` is missing or loops, one set per `parent_map`.
+- **Inside a set**: ascending `hierarchy` (absent or not a finite number reads 0), then the name, then the id by code point. Before 1.124.1 one sort by `hierarchy` mixed the groups, so an inferred floor map could stand between a region's own children.
 - **Picking one map among an element's maps** (the top-bar cluster, §3.5; the submap door, §3.6) takes the deepest map in the `parent_map` tree first, then the lowest `hierarchy`, then the name, then the id by code point (`mapPickOrder`, `src/tabs/right/auto-open-map.ts`, 1.124.0). A chain that cycles or names a map not in the world counts its depth up to the break. Before 1.124.0 the highest `hierarchy` came first, which read the number as depth.
 
 There is no absolute-scale semantic ("hierarchy 0 = multiverse, 1 = universe..."). That convention emerges naturally from a properly-nested parent_map tree without atlas enforcing field meaning. Users who want explicit scale-tagging can use `supertype`/`subtype` on the map.
@@ -176,7 +179,8 @@ function findInferredParent(m, maps, locations):
 
 
 function sortRecursively(siblings):
-    siblings.sort by ascending hierarchy (default 0), then alphabetical by name
+    cut siblings into the standard's groups (§1 "hierarchy"), in group order
+    inside each group: ascending hierarchy (default 0), then name, then id
 ```
 
 **Properties**:
@@ -550,13 +554,13 @@ Maps:
 ```
 
 Tree-build expected output:
-- 4 roots, sorted by hierarchy (all 0 here) then alpha: `Broken Child`, `Eldoria City`, `Orphan Map`, `World Overview`.
-- Under Eldoria City: Castle Floor 1, Free-floating Tavern (both hierarchy 0, alpha-tied), then Castle Floor 2 (h=1), then Throne Room (h=2).
+- 4 roots in the standard's groups: `World Overview` (the world's own), `Eldoria City`, `Orphan Map` (located roots, one set per location), `Broken Child` (a broken parent, last).
+- Under Eldoria City: Free-floating Tavern (its `parent_map` child) first, then the Castle set inferred by location: Castle Floor 1 (h=0), Castle Floor 2 (h=1), Throne Room (h=2).
 - See `tests/unit/map-tree.test.ts` for the formal expectation (a snapshot string).
 
 Edge cases this exercises: location-inferred placement, hierarchy sort, explicit override coexisting with inferred siblings, orphan loc-bound, dangling parent_map.
 
-**Sibling ordering reminder**: the algorithm sorts every sibling group by `hierarchy` ascending then `name` alphabetically. There's no separate "location-inferred first, explicit parent_map second" grouping — they're peers in the same sibling group. A description's prose hint should never be load-bearing; the tests are the contract.
+**Sibling ordering reminder**: since 1.124.1 a node's `parent_map` children come before the maps inferred under it, and each location's inferred maps form a set of their own (§1 "hierarchy"); the number orders only inside a set. The tests are the contract (`tests/unit/map-tree.test.ts`, `tests/unit/map-tree-groups.test.ts`).
 
 ### Fixture format
 
