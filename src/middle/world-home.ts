@@ -38,7 +38,7 @@ import { keepSafeCard, snoozeUntil } from './home-keepsafe';
 import { buildLandingLine } from './home-landing';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { hasFolderMode } from '../core/capabilities';
-import { currentStep } from '../core/guide';
+import { currentStep, newestEditFirst } from '../core/guide';
 import { doorOf, onDoorChange, pathDots, pathShowing, startPath, worldEmptyForPath } from '../core/guide-path';
 import { blockFocusKey, bringInWays, settleAfterDraw } from './home-guide';
 import { buildGrowBlock, buildHomeGrid, type GrowBlock } from './home-grow';
@@ -818,8 +818,7 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
 
 function buildDesk(elements: readonly Element[], worldId: string): HTMLElement | null {
   const content = elements.filter(el => el.type !== 'pin' && el.type !== 'marker' && el.type !== 'zone');
-  const byRecency = [...content]
-    .sort((a, b) => (b.local_updated_at ?? '').localeCompare(a.local_updated_at ?? ''));
+  const byRecency = [...content].sort(newestEditFirst);
 
   const desk = document.createElement('div');
   desk.className = 'atlas-home-desk';
@@ -867,8 +866,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   }
   // Newest first, ALWAYS — the pinned Write/Map/Edit picks used to outrank a
   // brand-new element, which read as stale ordering on fresh worlds.
-  continueRows.sort((a, b) =>
-    (b.el.local_updated_at ?? '').localeCompare(a.el.local_updated_at ?? ''));
+  continueRows.sort((a, b) => newestEditFirst(a.el, b.el));
 
   // The first element gets a standing highlight: with exactly one
   // content element, its row IS the tour's next step — make it unmissable.

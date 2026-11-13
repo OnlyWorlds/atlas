@@ -235,6 +235,18 @@ export function newestOf<T extends Element>(list: readonly T[]): T | null {
   return best ?? list[list.length - 1] ?? null;
 }
 
+/**
+ * Newest edit first, for Home's desk: `local_updated_at` read as an instant (another tool writing the
+ * folder may write it with an offset or more digits), one that cannot be read after every readable one,
+ * 0 for equal instants so a stable sort keeps the order given.
+ */
+export function newestEditFirst(a: Element, b: Element): number {
+  const ia = instantOf((a as { local_updated_at?: unknown }).local_updated_at);
+  const ib = instantOf((b as { local_updated_at?: unknown }).local_updated_at);
+  if (ia === null || ib === null) return ia === ib ? 0 : ia === null ? 1 : -1;
+  return compareInstants(ib, ia);
+}
+
 /** Characters an offer may place: no place at all (a gone place is not empty, and is never overwritten). */
 export function unplacedCharacters(els: readonly Element[]): Element[] {
   return els.filter(e => e.type === 'character' && !isFilled((e as { location?: unknown }).location));

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { guideDots, DOTS, isFilled, newestOf, noteEarned, loadGuideState, markNoteSeen, setNotesOff, rewardEarned, lensNoteEarned, type Dots } from '../../src/core/guide';
+import { guideDots, DOTS, isFilled, newestEditFirst, newestOf, noteEarned, loadGuideState, markNoteSeen, setNotesOff, rewardEarned, lensNoteEarned, type Dots } from '../../src/core/guide';
 import type { Element, WorldRegistryEntry } from '../../src/core/types';
 
 let n = 0;
@@ -315,5 +315,21 @@ describe('newestOf: when an element was made, read as an instant', () => {
   it('no created_at reads local_updated_at; an equal instant goes to the later in the list', () => {
     expect(newestOf([made('a', '2026-11-13T09:30:00Z'), made('l', undefined, '2026-11-13T09:31:00Z')])?.id).toBe('l');
     expect(newestOf([made('a', '2026-11-13T09:30:00Z'), made('b', '2026-11-13T10:30:00+01:00')])?.id).toBe('b');
+  });
+});
+
+describe('newestEditFirst: Home\'s desk, newest edit first', () => {
+  const edited = (id: string, local_updated_at?: string): Element =>
+    ({ id, type: 'character', name: id, ...(local_updated_at === undefined ? {} : { local_updated_at }) }) as unknown as Element;
+
+  it('reads local_updated_at as an instant: another tool\'s offset counts', () => {
+    // 10:00+02:00 is 08:00Z: older than 09:30Z, though its text sorts after.
+    const list = [edited('a', '2026-11-13T10:00:00+02:00'), edited('b', '2026-11-13T09:30:00.000Z')];
+    expect([...list].sort(newestEditFirst).map(e => e.id)).toEqual(['b', 'a']);
+  });
+
+  it('a stamp that cannot be read goes after every readable one; equal instants keep their order', () => {
+    const list = [edited('none'), edited('x', '2026-11-13T09:00:00Z'), edited('bad', 'soon'), edited('y', '2026-11-13T10:00:00+01:00')];
+    expect([...list].sort(newestEditFirst).map(e => e.id)).toEqual(['x', 'y', 'none', 'bad']);
   });
 });

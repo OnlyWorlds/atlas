@@ -87,7 +87,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'home-grid-times-as-instants',
         title: 'Home\'s grid reads when an element was made to the microsecond',
-        body: 'Home\'s grid places elements in the order they were made. Two made within the same millisecond now keep their true order, and a creation time written as a date alone counts as unknown. An element with no readable time still stands first, so a new element never moves the others, and the line about the newest element linked to nothing never names one with no readable time. Home\'s suggestions, which name the newest place or character, and a Character\'s older battles read times the same way, so a time written with another offset sorts where it truly falls.',
+        body: 'Home\'s grid places elements in the order they were made. Two made within the same millisecond now keep their true order, and a creation time written as a date alone counts as unknown. An element with no readable time still stands first, so a new element never moves the others, and the line about the newest element linked to nothing never names one with no readable time. Home\'s suggestions, which name the newest place or character, Home\'s list of what you edited last, and a Character\'s older battles read times the same way, so a time written with another offset sorts where it truly falls.',
         tags: ['home'],
       },
       {
