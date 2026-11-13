@@ -4,7 +4,7 @@
  * whose miss would let an old id come back.
  */
 import { describe, it, expect } from 'vitest';
-import { rekeyBody } from '../../src/store/rekey-body';
+import { NESTED_REKEY_DEPTH, rekeyBody } from '../../src/store/rekey-body';
 import { layoutGroundOf } from '../../src/core/layout-recipe';
 import { characterRecords } from '../../src/core/records';
 import { blocksOf } from '../../src/core/sharing';
@@ -268,6 +268,40 @@ describe('rekeyBody: ids nested in x_ values, at any depth (folder spec §3.3)',
     const { body } = rekeyBody(before, map);
     expect(body.atlas_calendar).toEqual({ eras: [{ start: O }] });
     expect((body as Record<string, unknown>).foreign_obj).toEqual({ id: O });
+  });
+
+  it('a value 10,000 levels deep neither throws nor changes past the depth cap; ids above it move', () => {
+    // Built from the inside out: { id, next: { id, next: ... } }, each level carrying O.
+    const LEVELS = 10_000;
+    let deep: Record<string, unknown> = { id: O };
+    for (let i = 1; i < LEVELS; i++) deep = { id: O, next: deep };
+    const before = el('event', { x_deep: deep });
+    let body: Element | undefined;
+    expect(() => { body = rekeyBody(before, map).body; }).not.toThrow();
+    // Walk down without recursion: levels up to the cap carry N, the rest are the very objects given, O kept.
+    let now = (body as Record<string, unknown>).x_deep as Record<string, unknown>;
+    let was = deep;
+    for (let level = 0; level < LEVELS; level++) {
+      if (level < NESTED_REKEY_DEPTH) {
+        expect(now.id).toBe(N);
+      } else {
+        expect(now).toBe(was);
+        expect(now.id).toBe(O);
+        break;
+      }
+      now = now.next as Record<string, unknown>;
+      was = was.next as Record<string, unknown>;
+    }
+  });
+
+  it('an own __proto__ key stays an own key when its value moves', () => {
+    const value = JSON.parse(`{"__proto__": "${O}", "a": "${O}"}`) as Record<string, unknown>;
+    const { body } = rekeyBody(el('event', { x_odd: value }), map);
+    const out = body.x_odd as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(out, '__proto__')).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(out, '__proto__')?.value).toBe(N);
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(out.a).toBe(N);
   });
 
   it('idempotent under the map', () => {

@@ -23,7 +23,8 @@
  *     which recompiles story): card/circle/collection/map ids, `fullPinIds`,
  *     and prose blocks' markdown + richtext. Block ids, chart ids and any
  *     unknown kind are left alone;
- *   - inside an `x_` value that is an object or a list, at any depth, a
+ *   - inside an `x_` value that is an object or a list, at any depth up to
+ *     `NESTED_REKEY_DEPTH` (deeper branches left as they are), a
  *     string that IS an old id, whole and as written (folder spec §3.3: the
  *     one edit a tool may make inside a foreign value), e.g. a layout Map's
  *     `x_layout.settings.ground.map`. Never a substring, an `ow://` link or
@@ -154,17 +155,28 @@ function rekeyIdString(value: unknown, map: IdMap): unknown {
 }
 
 /**
- * An `x_` value's ids at any depth: a string equal to an old id, whole, in a
- * list or as an object's value. Keys, numbers, booleans, nulls and every
- * other string stay as they are; an untouched branch comes back as the same
- * object, and a touched object keeps its keys in their order.
+ * How deep the nested walk goes inside one `x_` value. A list or object nested
+ * deeper than this is left exactly as it is, ids included: a value that deep is
+ * no reference anyone wrote by hand, and walking it would exhaust the stack
+ * (a re-key that throws after its journal is written throws again at every
+ * recovery). `JSON.stringify` with an indent gives up near 3,000 levels anyway.
  */
-function rekeyNested(value: unknown, map: IdMap): unknown {
+export const NESTED_REKEY_DEPTH = 1000;
+
+/**
+ * An `x_` value's ids at any depth up to `NESTED_REKEY_DEPTH`: a string equal
+ * to an old id, whole, in a list or as an object's value. Keys, numbers,
+ * booleans, nulls and every other string stay as they are; an untouched branch
+ * comes back as the same object, and a touched object keeps its keys in their
+ * order (an own `__proto__` key stays an own key).
+ */
+function rekeyNested(value: unknown, map: IdMap, depth = 0): unknown {
   if (typeof value === 'string') return map.get(value) ?? value;
+  if (depth >= NESTED_REKEY_DEPTH) return value;
   if (Array.isArray(value)) {
     let changed = false;
     const out = value.map(v => {
-      const next = rekeyNested(v, map);
+      const next = rekeyNested(v, map, depth + 1);
       if (next !== v) changed = true;
       return next;
     });
@@ -174,10 +186,10 @@ function rekeyNested(value: unknown, map: IdMap): unknown {
     const src = value as Record<string, unknown>;
     let out: Record<string, unknown> | null = null;
     for (const [k, v] of Object.entries(src)) {
-      const next = rekeyNested(v, map);
+      const next = rekeyNested(v, map, depth + 1);
       if (next !== v) {
         if (!out) out = { ...src };
-        out[k] = next;
+        Object.defineProperty(out, k, { value: next, enumerable: true, writable: true, configurable: true });
       }
     }
     return out ?? value;
