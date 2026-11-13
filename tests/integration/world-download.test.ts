@@ -139,6 +139,8 @@ describe('downloadWorld', () => {
     expect(meta.source).toEqual({ server: 'https://www.onlyworlds.com', world: 'srv', at: '2026-10-20T19:00:00.000Z' });
     expect(meta.exported_as).toEqual({ kind: 'character', role: 'guest', character: { id: ana.id, name: 'Ana' } });
     expect(meta.format_version).toBe(FOLDER_FORMAT_VERSION);
+    // The stamp is the folder spec's current version, named here so a move is a decision.
+    expect(meta.format_version).toBe('0.3.22');
     // The world's own world.json is left as it was.
     expect((await store.readWorldMeta() as unknown as Record<string, unknown>).source).toBeUndefined();
   });

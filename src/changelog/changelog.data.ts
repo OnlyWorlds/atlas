@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Atlas moves to the newest OnlyWorlds SDK. The mark beside a world\'s or an element\'s name is drawn with exact curves instead of short straight lines, so it stays smooth at any size. A Character\'s records name Subs by its name, and the mark\'s Open with list can offer Subs beside a Character.',
         tags: ['world'],
       },
+      {
+        id: 'folder-format-0-3-22',
+        title: 'New world folders are format 0.3.22',
+        body: 'Atlas writes new world folders as format 0.3.22, the newest version of the OnlyWorlds folder format. No file changes its shape.',
+        tags: ['folders'],
+      },
     ],
   },
   {
