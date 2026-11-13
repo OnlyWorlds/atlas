@@ -67,6 +67,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['world'],
       },
       {
+        id: 'ow-icon-in-curves',
+        title: 'Atlas\'s OnlyWorlds icon is the same smooth drawing',
+        body: 'The OnlyWorlds icon in the sidebar footer, the browser tab and the installed app is redrawn from the same true curves. It looks the same at a glance and is crisper at small sizes.',
+        tags: ['layout'],
+      },
+      {
         id: 'folder-format-0-3-22',
         title: 'New world folders are format 0.3.22',
         body: 'Atlas writes new world folders as format 0.3.22, the newest version of the OnlyWorlds folder format. No file changes its shape.',
