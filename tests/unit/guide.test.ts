@@ -312,6 +312,14 @@ describe('newestOf: when an element was made, read as an instant', () => {
     expect(newestOf([])).toBeNull();
   });
 
+  it('a created_at that cannot be read falls back to local_updated_at', () => {
+    // A date alone is no time the message profile reads: the edit stamp answers for it.
+    const dateAlone = made('d', '2026-11-13', '2026-11-13T12:00:00Z');
+    const old = made('o', '2020-01-01T00:00:00Z');
+    expect(newestOf([dateAlone, old])?.id).toBe('d');
+    expect(newestOf([old, dateAlone])?.id).toBe('d');
+  });
+
   it('no created_at reads local_updated_at; an equal instant goes to the later in the list', () => {
     expect(newestOf([made('a', '2026-11-13T09:30:00Z'), made('l', undefined, '2026-11-13T09:31:00Z')])?.id).toBe('l');
     expect(newestOf([made('a', '2026-11-13T09:30:00Z'), made('b', '2026-11-13T10:30:00+01:00')])?.id).toBe('b');

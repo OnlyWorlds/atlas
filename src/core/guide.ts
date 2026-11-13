@@ -212,10 +212,13 @@ export type Gesture =
   | { kind: 'location-set'; character: string }
   | { kind: 'date-set'; event: string };
 
-/** When it was made, as an instant: its `created_at`, else its `local_updated_at`; null when that cannot be read. */
+/**
+ * When it was made, as an instant: its `created_at` when that can be read, else its
+ * `local_updated_at` (also when `created_at` is there but cannot be read); null when neither can.
+ */
 const stampOf = (el: Element): OwInstant | null => {
   const r = el as { created_at?: unknown; local_updated_at?: unknown };
-  return instantOf(typeof r.created_at === 'string' ? r.created_at : r.local_updated_at);
+  return instantOf(r.created_at) ?? instantOf(r.local_updated_at);
 };
 
 /**
