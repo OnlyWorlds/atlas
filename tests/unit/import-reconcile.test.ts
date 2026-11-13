@@ -502,6 +502,61 @@ describe('reconcile — a renamed element in the world\'s own export', () => {
   });
 });
 
+describe('reconcile: an id in capitals (the writer rule, 1.124.2)', () => {
+  const A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+  const N = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
+  const story = (id: string) => `[Ann](ow://character/${id}) met [Bo](ow://character/${B}@3).`;
+  function exportOf(chars: Array<Record<string, unknown>>, scene: Record<string, unknown> = {}) {
+    return parsePayload({
+      format: 'onlyworlds-world-export', world: { name: 'Source' },
+      elements: { character: chars, narrative: [{ id: N, name: 'Chapter', ...scene }] },
+    });
+  }
+  const created = (plan: ReturnType<typeof reconcile>, name: string) =>
+    plan.creates.find(c => c.data.name === name)!.data as Record<string, unknown>;
+
+  it('a new element takes its id lowercase, and every link to it in the import follows', () => {
+    const plan = reconcile(exportOf(
+      [{ id: A.toUpperCase(), name: 'Ann', friends: [B] }, { id: B, name: 'Bo', friends: [A.toUpperCase()] }],
+      { characters: [A.toUpperCase(), B], story: story(A.toUpperCase()) },
+    ), [], { genId: () => 'fresh' });
+    expect(created(plan, 'Ann').id).toBe(A);
+    expect(created(plan, 'Bo').friends).toEqual([A]);
+    expect(created(plan, 'Chapter').characters).toEqual([A, B]);
+    expect(created(plan, 'Chapter').story).toBe(story(A));
+  });
+
+  it('a link in capitals to an id the import holds in lowercase resolves to it', () => {
+    const plan = reconcile(exportOf(
+      [{ id: A, name: 'Ann' }, { id: B, name: 'Bo', friends: [A.toUpperCase()] }],
+    ), [], { genId: () => 'fresh' });
+    expect(created(plan, 'Bo').friends).toEqual([A]);
+  });
+
+  it('an incoming id in capitals beside the same id held in lowercase is that element, not a second', () => {
+    const plan = reconcile(exportOf([{ id: A.toUpperCase(), name: 'Ann' }]),
+      [existingEl({ id: A, type: 'character', name: 'Ann' })], { genId: () => 'fresh', matchByName: false });
+    expect(plan.creates.filter(c => c.type === 'character')).toEqual([]);
+    expect(plan.skips).toEqual([{ type: 'character', id: A, name: 'Ann' }]);
+  });
+
+  it('a different element under the same id in another case gets a fresh id', () => {
+    const plan = reconcile(exportOf([{ id: A.toUpperCase(), name: 'Ann' }]),
+      [existingEl({ id: A, type: 'character', name: 'Someone Else' })], { genId: () => 'fresh' });
+    expect(created(plan, 'Ann').id).toBe('fresh');
+  });
+
+  it('an id already held in capitals is never re-spelled; a value naming it stays as written', () => {
+    const U = A.toUpperCase();
+    const plan = reconcile(exportOf(
+      [{ id: U, name: 'Ann' }, { id: B, name: 'Bo', friends: [U] }],
+    ), [existingEl({ id: U, type: 'character', name: 'Ann' })], { genId: () => 'fresh' });
+    expect(plan.skips.map(s => s.id)).toEqual([U]);
+    expect(created(plan, 'Bo').friends).toEqual([U]);
+  });
+});
+
 describe('reconcile: the incoming-id remap reaches ow:// prose', () => {
   const X = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; // Dampworth in the export
   const Y = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'; // Dampworth already in this world

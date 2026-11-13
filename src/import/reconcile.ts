@@ -22,6 +22,13 @@
  * rewritten to the final id — otherwise they'd dangle silently. Relation fields
  * go through resolveRelations; ow:// prose, sidecar and page blocks through
  * remapProse (the re-key kernel's rekeyBody).
+ *
+ * Id case (the address profile's writer rule): a new element's id is the
+ * incoming id trimmed and lowercased, and every reference to it in the same
+ * import follows (the remap holds the id as written → the final id whenever
+ * the spelling changes). An id already held in the world is never re-spelled:
+ * a match keeps the held id. Ids are compared lowercase, so an incoming id in
+ * capitals beside the same id held in lowercase is that element, not a second.
  */
 
 import { relationFieldsFor } from '../editor/field-schema';
@@ -70,16 +77,22 @@ export function reconcile(
 
   // --- existing lookups ---
   const existingById = new Map<string, Element>();
+  const existingByLowerId = new Map<string, Element>(); // ids compared lowercase
   const existingByNameType = new Map<string, Element>();
   for (const e of existing) {
     existingById.set(e.id, e);
+    const lower = e.id.toLowerCase();
+    if (!existingByLowerId.has(lower)) existingByLowerId.set(lower, e);
     if (e.name) existingByNameType.set(keyNT(e.type, e.name), e);
   }
+  const existingOf = (id: string): Element | undefined =>
+    existingById.get(id) ?? existingByLowerId.get(id.toLowerCase());
 
   // --- pass 1: normalize + decide action + assign final ids + build id remap ---
   const incoming: Incoming[] = [];
-  const incomingIdRemap = new Map<string, string>(); // discarded incoming uuid → finalId
+  const incomingIdRemap = new Map<string, string>(); // incoming uuid as written → finalId, when they differ
   const assignedIds = new Set<string>(); // final ids already claimed this batch (in-batch dup guard)
+  const assignedLower = new Set<string>(); // the same, lowercase (a guard that ignores case)
   for (const [type, records] of parsed.byType) {
     const claimed = new Set<string>(); // existing ids claimed by a name match this type
     for (const raw of records) {
@@ -97,12 +110,15 @@ export function reconcile(
       report.unknownFieldsDropped += droppedUnknown;
 
       const rawId = typeof record.id === 'string' && isUuid(record.id) ? record.id : undefined;
+      // The writer's spelling of a new id: trimmed and lowercase.
+      const newId = rawId?.trim().toLowerCase();
 
       let matched: Element | undefined;
-      if (rawId && existingById.has(rawId)) {
+      const exById = rawId ? existingOf(rawId.trim()) : undefined;
+      if (exById) {
         // Id match — but only when names agree (or a side is unnamed). A bare
         // uuid collision between unrelated elements must not clobber (#83 guard).
-        const ex = existingById.get(rawId)!;
+        const ex = exById;
         if (!ex.name || normName(ex.name) === normName(name)) matched = ex;
         // Within the world's own export an id IS the element, renamed or not.
         else if (opts.sameWorld && ex.type === type) matched = ex;
@@ -127,12 +143,14 @@ export function reconcile(
         // batch — then mint a fresh one. Without the in-batch guard, two records
         // sharing a raw id would both resolve to it and the second would silently
         // overwrite the first on apply.
-        finalId = rawId && !existingById.has(rawId) && !assignedIds.has(rawId) ? rawId : genId();
+        finalId = newId && !existingByLowerId.has(newId) && !assignedLower.has(newId) ? newId : genId();
         targetId = finalId;
         action = 'insert';
       }
       assignedIds.add(finalId);
+      assignedLower.add(finalId.toLowerCase());
       if (rawId && rawId !== finalId) incomingIdRemap.set(rawId, finalId);
+      if (rawId && rawId.trim() !== rawId && rawId.trim() !== finalId) incomingIdRemap.set(rawId.trim(), finalId);
       incoming.push({ type, record, name, finalId, action, targetId });
     }
   }
@@ -157,6 +175,17 @@ export function reconcile(
   for (const e of existing) typeById.set(e.id, e.type);
   for (const inc of incoming) typeById.set(inc.finalId, inc.type);
 
+  // A uuid value's final id: the remap as written, then an import's own id as
+  // written, then the same two lowercase; a value naming no record of this
+  // import (an element already in the world) stays as written.
+  const importIdOf = (value: string): string => {
+    const t = value.trim();
+    const hit = incomingIdRemap.get(t) ?? (assignedIds.has(t) ? t : undefined);
+    if (hit !== undefined) return hit;
+    const lower = t.toLowerCase();
+    return incomingIdRemap.get(lower) ?? (assignedIds.has(lower) ? lower : t);
+  };
+
   // --- pass 2: resolve relations + bucket ---
   for (const inc of incoming) {
     if (inc.action === 'skip') {
@@ -167,7 +196,7 @@ export function reconcile(
 
     const resolved = remapProse(
       inc.type,
-      resolveRelations(inc, idByNameType, incomingIdRemap, typeById, report),
+      resolveRelations(inc, idByNameType, importIdOf, typeById, report),
       incomingIdRemap,
     );
 
@@ -198,15 +227,11 @@ export function reconcile(
   return plan;
 }
 
-function remap(m: Map<string, string>, id: string): string {
-  return m.get(id) ?? id;
-}
-
 /** Resolve relation values to ids; rename spatial relations to disk shape; dedup multi-links. */
 function resolveRelations(
   inc: Incoming,
   idByNameType: Map<string, string>,
-  incomingIdRemap: Map<string, string>,
+  importIdOf: (value: string) => string,
   typeById: Map<string, ElementType>,
   report: ImportReport,
 ): RawRecord {
@@ -221,7 +246,7 @@ function resolveRelations(
       let resolved: string | undefined;
       if (typeof v === 'string' && v.trim()) {
         if (isUuid(v)) {
-          resolved = remap(incomingIdRemap, v.trim());
+          resolved = importIdOf(v);
         } else {
           const id = target ? idByNameType.get(keyNT(target, v)) : undefined;
           if (id) resolved = id;
@@ -239,7 +264,7 @@ function resolveRelations(
         if (typeof item !== 'string' || !item.trim()) continue;
         let id: string | undefined;
         if (isUuid(item)) {
-          id = remap(incomingIdRemap, item.trim());
+          id = importIdOf(item);
         } else {
           id = target ? idByNameType.get(keyNT(target, item)) : undefined;
           if (!id) {
