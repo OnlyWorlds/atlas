@@ -73,6 +73,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['layout'],
       },
       {
+        id: 'map-pick-deepest-first',
+        title: 'A place\'s maps list the most detailed map first',
+        body: 'When a place or a zone has several maps, its map buttons and the doors into its maps now put the map nested deepest under other maps first. Among maps at the same depth, a lower hierarchy number comes first, as it does in the maps tree. Before, the highest hierarchy number came first.',
+        tags: ['maps'],
+      },
+      {
         id: 'folder-format-0-3-22',
         title: 'New world folders are format 0.3.22',
         body: 'Atlas writes new world folders as format 0.3.22, the newest version of the OnlyWorlds folder format. No file changes its shape.',

@@ -24,7 +24,7 @@ import type { MapTabCacheEntry } from './map-tab-cache';
 /** Hover text on a pin that wears the map badge: the badge says what it means (Titus, 2026-10-15). */
 export const SUBMAP_PIN_HINT = 'This location has its own map: click it, then Open';
 
-/** The maps of a Location element other than `exceptMapId`, in the tree's order (hierarchy, then name). */
+/** The maps of a Location element other than `exceptMapId`, in `mapPickOrder` (deepest first, then hierarchy, then name). */
 export function submapsFor(elementId: string, elements: readonly Element[], exceptMapId: string): WorldMap[] {
   const el = elements.find(e => e.id === elementId);
   if (!el || el.type !== 'location') return [];

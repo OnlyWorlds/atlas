@@ -5,7 +5,7 @@
  * Verifies:
  *   - Location element → maps anchored to it (via map.location === id)
  *   - Non-location element → maps with pins targeting it
- *   - Hierarchy DESC sort for picker default-highlight ordering
+ *   - The pick order: deepest in the parent_map tree, then lowest hierarchy, name, id
  *   - Unknown element id → empty list
  *   - getLocationMapPresence walks parent_location chain for descendants
  */
@@ -48,14 +48,14 @@ describe('getAssociatedMaps — Location elements', () => {
     expect(maps.map(m => m.id).sort()).toEqual(['m1', 'm2']);
   });
 
-  it('hierarchy DESC sort places highest-hierarchy first', () => {
+  it('among siblings the lowest hierarchy comes first (the number orders siblings, it is not depth)', () => {
     const loc = mkLocation({ id: 'loc-1', name: 'Castle' });
     const lowH = mkMap({ id: 'low', name: 'Castle (overview)', location: 'loc-1', hierarchy: 0 });
     const midH = mkMap({ id: 'mid', name: 'Castle Floor 1', location: 'loc-1', hierarchy: 1 });
     const highH = mkMap({ id: 'high', name: 'Throne Room', location: 'loc-1', hierarchy: 2 });
 
     const maps = getAssociatedMaps('loc-1', [loc, lowH, midH, highH]);
-    expect(maps.map(m => m.id)).toEqual(['high', 'mid', 'low']);
+    expect(maps.map(m => m.id)).toEqual(['low', 'mid', 'high']);
   });
 
   it('hierarchy ties break alphabetically', () => {
@@ -71,6 +71,46 @@ describe('getAssociatedMaps — Location elements', () => {
     const loc = mkLocation({ id: 'lonely-loc', name: 'Lonely' });
     const m = mkMap({ id: 'm1', name: 'Other Map', location: 'other-loc' });
     expect(getAssociatedMaps('lonely-loc', [loc, m])).toEqual([]);
+  });
+});
+
+describe('getAssociatedMaps — the pick order', () => {
+  it('the deepest map in the parent_map tree comes first, whatever its hierarchy', () => {
+    const loc = mkLocation({ id: 'loc-1', name: 'Harbour' });
+    const world = mkMap({ id: 'world', name: 'World', hierarchy: 5 });
+    const region = mkMap({ id: 'region', name: 'Region', parent_map: 'world', hierarchy: 3 });
+    const top = mkMap({ id: 'top', name: 'Harbour (overview)', location: 'loc-1', hierarchy: 9 });
+    const mid = mkMap({ id: 'mid', name: 'Harbour district', location: 'loc-1', parent_map: 'world', hierarchy: 2 });
+    const deep = mkMap({ id: 'deep', name: 'Harbour docks', location: 'loc-1', parent_map: 'region', hierarchy: 0 });
+    const maps = getAssociatedMaps('loc-1', [loc, top, world, mid, region, deep]);
+    expect(maps.map(m => m.id)).toEqual(['deep', 'mid', 'top']);
+  });
+
+  it('a chain that cycles or names a map not in the world counts its depth up to the break', () => {
+    const loc = mkLocation({ id: 'loc-1', name: 'Isle' });
+    // a -> b -> a: a counts b (1), then the step back onto a breaks.
+    const a = mkMap({ id: 'a', name: 'A', location: 'loc-1', parent_map: 'b' });
+    const b = mkMap({ id: 'b', name: 'B', parent_map: 'a' });
+    // gone -> a map not in the world: depth 0.
+    const gone = mkMap({ id: 'gone', name: 'Gone parent', location: 'loc-1', parent_map: 'no-such-map' });
+    // two -> one -> a map not in the world: one step, then the break.
+    const one = mkMap({ id: 'one', name: 'One', parent_map: 'no-such-map' });
+    const two = mkMap({ id: 'two', name: 'Two', location: 'loc-1', parent_map: 'one', hierarchy: 1 });
+    // self -> self: depth 0.
+    const self = mkMap({ id: 'self', name: 'Self', location: 'loc-1', parent_map: 'self' });
+    const maps = getAssociatedMaps('loc-1', [loc, a, b, gone, one, two, self]);
+    expect(maps.map(m => m.id)).toEqual(['a', 'two', 'gone', 'self']);
+  });
+
+  it('then the lowest hierarchy, none reading as 0, then the name, then the id by code point', () => {
+    const loc = mkLocation({ id: 'loc-1', name: 'Vale' });
+    const neg = mkMap({ id: 'neg', name: 'Zed', location: 'loc-1', hierarchy: -1 });
+    const none = mkMap({ id: 'none', name: 'Nameless', location: 'loc-1' });
+    const one = mkMap({ id: 'one', name: 'Alpha', location: 'loc-1', hierarchy: 1 });
+    const twinLower = mkMap({ id: 'b-twin', name: 'Twin', location: 'loc-1', hierarchy: 0 });
+    const twinUpper = mkMap({ id: 'B-twin', name: 'Twin', location: 'loc-1', hierarchy: 0 });
+    const maps = getAssociatedMaps('loc-1', [loc, one, twinLower, none, twinUpper, neg]);
+    expect(maps.map(m => m.id)).toEqual(['neg', 'none', 'B-twin', 'b-twin', 'one']);
   });
 });
 
@@ -148,7 +188,7 @@ describe('getLocationMapPresence — Location subtree map collection', () => {
     expect(result.descendants.map(m => m.id)).toEqual(['m-tavern']);
   });
 
-  it('descendants sorted by hierarchy DESC, alpha-tied', () => {
+  it('descendants sorted by hierarchy ascending, alpha-tied', () => {
     const root = mkLocation({ id: 'root', name: 'Root' });
     const child = mkLocation({ id: 'child', name: 'Child', parent_location: 'root' });
     const lowH = mkMap({ id: 'low', name: 'Low', location: 'child', hierarchy: 0 });
@@ -157,7 +197,7 @@ describe('getLocationMapPresence — Location subtree map collection', () => {
     const midH_z = mkMap({ id: 'mid-z', name: 'Zebra', location: 'child', hierarchy: 1 });
 
     const { descendants } = getLocationMapPresence('root', [root, child, lowH, highH, midH_a, midH_z]);
-    expect(descendants.map(m => m.id)).toEqual(['high', 'mid-a', 'mid-z', 'low']);
+    expect(descendants.map(m => m.id)).toEqual(['low', 'mid-a', 'mid-z', 'high']);
   });
 
   it('lonely location (no maps anywhere in subtree) returns empty', () => {

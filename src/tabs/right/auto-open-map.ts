@@ -36,7 +36,55 @@ export function hasLinkedSubMap(
 }
 
 /**
- * Maps associated with an element, sorted by hierarchy DESC then alpha:
+ * How many `parent_map` steps lie above a map, counted up to the first break:
+ * a parent that is not a map in this world, or a step back onto a map already
+ * walked (a cycle). A root, or a map whose parent is gone, is 0.
+ */
+function mapDepths(elements: readonly Element[]): Map<string, number> {
+  const parentOf = new Map<string, string | undefined>();
+  for (const e of elements) {
+    if (e.type !== 'map') continue;
+    const p = (e as WorldMap).parent_map;
+    parentOf.set(e.id, typeof p === 'string' && p ? p : undefined);
+  }
+  const depth = new Map<string, number>();
+  for (const id of parentOf.keys()) {
+    const seen = new Set<string>([id]);
+    let n = 0;
+    let at = parentOf.get(id);
+    while (at !== undefined && parentOf.has(at) && !seen.has(at)) {
+      seen.add(at);
+      n++;
+      at = parentOf.get(at);
+    }
+    depth.set(id, n);
+  }
+  return depth;
+}
+
+/**
+ * The order a map is picked in, first to last (DESIGN_MAPS.md §1.3: nesting is
+ * said by `parent_map`, and `hierarchy` only orders siblings, lower first):
+ * the deepest map in the `parent_map` tree, then the lowest `hierarchy` (none
+ * reads as 0), then the name, then the id by code point.
+ */
+export function mapPickOrder(elements: readonly Element[]): (a: WorldMap, b: WorldMap) => number {
+  const depth = mapDepths(elements);
+  return (a, b) => {
+    const dA = depth.get(a.id) ?? 0;
+    const dB = depth.get(b.id) ?? 0;
+    if (dA !== dB) return dB - dA;
+    const hA = typeof a.hierarchy === 'number' && Number.isFinite(a.hierarchy) ? a.hierarchy : 0;
+    const hB = typeof b.hierarchy === 'number' && Number.isFinite(b.hierarchy) ? b.hierarchy : 0;
+    if (hA !== hB) return hA - hB;
+    const byName = (typeof a.name === 'string' ? a.name : '').localeCompare(typeof b.name === 'string' ? b.name : '');
+    if (byName !== 0) return byName;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  };
+}
+
+/**
+ * Maps associated with an element, in `mapPickOrder` (deepest first):
  *   - Location element  → maps where `map.location === element.id`
  *   - Zone element      → distinct maps that have a marker with
  *                         `marker.zone_id === element.id` (zones live on
@@ -80,14 +128,7 @@ export function getAssociatedMaps(
     );
   }
 
-  candidates.sort((a, b) => {
-    const aH = typeof a.hierarchy === 'number' ? a.hierarchy : 0;
-    const bH = typeof b.hierarchy === 'number' ? b.hierarchy : 0;
-    if (aH !== bH) return bH - aH; // hierarchy DESC
-    return (a.name ?? '').localeCompare(b.name ?? '');
-  });
-
-  return candidates;
+  return candidates.sort(mapPickOrder(elements));
 }
 
 /**
@@ -95,7 +136,7 @@ export function getAssociatedMaps(
  * location) and descendant maps (anchored to any location in this
  * location's subtree). Walks `parent_location` chains transitively.
  *
- * Pure function. Returns two lists, each sorted by hierarchy DESC then alpha.
+ * Pure function. Returns two lists, each in `mapPickOrder`.
  */
 export interface LocationMapPresence {
   direct: WorldMap[];
@@ -131,14 +172,8 @@ export function getLocationMapPresence(
     }
   }
 
-  const sortMaps = (arr: WorldMap[]): WorldMap[] => {
-    return arr.sort((a, b) => {
-      const aH = typeof a.hierarchy === 'number' ? a.hierarchy : 0;
-      const bH = typeof b.hierarchy === 'number' ? b.hierarchy : 0;
-      if (aH !== bH) return bH - aH; // hierarchy DESC
-      return (a.name ?? '').localeCompare(b.name ?? '');
-    });
-  };
+  const order = mapPickOrder(elements);
+  const sortMaps = (arr: WorldMap[]): WorldMap[] => arr.sort(order);
 
   const direct = sortMaps(
     elements.filter((m): m is WorldMap => m.type === 'map' && m.location === locationId),

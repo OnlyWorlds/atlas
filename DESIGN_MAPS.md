@@ -76,6 +76,7 @@ A map can have `parent_map`, `location`, both, or neither.
 
 - **Siblings under a `parent_map`** are sorted by ascending `hierarchy`. Ties broken alphabetically.
 - **Siblings co-located** (multiple maps with the same `location` and no `parent_map`) are sorted the same way.
+- **Picking one map among an element's maps** (the top-bar cluster, §3.5; the submap door, §3.6) takes the deepest map in the `parent_map` tree first, then the lowest `hierarchy`, then the name, then the id by code point (`mapPickOrder`, `src/tabs/right/auto-open-map.ts`, 1.124.0). A chain that cycles or names a map not in the world counts its depth up to the break. Before 1.124.0 the highest `hierarchy` came first, which read the number as depth.
 
 There is no absolute-scale semantic ("hierarchy 0 = multiverse, 1 = universe..."). That convention emerges naturally from a properly-nested parent_map tree without atlas enforcing field meaning. Users who want explicit scale-tagging can use `supertype`/`subtype` on the map.
 

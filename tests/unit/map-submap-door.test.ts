@@ -22,7 +22,7 @@ const world: Element[] = [
 
 describe('submapsFor', () => {
   it("a place's maps, in the tree's order, without the map it is pinned on", () => {
-    expect(submapsFor('loc-isle', world, 'map-realm').map(m => m.id)).toEqual(['map-isle', 'map-isle-old']);
+    expect(submapsFor('loc-isle', world, 'map-realm').map(m => m.id)).toEqual(['map-isle-old', 'map-isle']);
     expect(submapsFor('loc-isle', world, 'map-isle').map(m => m.id)).toEqual(['map-isle-old']);
   });
   it('a place with no map, or anything not a place, has none', () => {
