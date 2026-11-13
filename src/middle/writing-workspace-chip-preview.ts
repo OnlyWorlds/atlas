@@ -20,6 +20,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
+import { lookupHeldId } from '../core/ow-links';
 
 // A longer open delay (Titus) — the card popped a touch eagerly at
 // 220ms while reading past linked words; 480ms waits for a deliberate rest.
@@ -117,7 +118,8 @@ export function createChipPreview(workspaceRoot: HTMLElement): ChipPreviewContro
     clearTimers();
     currentChip = chip;
     sticky = stickyMode;
-    const el = getState().data.elements.find(e => e.id === elementId) ?? null;
+    const elements = getState().data.elements;
+    const el = lookupHeldId(elementId, id => elements.find(e => e.id === id)) ?? null;
     paint(el, elementType);
     card.dataset.state = 'shown';
     card.dataset.mode = stickyMode ? 'sticky' : 'hover';

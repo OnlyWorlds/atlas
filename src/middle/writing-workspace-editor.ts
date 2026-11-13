@@ -36,6 +36,7 @@ import {
 } from './writing-workspace-autolink';
 import type { Element } from '../core/types';
 import { isValidChipLabel, trimMatchSpan } from '../core/prose-autolink';
+import { lookupHeldId } from '../core/ow-links';
 import type { JSONContent } from '@tiptap/core';
 
 export interface WorkspaceEditorOptions {
@@ -448,7 +449,8 @@ function syncChipLabelsImpl(
     if (node.type.name !== 'elementChip') return;
     const id = node.attrs.id as string | null;
     if (!id) return;
-    const surface = lookupSurface(id);
+    // As held, then lowercase: a chip saved with an id in capitals still resolves.
+    const surface = lookupHeldId(id, lookupSurface);
     if (!surface) return; // Element deleted — leave the stale label; chip still serializes correctly.
     const currentLabel = node.attrs.label;
     // A chip label is "valid" if it is any casing of the canonical name OR

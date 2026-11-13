@@ -12,19 +12,20 @@
 
 import { OwAddressError, parseOwLink } from '@onlyworlds/sdk';
 import { UUID_RE } from './open-capture';
-
-// Found by its prefix, in any case, so a link in capitals is refused for its
-// case rather than missed.
-const ADDRESS_RE = /(?:https:\/\/www\.onlyworlds\.com\/w\/|ow:\/\/)\S*/i;
+import { pastedAddressIn } from './ow-links';
 
 export const ADDRESS_SLUG_LINE = 'This link names the world by its page name, which Atlas does not read. On OnlyWorlds, use Copy link: that link names the world by its id.';
 export const ADDRESS_NO_WORLD_LINE = 'This address names an element but not its world. Copy the link from OnlyWorlds, which names both.';
 export const ADDRESS_BROKEN_LINE = 'Atlas cannot read this link: part of it is missing or changed. Copy it again from OnlyWorlds.';
 
-/** The first address in a piece of text, without the punctuation a sentence puts after it. */
+/**
+ * The first address in a piece of text, as prose reads it (the SDK's
+ * `readOwLinkAt`, so the text after it stays out). Found by its prefix in any
+ * case, so a link in capitals, or one cut short, is refused in words rather
+ * than missed or opened short.
+ */
 export function addressIn(text: string): string | null {
-  const found = text.match(ADDRESS_RE)?.[0];
-  return found ? found.replace(/[.,;:!?)\]}>'"]+$/, '') : null;
+  return pastedAddressIn(text);
 }
 
 /**

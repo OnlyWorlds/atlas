@@ -18,7 +18,7 @@
  */
 
 import type { Element } from './types';
-import { createOwLinkScanner } from './ow-links';
+import { findOwLinks, isChipLink, readOwHref } from './ow-links';
 
 export const MIN_NAME_CHARS = 3;
 /** Cap alternation size to keep regex compile fast. */
@@ -190,10 +190,9 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
     protectedSpans.some(([s, e]) => a < e && b > s);
 
   // Already-linked ids anywhere in the story (first-mention rule).
+  // An address names an element as written, then by its lowercase reading.
   const already = new Set<string>();
-  const ows = createOwLinkScanner();
-  let om: RegExpExecArray | null;
-  while ((om = ows.exec(story)) !== null) already.add(om[2]);
+  for (const l of findOwLinks(story)) { already.add(l.idAsWritten); already.add(l.id); }
 
   // Flags come FROM the scanner, never restated — a hardcoded 'g' here
   // would silently drop the case-insensitivity the index depends on.
@@ -226,12 +225,21 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
   return { story: out, linked: replacements.map(r => r.cand) };
 }
 
-/** Replace every `[label](ow://…)` link with its bare label. */
+/**
+ * Replace every chip link `[label](ow://<type>/<id>)` with its bare label: the
+ * links the editor holds as chips (an element address with no moment and no
+ * lens, read by the SDK), the same set `unlinkRichtext` turns back to text.
+ */
 export function unlinkMarkdown(story: string): { story: string; unlinked: number } {
   if (!story) return { story, unlinked: 0 };
-  const re = /\[([^\]]*)\]\(ow:\/\/[a-z_]+\/[\w-]+\)/gi;
+  const re = /\[([^\]]*)\]\(([^)\s]*)\)/g;
   let n = 0;
-  const out = story.replace(re, (_all, label: string) => { n++; return label; });
+  const out = story.replace(re, (all, label: string, href: string) => {
+    const link = readOwHref(href);
+    if (!link || !isChipLink(link)) return all;
+    n++;
+    return label;
+  });
   return { story: out, unlinked: n };
 }
 

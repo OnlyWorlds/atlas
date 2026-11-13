@@ -36,6 +36,7 @@ import { WRITING_INLINE_CREATE_EVENT, WRITING_SPLIT_EVENT } from '../core/hotkey
 import type { Element } from '../core/types';
 import type { WorkspaceEditorHandle } from './writing-workspace-editor';
 import { forPointer } from '../core/pointer';
+import { proseNamesId } from '../core/ow-links';
 
 export interface ProseContextMenuController {
   destroy(): void;
@@ -349,9 +350,9 @@ export function createProseContextMenu(deps: {
     const targetEl = state.data.elements.find(e => e.id === chip.id);
     if (!targetEl) return;
 
-    // Re-read the editor's current markdown to check for ow://type/id chips.
+    // Re-read the editor's current markdown for another address naming it.
     const markdown = editorHandle.getMarkdown();
-    const otherChipMatch = markdown.includes('/' + chip.id + ')');
+    const otherChipMatch = proseNamesId(markdown, chip.id);
 
     // Text-mention scan: any of the element's surface forms (name + aliases)
     // appearing as a word-bounded match in the prose-as-plain-text view.

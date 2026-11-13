@@ -16,12 +16,10 @@
  */
 
 import { Mention } from '@tiptap/extension-mention';
-import { OW_LINK_HREF_RE, createOwLinkScanner } from '../core/ow-links';
 
-// Canonical OW link patterns live in core/ow-links.ts (TipTap-free home so
-// the derive + knowledge modules can import them without pulling the editor
-// bundle). Re-exported here for the writing modules that already import them.
-export { OW_LINK_HREF_RE, createOwLinkScanner };
+// Reading an address (`ow://<type>/<uuid>`) is core/ow-links.ts's, on the SDK
+// (a TipTap-free home so the derive + knowledge modules can import it without
+// pulling the editor bundle).
 
 export const ElementChip = Mention.extend({
   name: 'elementChip',

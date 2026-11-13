@@ -28,6 +28,7 @@ import { showProblem } from '../../ui/problem-fixes';
 import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink';
 import { currentLore, pageLore } from '../../core/parlor-room';
 import { readerLinksOf } from './context-pane-graph';
+import { findOwLinks } from '../../core/ow-links';
 
 export interface ContextListsHandle {
   /** Visually emphasize a row whose element id matches (or clear). */
@@ -56,14 +57,17 @@ function collectCastIds(narrative: Element): string[] {
   return linksIn(narrative, pageLore(narrative));
 }
 
-/** Count ow:// mentions of each element in the narrative's story. */
-function buildMentionCounts(story: string | undefined | null): Map<string, number> {
+/**
+ * Count the element addresses naming each element in the narrative's story,
+ * keyed by the id as written and by its lowercase reading (`linkNamesId`), so
+ * a lookup by the element's held id finds every address that names it.
+ */
+export function buildMentionCounts(story: string | undefined | null): Map<string, number> {
   const counts = new Map<string, number>();
   if (typeof story !== 'string' || story.length === 0) return counts;
-  const re = /ow:\/\/[a-z-]+\/([\w-]+)/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(story)) !== null) {
-    counts.set(m[1], (counts.get(m[1]) ?? 0) + 1);
+  for (const l of findOwLinks(story)) {
+    counts.set(l.id, (counts.get(l.id) ?? 0) + 1);
+    if (l.idAsWritten !== l.id) counts.set(l.idAsWritten, (counts.get(l.idAsWritten) ?? 0) + 1);
   }
   return counts;
 }

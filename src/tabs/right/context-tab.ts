@@ -45,6 +45,7 @@ import { refreshElementsAfterWrite } from '../../sync/sync-attach';
 import { showProblem } from '../../ui/problem-fixes';
 import { strandMarkKey } from '../../core/strand';
 import { buildStrandFrame } from './context-strand-frame';
+import { lookupHeldId } from '../../core/ow-links';
 
 export interface MountContextTabOpts {
   pane: HTMLElement;
@@ -644,9 +645,12 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   const onChipSelectEvent = (e: Event): void => {
     const detail = (e as CustomEvent).detail as { id?: string } | null;
     if (!detail || typeof detail.id !== 'string') return;
+    // A chip's id, as held then lowercase (a chip saved in capitals resolves).
+    const elements = getState().data.elements;
+    const id = lookupHeldId(detail.id, x => (elements.some(e => e.id === x) ? x : undefined)) ?? detail.id;
     // writing mode: preview slides over the lists. element mode (element room
     // + knowledge entries): preview swaps content. Both via onSelect.
-    if (currentRender.mode === 'writing' || currentRender.mode === 'element') onSelect(detail.id);
+    if (currentRender.mode === 'writing' || currentRender.mode === 'element') onSelect(id);
   };
   document.addEventListener('atlas:context-select-element', onChipSelectEvent);
 

@@ -209,19 +209,42 @@ describe('writing-compiled / renderProseFragment', () => {
 
   it('converts ow:// links to element chips and KEEPS THE WRITER\'S LABEL (the label law)', () => {
     const map = new Map<string, Element>();
-    map.set('char-1', {
-      id: 'char-1', type: 'character', name: 'Drizzle',
+    map.set('00000000-0000-0000-0000-636861722d31', {
+      id: '00000000-0000-0000-0000-636861722d31', type: 'character', name: 'Drizzle',
       local_updated_at: '2026-01-01T00:00:00Z',
     } as Element);
-    const html = renderProseFragment('hello [annoying guy](ow://character/char-1) end', map).outerHTML;
+    const html = renderProseFragment('hello [annoying guy](ow://character/00000000-0000-0000-0000-636861722d31) end', map).outerHTML;
     // Titus: a link must NEVER be shown as the element's name. The
     // rendering used to print "Drizzle" here, so a book compiled differently
     // from the scene it contained.
     expect(html).toContain('class="atlas-element-chip"');
-    expect(html).toContain('data-id="char-1"');
+    expect(html).toContain('data-id="00000000-0000-0000-0000-636861722d31"');
     expect(html).toContain('data-type="character"');
     expect(html).toContain('>annoying guy<');
     expect(html).not.toContain('Drizzle');
+  });
+
+  describe('an address read by the SDK (1.124.2)', () => {
+    const ID = '00000000-0000-0000-0000-636861722d31';
+    const map = new Map<string, Element>([[ID, { id: ID, type: 'character', name: 'Drizzle' } as Element]]);
+    it('an id in capitals chips the lowercase element', () => {
+      const html = renderProseFragment(`[her](ow://character/${ID.toUpperCase()})`, map, { unresolved: 'text' }).outerHTML;
+      expect(html).toContain(`data-id="${ID}"`);
+      expect(html).toContain('>her<');
+    });
+    it('a type word in capitals is plain text: its label, no chip, no href', () => {
+      const html = renderProseFragment(`[her](ow://Character/${ID})`, map).outerHTML;
+      expect(html).not.toContain('atlas-element-chip');
+      expect(html).not.toContain('ow://');
+      expect(html).toContain('her');
+    });
+    it('a link with a moment or a lens chips its element, the label kept', () => {
+      const html = renderProseFragment(`[then](ow://character/${ID}@12) and [seen](ow://character/${ID}?lens=${ID})`, map).outerHTML;
+      expect(html.match(/atlas-element-chip/g)).toHaveLength(2);
+      expect(html).toContain('>then<');
+      expect(html).toContain('>seen<');
+      expect(html).not.toContain('ow://');
+    });
   });
 
   it('renders standard links as anchor tags', () => {

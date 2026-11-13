@@ -25,30 +25,62 @@ describe('extractProseLinks', () => {
   });
 
   it('parses a single character link', () => {
-    const md = 'Hello [Drizzle](ow://character/abc-123)';
-    expect(extractProseLinks(md)).toEqual({ character: ['abc-123'] });
+    const md = 'Hello [Drizzle](ow://character/00000000-0000-0000-0061-62632d313233)';
+    expect(extractProseLinks(md)).toEqual({ character: ['00000000-0000-0000-0061-62632d313233'] });
   });
 
   it('groups multiple types', () => {
-    const md = `[A](ow://character/c-1) walked into [B](ow://location/l-1) and saw [C](ow://character/c-2).`;
+    const md = `[A](ow://character/00000000-0000-0000-0000-000000632d31) walked into [B](ow://location/00000000-0000-0000-0000-0000006c2d31) and saw [C](ow://character/00000000-0000-0000-0000-000000632d32).`;
     const result = extractProseLinks(md);
-    expect(result.character).toEqual(['c-1', 'c-2']);
-    expect(result.location).toEqual(['l-1']);
+    expect(result.character).toEqual(['00000000-0000-0000-0000-000000632d31', '00000000-0000-0000-0000-000000632d32']);
+    expect(result.location).toEqual(['00000000-0000-0000-0000-0000006c2d31']);
   });
 
   it('dedupes repeated uuids of the same type', () => {
-    const md = `[Hal](ow://character/c-1) said hi. Later [Halloway](ow://character/c-1) returned.`;
-    expect(extractProseLinks(md)).toEqual({ character: ['c-1'] });
+    const md = `[Hal](ow://character/00000000-0000-0000-0000-000000632d31) said hi. Later [Halloway](ow://character/00000000-0000-0000-0000-000000632d31) returned.`;
+    expect(extractProseLinks(md)).toEqual({ character: ['00000000-0000-0000-0000-000000632d31'] });
   });
 
-  it('is case-insensitive on element type', () => {
-    const md = `[X](ow://CHARACTER/c-1)`;
-    expect(extractProseLinks(md)).toEqual({ character: ['c-1'] });
+  // The address profile, as the SDK reads it (1.124.2): the type word is
+  // lowercase only, the id is an id, read lowercase in either case of hex.
+  it('a type word in capitals is plain text, not a link', () => {
+    const md = `[X](ow://CHARACTER/00000000-0000-0000-0000-000000632d31) and ow://Character/00000000-0000-0000-0000-000000632d31`;
+    expect(extractProseLinks(md)).toEqual({});
   });
 
-  it('handles UUIDs with hyphens correctly', () => {
-    const md = `[X](ow://event/abc-12345-67890-abcdef)`;
-    expect(extractProseLinks(md)).toEqual({ event: ['abc-12345-67890-abcdef'] });
+  it('an id in capitals names the element held in lowercase', () => {
+    const md = `[X](ow://event/00000000-0000-0000-0000-000000632D31)`;
+    expect(extractProseLinks(md)).toEqual({ event: ['00000000-0000-0000-0000-000000632d31'] });
+  });
+
+  it('an id that is not an id is no link', () => {
+    expect(extractProseLinks(`[X](ow://event/abc-12345-67890-abcdef) ow://character/abc`)).toEqual({});
+  });
+
+  it('text run on after the id is prose: the address names the id', () => {
+    const md = `see ow://character/00000000-0000-0000-0000-000000632d31x and ow://character/00000000-0000-0000-0000-000000632d32_x.`;
+    expect(extractProseLinks(md)).toEqual({
+      character: ['00000000-0000-0000-0000-000000632d31', '00000000-0000-0000-0000-000000632d32'],
+    });
+  });
+
+  it('a moment and a lens do not change the element named', () => {
+    const md = `[X](ow://character/00000000-0000-0000-0000-000000632d31@12?lens=00000000-0000-0000-0000-000000632d32).`;
+    expect(extractProseLinks(md)).toEqual({ character: ['00000000-0000-0000-0000-000000632d31'] });
+  });
+});
+
+describe('an upper-case address and the derive (1.124.2)', () => {
+  const LOWER = '00000000-0000-0000-0000-000000632d31';
+  it('a scene naming a lowercase element in capitals derives the relation', () => {
+    const narr = makeNarrative();
+    const exists = linkTargetsIn([{ id: LOWER, type: 'character' } as any]);
+    expect(computeRelationPatch(narr, `[X](ow://character/${LOWER.toUpperCase()})`, exists)).toEqual({ characters: [LOWER] });
+  });
+  it('an element whose own id is held in capitals is named by no address: nothing is derived', () => {
+    const narr = makeNarrative();
+    const exists = linkTargetsIn([{ id: LOWER.toUpperCase(), type: 'character' } as any]);
+    expect(computeRelationPatch(narr, `[X](ow://character/${LOWER.toUpperCase()})`, exists)).toEqual({});
   });
 });
 
@@ -60,60 +92,60 @@ describe('computeRelationPatch', () => {
   // and leaves prose alone), and the derive used to write the dead id back.
   it('does not derive a link to an element that no longer exists', () => {
     const narr = makeNarrative({ characters: [] } as any);
-    const md = `[Gone](ow://character/dead-1) and [Here](ow://character/c-1)`;
-    const exists = linkTargetsIn([{ id: 'c-1', type: 'character' } as any]);
-    expect(computeRelationPatch(narr, md, exists)).toEqual({ characters: ['c-1'] });
+    const md = `[Gone](ow://character/00000000-0000-0000-0000-646561642d31) and [Here](ow://character/00000000-0000-0000-0000-000000632d31)`;
+    const exists = linkTargetsIn([{ id: '00000000-0000-0000-0000-000000632d31', type: 'character' } as any]);
+    expect(computeRelationPatch(narr, md, exists)).toEqual({ characters: ['00000000-0000-0000-0000-000000632d31'] });
   });
 
   it('does not derive an id into the wrong field when the chip names the wrong type', () => {
     const narr = makeNarrative();
-    const md = `[X](ow://location/c-1)`;
-    const exists = linkTargetsIn([{ id: 'c-1', type: 'character' } as any]);
+    const md = `[X](ow://location/00000000-0000-0000-0000-000000632d31)`;
+    const exists = linkTargetsIn([{ id: '00000000-0000-0000-0000-000000632d31', type: 'character' } as any]);
     expect(computeRelationPatch(narr, md, exists)).toEqual({});
   });
 
   it('keeps an entry already in the field even when its target is gone (the scrub owns removal)', () => {
-    const narr = makeNarrative({ characters: ['dead-1'] } as any);
-    const md = `[Gone](ow://character/dead-1)`;
+    const narr = makeNarrative({ characters: ['00000000-0000-0000-0000-646561642d31'] } as any);
+    const md = `[Gone](ow://character/00000000-0000-0000-0000-646561642d31)`;
     expect(computeRelationPatch(narr, md, linkTargetsIn([]))).toEqual({});
   });
 
   it('returns empty patch when no prose links exist', () => {
-    const narr = makeNarrative({ characters: ['existing-1'] } as any);
+    const narr = makeNarrative({ characters: ['00000000-0000-6578-6973-74696e672d31'] } as any);
     expect(computeRelationPatch(narr, 'Some prose without links.', ANY)).toEqual({});
   });
 
   it('adds prose-derived uuids to empty relation field', () => {
     const narr = makeNarrative();
-    const md = `[Drizzle](ow://character/c-1) and [Hal](ow://character/c-2).`;
-    expect(computeRelationPatch(narr, md, ANY)).toEqual({ characters: ['c-1', 'c-2'] });
+    const md = `[Drizzle](ow://character/00000000-0000-0000-0000-000000632d31) and [Hal](ow://character/00000000-0000-0000-0000-000000632d32).`;
+    expect(computeRelationPatch(narr, md, ANY)).toEqual({ characters: ['00000000-0000-0000-0000-000000632d31', '00000000-0000-0000-0000-000000632d32'] });
   });
 
   it('UNIONs prose-derived with existing manual entries (preserves manual)', () => {
-    const narr = makeNarrative({ characters: ['manual-1', 'manual-2'] } as any);
-    const md = `[Manual1](ow://character/manual-1) [New](ow://character/new-1)`;
-    expect(computeRelationPatch(narr, md, ANY)).toEqual({ characters: ['manual-1', 'manual-2', 'new-1'] });
+    const narr = makeNarrative({ characters: ['00000000-0000-0000-6d61-6e75616c2d31', '00000000-0000-0000-6d61-6e75616c2d32'] } as any);
+    const md = `[Manual1](ow://character/00000000-0000-0000-6d61-6e75616c2d31) [New](ow://character/00000000-0000-0000-0000-006e65772d31)`;
+    expect(computeRelationPatch(narr, md, ANY)).toEqual({ characters: ['00000000-0000-0000-6d61-6e75616c2d31', '00000000-0000-0000-6d61-6e75616c2d32', '00000000-0000-0000-0000-006e65772d31'] });
   });
 
   it('returns no-op when prose adds nothing new', () => {
-    const narr = makeNarrative({ characters: ['c-1'] } as any);
-    const md = `[X](ow://character/c-1)`;
+    const narr = makeNarrative({ characters: ['00000000-0000-0000-0000-000000632d31'] } as any);
+    const md = `[X](ow://character/00000000-0000-0000-0000-000000632d31)`;
     expect(computeRelationPatch(narr, md, ANY)).toEqual({});
   });
 
   it('groups multiple element types into their respective fields', () => {
     const narr = makeNarrative();
-    const md = `[A](ow://character/c-1) walked into [B](ow://location/l-1).`;
+    const md = `[A](ow://character/00000000-0000-0000-0000-000000632d31) walked into [B](ow://location/00000000-0000-0000-0000-0000006c2d31).`;
     const patch = computeRelationPatch(narr, md, ANY);
     expect(patch).toEqual({
-      characters: ['c-1'],
-      locations: ['l-1'],
+      characters: ['00000000-0000-0000-0000-000000632d31'],
+      locations: ['00000000-0000-0000-0000-0000006c2d31'],
     });
   });
 
   it('ignores element types that have no Narrative relation field (e.g. pin)', () => {
     const narr = makeNarrative();
-    const md = `[A](ow://pin/p-1)`;
+    const md = `[A](ow://pin/00000000-0000-0000-0000-000000702d31)`;
     expect(computeRelationPatch(narr, md, ANY)).toEqual({});
   });
 });

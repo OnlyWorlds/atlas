@@ -32,6 +32,7 @@ import {
 import { knowledgeHeldBy } from './knowledge';
 import { handsOnAsProposed } from './review-mark';
 import { isHiddenMark } from './hidden-mark';
+import { findAddresses, lookupHeldId } from './ow-links';
 // Pure shape/geometry helpers (no DOM) — one resolver for zone shape across
 // canvas, builder, and payload; the tabs/right location is historical.
 import { getZoneShape } from '../tabs/right/zone-derived';
@@ -164,38 +165,58 @@ export function populatedFieldNames(el: Element): string[] {
 // Disclosure scrub — the wire artifact must not carry undisclosed ids.
 // ---------------------------------------------------------------------------
 
-/** Markdown ow:// link: [label](ow://type/uuid) — the shape both renderers match. */
-const MD_OW_LINK_RE = /\[([^\]]+?)\]\(ow:\/\/([a-z_-]+)\/([\w-]+)\)/gi;
-
-/** Bare ow:// URI outside link syntax (hand-typed) — same leak, no label. */
-const BARE_OW_LINK_RE = /ow:\/\/([a-z_-]+)\/([\w-]+)/gi;
-
 /** Scrub target for text that never chips (card field values): drop every link. */
 const NO_IDS: ReadonlySet<string> = new Set<string>();
 
+/** Is an id on the page, as written or by its lowercase reading? */
+function disclosed(includedIds: ReadonlySet<string>, asWritten: string | null, reading: string | null): boolean {
+  if (asWritten === null || reading === null) return true;
+  return includedIds.has(asWritten) || includedIds.has(reading);
+}
+
 /**
- * Pre-resolve markdown for the payload (contract §2): ow:// links whose
- * target is NOT included become plain label text BEFORE the payload ships.
+ * Pre-resolve markdown for the payload (contract §2): an address whose
+ * element or lens is NOT included is taken out BEFORE the payload ships.
  * The render-time rule (§5.1) still strips them visually, but the payload
  * JSON itself is served publicly — an `ow://character/<uuid>` in raw markdown
  * would leak the element's type, uuid, and cross-page linkable identity even
- * when no renderer ever shows it. Included targets keep their links (the
- * viewer chips them). Bare hand-typed ow:// URIs resolve to the element's
- * name when known, else drop.
+ * when no renderer ever shows it. Every address the SDK reads counts, in
+ * either form and of any world, and its lens too (`findAddresses`). Inside a
+ * markdown link `[label](address)` the link becomes its label (THE LABEL LAW);
+ * a bare address becomes the element's name when the world holds it (an
+ * element of this world), else nothing. Included targets keep their links
+ * (the viewer chips them). A world's own address names no element and stays.
  */
 export function scrubMarkdownForPayload(
   markdown: string,
   includedIds: ReadonlySet<string>,
   byId: Map<string, Element>,
 ): string {
-  let out = markdown.replace(MD_OW_LINK_RE, (whole, label: string, _type: string, id: string) =>
-    includedIds.has(id) ? whole : label,
-  );
-  out = out.replace(BARE_OW_LINK_RE, (whole, _type: string, id: string) => {
-    if (includedIds.has(id)) return whole;
-    return byId.get(id)?.name ?? '';
-  });
-  return out;
+  if (typeof markdown !== 'string') return markdown;
+  const found = findAddresses(markdown);
+  if (found.length === 0) return markdown;
+  let out = '';
+  let last = 0;
+  for (const f of found) {
+    if (f.start < last) continue; // inside a markdown link already replaced
+    const r = f.reading;
+    if (disclosed(includedIds, f.idAsWritten, r.id) && disclosed(includedIds, f.lensAsWritten, r.lens)) continue;
+    // `[label](address…)`: the whole link becomes its label. The href may go
+    // on past the address (a query, a fragment, a title) up to its `)`.
+    const open = markdown.lastIndexOf('](', f.start);
+    const labelStart = open === f.start - 2 ? markdown.lastIndexOf('[', open) : -1;
+    const close = labelStart !== -1 ? /^[^\s()]*(?:\s+"[^"\n]*")?\)/.exec(markdown.slice(f.end)) : null;
+    if (labelStart >= last && close && !markdown.slice(labelStart + 1, open).includes(']')) {
+      out += markdown.slice(last, labelStart) + markdown.slice(labelStart + 1, open);
+      last = f.end + close[0].length;
+      continue;
+    }
+    const inWorld = r.form === 'text' && r.world === null && r.id !== null;
+    const name = inWorld && f.idAsWritten !== null ? lookupHeldId(f.idAsWritten, id => byId.get(id))?.name ?? '' : '';
+    out += markdown.slice(last, f.start) + name;
+    last = f.end;
+  }
+  return last === 0 ? markdown : out + markdown.slice(last);
 }
 
 // ---------------------------------------------------------------------------

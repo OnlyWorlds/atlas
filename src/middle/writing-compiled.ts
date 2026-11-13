@@ -24,6 +24,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { getState } from '../core/state';
 import { navigate, writingHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
+import { lookupHeldId, readOwHref } from '../core/ow-links';
 import { buildNarrativeIndex, getTierForNarrative, getWritingLabels, iconForTier, type NarrativeNode } from './writing-helpers';
 import { countMarkdownWords } from './writing-word-count';
 
@@ -370,23 +371,28 @@ function renderInline(
   // view — missing = deleted-but-referenced); 'text' renders plain text with
   // no styling and no data-id (sharing — missing = NOT DISCLOSED, contract
   // §5.1: non-disclosure must leak nothing).
-  s = s.replace(/\[([^\]]+?)\]\(ow:\/\/([a-z-]+)\/([\w-]+)\)/gi, (_, label, type, id) => {
-    const el = elements.get(id);
-    // `label` was captured from the already-escaped string — return as-is.
-    if (!el && unresolved === 'text') return label;
-    // THE LABEL LAW reaches the read-only view (Titus: a link must
-    // NEVER be shown as the element's name). The writer's label is the text;
-    // the chip resolves by id. `label` is already escaped (captured from the
-    // escaped string), so it goes back as-is.
-    return `<span class="atlas-element-chip" data-id="${id}" data-type="${type}">${label}</span>`;
-  });
-
-  // Standard links: [text](url) — non-ow:// only (the above already consumed
-  // ow:// matches, so the remaining pattern matches plain URLs). Scheme
-  // allowlist: markdown reaches public visitors via published payloads, so a
-  // javascript:/data: href would be click-to-execute XSS. Unsafe scheme →
-  // plain text (`text` was captured from the already-escaped string).
+  // The href is read by the SDK (core/ow-links): an element address inside
+  // this world, its id looked up as written and then lowercase. An address
+  // character is never one escapeText changes, so reading the escaped href is
+  // reading the writer's.
+  //
+  // Standard links: [text](url). Scheme allowlist: markdown reaches public
+  // visitors via published payloads, so a javascript:/data: href would be
+  // click-to-execute XSS. Unsafe scheme (an `ow://` href that is no element
+  // address in this world included) → plain text (`text` was captured from
+  // the already-escaped string).
   s = s.replace(/\[([^\]]+?)\]\(([^)\s]+?)\)/g, (_, text, url) => {
+    const link = readOwHref(url);
+    if (link) {
+      const el = lookupHeldId(link.idAsWritten, id => elements.get(id));
+      if (!el && unresolved === 'text') return text;
+      // THE LABEL LAW reaches the read-only view (Titus: a link must
+      // NEVER be shown as the element's name). The writer's label is the text;
+      // the chip resolves by id. `text` is already escaped (captured from the
+      // escaped string), so it goes back as-is; the id and type are the
+      // reading's (hex and a type word).
+      return `<span class="atlas-element-chip" data-id="${el?.id ?? link.id}" data-type="${link.type}">${text}</span>`;
+    }
     if (!SAFE_LINK_HREF_RE.test(url)) return text;
     // `url` was captured from the already-escaped string (escapeText covers
     // quotes), so it is attribute-safe as-is; escaping it again

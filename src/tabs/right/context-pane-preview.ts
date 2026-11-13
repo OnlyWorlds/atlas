@@ -38,6 +38,7 @@ import { getWritingLabels } from '../../middle/writing-helpers';
 import { toastManager } from '../../ui/toast-manager';
 import { showProblem } from '../../ui/problem-fixes';
 import { escapeOwned } from '../../core/escape-mark';
+import { proseNamesId } from '../../core/ow-links';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -98,13 +99,12 @@ export function mountContextPreview(opts: ContextPreviewOpts): ContextPreviewHan
 // meaning the narrative's prose contains a chip (or text mention via alias)
 // for it. Only meaningful in writing mode; callers gate on mode.
 //
-// Match rule: scan narrative.story for either an ow:// chip link with this
-// id OR a word-boundary text match of the element's name / any alias.
-function isElementFeatured(el: Element, narrative: Element): boolean {
+// Match rule: scan narrative.story for either an element address naming this
+// element (as the SDK reads it) OR a word-boundary text match of the element's name / any alias.
+export function isElementFeatured(el: Element, narrative: Element): boolean {
   const story = typeof narrative.story === 'string' ? narrative.story : '';
   if (story.length === 0) return false;
-  const chipTail = '/' + el.id + ')';
-  if (story.indexOf(chipTail) !== -1) return true;
+  if (proseNamesId(story, el.id)) return true;
   const candidates: string[] = [];
   if (el.name) candidates.push(el.name);
   if (Array.isArray(el.atlas_aliases)) {

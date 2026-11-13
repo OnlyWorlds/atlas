@@ -42,6 +42,7 @@ import type { ToastManager } from '../ui/toast-manager';
 import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
 import { currentLore } from '../core/parlor-room';
+import { proseNamesId } from '../core/ow-links';
 
 export interface KnowledgeEditorOptions {
   /** Prose host — the editor takes over this element (already carries the prose CSS class). */
@@ -180,7 +181,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
     // Any other mention left? Other chips with the same id, or word-bounded
     // name/alias text matches.
     const markdown = editorHandle.getMarkdown();
-    if (markdown.includes('/' + chip.id + ')')) return;
+    if (proseNamesId(markdown, chip.id)) return;
     const plainText = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n');
     const surfaceForms: string[] = [];
     if (targetEl.name) surfaceForms.push(targetEl.name);

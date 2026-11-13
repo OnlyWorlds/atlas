@@ -19,20 +19,20 @@ function el(id: string, type: string, name: string, aliases?: string[]): Element
 }
 
 const WORLD = [
-  el('c1', 'character', 'Aralia', ['the duchess']),
-  el('c2', 'character', 'Bram'),
-  el('l1', 'location', 'Vallaki'),
+  el('00000000-0000-0000-0000-000000006331', 'character', 'Aralia', ['the duchess']),
+  el('00000000-0000-0000-0000-000000006332', 'character', 'Bram'),
+  el('00000000-0000-0000-0000-000000006c31', 'location', 'Vallaki'),
   // Ambiguous pair — same name, two elements.
-  el('x1', 'object', 'Echo'),
-  el('x2', 'creature', 'Echo'),
+  el('00000000-0000-0000-0000-000000007831', 'object', 'Echo'),
+  el('00000000-0000-0000-0000-000000007832', 'creature', 'Echo'),
 ];
 
 describe('autolinkMarkdown', () => {
   it('links the first mention only, leaves later occurrences as text', () => {
     const index = buildAutolinkIndex(WORLD);
     const r = autolinkMarkdown('Aralia rode out. Later Aralia returned.', index);
-    expect(r.story).toBe('[Aralia](ow://character/c1) rode out. Later Aralia returned.');
-    expect(r.linked.map(c => c.id)).toEqual(['c1']);
+    expect(r.story).toBe('[Aralia](ow://character/00000000-0000-0000-0000-000000006331) rode out. Later Aralia returned.');
+    expect(r.linked.map(c => c.id)).toEqual(['00000000-0000-0000-0000-000000006331']);
   });
 
   it('matches aliases and KEEPS THE WRITER\'S TEXT as the label', () => {
@@ -42,16 +42,16 @@ describe('autolinkMarkdown', () => {
     // is superseded: link-all rewrote the tour's own sentence with it.
     const index = buildAutolinkIndex(WORLD);
     const r = autolinkMarkdown('They bowed to the duchess.', index);
-    expect(r.story).toBe('They bowed to [the duchess](ow://character/c1).');
+    expect(r.story).toBe('They bowed to [the duchess](ow://character/00000000-0000-0000-0000-000000006331).');
   });
 
   it("a CASE-VARIANT alias keeps the writer own casing", () => {
     // Titus: do not change capitalization when linking in the writing
     // room. A link is a relationship, not a spelling correction.
-    const world = [el('c9', 'character', 'Consul', ['consul'])];
+    const world = [el('00000000-0000-0000-0000-000000006339', 'character', 'Consul', ['consul'])];
     const index = buildAutolinkIndex(world);
     const r = autolinkMarkdown('The old consul waited.', index);
-    expect(r.story).toBe('The old [consul](ow://character/c9) waited.');
+    expect(r.story).toBe('The old [consul](ow://character/00000000-0000-0000-0000-000000006339) waited.');
   });
 
   it("a GENUINELY different alias keeps its text AND resolves to the canonical ELEMENT", () => {
@@ -61,8 +61,8 @@ describe('autolinkMarkdown', () => {
     // still points at Aralia's id, it just keeps saying "the duchess".
     const index = buildAutolinkIndex(WORLD);
     const r = autolinkMarkdown('They bowed to the duchess.', index);
-    expect(r.linked.map(c => c.id)).toEqual(['c1']);
-    expect(r.story).toContain('(ow://character/c1)');
+    expect(r.linked.map(c => c.id)).toEqual(['00000000-0000-0000-0000-000000006331']);
+    expect(r.story).toContain('(ow://character/00000000-0000-0000-0000-000000006331)');
     expect(r.story).not.toContain('Aralia');
   });
 
@@ -77,9 +77,9 @@ describe('autolinkMarkdown', () => {
     const forms = ['Aralia', 'aralia', 'ARALIA', 'ArAlIa', 'the duchess', 'The Duchess'];
     for (const form of forms) {
       const r = autolinkMarkdown(`Then ${form} spoke.`, index);
-      expect(r.linked.map(c => c.id), `${form} should link`).toEqual(['c1']);
+      expect(r.linked.map(c => c.id), `${form} should link`).toEqual(['00000000-0000-0000-0000-000000006331']);
       expect(r.story, `${form} must survive linking unchanged`)
-        .toBe(`Then [${form}](ow://character/c1) spoke.`);
+        .toBe(`Then [${form}](ow://character/00000000-0000-0000-0000-000000006331) spoke.`);
     }
   });
 
@@ -125,7 +125,7 @@ describe('autolinkMarkdown', () => {
     const chip = para.content.find(n => n.type === 'elementChip') as { attrs: { id: string; label: string } } | undefined;
     expect(chip, 'the alias mention linked').toBeTruthy();
     expect(chip!.attrs.label, 'and kept the writer text').toBe('the duchess');
-    expect(chip!.attrs.id, 'while resolving to the canonical element').toBe('c1');
+    expect(chip!.attrs.id, 'while resolving to the canonical element').toBe('00000000-0000-0000-0000-000000006331');
   });
 
   it('skips ambiguous names entirely', () => {
@@ -137,12 +137,12 @@ describe('autolinkMarkdown', () => {
 
   it('respects existing ow:// links (id counts as mentioned) and protected link spans', () => {
     const index = buildAutolinkIndex(WORLD);
-    const story = 'See [Aralia](ow://character/c1). Aralia smiled. [Vallaki gates](https://x.test) held. Vallaki fell.';
+    const story = 'See [Aralia](ow://character/00000000-0000-0000-0000-000000006331). Aralia smiled. [Vallaki gates](https://x.test) held. Vallaki fell.';
     const r = autolinkMarkdown(story, index);
     // Aralia already linked → second mention untouched. "Vallaki" inside the
     // external link's label is protected; the bare "Vallaki" after it links.
     expect(r.story).toBe(
-      'See [Aralia](ow://character/c1). Aralia smiled. [Vallaki gates](https://x.test) held. [Vallaki](ow://location/l1) fell.',
+      'See [Aralia](ow://character/00000000-0000-0000-0000-000000006331). Aralia smiled. [Vallaki gates](https://x.test) held. [Vallaki](ow://location/00000000-0000-0000-0000-000000006c31) fell.',
     );
   });
 
@@ -150,12 +150,12 @@ describe('autolinkMarkdown', () => {
     const index = buildAutolinkIndex(WORLD);
     // Lowercase now links (Titus's ask) ...
     const lower = autolinkMarkdown('aralia walked home.', index);
-    expect(lower.linked.map(c => c.id)).toEqual(['c1']);
+    expect(lower.linked.map(c => c.id)).toEqual(['00000000-0000-0000-0000-000000006331']);
     // ... and the writer's casing SURVIVES it. This is the guarantee the
     // whole change rests on: folding case without preserving the surface
     // form would turn every lowercase mention into a silent edit of the
     // prose.
-    expect(lower.story).toBe('[aralia](ow://character/c1) walked home.');
+    expect(lower.story).toBe('[aralia](ow://character/00000000-0000-0000-0000-000000006331) walked home.');
     // Word boundaries still hold: "Bramble" is not "Bram".
     expect(autolinkMarkdown('Bramble is a shrub.', index).linked).toHaveLength(0);
   });
@@ -163,18 +163,46 @@ describe('autolinkMarkdown', () => {
   it('links multiple distinct candidates in one pass', () => {
     const index = buildAutolinkIndex(WORLD);
     const r = autolinkMarkdown('Bram met Aralia in Vallaki.', index);
-    expect(r.linked.map(c => c.id).sort()).toEqual(['c1', 'c2', 'l1']);
+    expect(r.linked.map(c => c.id).sort()).toEqual(['00000000-0000-0000-0000-000000006331', '00000000-0000-0000-0000-000000006332', '00000000-0000-0000-0000-000000006c31']);
     expect(r.story).toBe(
-      '[Bram](ow://character/c2) met [Aralia](ow://character/c1) in [Vallaki](ow://location/l1).',
+      '[Bram](ow://character/00000000-0000-0000-0000-000000006332) met [Aralia](ow://character/00000000-0000-0000-0000-000000006331) in [Vallaki](ow://location/00000000-0000-0000-0000-000000006c31).',
     );
   });
 });
 
 describe('unlinkMarkdown', () => {
   it('strips ow links to bare labels, leaves external links alone', () => {
-    const r = unlinkMarkdown('See [Aralia](ow://character/c1) at [the site](https://x.test).');
+    const r = unlinkMarkdown('See [Aralia](ow://character/00000000-0000-0000-0000-000000006331) at [the site](https://x.test).');
     expect(r.story).toBe('See Aralia at [the site](https://x.test).');
     expect(r.unlinked).toBe(1);
+  });
+
+  // The address profile, read by the SDK (1.124.2): unlink takes the links the
+  // editor holds as chips, the same set unlinkRichtext turns back to text.
+  const ARALIA = '00000000-0000-0000-0000-000000006331';
+  it('a link with a moment or a lens is no chip: it stays', () => {
+    const story = `[A](ow://character/${ARALIA}@12) [B](ow://character/${ARALIA}?lens=${ARALIA})`;
+    expect(unlinkMarkdown(story)).toEqual({ story, unlinked: 0 });
+  });
+  it('a type word in capitals is plain text already: it stays', () => {
+    const story = `[A](ow://Character/${ARALIA})`;
+    expect(unlinkMarkdown(story)).toEqual({ story, unlinked: 0 });
+  });
+  it('an id in capitals is a chip: it unlinks', () => {
+    expect(unlinkMarkdown(`[A](ow://character/${ARALIA.toUpperCase()}).`)).toEqual({ story: 'A.', unlinked: 1 });
+  });
+});
+
+describe('autolinkMarkdown reads already-linked ids as the SDK does (1.124.2)', () => {
+  it('an id written in capitals counts as a mention of the lowercase element', () => {
+    const index = buildAutolinkIndex(WORLD);
+    const story = 'See [her](ow://character/00000000-0000-0000-0000-000000006331'.toUpperCase().replace('OW://CHARACTER', 'ow://character') + '). Aralia smiled.';
+    expect(autolinkMarkdown(story, index).linked).toEqual([]);
+  });
+  it('a type word in capitals is no link: the first mention links', () => {
+    const index = buildAutolinkIndex(WORLD);
+    const story = 'See [her](ow://Character/00000000-0000-0000-0000-000000006331). Aralia smiled.';
+    expect(autolinkMarkdown(story, index).linked.map(c => c.id)).toEqual(['00000000-0000-0000-0000-000000006331']);
   });
 });
 
@@ -188,10 +216,10 @@ describe('autolinkRichtext', () => {
     const para = (r.doc as any).content[0];
     expect(para.content).toEqual([
       { type: 'text', text: 'Then ' },
-      { type: 'elementChip', attrs: { id: 'c1', type: 'character', label: 'Aralia' } },
+      { type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006331', type: 'character', label: 'Aralia' } },
       { type: 'text', text: ' spoke. Aralia left.' },
     ]);
-    expect(r.linked.map(c => c.id)).toEqual(['c1']);
+    expect(r.linked.map(c => c.id)).toEqual(['00000000-0000-0000-0000-000000006331']);
     // Input untouched (pure).
     expect((input as any).content[0].content).toHaveLength(1);
   });
@@ -212,14 +240,14 @@ describe('autolinkRichtext', () => {
     const input = {
       type: 'doc',
       content: [
-        { type: 'paragraph', content: [{ type: 'elementChip', attrs: { id: 'c1', type: 'character', label: 'Aralia' } }] },
+        { type: 'paragraph', content: [{ type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006331', type: 'character', label: 'Aralia' } }] },
         { type: 'paragraph', content: [{ type: 'text', text: 'Aralia again, and Vallaki.' }] },
       ],
     };
     const r = autolinkRichtext(input, index);
     const p2 = (r.doc as any).content[1];
     expect(p2.content.map((n: any) => n.type)).toEqual(['text', 'elementChip', 'text']);
-    expect(p2.content[1].attrs.id).toBe('l1');
+    expect(p2.content[1].attrs.id).toBe('00000000-0000-0000-0000-000000006c31');
   });
 });
 
@@ -263,7 +291,7 @@ describe('unlinkRichtext', () => {
         type: 'paragraph',
         content: [
           { type: 'text', text: 'See ' },
-          { type: 'elementChip', attrs: { id: 'c1', type: 'character', label: 'Aralia' } },
+          { type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006331', type: 'character', label: 'Aralia' } },
           { type: 'text', text: ' now.' },
         ],
       }],
@@ -285,13 +313,13 @@ describe('unlinkRichtext', () => {
 // ---------------------------------------------------------------------------
 
 describe('linkTermMarkdown', () => {
-  const target = { id: 'c2', type: 'character' };
+  const target = { id: '00000000-0000-0000-0000-000000006332', type: 'character' };
 
   it('links EVERY match, not just the first, keeping the matched text as label', () => {
     const r = linkTermMarkdown('the orc met the Orc and another orc left', 'orc', target);
     expect(r.linked).toBe(3);
     expect(r.story).toBe(
-      'the [orc](ow://character/c2) met the [Orc](ow://character/c2) and another [orc](ow://character/c2) left',
+      'the [orc](ow://character/00000000-0000-0000-0000-000000006332) met the [Orc](ow://character/00000000-0000-0000-0000-000000006332) and another [orc](ow://character/00000000-0000-0000-0000-000000006332) left',
     );
   });
 
@@ -302,15 +330,15 @@ describe('linkTermMarkdown', () => {
     expect(ww.linked).toBe(2); // "orc" and "Orc"; "orcs" skipped
     const both = linkTermMarkdown('orc Orc orcs', 'orc', target, { caseSensitive: true, wholeWord: true });
     expect(both.linked).toBe(1);
-    expect(both.story).toBe('[orc](ow://character/c2) Orc orcs');
+    expect(both.story).toBe('[orc](ow://character/00000000-0000-0000-0000-000000006332) Orc orcs');
   });
 
   it('never enters an existing link, ow:// or plain', () => {
-    const story = 'orc [orc](ow://character/c1) and [an orc](https://x.y) plus orc';
+    const story = 'orc [orc](ow://character/00000000-0000-0000-0000-000000006331) and [an orc](https://x.y) plus orc';
     const r = linkTermMarkdown(story, 'orc', target);
     expect(r.linked).toBe(2);
     expect(r.story).toBe(
-      '[orc](ow://character/c2) [orc](ow://character/c1) and [an orc](https://x.y) plus [orc](ow://character/c2)',
+      '[orc](ow://character/00000000-0000-0000-0000-000000006332) [orc](ow://character/00000000-0000-0000-0000-000000006331) and [an orc](https://x.y) plus [orc](ow://character/00000000-0000-0000-0000-000000006332)',
     );
   });
 
@@ -329,7 +357,7 @@ describe('linkTermMarkdown', () => {
     // Titus: "orc " typed into the find box was becoming the chip.
     const r = linkTermMarkdown('an orc came; an orc.', 'orc ', target);
     expect(r.linked).toBe(1); // only "orc " (with the trailing space) matches; "orc." does not
-    expect(r.story).toBe('an [orc](ow://character/c2) came; an orc.');
+    expect(r.story).toBe('an [orc](ow://character/00000000-0000-0000-0000-000000006332) came; an orc.');
     const ws = linkTermMarkdown('a  b', ' ', target);
     expect(ws.linked).toBe(0);
     expect(ws.story).toBe('a  b');
@@ -337,13 +365,13 @@ describe('linkTermMarkdown', () => {
 });
 
 describe('linkTermRichtext', () => {
-  const target = { id: 'c2', type: 'character' };
+  const target = { id: '00000000-0000-0000-0000-000000006332', type: 'character' };
   const doc = (content: unknown[]) => ({ type: 'doc', content: [{ type: 'paragraph', content }] });
 
   it('splits text nodes around every match and never enters a chip', () => {
     const input = doc([
       { type: 'text', text: 'the orc met ' },
-      { type: 'elementChip', attrs: { id: 'c1', type: 'character', label: 'orc' } },
+      { type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006331', type: 'character', label: 'orc' } },
       { type: 'text', text: ' and an orc left', marks: [{ type: 'bold' }] },
     ]);
     const r = linkTermRichtext(input, 'orc', target);
@@ -351,11 +379,11 @@ describe('linkTermRichtext', () => {
     const para = (r.doc as any).content[0].content;
     expect(para).toEqual([
       { type: 'text', text: 'the ' },
-      { type: 'elementChip', attrs: { id: 'c2', type: 'character', label: 'orc' } },
+      { type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006332', type: 'character', label: 'orc' } },
       { type: 'text', text: ' met ' },
-      { type: 'elementChip', attrs: { id: 'c1', type: 'character', label: 'orc' } },
+      { type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006331', type: 'character', label: 'orc' } },
       { type: 'text', text: ' and an ', marks: [{ type: 'bold' }] },
-      { type: 'elementChip', attrs: { id: 'c2', type: 'character', label: 'orc' } },
+      { type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006332', type: 'character', label: 'orc' } },
       { type: 'text', text: ' left', marks: [{ type: 'bold' }] },
     ]);
     // Input untouched.
@@ -367,7 +395,7 @@ describe('linkTermRichtext', () => {
     expect(r.linked).toBe(1);
     expect((r.doc as any).content[0].content).toEqual([
       { type: 'text', text: 'an ' },
-      { type: 'elementChip', attrs: { id: 'c2', type: 'character', label: 'orc' } },
+      { type: 'elementChip', attrs: { id: '00000000-0000-0000-0000-000000006332', type: 'character', label: 'orc' } },
       { type: 'text', text: ' came; an orc.' },
     ]);
   });

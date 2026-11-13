@@ -52,7 +52,7 @@ function el(id: string, type: string, name: string, extra: Record<string, unknow
   return { id, type, name, local_updated_at: '2026-10-19T10:00:00.000Z', ...extra } as unknown as Element;
 }
 
-const IREENA = el('c3', 'character', 'Ireena', { objects: ['o1'] });
+const IREENA = el('00000000-0000-0000-0000-000000006333', 'character', 'Ireena', { objects: ['o1'] });
 const LOCKET = el('o1', 'object', 'Locket');
 const BAROVIA = el('l1', 'location', 'Barovia');
 
@@ -78,12 +78,12 @@ describe('the prose editor', () => {
   });
 
   it('"Add to story" puts no chip in a view-only world\'s prose; a writable one takes it', async () => {
-    const detail = { id: 'c3', type: 'character', name: 'Ireena' };
+    const detail = { id: '00000000-0000-0000-0000-000000006333', type: 'character', name: 'Ireena' };
     for (const readOnly of [true, false]) {
       openWorld(readOnly, [IREENA]);
       const h = mountWorkspaceEditor({ target: document.createElement('div'), initialMarkdown: 'She came.', onUpdate: () => {} });
       await handleAddToCast(detail, h.editor);
-      expect(h.getMarkdown().includes('ow://character/c3')).toBe(!readOnly);
+      expect(h.getMarkdown().includes('ow://character/00000000-0000-0000-0000-000000006333')).toBe(!readOnly);
       h.destroy();
     }
   });
@@ -93,7 +93,7 @@ describe('the writing workspace', () => {
   // A scene whose chip label is a pre-rename name: the mount's chip-label
   // sync rewrites it, and that transaction is what the autosave hears.
   const scene = el('n1', 'narrative', 'Arrival', {
-    story: '[Old name](ow://character/c3) arrives.', characters: ['c3'],
+    story: '[Old name](ow://character/00000000-0000-0000-0000-000000006333) arrives.', characters: ['00000000-0000-0000-0000-000000006333'],
   });
 
   async function workspace(readOnly: boolean): Promise<{ root: HTMLElement; writes: unknown[] }> {
@@ -218,7 +218,7 @@ describe('the find bar', () => {
 });
 
 describe('the writing context pane', () => {
-  const scene = el('n1', 'narrative', 'Arrival', { story: 'Barovia waits.', characters: ['c3'] });
+  const scene = el('n1', 'narrative', 'Arrival', { story: 'Barovia waits.', characters: ['00000000-0000-0000-0000-000000006333'] });
 
   function lists(readOnly: boolean): HTMLElement {
     openWorld(readOnly, [IREENA, LOCKET, BAROVIA, scene]);
@@ -415,7 +415,7 @@ describe('the writing room', () => {
 });
 
 describe('the knowledge room', () => {
-  const entry = el('k1', 'narrative', 'The secret', { subtype: 'knowledge', story: '', narrator: 'c3' });
+  const entry = el('k1', 'narrative', 'The secret', { subtype: 'knowledge', story: '', narrator: '00000000-0000-0000-0000-000000006333' });
 
   function room(readOnly: boolean, hash: string): HTMLElement {
     openWorld(readOnly, [IREENA, entry]);

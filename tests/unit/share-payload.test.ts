@@ -213,6 +213,42 @@ describe('buildPagePayload', () => {
     expect(JSON.stringify(p)).not.toContain(VALLAKI);
   });
 
+  // Every address the SDK reads, in either form, and its lens (1.124.2).
+  describe('the scrub reads every address the SDK reads', () => {
+    const W = '0193a1c2-7d3e-7f00-8a11-3c5e7b9d2f40';
+    const scrub = (markdown: string): { md: string; json: string } => {
+      const p = buildPagePayload(makePage([
+        { id: 'b1', kind: 'prose', markdown },
+        { id: 'b2', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [] },
+      ]), world());
+      return { md: (p.blocks[0] as { markdown: string }).markdown, json: JSON.stringify(p) };
+    };
+    it('a lens not on the page takes the whole link out, though its element is on it', () => {
+      const r = scrub(`[Ireena](ow://character/${IREENA}?lens=${VALLAKI}) waits.`);
+      expect(r.md).toBe('Ireena waits.');
+      expect(r.json).not.toContain(VALLAKI);
+    });
+    it('a moment rides with its address: the whole link goes', () => {
+      const r = scrub(`[Vallaki](ow://location/${VALLAKI}@12). Then ow://location/${VALLAKI}@3, gone.`);
+      expect(r.md).toBe('Vallaki. Then Vallaki, gone.');
+      expect(r.json).not.toContain(VALLAKI);
+    });
+    it("another world's address and the site's link are scrubbed too", () => {
+      const r = scrub(`See [there](ow://${W}/location/${VALLAKI}) and https://www.onlyworlds.com/w/${W}/location/${VALLAKI}.`);
+      expect(r.md).toBe('See there and .');
+      expect(r.json).not.toContain(VALLAKI);
+    });
+    it('an id in capitals is scrubbed, and an included one in capitals kept', () => {
+      const r = scrub(`[V](ow://location/${VALLAKI.toUpperCase()}) [I](ow://character/${IREENA.toUpperCase()})`);
+      expect(r.md).toBe(`V [I](ow://character/${IREENA.toUpperCase()})`);
+      expect(r.json.toLowerCase()).not.toContain(VALLAKI);
+    });
+    it('an included link with a lens on the page is kept, byte for byte', () => {
+      const md = `[Ireena](ow://character/${IREENA}@2?lens=${IREENA}).`;
+      expect(scrub(md).md).toBe(md);
+    });
+  });
+
   it('scrubs circle entry markdown the same way (frozen knowledge is public wire too)', () => {
     const CIRCLE = 'c1000000-0000-0000-0000-000000000001';
     const ENTRY = 'e1000000-0000-0000-0000-000000000001';

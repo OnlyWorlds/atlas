@@ -130,7 +130,7 @@ describe('convertLinkMarksToChips', () => {
     const input = doc(
       p(
         text('Hello '),
-        text('Drizzle', [{ type: 'link', attrs: { href: 'ow://character/abc-123' } }]),
+        text('Drizzle', [{ type: 'link', attrs: { href: 'ow://character/00000000-0000-0000-0061-62632d313233' } }]),
         text('.'),
       ),
     );
@@ -138,7 +138,7 @@ describe('convertLinkMarksToChips', () => {
     const paragraph = (out.content as JSONContent[])[0];
     const chipNode = (paragraph.content as JSONContent[])[1];
     expect(chipNode.type).toBe('elementChip');
-    expect(chipNode.attrs?.id).toBe('abc-123');
+    expect(chipNode.attrs?.id).toBe('00000000-0000-0000-0061-62632d313233');
     expect(chipNode.attrs?.type).toBe('character');
     expect(chipNode.attrs?.label).toBe('Drizzle');
   });
@@ -163,7 +163,7 @@ describe('convertLinkMarksToChips', () => {
     const input = doc(
       p(
         text('Drizzle', [
-          { type: 'link', attrs: { href: 'ow://character/abc-123' } },
+          { type: 'link', attrs: { href: 'ow://character/00000000-0000-0000-0061-62632d313233' } },
           { type: 'bold' },
         ]),
       ),
@@ -179,9 +179,9 @@ describe('convertLinkMarksToChips', () => {
   it('handles multiple chips in a single paragraph', () => {
     const input = doc(
       p(
-        text('A', [{ type: 'link', attrs: { href: 'ow://character/c-1' } }]),
+        text('A', [{ type: 'link', attrs: { href: 'ow://character/00000000-0000-0000-0000-000000632d31' } }]),
         text(' and '),
-        text('B', [{ type: 'link', attrs: { href: 'ow://location/l-1' } }]),
+        text('B', [{ type: 'link', attrs: { href: 'ow://location/00000000-0000-0000-0000-0000006c2d31' } }]),
       ),
     );
     const out = convertLinkMarksToChips(input);
@@ -191,6 +191,33 @@ describe('convertLinkMarksToChips', () => {
     expect(kids[0].attrs?.type).toBe('character');
     expect(kids[2].type).toBe('elementChip');
     expect(kids[2].attrs?.type).toBe('location');
+  });
+
+  // The address profile, read by the SDK (1.124.2).
+  const ID = '00000000-0000-0000-0061-62632d313233';
+  const firstOf = (href: string): JSONContent => {
+    const out = convertLinkMarksToChips(doc(p(text('Drizzle', [{ type: 'link', attrs: { href } }]))));
+    return ((out.content as JSONContent[])[0].content as JSONContent[])[0];
+  };
+
+  it('a link with a moment or a lens stays a link, its href kept as written', () => {
+    for (const href of [`ow://character/${ID}@12`, `ow://character/${ID}?lens=00000000-0000-0000-0000-000000632d31`]) {
+      const node = firstOf(href);
+      expect(node.type, href).toBe('text');
+      expect(node.marks?.[0]?.attrs?.href, href).toBe(href);
+    }
+  });
+
+  it('a type word in capitals, or an id that is no id, is no chip', () => {
+    for (const href of [`ow://Character/${ID}`, 'ow://character/abc-123', `ow://character/${ID}x`]) {
+      expect(firstOf(href).type, href).toBe('text');
+    }
+  });
+
+  it('an id in capitals becomes a chip naming the lowercase id', () => {
+    const node = firstOf(`ow://character/${ID.toUpperCase()}`);
+    expect(node.type).toBe('elementChip');
+    expect(node.attrs?.id).toBe(ID);
   });
 });
 

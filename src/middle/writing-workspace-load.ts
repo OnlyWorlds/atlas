@@ -10,7 +10,7 @@
  */
 
 import type { JSONContent } from '@tiptap/core';
-import { OW_LINK_HREF_RE } from './writing-workspace-element-chip';
+import { isChipLink, readOwHref, type OwLink } from '../core/ow-links';
 
 export function convertLinkMarksToChips(doc: JSONContent): JSONContent {
   return walk(doc);
@@ -21,30 +21,26 @@ function walk(node: JSONContent): JSONContent {
   if (Array.isArray(node.content)) {
     const newContent: JSONContent[] = [];
     for (const child of node.content) {
-      // If this text node has a link mark with an ow:// href, replace it
-      // with an elementChip node.
-      if (
-        child.type === 'text' &&
-        Array.isArray(child.marks) &&
-        child.marks.some(m => m.type === 'link' && isOwLink(m.attrs?.href))
-      ) {
-        const linkMark = child.marks.find(m => m.type === 'link');
-        const href = linkMark?.attrs?.href as string;
-        const match = OW_LINK_HREF_RE.exec(href);
-        if (match) {
-          newContent.push({
-            type: 'elementChip',
-            attrs: {
-              id: match[2],
-              type: match[1].toLowerCase(),
-              label: child.text ?? '',
-            },
-            // Carry over any other marks (bold/italic) onto the chip so
-            // styling round-trips.
-            marks: child.marks.filter(m => m.type !== 'link'),
-          });
-          continue;
-        }
+      // A text node whose link mark is a chip address (an element in this
+      // world, no moment and no lens) becomes an elementChip node. A link
+      // with a moment or a lens stays a link mark, its href kept as written.
+      const linkMark = child.type === 'text' && Array.isArray(child.marks)
+        ? child.marks.find(m => m.type === 'link')
+        : undefined;
+      const link = linkMark ? chipLinkOf(linkMark.attrs?.href) : null;
+      if (link && Array.isArray(child.marks)) {
+        newContent.push({
+          type: 'elementChip',
+          attrs: {
+            id: link.id,
+            type: link.type,
+            label: child.text ?? '',
+          },
+          // Carry over any other marks (bold/italic) onto the chip so
+          // styling round-trips.
+          marks: child.marks.filter(m => m.type !== 'link'),
+        });
+        continue;
       }
       newContent.push(walk(child));
     }
@@ -53,6 +49,7 @@ function walk(node: JSONContent): JSONContent {
   return node;
 }
 
-function isOwLink(href: unknown): boolean {
-  return typeof href === 'string' && OW_LINK_HREF_RE.test(href);
+function chipLinkOf(href: unknown): OwLink | null {
+  const link = readOwHref(href);
+  return link && isChipLink(link) ? link : null;
 }

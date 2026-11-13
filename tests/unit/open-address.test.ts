@@ -52,6 +52,13 @@ describe('a pasted OnlyWorlds address', () => {
       expect(openHashOfAddress(s), s).toEqual({ refused: ADDRESS_BROKEN_LINE });
     }
   });
+  it('read as prose reads it: words glued after the address are prose (1.124.2)', () => {
+    expect(openHashOfAddress(`${SITE}${WORLD}/character/${EL},then`)).toEqual({ hash: `#/open/${WORLD}/element/${EL}` });
+    expect(openHashOfAddress(`ow://${WORLD}/character/${EL}x`)).toEqual({ hash: `#/open/${WORLD}/element/${EL}` });
+  });
+  it('the text form with its prefix in capitals is refused, never missed', () => {
+    expect(openHashOfAddress(`OW://${WORLD}/character/${EL}`)).toEqual({ refused: ADDRESS_BROKEN_LINE });
+  });
   it('text with no address is not one: an invite, another site, plain words', () => {
     for (const s of ['https://www.onlyworlds.com/join#ow_j_abc', `https://example.com/w/${WORLD}`, 'Ada', '']) {
       expect(openHashOfAddress(s), s).toBeNull();

@@ -14,29 +14,27 @@
 
 import type { Element, ElementType } from '../core/types';
 import { NARRATIVE_RELATION_FIELDS } from '../core/narrative-fields';
-// Scanner from core/ow-links (NOT the chip module) — keeps this module
+// The reader from core/ow-links (NOT the chip module) keeps this module
 // TipTap-free so the knowledge room can import it statically without
 // breaking the editor code-split.
-import { createOwLinkScanner } from '../core/ow-links';
+import { findOwLinks } from '../core/ow-links';
 
 // Canonical map lives in core/narrative-fields.ts (also consumed by
 // core/knowledge.ts). Re-exported here for the writing modules + tests.
 export { NARRATIVE_RELATION_FIELDS };
 
 /**
- * Parse markdown for `ow://<type>/<uuid>` links and group UUIDs by element type.
- * Duplicates within the same type are deduped.
+ * Parse markdown for element addresses (`ow://<type>/<uuid>`, as the SDK reads
+ * them) and group the ids by element type. The id is the profile's reading,
+ * lowercase: an element whose own id is held in upper case is one no address
+ * can name, so no relation is derived for it. Duplicates within the same type
+ * are deduped.
  */
 export function extractProseLinks(markdown: string): Record<string, string[]> {
   const out: Record<string, Set<string>> = {};
-  // Fresh scanner per call — never share a /g regex (lastIndex is stateful).
-  const scanner = createOwLinkScanner();
-  let match: RegExpExecArray | null;
-  while ((match = scanner.exec(markdown)) !== null) {
-    const type = match[1].toLowerCase();
-    const id = match[2];
-    if (!out[type]) out[type] = new Set();
-    out[type].add(id);
+  for (const link of findOwLinks(markdown)) {
+    if (!out[link.type]) out[link.type] = new Set();
+    out[link.type].add(link.id);
   }
   const flat: Record<string, string[]> = {};
   for (const [type, ids] of Object.entries(out)) {
