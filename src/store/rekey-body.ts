@@ -11,10 +11,13 @@
  *   - any top-level string or string[] member EQUAL to an old id, except in
  *     identity/stamp fields and prose (a bare uuid a writer typed is text);
  *   - an `ow://<type>/<id>` link inside ANY top-level string (story,
- *     description, custom text): the id segment only, every other byte kept;
+ *     description, custom text), as the SDK reads it (`rewriteOwLinks`): the
+ *     id, and a `?lens=` id, looked up as written and then lowercase; the
+ *     type word, a moment and every other byte kept;
  *   - the TipTap sidecar `atlas_richtext_json` (object, or the JSON string
  *     older and foreign files carry): `elementChip` and `mention` nodes'
- *     `attrs.id`, and `link` marks whose href is an ow:// link. The serializer
+ *     `attrs.id`, and `link` marks whose href holds an ow:// link (a moment, a
+ *     lens and a query kept, through the same rewriter). The serializer
  *     turns all three into `ow://` links, so missing one lets the editor write
  *     the old id back into `story` on the next keystroke, and the relation
  *     derive (#50) then re-links it;
@@ -42,7 +45,7 @@
  */
 import type { Element, ElementType } from '../core/types';
 import { SERVER_AUTHOR_FIELDS, isRekeyExemptField } from '../core/constants';
-import { OW_LINK_HREF_RE, createOwLinkScanner } from '../core/ow-links';
+import { rewriteOwLinks } from '../core/ow-links';
 import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
 
 export type IdMap = ReadonlyMap<string, string>;
@@ -73,21 +76,21 @@ function proseFieldsFor(type: ElementType): Set<string> {
   return set;
 }
 
-/** Replace the id segment of every ow:// link whose id is in the map. */
+/**
+ * Replace the id (and the lens) of every element address in a text whose id is
+ * in the map: looked up as written, then by the lowercase reading (the map's
+ * keys are ids as held). Only those bytes change; a text where nothing moves
+ * comes back as the same string.
+ */
 export function rekeyOwLinks(text: string, map: IdMap): string {
-  if (!text.includes('ow://')) return text;
-  return text.replace(createOwLinkScanner(), (whole, type: string, id: string) => {
-    const next = map.get(id);
-    return next ? `ow://${type}/${next}` : whole;
-  });
+  return rewriteOwLinks(text, l => ({
+    id: map.get(l.idAsWritten) ?? map.get(l.id),
+    lens: l.lensAsWritten !== null && l.lens !== null ? map.get(l.lensAsWritten) ?? map.get(l.lens) : null,
+  }));
 }
 
 function rekeyHref(href: unknown, map: IdMap): unknown {
-  if (typeof href !== 'string') return href;
-  const m = OW_LINK_HREF_RE.exec(href);
-  if (!m) return href;
-  const next = map.get(m[2]);
-  return next ? `ow://${m[1]}/${next}` : href;
+  return typeof href === 'string' ? rekeyOwLinks(href, map) : href;
 }
 
 /** Walk a TipTap JSON node; returns the same node when nothing changed. */

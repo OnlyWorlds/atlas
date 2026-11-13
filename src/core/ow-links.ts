@@ -242,11 +242,3 @@ export function pastedAddressIn(text: string): string | null {
   const run = /^\S*/.exec(text.slice(i))?.[0] ?? '';
   return run.replace(/[.,;:!?)\]}>'"]+$/, '');
 }
-
-/** @deprecated The old pattern pair, kept only until its last reader moves onto the SDK's reading. */
-export const OW_LINK_HREF_RE = /^ow:\/\/([a-z_]+)\/([\w-]+)$/i;
-
-/** @deprecated See {@link OW_LINK_HREF_RE}. */
-export function createOwLinkScanner(): RegExp {
-  return /ow:\/\/([a-z_]+)\/([\w-]+)/gi;
-}

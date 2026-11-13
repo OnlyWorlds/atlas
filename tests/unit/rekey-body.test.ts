@@ -338,3 +338,54 @@ describe('rekeyBody: a published profile key is never an id (identity profile ru
     expect(body.x_report_answers).toEqual(body.relations);
   });
 });
+
+// The re-key reads an address as the SDK does (1.124.2): only the id's and the
+// lens's bytes move, looked up as written and then lowercase.
+describe('rekeyBody: addresses as the SDK reads them', () => {
+  const W = '0193a1c2-7d3e-7f00-8a11-3c5e7b9d2f40';
+  const story = (s: string): string => rekeyBody(el('narrative', { story: s }), map).body.story as string;
+
+  it('the round trip: a moment, a lens, a full stop, an id in capitals, another world; nothing else moves', () => {
+    const before = [
+      `[a](ow://character/${O}@12) and`,
+      `[b](ow://character/${X}?lens=${O2}).`,
+      `see ow://character/${O}.`,
+      `[c](ow://character/${O.toUpperCase()})`,
+      `ow://${W}/character/${O} and https://www.onlyworlds.com/w/${W}/character/${O}`,
+      `ow://Character/${O} and ow://character/${O}x`,
+    ].join('\n');
+    const after = [
+      `[a](ow://character/${N}@12) and`,
+      `[b](ow://character/${X}?lens=${N2}).`,
+      `see ow://character/${N}.`,
+      `[c](ow://character/${N})`,
+      `ow://${W}/character/${O} and https://www.onlyworlds.com/w/${W}/character/${O}`,
+      `ow://Character/${O} and ow://character/${N}x`,
+    ].join('\n');
+    expect(story(before)).toBe(after);
+  });
+
+  it('an id held in capitals is found as written', () => {
+    const U = O.toUpperCase();
+    const out = rekeyBody(el('narrative', { story: `[a](ow://character/${U})` }), new Map([[U, N]])).body.story;
+    expect(out).toBe(`[a](ow://character/${N})`);
+  });
+
+  it('a link mark with a moment, a lens or a query is re-keyed, the rest of the href kept', () => {
+    const hrefs = [`ow://character/${O}@12`, `ow://character/${O}?lens=${O2}`, `ow://character/${O}?x=1#f`];
+    for (const href of hrefs) {
+      const text = { type: 'text', text: 'Ann', marks: [{ type: 'link', attrs: { href } }] };
+      const out = rekeyBody(el('narrative', { atlas_richtext_json: doc(text) }), map).body.atlas_richtext_json as ReturnType<typeof doc>;
+      const got = (out.content[0].content as Array<{ marks: Array<{ attrs: { href: string } }> }>)[0].marks[0].attrs.href;
+      expect(got, href).toBe(href.split(O).join(N).split(O2).join(N2));
+    }
+  });
+
+  it('a text with no address in the map comes back as the same string', () => {
+    const s = `ow://character/abc and [x](ow://character/${X}) ow://Character/${O}`;
+    const src = el('narrative', { story: s });
+    const { body, changed } = rekeyBody(src, map);
+    expect(changed).toBe(false);
+    expect(body).toBe(src);
+  });
+});

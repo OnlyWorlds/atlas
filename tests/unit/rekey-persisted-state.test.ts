@@ -128,19 +128,22 @@ describe('remapRecents', () => {
 
 describe('remapDraftStash', () => {
   it('remaps ids, prose links and the rich-text sidecar', () => {
+    // A prose link names an id in the id form (a short id is no address).
+    const OID = '11111111-1111-4111-8111-111111111111';
+    const NID = '99999999-9999-4999-8999-999999999999';
     const chip = { type: 'elementChip', attrs: { id: 'O', type: 'character', label: 'Ann' } };
     localStorage.setItem(KNOWLEDGE_DRAFT_STASH_PREFIX + 'w1', JSON.stringify({
-      name: 'n', story: 'see [Ann](ow://character/O) now',
+      name: 'n', story: `see [Ann](ow://character/${OID}) now`,
       richtextJson: { type: 'doc', content: [{ type: 'paragraph', content: [chip] }] },
       narrator: 'O', collectives: ['O', 'c'], aboutIds: ['x', 'O'],
     }));
     localStorage.setItem(KNOWLEDGE_DRAFT_STASH_PREFIX + 'w2', JSON.stringify({ narrator: 'O', story: '(ow://character/O)' }));
-    remapDraftStash('w1', MAP);
+    remapDraftStash('w1', new Map([...MAP, [OID, NID]]));
     const d = j(KNOWLEDGE_DRAFT_STASH_PREFIX + 'w1');
     expect(d.narrator).toBe('N');
     expect(d.collectives).toEqual(['N', 'c']);
     expect(d.aboutIds).toEqual(['x', 'N']);
-    expect(d.story).toBe('see [Ann](ow://character/N) now');
+    expect(d.story).toBe(`see [Ann](ow://character/${NID}) now`);
     expect(d.richtextJson.content[0].content[0].attrs.id).toBe('N');
     expect(j(KNOWLEDGE_DRAFT_STASH_PREFIX + 'w2').narrator).toBe('O');
   });
