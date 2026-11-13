@@ -3,8 +3,7 @@
  * from the world on every draw and never stored, so two browsers with the
  * same elements at the same width draw the same grid.
  *
- *   Arrival: a UUIDv7 id's own milliseconds, else `created_at` read as an
- *   instant (the SDK's `instantOf`), else after every readable arrival.
+ *   Arrival: a UUIDv7 id's own milliseconds, else `created_at`, else first.
  *   A new element is always last, so being born moves nothing drawn before.
  *
  *   Holds: the pairs the SDK's `dragField` marks `holds` put one square
@@ -30,7 +29,7 @@
  * Pure: nodes and edges as the SDK's `worldGraph` answers them.
  */
 
-import { compareInstants, dragField, instantOf, type OwInstant } from '@onlyworlds/sdk';
+import { dragField } from '@onlyworlds/sdk';
 import { linkKind } from './home-grid-pair';
 
 /**
@@ -126,31 +125,23 @@ const V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}
 const RFC_V7_BEFORE = Date.UTC(2100, 0, 1);
 
 /**
- * When an element arrived, as an instant: an RFC UUIDv7 id's own time; the
- * v1 server's draft ids (also version 7, `06…`) carry 36-bit seconds first,
- * read as such; else its `created_at` as the SDK's `instantOf` reads a time
- * (the message profile's grammar, to the microsecond); else null, a time that
- * cannot be read, which `compareInstants` puts after every readable one.
- * Pure: no clock is read.
+ * When an element arrived, in epoch milliseconds: an RFC UUIDv7 id's own
+ * time; the v1 server's draft ids (also version 7, `06…`) carry 36-bit
+ * seconds first, read as such; else its `created_at`; else minus infinity
+ * (first). Pure: no clock is read.
  */
-export function arrivalInstantOf(node: GridNode): OwInstant | null {
+export function arrivalOf(node: GridNode): number {
   if (V7.test(node.id)) {
     const hex = node.id.slice(0, 8) + node.id.slice(9, 13);
     const ms = parseInt(hex, 16);
-    if (ms < RFC_V7_BEFORE) return { seconds: Math.floor(ms / 1000), microseconds: (ms % 1000) * 1000 };
-    return { seconds: parseInt(hex.slice(0, 9), 16), microseconds: 0 };
+    if (ms < RFC_V7_BEFORE) return ms;
+    return parseInt(hex.slice(0, 9), 16) * 1000;
   }
-  return instantOf(node.created_at);
-}
-
-/**
- * `arrivalInstantOf` in epoch milliseconds (a fraction carries the
- * microseconds); plus infinity for an arrival that cannot be read, so it
- * stands after every readable one here too.
- */
-export function arrivalOf(node: GridNode): number {
-  const at = arrivalInstantOf(node);
-  return at ? at.seconds * 1000 + at.microseconds / 1000 : Infinity;
+  if (typeof node.created_at === 'string') {
+    const t = Date.parse(node.created_at);
+    if (Number.isFinite(t)) return t;
+  }
+  return -Infinity;
 }
 
 const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -187,9 +178,7 @@ export function gridOf(
   // The block's two columns and one more for the rest: a line with the block is never narrower than three.
   const per = Math.max(block ? 3 : 1, Math.floor(perLine));
   const offset = block ? STRAND_COLS : 0;
-  const arrival = new Map(nodes.map(n => [n.id, arrivalInstantOf(n)] as const));
-  const order = nodes.filter(n => !pinned.has(n.id))
-    .sort((a, b) => compareInstants(arrival.get(a.id) ?? null, arrival.get(b.id) ?? null) || byCodePoint(a.id, b.id));
+  const order = nodes.filter(n => !pinned.has(n.id)).sort((a, b) => arrivalOf(a) - arrivalOf(b) || byCodePoint(a.id, b.id));
   const rank = new Map(order.map((n, i) => [n.id, i] as const));
   const typeOf = new Map(nodes.map(n => [n.id, n.type] as const));
   const isNode = (id: string): boolean => rank.has(id) || pinned.has(id);

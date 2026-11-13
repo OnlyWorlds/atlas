@@ -43,31 +43,14 @@ describe('arrivalOf', () => {
     for (const n of old) expect(at(after, n.id)).toEqual(at(before, n.id));
     expect(at(after, born.id).col).toBe(3);
   });
-  it('reads created_at as an instant, across offsets and to the microsecond, for any other id', () => {
+  it('reads created_at as a time, across offsets and precisions, for any other id', () => {
     const a = arrivalOf(node('a', 'x', '2026-10-30T10:00:00.000Z'));
-    const b = arrivalOf(node('b', 'x', '2026-10-30T11:00:00+01:00'));
-    const c = arrivalOf(node('c', 'x', '2026-10-30T11:00:00.000001+01:00'));
+    const b = arrivalOf(node('b', 'x', '2026-10-30T11:00:00.000001+01:00'));
     expect(a).toBe(b);
-    expect(c).toBeGreaterThan(b);
-    // A microsecond apart orders as an instant does: c after b, though the milliseconds are equal.
-    const g = gridOf([node('c', 'x', '2026-10-30T11:00:00.000001+01:00'), node('b', 'x', '2026-10-30T10:00:00Z')], [], 4);
-    expect(at(g, 'b').col).toBe(0);
-    expect(at(g, 'c').col).toBe(1);
   });
-  it('an element with no stamp, or one that cannot be read as the message profile reads a time, arrives after every readable one', () => {
-    expect(arrivalOf(node('a', 'x'))).toBe(Infinity);
-    expect(arrivalOf(node('a', 'x', 'yesterday'))).toBe(Infinity);
-    // A date alone and a space for the T are not read (the SDK's instantOf).
-    expect(arrivalOf(node('a', 'x', '2026-10-30'))).toBe(Infinity);
-    expect(arrivalOf(node('a', 'x', '2026-10-30 10:00:00Z'))).toBe(Infinity);
-    const g = gridOf([
-      node('n0', 'x', 'yesterday'),
-      node('n1', 'x', '2026-10-30T10:00:00Z'),
-      node('N2', 'x'),
-      node('n3', 'x', '2001-01-01T00:00:00Z'),
-    ], [], 4);
-    // Readable first, earliest first; then the unreadable ones, by id by code point ('N2' before 'n0').
-    expect(['n3', 'n1', 'N2', 'n0'].map(id => at(g, id).col)).toEqual([0, 1, 2, 3]);
+  it('an element with no stamp, or one that does not parse, arrives first', () => {
+    expect(arrivalOf(node('a', 'x'))).toBe(-Infinity);
+    expect(arrivalOf(node('a', 'x', 'yesterday'))).toBe(-Infinity);
   });
 });
 
@@ -102,14 +85,13 @@ describe('gridOf: the walk (the design\'s fourth drawing)', () => {
 });
 
 describe('gridOf: the gate\'s cases', () => {
-  it('a folder with no stamps stands after every readable arrival, so a new element stands before it (the named exception to G2)', () => {
+  it('a folder with no stamps sorts first, so a new element is last and moves none of them (G2)', () => {
     const old = ['d', 'b', 'c', 'a'].map(id => node(`00000000-0000-4000-8000-00000000000${id}`, 'character'));
     const before = gridOf(old, [], 4);
     const born = node(v7(Date.UTC(2026, 9, 30)), 'character');
     const after = gridOf([...old, born], [], 4);
-    expect(at(after, born.id).col).toBe(0);
-    // The unstamped squares keep their order among themselves (id by code point), one column on.
-    for (const n of old) expect(at(after, n.id).col).toBe(at(before, n.id).col + 1);
+    for (const n of old) expect(at(after, n.id)).toEqual(at(before, n.id));
+    expect(at(after, born.id).col).toBe(4);
   });
   it('a holder that arrives listing an older Event takes it under it, the named exception (G3)', () => {
     const ev = v7(1000), tale = v7(2000);

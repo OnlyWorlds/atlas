@@ -74,7 +74,7 @@ describe('re-key keeps arrival', () => {
     const el = await s.getElement(V4_BARE);
     delete (el as Record<string, unknown>).created_at;
     (s as unknown as { elements: Map<string, Element> }).elements.set(V4_BARE, el!);
-    expect(arrivalOf((await s.getElement(V4_BARE))!)).toBe(Infinity);
+    expect(arrivalOf((await s.getElement(V4_BARE))!)).toBe(-Infinity);
     const t0 = Date.now();
     const { map } = await startRekey(s, { worldId: 'w', ids: [V4_BARE] });
     const n = map.get(V4_BARE)!;
