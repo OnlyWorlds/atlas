@@ -93,7 +93,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'rekey-nested-x-ids',
         title: 'New ids reach links kept deep inside custom fields',
-        body: 'When elements get new ids (making a world online, an import, or a merge), a link to one of them kept inside a custom x_ field\'s nested values now moves too. A laid-out map keeps standing on its ground map, where before it lost it.',
+        body: 'When elements get new ids (making a world online, an import, or a merge), a link to one of them kept inside a custom x_ field\'s nested values now moves too. A laid-out map keeps standing on its ground map, where before it lost it, and a game record keeps the seat it names for each Character (such as "as General").',
         tags: ['sync', 'fix'],
       },
       {

@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { rekeyBody } from '../../src/store/rekey-body';
 import { layoutGroundOf } from '../../src/core/layout-recipe';
+import { characterRecords } from '../../src/core/records';
 import { blocksOf } from '../../src/core/sharing';
 import { computeRelationPatch, extractProseLinks } from '../../src/middle/writing-workspace-derive';
 import { serializeDocToMarkdown } from '../../src/middle/writing-workspace-markdown';
@@ -225,6 +226,28 @@ describe('rekeyBody: ids nested in x_ values, at any depth (folder spec §3.3)',
     const { body } = rekeyBody(el('narrative', { x_report_answers: [O, X, O2], x_steps: [{ at: O }, 'note'] }), map);
     expect(body.x_report_answers).toEqual([N, X, N2]);
     expect(body.x_steps).toEqual([{ at: N }, 'note']);
+  });
+
+  it('an Event\'s record seats follow their Characters: keys renamed in place, order and values kept (record profile, seats)', () => {
+    const seats = { [O]: 'General', [X]: 'Bosun', [O2]: 'Cook' };
+    const before = el('event', { characters: [O, X, O2], x_record: { tool: 'tangle', played_at: '2026-11-01T00:30:00Z', seats } });
+    const { body } = rekeyBody(before, map);
+    expect(body.characters).toEqual([N, X, N2]);
+    const rec = body.x_record as { tool: string; seats: Record<string, string> };
+    expect(Object.entries(rec.seats)).toEqual([[N, 'General'], [X, 'Bosun'], [N2, 'Cook']]);
+    expect(rec.tool).toBe('tangle');
+    // Atlas's records read the seat under the Character's new id.
+    const ann = { id: N, type: 'character', name: 'Ann', local_updated_at: '2026-01-01T00:00:00Z' } as unknown as Element;
+    expect(characterRecords(N, [ann, body]).records[0]?.seat).toBe('General');
+    // The source is not mutated.
+    expect(Object.keys(seats)).toEqual([O, X, O2]);
+  });
+
+  it('seats are renamed on an Event only, and a key whose new id is already a key stays as it is', () => {
+    const onCharacter = rekeyBody(el('character', { x_record: { tool: 't', played_at: '2026-11-01T00:30:00Z', seats: { [O]: 'General' } } }), map).body;
+    expect(Object.keys((onCharacter.x_record as { seats: object }).seats)).toEqual([O]);
+    const clash = rekeyBody(el('event', { x_record: { tool: 't', played_at: '2026-11-01T00:30:00Z', seats: { [O]: 'Old', [N]: 'New' } } }), map).body;
+    expect(Object.entries((clash.x_record as { seats: object }).seats)).toEqual([[O, 'Old'], [N, 'New']]);
   });
 
   it('an exempt profile key stays whole, nested ids included; a value that names no old id is the same object', () => {

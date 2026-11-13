@@ -27,7 +27,12 @@
  *     string that IS an old id, whole and as written (folder spec §3.3: the
  *     one edit a tool may make inside a foreign value), e.g. a layout Map's
  *     `x_layout.settings.ground.map`. Never a substring, an `ow://` link or
- *     an object's key; every other value, and the order of keys, kept.
+ *     an object's key; every other value, and the order of keys, kept;
+ *   - one named rule for keys: an Event's `x_record.seats` is keyed by
+ *     Character ids, and the record profile (schema-dist `profiles/record.md`,
+ *     `seats`) says "a carrier that knows this profile re-keys them with the
+ *     Event's `characters` when it re-keys a world". A key in the map is
+ *     renamed in place, its value and the key order kept (`rekeyRecordSeats`).
  * Never touched: `id`, `type`, `name`, stamps, `image_media_id` (a media id),
  * `atlas_page_pub` (the published page's own id), `atlas_calendar`,
  * `atlas_page_theme`, `atlas_page_intent`, `atlas_aliases`, and the profile
@@ -215,6 +220,27 @@ function rekeyBlocks(value: unknown, map: IdMap): unknown {
   return changed ? out : value;
 }
 
+/**
+ * The record profile's seats rule: an Event's `x_record.seats` keys that are old ids take their new ids,
+ * in place (key order and every value kept). A key whose new id is already a key of its own is left as
+ * it is, so no seat is lost. Anything that is not an object with an object `seats` comes back as given.
+ */
+export function rekeyRecordSeats(record: unknown, map: IdMap): unknown {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
+  const rec = record as Record<string, unknown>;
+  const seats = rec.seats;
+  if (!seats || typeof seats !== 'object' || Array.isArray(seats)) return record;
+  const keys = Object.keys(seats);
+  if (!keys.some(k => map.has(k) && !Object.prototype.hasOwnProperty.call(seats, map.get(k)!))) return record;
+  const next: Record<string, unknown> = {};
+  for (const k of keys) {
+    const to = map.get(k);
+    const key = to !== undefined && !Object.prototype.hasOwnProperty.call(seats, to) ? to : k;
+    Object.defineProperty(next, key, { value: (seats as Record<string, unknown>)[k], enumerable: true, writable: true, configurable: true });
+  }
+  return { ...rec, seats: next };
+}
+
 export function rekeyBody(body: Element, map: IdMap): { body: Element; changed: boolean } {
   if (map.size === 0) return { body, changed: false };
   const prose = proseFieldsFor(body.type);
@@ -229,7 +255,10 @@ export function rekeyBody(body: Element, map: IdMap): { body: Element; changed: 
     else if (key === BLOCKS) next = rekeyBlocks(value, map);
     else if (typeof value === 'string') {
       next = !prose.has(key) && map.has(value) ? map.get(value)! : rekeyOwLinks(value, map);
-    } else if (key.startsWith('x_') && value !== null && typeof value === 'object') next = rekeyNested(value, map);
+    } else if (key.startsWith('x_') && value !== null && typeof value === 'object') {
+      next = rekeyNested(value, map);
+      if (key === 'x_record' && body.type === 'event') next = rekeyRecordSeats(next, map);
+    }
     else if (Array.isArray(value)) next = rekeyIdArray(value, map);
     if (next !== value) {
       if (!out) out = { ...src };
