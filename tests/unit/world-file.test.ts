@@ -3,7 +3,8 @@
  * one `.zip` holding one world as the
  * portable copy (no `api`, no sync-state, no tombstones, no transient file),
  * and a reader that refuses before anything is written: zip-slip, absolute
- * paths, a declared-size bomb, no world, two worlds, the tour's sandbox.
+ * paths, a declared-size bomb, no world, two worlds. A tour folder zipped by
+ * hand opens, its `demo` mark left out (2026-11-14).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { zipSync, strToU8, unzipSync } from 'fflate';
@@ -204,8 +205,23 @@ describe('the reader refuses before anything is written', () => {
     refuses({ ...world, 'w/.atlas/lock/x': strToU8('x') }, /not a world Atlas can open|cannot be opened safely/);
   });
 
-  it('the tour\'s sandbox', () => {
-    refuses({ 'w/world.json': strToU8(j({ id: WID, name: 'Hyperion', demo: true })) }, /not a world Atlas can open/);
+  it('a tour folder zipped by hand opens, its demo mark left out and nothing else changed (2026-11-14)', () => {
+    const el = j({ id: '1', name: 'Ana' });
+    const read = readWorldZip(zipSync({
+      'w/world.json': strToU8(j({ id: WID, name: 'Hyperion', demo: true, time_current: 3 })),
+      'w/elements/character/ana--00000001.json': strToU8(el),
+    }));
+    expect(read.worldId).toBe(WID);
+    expect(read.worldName).toBe('Hyperion');
+    const meta = JSON.parse(text(read.files.find(f => f.path === 'world.json')!.data));
+    expect(meta).toEqual({ id: WID, name: 'Hyperion', time_current: 3 });
+    expect(text(read.files.find(f => f.path === 'elements/character/ana--00000001.json')!.data)).toBe(el);
+  });
+
+  it('a world.json with demo other than true is left byte for byte', () => {
+    const raw = j({ id: WID, name: 'Hyperion', demo: false });
+    const read = readWorldZip(zipSync({ 'w/world.json': strToU8(raw) }));
+    expect(text(read.files.find(f => f.path === 'world.json')!.data)).toBe(raw);
   });
 
   it('something that is not a zip at all', () => {

@@ -15,7 +15,7 @@
  * an empty path part, a path that is both a file and a folder, a declared size
  * or a file count past the budget, no world, more than one world or files
  * outside it. Atlas adds its own: the `.atlas/making/x` collision and the
- * tour's sandbox (`demo: true`), its own sentences for each refusal, and the
+ * tour's sandbox mark (`demo: true`, left out), its own sentences for each refusal, and the
  * files it leaves out (sync and transient).
  */
 
@@ -228,6 +228,13 @@ const REFUSALS: Record<OwWorldFileReason, string> = {
   marker: MARKER,
 };
 
+/** world.json without the tour's `demo` mark; every other file as it is. */
+function withoutDemoMark(f: WorldFileEntry): WorldFileEntry {
+  if (f.path !== WORLD_FILE) return f;
+  const { demo: _demo, ...rest } = JSON.parse(new TextDecoder().decode(f.data)) as Record<string, unknown>;
+  return { ...f, data: new TextEncoder().encode(JSON.stringify(rest, null, 2) + '\n') };
+}
+
 export interface ReadWorld {
   worldId: string;
   worldName: string;
@@ -245,7 +252,7 @@ export function readWorldZip(
 ): ReadWorld {
   // The format and its refusals are the SDK's (4.10, Kael 2026-10-11): one
   // reader for every tool. Atlas keeps its own sentences, its `.atlas/` rules
-  // and the demo refusal.
+  // and the tour mark left out.
   let read: ReturnType<typeof readWorldFile>;
   try {
     read = readWorldFile(bytes, {
@@ -265,10 +272,15 @@ export function readWorldZip(
     const rest = path.slice(ATLAS_INTERNAL_DIR.length + 1);
     if (rest.includes('/') && isTransientPath(`${ATLAS_INTERNAL_DIR}/${rest.split('/')[0]}`)) throw new PlainError(NOT_OPENABLE);
   }
-  if (read.world.demo === true) throw new PlainError(NOT_OPENABLE);
+  // `demo: true` is this browser's mark for the tour's sandbox, never a world's
+  // own: Atlas writes no file from the tour world, so a file carrying it is a
+  // tour folder zipped by hand. It opens as a world of the person's own, the
+  // mark left out, as the Data room's import leaves it out (2026-11-14; it was
+  // refused as "not a world", which it is).
+  const files = read.world.demo === true ? read.files.map(withoutDemoMark) : read.files;
   return {
     worldId: read.worldId,
     worldName: read.name.trim() ? read.name : 'Untitled world',
-    files: read.files,
+    files,
   };
 }

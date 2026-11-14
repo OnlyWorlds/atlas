@@ -70,7 +70,13 @@ export const CHANGELOG: ChangelogRelease[] = [
         id: 'empty-mark-is-none',
         title: 'An empty mark is no mark',
         body: 'A Charter whose charter mark, or a room element whose room mark, holds an empty list or an empty set of fields is now read as unmarked, as the OnlyWorlds standard says: the Charter no longer leads Home and the element reads as lore. Marking a Charter in Atlas writes a real mark, as before.',
-        tags: ['charter', 'fix'],
+        tags: ['world', 'fix'],
+      },
+      {
+        id: 'tour-folder-file-opens',
+        title: 'A tour world zipped by hand opens',
+        body: 'A world file made by zipping the folder of an Atlas tour world was refused as "not a world Atlas can open". It now opens as a world of your own; the mark that told Atlas it was the tour\'s practice world is left out, as an import already leaves it out.',
+        tags: ['world-file', 'fix'],
       },
       {
         id: 'folder-format-0-3-23',
