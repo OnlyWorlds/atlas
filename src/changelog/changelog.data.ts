@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.4',
+    date: '2026-11-14',
+    theme: 'Folders stamped as the folder check reads them',
+    entries: [
+      {
+        id: 'folder-format-back-to-0-3-22',
+        title: 'New world folders are format 0.3.22 again',
+        body: 'Atlas 1.124.3 wrote new world folders as format 0.3.23, a version the OnlyWorlds folder check does not know yet, so checking a new folder printed a warning to update a check that has no newer version. Nothing a folder holds differs between the two versions, so Atlas writes 0.3.22 again, the version the check reads.',
+        tags: ['folders', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.3',
     date: '2026-11-14',
     theme: 'An empty link or mark is none',
