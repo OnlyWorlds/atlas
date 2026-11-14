@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'empty-string-link-is-none',
         title: 'A link left as an empty text is read as no link',
-        body: 'A world folder written by another tool can hold a link as an empty text, such as a pin whose map is "" or a map whose parent map is "". Atlas now reads it as no link when the world opens, as the OnlyWorlds standard says, so the element shows no target and saving it online sends nothing the site would refuse. The file keeps its empty text until Atlas next writes it, when you edit the element or when Atlas gives the file its usual name.',
+        body: 'A world folder written by another tool can hold a link as an empty text, such as a pin whose map is "" or a map whose parent map is "". Atlas now reads it as no link when the world opens, as the OnlyWorlds standard says, so the element shows no target and saving it online sends nothing the site would refuse. The file keeps its empty text until Atlas next writes it: when you edit the element, after a sync, or when Atlas gives the file its usual name.',
         tags: ['folders', 'fix'],
       },
       {

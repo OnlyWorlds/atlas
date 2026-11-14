@@ -83,4 +83,22 @@ describe('an empty-string link reads as no link at load', () => {
     expect(c.description).toBe('');
     for (const [p, body] of before) if (p.startsWith('elements/')) expect(root.get(p)).toBe(body);
   });
+
+  it('a body with no type read on a cache miss takes the folder\'s type first, so its empty link still reads as none', async () => {
+    const TYPELESS = '22222222-2222-4222-8222-222222222299';
+    const DECLARED = '22222222-2222-4222-8222-222222222288';
+    const root = world();
+    root.put(`elements/pin/t--${TYPELESS.slice(-8)}.json`, j({ id: TYPELESS, name: 'T', map: '', x: 1, y: 2 }));
+    root.put(`elements/pin/d--${DECLARED.slice(-8)}.json`, j({ id: DECLARED, type: 'location', name: 'D' }));
+    const s = await open(root);
+    await s.listElements();
+    const cache = (s as unknown as { bodyCache: Map<string, unknown> }).bodyCache;
+    cache.delete(TYPELESS);
+    cache.delete(DECLARED);
+    const t1 = (await s.getElement(TYPELESS)) as Record<string, unknown>;
+    expect(t1.type).toBe('pin');
+    expect(t1.map_id ?? null).toBeNull();
+    const d1 = (await s.getElement(DECLARED)) as Record<string, unknown>;
+    expect(d1.type).toBe('location'); // a declared type is never overwritten
+  });
 });
