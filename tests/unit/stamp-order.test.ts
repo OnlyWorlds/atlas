@@ -94,7 +94,14 @@ describe('the heal of a stamp that cannot be read (R4b)', () => {
     }
     const absent = { ...base } as Element;
     delete (absent as Record<string, unknown>).local_updated_at;
-    expect(stampedBody(absent, KEEL, undefined).local_updated_at).toBe(KEEL);
+    expect(stampedBody(absent, KEEL, '').local_updated_at).toBe(KEEL); // sent with no stamp, none since
+    expect(stampedBody(absent, KEEL).local_updated_at).toBe(KEEL); // the caller passed nothing
+  });
+
+  it('a body sent with no stamp and edited in flight is lifted, never healed into reading clean', () => {
+    // The code gate's M1: the edit stamped .003Z inside the PATCH, keel answered .004003.
+    const edited = { ...base, local_updated_at: '2026-11-14T05:00:00.003Z' } as Element;
+    expect(stampedBody(edited, '2026-11-14T05:00:00.004003+00:00', '').local_updated_at).toBe('2026-11-14T05:00:00.005Z');
   });
 
   it('a readable local stamp is never touched by the heal', () => {

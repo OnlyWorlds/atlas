@@ -96,11 +96,13 @@ export function stampedBody(
   // world, the old id, the pull before an Unlink) would name tools that never wrote this row, and a
   // `/bulk` echo brings no body to replace it (#760, the code gate's G1).
   if (!existing.server_updated_at && !(kept && 'doors' in kept)) delete rec.doors;
-  // No edit in flight (the caller sent none, or the file still holds the stamp it sent): the
-  // copy is what keel now holds. An absent or unreadable local stamp becomes keel's stamp as
-  // served (R4b), so the copy reads clean next round instead of uploading every round.
+  // No edit in flight (the caller passed no argument, or the file still holds the stamp it sent):
+  // the copy is what keel now holds. An absent or unreadable local stamp becomes keel's stamp as
+  // served (R4b), so the copy reads clean next round instead of uploading every round. A body sent
+  // with no stamp is passed as '', never left out: an edit stamped while it was in flight then
+  // differs from it and goes on to the lift below instead of being read as "no edit".
   if (sentLocalUpdatedAt === undefined
-    || (sentLocalUpdatedAt !== null && existing.local_updated_at === sentLocalUpdatedAt)) {
+    || (sentLocalUpdatedAt !== null && (existing.local_updated_at ?? '') === sentLocalUpdatedAt)) {
     if (instantOf(existing.local_updated_at) === null) next.local_updated_at = serverUpdatedAt;
     return next;
   }

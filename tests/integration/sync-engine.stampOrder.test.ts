@@ -173,6 +173,47 @@ describe('a local stamp that cannot be read (R3, R4b)', () => {
   });
 });
 
+describe('a local stamp absent when sent (the code gate)', () => {
+  it('an edit landing while that push is in flight is lifted and sent next round (two PATCHes)', async () => {
+    const engine = new SyncEngine({ folder, client });
+    await synced(engine);
+    outsideEdit(WREN, { description: 'outside' }, undefined);
+    const realUpdate = client.updateElement.bind(client);
+    let once = true;
+    client.updateElement = async (type, id, body) => {
+      if (once) { once = false; await folder.updateElement(WREN, { description: 'typed in flight' }); }
+      return realUpdate(type, id, body);
+    };
+    client.calls = [];
+    await engine.syncNow();
+    await engine.syncNow();
+    await engine.syncNow();
+    expect(updatesOf(WREN)).toBe(2);
+    expect(client.__server_get('character', WREN)?.description).toBe('typed in flight');
+  });
+
+  it('is never pushed over keel\'s newer copy under local-wins: held for review, nothing sent', async () => {
+    for (const stamp of [undefined, UNREADABLE]) {
+      now = Date.parse('2026-11-14T05:00:00.000Z');
+      folder = new MockFolderStore();
+      folder.setClock(tick);
+      await folder.open(null);
+      client = new FakeOwApiClient();
+      client.setClock(tick);
+      client.__enable_changes();
+      const engine = new SyncEngine({ folder, client, policy: 'local-wins' });
+      await synced(engine);
+      outsideEdit(WREN, { description: 'outside' }, stamp);
+      client.__server_mutate('character', WREN, { description: 'a teammate\'s' });
+      client.calls = [];
+      await engine.syncNow();
+      expect(updatesOf(WREN)).toBe(0);
+      expect(client.__server_get('character', WREN)?.description).toBe('a teammate\'s');
+      expect((await folder.readSyncState()).conflicts.map(c => c.element_id)).toEqual([WREN]);
+    }
+  });
+});
+
 describe('a baseline that cannot be read (R3)', () => {
   it('holds the push as a review conflict under local-wins, once; Keep mine sends it', async () => {
     const engine = new SyncEngine({ folder, client, policy: 'local-wins' });

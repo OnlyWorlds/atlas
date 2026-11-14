@@ -945,7 +945,7 @@ export class SyncEngine {
         const response = local.server_updated_at
           ? await this.client.updateElement(local.type, id, body)
           : await this.client.createElement(local.type, body);
-        await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at,
+        await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at ?? '',
           keptFrom(response, !local.server_updated_at));
         console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
       } catch (err) {
@@ -1096,7 +1096,7 @@ export class SyncEngine {
     }
     await this.folder.stampServerUpdatedAt(
       local.id, local.type as ElementType, remote.updated_at,
-      sameWireContent(local, remote) ? (local.local_updated_at as string | undefined) : null,
+      sameWireContent(local, remote) ? (local.local_updated_at ?? '') : null,
       stampWordOf(remote),
     );
   }
@@ -1138,7 +1138,7 @@ export class SyncEngine {
   ): Promise<'no' | 'adopted' | 'held'> {
     if (local.server_updated_at || !sameWireContent(local, remoteBody)) return 'no';
     const wrote = await this.pullWrite(failures, local.id, type, () =>
-      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at as string | undefined, stampWordOf(remoteBody)));
+      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at ?? '', stampWordOf(remoteBody)));
     if (!wrote) return 'held'; // the /changes walk must not pass it
     console.info(`[atlas:sync] pull: ${type}/${local.id} is our own create with an unrecorded stamp; baseline adopted`);
     return 'adopted';
@@ -2127,7 +2127,7 @@ export class SyncEngine {
         }
       }
       items.push({ type: current.type, element: this.outgoing(current) });
-      sentStamps.set(current.id, current.local_updated_at);
+      sentStamps.set(current.id, current.local_updated_at ?? ''); // '' = sent with none (never "passed nothing")
     }
     if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false };
 
@@ -2626,7 +2626,7 @@ export class SyncEngine {
             continue;
           }
           // keel marks a seat's new element proposed on a reviewed world (conv. 168): the copy keeps it.
-          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, keptFrom(response, true));
+          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at ?? '', keptFrom(response, true));
           creates++;
         } else {
           // UPDATE path: re-fetch element from folder in case an in-loop
@@ -2688,7 +2688,8 @@ export class SyncEngine {
             if (this.policy === 'pause-and-review') {
               // Keep local change on disk; do NOT push. Baseline stays.
               skipPush = true;
-            } else if (moveOrder === null) {
+            } else if (moveOrder === null || stampOrder(current.local_updated_at, baseline) === null) {
+              // Nor can a local stamp that cannot be read say this copy is the newer: never over keel's move.
               skipPush = true;
               reviewHeld.push(conflict);
             }
@@ -2713,7 +2714,7 @@ export class SyncEngine {
             // (it used to be stamped clean and never uploaded).
             // keel takes the mark on a create only: its answer says whether it shows the element,
             // and a mark taken out here comes back with it, since keel keeps hiding it (conv. 173).
-            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at, stampKeptOf(response));
+            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at ?? '', stampKeptOf(response));
             updates++;
           }
         }
@@ -3176,7 +3177,7 @@ export class SyncEngine {
             && await this.folder.applyServerRecordIfUnchanged(entry.type, body, updated_at, local.local_updated_at ?? null);
           // Edited since (before the settle, or during it): the newer edit stays
           // and goes out on the new baseline.
-          if (!landed) await this.folder.stampServerUpdatedAt(entry.element_id, entry.type, updated_at, entry.local_updated_at, stampWordOf(body));
+          if (!landed) await this.folder.stampServerUpdatedAt(entry.element_id, entry.type, updated_at, entry.local_updated_at ?? '', stampWordOf(body));
         });
         if (!ok) continue;
         accepted.push(entry.element_id);

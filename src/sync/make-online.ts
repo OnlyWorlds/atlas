@@ -421,7 +421,7 @@ export async function mergeLocalIntoApi(
     const current = await folder.updateElementWith(id, () => null);
     if (!current) return null;
     const { local_updated_at, server_updated_at: _s, ...body } = current;
-    return { body, sent: local_updated_at };
+    return { body, sent: local_updated_at ?? '' }; // '' = sent with none (never "passed nothing")
   };
 
   async function createOne(c: { local: Element; type: ElementType }): Promise<void> {
