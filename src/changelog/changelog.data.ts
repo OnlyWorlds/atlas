@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.5',
+    date: '2026-11-14',
+    theme: 'Edit times read as times',
+    entries: [
+      {
+        id: 'edit-times-any-offset',
+        title: 'An edit another tool writes now syncs, whatever its time offset',
+        body: 'Atlas compared edit times as text, so an edit another tool made in your folder with a time like 00:10:00-05:00 could read as older than the copy online, stay unsynced and be replaced by the next pull. Atlas now reads every edit time as the moment it names, so that edit uploads like any other.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.4',
     date: '2026-11-14',
     theme: 'Folders stamped as the folder check reads them',

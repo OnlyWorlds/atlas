@@ -42,6 +42,8 @@ The class is `src/sync/sync-engine.ts`; its state and result types are `SyncEngi
 
 ## A round
 
+**Stamps are read as instants** (conv. 190): every "newer", "moved" or "edited since" below is `stampOrder` on the two times (keel's `isoformat()`, Atlas's `toISOString()`, another tool's offset, all the same instant when they name it), never their text; a time that cannot be read is changed on the local side, moved on keel's, and a baseline that cannot be read holds the push for review whatever the policy. Equality with a stamp read or sent before stays text.
+
 Every round checks, in order: blocked (paused or held) returns an empty result; a re-key journal on disk refuses the round and publishes "held" (conv. 105); then the **meta step** (below). A push round skips the `GET /world` when a baseline exists and local meta equals it.
 
 **Push** (`pushPhase`):
@@ -49,7 +51,7 @@ Every round checks, in order: blocked (paused or held) returns an empty result; 
 2. CREATEs (no `server_updated_at`) land before UPDATEs. Two or more creates go through `POST /bulk`: one atomic request, keel resolves in-batch links as a fixpoint including cycles, one retry of the survivors on a partial failure, then timestamp backfill (never the client clock) (conv. 23). A single create, or a client without `bulkCreate`, uses the per-element path ordered by the Kahn topo-sort.
 3. UPDATEs: a server copy newer than the baseline is a conflict, handled per policy. A 404 routes the element to the server-delete review, except a guest's, which keeps it (conv. 151); an element in the kept set is skipped unsent.
 4. Tombstones become DELETEs; success or a 404 clears the entry.
-5. Each success stamps `server_updated_at` passing the sent `local_updated_at`, so an edit made during the request stays dirty (conv. 96). A pin missing `element_type` is healed from its element first (conv. 19). An `invalid_link` routes the dangling peer to the server-delete review. A create refused because another world holds the id is recorded as foreign, on evidence only (conv. 108).
+5. Each success stamps `server_updated_at` passing the sent `local_updated_at`, so an edit made during the request stays dirty, lifted to the first millisecond after keel's instant (conv. 96, 190); with no edit in flight, a local stamp that cannot be read becomes keel's. A pin missing `element_type` is healed from its element first (conv. 19). An `invalid_link` routes the dangling peer to the server-delete review. A create refused because another world holds the id is recorded as foreign, on evidence only (conv. 108).
 6. Errors: a per-element 4xx or validation failure is recorded and the loop goes on. 401/403 bails the round and turns the engine red (conv. 22). 429, 503 or a network failure ENDS the round (`transient_blocked`), nothing pauses, and one retry is scheduled after `Retry-After` or 30 s (conv. 100).
 
 **Pull** (`pullPhase`):

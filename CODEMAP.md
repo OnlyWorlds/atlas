@@ -76,7 +76,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/store/folder-store.ts`: the FolderStore INTERFACE, the seam (`updateSyncState` mutator, conv. 86).
 - `src/store/folder-store-fs.ts`: FsFolderStore: body-based fileIndex + id-sorted tidy + sticky writes (conv. 87), 30 s lock heartbeat, tombstone + sync-state chains.
 - `src/store/write-chain.ts`: `PerIdWriteChain`, per-id update/delete serialization (conv. 79; both stores use it).
-- `src/store/sync-stamp.ts`: `stampedBody`: a push stamp keeps an edit made IN FLIGHT dirty (conv. 96); `dropLastWriter`, a local edit is the person's (conv. 144).
+- `src/store/sync-stamp.ts`: `stampOrder`, the one ordering of two element times, as instants (`editedSince`: after, or unknown; conv. 190); `stampedBody`: a push stamp keeps an edit made IN FLIGHT dirty (conv. 96) and heals an unreadable local stamp; `editStamp` (conv. 135); `dropLastWriter`, a local edit is the person's (conv. 144).
 - `src/store/disk-link-names.ts`: pin/marker link fields read under BOTH disk spellings (`map`/`map_id`); per-FILE spelling recorded in fileIndex and written back the way it came (conv. 8).
 - `src/store/fs-utils.ts`: `writeJsonAtomic` (ONE writable + read-back verify, busy files retried about 2 s; conv. 123), slugify / idTail / elementFilename / validElementFilenames / `sameFsName` (the File-naming contract).
 - `src/store/scrub-links.ts`: a delete removes the dead ids from every link (conv. 101).
