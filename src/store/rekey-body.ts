@@ -45,6 +45,7 @@
  */
 import type { Element, ElementType } from '../core/types';
 import { SERVER_AUTHOR_FIELDS, isRekeyExemptField } from '../core/constants';
+import { DECLARED_LINKS } from '@onlyworlds/sdk';
 import { namedId, rewriteOwLinks } from '../core/ow-links';
 import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
 
@@ -150,6 +151,46 @@ export function rekeySidecar(value: unknown, map: IdMap): unknown {
   return rekeyDocNode(value, map);
 }
 
+/**
+ * A list of links names each element once (folder format 0.3.24): a writer
+ * that builds a list builds it so, and one served a repeat writes it back as
+ * served. The rewrite builds: `[old, new]` would come out `[new, new]`. So an
+ * id the rewrite lands on appears as many times as the most any one served
+ * entry that lands there appeared, in its first places: `[old, new]` gives one,
+ * `[old, old]` and `[new, old, old]` give two (the served repeat, rewritten).
+ * Only for a link list: a positional list (a page's `atlas_page_refs`, a
+ * block's ids, which mirror each other by place) keeps its length.
+ */
+export function rekeyIdList(value: readonly unknown[], rewrite: (v: unknown) => unknown): unknown[] | null {
+  const outs = value.map(rewrite);
+  if (outs.every((o, i) => o === value[i])) return null;
+  const served = new Map<string, Map<unknown, number>>();
+  outs.forEach((o, i) => {
+    if (typeof o !== 'string') return;
+    const by = served.get(o) ?? new Map<unknown, number>();
+    by.set(value[i], (by.get(value[i]) ?? 0) + 1);
+    served.set(o, by);
+  });
+  const left = new Map<string, number>();
+  for (const [o, by] of served) {
+    let most = 0;
+    for (const n of by.values()) if (n > most) most = n;
+    left.set(o, most);
+  }
+  const out: unknown[] = [];
+  for (const o of outs) {
+    if (typeof o === 'string') {
+      const n = left.get(o)!;
+      if (n === 0) continue;
+      left.set(o, n - 1);
+    }
+    out.push(o);
+  }
+  return out;
+}
+
+const rewriteId = (map: IdMap) => (v: unknown): unknown => (typeof v === 'string' ? map.get(v) ?? v : v);
+
 function rekeyIdArray(value: unknown, map: IdMap): unknown {
   if (!Array.isArray(value)) return value;
   let changed = false;
@@ -159,6 +200,25 @@ function rekeyIdArray(value: unknown, map: IdMap): unknown {
     return v;
   });
   return changed ? out : value;
+}
+
+/** A schema multi-link's list: rewritten, each element once. */
+function rekeyLinkList(value: unknown, map: IdMap): unknown {
+  if (!Array.isArray(value)) return value;
+  return rekeyIdList(value, rewriteId(map)) ?? value;
+}
+
+const multiCache = new Map<ElementType, Set<string>>();
+function multiLinkFieldsFor(type: ElementType): Set<string> {
+  let set = multiCache.get(type);
+  if (!set) {
+    set = new Set();
+    try {
+      for (const r of relationFieldsFor(type)) if (r.kind === 'multi') { set.add(r.diskField); set.add(r.schemaField); }
+    } catch { /* unknown type: no multi-links */ }
+    multiCache.set(type, set);
+  }
+  return set;
 }
 
 function rekeyIdString(value: unknown, map: IdMap): unknown {
@@ -279,10 +339,12 @@ export function rekeyBody(body: Element, map: IdMap): { body: Element; changed: 
     else if (typeof value === 'string') {
       next = !prose.has(key) && map.has(value) ? map.get(value)! : rekeyOwLinks(value, map);
     } else if (key.startsWith('x_') && value !== null && typeof value === 'object') {
-      next = rekeyNested(value, map);
+      next = DECLARED_LINKS.includes(key) && Array.isArray(value)
+        ? rekeyIdList(value, v => rekeyNested(v, map, 1)) ?? value
+        : rekeyNested(value, map);
       if (key === 'x_record' && body.type === 'event') next = rekeyRecordSeats(next, map);
     }
-    else if (Array.isArray(value)) next = rekeyIdArray(value, map);
+    else if (Array.isArray(value)) next = multiLinkFieldsFor(body.type).has(key) ? rekeyLinkList(value, map) : rekeyIdArray(value, map);
     if (next !== value) {
       if (!out) out = { ...src };
       out[key] = next;

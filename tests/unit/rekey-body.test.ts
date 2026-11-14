@@ -33,6 +33,40 @@ describe('rekeyBody: flat links', () => {
     expect(body.friends).toEqual([X, N, N2]);
   });
 
+  it('a list names each element once: an entry the rewrite makes a repeat goes, a served repeat stays (format 0.3.24)', () => {
+    // The new id already in the list beside the old one, either order.
+    expect(rekeyBody(el('character', { friends: [O, N, X] }), map).body.friends).toEqual([N, X]);
+    expect(rekeyBody(el('character', { friends: [N, O, X] }), map).body.friends).toEqual([N, X]);
+    // A repeat the list was served is written back as served, rewritten, as many times as served.
+    expect(rekeyBody(el('character', { friends: [O, O, X] }), map).body.friends).toEqual([N, N, X]);
+    expect(rekeyBody(el('character', { friends: [O, N, O] }), map).body.friends).toEqual([N, N]);
+    expect(rekeyBody(el('character', { friends: [N, O, O] }), map).body.friends).toEqual([N, N]);
+    expect(rekeyBody(el('character', { friends: [O, N, N] }), map).body.friends).toEqual([N, N]);
+    // Nothing in the map: the list, a repeat included, comes back as the same array.
+    const served = [X, X];
+    const r = rekeyBody(el('character', { friends: served, location: O }), map);
+    expect(r.body.friends).toBe(served);
+    // The extension lists a profile reads as links are links too; any other x_ list keeps its places.
+    expect(rekeyBody(el('object', { x_spine_depends_on: [O, N] }), map).body.x_spine_depends_on).toEqual([N]);
+    expect(rekeyBody(el('object', { x_lens_leads_to: [N, O] }), map).body.x_lens_leads_to).toEqual([N]);
+    expect(rekeyBody(el('object', { x_pair: [O, N] }), map).body.x_pair).toEqual([N, N]);
+  });
+
+  it('a positional list keeps its length: a page\'s refs mirror its blocks by place', () => {
+    // Cards bound to O, N, X: the refs and the blocks rewrite in step, so each card keeps its element.
+    const page = el('narrative', {
+      atlas_page_blocks: [
+        { id: 'b1', kind: 'element-card', elementId: O }, { id: 'b2', kind: 'element-card', elementId: N }, { id: 'b3', kind: 'element-card', elementId: X },
+        { id: 'b4', kind: 'collection', elementIds: [O, N] },
+      ],
+      atlas_page_refs: [O, N, X, O, N],
+    });
+    const after = rekeyBody(page, map).body;
+    expect(after.atlas_page_refs).toEqual([N, N, X, N, N]);
+    const bound = blocksOf(after).map(b => (b as { elementId?: string; elementIds?: string[] }).elementId ?? (b as { elementIds?: string[] }).elementIds);
+    expect(bound).toEqual([N, N, X, [N, N]]);
+  });
+
   it('pin/marker in-memory spelling and extension scalars', () => {
     const pin = rekeyBody(el('pin', { map_id: O, element_id: O2, element_type: 'character' }), map).body;
     expect(pin.map_id).toBe(N);

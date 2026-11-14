@@ -39,6 +39,10 @@ describe('withKeptLinks: what the copy keeps from keel\'s redacted read', () => 
     expect(withKeptLinks('event', { characters: [BO] }, { characters: [ANA, BO] }, kept)).toEqual({ characters: [BO, ANA] });
   });
 
+  it('a kept id the copy names twice comes back once (format 0.3.24)', () => {
+    expect(withKeptLinks('event', { characters: [BO] }, { characters: [ANA, BO, ANA] }, kept)).toEqual({ characters: [BO, ANA] });
+  });
+
   it('a single link keel read as empty keeps the copy\'s kept id', () => {
     expect(withKeptLinks('character', { name: 'Cy', location: null }, { location: FERRY }, kept)).toEqual({ name: 'Cy', location: FERRY });
     expect(withKeptLinks('character', { name: 'Cy' }, { location: FERRY }, kept)).toEqual({ name: 'Cy', location: FERRY });

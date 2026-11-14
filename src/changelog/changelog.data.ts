@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.7',
+    date: '2026-11-14',
+    theme: 'Each element once in a list of links',
+    entries: [
+      {
+        id: 'links-each-element-once',
+        title: 'A list of links names each element once',
+        body: 'The OnlyWorlds standard now says a list of links names each element once. When a list names one element twice, the world\'s picture and its link counts read it once. When elements get new ids, after an import that matched an element by name or a sync that joined two copies, a list that held both the old and the new id now keeps one of them. New world folders are format 0.3.24.',
+        tags: ['folders', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.6',
     date: '2026-11-14',
     theme: 'A link glued to a word is part of the word',

@@ -73,7 +73,8 @@ export function restoredLinkPatch(local: Element, server: Element, back: Readonl
       const lost = s.filter(x => { const id = idOf(x); return id !== null && back.has(id); });
       const here = Array.isArray(l) ? l : [];
       const hereIds = new Set(here.map(idOf));
-      const missing = lost.filter(x => !hereIds.has(idOf(x)));
+      // Each element once (format 0.3.24): a list keel served before it kept each once can name one twice.
+      const missing = lost.filter(x => { const id = idOf(x); if (hereIds.has(id)) return false; hereIds.add(id); return true; });
       if (missing.length === 0) continue;
       const rest = (list: unknown[]) => list.map(idOf).filter(id => id === null || !back.has(id)).join('\u0000');
       patch[f.diskField] = rest(s) === rest(here) ? s : [...here, ...missing];

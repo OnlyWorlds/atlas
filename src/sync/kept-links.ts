@@ -50,7 +50,8 @@ export function withKeptLinks(
       const keptMine = mine.filter((id): id is string => typeof id === 'string' && kept.has(id));
       if (keptMine.length === 0) continue;
       const theirs = Array.isArray(remote[f.diskField]) ? remote[f.diskField] as unknown[] : [];
-      const back = keptMine.filter(id => !theirs.includes(id));
+      // Each element once (format 0.3.24), however many times the copy's list names it.
+      const back = [...new Set(keptMine)].filter(id => !theirs.includes(id));
       if (back.length === 0) continue;
       out ??= { ...remote };
       out[f.diskField] = [...theirs, ...back];
