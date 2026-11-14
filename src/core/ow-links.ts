@@ -7,7 +7,12 @@
  * pattern of Atlas's own: the prefix and the type word lowercase, the id an id
  * in either case of hex (read lowercase), then an optional `@moment` and
  * `?lens=<id>`; what follows is prose, a full stop included. `ow://Character/…`
- * and `ow://character/abc` are plain text.
+ * and `ow://character/abc` are plain text. Where an address may begin is the
+ * profile's too: one glued to a word before it (a letter of any script, a
+ * combining mark, an underscore) is prose, so `elbow://…` and `_ow://…_` are
+ * no address; a hyphen, a digit or any other mark before it does not glue.
+ * The SDK's `findOwLinks` reads the whole text, so it sees that character;
+ * Atlas keeps no finder, prefilter or start test of its own.
  *
  * Lives in core/ (not middle/) so TipTap-free consumers (the relation derive,
  * the knowledge room) can import without pulling the editor bundle in.
@@ -18,7 +23,8 @@
  * share scrub reads them ({@link findAddresses}).
  */
 
-import { ELEMENT_TYPES, readOwLinkAt, type OwAddressReading } from '@onlyworlds/sdk';
+// The SDK's finder and its found type share names with Atlas's own exports, so they come in aliased.
+import { findOwLinks as findAllAddresses, readOwLinkAt, type OwAddressReading } from '@onlyworlds/sdk';
 
 /** The text form's prefix, as the profile writes it. */
 const OW_TEXT_PREFIX = 'ow://';
@@ -63,79 +69,6 @@ export interface OwLink {
   moment: number | null;
 }
 
-/*
- * The SDK reads an address; Atlas only decides when to ask, and how much
- * text to hand it, so a walk over any text stays linear. A read that fails
- * costs the SDK about a millisecond, so a prefix is first held against the
- * address's core shape (a cheap sticky match: the prefix, then a world or a
- * type word from the SDK's own list, and ids), and a prefix with no core is
- * no address without asking. A core is never shorter than what the SDK reads
- * from it, so nothing it would read is missed (the profile's 57 prose cases
- * and a fuzz pass hold it). The SDK is then handed the core and the stretch
- * after it that a moment, a lens and the next character can take, or the
- * core alone when a path character follows it (a path or a word that goes on
- * past the core is one the SDK does not take: its reading ends at the core
- * either way; the site's form, whose world run is read whole, never ends its
- * core before such a character).
- */
-const ID_SRC = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
-const TYPES_SRC = [...ELEMENT_TYPES].sort((a, b) => b.length - a.length).join('|');
-const TEXT_CORE = new RegExp(`ow://(?:(?:${TYPES_SRC})/${ID_SRC}|${ID_SRC}(?:/(?:${TYPES_SRC})/${ID_SRC})?)`, 'y');
-const SITE_CORE = new RegExp(`https://www\\.onlyworlds\\.com/w/[0-9A-Za-z-]{1,64}(?:/(?:${TYPES_SRC})/${ID_SRC})?`, 'y');
-/** What may follow a core inside an address, and the character after it: `@` and a moment, `?lens=` and an id. */
-const TAIL = 64;
-const PATH_CHAR = /[0-9A-Za-z/-]/;
-/** A moment's run after the core, read up to one digit past the 32-bit range's ten. */
-const MOMENT_RUN = /@-?(\d{0,11})/y;
-
-/** A moment whose digits run past ten is out of range: the SDK takes no moment, and the address ends at the core. */
-function momentOutOfRange(text: string, at: number): boolean {
-  if (text[at] !== '@') return false;
-  MOMENT_RUN.lastIndex = at;
-  const m = MOMENT_RUN.exec(text);
-  return m !== null && m[1].length > 10;
-}
-
-/** The SDK's reading of the address that starts at `i`, or null. */
-function readAt(text: string, i: number): { reading: OwAddressReading; end: number } | null {
-  const core = text.startsWith(OW_TEXT_PREFIX, i) ? TEXT_CORE : text.startsWith(OW_SITE_PREFIX, i) ? SITE_CORE : null;
-  if (!core) return null;
-  core.lastIndex = i;
-  const m = core.exec(text);
-  if (!m) return null;
-  const coreEnd = i + m[0].length;
-  // A path character after the core (a letter, a digit, `-` or `/`) is no
-  // moment and no lens: the reading ends at the core either way, and handing
-  // the SDK a run of them costs it some forty failing longer readings.
-  const stop = coreEnd < text.length && (PATH_CHAR.test(text[coreEnd]) || momentOutOfRange(text, coreEnd))
-    ? coreEnd
-    : Math.min(text.length, coreEnd + TAIL);
-  const at = readOwLinkAt(i === 0 && stop === text.length ? text : text.slice(i, stop), 0);
-  return at ? { reading: at.reading, end: i + at.end } : null;
-}
-
-/**
- * Each start of a prefix in a text, in order, found in one pass: each
- * prefix's next index is kept and searched again only once the walk has
- * passed it, so no stretch of the text is searched twice for one prefix.
- */
-class PrefixWalk {
-  private nextText: number;
-  private nextSite: number;
-  constructor(private readonly text: string) {
-    this.nextText = text.indexOf(OW_TEXT_PREFIX);
-    this.nextSite = text.indexOf(OW_SITE_PREFIX);
-  }
-  /** The first prefix at or after `from`, or -1. */
-  next(from: number): number {
-    if (this.nextText !== -1 && this.nextText < from) this.nextText = this.text.indexOf(OW_TEXT_PREFIX, from);
-    if (this.nextSite !== -1 && this.nextSite < from) this.nextSite = this.text.indexOf(OW_SITE_PREFIX, from);
-    if (this.nextText === -1) return this.nextSite;
-    if (this.nextSite === -1) return this.nextText;
-    return Math.min(this.nextText, this.nextSite);
-  }
-}
-
 /** Where the id and the lens sit inside an address the SDK read at [start, end). */
 function locate(text: string, start: number, end: number, reading: OwAddressReading): OwAddressFound | null {
   let lensAt = -1;
@@ -166,22 +99,18 @@ function locate(text: string, start: number, end: number, reading: OwAddressRead
 
 /**
  * Every address the SDK reads in a text, in either form and of any world
- * (the share scrub's reader: nothing that names an element may slip past it).
- * Every prefix is read where it stands, the SDK's way: an address may start
- * inside another one (an `ow://` glued after a site address's slug).
+ * (the share scrub's reader: nothing that names an element may slip past it),
+ * as the SDK's `findOwLinks` finds them: in order, none overlapping, none
+ * glued to a word before it. What it leaves (a glued address, an address
+ * inside a slug's run) the scrub's wide pass still reads
+ * ({@link findLooseAddressRuns}).
  */
 export function findAddresses(text: string): OwAddressFound[] {
   const out: OwAddressFound[] = [];
   if (typeof text !== 'string') return out;
-  const walk = new PrefixWalk(text);
-  let i = walk.next(0);
-  while (i !== -1) {
-    const at = readAt(text, i);
-    if (at) {
-      const found = locate(text, i, at.end, at.reading);
-      if (found) out.push(found);
-    }
-    i = walk.next(i + 1);
+  for (const f of findAllAddresses(text)) {
+    const found = locate(text, f.start, f.end, f.reading);
+    if (found) out.push(found);
   }
   return out;
 }
@@ -212,7 +141,7 @@ export function findOwLinks(text: string): OwLink[] {
  */
 export function readOwHref(href: unknown): OwLink | null {
   if (typeof href !== 'string' || !href.startsWith(OW_TEXT_PREFIX)) return null;
-  const at = readAt(href, 0);
+  const at = readOwLinkAt(href, 0);
   if (!at || at.end !== href.length) return null;
   const found = locate(href, 0, at.end, at.reading);
   return found ? asLink(found) : null;
@@ -357,13 +286,15 @@ function indexOfPrefixAnyCase(text: string): number {
  * capitals, a link cut short, a path that goes on past the address), the run
  * to the next space without a sentence's closing punctuation, which the
  * whole-string reader then refuses in words. Null when there is no prefix.
+ * A paste is one address the person meant, so it is read from its first
+ * prefix on, whatever stands before it: prose's start rule does not apply.
  */
 export function pastedAddressIn(text: string): string | null {
   if (typeof text !== 'string') return null;
   const i = indexOfPrefixAnyCase(text);
   if (i === -1) return null;
-  const at = readAt(text, i);
-  if (at && text[at.end] !== '/') return text.slice(i, at.end);
+  const at = readOwLinkAt(text.slice(i), 0);
+  if (at && text[i + at.end] !== '/') return text.slice(i, i + at.end);
   let runEnd = i;
   while (runEnd < text.length && !/\s/.test(text[runEnd])) runEnd++;
   const run = text.slice(i, runEnd);

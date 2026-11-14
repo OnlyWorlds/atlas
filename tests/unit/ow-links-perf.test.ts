@@ -52,9 +52,22 @@ const SHAPES: Array<[string, (size: number) => string]> = [
   ['a world, an unknown type word and an id, repeated', s => story(s, () => `ow://${ID}/characterx/${ID} `)],
   ["the site's prefix, an id and an unknown type word, repeated", s => story(s, () => `https://www.onlyworlds.com/w/${ID}/characterx/${ID} `)],
   ['an address and 64 letters glued after it, repeated', s => story(s, k => `ow://character/${idOf(k)}` + 'a'.repeat(64) + ' ')],
+  // Glued after a letter, every address but the first is prose (serial 127), so this shape reads one; its twin
+  // after a hyphen keeps every address readable, so the many reads stay timed.
   ['an address and 64 letters glued after it, no space', s => story(s, k => `ow://character/${idOf(k)}` + 'a'.repeat(64))],
+  ['an address and 64 letters then a hyphen, no space', s => story(s, k => `ow://character/${idOf(k)}` + 'a'.repeat(64) + '-')],
   ['an address and a moment of 60 digits, repeated', s => story(s, k => `ow://character/${idOf(k)}@` + '9'.repeat(60))],
 ];
+
+describe('the glued shapes read as the start rule says', () => {
+  const unit = 15 + 36 + 64;
+  it('64 letters then a hyphen: every address reads', () => {
+    expect(findOwLinks(story(unit * 100, k => `ow://character/${idOf(k)}` + 'a'.repeat(64) + '-'))).toHaveLength(100);
+  });
+  it('64 letters, no space: only the first address reads', () => {
+    expect(findOwLinks(story(unit * 100, k => `ow://character/${idOf(k)}` + 'a'.repeat(64)))).toHaveLength(1);
+  });
+});
 
 describe('a 2 MB story is read in linear time', () => {
   for (const [label, make] of SHAPES) {

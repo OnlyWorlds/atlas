@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { buildPagePayload, freezeMapBlock, scrubMarkdownForPayload, type RelationToken, type PayloadCircleBlock } from '../../src/core/share-payload';
 import type { MapBlock } from '../../src/core/sharing';
 import type { Element } from '../../src/core/types';
+import addressFixture from '../fixtures/address.fixture.json';
 
 // ---- fixtures ---------------------------------------------------------------
 
@@ -296,6 +297,7 @@ describe('buildPagePayload', () => {
       ['on the page and not, one run, a slash', `x [Alice](ow://character/${A}/${S}) y`],
       ['a lens held in capitals', `x [m](ow://character/${A}?lens=${S.toUpperCase()}) y`],
       ["glued after a site address's slug", `x https://www.onlyworlds.com/w/my-worldow://character/${S} y`],
+      ["inside a site address's slug run, after a digit", `x https://www.onlyworlds.com/w/abc3ow://character/${S} y`],
       ['an escaped bracket in the label', `x [a\\]b](ow://character/${S}) y`],
       ["the world's own text form", `x [The World](ow://${W2}) y`],
       ["the world's own site link", `x [The World](https://www.onlyworlds.com/w/${W2}) y`],
@@ -314,6 +316,30 @@ describe('buildPagePayload', () => {
         if (want !== undefined) expect(out).toBe(want);
       });
     }
+
+    // Serial 127: an address glued to a word before it is prose, so the address reader no longer finds
+    // it; the wide pass still reads its run from the same index, so the scrub's text is what it was.
+    describe('an address glued to a word before it is still scrubbed, the text as before', () => {
+      const glued = (addressFixture.cases as unknown as Array<{ name: string; text: string; index: number; index_utf16?: number }>);
+      const ROWS: Array<[string, (text: string, at: number) => string]> = [
+        ['prose-start-glued-letter', (t, at) => t.slice(0, at) + '.'],
+        ['prose-start-glued-underscore', (t, at) => t.slice(0, at) + ' here'],
+        ['prose-start-glued-non-ascii-letter', (t, at) => t.slice(0, at)],
+        ['prose-start-glued-combining-mark', (t, at) => t.slice(0, at)],
+        ['prose-start-glued-astral-letter', (t, at) => t.slice(0, at)],
+        ['prose-start-glued-letter-site-form', (t, at) => t.slice(0, at)],
+        // One run from the first address on: both ids go, the full stop stays.
+        ['prose-back-to-back-after-hex-letter', () => '.'],
+      ];
+      for (const [name, want] of ROWS) {
+        it(name, () => {
+          const c = glued.find(x => x.name === name)!;
+          const out = scrub(c.text);
+          expect(out).toBe(want(c.text, c.index_utf16 ?? c.index));
+          expect(out).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
+        });
+      }
+    });
 
     it('what is on the page is kept, byte for byte', () => {
       const md = `x [Alice](ow://character/${A}) and ow://character/${A}@4 and [L](ow://character/${A}?lens=${A}) [U](ow://character/${A.toUpperCase()}) y`;
