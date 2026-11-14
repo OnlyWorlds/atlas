@@ -272,6 +272,49 @@ describe('buildPagePayload', () => {
       expect(scrub(`x [lbl](ow://character/${S} "t") y`)).toBe('x lbl y');
       expect(scrub(`x [lbl](<ow://character/${S}>) y`)).toBe('x lbl y');
     });
+    // The second gate's cases: every form leaks nothing, the known limits aside (DESIGN_WRITING #48:
+    // an id spelled with zero-width characters, full-width hyphens or percent-encoding names nothing).
+    const W2 = '0193aaaa-7d3e-7f00-8a11-3c5e7b9d2f40';
+    const strip = (x: string): string => x.toLowerCase().replace(/[^0-9a-f]/g, '');
+    const leaks2 = (out: string): boolean => [S, W2].some(x => strip(out).includes(strip(x).slice(0, 28))) || out.includes('Secret Sam');
+    const FORMS_2: Array<[string, string, string?]> = [
+      ['the site form over http', `x http://www.onlyworlds.com/w/${W2}/character/${S} y`],
+      ['the site form with no scheme', `x www.onlyworlds.com/w/${W2}/character/${S} y`],
+      ['the site form with no scheme or www', `x onlyworlds.com/w/${W2}/character/${S} y`],
+      ['the site form in an autolink', `x <https://www.onlyworlds.com/w/${W2}/character/${S}> y`],
+      ['a fenced code block', 'x\n```\now://character/' + S + '\n```\ny'],
+      ['a title in single quotes', `x [lbl](ow://character/${S} 't') y`, 'x lbl y'],
+      ['a title in brackets', `x [lbl](ow://character/${S} (t)) y`, 'x lbl y'],
+      ['an angle href with a space', `x [lbl](<ow://character/${S} >) y`, 'x lbl y'],
+      ['a label with ]', `x [a]b](ow://character/${S}) y`, 'x a]b y'],
+      ['a label with nested brackets', `x [a [b] c](ow://character/${S}) y`, 'x a [b] c y'],
+      ['an image', `x ![pic](ow://character/${S}) y`],
+      ['a run ending in )', `x (see ow://character/${S}) y`],
+      ['an html anchor in single quotes', `x <a href='ow://character/${S}'>l</a> y`],
+      ['a reference-style link with a title', `x [lbl][r]\n\n[r]: <ow://character/${S}> "T"\n`],
+      ['on the page and not, one run, a comma', `x ow://character/${A},ow://character/${S} y`],
+      ['on the page and not, one run, a slash', `x [Alice](ow://character/${A}/${S}) y`],
+      ['a lens held in capitals', `x [m](ow://character/${A}?lens=${S.toUpperCase()}) y`],
+      ["glued after a site address's slug", `x https://www.onlyworlds.com/w/my-worldow://character/${S} y`],
+      ['an escaped bracket in the label', `x [a\\]b](ow://character/${S}) y`],
+      ["the world's own text form", `x [The World](ow://${W2}) y`],
+      ["the world's own site link", `x [The World](https://www.onlyworlds.com/w/${W2}) y`],
+      ['on the page, a run ending ).', `x [Alice](ow://character/${A}). y`, `x [Alice](ow://character/${A}). y`],
+      ['on the page, a run ending ,', `x ow://character/${A}, y`, `x ow://character/${A}, y`],
+      ['on the page, a run ending ]', `x [see ow://character/${A}] y`, `x [see ow://character/${A}] y`],
+      ['on the page, in quotes', `x "ow://character/${A}" y`, `x "ow://character/${A}" y`],
+      ['on the page, in a code span', 'x `ow://character/' + A + '` y', 'x `ow://character/' + A + '` y'],
+      ['on the page, an angle href', `x [a](<ow://character/${A}>) y`, `x [a](<ow://character/${A}>) y`],
+      ['on the page, a title', `x [a](ow://character/${A} "t") y`, `x [a](ow://character/${A} "t") y`],
+    ];
+    for (const [label, md, want] of FORMS_2) {
+      it(`${label}: nothing off the page ships${want !== undefined ? ', and the text is exact' : ''}`, () => {
+        const out = scrub(md);
+        expect(leaks2(out), out).toBe(false);
+        if (want !== undefined) expect(out).toBe(want);
+      });
+    }
+
     it('what is on the page is kept, byte for byte', () => {
       const md = `x [Alice](ow://character/${A}) and ow://character/${A}@4 and [L](ow://character/${A}?lens=${A}) [U](ow://character/${A.toUpperCase()}) y`;
       expect(scrub(md)).toBe(md);

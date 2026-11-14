@@ -75,14 +75,20 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'share-scrub-every-address',
         title: 'A published page leaves out every link it does not show',
-        body: 'A published page now takes out a link to any element or lens that is not on the page, however the link is written: with a moment or a lens, to another world, copied from onlyworlds.com, in capital letters, or with a type word Atlas does not read as a link. A link written as [label](...) becomes its label, and a bare address is left out. The name of an element that is not on the page is never written in its place; before, a bare address was replaced by the element\'s name, and a link could carry the id of a lens that was not on the page.',
+        body: 'A published page now takes out a link to any element or lens that is not on the page, however the link is written: with a moment or a lens, to another world, copied from onlyworlds.com, in capital letters, or with a type word Atlas does not read as a link. A link written as [label](...) becomes its label, with a title, an address in angle brackets or brackets inside the label too, and a bare address is left out. The name of an element that is not on the page is never written in its place; before, a bare address was replaced by the element\'s name, and a link could carry the id of a lens that was not on the page.',
         tags: ['sharing', 'fix'],
       },
       {
         id: 'import-ids-lowercase',
         title: 'An import writes a new element\'s id in lowercase',
-        body: 'When an import makes a new element from a file whose id is written in capital letters, Atlas writes the id in lowercase, and every link to it in the same import follows, however the link spells the id. An element already in your world keeps its id exactly as it is, and an incoming element whose id differs from one here only in capitals is that element, not a second copy.',
+        body: 'When an import makes a new element from a file whose id is written in capital letters, Atlas writes the id in lowercase, and every link to it in the same import follows, however the link spells the id. An element already in your world keeps its id exactly as it is. An incoming element whose id differs from one here only in capitals is that element, not a second copy, when their names agree or the file is this world\'s own; otherwise it gets a new id.',
         tags: ['folders'],
+      },
+      {
+        id: 'light-theme-mark-and-names',
+        title: 'In the light theme, the OnlyWorlds mark, the Web\'s small names and Create a world read more clearly',
+        body: 'In the light theme, the OnlyWorlds mark in the sidebar footer is darker and stronger at rest, and still lifts under the pointer. The small names round the Web\'s centre, of the elements that link to it, are darker, and the Create a world button darkens under the pointer instead of turning paler, so its white word stays easy to read. The dark theme is unchanged.',
+        tags: ['layout'],
       },
       {
         id: 'paste-address-as-prose',

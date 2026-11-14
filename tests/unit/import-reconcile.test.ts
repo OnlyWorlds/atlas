@@ -552,6 +552,21 @@ describe('reconcile: an id in capitals (the writer rule, 1.124.2)', () => {
     expect(created(plan, 'Chapter').story).toBe('[Ann](ow://character/gen-1) and [Ann](ow://character/gen-1@2?lens=gen-1)');
   });
 
+  it('two records differing only in case, lowercase first: each keeps its own references', () => {
+    const lo = A; // Annie, first
+    const UP = A.toUpperCase(); // Ann, re-minted
+    const MIX = 'A' + A.slice(1); // a third spelling, neither record's
+    const plan = reconcile(exportOf(
+      [{ id: lo, name: 'Annie' }, { id: UP, name: 'Ann' }, { id: B, name: 'Bo', friends: [lo, UP, MIX] }],
+      { story: `[lo](ow://character/${lo}) [UP](ow://character/${UP}) [Mx](ow://character/${MIX})` },
+    ), [], { genId: () => 'gen-2' });
+    expect(created(plan, 'Annie').id).toBe(lo);
+    expect(created(plan, 'Ann').id).toBe('gen-2');
+    expect(created(plan, 'Bo').friends).toEqual([lo, 'gen-2']);
+    // The prose keeps Annie's id as written (and the third spelling names her by the rule); Ann's follows her.
+    expect(created(plan, 'Chapter').story).toBe(`[lo](ow://character/${lo}) [UP](ow://character/gen-2) [Mx](ow://character/${MIX})`);
+  });
+
   it('a different element under the same id in another case gets a fresh id', () => {
     const plan = reconcile(exportOf([{ id: A.toUpperCase(), name: 'Ann' }]),
       [existingEl({ id: A, type: 'character', name: 'Someone Else' })], { genId: () => 'fresh' });

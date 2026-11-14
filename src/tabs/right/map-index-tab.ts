@@ -207,7 +207,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     // of one place. A drop across groups would rewrite numbers and move nothing.
     const sourceGroup = sourceRow?.getAttribute('data-sibling-group') ?? '';
     if (sourceGroup !== (row.getAttribute('data-sibling-group') ?? '')) {
-      toasts.info('Drag only reorders maps in the same group: the maps set under this map by Parent map, or the maps of one place. To move a map, set its Parent map in Configure map.');
+      toasts.info('Drag only reorders maps in the same group: the maps set under this map by Parent map, or the maps of the same location. To move a map, set its Parent map in Configure map.');
       return;
     }
 

@@ -168,6 +168,31 @@ export function populatedFieldNames(el: Element): string[] {
 /** Scrub target for text that never chips (card field values): drop every link. */
 const NO_IDS: ReadonlySet<string> = new Set<string>();
 
+/** The rest of a link's href after the scrubbed span, to its `)` (sticky: read in place, never a copy). */
+const LINK_CLOSE = /[^\s()<>]*(?:\s*>)?(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\s*\)/y;
+
+/**
+ * Where a link's label opens, for the `](` at `open`: the `[` that matches
+ * its `]`, nested brackets counted (`[a [b] c]`); with none (`[a]b]`), the
+ * nearest `[`. Never before `floor` (text already written out) and never
+ * across a blank line; -1 when there is none.
+ */
+function labelStartBefore(md: string, open: number, floor: number): number {
+  let depth = 0;
+  let nearest = -1;
+  for (let k = open - 1; k >= floor; k--) {
+    const c = md[k];
+    if (c === '\n' && md[k - 1] === '\n') break;
+    if (c === ']') depth++;
+    else if (c === '[') {
+      if (nearest === -1) nearest = k;
+      if (depth === 0) return k;
+      depth--;
+    }
+  }
+  return nearest;
+}
+
 /**
  * Pre-resolve markdown for the payload (contract §2): an address whose
  * element or lens is NOT included is taken out BEFORE the payload ships.
@@ -227,13 +252,14 @@ export function scrubMarkdownForPayload(
   for (const sp of merged) {
     if (sp.start < last) continue; // inside a markdown link already replaced
     // `[label](…)` (an href in angle brackets too): the whole link becomes its
-    // label. The href may go on past the span (a query, a fragment, a title)
-    // up to its `)`.
+    // label. The href may go on past the span (a query, a fragment, a closing
+    // `>`, a title in "…", '…' or (…)) up to its `)`.
     const angle = markdown.slice(sp.start - 3, sp.start) === '](<';
     const open = angle ? sp.start - 3 : (markdown.slice(sp.start - 2, sp.start) === '](' ? sp.start - 2 : -1);
-    const labelStart = open !== -1 ? markdown.lastIndexOf('[', open) : -1;
-    const close = labelStart !== -1 ? /^[^\s()]*(?:\s+"[^"\n]*")?>?\)/.exec(markdown.slice(sp.end)) : null;
-    if (labelStart !== -1 && labelStart >= last && close && !markdown.slice(labelStart + 1, open).includes(']')) {
+    const labelStart = open !== -1 ? labelStartBefore(markdown, open, last) : -1;
+    LINK_CLOSE.lastIndex = sp.end;
+    const close = labelStart !== -1 ? LINK_CLOSE.exec(markdown) : null;
+    if (labelStart !== -1 && close) {
       out += markdown.slice(last, labelStart) + markdown.slice(labelStart + 1, open);
       last = sp.end + close[0].length;
       continue;

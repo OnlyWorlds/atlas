@@ -1,22 +1,30 @@
 /**
- * The address ratchet: an element address in prose (`ow://<type>/<id>`) is
- * found, read, written and rewritten only in `src/core/ow-links.ts`, on the
- * SDK's reader (the address profile; DESIGN_LAWS conv. 189). Anywhere else in
- * `src/`, a line of code may not hold:
+ * The address ratchet: an element address in prose (`ow://<type>/<id>`, or
+ * the site's `onlyworlds.com/w/` form) is found, read, written and rewritten
+ * only in `src/core/ow-links.ts`, on the SDK's reader (the address profile;
+ * DESIGN_LAWS conv. 189). Anywhere else in `src/`, a line of code may not hold:
  *
  *   - `ow:` followed by two slashes in any spelling: `//`, `\/\/`, `\\/\\/`,
- *     `[/][/]`, `\/{2}`, `\x2f\x2f`, `[:]` for the colon, in a string, a
+ *     `[/][/]`, `\/{2}`, `(?:\/){2}`, `\/+`, `\x2f\x2f`, `\:` or `[:]` for the
+ *     colon, string pieces joined by `+` (`'ow:' + '//'`), in a string, a
  *     regex or a `new RegExp('…')` (a writer asks `owLinkHref`);
+ *   - `onlyworlds.com/w/` in the same spellings (the site's form);
  *   - a test of a link's tail, an id followed by `)`: `'/' + id + ')'`,
- *     `` `/${id})` ``, `id + ')'`, or `'/' + id` inside a string test. It
- *     misses an address with a moment, a lens or an id in capitals, and finds
- *     text that is no address.
+ *     `` `/${…})` ``, ``includes(`/${…}`)`` and its kin, `'/' + id` inside a
+ *     string test, `id + ')'`, or `<name> + ')'` on a line that also joins a
+ *     slash. It misses an address with a moment, a lens or an id in capitals,
+ *     and finds text that is no address.
  *
- * Comments are not code: a line that starts as one is skipped, and a leading
- * block comment is cut before the line is read. Counted exceptions: a file
- * that reads no address (it counts markdown links, say) keeps a count that
- * may never rise. The changelog's data is user copy, never code, and is not
- * read. Lower a count here in the change that removes a site.
+ * The guard is against accidents, not adversaries: a prefix spelled by escape
+ * tricks (`'\x6fw://'`, `'\u006fw://'`, `'o' + 'w://'`,
+ * `String.fromCharCode`) is not caught, and need not be.
+ *
+ * Comments are not code: a `//` line, and what is inside a block comment
+ * (tracked across lines, so a code line that starts with `*` is still read).
+ * Counted exceptions: a file that reads no address (it counts markdown links,
+ * say) keeps a count that may never rise. The changelog's data is user copy,
+ * never code, and is not read. Lower a count here in the change that removes
+ * a site.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -39,39 +47,67 @@ const ALLOWED: Record<string, number> = {
   'src/tour/tour-view.ts': 1,
 };
 
-/** One line with every spelling of a slash and a colon folded to the plain one. */
+/** One line with every spelling of a slash, a colon and a dot folded to the plain one, and string pieces joined. */
 function fold(line: string): string {
   return line
+    .replace(/['"`]\s*\+\s*['"`]/g, '')
     .replace(/\\x2f|\\u002f|\\u\{2f\}/gi, '/')
     .replace(/\\x3a|\\u003a/gi, ':')
     .replace(/\\\\\//g, '/')
     .replace(/\\\//g, '/')
+    .replace(/\\:/g, ':')
+    .replace(/\\\\\./g, '.')
+    .replace(/\\\./g, '.')
     .replace(/\[\/\]/g, '/')
     .replace(/\[:\]/g, ':')
-    .replace(/\/\{2\}/g, '//');
+    .replace(/\(\?:\/\)\{2\}/g, '//')
+    .replace(/\/\{2\}/g, '//')
+    .replace(/\/\+/g, '//');
 }
 
-const PREFIX = /ow:\/\//i;
-const TAILS: RegExp[] = [
-  /['"`]\/['"`]\s*\+[^;]*\+\s*['"`]\)['"`]/, // '/' + id + ')'
-  /\/\$\{[^}]*(?:id|Id|ID)\}\)/, // `/${id})`
-  /\b\w*(?:id|Id|ID)\s*\+\s*['"`]\)['"`]/, // id + ')'
-  /\b(?:includes|indexOf|lastIndexOf|startsWith|endsWith|search|match|test)\(\s*['"`]\/['"`]\s*\+/, // includes('/' + id)
+const PREFIXES: RegExp[] = [/ow:\/\//i, /onlyworlds\.com\/w\//i];
+const SLASH_JOIN = /['"`]\/|\/['"`]/;
+const TAILS: Array<(line: string) => boolean> = [
+  l => /['"`]\/['"`]\s*\+[^;]*\+\s*['"`]\)['"`]/.test(l), // '/' + id + ')'
+  l => /\/\$\{[^}]*\}\)/.test(l), // `/${…})`
+  l => /\b(?:includes|indexOf|lastIndexOf|startsWith|endsWith|search|match|test)\(\s*`\/\$\{/.test(l), // includes(`/${…}`)
+  l => /\b(?:includes|indexOf|lastIndexOf|startsWith|endsWith|search|match|test)\(\s*['"`]\/['"`]\s*\+/.test(l), // includes('/' + id)
+  l => /\b\w*(?:id|Id|ID)\s*\+\s*['"`]\)['"`]/.test(l), // id + ')'
+  l => /[\w)\]]\s*\+\s*['"`]\)['"`]/.test(l) && SLASH_JOIN.test(l), // name + ')' with a slash joined
 ];
+
+/** The code of one source, line by line, comments out (block comments tracked across lines). */
+function codeLines(source: string): string[] {
+  const out: string[] = [];
+  let inBlock = false;
+  for (const raw of source.split('\n')) {
+    let line = raw;
+    let code = '';
+    for (;;) {
+      if (inBlock) {
+        const close = line.indexOf('*/');
+        if (close === -1) { line = ''; break; }
+        line = line.slice(close + 2);
+        inBlock = false;
+      }
+      const open = line.indexOf('/*');
+      if (open === -1) { code += line; break; }
+      code += line.slice(0, open);
+      line = line.slice(open + 2);
+      inBlock = true;
+    }
+    const t = code.trim();
+    if (t && !t.startsWith('//')) out.push(t);
+  }
+  return out;
+}
 
 /** Lines of one source that read an address by a pattern or a substring of their own. */
 export function countAddressReaders(source: string): number {
   let n = 0;
-  for (const raw of source.split('\n')) {
-    let line = raw.trim();
-    if (line.startsWith('//') || line.startsWith('*')) continue;
-    while (line.startsWith('/*')) {
-      const close = line.indexOf('*/');
-      if (close === -1) { line = ''; break; }
-      line = line.slice(close + 2).trim();
-    }
-    if (!line) continue;
-    if (PREFIX.test(fold(line)) || TAILS.some(r => r.test(line))) n++;
+  for (const line of codeLines(source)) {
+    const folded = fold(line);
+    if (PREFIXES.some(r => r.test(folded)) || TAILS.some(t => t(line))) n++;
   }
   return n;
 }
@@ -96,16 +132,43 @@ const BYPASSES: Record<string, string> = {
   commentLead: String.raw`/* ok */ const re = /ow:\/\//;`,
 };
 
+// The second gate's list: more spellings, the site's form and more tail tests.
+const BYPASSES_2: Record<string, string> = {
+  splitConcat: `const p = 'ow:' + '//';`,
+  splitConcat2: `const p = 'ow:/' + '/';`,
+  regexEscapedColon: String.raw`const re = /ow\:\/\//;`,
+  regexGroupSlash: String.raw`const re = /ow:(?:\/){2}/;`,
+  regexSlashPlus: String.raw`const re = /ow:\/+/;`,
+  regexClassBoth: String.raw`const re = /ow:[\/][\/]/;`,
+  siteHost: `const re = /onlyworlds\\.com\\/w\\/([^/]+)\\/(\\w+)\\/([\\w-]+)/;`,
+  siteString: `const base = 'https://www.onlyworlds.com/w/' + world;`,
+  tailTemplateLower: 'if (md.includes(`/${id.toLowerCase()})`)) return;',
+  tailTemplateUuid: 'if (md.includes(`/${chip.uuid})`)) return;',
+  tailTemplateKey: 'if (md.includes(`/${key})`)) return;',
+  tailTemplateNoParen: 'if (md.includes(`/${chip.id}`)) return;',
+  tailEndsWith: 'href.endsWith(`/${id}`)',
+  tailStringId: `if (md.includes('/' + String(id) + ')')) return;`,
+  tailNameParenSlash: `const tail = '/' + key; if (md.includes(tail + ')')) return;`,
+  tailDouble: `md.includes("/" + chip.id)`,
+  starLine: `const n = 1\n  * 2 + md.indexOf('ow://');`,
+  blockCommentMid: String.raw`const a = 1; /* x */ const re = /ow:\/\//;`,
+};
+
 describe('the address ratchet', () => {
   for (const [name, line] of Object.entries(BYPASSES)) {
     it(`flags ${name}`, () => {
       expect(countAddressReaders(line)).toBe(1);
     });
   }
+  for (const [name, line] of Object.entries(BYPASSES_2)) {
+    it(`flags ${name}`, () => {
+      expect(countAddressReaders(line)).toBeGreaterThanOrEqual(1);
+    });
+  }
 
   it('lets comments and the writer through', () => {
     expect(countAddressReaders('// the old /ow:\\/\\// pattern')).toBe(0);
-    expect(countAddressReaders(' * an `ow://character/<id>` link')).toBe(0);
+    expect(countAddressReaders('/**\n * an `ow://character/<id>` link\n */')).toBe(0);
     expect(countAddressReaders('/* a note about ow://x */')).toBe(0);
     expect(countAddressReaders('out.push(`[${label}](${owLinkHref(type, id)})`);')).toBe(0);
     expect(countAddressReaders("const label = '(' + count + ')';")).toBe(0);

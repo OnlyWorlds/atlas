@@ -662,9 +662,10 @@ export class FsFolderStore implements FolderStore {
         if (existing && existing.type === type) {
           this.shadowedIds.add(id);
           const challengerWins = layout === ELEMENTS_DIR && existing.layout !== ELEMENTS_DIR;
+          const paths = [`${existing.layout}/${existing.filename}`, `${layout}/${rec.filename}`];
           console.warn(
             `[fs-folder-store] index(${type}): id ${id} exists in BOTH layouts ` +
-            `(${existing.layout}/${existing.filename} and ${layout}/${rec.filename}); ` +
+            `(${paths.join(' and ')}); ` +
             `serving the ${challengerWins ? layout : existing.layout} copy. Neither file was touched.`
           );
           if (!challengerWins) {

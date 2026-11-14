@@ -153,9 +153,9 @@ export function reconcile(
       if (rawId && rawId !== finalId) incomingIdRemap.set(rawId, finalId);
       if (rawId && rawId.trim() !== rawId && rawId.trim() !== finalId) incomingIdRemap.set(rawId.trim(), finalId);
       // Keyed lowercase too, so a reference in any spelling follows a record
-      // the import re-minted (first record wins a lowercase key; a key written
-      // exactly so by a record is that record's).
-      if (newId && newId !== finalId && !incomingIdRemap.has(newId) && !lowerRemap.has(newId)) lowerRemap.set(newId, finalId);
+      // the import re-minted. The first record wins a lowercase key; an id a
+      // record holds (assignedIds) never becomes one, here or after (below).
+      if (newId && newId !== finalId && !incomingIdRemap.has(newId) && !lowerRemap.has(newId) && !assignedIds.has(newId)) lowerRemap.set(newId, finalId);
       incoming.push({ type, record, name, finalId, action, targetId });
     }
   }
@@ -188,8 +188,10 @@ export function reconcile(
     const hit = incomingIdRemap.get(t) ?? (assignedIds.has(t) ? t : undefined);
     if (hit !== undefined) return hit;
     const lower = t.toLowerCase();
-    return incomingIdRemap.get(lower) ?? lowerRemap.get(lower) ?? (assignedIds.has(lower) ? lower : t);
+    return incomingIdRemap.get(lower) ?? (assignedIds.has(lower) ? lower : undefined) ?? lowerRemap.get(lower) ?? t;
   };
+  // A record assigned later may hold a lowercase key: then the key is its, never a fallback.
+  for (const k of [...lowerRemap.keys()]) if (assignedIds.has(k)) lowerRemap.delete(k);
   // The prose, sidecar and page-block remap: as written, then any spelling's lowercase key.
   const proseRemap = new Map<string, string>(incomingIdRemap);
   for (const [k, v] of lowerRemap) if (!proseRemap.has(k)) proseRemap.set(k, v);

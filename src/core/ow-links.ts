@@ -21,9 +21,9 @@
 import { ELEMENT_TYPES, readOwLinkAt, type OwAddressReading } from '@onlyworlds/sdk';
 
 /** The text form's prefix, as the profile writes it. */
-export const OW_TEXT_PREFIX = 'ow://';
+const OW_TEXT_PREFIX = 'ow://';
 /** The site's form's prefix, as the profile writes it. */
-export const OW_SITE_PREFIX = 'https://www.onlyworlds.com/w/';
+const OW_SITE_PREFIX = 'https://www.onlyworlds.com/w/';
 
 const ID_LENGTH = 36;
 const LENS_KEY = '?lens=';
@@ -73,8 +73,10 @@ export interface OwLink {
  * from it, so nothing it would read is missed (the profile's 57 prose cases
  * and a fuzz pass hold it). The SDK is then handed the core and the stretch
  * after it that a moment, a lens and the next character can take, or the
- * core alone when a `/` follows it (a path that goes on past the core is one
- * the SDK does not take: its reading ends at the core either way).
+ * core alone when a path character follows it (a path or a word that goes on
+ * past the core is one the SDK does not take: its reading ends at the core
+ * either way; the site's form, whose world run is read whole, never ends its
+ * core before such a character).
  */
 const ID_SRC = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const TYPES_SRC = [...ELEMENT_TYPES].sort((a, b) => b.length - a.length).join('|');
@@ -82,6 +84,17 @@ const TEXT_CORE = new RegExp(`ow://(?:(?:${TYPES_SRC})/${ID_SRC}|${ID_SRC}(?:/(?
 const SITE_CORE = new RegExp(`https://www\\.onlyworlds\\.com/w/[0-9A-Za-z-]{1,64}(?:/(?:${TYPES_SRC})/${ID_SRC})?`, 'y');
 /** What may follow a core inside an address, and the character after it: `@` and a moment, `?lens=` and an id. */
 const TAIL = 64;
+const PATH_CHAR = /[0-9A-Za-z/-]/;
+/** A moment's run after the core, read up to one digit past the 32-bit range's ten. */
+const MOMENT_RUN = /@-?(\d{0,11})/y;
+
+/** A moment whose digits run past ten is out of range: the SDK takes no moment, and the address ends at the core. */
+function momentOutOfRange(text: string, at: number): boolean {
+  if (text[at] !== '@') return false;
+  MOMENT_RUN.lastIndex = at;
+  const m = MOMENT_RUN.exec(text);
+  return m !== null && m[1].length > 10;
+}
 
 /** The SDK's reading of the address that starts at `i`, or null. */
 function readAt(text: string, i: number): { reading: OwAddressReading; end: number } | null {
@@ -91,7 +104,12 @@ function readAt(text: string, i: number): { reading: OwAddressReading; end: numb
   const m = core.exec(text);
   if (!m) return null;
   const coreEnd = i + m[0].length;
-  const stop = text[coreEnd] === '/' ? coreEnd : Math.min(text.length, coreEnd + TAIL);
+  // A path character after the core (a letter, a digit, `-` or `/`) is no
+  // moment and no lens: the reading ends at the core either way, and handing
+  // the SDK a run of them costs it some forty failing longer readings.
+  const stop = coreEnd < text.length && (PATH_CHAR.test(text[coreEnd]) || momentOutOfRange(text, coreEnd))
+    ? coreEnd
+    : Math.min(text.length, coreEnd + TAIL);
   const at = readOwLinkAt(i === 0 && stop === text.length ? text : text.slice(i, stop), 0);
   return at ? { reading: at.reading, end: i + at.end } : null;
 }
@@ -149,7 +167,8 @@ function locate(text: string, start: number, end: number, reading: OwAddressRead
 /**
  * Every address the SDK reads in a text, in either form and of any world
  * (the share scrub's reader: nothing that names an element may slip past it).
- * A text is walked once; an address is never read inside another.
+ * Every prefix is read where it stands, the SDK's way: an address may start
+ * inside another one (an `ow://` glued after a site address's slug).
  */
 export function findAddresses(text: string): OwAddressFound[] {
   const out: OwAddressFound[] = [];
@@ -161,10 +180,8 @@ export function findAddresses(text: string): OwAddressFound[] {
     if (at) {
       const found = locate(text, i, at.end, at.reading);
       if (found) out.push(found);
-      i = walk.next(Math.max(at.end, i + 1));
-    } else {
-      i = walk.next(i + 1);
     }
+    i = walk.next(i + 1);
   }
   return out;
 }
@@ -252,6 +269,17 @@ export function owLinkHref(type: string, id: string): string {
   return OW_TEXT_PREFIX + type + '/' + id;
 }
 
+/** A sentence's closing punctuation after a loose run, and after a pasted one. */
+const RUN_CLOSERS = '.,;:!?\'"]>';
+const PASTE_CLOSERS = '.,;:!?)]}>\'"';
+
+/** The end of `s` with its trailing `closers` left out, found by walking back (linear). */
+function trimmedEnd(s: string, closers: string): number {
+  let end = s.length;
+  while (end > 0 && closers.includes(s[end - 1])) end--;
+  return end;
+}
+
 /** A run the share scrub reads loosely, with the id-forms in it (lowercase). */
 export interface LooseAddressRun {
   start: number;
@@ -262,7 +290,7 @@ export interface LooseAddressRun {
 /**
  * The share scrub's wide pass: wider than the address rules on purpose,
  * because it guards what a public page discloses. Every `ow://` or
- * `http(s)://(www.)onlyworlds.com/w/` prefix in any case, with its run of
+ * `(http(s)://)(www.)onlyworlds.com/w/` prefix in any case, with its run of
  * characters that are not a space or `)`, and every id-form in that run
  * (8-4-4-4-12 hex in either case, given lowercase). A link in capitals, an
  * unknown type word, another query key: whatever the address rules leave as
@@ -271,11 +299,11 @@ export interface LooseAddressRun {
 export function findLooseAddressRuns(text: string): LooseAddressRun[] {
   const out: LooseAddressRun[] = [];
   if (typeof text !== 'string') return out;
-  const runRe = /(?:ow:\/\/|https?:\/\/(?:www\.)?onlyworlds\.com\/w\/)[^\s)]*/gi;
+  const runRe = /(?:ow:\/\/|(?:https?:\/\/)?(?:www\.)?onlyworlds\.com\/w\/)[^\s)]*/gi;
   const idRe = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
   for (const m of text.matchAll(runRe)) {
     // A sentence's closing punctuation is the sentence's: it holds no id.
-    const run = m[0].replace(/[.,;:!?'"\]>]+$/, '');
+    const run = m[0].slice(0, trimmedEnd(m[0], RUN_CLOSERS));
     const ids = [...run.matchAll(idRe)].map(x => x[0].toLowerCase());
     out.push({ start: m.index, end: m.index + run.length, ids });
   }
@@ -336,6 +364,8 @@ export function pastedAddressIn(text: string): string | null {
   if (i === -1) return null;
   const at = readAt(text, i);
   if (at && text[at.end] !== '/') return text.slice(i, at.end);
-  const run = /^\S*/.exec(text.slice(i))?.[0] ?? '';
-  return run.replace(/[.,;:!?)\]}>'"]+$/, '');
+  let runEnd = i;
+  while (runEnd < text.length && !/\s/.test(text[runEnd])) runEnd++;
+  const run = text.slice(i, runEnd);
+  return run.slice(0, trimmedEnd(run, PASTE_CLOSERS));
 }

@@ -1049,6 +1049,13 @@ html {
 .atlas-btn-entry:hover:not(:disabled) {
   background: rgba(var(--atlas-accent-rgb), 0.88);
 }
+/* Light theme: 0.88 over paper lightens the cyan (the white word read about
+   4.3:1); the hover darkens to the accent text token instead, #155e75 here,
+   white on it 7.27:1. */
+:root[data-theme='light'] .atlas-btn-entry:hover:not(:disabled) {
+  background: var(--atlas-accent-text);
+  border-color: var(--atlas-accent-text);
+}
 
 .atlas-btn-primary {
   background: rgba(var(--atlas-accent-rgb), 0.14);
@@ -14289,8 +14296,14 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-accent-text);
 }
 .atlas-context-graph-node.is-backlink .atlas-context-graph-node-label {
-  /* 0.70: 10 px labels at 5.4:1; 0.62 read 4.42:1, under AA (style read of 1.123.25). */
+  /* 0.70: 10 px labels at 5.4:1 in the dark theme; 0.62 read 4.42:1, under AA (style read of 1.123.25). */
   opacity: 0.70;
+}
+/* Light theme: ink at 0.78 under 0.70 computed 3.7:1 on the light ground.
+   0.85 is the smallest step that clears 4.5: 5.5:1 on paper (#fbfbfa),
+   5.4:1 on the deep ground (#f4f4f2). */
+:root[data-theme='light'] .atlas-context-graph-node.is-backlink .atlas-context-graph-node-label {
+  opacity: 0.85;
 }
 /* A proposed or hidden node keeps its ring's meaning (dashed is ring 2) and
    adds a dotted warn ring outside it, with the word in its label. */
@@ -15914,16 +15927,19 @@ body.atlas-share-fullpreview > * {
 .atlas-footer-ow-icon {
   width: 15px;
   height: 15px;
-  /* 0.7, not 0.55: at rest the thin 15 px mark reads 3:1 or more on the
-     rail, level with its neighbours (0.55 painted 2.77 to 2.93:1). */
+  /* At rest the dark theme reads about 4.0:1 on the rail (a style reader's
+     measure: the median of the glyph's lit tenth). */
   opacity: 0.7;
   transition: opacity 120ms ease;
   display: block;
 }
 .atlas-footer-owmark:hover .atlas-footer-ow-icon { opacity: 1; }
-/* Light mode: the PNG's bright cyan read 1.46:1 on paper at rest; halved, it
-   lands near the light accent text (#155e75), 3:1 or more at rest. */
-:root[data-theme='light'] .atlas-footer-ow-icon { filter: brightness(0.5); }
+/* Light theme: the PNG's bright cyan read 1.46:1 on paper. Darkened to 0.35
+   and at 0.85 at rest, the mark reads about 4.9:1 by the same measure. The
+   hover rule comes after the rest rule, at equal specificity, so the pointer
+   still lifts it to 1. */
+:root[data-theme='light'] .atlas-footer-ow-icon { opacity: 0.85; filter: brightness(0.35); }
+:root[data-theme='light'] .atlas-footer-owmark:hover .atlas-footer-ow-icon { opacity: 1; }
 
 /* ==== The guide (onboarding step 1): the strip on the home, the one note ====
    The strip: five unnumbered marks on a hairline, filled when the world has

@@ -108,6 +108,11 @@ describe('rewriteOwLinks changes the id and the lens bytes, nothing else', () =>
       expect(rewriteOwLinks(c.text, l => ({ id: l.idAsWritten, lens: l.lensAsWritten }))).toBe(c.text);
     }
   });
+  it("an address glued after a site address's slug is read where it starts, as the SDK reads it", () => {
+    const ID = '019a1f3c-2b4e-7d10-8c3a-6f2e9b0d4a71';
+    const text = `x https://www.onlyworlds.com/w/my-worldow://character/${ID} y`;
+    expect(findOwLinks(text).map(l => l.id)).toEqual([ID]);
+  });
   it('two addresses with no space between them read as two', () => {
     const A = '019a1f3c-2b4e-7d10-8c3a-6f2e9b0d4a71';
     const B = '019a1f3c-2b4e-7d10-8c3a-6f2e9b0d4a72';

@@ -172,7 +172,7 @@ function derivedAboutIds(markdown: string): string[] {
 /** True iff the prose mentions at least one collective (for the holder toast). */
 function proseMentionsCollective(markdown: string): boolean {
   if (!markdown) return false;
-  return 'collective' in extractProseLinks(markdown);
+  return 'collective' in extractProseLinks(markdown, linkTargetsIn(getState().data.elements));
 }
 
 export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): () => void {
