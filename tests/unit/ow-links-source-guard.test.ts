@@ -77,6 +77,23 @@ const TAILS: Array<(line: string) => boolean> = [
 ];
 
 /** The code of one source, line by line, comments out (block comments tracked across lines). */
+/** Where a block comment opens on a line, skipping a `/*` inside a quoted string ('image/*' opens nothing), or -1. */
+export function blockOpenOutsideString(line: string): number {
+  let quote: string | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '\'' || c === '"' || c === '`') { quote = c; continue; }
+    if (c === '/' && line[i + 1] === '/') return -1;
+    if (c === '/' && line[i + 1] === '*') return i;
+  }
+  return -1;
+}
+
 function codeLines(source: string): string[] {
   const out: string[] = [];
   let inBlock = false;
@@ -90,7 +107,7 @@ function codeLines(source: string): string[] {
         line = line.slice(close + 2);
         inBlock = false;
       }
-      const open = line.indexOf('/*');
+      const open = blockOpenOutsideString(line);
       if (open === -1) { code += line; break; }
       code += line.slice(0, open);
       line = line.slice(open + 2);
@@ -172,6 +189,15 @@ describe('the address ratchet', () => {
     expect(countAddressReaders('/* a note about ow://x */')).toBe(0);
     expect(countAddressReaders('out.push(`[${label}](${owLinkHref(type, id)})`);')).toBe(0);
     expect(countAddressReaders("const label = '(' + count + ')';")).toBe(0);
+  });
+
+  it('a /* inside a string opens no comment, so the lines after it are still read', () => {
+    // element-detail-map-image.ts holds 'image/*' with no later */: the guard read the rest of that file as a comment.
+    expect(countAddressReaders("input.accept = 'image/*';\nlet i = md.indexOf('ow://');")).toBe(1);
+    expect(countAddressReaders('const a = "a/*";\nconst b = `x/*`;\nlet i = md.indexOf(\'ow://\');')).toBe(1);
+    expect(countAddressReaders("const s = 'it\\'s /*';\nlet i = md.indexOf('ow://');")).toBe(1);
+    // control: a real block comment still hides what it holds
+    expect(countAddressReaders("x(); /* md.indexOf('ow://') */ y();")).toBe(0);
   });
 
   it('no file in src/ but ow-links.ts reads or writes an address its own way', () => {

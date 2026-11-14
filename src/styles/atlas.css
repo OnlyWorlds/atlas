@@ -14299,10 +14299,11 @@ a.atlas-share-map-pin { cursor: pointer; }
   /* 0.70: 10 px labels at 5.4:1 in the dark theme; 0.62 read 4.42:1, under AA (style read of 1.123.25). */
   opacity: 0.70;
 }
-/* Light theme: ink at 0.78 under 0.70 computed 3.7:1 on the light ground.
-   0.85 is the smallest step that clears 4.5: 5.5:1 on paper (#fbfbfa),
-   5.4:1 on the deep ground (#f4f4f2). */
-:root[data-theme='light'] .atlas-context-graph-node.is-backlink .atlas-context-graph-node-label {
+/* Light theme: ink at 0.78 under 0.70 computed 3.7:1 on the light ground;
+   at 0.85 it reads 5.5:1 on paper (#fbfbfa), 5.4:1 on the deep ground
+   (#f4f4f2), with room above 4.5. :where() keeps this rule at the base rule's
+   weight, so the hidden, faded and hover states written later still win. */
+:where(:root[data-theme='light']) .atlas-context-graph-node.is-backlink .atlas-context-graph-node-label {
   opacity: 0.85;
 }
 /* A proposed or hidden node keeps its ring's meaning (dashed is ring 2) and
@@ -15936,8 +15937,8 @@ body.atlas-share-fullpreview > * {
 .atlas-footer-owmark:hover .atlas-footer-ow-icon { opacity: 1; }
 /* Light theme: the PNG's bright cyan read 1.46:1 on paper. Darkened to 0.35
    and at 0.85 at rest, the mark reads about 4.9:1 by the same measure. The
-   hover rule comes after the rest rule, at equal specificity, so the pointer
-   still lifts it to 1. */
+   light hover rule outweighs the light rest rule, so the pointer still lifts
+   it to 1. */
 :root[data-theme='light'] .atlas-footer-ow-icon { opacity: 0.85; filter: brightness(0.35); }
 :root[data-theme='light'] .atlas-footer-owmark:hover .atlas-footer-ow-icon { opacity: 1; }
 
