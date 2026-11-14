@@ -35,7 +35,8 @@ export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> =
 /**
  * The SDK's rule (4.55.0): the pair, trimmed and case-folded, AND the mark
  * `x_room_of`, read by presence since 4.100.0 (serial 83: any value but null,
- * a string only when something is left after trimming; a number counts). A
+ * a string only when something is left after trimming; a number counts; since
+ * 4.163.0, serial 126, an empty list or empty object is no mark). A
  * body whose type or supertype is not a string (a foreign file can hold
  * anything) is lore here, before the SDK is asked; the mark goes as it is.
  */

@@ -58,13 +58,25 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.124.3',
     date: '2026-11-14',
-    theme: 'An empty link is no link',
+    theme: 'An empty link or mark is none',
     entries: [
       {
         id: 'empty-string-link-is-none',
         title: 'A link left as an empty text is read as no link',
         body: 'A world folder written by another tool can hold a link as an empty text, such as a pin whose map is "" or a map whose parent map is "". Atlas now reads it as no link when the world opens, as the OnlyWorlds standard says, so the element shows no target and saving it online sends nothing the site would refuse. The file on disk is unchanged until you edit the element.',
         tags: ['folders', 'fix'],
+      },
+      {
+        id: 'empty-mark-is-none',
+        title: 'An empty mark is no mark',
+        body: 'A Charter whose charter mark, or a room element whose room mark, holds an empty list or an empty set of fields is now read as unmarked, as the OnlyWorlds standard says: the Charter no longer leads Home and the element reads as lore. Marking a Charter in Atlas writes a real mark, as before.',
+        tags: ['charter', 'fix'],
+      },
+      {
+        id: 'folder-format-0-3-23',
+        title: 'New world folders are format 0.3.23',
+        body: 'Atlas writes new world folders as format 0.3.23, the newest version of the OnlyWorlds folder format. No file changes its shape.',
+        tags: ['folders'],
       },
     ],
   },
