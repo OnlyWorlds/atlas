@@ -28,6 +28,7 @@
  */
 import { hasUnseenRecipients, isMessage as sdkIsMessage, isToEveryone, recipientsOf, senderStatus, type OwMessageMember, type OwSenderStatus } from '@onlyworlds/sdk';
 import type { Element } from './types';
+import { editedSince } from '../store/sync-stamp';
 
 export interface MessageParty {
   id: string;
@@ -69,9 +70,8 @@ export interface MessageReading {
  */
 export function authorAsServed(el: Element): boolean {
   const rec = el as Record<string, unknown>;
-  const server = rec.server_updated_at;
-  const local = rec.local_updated_at;
-  return typeof server === 'string' && !(typeof local === 'string' && local > server);
+  // By instant; a stamp that cannot be read is not as served (conv. 190, R3).
+  return typeof rec.server_updated_at === 'string' && !editedSince(rec.local_updated_at, rec.server_updated_at);
 }
 
 export function isMessage(el: Element): boolean {

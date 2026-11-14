@@ -15,8 +15,8 @@ const place = el({ id: 'l1', type: 'location', name: 'Harbour' });
 const world = [codex, bb, kael, place];
 
 describe('messageParties, by the message profile', () => {
-  // As keel served it: a stamp and no edit since, so its created_by counts.
-  const msg = (o: Record<string, unknown>) => el({ id: 'n1', type: 'narrative', supertype: 'Message', server_updated_at: '2026-10-26T10:00:00Z', ...o });
+  // As keel served it: a stamp and no edit since (a pull writes both stamps), so its created_by counts.
+  const msg = (o: Record<string, unknown>) => el({ id: 'n1', type: 'narrative', supertype: 'Message', server_updated_at: '2026-10-26T10:00:00Z', local_updated_at: '2026-10-26T10:00:00Z', ...o });
   // keel's members list: the owner's row has id null; m2 plays BB, m3 plays Kael.
   const members = [{ id: null, character: 'c1' }, { id: 'm2', character: 'c2' }, { id: 'm3', character: 'c3' }];
 

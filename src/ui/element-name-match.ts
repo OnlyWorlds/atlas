@@ -16,6 +16,7 @@
  */
 
 import type { Element, ElementType } from '../core/types';
+import { newestEditFirst } from '../core/guide';
 
 export interface NameMatchResult {
   id: string;
@@ -39,11 +40,8 @@ export function findExistingNameMatch(
     if (name.toLowerCase().startsWith(lower)) matches.push(el);
   }
   if (matches.length === 0) return null;
-  matches.sort((a, b) => {
-    const aT = a.local_updated_at ?? '';
-    const bT = b.local_updated_at ?? '';
-    return bT.localeCompare(aT);
-  });
+  // The newest edit by instant, an unreadable stamp last (conv. 190).
+  matches.sort(newestEditFirst);
   const winner = matches[0];
   return { id: winner.id, type: winner.type, name: winner.name ?? '' };
 }

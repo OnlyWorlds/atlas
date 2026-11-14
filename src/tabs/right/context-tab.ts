@@ -46,6 +46,7 @@ import { showProblem } from '../../ui/problem-fixes';
 import { strandMarkKey } from '../../core/strand';
 import { buildStrandFrame } from './context-strand-frame';
 import { lookupHeldId } from '../../core/ow-links';
+import { newestEditFirst } from '../../core/guide';
 
 export interface MountContextTabOpts {
   pane: HTMLElement;
@@ -68,16 +69,9 @@ interface Subject {
   caption?: string;
 }
 
-/** Most-recently-edited element in a set (by local/server update timestamp). */
+/** Most-recently-edited element in a set: its edit stamp by instant, the first of a tie, an unreadable one last (conv. 190). */
 function mostRecentlyEdited(els: readonly Element[]): Element | null {
-  let best: Element | null = null;
-  let bestTs = '';
-  for (const e of els) {
-    const rec = e as Record<string, unknown>;
-    const ts = String(rec.local_updated_at ?? rec.server_updated_at ?? '');
-    if (!best || ts > bestTs) { best = e; bestTs = ts; }
-  }
-  return best;
+  return els.length === 0 ? null : [...els].sort(newestEditFirst)[0];
 }
 
 function resolveSubject(route: Route, elements: readonly Element[]): Subject {

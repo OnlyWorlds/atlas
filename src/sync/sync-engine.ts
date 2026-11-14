@@ -42,6 +42,7 @@ import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
 import { stampKeptOf, stampWordOf } from '../core/door-trail';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
 import { isKnownOf, knownOfMove, stubShape } from './known-of';
+import { editedSince, stampOrder } from '../store/sync-stamp';
 import type {
   Conflict,
   Element,
@@ -657,7 +658,7 @@ export class SyncEngine {
     const owes = (e: Element) =>
       typeof e.server_updated_at === 'string' && isHiddenMark(e)
       && (e as Record<string, unknown>)[HIDDEN_SHOWN_ONLINE] === true
-      && !(e.local_updated_at > e.server_updated_at) && !skip.has(e.id) && !isKnownOf(e);
+      && !editedSince(e.local_updated_at, e.server_updated_at) && !skip.has(e.id) && !isKnownOf(e);
     const owed = (await this.folder.listElements()).filter(owes).slice(0, HIDE_SWEEP_CAP);
     for (const listed of owed) {
       if (this.stopped) return;
@@ -2453,6 +2454,8 @@ export class SyncEngine {
     let updates = 0;
     let deletes = 0;
     const conflicts: Conflict[] = [...settled.refused];
+    /** Updates held for review whatever the policy: a baseline that cannot be read (conv. 190, R3). */
+    const reviewHeld: Conflict[] = [];
     const failures: PerElementFailure[] = [...settleFailures];
     /**
      * Server-side deletes detected DURING push (pre-update GET returned null,
@@ -2664,7 +2667,11 @@ export class SyncEngine {
             continue;
           }
 
-          const serverMoved = remote.updated_at > baseline;
+          // By instant (conv. 190). A baseline that cannot be read gives no way to tell keel's
+          // move from ours: held for review whatever the policy, never written over keel's copy.
+          // Once at most: Keep mine's push writes a readable baseline (R4b).
+          const moveOrder = stampOrder(remote.updated_at, baseline);
+          const serverMoved = moveOrder === null || moveOrder === 1;
 
           let skipPush = false;
           if (serverMoved) {
@@ -2681,6 +2688,9 @@ export class SyncEngine {
             if (this.policy === 'pause-and-review') {
               // Keep local change on disk; do NOT push. Baseline stays.
               skipPush = true;
+            } else if (moveOrder === null) {
+              skipPush = true;
+              reviewHeld.push(conflict);
             }
             // local-wins: fall through and push our version anyway.
           }
@@ -2980,7 +2990,13 @@ export class SyncEngine {
             ? { server_deletes: [...existing, ...fresh] } : {};
           const heldNow = [...new Set([...hiddenHeld, ...this.roundHiddenRefused])];
           const heldPart = heldNow.length > 0 || (curr.hidden_held?.length ?? 0) > 0 ? { hidden_held: heldNow } : {};
-          return { last_push_at: roundNow, ...foreignNext, ...keptPart, ...deletesPart, ...heldPart };
+          // Under local-wins a push conflict is informational and never kept; one held for an
+          // unreadable baseline waits in the review (pause-and-review's callers keep their own).
+          const held = curr.conflicts ?? [];
+          const reviewIds = new Set(held.map(c => c.element_id));
+          const reviewFresh = this.policy === 'local-wins' ? reviewHeld.filter(c => !reviewIds.has(c.element_id)) : [];
+          const reviewPart = reviewFresh.length > 0 ? { conflicts: [...held, ...reviewFresh] } : {};
+          return { last_push_at: roundNow, ...foreignNext, ...keptPart, ...deletesPart, ...heldPart, ...reviewPart };
         });
       } catch (err) {
         // A cloud client re-uploading `.atlas/sync-state.json` each round
@@ -3453,9 +3469,11 @@ export class SyncEngine {
               continue;
             }
             const baseline = local.server_updated_at ?? '';
-            const serverChanged = serverStamp > baseline;
+            // By instant (conv. 190): a baseline that cannot be read reads as keel moved, a local
+            // stamp that cannot be read as an edit, so the row is a conflict, never a pull over it.
+            const serverChanged = editedSince(serverStamp, local.server_updated_at);
             // keel's stub holds no edit of its own here, so the server always wins it (conv. 155, I5).
-            const localChanged = !isKnownOf(local) && local.local_updated_at > baseline;
+            const localChanged = !isKnownOf(local) && editedSince(local.local_updated_at, local.server_updated_at);
             if (!serverChanged) continue; // own echo or stale replay — idempotent skip
             if (localChanged) {
               const adopt = await this.adoptOwnCreate(failures, local, op.type, remoteBody, serverStamp);
@@ -3512,7 +3530,7 @@ export class SyncEngine {
                 continue;
               }
               if (keptBefore.has(op.id)) continue;
-              if (!local.server_updated_at || (local.local_updated_at ?? '') > local.server_updated_at) {
+              if (!local.server_updated_at || editedSince(local.local_updated_at, local.server_updated_at)) {
                 keptHidden.add(op.id);
                 continue;
               }
@@ -3542,7 +3560,9 @@ export class SyncEngine {
             }
             // Staleness guard: a delete that predates our baseline was
             // superseded by a newer server state we already hold.
-            if (op.deletedAt && op.deletedAt <= local.server_updated_at) {
+            // By instant (conv. 190); a time that cannot be read is not stale: the review asks.
+            const deleteOrder = stampOrder(op.deletedAt, local.server_updated_at);
+            if (deleteOrder === 0 || deleteOrder === -1) {
               console.info(`[atlas:sync] changes: stale delete op for ${op.type}/${op.id} — skipping`);
               continue;
             }
@@ -3632,7 +3652,7 @@ export class SyncEngine {
         // Only a drop waits for the person; a keep supersedes the row (conv. 151).
         if (!this.readOnly && drops && inReview.has(el.id)) continue;
         // An edit never sent stays here, kept, never sent again (conv. 151).
-        if (!drops || (el.local_updated_at ?? '') > el.server_updated_at) {
+        if (!drops || editedSince(el.local_updated_at, el.server_updated_at)) {
           keptNow.push(el.id);
           continue;
         }
@@ -3769,8 +3789,9 @@ export class SyncEngine {
 
         // Local has it. Decide based on timestamps.
         const localBaseline = local.server_updated_at ?? '';
-        const localChanged = !isKnownOf(local) && local.local_updated_at > localBaseline;
-        const serverChanged = remote.updated_at > localBaseline;
+        // By instant (conv. 190): an unknown local stamp is an edit, an unknown baseline a move.
+        const localChanged = !isKnownOf(local) && editedSince(local.local_updated_at, local.server_updated_at);
+        const serverChanged = editedSince(remote.updated_at, local.server_updated_at);
 
         if (!serverChanged) {
           // Server matches our baseline — nothing to pull for this element.

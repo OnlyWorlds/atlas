@@ -11,6 +11,7 @@
 import { getState } from '../core/state';
 import { typeName } from '../core/type-words';
 import type { Element } from '../core/types';
+import { newestEditFirst } from '../core/guide';
 import { getRecents } from './writing-workspace-recents';
 import type { MentionSuggestionItem } from './writing-workspace-mention';
 import { currentLore } from '../core/parlor-room';
@@ -50,16 +51,12 @@ export function buildMentionItems(query: string): MentionSuggestionItem[] {
     }
     // Then: recently-edited elements (whatever the writer touched lately in
     // element-detail elsewhere — Drizzle's description, etc.). Sorted by
-    // local_updated_at desc. Pad up to 8.
+    // local_updated_at desc, by instant (conv. 190). Pad up to 8.
     if (out.length < 8) {
       const byMtime = elements
         .filter(e => !PICKER_EXCLUDED_TYPES.has(e.type) && !seen.has(e.id))
         .slice()
-        .sort((a, b) => {
-          const aT = a.local_updated_at ?? '';
-          const bT = b.local_updated_at ?? '';
-          return aT < bT ? 1 : aT > bT ? -1 : 0;
-        });
+        .sort(newestEditFirst);
       for (const el of byMtime) {
         if (out.length >= 8) break;
         out.push(toItem(el));

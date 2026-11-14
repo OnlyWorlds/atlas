@@ -28,7 +28,7 @@ import type {
 } from '../../src/core/types';
 import type { ChartConfig } from '../../src/visualization/timeline/types';
 import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
-import { stampedBody, editStamp, dropLastWriter } from '../../src/store/sync-stamp';
+import { stampedBody, editStamp, dropLastWriter, editedSince } from '../../src/store/sync-stamp';
 import { scrubReferrers } from '../../src/store/scrub-links';
 import { CorruptFileError } from '../../src/store/fs-utils';
 import { withoutSeatSecret } from '../../src/core/seat';
@@ -530,15 +530,14 @@ export class MockFolderStore implements FolderStore {
       if (isKnownOf(elem)) return false;
       // Never synced → always pending.
       if (!elem.server_updated_at) return true;
-      // No baseline → all of them.
-      if (baseline === null) return elem.local_updated_at > elem.server_updated_at;
-      return elem.local_updated_at > baseline;
+      // By instant; an absent or unreadable stamp reads as changed (conv. 190, R3).
+      return editedSince(elem.local_updated_at, baseline ?? elem.server_updated_at);
     });
   }
 
   async listTombstonesSince(baseline: string | null): Promise<Tombstone[]> {
     if (baseline === null) return [...this.tombstones];
-    return this.tombstones.filter(t => t.deleted_at > baseline);
+    return this.tombstones.filter(t => editedSince(t.deleted_at, baseline));
   }
 
   async clearTombstone(id: string): Promise<void> {

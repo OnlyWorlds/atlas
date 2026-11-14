@@ -20,8 +20,56 @@
  *
  * Pure, shared by FsFolderStore and the MockFolderStore fixture (parity).
  */
+import { instantOf } from '@onlyworlds/sdk';
 import type { Element } from '../core/types';
 import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
+
+/**
+ * The one ORDERING of two element times (DESIGN_LAWS conv. 190, R1): each read
+ * as the message profile reads a time (`instantOf`: one ISO form, an instant,
+ * any offset, no offset read as UTC, microseconds kept), never as text. keel
+ * writes `isoformat()` (`…07.089123+00:00`, no fraction on a whole second),
+ * Atlas `toISOString()` (`…07.089Z`), another tool any offset: as text an edit
+ * at `00:10:00-05:00` sorts before keel's `05:06:07+00:00` and reads synced.
+ *
+ * `null` when either side is absent or unreadable: each caller takes its
+ * mildest reading of that (R3), so it is never folded into an order here (the
+ * SDK's `compareInstants` sorts an unreadable time after every readable one,
+ * which would read as newer). Equality of a stamp Atlas read or sent before is
+ * an echo, not a time, and stays text (R2).
+ */
+export function stampOrder(a: unknown, b: unknown): -1 | 0 | 1 | null {
+  const x = instantOf(a);
+  const y = instantOf(b);
+  if (!x || !y) return null;
+  if (x.seconds !== y.seconds) return x.seconds < y.seconds ? -1 : 1;
+  if (x.microseconds !== y.microseconds) return x.microseconds < y.microseconds ? -1 : 1;
+  return 0;
+}
+
+/**
+ * "Was it edited since the baseline?": `stamp` after `baseline`, or either one
+ * absent or unreadable. Asked of the local copy (R3: an unknown local stamp
+ * reads as changed: uploaded, kept, a conflict, never pulled over) and of keel's
+ * copy (an unknown baseline reads as keel moved: a conflict, never a quiet skip).
+ */
+export function editedSince(stamp: unknown, baseline: unknown): boolean {
+  const o = stampOrder(stamp, baseline);
+  return o === null || o === 1;
+}
+
+/**
+ * The first millisecond stamp after keel's instant (R4a): floor to the
+ * millisecond, plus one, in `toISOString()`'s form. Equal to keel's instant plus
+ * one microsecond rounded up to the millisecond, so it sorts after keel's stamp
+ * whatever its fraction (`.089123` → `.090`, `.999999` → the next second).
+ * `null` when keel's stamp cannot be read.
+ */
+export function stampJustAfter(serverUpdatedAt: unknown): string | null {
+  const at = instantOf(serverUpdatedAt);
+  if (!at) return null;
+  return new Date(at.seconds * 1000 + Math.floor(at.microseconds / 1000) + 1).toISOString();
+}
 
 export function stampedBody(
   existing: Element,
@@ -48,14 +96,18 @@ export function stampedBody(
   // world, the old id, the pull before an Unlink) would name tools that never wrote this row, and a
   // `/bulk` echo brings no body to replace it (#760, the code gate's G1).
   if (!existing.server_updated_at && !(kept && 'doors' in kept)) delete rec.doors;
-  if (sentLocalUpdatedAt === undefined) return next;
-  if (sentLocalUpdatedAt !== null && existing.local_updated_at === sentLocalUpdatedAt) return next;
-  // Edited in flight. Already newer than the baseline: nothing to do.
-  if (typeof existing.local_updated_at === 'string' && existing.local_updated_at > serverUpdatedAt) return next;
-  const serverMs = Date.parse(serverUpdatedAt);
-  next.local_updated_at = Number.isFinite(serverMs)
-    ? new Date(serverMs + 1).toISOString()
-    : new Date().toISOString();
+  // No edit in flight (the caller sent none, or the file still holds the stamp it sent): the
+  // copy is what keel now holds. An absent or unreadable local stamp becomes keel's stamp as
+  // served (R4b), so the copy reads clean next round instead of uploading every round.
+  if (sentLocalUpdatedAt === undefined
+    || (sentLocalUpdatedAt !== null && existing.local_updated_at === sentLocalUpdatedAt)) {
+    if (instantOf(existing.local_updated_at) === null) next.local_updated_at = serverUpdatedAt;
+    return next;
+  }
+  // Edited in flight. Already after the baseline: nothing to do. Otherwise lift it just past
+  // keel's instant (R4a); an unreadable keel stamp lifts nothing, and the stamp is now.
+  if (stampOrder(existing.local_updated_at, serverUpdatedAt) === 1) return next;
+  next.local_updated_at = stampJustAfter(serverUpdatedAt) ?? new Date().toISOString();
   return next;
 }
 
@@ -87,7 +139,8 @@ export function dropLastWriter(next: Element): Element {
 }
 
 export function editStamp(now: string, serverUpdatedAt: unknown): string {
-  if (typeof serverUpdatedAt !== 'string' || now > serverUpdatedAt) return now;
-  const serverMs = Date.parse(serverUpdatedAt);
-  return Number.isFinite(serverMs) ? new Date(serverMs + 1).toISOString() : now;
+  // After keel's instant already: now. Otherwise just past it (R4a), the comparison an
+  // instant's (keel's `.089500` is after a `.089Z` now); an unreadable baseline lifts nothing.
+  if (stampOrder(now, serverUpdatedAt) === 1) return now;
+  return stampJustAfter(serverUpdatedAt) ?? now;
 }

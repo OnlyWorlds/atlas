@@ -17,7 +17,8 @@ const world = [
 const members = [{ id: null, character: 'c1' }, { id: 'm2', character: 'c2' }, { id: 'm3', character: 'c3' }];
 
 function said(o: Record<string, unknown>, roster: typeof members | null = null, wholeWorld = true): string {
-  const body = { id: 'n1', type: 'narrative', supertype: 'Message', server_updated_at: '2026-10-26T10:00:00Z', ...o };
+  // As keel served it: a pull writes both stamps.
+  const body = { id: 'n1', type: 'narrative', supertype: 'Message', server_updated_at: '2026-10-26T10:00:00Z', local_updated_at: '2026-10-26T10:00:00Z', ...o };
   const parties = messageParties(el(body), world, { members: roster, wholeWorld });
   if (!parties) return '(no line)';
   const line = document.createElement('p');

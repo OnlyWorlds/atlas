@@ -26,6 +26,7 @@ import { isZoneGestureActive } from './zone-gesture';
 import { flushBeforeLeavingWorld } from './leave-flush';
 import { onHashChange, parseHash } from './router';
 import type { DiskChange, FolderStore } from '../store/folder-store';
+import { editedSince } from '../store/sync-stamp';
 import type { Element } from './types';
 
 /** A focus storm (alt-tab, devtools) runs one pass, not five. */
@@ -126,7 +127,7 @@ export function notSyncedNow(n: DiskNotice, elements: readonly Element[]): numbe
   let count = 0;
   for (const id of n.notSynced) {
     const el = byId.get(id);
-    if (el && el.server_updated_at && (el.local_updated_at ?? '') <= el.server_updated_at) count++;
+    if (el && el.server_updated_at && !editedSince(el.local_updated_at, el.server_updated_at)) count++;
   }
   return count;
 }
@@ -373,7 +374,8 @@ async function runPass(store: FolderStore, worldId: string, full: boolean): Prom
       if (c.kind === 'deleted') continue;
       const el = byId.get(c.id);
       if (!el) continue;
-      const willUpload = !el.server_updated_at || (el.local_updated_at ?? '') > el.server_updated_at;
+      // By instant (an outside tool's offset), an unreadable stamp as an edit (conv. 190, R3).
+      const willUpload = !el.server_updated_at || editedSince(el.local_updated_at, el.server_updated_at);
       if (willUpload) { pending++; notSynced.delete(c.id); }
       else notSynced.add(c.id);
     }

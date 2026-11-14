@@ -103,7 +103,7 @@ interface LayoutScan {
   unreadableLc: Set<string>;
 }
 import { PerIdWriteChain } from './write-chain';
-import { stampedBody, editStamp, dropLastWriter } from './sync-stamp';
+import { stampedBody, editStamp, dropLastWriter, editedSince } from './sync-stamp';
 import { scrubReferrers } from './scrub-links';
 import { isKnownOf, KNOWN_OF_DROPS_LOCAL, KNOWN_OF_REFUSAL, stubShape } from '../sync/known-of';
 import { withoutSeatSecret } from '../core/seat';
@@ -2148,15 +2148,15 @@ export class FsFolderStore implements FolderStore {
     return all.filter(elem => {
       if (isKnownOf(elem)) return false; // keel's stub never waits to be sent (conv. 155, I4)
       if (!elem.server_updated_at) return true;
-      if (baseline === null) return elem.local_updated_at > elem.server_updated_at;
-      return elem.local_updated_at > baseline;
+      // By instant; an absent or unreadable stamp reads as changed (conv. 190, R3).
+      return editedSince(elem.local_updated_at, baseline ?? elem.server_updated_at);
     });
   }
 
   async listTombstonesSince(baseline: string | null): Promise<Tombstone[]> {
     const all = await this.readTombstoneList();
     if (baseline === null) return all;
-    return all.filter(t => t.deleted_at > baseline);
+    return all.filter(t => editedSince(t.deleted_at, baseline));
   }
 
   async clearTombstone(id: string): Promise<void> {
