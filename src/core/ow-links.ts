@@ -209,11 +209,14 @@ function trimmedEnd(s: string, closers: string): number {
   return end;
 }
 
-/** A run the share scrub reads loosely, with the id-forms in it (lowercase). */
+/** A run the share scrub reads loosely, with the id-forms in it. */
 export interface LooseAddressRun {
   start: number;
   end: number;
+  /** The id-forms, lowercase. */
   ids: string[];
+  /** The same id-forms as the text spells them, so a reader can ask {@link namedId}. */
+  idsAsWritten: string[];
 }
 
 /**
@@ -221,7 +224,7 @@ export interface LooseAddressRun {
  * because it guards what a public page discloses. Every `ow://` or
  * `(http(s)://)(www.)onlyworlds.com/w/` prefix in any case, with its run of
  * characters that are not a space or `)`, and every id-form in that run
- * (8-4-4-4-12 hex in either case, given lowercase). A link in capitals, an
+ * (8-4-4-4-12 hex in either case, given lowercase and as written). A link in capitals, an
  * unknown type word, another query key: whatever the address rules leave as
  * text is still seen here.
  */
@@ -233,8 +236,8 @@ export function findLooseAddressRuns(text: string): LooseAddressRun[] {
   for (const m of text.matchAll(runRe)) {
     // A sentence's closing punctuation is the sentence's: it holds no id.
     const run = m[0].slice(0, trimmedEnd(m[0], RUN_CLOSERS));
-    const ids = [...run.matchAll(idRe)].map(x => x[0].toLowerCase());
-    out.push({ start: m.index, end: m.index + run.length, ids });
+    const idsAsWritten = [...run.matchAll(idRe)].map(x => x[0]);
+    out.push({ start: m.index, end: m.index + run.length, ids: idsAsWritten.map(x => x.toLowerCase()), idsAsWritten });
   }
   return out;
 }

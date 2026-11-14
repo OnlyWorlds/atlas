@@ -208,8 +208,11 @@ function labelStartBefore(md: string, open: number, floor: number): number {
  *      lowercase) or lens is not on the page;
  *   2. every loose run (`findLooseAddressRuns`: an `ow://` or onlyworlds.com
  *      `/w/` prefix in any case, to the next space or `)`) holding an id-form
- *      not on the page, compared lowercase. A link in capitals, an unknown type
- *      word, another query key or a world's id is still seen.
+ *      not on the page: one that names a held element (`namedId`, as written,
+ *      then lowercase) is on the page only when that element is; one that
+ *      names none is compared lowercase. A link in capitals, an unknown type
+ *      word, another query key, a glued address or a world's id is still seen,
+ *      and an id in capitals is never read as its lowercase twin on the page.
  * Inside a markdown link `[label](…)` the whole link becomes its label (THE
  * LABEL LAW: never the element's name); a bare address or run becomes
  * nothing, so no name of an element left off the page ever ships.
@@ -234,8 +237,12 @@ export function scrubMarkdownForPayload(
     if (onPage(f.idAsWritten, f.reading.id) && onPage(f.lensAsWritten, f.reading.lens)) continue;
     spans.push({ start: f.start, end: f.end });
   }
+  const looseOnPage = (asWritten: string): boolean => {
+    const named = namedId({ idAsWritten: asWritten, id: asWritten.toLowerCase() }, has);
+    return named !== null ? includedIds.has(named) : includedLower.has(asWritten.toLowerCase());
+  };
   for (const run of findLooseAddressRuns(markdown)) {
-    if (run.ids.every(id => includedLower.has(id))) continue;
+    if (run.idsAsWritten.every(looseOnPage)) continue;
     spans.push({ start: run.start, end: run.end });
   }
   if (spans.length === 0) return markdown;

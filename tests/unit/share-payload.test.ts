@@ -341,6 +341,32 @@ describe('buildPagePayload', () => {
       }
     });
 
+    // A world holding two elements whose ids differ only in case, the capitals one off the page: the wide pass
+    // reads each id as written by the one rule (`namedId`), so the capitals id is never taken for its twin.
+    describe('an id in capitals off the page, its lowercase twin on it', () => {
+      const LOW = '01a1d4ef-0000-7000-8000-00000000008a';
+      const UP = LOW.toUpperCase();
+      const twins = new Map<string, Element>([
+        [LOW, { id: LOW, name: 'Gate', type: 'object' } as unknown as Element],
+        [UP, { id: UP, name: 'Hidden Gate', type: 'object' } as unknown as Element],
+      ]);
+      const scrubTwins = (md: string): string => scrubMarkdownForPayload(md, new Set([LOW]), twins);
+      const SHAPES: Array<[string, string, string]> = [
+        ['glued to a letter before it', `Built xow://object/${UP} today`, 'Built x today'],
+        ['a type word in capitals', `Built ow://Object/${UP} today`, 'Built  today'],
+        ['the prefix in capitals', `Built OW://object/${UP} today`, 'Built  today'],
+      ];
+      for (const [label, md, want] of SHAPES) {
+        it(`${label}: the capitals id does not ship`, () => {
+          expect(scrubTwins(md)).toBe(want);
+        });
+      }
+      it('the twin on the page, as written, is kept', () => {
+        const md = `Built ow://object/${LOW} and ow://Object/${LOW} today`;
+        expect(scrubTwins(md)).toBe(md);
+      });
+    });
+
     it('what is on the page is kept, byte for byte', () => {
       const md = `x [Alice](ow://character/${A}) and ow://character/${A}@4 and [L](ow://character/${A}?lens=${A}) [U](ow://character/${A.toUpperCase()}) y`;
       expect(scrub(md)).toBe(md);
