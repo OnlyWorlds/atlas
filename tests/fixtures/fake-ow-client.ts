@@ -22,6 +22,7 @@ import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } fr
 import type { ElementType } from '../../src/core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../../src/core/constants';
 import { OwProposed, type ProposalRow } from '../../src/sync/proposals';
+import { keelStampClock } from './keel-stamp';
 
 interface ServerRecord {
   id: string;
@@ -62,7 +63,8 @@ function withoutDoors(record: ServerRecord): ServerRecord {
 }
 
 export class FakeOwApiClient implements OwApiClient {
-  private clock = () => new Date().toISOString();
+  /** Every stamp the fake writes is in keel's form (`./keel-stamp`), whatever clock a suite injects. */
+  private clock = keelStampClock(() => new Date().toISOString());
   /** keel seam (`__propose_writes`): a seat on a reviewed world. */
   private proposeWrites = false;
   /** keel calls, apart from `calls` so the exact-sequence suites keep their meaning. */
@@ -143,8 +145,8 @@ export class FakeOwApiClient implements OwApiClient {
     mass_unit: '',
     distance_unit: '',
     public_read: false,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
+    created_at: '2026-01-01T00:00:00+00:00',
+    updated_at: '2026-01-01T00:00:00+00:00',
     // keel always serves both members, null when it knows none.
     origin: { source: null, producer: null },
   };
@@ -169,7 +171,7 @@ export class FakeOwApiClient implements OwApiClient {
    */
   changesPulls = 0;
 
-  setClock(fn: () => string): void { this.clock = fn; }
+  setClock(fn: () => string): void { this.clock = keelStampClock(fn); }
 
   private bucket(type: ElementType): Map<string, ServerRecord> {
     let m = this.byType.get(type);

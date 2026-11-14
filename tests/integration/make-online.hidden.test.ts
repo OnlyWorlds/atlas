@@ -69,8 +69,9 @@ describe('the merge', () => {
 
 describe('planMerge', () => {
   const el = (id: string, name: string, extra: Record<string, unknown> = {}): Element =>
-    ({ id, type: 'character', name, local_updated_at: 't', ...extra }) as unknown as Element;
-  const srv = (id: string, name: string, extra: Record<string, unknown> = {}): ServerRec => ({ id, name, updated_at: 't', ...extra });
+    ({ id, type: 'character', name, local_updated_at: '2026-11-14T05:06:07.089Z', ...extra }) as unknown as Element;
+  const srv = (id: string, name: string, extra: Record<string, unknown> = {}): ServerRec =>
+    ({ id, name, updated_at: '2026-11-14T05:06:07.089123+00:00', ...extra });
   const server = (recs: ServerRec[]) => new Map<ElementType, ServerRec[]>([['character', recs]]);
 
   it('hidden on both sides is the same element, as before', () => {

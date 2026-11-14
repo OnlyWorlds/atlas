@@ -12,6 +12,7 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { ATLAS_LOCAL_EXTENSION_FIELDS, ATLAS_LOCAL_ONLY_FIELDS } from '../src/core/constants';
 import { WORLD_EXTENSION_KEY, jsonbStored } from './fixtures/fake-ow-client';
+import { keelStampClock } from './fixtures/keel-stamp';
 
 const DEFAULT_BASE = 'https://www.onlyworlds.com/api/worldapi';
 /** Single source of truth list — keep in lockstep with constants.ts. */
@@ -69,7 +70,8 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
   __mutate: (type: string, id: string, patch: Record<string, unknown>) => void;
 } {
   const base = (options.baseUrl ?? DEFAULT_BASE).replace(/\/$/, '');
-  const clock = options.clock ?? (() => new Date().toISOString());
+  // Every stamp in keel's form (`./fixtures/keel-stamp`), whatever clock a suite injects.
+  const clock = keelStampClock(options.clock ?? (() => new Date().toISOString()));
   const state = new Map<string, Map<string, ServerRecord>>();
 
   function bucket(type: string): Map<string, ServerRecord> {
@@ -429,7 +431,8 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
   __mutate_world_meta: (patch: Record<string, unknown>) => void;
 } {
   const base = (options.baseUrl ?? V2_DEFAULT_BASE).replace(/\/$/, '');
-  const clock = options.clock ?? (() => new Date().toISOString());
+  // Every stamp in keel's form (`./fixtures/keel-stamp`), whatever clock a suite injects.
+  const clock = keelStampClock(options.clock ?? (() => new Date().toISOString()));
   const pageSize = options.pageSize ?? 100;
   const unknownFields = options.unknownFields ?? ['mood'];
   const state = new Map<string, Map<string, ServerRecord>>();
@@ -456,8 +459,8 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
     mass_unit: '',
     distance_unit: '',
     public_read: false,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
+    created_at: '2026-01-01T00:00:00+00:00',
+    updated_at: '2026-01-01T00:00:00+00:00',
     ...(options.worldMeta ?? {}),
   };
 
