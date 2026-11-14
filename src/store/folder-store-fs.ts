@@ -1319,9 +1319,12 @@ export class FsFolderStore implements FolderStore {
    * write of this element does not silently change its dialect.
    */
   private adoptDiskBody(id: string, elem: Element): void {
+    const entry = this.fileIndex.get(id);
+    // The folder names the type when the body does not (as the index pass fills it), so the shape rules below,
+    // which read the type, run on a cache-miss read too.
+    if ((typeof elem.type !== 'string' || !elem.type) && entry) elem.type = entry.type;
     coerceForeignShapes(elem); // every disk read path passes here
     const spelling = normalizeDiskLinks(elem);
-    const entry = this.fileIndex.get(id);
     if (spelling && entry && entry.spelling !== spelling) this.fileIndex.set(id, { ...entry, spelling });
   }
 
