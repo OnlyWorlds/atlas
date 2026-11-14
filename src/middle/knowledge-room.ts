@@ -160,7 +160,7 @@ function clearDraftStash(worldId: string): void {
  */
 function derivedAboutIds(markdown: string): string[] {
   if (!markdown) return [];
-  const byType = extractProseLinks(markdown);
+  const byType = extractProseLinks(markdown, linkTargetsIn(getState().data.elements));
   const out: string[] = [];
   for (const [type, ids] of Object.entries(byType)) {
     if (!aboutFieldFor(type)) continue;

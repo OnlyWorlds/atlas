@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildPagePayload, freezeMapBlock, type RelationToken, type PayloadCircleBlock } from '../../src/core/share-payload';
+import { buildPagePayload, freezeMapBlock, scrubMarkdownForPayload, type RelationToken, type PayloadCircleBlock } from '../../src/core/share-payload';
 import type { MapBlock } from '../../src/core/sharing';
 import type { Element } from '../../src/core/types';
 
@@ -207,45 +207,74 @@ describe('buildPagePayload', () => {
     ]), world());
     const prose = p.blocks[0] as { markdown: string };
     // Included target keeps its link; non-included pre-resolves to the label;
-    // a bare hand-typed URI resolves to the element name.
-    expect(prose.markdown).toBe(`[Ireena](ow://character/${IREENA}) hides from Vallaki. See Vallaki too.`);
+    // a bare hand-typed URI goes, and never becomes the element's name (1.124.2).
+    expect(prose.markdown).toBe(`[Ireena](ow://character/${IREENA}) hides from Vallaki. See  too.`);
     // The payload JSON itself must not carry the undisclosed uuid anywhere.
     expect(JSON.stringify(p)).not.toContain(VALLAKI);
   });
 
-  // Every address the SDK reads, in either form, and its lens (1.124.2).
-  describe('the scrub reads every address the SDK reads', () => {
-    const W = '0193a1c2-7d3e-7f00-8a11-3c5e7b9d2f40';
-    const scrub = (markdown: string): { md: string; json: string } => {
-      const p = buildPagePayload(makePage([
-        { id: 'b1', kind: 'prose', markdown },
-        { id: 'b2', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [] },
-      ]), world());
-      return { md: (p.blocks[0] as { markdown: string }).markdown, json: JSON.stringify(p) };
-    };
-    it('a lens not on the page takes the whole link out, though its element is on it', () => {
-      const r = scrub(`[Ireena](ow://character/${IREENA}?lens=${VALLAKI}) waits.`);
-      expect(r.md).toBe('Ireena waits.');
-      expect(r.json).not.toContain(VALLAKI);
+  // The scrub reads wider than the address rules: every address the SDK reads,
+  // and every loose run of an address prefix in any case holding an id not on
+  // the page (1.124.2). A dropped link becomes its label; a bare one, nothing.
+  describe('the scrub leaves out every link it does not show', () => {
+    const A = '019a1f3c-2b4e-7d10-8c3a-6f2e9b0d4a71'; // on the page
+    const S = '0193a1c2-7d3e-7f00-8a11-3c5e7b9d2f40'; // in the world, not on the page
+    const W = '0193aaaa-7d3e-7f00-8a11-3c5e7b9d2f40'; // a world
+    const byId = new Map<string, Element>([
+      [A, { id: A, name: 'Alice', type: 'character' } as unknown as Element],
+      [S, { id: S, name: 'Secret Sam', type: 'character' } as unknown as Element],
+    ]);
+    const scrub = (md: string): string => scrubMarkdownForPayload(md, new Set([A]), byId);
+    const leaks = (out: string): boolean => out.toLowerCase().includes(S) || out.includes('Secret Sam');
+    const FORMS: Array<[string, string]> = [
+      ['the text form', `x ow://character/${S} y`],
+      ['a type word in capitals', `x ow://Character/${S} y`],
+      ['the prefix in capitals', `x OW://character/${S} y`],
+      ['an unknown type word', `x ow://characters/${S} y`],
+      ['an id in capitals', `x ow://character/${S.toUpperCase()} y`],
+      ["the site's form", `x https://www.onlyworlds.com/w/${W}/character/${S} y`],
+      ["the site's form in capitals", `x HTTPS://www.onlyworlds.com/w/${W}/character/${S} y`],
+      ["the site's form without www", `x https://onlyworlds.com/w/${W}/character/${S} y`],
+      ['the text form with a world', `x ow://${W}/character/${S} y`],
+      ['a moment', `x [m](ow://character/${S}@12) y`],
+      ['a lens not on the page', `x [m](ow://character/${A}?lens=${S}) y`],
+      ['a lens key in capitals', `x [m](ow://character/${A}?LENS=${S}) y`],
+      ['a lens after a moment', `x [m](ow://character/${A}@3?lens=${S}) y`],
+      ['a lens as a second key', `x [m](ow://character/${A}?a=b&lens=${S}) y`],
+      ['a label with ]', `x [a]b](ow://character/${S}) y`],
+      ['a label with nested brackets', `x [a [b] c](ow://character/${S}) y`],
+      ['a title', `x [lbl](ow://character/${S} "t") y`],
+      ['an href in angle brackets', `x [lbl](<ow://character/${S}>) y`],
+      ['two addresses with no space', `x ow://character/${S}ow://character/${S} y`],
+      ['one on the page and one not, no space', `x ow://character/${A}ow://character/${S} y`],
+      ['a code span', 'x `ow://character/' + S + '` y'],
+      ['letters after the id', `x ow://character/${S}x y`],
+      ['a reference-style link', `x [lbl][r]\n\n[r]: ow://character/${S}\n`],
+      ['an html anchor', `x <a href="ow://character/${S}">l</a> y`],
+      ['a percent-encoded slash', `x ow://character%2F${S} y`],
+      ['an address in a label', `x [ow://character/${S}](ow://character/${A}) y`],
+      ['an address in a label, prose around it', `x [see ow://character/${S} now](ow://character/${A}) y`],
+      ['a query after', `[a](ow://character/${S}?x=1)`],
+      ['a fragment after', `[a](ow://character/${S}#frag)`],
+      ["another world's element", `https://www.onlyworlds.com/w/${W}/character/11111111-2222-7333-8444-555555555555`],
+    ];
+    for (const [label, md] of FORMS) {
+      it(`${label}: no id and no name off the page`, () => {
+        const out = scrub(md);
+        expect(leaks(out), out).toBe(false);
+        expect(out).not.toContain('11111111-2222');
+      });
+    }
+    it('a dropped link becomes its label, never the name; a bare address becomes nothing', () => {
+      expect(scrub(`x [her](ow://Character/${S}) y`)).toBe('x her y');
+      expect(scrub(`x [m](ow://character/${A}?a=b&lens=${S}) y`)).toBe('x m y');
+      expect(scrub(`x ow://character/${S} y`)).toBe('x  y');
+      expect(scrub(`x [lbl](ow://character/${S} "t") y`)).toBe('x lbl y');
+      expect(scrub(`x [lbl](<ow://character/${S}>) y`)).toBe('x lbl y');
     });
-    it('a moment rides with its address: the whole link goes', () => {
-      const r = scrub(`[Vallaki](ow://location/${VALLAKI}@12). Then ow://location/${VALLAKI}@3, gone.`);
-      expect(r.md).toBe('Vallaki. Then Vallaki, gone.');
-      expect(r.json).not.toContain(VALLAKI);
-    });
-    it("another world's address and the site's link are scrubbed too", () => {
-      const r = scrub(`See [there](ow://${W}/location/${VALLAKI}) and https://www.onlyworlds.com/w/${W}/location/${VALLAKI}.`);
-      expect(r.md).toBe('See there and .');
-      expect(r.json).not.toContain(VALLAKI);
-    });
-    it('an id in capitals is scrubbed, and an included one in capitals kept', () => {
-      const r = scrub(`[V](ow://location/${VALLAKI.toUpperCase()}) [I](ow://character/${IREENA.toUpperCase()})`);
-      expect(r.md).toBe(`V [I](ow://character/${IREENA.toUpperCase()})`);
-      expect(r.json.toLowerCase()).not.toContain(VALLAKI);
-    });
-    it('an included link with a lens on the page is kept, byte for byte', () => {
-      const md = `[Ireena](ow://character/${IREENA}@2?lens=${IREENA}).`;
-      expect(scrub(md).md).toBe(md);
+    it('what is on the page is kept, byte for byte', () => {
+      const md = `x [Alice](ow://character/${A}) and ow://character/${A}@4 and [L](ow://character/${A}?lens=${A}) [U](ow://character/${A.toUpperCase()}) y`;
+      expect(scrub(md)).toBe(md);
     });
   });
 
@@ -279,7 +308,7 @@ describe('buildPagePayload', () => {
       { id: 'b1', kind: 'element-card', elementId: SCENE, variant: 'full', fields: ['story'] },
       { id: 'b2', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [] },
     ]), elements);
-    expect(p.elements[SCENE].fields.story).toBe('The courier met Ireena near Vallaki.');
+    expect(p.elements[SCENE].fields.story).toBe('The courier met Ireena near .');
     expect(JSON.stringify(p)).not.toContain('ow://');
     expect(JSON.stringify(p)).not.toContain(VALLAKI);
 

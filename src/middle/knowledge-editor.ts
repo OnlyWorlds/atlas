@@ -42,7 +42,7 @@ import type { ToastManager } from '../ui/toast-manager';
 import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
 import { currentLore } from '../core/parlor-room';
-import { proseNamesId } from '../core/ow-links';
+import { lookupHeldId, proseNamesId } from '../core/ow-links';
 
 export interface KnowledgeEditorOptions {
   /** Prose host — the editor takes over this element (already carries the prose CSS class). */
@@ -173,7 +173,8 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
 
     const entry = getEntry();
     if (!entry) return; // draft — derived about-set recomputes from prose automatically
-    const targetEl = getState().data.elements.find(e => e.id === chip.id);
+    const elements = getState().data.elements;
+    const targetEl = lookupHeldId(chip.id, id => elements.find(e => e.id === id));
     if (!targetEl) return;
     const field = aboutFieldFor(targetEl.type);
     if (!field) return; // collective (holder) or non-subject type — leave fields alone
@@ -181,7 +182,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
     // Any other mention left? Other chips with the same id, or word-bounded
     // name/alias text matches.
     const markdown = editorHandle.getMarkdown();
-    if (proseNamesId(markdown, chip.id)) return;
+    if (proseNamesId(markdown, targetEl.id, id => elements.some(e => e.id === id))) return;
     const plainText = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n');
     const surfaceForms: string[] = [];
     if (targetEl.name) surfaceForms.push(targetEl.name);

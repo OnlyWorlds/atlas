@@ -28,7 +28,7 @@ import { showProblem } from '../../ui/problem-fixes';
 import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink';
 import { currentLore, pageLore } from '../../core/parlor-room';
 import { readerLinksOf } from './context-pane-graph';
-import { findOwLinks } from '../../core/ow-links';
+import { findOwLinks, namedId, type HeldId } from '../../core/ow-links';
 
 export interface ContextListsHandle {
   /** Visually emphasize a row whose element id matches (or clear). */
@@ -59,15 +59,22 @@ function collectCastIds(narrative: Element): string[] {
 
 /**
  * Count the element addresses naming each element in the narrative's story,
- * keyed by the id as written and by its lowercase reading (`linkNamesId`), so
- * a lookup by the element's held id finds every address that names it.
+ * keyed by the element each names (`namedId`: as written, failing that the
+ * lowercase reading). Without the world (`has`), an address counts under both
+ * spellings, which a lookup by one held id reads the same way.
  */
-export function buildMentionCounts(story: string | undefined | null): Map<string, number> {
+export function buildMentionCounts(story: string | undefined | null, has?: HeldId): Map<string, number> {
   const counts = new Map<string, number>();
   if (typeof story !== 'string' || story.length === 0) return counts;
+  const add = (id: string): void => { counts.set(id, (counts.get(id) ?? 0) + 1); };
   for (const l of findOwLinks(story)) {
-    counts.set(l.id, (counts.get(l.id) ?? 0) + 1);
-    if (l.idAsWritten !== l.id) counts.set(l.idAsWritten, (counts.get(l.idAsWritten) ?? 0) + 1);
+    if (has) {
+      const id = namedId(l, has);
+      if (id !== null) add(id);
+      continue;
+    }
+    add(l.idAsWritten);
+    if (l.idAsWritten !== l.id) add(l.id);
   }
   return counts;
 }
@@ -183,7 +190,7 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   for (const e of elements) byId.set(e.id, e);
 
   const castIds = collectCastIds(narrative);
-  const mentionCounts = buildMentionCounts(narrative.story);
+  const mentionCounts = buildMentionCounts(narrative.story, id => byId.has(id));
   const castEntries = castIds
     .map(id => byId.get(id))
     .filter((e): e is Element => Boolean(e))

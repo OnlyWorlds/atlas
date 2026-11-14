@@ -63,25 +63,25 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'prose-links-address-rules',
         title: 'A link to an element in your writing is read the way every OnlyWorlds tool reads it',
-        body: 'Atlas now reads a link to an element in a story with the OnlyWorlds address rules, the same in the writing room, the context pane, the compiled view and a published page. A link whose id is written in capital letters now links to its element, and a scene that names an element that way adds it to the scene\'s characters, places and other links the first time you open it. A link whose type word starts with a capital (ow://Character/...), whose id is not a whole id (ow://character/abc), or that starts with OW:// is plain text: it links nothing and adds nothing to the scene. Text written straight after an id is the sentence\'s, so a link followed by letters now names the id before them; before, the letters were read as part of the id and the link named nothing.',
+        body: 'Atlas now reads a link to an element in a story with the OnlyWorlds address rules, the same in the writing room, the context pane, the compiled view and a published page. A link whose type word starts with a capital (ow://Character/...), whose id is not a whole id (ow://character/abc), or that starts with OW:// is plain text: it links nothing and adds nothing to the scene. Letters written straight after a link\'s id are part of the sentence, so the link names the id before them; before, the letters were read as part of the id and the link named nothing.',
         tags: ['writing'],
       },
       {
         id: 'prose-links-moment-lens-rekey',
-        title: 'A link with a moment or a lens keeps it, and follows new ids',
-        body: 'A link written with a moment (@12) or a lens (?lens=) stays a link in the editor with both kept, rather than an element chip. When elements get new ids (making a world online, an import, or a merge), those links now move with them; before, they kept the old id and pointed at nothing. A chip another tool saved with an id in capital letters now opens and names its element. An element whose own id is written in capital letters, which only files made elsewhere hold, is one no link can name: a scene does not add it from its prose.',
+        title: 'An id in capital letters names its element, and a link with a moment or a lens follows new ids',
+        body: 'An id written in capital letters in a link names the element whose id is written that way, and otherwise the element with the same id in lowercase, so a scene that names an element that way now adds it to the scene\'s characters, places and other links. Atlas keeps the id as the link wrote it, in the editor too. A link written with a moment (@12) or a lens (?lens=) stays a link in the editor with both kept, rather than an element chip. When elements get new ids (making a world online, an import, or a merge), those links now move with them; before, they kept the old id and pointed at nothing.',
         tags: ['writing', 'fix'],
       },
       {
         id: 'share-scrub-every-address',
         title: 'A published page leaves out every link it does not show',
-        body: 'A published page now takes out a link to any element or lens that is not on the page, however the link is written: with a moment or a lens, to another world, or copied from onlyworlds.com. A link written as [label](...) becomes its label. Before, a link to an element on the page could carry the id of a lens that was not.',
+        body: 'A published page now takes out a link to any element or lens that is not on the page, however the link is written: with a moment or a lens, to another world, copied from onlyworlds.com, in capital letters, or with a type word Atlas does not read as a link. A link written as [label](...) becomes its label, and a bare address is left out. The name of an element that is not on the page is never written in its place; before, a bare address was replaced by the element\'s name, and a link could carry the id of a lens that was not on the page.',
         tags: ['sharing', 'fix'],
       },
       {
         id: 'import-ids-lowercase',
         title: 'An import writes a new element\'s id in lowercase',
-        body: 'When an import makes a new element from a file whose id is written in capital letters, Atlas writes the id in lowercase, and every link to it in the same import follows. An element already in your world keeps its id exactly as it is, and an incoming element whose id differs from one here only in capitals is that element, not a second copy.',
+        body: 'When an import makes a new element from a file whose id is written in capital letters, Atlas writes the id in lowercase, and every link to it in the same import follows, however the link spells the id. An element already in your world keeps its id exactly as it is, and an incoming element whose id differs from one here only in capitals is that element, not a second copy.',
         tags: ['folders'],
       },
       {

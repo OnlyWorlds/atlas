@@ -541,6 +541,17 @@ describe('reconcile: an id in capitals (the writer rule, 1.124.2)', () => {
     expect(plan.skips).toEqual([{ type: 'character', id: A, name: 'Ann' }]);
   });
 
+  it('a re-minted record is followed by its references in any spelling: relations, prose, moment and lens', () => {
+    const plan = reconcile(exportOf(
+      [{ id: A.toUpperCase(), name: 'Ann' }, { id: B, name: 'Bo', friends: [A] }],
+      { characters: [A], story: `[Ann](ow://character/${A}) and [Ann](ow://character/${A.toUpperCase()}@2?lens=${A.toUpperCase()})` },
+    ), [existingEl({ id: A, type: 'character', name: 'Someone Else' })], { genId: () => 'gen-1' });
+    expect(created(plan, 'Ann').id).toBe('gen-1');
+    expect(created(plan, 'Bo').friends).toEqual(['gen-1']);
+    expect(created(plan, 'Chapter').characters).toEqual(['gen-1']);
+    expect(created(plan, 'Chapter').story).toBe('[Ann](ow://character/gen-1) and [Ann](ow://character/gen-1@2?lens=gen-1)');
+  });
+
   it('a different element under the same id in another case gets a fresh id', () => {
     const plan = reconcile(exportOf([{ id: A.toUpperCase(), name: 'Ann' }]),
       [existingEl({ id: A, type: 'character', name: 'Someone Else' })], { genId: () => 'fresh' });

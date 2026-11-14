@@ -17,7 +17,7 @@ import { NARRATIVE_RELATION_FIELDS } from '../core/narrative-fields';
 // The reader from core/ow-links (NOT the chip module) keeps this module
 // TipTap-free so the knowledge room can import it statically without
 // breaking the editor code-split.
-import { findOwLinks } from '../core/ow-links';
+import { findOwLinks, namedId } from '../core/ow-links';
 
 // Canonical map lives in core/narrative-fields.ts (also consumed by
 // core/knowledge.ts). Re-exported here for the writing modules + tests.
@@ -25,16 +25,18 @@ export { NARRATIVE_RELATION_FIELDS };
 
 /**
  * Parse markdown for element addresses (`ow://<type>/<uuid>`, as the SDK reads
- * them) and group the ids by element type. The id is the profile's reading,
- * lowercase: an element whose own id is held in upper case is one no address
- * can name, so no relation is derived for it. Duplicates within the same type
- * are deduped.
+ * them) and group the ids by element type. Given the world (`exists`), each
+ * address names the element `namedId` gives (its id as written, failing that
+ * its lowercase reading) and one that names none is left out; without it, the
+ * ids are as written. Duplicates within the same type are deduped.
  */
-export function extractProseLinks(markdown: string): Record<string, string[]> {
+export function extractProseLinks(markdown: string, exists?: LinkTargetExists): Record<string, string[]> {
   const out: Record<string, Set<string>> = {};
   for (const link of findOwLinks(markdown)) {
+    const id = exists ? namedId(link, x => exists(link.type, x)) : link.idAsWritten;
+    if (id === null) continue;
     if (!out[link.type]) out[link.type] = new Set();
-    out[link.type].add(link.id);
+    out[link.type].add(id);
   }
   const flat: Record<string, string[]> = {};
   for (const [type, ids] of Object.entries(out)) {
@@ -72,7 +74,7 @@ export function computeRelationPatch(
   markdown: string,
   exists: LinkTargetExists,
 ): Partial<Element> {
-  const linksByType = extractProseLinks(markdown);
+  const linksByType = extractProseLinks(markdown, exists);
   const patch: Partial<Element> = {};
 
   for (const [type, ids] of Object.entries(linksByType)) {

@@ -18,7 +18,7 @@
  */
 
 import type { Element } from './types';
-import { findOwLinks, isChipLink, readOwHref } from './ow-links';
+import { findOwLinks, isChipLink, namedId, owLinkHref, readOwHref } from './ow-links';
 
 export const MIN_NAME_CHARS = 3;
 /** Cap alternation size to keep regex compile fast. */
@@ -58,6 +58,13 @@ export interface AutolinkIndex {
  * candidates for a key is already suppressed entirely, so an ambiguous pair
  * links to neither rather than guessing.
  */
+/** The ids of the index's candidates: the world a chip's or an address's id is named against. */
+export function candidateIds(index: AutolinkIndex): Set<string> {
+  const ids = new Set<string>();
+  for (const cands of index.byName.values()) for (const c of cands) ids.add(c.id);
+  return ids;
+}
+
 export function buildAutolinkIndex(elements: Element[]): AutolinkIndex {
   const byName = new Map<string, AutolinkCandidate[]>();
   for (const el of elements) {
@@ -190,9 +197,13 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
     protectedSpans.some(([s, e]) => a < e && b > s);
 
   // Already-linked ids anywhere in the story (first-mention rule).
-  // An address names an element as written, then by its lowercase reading.
+  // An address names the element `namedId` gives (as written, then lowercase).
   const already = new Set<string>();
-  for (const l of findOwLinks(story)) { already.add(l.idAsWritten); already.add(l.id); }
+  const held = candidateIds(index);
+  for (const l of findOwLinks(story)) {
+    const id = namedId(l, x => held.has(x));
+    if (id !== null) already.add(id);
+  }
 
   // Flags come FROM the scanner, never restated — a hardcoded 'g' here
   // would silently drop the case-insensitivity the index depends on.
@@ -219,7 +230,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: str
   for (let i = replacements.length - 1; i >= 0; i--) {
     const r = replacements[i];
     out = out.slice(0, r.from)
-      + `[${promotionLabel(story.slice(r.from, r.to), r.cand)}](ow://${r.cand.type}/${r.cand.id})`
+      + `[${promotionLabel(story.slice(r.from, r.to), r.cand)}](${owLinkHref(r.cand.type, r.cand.id)})`
       + out.slice(r.to);
   }
   return { story: out, linked: replacements.map(r => r.cand) };
@@ -272,8 +283,12 @@ export function autolinkRichtext(doc: unknown, index: AutolinkIndex, only?: stri
   const root = structuredClone(doc) as RtNode;
 
   const already = new Set<string>();
+  const held = candidateIds(index);
   const collect = (n: RtNode): void => {
-    if (n.type === 'elementChip' && typeof n.attrs?.id === 'string') already.add(n.attrs.id as string);
+    if (n.type === 'elementChip' && typeof n.attrs?.id === 'string') {
+      const chipId = n.attrs.id as string;
+      already.add(namedId({ idAsWritten: chipId, id: chipId.toLowerCase() }, x => held.has(x)) ?? chipId);
+    }
     n.content?.forEach(collect);
   };
   collect(root);
@@ -477,7 +492,7 @@ export function linkTermMarkdown(
   for (let i = spans.length - 1; i >= 0; i--) {
     const [from, to] = spans[i];
     out = out.slice(0, from)
-      + `[${story.slice(from, to)}](ow://${target.type}/${target.id})`
+      + `[${story.slice(from, to)}](${owLinkHref(target.type, target.id)})`
       + out.slice(to);
   }
   return { story: out, linked: spans.length };

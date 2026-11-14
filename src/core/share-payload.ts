@@ -32,7 +32,7 @@ import {
 import { knowledgeHeldBy } from './knowledge';
 import { handsOnAsProposed } from './review-mark';
 import { isHiddenMark } from './hidden-mark';
-import { findAddresses, lookupHeldId } from './ow-links';
+import { findAddresses, findLooseAddressRuns, namedId } from './ow-links';
 // Pure shape/geometry helpers (no DOM) — one resolver for zone shape across
 // canvas, builder, and payload; the tabs/right location is historical.
 import { getZoneShape } from '../tabs/right/zone-derived';
@@ -168,24 +168,26 @@ export function populatedFieldNames(el: Element): string[] {
 /** Scrub target for text that never chips (card field values): drop every link. */
 const NO_IDS: ReadonlySet<string> = new Set<string>();
 
-/** Is an id on the page, as written or by its lowercase reading? */
-function disclosed(includedIds: ReadonlySet<string>, asWritten: string | null, reading: string | null): boolean {
-  if (asWritten === null || reading === null) return true;
-  return includedIds.has(asWritten) || includedIds.has(reading);
-}
-
 /**
  * Pre-resolve markdown for the payload (contract §2): an address whose
  * element or lens is NOT included is taken out BEFORE the payload ships.
  * The render-time rule (§5.1) still strips them visually, but the payload
  * JSON itself is served publicly — an `ow://character/<uuid>` in raw markdown
  * would leak the element's type, uuid, and cross-page linkable identity even
- * when no renderer ever shows it. Every address the SDK reads counts, in
- * either form and of any world, and its lens too (`findAddresses`). Inside a
- * markdown link `[label](address)` the link becomes its label (THE LABEL LAW);
- * a bare address becomes the element's name when the world holds it (an
- * element of this world), else nothing. Included targets keep their links
- * (the viewer chips them). A world's own address names no element and stays.
+ * when no renderer ever shows it.
+ *
+ * Two passes, and the scrub is the one reader that reads WIDER than the
+ * address rules, because it guards disclosure:
+ *   1. every address the SDK reads (`findAddresses`: either form, any world),
+ *      whose element (`namedId` against the world: as written, then
+ *      lowercase) or lens is not on the page;
+ *   2. every loose run (`findLooseAddressRuns`: an `ow://` or onlyworlds.com
+ *      `/w/` prefix in any case, to the next space or `)`) holding an id-form
+ *      not on the page, compared lowercase. A link in capitals, an unknown type
+ *      word, another query key or a world's id is still seen.
+ * Inside a markdown link `[label](…)` the whole link becomes its label (THE
+ * LABEL LAW: never the element's name); a bare address or run becomes
+ * nothing, so no name of an element left off the page ever ships.
  */
 export function scrubMarkdownForPayload(
   markdown: string,
@@ -193,28 +195,51 @@ export function scrubMarkdownForPayload(
   byId: Map<string, Element>,
 ): string {
   if (typeof markdown !== 'string') return markdown;
-  const found = findAddresses(markdown);
-  if (found.length === 0) return markdown;
+  const has = (id: string): boolean => byId.has(id);
+  const onPage = (asWritten: string | null, reading: string | null): boolean => {
+    if (asWritten === null || reading === null) return true;
+    const named = namedId({ idAsWritten: asWritten, id: reading }, has);
+    return named !== null && includedIds.has(named);
+  };
+  const includedLower = new Set<string>();
+  for (const id of includedIds) includedLower.add(id.toLowerCase());
+
+  const spans: Array<{ start: number; end: number }> = [];
+  for (const f of findAddresses(markdown)) {
+    if (onPage(f.idAsWritten, f.reading.id) && onPage(f.lensAsWritten, f.reading.lens)) continue;
+    spans.push({ start: f.start, end: f.end });
+  }
+  for (const run of findLooseAddressRuns(markdown)) {
+    if (run.ids.every(id => includedLower.has(id))) continue;
+    spans.push({ start: run.start, end: run.end });
+  }
+  if (spans.length === 0) return markdown;
+  spans.sort((x, y) => x.start - y.start || y.end - x.end);
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const sp of spans) {
+    const lastSpan = merged[merged.length - 1];
+    if (lastSpan && sp.start < lastSpan.end) lastSpan.end = Math.max(lastSpan.end, sp.end);
+    else merged.push({ ...sp });
+  }
+
   let out = '';
   let last = 0;
-  for (const f of found) {
-    if (f.start < last) continue; // inside a markdown link already replaced
-    const r = f.reading;
-    if (disclosed(includedIds, f.idAsWritten, r.id) && disclosed(includedIds, f.lensAsWritten, r.lens)) continue;
-    // `[label](address…)`: the whole link becomes its label. The href may go
-    // on past the address (a query, a fragment, a title) up to its `)`.
-    const open = markdown.lastIndexOf('](', f.start);
-    const labelStart = open === f.start - 2 ? markdown.lastIndexOf('[', open) : -1;
-    const close = labelStart !== -1 ? /^[^\s()]*(?:\s+"[^"\n]*")?\)/.exec(markdown.slice(f.end)) : null;
-    if (labelStart >= last && close && !markdown.slice(labelStart + 1, open).includes(']')) {
+  for (const sp of merged) {
+    if (sp.start < last) continue; // inside a markdown link already replaced
+    // `[label](…)` (an href in angle brackets too): the whole link becomes its
+    // label. The href may go on past the span (a query, a fragment, a title)
+    // up to its `)`.
+    const angle = markdown.slice(sp.start - 3, sp.start) === '](<';
+    const open = angle ? sp.start - 3 : (markdown.slice(sp.start - 2, sp.start) === '](' ? sp.start - 2 : -1);
+    const labelStart = open !== -1 ? markdown.lastIndexOf('[', open) : -1;
+    const close = labelStart !== -1 ? /^[^\s()]*(?:\s+"[^"\n]*")?>?\)/.exec(markdown.slice(sp.end)) : null;
+    if (labelStart !== -1 && labelStart >= last && close && !markdown.slice(labelStart + 1, open).includes(']')) {
       out += markdown.slice(last, labelStart) + markdown.slice(labelStart + 1, open);
-      last = f.end + close[0].length;
+      last = sp.end + close[0].length;
       continue;
     }
-    const inWorld = r.form === 'text' && r.world === null && r.id !== null;
-    const name = inWorld && f.idAsWritten !== null ? lookupHeldId(f.idAsWritten, id => byId.get(id))?.name ?? '' : '';
-    out += markdown.slice(last, f.start) + name;
-    last = f.end;
+    out += markdown.slice(last, sp.start);
+    last = sp.end;
   }
   return last === 0 ? markdown : out + markdown.slice(last);
 }

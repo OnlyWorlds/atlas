@@ -22,8 +22,10 @@ function walk(node: JSONContent): JSONContent {
     const newContent: JSONContent[] = [];
     for (const child of node.content) {
       // A text node whose link mark is a chip address (an element in this
-      // world, no moment and no lens) becomes an elementChip node. A link
-      // with a moment or a lens stays a link mark, its href kept as written.
+      // world, no moment and no lens) becomes an elementChip node, its id
+      // kept as written (Atlas never re-spells an id; the chip resolves it as
+      // written, then lowercase). A link with a moment or a lens stays a link
+      // mark, its href kept as written.
       const linkMark = child.type === 'text' && Array.isArray(child.marks)
         ? child.marks.find(m => m.type === 'link')
         : undefined;
@@ -32,7 +34,7 @@ function walk(node: JSONContent): JSONContent {
         newContent.push({
           type: 'elementChip',
           attrs: {
-            id: link.id,
+            id: link.idAsWritten,
             type: link.type,
             label: child.text ?? '',
           },

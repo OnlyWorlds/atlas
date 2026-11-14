@@ -36,7 +36,7 @@ import { WRITING_INLINE_CREATE_EVENT, WRITING_SPLIT_EVENT } from '../core/hotkey
 import type { Element } from '../core/types';
 import type { WorkspaceEditorHandle } from './writing-workspace-editor';
 import { forPointer } from '../core/pointer';
-import { proseNamesId } from '../core/ow-links';
+import { lookupHeldId, proseNamesId } from '../core/ow-links';
 
 export interface ProseContextMenuController {
   destroy(): void;
@@ -347,12 +347,13 @@ export function createProseContextMenu(deps: {
     // After the replacement, the doc no longer has THIS chip but may still
     // have other chips with the same id, or text matches via name/aliases.
     const state = getState();
-    const targetEl = state.data.elements.find(e => e.id === chip.id);
+    const has = (id: string): boolean => state.data.elements.some(e => e.id === id);
+    const targetEl = lookupHeldId(chip.id, id => state.data.elements.find(e => e.id === id));
     if (!targetEl) return;
 
     // Re-read the editor's current markdown for another address naming it.
     const markdown = editorHandle.getMarkdown();
-    const otherChipMatch = proseNamesId(markdown, chip.id);
+    const otherChipMatch = proseNamesId(markdown, targetEl.id, has);
 
     // Text-mention scan: any of the element's surface forms (name + aliases)
     // appearing as a word-bounded match in the prose-as-plain-text view.

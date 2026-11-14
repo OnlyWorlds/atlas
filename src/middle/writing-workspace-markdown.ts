@@ -16,6 +16,7 @@
  */
 
 import type { JSONContent } from '@tiptap/core';
+import { owLinkHref } from '../core/ow-links';
 
 interface SerializeContext {
   /** Track nested list depth for indentation. */
@@ -159,7 +160,7 @@ function serializeInline(nodes: JSONContent[] | undefined, ctx: SerializeContext
       const label = (attrs.label ?? id) as string;
       if (id) {
         const safeLabel = String(label).replace(/\]/g, '\\]');
-        ctx.out.push(applyMarks(`[${safeLabel}](ow://${type}/${id})`, node.marks));
+        ctx.out.push(applyMarks(`[${safeLabel}](${owLinkHref(type, id)})`, node.marks));
       } else {
         ctx.out.push(applyMarks(String(label), node.marks));
       }

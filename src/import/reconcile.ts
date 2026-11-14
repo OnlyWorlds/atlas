@@ -91,6 +91,7 @@ export function reconcile(
   // --- pass 1: normalize + decide action + assign final ids + build id remap ---
   const incoming: Incoming[] = [];
   const incomingIdRemap = new Map<string, string>(); // incoming uuid as written → finalId, when they differ
+  const lowerRemap = new Map<string, string>(); // the same, keyed lowercase (a fallback for any spelling)
   const assignedIds = new Set<string>(); // final ids already claimed this batch (in-batch dup guard)
   const assignedLower = new Set<string>(); // the same, lowercase (a guard that ignores case)
   for (const [type, records] of parsed.byType) {
@@ -151,6 +152,10 @@ export function reconcile(
       assignedLower.add(finalId.toLowerCase());
       if (rawId && rawId !== finalId) incomingIdRemap.set(rawId, finalId);
       if (rawId && rawId.trim() !== rawId && rawId.trim() !== finalId) incomingIdRemap.set(rawId.trim(), finalId);
+      // Keyed lowercase too, so a reference in any spelling follows a record
+      // the import re-minted (first record wins a lowercase key; a key written
+      // exactly so by a record is that record's).
+      if (newId && newId !== finalId && !incomingIdRemap.has(newId) && !lowerRemap.has(newId)) lowerRemap.set(newId, finalId);
       incoming.push({ type, record, name, finalId, action, targetId });
     }
   }
@@ -183,8 +188,11 @@ export function reconcile(
     const hit = incomingIdRemap.get(t) ?? (assignedIds.has(t) ? t : undefined);
     if (hit !== undefined) return hit;
     const lower = t.toLowerCase();
-    return incomingIdRemap.get(lower) ?? (assignedIds.has(lower) ? lower : t);
+    return incomingIdRemap.get(lower) ?? lowerRemap.get(lower) ?? (assignedIds.has(lower) ? lower : t);
   };
+  // The prose, sidecar and page-block remap: as written, then any spelling's lowercase key.
+  const proseRemap = new Map<string, string>(incomingIdRemap);
+  for (const [k, v] of lowerRemap) if (!proseRemap.has(k)) proseRemap.set(k, v);
 
   // --- pass 2: resolve relations + bucket ---
   for (const inc of incoming) {
@@ -197,7 +205,7 @@ export function reconcile(
     const resolved = remapProse(
       inc.type,
       resolveRelations(inc, idByNameType, importIdOf, typeById, report),
-      incomingIdRemap,
+      proseRemap,
     );
 
     if (inc.action === 'insert') {

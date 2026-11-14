@@ -18,7 +18,7 @@
  * share scrub reads them ({@link findAddresses}).
  */
 
-import { readOwLinkAt, type OwAddressReading } from '@onlyworlds/sdk';
+import { ELEMENT_TYPES, readOwLinkAt, type OwAddressReading } from '@onlyworlds/sdk';
 
 /** The text form's prefix, as the profile writes it. */
 export const OW_TEXT_PREFIX = 'ow://';
@@ -63,12 +63,59 @@ export interface OwLink {
   moment: number | null;
 }
 
-function nextPrefix(text: string, from: number): number {
-  const a = text.indexOf(OW_TEXT_PREFIX, from);
-  const b = text.indexOf(OW_SITE_PREFIX, from);
-  if (a === -1) return b;
-  if (b === -1) return a;
-  return Math.min(a, b);
+/*
+ * The SDK reads an address; Atlas only decides when to ask, and how much
+ * text to hand it, so a walk over any text stays linear. A read that fails
+ * costs the SDK about a millisecond, so a prefix is first held against the
+ * address's core shape (a cheap sticky match: the prefix, then a world or a
+ * type word from the SDK's own list, and ids), and a prefix with no core is
+ * no address without asking. A core is never shorter than what the SDK reads
+ * from it, so nothing it would read is missed (the profile's 57 prose cases
+ * and a fuzz pass hold it). The SDK is then handed the core and the stretch
+ * after it that a moment, a lens and the next character can take, or the
+ * core alone when a `/` follows it (a path that goes on past the core is one
+ * the SDK does not take: its reading ends at the core either way).
+ */
+const ID_SRC = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+const TYPES_SRC = [...ELEMENT_TYPES].sort((a, b) => b.length - a.length).join('|');
+const TEXT_CORE = new RegExp(`ow://(?:(?:${TYPES_SRC})/${ID_SRC}|${ID_SRC}(?:/(?:${TYPES_SRC})/${ID_SRC})?)`, 'y');
+const SITE_CORE = new RegExp(`https://www\\.onlyworlds\\.com/w/[0-9A-Za-z-]{1,64}(?:/(?:${TYPES_SRC})/${ID_SRC})?`, 'y');
+/** What may follow a core inside an address, and the character after it: `@` and a moment, `?lens=` and an id. */
+const TAIL = 64;
+
+/** The SDK's reading of the address that starts at `i`, or null. */
+function readAt(text: string, i: number): { reading: OwAddressReading; end: number } | null {
+  const core = text.startsWith(OW_TEXT_PREFIX, i) ? TEXT_CORE : text.startsWith(OW_SITE_PREFIX, i) ? SITE_CORE : null;
+  if (!core) return null;
+  core.lastIndex = i;
+  const m = core.exec(text);
+  if (!m) return null;
+  const coreEnd = i + m[0].length;
+  const stop = text[coreEnd] === '/' ? coreEnd : Math.min(text.length, coreEnd + TAIL);
+  const at = readOwLinkAt(i === 0 && stop === text.length ? text : text.slice(i, stop), 0);
+  return at ? { reading: at.reading, end: i + at.end } : null;
+}
+
+/**
+ * Each start of a prefix in a text, in order, found in one pass: each
+ * prefix's next index is kept and searched again only once the walk has
+ * passed it, so no stretch of the text is searched twice for one prefix.
+ */
+class PrefixWalk {
+  private nextText: number;
+  private nextSite: number;
+  constructor(private readonly text: string) {
+    this.nextText = text.indexOf(OW_TEXT_PREFIX);
+    this.nextSite = text.indexOf(OW_SITE_PREFIX);
+  }
+  /** The first prefix at or after `from`, or -1. */
+  next(from: number): number {
+    if (this.nextText !== -1 && this.nextText < from) this.nextText = this.text.indexOf(OW_TEXT_PREFIX, from);
+    if (this.nextSite !== -1 && this.nextSite < from) this.nextSite = this.text.indexOf(OW_SITE_PREFIX, from);
+    if (this.nextText === -1) return this.nextSite;
+    if (this.nextSite === -1) return this.nextText;
+    return Math.min(this.nextText, this.nextSite);
+  }
 }
 
 /** Where the id and the lens sit inside an address the SDK read at [start, end). */
@@ -107,15 +154,16 @@ function locate(text: string, start: number, end: number, reading: OwAddressRead
 export function findAddresses(text: string): OwAddressFound[] {
   const out: OwAddressFound[] = [];
   if (typeof text !== 'string') return out;
-  let i = nextPrefix(text, 0);
+  const walk = new PrefixWalk(text);
+  let i = walk.next(0);
   while (i !== -1) {
-    const at = readOwLinkAt(text, i);
+    const at = readAt(text, i);
     if (at) {
       const found = locate(text, i, at.end, at.reading);
       if (found) out.push(found);
-      i = nextPrefix(text, Math.max(at.end, i + 1));
+      i = walk.next(Math.max(at.end, i + 1));
     } else {
-      i = nextPrefix(text, i + 1);
+      i = walk.next(i + 1);
     }
   }
   return out;
@@ -147,7 +195,7 @@ export function findOwLinks(text: string): OwLink[] {
  */
 export function readOwHref(href: unknown): OwLink | null {
   if (typeof href !== 'string' || !href.startsWith(OW_TEXT_PREFIX)) return null;
-  const at = readOwLinkAt(href, 0);
+  const at = readAt(href, 0);
   if (!at || at.end !== href.length) return null;
   const found = locate(href, 0, at.end, at.reading);
   return found ? asLink(found) : null;
@@ -158,26 +206,80 @@ export function isChipLink(link: OwLink): boolean {
   return link.moment === null && link.lens === null;
 }
 
+/** Is an id held in the world (an element has exactly this id)? */
+export type HeldId = (id: string) => boolean;
+
 /**
- * Does this address name the element held under `heldId`? As written first,
- * then the profile's lowercase reading (the re-key's lookup, so the two agree).
+ * THE RULE for an id in capitals, the one every reader asks: an address names
+ * the element whose id equals its id as written; failing that, the element
+ * whose id equals its lowercase reading; failing both, none. Atlas never
+ * re-spells an id in prose. A chip's id is read the same way (as written,
+ * then lowercase).
  */
-export function linkNamesId(link: Pick<OwLink, 'id' | 'idAsWritten'>, heldId: string): boolean {
-  return link.idAsWritten === heldId || link.id === heldId;
+export function namedId(link: Pick<OwLink, 'id' | 'idAsWritten'>, has: HeldId): string | null {
+  if (has(link.idAsWritten)) return link.idAsWritten;
+  if (link.id !== link.idAsWritten && has(link.id)) return link.id;
+  return null;
 }
 
-/** Does any element address in a text name the element held under `heldId`? */
-export function proseNamesId(text: string, heldId: string): boolean {
-  return findOwLinks(text).some(l => linkNamesId(l, heldId));
+/**
+ * Does this address name the element held under `heldId`, by {@link namedId}?
+ * `has` says which other ids the world holds (an id in capitals names the
+ * element held that way before the lowercase one); without it, no other is.
+ */
+export function linkNamesId(link: Pick<OwLink, 'id' | 'idAsWritten'>, heldId: string, has?: HeldId): boolean {
+  return namedId(link, id => id === heldId || (has ? has(id) : false)) === heldId;
 }
 
-/** An id looked up as held, then lowercase: the chip resolver's rule. */
+/**
+ * Does any element address in a text name the element held under `heldId`?
+ * A case-blind look for the id comes first; the text is read only on a hit.
+ */
+export function proseNamesId(text: string, heldId: string, has?: HeldId): boolean {
+  if (typeof text !== 'string' || !heldId || !text.toLowerCase().includes(heldId.toLowerCase())) return false;
+  return findOwLinks(text).some(l => linkNamesId(l, heldId, has));
+}
+
+/** A chip's id (or any id as written) resolved by {@link namedId}: as written, then lowercase. */
 export function lookupHeldId<T>(id: string, get: (id: string) => T | undefined | null): T | undefined {
-  const held = get(id);
-  if (held !== undefined && held !== null) return held;
-  const lower = id.toLowerCase();
-  if (lower === id) return undefined;
-  return get(lower) ?? undefined;
+  const found = (x: string): boolean => { const v = get(x); return v !== undefined && v !== null; };
+  const named = namedId({ idAsWritten: id, id: id.toLowerCase() }, found);
+  return named === null ? undefined : get(named) ?? undefined;
+}
+
+/** The text form's href for an element, as Atlas's chip writer writes it (the id as held). */
+export function owLinkHref(type: string, id: string): string {
+  return OW_TEXT_PREFIX + type + '/' + id;
+}
+
+/** A run the share scrub reads loosely, with the id-forms in it (lowercase). */
+export interface LooseAddressRun {
+  start: number;
+  end: number;
+  ids: string[];
+}
+
+/**
+ * The share scrub's wide pass: wider than the address rules on purpose,
+ * because it guards what a public page discloses. Every `ow://` or
+ * `http(s)://(www.)onlyworlds.com/w/` prefix in any case, with its run of
+ * characters that are not a space or `)`, and every id-form in that run
+ * (8-4-4-4-12 hex in either case, given lowercase). A link in capitals, an
+ * unknown type word, another query key: whatever the address rules leave as
+ * text is still seen here.
+ */
+export function findLooseAddressRuns(text: string): LooseAddressRun[] {
+  const out: LooseAddressRun[] = [];
+  if (typeof text !== 'string') return out;
+  const runRe = /(?:ow:\/\/|https?:\/\/(?:www\.)?onlyworlds\.com\/w\/)[^\s)]*/gi;
+  const idRe = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+  for (const m of text.matchAll(runRe)) {
+    // A sentence's closing punctuation is the sentence's: it holds no id.
+    const run = m[0].replace(/[.,;:!?'"\]>]+$/, '');
+    const ids = [...run.matchAll(idRe)].map(x => x[0].toLowerCase());
+    out.push({ start: m.index, end: m.index + run.length, ids });
+  }
+  return out;
 }
 
 /** What a rewrite gives back for one address: a new id, a new lens, either or neither. */
@@ -217,13 +319,8 @@ export function rewriteOwLinks(text: string, fn: (link: OwLink) => OwLinkRewrite
 
 /** Index of the first address prefix in any case (a paste in capitals is refused for its case, not missed). */
 function indexOfPrefixAnyCase(text: string): number {
-  const prefixes = [OW_TEXT_PREFIX, OW_SITE_PREFIX];
-  for (let i = 0; i < text.length; i++) {
-    for (const p of prefixes) {
-      if (text.length - i >= p.length && text.slice(i, i + p.length).toLowerCase() === p) return i;
-    }
-  }
-  return -1;
+  const m = /ow:\/\/|https:\/\/www\.onlyworlds\.com\/w\//i.exec(text);
+  return m ? m.index : -1;
 }
 
 /**
@@ -237,7 +334,7 @@ export function pastedAddressIn(text: string): string | null {
   if (typeof text !== 'string') return null;
   const i = indexOfPrefixAnyCase(text);
   if (i === -1) return null;
-  const at = readOwLinkAt(text, i);
+  const at = readAt(text, i);
   if (at && text[at.end] !== '/') return text.slice(i, at.end);
   const run = /^\S*/.exec(text.slice(i))?.[0] ?? '';
   return run.replace(/[.,;:!?)\]}>'"]+$/, '');

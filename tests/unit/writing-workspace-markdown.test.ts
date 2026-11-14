@@ -214,10 +214,10 @@ describe('convertLinkMarksToChips', () => {
     }
   });
 
-  it('an id in capitals becomes a chip naming the lowercase id', () => {
+  it('an id in capitals becomes a chip that keeps the id as written (never re-spelled)', () => {
     const node = firstOf(`ow://character/${ID.toUpperCase()}`);
     expect(node.type).toBe('elementChip');
-    expect(node.attrs?.id).toBe(ID);
+    expect(node.attrs?.id).toBe(ID.toUpperCase());
   });
 });
 

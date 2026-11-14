@@ -104,7 +104,7 @@ export function mountContextPreview(opts: ContextPreviewOpts): ContextPreviewHan
 export function isElementFeatured(el: Element, narrative: Element): boolean {
   const story = typeof narrative.story === 'string' ? narrative.story : '';
   if (story.length === 0) return false;
-  if (proseNamesId(story, el.id)) return true;
+  if (proseNamesId(story, el.id, id => getState().data.elements.some(e => e.id === id))) return true;
   const candidates: string[] = [];
   if (el.name) candidates.push(el.name);
   if (Array.isArray(el.atlas_aliases)) {

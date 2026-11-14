@@ -45,7 +45,7 @@
  */
 import type { Element, ElementType } from '../core/types';
 import { SERVER_AUTHOR_FIELDS, isRekeyExemptField } from '../core/constants';
-import { rewriteOwLinks } from '../core/ow-links';
+import { namedId, rewriteOwLinks } from '../core/ow-links';
 import { knownFieldsFor, numberFieldsFor, relationFieldsFor } from '../editor/field-schema';
 
 export type IdMap = ReadonlyMap<string, string>;
@@ -83,9 +83,13 @@ function proseFieldsFor(type: ElementType): Set<string> {
  * comes back as the same string.
  */
 export function rekeyOwLinks(text: string, map: IdMap): string {
+  const has = (id: string): boolean => map.has(id);
+  const moved = (id: string | null): string | null => (id === null ? null : map.get(id) ?? null);
   return rewriteOwLinks(text, l => ({
-    id: map.get(l.idAsWritten) ?? map.get(l.id),
-    lens: l.lensAsWritten !== null && l.lens !== null ? map.get(l.lensAsWritten) ?? map.get(l.lens) : null,
+    id: moved(namedId(l, has)),
+    lens: l.lensAsWritten !== null && l.lens !== null
+      ? moved(namedId({ idAsWritten: l.lensAsWritten, id: l.lens }, has))
+      : null,
   }));
 }
 
@@ -102,7 +106,11 @@ function rekeyDocNode(node: unknown, map: IdMap): unknown {
 
   if (typeof n.type === 'string' && CHIP_NODES.has(n.type) && n.attrs && typeof n.attrs === 'object') {
     const attrs = n.attrs as Record<string, unknown>;
-    const next = typeof attrs.id === 'string' ? map.get(attrs.id) : undefined;
+    // A chip's id names its element as an address does (as written, then lowercase).
+    const named = typeof attrs.id === 'string'
+      ? namedId({ idAsWritten: attrs.id, id: attrs.id.toLowerCase() }, x => map.has(x))
+      : null;
+    const next = named !== null ? map.get(named) : undefined;
     if (next) set('attrs', { ...attrs, id: next });
   }
   if (Array.isArray(n.marks)) {

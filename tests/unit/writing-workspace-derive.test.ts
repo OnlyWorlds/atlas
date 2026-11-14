@@ -48,9 +48,11 @@ describe('extractProseLinks', () => {
     expect(extractProseLinks(md)).toEqual({});
   });
 
-  it('an id in capitals names the element held in lowercase', () => {
+  it('without the world, an id is given as written; with it, as the rule names it', () => {
     const md = `[X](ow://event/00000000-0000-0000-0000-000000632D31)`;
-    expect(extractProseLinks(md)).toEqual({ event: ['00000000-0000-0000-0000-000000632d31'] });
+    expect(extractProseLinks(md)).toEqual({ event: ['00000000-0000-0000-0000-000000632D31'] });
+    const world = linkTargetsIn([{ id: '00000000-0000-0000-0000-000000632d31', type: 'event' } as any]);
+    expect(extractProseLinks(md, world)).toEqual({ event: ['00000000-0000-0000-0000-000000632d31'] });
   });
 
   it('an id that is not an id is no link', () => {
@@ -77,10 +79,11 @@ describe('an upper-case address and the derive (1.124.2)', () => {
     const exists = linkTargetsIn([{ id: LOWER, type: 'character' } as any]);
     expect(computeRelationPatch(narr, `[X](ow://character/${LOWER.toUpperCase()})`, exists)).toEqual({ characters: [LOWER] });
   });
-  it('an element whose own id is held in capitals is named by no address: nothing is derived', () => {
+  it('an element whose own id is held in capitals is named as written, never by the lowercase id', () => {
     const narr = makeNarrative();
     const exists = linkTargetsIn([{ id: LOWER.toUpperCase(), type: 'character' } as any]);
-    expect(computeRelationPatch(narr, `[X](ow://character/${LOWER.toUpperCase()})`, exists)).toEqual({});
+    expect(computeRelationPatch(narr, `[X](ow://character/${LOWER.toUpperCase()})`, exists)).toEqual({ characters: [LOWER.toUpperCase()] });
+    expect(computeRelationPatch(narr, `[X](ow://character/${LOWER})`, exists)).toEqual({});
   });
 });
 

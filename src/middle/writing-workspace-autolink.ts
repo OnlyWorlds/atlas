@@ -30,7 +30,8 @@ import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 import type { Element } from '../core/types';
-import { buildAutolinkIndex, promotionLabel } from '../core/prose-autolink';
+import { buildAutolinkIndex, candidateIds, promotionLabel } from '../core/prose-autolink';
+import { namedId } from '../core/ow-links';
 import type { AutolinkCandidate, AutolinkIndex } from '../core/prose-autolink';
 
 // Index construction moved to core/prose-autolink so the bulk
@@ -39,13 +40,18 @@ import type { AutolinkCandidate, AutolinkIndex } from '../core/prose-autolink';
 export { buildAutolinkIndex };
 export type { AutolinkCandidate, AutolinkIndex };
 
-/** Walk the doc once to collect ids that are ALREADY chipped. */
-function collectChippedIds(doc: PmNode): Set<string> {
+/**
+ * Walk the doc once to collect the elements ALREADY chipped: each chip's id
+ * named as the address rule names it (`namedId`: as written, then lowercase)
+ * against the index's candidates.
+ */
+function collectChippedIds(doc: PmNode, index: AutolinkIndex): Set<string> {
   const ids = new Set<string>();
+  const held = candidateIds(index);
   doc.descendants((node) => {
     if (node.type.name === 'elementChip') {
       const id = node.attrs.id as string | null;
-      if (id) ids.add(id);
+      if (id) ids.add(namedId({ idAsWritten: id, id: id.toLowerCase() }, x => held.has(x)) ?? id);
     }
   });
   return ids;
@@ -197,7 +203,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
     key: AUTOLINK_PLUGIN_KEY,
     state: {
       init(_config, instance): AutolinkPluginState {
-        const alreadyChipped = collectChippedIds(instance.doc);
+        const alreadyChipped = collectChippedIds(instance.doc, initialIndex);
         const matches = scanDocForMatches(instance.doc, initialIndex, alreadyChipped);
         return {
           index: initialIndex,
@@ -210,7 +216,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
         // world's elements list changes.
         const newIndex = tr.getMeta(AUTOLINK_INDEX_META) as AutolinkIndex | undefined;
         if (newIndex) {
-          const alreadyChipped = collectChippedIds(newState.doc);
+          const alreadyChipped = collectChippedIds(newState.doc, newIndex);
           const matches = scanDocForMatches(newState.doc, newIndex, alreadyChipped);
           return {
             index: newIndex,
@@ -219,7 +225,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
           };
         }
         if (tr.docChanged) {
-          const alreadyChipped = collectChippedIds(newState.doc);
+          const alreadyChipped = collectChippedIds(newState.doc, prev.index);
           const matches = scanDocForMatches(newState.doc, prev.index, alreadyChipped);
           return {
             ...prev,
