@@ -72,6 +72,7 @@ import { journalIds, RekeyPendingError } from './folder-store';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { newElementId, newId, nowIso } from './folder-store';
 import { normalizeDiskLinks, denormalizeDiskLinks, type LinkSpelling } from './disk-link-names';
+import { relationFieldsFor } from '../editor/field-schema';
 
 /**
  * One file's binding: where it lives and how its link fields are spelled
@@ -2583,5 +2584,14 @@ function coerceForeignShapes(body: Element): void {
   for (const k of ['x', 'y', 'z', 'order'] as const) {
     const v = rec[k];
     if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) rec[k] = Number(v);
+  }
+  // A single link whose value is the empty string is no link (serial 126, the layout profile's reading H): read
+  // as null, under either spelling (`map` or `map_id`), so the element shows no target and an edit never sends
+  // "" back to keel, which refuses it.
+  if (typeof rec.type === 'string') {
+    for (const f of relationFieldsFor(rec.type as ElementType)) {
+      if (f.kind !== 'single') continue;
+      for (const k of new Set([f.schemaField, f.diskField])) if (rec[k] === '') rec[k] = null;
+    }
   }
 }
