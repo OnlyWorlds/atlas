@@ -19,8 +19,9 @@ export const ADDRESS_NO_WORLD_LINE = 'This address names an element but not its 
 export const ADDRESS_BROKEN_LINE = 'Atlas cannot read this link: part of it is missing or changed. Copy it again from OnlyWorlds.';
 
 /**
- * The first address in a piece of text, as prose reads it (the SDK's
- * `readOwLinkAt`, so the text after it stays out). Found by its prefix in any
+ * The first address in a piece of text, read from its first prefix by the
+ * SDK's `readOwLinkAt` whatever stands before it (no start rule: a paste is
+ * one address meant), so the text after it stays out. Found by its prefix in any
  * case, so a link in capitals, or one cut short, is refused in words rather
  * than missed or opened short.
  */

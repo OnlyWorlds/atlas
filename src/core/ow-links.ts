@@ -285,12 +285,12 @@ function indexOfPrefixAnyCase(text: string): number {
 
 /**
  * The first address in a pasted text, as the string to read whole: the
- * address as prose reads it, or, when that does not read (a prefix in
- * capitals, a link cut short, a path that goes on past the address), the run
- * to the next space without a sentence's closing punctuation, which the
- * whole-string reader then refuses in words. Null when there is no prefix.
- * A paste is one address the person meant, so it is read from its first
- * prefix on, whatever stands before it: prose's start rule does not apply.
+ * address the SDK's `readOwLinkAt` reads from the first prefix, whatever
+ * stands before it (a paste is one address the person meant, so prose's start
+ * rule does not apply), or, when that does not read (a prefix in capitals, a
+ * link cut short, a path that goes on past the address), the run to the next
+ * space without a sentence's closing punctuation, which the whole-string
+ * reader then refuses in words. Null when there is no prefix.
  */
 export function pastedAddressIn(text: string): string | null {
   if (typeof text !== 'string') return null;

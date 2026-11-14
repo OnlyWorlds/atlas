@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'prose-links-glued-start',
         title: 'A link written straight after a letter or an underscore is plain text',
-        body: 'A link to an element that starts right after a letter, an accent mark or an underscore is now part of the sentence, the way every OnlyWorlds tool reads it: elbow://object/... names nothing, and a link written between underscores for emphasis (_ow://object/..._) links nothing either. Such a link adds nothing to the scene, shows in no element\'s mentions and keeps its id when elements get new ids. A link after a space, a hyphen, a digit, a bracket or a quote reads as before, and so does a link between asterisks (*ow://object/...*). A published page still leaves such a link out when its element is not on the page.',
+        body: 'A link to an element that starts right after a letter, an accent mark or an underscore is now part of the sentence, as the OnlyWorlds standard reads it: elbow://object/... names nothing, and a link written between underscores for emphasis (_ow://object/..._) links nothing either. Such a link adds nothing to the scene, shows in no element\'s mentions and keeps its id when elements get new ids. A link after a space, a hyphen, a digit, a bracket or a quote reads as before, and so does a link between asterisks (*ow://object/...*). A published page still leaves such a link out when its element is not on the page. It now also leaves out a link whose id is written in capital letters when that element is not on the page, even when the world holds an element with the same id in small letters that is.',
         tags: ['writing', 'fix'],
       },
     ],
