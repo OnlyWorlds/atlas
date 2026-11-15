@@ -7,6 +7,9 @@
  * the old traced outline), rendered in the brand ink #37c1f0 on transparency.
  * The bytes are pinned so a swap back to the traced drawing, or a redraw, is a
  * decision; the sizes are pinned because every place that shows them sizes to them.
+ * The link card `og.png` (1200x630) carries the same drawing at 104 px since
+ * 2026-11-15. The landing's `ow-logo.mp4` keeps the traced one: at its 420 px
+ * the traced outline's segments are far under a pixel, so no frame would change.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -22,11 +25,13 @@ describe('the OnlyWorlds mark Atlas ships', () => {
     expect(sha(pub('owlogo.png'))).toBe('4c73635eba785599a2272e69ed8a7bddb5df148b7f2d6b39dec527d3b597f392');
     expect(sha(pub('favicon.png'))).toBe('53a064b3c83dfc556c397801cb3912b78fc67891a650e09d1c87afca3e437e28');
     expect(sha(pub('favicon.ico'))).toBe('af727549631cb171c67cddbc82011388e519156fdf3f6ceb7635771cb0ecc226');
+    expect(sha(pub('og.png'))).toBe('9f2e46156d89ee80db0c2d6f615cb3760441a7f6a7c15fd1cf576708d04d71f0');
   });
 
   it('keeps its sizes', () => {
     expect(pngSize(pub('owlogo.png'))).toEqual([512, 512]);
     expect(pngSize(pub('favicon.png'))).toEqual([72, 72]);
+    expect(pngSize(pub('og.png'))).toEqual([1200, 630]);
     const ico = pub('favicon.ico');
     const count = ico.readUInt16LE(4);
     const sizes = Array.from({ length: count }, (_, i) => ico[6 + i * 16] || 256).sort((a, b) => a - b);
