@@ -110,15 +110,15 @@ describe('the lore (1.76)', () => {
   });
 });
 
-// schema-dist's room profile (profiles/room.fixture.json, copied whole at v0.34.0-dist.113, 35 cases): the cases
+// schema-dist's room profile (profiles/room.fixture.json, copied whole at v0.34.1-dist.131, 48 cases): the cases
 // every reader of the room answers, run against the SDK's rule (1.77): a repin that moves it goes red.
 import roomFixture from '../fixtures/room.fixture.json';
-import { ROOM_SUPERTYPES } from '../../src/core/parlor-room';
+import { ROOM_PAIRS } from '@onlyworlds/sdk';
 
-describe("the room profile's cases (dist.113)", () => {
+describe("the room profile's cases (dist.131)", () => {
   it('holds the profile pairs, no more, no less', () => {
-    const want = roomFixture.pairs.map(p => `${p.type}/${p.supertype.toLowerCase()}`).sort();
-    expect(ROOM_SUPERTYPES.map(([t, w]) => `${t}/${w}`).sort()).toEqual(want);
+    const want = roomFixture.pairs.map(p => `${p.type}/${p.supertype}`).sort();
+    expect(ROOM_PAIRS.map(p => `${p.type}/${p.supertype}`).sort()).toEqual(want);
   });
   for (const c of roomFixture.cases) {
     it(`${c.name}: ${c.in_room ? 'in the room' : 'lore'}`, () => {

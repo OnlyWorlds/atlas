@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.8',
+    date: '2026-11-15',
+    theme: 'The new globe on a shared link',
+    entries: [
+      {
+        id: 'link-card-true-curves-globe',
+        title: 'A shared Atlas link shows the new OnlyWorlds globe',
+        body: 'The picture a chat or a social site shows beside an atlas.onlyworlds.com link now carries the OnlyWorlds globe drawn in true curves, the same mark as the tab and the app icon.',
+        tags: ['sharing'],
+      },
+    ],
+  },
+  {
     version: '1.124.7',
     date: '2026-11-14',
     theme: 'Each element once in a list of links',

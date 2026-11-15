@@ -18,19 +18,10 @@
  * Guide and Domains (core/charter.ts `isReadingAid`), which Home shows first
  * at the door. An unmarked Charter Law is lore and stays in.
  */
-import type { Element, ElementType } from './types';
-import { ROOM_PAIRS, isRoomElement as sdkIsRoomElement } from '@onlyworlds/sdk';
+import type { Element } from './types';
+import { isRoomElement as sdkIsRoomElement } from '@onlyworlds/sdk';
 import { getState, patchSlice } from './state';
 import { aidKind, isReadingAid, readingAids } from './charter';
-
-/**
- * The room profile's pairs as the SDK carries them (4.55.0, generated from
- * schema-dist's room.fixture.json, never typed by hand: the ninth,
- * relation/Take, arrived by the 4.75.0 repin), lower-cased for reading.
- * Atlas's own copy is gone.
- */
-export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> =
-  ROOM_PAIRS.map(p => [p.type, p.supertype.toLowerCase()] as const);
 
 /**
  * The SDK's rule (4.55.0): the pair, trimmed and case-folded, AND the mark
@@ -41,6 +32,9 @@ export const ROOM_SUPERTYPES: ReadonlyArray<readonly [ElementType, string]> =
  * anything) is lore here, before the SDK is asked; the mark goes as it is.
  */
 export function isRoomElement(el: Element): boolean {
+  // Serial 131: a value that is not an object (null, a list, a string) is no
+  // element, so it is lore, and the reader never throws on it.
+  if (el === null || typeof el !== 'object' || Array.isArray(el)) return false;
   const r = el as Record<string, unknown>;
   if (typeof r.type !== 'string' || typeof r.supertype !== 'string') return false;
   return sdkIsRoomElement({ type: r.type, supertype: r.supertype, x_room_of: r.x_room_of } as never);
