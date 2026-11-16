@@ -8,8 +8,8 @@
  *
  * The guards on the answer: a 403, a body that is not a JSON object or list
  * (so no keel envelope either: keel answers every error in its JSON
- * envelope, an object), and an HTML title that says "Blocked". Read on the
- * whole body.
+ * envelope, an object), and an HTML title that is "Blocked" (as the SDK reads
+ * it). Read on the whole body.
  */
 export function isHostBlockedPage(status: number, body: string): boolean {
   if (status !== 403) return false;
@@ -17,5 +17,6 @@ export function isHostBlockedPage(status: number, body: string): boolean {
     const parsed: unknown = JSON.parse(body);
     if (parsed !== null && typeof parsed === 'object') return false;
   } catch { /* not JSON: the host's page, perhaps */ }
-  return /<title[^>]*>[^<]*\bBlocked\b[^<]*<\/title>/i.test(body);
+  // The SDK's reading (4.175.0): the title is "Blocked" and nothing else, spaces around it aside.
+  return /<title[^>]*>\s*Blocked\s*<\/title>/i.test(body);
 }

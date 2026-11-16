@@ -19,7 +19,7 @@ import { classifyError } from '../../src/core/problems';
 const BASE = 'https://test-ow.local/api/v2';
 const adapter = (): OwV2ClientAdapter => new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: BASE });
 
-const BLOCKED_PAGE = '<!DOCTYPE html><html lang="en-US"><head><title>Attention Required! | Blocked</title></head><body>Sorry, you have been blocked</body></html>';
+const BLOCKED_PAGE = '<!DOCTYPE html><html lang="en-US"><head><title>Blocked</title></head><body>Sorry, you have been blocked</body></html>';
 /** A host page that is not the Blocked one: the wide tier only. */
 const OTHER_PAGE = '<!DOCTYPE html><html><head><title>Access denied</title></head><body>Forbidden</body></html>';
 const html403 = () => new HttpResponse(BLOCKED_PAGE, { status: 403, headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
@@ -128,6 +128,10 @@ describe('two tiers: any 403 without keel\'s envelope (wide), the "Blocked" page
     expect(isHostBlockedPage(403, JSON.stringify({ error: { message: '<title>Blocked</title>' } }))).toBe(false);
     expect(isHostBlockedPage(403, JSON.stringify(['<title>Blocked</title>']))).toBe(false);
     expect(isHostBlockedPage(403, '<title>Unblocked</title>')).toBe(false);
+    // The SDK's reading: the title is "Blocked" alone (spaces and case aside), not the word anywhere.
+    expect(isHostBlockedPage(403, '<title> blocked\n</title>')).toBe(true);
+    expect(isHostBlockedPage(403, '<title>Attention Required! | Blocked</title>')).toBe(false);
+    expect(isHostBlockedPage(403, '<title>Blocked by policy</title>')).toBe(false);
   });
 
   it('the Blocked page on a write: both tiers; read on the whole body, past the 300 characters the error keeps', async () => {
