@@ -12,13 +12,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
-import { SyncEngine } from '../../src/sync/sync-engine';
+import { HOST_HELD_MESSAGE, SyncEngine } from '../../src/sync/sync-engine';
 import { OwV2Error } from '../../src/sync/ow-v2-client-adapter';
-import { classifyFailure } from '../../src/sync/sync-failure-copy';
+import { classifyFailure, describeFailures } from '../../src/sync/sync-failure-copy';
 import type { BulkItem } from '../../src/sync/sync-engine';
 import { mergeLocalIntoApi } from '../../src/sync/make-online';
 
-const BLOCKED_PAGE = '<!DOCTYPE html><html><head><title>Attention Required! | Blocked</title></head><body>Sorry, you have been blocked</body></html>';
+const BLOCKED_PAGE = '<!DOCTYPE html><html><head><title>Blocked</title></head><body>Sorry, you have been blocked</body></html>';
 /** What the adapter builds for the host's page on a write (no envelope, a body sent). */
 const hostRefusal = (): OwV2Error => new OwV2Error(403, null, BLOCKED_PAGE, null, { sentBody: true, hostBlocked: true });
 /** Another non-JSON 403 from the host (no Blocked title): the wide tier, said without a cause. */
@@ -218,6 +218,91 @@ describe('R4: a bulk create refused by the host', () => {
     expect(sent.bulk).toBe(1);
     expect(sent.create).toEqual([]);
     expect(result.auth_blocked).toBe(true);
+  });
+});
+
+describe('R4: links inside a host-refused batch', () => {
+  beforeEach(() => {
+    // keel refuses a single create that links an element it does not hold.
+    client.strictUpdateLinks = true;
+    client.__enable_bulk();
+    const bulk = client.bulkCreate!.bind(client);
+    client.bulkCreate = async (items: BulkItem[], opts) => {
+      sent.bulk++;
+      if (items.some(it => refusedText(it.element))) throw hostRefusal();
+      return bulk(items, opts);
+    };
+  });
+
+  it('two new elements that name each other land in round one beside a refused one, which stays refused; one refusal said each round', async () => {
+    const a = await folder.createElement('character', { name: 'Aldric' });
+    const b = await folder.createElement('character', { name: 'Bree', friends: [a.id] });
+    await folder.updateElement(a.id, { friends: [b.id] });
+    const x = await folder.createElement('character', { name: 'Xan', description: REFUSED_TEXT });
+
+    for (let round = 1; round <= 3; round++) {
+      const result = await engine.pushOnce();
+      expect(result.auth_blocked, `round ${round}`).toBeFalsy();
+      expect(result.failures.map(f => [f.element_id, classifyFailure(f)]), `round ${round}`).toEqual([[x.id, 'host_refused']]);
+      expect(describeFailures(result.failures), `round ${round}`).toMatch(/^1 change was refused by the web host in front of OnlyWorlds/);
+      if (round === 1) expect(result.pushed.creates).toBe(2);
+    }
+    expect(client.__server_get('character', a.id)?.friends).toEqual([b.id]);
+    expect(client.__server_get('character', b.id)?.friends).toEqual([a.id]);
+    expect(client.__server_get('character', x.id)).toBeUndefined();
+    expect(await changedIds()).toEqual([x.id]);
+  });
+
+  it('when the host refuses the second bulk too, the pair stays failed as it was', async () => {
+    client.bulkCreate = async () => { sent.bulk++; throw hostRefusal(); };
+    const a = await folder.createElement('character', { name: 'Aldric' });
+    const b = await folder.createElement('character', { name: 'Bree', friends: [a.id] });
+    await folder.updateElement(a.id, { friends: [b.id] });
+    const x = await folder.createElement('character', { name: 'Xan', description: REFUSED_TEXT });
+
+    const result = await engine.pushOnce();
+
+    expect(sent.bulk).toBe(2);
+    expect(result.pushed.creates).toBe(0);
+    expect(result.failures.map(f => f.element_id).sort()).toEqual([a.id, b.id, x.id].sort());
+    expect(await changedIds()).toEqual([a.id, b.id, x.id].sort());
+  });
+
+  it('a create whose link names a create keel refused for another reason is not sent again in a bulk', async () => {
+    const b = await folder.createElement('character', { name: 'Bree' });
+    const a = await folder.createElement('character', { name: 'Aldric', friends: [b.id] });
+    const x = await folder.createElement('character', { name: 'Xan', description: REFUSED_TEXT });
+    client.__inject_failure('create', b.id, 'API Error 422: name is not valid');
+
+    const result = await engine.pushOnce();
+
+    expect(sent.bulk).toBe(1); // the refused batch only: no second bulk for Aldric alone
+    expect(result.failures.map(f => f.element_id).sort()).toEqual([a.id, b.id, x.id].sort());
+    expect(classifyFailure(result.failures.find(f => f.element_id === x.id)!)).toBe('host_refused');
+  });
+
+  it('a create, and an update, that link a create the host refused are held and never sent, the host named', async () => {
+    const w = await folder.createElement('character', { name: 'Wren' });
+    await engine.pushOnce();
+    const x = await folder.createElement('character', { name: 'Xan', description: REFUSED_TEXT });
+    const y = await folder.createElement('character', { name: 'Yara', friends: [x.id] });
+    const z = await folder.createElement('character', { name: 'Zed' });
+    // Held in turn: it links the held Yara.
+    const v = await folder.createElement('character', { name: 'Vale', friends: [y.id] });
+    await folder.updateElement(w.id, { friends: [x.id] });
+    sent.create = []; sent.update = [];
+
+    const result = await engine.pushOnce();
+
+    expect(sent.create.sort()).toEqual([x.id, z.id].sort());
+    expect(sent.update).toEqual([]);
+    expect(client.__server_get('character', z.id)).toBeTruthy();
+    const byId = new Map(result.failures.map(f => [f.element_id, f]));
+    expect(classifyFailure(byId.get(x.id)!)).toBe('host_refused');
+    expect(byId.get(y.id)).toMatchObject({ operation: 'create', message: HOST_HELD_MESSAGE });
+    expect(byId.get(w.id)).toMatchObject({ operation: 'update', message: HOST_HELD_MESSAGE });
+    expect(byId.get(v.id)).toMatchObject({ operation: 'create', message: HOST_HELD_MESSAGE });
+    expect(result.failures).toHaveLength(4);
   });
 });
 

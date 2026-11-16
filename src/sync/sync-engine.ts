@@ -2597,6 +2597,12 @@ export class SyncEngine {
       return true;
     };
 
+    /** The creates a host-refused `/bulk` sent one at a time this round (R4). */
+    const oneByOneIds = new Set<string>();
+    /** Creates the web host refused this round, and the creates held for linking one. */
+    const hostRefusedCreates = new Set<string>();
+    /** One-at-a-time creates refused only for a link to a peer not made yet: the peer's id and the failure recorded. */
+    const linkFailed = new Map<string, { refId: string; failure: PerElementFailure }>();
     if (useBulk) {
       const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
         done++;
@@ -2607,7 +2613,10 @@ export class SyncEngine {
       if (bulk.transient) transient = bulk.transient;
       // The web host refused the batch (R4): its creates take the per-element
       // path below, ordered as that path orders them, before the updates.
-      if (bulk.oneByOne && bulk.oneByOne.length > 0) changed = [...this.sortCreatesByDependencies(bulk.oneByOne), ...changed];
+      if (bulk.oneByOne && bulk.oneByOne.length > 0) {
+        changed = [...this.sortCreatesByDependencies(bulk.oneByOne), ...changed];
+        for (const e of bulk.oneByOne) oneByOneIds.add(e.id);
+      }
     }
 
     /**
@@ -2640,12 +2649,20 @@ export class SyncEngine {
         this.onPushProgress(done, total);
         continue;
       }
-      if (!isCreate && refusedCreates.size > 0 && splitByRefusedLinks([elem], refusedCreates).blocked.length > 0) {
+      // A create that links a create the web host refused this round is held
+      // as an update is (keel would only refuse its link), and holds in turn
+      // what links it.
+      const byHost = hostRefusedCreates.size > 0 && splitByRefusedLinks([elem], hostRefusedCreates).blocked.length > 0;
+      if (isCreate && byHost) {
+        hostRefusedCreates.add(elem.id);
+        refusedCreates.add(elem.id);
+      }
+      if ((isCreate && byHost) || (!isCreate && refusedCreates.size > 0 && splitByRefusedLinks([elem], refusedCreates).blocked.length > 0)) {
         failures.push({
           element_id: elem.id,
           type: elem.type,
-          operation: 'update',
-          message: 'waits for an element OnlyWorlds refused in the same upload',
+          operation: isCreate ? 'create' : 'update',
+          message: byHost ? HOST_HELD_MESSAGE : 'waits for an element OnlyWorlds refused in the same upload',
         });
         done++;
         this.onPushProgress(done, total);
@@ -2884,14 +2901,18 @@ export class SyncEngine {
             if (isCreate) refusedCreates.add(elem.id);
             continue;
           }
-          failures.push({
+          const linkFailure: PerElementFailure = {
             element_id: elem.id,
             type: elem.type,
             operation: isCreate ? 'create' : 'update',
             message: routedPeer
               ? `referenced ${parsed.refType} was deleted on the server; review in sync panel`
               : `referenced ${parsed.refType} not found on the server`,
-          });
+          };
+          failures.push(linkFailure);
+          // Sent one at a time after the host refused the batch: a link to a
+          // create not made yet may be one the batch would have made with it.
+          if (isCreate && !routedPeer && oneByOneIds.has(elem.id)) linkFailed.set(elem.id, { refId: parsed.refId, failure: linkFailure });
         }
         // 409 id_conflict on CREATE: the server already has this id (backfill
         // miss on a prior /bulk, or a re-push after an interrupted round).
@@ -2938,6 +2959,7 @@ export class SyncEngine {
           // to surface. This matters most for Make-Online flows uploading dozens
           // of elements — one bad element shouldn't abort the rest.
           failures.push(failureOf(elem.id, elem.type, isCreate ? 'create' : 'update', err));
+          if (isCreate && isHostRefusal(err)) hostRefusedCreates.add(elem.id);
         }
       } finally {
         done++;
@@ -2945,6 +2967,33 @@ export class SyncEngine {
         if (isCreate && failures.slice(failuresBefore).some(f => f.element_id === elem.id && !acceptedButHeld(f))) {
           refusedCreates.add(elem.id);
         }
+      }
+    }
+
+    // After a host-refused /bulk (R4): creates refused one at a time only for
+    // a link to another create of the batch also refused that way, never one
+    // the host refused, go up again together as one atomic /bulk in this round, as
+    // the batch would have made them. Two that name each other can never land
+    // one at a time.
+    if (linkFailed.size > 0 && !authBlocked && !transient && !this.stopped) {
+      const again = new Set(linkFailed.keys());
+      for (let narrowed = true; narrowed;) {
+        narrowed = false;
+        for (const id of again) {
+          const ref = linkFailed.get(id)!.refId;
+          if (!again.has(ref)) { again.delete(id); narrowed = true; }
+        }
+      }
+      if (again.size > 0) {
+        const dropped = new Set([...again].map(id => linkFailed.get(id)!.failure));
+        for (let i = failures.length - 1; i >= 0; i--) if (dropped.has(failures[i])) failures.splice(i, 1);
+        console.info(`[atlas:sync] bulk CREATE of ${again.size} element(s) that link each other, after the host refused the batch`);
+        const bulk = await this.bulkCreatePhase(changed.filter(e => again.has(e.id)), failures, serverDeletesDetected, () => {}, false, roundForeign, attemptedCreates);
+        creates += bulk.created;
+        if (bulk.authBlocked) authBlocked = true;
+        if (bulk.transient) transient = bulk.transient;
+        // Refused whole by the host again: they stay failed as they were.
+        if (bulk.oneByOne) failures.push(...[...dropped].filter(f => bulk.oneByOne!.some(e => e.id === f.element_id)));
       }
     }
 
@@ -4320,9 +4369,11 @@ export function isAuthError(err: unknown): boolean {
  * text goes up.
  *
  * Read on three shapes: Atlas's adapter (`OwV2Error`: no envelope, and the
- * request carried a body, so a read or a delete never qualifies), the SDK's
- * `OwApiError` (403 with no code, its body not keel's JSON), and the bare
- * message form the legacy fallbacks read ("API Error 403: <html…").
+ * request carried a body, so the adapter's reads and deletes never qualify),
+ * the SDK's `OwApiError` (403 with no code, its body not keel's JSON), and the
+ * bare message form the legacy fallbacks read ("API Error 403: <html…"). The
+ * last two cannot say whether a body was sent: they are read by their body
+ * and code alone.
  */
 export function isHostRefusal(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
@@ -4432,6 +4483,9 @@ export function splitByRefusedLinks(
     blocked: survivors.filter(s => blocked.has(s.id)),
   };
 }
+
+/** A change held this round because it links a create the web host refused (the Not syncing row reads it). */
+export const HOST_HELD_MESSAGE = 'waits for an element the OnlyWorlds web host refused';
 
 const NOT_ON_THE_WIRE = new Set<string>(['id', 'local_updated_at', 'server_updated_at', ...ATLAS_LOCAL_ONLY_FIELDS]);
 

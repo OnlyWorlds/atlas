@@ -859,6 +859,9 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
     case 'other':
     default: {
       const m = f.message ?? '';
+      if (/^waits for an element the OnlyWorlds web host refused/.test(m)) {
+        return 'It links to an element the web host in front of OnlyWorlds refused, so it waits for that one.';
+      }
       if (/^waits for an element OnlyWorlds refused/.test(m) || /^rolled back by failing peers/.test(m)) {
         return 'It links to an element OnlyWorlds refused, so it waits for that one.';
       }
