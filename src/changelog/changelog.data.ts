@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.9',
+    date: '2026-11-16',
+    theme: 'A linked world keeps its own settings until you choose',
+    entries: [
+      {
+        id: 'link-keeps-world-settings',
+        title: 'Linking a folder no longer replaces a world\'s own settings unasked',
+        body: 'When you link a folder to an online world that already has its own description, picture or time settings, and the two differ, Atlas now treats each one as a conflict. With Pause and review, it waits for you to choose which to keep; with Local wins, the folder\'s value goes up, as that setting says. Before, the folder\'s value went up at the next open even under Pause and review.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.8',
     date: '2026-11-15',
     theme: 'The new globe on a shared link',

@@ -1355,9 +1355,23 @@ export class SyncEngine {
     if (!baseline) {
       const seeded = pickSyncedMeta(serverRec);
       const pulls: Record<string, unknown> = {};
+      const heldAtSeed: string[] = [];
       for (const field of META_SYNC_FIELD_NAMES) {
         if (isMetaEmpty(field, local[field]) && !isMetaEmpty(field, seeded[field])) {
           pulls[field] = seeded[field];
+        } else if (
+          !isMetaEmpty(field, local[field])
+          && !isMetaEmpty(field, seeded[field])
+          && !metaEquals(META_SYNC_FIELDS[field], local[field], seeded[field])
+        ) {
+          // Both sides hold the setting and differ (a folder linked to a world
+          // that already has its own): no side is the change, so no baseline is
+          // taken for it, as for the x_ keys below. A seed to the server's value
+          // made the folder's read as an edit, pushed unasked at the next open.
+          // The next three-way sees both changed: held under pause-and-review,
+          // the folder's sent under local-wins, as any contested setting.
+          delete seeded[field];
+          if (this.policy === 'pause-and-review') heldAtSeed.push(field);
         }
       }
       Object.assign(pulls, ext.pullKeys);
@@ -1370,7 +1384,7 @@ export class SyncEngine {
         meta_baseline: seeded,
         meta_ext_baseline: ext.baselineNext,
         meta_server_updated_at: server.updated_at || null,
-        ...(ext.contested.length > 0 ? { meta_conflicts: ext.contested } : {}),
+        ...(heldAtSeed.length + ext.contested.length > 0 ? { meta_conflicts: [...heldAtSeed, ...ext.contested] } : {}),
       }));
       return { ...empty, meta_pulled: Object.keys(pulls) };
     }
