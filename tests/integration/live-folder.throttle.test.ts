@@ -7,7 +7,7 @@
  *   tour flag is per origin, so a tour in another tab must not switch this
  *   tab's live folder off (L1), and the tour world itself is still skipped.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../src/sync/sync-attach', () => ({
   getCurrentSyncEngine: () => null,
@@ -47,6 +47,15 @@ function editOutside(root: FakeDirHandle, id: string, patch: Record<string, unkn
 }
 const desc = (id: string) => getState().data.elements.find(e => e.id === id)?.description;
 
+// The first store open and pass pay for the modules they load on first use
+// (about 5 s of the first test's 7 here, tripled on a loaded machine past the
+// default 15 s): pay it once in a hook with its own budget, so each test's
+// time is its own.
+beforeAll(async () => {
+  await localWorld();
+  await rescanNow();
+  __resetLiveFolderForTests();
+}, 120_000);
 beforeEach(() => { localStorage.clear(); __resetLiveFolderForTests(); });
 afterEach(() => { vi.useRealTimers(); });
 
