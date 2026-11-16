@@ -689,8 +689,13 @@ function buildStatline(counts: Map<string, number>): HTMLElement {
       item.appendChild(sep);
     });
     // A wrap leaves a separator at a line's end: hidden whenever the item after it starts the next line,
-    // read again at every size the line takes.
-    if (typeof ResizeObserver === 'function') new ResizeObserver(() => hideLineEndSeps(statline)).observe(statline);
+    // read again at every size the line or any item takes (a font that lands late widens the items while
+    // the line keeps its size).
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(() => hideLineEndSeps(statline));
+      ro.observe(statline);
+      for (const item of statline.children) ro.observe(item);
+    }
     return statline;
   }
 }
