@@ -58,8 +58,14 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.124.11',
     date: '2026-11-16',
-    theme: 'A world\'s counts read cleanly at any width',
+    theme: 'A change the web host refuses is said for what it is',
     entries: [
+      {
+        id: 'host-refused-change',
+        title: 'A change the web host refuses no longer stops your world from syncing',
+        body: 'The web host in front of OnlyWorlds refuses some writes before they reach OnlyWorlds, usually text holding a command between code marks, such as `python -m`. Atlas read that as a refused key: it asked you to check your PIN and stopped syncing the whole world. Now only that change waits, Atlas says the host refused it and why, and every other change keeps going up. Write the command without the code marks, or in a code block that names its language, and it goes up too. Publishing a page and adding a file say the same.',
+        tags: ['sync', 'fix'],
+      },
       {
         id: 'home-counts-wrap',
         title: 'The counts on a world\'s home no longer leave a dot at the edge of a line',
