@@ -16,8 +16,17 @@ let folder: MockFolderStore;
 let client: FakeOwApiClient;
 let clock: MonotonicClock;
 
-function makeEngine(policy?: 'local-wins' | 'pause-and-review'): SyncEngine {
-  return new SyncEngine({ folder, client, policy });
+function makeEngine(policy?: 'local-wins' | 'pause-and-review', readOnly = false): SyncEngine {
+  return new SyncEngine({ folder, client, policy, readOnly });
+}
+
+/** Folder and world hold different descriptions; the first round has run under the policy. */
+async function linkedHeld(policy: 'local-wins' | 'pause-and-review' = 'pause-and-review', readOnly = false): Promise<SyncEngine> {
+  await folder.writeWorldMeta({ description: 'mine' } as never);
+  client.__server_mutate_world_meta({ description: 'theirs' });
+  const engine = makeEngine(policy, readOnly);
+  await engine.syncNow();
+  return engine;
 }
 
 function patchBodies(): Array<Record<string, unknown>> {
@@ -111,6 +120,69 @@ describe('a folder linked to a world with its own settings', () => {
     expect((await localMeta()).description).toBe('The world’s own words');
     expect(await engine.listMetaConflicts()).toEqual([]);
     expect(patchBodies()).toEqual([]);
+  });
+
+  it('a world that clears its held description online sends nothing and keeps the review (gate C1)', async () => {
+    const engine = await linkedHeld();
+    client.__server_mutate_world_meta({ description: '' });
+    await engine.syncNow();
+    await engine.syncNow();
+    expect(patchBodies()).toEqual([]);
+    expect(await engine.listMetaConflicts()).toEqual(['description']);
+    expect((await localMeta()).description).toBe('mine');
+  });
+
+  it('a folder that clears its held description takes nothing from the world and keeps the review (gate S2)', async () => {
+    const engine = await linkedHeld();
+    await folder.writeWorldMeta({ description: '' } as never);
+    await engine.syncNow();
+    await engine.syncNow();
+    expect(patchBodies()).toEqual([]);
+    expect((await localMeta()).description).toBe('');
+    expect(await engine.listMetaConflicts()).toEqual(['description']);
+  });
+
+  it('both sides coming to the same value settle it: no review, and later edits go as usual', async () => {
+    const engine = await linkedHeld();
+    await folder.writeWorldMeta({ description: 'theirs' } as never);
+    await engine.syncNow();
+    expect(await engine.listMetaConflicts()).toEqual([]);
+    expect(patchBodies()).toEqual([]);
+    await folder.writeWorldMeta({ description: 'later' } as never);
+    await engine.syncNow();
+    expect((await serverMeta()).description).toBe('later');
+  });
+
+  it('under local-wins the folder’s value is sent once, then settled: no repeat, and a later online edit comes down', async () => {
+    const engine = await linkedHeld('local-wins');
+    await engine.syncNow();
+    await engine.syncNow();
+    expect(patchBodies()).toEqual([{ description: 'mine' }]);
+    client.__server_mutate_world_meta({ description: 'edited online' });
+    await engine.syncNow();
+    expect((await localMeta()).description).toBe('edited online');
+    expect(patchBodies().length).toBe(1);
+  });
+
+  it('a view-only world seeds as before: no review row, nothing sent (gate S1)', async () => {
+    const engine = await linkedHeld('pause-and-review', true);
+    await engine.syncNow();
+    expect(await engine.listMetaConflicts()).toEqual([]);
+    expect(patchBodies()).toEqual([]);
+    await expect(engine.resolveMetaConflict('description', 'mine')).rejects.toThrow(/view-only/);
+    expect(patchBodies()).toEqual([]);
+  });
+
+  it('an x_ key the world clears after a held seed is not sent either', async () => {
+    await folder.writeWorldMeta({ x_names: { character: { singular: 'Mine' } } } as never);
+    client.__server_mutate_world_meta({ x_names: { character: { singular: 'Theirs' } } });
+    const engine = makeEngine('pause-and-review');
+    await engine.syncNow();
+    client.__server_mutate_world_meta({ x_names: null } as never);
+    await engine.syncNow();
+    await engine.syncNow();
+    expect(patchBodies()).toEqual([]);
+    expect(await engine.listMetaConflicts()).toEqual(['x_names']);
   });
 
   it('a later edit in the folder, after the seed agreed, is sent as before', async () => {

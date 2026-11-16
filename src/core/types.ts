@@ -337,6 +337,13 @@ export interface SyncState {
    */
   meta_conflicts?: string[];
   /**
+   * Settings and `x_` keys the folder and the world both held, differently,
+   * at the first round with the world: they have no baseline, so neither
+   * side's later change (a clear included) is read as an edit to send or take.
+   * One leaves the list when the two sides agree or its chosen value lands.
+   */
+  meta_unsettled?: string[];
+  /**
    * A profile's `x_` keys on the World at the last agreement:
    * key → canonical JSON (`canonicalExtValue`), absent = the key was absent.
    * Its own map so a world linked before these keys synced seeds them once.

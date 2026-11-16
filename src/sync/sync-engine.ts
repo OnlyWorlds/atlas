@@ -272,6 +272,31 @@ export interface SyncEngineOptions {
   ) => void;
 }
 
+/**
+ * A setting or x_ key both sides held differently at the seed has no baseline,
+ * so a change on one side (a clear included) must not read as that side's
+ * edit: the absent baseline would take an emptied server as unchanged and send
+ * the folder's value, or an emptied folder as unchanged and pull the server's.
+ * Each unsettled name is taken out of the pushes and pulls the three-way
+ * found, and is converged when the two sides now agree, else contested (the
+ * policy then decides, as for any contested name). Mutates the diff.
+ */
+function settleUnsettled(
+  push: Record<string, unknown>,
+  pull: Record<string, unknown>,
+  diff: { contested: string[]; converged: string[] },
+  names: readonly string[],
+  same: (name: string) => boolean,
+): void {
+  for (const n of names) {
+    delete push[n];
+    delete pull[n];
+    diff.contested = diff.contested.filter(c => c !== n);
+    diff.converged = diff.converged.filter(c => c !== n);
+    (same(n) ? diff.converged : diff.contested).push(n);
+  }
+}
+
 // ---- The engine ----
 
 export class SyncEngine {
@@ -1151,6 +1176,7 @@ export class SyncEngine {
     if (!kind) throw new Error(`resolveMetaConflict: unknown meta field '${field}'`);
     let baselineValue: unknown;
     if (choice === 'mine') {
+      if (this.readOnly) throw new PlainError('This world is view-only here, so its settings cannot be sent to OnlyWorlds.');
       const local = await this.folder.readWorldMeta({ strict: true });
       const resp = await this.client.patchWorldMeta(
         encodeMetaFieldsForPush({ [field]: (local as unknown as Record<string, unknown>)[field] }),
@@ -1166,6 +1192,7 @@ export class SyncEngine {
     if (this.stopped) return;
     await this.folder.updateSyncState(current => ({
       meta_baseline: { ...(current.meta_baseline ?? {}), [field]: baselineValue },
+      meta_unsettled: (current.meta_unsettled ?? []).filter(f => f !== field),
       meta_conflicts: (current.meta_conflicts ?? []).filter(f => f !== field),
     }));
   }
@@ -1190,6 +1217,7 @@ export class SyncEngine {
       setExtBaseline(ext, key, agreed);
       return {
         meta_ext_baseline: ext,
+        meta_unsettled: (current.meta_unsettled ?? []).filter(f => f !== key),
         meta_conflicts: (current.meta_conflicts ?? []).filter(f => f !== key),
       };
     });
@@ -1342,7 +1370,9 @@ export class SyncEngine {
     const syncState = await this.folder.readSyncState();
     const baseline = syncState.meta_baseline ?? null;
     // A profile's x_ keys: their own three-way, beside the fields.
-    const ext = this.planExtStep(local, serverRec, syncState.meta_ext_baseline ?? null);
+    // Settings and keys both sides held differently at the seed, not yet agreed or chosen.
+    const unsettled = new Set(syncState.meta_unsettled ?? []);
+    const ext = this.planExtStep(local, serverRec, syncState.meta_ext_baseline ?? null, unsettled);
     // The world's first import, kept in the folder as keel serves it (folder
     // spec 0.3.16, §4.2): read-only on the server, so only ever pulled, and
     // written only when it differs, so a world's folder takes it once.
@@ -1356,11 +1386,13 @@ export class SyncEngine {
       const seeded = pickSyncedMeta(serverRec);
       const pulls: Record<string, unknown> = {};
       const heldAtSeed: string[] = [];
+      const unsettledSeed: string[] = [];
       for (const field of META_SYNC_FIELD_NAMES) {
         if (isMetaEmpty(field, local[field]) && !isMetaEmpty(field, seeded[field])) {
           pulls[field] = seeded[field];
         } else if (
-          !isMetaEmpty(field, local[field])
+          !this.readOnly
+          && !isMetaEmpty(field, local[field])
           && !isMetaEmpty(field, seeded[field])
           && !metaEquals(META_SYNC_FIELDS[field], local[field], seeded[field])
         ) {
@@ -1368,9 +1400,13 @@ export class SyncEngine {
           // that already has its own): no side is the change, so no baseline is
           // taken for it, as for the x_ keys below. A seed to the server's value
           // made the folder's read as an edit, pushed unasked at the next open.
-          // The next three-way sees both changed: held under pause-and-review,
-          // the folder's sent under local-wins, as any contested setting.
+          // It stays unsettled (`meta_unsettled`) until the two agree or a
+          // choice is made: no later change on one side, a clear included, is
+          // read as that side's edit (settleUnsettled). Held under
+          // pause-and-review; the folder's sent under local-wins, by the policy.
+          // A view-only world can never send, so it seeds as before.
           delete seeded[field];
+          unsettledSeed.push(field);
           if (this.policy === 'pause-and-review') heldAtSeed.push(field);
         }
       }
@@ -1384,12 +1420,16 @@ export class SyncEngine {
         meta_baseline: seeded,
         meta_ext_baseline: ext.baselineNext,
         meta_server_updated_at: server.updated_at || null,
+        meta_unsettled: [...unsettledSeed, ...ext.unsettled],
         ...(heldAtSeed.length + ext.contested.length > 0 ? { meta_conflicts: [...heldAtSeed, ...ext.contested] } : {}),
       }));
       return { ...empty, meta_pulled: Object.keys(pulls) };
     }
 
     const diff = threeWayMetaDiff(local, serverRec, baseline);
+    settleUnsettled(diff.pushFields, diff.pullFields, diff,
+      [...unsettled].filter(f => f in META_SYNC_FIELDS),
+      f => metaEquals(META_SYNC_FIELDS[f], local[f], serverRec[f]));
     const pushFields: Record<string, unknown> = { ...diff.pushFields, ...ext.pushKeys };
     let contested = diff.contested;
     if (contested.length > 0 && this.policy === 'local-wins') {
@@ -1440,12 +1480,18 @@ export class SyncEngine {
     // (the store guard blocks UI writes), so anything here stays unpushed.
     let pushedNames = this.readOnly ? [] : Object.keys(pushFields);
     let serverUpdatedAt = server.updated_at || null;
+    // An unsettled name settles when the two sides agree or its push lands.
+    const unsettledNext = (): string[] => {
+      const settled = new Set([...diff.converged, ...ext.converged, ...pushedNames]);
+      return [...unsettled].filter(n => !settled.has(n));
+    };
     const persistOnBail = async (): Promise<void> => {
       if (this.stopped) return;
       await this.folder.updateSyncState(current => ({
         meta_baseline: baselineNext,
         meta_ext_baseline: extBaselineNext,
         meta_server_updated_at: serverUpdatedAt,
+        meta_unsettled: unsettledNext(),
         meta_conflicts: this.policy === 'pause-and-review'
           ? contested
           : (current.meta_conflicts ?? []),
@@ -1537,6 +1583,7 @@ export class SyncEngine {
       meta_baseline: baselineNext,
       meta_ext_baseline: extBaselineNext,
       meta_server_updated_at: serverUpdatedAt,
+      meta_unsettled: unsettledNext(),
       meta_conflicts: this.policy === 'pause-and-review' ? contested : [],
     }));
     return { meta_pushed: [...pushedNames], meta_pulled: pulled, failures, auth_blocked: false };
@@ -1553,28 +1600,35 @@ export class SyncEngine {
     local: Record<string, unknown>,
     server: Record<string, unknown>,
     baseline: Record<string, string> | null,
-  ): { pushKeys: Record<string, unknown>; pullKeys: Record<string, unknown>; contested: string[]; baselineNext: Record<string, string> } {
+    unsettled: ReadonlySet<string>,
+  ): { pushKeys: Record<string, unknown>; pullKeys: Record<string, unknown>; contested: string[]; converged: string[]; unsettled: string[]; baselineNext: Record<string, string> } {
     if (!baseline) {
       const pullKeys: Record<string, unknown> = {};
       const baselineNext = pickExtensionBaseline(server);
       const contested: string[] = [];
+      const unsettledSeed: string[] = [];
       for (const [k, v] of Object.entries(server)) {
         if (!isWorldExtensionKey(k)) continue;
         const s = canonicalExtValue(v);
         const l = canonicalExtValue(local[k]);
         if (s !== null && l === null) pullKeys[k] = v;
         // Both sides hold the key and differ: no side is the change, so no
-        // baseline is taken for it (a seed to the server's
-        // value made the folder's read as an edit, pushed unasked). The next
-        // three-way sees both changed; under pause-and-review it is held now.
-        if (s !== null && l !== null && s !== l) {
+        // baseline is taken for it (a seed to the server's value made the
+        // folder's read as an edit, pushed unasked), and it stays unsettled
+        // until the two agree or a choice is made. Under pause-and-review it
+        // is held now. A view-only world can never send: it seeds as before.
+        if (!this.readOnly && s !== null && l !== null && s !== l) {
           delete baselineNext[k];
+          unsettledSeed.push(k);
           if (this.policy === 'pause-and-review') contested.push(k);
         }
       }
-      return { pushKeys: {}, pullKeys, contested, baselineNext };
+      return { pushKeys: {}, pullKeys, contested, converged: [], unsettled: unsettledSeed, baselineNext };
     }
     const d = threeWayExtDiff(local, server, baseline);
+    settleUnsettled(d.pushKeys, d.pullKeys, d,
+      [...unsettled].filter(isWorldExtensionKey),
+      k => canonicalExtValue(local[k]) === canonicalExtValue(server[k]));
     const pushKeys = { ...d.pushKeys };
     let contested = d.contested;
     if (contested.length > 0 && this.policy === 'local-wins') {
@@ -1583,7 +1637,7 @@ export class SyncEngine {
     }
     const baselineNext = { ...baseline };
     for (const k of [...d.converged, ...Object.keys(d.pullKeys)]) setExtBaseline(baselineNext, k, server[k]);
-    return { pushKeys, pullKeys: d.pullKeys, contested, baselineNext };
+    return { pushKeys, pullKeys: d.pullKeys, contested, converged: d.converged, unsettled: [], baselineNext };
   }
 
   /**
