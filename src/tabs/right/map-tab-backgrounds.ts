@@ -22,6 +22,21 @@ import { extractEdgeColor } from './edge-color';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { layoutUnderlayFor, layoutUnderlayKey } from './layout-underlay';
 import { DEFAULT_COLOR as ZONE_DEFAULT_COLOR } from '../../visualization/leaflet-2d/ZoneOverlay';
+import { drawnFrame, measuredPictureSize, missingSize, rememberPictureSize, usableMeasure, writtenFrame } from './map-frame';
+
+/**
+ * A picture was measured for a map whose written size is not its frame. When the tab's canvas was built in
+ * another frame, tell the subscribers (the state itself is unchanged): the active tab remounts in right-pane's
+ * dims-flip block, a background tab is evicted by `refreshCachedBackgrounds`, each in the measured frame.
+ */
+function frameMeasured(entry: MapTabCacheEntry, map: WorldMap): boolean {
+  const cfg = entry.manager.getConfig();
+  const frame = drawnFrame(map);
+  if (cfg.canvasWidth === frame.w && cfg.canvasHeight === frame.h) return false;
+  // After the tab's mount chain: a remount before it ends leaves its last steps on a disposed manager.
+  void entry.ready.then(() => patchSlice('ui', getState().ui));
+  return true;
+}
 
 /**
  * Serialize the picked image source to a comparable key. Used by the
@@ -34,7 +49,10 @@ export function sourceKey(map: WorldMap): string {
   // so a dims write must drift the key. Without this, adding image_url to a
   // dims-stamped imageless map painted the image stretched into the old
   // square and the later autoUpdateMapDims persist never re-applied.
-  const dims = `${typeof map.width === 'number' ? map.width : ''}x${typeof map.height === 'number' ? map.height : ''}`;
+  // A session's measure of the picture is part of the frame too (map-frame.ts), so it drifts the key as a write would.
+  const measure = measuredPictureSize(map);
+  const dims = `${typeof map.width === 'number' ? map.width : ''}x${typeof map.height === 'number' ? map.height : ''}`
+    + (measure ? `:${measure.w}x${measure.h}` : '');
   if (s.kind === 'url') return `url:${s.url}:${dims}`;
   if (s.kind === 'local') return `local:${s.mediaId}:${dims}`;
   // Flat canvas: background_color is part of the render, so an edit to it
@@ -79,6 +97,9 @@ export async function applyMapBackground(
   const manager = entry.manager;
   const container = entry.container;
   let backgroundApplied = false;
+  // The canvas was built in another frame than the one just measured: the stamp stays empty so
+  // `refreshCachedBackgrounds` sees the drift and evicts a background tab (map-frame.ts).
+  let frameStale = false;
   const gen = (applyGen.get(entry) ?? 0) + 1;
   applyGen.set(entry, gen);
 
@@ -141,26 +162,37 @@ export async function applyMapBackground(
   };
 
   if (source.kind === 'url') {
-    let dims: { w: number; h: number };
-    if (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0 && map.height > 0) {
-      dims = { w: map.width, h: map.height };
-    } else {
-      // First-ever open of a URL-sourced map: the apply blocks on a full
+    let dims = writtenFrame(map) ?? measuredPictureSize(map);
+    if (!dims) {
+      // First open of a URL-sourced map with no usable size: the apply blocks on a full
       // decode of the (possibly large, remote) image to learn its dims.
-      // Show an honest hint for that window — after this, width/height are
-      // persisted on the Map element and the decode never runs again.
+      // Show an honest hint for that window. A missing width or height is then
+      // persisted on the Map element; a written one, whatever its number, stays as
+      // written and the measure is kept for this session (map-frame.ts).
       const hint = showLoadingHint(container);
-      const decoded = await decodeImageDims(source.url).finally(hint.remove);
+      const decoded = usableMeasure(await decodeImageDims(source.url).finally(hint.remove));
       dims = decoded ?? { w: defaultWidth, h: defaultHeight };
-      // A view-only world keeps the decoded size for this session only (conv. 149).
-      if (decoded && !worldIsViewOnly()) {
-        const store = getActiveStore();
-        const worldId = getState().active?.worldId;
-        if (store && worldId) {
-          store.updateMap(map.id, { width: decoded.w, height: decoded.h })
-            .then(() => refreshElementsIfStillActive(store, worldId))
-            .catch(err => console.warn('[map-tab] dim persist failed:', err));
+      if (decoded) {
+        rememberPictureSize(map, decoded);
+        // The map as it stands now, not as it was at mount: a size written during the decode is a
+        // written size, and a tab disposed meanwhile writes nothing (its successor decides).
+        const live = mapTabCache.get(map.id) === entry
+          ? getState().data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === map.id)
+          : undefined;
+        const patch = live ? missingSize(live, decoded) : {};
+        // A view-only world keeps the decoded size for this session only (conv. 149).
+        // The tab's own world must still be the active one: after the await, the active
+        // store may be another world's, which can hold a map of the same id (a copy).
+        if (Object.keys(patch).length > 0 && !worldIsViewOnly() && getState().active?.worldId === entry.worldId) {
+          const store = getActiveStore();
+          const worldId = entry.worldId;
+          if (store && worldId) {
+            store.updateMap(map.id, patch)
+              .then(() => refreshElementsIfStillActive(store, worldId))
+              .catch(err => console.warn('[map-tab] dim persist failed:', err));
+          }
         }
+        frameStale = frameMeasured(entry, map);
       }
     }
     applyImage(source.url, dims);
@@ -171,9 +203,12 @@ export async function applyMapBackground(
       if (blob) {
         const url = URL.createObjectURL(blob);
         entry.objectUrls.push(url);
-        const dims = (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0)
-          ? { w: map.width, h: map.height }
-          : (await decodeImageDims(url)) ?? { w: defaultWidth, h: defaultHeight };
+        let dims = writtenFrame(map) ?? measuredPictureSize(map);
+        if (!dims) {
+          const decoded = usableMeasure(await decodeImageDims(url));
+          dims = decoded ?? { w: defaultWidth, h: defaultHeight };
+          if (decoded) { rememberPictureSize(map, decoded); frameStale = frameMeasured(entry, map); }
+        }
         applyImage(url, dims);
       }
     } catch (err) {
@@ -227,21 +262,24 @@ export async function applyMapBackground(
     // view-only worlds the write throws — there, the deterministic
     // IMAGELESS_MAP_SIZE runtime fallback carries the space instead, which
     // is why that constant is frozen for legacy dimless maps.
-    if (!(typeof map.width === 'number' && map.width > 0 && typeof map.height === 'number' && map.height > 0)) {
+    // Only a missing size is persisted: a written one, 0 or below included, stays as written (map-frame.ts).
+    const missing = missingSize(map, { w: defaultWidth, h: defaultHeight });
+    // Only into the tab's own world, still the active one (a ground picture's read is awaited above).
+    if (Object.keys(missing).length > 0 && getState().active?.worldId === entry.worldId) {
       const store = getActiveStore();
-      const worldId = getState().active?.worldId;
+      const worldId = entry.worldId;
       // Memory, not storage: `loadRegistry` re-bases the two-tab merge and is
       // boot-only.
       const entryReg = worldId ? findWorld(getState().registry, worldId) : undefined;
       if (store && worldId && entryReg && !entryReg.api) {
-        store.updateMap(map.id, { width: defaultWidth, height: defaultHeight })
+        store.updateMap(map.id, missing)
           .then(() => refreshElementsIfStillActive(store, worldId))
           .catch(err => console.warn('[map-tab] imageless dim persist failed:', err));
       }
     }
   }
 
-  entry.lastBg = sourceKey(map);
+  entry.lastBg = frameStale ? '' : sourceKey(map);
 }
 
 /**
@@ -274,11 +312,11 @@ export function refreshCachedBackgrounds(): string[] {
     if (currentKey === entry.lastBg) continue;
     const src = pickMapImageSource(map);
     const cfg = entry.manager.getConfig();
+    const frame = drawnFrame(map);
     const dimsDrifted =
       src.kind !== 'flat' &&
-      typeof map.width === 'number' && map.width > 0 &&
-      typeof map.height === 'number' && map.height > 0 &&
-      (cfg.canvasWidth !== map.width || cfg.canvasHeight !== map.height);
+      (writtenFrame(map) !== null || measuredPictureSize(map) !== null) &&
+      (cfg.canvasWidth !== frame.w || cfg.canvasHeight !== frame.h);
     if (dimsDrifted) {
       if (entry.mapId !== activeMapId) evictBackground.push(entry.mapId);
       // Active tab: leave it — right-pane remounts it this tick.

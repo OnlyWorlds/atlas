@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.10',
+    date: '2026-11-16',
+    theme: 'A map keeps the size its file gives it',
+    entries: [
+      {
+        id: 'map-size-as-written',
+        title: 'Opening a map no longer writes over a size of 0 or below',
+        body: 'A map whose file gives a width or height of 0 or below, written by another tool or by hand, now keeps those numbers. Atlas draws its picture at the picture\'s own size, or the plain square when it has none, and leaves the file as it is. Before, the first open wrote the picture\'s size over them. A map with no size at all is filled in as before.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.9',
     date: '2026-11-16',
     theme: 'A linked world keeps its own settings until you choose',

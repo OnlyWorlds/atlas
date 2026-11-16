@@ -410,7 +410,7 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
     // Error, which the problem wording would treat as a bug.
     const mapEl = getState().data.elements.find(e => e.id === mapId) as { height?: unknown } | undefined;
     if (mapEl && !(typeof mapEl.height === 'number' && mapEl.height > 0)) {
-      toastManager.info('This map has no size yet, so it cannot be flipped. Set an image or reopen it first.');
+      toastManager.info('This map has no height above 0, so it cannot be flipped. Give it a height on its page first.');
       return;
     }
     flipBtn.disabled = true;

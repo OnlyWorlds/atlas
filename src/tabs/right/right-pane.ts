@@ -34,6 +34,7 @@ import { filesWhereOf } from '../../core/browser-worlds';
 import { SEAT_SECRET_MISSING_LINE } from '../../core/seat';
 import { renderGate } from '../../ui/render-gate';
 import { copyLine, worldIsCopiedBy } from '../../core/world-copy';
+import { drawnFrame } from './map-frame';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -140,7 +141,8 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     const activeTab = ui.rightTabs[ui.rightActiveIndex];
     if (activeTab?.kind === 'map' && !stale) {
       const m = state.data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === activeTab.mapId);
-      const newDimsKey = m ? `${m.width ?? 2000}x${m.height ?? 2000}` : null;
+      const frame = m ? drawnFrame(m) : null;
+      const newDimsKey = frame ? `${frame.w}x${frame.h}` : null;
       if (lastActiveMapDimsKey !== null && newDimsKey !== null && lastActiveMapDimsKey !== newDimsKey) {
         // The saved camera targets the OLD coordinate space — restoring it
         // after the remount teleports the view somewhere meaningless on the

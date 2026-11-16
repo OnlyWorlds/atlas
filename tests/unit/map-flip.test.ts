@@ -47,7 +47,7 @@ describe('flipMapVertically', () => {
     const map = await store.createElement('map', { name: 'Sizeless' });
     const loc = await store.createElement('location', { name: 'Keep' });
     await store.createElement('pin', { map_id: map.id, element_id: loc.id, element_type: 'location', x: 10, y: 100 } as never);
-    await expect(flipMapVertically(store, map.id)).rejects.toThrow(/no size/);
+    await expect(flipMapVertically(store, map.id)).rejects.toThrow(/no height above 0/);
     expect(await ys('pin', map.id)).toEqual([100]);
   });
 });

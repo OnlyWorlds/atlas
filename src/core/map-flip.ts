@@ -28,7 +28,7 @@ export async function flipMapVertically(store: FolderStore, mapId: string): Prom
   const map = (await store.getElement(mapId)) as unknown as { height?: unknown } | null;
   const height = map && typeof map.height === 'number' ? map.height : NaN;
   if (!Number.isFinite(height) || height <= 0) {
-    throw new PlainError('This map has no size yet, so it cannot be flipped. Set an image or reopen it first.');
+    throw new PlainError('This map has no height above 0, so it cannot be flipped. Give it a height on its page first.');
   }
   const result: MapFlipResult = { pins: 0, points: 0 };
   for (const type of ['pin', 'marker'] as const) {

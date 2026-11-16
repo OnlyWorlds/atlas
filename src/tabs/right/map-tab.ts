@@ -26,7 +26,7 @@ import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
 import { hasLinkedSubMap } from './auto-open-map';
 import { disposeGhostsForMap } from './ghost-pins';
 import { ToastManager } from '../../ui/toast-manager';
-import { IMAGELESS_MAP_SIZE } from '../../ui/image-dims';
+import { drawnFrame } from './map-frame';
 import { navigate, elementHash } from '../../core/router';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { syncPins, refreshActiveMapPins, applyPinScale, refreshPinDates } from './map-tab-pins';
@@ -38,7 +38,7 @@ import { wireMapInteractions } from './map-tab-interactions';
 import { renderStaleMapPane } from './map-tab-stale';
 import { applyLivePrefs, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
-import { saveCameraState, getCameraState } from '../../core/map-camera-persist';
+import { saveCameraState, getCameraState, clearCameraState } from '../../core/map-camera-persist';
 import { disposeDraftForMap } from './zone-drawing';
 import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { syncZones, wireChipStrip, refreshActiveMapZones, refreshZoneDates } from './map-tab-zones';
@@ -67,7 +67,19 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     return;
   }
 
-  const cached = mapTabCache.get(mapId);
+  let cached = mapTabCache.get(mapId);
+  // A cached tab built in another frame than the map's now (a picture measured while the tab was
+  // in the background, a size edited meanwhile) would clamp placed and dragged pins and drawn zones
+  // to the old canvas: mount it fresh, its camera cleared as the dims-flip does (map-frame.ts).
+  if (cached) {
+    const cfg = cached.manager.getConfig();
+    const frame = drawnFrame(map);
+    if (cfg.canvasWidth !== frame.w || cfg.canvasHeight !== frame.h) {
+      clearCameraState(mapId);
+      disposeMapTab(mapId);
+      cached = undefined;
+    }
+  }
   if (cached) {
     pane.appendChild(cached.wrapper);
     cached.ready.then(() => {
@@ -138,11 +150,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   const dateBar = buildDateBar();
   container.appendChild(dateBar);
 
-  // Legacy imageless maps may lack stored dims — the flat-canvas default is
-  // the shared IMAGELESS_MAP_SIZE square (applyMapBackground persists it on
-  // first open so the space becomes durable; DESIGN_MAPS.md §4.2).
-  const width = map.width ?? IMAGELESS_MAP_SIZE;
-  const height = map.height ?? IMAGELESS_MAP_SIZE;
+  // The frame (map-frame.ts): the written size above 0, else the picture's size measured
+  // this session, else the IMAGELESS_MAP_SIZE square per axis (applyMapBackground persists
+  // a missing size on first open so the space becomes durable; DESIGN_MAPS.md §4.2).
+  const { w: width, h: height } = drawnFrame(map);
 
   const manager = new Leaflet2DManager({
     containerId: container.id,
@@ -233,6 +244,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         savePending = true;
         queueMicrotask(() => {
           savePending = false;
+          // A tab disposed meanwhile (a dims flip remounts it) has a removed map: nothing to save.
+          if (mapTabCache.get(mapId) !== entry) return;
           const center = lMapForRestore.getCenter();
           const zoom = lMapForRestore.getZoom();
           saveCameraState(mapId, { center: [center.lat, center.lng], zoom });
