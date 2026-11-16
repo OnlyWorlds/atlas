@@ -1515,7 +1515,9 @@ export class SyncEngine {
         if (isAuthError(err)) {
           this.noteAuthBail(err);
           // Persist what the round already learned (pull-applies + converged)
-          // before bailing — the pushed fields stay dirty and retry.
+          // before bailing — the pushed fields stay dirty and retry. Nothing
+          // landed, so nothing the body carried is settled either.
+          pushedNames = [];
           await persistOnBail();
           return { meta_pushed: [], meta_pulled: pulled, failures, auth_blocked: true };
         }

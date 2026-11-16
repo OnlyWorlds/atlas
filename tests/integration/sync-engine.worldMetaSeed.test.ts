@@ -164,6 +164,19 @@ describe('a folder linked to a world with its own settings', () => {
     expect(patchBodies().length).toBe(1);
   });
 
+  it('under local-wins a send refused for the key keeps the setting unsettled, so a later clear pulls nothing (gate 2 S1)', async () => {
+    const engine = await linkedHeld('local-wins');
+    const real = client.patchWorldMeta.bind(client);
+    client.patchWorldMeta = (async () => { throw Object.assign(new Error('Unauthorized'), { status: 401 }); }) as never;
+    await engine.syncNow();
+    client.patchWorldMeta = real;
+    const st = await folder.readSyncState();
+    expect(st.meta_unsettled).toEqual(['description']);
+    await folder.writeWorldMeta({ description: '' } as never);
+    await makeEngine('pause-and-review').syncNow();
+    expect((await localMeta()).description).toBe('');
+  });
+
   it('a view-only world seeds as before: no review row, nothing sent (gate S1)', async () => {
     const engine = await linkedHeld('pause-and-review', true);
     await engine.syncNow();
