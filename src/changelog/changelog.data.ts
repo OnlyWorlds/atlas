@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.11',
+    date: '2026-11-16',
+    theme: 'A world\'s counts read cleanly at any width',
+    entries: [
+      {
+        id: 'home-counts-wrap',
+        title: 'The counts on a world\'s home no longer leave a dot at the edge of a line',
+        body: 'When the line of counts under a world\'s name wraps, on a phone or in a narrow middle pane, a separating dot could hang at the end of a line or start the next one. Now a dot only ever stands between two counts on the same line, and the last "1 each" part reads from the left like the rest.',
+        tags: ['home', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.10',
     date: '2026-11-16',
     theme: 'A map keeps the size its file gives it',

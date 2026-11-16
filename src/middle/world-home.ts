@@ -609,6 +609,22 @@ function buildCoverDoors(
 }
 
 /**
+ * Each separator rides at the end of the item before it, so a wrap never starts a line with one; the one
+ * whose next item starts the next line is hidden, the rest shown. By visibility, so the line's layout (and
+ * with it this reading) never moves.
+ */
+export function hideLineEndSeps(line: HTMLElement): void {
+  const items = [...line.children] as HTMLElement[];
+  items.forEach((item, i) => {
+    const sep = item.querySelector<HTMLElement>('.atlas-home-statline-sep');
+    if (!sep) return;
+    const next = items[i + 1];
+    const ends = !!next && next.getBoundingClientRect().top > item.getBoundingClientRect().top + 2;
+    sep.style.visibility = ends ? 'hidden' : '';
+  });
+}
+
+/**
  * The woven stat line (replaces the count-card grid + the meta chips).
  * ALWAYS rendered — empty at zero elements, with a reserved min-height, so
  * the first element's "1 character" doesn't shift everything below.
@@ -639,26 +655,23 @@ function buildStatline(counts: Map<string, number>): HTMLElement {
         patchSlice('ui', { ...ui, elementFilters: new Set(types) });
       }
     };
-    const addSep = () => {
-      const sep = document.createElement('span');
-      sep.className = 'atlas-home-statline-sep';
-      sep.textContent = '·';
-      statline.appendChild(sep);
+    // One item per segment; every item but the last ends with its separator.
+    const addItem = (seg: HTMLElement) => {
+      const item = document.createElement('span');
+      item.className = 'atlas-home-statline-item';
+      item.appendChild(seg);
+      statline.appendChild(item);
     };
-    let first = true;
     for (const { type, count } of listed) {
-      if (!first) addSep();
-      first = false;
       const seg = document.createElement('button');
       seg.type = 'button';
       seg.className = 'atlas-home-statline-seg';
       seg.title = `Show ${typeName(type, { many: true })} in the sidebar`;
       seg.innerHTML = `<b>${count}</b> ${escapeText(typeName(type, { many: count !== 1 }))}`;
       seg.addEventListener('click', () => filterSidebarTo([type]));
-      statline.appendChild(seg);
+      addItem(seg);
     }
     if (grouped && singles.length > 0) {
-      if (!first) addSep();
       const seg = document.createElement('button');
       seg.type = 'button';
       seg.className = 'atlas-home-statline-seg';
@@ -666,8 +679,18 @@ function buildStatline(counts: Map<string, number>): HTMLElement {
       const names = singles.map(e => escapeText(typeName(e.type))).join(', ');
       seg.innerHTML = `<b>1</b> each: ${names}`;
       seg.addEventListener('click', () => filterSidebarTo(singles.map(e => e.type)));
-      statline.appendChild(seg);
+      addItem(seg);
     }
+    [...statline.children].slice(0, -1).forEach(item => {
+      const sep = document.createElement('span');
+      sep.className = 'atlas-home-statline-sep';
+      sep.setAttribute('aria-hidden', 'true');
+      sep.textContent = '·';
+      item.appendChild(sep);
+    });
+    // A wrap leaves a separator at a line's end: hidden whenever the item after it starts the next line,
+    // read again at every size the line takes.
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => hideLineEndSeps(statline)).observe(statline);
     return statline;
   }
 }

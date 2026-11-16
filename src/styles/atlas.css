@@ -15432,6 +15432,8 @@ a.atlas-share-map-pin { cursor: pointer; }
   background: transparent;
   border: none;
   padding: 0;
+  /* A button centres its text; a segment that wraps ("1 each: ...") reads from the left like the line. */
+  text-align: left;
   font-family: inherit;
   font-size: 13px;
   color: var(--atlas-text-muted);
@@ -15444,6 +15446,12 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-home-statline-seg:hover { color: var(--atlas-accent-text); }
 .atlas-home-statline-seg:hover b { color: var(--atlas-accent-text); }
+.atlas-home-statline-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
 .atlas-home-statline-sep { opacity: 0.45; }
 
 /* Loose threads band (2026-07-24) — the world's cheap gaps, quiet under the
