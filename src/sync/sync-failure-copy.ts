@@ -45,7 +45,11 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
  * command right after a code mark. Said only for that page (`host_blocked`).
  * Never the key, the PIN or signing in: nothing is wrong with them.
  */
-export const HOST_REFUSAL_CAUSE = 'A command written between code marks, such as `python -m`, is the usual cause: write it without the marks, or in a code block that names its language, and it goes up.';
+export function hostRefusalCause(then: string): string {
+  return `A command written between code marks, such as \`python -m\`, is the usual cause: write it without the marks, or in a code block that names its language, ${then}.`;
+}
+
+export const HOST_REFUSAL_CAUSE = hostRefusalCause('and it goes up');
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;

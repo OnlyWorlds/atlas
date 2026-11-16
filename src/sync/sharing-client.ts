@@ -14,6 +14,8 @@
  * Auth: worldapi headers (`API-Key` + `API-Pin`); the world association
  * derives from the key server-side. The public GET sends no auth.
  */
+import { isHostBlockedPage } from './host-blocked-page';
+import { hostRefusalCause } from './sync-failure-copy';
 
 /**
  * Base URL for the sharing API — CONFIRMED as-built (Anchor's `ow/sharing/`
@@ -63,7 +65,9 @@ export type SharingErrorCode =
   | 'title_too_long' | 'intent_invalid'
   | 'revoked' | 'not_found' | 'rate_limited' | 'admin_locked'
   | 'forbidden' | 'unauthorized' | 'owner_only'
-  | 'auth_failed' | 'network' | 'unknown';
+  | 'auth_failed' | 'network' | 'unknown'
+  // The web host in front of OnlyWorlds refused the page (conv. 191): its "Blocked" page, or another refusal.
+  | 'host_blocked' | 'host_refused';
 
 export class SharingApiError extends Error {
   constructor(
@@ -99,6 +103,8 @@ export function sharingErrorMessage(err: SharingApiError): string {
     // A read key (the demo key, any ow_r_) is refused with 403 permission_error
     // (keel core/auth.py); cross-account mutations are existence-hidden 404s.
     case 'forbidden': return 'This key can only read, so it can\'t publish. Use a write key.';
+    case 'host_blocked': return `The web host in front of OnlyWorlds refused this page before it reached OnlyWorlds. ${hostRefusalCause('and it publishes')} Nothing was lost: the page is still here.`;
+    case 'host_refused': return 'The web host in front of OnlyWorlds refused this page before it reached OnlyWorlds. Nothing was lost: the page is still here.';
     // A contributor or guest seat (keel sharing `_require_page_manager`, #104).
     case 'owner_only': return 'Only the world\'s owner or a co-builder can publish, change or revoke its pages.';
     case 'unauthorized':
@@ -246,14 +252,24 @@ export class SharingClient {
     // Error path: prefer the contract's machine code; fall back by status.
     let code: SharingErrorCode = 'unknown';
     let detail: string | undefined;
+    let text = '';
+    try { text = await res.text(); } catch { /* no body to read */ }
+    let parsed: unknown;
     try {
-      const body = await res.json() as { error?: { code?: string; detail?: string } };
+      parsed = JSON.parse(text);
+      const body = parsed as { error?: { code?: string; detail?: string } } | null;
       const raw = body?.error?.code;
       detail = body?.error?.detail;
       if (raw && isKnownCode(raw)) code = raw;
     } catch { /* non-JSON error body */ }
     if (code === 'unknown') {
       if (res.status === 401) code = 'auth_failed';
+      // A write answered 403 with no JSON body at all is the web host's
+      // refusal of the page's text, before OnlyWorlds saw it, never the key's
+      // (conv. 191); its page titled "Blocked" says the usual cause.
+      else if (res.status === 403 && opts.body !== undefined && !(parsed !== null && typeof parsed === 'object')) {
+        code = isHostBlockedPage(res.status, text) ? 'host_blocked' : 'host_refused';
+      }
       else if (res.status === 403) code = 'forbidden';
       else if (res.status === 404) code = 'not_found';
       else if (res.status === 410) code = 'revoked';

@@ -22,6 +22,7 @@ import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
+import { isHostBlocked, isHostRefusal } from './sync-engine';
 
 const STALE_AFTER_MS = 60_000;
 const READ_TIMEOUT_MS = 15_000;
@@ -284,6 +285,10 @@ export function addRefusal(err: unknown, file: { size: number }): string {
   if (err.status === 404) return FILES_NOT_SYNCED_LINE;
   if (err.isAuthError && err.param === 'API-Pin') return 'OnlyWorlds did not accept that PIN. Check it in Settings, under OnlyWorlds.';
   if (err.isAuthError) return SIGN_IN_AGAIN;
+  // The web host in front of OnlyWorlds refused the request for its text (the
+  // file's name or label), before OnlyWorlds saw it: never the key (conv. 191).
+  if (isHostBlocked(err)) return 'The web host in front of OnlyWorlds refused this file before it reached OnlyWorlds. A command between code marks in its name or label, such as `python -m`, is the usual cause: write it without the marks, and add the file again. Nothing was added.';
+  if (isHostRefusal(err)) return 'The web host in front of OnlyWorlds refused this file before it reached OnlyWorlds. Nothing was added.';
   if (err.status === 403) return 'This world\'s key may not add files to this element.';
   if (err.status === 422 && err.param === 'label') return 'That label is too long: up to 80 characters.';
   return 'The file was not added. Try again in a moment.';
