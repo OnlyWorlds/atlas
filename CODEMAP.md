@@ -91,7 +91,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 - `src/sync/sync-engine.ts`: push (`/bulk` for 2+ CREATEs; topo-sort only as fallback) + pull (`/changes` cursor, full-list fallback) + conflict detect; auth bail, transient bail, `hold()`. FK constraint detection routes orphan peers to server_deletes.
 - `src/sync/sync-attach.ts`: the singleton; `flushPendingOnAttach` BEFORE pull-on-activate; `diagnoseSyncUnavailable()` for engine-not-ready UI.
-- `src/sync/sync-failure-copy.ts`: what a failed sync SAYS (foreign ids, 64 KB, held files; push vs pull side); once per set per session.
+- `src/sync/sync-failure-copy.ts`: what a failed sync SAYS (foreign ids, 64 KB, held files, the web host's refusal; push vs pull side); once per set per session.
+- `src/sync/host-blocked-page.ts`: `isHostBlockedPage`, the one test for the web host's page titled "Blocked" (conv. 191); the adapter reads it on the whole body.
 - `src/sync/sync-issues.ts`: NOT SYNCING (conv. 126): per world, session only, replaced per side; Settings › This world + the pill's warning count.
 - `src/sync/ow-v2-client-adapter.ts`: the keel v2 dialect, a thin fetch (no SDK in the sync path); spatial disk rename (`map_id`/`map`); strips `ATLAS_LOCAL_ONLY_FIELDS` (WIRE extensions are sent); lists walk `?cursor=`. Wire facts: DESIGN_SYNC "The shape".
 - `src/sync/public-reader.ts`: THE PUBLIC READER (1.123, conv. 188): keel's keyless door through the SDK's keyless client (`world` set, no key), shaped as `OwApiClient` for `initialDownloadAll` with the adapter's decoders; pages of 1000, a 429 paced on `Retry-After` three times in one open, the writes refusing before sending. Unit `tests/unit/public-reader.test.ts`.

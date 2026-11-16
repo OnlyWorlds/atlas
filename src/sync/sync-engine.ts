@@ -36,6 +36,7 @@ import { keptOnCreate } from '../core/review-mark';
 import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
+import { isHostBlockedPage } from './host-blocked-page';
 import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
 import { hiddenHeldOf } from './hidden-held';
 import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
@@ -2174,7 +2175,7 @@ export class SyncEngine {
     isRetry = false,
     foreign: Array<{ id: string; type: ElementType }> = [],
     attempted: Set<string> = new Set(),
-  ): Promise<{ created: number; authBlocked: boolean; transient?: unknown }> {
+  ): Promise<{ created: number; authBlocked: boolean; transient?: unknown; oneByOne?: Element[] }> {
     // Re-fetch each candidate from disk (freshness) + pin element_type
     // self-heal, mirroring the per-element loop's pre-send discipline.
     const items: BulkItem[] = [];
@@ -2210,6 +2211,14 @@ export class SyncEngine {
         idempotencyKey: crypto.randomUUID(),
       });
     } catch (err) {
+      // The web host refused the whole request for one element's text (R4):
+      // nothing reached keel. The batch goes up one at a time through the
+      // single-create path in this round, so only the refused element fails.
+      if (isHostRefusal(err)) {
+        const sent = new Set(items.map(it => it.element.id as string));
+        console.warn(`[atlas:sync] bulk CREATE refused by the web host: sending ${sent.size} one at a time`);
+        return { created: 0, authBlocked: false, oneByOne: candidates.filter(c => sent.has(c.id)) };
+      }
       const auth = isAuthError(err);
       const message = err instanceof Error ? err.message : String(err); // raw-error-ok: internal, classified below; never shown
       for (const it of items) {
@@ -2514,7 +2523,7 @@ export class SyncEngine {
       && (alreadyProposed(this.proposedNow(stateAtStart.proposed), e.id, e.local_updated_at) || inProposalReview.has(e.id)));
     const updatesOnly = allChanged.filter(e => !!e.server_updated_at && !heldAsProposed.includes(e));
     const useBulk = typeof this.client.bulkCreate === 'function' && allCreates.length >= 2;
-    const changed = useBulk
+    let changed = useBulk
       ? updatesOnly
       : [...this.sortCreatesByDependencies(allCreates), ...updatesOnly];
     const total = allChanged.length + tombstones.length;
@@ -2596,6 +2605,9 @@ export class SyncEngine {
       creates += bulk.created;
       if (bulk.authBlocked) authBlocked = true;
       if (bulk.transient) transient = bulk.transient;
+      // The web host refused the batch (R4): its creates take the per-element
+      // path below, ordered as that path orders them, before the updates.
+      if (bulk.oneByOne && bulk.oneByOne.length > 0) changed = [...this.sortCreatesByDependencies(bulk.oneByOne), ...changed];
     }
 
     /**
@@ -4039,8 +4051,12 @@ function failureOf(
     message: prefix + (err instanceof Error ? err.message : String(err)), // raw-error-ok: the failure record; Details print its fields, never this
     ...(typeof name === 'string' && name !== 'Error' ? { error_name: name } : {}),
     // What the details block may print: the server's status and code,
-    // never its message, which can quote a name.
-    ...(typed ? { status: typed.status, code: typed.code, ...(typed.param ? { param: typed.param } : {}), source: 'server' as const } : {}),
+    // never its message, which can quote a name. The web host's refusal has
+    // no keel code, and its record has none: that absence is its kind (R6).
+    ...(typed ? { status: typed.status, ...(isHostRefusal(err) ? {} : { code: typed.code }), ...(typed.param ? { param: typed.param } : {}), source: 'server' as const } : {}),
+    ...(!typed && isHostRefusal(err) ? { status: 403, source: 'server' as const } : {}),
+    // The host's "Blocked" page, whose cause the words can name.
+    ...(isHostBlocked(err) ? { host_blocked: true } : {}),
   };
 }
 
@@ -4266,6 +4282,8 @@ function isNotFoundError(err: unknown): boolean {
  * transitions to `error` state. See `setAuthError`.
  */
 export function isAuthError(err: unknown): boolean {
+  // The web host's refusal of one write's text is not the key's (R2).
+  if (isHostRefusal(err)) return false;
   const t = typedError(err);
   if (t) {
     if (t.code === 'rate_limited' || t.status === 429) return false;
@@ -4290,6 +4308,49 @@ export function isAuthError(err: unknown): boolean {
     || /\b403\b/.test(err.message)
     || /unauthor/i.test(err.message)
     || /forbidden/i.test(err.message);
+}
+
+/**
+ * The web host in front of keel refused one write: a 403 whose body is not
+ * keel's. keel answers every error in its JSON envelope; the host answers
+ * some writes whose text holds a shell command (after a backtick, a
+ * semicolon or a pipe) with its own HTML page, and keel never sees them.
+ * It is that write refused for its text, never a dead key and never a busy
+ * server: the element fails this round, the round goes on, and a changed
+ * text goes up.
+ *
+ * Read on three shapes: Atlas's adapter (`OwV2Error`: no envelope, and the
+ * request carried a body, so a read or a delete never qualifies), the SDK's
+ * `OwApiError` (403 with no code, its body not keel's JSON), and the bare
+ * message form the legacy fallbacks read ("API Error 403: <html…").
+ */
+export function isHostRefusal(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const e = err as Error & { status?: unknown; code?: unknown; enveloped?: unknown; sentBody?: unknown; detail?: unknown };
+  if (e.status !== 403) {
+    // A typed error of another status is never one; the bare form names its status in the message.
+    if (typeof e.status === 'number') return false;
+    return /^API Error 403:\s*</i.test(err.message); // raw-error-ok: classification of the legacy message form, never shown
+  }
+  if (typeof e.enveloped === 'boolean') return !e.enveloped && e.sentBody === true;
+  // The SDK's error: keel's code absent and the body not keel's JSON (its text, or nothing).
+  if (e.name === 'OwApiError') return (e.code === null || e.code === undefined) && (e.detail === null || e.detail === undefined || typeof e.detail === 'string');
+  return false;
+}
+
+/**
+ * The narrow reading inside `isHostRefusal`: the host's page titled "Blocked"
+ * (`isHostBlockedPage`), whose usual cause is known (a command after a code
+ * mark), so its words can say it. Any other host refusal is said without a
+ * guess at the cause. The adapter's flag, the SDK's `isHostBlocked`, or the
+ * page in the bare message form.
+ */
+export function isHostBlocked(err: unknown): boolean {
+  if (!isHostRefusal(err)) return false;
+  const e = err as Error & { hostBlocked?: unknown; isHostBlocked?: unknown };
+  if (typeof e.hostBlocked === 'boolean') return e.hostBlocked;
+  if (e.name === 'OwApiError') return e.isHostBlocked === true;
+  return isHostBlockedPage(403, e.message.replace(/^API Error 403:\s*/i, '')); // raw-error-ok: classification of the legacy message form, never shown
 }
 
 /**
@@ -4384,6 +4445,8 @@ const HIDE_SWEEP_CAP = 20;
  * Not an auth failure: nothing is wrong with the key, and nothing pauses.
  */
 export function isTransientError(err: unknown): boolean {
+  // The web host's refusal (`isHostRefusal`) is never transient: a 403 on
+  // every shape it takes, so no arm below reads it (its tests say so).
   const t = typedError(err);
   if (t) return t.status === 429 || t.status === 503 || t.code === 'server_busy' || t.code === 'rate_limited';
   if (err instanceof TypeError && /fetch|network/i.test(err.message)) return true;

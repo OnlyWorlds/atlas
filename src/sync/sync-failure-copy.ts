@@ -14,7 +14,7 @@
 import type { PerElementFailure } from '../core/types';
 import { isFileBusyError } from '../store/fs-utils';
 
-export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'not_yours' | 'keeper_mark' | 'review_mark' | 'other';
+export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_mark' | 'review_mark' | 'other';
 
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
@@ -22,6 +22,10 @@ const HELD_FILE_TEXT = /operation that depends on state cached in an interface o
 export function classifyFailure(f: PerElementFailure): FailureKind {
   const m = f.message ?? '';
   if (isFileBusyError({ name: f.error_name }) || HELD_FILE_TEXT.test(m)) return 'file_busy';
+  // The web host in front of keel refused the write for its text: a 403 with
+  // no keel code (keel names every refusal). By status and the absent code,
+  // never the page's text.
+  if (f.status === 403 && !f.code) return 'host_refused';
   // Evidence only: a 409 whose read-back FAILED says nothing about
   // which world holds the id, so its message no longer matches here.
   if (/already exists in another world|a copied world folder needs fresh ids/i.test(m)) return 'foreign_id';
@@ -35,6 +39,13 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   if (f.status === 403 && f.code === 'review_by_another') return 'review_mark';
   return 'other';
 }
+
+/**
+ * The usual cause of the web host's "Blocked" page and what to do (R6): a
+ * command right after a code mark. Said only for that page (`host_blocked`).
+ * Never the key, the PIN or signing in: nothing is wrong with them.
+ */
+export const HOST_REFUSAL_CAUSE = 'A command written between code marks, such as `python -m`, is the usual cause: write it without the marks, or in a code block that names its language, and it goes up.';
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -77,6 +88,18 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
     parts.push(inBrowser
       ? `${plural(busy.length, 'change', 'changes')} could not sync yet because another Atlas tab was saving to this world. ${busy.length === 1 ? 'It is' : 'They are'} saved in this browser, and Atlas will try again in a moment.`
       : `${plural(busy.length, 'change', 'changes')} could not sync yet because another program was using ${busy.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. ${busy.length === 1 ? 'It is' : 'They are'} saved on your disk, and Atlas will try again in a moment.`);
+  }
+  const hostRefused = byKind.get('host_refused');
+  if (hostRefused) {
+    const place = inBrowser ? 'in this browser' : 'on your disk';
+    // Two tiers: the "Blocked" page names its usual cause; any other refusal by the host is said without a guess.
+    for (const blocked of [true, false]) {
+      const tier = hostRefused.filter(f => (f.host_blocked === true) === blocked);
+      const n = new Set(tier.filter(f => f.type !== 'world').map(f => f.element_id)).size;
+      const cause = blocked ? ` ${HOST_REFUSAL_CAUSE}` : '';
+      if (n > 0) parts.push(`${plural(n, 'change was', 'changes were')} refused by the web host in front of OnlyWorlds before ${n === 1 ? 'it' : 'they'} reached OnlyWorlds.${cause} Nothing was lost: ${n === 1 ? 'the change stays' : 'the changes stay'} ${place}.`);
+      if (tier.some(f => f.type === 'world')) parts.push(`A change to this world's details was refused by the web host in front of OnlyWorlds before it reached OnlyWorlds.${cause} Nothing was lost: the change stays ${place}.`);
+    }
   }
   const notYours = byKind.get('not_yours');
   if (notYours) {

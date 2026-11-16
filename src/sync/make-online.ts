@@ -30,6 +30,7 @@ import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
+import { isHostBlocked, isHostRefusal } from './sync-engine';
 import { isKnownOf } from './known-of';
 import { isHiddenMark } from '../core/hidden-mark';
 import { stampWordOf } from '../core/door-trail';
@@ -683,7 +684,9 @@ export async function mergeLocalIntoApi(
 }
 
 /** keel's status and code on a failure record, so the words for a refusal (`classifyFailure`) reach Make online too. */
-function serverOf(err: unknown): { status?: number; code?: string } {
+function serverOf(err: unknown): { status?: number; code?: string; host_blocked?: boolean } {
+  // The web host's refusal carries no keel code, and its record none (its kind, `host_refused`).
+  if (isHostRefusal(err)) return { status: 403, ...(isHostBlocked(err) ? { host_blocked: true } : {}) };
   const e = err as { status?: unknown; code?: unknown } | null;
   return e && typeof e.status === 'number' && typeof e.code === 'string' ? { status: e.status, code: e.code } : {};
 }

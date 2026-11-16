@@ -260,7 +260,7 @@ When `pushPhase` or `pullPhase` sees a 401/403:
 
 ### Detection
 
-`isAuthError(err)` matches the SDK's `API Error 401:` / `API Error 403:` prefixes plus generic 401/403/Unauthorized/Forbidden substrings, mirroring `isNotFoundError`. Exported so tests can assert.
+`isAuthError(err)` matches the SDK's `API Error 401:` / `API Error 403:` prefixes plus generic 401/403/Unauthorized/Forbidden substrings, mirroring `isNotFoundError`. Exported so tests can assert. A 403 on a write whose body is not keel's envelope is the web host's page, never the key: `isHostRefusal` keeps it out first (conv. 191; the HTML page once paused the whole world for one element's text).
 
 ### Recovery
 

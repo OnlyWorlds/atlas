@@ -46,6 +46,7 @@ import { PROPOSED_MARK } from '../core/review-mark';
 const CHECKED_MARK = 'x_review_checked';
 import { isHiddenMark } from '../core/hidden-mark';
 import { publicPageUrl } from '../core/public-page';
+import { isHostBlockedPage } from './host-blocked-page';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -100,8 +101,17 @@ export class OwV2Error extends Error {
   readonly retryAfterMs: number | null;
   /** Why keel answered so, when it says (the 409 resync_required's `role` or `view`); null when absent. */
   readonly reason: string | null;
+  /**
+   * True when the body was keel's error envelope. keel answers every error in
+   * it; a body without one (the web host's HTML page) was never keel's.
+   */
+  readonly enveloped: boolean;
+  /** True when the request carried a body: only a write with text in it can be refused for that text. */
+  readonly sentBody: boolean;
+  /** True when the body was the web host's page titled "Blocked" (`isHostBlockedPage`, read by the adapter on the whole body, never the 300 characters kept here). */
+  readonly hostBlocked: boolean;
 
-  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown } | null, rawBody: string, retryAfter: string | null = null) {
+  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown } | null, rawBody: string, retryAfter: string | null = null, opts: { sentBody?: boolean; hostBlocked?: boolean } = {}) {
     const serverMsg = envelope?.message ?? (rawBody || 'request failed');
     super(`API Error ${status}: ${serverMsg}`);
     this.name = 'OwV2Error';
@@ -111,6 +121,9 @@ export class OwV2Error extends Error {
     this.param = envelope?.param ?? null;
     this.retryAfterMs = parseRetryAfter(retryAfter);
     this.reason = typeof envelope?.reason === 'string' ? envelope.reason : null;
+    this.enveloped = envelope !== null;
+    this.sentBody = opts.sentBody === true;
+    this.hostBlocked = opts.hostBlocked === true;
   }
 }
 
@@ -364,7 +377,7 @@ export class OwV2ClientAdapter implements OwApiClient {
         // read inside the envelope or beside it, whichever keel sends.
         envelope = inner && inner.reason === undefined && typeof parsed.reason === 'string' ? { ...inner, reason: parsed.reason } : inner;
       } catch { /* non-JSON error body — envelope stays null */ }
-      throw new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'));
+      throw new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'), { sentBody: body !== undefined, hostBlocked: isHostBlockedPage(response.status, text) });
     }
     if (!text) return undefined;
     try {

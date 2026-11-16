@@ -29,6 +29,7 @@ import { surfaceSyncUnavailable, upToDate } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
 import { elementHash, navigate } from '../core/router';
 import { issuesFor, clearSyncIssues, type SyncIssue } from '../sync/sync-issues';
+import { HOST_REFUSAL_CAUSE } from '../sync/sync-failure-copy';
 import { buildFailureDetails } from '../core/problems';
 import { detailsContext } from '../ui/problem-fixes';
 import {
@@ -840,6 +841,8 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       return issue.type === 'world'
         ? `Only the world's owner can change its details on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`
         : `Someone else made it, and this world lets Atlas change only what it made. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
+    case 'host_refused':
+      return `The web host in front of OnlyWorlds refused the change before it reached OnlyWorlds.${f.host_blocked ? ` ${HOST_REFUSAL_CAUSE}` : ''} Nothing was lost: your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'keeper_mark':
       return `It carries the mark that makes it the world's charter, and only the owner or a co-builder can set that on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'review_mark':
@@ -892,7 +895,7 @@ function renderSyncIssues(world: WorldRegistryEntry): string {
         ? `<span class="atlas-settings-issue-name">${escapeText(issueName(i))}</span>`
         : `<button class="atlas-link-btn atlas-settings-issue-name" data-action="open-issue">${escapeText(issueName(i))}</button>`}
       <span class="atlas-settings-issue-line">${escapeText(syncIssueLine(i, filesWhereOf(world)))}</span>
-      ${i.kind === 'other' ? '<button class="atlas-btn-ghost" data-action="copy-issue">Copy details</button>' : ''}
+      ${i.kind === 'other' || i.kind === 'host_refused' ? '<button class="atlas-btn-ghost" data-action="copy-issue">Copy details</button>' : ''}
     </li>`).join('');
   const more = issues.length > ISSUE_ROWS_SHOWN ? `<p class="atlas-settings-hint">And ${issues.length - ISSUE_ROWS_SHOWN} more.</p>` : '';
   // The engine's own sentence, as written; one full stop at the end.

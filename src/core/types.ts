@@ -558,6 +558,11 @@ export interface PerElementFailure {
   code?: string;
   param?: string;
   source?: 'server' | 'disk';
+  /**
+   * The web host's refusal (status 403, no code) was its page titled
+   * "Blocked", whose usual cause is known, so the words name it (conv. 191).
+   */
+  host_blocked?: boolean;
 }
 
 // ---- Registry ----
