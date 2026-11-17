@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.17',
+    date: '2026-11-17',
+    theme: 'The sync pill by keyboard',
+    entries: [
+      {
+        id: 'sync-pill-keyboard',
+        title: 'The sync pill\'s badges and refresh work from the keyboard',
+        body: 'The warning badges on the sync pill (conflicts to review, changes not syncing) and its refresh mark answered only a mouse, and reviewing conflicts opens from that badge alone. They are now buttons: Tab reaches them, Enter or Space presses them, and a screen reader names each one. Focus stays on the badge when the pill updates.',
+        tags: ['sync', 'accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.16',
     date: '2026-11-17',
     theme: 'Not syncing, said truly',

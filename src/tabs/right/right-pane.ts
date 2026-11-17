@@ -338,7 +338,13 @@ function closeMapTab(idx: number, mapId: string): void {
 const pillGate = renderGate();
 function writePill(pill: HTMLElement, html: string, worldId: string | null): boolean {
   if (!pillGate.changed([html, worldId])) return false;
+  // The pill's actions are buttons a keyboard reaches; a rewrite (the ticker's
+  // "1m ago") puts focus back on the same one, never on the page.
+  const focused = pill.contains(document.activeElement)
+    ? (document.activeElement as HTMLElement).closest<HTMLElement>('[data-role]')?.dataset.role
+    : undefined;
   pill.innerHTML = html;
+  if (focused) pill.querySelector<HTMLElement>(`[data-role="${focused}"]`)?.focus({ preventScroll: true });
   return true;
 }
 
@@ -407,7 +413,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       <span class="atlas-sync-pill-dot"></span>
       <span class="material-symbols-outlined atlas-sync-pill-eye">visibility</span>
       <span>View only</span>
-      <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds">refresh</span>
+      <button type="button" class="atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds"><span class="material-symbols-outlined">refresh</span></button>
     `, active.worldId);
     const refreshView = async (): Promise<void> => {
       try {
@@ -441,14 +447,14 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   pill.dataset.clickable = 'true';
   pill.title = title + (conflictCount > 0 ? '' : ' · click to refresh from OnlyWorlds');
   const conflictBadge = conflictCount > 0
-    ? `<span class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review">⚠ ${conflictCount}</span>`
+    ? `<button type="button" class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review" aria-label="Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}">⚠ ${conflictCount}</button>`
     : '';
   // Elements still not syncing: the place to come back to after a
   // failure toast. A first busy-file failure is left out: it usually clears
   // by itself in the next round, which is why its toast stays quiet too.
   const issueCount = issuesFor(active.worldId).filter(i => i.kind !== 'file_busy' || i.rounds > 1).length;
   const issueBadge = issueCount > 0
-    ? `<span class="atlas-sync-pill-conflict atlas-sync-pill-issues" data-role="sync-issues" title="${issueCount} change${issueCount === 1 ? '' : 's'} not syncing · click to see why">⚠ ${issueCount}</span>`
+    ? `<button type="button" class="atlas-sync-pill-conflict atlas-sync-pill-issues" data-role="sync-issues" title="${issueCount} change${issueCount === 1 ? '' : 's'} not syncing · click to see why" aria-label="${issueCount} change${issueCount === 1 ? '' : 's'} not syncing: see why">⚠ ${issueCount}</button>`
     : '';
   // The badges' listeners go on with the markup that made them; a skipped
   // write keeps both (conv. 146).
@@ -457,7 +463,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     <span>${label}</span>
     ${conflictBadge}
     ${issueBadge}
-    <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds">refresh</span>
+    <button type="button" class="atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds"><span class="material-symbols-outlined">refresh</span></button>
   `, active.worldId);
   if (wrote) pill.querySelector<HTMLElement>('[data-role="sync-issues"]')?.addEventListener('click', (e) => {
     e.stopPropagation();

@@ -6342,6 +6342,35 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transition: opacity 140ms ease, color 140ms ease;
 }
 
+/* The pill's three actions are buttons, so a keyboard reaches them (the
+   conflict review opens nowhere else); they keep the look they had as spans. */
+button.atlas-sync-pill-refresh {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.atlas-sync-pill-refresh .material-symbols-outlined {
+  font-size: 14px;
+  color: inherit;
+}
+
+button.atlas-sync-pill-conflict {
+  font-family: inherit;
+  line-height: inherit;
+}
+
+button.atlas-sync-pill-refresh:focus-visible,
+button.atlas-sync-pill-conflict:focus-visible {
+  outline: 2px solid var(--atlas-accent-text);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
 .atlas-sync-pill[data-clickable="true"]:hover .atlas-sync-pill-refresh {
   opacity: 1;
   color: var(--atlas-accent-text);

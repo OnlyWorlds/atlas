@@ -448,6 +448,57 @@ test('a click on the sync pill\'s conflict badge stays on the badge across a re-
   await expect.poll(() => page.evaluate(() => (window as any).__clickTargets)).toEqual(['review-conflicts']);
 });
 
+for (const tag of ['', ' @firefox']) {
+  test(`the sync pill's actions are buttons a keyboard reaches: Enter on the conflict badge is its press${tag}`, async ({ page }) => {
+    await freshBoot(page);
+    // A new world, the way both engines make one (Firefox keeps it in the browser).
+    await page.evaluate(async () => {
+      const root = await navigator.storage.getDirectory();
+      (window as any).__atlasTestApi.setNextDirectory(await root.getDirectoryHandle('pill-keys-root', { create: true }));
+    });
+    await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
+    await page.click('[data-action="create-local"]');
+    await page.fill('input[name="world-name"]', 'pillworld');
+    await page.click('[data-modal="create-world"] [data-action="pick"]');
+    await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+    // The pill's linked branch with two conflicts (no server: the UI branch only).
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      const s = api.getState();
+      const worlds = s.registry.worlds.map((w: any) => w.id === s.active.worldId
+        ? { ...w, state: 'api-linked', api: { world_id: 'fake-server-id', api_key: 'fake-key' } } : w);
+      api.patchSlice('registry', { ...s.registry, worlds });
+      api.patchSlice('sync', { ...api.getState().sync, activeConflictsCount: 2 });
+    });
+    const badge = page.locator('[data-role="sync-pill"] [data-role="review-conflicts"]');
+    await expect(badge).toBeVisible();
+    // The conflict review opens from this badge alone: as a span no keyboard could reach it.
+    await expect(badge).toHaveJSProperty('tagName', 'BUTTON');
+    await expect(badge).toHaveAccessibleName('Review 2 conflicts');
+    const refresh = page.locator('[data-role="sync-pill"] [data-role="refresh"]');
+    await expect(refresh).toHaveJSProperty('tagName', 'BUTTON');
+    await expect(refresh).toHaveAccessibleName('Refresh from OnlyWorlds');
+    // No engine runs here, so the review itself declines; what is under test is that Enter is the badge's press.
+    await page.evaluate(() => {
+      (window as any).__clickTargets = [];
+      document.addEventListener('click', (e) => (window as any).__clickTargets.push((e.target as HTMLElement).dataset.role ?? null), true);
+    });
+    // Reached by the keyboard: Shift+Tab from the refresh button lands on the badge.
+    await refresh.focus();
+    await page.keyboard.press('Shift+Tab');
+    await expect(badge).toBeFocused();
+    // A rewrite of the pill (here a third conflict) keeps focus on the badge, never the page.
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      api.patchSlice('sync', { ...api.getState().sync, activeConflictsCount: 3 });
+    });
+    await expect(badge).toHaveAccessibleName('Review 3 conflicts');
+    await expect(badge).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => (window as any).__clickTargets)).toEqual(['review-conflicts']);
+  });
+}
+
 test('"add a world" opens the chooser; its open-a-world row opens a picked world', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-6');
