@@ -409,7 +409,7 @@ class MapCreateModal extends BaseModal {
     if (this.locationPreview) {
       const chip = document.createElement('span');
       chip.className = 'atlas-link-chip';
-      chip.innerHTML = `<span>${escapeText(this.locationPreview.name || '(unnamed)')}</span><span class="material-symbols-outlined atlas-link-chip-remove" data-remove="1">close</span>`;
+      chip.innerHTML = `<span>${escapeText(this.locationPreview.name || '(unnamed)')}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(this.locationPreview.name || 'the location')}"><span class="material-symbols-outlined">close</span></button>`;
       row.appendChild(chip);
       chip.querySelector<HTMLElement>('.atlas-link-chip-remove')!.addEventListener('click', () => {
         this.locationPreview = null;
@@ -437,7 +437,7 @@ class MapCreateModal extends BaseModal {
     if (this.parentMapPreview) {
       const chip = document.createElement('span');
       chip.className = 'atlas-link-chip';
-      chip.innerHTML = `<span>${escapeText(this.parentMapPreview.name || '(unnamed)')}</span><span class="material-symbols-outlined atlas-link-chip-remove" data-remove="1">close</span>`;
+      chip.innerHTML = `<span>${escapeText(this.parentMapPreview.name || '(unnamed)')}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(this.parentMapPreview.name || 'the parent map')}"><span class="material-symbols-outlined">close</span></button>`;
       row.appendChild(chip);
       chip.querySelector<HTMLElement>('.atlas-link-chip-remove')!.addEventListener('click', () => {
         this.parentMapPreview = null;

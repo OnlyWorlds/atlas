@@ -3062,6 +3062,35 @@ body.atlas-preroot .atlas-middle {
   opacity: 1;
 }
 
+/* The × is a button (a keyboard removes a link); it keeps the glyph's look. */
+button.atlas-link-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  margin: 0;
+  border-radius: 3px;
+}
+
+.atlas-link-chip-remove .material-symbols-outlined {
+  font-size: 13px;
+  line-height: 1;
+  color: inherit;
+}
+
+button.atlas-link-chip-remove:focus-visible {
+  outline: 2px solid var(--atlas-accent-text);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+/* A field's value and the aliases row take keyboard focus (they open their editor). */
+.atlas-field-value[role="button"]:focus-visible,
+.atlas-aliases-display[role="button"]:focus-visible {
+  outline: 2px solid var(--atlas-accent-text);
+  outline-offset: 2px;
+}
+
 .atlas-link-row {
   display: flex;
   align-items: center;
@@ -17615,6 +17644,14 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 .atlas-modal-overlay :is(button, [role="button"], [role="tab"], .atlas-modal-title) {
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* A field's value and the aliases row are buttons for the keyboard (1.124.18)
+   and content all the same: they stay selectable, as A3 promises. */
+.atlas-shell .atlas-field-value[role="button"],
+.atlas-shell .atlas-aliases-display[role="button"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* A4: one brand focus ring for keyboard focus. :where() = zero specificity,

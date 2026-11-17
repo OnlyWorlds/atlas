@@ -38,6 +38,7 @@ import { reportGesture } from '../ui/guide-note';
 import { getFieldDescription } from '../editor/field-descriptions';
 import { unitLabelFor } from '../core/world-units';
 import { pickElement } from '../ui/element-picker-modal';
+import { installRowKeydownActivation } from '../core/dom-utils';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { readImageDimsFromUrl, smallMapImageHint, IMAGELESS_MAP_SIZE } from '../ui/image-dims';
 import { countSpatialOnMap, spatialPhrase, rescaleSketchOntoImage } from './map-attach-scale';
@@ -257,6 +258,15 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   // (especially left→right) opened the modal instead of leaving the user
   // with their highlight.
   if (readOnly) return withCalendarDate(wrap, valueEl, meta, raw, isEmpty);
+  // A keyboard opens the editor too: Tab reaches the value, Enter or Space
+  // presses it (the click below, where a keyboard leaves no selection).
+  valueEl.setAttribute('role', 'button');
+  valueEl.tabIndex = 0;
+  // The name says the field, the value (a long one cut short) with its unit, and the press.
+  const trimmed = valueText.trim();
+  const spoken = trimmed.length > 80 ? `${trimmed.slice(0, 80).trimEnd()}…` : trimmed;
+  valueEl.setAttribute('aria-label', `${humanizeFieldName(meta.name)}: ${spoken ? `${spoken}${unit ? ` ${unit}` : ''}` : 'empty'}. Press to edit`);
+  installRowKeydownActivation(valueEl);
   let mouseDownAt: { x: number; y: number } | null = null;
   let suppressNextClick = false;
   valueEl.addEventListener('mousedown', (e) => {
@@ -335,7 +345,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
       widget: editWidget,
       ...(suggestions ? { suggestions } : {}),
       onSave: async (nextValue) => {
-        await persistFieldPatch(el, meta.name, nextValue);
+        await saveKeepingFocus(valueEl, meta.name, () => persistFieldPatch(el, meta.name, nextValue));
       },
     });
   });
@@ -409,7 +419,14 @@ function renderAliasesRow(el: Element, readOnly: boolean): HTMLElement {
 
   // Whole-row click opens the modal — matches the row-click affordance of
   // every other field in element-detail. No separate edit button needed.
-  if (!readOnly) row.addEventListener('click', openModal);
+  if (!readOnly) {
+    row.addEventListener('click', openModal);
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
+    const label = humanizeFieldName('atlas_aliases');
+    row.setAttribute('aria-label', aliases.length === 0 ? `${label}: none. Press to add` : `${label}: ${aliases.join(', ')}. Press to edit`);
+    installRowKeydownActivation(row);
+  }
 
   return row;
 }
@@ -608,10 +625,16 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void) | nul
   });
   if (!onRemove) return chip;
 
-  const rm = document.createElement('span');
-  rm.className = 'material-symbols-outlined atlas-link-chip-remove';
+  // A button, so a keyboard can remove a link; the glyph in its own span (icons are hidden from assistive tech).
+  const rm = document.createElement('button');
+  rm.type = 'button';
+  rm.className = 'atlas-link-chip-remove';
   rm.dataset.remove = '1';
-  rm.textContent = 'close';
+  rm.setAttribute('aria-label', linked ? `Remove ${linked.name || 'this link'}` : 'Remove this link');
+  const glyph = document.createElement('span');
+  glyph.className = 'material-symbols-outlined';
+  glyph.textContent = 'close';
+  rm.appendChild(glyph);
   rm.addEventListener('click', (e) => {
     e.stopPropagation();
     onRemove();
@@ -636,6 +659,19 @@ export const WORLD_NOT_OPEN = 'This world is not open. Open it from the sidebar,
  */
 const latestFieldSave = new Map<string, number>();
 let fieldSaveSeq = 0;
+
+/**
+ * A save redraws the page and removes the value that held focus: focus goes to
+ * the field's new value, so a keyboard user keeps their place. Only when focus
+ * was on the old value and nothing else took it meanwhile.
+ */
+async function saveKeepingFocus(anchor: HTMLElement, fieldName: string, save: () => Promise<void>): Promise<void> {
+  const had = document.activeElement === anchor;
+  await save();
+  if (!had || anchor.isConnected || !/^[\w-]+$/.test(fieldName)) return;
+  if (document.activeElement && document.activeElement !== document.body) return;
+  document.querySelector<HTMLElement>(`[data-field="${fieldName}"] .atlas-field-value[role="button"]`)?.focus({ preventScroll: true });
+}
 
 export async function persistFieldPatch(el: Element, fieldName: string, nextValue: unknown): Promise<void> {
   const saveKey = `${el.id}|${fieldName}`;

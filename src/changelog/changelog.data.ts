@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.18',
+    date: '2026-11-17',
+    theme: 'An element\'s fields by keyboard',
+    entries: [
+      {
+        id: 'fields-keyboard',
+        title: 'Edit a field, its aliases and its links from the keyboard',
+        body: 'On an element\'s page, a field\'s value and the aliases row opened their editor on a mouse click alone, and a link\'s remove mark answered only a mouse. Tab now reaches each, Enter or Space opens the editor or removes the link, a screen reader names the field and its value, and focus comes back to the field when the editor closes or saves. Values stay selectable with a drag. The same remove mark in the map dialog works by keyboard too.',
+        tags: ['editor', 'accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.17',
     date: '2026-11-17',
     theme: 'The sync pill by keyboard',

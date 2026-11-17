@@ -189,7 +189,11 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   function cleanup(): void {
     document.removeEventListener('keydown', keyHandler);
     document.removeEventListener('atlas:save-request', saveRequestHandler);
+    const hadFocus = overlay.contains(document.activeElement);
     overlay.remove();
+    // Focus goes back to what opened the editor (a keyboard user keeps their
+    // place), only when it was inside the editor and the opener is still there.
+    if (hadFocus && opts.anchor.isConnected) opts.anchor.focus({ preventScroll: true });
   }
 
   const saveRequestHandler = () => { save(); };
@@ -274,6 +278,13 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
       // A focused BUTTON keeps its own Enter: Tab to
       // Cancel and press Enter used to SAVE.
       if (e.target instanceof HTMLButtonElement) return;
+      // The Enter that opened the editor (a field's value pressed by keyboard)
+      // reaches this listener on its way up from the value, and a held one
+      // repeats into the editor: neither saves. An Enter on the editor or the
+      // page behind it (focus dropped by a click on the panel) saves, as before.
+      if (e.repeat) return;
+      const t = e.target;
+      if (!(t === document || t === document.body || (t instanceof Node && overlay.contains(t)))) return;
       if (isLong) {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
