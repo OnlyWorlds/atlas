@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.14',
+    date: '2026-11-17',
+    theme: 'A map keeps its view after a reload',
+    entries: [
+      {
+        id: 'map-measure-kept',
+        title: 'A map with no size of its own keeps where you left it',
+        body: 'A map whose width or height is not written above 0 is drawn at its picture\'s own size. Atlas measured that picture again on every load and, as the map changed shape under it, threw away where you had zoomed and panned, so the map opened fitted each time. Atlas now remembers the measure in this browser, and the map opens where you left it. The picture is still measured on each load, so one replaced at the same address takes its new size.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.13',
     date: '2026-11-17',
     theme: 'A refused name gets advice it can follow',

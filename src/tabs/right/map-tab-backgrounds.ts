@@ -22,7 +22,7 @@ import { extractEdgeColor } from './edge-color';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { layoutUnderlayFor, layoutUnderlayKey } from './layout-underlay';
 import { DEFAULT_COLOR as ZONE_DEFAULT_COLOR } from '../../visualization/leaflet-2d/ZoneOverlay';
-import { drawnFrame, measuredPictureSize, missingSize, rememberPictureSize, usableMeasure, writtenFrame } from './map-frame';
+import { drawnFrame, measuredPictureSize, missingSize, rememberPictureSize, sessionPictureSize, usableMeasure, writtenFrame } from './map-frame';
 
 /**
  * A picture was measured for a map whose written size is not its frame. When the tab's canvas was built in
@@ -49,7 +49,7 @@ export function sourceKey(map: WorldMap): string {
   // so a dims write must drift the key. Without this, adding image_url to a
   // dims-stamped imageless map painted the image stretched into the old
   // square and the later autoUpdateMapDims persist never re-applied.
-  // A session's measure of the picture is part of the frame too (map-frame.ts), so it drifts the key as a write would.
+  // The picture's measure (this session's or a kept one) is part of the frame too (map-frame.ts), so it drifts the key as a write would.
   const measure = measuredPictureSize(map);
   const dims = `${typeof map.width === 'number' ? map.width : ''}x${typeof map.height === 'number' ? map.height : ''}`
     + (measure ? `:${measure.w}x${measure.h}` : '');
@@ -162,16 +162,18 @@ export async function applyMapBackground(
   };
 
   if (source.kind === 'url') {
-    let dims = writtenFrame(map) ?? measuredPictureSize(map);
+    // A measure kept from an earlier session draws the first frame but never skips the decode: a picture
+    // replaced at the same address is measured again, and a size still missing is written (map-frame.ts).
+    let dims = writtenFrame(map) ?? sessionPictureSize(map);
     if (!dims) {
       // First open of a URL-sourced map with no usable size: the apply blocks on a full
       // decode of the (possibly large, remote) image to learn its dims.
       // Show an honest hint for that window. A missing width or height is then
       // persisted on the Map element; a written one, whatever its number, stays as
-      // written and the measure is kept for this session (map-frame.ts).
+      // written and the measure is kept, in memory and in this browser (map-frame.ts).
       const hint = showLoadingHint(container);
       const decoded = usableMeasure(await decodeImageDims(source.url).finally(hint.remove));
-      dims = decoded ?? { w: defaultWidth, h: defaultHeight };
+      dims = decoded ?? measuredPictureSize(map) ?? { w: defaultWidth, h: defaultHeight };
       if (decoded) {
         rememberPictureSize(map, decoded);
         // The map as it stands now, not as it was at mount: a size written during the decode is a
@@ -203,10 +205,10 @@ export async function applyMapBackground(
       if (blob) {
         const url = URL.createObjectURL(blob);
         entry.objectUrls.push(url);
-        let dims = writtenFrame(map) ?? measuredPictureSize(map);
+        let dims = writtenFrame(map) ?? sessionPictureSize(map);
         if (!dims) {
           const decoded = usableMeasure(await decodeImageDims(url));
-          dims = decoded ?? { w: defaultWidth, h: defaultHeight };
+          dims = decoded ?? measuredPictureSize(map) ?? { w: defaultWidth, h: defaultHeight };
           if (decoded) { rememberPictureSize(map, decoded); frameStale = frameMeasured(entry, map); }
         }
         applyImage(url, dims);

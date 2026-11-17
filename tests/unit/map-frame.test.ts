@@ -23,7 +23,7 @@ class FakeImage {
 vi.stubGlobal('Image', FakeImage);
 
 import { applyMapBackground } from '../../src/tabs/right/map-tab-backgrounds';
-import { drawnFrame, missingSize, _resetMeasuredForTests } from '../../src/tabs/right/map-frame';
+import { drawnFrame, missingSize, rememberPictureSize, _resetMeasuredForTests, _forgetSessionMeasuresForTests } from '../../src/tabs/right/map-frame';
 import { mapTabCache } from '../../src/tabs/right/map-tab-cache';
 import { patchSlice, getState } from '../../src/core/state';
 import type { WorldMap } from '../../src/core/types';
@@ -156,5 +156,45 @@ describe('a first open with no picture', () => {
     const { entry } = entryFor(2000, 2000);
     await applyMapBackground(entry, stage(map({})), 2000, 2000);
     expect(updateMap).toHaveBeenCalledWith('m', { width: 2000, height: 2000 });
+  });
+});
+
+describe('a measure kept from an earlier session (1.124.14)', () => {
+  it('draws the first frame, and the picture is still decoded: a picture replaced at the same address heals', async () => {
+    const m = stage(map({ width: 0, height: 500, image_url: pic }));
+    rememberPictureSize(m, { w: 1600, h: 900 }); // the picture as it was last session
+    _forgetSessionMeasuresForTests(); // a reload
+    expect(drawnFrame(m)).toEqual({ w: 1600, h: 900 });
+    const { entry, manager } = entryFor(1600, 900);
+    await applyMapBackground(entry, m, 1600, 900);
+    expect(manager.setBackgroundImage).toHaveBeenCalledWith(pic, 40, 30, expect.any(Function));
+    expect(drawnFrame(m)).toEqual({ w: 40, h: 30 });
+    expect(JSON.parse(localStorage.getItem('atlas_map_picture_measures')!).m).toMatchObject({ w: 40, h: 30 });
+  });
+
+  it('a kept measure equal to the decode flips nothing: the tab is not remounted, so its camera stays', async () => {
+    const m = stage(map({ width: 0, height: 500, image_url: pic }));
+    rememberPictureSize(m, { w: 40, h: 30 });
+    _forgetSessionMeasuresForTests();
+    const { entry, manager } = entryFor(40, 30); // mounted in the kept frame
+    const { subscribe } = await import('../../src/core/state');
+    let notified = 0;
+    const off = subscribe(() => { notified++; });
+    await applyMapBackground(entry, m, 40, 30);
+    await entry.ready;
+    await Promise.resolve();
+    off();
+    expect(manager.setBackgroundImage).toHaveBeenCalledWith(pic, 40, 30, expect.any(Function));
+    expect(notified).toBe(0); // the flip's redraw (frameMeasured) never asked
+    expect(updateMap).not.toHaveBeenCalled();
+  });
+
+  it('a size still missing is written from the decode, never from the kept number', async () => {
+    const m = stage(map({ image_url: pic }));
+    rememberPictureSize(m, { w: 1600, h: 900 });
+    _forgetSessionMeasuresForTests();
+    const { entry } = entryFor(1600, 900);
+    await applyMapBackground(entry, m, 1600, 900);
+    expect(updateMap).toHaveBeenCalledWith('m', { width: 40, height: 30 });
   });
 });

@@ -150,8 +150,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   const dateBar = buildDateBar();
   container.appendChild(dateBar);
 
-  // The frame (map-frame.ts): the written size above 0, else the picture's size measured
-  // this session, else the IMAGELESS_MAP_SIZE square per axis (applyMapBackground persists
+  // The frame (map-frame.ts): the written size above 0, else the picture's measured size
+  // (this session's, else kept in this browser), else the IMAGELESS_MAP_SIZE square per axis (applyMapBackground persists
   // a missing size on first open so the space becomes durable; DESIGN_MAPS.md §4.2).
   const { w: width, h: height } = drawnFrame(map);
 
