@@ -12,6 +12,7 @@ import { defaultRegistry } from '../../src/core/types';
 import type { Element, PerElementFailure, WorldRegistryEntry } from '../../src/core/types';
 import { renderHeader, notSyncingTitle } from '../../src/middle/element-detail-header';
 import { noteRoundIssues, issuesFor, __resetSyncIssues } from '../../src/sync/sync-issues';
+import { syncIssueLine } from '../../src/middle/settings-world';
 
 const WORLD = 'w-dot';
 const EL = 'e-dot-1';
@@ -164,7 +165,11 @@ describe('the sync dot and a failed element', () => {
     for (const operation of ['update', 'delete'] as const) {
       const t = titleOf(fail({ operation, status: undefined, source: 'disk' }));
       expect(t).toBe('Not syncing. Atlas could not write it in the folder. Atlas tries again by itself. Click to see it in Settings.');
+      // Settings' own row says the same: never "OnlyWorlds has it" for a write that never reached it.
+      expect(syncIssueLine(issuesFor(WORLD)[0], 'browser')).toBe('Atlas could not write it in this browser. Atlas tries again by itself.');
     }
+    titleOf(fail({ operation: 'create', status: undefined, source: 'disk' }));
+    expect(syncIssueLine(issuesFor(WORLD)[0], 'folder')).toBe('OnlyWorlds has it, but Atlas could not note that in the folder. Atlas tries again by itself.');
   });
 
   it('the foreign-id words stand alone: no "above" outside Settings', () => {

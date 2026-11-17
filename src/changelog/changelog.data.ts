@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.16',
+    date: '2026-11-17',
+    theme: 'Not syncing, said truly',
+    entries: [
+      {
+        id: 'sync-issue-disk-words',
+        title: 'Settings no longer says OnlyWorlds has a change it never got',
+        body: 'When Atlas could not write an element to this browser or the folder during sync, Settings said "OnlyWorlds has it" for every such element. That is true only for an element just made online. For the rest, such as an element put back after OnlyWorlds refused its delete, it now says Atlas could not write it, and that Atlas tries again by itself.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.15',
     date: '2026-11-17',
     theme: 'An element that cannot sync says so',

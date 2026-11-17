@@ -871,9 +871,9 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
         return 'It links to something that is no longer on OnlyWorlds.';
       }
       if (f.source === 'disk') {
-        // Alone, only a create is known to have reached OnlyWorlds; the other
-        // disk failures (a resync's removal, a refused delete put back) wrote nothing there.
-        if (alone && f.operation !== 'create') return `Atlas could not write it ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
+        // Only a create is known to have reached OnlyWorlds; the other disk
+        // failures (a resync's removal, a refused delete put back) wrote nothing there.
+        if (f.operation !== 'create') return `Atlas could not write it ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
         return `OnlyWorlds has ${alone ? 'the change' : 'it'}, but Atlas could not note that ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
       }
       if (typeof f.status === 'number' && f.status >= 500) return 'OnlyWorlds had a problem on its side. Atlas tries again with your next save.';
