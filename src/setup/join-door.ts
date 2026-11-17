@@ -14,6 +14,7 @@ import { getState, patchSlice } from '../core/state';
 import { PlainError } from '../core/plain-error';
 import { isSeatWorld, SEAT_REMOVE_WHERE, seatRoleWords } from '../core/seat';
 import { DEFAULT_V2_BASE, OwV2Error } from '../sync/ow-v2-client-adapter';
+import { isHostBlockedPage } from '../sync/host-blocked-page';
 import { devV2Base } from '../sync/dev-api-base';
 import { findLinkedWorld, findWorldByServerId, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { linkExistingApiWorldInRoot, type LinkExistingApiWorldResult } from './atlas-root-flow';
@@ -115,8 +116,14 @@ async function postJoin(path: '/join' | '/join/preview', body: unknown): Promise
   const text = await res.text();
   if (!res.ok) {
     let envelope: { type?: string; code?: string; message?: string; param?: string | null } | null = null;
-    try { envelope = (JSON.parse(text) as { error?: typeof envelope }).error ?? null; } catch { /* not JSON */ }
-    throw new OwV2Error(res.status, envelope, '', res.headers.get('Retry-After'));
+    let jsonBody = false;
+    try {
+      const parsed = JSON.parse(text) as { error?: typeof envelope } | null;
+      jsonBody = true;
+      envelope = parsed?.error ?? null;
+    } catch { /* not JSON */ }
+    // The web host's own page (a player's name holding a command, say) is the host's refusal, never the code's (conv. 191).
+    throw new OwV2Error(res.status, envelope, '', res.headers.get('Retry-After'), { sentBody: true, hostBlocked: isHostBlockedPage(res.status, text), jsonBody });
   }
   const parsed = JSON.parse(text) as unknown;
   if (!parsed || typeof parsed !== 'object') throw new Error('join: the reply was not an object');

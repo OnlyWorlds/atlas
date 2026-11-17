@@ -110,8 +110,10 @@ export class OwV2Error extends Error {
   readonly sentBody: boolean;
   /** True when the body was the web host's page titled "Blocked" (`isHostBlockedPage`, read by the adapter on the whole body, never the 300 characters kept here). */
   readonly hostBlocked: boolean;
+  /** True when the body parsed as JSON: keel's or a proxy's JSON, never the web host's page, with or without an envelope. */
+  readonly jsonBody: boolean;
 
-  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown } | null, rawBody: string, retryAfter: string | null = null, opts: { sentBody?: boolean; hostBlocked?: boolean } = {}) {
+  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown } | null, rawBody: string, retryAfter: string | null = null, opts: { sentBody?: boolean; hostBlocked?: boolean; jsonBody?: boolean } = {}) {
     const serverMsg = envelope?.message ?? (rawBody || 'request failed');
     super(`API Error ${status}: ${serverMsg}`);
     this.name = 'OwV2Error';
@@ -124,6 +126,7 @@ export class OwV2Error extends Error {
     this.enveloped = envelope !== null;
     this.sentBody = opts.sentBody === true;
     this.hostBlocked = opts.hostBlocked === true;
+    this.jsonBody = opts.jsonBody === true;
   }
 }
 
@@ -370,14 +373,16 @@ export class OwV2ClientAdapter implements OwApiClient {
     if (!response.ok) {
       type Envelope = { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown };
       let envelope: Envelope | null = null;
+      let jsonBody = false;
       try {
         const parsed = JSON.parse(text) as { error?: Envelope; reason?: unknown };
+        jsonBody = true;
         const inner: Envelope | null = parsed?.error ?? null;
         // keel's 409 resync_required says why (role or view, Skeld 2026-10-20):
         // read inside the envelope or beside it, whichever keel sends.
         envelope = inner && inner.reason === undefined && typeof parsed.reason === 'string' ? { ...inner, reason: parsed.reason } : inner;
       } catch { /* non-JSON error body — envelope stays null */ }
-      throw new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'), { sentBody: body !== undefined, hostBlocked: isHostBlockedPage(response.status, text) });
+      throw new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'), { sentBody: body !== undefined, hostBlocked: isHostBlockedPage(response.status, text), jsonBody });
     }
     if (!text) return undefined;
     try {

@@ -15,6 +15,8 @@ import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
 import { isAuthError, isHostBlocked, isHostRefusal, isTransientError } from '../../src/sync/sync-engine';
 import { isHostBlockedPage } from '../../src/sync/host-blocked-page';
 import { classifyError } from '../../src/core/problems';
+import { redeemPlayerJoin, setJoinBaseForTests } from '../../src/setup/join-door';
+import { AccountClient } from '../../src/sync/account-client';
 
 const BASE = 'https://test-ow.local/api/v2';
 const adapter = (): OwV2ClientAdapter => new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: BASE });
@@ -54,8 +56,8 @@ describe('isHostRefusal: the host\'s page on a write', () => {
       expect(isHostRefusal(err)).toBe(true);
       expect(isAuthError(err)).toBe(false);
       expect(isTransientError(err)).toBe(false);
-      // Through problems too: a refusal by the server, never "sign in again".
-      expect(classifyError(err)).toBe('server-refused');
+      // Through problems too: the host's refusal, never "sign in again" and never Atlas's own fault.
+      expect(classifyError(err)).toBe('host-refused');
     }
   });
 
@@ -115,6 +117,43 @@ describe('isHostRefusal: keel\'s own answers on the same write keep their readin
     expect(isHostRefusal(err)).toBe(false);
     expect(isAuthError(err)).toBe(false);
     expect(isTransientError(err)).toBe(true);
+  });
+});
+
+describe('the host\'s page at the doors that make their own requests, and a JSON body never the host\'s', () => {
+  it('the join door: a player\'s name answered with the host\'s page is the host\'s refusal, never the code or the key', async () => {
+    setJoinBaseForTests(BASE);
+    try {
+      mswServer.use(http.post(`${BASE}/join`, () => html403()));
+      const err = await thrown(redeemPlayerJoin('ow_j_testcode', 'run `python -m x`'));
+      expect(isHostRefusal(err)).toBe(true);
+      expect(isHostBlocked(err)).toBe(true);
+      expect(isAuthError(err)).toBe(false);
+      expect(classifyError(err)).toBe('host-refused');
+      // A JSON answer, even a bare null, is never the host's page.
+      for (const body of ['{"detail":"Forbidden"}', 'null']) {
+        mswServer.use(http.post(`${BASE}/join`, () => new HttpResponse(body, { status: 403, headers: { 'Content-Type': 'application/json' } })));
+        const json = await thrown(redeemPlayerJoin('ow_j_testcode', 'x'));
+        expect(isHostRefusal(json)).toBe(false);
+      }
+    } finally { setJoinBaseForTests(null); }
+  });
+
+  it('the account client: a write answered with the host\'s page is the host\'s; a read keeps today\'s reading', async () => {
+    answerAll(html403);
+    const c = new AccountClient('ow_a_test', BASE);
+    const write = await thrown(c.mintWorldKey('w1', 'run `python -m x`'));
+    expect(isHostRefusal(write)).toBe(true);
+    expect(classifyError(write)).toBe('host-refused');
+    const read = await thrown(c.listWorlds());
+    expect(isHostRefusal(read)).toBe(false);
+  });
+
+  it('a write answered 403 with a JSON body and no envelope is not the host\'s page', async () => {
+    answerAll(() => HttpResponse.json({ detail: 'Forbidden' }, { status: 403 }));
+    const err = await thrown(adapter().patchWorldMeta({ description: 'x' }));
+    expect(isHostRefusal(err)).toBe(false);
+    expect(classifyError(err)).not.toBe('host-refused');
   });
 });
 

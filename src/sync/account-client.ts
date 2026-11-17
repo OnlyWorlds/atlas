@@ -34,6 +34,7 @@
 
 import { OwApiError } from '@onlyworlds/sdk';
 import { OwV2Error, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
+import { isHostBlockedPage } from './host-blocked-page';
 import { devV2Base } from './dev-api-base';
 import type { AccountWorldRow } from '../core/types';
 import { problemFor } from '../core/problems';
@@ -108,11 +109,14 @@ export class AccountClient {
     const text = await response.text();
     if (!response.ok) {
       let envelope: { type?: string; code?: string; message?: string; param?: string | null } | null = null;
+      let jsonBody = false;
       try {
         const parsed = JSON.parse(text) as { error?: typeof envelope };
+        jsonBody = true;
         envelope = parsed?.error ?? null;
       } catch { /* non-JSON error body */ }
-      throw new OwV2Error(response.status, envelope, text.slice(0, 300));
+      // The web host's own page on a write is the host's refusal, never the key's (conv. 191).
+      throw new OwV2Error(response.status, envelope, text.slice(0, 300), null, { sentBody: body !== undefined, hostBlocked: isHostBlockedPage(response.status, text), jsonBody });
     }
     if (!text) return undefined;
     try {

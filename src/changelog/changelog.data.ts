@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.12',
+    date: '2026-11-17',
+    theme: 'The web host\'s refusal said for what it is, everywhere',
+    entries: [
+      {
+        id: 'host-refused-everywhere',
+        title: 'A refusal by the web host is no longer called a problem in Atlas or a wrong PIN',
+        body: 'Since 1.124.11 a change the web host in front of OnlyWorlds refuses waits in its own words while your world syncs. A few other places still read that refusal wrongly: making a world online with a name that holds a command between code marks said Atlas had run into a problem it did not expect, and a player\'s name refused the same way at an invitation asked you to check your PIN. Now each says the web host refused it before it reached OnlyWorlds, and why when the host says so.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.11',
     date: '2026-11-16',
     theme: 'A change the web host refuses is said for what it is',

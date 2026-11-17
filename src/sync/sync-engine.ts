@@ -4383,7 +4383,8 @@ export function isHostRefusal(err: unknown): boolean {
     if (typeof e.status === 'number') return false;
     return /^API Error 403:\s*</i.test(err.message); // raw-error-ok: classification of the legacy message form, never shown
   }
-  if (typeof e.enveloped === 'boolean') return !e.enveloped && e.sentBody === true;
+  // The adapter's error: no envelope, a body sent, and the answer not JSON (a JSON body is keel's or a proxy's, never the host's page).
+  if (typeof e.enveloped === 'boolean') return !e.enveloped && e.sentBody === true && (e as { jsonBody?: unknown }).jsonBody !== true;
   // The SDK's error: keel's code absent and the body not keel's JSON (its text, or nothing).
   if (e.name === 'OwApiError') return (e.code === null || e.code === undefined) && (e.detail === null || e.detail === undefined || typeof e.detail === 'string');
   return false;

@@ -14,7 +14,9 @@ import { RekeyRefusedError } from '../../src/store/rekey';
 import { RekeyPendingError } from '../../src/store/folder-store';
 import { DuplicatePinError, isDuplicatePinError } from '../../src/core/pin-uniqueness';
 import { DownloadCancelledError } from '../../src/sync/initial-download';
+import { parseErrorEnvelope } from '@onlyworlds/sdk';
 
+const HOST_PAGE = (title: string) => `<!DOCTYPE html><html><head><title>${title}</title></head><body>Sorry, you have been blocked</body></html>`;
 const RAW = 'An operation that depends on state cached in an interface object was made';
 const dom = (name: string) => new DOMException(RAW, name);
 
@@ -45,6 +47,10 @@ const CASES: [string, unknown, ProblemKind][] = [
   ['DuplicatePinError', new DuplicatePinError('p1'), 'refused'],
   ['DownloadCancelledError', new DownloadCancelledError(), 'refused'],
   ['MergeRefusedError by name', Object.assign(new Error('Route 2 needs a PIN first.'), { name: 'MergeRefusedError' }), 'refused'],
+  // The web host in front of OnlyWorlds: a 403 with no API code, before OnlyWorlds saw it (conv. 191).
+  ['host Blocked page (SDK)', parseErrorEnvelope(403, HOST_PAGE('Blocked')), 'host-refused'],
+  ['host other page (SDK)', parseErrorEnvelope(403, HOST_PAGE('Access denied')), 'host-refused'],
+  ['host page (adapter, a write)', new OwV2Error(403, null, HOST_PAGE('Blocked'), null, { sentBody: true, hostBlocked: true }), 'host-refused'],
   ['plain bug', new Error('writeJsonAtomic: final file does not match intent for aldric-vane--1a2b3c4d.json'), 'bug'],
   ['a thrown string', 'oops', 'bug'],
 ];
@@ -68,6 +74,18 @@ describe('problemFor', () => {
       expect(p.sentence.length).toBeGreaterThan(20);
     });
   }
+
+  it("the web host's refusal is said as the host's, never Atlas's own: no details to send, its cause only for the Blocked page", () => {
+    const blocked = problemFor(parseErrorEnvelope(403, HOST_PAGE('Blocked')), { doing: 'making this world' });
+    expect(blocked.sentence).toBe('The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish making this world. A command written between code marks, such as `python -m`, is the usual cause: write it without the marks, or in a code block that names its language, then try again.');
+    expect(blocked.report).toBe(false);
+    expect(blocked.fixes).toEqual([]);
+    expect(buildDetails(blocked)).not.toMatch(/Message:|refused this request/);
+    const other = problemFor(parseErrorEnvelope(403, HOST_PAGE('Access denied')), { doing: 'making this world' });
+    expect(other.sentence).toBe('The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish making this world.');
+    // The API's own 403 keeps its reading.
+    expect(classifyError(new OwV2Error(403, { code: 'key_revoked', message: 'revoked' }, ''))).toBe('auth');
+  });
 
   it('says what Atlas was doing', () => {
     expect(problemFor(dom('NoModificationAllowedError'), { doing: 'saving this scene' }).sentence)

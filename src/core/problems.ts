@@ -16,7 +16,8 @@
 import pkg from '../../package.json';
 import { PlainError, isPlainError } from './plain-error';
 import { damagedFileSentence, isFileBusyError } from '../store/fs-utils';
-import { isAuthError, isTransientError, memberRefusal } from '../sync/sync-engine';
+import { isAuthError, isHostBlocked, isHostRefusal, isTransientError, memberRefusal } from '../sync/sync-engine';
+import { hostRefusalCause } from '../sync/sync-failure-copy';
 import { getState } from './state';
 import { hasFolderMode } from './capabilities';
 import { filesWhereOf, type FilesWhere } from './browser-worlds';
@@ -34,6 +35,8 @@ export type ProblemKind =
   | 'offline'
   | 'server-busy'
   | 'server-refused'
+  /** The web host in front of OnlyWorlds refused the request before OnlyWorlds saw it (a 403 with no API code, conv. 191). */
+  | 'host-refused'
   | 'server'
   | 'cancelled'
   | 'refused'
@@ -111,6 +114,9 @@ export function classifyError(err: unknown): ProblemKind {
   // A DOMException of any other name is the browser's, not the server's.
   if (typeof DOMException === 'function' && err instanceof DOMException) return 'bug';
   if (isNetworkTypeError(err)) return 'offline';
+  // Before the status read: the host's 403 carries no API code, so the status
+  // read passes it by and it would fall to 'bug', Atlas blamed for the host.
+  if (isHostRefusal(err)) return 'host-refused';
   const status = serverStatus(err);
   if (status !== null) {
     if (memberRefusal(err)) return 'not-yours';
@@ -180,6 +186,8 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
     case 'server-refused':
       return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
+    case 'host-refused':
+      return `The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish ${doing}.${saved}${isHostBlocked(err) ? ` ${hostRefusalCause('then try again')}` : ''}`;
     case 'server':
       return `OnlyWorlds had a problem on its side while Atlas was ${doing}.${saved} Try again in a while.`;
     case 'bug':
@@ -201,6 +209,7 @@ const FIXES: Record<ProblemKind, FixId[]> = {
   offline: ['retry'],
   'server-busy': ['retry'],
   'server-refused': ['copy-details', 'send-feedback'],
+  'host-refused': [],
   server: ['retry'],
   cancelled: [],
   refused: [],
