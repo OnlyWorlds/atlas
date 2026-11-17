@@ -81,6 +81,9 @@ describe('problemFor', () => {
     expect(blocked.report).toBe(false);
     expect(blocked.fixes).toEqual([]);
     expect(buildDetails(blocked)).not.toMatch(/Message:|refused this request/);
+    // A one-line name (Make online's world name, a player's name at a join): no code block to offer.
+    const named = problemFor(parseErrorEnvelope(403, HOST_PAGE('Blocked')), { doing: 'joining the world', oneLine: true });
+    expect(named.sentence).toBe('The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish joining the world. A command written between code marks, such as `python -m`, is the usual cause: write it without the marks, then try again.');
     const other = problemFor(parseErrorEnvelope(403, HOST_PAGE('Access denied')), { doing: 'making this world' });
     expect(other.sentence).toBe('The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish making this world.');
     // The API's own 403 keeps its reading.

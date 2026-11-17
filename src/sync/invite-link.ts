@@ -13,6 +13,8 @@ import { OwApiError, OwNetworkError, OwV2Client } from '@onlyworlds/sdk';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { PlainError } from '../core/plain-error';
+import { problemFor } from '../core/problems';
+import { isHostRefusal } from './sync-engine';
 import { typeNameStart } from '../core/type-words';
 
 /**
@@ -77,6 +79,9 @@ export async function makeInvite(
       // `_clean_link_character`): made here and not synced yet, or deleted there.
       if (err.status === 422 && err.param === 'character') throw new PlainError(inviteCharacterGoneLine());
     }
+    // The web host can refuse the inviter's name (a command between code
+    // marks): a retry never helps, so it is said in the host's words.
+    if (isHostRefusal(err)) throw new PlainError(problemFor(err, { inline: true, doing: 'making the invite link', oneLine: true }).sentence);
     throw new PlainError('The link was not made. Try again in a moment.');
   }
 }

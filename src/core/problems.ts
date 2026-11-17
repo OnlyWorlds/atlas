@@ -187,7 +187,7 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
     case 'server-refused':
       return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
     case 'host-refused':
-      return `The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish ${doing}.${saved}${isHostBlocked(err) ? ` ${hostRefusalCause('then try again')}` : ''}`;
+      return `The web host in front of OnlyWorlds refused this before it reached OnlyWorlds, so Atlas could not finish ${doing}.${saved}${isHostBlocked(err) ? ` ${hostRefusalCause('then try again', opts.oneLine === true)}` : ''}`;
     case 'server':
       return `OnlyWorlds had a problem on its side while Atlas was ${doing}.${saved} Try again in a while.`;
     case 'bug':
@@ -235,6 +235,8 @@ export interface ProblemOpts {
    * "saved" clause is true for it. Defaults to the open world's.
    */
   where?: FilesWhere;
+  /** What the person typed for this step is a one-line name: the host's cause offers no code block. */
+  oneLine?: boolean;
 }
 
 /** The open world's `where`, for a caller that did not say. */

@@ -441,7 +441,7 @@ export class MakeOnlineModal extends BaseModal {
       this.hide();
     } catch (err) {
       console.warn('[make-online] create route failed:', err);
-      const sentence = problemFor(err, { inline: true, doing: 'creating the world online' }).sentence;
+      const sentence = problemFor(err, { inline: true, doing: 'creating the world online', oneLine: true }).sentence;
       errorBox.textContent = sentence;
       errorBox.hidden = !sentence;
       progressBox.hidden = true;

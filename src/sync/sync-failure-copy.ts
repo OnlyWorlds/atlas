@@ -44,9 +44,12 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
  * The usual cause of the web host's "Blocked" page and what to do (R6): a
  * command right after a code mark. Said only for that page (`host_blocked`).
  * Never the key, the PIN or signing in: nothing is wrong with them.
+ * `oneLine`: what was refused is a one-line name, where a code block cannot
+ * be written, so the only way out said is the marks left off.
  */
-export function hostRefusalCause(then: string): string {
-  return `A command written between code marks, such as \`python -m\`, is the usual cause: write it without the marks, or in a code block that names its language, ${then}.`;
+export function hostRefusalCause(then: string, oneLine = false): string {
+  const way = oneLine ? 'write it without the marks' : 'write it without the marks, or in a code block that names its language';
+  return `A command written between code marks, such as \`python -m\`, is the usual cause: ${way}, ${then}.`;
 }
 
 export const HOST_REFUSAL_CAUSE = hostRefusalCause('and it goes up');

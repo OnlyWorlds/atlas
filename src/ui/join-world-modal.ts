@@ -385,7 +385,7 @@ export class JoinWorldModal extends BaseModal {
             // The code is spent or gone: nothing here can open it any more.
             closeOnly(table ? TABLE_GONE_LINE : redeemRefusedSentence(this.preview));
           } else {
-            say(problemFor(err, { inline: true, doing: 'joining the world' }).sentence);
+            say(problemFor(err, { inline: true, doing: 'joining the world', oneLine: true }).sentence);
           }
           return;
         }

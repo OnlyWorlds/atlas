@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.13',
+    date: '2026-11-17',
+    theme: 'A refused name gets advice it can follow',
+    entries: [
+      {
+        id: 'host-refused-names',
+        title: 'A name the web host refuses gets advice you can follow',
+        body: 'When the web host in front of OnlyWorlds refuses a world\'s name at Make online or New online world, a player\'s name at an invitation, or your name on an invite link, usually because it holds a command between code marks, such as `python -m`, Atlas now says only to write it without the marks: a name has no room for a code block. Making an invite link used to say "Try again in a moment" for that refusal, which never helps; it now says the host refused it and why.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.12',
     date: '2026-11-17',
     theme: 'The web host\'s refusal said for what it is, everywhere',
