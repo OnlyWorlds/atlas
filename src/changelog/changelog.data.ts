@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.15',
+    date: '2026-11-17',
+    theme: 'An element that cannot sync says so',
+    entries: [
+      {
+        id: 'sync-dot-not-syncing',
+        title: 'The sync mark on an element says when it is not syncing',
+        body: 'In a world linked to OnlyWorlds, the small mark beside an element\'s name said "Pending sync" even when OnlyWorlds had refused the change, for as long as it kept being refused. It now shows a warning mark that says the element is not syncing and why, the same words Settings gives, and a click opens Settings, under This world, where the fix is.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.14',
     date: '2026-11-17',
     theme: 'A map keeps its view after a reload',

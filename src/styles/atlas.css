@@ -3127,6 +3127,30 @@ body.atlas-preroot .atlas-middle {
   opacity: 0.75;
 }
 
+/* Not syncing: a button to Settings' rows, in the pill's warning colour. */
+button.atlas-element-sync-dot {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  border-radius: 4px;
+}
+
+.atlas-element-sync-dot[data-state="problem"] {
+  color: var(--atlas-warn);
+  opacity: 1;
+  cursor: pointer;
+}
+
+.atlas-element-sync-dot[data-state="problem"]:hover {
+  background: var(--atlas-warn-soft-tint);
+}
+
+.atlas-element-sync-dot[data-state="problem"]:focus-visible {
+  outline: 2px solid var(--atlas-warn);
+  outline-offset: 1px;
+}
+
 .atlas-element-sync-dot[data-state="dirty"] {
   color: var(--atlas-accent-text);
   opacity: 1;

@@ -829,12 +829,14 @@ const ISSUE_ROWS_SHOWN = 50;
  * One plain line per issue. Matches only text Atlas itself writes, never
  * server text. Place words follow where the world keeps its files (1.17).
  */
-export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'folder'): string {
+export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'folder', alone = false): string {
   const f = issue.failure;
   const inBrowser = where === 'browser';
   switch (issue.kind) {
     case 'foreign_id':
-      return 'Its id belongs to another OnlyWorlds world. Give it a new id above.';
+      return alone
+        ? 'Its id belongs to another OnlyWorlds world. Settings, under This world, can give it a new id.'
+        : 'Its id belongs to another OnlyWorlds world. Give it a new id above.';
     case 'too_large':
       return 'It holds more than 64 KB of custom fields, more than OnlyWorlds accepts. Shorten one to let it sync.';
     case 'not_yours':
@@ -850,11 +852,11 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
     case 'file_busy':
       if (inBrowser) {
         return f.operation === 'read'
-          ? 'Its newer copy from OnlyWorlds could not be saved: another Atlas tab was saving to this world. Try again now, or refresh later.'
+          ? `Its newer copy from OnlyWorlds could not be saved: another Atlas tab was saving to this world. ${alone ? 'Refresh later to try again.' : 'Try again now, or refresh later.'}`
           : 'Another Atlas tab was saving to this world. Atlas tries again by itself.';
       }
       return f.operation === 'read'
-        ? 'Its newer copy from OnlyWorlds could not be saved: another program was using its file in the folder. Try again now, or refresh later.'
+        ? `Its newer copy from OnlyWorlds could not be saved: another program was using its file in the folder. ${alone ? 'Refresh later to try again.' : 'Try again now, or refresh later.'}`
         : 'Another program was using its file in the folder. Atlas tries again by itself.';
     case 'other':
     default: {
@@ -868,14 +870,21 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       if (/^referenced \w+ (was deleted|not found)/.test(m)) {
         return 'It links to something that is no longer on OnlyWorlds.';
       }
-      if (f.source === 'disk') return `OnlyWorlds has it, but Atlas could not note that ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
+      if (f.source === 'disk') {
+        // Alone, only a create is known to have reached OnlyWorlds; the other
+        // disk failures (a resync's removal, a refused delete put back) wrote nothing there.
+        if (alone && f.operation !== 'create') return `Atlas could not write it ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
+        return `OnlyWorlds has ${alone ? 'the change' : 'it'}, but Atlas could not note that ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
+      }
       if (typeof f.status === 'number' && f.status >= 500) return 'OnlyWorlds had a problem on its side. Atlas tries again with your next save.';
       if (typeof f.status === 'number' && f.status >= 400) {
         const field = f.param && /^[a-z][a-z0-9_]*$/.test(f.param) && !/^(x|shadow)_/.test(f.param)
           ? ` The problem is in its ${f.param.replace(/_/g, ' ')} field.` : '';
-        return `OnlyWorlds did not accept it.${field} Open it to check, or copy the details to report it.`;
+        return `OnlyWorlds did not accept it.${field} ${alone ? 'Settings can copy the details to report it.' : 'Open it to check, or copy the details to report it.'}`;
       }
-      return 'It could not sync. Atlas tries again with your next save; copy the details if it keeps happening.';
+      return alone
+        ? 'Atlas tries again with your next save; Settings can copy the details if it keeps happening.'
+        : 'It could not sync. Atlas tries again with your next save; copy the details if it keeps happening.';
     }
   }
 }

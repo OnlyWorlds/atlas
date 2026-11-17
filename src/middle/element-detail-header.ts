@@ -24,8 +24,10 @@ import { isKnownOf } from '../sync/known-of';
 import { editedSince } from '../store/sync-stamp';
 import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
 import {
-  parseHash, navigate, homeHash, elementHash, writingHash, mapHash,
+  parseHash, navigate, homeHash, elementHash, writingHash, mapHash, settingsHash,
 } from '../core/router';
+import { issuesFor, SYNC_ISSUES_EVENT, type SyncIssue } from '../sync/sync-issues';
+import { syncIssueLine } from './settings-world';
 import {
   getTierForNarrative, getWritingLabels, supertypeForTier, writingHashForNarrative,
 } from './writing-helpers';
@@ -336,15 +338,73 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
 
 // ====== Sync dot ======
 
+/**
+ * This element's open sync issue, as the sync pill counts it: a first
+ * busy-file failure is left out, since it usually clears by itself.
+ */
+function openIssueOf(worldId: string, elementId: string): SyncIssue | undefined {
+  return issuesFor(worldId).find(i => i.element_id === elementId && (i.kind !== 'file_busy' || i.rounds > 1));
+}
+
+/** The dot's words for an element that is not syncing: Settings' own line, standing alone. */
+export function notSyncingTitle(issue: SyncIssue, where: 'folder' | 'browser'): string {
+  // A create OnlyWorlds took whose note on disk failed is sent, not refused: its line says so alone.
+  // Every other disk failure wrote nothing to OnlyWorlds and keeps "Not syncing".
+  const sent = issue.kind === 'other' && issue.failure.source === 'disk' && issue.failure.operation === 'create';
+  return `${sent ? '' : 'Not syncing. '}${syncIssueLine(issue, where, true)} Click to see it in Settings.`;
+}
+
+let issueDotsWatched = false;
+
+/**
+ * The issues list changes at a round's end, when nothing about the element
+ * itself may have moved: redraw the dots in place, so a failed element never
+ * keeps saying "Pending sync".
+ */
+function watchIssueDots(): void {
+  if (issueDotsWatched || typeof document === 'undefined') return;
+  issueDotsWatched = true;
+  document.addEventListener(SYNC_ISSUES_EVENT, () => {
+    for (const dot of document.querySelectorAll<HTMLElement>('[data-role="element-sync-dot"][data-element-id]')) {
+      const el = getState().data.elements.find(e => e.id === dot.dataset.elementId);
+      if (!el) continue;
+      // A failure that repeats moves only its round count: the same dot stays,
+      // so focus, a hover and a press in progress survive the round.
+      const next = buildSyncDot(el);
+      if (next.dataset.state === dot.dataset.state && next.title === dot.title) continue;
+      dot.replaceWith(next);
+    }
+  });
+}
+
 function buildSyncDot(el: Element): HTMLElement {
-  const dot = document.createElement('span');
-  dot.className = 'atlas-element-sync-dot';
-  dot.setAttribute('data-role', 'element-sync-dot');
+  watchIssueDots();
   const activeId = getState().active?.worldId;
   const worldEntry = activeId
     ? getState().registry.worlds.find((w) => w.id === activeId)
     : undefined;
   const isApi = worldEntry?.state === 'api-linked';
+  const issue = isApi && activeId && !isProposedHere(activeId, el.id) && !isKeptHere(activeId, el.id)
+    ? openIssueOf(activeId, el.id)
+    : undefined;
+  if (issue && activeId) {
+    // Not syncing (any kind): a button to the rows that say why and offer the fix.
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-element-sync-dot';
+    btn.setAttribute('data-role', 'element-sync-dot');
+    btn.dataset.elementId = el.id;
+    btn.dataset.state = 'problem';
+    btn.title = notSyncingTitle(issue, filesWhereOf(worldEntry) === 'browser' ? 'browser' : 'folder');
+    btn.setAttribute('aria-label', btn.title);
+    btn.innerHTML = '<span class="material-symbols-outlined">sync_problem</span>';
+    btn.addEventListener('click', () => navigate(settingsHash(activeId, 'world')));
+    return btn;
+  }
+  const dot = document.createElement('span');
+  dot.className = 'atlas-element-sync-dot';
+  dot.setAttribute('data-role', 'element-sync-dot');
+  dot.dataset.elementId = el.id;
   let icon: string;
   let title: string;
   let state: 'local' | 'synced' | 'dirty';
