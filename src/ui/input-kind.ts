@@ -14,9 +14,12 @@ function install(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
   window.addEventListener('pointerdown', () => { lastWasKey = false; }, true);
+  // A click with no pointer behind it (detail 0: a screen reader's or voice control's press, or Enter on a button)
+  // is a press without a mouse: focus is kept as for a key.
+  window.addEventListener('click', (e) => { if (e.detail === 0) lastWasKey = true; }, true);
   window.addEventListener('keydown', (e) => {
-    // A modifier alone (Shift held for a click) is no key press.
-    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
+    // A modifier alone (Shift held for a click) is no key press, and nor is a held key's repeat landing mid-click.
+    if (e.repeat || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
     lastWasKey = true;
   }, true);
 }

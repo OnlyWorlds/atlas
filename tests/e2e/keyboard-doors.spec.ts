@@ -597,4 +597,39 @@ for (const tag of ['', ' @firefox']) {
     await expect(page.locator('[data-action="zones-dropdown"]')).toBeFocused();
     await expect(page.locator(`.atlas-middle-body[data-element-id="${zoneId}"]`)).toBeVisible();
   });
+
+  // The last press's kind (src/ui/input-kind.ts): a click with no pointer behind it keeps focus as a key does, and a
+  // held key's repeat landing inside a mouse click does not make the click read as a key.
+  test(`a press with no pointer keeps focus, a held key's repeat does not turn a click into a key${tag}`, async ({ page }) => {
+    await freshWorld(page, 'kd-input-kind');
+    const mapId = await newMap(page, 'Tree Canvas');
+    await page.evaluate(async (map) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      await store.createElement('map', { name: 'Province', parent_map: map });
+      api.patchData(await store.listElements());
+      const ui = api.getState().ui;
+      api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+    }, mapId);
+    const chev = page.locator(`.atlas-map-tree-row[data-map-id="${mapId}"] .atlas-map-tree-chevron`);
+    // A screen reader's press after a mouse press: detail 0, no pointerdown, no keydown.
+    await page.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+    await chev.focus();
+    await chev.evaluate((el) => (el as HTMLElement).click());
+    await page.waitForTimeout(250);
+    expect(await chev.evaluate((el) => document.activeElement === el)).toBe(true);
+    // A key held across a mouse click: the repeat lands between the press and the release.
+    await page.locator('[data-role="elements-search"]').focus();
+    const box = (await chev.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.keyboard.down('x');
+    await page.mouse.down();
+    await page.keyboard.down('x');
+    await page.mouse.up();
+    await page.keyboard.up('x');
+    await page.mouse.move(2, 2);
+    await page.waitForTimeout(250);
+    expect(await chev.evaluate((el) => document.activeElement === el)).toBe(false);
+    expect(await page.locator(`.atlas-map-tree-row[data-map-id="${mapId}"] .atlas-inline-actions`).first().evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
+  });
 }
