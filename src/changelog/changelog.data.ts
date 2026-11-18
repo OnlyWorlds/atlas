@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.22',
+    date: '2026-11-18',
+    theme: 'Sync says it once, and truly',
+    entries: [
+      {
+        id: 'sync-busy-retry-words',
+        title: 'A file in use says what OnlyWorlds has, and tries again by itself only when it will',
+        body: 'When OnlyWorlds took a change and a file in use elsewhere stopped Atlas writing that down here, Settings, the element\'s mark and the message after a sync said only that the file was in use; now they say what OnlyWorlds has first (a change it took, or an element it kept). "Tries again by itself" is said only when Atlas has in fact set itself to try again: a file in use while saving this world\'s own settings or its conflicts now sets that too, as does one the browser reported without its usual name, and after five tries in a row the words say your next save instead. A copy Atlas could not remove after it left what OnlyWorlds shows you says it stays here as it was.',
+        tags: ['sync'],
+      },
+      {
+        id: 'sync-pill-one-name',
+        title: 'The sync pill says one thing at a time',
+        body: 'While sync runs, the refresh button says so and is marked unavailable, where it used to offer a refresh that did nothing. A waiting save is called a save on the button, in the pill\'s tooltip and in the message if it fails. When sync stops, the pill says Sync stopped and its button See why in Settings, where it said Error beside Sync stopped.',
+        tags: ['sync', 'accessibility'],
+      },
+      {
+        id: 'one-name-per-button',
+        title: 'Buttons with one name each',
+        body: 'A writing suggestion\'s dismiss button, the rename on Home and the buttons on a page block each say the same words to a mouse\'s tooltip and to a screen reader. The dismiss button\'s focus ring now shows at full strength, as the others do.',
+        tags: ['accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.21',
     date: '2026-11-18',
     theme: 'An element\'s fields keep your place',

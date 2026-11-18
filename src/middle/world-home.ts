@@ -538,8 +538,8 @@ function buildCover(
     <h1 class="atlas-home-world-name">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   ` : `
-    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Click to rename (here only; the online name is in Settings)"><span class="atlas-home-identity-edit" role="button" tabindex="0" aria-describedby="atlas-home-rename-hint">${escapeText(meta.name)}</span></h1>
-    <span id="atlas-home-rename-hint" hidden>Press to rename it here only; the online name is in Settings.</span>
+    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Rename it here only; the online name is in Settings."><span class="atlas-home-identity-edit" role="button" tabindex="0" aria-describedby="atlas-home-rename-hint">${escapeText(meta.name)}</span></h1>
+    <span id="atlas-home-rename-hint" hidden>Rename it here only; the online name is in Settings.</span>
     ${descriptionMarkup}
   `;
   // The OnlyWorlds mark after the name, in a row with it, never inside the click-to-rename h1.

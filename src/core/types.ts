@@ -573,6 +573,12 @@ export interface PerElementFailure {
    * a conflict. Only `note` and `put_back` are redone by the next round.
    */
   local_step?: 'note' | 'note_edit' | 'put_back' | 'restore_links' | 'remove';
+  /**
+   * Set by the engine on a held file's failure when its round armed the
+   * timed retry (`isBusyFailure`, push side, five rounds in a row at most).
+   * The words say "tries again by itself" only where this is set.
+   */
+  retry_armed?: true;
 }
 
 // ---- Registry ----

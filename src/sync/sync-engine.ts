@@ -34,6 +34,7 @@ import {
 import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS } from '../core/constants';
 import { keptOnCreate } from '../core/review-mark';
 import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
+import { isBusyFailure } from './sync-failure-copy';
 import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
 import { isHostBlockedPage } from './host-blocked-page';
@@ -576,7 +577,11 @@ export class SyncEngine {
    * persist, and said nothing anywhere.
    */
   private transientRetryTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Push rounds in a row that met a held file: caps the busy retries. */
+  /**
+   * Push and sync rounds in a row, run to their end, that met a held file: caps the busy
+   * retries (`armBusyRetry`). A round stopped by a refused key or a busy server neither
+   * counts nor resets it.
+   */
   private busyRounds = 0;
   /**
    * Proposals keel took whose sync-state entry could not be written (a held
@@ -732,6 +737,34 @@ export class SyncEngine {
       if (this.inFlight && this.inFlightKind === 'pull') void this.inFlight.then(retry, retry);
       else retry();
     }, delay);
+  }
+
+  /**
+   * A file another program held past the writer's own retries: the element
+   * stays dirty, so try again shortly instead of waiting for the person's
+   * next edit (the Discord report: it healed only on the next save). Five
+   * rounds in a row at most: a file that never frees up (read-only, locked
+   * for good) stops costing a round every 30 s. Called by a push or sync
+   * round that ran to its end, with every failure of the round; each
+   * push-side busy failure it covers is marked `retry_armed`, which is what
+   * lets the words say "tries again by itself". A pull-side one waits for
+   * the next refresh, and a pull-only round decides nothing here.
+   */
+  private armBusyRetry(failures: PerElementFailure[], timerSet = false): void {
+    // A removal or a link put back after a resync is no push's work (no
+    // round redoes them, the words promise nothing): they never arm.
+    const busy = failures.filter(f => f.operation !== 'read'
+      && f.local_step !== 'restore_links' && f.local_step !== 'remove' && isBusyFailure(f));
+    // A round stopped by a busy server already set the transient retry, which
+    // pushes these too: marked so, the count of busy rounds left alone.
+    if (timerSet) {
+      for (const f of busy) f.retry_armed = true;
+      return;
+    }
+    this.busyRounds = busy.length > 0 ? this.busyRounds + 1 : 0;
+    if (busy.length === 0 || this.stopped || this.busyRounds > 5) return;
+    this.scheduleTransientRetry(undefined);
+    for (const f of busy) f.retry_armed = true;
   }
 
   private settleThrownRound(err: unknown): void {
@@ -1851,6 +1884,7 @@ export class SyncEngine {
       meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
       ...keptFields(pushResult),
     };
+    if (!result.auth_blocked) this.armBusyRetry(result.failures, !!result.transient_blocked);
     this.onSyncResult('push', result);
     return result;
   }
@@ -1966,6 +2000,7 @@ export class SyncEngine {
         retry_after_ms: pushResult.retry_after_ms,
         ...keptFields(pushResult),
       };
+      this.armBusyRetry(result.failures, true);
       this.onSyncResult('sync', result);
       return result;
     }
@@ -1975,6 +2010,9 @@ export class SyncEngine {
     try {
       pullResult = await this.pullPhase(handledIds);
     } catch (err) {
+      // The push half ran to its end: its held files still get their retry
+      // (before 1.124.22 the push armed it itself, ahead of the pull).
+      this.armBusyRetry([...meta.failures, ...pushResult.failures]);
       this.settleThrownRound(err);
       throw err;
     }
@@ -2003,6 +2041,7 @@ export class SyncEngine {
     } else {
       this.settleIdle(nowIso());
     }
+    if (!result.auth_blocked) this.armBusyRetry(result.failures);
     this.onSyncResult('sync', result);
     return result;
   }
@@ -3146,16 +3185,8 @@ export class SyncEngine {
         failures.push(failureOf('world', 'world', 'update', err));
       }
     }
-    // A file another program held past the writer's own retries: the
-    // element stays dirty, so try again shortly instead of waiting for the
-    // user's next edit (the Discord report: it healed only on the next save).
-    // Five rounds in a row at most: a file that never frees up (read-only,
-    // locked for good) stops costing a round every 30 s.
-    const busy = failures.some(f => isFileBusyError({ name: f.error_name }));
-    this.busyRounds = busy ? this.busyRounds + 1 : 0;
-    if (busy && !transient && !authBlocked && !this.stopped && this.busyRounds <= 5) {
-      this.scheduleTransientRetry(undefined);
-    }
+    // A held file's timed retry is decided by the round, once every failure
+    // is in (the meta step's and the conflicts' too): `armBusyRetry`.
     // The role this round read, reported so Settings moves with the first
     // kept 404, not at the next pull's resync. A round that never
     // asked reports nothing; an unknown role is not news.

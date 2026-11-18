@@ -35,7 +35,9 @@ for (const tag of ['', ' @firefox']) {
     // The heading reads the name alone; where the rename applies is its description.
     await expect(name).toHaveAccessibleName('Keyed World');
     await expect(page.locator('h1[data-edit="name"]')).toHaveAccessibleName('Keyed World');
-    await expect(name).toHaveAccessibleDescription('Press to rename it here only; the online name is in Settings.');
+    await expect(name).toHaveAccessibleDescription('Rename it here only; the online name is in Settings.');
+    // One sentence for both: the mouse's tooltip says what the keyboard's description says.
+    await expect(page.locator('h1[data-edit="name"]')).toHaveAttribute('title', 'Rename it here only; the online name is in Settings.');
     await name.focus();
     await page.keyboard.press('Enter');
     const input = page.locator('.atlas-edit-popover input, .atlas-edit-popover textarea').first();

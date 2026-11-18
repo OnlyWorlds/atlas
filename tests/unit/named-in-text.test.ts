@@ -80,6 +80,8 @@ describe('the Potentials column', () => {
       expect(a.tagName).toBe('BUTTON');
       expect(a.parentElement?.closest('button')).toBeNull();
       expect(a.getAttribute('aria-label')).toMatch(/^(Link|Dismiss) /);
+      // One name each: the title says what the label says.
+      expect(a.title).toBe(a.getAttribute('aria-label'));
     }
     // The row's own press still selects the element.
     const row = host.querySelector<HTMLElement>('.atlas-context-pane-list-suggested [data-named] .atlas-context-pane-row')!;

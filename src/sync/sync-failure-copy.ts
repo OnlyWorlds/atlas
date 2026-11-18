@@ -19,9 +19,18 @@ export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'host_refus
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
 
+/**
+ * A held file, by the error's name or, where a wrapper lost the name, by
+ * Chromium's text. The engine's timed retry and the words read this one
+ * test, so a retry is armed for every failure the words call busy.
+ */
+export function isBusyFailure(f: Pick<PerElementFailure, 'error_name' | 'message'>): boolean {
+  return isFileBusyError({ name: f.error_name }) || HELD_FILE_TEXT.test(f.message ?? '');
+}
+
 export function classifyFailure(f: PerElementFailure): FailureKind {
   const m = f.message ?? '';
-  if (isFileBusyError({ name: f.error_name }) || HELD_FILE_TEXT.test(m)) return 'file_busy';
+  if (isBusyFailure(f)) return 'file_busy';
   // The web host in front of keel refused the write for its text: a 403 with
   // no keel code (keel names every refusal). By status and the absent code,
   // never the page's text.
@@ -90,11 +99,44 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
       ? `${plural(busyPull.length, 'newer copy', 'newer copies')} from OnlyWorlds could not be saved because another Atlas tab was saving to this world. Refresh in a moment to try again.`
       : `${plural(busyPull.length, 'newer copy', 'newer copies')} from OnlyWorlds could not be saved because another program was using ${busyPull.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. Refresh in a moment to try again.`);
   }
-  const busy = [...new Set(byKind.get('file_busy')?.filter(f => f.operation !== 'read').map(f => f.element_id) ?? [])];
+  // An upload's held file: "in a moment" only where the round armed the
+  // retry (`retry_armed`), else the next save. A held file after OnlyWorlds
+  // took the change (a note step) says OnlyWorlds has it; the two steps no
+  // round redoes point at Settings, where each says what it needs.
+  const busyUp = byKind.get('file_busy')?.filter(f => f.operation !== 'read') ?? [];
+  const ids = (fs: PerElementFailure[]): string[] => [...new Set(fs.map(f => f.element_id))];
+  const heldBy = (n: number): string => inBrowser
+    ? 'another Atlas tab was saving to this world'
+    : `another program was using ${n === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this`;
+  const againFor = (fs: PerElementFailure[]): string => fs.every(f => f.retry_armed)
+    ? 'Atlas will try again in a moment.' : 'Atlas will try again with your next save.';
+  const place = inBrowser ? 'in this browser' : 'on your disk';
+  const noted = busyUp.filter(f => f.local_step === 'note');
+  const notedEdits = busyUp.filter(f => f.local_step === 'note_edit');
+  const putBack = busyUp.filter(f => f.local_step === 'put_back');
+  const unredone = busyUp.filter(f => f.local_step === 'restore_links' || f.local_step === 'remove');
+  const busy = busyUp.filter(f => f.local_step === undefined);
+  if (noted.length > 0) {
+    const n = ids(noted).length;
+    parts.push(`OnlyWorlds has ${plural(n, 'change', 'changes')}, but Atlas could not note ${n === 1 ? 'it' : 'them'} ${place} because ${heldBy(n)}. ${againFor(noted)}`);
+  }
+  // An edit sent: the next round can read keel's newer stamp as a conflict, so no promise to resend.
+  if (notedEdits.length > 0) {
+    const n = ids(notedEdits).length;
+    parts.push(`OnlyWorlds has ${plural(n, 'edit', 'edits')}, but Atlas could not note ${n === 1 ? 'it' : 'them'} ${place} because ${heldBy(n)}. The next sync may list ${n === 1 ? 'it' : 'them'} as a conflict; both copies hold your change.`);
+  }
+  // OnlyWorlds refused the delete and kept the element; putting it back here is what failed.
+  if (putBack.length > 0) {
+    const n = ids(putBack).length;
+    parts.push(`OnlyWorlds kept ${plural(n, 'element', 'elements')} deleted here, but Atlas could not put ${n === 1 ? 'it' : 'them'} back ${place} because ${heldBy(n)}. ${againFor(putBack)}`);
+  }
+  if (unredone.length > 0) {
+    const n = ids(unredone).length;
+    parts.push(`Atlas could not finish ${plural(n, 'change', 'changes')} from OnlyWorlds ${place} because ${heldBy(n)}. Settings, under This world, says what happened.`);
+  }
   if (busy.length > 0) {
-    parts.push(inBrowser
-      ? `${plural(busy.length, 'change', 'changes')} could not sync yet because another Atlas tab was saving to this world. ${busy.length === 1 ? 'It is' : 'They are'} saved in this browser, and Atlas will try again in a moment.`
-      : `${plural(busy.length, 'change', 'changes')} could not sync yet because another program was using ${busy.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. ${busy.length === 1 ? 'It is' : 'They are'} saved on your disk, and Atlas will try again in a moment.`);
+    const n = ids(busy).length;
+    parts.push(`${plural(n, 'change', 'changes')} could not sync yet because ${heldBy(n)}. ${n === 1 ? 'It is' : 'They are'} saved ${inBrowser ? 'in this browser' : 'on your disk'}. ${againFor(busy)}`);
   }
   const hostRefused = byKind.get('host_refused');
   if (hostRefused) {

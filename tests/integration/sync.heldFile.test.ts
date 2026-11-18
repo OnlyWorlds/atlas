@@ -197,3 +197,106 @@ describe('a push while a new character is held', () => {
     expect((engine as unknown as { transientRetryTimer: unknown }).transientRetryTimer).not.toBeNull();
   });
 });
+
+/**
+ * "Tries again by itself" is said only where the round armed the timer
+ * (`retry_armed`), and the round arms it for every failure the words call
+ * busy: one test (`isBusyFailure`), decided once every failure of the round
+ * is in. Before, the timer read only pushPhase's own failures by the error's
+ * name, so a busy text with no name, the meta step's held file and the
+ * conflicts' held file armed nothing while the words promised a retry.
+ */
+describe('a held file\'s retry is armed where the words say so', () => {
+  const HELD = 'An operation that depends on state cached in an interface object was made but the state had changed since it was read from disk.';
+  const timerOf = (engine: SyncEngine) => (engine as unknown as { transientRetryTimer: ReturnType<typeof setTimeout> | null });
+  const clearTimer = (engine: SyncEngine) => {
+    const e = timerOf(engine);
+    if (e.transientRetryTimer) clearTimeout(e.transientRetryTimer);
+    e.transientRetryTimer = null;
+  };
+  const busyErr = () => Object.assign(new Error('held'), { name: 'NoModificationAllowedError' });
+
+  it('a busy text whose name a wrapper lost arms the retry and is marked so', async () => {
+    const { store, engine } = await world();
+    await store.createElement('character', { name: 'Mira' });
+    const real = store.stampServerUpdatedAt.bind(store);
+    store.stampServerUpdatedAt = async () => { throw new Error(HELD); };
+    const r = await engine.pushOnce();
+    store.stampServerUpdatedAt = real;
+    const f = r.failures.find(x => x.type === 'character')!;
+    expect(f.error_name).toBeUndefined();
+    expect(f.retry_armed).toBe(true);
+    expect(timerOf(engine).transientRetryTimer).not.toBeNull();
+  });
+
+  it('the meta step\'s held file, with nothing else to send, arms the retry', async () => {
+    const { engine } = await world();
+    (engine as unknown as { executeMetaStep: () => Promise<never> }).executeMetaStep = async () => { throw busyErr(); };
+    const r = await engine.pushOnce();
+    expect(r.failures).toEqual([expect.objectContaining({ element_id: 'world', retry_armed: true })]);
+    expect(timerOf(engine).transientRetryTimer).not.toBeNull();
+  });
+
+  it('the conflicts\' held file under Pause and review arms the retry', async () => {
+    const { engine } = await world();
+    engine.setPolicy('pause-and-review');
+    (engine as unknown as { persistConflicts: () => Promise<never> }).persistConflicts = async () => { throw busyErr(); };
+    const r = await engine.pushOnce();
+    expect(r.failures).toEqual([expect.objectContaining({ element_id: 'world', retry_armed: true })]);
+    expect(timerOf(engine).transientRetryTimer).not.toBeNull();
+  });
+
+  it('the sixth busy round in a row arms nothing, and its failure is not marked', async () => {
+    const { root, store, engine } = await world();
+    await store.createElement('character', { name: 'Mira' });
+    root.hold(charFile(root));
+    for (let i = 0; i < 5; i++) {
+      const r = await engine.pushOnce();
+      expect(r.failures.every(f => f.retry_armed)).toBe(true);
+    }
+    clearTimer(engine);
+    const r6 = await engine.pushOnce();
+    expect(timerOf(engine).transientRetryTimer).toBeNull();
+    expect(r6.failures.length).toBeGreaterThan(0);
+    expect(r6.failures.some(f => f.retry_armed)).toBe(false);
+  });
+
+  it('a sync round whose pull throws still arms its push half\'s held file', async () => {
+    const { root, store, engine } = await world();
+    await store.createElement('character', { name: 'Mira' });
+    root.hold(charFile(root));
+    (engine as unknown as { pullPhase: () => Promise<never> }).pullPhase = async () => { throw new TypeError('Failed to fetch'); };
+    await expect(engine.syncNow()).rejects.toThrow();
+    expect(timerOf(engine).transientRetryTimer).not.toBeNull();
+  });
+
+  it('a round a busy server stopped marks its held files: the transient retry pushes them', async () => {
+    const { engine } = await world();
+    const held = { element_id: 'e1', type: 'character' as const, operation: 'create' as const, message: 'held', error_name: 'NoModificationAllowedError', source: 'disk' as const, local_step: 'note' as const };
+    (engine as unknown as { pushPhase: () => Promise<unknown> }).pushPhase = async () => ({
+      pushed: { creates: 0, updates: 0, deletes: 0 }, pulled: { creates: 0, updates: 0, deletes: 0 },
+      conflicts: [], failures: [held], transient_blocked: true, retry_after_ms: 5000,
+    });
+    const r = await engine.pushOnce();
+    expect(r.failures.find(f => f.element_id === 'e1')?.retry_armed).toBe(true);
+    expect(timerOf(engine).transientRetryTimer).not.toBeNull();
+  });
+
+  it('a held removal or link put back after a resync arms nothing (no push redoes them)', async () => {
+    const { engine } = await world();
+    clearTimer(engine);
+    const steps = (['remove', 'restore_links'] as const).map(local_step => ({ element_id: local_step, type: 'character' as const, operation: local_step === 'remove' ? 'delete' as const : 'update' as const, message: 'held', error_name: 'NoModificationAllowedError', source: 'disk' as const, local_step }));
+    (engine as unknown as { armBusyRetry: (f: unknown[]) => void }).armBusyRetry(steps);
+    expect(timerOf(engine).transientRetryTimer).toBeNull();
+    expect(steps.some(s => (s as { retry_armed?: true }).retry_armed)).toBe(false);
+  });
+
+  it('a pull-side held file arms nothing (it waits for the next refresh)', async () => {
+    const { engine } = await world();
+    const fake = { element_id: 'x', type: 'character' as const, operation: 'read' as const, message: 'held', error_name: 'NoModificationAllowedError', source: 'disk' as const };
+    clearTimer(engine);
+    (engine as unknown as { armBusyRetry: (f: unknown[]) => void }).armBusyRetry([fake]);
+    expect(timerOf(engine).transientRetryTimer).toBeNull();
+    expect((fake as { retry_armed?: true }).retry_armed).toBeUndefined();
+  });
+});

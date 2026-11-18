@@ -1436,7 +1436,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     b.type = 'button';
     b.className = 'atlas-share-block-ctrl';
     b.title = title;
-    b.innerHTML = `<span class="material-symbols-outlined">${icon}</span>`;
+    // Named by its words, never the icon's (the glyph is a ligature word).
+    b.setAttribute('aria-label', title);
+    b.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${icon}</span>`;
     b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
     return b;
   }

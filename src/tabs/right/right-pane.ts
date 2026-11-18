@@ -459,7 +459,10 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   pill.dataset.clickable = 'true';
   // The click's own test: an errored engine opens Settings (no engine says why in a toast).
   const errored = engine?.kind === 'error';
-  pill.title = title + (conflictCount > 0 ? '' : errored ? ' · click to see why in Settings' : ' · click to refresh from OnlyWorlds');
+  // A press while a round runs does nothing (the round is already asking), so
+  // neither the title nor the button offers one then.
+  const busyRound = engine?.kind === 'syncing';
+  pill.title = title + (conflictCount > 0 || busyRound ? '' : errored ? ' · click to see why in Settings' : ' · click to refresh from OnlyWorlds');
   // Each badge's title is its name, so a screen reader says it once.
   const conflictName = `Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}`;
   const conflictBadge = conflictCount > 0
@@ -475,9 +478,13 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     : '';
   // The refresh button is the keyboard's way to the pill's click, so its name
   // says what that click does now: push a waiting save, open Settings on an
-  // error, or refresh (a paused or busy engine says why nothing came).
+  // error, or refresh (a paused engine says why nothing came). While a round
+  // runs it presses nothing: it says so and is marked disabled, keeping its
+  // place for the keyboard.
+  const roundOnly = busyRound && !currentPendingPush;
   const refreshName = currentPendingPush ? 'Save to OnlyWorlds now'
-    : errored ? 'Sync stopped: see why in Settings'
+    : errored ? 'See why in Settings'
+    : roundOnly ? 'Syncing with OnlyWorlds now'
     : 'Refresh from OnlyWorlds';
   // "Review N" is the badge's name too: the label is not said twice.
   const labelHidden = conflictCount > 0 && base.dataState === 'synced' ? ' aria-hidden="true"' : '';
@@ -488,7 +495,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     <span${labelHidden}>${label}</span>
     ${conflictBadge}
     ${issueBadge}
-    <button type="button" class="atlas-sync-pill-refresh" data-role="refresh" aria-label="${refreshName}"><span class="material-symbols-outlined">refresh</span></button>
+    <button type="button" class="atlas-sync-pill-refresh" data-role="refresh" aria-label="${refreshName}"${roundOnly ? ' aria-disabled="true"' : ''}><span class="material-symbols-outlined">refresh</span></button>
   `, active.worldId);
   if (wrote) pill.querySelector<HTMLElement>('[data-role="sync-issues"]')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -505,7 +512,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     const debounceMs = Math.max(1, currentPendingPush.debounceMs);
     const elapsed = Math.max(0, Math.min(debounceMs, debounceMs - remaining));
     pill.style.setProperty('--decay-fraction', String(elapsed / debounceMs));
-    pill.title = `Saving in ${Math.max(0, Math.ceil(remaining / 1000))}s · click to push now`;
+    pill.title = `Saving to OnlyWorlds in ${Math.max(0, Math.ceil(remaining / 1000))}s · click to save now`;
   } else {
     pill.dataset.pending = 'false';
     pill.style.removeProperty('--decay-fraction');
@@ -533,7 +540,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
           await eng.flushPendingPush();
         } catch (err) {
           console.warn('[right-pane] push now failed:', err);
-          showProblem(err, { doing: 'uploading changes', savedLocally: true, retry: pushNow, toasts });
+          showProblem(err, { doing: 'saving to OnlyWorlds', savedLocally: true, retry: pushNow, toasts });
         }
       };
       await pushNow();
@@ -651,7 +658,7 @@ function mapEngineStateToPill(
     case 'error':
       return {
         dataState: 'error',
-        label: 'Error',
+        label: 'Sync stopped',
         title: engine.message,
       };
   }
@@ -713,7 +720,7 @@ function startDecayTick(toasts: ToastManager): void {
       pill.style.setProperty('--decay-fraction', String(elapsed / debounceMs));
       // Update the time-left tooltip — rounded to nearest second so it
       // doesn't flicker every frame.
-      pill.title = `Saving in ${Math.max(0, Math.ceil(remaining / 1000))}s · click to push now`;
+      pill.title = `Saving to OnlyWorlds in ${Math.max(0, Math.ceil(remaining / 1000))}s · click to save now`;
     }
     pendingPushRafHandle = requestAnimationFrame(tick);
   };

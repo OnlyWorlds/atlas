@@ -14870,6 +14870,10 @@ a.atlas-share-map-pin { cursor: pointer; }
   flex-shrink: 0;
   margin-left: 2px;
 }
+/* Full strength under the keyboard's focus too, so its ring is not painted at 60%. */
+.atlas-context-pane-row-dismiss:focus-visible {
+  opacity: 1;
+}
 .atlas-context-pane-row-dismiss:hover {
   opacity: 1;
   color: var(--atlas-danger-hover);

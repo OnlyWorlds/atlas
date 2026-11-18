@@ -538,13 +538,27 @@ for (const tag of ['', ' @firefox']) {
     // A save waiting: the press pushes it now, and the name says so.
     await page.evaluate(() => document.dispatchEvent(new CustomEvent('atlas:pending-push', { detail: { scheduledAt: Date.now() + 60_000, debounceMs: 60_000 } })));
     await expect(refresh).toHaveAccessibleName('Save to OnlyWorlds now');
+    // One verb for the waiting save: the pill's title says save too.
+    await expect(pill).toHaveAttribute('title', /^Saving to OnlyWorlds in \d+s · click to save now$/);
     await page.evaluate(() => document.dispatchEvent(new CustomEvent('atlas:pending-push', { detail: { scheduledAt: null, debounceMs: 5000 } })));
-    // Sync in an error: the press opens Settings, and the name says so.
+    // A round running: a press does nothing, and the button and title say so.
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      api.patchSlice('sync', { ...api.getState().sync, activeSync: { kind: 'syncing', phase: 'pull' } });
+    });
+    await expect(refresh).toHaveAccessibleName('Syncing with OnlyWorlds now');
+    await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+    await expect(pill).toHaveAttribute('title', 'Syncing');
+    await expect(refresh).toBeFocused();
+    // Sync in an error: the press opens Settings, and the label and the name say one thing.
     await page.evaluate(() => {
       const api = (window as any).__atlasTestApi;
       api.patchSlice('sync', { ...api.getState().sync, activeSync: { kind: 'error', message: 'The PIN was not accepted.', recoverable: true } });
     });
-    await expect(refresh).toHaveAccessibleName('Sync stopped: see why in Settings');
+    await expect(refresh).toHaveAccessibleName('See why in Settings');
+    await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(pill.locator('span', { hasText: 'Sync stopped' })).toBeVisible();
+    await expect(pill).not.toContainText('Error');
     await expect(pill).toHaveAttribute('title', 'The PIN was not accepted. · click to see why in Settings');
     await expect(refresh).toBeFocused();
   });

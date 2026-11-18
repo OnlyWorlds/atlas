@@ -193,14 +193,30 @@ describe('the sync dot and a failed element', () => {
     expect(lineOf(disk('update', 'restore_links')).title)
       .toBe('Not syncing. OnlyWorlds kept an element this one links to, but Atlas could not put that link back in the folder. Add the link again to keep it. See it in Settings.');
     expect(lineOf(disk('delete', 'remove')).row)
-      .toBe('It is no longer in what OnlyWorlds shows you, but Atlas could not remove it from the folder.');
+      .toBe('It is no longer in what OnlyWorlds shows you, but Atlas could not remove it from the folder. It stays here as it was, and nothing changed on OnlyWorlds.');
     expect(lineOf(disk('update')).row).toBe('Atlas could not write it in the folder. Atlas tries again with your next save.');
     for (const step of ['note', 'put_back', 'restore_links', 'remove', undefined] as const) {
       expect(lineOf(disk('update', step)).row).not.toMatch(/by itself/);
     }
-    // A busy file does arm the timer, and keeps saying so.
-    expect(lineOf(fail({ status: undefined, source: 'disk', error_name: 'NoModificationAllowedError' })).row)
+    // A busy file says "by itself" only where its round armed the timer.
+    const held = (extra: Partial<PerElementFailure> = {}) =>
+      fail({ status: undefined, source: 'disk', error_name: 'NoModificationAllowedError', ...extra });
+    expect(lineOf(held({ retry_armed: true })).row)
       .toBe('Another program was using its file in the folder. Atlas tries again by itself.');
+    // The sixth round in a row, or a pull-only round's meta step: no timer, so the next save.
+    expect(lineOf(held()).row)
+      .toBe('Another program was using its file in the folder. Atlas tries again with your next save.');
+    // A held file after OnlyWorlds took the change: OnlyWorlds has it, said first.
+    expect(lineOf(held({ operation: 'create', local_step: 'note', retry_armed: true })).row)
+      .toBe('OnlyWorlds has it, but another program was using its file in the folder, so Atlas could not note that there. Atlas tries again by itself.');
+    expect(lineOf(held({ operation: 'create', local_step: 'note', retry_armed: true })).title)
+      .toBe('OnlyWorlds has the change, but another program was using its file in the folder, so Atlas could not note that there. Atlas tries again by itself. See it in Settings.');
+    expect(lineOf(held({ operation: 'delete', local_step: 'note', retry_armed: true }), 'browser').row)
+      .toBe('OnlyWorlds has the delete, but another Atlas tab was saving to this world, so Atlas could not note that in this browser. Atlas tries again by itself.');
+    expect(lineOf(held({ operation: 'update', local_step: 'note_edit', retry_armed: true })).row)
+      .toBe('OnlyWorlds has it, but another program was using its file in the folder, so Atlas could not note that there, and the next sync may list it as a conflict. Both copies hold your change.');
+    expect(lineOf(held({ operation: 'delete', local_step: 'put_back' })).row)
+      .toBe('OnlyWorlds kept it when it was deleted here, but another program was using its file in the folder, so Atlas could not put it back there. Atlas tries again with your next save.');
     // Except for the two steps no round redoes: busy or not, the step's own words.
     for (const step of ['restore_links', 'remove'] as const) {
       const busy = lineOf(fail({ operation: step === 'remove' ? 'delete' : 'update', status: undefined, source: 'disk', error_name: 'NoModificationAllowedError', local_step: step }), 'browser').row;

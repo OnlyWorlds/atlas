@@ -379,8 +379,9 @@ function buildRow(el: Element, opts: RowOpts): HTMLElement {
     const dismissBtn = document.createElement('button');
     dismissBtn.type = 'button';
     dismissBtn.className = 'atlas-context-pane-row-dismiss';
-    dismissBtn.title = 'Dismiss suggestion for this narrative';
-    dismissBtn.setAttribute('aria-label', `Dismiss ${name} as a suggestion for this narrative`);
+    // One name, as the Link button beside it has: its title is its label.
+    dismissBtn.title = `Dismiss ${name} as a suggestion for this narrative`;
+    dismissBtn.setAttribute('aria-label', dismissBtn.title);
     dismissBtn.textContent = '×';
     dismissBtn.addEventListener('click', () => { const back = keepFocusNear(wrap); void Promise.resolve(opts.onDismiss?.()).finally(back); });
     wrap.appendChild(dismissBtn);

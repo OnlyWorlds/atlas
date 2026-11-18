@@ -48,6 +48,27 @@ describe('sync failure copy', () => {
     expect(text).not.toContain('—');
   });
 
+  it('a held file says what OnlyWorlds has by the step, and "in a moment" only where a retry is armed', () => {
+    const at = (local_step: PerElementFailure['local_step'], extra: Partial<PerElementFailure> = {}): PerElementFailure =>
+      ({ ...busy(local_step ?? 'plain'), source: 'disk', ...(local_step ? { local_step } : {}), ...extra });
+    expect(describeFailures([at(undefined, { retry_armed: true })])).toContain('Atlas will try again in a moment.');
+    expect(describeFailures([at(undefined)])).toContain('Atlas will try again with your next save.');
+    expect(describeFailures([at(undefined)])).not.toContain('in a moment');
+    expect(describeFailures([at('note', { retry_armed: true })])).toMatch(/^OnlyWorlds has 1 change, but Atlas could not note it on your disk because another program was using its file/);
+    // An edit: no promise to resend, the conflict said instead.
+    const edit = describeFailures([at('note_edit', { operation: 'update', retry_armed: true })]);
+    expect(edit).toContain('The next sync may list it as a conflict; both copies hold your change.');
+    expect(edit).not.toMatch(/try again/);
+    // OnlyWorlds refused the delete and kept the element: never "OnlyWorlds has 1 change".
+    const back = describeFailures([at('put_back', { operation: 'delete', retry_armed: true })], 'browser');
+    expect(back).toBe('OnlyWorlds kept 1 element deleted here, but Atlas could not put it back in this browser because another Atlas tab was saving to this world. Atlas will try again in a moment.');
+    for (const step of ['remove', 'restore_links'] as const) {
+      const t = describeFailures([at(step)]);
+      expect(t).toContain('Settings, under This world, says what happened.');
+      expect(t).not.toMatch(/try again/);
+    }
+  });
+
   it('keeps an element\'s first held-file failure quiet and says the second', () => {
     expect(failureToastOnce([busy('a')])).toBeNull();
     expect(failureToastOnce([busy('a')])).toContain('another program');
