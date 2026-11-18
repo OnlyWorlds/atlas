@@ -46,13 +46,18 @@ export function focusArrival(find?: () => HTMLElement | null): void {
     const now = document.activeElement;
     const fell = !now || now === document.body || !now.isConnected;
     if (!fell && now !== pressed && now !== placed) return;
-    if (fell && last && last !== document.body && last !== pressed && last !== placed) return;
+    // Focus fell from a node still on the page (a click on plain text, the
+    // pressed chip blurred by the person): their move, never undone. Only a
+    // node that is gone (the old page, a heading drawn again) hands focus on.
+    if (fell && last && last !== document.body && (last.isConnected || (last !== pressed && last !== placed))) return;
     if (fell || now === pressed) {
       const heading = findHeading();
       if (heading && heading.isConnected) {
         // A heading that is no control takes focus from a script only.
         if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
-        heading.focus();
+        // The first landing scrolls to the new page's start; a hand-on to a
+        // heading drawn again keeps where the person has scrolled.
+        heading.focus({ preventScroll: placed !== null });
         placed = heading;
       }
     }

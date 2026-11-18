@@ -86,6 +86,20 @@ export function installRowKeydownActivation(root: HTMLElement, selector = '[role
 }
 
 /**
+ * One press per key press on native buttons under `root` (or `root` itself): a
+ * held Enter clicks a button again on every repeat, and a button that hands
+ * focus to its twin (a toggle and its way back, a fold rebuilt in place) would
+ * flip once per repeat. The repeat's default is cancelled; the event is marked,
+ * never stopped, so every listener still sees it.
+ */
+export function pressOncePerKey(root: HTMLElement): void {
+  root.addEventListener('keydown', (e) => {
+    if (!e.repeat || (e.key !== 'Enter' && e.key !== ' ')) return;
+    if ((e.target as HTMLElement).closest('button') && root.contains(e.target as Node)) e.preventDefault();
+  });
+}
+
+/**
  * A number from untrusted data (a world file): the value when it is a finite
  * number or a numeric string, else the fallback. A string `order` from a
  * foreign folder was concatenated straight into HTML before this.

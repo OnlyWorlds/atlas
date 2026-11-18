@@ -16,6 +16,7 @@ import type { TimelineViewExtras, TimelineViewHandle } from './timeline-view';
 import { layoutScroll, type ScrollLayout } from './scroll-layout';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
+import { lastPressWasKey } from '../../ui/input-kind';
 import { formatStep, formatDuration, type CalendarConfig } from '@onlyworlds/sdk';
 
 export interface ScrollViewOptions {
@@ -146,6 +147,8 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
    * focus on a card's head: the card it opened, else the one it was in.
    */
   function headBack(ids: Array<string | null>): void {
+    // A key press only: after a mouse click focus goes as it always did.
+    if (!lastPressWasKey()) return;
     const a = document.activeElement;
     if (a && a !== document.body && a.isConnected) return;
     for (const id of ids) {

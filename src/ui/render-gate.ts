@@ -1,3 +1,5 @@
+import { lastPressWasKey } from './input-kind';
+
 /**
  * A rebuild gate (conv. 146). A surface that rebuilds its clickable
  * nodes on every store change or hashchange loses any click whose press and
@@ -56,11 +58,13 @@ export function keepingFocus(root: Element, selector: string, draw: () => void):
  * Draw a surface that rebuilds its controls with innerHTML, keeping keyboard
  * focus on the same control: `keyOf` names the focused control by a selector
  * that finds its twin in the new markup (null for one it does not keep). Only
- * when the rebuild dropped focus to the page; focus moved elsewhere stays.
+ * when the rebuild dropped focus to the page; focus moved elsewhere stays. Only
+ * for a person on the keyboard: after a mouse click focus goes as it always
+ * did, so no hover-only control is left showing (ui/input-kind.ts).
  */
 export function keepingFocusOn(root: Element, keyOf: (el: HTMLElement) => string | null, draw: () => void): void {
   const active = document.activeElement;
-  const key = active instanceof HTMLElement && root.contains(active) ? keyOf(active) : null;
+  const key = active instanceof HTMLElement && root.contains(active) && lastPressWasKey() ? keyOf(active) : null;
   draw();
   if (!key) return;
   const now = document.activeElement;

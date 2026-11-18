@@ -93,11 +93,12 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
     headerRow.setAttribute('aria-expanded', String(!isCollapsed));
     installRowKeydownActivation(headerRow);
     const focusKey = `${el.id}::${collapsedKey}`;
-    headerRow.addEventListener('click', () => {
+    headerRow.addEventListener('click', (e) => {
       if (collapsedSections.has(collapsedKey)) collapsedSections.delete(collapsedKey);
       else collapsedSections.add(collapsedKey);
-      // The page redraws (now, or when a held press lands): focus comes back to this fold.
-      sectionFocusAfterDraw = document.activeElement === headerRow ? focusKey : null;
+      // The page redraws (now, or when a held press lands): after a key press
+      // (detail 0) focus comes back to this fold; a mouse click leaves it be.
+      sectionFocusAfterDraw = document.activeElement === headerRow && e.detail === 0 ? focusKey : null;
       // Re-emit data.elements with a new array reference so the detail subscriber re-fires.
       const data = getState().data;
       patchSlice('data', { elements: [...data.elements] });

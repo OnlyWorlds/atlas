@@ -45,7 +45,7 @@ import { renderElementImage } from '../ui/element-image';
 import { renderGate } from '../ui/render-gate';
 import { afterPress, pressHeld } from '../ui/press';
 import { sameButStamps } from './held-element';
-import { escapeText, relativeTime } from '../core/dom-utils';
+import { escapeText, relativeTime, pressOncePerKey } from '../core/dom-utils';
 import { proposedNoteFor } from './element-agent-mark';
 import { hiddenMarkLine } from '../core/hidden-mark';
 import { doorTrail, type DoorRead, type TrailStep } from '../core/door-trail';
@@ -299,8 +299,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
         glyph.className = 'material-symbols-outlined';
         glyph.textContent = 'visibility_off';
         hide.appendChild(glyph);
-        hide.addEventListener('click', () => {
-          const hadFocus = document.activeElement === hide;
+        pressOncePerKey(hide);
+        hide.addEventListener('click', (e) => {
+          const hadFocus = document.activeElement === hide && e.detail === 0;
           const next = setEditorSettings(getState().registry, { show_element_images: false });
           saveRegistry(next);
           patchSlice('registry', next);

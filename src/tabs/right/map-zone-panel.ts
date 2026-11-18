@@ -23,7 +23,7 @@ import { getState, patchSlice } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
 import { typeName } from '../../core/type-words';
-import { escapeText, escapeAttr, hexColourOr } from '../../core/dom-utils';
+import { escapeText, escapeAttr, hexColourOr, pressOncePerKey } from '../../core/dom-utils';
 import { getZoneShape } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import type { Zone } from '../../core/types';
@@ -51,8 +51,10 @@ export interface ZonePanelState {
   touched: boolean;
   /** A sync happened while the panel was closed; render on open. */
   stale: boolean;
-  /** The selected zone whose kind the panel last opened by itself. */
-  openedFor?: string | null;
+  /** The selection the panel last saw. */
+  seenSel?: string | null;
+  /** A new selection whose kind is still to open (once it is listed). */
+  revealFor?: string | null;
   /** The markup last written into the panel. */
   drawn?: string;
 }
@@ -101,6 +103,11 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   strip.style.display = '';
 
   const ps = stateFor(entry);
+  // A new selection (the same zone again after a deselect included) asks for its kind to open.
+  if ((selectedId ?? null) !== (ps.seenSel ?? null)) {
+    ps.seenSel = selectedId ?? null;
+    ps.revealFor = selectedId ?? null;
+  }
   // A closed panel is not rebuilt (syncZones runs on every elements tick;
   // 300 rows of innerHTML for nobody). It renders on open instead.
   if (!strip.classList.contains('is-open')) { ps.stale = true; return; }
@@ -122,10 +129,11 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   // One kind (a small hand-drawn world) opens itself: the panel reads as the
   // flat list it was. Many kinds start closed; the selected zone's kind opens.
   if (!ps.touched && kinds.length === 1) ps.openKinds.add(kinds[0].key);
-  // Once per selection: a kind folded while its zone stays selected stays folded.
-  if (selectedId && selectedId !== ps.openedFor) {
-    const k = kinds.find(k => k.members.some(z => z.id === selectedId));
-    if (k) { ps.openKinds.add(k.key); ps.openedFor = selectedId; }
+  // Once per selection (seen above, the panel open or not): the selected zone's
+  // kind opens when the zone is listed, then a fold stays as the person left it.
+  if (ps.revealFor) {
+    const k = kinds.find(k => k.members.some(z => z.id === ps.revealFor));
+    if (k) { ps.openKinds.add(k.key); ps.revealFor = null; }
   }
 
   // Preserve the search box's focus/caret across a rebuild.
@@ -301,6 +309,8 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     void saveWorldStyleRules(next);
   };
 
+  // A held Enter folds or selects once, not once per repeat (the fold is rebuilt in place, focus kept).
+  pressOncePerKey(strip);
   strip.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     e.stopPropagation();

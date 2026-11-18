@@ -23,6 +23,7 @@ import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
 import { installIconA11y } from './ui/icon-a11y';
 import { watchFailedLandings } from './setup/landing-failed';
 import { watchPresses } from './ui/press';
+import { watchInputKind } from './ui/input-kind';
 import { installDocumentTitle } from './ui/document-title';
 import { installTruncationTitles } from './ui/truncation-title';
 import { applyTheme } from './core/theme';
@@ -103,6 +104,8 @@ function boot(): void {
   watchFailedLandings();
   // A redraw driven by data waits for a press in flight (ui/press.ts): seen from the first press.
   watchPresses();
+  // Focus moves after a redraw for a key press only (ui/input-kind.ts): seen from the first press.
+  watchInputKind();
   // The tab title follows the route; clipped names show whole on hover.
   installDocumentTitle();
   installTruncationTitles();

@@ -16,6 +16,7 @@ import { navigate, elementHash } from '../../core/router';
 import { mapTabCache } from './map-tab-cache';
 import { toggleVisualSettingsPopover } from './map-visual-settings-popover';
 import { startDrawing, getActiveDraft, cancelDrawing } from './zone-drawing';
+import { markEscapeOwned } from '../../core/escape-mark';
 
 export interface CanvasToolbarRefs {
   root: HTMLDivElement;
@@ -218,9 +219,13 @@ function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
   let outsideListener: ((e: MouseEvent) => void) | null = null;
   let escListener: ((e: KeyboardEvent) => void) | null = null;
 
-  const close = (): void => {
+  const close = (byKey = false): void => {
+    // Escape with focus inside the panel: focus would go with it, so it goes
+    // back to the Zones button that opened it.
+    const held = byKey && panel.contains(document.activeElement);
     panel.classList.remove('is-open');
     btn.classList.remove('is-open');
+    if (held) btn.focus({ preventScroll: true });
     if (outsideListener) document.removeEventListener('mousedown', outsideListener);
     if (escListener) document.removeEventListener('keydown', escListener);
     outsideListener = null;
@@ -241,7 +246,7 @@ function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
       close();
     };
     escListener = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') close(true);
     };
     // Defer registration so the originating click doesn't immediately close.
     setTimeout(() => {
@@ -253,6 +258,13 @@ function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
   btn.addEventListener('click', () => {
     if (panel.classList.contains('is-open')) close();
     else open();
+  });
+  // Escape from inside the panel is the panel's: marked, so the global
+  // deselect-to-home steps aside and the page the person is on stays.
+  panel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !panel.classList.contains('is-open')) return;
+    markEscapeOwned(e);
+    close(true);
   });
 }
 

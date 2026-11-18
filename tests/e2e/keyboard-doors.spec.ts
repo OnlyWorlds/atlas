@@ -416,4 +416,185 @@ for (const tag of ['', ' @firefox']) {
     await expect(childRow).toBeVisible();
     await expect(fold).toBeFocused();
   });
+
+  // The 1.124.24 gate: a held key presses once, a mouse click moves no focus, a
+  // person's own click is never undone, a reselected zone shows, Escape keeps the keyboard's place.
+  test(`a held Enter presses the picture and the zone fold once, not once per repeat${tag}`, async ({ page }) => {
+    await page.route('https://media.onlyworlds.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+    await freshWorld(page, 'keys-held');
+    const id = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const c = await store.createElement('character', { name: 'Ireena', image_url: 'https://media.onlyworlds.com/u/keys/ireena.png' });
+      api.patchData(await store.listElements());
+      const reg = api.getState().registry;
+      api.patchSlice('registry', { ...reg, editor_settings: { ...(reg.editor_settings ?? {}), show_element_images: false } });
+      return c.id as string;
+    });
+    await openElement(page, id);
+    const imagesOn = () => page.evaluate(() => (window as any).__atlasTestApi.getState().registry.editor_settings?.show_element_images);
+    const show = page.locator('.atlas-middle-header button.atlas-header-icon-thumb-btn');
+    await expect(show.locator('img')).toBeVisible();
+    await show.focus();
+    await page.keyboard.down('Enter');
+    await expect(page.locator('.atlas-element-image-hide')).toBeFocused();
+    // Three repeats: an odd count, so a toggle that flips per repeat ends the other way.
+    for (let i = 0; i < 3; i++) { await page.keyboard.down('Enter'); await page.waitForTimeout(150); }
+    await page.keyboard.up('Enter');
+    expect(await imagesOn()).toBe(true);
+    await expect(page.locator('.atlas-element-image-hide')).toBeFocused();
+
+    // The zone kind's fold, held.
+    const mapId = await newMap(page, 'Held Canvas');
+    await page.evaluate(async (map) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the deep', 'Sea', 900]] as const) {
+        const zone = await store.createZone({ name, supertype });
+        let order = 1;
+        for (const [px, py] of [[x, 100], [x + 300, 100], [x + 300, 400], [x, 400]]) await store.createMarker({ map_id: map, zone_id: zone.id, x: px, y: py, order: order++ });
+      }
+      api.patchData(await store.listElements());
+    }, mapId);
+    await page.click('[data-action="zones-dropdown"]');
+    const fold = page.locator('[data-role="zones-dropdown-panel"] .atlas-zone-kind', { hasText: 'Border' }).locator('button.atlas-zone-kind-caret');
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await fold.focus();
+    await page.keyboard.down('Enter');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    // Three repeats: an odd count, so a toggle that flips per repeat ends the other way.
+    for (let i = 0; i < 3; i++) { await page.keyboard.down('Enter'); await page.waitForTimeout(150); }
+    await page.keyboard.up('Enter');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test(`a mouse click on the picture, a zone's name or the Maps fold leaves no focus behind, so their hover-only controls stay hidden${tag}`, async ({ page }) => {
+    await page.route('https://media.onlyworlds.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+    await freshWorld(page, 'keys-mouse');
+    const opacity = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).opacity);
+    const id = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const c = await store.createElement('character', { name: 'Ireena', image_url: 'https://media.onlyworlds.com/u/keys/ireena.png' });
+      api.patchData(await store.listElements());
+      const reg = api.getState().registry;
+      api.patchSlice('registry', { ...reg, editor_settings: { ...(reg.editor_settings ?? {}), show_element_images: false } });
+      return c.id as string;
+    });
+    await openElement(page, id);
+    await page.locator('.atlas-middle-header button.atlas-header-icon-thumb-btn').click();
+    const hide = page.locator('.atlas-element-image-hide');
+    await expect(hide).toHaveCount(1);
+    await page.mouse.move(2, 2);
+    await expect(hide).not.toBeFocused();
+    await expect.poll(() => opacity('.atlas-element-image-hide')).toBe('0');
+
+    // A zone's name, by mouse: selected, its trash hidden once the mouse leaves.
+    const mapId = await newMap(page, 'Mouse Canvas');
+    await page.evaluate(async (map) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const zone = await store.createZone({ name: 'the north march', supertype: 'Border' });
+      let order = 1;
+      for (const [px, py] of [[100, 100], [400, 100], [400, 400], [100, 400]]) await store.createMarker({ map_id: map, zone_id: zone.id, x: px, y: py, order: order++ });
+      const child = await store.createElement('map', { name: 'Province', parent_map: map });
+      void child;
+      api.patchData(await store.listElements());
+    }, mapId);
+    await page.click('[data-action="zones-dropdown"]');
+    const panel = page.locator('[data-role="zones-dropdown-panel"]');
+    await panel.locator('.atlas-zone-chip-name').click();
+    await expect(panel.locator('.atlas-zone-chip')).toHaveClass(/is-selected/);
+    await page.mouse.move(2, 2);
+    await expect(panel.locator('.atlas-zone-chip-name')).not.toBeFocused();
+    await expect.poll(() => opacity('[data-role="zones-dropdown-panel"] .atlas-zone-chip-x')).toBe('0');
+    await page.keyboard.press('Escape');
+
+    // The Maps fold, by mouse: the map's delete is not left showing.
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      const ui = api.getState().ui;
+      api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+    });
+    const row = page.locator(`.atlas-map-tree-row[data-map-id="${mapId}"]`);
+    await row.locator('.atlas-map-tree-chevron').click();
+    await expect(row.locator('.atlas-map-tree-chevron')).toHaveAttribute('aria-expanded', 'false');
+    await page.mouse.move(2, 2);
+    await expect(row.locator('.atlas-map-tree-chevron')).not.toBeFocused();
+    await expect.poll(() => opacity(`.atlas-map-tree-row[data-map-id="${mapId}"] .atlas-inline-actions`)).toBe('0');
+  });
+
+  test(`a click on plain text just after a chip opened a page keeps focus where the click left it${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-arrival-click');
+    const ids = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const bram = await store.createElement('character', { name: 'Bram' });
+      const ann = await store.createElement('character', { name: 'Ann', friends: [bram.id] });
+      api.patchData(await store.listElements());
+      return { bram: bram.id as string, ann: ann.id as string };
+    });
+    await openElement(page, ids.ann);
+    await page.locator('[data-field="friends"] .atlas-link-chip [role="link"]').focus();
+    await page.keyboard.press('Enter');
+    const heading = page.locator('.atlas-middle [data-role="element-name"]');
+    await expect(heading).toHaveText('Bram');
+    await expect(heading).toBeFocused();
+    // Within the watch's time: a click on a label (no control) drops focus to the page, and it stays there.
+    await page.locator('.atlas-middle .atlas-detail-refs .atlas-field-label').first().click();
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  });
+
+  test(`a selected zone's kind opens again on a new selection, and Escape in the zones list goes back to its button${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-reselect');
+    const mapId = await newMap(page, 'Reselect Canvas');
+    const { zoneId, charId } = await page.evaluate(async (map) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const ids: string[] = [];
+      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the deep', 'Sea', 900]] as const) {
+        const zone = await store.createZone({ name, supertype });
+        let order = 1;
+        for (const [px, py] of [[x, 100], [x + 300, 100], [x + 300, 400], [x, 400]]) await store.createMarker({ map_id: map, zone_id: zone.id, x: px, y: py, order: order++ });
+        ids.push(zone.id);
+      }
+      const c = await store.createElement('character', { name: 'Bram' });
+      api.patchData(await store.listElements());
+      return { zoneId: ids[0], charId: c.id as string };
+    }, mapId);
+    await page.click('[data-action="zones-dropdown"]');
+    const panel = page.locator('[data-role="zones-dropdown-panel"]');
+    const fold = panel.locator('.atlas-zone-kind', { hasText: 'Border' }).locator('button.atlas-zone-kind-caret');
+    const select = (sel: string | null) => page.evaluate((zid) => {
+      const api = (window as any).__atlasTestApi;
+      api.patchSlice('ui', { ...api.getState().ui, selectedElementId: zid });
+    }, sel);
+    await select(zoneId);
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    // Folded around the selected zone, it stays folded while the zone stays selected.
+    await fold.click();
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    // Deselect, select the same zone again: its kind opens.
+    await select(null);
+    await select(zoneId);
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    // Fold, another element between, the zone again: opens again.
+    await fold.click();
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await select(charId);
+    await select(zoneId);
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+
+    // Escape on a focused zone name: the list closes, focus is on the Zones button, the page stays.
+    const zname = panel.locator('.atlas-zone-chip-name', { hasText: 'the north march' });
+    await zname.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator(`.atlas-middle-body[data-element-id="${zoneId}"]`)).toBeVisible();
+    await expect(zname).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(panel).not.toHaveClass(/is-open/);
+    await expect(page.locator('[data-action="zones-dropdown"]')).toBeFocused();
+    await expect(page.locator(`.atlas-middle-body[data-element-id="${zoneId}"]`)).toBeVisible();
+  });
 }

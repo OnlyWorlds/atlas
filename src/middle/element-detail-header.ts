@@ -48,7 +48,7 @@ import { panMapTabTo } from '../tabs/right/map-tab';
 import { revealPinsOnMap } from '../tabs/right/map-tab-pins';
 import { createMapDialog } from '../ui/map-create-modal';
 import { getMapsSettings } from '../registry/registry';
-import { escapeText } from '../core/dom-utils';
+import { escapeText, pressOncePerKey } from '../core/dom-utils';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { filesWhereOf } from '../core/browser-worlds';
 import { buildAgentMark, buildHiddenMark, buildProposedMark } from './element-agent-mark';
@@ -150,8 +150,11 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
     thumb.alt = '';
     thumb.loading = 'lazy';
     show.appendChild(thumb);
-    show.addEventListener('click', () => {
-      const hadFocus = document.activeElement === show;
+    pressOncePerKey(show);
+    show.addEventListener('click', (e) => {
+      // A key press only (detail 0): a mouse click leaves focus as it always did,
+      // so the banner's hover-only eye does not stay showing.
+      const hadFocus = document.activeElement === show && e.detail === 0;
       const next = setEditorSettings(getState().registry, { show_element_images: true });
       saveRegistry(next);
       patchSlice('registry', next);
