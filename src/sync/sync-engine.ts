@@ -2260,7 +2260,7 @@ export class SyncEngine {
             failures.push({ ...last, element_id: sentId, type: items[i].type, operation: 'create' });
             continue;
           }
-          if (await this.localStep(failures, sentId, items[i].type, 'create',
+          if (await this.localStep(failures, sentId, items[i].type, 'create', 'note',
             () => this.folder.stampServerUpdatedAt(sentId, items[i].type, echo, sentStamps.get(sentId)))) {
             stamped++;
             heldInARow = 0;
@@ -2301,7 +2301,7 @@ export class SyncEngine {
         const remote = await this.client.getElement(item.type, id).catch(() => null);
         const local = candidates.find(c => c.id === id);
         if (remote && local) {
-          if (await this.localStep(failures, id, item.type, 'create', () => this.adoptServerCopy(local, remote))) {
+          if (await this.localStep(failures, id, item.type, 'create', 'note', () => this.adoptServerCopy(local, remote))) {
             console.info('[atlas:sync] bulk item id_conflict — element already on server; baseline adopted', {
               id, type: item.type,
             });
@@ -2413,6 +2413,7 @@ export class SyncEngine {
     id: string,
     type: ElementType,
     operation: PerElementFailure['operation'],
+    localStepKind: NonNullable<PerElementFailure['local_step']>,
     step: () => Promise<unknown>,
   ): Promise<boolean> {
     try {
@@ -2420,7 +2421,7 @@ export class SyncEngine {
       return true;
     } catch (err) {
       if (err instanceof CorruptFileError) throw err;
-      failures.push({ ...failureOf(id, type, operation, err), source: 'disk' });
+      failures.push({ ...failureOf(id, type, operation, err), source: 'disk', local_step: localStepKind });
       return false;
     }
   }
@@ -2438,8 +2439,9 @@ export class SyncEngine {
         try {
           const remote = await this.client.getElement(it.type, id);
           if (!remote) throw new Error('created element missing on read-back');
-          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id), keptFrom(remote, true));
-          stamped++;
+          // The read-back answered: what fails now is the note here, said as such.
+          if (await this.localStep(failures, id, it.type, 'create', 'note',
+            () => this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id), keptFrom(remote, true)))) stamped++;
         } catch (err) {
           if (err instanceof CorruptFileError) throw err;
           failures.push(failureOf(id, it.type, 'create', err, 'created but baseline backfill failed: '));
@@ -2465,7 +2467,7 @@ export class SyncEngine {
         const id = it.element.id as string;
         const remote = remoteById.get(id);
         if (remote) {
-          if (await this.localStep(failures, id, type, 'create',
+          if (await this.localStep(failures, id, type, 'create', 'note',
             () => this.folder.stampServerUpdatedAt(id, type, remote.updated_at, sentStamps.get(id), keptFrom(remote, true)))) {
             stamped++;
           }
@@ -2725,7 +2727,9 @@ export class SyncEngine {
             continue;
           }
           // keel marks a seat's new element proposed on a reviewed world (conv. 168): the copy keeps it.
-          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at ?? '', keptFrom(response, true));
+          // OnlyWorlds has it now: a refusal to note that here is said as such (the next round's 409 adopts it).
+          if (!await this.localStep(failures, current.id, current.type, 'create', 'note',
+            () => this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at ?? '', keptFrom(response, true)))) continue;
           creates++;
         } else {
           // UPDATE path: re-fetch element from folder in case an in-loop
@@ -2813,7 +2817,9 @@ export class SyncEngine {
             // (it used to be stamped clean and never uploaded).
             // keel takes the mark on a create only: its answer says whether it shows the element,
             // and a mark taken out here comes back with it, since keel keeps hiding it (conv. 173).
-            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at ?? '', stampKeptOf(response));
+            // OnlyWorlds has the edit: a refusal to note it here stays dirty, and the next round sends it again.
+            if (!await this.localStep(failures, current.id, current.type, 'update', 'note_edit',
+              () => this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at ?? '', stampKeptOf(response)))) continue;
             updates++;
           }
         }
@@ -2935,7 +2941,7 @@ export class SyncEngine {
             }
           }
           if (remote) {
-            if (await this.localStep(failures, elem.id, elem.type, 'create', () => this.adoptServerCopy(elem, remote))) {
+            if (await this.localStep(failures, elem.id, elem.type, 'create', 'note', () => this.adoptServerCopy(elem, remote))) {
               console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
                 id: elem.id, type: elem.type,
               });
@@ -3001,8 +3007,8 @@ export class SyncEngine {
       if (authBlocked || transient || this.stopped) break;
       try {
         await this.client.deleteElement(tomb.type, tomb.id);
-        await this.folder.clearTombstone(tomb.id);
-        deletes++;
+        // OnlyWorlds has the delete: a tombstone that cannot be cleared waits for the next round's 404.
+        if (await this.localStep(failures, tomb.id, tomb.type, 'delete', 'note', () => this.folder.clearTombstone(tomb.id))) deletes++;
       } catch (err) {
         // A seat on a reviewed world deletes only what it made (conv. 163, P6):
         // keel's 403 `proposed_only` is not a dead key. The element comes back
@@ -3016,7 +3022,7 @@ export class SyncEngine {
           if (remote === undefined) {
             console.info('[atlas:sync] push: proposed_only, and keel\'s copy could not be read — the delete waits for the next round', { id: tomb.id });
           } else {
-            const back = await this.localStep(failures, tomb.id, tomb.type, 'delete', async () => {
+            const back = await this.localStep(failures, tomb.id, tomb.type, 'delete', 'put_back', async () => {
               if (remote) {
                 const { updated_at, ...body } = remote;
                 await this.folder.applyServerRecord(tomb.type, body, updated_at);
@@ -3053,7 +3059,7 @@ export class SyncEngine {
           console.info('[atlas:sync] tombstone target already gone (404) — clearing', {
             id: tomb.id, type: tomb.type,
           });
-          if (await this.localStep(failures, tomb.id, tomb.type, 'delete', () => this.folder.clearTombstone(tomb.id))) {
+          if (await this.localStep(failures, tomb.id, tomb.type, 'delete', 'note', () => this.folder.clearTombstone(tomb.id))) {
             deletes++;
           }
         } else {
@@ -3233,7 +3239,7 @@ export class SyncEngine {
         withdrawnPids.add(entry.proposal_id);
         withdrawn.add(el.id);
       }
-      await this.localStep(failures, el.id, el.type, 'update', async () => {
+      await this.localStep(failures, el.id, el.type, 'update', 'restore_links', async () => {
         const restored = await this.folder.updateElementWith(el.id, onDisk => restoredLinkPatch(onDisk, server, back));
         if (restored && sameWireContent(restored, server as unknown as Record<string, unknown>)) {
           await this.folder.applyServerRecordIfUnchanged(el.type, body, updated_at, restored.local_updated_at ?? null);
@@ -3303,7 +3309,7 @@ export class SyncEngine {
         goneOnline.push({ id: entry.element_id, type: entry.type, detected_at: nowIso(), name: local.name });
       } else if (outcome.kind === 'accepted') {
         const { updated_at, ...body } = remote;
-        const ok = await this.localStep(failures, entry.element_id, entry.type, 'update', async () => {
+        const ok = await this.localStep(failures, entry.element_id, entry.type, 'update', 'note', async () => {
           const landed = local.local_updated_at === entry.local_updated_at
             && await this.folder.applyServerRecordIfUnchanged(entry.type, body, updated_at, local.local_updated_at ?? null);
           // Edited since (before the settle, or during it): the newer edit stays
@@ -3799,7 +3805,7 @@ export class SyncEngine {
           }
         } catch (err) {
           console.warn(`[atlas:sync] resync: ${el.type}/${el.id} left the view but could not be removed`, err);
-          failures.push({ ...failureOf(el.id, el.type, 'delete', err), source: 'disk' });
+          failures.push({ ...failureOf(el.id, el.type, 'delete', err), source: 'disk', local_step: 'remove' });
         }
       }
       if (deletes > 0) console.info(`[atlas:sync] resync: ${deletes} element(s) left this reader's view and were removed`);

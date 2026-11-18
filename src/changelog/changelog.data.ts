@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.19',
+    date: '2026-11-18',
+    theme: 'Sync says what it will do',
+    entries: [
+      {
+        id: 'sync-disk-step-words',
+        title: 'A change Atlas could not write here says what OnlyWorlds has',
+        body: 'When OnlyWorlds took a change and Atlas then could not write that down in the folder or this browser, Settings and the element\'s mark said Atlas tries again by itself. Only a file in use elsewhere is retried on its own; the words now say what happens next for each case, most often with your next save. A change or a delete OnlyWorlds already has says so, where it used to read as a change that did not sync.',
+        tags: ['sync'],
+      },
+      {
+        id: 'sync-pill-names',
+        title: 'The sync pill\'s refresh button is named for what it does',
+        body: 'With a save waiting, the refresh button sends it now, and with sync stopped it opens Settings; its name now says so, for a screen reader and the keyboard. Each warning badge has one name, the element\'s mark no longer says Click or names Settings twice, and when a badge goes away while it has focus, focus moves to the refresh button.',
+        tags: ['sync', 'accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.18',
     date: '2026-11-17',
     theme: 'An element\'s fields by keyboard',

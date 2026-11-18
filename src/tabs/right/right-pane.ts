@@ -344,7 +344,9 @@ function writePill(pill: HTMLElement, html: string, worldId: string | null): boo
     ? (document.activeElement as HTMLElement).closest<HTMLElement>('[data-role]')?.dataset.role
     : undefined;
   pill.innerHTML = html;
-  if (focused) pill.querySelector<HTMLElement>(`[data-role="${focused}"]`)?.focus({ preventScroll: true });
+  // A badge whose count fell to 0 is gone: focus goes to the pill's other
+  // door, the refresh button, rather than falling to the page.
+  if (focused) (pill.querySelector<HTMLElement>(`[data-role="${focused}"]`) ?? pill.querySelector<HTMLElement>('[data-role="refresh"]'))?.focus({ preventScroll: true });
   return true;
 }
 
@@ -445,25 +447,38 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     : base;
   pill.dataset.state = dataState;
   pill.dataset.clickable = 'true';
-  pill.title = title + (conflictCount > 0 ? '' : ' · click to refresh from OnlyWorlds');
+  // The click's own test: an errored engine opens Settings (no engine says why in a toast).
+  const errored = engine?.kind === 'error';
+  pill.title = title + (conflictCount > 0 ? '' : errored ? ' · click to see why in Settings' : ' · click to refresh from OnlyWorlds');
+  // Each badge's title is its name, so a screen reader says it once.
+  const conflictName = `Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}`;
   const conflictBadge = conflictCount > 0
-    ? `<button type="button" class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review" aria-label="Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}">⚠ ${conflictCount}</button>`
+    ? `<button type="button" class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictName}" aria-label="${conflictName}">⚠ ${conflictCount}</button>`
     : '';
   // Elements still not syncing: the place to come back to after a
   // failure toast. A first busy-file failure is left out: it usually clears
   // by itself in the next round, which is why its toast stays quiet too.
   const issueCount = issuesFor(active.worldId).filter(i => i.kind !== 'file_busy' || i.rounds > 1).length;
+  const issueName = `${issueCount} change${issueCount === 1 ? '' : 's'} not syncing: see why`;
   const issueBadge = issueCount > 0
-    ? `<button type="button" class="atlas-sync-pill-conflict atlas-sync-pill-issues" data-role="sync-issues" title="${issueCount} change${issueCount === 1 ? '' : 's'} not syncing · click to see why" aria-label="${issueCount} change${issueCount === 1 ? '' : 's'} not syncing: see why">⚠ ${issueCount}</button>`
+    ? `<button type="button" class="atlas-sync-pill-conflict atlas-sync-pill-issues" data-role="sync-issues" title="${issueName}" aria-label="${issueName}">⚠ ${issueCount}</button>`
     : '';
+  // The refresh button is the keyboard's way to the pill's click, so its name
+  // says what that click does now: push a waiting save, open Settings on an
+  // error, or refresh (a paused or busy engine says why nothing came).
+  const refreshName = currentPendingPush ? 'Save to OnlyWorlds now'
+    : errored ? 'Sync stopped: see why in Settings'
+    : 'Refresh from OnlyWorlds';
+  // "Review N" is the badge's name too: the label is not said twice.
+  const labelHidden = conflictCount > 0 && base.dataState === 'synced' ? ' aria-hidden="true"' : '';
   // The badges' listeners go on with the markup that made them; a skipped
   // write keeps both (conv. 146).
   const wrote = writePill(pill, `
     <span class="atlas-sync-pill-dot"></span>
-    <span>${label}</span>
+    <span${labelHidden}>${label}</span>
     ${conflictBadge}
     ${issueBadge}
-    <button type="button" class="atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from OnlyWorlds"><span class="material-symbols-outlined">refresh</span></button>
+    <button type="button" class="atlas-sync-pill-refresh" data-role="refresh" aria-label="${refreshName}"><span class="material-symbols-outlined">refresh</span></button>
   `, active.worldId);
   if (wrote) pill.querySelector<HTMLElement>('[data-role="sync-issues"]')?.addEventListener('click', (e) => {
     e.stopPropagation();

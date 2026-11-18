@@ -563,6 +563,16 @@ export interface PerElementFailure {
    * "Blocked", whose usual cause is known, so the words name it (conv. 191).
    */
   host_blocked?: boolean;
+  /**
+   * A disk failure's step after OnlyWorlds answered, for the words: `note`
+   * (OnlyWorlds has the change; Atlas could not record that), `put_back` (a
+   * delete OnlyWorlds refused; the element could not be put back),
+   * `restore_links` (the links to it could not be put back) and `remove` (it
+   * left this reader's view; it could not be removed here); `note_edit` is a
+   * `note` for an edit sent, whose next round can read keel's newer stamp as
+   * a conflict. Only `note` and `put_back` are redone by the next round.
+   */
+  local_step?: 'note' | 'note_edit' | 'put_back' | 'restore_links' | 'remove';
 }
 
 // ---- Registry ----

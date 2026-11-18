@@ -348,10 +348,14 @@ function openIssueOf(worldId: string, elementId: string): SyncIssue | undefined 
 
 /** The dot's words for an element that is not syncing: Settings' own line, standing alone. */
 export function notSyncingTitle(issue: SyncIssue, where: 'folder' | 'browser'): string {
-  // A create OnlyWorlds took whose note on disk failed is sent, not refused: its line says so alone.
+  // A change OnlyWorlds has whose note on disk failed is sent, not refused: its line says so alone.
   // Every other disk failure wrote nothing to OnlyWorlds and keeps "Not syncing".
-  const sent = issue.kind === 'other' && issue.failure.source === 'disk' && issue.failure.operation === 'create';
-  return `${sent ? '' : 'Not syncing. '}${syncIssueLine(issue, where, true)} Click to see it in Settings.`;
+  const sent = issue.kind === 'other' && issue.failure.source === 'disk'
+    && (issue.failure.local_step === 'note' || issue.failure.local_step === 'note_edit');
+  const line = syncIssueLine(issue, where, true);
+  // One string for the title and the name a screen reader says: no "click",
+  // and Settings named once (some lines already send the person there).
+  return `${sent ? '' : 'Not syncing. '}${line}${/\bSettings\b/.test(line) ? '' : ' See it in Settings.'}`;
 }
 
 let issueDotsWatched = false;

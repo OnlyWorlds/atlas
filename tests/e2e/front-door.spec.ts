@@ -497,6 +497,57 @@ for (const tag of ['', ' @firefox']) {
     await page.keyboard.press('Enter');
     await expect.poll(() => page.evaluate(() => (window as any).__clickTargets)).toEqual(['review-conflicts']);
   });
+
+  test(`the sync pill's refresh button is named for what its press does, and a badge that goes leaves focus on it${tag}`, async ({ page }) => {
+    await freshBoot(page);
+    await page.evaluate(async () => {
+      const root = await navigator.storage.getDirectory();
+      (window as any).__atlasTestApi.setNextDirectory(await root.getDirectoryHandle('pill-names-root', { create: true }));
+    });
+    await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
+    await page.click('[data-action="create-local"]');
+    await page.fill('input[name="world-name"]', 'pillnames');
+    await page.click('[data-modal="create-world"] [data-action="pick"]');
+    await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+    // The linked branch, synced, with one conflict (no server: the UI branch only).
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      const s = api.getState();
+      const worlds = s.registry.worlds.map((w: any) => w.id === s.active.worldId
+        ? { ...w, state: 'api-linked', api: { world_id: 'fake-server-id', api_key: 'fake-key' } } : w);
+      api.patchSlice('registry', { ...s.registry, worlds });
+      api.patchSlice('sync', { ...api.getState().sync, activeSync: { kind: 'idle', last_sync_at: new Date().toISOString() }, activeConflictsCount: 1 });
+    });
+    const pill = page.locator('[data-role="sync-pill"]');
+    const badge = pill.locator('[data-role="review-conflicts"]');
+    const refresh = pill.locator('[data-role="refresh"]');
+    await expect(badge).toHaveAccessibleName('Review 1 conflict');
+    // One name per badge: its title is the same words, with no "click".
+    await expect(badge).toHaveAttribute('title', 'Review 1 conflict');
+    // "Review 1" is the label too; it is not said twice.
+    await expect(pill.locator('span', { hasText: 'Review 1' })).toHaveAttribute('aria-hidden', 'true');
+    await expect(refresh).toHaveAccessibleName('Refresh from OnlyWorlds');
+    // The conflict settled while its badge had focus: focus stays in the pill, on refresh.
+    await badge.focus();
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      api.patchSlice('sync', { ...api.getState().sync, activeConflictsCount: 0 });
+    });
+    await expect(badge).toHaveCount(0);
+    await expect(refresh).toBeFocused();
+    // A save waiting: the press pushes it now, and the name says so.
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent('atlas:pending-push', { detail: { scheduledAt: Date.now() + 60_000, debounceMs: 60_000 } })));
+    await expect(refresh).toHaveAccessibleName('Save to OnlyWorlds now');
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent('atlas:pending-push', { detail: { scheduledAt: null, debounceMs: 5000 } })));
+    // Sync in an error: the press opens Settings, and the name says so.
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      api.patchSlice('sync', { ...api.getState().sync, activeSync: { kind: 'error', message: 'The PIN was not accepted.', recoverable: true } });
+    });
+    await expect(refresh).toHaveAccessibleName('Sync stopped: see why in Settings');
+    await expect(pill).toHaveAttribute('title', 'The PIN was not accepted. · click to see why in Settings');
+    await expect(refresh).toBeFocused();
+  });
 }
 
 test('"add a world" opens the chooser; its open-a-world row opens a picked world', async ({ page }) => {

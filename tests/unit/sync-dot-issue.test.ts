@@ -69,7 +69,7 @@ describe('the sync dot and a failed element', () => {
     const d = dot();
     expect(d.tagName).toBe('BUTTON');
     expect(d.dataset.state).toBe('problem');
-    expect(d.title).toBe('Not syncing. OnlyWorlds had a problem on its side. Atlas tries again with your next save. Click to see it in Settings.');
+    expect(d.title).toBe('Not syncing. OnlyWorlds had a problem on its side. Atlas tries again with your next save. See it in Settings.');
     expect(d.getAttribute('aria-label')).toBe(d.title);
     expect(d.textContent).toContain('sync_problem');
   });
@@ -156,20 +156,57 @@ describe('the sync dot and a failed element', () => {
       titleOf(fail({ status: undefined, source: undefined })),
       titleOf(fail({ operation: 'read', error_name: 'InvalidStateError', status: undefined, source: 'disk' })),
     ];
-    for (const t of titles) expect(t).not.toMatch(/Open it to check|Try again now|copy the details to report it\.$|It could not sync/);
-    expect(titles[0]).toBe('Not syncing. OnlyWorlds did not accept it. The problem is in its birth date field. Settings can copy the details to report it. Click to see it in Settings.');
-    // A create OnlyWorlds took, not noted on disk: never "Not syncing".
-    const sent = titleOf(fail({ operation: 'create', status: undefined, source: 'disk' }));
-    expect(sent).toBe('OnlyWorlds has the change, but Atlas could not note that in the folder. Atlas tries again by itself. Click to see it in Settings.');
-    // Any other disk failure wrote nothing there (a resync's removal, a refused delete put back).
-    for (const operation of ['update', 'delete'] as const) {
-      const t = titleOf(fail({ operation, status: undefined, source: 'disk' }));
-      expect(t).toBe('Not syncing. Atlas could not write it in the folder. Atlas tries again by itself. Click to see it in Settings.');
-      // Settings' own row says the same: never "OnlyWorlds has it" for a write that never reached it.
-      expect(syncIssueLine(issuesFor(WORLD)[0], 'browser')).toBe('Atlas could not write it in this browser. Atlas tries again by itself.');
+    for (const t of titles) expect(t).not.toMatch(/Open it to check|Try again now|or copy the details|It could not sync/);
+    // A line that already names Settings is not followed by a second pointer there.
+    expect(titles[0]).toBe('Not syncing. OnlyWorlds did not accept it. The problem is in its birth date field. Settings can copy the details to report it.');
+    for (const t of titles) {
+      expect(t).not.toMatch(/\bclick\b/i);
+      expect(t.match(/\bSettings\b/g)?.length).toBe(1);
     }
-    titleOf(fail({ operation: 'create', status: undefined, source: 'disk' }));
-    expect(syncIssueLine(issuesFor(WORLD)[0], 'folder')).toBe('OnlyWorlds has it, but Atlas could not note that in the folder. Atlas tries again by itself.');
+  });
+
+  it('a disk failure says the step that failed, and "by itself" only where a timer is armed', () => {
+    const lineOf = (f: PerElementFailure, where: 'folder' | 'browser' = 'folder'): { title: string; row: string } => {
+      __resetSyncIssues();
+      noteRoundIssues(WORLD, 'push', round([f]));
+      const [issue] = issuesFor(WORLD);
+      return { title: notSyncingTitle(issue, where), row: syncIssueLine(issue, where) };
+    };
+    const disk = (operation: PerElementFailure['operation'], local_step?: PerElementFailure['local_step']) =>
+      fail({ operation, status: undefined, source: 'disk', error_name: 'NotAllowedError', ...(local_step ? { local_step } : {}) });
+    // OnlyWorlds has the change (a create, an accepted proposal): never "Not syncing".
+    for (const operation of ['create', 'update'] as const) {
+      const { title, row } = lineOf(disk(operation, 'note'));
+      expect(title).toBe('OnlyWorlds has the change, but Atlas could not note that in the folder. Atlas tries again with your next save. See it in Settings.');
+      expect(row).toBe('OnlyWorlds has it, but Atlas could not note that in the folder. Atlas tries again with your next save.');
+    }
+    // A delete it has: the delete, never "OnlyWorlds has it" beside a deleted element's name.
+    expect(lineOf(disk('delete', 'note')).row)
+      .toBe('OnlyWorlds has the delete, but Atlas could not note that in the folder. Atlas tries again with your next save.');
+    // An edit sent: the next round can read keel's newer stamp as a conflict, so no promise to resend.
+    const edit = lineOf(disk('update', 'note_edit'));
+    expect(edit.title).toBe('OnlyWorlds has the change, but Atlas could not note that in the folder, so the next sync may list it as a conflict. Both copies hold your change. See it in Settings.');
+    expect(edit.row).not.toMatch(/tries again/);
+    expect(lineOf(disk('delete', 'put_back'), 'browser').row)
+      .toBe('OnlyWorlds kept it when it was deleted here, but Atlas could not put it back in this browser. Atlas tries again with your next save.');
+    // No round redoes these two: no promise to try again.
+    expect(lineOf(disk('update', 'restore_links')).title)
+      .toBe('Not syncing. OnlyWorlds kept an element this one links to, but Atlas could not put that link back in the folder. Add the link again to keep it. See it in Settings.');
+    expect(lineOf(disk('delete', 'remove')).row)
+      .toBe('It is no longer in what OnlyWorlds shows you, but Atlas could not remove it from the folder.');
+    expect(lineOf(disk('update')).row).toBe('Atlas could not write it in the folder. Atlas tries again with your next save.');
+    for (const step of ['note', 'put_back', 'restore_links', 'remove', undefined] as const) {
+      expect(lineOf(disk('update', step)).row).not.toMatch(/by itself/);
+    }
+    // A busy file does arm the timer, and keeps saying so.
+    expect(lineOf(fail({ status: undefined, source: 'disk', error_name: 'NoModificationAllowedError' })).row)
+      .toBe('Another program was using its file in the folder. Atlas tries again by itself.');
+    // Except for the two steps no round redoes: busy or not, the step's own words.
+    for (const step of ['restore_links', 'remove'] as const) {
+      const busy = lineOf(fail({ operation: step === 'remove' ? 'delete' : 'update', status: undefined, source: 'disk', error_name: 'NoModificationAllowedError', local_step: step }), 'browser').row;
+      expect(busy).not.toMatch(/by itself|tries again/);
+      expect(busy).toBe(lineOf(disk(step === 'remove' ? 'delete' : 'update', step), 'browser').row);
+    }
   });
 
   it('the foreign-id words stand alone: no "above" outside Settings', () => {

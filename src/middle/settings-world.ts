@@ -850,6 +850,8 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
     case 'review_mark':
       return `It carries a review mark made by someone else (proposed or checked), and only the owner or a co-builder can send such a mark to OnlyWorlds. Ask one of them to sync it. It stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'file_busy':
+      // No round redoes these two, busy or not: never "tries again by itself".
+      if (f.local_step === 'restore_links' || f.local_step === 'remove') return diskStepLine(f, inBrowser, alone);
       if (inBrowser) {
         return f.operation === 'read'
           ? `Its newer copy from OnlyWorlds could not be saved: another Atlas tab was saving to this world. ${alone ? 'Refresh later to try again.' : 'Try again now, or refresh later.'}`
@@ -870,12 +872,7 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       if (/^referenced \w+ (was deleted|not found)/.test(m)) {
         return 'It links to something that is no longer on OnlyWorlds.';
       }
-      if (f.source === 'disk') {
-        // Only a create is known to have reached OnlyWorlds; the other disk
-        // failures (a resync's removal, a refused delete put back) wrote nothing there.
-        if (f.operation !== 'create') return `Atlas could not write it ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
-        return `OnlyWorlds has ${alone ? 'the change' : 'it'}, but Atlas could not note that ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
-      }
+      if (f.source === 'disk') return diskStepLine(f, inBrowser, alone);
       if (typeof f.status === 'number' && f.status >= 500) return 'OnlyWorlds had a problem on its side. Atlas tries again with your next save.';
       if (typeof f.status === 'number' && f.status >= 400) {
         const field = f.param && /^[a-z][a-z0-9_]*$/.test(f.param) && !/^(x|shadow)_/.test(f.param)
@@ -886,6 +883,32 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
         ? 'Atlas tries again with your next save; Settings can copy the details if it keeps happening.'
         : 'It could not sync. Atlas tries again with your next save; copy the details if it keeps happening.';
     }
+  }
+}
+
+/**
+ * A disk failure after OnlyWorlds answered, by the step that failed. Only a
+ * busy file arms a timed retry (file_busy); these wait for the next round,
+ * an edit's next round can read keel's newer stamp as a conflict, and two
+ * steps no round redoes.
+ */
+function diskStepLine(f: SyncIssue['failure'], inBrowser: boolean, alone: boolean): string {
+  const place = inBrowser ? 'in this browser' : 'in the folder';
+  switch (f.local_step) {
+    case 'note':
+      return f.operation === 'delete'
+        ? `OnlyWorlds has the delete, but Atlas could not note that ${place}. Atlas tries again with your next save.`
+        : `OnlyWorlds has ${alone ? 'the change' : 'it'}, but Atlas could not note that ${place}. Atlas tries again with your next save.`;
+    case 'note_edit':
+      return `OnlyWorlds has ${alone ? 'the change' : 'it'}, but Atlas could not note that ${place}, so the next sync may list it as a conflict. Both copies hold your change.`;
+    case 'put_back':
+      return `OnlyWorlds kept it when it was deleted here, but Atlas could not put it back ${place}. Atlas tries again with your next save.`;
+    case 'restore_links':
+      return `OnlyWorlds kept an element this one links to, but Atlas could not put that link back ${place}. Add the link again to keep it.`;
+    case 'remove':
+      return `It is no longer in what OnlyWorlds shows you, but Atlas could not remove it ${inBrowser ? 'from this browser' : 'from the folder'}.`;
+    default:
+      return `Atlas could not write it ${place}. Atlas tries again with your next save.`;
   }
 }
 
