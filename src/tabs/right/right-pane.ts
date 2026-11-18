@@ -236,7 +236,17 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       const isStale = !m;
       if (isStale) btn.classList.add('atlas-tab-stale');
       const label = m?.name || tab.label || '(missing map)';
-      btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="Close tab">×</span>`;
+      // The × answers a mouse; the keyboard's close is Delete on the focused tab.
+      btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-hidden="true">×</span>`;
+      btn.setAttribute('aria-keyshortcuts', 'Delete');
+      btn.addEventListener('keydown', (e) => {
+        if (e.key !== 'Delete' || e.repeat || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        e.preventDefault();
+        if (tab.kind !== 'map') return;
+        closeMapTab(idx, tab.mapId);
+        // The bar redrew in the patch: focus goes to the tab now active, never the page.
+        tabBar.querySelector<HTMLElement>('.atlas-tab.active')?.focus({ preventScroll: true });
+      });
       if (isStale) {
         btn.title = 'This map is no longer in the current world. Click anywhere on the tab to close it';
       }

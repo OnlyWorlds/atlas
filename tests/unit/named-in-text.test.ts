@@ -68,4 +68,22 @@ describe('the Potentials column', () => {
     expect(rows[0].textContent).toContain('in the text');
     expect(host.querySelector('.atlas-context-pane-list-suggested .atlas-context-pane-empty')).toBeNull();
   });
+
+  it('a row\'s Link and Dismiss are buttons of their own, never inside the row\'s button', () => {
+    const scene = el('n1', 'narrative', 'Arrival', { story: 'Ireena left Barovia.' });
+    patchSlice('data', { elements: [IREENA, BARovia, scene] });
+    const host = document.createElement('div');
+    mountContextLists({ host, narrative: scene, onSelect: () => {} });
+    const actions = [...host.querySelectorAll<HTMLElement>('[data-action="link-named"], .atlas-context-pane-row-dismiss')];
+    expect(actions.length).toBeGreaterThan(0);
+    for (const a of actions) {
+      expect(a.tagName).toBe('BUTTON');
+      expect(a.parentElement?.closest('button')).toBeNull();
+      expect(a.getAttribute('aria-label')).toMatch(/^(Link|Dismiss) /);
+    }
+    // The row's own press still selects the element.
+    const row = host.querySelector<HTMLElement>('.atlas-context-pane-list-suggested [data-named] .atlas-context-pane-row')!;
+    expect(row.tagName).toBe('BUTTON');
+    expect(row.querySelector('button, [role="button"]')).toBeNull();
+  });
 });

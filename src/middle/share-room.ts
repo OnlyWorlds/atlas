@@ -1313,17 +1313,29 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         const content = renderStaticBlock(block);
         content.classList.add('is-editable');
         content.title = 'Click to edit';
-        content.addEventListener('click', () => {
+        const openEditor = (focusEditor: boolean): void => {
           void (async () => {
             await commitOpenEdit(pageId);
             editingBlockId = block.id;
             renderBlocks(pageId);
+            // From the Edit button, focus goes into the editor it opened, never the page:
+            // a heading and a prose block focus their own editor; the rest land on a text
+            // box when they have one, else on Done, never on a control that removes
+            // (a held Enter would repeat onto it).
+            if (focusEditor && block.kind !== 'heading' && block.kind !== 'prose') {
+              const editor = blocksHost?.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(block.id)}"]`);
+              (editor?.querySelector<HTMLElement>('input:not([type]), input[type="text"], input[type="search"], textarea')
+                ?? editor?.querySelector<HTMLElement>('.atlas-share-block-done'))?.focus();
+            }
           })();
-        });
+        };
+        content.addEventListener('click', () => openEditor(false));
         row.appendChild(content);
 
         const controls = document.createElement('div');
         controls.className = 'atlas-share-block-controls';
+        // The block body answers a mouse; this is the same door for a keyboard.
+        controls.appendChild(controlBtn('edit', 'Edit block', () => openEditor(true)));
         // Element-bearing blocks: jump to the element itself (builder-only
         // affordance — clicking the block body opens the block EDITOR, so the
         // navigation lives on an explicit control).

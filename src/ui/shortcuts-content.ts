@@ -51,6 +51,7 @@ function gestureSections(): Section[] {
       label: 'Map',
       rows: [
         { combo: 'F', description: 'Fit map to bounds (when map tab is focused)', comboAsKbd: true },
+        { combo: 'Delete', description: 'Close the map tab that has focus', comboAsKbd: true },
         { combo: 'Z', description: 'Start drawing a polygon zone', comboAsKbd: true },
         { combo: 'L', description: 'Start drawing a line zone', comboAsKbd: true },
         { combo: 'Shift + click', description: 'Snap to 45° axis while drawing a zone', comboAsKbd: true },

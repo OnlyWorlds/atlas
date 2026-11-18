@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.20',
+    date: '2026-11-18',
+    theme: 'More doors by keyboard',
+    entries: [
+      {
+        id: 'keyboard-doors-home-tabs-panes',
+        title: 'Home\'s name and description, map tabs, the pane dividers and page blocks by keyboard',
+        body: 'On Home, Tab reaches the world\'s name and description, and Enter or Space opens their editor. Delete closes the map tab that has focus. The dividers between the panes take focus and move with the arrow keys (Shift for a bigger step). A block on a page you are building has an Edit button beside Move up and Move down. In the writing room, a suggestion\'s Link and dismiss are real buttons a keyboard reaches.',
+        tags: ['accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.19',
     date: '2026-11-18',
     theme: 'Sync says what it will do',

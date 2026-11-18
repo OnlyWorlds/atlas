@@ -196,10 +196,24 @@ export function mountAppShell(container: HTMLElement): AppShell {
 
   let ratios = loadRatios();
 
+  // The dividers are focusable separators: arrow keys move them as a drag
+  // does, and each says where it stands (a share of the window's width).
+  divider1.setAttribute('aria-label', 'Resize the sidebar');
+  divider2.setAttribute('aria-label', 'Resize the middle pane');
+  for (const d of [divider1, divider2]) {
+    d.setAttribute('role', 'separator');
+    d.setAttribute('aria-orientation', 'vertical');
+    d.setAttribute('aria-valuemin', '0');
+    d.setAttribute('aria-valuemax', '100');
+    d.tabIndex = 0;
+  }
+
   function applyRatios(): void {
     sidebar.style.flex = `0 0 ${(ratios.sidebar * 100).toFixed(3)}%`;
     middle.style.flex = `0 0 ${(ratios.middle * 100).toFixed(3)}%`;
     right.style.flex = `1 1 auto`;
+    divider1.setAttribute('aria-valuenow', String(Math.round(ratios.sidebar * 100)));
+    divider2.setAttribute('aria-valuenow', String(Math.round((ratios.sidebar + ratios.middle) * 100)));
   }
   applyRatios();
 
@@ -227,7 +241,7 @@ export function mountAppShell(container: HTMLElement): AppShell {
       middle: clamp(middleFraction, 0.20, middleCapFor(rect.width, ratios.sidebar, 0.70)),
     };
     applyRatios();
-  }, () => saveRatios(ratios));
+  }, () => saveRatios(ratios), () => divider1.getBoundingClientRect().width);
 
   // A stored ratio that fits at 1920 can overflow at 1280, so re-clamp when
   // the window changes rather than only when a divider is dragged.
@@ -268,8 +282,26 @@ function attachDivider(
   shell: HTMLElement,
   onMove: (clientX: number) => void,
   onEnd: () => void,
+  // What lies between the pane this divider moves and the shell's left edge
+  // beyond the panes' own widths (divider 2: divider 1), so a key's step
+  // lands where onMove reads it.
+  keyOffset: () => number = () => 0,
 ): void {
   let dragging = false;
+  // A keyboard's drag: Left and Right move the divider 24 px (Shift: 96 px),
+  // through the same clamps a mouse meets, and save as a drag's end does.
+  divider.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault();
+    // The divider's left edge is where the pane before it ends: a step from
+    // there and back lands where it started.
+    const r = divider.getBoundingClientRect();
+    const step = (e.shiftKey ? 96 : 24) * (e.key === 'ArrowLeft' ? -1 : 1);
+    onMove(r.left - keyOffset() + step);
+    onEnd();
+    window.dispatchEvent(new Event('resize'));
+  });
   divider.addEventListener('mousedown', (e) => {
     e.preventDefault();
     dragging = true;

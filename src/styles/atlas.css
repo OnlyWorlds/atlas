@@ -14830,6 +14830,32 @@ a.atlas-share-map-pin { cursor: pointer; }
   max-width: 110px;
 }
 
+/* A row with actions: its button and the actions side by side, so no button
+   sits inside another (1.124.20). */
+.atlas-context-pane-row-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.atlas-context-pane-row-wrap > .atlas-context-pane-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.atlas-context-pane-row-wrap > .atlas-context-pane-row-link,
+.atlas-context-pane-row-wrap > .atlas-context-pane-row-dismiss {
+  appearance: none;
+  background: transparent;
+  font-family: inherit;
+}
+.atlas-context-pane-row-wrap > .atlas-context-pane-row-dismiss {
+  border: 0;
+  padding: 0;
+  margin-right: 6px;
+}
+.atlas-context-pane-row-wrap > .atlas-context-pane-row-link {
+  font-size: 11px;
+}
+
 .atlas-context-pane-row-dismiss {
   width: 14px;
   height: 14px;
@@ -17646,10 +17672,13 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
   -webkit-user-select: none;
 }
 
-/* A field's value and the aliases row are buttons for the keyboard (1.124.18)
-   and content all the same: they stay selectable, as A3 promises. */
+/* A field's value, the aliases row (1.124.18) and Home's world name and
+   description are buttons for the keyboard and content all the same: they
+   stay selectable, as A3 promises. */
 .atlas-shell .atlas-field-value[role="button"],
-.atlas-shell .atlas-aliases-display[role="button"] {
+.atlas-shell .atlas-aliases-display[role="button"],
+.atlas-shell .atlas-home-identity-edit[role="button"],
+.atlas-shell .atlas-home-world-description[role="button"] {
   user-select: text;
   -webkit-user-select: text;
 }

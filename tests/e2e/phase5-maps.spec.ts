@@ -110,6 +110,24 @@ test('close button on a map tab removes it from the bar', async ({ page }) => {
   await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
 });
 
+for (const tag of ['', ' @firefox']) {
+  test(`Delete on a focused map tab closes it, and focus goes to the tab now active${tag}`, async ({ page }) => {
+    await page.click('[data-action="new-map"]');
+    await page.fill('[data-modal="create-map"] input[name="map-name"]', 'Keyed');
+    await page.fill('[data-modal="create-map"] input[name="map-image-url"]', 'https://example.com/keyed.png');
+    await page.click('[data-modal="create-map"] [data-action="submit"]');
+    await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
+    const tab = page.locator('.atlas-tab[data-tab-kind="map"]', { hasText: 'Keyed' });
+    await expect(tab).toHaveAttribute('aria-keyshortcuts', 'Delete');
+    // The × is for a mouse: hidden from a screen reader, which hears the tab's shortcut.
+    await expect(tab.locator('[data-role="close"]')).toHaveAttribute('aria-hidden', 'true');
+    await tab.focus();
+    await page.keyboard.press('Delete');
+    await expect(tab).toHaveCount(0);
+    await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toBeFocused();
+  });
+}
+
 test('map index pin-count badge updates as pins are added (via FolderStore)', async ({ page }) => {
   // Create a character to pin and a map.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');

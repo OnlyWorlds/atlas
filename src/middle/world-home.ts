@@ -32,7 +32,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { typeName } from '../core/type-words';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { isWritingNarrative } from './writing-helpers';
-import { escapeText, relativeTime } from '../core/dom-utils';
+import { escapeText, installRowKeydownActivation, relativeTime } from '../core/dom-utils';
 import { dismissTourCard, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { keepSafeCard, snoozeUntil } from './home-keepsafe';
 import { buildLandingLine } from './home-landing';
@@ -530,7 +530,7 @@ function buildCover(
   const descriptionMarkup = meta.description
     ? viewOnly
       ? `<p class="atlas-home-world-description">${escapeText(meta.description)}</p>`
-      : `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
+      : `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description" role="button" tabindex="0">${escapeText(meta.description)}</p>`
     : viewOnly || doors !== 'above'
       ? ''
       : DESCRIBE_PROMPT;
@@ -538,7 +538,8 @@ function buildCover(
     <h1 class="atlas-home-world-name">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   ` : `
-    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Click to rename (here only; the online name is in Settings)">${escapeText(meta.name)}</h1>
+    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Click to rename (here only; the online name is in Settings)"><span class="atlas-home-identity-edit" role="button" tabindex="0" aria-describedby="atlas-home-rename-hint">${escapeText(meta.name)}</span></h1>
+    <span id="atlas-home-rename-hint" hidden>Press to rename it here only; the online name is in Settings.</span>
     ${descriptionMarkup}
   `;
   // The OnlyWorlds mark after the name, in a row with it, never inside the click-to-rename h1.
@@ -569,8 +570,12 @@ function buildCover(
 
   const nameEl = identity.querySelector<HTMLElement>('[data-edit="name"]');
   const descEl = identity.querySelector<HTMLElement>('[data-edit="description"]');
-  if (nameEl) nameEl.addEventListener('click', () => openIdentityEdit('name', meta.name, nameEl, toasts));
+  // The heading keeps its role: the name inside it is the button a keyboard
+  // reaches, and the editor's anchor, so Escape gives focus back to it.
+  const nameBtn = nameEl?.querySelector<HTMLElement>('.atlas-home-identity-edit') ?? nameEl;
+  if (nameEl && nameBtn) nameEl.addEventListener('click', () => openIdentityEdit('name', meta.name, nameBtn, toasts));
   descEl?.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
+  installRowKeydownActivation(identity, '[data-edit]');
 
   // (The old quick text-links — new element / open writing / import — were
   // removed: the room nav + onboarding tiles cover every one of them.)
@@ -584,7 +589,7 @@ function buildCover(
 /** The cover's doors: "Describe your world" and the count line. */
 export type CoverDoors = 'above' | 'held' | 'below';
 
-const DESCRIBE_PROMPT = `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">Describe your world…</p>`;
+const DESCRIBE_PROMPT = `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description" role="button" tabindex="0">Describe your world…</p>`;
 
 /**
  * The cover's doors drawn under the grid, after the path closed while this Home was open: the
@@ -603,6 +608,7 @@ function buildCoverDoors(
     section.insertAdjacentHTML('beforeend', DESCRIBE_PROMPT);
     const descEl = section.querySelector<HTMLElement>('[data-edit="description"]')!;
     descEl.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
+    installRowKeydownActivation(section, '[data-edit]');
   }
   section.appendChild(buildStatline(counts));
   return section;
@@ -1055,6 +1061,9 @@ function openIdentityEdit(
   anchor: HTMLElement,
   toasts: ToastManager,
 ): void {
+  // Opened from the keyboard: after a save redraws Home, focus goes back to
+  // the same door, never the page.
+  const fromKeyboard = anchor.contains(document.activeElement);
   openFieldEditPopover({
     anchor,
     label: field === 'name' ? 'World name' : 'World description',
@@ -1082,6 +1091,13 @@ function openIdentityEdit(
       // settings → World), so only description triggers a push.
       if (field === 'description') requestPushIfLinked();
       toasts.info(`World ${field} saved`);
+      if (fromKeyboard) {
+        requestAnimationFrame(() => {
+          if (document.activeElement && document.activeElement !== document.body) return;
+          const door = document.querySelector<HTMLElement>(`[data-edit="${field}"]`);
+          (door?.querySelector<HTMLElement>('[role="button"]') ?? door)?.focus({ preventScroll: true });
+        });
+      }
     },
   });
 }

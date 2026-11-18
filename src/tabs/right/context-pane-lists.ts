@@ -278,7 +278,7 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   return {
     highlight(elementId: string | null): void {
       rowEls.forEach((el, id) => {
-        el.classList.toggle('is-highlighted', id === elementId);
+        rowButtonOf(el).classList.toggle('is-highlighted', id === elementId);
       });
     },
     destroy(): void {
@@ -300,9 +300,9 @@ interface RowOpts {
   reason?: string;
   status?: CastStatus;
   onClick: () => void;
-  onDismiss?: () => void;
+  onDismiss?: () => void | Promise<void>;
   /** "Named in the text" rows (#24): link the element where the text names it. */
-  onLink?: () => void;
+  onLink?: () => void | Promise<void>;
 }
 
 function buildRow(el: Element, opts: RowOpts): HTMLElement {
@@ -351,35 +351,71 @@ function buildRow(el: Element, opts: RowOpts): HTMLElement {
   }
 
   row.addEventListener('click', opts.onClick);
+  if (!opts.onLink && !opts.onDismiss) return row;
+
+  // A row with actions: the row's button and its actions sit side by side in
+  // a wrapper, real buttons a keyboard reaches (a button inside a button is
+  // neither valid nor reachable). The wrapper carries the row's identity.
+  const wrap = document.createElement('div');
+  wrap.className = 'atlas-context-pane-row-wrap';
+  wrap.dataset.elementId = el.id;
+  wrap.dataset.elementType = el.type;
+  wrap.appendChild(row);
+  const name = el.name || 'it';
 
   if (opts.onLink) {
-    const linkBtn = document.createElement('span');
+    const linkBtn = document.createElement('button');
+    linkBtn.type = 'button';
     linkBtn.className = 'atlas-context-pane-row-link';
-    linkBtn.setAttribute('role', 'button');
     linkBtn.dataset.action = 'link-named';
-    linkBtn.title = `Link ${el.name || 'it'} where the text names it`;
+    linkBtn.title = `Link ${name} where the text names it`;
+    linkBtn.setAttribute('aria-label', linkBtn.title);
     linkBtn.textContent = 'Link';
-    linkBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      opts.onLink?.();
-    });
-    row.appendChild(linkBtn);
+    linkBtn.addEventListener('click', () => { const back = keepFocusNear(wrap); void Promise.resolve(opts.onLink?.()).finally(back); });
+    wrap.appendChild(linkBtn);
   }
 
   if (opts.onDismiss) {
-    const dismissBtn = document.createElement('span');
+    const dismissBtn = document.createElement('button');
+    dismissBtn.type = 'button';
     dismissBtn.className = 'atlas-context-pane-row-dismiss';
-    dismissBtn.setAttribute('role', 'button');
     dismissBtn.title = 'Dismiss suggestion for this narrative';
+    dismissBtn.setAttribute('aria-label', `Dismiss ${name} as a suggestion for this narrative`);
     dismissBtn.textContent = '×';
-    dismissBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      opts.onDismiss?.();
-    });
-    row.appendChild(dismissBtn);
+    dismissBtn.addEventListener('click', () => { const back = keepFocusNear(wrap); void Promise.resolve(opts.onDismiss?.()).finally(back); });
+    wrap.appendChild(dismissBtn);
   }
 
-  return row;
+  return wrap;
+}
+
+/**
+ * An action that takes its row away (Link, dismiss) leaves focus in the list:
+ * on the row now in its place, or the one before, after the list redraws.
+ * Returns the step to run after the action.
+ */
+function keepFocusNear(wrap: HTMLElement): () => void {
+  const list = wrap.closest<HTMLElement>('.atlas-context-pane-list-suggested');
+  const index = wrap.parentElement ? [...wrap.parentElement.children].indexOf(wrap) : -1;
+  return () => {
+    if (!list || index < 0) return;
+    requestAnimationFrame(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      // The pane may have redrawn: find the column again by its class.
+      const body = (list.isConnected ? list : document.querySelector<HTMLElement>('.atlas-context-pane-list-suggested'))
+        ?.querySelector<HTMLElement>('.atlas-context-pane-list-body');
+      const rows = body ? [...body.querySelectorAll<HTMLElement>(':scope > .atlas-context-pane-row, :scope > .atlas-context-pane-row-wrap > .atlas-context-pane-row')] : [];
+      // The list emptied: the pane's first row (the cast) keeps focus in the pane.
+      const target = rows[Math.min(index, rows.length - 1)]
+        ?? document.querySelector<HTMLElement>('.atlas-context-pane-list-cast .atlas-context-pane-row');
+      target?.focus({ preventScroll: true });
+    });
+  };
+}
+
+/** The element a row highlights: the row's own button, inside a wrapper when it has actions. */
+function rowButtonOf(outer: HTMLElement): HTMLElement {
+  return outer.matches('.atlas-context-pane-row') ? outer : outer.querySelector<HTMLElement>('.atlas-context-pane-row') ?? outer;
 }
 
 const namedCache = new WeakMap<readonly Element[], Map<string, Element[]>>();
