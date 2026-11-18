@@ -94,8 +94,50 @@ describe('a field\'s value by keyboard', () => {
     const v = section(el, [{ name: 'description', widget: 'text-long' }]).querySelector<HTMLElement>('.atlas-field-value')!;
     const name = v.getAttribute('aria-label')!;
     expect(name.startsWith('Description: The reef runs north')).toBe(true);
-    expect(name.endsWith('…. Press to edit')).toBe(true);
+    // A cut value ends on its ellipsis, never "….".
+    expect(name.endsWith('… Press to edit')).toBe(true);
     expect(name).not.toContain('three fleets');
+  });
+
+  it('a value that ends its own sentence gets no second stop, and line breaks read as spaces', async () => {
+    const { el } = await world({ description: 'Salt.\nMore salt.' });
+    const v = section(el, [{ name: 'description', widget: 'text-long' }]).querySelector<HTMLElement>('.atlas-field-value')!;
+    expect(v.getAttribute('aria-label')).toBe('Description: Salt. More salt. Press to edit');
+  });
+
+  it('a held Enter presses once: its repeats open nothing', async () => {
+    const { el } = await world({ description: 'Salt' });
+    const v = section(el, [{ name: 'description', widget: 'text-long' }]).querySelector<HTMLElement>('.atlas-field-value')!;
+    let opened = 0;
+    v.addEventListener('click', () => { opened++; });
+    v.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, repeat: true }));
+    expect(opened).toBe(0);
+    v.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(opened).toBe(1);
+    document.querySelector<HTMLElement>('.atlas-edit-popover-backdrop')?.remove();
+  });
+
+  it('a key press opens the editor even with text selected in the value', async () => {
+    const { el } = await world({ description: 'The reef runs north.' });
+    const host = section(el, [{ name: 'description', widget: 'text-long' }]);
+    document.body.appendChild(host);
+    const v = host.querySelector<HTMLElement>('.atlas-field-value')!;
+    // Focus first (jsdom's focus can move the selection), then select inside the value.
+    v.focus();
+    const range = document.createRange();
+    range.selectNodeContents(v);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    // A mouse's click (detail 1) with the selection inside: nothing opens.
+    v.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(document.querySelector('.atlas-edit-popover')).toBeNull();
+    // Enter on the focused value, the selection still there: the editor opens.
+    expect(window.getSelection()!.toString()).toBe('The reef runs north.');
+    v.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(document.querySelector('.atlas-edit-popover')).not.toBeNull();
+    document.querySelector<HTMLElement>('.atlas-edit-popover-backdrop')?.remove();
+    window.getSelection()!.removeAllRanges();
+    host.remove();
   });
 
   it('an empty value says so in its name', async () => {

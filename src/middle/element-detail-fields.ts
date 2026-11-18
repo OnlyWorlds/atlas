@@ -263,9 +263,11 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   valueEl.setAttribute('role', 'button');
   valueEl.tabIndex = 0;
   // The name says the field, the value (a long one cut short) with its unit, and the press.
-  const trimmed = valueText.trim();
+  // Line breaks read as spaces; a value that ends its own sentence gets no second stop.
+  const trimmed = valueText.replace(/\s+/g, ' ').trim();
   const spoken = trimmed.length > 80 ? `${trimmed.slice(0, 80).trimEnd()}…` : trimmed;
-  valueEl.setAttribute('aria-label', `${humanizeFieldName(meta.name)}: ${spoken ? `${spoken}${unit ? ` ${unit}` : ''}` : 'empty'}. Press to edit`);
+  const said = spoken ? `${spoken}${unit ? ` ${unit}` : ''}` : 'empty';
+  valueEl.setAttribute('aria-label', `${humanizeFieldName(meta.name)}: ${said}${/[.…!?]$/.test(said) ? '' : '.'} Press to edit`);
   installRowKeydownActivation(valueEl);
   let mouseDownAt: { x: number; y: number } | null = null;
   let suppressNextClick = false;
@@ -289,7 +291,12 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
       suppressNextClick = true;
     }
   });
-  valueEl.addEventListener('click', () => {
+  valueEl.addEventListener('click', (e) => {
+    // A key press (or the label's forwarded press) is no drag: it opens the
+    // editor whatever text is selected; the guards below are for a mouse's own
+    // click after a selection. Such a click has detail 0, a mouse's 1 or more.
+    const fromKey = e.detail === 0;
+    if (fromKey) suppressNextClick = false;
     if (suppressNextClick) {
       suppressNextClick = false;
       return;
@@ -299,7 +306,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
     // ANY active text selection inside or overlapping valueEl at click time.
     // Without this, asymmetric drag directions can leak past the mouseup gate.
     const sel = window.getSelection();
-    if (sel && sel.toString().length > 0) {
+    if (!fromKey && sel && sel.toString().length > 0) {
       const anchorIn = sel.anchorNode && valueEl.contains(sel.anchorNode);
       const focusIn = sel.focusNode && valueEl.contains(sel.focusNode);
       if (anchorIn || focusIn) return;
@@ -317,7 +324,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
         widget: editWidget,
         mode: 'single',
         onSave: async (nextValue) => {
-          await persistFieldPatch(el, meta.name, nextValue);
+          await saveKeepingFocus(valueEl, meta.name, () => persistFieldPatch(el, meta.name, nextValue));
         },
       });
       return;
@@ -329,7 +336,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
         widget: editWidget,
         mode: 'multi',
         onSave: async (nextValue) => {
-          await persistFieldPatch(el, meta.name, nextValue);
+          await saveKeepingFocus(valueEl, meta.name, () => persistFieldPatch(el, meta.name, nextValue));
         },
       });
       return;
@@ -386,7 +393,6 @@ function withCalendarDate(wrap: HTMLElement, valueEl: HTMLElement, meta: FieldMe
 function renderAliasesRow(el: Element, readOnly: boolean): HTMLElement {
   const row = document.createElement('div');
   row.className = 'atlas-aliases-display';
-  if (!readOnly) row.title = 'Click to edit aliases';
 
   const aliases: string[] = Array.isArray(el.atlas_aliases)
     ? el.atlas_aliases.filter((s): s is string => typeof s === 'string' && s.length > 0)
@@ -424,7 +430,9 @@ function renderAliasesRow(el: Element, readOnly: boolean): HTMLElement {
     row.setAttribute('role', 'button');
     row.tabIndex = 0;
     const label = humanizeFieldName('atlas_aliases');
+    // One name: the title says the same words, so a screen reader hears it once.
     row.setAttribute('aria-label', aliases.length === 0 ? `${label}: none. Press to add` : `${label}: ${aliases.join(', ')}. Press to edit`);
+    row.title = row.getAttribute('aria-label')!;
     installRowKeydownActivation(row);
   }
 
@@ -600,7 +608,7 @@ function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLE
 }
 
 /** `onRemove` null = no × (a view-only world, conv. 149). */
-function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void) | null): HTMLElement {
+function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void | Promise<void>) | null): HTMLElement {
   const linked = getState().data.elements.find(e => e.id === id);
   const chip = document.createElement('span');
   chip.className = 'atlas-link-chip' + (linked ? '' : ' atlas-link-chip-unresolved');
@@ -630,14 +638,31 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void) | nul
   rm.type = 'button';
   rm.className = 'atlas-link-chip-remove';
   rm.dataset.remove = '1';
-  rm.setAttribute('aria-label', linked ? `Remove ${linked.name || 'this link'}` : 'Remove this link');
+  rm.setAttribute('aria-label', linked
+    ? `Remove ${linked.name?.trim() || `the unnamed ${typeName(linked.type, { supertype: linked.supertype })}`}`
+    : 'Remove this link');
   const glyph = document.createElement('span');
   glyph.className = 'material-symbols-outlined';
   glyph.textContent = 'close';
   rm.appendChild(glyph);
   rm.addEventListener('click', (e) => {
     e.stopPropagation();
-    onRemove();
+    // The field redraws without this chip: focus goes to the remove mark now in
+    // its place (or the one before), else the field's pick button, never the page.
+    const hadFocus = document.activeElement === rm;
+    const removesIn = (): HTMLElement[] => /^[\w-]+$/.test(meta.name)
+      ? [...document.querySelectorAll<HTMLElement>(`[data-field="${meta.name}"] .atlas-link-chip-remove`)]
+      : [];
+    const at = removesIn().indexOf(rm);
+    void Promise.resolve(onRemove()).finally(() => {
+      if (!hadFocus || at < 0) return;
+      requestAnimationFrame(() => {
+        if (document.activeElement && document.activeElement !== document.body) return;
+        const left = removesIn();
+        (left[Math.min(at, left.length - 1)]
+          ?? document.querySelector<HTMLElement>(`[data-field="${meta.name}"] .atlas-link-pick`))?.focus({ preventScroll: true });
+      });
+    });
   });
   chip.appendChild(rm);
 
@@ -666,7 +691,8 @@ let fieldSaveSeq = 0;
  * was on the old value and nothing else took it meanwhile.
  */
 async function saveKeepingFocus(anchor: HTMLElement, fieldName: string, save: () => Promise<void>): Promise<void> {
-  const had = document.activeElement === anchor;
+  // On the value, or inside it (an inline editor lives in the value).
+  const had = !!document.activeElement && anchor.contains(document.activeElement);
   await save();
   if (!had || anchor.isConnected || !/^[\w-]+$/.test(fieldName)) return;
   if (document.activeElement && document.activeElement !== document.body) return;

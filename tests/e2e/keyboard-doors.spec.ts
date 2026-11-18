@@ -109,6 +109,64 @@ for (const tag of ['', ' @firefox']) {
     await expect(block).toContainText('Ireena');
   });
 
+  test(`an element's fields keep the keyboard's place: inline saves and Escape, link removes, a key past a selection${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-fields');
+    const annId = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const a = await store.createElement('character', { name: 'Bram' });
+      const b = await store.createElement('character', { name: 'Cora' });
+      const ann = await store.createElement('character', { name: 'Ann', description: 'Salt', friends: [a.id, b.id] });
+      api.patchData(await store.listElements());
+      return ann.id;
+    });
+    await page.evaluate((id) => {
+      const worldId = (window as any).__atlasTestApi.getState().active.worldId;
+      window.location.hash = `#/w/${worldId}/element/${id}`;
+    }, annId);
+    const desc = page.locator('[data-field="description"] .atlas-field-value[role="button"]');
+    await expect(desc).toHaveText('Salt');
+
+    // A selection inside the value, then Enter: the editor opens (the popover, the default mode).
+    await desc.focus();
+    await desc.evaluate((v) => { const r = document.createRange(); r.selectNodeContents(v); const s = getSelection()!; s.removeAllRanges(); s.addRange(r); });
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.atlas-edit-popover')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(desc).toBeFocused();
+
+    // Two link removes in a row from the keyboard: focus stays in the field.
+    const removes = page.locator('[data-field="friends"] .atlas-link-chip-remove');
+    await expect(removes).toHaveCount(2);
+    await removes.first().focus();
+    await page.keyboard.press('Enter');
+    await expect(removes).toHaveCount(1);
+    await expect(removes.first()).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(removes).toHaveCount(0);
+    await expect(page.locator('[data-field="friends"] .atlas-link-pick')).toBeFocused();
+
+    // The inline mode: a save and an Escape both give focus back to the value.
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      const reg = api.getState().registry;
+      api.patchSlice('registry', { ...reg, editor_settings: { ...(reg.editor_settings ?? {}), field_edit_mode: 'inline-single' } });
+    });
+    await desc.focus();
+    await page.keyboard.press('Enter');
+    const input = page.locator('[data-field="description"] .atlas-field-inline-input');
+    await expect(input).toBeFocused();
+    await input.fill('Salt and pepper');
+    await page.keyboard.press('Enter');
+    await expect(desc).toHaveText('Salt and pepper');
+    await expect(desc).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(input).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(input).toHaveCount(0);
+    await expect(desc).toBeFocused();
+  });
+
   test(`a suggestion's Link is a button a keyboard reaches, and focus stays in the list after it${tag}`, async ({ page }) => {
     await freshWorld(page, 'keys-link');
     const scene = await page.evaluate(async () => {

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.21',
+    date: '2026-11-18',
+    theme: 'An element\'s fields keep your place',
+    entries: [
+      {
+        id: 'fields-keyboard-place',
+        title: 'Fields by keyboard keep your place',
+        body: 'With some of a field\'s value selected, Enter or Space on it opened nothing; now it opens the editor (a mouse click after selecting still leaves your selection alone). In the in-place edit modes, a save or Escape brings focus back to the field, and after removing a link, focus moves to a neighbouring link\'s remove mark, or to the field\'s pick button when none is left. A screen reader hears a value\'s line breaks as spaces, no doubled full stop, and an unnamed linked element by its type.',
+        tags: ['editor', 'accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.20',
     date: '2026-11-18',
     theme: 'More doors by keyboard',

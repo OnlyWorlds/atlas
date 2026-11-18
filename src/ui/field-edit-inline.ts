@@ -74,9 +74,13 @@ export function openFieldEditInline(opts: FieldEditInlineOptions): void {
   }, 0);
 
   let resolved = false;
+  // Putting the text back removes the editor: when it held focus, focus goes
+  // to the anchor (a field's value is a button), never the page.
   function restoreAnchor(): void {
+    const hadFocus = document.activeElement === editor;
     anchor.className = originalClass;
     anchor.textContent = originalText;
+    if (hadFocus) anchor.focus({ preventScroll: true });
   }
 
   function cancel(): void {
@@ -107,7 +111,11 @@ export function openFieldEditInline(opts: FieldEditInlineOptions): void {
       // Empty → null (not undefined; see convention #21). Otherwise coerce.
       nextValue = nextValue === '' ? null : n;
     }
-    // Disable editor visually while saving so the user can't double-trigger.
+    // Focus steps out to the anchor first (a field's value is a button): the
+    // page holds its redraw while focus is in an input, and the save's redraw
+    // then gives focus to the field's new value. Disabled while saving, so
+    // the user can't double-trigger.
+    if (document.activeElement === editor) anchor.focus({ preventScroll: true });
     editor.setAttribute('disabled', 'true');
     try {
       await onSave(nextValue);
@@ -126,6 +134,9 @@ export function openFieldEditInline(opts: FieldEditInlineOptions): void {
       return;
     }
     if (e.key === 'Enter') {
+      // A held Enter saves once: its repeats would reach the value focus
+      // returns to and open the editor again.
+      if (e.repeat) { e.preventDefault(); return; }
       if (isMulti) {
         // Ctrl/Cmd+Enter OR Shift+Enter saves. Plain Enter inserts a newline
         // (textarea default). Shift is the conventional editor shortcut; ctrl
