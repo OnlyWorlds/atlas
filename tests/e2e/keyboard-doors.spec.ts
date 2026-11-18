@@ -1,11 +1,34 @@
 /**
  * Doors a mouse alone could open, reached by the keyboard (the mouse-only
- * census, rows 5 to 10): Home's world name and description, the pane
- * dividers, a share page block's editor, and a suggestion row's actions.
- * Each is a control a keyboard reaches, its press is Enter or Space (or the
- * arrows for a divider), and focus comes back where the person was.
+ * census, rows 5 to 18): Home's world name and description, the pane
+ * dividers, a share page block's editor, a suggestion row's actions; the link
+ * chips, a zone and its kind in the map's zone panel, a card of the scroll
+ * view, the picture beside an element's name, a field section's fold and the
+ * Maps tree's fold. Each is a control a keyboard reaches, its press is Enter
+ * or Space (or the arrows for a divider), and focus comes back where the
+ * person was, or lands on the page the press opened.
  */
 import { test, expect, Page } from '@playwright/test';
+
+// A 1x1 PNG, for a picture the page can draw without a network.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+
+async function openElement(page: Page, id: string): Promise<void> {
+  await page.evaluate((elementId) => {
+    const worldId = (window as any).__atlasTestApi.getState().active.worldId;
+    window.location.hash = `#/w/${worldId}/element/${elementId}`;
+  }, id);
+  await expect(page.locator(`.atlas-middle-body[data-element-id="${id}"]`)).toBeVisible();
+}
+
+/** A map made through its dialog, open in its tab; its id. */
+async function newMap(page: Page, name: string): Promise<string> {
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', name);
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: name })).toBeVisible();
+  return page.evaluate((n) => (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.type === 'map' && e.name === n).id, name);
+}
 
 async function freshWorld(page: Page, dir: string): Promise<void> {
   await page.goto('/');
@@ -194,5 +217,203 @@ for (const tag of ['', ' @firefox']) {
     await page.keyboard.press('Enter');
     await expect(named).toHaveCount(1);
     await expect(named.first().locator('.atlas-context-pane-row')).toBeFocused();
+  });
+
+  // Census row 11.
+  test(`a link chip's name opens the element it names, from a link field and from Referenced by, and focus lands on that page's name${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-chips');
+    const ids = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const bram = await store.createElement('character', { name: 'Bram' });
+      const ann = await store.createElement('character', { name: 'Ann', friends: [bram.id] });
+      api.patchData(await store.listElements());
+      return { bram: bram.id as string, ann: ann.id as string };
+    });
+    await openElement(page, ids.ann);
+    const heading = page.locator('.atlas-middle [data-role="element-name"]');
+    const link = page.locator('[data-field="friends"] .atlas-link-chip [role="link"]');
+    await expect(link).toHaveAccessibleName('Bram');
+    // The chip's remove is its own stop, after the name.
+    await link.focus();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('[data-field="friends"] .atlas-link-chip-remove')).toBeFocused();
+    // Enter, held: the first keydown opens Bram's page, focus lands on his name,
+    // and the key's repeats there rename nothing.
+    await link.focus();
+    await page.keyboard.down('Enter');
+    await expect(page.locator(`.atlas-middle-body[data-element-id="${ids.bram}"]`)).toBeVisible();
+    await expect(heading).toHaveText('Bram');
+    await expect(heading).toBeFocused();
+    await page.keyboard.down('Enter');
+    await page.keyboard.down('Enter');
+    await page.keyboard.up('Enter');
+    await expect(heading.locator('input')).toHaveCount(0);
+    await expect(heading).toBeFocused();
+
+    // Bram's page: Ann refers to him; Space on her chip opens her page.
+    const ref = page.locator('.atlas-detail-refs .atlas-link-chip [role="link"]', { hasText: 'Ann' });
+    await expect(ref).toHaveAccessibleName('Ann');
+    await ref.focus();
+    await page.keyboard.press(' ');
+    await expect(page.locator(`.atlas-middle-body[data-element-id="${ids.ann}"]`)).toBeVisible();
+    await expect(heading).toHaveText('Ann');
+    await expect(heading).toBeFocused();
+  });
+
+  // Census rows 12 and 13.
+  test(`the zone panel's kinds fold and its zones open from the keyboard, and focus stays on what was pressed${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-zones');
+    const mapId = await newMap(page, 'Keyed Canvas');
+    const zoneId = await page.evaluate(async (map) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const ids: string[] = [];
+      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the deep', 'Sea', 900]] as const) {
+        const zone = await store.createZone({ name, supertype });
+        let order = 1;
+        for (const [px, py] of [[x, 100], [x + 300, 100], [x + 300, 400], [x, 400]]) await store.createMarker({ map_id: map, zone_id: zone.id, x: px, y: py, order: order++ });
+        ids.push(zone.id);
+      }
+      api.patchData(await store.listElements());
+      return ids[0];
+    }, mapId);
+    await page.click('[data-action="zones-dropdown"]');
+    const panel = page.locator('[data-role="zones-dropdown-panel"]');
+    const kind = panel.locator('.atlas-zone-kind', { hasText: 'Border' });
+    const fold = kind.locator('button.atlas-zone-kind-caret');
+    // Two kinds start closed; the fold names its kind and its count.
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(fold).toHaveAccessibleName('Border, 1 zone');
+    await fold.focus();
+    await page.keyboard.press('Enter');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await expect(fold).toBeFocused();
+
+    // The zone's name: Enter selects it and opens its page; focus stays on it.
+    const zone = kind.locator('.atlas-zone-chip-name');
+    await expect(zone).toHaveAccessibleName('the north march');
+    await zone.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator(`.atlas-middle-body[data-element-id="${zoneId}"]`)).toBeVisible();
+    await expect(kind.locator('.atlas-zone-chip')).toHaveClass(/is-selected/);
+    await expect(zone).toHaveAttribute('aria-current', 'true');
+    await expect(zone).toBeFocused();
+
+    // Space folds the kind again.
+    await fold.focus();
+    await page.keyboard.press(' ');
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(fold).toBeFocused();
+  });
+
+  // Census row 15: the on-map badge needs no stop of its own (see the build report).
+  test(`an element on the open map is located from the keyboard: its row opens its page, whose pin button opens the map at it${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-locate');
+    const mapId = await newMap(page, 'Keyed Canvas');
+    const ireena = await page.evaluate(async (map) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const c = await store.createElement('character', { name: 'Ireena' });
+      await store.createElement('pin', { name: 'Ireena', map_id: map, element_id: c.id, element_type: 'character', x: 200, y: 200 });
+      api.patchData(await store.listElements());
+      return c.id as string;
+    }, mapId);
+    const row = page.locator(`.atlas-list [data-element-id="${ireena}"]`);
+    await expect(row.locator('.atlas-elements-row-onmap-badge')).toHaveCount(1);
+    await row.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator(`.atlas-middle-body[data-element-id="${ireena}"]`)).toBeVisible();
+    const pinBtn = page.locator('.atlas-middle-header [data-action="goto-pin"]');
+    await expect(pinBtn).toHaveJSProperty('tagName', 'BUTTON');
+    await pinBtn.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.atlas-tab.active', { hasText: 'Keyed Canvas' })).toBeVisible();
+  });
+
+  // Census row 16.
+  test(`the picture beside an element's name shows the images again from the keyboard, and the hide button sends focus back to it${tag}`, async ({ page }) => {
+    await page.route('https://media.onlyworlds.com/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+    await freshWorld(page, 'keys-picture');
+    const id = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const c = await store.createElement('character', { name: 'Ireena', image_url: 'https://media.onlyworlds.com/u/keys/ireena.png' });
+      api.patchData(await store.listElements());
+      const reg = api.getState().registry;
+      api.patchSlice('registry', { ...reg, editor_settings: { ...(reg.editor_settings ?? {}), show_element_images: false } });
+      return c.id as string;
+    });
+    await openElement(page, id);
+    const show = page.locator('.atlas-middle-header button.atlas-header-icon-thumb-btn');
+    await expect(show).toHaveAccessibleName('Show element images');
+    await expect(show.locator('img')).toBeVisible();
+    await show.focus();
+    await page.keyboard.press('Enter');
+    const hide = page.locator('.atlas-element-image-hide');
+    await expect(hide).toBeFocused();
+    await expect(show).toHaveCount(0);
+    await page.keyboard.press(' ');
+    await expect(hide).toHaveCount(0);
+    await expect(show).toBeFocused();
+  });
+
+  // Census row 17.
+  test(`a field section folds from the keyboard and keeps focus through the redraw${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-sections');
+    const id = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const c = await api.getActiveStore().createElement('character', { name: 'Ireena', description: 'Salt' });
+      api.patchData(await api.getActiveStore().listElements());
+      return c.id as string;
+    });
+    await openElement(page, id);
+    const section = page.locator('.atlas-detail-section', { has: page.locator('[data-field="description"]') });
+    const name = await section.getAttribute('data-section');
+    const fold = page.locator(`.atlas-detail-section[data-section="${name}"] > .atlas-detail-section-header`);
+    await expect(fold).toHaveAttribute('role', 'button');
+    await expect(fold).toHaveAccessibleName(name!);
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await fold.focus();
+    await page.keyboard.press('Enter');
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('[data-field="description"]')).toHaveCount(0);
+    await expect(fold).toBeFocused();
+    // Space presses on its release: the page holds its redraw until then, and focus still comes back.
+    await page.keyboard.press(' ');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('[data-field="description"]')).toHaveCount(1);
+    await expect(fold).toBeFocused();
+  });
+
+  // Census row 18.
+  test(`the Maps tree's fold is a stop of its own, named for the maps it holds, and keeps focus through the redraw${tag}`, async ({ page }) => {
+    await freshWorld(page, 'keys-maptree');
+    const { parent, child } = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const p = await store.createElement('map', { name: 'Realm' });
+      const c = await store.createElement('map', { name: 'Province', parent_map: p.id });
+      api.patchData(await store.listElements());
+      const ui = api.getState().ui;
+      api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+      return { parent: p.id as string, child: c.id as string };
+    });
+    const childRow = page.locator(`.atlas-map-tree-row[data-map-id="${child}"]`);
+    await expect(childRow).toBeVisible();
+    const fold = page.locator(`.atlas-map-tree-row[data-map-id="${parent}"] .atlas-map-tree-chevron`);
+    await expect(fold).toHaveAccessibleName('1 map under Realm');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    // Tab from the row reaches the fold.
+    await page.locator(`.atlas-map-tree-row[data-map-id="${parent}"]`).focus();
+    await page.keyboard.press('Tab');
+    await expect(fold).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(childRow).toHaveCount(0);
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(fold).toBeFocused();
+    await page.keyboard.press(' ');
+    await expect(childRow).toBeVisible();
+    await expect(fold).toBeFocused();
   });
 }

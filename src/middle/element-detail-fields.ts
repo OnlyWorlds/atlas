@@ -39,6 +39,7 @@ import { getFieldDescription } from '../editor/field-descriptions';
 import { unitLabelFor } from '../core/world-units';
 import { pickElement } from '../ui/element-picker-modal';
 import { installRowKeydownActivation } from '../core/dom-utils';
+import { focusArrival, elementPageHeading } from '../ui/focus-arrival';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { readImageDimsFromUrl, smallMapImageHint, IMAGELESS_MAP_SIZE } from '../ui/image-dims';
 import { countSpatialOnMap, spatialPhrase, rescaleSketchOntoImage } from './map-attach-scale';
@@ -51,6 +52,8 @@ import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
 
 /** Set of `${type}::${section}` keys currently collapsed. Module-level (survives re-render). */
 const collapsedSections = new Set<string>();
+/** The fold a key press folded, by element and section: its redraw gives it focus back. */
+let sectionFocusAfterDraw: string | null = null;
 
 // ====== Public API ======
 
@@ -84,13 +87,28 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
     chev.className = 'material-symbols-outlined';
     chev.textContent = isCollapsed ? 'expand_more' : 'expand_less';
     headerRow.appendChild(chev);
+    // A fold a keyboard reaches: Tab, then Enter or Space; its name is the section's.
+    headerRow.setAttribute('role', 'button');
+    headerRow.tabIndex = 0;
+    headerRow.setAttribute('aria-expanded', String(!isCollapsed));
+    installRowKeydownActivation(headerRow);
+    const focusKey = `${el.id}::${collapsedKey}`;
     headerRow.addEventListener('click', () => {
       if (collapsedSections.has(collapsedKey)) collapsedSections.delete(collapsedKey);
       else collapsedSections.add(collapsedKey);
+      // The page redraws (now, or when a held press lands): focus comes back to this fold.
+      sectionFocusAfterDraw = document.activeElement === headerRow ? focusKey : null;
       // Re-emit data.elements with a new array reference so the detail subscriber re-fires.
       const data = getState().data;
       patchSlice('data', { elements: [...data.elements] });
     });
+    if (sectionFocusAfterDraw === focusKey) {
+      sectionFocusAfterDraw = null;
+      queueMicrotask(() => {
+        const a = document.activeElement;
+        if (headerRow.isConnected && (!a || a === document.body || !a.isConnected)) headerRow.focus({ preventScroll: true });
+      });
+    }
   }
   wrap.appendChild(headerRow);
 
@@ -607,6 +625,19 @@ function renderMultiLink(meta: FieldMeta, el: Element, readOnly: boolean): HTMLE
   return wrap;
 }
 
+/**
+ * A chip's name as the link that opens its element: Tab reaches it, Enter or
+ * Space presses it (the chip's own click handler acts). A link, not a button:
+ * it goes to a page, and its text stays selectable like any other content.
+ * Shared by the link fields and the "Referenced by" chips.
+ */
+export function markChipLink(chip: HTMLElement, name: HTMLElement): void {
+  name.classList.add('atlas-link-chip-name');
+  name.setAttribute('role', 'link');
+  name.tabIndex = 0;
+  installRowKeydownActivation(chip, '[role="link"]');
+}
+
 /** `onRemove` null = no × (a view-only world, conv. 149). */
 function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void | Promise<void>) | null): HTMLElement {
   const linked = getState().data.elements.find(e => e.id === id);
@@ -622,6 +653,9 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void | Prom
     chip.title = `No ${meta.target ? typeName(meta.target) : 'element'} with this id in this world`;
   }
   chip.appendChild(name);
+  // The name opens the linked element: a link a keyboard reaches (the chip
+  // holds the remove button, so the name is the control, not the chip).
+  if (linked) markChipLink(chip, name);
 
   chip.addEventListener('click', (e) => {
     if ((e.target as HTMLElement).dataset.remove) return;
@@ -629,6 +663,8 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void | Prom
     if (linked && worldId) {
       patchSlice('ui', { ...getState().ui, selectedElementId: linked.id });
       navigate(elementHash(worldId, linked.id));
+      // A key press's control went with the old page: focus lands on the new one's name.
+      if (e.detail === 0) focusArrival(elementPageHeading(linked.id));
     }
   });
   if (!onRemove) return chip;

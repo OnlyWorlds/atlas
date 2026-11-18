@@ -52,6 +52,22 @@ export function keepingFocus(root: Element, selector: string, draw: () => void):
   if (start !== null) fresh.setSelectionRange(start, end ?? start);
 }
 
+/**
+ * Draw a surface that rebuilds its controls with innerHTML, keeping keyboard
+ * focus on the same control: `keyOf` names the focused control by a selector
+ * that finds its twin in the new markup (null for one it does not keep). Only
+ * when the rebuild dropped focus to the page; focus moved elsewhere stays.
+ */
+export function keepingFocusOn(root: Element, keyOf: (el: HTMLElement) => string | null, draw: () => void): void {
+  const active = document.activeElement;
+  const key = active instanceof HTMLElement && root.contains(active) ? keyOf(active) : null;
+  draw();
+  if (!key) return;
+  const now = document.activeElement;
+  if (now && now !== document.body && now.isConnected) return;
+  root.querySelector<HTMLElement>(key)?.focus({ preventScroll: true });
+}
+
 export function renderGate(): RenderGate {
   let last: readonly unknown[] | null = null;
   return {

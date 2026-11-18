@@ -15,7 +15,7 @@ import type { TimelineNode } from './types';
 import type { TimelineViewExtras, TimelineViewHandle } from './timeline-view';
 import { layoutScroll, type ScrollLayout } from './scroll-layout';
 import { ELEMENT_ICONS } from '../../core/constants';
-import { escapeText } from '../../core/dom-utils';
+import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
 import { formatStep, formatDuration, type CalendarConfig } from '@onlyworlds/sdk';
 
 export interface ScrollViewOptions {
@@ -59,6 +59,8 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
 
   function rebuild(): void {
     layout = layoutScroll(nodes, { now, calendar });
+    // Focus in a card survives the rebuild (Focus narrows the chart and redraws it).
+    const from = focusedCardId();
     doc.innerHTML = '';
     doc.style.height = `${Math.ceil(layout.totalHeight)}px`;
 
@@ -91,6 +93,7 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       }
     }
     applySelection();
+    if (from) headBack([from, focusId]);
     onScroll();
   }
 
@@ -112,7 +115,9 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
     card.innerHTML =
       `<span class="atlas-scroll-card-dot" style="color:${escapeText(node.color)}"></span>` +
       `<div class="atlas-scroll-card-body">` +
-      `<div class="atlas-scroll-card-head">` +
+      // The head is the card's press for a keyboard: it opens the card (its
+      // links, Focus and Open) and closes it again.
+      `<div class="atlas-scroll-card-head" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeText(`${node.name || '(unnamed)'}, ${dateLine.replace(/\s*→\s*/g, ' to ')}`)}">` +
       `<span class="material-symbols-outlined" style="color:${escapeText(node.color)}">${escapeText(icon)}</span>` +
       `<span class="atlas-scroll-card-name">${escapeText(node.name || '(unnamed)')}</span>` +
       `</div>` +
@@ -125,15 +130,39 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       e.stopPropagation();
       opts.onSelect(node.id === selectedId ? null : node.id);
     });
+    installRowKeydownActivation(card);
     return card;
+  }
+
+  /** The card that holds focus, if focus is in the document. */
+  function focusedCardId(): string | null {
+    const a = document.activeElement;
+    if (!(a instanceof HTMLElement) || !doc.contains(a)) return null;
+    return a.closest<HTMLElement>('.atlas-scroll-card')?.dataset.id ?? null;
+  }
+
+  /**
+   * A press that took its own control away (a card's link chip, Focus) leaves
+   * focus on a card's head: the card it opened, else the one it was in.
+   */
+  function headBack(ids: Array<string | null>): void {
+    const a = document.activeElement;
+    if (a && a !== document.body && a.isConnected) return;
+    for (const id of ids) {
+      if (!id) continue;
+      const head = doc.querySelector<HTMLElement>(`.atlas-scroll-card[data-id="${CSS.escape(id)}"] .atlas-scroll-card-head`);
+      if (head) { head.focus(); return; }
+    }
   }
 
   /** Expanded content (chips + actions) for the selected card only. */
   function applySelection(): void {
+    const from = focusedCardId();
     for (const card of doc.querySelectorAll<HTMLElement>('.atlas-scroll-card')) {
       const id = card.dataset.id!;
       const selected = id === selectedId;
       card.classList.toggle('selected', selected);
+      card.querySelector('.atlas-scroll-card-head')?.setAttribute('aria-expanded', String(selected));
       const more = card.querySelector<HTMLElement>('.atlas-scroll-card-more');
       if (!more) continue;
       if (!selected) { more.innerHTML = ''; continue; }
@@ -182,6 +211,7 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       actions.appendChild(openBtn);
       more.appendChild(actions);
     }
+    if (from) headBack([selectedId, from]);
   }
 
   /** Scroll-driven ambience: the sticky readout + the gentle recede. */

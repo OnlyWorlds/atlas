@@ -30,7 +30,8 @@ import { typeName, typeNameStart } from '../core/type-words';
 import { getTierForNarrative, getWritingLabels, type WritingTier } from './writing-helpers';
 import { isKnowledgeNarrative, aboutIdsOf, heldByOf, knowersOfElement } from '../core/knowledge';
 import { isPageNarrative } from '../core/sharing';
-import { humanizeFieldName } from './element-detail-fields';
+import { humanizeFieldName, markChipLink } from './element-detail-fields';
+import { focusArrival, elementPageHeading } from '../ui/focus-arrival';
 import { getEditorSettings } from '../registry/registry';
 import { foldBacklinks, markerFoldLabel } from '../core/spatial-backlinks';
 import { pageLore } from '../core/parlor-room';
@@ -360,9 +361,12 @@ function buildRefChip(src: Element, navigateTo: NavTarget): HTMLElement {
   const name = document.createElement('span');
   name.textContent = src.name || '(unnamed)';
   chip.appendChild(name);
-  chip.addEventListener('click', () => {
+  markChipLink(chip, name);
+  chip.addEventListener('click', (e) => {
     const worldId = getState().active?.worldId;
     if (!worldId) return;
+    // A key press's control goes with this page: focus lands on the page it opens.
+    if (e.detail === 0) focusArrival(navigateTo === 'element' ? elementPageHeading(src.id) : undefined);
     if (navigateTo === 'writing') {
       // Don't mirror selectedElementId — writing room's URL is the source of
       // truth (convention #46). The global selection stays where it was.
@@ -395,9 +399,11 @@ function buildEntryChip(iconName: string, label: string, title: string, navId: s
   name.textContent = label;
   chip.appendChild(name);
   if (navId) {
-    chip.addEventListener('click', () => {
+    markChipLink(chip, name);
+    chip.addEventListener('click', (e) => {
       const worldId = getState().active?.worldId;
       if (!worldId) return;
+      if (e.detail === 0) focusArrival(elementPageHeading(navId));
       patchSlice('ui', { ...getState().ui, selectedElementId: navId });
       navigate(elementHash(worldId, navId));
     });

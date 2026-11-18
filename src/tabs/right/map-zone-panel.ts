@@ -38,6 +38,7 @@ import { refreshActiveMapZones } from './map-tab-zones';
 import { markersForZoneOnMap, listLinkedZonesOnMap } from './zone-derived';
 import { mapZoneDate, zoneShownOnMap } from './map-date-bar';
 import { partitionZonesAndMarkers } from './zone-derived';
+import { keepingFocusOn } from '../../ui/render-gate';
 
 const DEFAULT_ZONE_COLOR = '#22d3ee';
 
@@ -50,6 +51,10 @@ export interface ZonePanelState {
   touched: boolean;
   /** A sync happened while the panel was closed; render on open. */
   stale: boolean;
+  /** The selected zone whose kind the panel last opened by itself. */
+  openedFor?: string | null;
+  /** The markup last written into the panel. */
+  drawn?: string;
 }
 
 const panelState = new WeakMap<MapTabCacheEntry, ZonePanelState>();
@@ -117,9 +122,10 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   // One kind (a small hand-drawn world) opens itself: the panel reads as the
   // flat list it was. Many kinds start closed; the selected zone's kind opens.
   if (!ps.touched && kinds.length === 1) ps.openKinds.add(kinds[0].key);
-  if (selectedId) {
+  // Once per selection: a kind folded while its zone stays selected stays folded.
+  if (selectedId && selectedId !== ps.openedFor) {
     const k = kinds.find(k => k.members.some(z => z.id === selectedId));
-    if (k) ps.openKinds.add(k.key);
+    if (k) { ps.openKinds.add(k.key); ps.openedFor = selectedId; }
   }
 
   // Preserve the search box's focus/caret across a rebuild.
@@ -151,7 +157,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     parts.push(`
       <div class="atlas-zone-kind ${open ? 'is-open' : ''} ${hidden ? 'is-hidden' : ''}" data-kind-key="${escapeAttr(kind.key)}">
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
-          <span class="material-symbols-outlined atlas-zone-kind-caret" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span>
+          <button type="button" class="atlas-zone-kind-caret" aria-expanded="${open}" aria-label="${escapeAttr(foldName(kind, matching.length))}" title="${escapeAttr(foldName(kind, matching.length))}"><span class="material-symbols-outlined" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span></button>
           ${hasKind
             ? `<button type="button" class="atlas-zone-kind-swatch" title="Color for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the world)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Color for ${escapeAttr(kindLabel(kind))}">
                  <span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span>
@@ -171,11 +177,43 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   if (kinds.length === 0) parts.push(`<div class="atlas-zone-panel-empty">No zone on this map at this date</div>`);
   else if (q && parts.length === 1) parts.push(`<div class="atlas-zone-panel-empty">No zone matches "${escapeText(ps.search.trim())}"</div>`);
 
-  strip.innerHTML = parts.join('');
-  if (hadFocus) {
-    const input = strip.querySelector<HTMLInputElement>('[data-role="zone-search"]');
-    if (input) { input.focus(); if (caret !== null) input.setSelectionRange(caret, caret); }
-  }
+  // The panel is asked to draw on every state change: it writes only when its
+  // markup moved (conv. 146), so a tick inside a press (a Space press clicks on
+  // its release) leaves the pressed button where it was.
+  const html = parts.join('');
+  if (html === ps.drawn && strip.childElementCount > 0) return;
+  ps.drawn = html;
+  // A rebuild keeps keyboard focus on the control that had it (a kind's fold,
+  // a zone's name, its delete, a tune control): pressing one rebuilds the panel.
+  keepingFocusOn(strip, zonePanelFocusKey, () => {
+    strip.innerHTML = html;
+    if (hadFocus) {
+      const input = strip.querySelector<HTMLInputElement>('[data-role="zone-search"]');
+      if (input) { input.focus(); if (caret !== null) input.setSelectionRange(caret, caret); }
+    }
+  });
+}
+
+/** A kind's fold names the kind and how many zones it holds. */
+function foldName(kind: Kind<Zone>, count: number): string {
+  return `${kindLabel(kind)}, ${count} ${count === 1 ? 'zone' : 'zones'}`;
+}
+
+/** The focused control's twin in a rebuilt panel, by its zone or kind and its own mark. */
+function zonePanelFocusKey(el: HTMLElement): string | null {
+  // The search box keeps its own focus and caret above.
+  if (el.matches('[data-role="zone-search"]')) return null;
+  const action = el.getAttribute('data-action');
+  const own = action ? `[data-action="${CSS.escape(action)}"]`
+    : el.classList.contains('atlas-zone-chip-name') ? '.atlas-zone-chip-name'
+    : el.classList.contains('atlas-zone-kind-caret') ? '.atlas-zone-kind-caret'
+    : null;
+  if (!own) return null;
+  const chip = el.closest<HTMLElement>('.atlas-zone-chip');
+  if (chip?.dataset.zoneId) return `.atlas-zone-chip[data-zone-id="${CSS.escape(chip.dataset.zoneId)}"] ${own}`;
+  const kind = el.closest<HTMLElement>('.atlas-zone-kind');
+  if (kind?.dataset.kindKey) return `.atlas-zone-kind[data-kind-key="${CSS.escape(kind.dataset.kindKey)}"] ${own}`;
+  return null;
 }
 
 function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[], parts?: string[], viewOnly = false): string {
@@ -190,7 +228,7 @@ function renderChip(z: Zone, selectedId: string | null | undefined, rules: reado
     <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''} ${parts ? 'is-linked' : ''}" data-zone-id="${escapeAttr(z.id)}"${parts ? ` data-parts="${escapeAttr(parts.join(' '))}"` : ''} title="${escapeAttr(title)}">
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
       <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own color' : ''}"></span>
-      <span class="atlas-zone-chip-name">${escapeText(z.name || '(unnamed)')}</span>${parts ? `
+      <button type="button" class="atlas-zone-chip-name"${z.id === selectedId ? ' aria-current="true"' : ''}>${escapeText(z.name || '(unnamed)')}</button>${parts ? `
       <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}${viewOnly ? '' : `
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
         <span class="material-symbols-outlined">delete</span>

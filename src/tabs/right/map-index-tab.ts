@@ -26,7 +26,7 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-
 import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
-import { renderGate, keepingFocus } from '../../ui/render-gate';
+import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
 
 // ---- Collapsed tree-node state ----
 
@@ -255,8 +255,9 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   let rerenderSeq = 0;
 
   // The search keeps its focus and caret through every redraw, a data tick's included.
+  // So does a row's control (a fold, the row, its location, its delete): a press redraws the tree.
   function render(): void {
-    keepingFocus(root, 'input[data-role="map-search"]', draw);
+    keepingFocusOn(root, mapTreeFocusKey, () => keepingFocus(root, 'input[data-role="map-search"]', draw));
   }
 
   function draw(): void {
@@ -414,6 +415,19 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   return unsubState;
 }
 
+/** The focused tree control's twin in a redrawn tree, by its map and its own mark. */
+function mapTreeFocusKey(el: HTMLElement): string | null {
+  const row = el.closest<HTMLElement>('.atlas-map-tree-row');
+  const id = row?.getAttribute('data-map-id');
+  if (!row || !id) return null;
+  const at = `.atlas-map-tree-row[data-map-id="${CSS.escape(id)}"]`;
+  if (el === row) return at;
+  for (const own of ['.atlas-map-tree-chevron', '.atlas-row-chip-location', '[data-action="delete-map"]']) {
+    if (el.matches(own)) return `${at} ${own}`;
+  }
+  return null;
+}
+
 interface RenderCtx {
   activeMapId: string | null;
   /** Map ids that have an open right-pane tab (active or background). */
@@ -477,9 +491,15 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   const chevron = document.createElement('span');
   if (hasChildren) {
     chevron.className = 'atlas-map-tree-chevron';
+    // A fold a keyboard reaches (Tab, then Enter or Space): named for the maps
+    // it shows or hides, one name for the mouse and the screen reader.
     chevron.setAttribute('role', 'button');
-    chevron.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
-    chevron.title = collapsed ? `Expand (${node.children.length} child${node.children.length === 1 ? '' : 'ren'})` : 'Collapse';
+    chevron.tabIndex = 0;
+    chevron.setAttribute('aria-expanded', String(!collapsed));
+    const n = node.children.length;
+    const foldName = `${n} ${n === 1 ? 'map' : 'maps'} under ${m.name || '(unnamed map)'}`;
+    chevron.setAttribute('aria-label', foldName);
+    chevron.title = foldName;
     chevron.innerHTML = `<span class="material-symbols-outlined">${collapsed ? 'chevron_right' : 'expand_more'}</span>`;
     chevron.addEventListener('click', (e) => {
       e.stopPropagation();

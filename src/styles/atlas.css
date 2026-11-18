@@ -3084,6 +3084,16 @@ button.atlas-link-chip-remove:focus-visible {
   opacity: 1;
 }
 
+/* A chip's name is the link that opens its element (1.124.24): the ring goes
+   round the whole chip, as the chip is what a mouse presses. */
+.atlas-link-chip-name:focus-visible {
+  outline: none;
+}
+.atlas-link-chip:has(> .atlas-link-chip-name:focus-visible) {
+  outline: 2px solid var(--atlas-accent-text);
+  outline-offset: 1px;
+}
+
 /* A field's value and the aliases row take keyboard focus (they open their editor). */
 .atlas-field-value[role="button"]:focus-visible,
 .atlas-aliases-display[role="button"]:focus-visible {
@@ -7647,6 +7657,23 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
   width: 16px;
 }
 
+/* The caret is the kind's fold for a keyboard (1.124.24); it keeps the glyph's look. */
+button.atlas-zone-kind-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.atlas-zone-kind-caret .material-symbols-outlined {
+  font-size: 16px;
+}
+
 /* The swatch: the rule's colour as a dot, the native picker underneath it. */
 .atlas-zone-kind-swatch {
   position: relative;
@@ -7937,6 +7964,21 @@ button.atlas-zone-kind-swatch:focus-visible .atlas-zone-kind-swatch-dot {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The name is the chip's press for a keyboard (1.124.24); it keeps the text's look. */
+button.atlas-zone-chip-name {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 3px;
 }
 
 .atlas-zone-chip-x {
@@ -15055,6 +15097,17 @@ a.atlas-share-map-pin { cursor: pointer; }
   border: 1px solid rgba(var(--atlas-ink-rgb), 0.12);
 }
 .atlas-header-icon-thumb:hover { border-color: var(--atlas-cyan, #22d3ee); }
+/* The picture is a button (1.124.24: a keyboard shows the images again); it keeps the picture's look. */
+.atlas-header-icon-thumb-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
 
 .atlas-context-preview-body {
   flex: 1 1 auto;

@@ -38,7 +38,7 @@ import { buildWorkPacket } from './element-detail-packet';
 import { buildRecordsSection } from './element-detail-records';
 import { renderSection } from './element-detail-fields';
 import { filledSections, isFieldFilled } from './filled-fields';
-import { renderHeader, isEditingIn, pendingInlineNameEdit } from './element-detail-header';
+import { renderHeader, isEditingIn, pendingInlineNameEdit, imagesFocusBack } from './element-detail-header';
 import { focusWaymark, waymarkHasFocus, waymarkOpenIn, waymarkSlot, type WaymarkSlot } from './waymark-slot';
 import { keptSetOf, proposedSetOf } from '../sync/sync-attach';
 import { renderElementImage } from '../ui/element-image';
@@ -300,9 +300,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
         glyph.textContent = 'visibility_off';
         hide.appendChild(glyph);
         hide.addEventListener('click', () => {
+          const hadFocus = document.activeElement === hide;
           const next = setEditorSettings(getState().registry, { show_element_images: false });
           saveRegistry(next);
           patchSlice('registry', next);
+          // The way back is the picture beside the name: focus goes there.
+          if (hadFocus) imagesFocusBack('.atlas-header-icon-thumb-btn');
           toastManager.info('Element images hidden. Click the type icon (or Settings → Elements) to show them again');
         });
         wrap.appendChild(hide);

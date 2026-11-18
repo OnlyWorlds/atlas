@@ -88,8 +88,29 @@ function wireRename(title: HTMLElement, el: Element): void {
     if (e.target !== title) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      // One press per key press: focus can land here from a press elsewhere
+      // (a link chip opening this page), and a held key must not rename.
+      if (e.repeat) return;
       startInlineNameEdit(title, el);
     }
+  });
+}
+
+/**
+ * The element images switch flipped from the page (the header's picture or
+ * the banner's hide button): the redraw takes the pressed control away, so
+ * focus goes to its counterpart on the new page, else the element's name.
+ * Only while focus fell to the page.
+ */
+export function imagesFocusBack(selector: string): void {
+  requestAnimationFrame(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body && a.isConnected) return;
+    const middle = document.querySelector('.atlas-middle');
+    const back = middle?.querySelector<HTMLElement>(selector) ?? null;
+    back?.focus({ preventScroll: true });
+    if (back && document.activeElement === back) return;
+    middle?.querySelector<HTMLElement>('[data-role="element-name"]')?.focus({ preventScroll: true });
   });
 }
 
@@ -116,19 +137,30 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
   const imageUrl = typeof rawImageUrl === 'string' ? rawImageUrl.trim() : '';
   const imagesHidden = !getEditorSettings(getState().registry).show_element_images;
   if (imagesHidden && /^https?:\/\//i.test(imageUrl)) {
+    // A button holding the picture, so a keyboard shows the images again too;
+    // one name for the mouse and the screen reader.
+    const show = document.createElement('button');
+    show.type = 'button';
+    show.className = 'atlas-header-icon-thumb-btn';
+    show.title = 'Show element images';
+    show.setAttribute('aria-label', 'Show element images');
     const thumb = document.createElement('img');
     thumb.className = 'atlas-header-icon-thumb';
     thumb.src = imageUrl;
     thumb.alt = '';
     thumb.loading = 'lazy';
-    thumb.title = `${typeName(el.type, { supertype: el.supertype })} · click to show element images`;
-    thumb.addEventListener('click', () => {
+    show.appendChild(thumb);
+    show.addEventListener('click', () => {
+      const hadFocus = document.activeElement === show;
       const next = setEditorSettings(getState().registry, { show_element_images: true });
       saveRegistry(next);
       patchSlice('registry', next);
+      // The page draws the picture and drops this button: focus goes to the
+      // picture's hide button (the way back), else the element's name.
+      if (hadFocus) imagesFocusBack('.atlas-element-image-hide');
     });
-    thumb.addEventListener('error', () => thumb.replaceWith(buildTypeIcon()), { once: true });
-    header.appendChild(thumb);
+    thumb.addEventListener('error', () => show.replaceWith(buildTypeIcon()), { once: true });
+    header.appendChild(show);
   } else {
     header.appendChild(buildTypeIcon());
   }

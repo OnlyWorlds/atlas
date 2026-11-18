@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.24',
+    date: '2026-11-18',
+    theme: 'More of the page by keyboard',
+    entries: [
+      {
+        id: 'keyboard-chips-folds',
+        title: 'Link chips, folds, zones and chart cards work from the keyboard',
+        body: 'Tab now reaches the name on a link chip and on a Referenced by chip, and Enter or Space opens that element with focus on its name. A field section folds and unfolds by keyboard, and the picture beside an element\'s name shows element images again, with the hide button then one press away. On a map, a zone kind folds and a zone opens from its name in the zones list, and the Maps tab folds a map\'s children. In the charts\' scroll view, a card opens and closes from its name. When the page redraws after such a press, focus stays on what you pressed. A zone kind holding the selected zone can now be folded as well.',
+        tags: ['accessibility', 'editor', 'maps'],
+      },
+    ],
+  },
+  {
     version: '1.124.23',
     date: '2026-11-18',
     theme: 'One verb, one tense',

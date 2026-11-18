@@ -147,3 +147,38 @@ test('a chart saved in scroll mode reopens in scroll mode', async ({ page }) => 
   });
   expect(saved).toEqual(['scroll']);
 });
+
+// The mouse-only census, row 14: a card's head is its press for a keyboard.
+for (const tag of ['', ' @firefox']) {
+  test(`a card opens and closes from the keyboard, and Focus keeps focus on the card it narrowed to${tag}`, async ({ page }) => {
+    await setupWorld(page);
+    const founding = await createElement(page, 'event', { name: 'Founding', start_date: 0 });
+    await createElement(page, 'event', { name: 'The Cracking', start_date: 380 });
+    await openCharts(page);
+    await page.click('[data-action="chart-mode-scroll"]');
+    const card = page.locator('.atlas-scroll-card', { hasText: 'Founding' });
+    const head = card.locator('.atlas-scroll-card-head');
+    await expect(head).toHaveAttribute('role', 'button');
+    await expect(head).toHaveAccessibleName('Founding, 0');
+    await expect(head).toHaveAttribute('aria-expanded', 'false');
+    await head.focus();
+    await page.keyboard.press('Enter');
+    await expect(card).toHaveClass(/selected/);
+    await expect(head).toHaveAttribute('aria-expanded', 'true');
+    await expect(head).toBeFocused();
+
+    // Tab reaches the card's Focus; its press redraws the document, and focus stays on the card.
+    await page.keyboard.press('Tab');
+    const focusBtn = card.locator('.atlas-scroll-card-actions button', { hasText: 'Focus' });
+    await expect(focusBtn).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => window.location.hash)).toContain(`/timeline/${founding}`);
+    await expect(card).toHaveClass(/focused/);
+    await expect(head).toBeFocused();
+
+    // Space closes it again.
+    await page.keyboard.press(' ');
+    await expect(head).toHaveAttribute('aria-expanded', 'false');
+    await expect(head).toBeFocused();
+  });
+}
