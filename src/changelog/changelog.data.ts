@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.23',
+    date: '2026-11-18',
+    theme: 'One verb, one tense',
+    entries: [
+      {
+        id: 'sync-pill-one-verb',
+        title: 'While sync runs, the pill uses one verb',
+        body: 'The pill\'s label, its tooltip and the refresh button\'s name all say Saving or Fetching. They used to say Saving, Syncing 3/10 and Syncing with OnlyWorlds now for the same moment. With the keyboard on the faint refresh button while sync runs, its focus ring now shows at full strength.',
+        tags: ['sync', 'accessibility'],
+      },
+      {
+        id: 'sync-words-one-tense',
+        title: 'Sync messages promise the same thing in the same words',
+        body: 'The message after a sync said Atlas will try again where Settings and the element\'s mark said Atlas tries again; now every place says tries again. An element OnlyWorlds kept when it was deleted here is described that way in the message too, so it no longer reads as OnlyWorlds keeping it deleted.',
+        tags: ['sync'],
+      },
+      {
+        id: 'share-copy-address-name',
+        title: 'The copy button on a published page has a name',
+        body: 'On the Pages room, the button that copies a published page\'s address now tells a screen reader what it does. It used to read out the name of its icon.',
+        tags: ['accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.22',
     date: '2026-11-18',
     theme: 'Sync says it once, and truly',

@@ -860,8 +860,8 @@ function emitConflictToasts(
       result.transient_reason === 'rate_limited'
         ? `Too many wrong PIN tries. Check your PIN in Settings; Atlas tries again in ${when}.`
         : result.transient_reason === 'offline'
-          ? `OnlyWorlds could not be reached. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas will try again in ${when}.`
-          : `OnlyWorlds is busy. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas will try again in ${when}.`
+          ? `OnlyWorlds could not be reached. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas tries again in ${when}.`
+          : `OnlyWorlds is busy. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas tries again in ${when}.`
     );
     return;
   }

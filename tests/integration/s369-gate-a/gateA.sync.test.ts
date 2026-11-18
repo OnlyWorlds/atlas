@@ -102,7 +102,7 @@ describe('gate A: one held element file does not hold back the rest of the feed'
 
 describe('gate A: a pull-side held file is retried by itself, as the copy promises', () => {
   // BANKED: copy now says 'refresh to try again' / schema allow-list not built.
-  it.skip('a held pull write arms a retry ("Atlas will try again in a moment")', async () => {
+  it.skip('a held pull write arms a retry ("Atlas tries again in a moment")', async () => {
     const { root, store, engine } = await world();
     const a = await store.createElement('character', { name: 'Aldric', description: 'one' });
     await engine.pushOnce();

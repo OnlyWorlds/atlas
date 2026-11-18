@@ -546,10 +546,27 @@ for (const tag of ['', ' @firefox']) {
       const api = (window as any).__atlasTestApi;
       api.patchSlice('sync', { ...api.getState().sync, activeSync: { kind: 'syncing', phase: 'pull' } });
     });
-    await expect(refresh).toHaveAccessibleName('Syncing with OnlyWorlds now');
+    // One verb in the label, the title and the name (Fetching for a pull, Saving for a push).
+    await expect(pill).toContainText('Fetching…');
+    await expect(refresh).toHaveAccessibleName('Fetching from OnlyWorlds now');
     await expect(refresh).toHaveAttribute('aria-disabled', 'true');
-    await expect(pill).toHaveAttribute('title', 'Syncing');
+    await expect(pill).toHaveAttribute('title', 'Fetching from OnlyWorlds');
     await expect(refresh).toBeFocused();
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      api.patchSlice('sync', { ...api.getState().sync, activeSync: { kind: 'syncing', phase: 'push', progress: { done: 3, total: 10 } } });
+    });
+    await expect(pill).toContainText('Saving…');
+    await expect(refresh).toHaveAccessibleName('Saving to OnlyWorlds now');
+    await expect(pill).toHaveAttribute('title', 'Saving to OnlyWorlds, 3 of 10');
+    // Under focus while unavailable, the ring shows whole: the button is not left at a quarter.
+    // Tab away and back, as a person on the keyboard would (focus by script after a mouse is not :focus-visible),
+    // with the mouse resting on the pill: its hover rule must not hold the ring at a quarter.
+    await pill.hover();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    // Polled: the button's opacity eases over 140 ms.
+    await expect.poll(() => refresh.evaluate(el => [document.activeElement === el, el.matches(':focus-visible'), getComputedStyle(el).opacity].join(' '))).toBe('true true 1');
     // Sync in an error: the press opens Settings, and the label and the name say one thing.
     await page.evaluate(() => {
       const api = (window as any).__atlasTestApi;

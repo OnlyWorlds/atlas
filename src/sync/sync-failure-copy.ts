@@ -109,7 +109,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
     ? 'another Atlas tab was saving to this world'
     : `another program was using ${n === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this`;
   const againFor = (fs: PerElementFailure[]): string => fs.every(f => f.retry_armed)
-    ? 'Atlas will try again in a moment.' : 'Atlas will try again with your next save.';
+    ? 'Atlas tries again in a moment.' : 'Atlas tries again with your next save.';
   const place = inBrowser ? 'in this browser' : 'on your disk';
   const noted = busyUp.filter(f => f.local_step === 'note');
   const notedEdits = busyUp.filter(f => f.local_step === 'note_edit');
@@ -128,7 +128,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   // OnlyWorlds refused the delete and kept the element; putting it back here is what failed.
   if (putBack.length > 0) {
     const n = ids(putBack).length;
-    parts.push(`OnlyWorlds kept ${plural(n, 'element', 'elements')} deleted here, but Atlas could not put ${n === 1 ? 'it' : 'them'} back ${place} because ${heldBy(n)}. ${againFor(putBack)}`);
+    parts.push(`OnlyWorlds kept ${plural(n, 'element', 'elements')} when ${n === 1 ? 'it was' : 'they were'} deleted here, but Atlas could not put ${n === 1 ? 'it' : 'them'} back ${place} because ${heldBy(n)}. ${againFor(putBack)}`);
   }
   if (unredone.length > 0) {
     const n = ids(unredone).length;
@@ -172,7 +172,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   if (other) {
     // The cause stays out of the sentence: it was raw browser or
     // server text. It rides in the toast's Details instead (sync-attach).
-    parts.push(`${plural(other.length, 'change', 'changes')} could not sync. Atlas will try again with your next save.`);
+    parts.push(`${plural(other.length, 'change', 'changes')} could not sync. Atlas tries again with your next save.`);
   }
   return parts.join(' ');
 }

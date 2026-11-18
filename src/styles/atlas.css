@@ -6417,6 +6417,13 @@ button.atlas-sync-pill-refresh[aria-disabled="true"],
   color: rgba(var(--atlas-ink-rgb), 0.7);
   cursor: default;
 }
+/* Under focus its ring shows whole, with the mouse resting on the pill too (both rules above are as heavy as the
+   focus rule or heavier, and later); the glyph stays faint. */
+button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
+.atlas-sync-pill[data-clickable="true"]:hover button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible {
+  opacity: 1;
+  color: rgba(var(--atlas-ink-rgb), 0.175); /* the unfocused glyph's 0.25 x 0.7 */
+}
 
 /* Unsupported-browser landing page */
 .atlas-unsupported {

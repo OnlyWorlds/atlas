@@ -27,7 +27,7 @@ describe('sync failure copy', () => {
     expect(text).toContain('2 elements could not upload because their ids already belong to another OnlyWorlds world');
     expect(text).toContain('1 element holds more than 64 KB');
     // The raw cause ("boom") never reaches the sentence; it rides in Details.
-    expect(text).toContain('1 change could not sync. Atlas will try again with your next save.');
+    expect(text).toContain('1 change could not sync. Atlas tries again with your next save.');
     expect(text).not.toContain('boom');
     expect(text).not.toMatch(/test connection/i);
     expect(text).not.toContain('—');
@@ -51,17 +51,22 @@ describe('sync failure copy', () => {
   it('a held file says what OnlyWorlds has by the step, and "in a moment" only where a retry is armed', () => {
     const at = (local_step: PerElementFailure['local_step'], extra: Partial<PerElementFailure> = {}): PerElementFailure =>
       ({ ...busy(local_step ?? 'plain'), source: 'disk', ...(local_step ? { local_step } : {}), ...extra });
-    expect(describeFailures([at(undefined, { retry_armed: true })])).toContain('Atlas will try again in a moment.');
-    expect(describeFailures([at(undefined)])).toContain('Atlas will try again with your next save.');
+    // One promise in one tense across the toast, Settings and the mark: "tries again".
+    expect(describeFailures([at(undefined, { retry_armed: true })])).toContain('Atlas tries again in a moment.');
+    expect(describeFailures([at(undefined)])).toContain('Atlas tries again with your next save.');
+    expect(describeFailures([at(undefined)])).not.toContain('will try');
     expect(describeFailures([at(undefined)])).not.toContain('in a moment');
     expect(describeFailures([at('note', { retry_armed: true })])).toMatch(/^OnlyWorlds has 1 change, but Atlas could not note it on your disk because another program was using its file/);
     // An edit: no promise to resend, the conflict said instead.
     const edit = describeFailures([at('note_edit', { operation: 'update', retry_armed: true })]);
     expect(edit).toContain('The next sync may list it as a conflict; both copies hold your change.');
-    expect(edit).not.toMatch(/try again/);
+    expect(edit).not.toMatch(/tr(y|ies) again/);
     // OnlyWorlds refused the delete and kept the element: never "OnlyWorlds has 1 change".
     const back = describeFailures([at('put_back', { operation: 'delete', retry_armed: true })], 'browser');
-    expect(back).toBe('OnlyWorlds kept 1 element deleted here, but Atlas could not put it back in this browser because another Atlas tab was saving to this world. Atlas will try again in a moment.');
+    // "kept it when it was deleted here", as Settings says: never read as OnlyWorlds keeping it deleted.
+    expect(back).toBe('OnlyWorlds kept 1 element when it was deleted here, but Atlas could not put it back in this browser because another Atlas tab was saving to this world. Atlas tries again in a moment.');
+    expect(describeFailures([at('put_back', { operation: 'delete' }), { ...at('put_back', { operation: 'delete' }), element_id: 'second' }], 'browser'))
+      .toMatch(/^OnlyWorlds kept 2 elements when they were deleted here, but Atlas could not put them back/);
     for (const step of ['remove', 'restore_links'] as const) {
       const t = describeFailures([at(step)]);
       expect(t).toContain('Settings, under This world, says what happened.');

@@ -484,7 +484,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const roundOnly = busyRound && !currentPendingPush;
   const refreshName = currentPendingPush ? 'Save to OnlyWorlds now'
     : errored ? 'See why in Settings'
-    : roundOnly ? 'Syncing with OnlyWorlds now'
+    : roundOnly ? `${syncPhaseWords(engine?.kind === 'syncing' ? engine.phase : undefined)} now`
     : 'Refresh from OnlyWorlds';
   // "Review N" is the badge's name too: the label is not said twice.
   const labelHidden = conflictCount > 0 && base.dataState === 'synced' ? ' aria-hidden="true"' : '';
@@ -590,6 +590,11 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   };
 }
 
+/** A running round's verb, as the pill's label reads it ("Saving…" for a push, else "Fetching…"). */
+function syncPhaseWords(phase: string | undefined): string {
+  return phase === 'push' ? 'Saving to OnlyWorlds' : 'Fetching from OnlyWorlds';
+}
+
 function mapEngineStateToPill(
   engine: ReturnType<typeof getState>['sync']['activeSync']
 ): { dataState: string; label: string; title: string } {
@@ -631,7 +636,8 @@ function mapEngineStateToPill(
       return {
         dataState: 'saving',
         label: engine.phase === 'push' ? 'Saving…' : 'Fetching…',
-        title: `Syncing${engine.progress ? ` ${engine.progress.done}/${engine.progress.total}` : ''}`,
+        // The label, the title and the refresh button's name say the same verb (Saving or Fetching).
+        title: `${syncPhaseWords(engine.phase)}${engine.progress ? `, ${engine.progress.done} of ${engine.progress.total}` : ''}`,
       };
     case 'paused':
       if (engine.reason === 'held' && engine.held_for === 'disk') {

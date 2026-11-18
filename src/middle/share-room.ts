@@ -1761,17 +1761,12 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       link.rel = 'noopener noreferrer';
       link.textContent = url;
       row.appendChild(link);
-      const copy = document.createElement('button');
-      copy.type = 'button';
-      copy.className = 'atlas-share-block-ctrl';
-      copy.title = 'Copy the page\'s address';
-      copy.innerHTML = `<span class="material-symbols-outlined">content_copy</span>`;
-      copy.addEventListener('click', () => {
+      // The block buttons' shape: named by its words, the glyph hidden from a screen reader.
+      row.appendChild(controlBtn('content_copy', 'Copy the page\'s address', () => {
         void navigator.clipboard.writeText(url)
           .then(() => toasts.success('Address copied'))
           .catch(() => toasts.info(url));
-      });
-      row.appendChild(copy);
+      }));
       section.appendChild(row);
 
       const meta = document.createElement('p');
