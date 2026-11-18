@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'sync-pill-one-name',
         title: 'The sync pill says one thing at a time',
-        body: 'While sync runs, the refresh button says so and is marked unavailable, where it used to offer a refresh that did nothing. A waiting save is called a save on the button, in the pill\'s tooltip and in the message if it fails. When sync stops, the pill says Sync stopped and its button See why in Settings, where it said Error beside Sync stopped.',
+        body: 'While sync runs, the refresh button stays in its place, faint, says so and is marked unavailable; it used to vanish, taking the keyboard\'s place with it, and the pill\'s tooltip offered a refresh that did nothing. A waiting save is called a save on the button, in the pill\'s tooltip and in the message if it fails. When sync stops, the pill says Sync stopped and its button See why in Settings, where it said Error beside Sync stopped.',
         tags: ['sync', 'accessibility'],
       },
       {

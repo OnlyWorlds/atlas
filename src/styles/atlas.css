@@ -6405,9 +6405,17 @@ button.atlas-sync-pill-conflict:focus-visible {
   color: var(--atlas-accent-text);
 }
 
-/* While syncing, the refresh icon is hidden — the dot pulses instead. */
-.atlas-sync-pill[data-state="saving"] .atlas-sync-pill-refresh {
+/* While a round runs, the dot pulses and the refresh button stays in its place, faint and marked
+   unavailable (aria-disabled: a press then does nothing), so the pill keeps its width and a keyboard
+   keeps its place. The other saving states (moving, saving a copy, new ids) still hide it. */
+.atlas-sync-pill[data-state="saving"] .atlas-sync-pill-refresh:not([aria-disabled="true"]) {
   display: none;
+}
+button.atlas-sync-pill-refresh[aria-disabled="true"],
+.atlas-sync-pill[data-clickable="true"]:hover button.atlas-sync-pill-refresh[aria-disabled="true"] {
+  opacity: 0.25;
+  color: rgba(var(--atlas-ink-rgb), 0.7);
+  cursor: default;
 }
 
 /* Unsupported-browser landing page */
