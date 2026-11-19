@@ -23,7 +23,7 @@ import { getActiveStore } from '../core/active-store';
 import { worldIsViewOnly } from '../core/view-only';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { knownFieldsFor, type FieldMeta, type WidgetKind, type SectionLayout } from '../editor/field-schema';
-import { renderSection, humanizeFieldName } from './element-detail-fields';
+import { renderSection, humanizeFieldName, removeFieldName } from './element-detail-fields';
 import { customFieldNameSuggestions } from '../core/taxonomy';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -313,7 +313,7 @@ function structuredRemoveButton(el: Element, fieldName: string): HTMLButtonEleme
   const del = document.createElement('button');
   del.type = 'button';
   del.className = 'atlas-custom-structured-remove';
-  del.title = `Remove ${humanizeFieldName(fieldName)} from this element`;
+  del.title = removeFieldName(fieldName);
   // Named as its title says; the × is only drawn.
   del.setAttribute('aria-label', del.title);
   del.innerHTML = '<span aria-hidden="true">×</span>';

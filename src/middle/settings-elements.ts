@@ -77,7 +77,7 @@ export function renderElementsTab(): string {
       </label>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="show-element-images" ${showImages ? 'checked' : ''} />
-        <span>Show element images (detail view banner + web pane thumbnail)</span>
+        <span>Show element images, on an element's page and in the web pane</span>
       </label>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="hide-empty-fields" ${hideEmpty ? 'checked' : ''} />

@@ -25,7 +25,7 @@ import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType, type WorldMap } from '../core/types';
 import { ElementCreateModal } from '../ui/element-create-modal';
-import { typeName, aTypeName } from '../core/type-words';
+import { typeName, aTypeName, theUnnamed } from '../core/type-words';
 import { ELEMENT_ICONS, EXTENSION_FIELD_NAMESPACES, isExtensionField, isCustomEditableField } from '../core/constants';
 import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
@@ -127,7 +127,7 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
         rm.className = 'atlas-field-remove';
         // It removes the field and its value: one name for the mouse and the
         // screen reader, the × only drawn.
-        rm.title = `Remove the field ${humanizeFieldName(meta.name)}`;
+        rm.title = removeFieldName(meta.name);
         rm.setAttribute('aria-label', rm.title);
         rm.innerHTML = '<span aria-hidden="true">×</span>';
         rm.addEventListener('click', (e) => {
@@ -681,7 +681,7 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void | Prom
   rm.className = 'atlas-link-chip-remove';
   rm.dataset.remove = '1';
   rm.setAttribute('aria-label', linked
-    ? `Remove ${linked.name?.trim() || `the unnamed ${typeName(linked.type, { supertype: linked.supertype })}`}`
+    ? `Remove ${linked.name?.trim() || theUnnamed(linked.type, { supertype: linked.supertype })}`
     : 'Remove this link');
   const glyph = document.createElement('span');
   glyph.className = 'material-symbols-outlined';
@@ -919,6 +919,15 @@ function activeCalendarLens(): WorldCalendar | null {
 }
 
 /** "image_url" → "Image URL": the SDK's `fieldLabel` after the prefix step. */
+/**
+ * A field's remove, one wording for every kind of field (a plain field's ×
+ * and a structured one's): "Remove the field Mood", "Remove the unnamed field".
+ */
+export function removeFieldName(fieldName: string): string {
+  const label = humanizeFieldName(fieldName).trim();
+  return label ? `Remove the field ${label}` : 'Remove the unnamed field';
+}
+
 export function humanizeFieldName(name: string): string {
   // Drop extension-namespace prefixes (atlas_/x_/shadow_) when surfacing
   // fields in the UI — keeps labels clean ("x_mood" → "Mood"). The on-disk

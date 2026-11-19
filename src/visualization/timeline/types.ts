@@ -90,6 +90,12 @@ export interface TimelineNode {
    */
   glyph?: string;
   /**
+   * True when the element has no name (`name` then holds the card's
+   * "(unnamed)"), so a control can say "the unnamed event" instead. A pure
+   * render cache, never serialized.
+   */
+  unnamed?: boolean;
+  /**
    * Open-end semantics (Act 2A): the type records spans and this node has a
    * start but NO recorded end — the span is still running (a held title). The
    * renderer resolves the effective end against the live now at draw time

@@ -17,6 +17,7 @@ import { layoutScroll, type ScrollLayout } from './scroll-layout';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
 import { lastPressWasKey } from '../../ui/input-kind';
+import { theUnnamed } from '../../core/type-words';
 import { formatStep, formatDuration, type CalendarConfig } from '@onlyworlds/sdk';
 
 export interface ScrollViewOptions {
@@ -208,9 +209,9 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       openBtn.type = 'button';
       openBtn.className = 'atlas-btn-ghost';
       openBtn.textContent = 'Open';
-      // Every open card has an Open: its name says which element it opens, in
-      // the card's own words ("(unnamed)" for an element with no name).
-      openBtn.title = `Open ${node.name || '(unnamed)'}`;
+      // Every open card has an Open: its name says which element it opens, and
+      // one with no name in the form every control says it ("Open the unnamed event").
+      openBtn.title = `Open ${node.unnamed || !node.name.trim() ? theUnnamed(node.elementType) : node.name}`;
       openBtn.setAttribute('aria-label', openBtn.title);
       openBtn.addEventListener('click', (e) => { e.stopPropagation(); opts.onOpenElement(id); });
       if (id !== focusId) actions.appendChild(focusBtn);

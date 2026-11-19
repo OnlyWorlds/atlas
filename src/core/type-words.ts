@@ -79,6 +79,16 @@ export function aTypeName(type: string, opts: Omit<TypeNameOptions, 'many'> = {}
 }
 
 /**
+ * A name for an element that has none, the one form every control says it
+ * in: "the unnamed map", "the unnamed event", in the world's own word for the
+ * type. Mid-sentence, so never capitalised: "Delete the unnamed zone",
+ * "Show the 3 maps under the unnamed map".
+ */
+export function theUnnamed(type: string, opts: Omit<TypeNameOptions, 'many' | 'start'> = {}): string {
+  return `the unnamed ${typeName(type, opts)}`;
+}
+
+/**
  * The open world's words as one stable string, for a surface that redraws
  * only when its inputs move: a surface that prints a type joins this to its
  * key, or a world whose words change keeps the old ones on screen.

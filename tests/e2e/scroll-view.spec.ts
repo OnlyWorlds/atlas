@@ -186,7 +186,7 @@ for (const tag of ['', ' @firefox']) {
     await expect(head).toBeFocused();
   });
 
-  test(`an unnamed element's Open says so in the card's own words${tag}`, async ({ page }) => {
+  test(`an unnamed element's Open says the unnamed event, the one form every control says it in${tag}`, async ({ page }) => {
     await setupWorld(page);
     await createElement(page, 'event', { name: '', start_date: 10 });
     await createElement(page, 'event', { name: 'The Cracking', start_date: 380 });
@@ -194,6 +194,8 @@ for (const tag of ['', ' @firefox']) {
     await page.click('[data-action="chart-mode-scroll"]');
     const card = page.locator('.atlas-scroll-card', { hasText: '(unnamed)' });
     await card.locator('.atlas-scroll-card-head').click();
-    await expect(card.locator('.atlas-scroll-card-actions button', { hasText: 'Open' })).toHaveAccessibleName('Open (unnamed)');
+    const openBtn = card.locator('.atlas-scroll-card-actions button', { hasText: 'Open' });
+    await expect(openBtn).toHaveAccessibleName('Open the unnamed event');
+    await expect(openBtn).toHaveAttribute('title', 'Open the unnamed event');
   });
 }

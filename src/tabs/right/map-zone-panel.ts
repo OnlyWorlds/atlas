@@ -22,7 +22,7 @@
 import { getState, patchSlice } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
-import { typeName } from '../../core/type-words';
+import { theUnnamed, typeName } from '../../core/type-words';
 import { escapeText, escapeAttr, hexColourOr, pressOncePerKey } from '../../core/dom-utils';
 import { getZoneShape } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
@@ -162,10 +162,14 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     const linkedOnly = kind.members.every(z => partsOf.has(z.id));
     const hasKind = Boolean(kind.supertype || kind.subtype || kind.role) && !linkedOnly && !viewOnly;
     const tuning = ps.tuning === kind.key;
+    // The caret is the one control whose name and tooltip part, on purpose:
+    // its aria-label names the list (foldName) and aria-expanded says its
+    // state, so a screen reader hears the state once; its title keeps the verb
+    // (foldTitle) for the mouse, which hears no aria-expanded.
     parts.push(`
       <div class="atlas-zone-kind ${open ? 'is-open' : ''} ${hidden ? 'is-hidden' : ''}" data-kind-key="${escapeAttr(kind.key)}">
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
-          <button type="button" class="atlas-zone-kind-caret" aria-expanded="${open}"${q ? ' aria-disabled="true"' : ''} aria-label="${escapeAttr(foldName(kind, matching.length, open, !!q))}" title="${escapeAttr(foldName(kind, matching.length, open, !!q))}"><span class="material-symbols-outlined" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span></button>
+          <button type="button" class="atlas-zone-kind-caret" aria-expanded="${open}"${q ? ' aria-disabled="true"' : ''} aria-label="${escapeAttr(foldName(kind, matching.length))}" title="${escapeAttr(foldTitle(kind, matching.length, open, !!q))}"><span class="material-symbols-outlined" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span></button>
           ${hasKind
             ? `<button type="button" class="atlas-zone-kind-swatch" title="Color for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the world)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Color for ${escapeAttr(kindLabel(kind))}">
                  <span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span>
@@ -203,21 +207,39 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
 }
 
 /**
- * A kind's fold says what a press does to the list of its zones, by its state
- * (the eye beside it hides the zones on the map): "Show the list of the 3
- * Border zones", "Hide the list of one Border zone", "Show the list of the 2
- * zones with no kind". While a search holds every kind open a press does
- * nothing, and the name says what is true: "The search shows the list of ...".
+ * The list a kind's fold folds, mid-sentence (the eye beside it hides the
+ * zones on the map, so the fold names the list): "the list of the 3 Border
+ * zones", "the list of one Border zone", "the list of the 2 zones with no kind".
  */
-export function foldName(kind: { supertype: string; subtype: string; role?: string }, count: number, open: boolean, searching = false): string {
-  const lead = searching ? 'The search shows' : open ? 'Hide' : 'Show';
+function foldList(kind: { supertype: string; subtype: string; role?: string }, count: number): string {
   const how = count === 1 ? 'one' : `the ${count}`;
   const zones = count === 1 ? 'zone' : 'zones';
   // A kind-less kind is said in the app's own word, "no kind", after the zones (a role still names them).
   const what = kind.supertype || kind.subtype
     ? `${kindLabel(kind)} ${zones}`
     : `${kind.role ? `${kind.role} ` : ''}${zones} with no kind`;
-  return `${lead} the list of ${how} ${what}`;
+  return `the list of ${how} ${what}`;
+}
+
+/**
+ * A kind's fold's accessible name: the list it folds, with no verb ("The list
+ * of the 3 Border zones"). Its aria-expanded says whether the list shows, so
+ * the name never says it a second time.
+ */
+export function foldName(kind: { supertype: string; subtype: string; role?: string }, count: number): string {
+  const list = foldList(kind, count);
+  return list.charAt(0).toUpperCase() + list.slice(1);
+}
+
+/**
+ * A kind's fold's tooltip, for the mouse: what a press does to the list, by
+ * its state ("Show the list of the 3 Border zones", "Hide the list of one
+ * Border zone"). While a search holds every kind open a press does nothing,
+ * and the tooltip says why: "The search shows the list of ...".
+ */
+export function foldTitle(kind: { supertype: string; subtype: string; role?: string }, count: number, open: boolean, searching = false): string {
+  const lead = searching ? 'The search shows' : open ? 'Hide' : 'Show';
+  return `${lead} ${foldList(kind, count)}`;
 }
 
 /** The focused control's twin in a rebuilt panel, by its zone or kind and its own mark. */
@@ -239,8 +261,8 @@ function zonePanelFocusKey(el: HTMLElement): string | null {
 
 /** A zone's delete, named for its zone: every zone in the list has one. */
 function deleteName(z: Zone): string {
-  const word = typeName('zone');
-  return z.name ? `Delete the ${word} ${z.name}` : `Delete the unnamed ${word}`;
+  const name = z.name?.trim();
+  return name ? `Delete the ${typeName('zone')} ${name}` : `Delete ${theUnnamed('zone')}`;
 }
 
 function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[], parts?: string[], viewOnly = false): string {

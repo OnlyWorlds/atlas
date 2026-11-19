@@ -105,6 +105,7 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       id: el.id,
       elementType: el.type,
       name: el.name || '(unnamed)',
+      unnamed: !el.name?.trim() || undefined,
       startDate,
       endDate,
       // Open-end semantics (Act 2A): start recorded, end field EMPTY (an end

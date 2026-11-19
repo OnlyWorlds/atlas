@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.26',
+    date: '2026-11-19',
+    theme: 'Names said once, and one way',
+    entries: [
+      {
+        id: 'names-said-once',
+        title: 'A fold says its state once, and a missing name is said one way',
+        body: 'A screen reader now hears a fold in the Maps tab or a map\'s zones list say what it folds, such as The 3 maps under Sikelia, and whether it is open, once; the tooltip still says what a press does, such as Show the 3 maps under Sikelia, or why a press does nothing while a search holds it open. Something with no name is said the same way everywhere: the unnamed map, the unnamed event. A field\'s remove reads Remove the field Tally for every kind of field. A map\'s location chip is named for what it does, such as Open Syracuse, and the setting for element images reads Show element images, on an element\'s page and in the web pane.',
+        tags: ['accessibility', 'maps', 'editor'],
+      },
+    ],
+  },
+  {
     version: '1.124.25',
     date: '2026-11-19',
     theme: 'Each control says its own name',

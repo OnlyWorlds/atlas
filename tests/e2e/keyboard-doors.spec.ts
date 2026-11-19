@@ -282,13 +282,15 @@ for (const tag of ['', ' @firefox']) {
     const panel = page.locator('[data-role="zones-dropdown-panel"]');
     const kind = panel.locator('.atlas-zone-kind', { hasText: 'Border' });
     const fold = kind.locator('button.atlas-zone-kind-caret');
-    // Two kinds start closed; the fold says what a press does to its kind's zones.
+    // Two kinds start closed; the fold names its list, aria-expanded its state, the tooltip what a press does.
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
-    await expect(fold).toHaveAccessibleName('Show the list of one Border zone');
+    await expect(fold).toHaveAccessibleName('The list of one Border zone');
+    await expect(fold).toHaveAttribute('title', 'Show the list of one Border zone');
     await fold.focus();
     await page.keyboard.press('Enter');
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
-    await expect(fold).toHaveAccessibleName('Hide the list of one Border zone');
+    await expect(fold).toHaveAccessibleName('The list of one Border zone');
+    await expect(fold).toHaveAttribute('title', 'Hide the list of one Border zone');
     await expect(fold).toBeFocused();
 
     // The zone's name: Enter selects it and opens its page; focus stays on it.
@@ -359,6 +361,15 @@ for (const tag of ['', ' @firefox']) {
     await expect(show).toBeFocused();
     // The note after hiding names the way back in the button's own words.
     await expect(page.locator('.ow-toast', { hasText: 'Element images hidden' })).toContainText('press Show element images beside the name');
+    await expect(page.locator('.ow-toast', { hasText: 'Element images hidden' })).toContainText('or tick it in Settings → Elements');
+    // The setting it points to is there by those words, said plainly, and now off.
+    await page.evaluate(() => {
+      const api = (window as any).__atlasTestApi;
+      window.location.hash = `#/w/${api.getState().active.worldId}/settings/elements`;
+    });
+    const setting = page.getByRole('checkbox', { name: 'Show element images, on an element\'s page and in the web pane', exact: true });
+    await expect(setting).toBeVisible();
+    await expect(setting).not.toBeChecked();
   });
 
   // Census row 17.
@@ -406,7 +417,8 @@ for (const tag of ['', ' @firefox']) {
     await expect(childRow).toBeVisible();
     const fold = page.locator(`.atlas-map-tree-row[data-map-id="${parent}"] .atlas-map-tree-chevron`);
     const name = page.locator(`.atlas-map-tree-row[data-map-id="${parent}"] .atlas-map-tree-name`);
-    await expect(fold).toHaveAccessibleName('Hide the map under Realm');
+    await expect(fold).toHaveAccessibleName('The map under Realm');
+    await expect(fold).toHaveAttribute('title', 'Hide the map under Realm');
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
     // The fold and the name are stops side by side: Tab from the fold reaches the name, Shift+Tab goes back.
     await fold.focus();
@@ -417,7 +429,8 @@ for (const tag of ['', ' @firefox']) {
     await page.keyboard.press('Enter');
     await expect(childRow).toHaveCount(0);
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
-    await expect(fold).toHaveAccessibleName('Show the map under Realm');
+    await expect(fold).toHaveAccessibleName('The map under Realm');
+    await expect(fold).toHaveAttribute('title', 'Show the map under Realm');
     await expect(fold).toBeFocused();
     await page.keyboard.press(' ');
     await expect(childRow).toBeVisible();
@@ -644,8 +657,8 @@ for (const tag of ['', ' @firefox']) {
     expect(await page.locator(`.atlas-map-tree-row[data-map-id="${mapId}"] .atlas-inline-actions`).first().evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
   });
 
-  // The 1.124.25 names: a row holding controls is no control itself, a fold says what a press does, and a
-  // button met in a run of its twins says what it acts on.
+  // The 1.124.25 names: a row holding controls is no control itself, a fold names what it folds (its state
+  // aria-expanded's, the verb its tooltip's, 1.124.26), and a button met in a run of its twins says what it acts on.
   test(`the Maps tree names each map once, its name and its fold are side by side, and each delete names its map${tag}`, async ({ page }) => {
     await freshWorld(page, 'kd-names-maps');
     const parent = await page.evaluate(async () => {
@@ -668,11 +681,13 @@ for (const tag of ['', ' @firefox']) {
     await expect(row.locator('.atlas-map-tree-name')).toHaveAccessibleName('Sikelia');
     const fold = row.locator('.atlas-map-tree-chevron');
     await expect(fold).toHaveRole('button');
-    await expect(fold).toHaveAccessibleName('Hide the 3 maps under Sikelia');
+    // The fold's name says which maps, aria-expanded their state; only its tooltip says what a press does.
+    await expect(fold).toHaveAccessibleName('The 3 maps under Sikelia');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
     await expect(fold).toHaveAttribute('title', 'Hide the 3 maps under Sikelia');
     await fold.click();
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
-    await expect(fold).toHaveAccessibleName('Show the 3 maps under Sikelia');
+    await expect(fold).toHaveAccessibleName('The 3 maps under Sikelia');
     await expect(fold).toHaveAttribute('title', 'Show the 3 maps under Sikelia');
     const del = row.locator('[data-action="delete-map"]');
     await expect(del).toHaveAccessibleName('Delete the map Sikelia');
@@ -688,14 +703,17 @@ for (const tag of ['', ' @firefox']) {
       return p.id as string;
     });
     const blankRow = page.locator(`.atlas-map-tree-row[data-map-id="${blank}"]`);
-    await expect(blankRow.locator('.atlas-map-tree-chevron')).toHaveAccessibleName('Hide the map under (unnamed map)');
+    await expect(blankRow.locator('.atlas-map-tree-chevron')).toHaveAccessibleName('The map under the unnamed map');
+    await expect(blankRow.locator('.atlas-map-tree-chevron')).toHaveAttribute('title', 'Hide the map under the unnamed map');
     await expect(blankRow.locator('[data-action="delete-map"]')).toHaveAccessibleName('Delete the unnamed map');
+    await expect(blankRow.locator('[data-action="delete-map"]')).toHaveAttribute('title', 'Delete the unnamed map');
 
     // A search holds the tree open: the fold says so, is disabled, and a press neither folds nor writes the stored fold.
     const stored = () => page.evaluate(() => localStorage.getItem('atlas_map_tree_collapsed_v1'));
     const before = await stored();
     await page.locator('input[data-role="map-search"]').fill('a');
-    await expect(fold).toHaveAccessibleName('The search shows the 2 maps under Sikelia');
+    // The name stays the plain list; why a press does nothing is the tooltip's.
+    await expect(fold).toHaveAccessibleName('The 2 maps under Sikelia');
     await expect(fold).toHaveAttribute('title', 'The search shows the 2 maps under Sikelia');
     await expect(fold).toHaveAttribute('aria-disabled', 'true');
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
@@ -710,12 +728,43 @@ for (const tag of ['', ' @firefox']) {
     expect(await stored()).toBe(before);
     await page.locator('input[data-role="map-search"]').fill('');
     // Out of the search, the fold is as it was left: closed.
-    await expect(fold).toHaveAccessibleName('Show the 3 maps under Sikelia');
+    await expect(fold).toHaveAccessibleName('The 3 maps under Sikelia');
+    await expect(fold).toHaveAttribute('title', 'Show the 3 maps under Sikelia');
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
     expect(await fold.getAttribute('aria-disabled')).toBeNull();
 
     // A mouse click on the name opens the map, as a click on the row always did.
     await row.locator('.atlas-map-tree-name').click();
     await expect(page.locator('.atlas-tab.active', { hasText: 'Sikelia' })).toBeVisible();
+  });
+
+  test(`a map's location chip is named by what it opens, its glyph hidden${tag}`, async ({ page }) => {
+    await freshWorld(page, 'kd-names-loc');
+    const ids = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const loc = await store.createElement('location', { name: 'Syracuse' });
+      const blank = await store.createElement('location', { name: '' });
+      const harbour = await store.createElement('map', { name: 'Harbour', location: loc.id });
+      const quay = await store.createElement('map', { name: 'Quay', location: blank.id });
+      api.patchData(await store.listElements());
+      const ui = api.getState().ui;
+      api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+      return { loc: loc.id as string, harbour: harbour.id as string, quay: quay.id as string };
+    });
+    const chip = page.locator(`.atlas-map-tree-row[data-map-id="${ids.harbour}"] .atlas-row-chip-location`);
+    await expect(chip).toHaveRole('button');
+    await expect(chip).toHaveAccessibleName('Open Syracuse');
+    await expect(chip).toHaveAttribute('title', 'Open Syracuse');
+    await expect(chip.locator('.material-symbols-outlined')).toHaveAttribute('aria-hidden', 'true');
+    // A place with no name, in the one form every control says it.
+    const blankChip = page.locator(`.atlas-map-tree-row[data-map-id="${ids.quay}"] .atlas-row-chip-location`);
+    await expect(blankChip).toHaveAccessibleName('Open the unnamed location');
+    await expect(blankChip).toHaveAttribute('title', 'Open the unnamed location');
+    // What the name says is what a press does: Enter opens the place's page.
+    await chip.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator(`.atlas-middle-body[data-element-id="${ids.loc}"]`)).toBeVisible();
   });
 
   test(`a zone kind's fold says what it shows or hides, and each zone's delete names its zone${tag}`, async ({ page }) => {
@@ -736,15 +785,21 @@ for (const tag of ['', ' @firefox']) {
     const border = panel.locator('.atlas-zone-kind', { hasText: 'Border' });
     const fold = border.locator('button.atlas-zone-kind-caret');
     // The fold names the list; the eye beside it is the one that hides zones on the map.
-    await expect(fold).toHaveAccessibleName('Show the list of the 2 Border zones');
+    // Its name says which list, aria-expanded its state; only its tooltip says what a press does.
+    await expect(fold).toHaveAccessibleName('The list of the 2 Border zones');
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
     await expect(fold).toHaveAttribute('title', 'Show the list of the 2 Border zones');
     // A kind-less zone's fold, in the app's own word.
-    await expect(panel.locator('.atlas-zone-kind', { hasText: '(no kind)' }).locator('button.atlas-zone-kind-caret')).toHaveAccessibleName('Show the list of one zone with no kind');
+    const kindless = panel.locator('.atlas-zone-kind', { hasText: '(no kind)' }).locator('button.atlas-zone-kind-caret');
+    await expect(kindless).toHaveAccessibleName('The list of one zone with no kind');
+    await expect(kindless).toHaveAttribute('title', 'Show the list of one zone with no kind');
 
     // A search holds the kind open: the fold says so, is disabled, and a press does not change what clearing brings back.
     const search = panel.locator('input[data-role="zone-search"]');
     await search.fill('march');
-    await expect(fold).toHaveAccessibleName('The search shows the list of the 2 Border zones');
+    // The name stays the plain list; why a press does nothing is the tooltip's.
+    await expect(fold).toHaveAccessibleName('The list of the 2 Border zones');
+    await expect(fold).toHaveAttribute('title', 'The search shows the list of the 2 Border zones');
     await expect(fold).toHaveAttribute('aria-disabled', 'true');
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
     // One press at a time (two would flip the kind and back), each checked by clearing the search.
@@ -753,7 +808,8 @@ for (const tag of ['', ' @firefox']) {
     await expect(border.locator('.atlas-zone-chip', { hasText: 'the north march' })).toBeVisible();
     await search.fill('');
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
-    await expect(fold).toHaveAccessibleName('Show the list of the 2 Border zones');
+    await expect(fold).toHaveAccessibleName('The list of the 2 Border zones');
+    await expect(fold).toHaveAttribute('title', 'Show the list of the 2 Border zones');
     expect(await fold.getAttribute('aria-disabled')).toBeNull();
     await search.fill('march');
     await expect(fold).toHaveAttribute('aria-disabled', 'true');
@@ -762,7 +818,8 @@ for (const tag of ['', ' @firefox']) {
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
 
     await fold.click();
-    await expect(fold).toHaveAccessibleName('Hide the list of the 2 Border zones');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await expect(fold).toHaveAccessibleName('The list of the 2 Border zones');
     await expect(fold).toHaveAttribute('title', 'Hide the list of the 2 Border zones');
     const north = border.locator('.atlas-zone-chip', { hasText: 'the north march' });
     await expect(north.locator('[data-action="delete"]')).toHaveAccessibleName('Delete the zone the north march');
@@ -771,6 +828,7 @@ for (const tag of ['', ' @firefox']) {
     const sea = panel.locator('.atlas-zone-kind', { hasText: 'Sea' });
     await sea.locator('button.atlas-zone-kind-caret').click();
     await expect(sea.locator('[data-action="delete"]')).toHaveAccessibleName('Delete the unnamed zone');
+    await expect(sea.locator('[data-action="delete"]')).toHaveAttribute('title', 'Delete the unnamed zone');
   });
 
   test(`a field's remove names the field it removes${tag}`, async ({ page }) => {

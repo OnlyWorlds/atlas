@@ -27,6 +27,7 @@ import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type 
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation, pressOncePerKey } from '../../core/dom-utils';
 import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
+import { theUnnamed, typeName } from '../../core/type-words';
 
 // ---- Collapsed tree-node state ----
 
@@ -358,7 +359,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
     const locationNames = new Map<string, string>();
     for (const e of state.data.elements) {
-      if (e.type === 'location') locationNames.set(e.id, e.name || '(unnamed location)');
+      if (e.type === 'location') locationNames.set(e.id, e.name?.trim() ?? '');
     }
 
     const list = document.createElement('div');
@@ -417,17 +418,32 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   return unsubState;
 }
 
-/**
- * A map fold's name and tooltip: what a press does, by its state ("Show the 3
- * maps under Sikelia", "Hide the map under Sikelia"). While a search holds the
- * tree open a press does nothing, and the name says what is true: "The search
- * shows the 3 maps under Sikelia".
- */
-export function mapFoldName(count: number, mapName: string | undefined, collapsed: boolean, searching = false): string {
+/** The maps a fold folds, mid-sentence: "the 3 maps under Sikelia", "the map under the unnamed map". */
+function mapFoldList(count: number, mapName: string | undefined): string {
   const what = count === 1 ? 'the map' : `the ${count} maps`;
-  const under = `under ${mapName?.trim() || '(unnamed map)'}`;
-  if (searching) return `The search shows ${what} ${under}`;
-  return `${collapsed ? 'Show' : 'Hide'} ${what} ${under}`;
+  return `${what} under ${mapName?.trim() || theUnnamed('map')}`;
+}
+
+/**
+ * A map fold's accessible name: the maps it folds, with no verb ("The 3 maps
+ * under Sikelia"). Its aria-expanded says whether they show, so the name never
+ * says it a second time.
+ */
+export function mapFoldName(count: number, mapName: string | undefined): string {
+  const list = mapFoldList(count, mapName);
+  return list.charAt(0).toUpperCase() + list.slice(1);
+}
+
+/**
+ * A map fold's tooltip, for the mouse, which has no aria-expanded to hear:
+ * what a press does, by its state ("Show the 3 maps under Sikelia", "Hide the
+ * map under Sikelia"). While a search holds the tree open a press does
+ * nothing, and the tooltip says why: "The search shows the 3 maps under Sikelia".
+ */
+export function mapFoldTitle(count: number, mapName: string | undefined, collapsed: boolean, searching = false): string {
+  const list = mapFoldList(count, mapName);
+  if (searching) return `The search shows ${list}`;
+  return `${collapsed ? 'Show' : 'Hide'} ${list}`;
 }
 
 /** The focused tree control's twin in a redrawn tree, by its map and its own mark. */
@@ -509,13 +525,14 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     const chevron = document.createElement('button');
     chevron.type = 'button';
     chevron.className = 'atlas-map-tree-chevron';
-    // A fold a keyboard reaches (Tab, then Enter or Space), beside the name:
-    // named for what a press does to the maps under it, one name for the
-    // mouse and the screen reader.
+    // A fold a keyboard reaches (Tab, then Enter or Space), beside the name.
+    // The one control whose name and tooltip part, on purpose: the name says
+    // which maps it folds and aria-expanded says their state, so a screen
+    // reader hears the state once; the tooltip keeps the verb ("Show ...",
+    // "Hide ...") for the mouse, which hears no aria-expanded.
     chevron.setAttribute('aria-expanded', String(!collapsed));
-    const foldName = mapFoldName(node.children.length, m.name, collapsed, ctx.ignoreCollapsed);
-    chevron.setAttribute('aria-label', foldName);
-    chevron.title = foldName;
+    chevron.setAttribute('aria-label', mapFoldName(node.children.length, m.name));
+    chevron.title = mapFoldTitle(node.children.length, m.name, collapsed, ctx.ignoreCollapsed);
     // A search holds every map open: the fold cannot hide, so it says so and presses nothing.
     if (ctx.ignoreCollapsed) chevron.setAttribute('aria-disabled', 'true');
     chevron.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${collapsed ? 'chevron_right' : 'expand_more'}</span>`;
@@ -565,21 +582,25 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   // read as one cluster).
   if (typeof m.location === 'string' && m.location) {
     const locName = ctx.locationNames.get(m.location);
-    if (locName) {
+    if (locName !== undefined) {
       const chip = document.createElement('span');
       chip.className = 'atlas-row-chip atlas-row-chip-location';
-      chip.title = `Location: ${locName} (click to open)`;
+      // Named by what a press does (it opens the place's page) and the place,
+      // one name for the mouse and the screen reader; the glyph is only drawn.
+      chip.title = `Open ${locName || theUnnamed('location')}`;
+      chip.setAttribute('aria-label', chip.title);
       chip.setAttribute('role', 'button');
       chip.tabIndex = 0;
       const icon = document.createElement('span');
       icon.className = 'material-symbols-outlined atlas-row-chip-icon';
+      icon.setAttribute('aria-hidden', 'true');
       // SDK ELEMENT_ICONS.location = 'castle' — match the Location element
       // type icon used everywhere else (sidebar rows, pin canvas glyph) so
       // the chip reads as "this is a Location" rather than "this is a pin."
       icon.textContent = 'castle';
       chip.appendChild(icon);
       const label = document.createElement('span');
-      label.textContent = locName;
+      label.textContent = locName || '(unnamed location)';
       chip.appendChild(label);
       const locationId = m.location;
       chip.addEventListener('click', (e) => {
@@ -625,7 +646,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     del.setAttribute('data-action', 'delete-map');
     // Named for its map, one name for the mouse and the screen reader: every
     // row has one, and Tab meets them in a run.
-    del.title = m.name?.trim() ? `Delete the map ${m.name.trim()}` : 'Delete the unnamed map';
+    del.title = m.name?.trim() ? `Delete the ${typeName('map')} ${m.name.trim()}` : `Delete ${theUnnamed('map')}`;
     del.setAttribute('aria-label', del.title);
     del.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>';
     del.addEventListener('click', (e) => {
