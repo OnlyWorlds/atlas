@@ -707,6 +707,9 @@ for (const tag of ['', ' @firefox']) {
     await expect(blankRow.locator('.atlas-map-tree-chevron')).toHaveAttribute('title', 'Hide the map under the unnamed map');
     await expect(blankRow.locator('[data-action="delete-map"]')).toHaveAccessibleName('Delete the unnamed map');
     await expect(blankRow.locator('[data-action="delete-map"]')).toHaveAttribute('title', 'Delete the unnamed map');
+    // Its name button says it the same way, never a blank: the text is the name.
+    await expect(blankRow.locator('.atlas-map-tree-name')).toHaveAccessibleName('the unnamed map');
+    await expect(blankRow.locator('.atlas-map-tree-name')).toHaveText('the unnamed map');
 
     // A search holds the tree open: the fold says so, is disabled, and a press neither folds nor writes the stored fold.
     const stored = () => page.evaluate(() => localStorage.getItem('atlas_map_tree_collapsed_v1'));
@@ -745,12 +748,14 @@ for (const tag of ['', ' @firefox']) {
       const store = api.getActiveStore();
       const loc = await store.createElement('location', { name: 'Syracuse' });
       const blank = await store.createElement('location', { name: '' });
+      const spaces = await store.createElement('location', { name: '   ' });
       const harbour = await store.createElement('map', { name: 'Harbour', location: loc.id });
       const quay = await store.createElement('map', { name: 'Quay', location: blank.id });
+      const mole = await store.createElement('map', { name: 'Mole', location: spaces.id });
       api.patchData(await store.listElements());
       const ui = api.getState().ui;
       api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
-      return { loc: loc.id as string, harbour: harbour.id as string, quay: quay.id as string };
+      return { loc: loc.id as string, harbour: harbour.id as string, quay: quay.id as string, mole: mole.id as string };
     });
     const chip = page.locator(`.atlas-map-tree-row[data-map-id="${ids.harbour}"] .atlas-row-chip-location`);
     await expect(chip).toHaveRole('button');
@@ -761,6 +766,12 @@ for (const tag of ['', ' @firefox']) {
     const blankChip = page.locator(`.atlas-map-tree-row[data-map-id="${ids.quay}"] .atlas-row-chip-location`);
     await expect(blankChip).toHaveAccessibleName('Open the unnamed location');
     await expect(blankChip).toHaveAttribute('title', 'Open the unnamed location');
+    // The words seen are the words in its name.
+    await expect(blankChip.locator('span:not(.material-symbols-outlined)')).toHaveText('the unnamed location');
+    // A place named only with spaces is no name either.
+    const spacesChip = page.locator(`.atlas-map-tree-row[data-map-id="${ids.mole}"] .atlas-row-chip-location`);
+    await expect(spacesChip).toHaveAccessibleName('Open the unnamed location');
+    await expect(spacesChip.locator('span:not(.material-symbols-outlined)')).toHaveText('the unnamed location');
     // What the name says is what a press does: Enter opens the place's page.
     await chip.focus();
     await page.keyboard.press('Enter');
@@ -773,7 +784,7 @@ for (const tag of ['', ' @firefox']) {
     await page.evaluate(async (map) => {
       const api = (window as any).__atlasTestApi;
       const store = api.getActiveStore();
-      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the south march', 'Border', 500], ['', 'Sea', 900], ['the open ground', '', 1300]] as const) {
+      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the south march', 'Border', 500], ['   ', 'Sea', 900], ['the open ground', '', 1300]] as const) {
         const zone = await store.createZone({ name, supertype });
         let order = 1;
         for (const [px, py] of [[x, 100], [x + 300, 100], [x + 300, 400], [x, 400]]) await store.createMarker({ map_id: map, zone_id: zone.id, x: px, y: py, order: order++ });
@@ -829,6 +840,9 @@ for (const tag of ['', ' @firefox']) {
     await sea.locator('button.atlas-zone-kind-caret').click();
     await expect(sea.locator('[data-action="delete"]')).toHaveAccessibleName('Delete the unnamed zone');
     await expect(sea.locator('[data-action="delete"]')).toHaveAttribute('title', 'Delete the unnamed zone');
+    // Its name button says it the same way, never a blank.
+    await expect(sea.locator('.atlas-zone-chip-name')).toHaveAccessibleName('the unnamed zone');
+    await expect(sea.locator('.atlas-zone-chip-name')).toHaveText('the unnamed zone');
   });
 
   test(`a field's remove names the field it removes${tag}`, async ({ page }) => {

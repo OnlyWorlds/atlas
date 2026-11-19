@@ -27,7 +27,7 @@ import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type 
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation, pressOncePerKey } from '../../core/dom-utils';
 import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
-import { theUnnamed, typeName } from '../../core/type-words';
+import { capitalise, theUnnamed, typeName } from '../../core/type-words';
 
 // ---- Collapsed tree-node state ----
 
@@ -426,17 +426,16 @@ function mapFoldList(count: number, mapName: string | undefined): string {
 
 /**
  * A map fold's accessible name: the maps it folds, with no verb ("The 3 maps
- * under Sikelia"). Its aria-expanded says whether they show, so the name never
- * says it a second time.
+ * under Sikelia"). Its aria-expanded carries the state, so the name never
+ * changes with it.
  */
 export function mapFoldName(count: number, mapName: string | undefined): string {
-  const list = mapFoldList(count, mapName);
-  return list.charAt(0).toUpperCase() + list.slice(1);
+  return capitalise(mapFoldList(count, mapName));
 }
 
 /**
- * A map fold's tooltip, for the mouse, which has no aria-expanded to hear:
- * what a press does, by its state ("Show the 3 maps under Sikelia", "Hide the
+ * A map fold's tooltip, for the mouse (a screen reader may read it too, as the
+ * fold's description): what a press does, by its state ("Show the 3 maps under Sikelia", "Hide the
  * map under Sikelia"). While a search holds the tree open a press does
  * nothing, and the tooltip says why: "The search shows the 3 maps under Sikelia".
  */
@@ -527,9 +526,9 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     chevron.className = 'atlas-map-tree-chevron';
     // A fold a keyboard reaches (Tab, then Enter or Space), beside the name.
     // The one control whose name and tooltip part, on purpose: the name says
-    // which maps it folds and aria-expanded says their state, so a screen
-    // reader hears the state once; the tooltip keeps the verb ("Show ...",
-    // "Hide ...") for the mouse, which hears no aria-expanded.
+    // which maps it folds, with no verb, and aria-expanded carries their
+    // state; the tooltip keeps the verb ("Show ...", "Hide ...") for the
+    // mouse, and a screen reader may read it as the fold's description.
     chevron.setAttribute('aria-expanded', String(!collapsed));
     chevron.setAttribute('aria-label', mapFoldName(node.children.length, m.name));
     chevron.title = mapFoldTitle(node.children.length, m.name, collapsed, ctx.ignoreCollapsed);
@@ -573,7 +572,8 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   main.type = 'button';
   main.className = 'atlas-row-main atlas-map-tree-name';
   if (ctx.openMapIds.has(m.id)) main.classList.add('atlas-map-tree-row-open');
-  main.textContent = m.name || '(unnamed map)';
+  // A missing or blank name in the form every control says it in, so the button is never nameless.
+  main.textContent = m.name?.trim() || theUnnamed('map');
   row.appendChild(main);
 
   // Location chip — surfaces loc-bound maps and lets users click through to
@@ -600,7 +600,8 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
       icon.textContent = 'castle';
       chip.appendChild(icon);
       const label = document.createElement('span');
-      label.textContent = locName || '(unnamed location)';
+      // The words seen are the words in its name ("Open the unnamed location").
+      label.textContent = locName || theUnnamed('location');
       chip.appendChild(label);
       const locationId = m.location;
       chip.addEventListener('click', (e) => {

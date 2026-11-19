@@ -18,6 +18,11 @@ import { ELEMENT_ICONS } from '../../core/constants';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
 import { lastPressWasKey } from '../../ui/input-kind';
 import { theUnnamed } from '../../core/type-words';
+
+/** A card's name as its head and its Open say it: a missing or blank one is "the unnamed event". */
+function shownName(node: TimelineNode): string {
+  return node.unnamed || !node.name.trim() ? theUnnamed(node.elementType) : node.name;
+}
 import { formatStep, formatDuration, type CalendarConfig } from '@onlyworlds/sdk';
 
 export interface ScrollViewOptions {
@@ -119,9 +124,9 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       `<div class="atlas-scroll-card-body">` +
       // The head is the card's press for a keyboard: it opens the card (its
       // links, Focus and Open) and closes it again.
-      `<div class="atlas-scroll-card-head" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeText(`${node.name || '(unnamed)'}, ${dateLine.replace(/\s*→\s*/g, ' to ')}`)}">` +
+      `<div class="atlas-scroll-card-head" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeText(`${shownName(node)}, ${dateLine.replace(/\s*→\s*/g, ' to ')}`)}">` +
       `<span class="material-symbols-outlined" style="color:${escapeText(node.color)}">${escapeText(icon)}</span>` +
-      `<span class="atlas-scroll-card-name">${escapeText(node.name || '(unnamed)')}</span>` +
+      `<span class="atlas-scroll-card-name">${escapeText(shownName(node))}</span>` +
       `</div>` +
       `<div class="atlas-scroll-card-date">${escapeText(dateLine)}</div>` +
       (node.snippet ? `<div class="atlas-scroll-card-snippet">${escapeText(node.snippet)}</div>` : '') +
@@ -211,7 +216,7 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       openBtn.textContent = 'Open';
       // Every open card has an Open: its name says which element it opens, and
       // one with no name in the form every control says it ("Open the unnamed event").
-      openBtn.title = `Open ${node.unnamed || !node.name.trim() ? theUnnamed(node.elementType) : node.name}`;
+      openBtn.title = `Open ${shownName(node)}`;
       openBtn.setAttribute('aria-label', openBtn.title);
       openBtn.addEventListener('click', (e) => { e.stopPropagation(); opts.onOpenElement(id); });
       if (id !== focusId) actions.appendChild(focusBtn);

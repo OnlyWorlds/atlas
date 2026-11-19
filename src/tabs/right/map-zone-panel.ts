@@ -22,7 +22,7 @@
 import { getState, patchSlice } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
-import { theUnnamed, typeName } from '../../core/type-words';
+import { capitalise, theUnnamed, typeName } from '../../core/type-words';
 import { escapeText, escapeAttr, hexColourOr, pressOncePerKey } from '../../core/dom-utils';
 import { getZoneShape } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
@@ -163,9 +163,9 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     const hasKind = Boolean(kind.supertype || kind.subtype || kind.role) && !linkedOnly && !viewOnly;
     const tuning = ps.tuning === kind.key;
     // The caret is the one control whose name and tooltip part, on purpose:
-    // its aria-label names the list (foldName) and aria-expanded says its
-    // state, so a screen reader hears the state once; its title keeps the verb
-    // (foldTitle) for the mouse, which hears no aria-expanded.
+    // its aria-label names the list with no verb (foldName) and aria-expanded
+    // carries its state; its title keeps the verb (foldTitle) for the mouse,
+    // and a screen reader may read it as the caret's description.
     parts.push(`
       <div class="atlas-zone-kind ${open ? 'is-open' : ''} ${hidden ? 'is-hidden' : ''}" data-kind-key="${escapeAttr(kind.key)}">
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
@@ -223,16 +223,16 @@ function foldList(kind: { supertype: string; subtype: string; role?: string }, c
 
 /**
  * A kind's fold's accessible name: the list it folds, with no verb ("The list
- * of the 3 Border zones"). Its aria-expanded says whether the list shows, so
- * the name never says it a second time.
+ * of the 3 Border zones"). Its aria-expanded carries the state, so the name
+ * never changes with it.
  */
 export function foldName(kind: { supertype: string; subtype: string; role?: string }, count: number): string {
-  const list = foldList(kind, count);
-  return list.charAt(0).toUpperCase() + list.slice(1);
+  return capitalise(foldList(kind, count));
 }
 
 /**
- * A kind's fold's tooltip, for the mouse: what a press does to the list, by
+ * A kind's fold's tooltip, for the mouse (a screen reader may read it too, as
+ * the caret's description): what a press does to the list, by
  * its state ("Show the list of the 3 Border zones", "Hide the list of one
  * Border zone"). While a search holds every kind open a press does nothing,
  * and the tooltip says why: "The search shows the list of ...".
@@ -277,7 +277,7 @@ function renderChip(z: Zone, selectedId: string | null | undefined, rules: reado
     <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''} ${parts ? 'is-linked' : ''}" data-zone-id="${escapeAttr(z.id)}"${parts ? ` data-parts="${escapeAttr(parts.join(' '))}"` : ''} title="${escapeAttr(title)}">
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
       <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own color' : ''}"></span>
-      <button type="button" class="atlas-zone-chip-name"${z.id === selectedId ? ' aria-current="true"' : ''}>${escapeText(z.name || '(unnamed)')}</button>${parts ? `
+      <button type="button" class="atlas-zone-chip-name"${z.id === selectedId ? ' aria-current="true"' : ''}>${escapeText(z.name?.trim() || theUnnamed('zone'))}</button>${parts ? `
       <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}${viewOnly ? '' : `
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="${escapeAttr(deleteName(z))}" aria-label="${escapeAttr(deleteName(z))}">
         <span class="material-symbols-outlined" aria-hidden="true">delete</span>

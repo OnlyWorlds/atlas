@@ -652,7 +652,8 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void | Prom
 
   const name = document.createElement('span');
   if (linked) {
-    name.textContent = linked.name || '(unnamed)';
+    // A missing or blank name as its remove says it, so the link is never nameless.
+    name.textContent = linked.name?.trim() || theUnnamed(linked.type, { supertype: linked.supertype });
     chip.title = `${typeName(linked.type, { supertype: linked.supertype })} · id ${id}`;
   } else {
     name.textContent = id;

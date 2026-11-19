@@ -108,6 +108,7 @@ function supertypeOf(v: unknown): string | null {
   return typeof v === 'string' ? v : null;
 }
 
-function capitalise(s: string): string {
+/** The first letter in capitals, the rest as written: a phrase at the start of a name or line. */
+export function capitalise(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
