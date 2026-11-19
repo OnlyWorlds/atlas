@@ -165,7 +165,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     parts.push(`
       <div class="atlas-zone-kind ${open ? 'is-open' : ''} ${hidden ? 'is-hidden' : ''}" data-kind-key="${escapeAttr(kind.key)}">
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
-          <button type="button" class="atlas-zone-kind-caret" aria-expanded="${open}" aria-label="${escapeAttr(foldName(kind, matching.length))}" title="${escapeAttr(foldName(kind, matching.length))}"><span class="material-symbols-outlined" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span></button>
+          <button type="button" class="atlas-zone-kind-caret" aria-expanded="${open}" aria-label="${escapeAttr(foldName(kind, matching.length, open))}" title="${escapeAttr(foldName(kind, matching.length, open))}"><span class="material-symbols-outlined" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span></button>
           ${hasKind
             ? `<button type="button" class="atlas-zone-kind-swatch" title="Color for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the world)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Color for ${escapeAttr(kindLabel(kind))}">
                  <span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span>
@@ -202,9 +202,16 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   });
 }
 
-/** A kind's fold names the kind and how many zones it holds. */
-function foldName(kind: Kind<Zone>, count: number): string {
-  return `${kindLabel(kind)}, ${count} ${count === 1 ? 'zone' : 'zones'}`;
+/**
+ * A kind's fold says what a press does, by its state, to the zones it holds:
+ * "Show the 3 Border zones", "Hide the Border zone", "Show the 2 zones with no kind".
+ */
+export function foldName(kind: { supertype: string; subtype: string; role?: string }, count: number, open: boolean): string {
+  const verb = open ? 'Hide' : 'Show';
+  const zones = count === 1 ? 'zone' : 'zones';
+  const the = count === 1 ? 'the' : `the ${count}`;
+  if (!kind.supertype && !kind.subtype && !kind.role) return `${verb} ${the} ${zones} with no kind`;
+  return `${verb} ${the} ${kindLabel(kind)} ${zones}`;
 }
 
 /** The focused control's twin in a rebuilt panel, by its zone or kind and its own mark. */
@@ -224,6 +231,12 @@ function zonePanelFocusKey(el: HTMLElement): string | null {
   return null;
 }
 
+/** A zone's delete, named for its zone: every zone in the list has one. */
+function deleteName(z: Zone): string {
+  const word = typeName('zone');
+  return z.name ? `Delete the ${word} ${z.name}` : `Delete the unnamed ${word}`;
+}
+
 function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[], parts?: string[], viewOnly = false): string {
   const shapeIcon = parts ? 'route' : getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
   const own = (z as { atlas_color?: string }).atlas_color;
@@ -238,8 +251,8 @@ function renderChip(z: Zone, selectedId: string | null | undefined, rules: reado
       <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own color' : ''}"></span>
       <button type="button" class="atlas-zone-chip-name"${z.id === selectedId ? ' aria-current="true"' : ''}>${escapeText(z.name || '(unnamed)')}</button>${parts ? `
       <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}${viewOnly ? '' : `
-      <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
-        <span class="material-symbols-outlined">delete</span>
+      <button type="button" class="atlas-zone-chip-x" data-action="delete" title="${escapeAttr(deleteName(z))}" aria-label="${escapeAttr(deleteName(z))}">
+        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
       </button>`}
     </div>`;
 }

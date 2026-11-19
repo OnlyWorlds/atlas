@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.25',
+    date: '2026-11-19',
+    theme: 'Each control says its own name',
+    entries: [
+      {
+        id: 'controls-say-their-names',
+        title: 'Folds, rows and buttons say what they do',
+        body: 'In the Maps tab, a map\'s name is its own button with its fold beside it, so Tab reaches each once and the map is named once. The folds there and in a map\'s zones list say what a press does, such as Show the 3 maps under Sikelia or Hide the 2 Border zones, in their tooltips too. A zone\'s delete, a map\'s delete, a field\'s remove and a card\'s Open in the charts\' scroll view name what they act on, such as Delete the zone the north march. After hiding element images, the note says how to bring them back in the same words as the button: Show element images.',
+        tags: ['accessibility', 'maps', 'editor'],
+      },
+    ],
+  },
+  {
     version: '1.124.24',
     date: '2026-11-18',
     theme: 'More of the page by keyboard',
@@ -63,7 +76,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'keyboard-chips-folds',
         title: 'Link chips, folds, zones and chart cards work from the keyboard',
-        body: 'Tab now reaches the name on a link chip and on a Referenced by chip, and Enter or Space opens that element with focus on its name. A field section folds and unfolds by keyboard, and the picture beside an element\'s name shows element images again, with the hide button then one press away. On a map, a zone kind folds and a zone opens from its name in the zones list, and the Maps tab folds a map\'s children. In the charts\' scroll view, a card opens and closes from its name. When the page redraws after such a key press, focus stays on what you pressed, and a held key presses once; a mouse click leaves focus as it always did. Escape in the zones list closes it and puts focus back on its button. A zone kind holding the selected zone can now be folded as well, and selecting the zone again opens it.',
+        body: 'Tab now reaches the name on a link chip and on a Referenced by chip, and Enter or Space opens that element with focus on its name. A field section folds and unfolds by keyboard, and Show element images beside an element\'s name works by keyboard too, with the hide button then one press away. On a map, a zone kind folds and a zone opens from its name in the zones list, and the Maps tab folds a map\'s children. In the charts\' scroll view, a card opens and closes from its name. When the page redraws after such a key press, focus stays on what you pressed, and a held key presses once; a mouse click leaves focus as it always did. Escape in the zones list closes it and puts focus back on its button. A zone kind holding the selected zone can now be folded as well, and selecting the zone again opens it.',
         tags: ['accessibility', 'editor', 'maps'],
       },
     ],

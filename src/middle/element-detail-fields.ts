@@ -85,6 +85,8 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
   if (!alwaysExpanded) {
     const chev = document.createElement('span');
     chev.className = 'material-symbols-outlined';
+    // The glyph is drawn, never read: the fold's name is the section's alone.
+    chev.setAttribute('aria-hidden', 'true');
     chev.textContent = isCollapsed ? 'expand_more' : 'expand_less';
     headerRow.appendChild(chev);
     // A fold a keyboard reaches: Tab, then Enter or Space; its name is the section's.
@@ -123,8 +125,11 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
         const rm = document.createElement('button');
         rm.type = 'button';
         rm.className = 'atlas-field-remove';
-        rm.title = `Remove ${humanizeFieldName(meta.name)}`;
-        rm.textContent = '×';
+        // It removes the field and its value: one name for the mouse and the
+        // screen reader, the × only drawn.
+        rm.title = `Remove the field ${humanizeFieldName(meta.name)}`;
+        rm.setAttribute('aria-label', rm.title);
+        rm.innerHTML = '<span aria-hidden="true">×</span>';
         rm.addEventListener('click', (e) => {
           e.stopPropagation();
           opts.onRemoveField!(meta.name);

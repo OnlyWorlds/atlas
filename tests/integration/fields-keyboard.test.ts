@@ -176,6 +176,33 @@ describe('a link chip\'s x by keyboard', () => {
   });
 });
 
+describe('a section\'s fold and a field\'s remove say their own names', () => {
+  it('the fold\'s arrow glyph is hidden, so the fold is named by its section alone', async () => {
+    const { el } = await world({ description: 'Salt' });
+    const s = renderSection({ name: 'Details', order: 1, fields: [{ name: 'description', widget: 'text-long' }] as never }, el, false)!;
+    document.body.appendChild(s);
+    const fold = s.querySelector<HTMLElement>('.atlas-detail-section-header')!;
+    expect(fold.getAttribute('role')).toBe('button');
+    expect(fold.getAttribute('aria-expanded')).toBe('true');
+    const glyph = fold.querySelector<HTMLElement>('.material-symbols-outlined')!;
+    expect(glyph.textContent).toBe('expand_less');
+    expect(glyph.getAttribute('aria-hidden')).toBe('true');
+    // What a reader hears: the header's text with the hidden glyph left out.
+    const heard = [...fold.childNodes].filter(n => !(n instanceof HTMLElement && n.getAttribute('aria-hidden') === 'true')).map(n => n.textContent).join('').trim();
+    expect(heard).toBe('Details');
+  });
+
+  it('a field\'s × is named for the field it removes, its glyph hidden', async () => {
+    const { el } = await world({ x_mood: 'calm' });
+    const s = renderSection({ name: 'Custom', order: 1, fields: [{ name: 'x_mood', widget: 'text-short' }] as never }, el, false, { onRemoveField: () => {} })!;
+    document.body.appendChild(s);
+    const rm = s.querySelector<HTMLElement>('.atlas-field-remove')!;
+    expect(rm.getAttribute('aria-label')).toBe('Remove the field Mood');
+    expect(rm.title).toBe('Remove the field Mood');
+    expect(rm.querySelector('[aria-hidden="true"]')?.textContent).toBe('×');
+  });
+});
+
 describe('the editor and its Enter', () => {
   it('a held Enter does not save at once; an Enter on the page behind the editor still saves', async () => {
     const { store, el } = await world({ level: 12 }, [], 'ability');

@@ -208,7 +208,10 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       openBtn.type = 'button';
       openBtn.className = 'atlas-btn-ghost';
       openBtn.textContent = 'Open';
-      openBtn.title = 'Open this element';
+      // Every open card has an Open: its name says which element it opens, in
+      // the card's own words ("(unnamed)" for an element with no name).
+      openBtn.title = `Open ${node.name || '(unnamed)'}`;
+      openBtn.setAttribute('aria-label', openBtn.title);
       openBtn.addEventListener('click', (e) => { e.stopPropagation(); opts.onOpenElement(id); });
       if (id !== focusId) actions.appendChild(focusBtn);
       actions.appendChild(openBtn);

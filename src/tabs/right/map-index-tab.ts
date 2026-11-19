@@ -25,7 +25,7 @@ import { worldIsViewOnly } from '../../core/view-only';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
-import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
+import { escapeText, installRowKeydownActivation, pressOncePerKey } from '../../core/dom-utils';
 import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
 
 // ---- Collapsed tree-node state ----
@@ -140,6 +140,8 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   }
 
   installRowKeydownActivation(root);
+  // A held Enter on a fold or a name presses once (the fold is rebuilt in place, focus kept).
+  pressOncePerKey(root);
 
   root.addEventListener('dragstart', (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>('.atlas-map-tree-row');
@@ -415,6 +417,16 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   return unsubState;
 }
 
+/**
+ * A map fold's name and tooltip: what a press does, by its state ("Show the 3
+ * maps under Sikelia", "Hide the map under Sikelia").
+ */
+export function mapFoldName(count: number, mapName: string | undefined, collapsed: boolean): string {
+  const verb = collapsed ? 'Show' : 'Hide';
+  const what = count === 1 ? 'the map' : `the ${count} maps`;
+  return `${verb} ${what} under ${mapName || '(unnamed map)'}`;
+}
+
 /** The focused tree control's twin in a redrawn tree, by its map and its own mark. */
 function mapTreeFocusKey(el: HTMLElement): string | null {
   const row = el.closest<HTMLElement>('.atlas-map-tree-row');
@@ -422,7 +434,7 @@ function mapTreeFocusKey(el: HTMLElement): string | null {
   if (!row || !id) return null;
   const at = `.atlas-map-tree-row[data-map-id="${CSS.escape(id)}"]`;
   if (el === row) return at;
-  for (const own of ['.atlas-map-tree-chevron', '.atlas-row-chip-location', '[data-action="delete-map"]']) {
+  for (const own of ['.atlas-map-tree-name', '.atlas-map-tree-chevron', '.atlas-row-chip-location', '[data-action="delete-map"]']) {
     if (el.matches(own)) return `${at} ${own}`;
   }
   return null;
@@ -474,8 +486,10 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   if (!ctx.viewOnly) row.setAttribute('draggable', 'true');
   if (depth > 0) row.setAttribute('data-depth', String(depth));
   row.style.setProperty('--atlas-map-tree-depth', String(depth));
-  row.setAttribute('role', 'button');
-  row.tabIndex = 0;
+  // The row holds controls of its own (the fold, the location chip, the
+  // delete), so it is a wrapper, not a control: the map's name is its one
+  // button, the others sit beside it (a button inside a button is neither
+  // valid nor reachable). A mouse click anywhere on the row still opens the map.
 
   // Indent spacer — purely visual; CSS uses the custom property too.
   if (depth > 0) {
@@ -488,28 +502,31 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   // Disclosure chevron — visible only for nodes with children. Leaf nodes
   // get a placeholder span of the same width so the row icons stay aligned
   // across siblings (mix of leaves + parents in one group is the common case).
-  const chevron = document.createElement('span');
   if (hasChildren) {
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
     chevron.className = 'atlas-map-tree-chevron';
-    // A fold a keyboard reaches (Tab, then Enter or Space): named for the maps
-    // it shows or hides, one name for the mouse and the screen reader.
-    chevron.setAttribute('role', 'button');
-    chevron.tabIndex = 0;
+    // A fold a keyboard reaches (Tab, then Enter or Space), beside the name:
+    // named for what a press does to the maps under it, one name for the
+    // mouse and the screen reader.
     chevron.setAttribute('aria-expanded', String(!collapsed));
-    const n = node.children.length;
-    const foldName = `${n} ${n === 1 ? 'map' : 'maps'} under ${m.name || '(unnamed map)'}`;
+    const foldName = mapFoldName(node.children.length, m.name, collapsed);
     chevron.setAttribute('aria-label', foldName);
     chevron.title = foldName;
-    chevron.innerHTML = `<span class="material-symbols-outlined">${collapsed ? 'chevron_right' : 'expand_more'}</span>`;
+    chevron.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${collapsed ? 'chevron_right' : 'expand_more'}</span>`;
+    // A drag starts on the row, never on its fold.
+    chevron.draggable = false;
     chevron.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleNodeCollapsed(ctx.worldId, m.id);
       ctx.requestRerender();
     });
+    row.appendChild(chevron);
   } else {
-    chevron.className = 'atlas-map-tree-chevron-placeholder';
+    const placeholder = document.createElement('span');
+    placeholder.className = 'atlas-map-tree-chevron-placeholder';
+    row.appendChild(placeholder);
   }
-  row.appendChild(chevron);
 
   const hasImage = !!(m.image_url || m.image_media_id);
   const icon = document.createElement('span');
@@ -526,8 +543,11 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   }
   row.appendChild(icon);
 
-  const main = document.createElement('span');
-  main.className = 'atlas-row-main';
+  // The map's name is the row's button: it opens the map (its click is the
+  // row's), named by the map's name alone.
+  const main = document.createElement('button');
+  main.type = 'button';
+  main.className = 'atlas-row-main atlas-map-tree-name';
   if (ctx.openMapIds.has(m.id)) main.classList.add('atlas-map-tree-row-open');
   main.textContent = m.name || '(unnamed map)';
   row.appendChild(main);
@@ -596,8 +616,11 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     del.type = 'button';
     del.className = 'atlas-icon-btn-sm';
     del.setAttribute('data-action', 'delete-map');
-    del.title = 'Delete map';
-    del.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+    // Named for its map, one name for the mouse and the screen reader: every
+    // row has one, and Tab meets them in a run.
+    del.title = m.name ? `Delete the map ${m.name}` : 'Delete the unnamed map';
+    del.setAttribute('aria-label', del.title);
+    del.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>';
     del.addEventListener('click', (e) => {
       e.stopPropagation();
       void handleMapDelete(m, pinCount, ctx.toasts);

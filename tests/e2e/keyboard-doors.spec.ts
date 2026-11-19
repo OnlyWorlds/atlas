@@ -282,12 +282,13 @@ for (const tag of ['', ' @firefox']) {
     const panel = page.locator('[data-role="zones-dropdown-panel"]');
     const kind = panel.locator('.atlas-zone-kind', { hasText: 'Border' });
     const fold = kind.locator('button.atlas-zone-kind-caret');
-    // Two kinds start closed; the fold names its kind and its count.
+    // Two kinds start closed; the fold says what a press does to its kind's zones.
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
-    await expect(fold).toHaveAccessibleName('Border, 1 zone');
+    await expect(fold).toHaveAccessibleName('Show the Border zone');
     await fold.focus();
     await page.keyboard.press('Enter');
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await expect(fold).toHaveAccessibleName('Hide the Border zone');
     await expect(fold).toBeFocused();
 
     // The zone's name: Enter selects it and opens its page; focus stays on it.
@@ -356,6 +357,8 @@ for (const tag of ['', ' @firefox']) {
     await page.keyboard.press(' ');
     await expect(hide).toHaveCount(0);
     await expect(show).toBeFocused();
+    // The note after hiding names the way back in the button's own words.
+    await expect(page.locator('.ow-toast', { hasText: 'Element images hidden' })).toContainText('press Show element images beside the name');
   });
 
   // Census row 17.
@@ -402,19 +405,27 @@ for (const tag of ['', ' @firefox']) {
     const childRow = page.locator(`.atlas-map-tree-row[data-map-id="${child}"]`);
     await expect(childRow).toBeVisible();
     const fold = page.locator(`.atlas-map-tree-row[data-map-id="${parent}"] .atlas-map-tree-chevron`);
-    await expect(fold).toHaveAccessibleName('1 map under Realm');
+    const name = page.locator(`.atlas-map-tree-row[data-map-id="${parent}"] .atlas-map-tree-name`);
+    await expect(fold).toHaveAccessibleName('Hide the map under Realm');
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
-    // Tab from the row reaches the fold.
-    await page.locator(`.atlas-map-tree-row[data-map-id="${parent}"]`).focus();
+    // The fold and the name are stops side by side: Tab from the fold reaches the name, Shift+Tab goes back.
+    await fold.focus();
     await page.keyboard.press('Tab');
+    await expect(name).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
     await expect(fold).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(childRow).toHaveCount(0);
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(fold).toHaveAccessibleName('Show the map under Realm');
     await expect(fold).toBeFocused();
     await page.keyboard.press(' ');
     await expect(childRow).toBeVisible();
     await expect(fold).toBeFocused();
+    // Enter on the name opens the map, as a click on the row does.
+    await name.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.atlas-tab.active', { hasText: 'Realm' })).toBeVisible();
   });
 
   // The 1.124.24 gate: a held key presses once, a mouse click moves no focus, a
@@ -631,5 +642,88 @@ for (const tag of ['', ' @firefox']) {
     await page.waitForTimeout(250);
     expect(await chev.evaluate((el) => document.activeElement === el)).toBe(false);
     expect(await page.locator(`.atlas-map-tree-row[data-map-id="${mapId}"] .atlas-inline-actions`).first().evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
+  });
+
+  // The 1.124.25 names: a row holding controls is no control itself, a fold says what a press does, and a
+  // button met in a run of its twins says what it acts on.
+  test(`the Maps tree names each map once, its name and its fold are side by side, and each delete names its map${tag}`, async ({ page }) => {
+    await freshWorld(page, 'kd-names-maps');
+    const parent = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const p = await store.createElement('map', { name: 'Sikelia' });
+      for (const name of ['Akragas', 'Gela', 'Selinous']) await store.createElement('map', { name, parent_map: p.id });
+      api.patchData(await store.listElements());
+      const ui = api.getState().ui;
+      api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+      return p.id as string;
+    });
+    const row = page.locator(`.atlas-map-tree-row[data-map-id="${parent}"]`);
+    await expect(row).toBeVisible();
+    // The row is a wrapper: no role, no tab stop, no button inside a button.
+    expect(await row.getAttribute('role')).toBeNull();
+    expect(await row.getAttribute('tabindex')).toBeNull();
+    await expect(row.locator(':is(button, [role="button"]) :is(button, [role="button"])')).toHaveCount(0);
+    await expect(row.locator('.atlas-map-tree-name')).toHaveRole('button');
+    await expect(row.locator('.atlas-map-tree-name')).toHaveAccessibleName('Sikelia');
+    const fold = row.locator('.atlas-map-tree-chevron');
+    await expect(fold).toHaveRole('button');
+    await expect(fold).toHaveAccessibleName('Hide the 3 maps under Sikelia');
+    await expect(fold).toHaveAttribute('title', 'Hide the 3 maps under Sikelia');
+    await fold.click();
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(fold).toHaveAccessibleName('Show the 3 maps under Sikelia');
+    await expect(fold).toHaveAttribute('title', 'Show the 3 maps under Sikelia');
+    const del = row.locator('[data-action="delete-map"]');
+    await expect(del).toHaveAccessibleName('Delete the map Sikelia');
+    await expect(del).toHaveAttribute('title', 'Delete the map Sikelia');
+    // A mouse click on the name opens the map, as a click on the row always did.
+    await row.locator('.atlas-map-tree-name').click();
+    await expect(page.locator('.atlas-tab.active', { hasText: 'Sikelia' })).toBeVisible();
+  });
+
+  test(`a zone kind's fold says what it shows or hides, and each zone's delete names its zone${tag}`, async ({ page }) => {
+    await freshWorld(page, 'kd-names-zones');
+    const mapId = await newMap(page, 'Named Canvas');
+    await page.evaluate(async (map) => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the south march', 'Border', 500], ['', 'Sea', 900]] as const) {
+        const zone = await store.createZone({ name, supertype });
+        let order = 1;
+        for (const [px, py] of [[x, 100], [x + 300, 100], [x + 300, 400], [x, 400]]) await store.createMarker({ map_id: map, zone_id: zone.id, x: px, y: py, order: order++ });
+      }
+      api.patchData(await store.listElements());
+    }, mapId);
+    await page.click('[data-action="zones-dropdown"]');
+    const panel = page.locator('[data-role="zones-dropdown-panel"]');
+    const border = panel.locator('.atlas-zone-kind', { hasText: 'Border' });
+    const fold = border.locator('button.atlas-zone-kind-caret');
+    await expect(fold).toHaveAccessibleName('Show the 2 Border zones');
+    await expect(fold).toHaveAttribute('title', 'Show the 2 Border zones');
+    await fold.click();
+    await expect(fold).toHaveAccessibleName('Hide the 2 Border zones');
+    await expect(fold).toHaveAttribute('title', 'Hide the 2 Border zones');
+    const north = border.locator('.atlas-zone-chip', { hasText: 'the north march' });
+    await expect(north.locator('[data-action="delete"]')).toHaveAccessibleName('Delete the zone the north march');
+    await expect(north.locator('[data-action="delete"]')).toHaveAttribute('title', 'Delete the zone the north march');
+    // A zone with no name: its delete says so, never a bare "Delete".
+    const sea = panel.locator('.atlas-zone-kind', { hasText: 'Sea' });
+    await sea.locator('button.atlas-zone-kind-caret').click();
+    await expect(sea.locator('[data-action="delete"]')).toHaveAccessibleName('Delete the unnamed zone');
+  });
+
+  test(`a field's remove names the field it removes${tag}`, async ({ page }) => {
+    await freshWorld(page, 'kd-names-fields');
+    const id = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const c = await api.getActiveStore().createElement('character', { name: 'Ireena', x_mood: 'calm' });
+      api.patchData(await api.getActiveStore().listElements());
+      return c.id as string;
+    });
+    await openElement(page, id);
+    const rm = page.locator('[data-field="x_mood"] .atlas-field-remove');
+    await expect(rm).toHaveAccessibleName('Remove the field Mood');
+    await expect(rm).toHaveAttribute('title', 'Remove the field Mood');
   });
 }

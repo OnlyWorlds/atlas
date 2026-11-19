@@ -307,7 +307,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
           patchSlice('registry', next);
           // The way back is the picture beside the name: focus goes there.
           if (hadFocus) imagesFocusBack('.atlas-header-icon-thumb-btn');
-          toastManager.info('Element images hidden. Click the type icon (or Settings → Elements) to show them again');
+          // The way back named as its controls are: the Show element images button beside the name, and the setting.
+          toastManager.info('Element images hidden. To show them again, press Show element images beside the name, or tick it in Settings → Elements.');
         });
         wrap.appendChild(hide);
         detail.appendChild(wrap);

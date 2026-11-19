@@ -314,7 +314,9 @@ function structuredRemoveButton(el: Element, fieldName: string): HTMLButtonEleme
   del.type = 'button';
   del.className = 'atlas-custom-structured-remove';
   del.title = `Remove ${humanizeFieldName(fieldName)} from this element`;
-  del.textContent = '×';
+  // Named as its title says; the × is only drawn.
+  del.setAttribute('aria-label', del.title);
+  del.innerHTML = '<span aria-hidden="true">×</span>';
   del.addEventListener('click', () => { void removeField(el, fieldName, { alwaysConfirm: true }); });
   return del;
 }

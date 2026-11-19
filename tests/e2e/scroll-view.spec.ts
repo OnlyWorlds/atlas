@@ -166,6 +166,10 @@ for (const tag of ['', ' @firefox']) {
     await expect(card).toHaveClass(/selected/);
     await expect(head).toHaveAttribute('aria-expanded', 'true');
     await expect(head).toBeFocused();
+    // Every open card has an Open: its name says which element it opens.
+    const openBtn = card.locator('.atlas-scroll-card-actions button', { hasText: 'Open' });
+    await expect(openBtn).toHaveAccessibleName('Open Founding');
+    await expect(openBtn).toHaveAttribute('title', 'Open Founding');
 
     // Tab reaches the card's Focus; its press redraws the document, and focus stays on the card.
     await page.keyboard.press('Tab');
@@ -180,5 +184,16 @@ for (const tag of ['', ' @firefox']) {
     await page.keyboard.press(' ');
     await expect(head).toHaveAttribute('aria-expanded', 'false');
     await expect(head).toBeFocused();
+  });
+
+  test(`an unnamed element's Open says so in the card's own words${tag}`, async ({ page }) => {
+    await setupWorld(page);
+    await createElement(page, 'event', { name: '', start_date: 10 });
+    await createElement(page, 'event', { name: 'The Cracking', start_date: 380 });
+    await openCharts(page);
+    await page.click('[data-action="chart-mode-scroll"]');
+    const card = page.locator('.atlas-scroll-card', { hasText: '(unnamed)' });
+    await card.locator('.atlas-scroll-card-head').click();
+    await expect(card.locator('.atlas-scroll-card-actions button', { hasText: 'Open' })).toHaveAccessibleName('Open (unnamed)');
   });
 }
