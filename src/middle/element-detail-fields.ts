@@ -46,7 +46,7 @@ import { countSpatialOnMap, spatialPhrase, rescaleSketchOntoImage } from './map-
 import { getEditorSettings } from '../registry/registry';
 import { suggestionsForField, reservedValueHint } from '../core/taxonomy';
 import { styleValueHint } from '../core/world-styles';
-import { resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
+import { CALENDAR_WORD, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
 import { fieldLabel, formatStep } from '@onlyworlds/sdk';
 import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
 
@@ -399,7 +399,7 @@ function withCalendarDate(wrap: HTMLElement, valueEl: HTMLElement, meta: FieldMe
     dateEl.className = 'atlas-row-meta atlas-field-calendar-date';
     dateEl.setAttribute('data-role', 'calendar-date');
     dateEl.textContent = dateText;
-    dateEl.title = `Calendar: ${nameOrUnnamed(lens)}. The stored number does not change.`;
+    dateEl.title = `Calendar: ${nameOrUnnamed(lens, { word: CALENDAR_WORD })}. The stored number does not change.`;
     col.appendChild(dateEl);
     wrap.appendChild(col);
     return wrap;

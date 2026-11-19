@@ -29,7 +29,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { capitalise, nameOrUnnamed, typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
-import { worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
+import { CALENDAR_WORD, worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
 import { parseLegacySeed } from '../core/calendar-seed';
 import { formatStep } from '@onlyworlds/sdk';
 import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
@@ -270,7 +270,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     calChip.className = 'atlas-cal-chip' + (lensEarly ? ' active' : '');
     calChip.dataset.action = 'calendar-menu';
     calChip.title = lensEarly
-      ? `Dates read in ${nameOrUnnamed(lensEarly)}. Click to switch or edit`
+      ? `Dates read in ${nameOrUnnamed(lensEarly, { word: CALENDAR_WORD })}. Click to switch or edit`
       : 'These numbers could have names. Create a calendar';
     calChip.innerHTML =
       `<span class="material-symbols-outlined">calendar_month</span>` +
@@ -580,7 +580,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
     if (!viewOnly) {
       if (lens) {
-        item(`Edit ${nameOrUnnamed(lens)}`, {
+        item(`Edit ${nameOrUnnamed(lens, { word: CALENDAR_WORD })}`, {
           icon: 'edit',
           action: () => new CalendarBuilderModal(toasts, {
             elementId: lens.id,

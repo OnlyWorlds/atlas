@@ -85,9 +85,14 @@ export function aTypeName(type: string, opts: Omit<TypeNameOptions, 'many'> = {}
  * "Show the 3 maps under the unnamed map". Where it starts a name or a line,
  * `capitalise` it (or `nameOrUnnamed(el, { start: true })`): only "the" takes
  * the capital, so a world's own word stays as the world wrote it.
+ *
+ * `word`: a room that names the type with its own word passes it, and the
+ * unnamed form keeps it as given: the writing tree's tier ("the unnamed
+ * chapter"), the calendar lens ("the unnamed calendar").
  */
-export function theUnnamed(type: string, opts: Omit<TypeNameOptions, 'many' | 'start'> = {}): string {
-  return `the unnamed ${typeName(type, opts)}`;
+export function theUnnamed(type: string, opts: Omit<TypeNameOptions, 'many' | 'start'> & { word?: string } = {}): string {
+  const word = opts.word?.trim();
+  return `the unnamed ${word || typeName(type, opts)}`;
 }
 
 /** Anything that carries an element's name and type: an element, or a row built from one. */
@@ -105,12 +110,13 @@ export interface Nameable {
  * starts a line (a heading, a row, a chip, a button's whole name, a tab, a menu
  * item): "The unnamed event". Without it the form is lower case, for a name
  * inside a longer line: "Open the unnamed event", "Held by the unnamed character".
- * An element's own name is never re-cased.
+ * An element's own name is never re-cased. `word` is the room's own word for
+ * the type, as `theUnnamed` takes it.
  */
-export function nameOrUnnamed(el: Nameable, opts: { start?: boolean } = {}): string {
+export function nameOrUnnamed(el: Nameable, opts: { start?: boolean; word?: string } = {}): string {
   const own = el.unnamed === true || typeof el.name !== 'string' ? '' : el.name.trim();
   if (own) return own;
-  const words = theUnnamed(el.type, { supertype: el.supertype });
+  const words = theUnnamed(el.type, { supertype: el.supertype, word: opts.word });
   return opts.start ? capitalise(words) : words;
 }
 

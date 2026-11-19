@@ -20,7 +20,11 @@ import { defaultRegistry } from '../../src/core/types';
 import type { Element } from '../../src/core/types';
 import { buildLooseThreads, computeLooseThreads } from '../../src/middle/home-loose-threads';
 import { findDateConflicts } from '../../src/core/date-continuity';
-import { worldCalendars } from '../../src/core/calendar-lens';
+import { CALENDAR_WORD, worldCalendars } from '../../src/core/calendar-lens';
+import { mountWritingBody } from '../../src/sidebar/writing-sidebar';
+import { writingHash } from '../../src/core/router';
+import { setActiveStore } from '../../src/core/active-store';
+import type { ToastManager } from '../../src/ui/toast-manager';
 import { projectElementEntry } from '../../src/core/share-payload';
 import { renderHeader } from '../../src/middle/element-detail-header';
 import { makeEditableTitle } from '../../src/middle/editable-title';
@@ -36,8 +40,9 @@ const NEEDLE = '(unnamed';
 
 /**
  * The places left on purpose, each with its count and why. A label a pick
- * writes into a story is stored text: the chip-label sync owns it from there,
- * and the story keeps what was written (a stored value is never rewritten).
+ * writes into a story is the story's text, and a story's text is the
+ * person's: what an insert writes there is a decision of its own, not this
+ * sweep's (ruled for 1.124.27). The chip-label sync owns it from there.
  */
 const LEFT: Record<string, { count: number; why: string }> = {
   'src/middle/writing-workspace-add-to-cast.ts': {
@@ -180,11 +185,11 @@ describe('the rows other parts read', () => {
     expect(c.b.unnamed).toBeUndefined();
   });
 
-  it('a calendar with no name is the unnamed construct, a menu item with the capital, a title in lower case', () => {
+  it('a calendar with no name keeps its room\'s word: the unnamed calendar, a menu item with the capital, a title in lower case', () => {
     const cfg = { version: 1, grain: 'year', eras: [{ name: 'Age', abbrev: 'A', start: 0 }], format: '{year} {era}' };
     const [cal] = worldCalendars([el('construct', 'k1', { name: ' ', supertype: 'calendar', atlas_calendar: cfg })]);
-    expect(cal?.name).toBe('The unnamed construct');
-    expect(nameOrUnnamed(cal!)).toBe('the unnamed construct');
+    expect(cal?.name).toBe('The unnamed calendar');
+    expect(nameOrUnnamed(cal!, { word: CALENDAR_WORD })).toBe('the unnamed calendar');
   });
 
   it('a shared page carries the unnamed form as the name it prints alone', () => {
@@ -206,5 +211,40 @@ describe('the headings', () => {
     const t = makeEditableTitle({ initial: '   ', placeholder: 'The unnamed character', onCommit: () => {} });
     expect(t.el.textContent).toBe('The unnamed character');
     expect(t.el.classList.contains('is-placeholder')).toBe(true);
+  });
+});
+
+describe("a room's own word for the type", () => {
+  it('theUnnamed and nameOrUnnamed keep the word a room passes, as given', () => {
+    expect(theUnnamed('narrative', { word: 'chapter' })).toBe('the unnamed chapter');
+    expect(nameOrUnnamed({ name: ' ', type: 'construct' }, { start: true, word: 'calendar' })).toBe('The unnamed calendar');
+    expect(nameOrUnnamed({ name: 'Ada', type: 'character' }, { word: 'hero' })).toBe('Ada');
+    // No word, or only spaces: the type's word.
+    expect(theUnnamed('narrative', { word: '  ' })).toBe('the unnamed narrative');
+  });
+
+  it("the writing tree says a nameless book and chapter by their tiers, and the row's + in lower case", () => {
+    const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
+    const W = 'w-tree';
+    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: W, name: 'Tree', state: 'local-only' }] } as never);
+    patchSlice('active', { worldId: W, meta: { name: 'Tree' } } as never);
+    patchSlice('data', { elements: [
+      el('narrative', 'b1', { name: '  ', supertype: 'Book', order: 0 }),
+      el('narrative', 'ch1', { name: '', supertype: 'Chapter', parent_narrative: 'b1', order: 0 }),
+    ] } as never);
+    window.location.hash = writingHash(W);
+    const content = document.createElement('div');
+    document.body.appendChild(content);
+    const unmount = mountWritingBody({ content, toasts });
+    try {
+      const names = [...content.querySelectorAll('.atlas-writing-tree-name')].map(n => n.textContent);
+      expect(names).toEqual(['The unnamed book', 'The unnamed chapter']);
+      const add = content.querySelector<HTMLElement>('.atlas-writing-tree-row-add');
+      expect(add?.title).toBe('New chapter in the unnamed book');
+    } finally {
+      unmount();
+      setActiveStore(null);
+      window.location.hash = '';
+    }
   });
 });
