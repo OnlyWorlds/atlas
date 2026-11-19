@@ -298,6 +298,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const worldId = wid();
     if (!folder || !worldId || viewOnly) return;
     const el = elOf(id);
+    // The entry as the confirm and the toast both say it: its name in quotes, or the unnamed entry.
+    const own = el ? ownName(el) : '';
+    const said = own ? `"${own}"` : theUnnamed('narrative', { word: 'entry' });
     if (getEditorSettings(getState().registry).confirm_before_delete) {
       let dependentCount = 0;
       try {
@@ -306,8 +309,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const extra = dependentCount > 0
         ? ` This also deletes ${dependentCount} element${dependentCount === 1 ? '' : 's'} filed under it.`
         : '';
-      const own = el ? ownName(el) : '';
-      if (!window.confirm(`Delete ${own ? `"${own}"` : theUnnamed('narrative', { word: 'entry' })}?${extra} This cannot be undone.`)) return;
+      if (!window.confirm(`Delete ${said}?${extra} This cannot be undone.`)) return;
     }
     cancelPendingSave();
     // The teardown capture (A4) must not write the text back to the entry being
@@ -318,7 +320,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       await folder.deleteElement(id);
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
-      toasts.success(`Deleted ${el?.name || 'knowledge entry'}`);
+      toasts.success(`Deleted ${said}`);
     } catch (err) {
       console.error('[knowledge-room] delete failed', err);
       showProblem(err, { doing: 'deleting the knowledge entry', toasts });
@@ -486,13 +488,14 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const chip = document.createElement('span');
     chip.className = 'atlas-knowledge-chip' + (derived ? ' is-derived' : '');
     const icon = el ? (ELEMENT_ICONS[el.type] ?? 'category') : 'help';
-    const name = el?.name || '(unknown)';
+    // An element here is said by its name or its unnamed form; one not here keeps its own word.
+    const name = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';
     const body = document.createElement('button');
     body.type = 'button';
     body.className = 'atlas-knowledge-chip-body';
-    body.innerHTML = `<span class="material-symbols-outlined">${icon}</span><span>${escapeText(name)}</span>`;
+    body.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${icon}</span><span>${escapeText(name)}</span>`;
     if (el && worldId) {
-      body.title = derived ? `${name} · mentioned in the text` : `Open ${name}`;
+      body.title = derived ? `${name} · mentioned in the text` : openWords(el);
       body.addEventListener('click', () => navigate(elementHash(worldId, el.id)));
     } else {
       body.disabled = true;
@@ -1223,6 +1226,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       // is not an entry yet: its heading is the prompt, and Create asks for a name.
       placeholder: isDraft ? 'What is known…' : capitalise(theUnnamed('narrative', { word: 'entry' })),
       prompt: 'What is known…',
+      // A draft's name may be emptied again; a saved entry's may not (an empty commit writes nothing).
+      allowEmpty: isDraft,
       ariaLabel: 'Knowledge entry name',
       readOnly: viewOnly,
       onCommit: (next) => {

@@ -38,6 +38,11 @@ export function makeEditableTitle(opts: {
   autoEdit?: boolean;
   /** Show the name only, never an input: a view-only world (conv. 149). */
   readOnly?: boolean;
+  /**
+   * Whether emptying a title is a value of its own (a draft's name). Without it, an emptied title over a
+   * name writes nothing and shows that name again at once, never the placeholder over a named thing.
+   */
+  allowEmpty?: boolean;
   /** Fired on Enter/blur when the trimmed value changed from the last value. */
   onCommit: (next: string) => void;
 }): EditableTitleHandle {
@@ -85,7 +90,9 @@ export function makeEditableTitle(opts: {
       if (committed) return;
       committed = true;
       const next = input.value.trim();
-      if (next !== original) { current = next; opts.onCommit(next); }
+      // An emptied name is no new name: the heading says the name it still has.
+      const emptied = !next && original.trim() !== '' && !opts.allowEmpty;
+      if (next !== original && !emptied) { current = next; opts.onCommit(next); }
       renderDisplay();
     };
 

@@ -269,7 +269,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         await folder.deleteElement(id);
         await refreshElementsAfterWrite(folder);
         requestPushIfLinked();
-        toasts.success(`Deleted ${el?.name || 'page'}`);
+        // As the confirm said it: the name in quotes, or the unnamed page.
+        toasts.success(`Deleted ${pageInLine(el)}`);
       } catch (err) {
         console.error('[share-room] delete failed', err);
         showProblem(err, { doing: 'deleting the page', toasts });

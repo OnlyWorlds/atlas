@@ -2198,14 +2198,14 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   chip.className = 'atlas-timeline-chip'
     + (dated ? ' atlas-timeline-chip-dated' : '')
     + (dateable && !dated ? ' atlas-timeline-chip-undated' : '');
-  // Its name is what a press does, never the glyph's word, and the tooltip is the same string: "Open Ada
-  // (character), on this chart". The group's label above the row says the field.
-  const opens = `${openWords(link)} (${typeName(link.type)})`;
-  const named = dated
-    ? `${opens}, on this chart`
-    : dateable
-      ? `${opens}, undated: drag onto the chart to date it`
-      : opens;
+  // Its name is what a press does, never the glyph's word, and the tooltip is the same string. A press
+  // selects it on the chart, or narrows the chart to it when it is not here (`onSelect`), so it shows,
+  // never opens: "Show Ada (character) on the chart". The group's label above the row says the field;
+  // the drag hint only where a drag dates it.
+  const shows = `Show ${nameOrUnnamed(link)} (${typeName(link.type)}) on the chart`;
+  const named = dateable && !dated && state.onDateElement
+    ? `${shows}. It is undated: drag it onto the chart to date it`
+    : shows;
   chip.title = named;
   chip.setAttribute('aria-label', named);
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';

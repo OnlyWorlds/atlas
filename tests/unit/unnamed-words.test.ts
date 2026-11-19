@@ -12,7 +12,13 @@
  * is for "(unnamed": any line that is not a comment line and holds the word
  * unnamed as a word of its own (never part of a name like `theUnnamed`, a
  * property read like `row.unnamed`, or a key like `unnamed: true`), or
- * "(untitled", fails unless its file is on the allowlist with its reason.
+ * "(untitled" or "Untitled", fails unless its file is on the allowlist with
+ * its reason. "Unnamed" with the capital counts before any punctuation
+ * ("Unnamed, but kept", "Unnamed: "), since no identifier here is spelled
+ * so; the lower-case word is passed before `?:=,;)}&|]`, its shape as a key
+ * or a flag, so "the unnamed, " inside a string is a named limit. A world's
+ * name, "Untitled world", is left as ruled: a world is not an element, and
+ * keel refuses a blank world name.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -29,7 +35,8 @@ import { messageParties } from '../../src/core/message-parties';
 import { findUnlinkedMentions } from '../../src/core/unlinked-mentions';
 import { makeEditableTitle } from '../../src/middle/editable-title';
 import { mountKnowledgeRoom } from '../../src/middle/knowledge-room';
-import { knowledgeHash } from '../../src/core/router';
+import { knowledgeHash, shareHash } from '../../src/core/router';
+import { mountShareRoom } from '../../src/middle/share-room';
 import { setActiveStore } from '../../src/core/active-store';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry } from '../../src/core/types';
@@ -48,8 +55,9 @@ const SRC = join(ROOT, 'src');
 const SKIP = new Set(['src/changelog/changelog.data.ts']);
 
 /** The word on its own: not inside a name (theUnnamed), not a property read (.unnamed) or a key or flag (unnamed: true). */
-const BARE = /(?<![\w.$-])[Uu]nnamed(?![\w$])(?!\s*[?:=,;)}&|\]])/;
-const UNTITLED = /\(untitled/;
+const BARE = /(?<![\w.$-])(?:Unnamed(?![\w$])|unnamed(?![\w$])(?!\s*[?:=,;)}&|\]]))/;
+/** "(untitled", or Untitled as a word of its own, but for a world's name. */
+const UNTITLED = /\(untitled|(?<![\w.$-])[Uu]ntitled(?![\w$])(?! world)/;
 
 /** The places left on purpose, each with its count and why. */
 const LEFT: Record<string, { count: number; why: string }> = {
@@ -124,6 +132,10 @@ describe('the census: no bare Unnamed or (untitled) a person can meet', () => {
       'const t = `Delete chart "${c.name ?? `unnamed`}"?`;',
       ".map(a => a.name || 'unnamed')",
       'const s = `An unnamed ${typeName(t)}`;',
+      "toasts.info('Unnamed, but kept');",
+      "const h = 'Unnamed: ' + x;",
+      "const t = n.name || 'Untitled';",
+      "title: p.name || 'Untitled page',",
     ];
     expect(hitLines(planted.join('\n'))).toEqual(planted.map((_, i) => i + 1));
   });
@@ -139,6 +151,8 @@ describe('the census: no bare Unnamed or (untitled) a person can meet', () => {
       'const r = { ...row, unnamed };',
       'if (!unnamed && x) go();',
       'auditUnnamedIconControls();',
+      "const w = name.trim() || 'Untitled world';",
+      'if (isUntitled(x)) go();',
       "// was 'Unnamed'",
       ' * (untitled)',
     ];
@@ -254,6 +268,106 @@ describe('an editable title', () => {
     t.edit();
     expect(t.el.querySelector('input')!.placeholder).toBe('Page name…');
   });
+
+  it('emptied over a name, it writes nothing and shows that name again at once', () => {
+    const commits: string[] = [];
+    const t = makeEditableTitle({ initial: 'Ada', placeholder: 'The unnamed entry', onCommit: n => commits.push(n) });
+    t.edit();
+    const input = t.el.querySelector('input')!;
+    input.value = '   ';
+    input.dispatchEvent(new Event('blur'));
+    expect(t.el.textContent).toBe('Ada');
+    expect(commits).toEqual([]);
+    // A later rename still writes.
+    t.edit();
+    const again = t.el.querySelector('input')!;
+    again.value = 'Ada of the Vale';
+    again.dispatchEvent(new Event('blur'));
+    expect(commits).toEqual(['Ada of the Vale']);
+  });
+
+  it('a draft may empty its name again (allowEmpty)', () => {
+    const commits: string[] = [];
+    const t = makeEditableTitle({ initial: 'Half', placeholder: 'What is known…', allowEmpty: true, onCommit: n => commits.push(n) });
+    t.edit();
+    const input = t.el.querySelector('input')!;
+    input.value = '';
+    input.dispatchEvent(new Event('blur'));
+    expect(commits).toEqual(['']);
+    expect(t.el.textContent).toBe('What is known…');
+  });
+});
+
+describe('the knowledge room says a nameless element and a deleted entry as its rows do', () => {
+  const W = 'w-know2';
+  const opened = (elements: Element[]): void => {
+    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: W, name: 'Know', state: 'local-only' }] } as never);
+    patchSlice('active', { worldId: W, meta: { name: 'Know' } } as never);
+    patchSlice('data', { elements } as never);
+  };
+
+  it("a holder chip for a nameless character reads its unnamed form, its tooltip what it opens", () => {
+    opened([el('character', 'c1', { name: ' ' }), el('narrative', 'k1', { name: 'Debt', subtype: 'knowledge', narrator: 'c1', story: 'Owed.' })]);
+    window.location.hash = knowledgeHash(W, 'k1');
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
+    const unmount = mountKnowledgeRoom(target, toasts);
+    try {
+      const chip = target.querySelector<HTMLButtonElement>('.atlas-knowledge-chip-body')!;
+      expect(chip.textContent).toContain('The unnamed character');
+      expect(chip.textContent).not.toContain('(unknown)');
+      expect(chip.title).toBe('Open the unnamed character');
+      expect(chip.querySelector('.material-symbols-outlined')!.getAttribute('aria-hidden')).toBe('true');
+    } finally {
+      unmount();
+      window.location.hash = '';
+    }
+  });
+
+  it("the delete toast says the entry as the confirm did", async () => {
+    opened([el('narrative', 'k1', { name: '', subtype: 'knowledge', story: 'Owed.' })]);
+    window.location.hash = knowledgeHash(W, 'k1');
+    const said: string[] = [];
+    const toasts = { info() {}, error() {}, success: (m: string) => said.push(m), warning() {} } as unknown as ToastManager;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    setActiveStore({ deleteElement: vi.fn(async () => {}), findDependents: async () => [], listElements: async () => [] } as never);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const unmount = mountKnowledgeRoom(target, toasts);
+    try {
+      target.querySelector<HTMLButtonElement>('.atlas-knowledge-delete')!.click();
+      await vi.waitFor(() => expect(said).toEqual(['Deleted the unnamed entry']));
+      expect(confirm.mock.calls[0][0]).toMatch(/^Delete the unnamed entry\?/);
+    } finally {
+      unmount();
+      confirm.mockRestore();
+      setActiveStore(null);
+      window.location.hash = '';
+    }
+  });
+
+  it("the pages' delete toast says the page as the confirm did", async () => {
+    opened([el('narrative', 'p1', { name: '  ', subtype: 'page', atlas_page_blocks: [] })]);
+    window.location.hash = shareHash(W, 'p1');
+    const said: string[] = [];
+    const toasts = { info() {}, error() {}, success: (m: string) => said.push(m), warning() {} } as unknown as ToastManager;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    setActiveStore({ deleteElement: vi.fn(async () => {}), findDependents: async () => [], listElements: async () => [], readCharts: async () => [] } as never);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const unmount = mountShareRoom(target, toasts);
+    try {
+      target.querySelector<HTMLButtonElement>('.atlas-share-delete')!.click();
+      await vi.waitFor(() => expect(said).toEqual(['Deleted the unnamed page']));
+      expect(confirm.mock.calls[0][0]).toMatch(/^Delete the unnamed page\?/);
+    } finally {
+      unmount();
+      confirm.mockRestore();
+      setActiveStore(null);
+      window.location.hash = '';
+    }
+  });
 });
 
 describe('pins and markers that link to an element', () => {
@@ -330,20 +444,27 @@ describe("a chart card's chips", () => {
         { id: 'o1', type: 'object', name: 'Ada', fieldLabel: 'Objects' },
       ],
     } as unknown as TimelineNode;
-    const target = document.createElement('div');
-    document.body.appendChild(target);
-    const h = mountTimelineView(target, { onSelect: () => {}, onFocus: () => {}, onOpenElement: () => {} });
-    h.setNodes([n], [n], { now: null, calendar: null, undated: [], focusId: null, chartLabel: null });
-    h.setSelection(n.id);
-    const chips = [...target.querySelectorAll<HTMLElement>('.atlas-timeline-chip:not(.atlas-timeline-chip-more)')];
+    // A press selects (shows), never opens; the drag hint only where a drag can date it.
+    const chipsWith = (onDateElement?: () => void): HTMLElement[] => {
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const h = mountTimelineView(target, { onSelect: () => {}, onFocus: () => {}, onOpenElement: () => {}, onDateElement });
+      h.setNodes([n], [n], { now: null, calendar: null, undated: [], focusId: null, chartLabel: null });
+      h.setSelection(n.id);
+      const chips = [...target.querySelectorAll<HTMLElement>('.atlas-timeline-chip:not(.atlas-timeline-chip-more)')];
+      h.destroy();
+      return chips;
+    };
+    const chips = chipsWith(() => {});
     expect(chips.map(c => c.getAttribute('aria-label'))).toEqual([
-      'Open the unnamed character (character), undated: drag onto the chart to date it',
-      'Open Ada (object)',
+      'Show the unnamed character (character) on the chart. It is undated: drag it onto the chart to date it',
+      'Show Ada (object) on the chart',
     ]);
     expect(chips.map(c => c.title)).toEqual(chips.map(c => c.getAttribute('aria-label')));
     expect(chips.map(c => c.querySelector('.material-symbols-outlined')!.getAttribute('aria-hidden'))).toEqual(['true', 'true']);
     expect(chips[0].querySelector('.atlas-timeline-chip-name')!.textContent).toBe('The unnamed character');
-    h.destroy();
+    // A chart that dates nothing (a view-only world) offers no drag, so it names none.
+    expect(chipsWith()[0].getAttribute('aria-label')).toBe('Show the unnamed character (character) on the chart');
   });
 });
 
