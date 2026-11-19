@@ -40,7 +40,7 @@ import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writin
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
-import { capitalise, nameOrUnnamed, theUnnamed, typeName } from '../core/type-words';
+import { capitalise, nameOrUnnamed, ownName, theUnnamed, typeName } from '../core/type-words';
 import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { Element } from '../core/types';
@@ -822,7 +822,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const ids = [...(held.narrator ? [held.narrator] : []), ...held.collectives];
     if (ids.length === 0) return 'No holders yet';
     const firstEl = elOf(ids[0]);
-    const first = firstEl ? nameOrUnnamed(firstEl) : 'someone not shown here';
+    const first = firstEl ? nameOrUnnamed(firstEl, { word: firstEl.type === 'collective' ? 'circle' : undefined }) : 'someone not shown here';
     return ids.length === 1 ? `Held by ${first}` : `Held by ${first} +${ids.length - 1}`;
   }
 
@@ -979,7 +979,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const existing = listPages(getState().data.elements).find(p =>
           blocksOf(p).some(b => b.kind === 'circle' && b.knowerId === knower.id));
         if (existing) {
-          toasts.info(`Opened the existing page for this circle: ${existing.name?.trim() ? `"${existing.name.trim()}"` : nameOrUnnamed(existing, { word: 'page' })}`);
+          toasts.info(`Opened the existing page for this circle: ${ownName(existing) ? `"${ownName(existing)}"` : nameOrUnnamed(existing, { word: 'page' })}`);
           navigate(shareHash(worldId, existing.id));
           return;
         }

@@ -848,7 +848,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = knower ? `Circle: ${nameOrUnnamed(knower)} · change…` : 'Pick circle…';
+    changeBtn.textContent = knower ? `Circle: ${nameOrUnnamed(knower, { word: knower.type === 'collective' ? 'circle' : undefined })} · change…` : 'Pick circle…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ restrictToType: 'collective', title: 'Whose knowledge? (a circle)' });
