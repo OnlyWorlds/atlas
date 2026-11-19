@@ -325,47 +325,109 @@ describe('the knowledge room says a nameless element and a deleted entry as its 
     }
   });
 
-  it("the delete toast says the entry as the confirm did", async () => {
-    opened([el('narrative', 'k1', { name: '', subtype: 'knowledge', story: 'Owed.' })]);
-    window.location.hash = knowledgeHash(W, 'k1');
-    const said: string[] = [];
-    const toasts = { info() {}, error() {}, success: (m: string) => said.push(m), warning() {} } as unknown as ToastManager;
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    setActiveStore({ deleteElement: vi.fn(async () => {}), findDependents: async () => [], listElements: async () => [] } as never);
+  // The toast says a name as the app's other delete notes do, with no quotes; the confirm keeps its quotes.
+  for (const c of [
+    { name: '', toast: 'Deleted the unnamed entry', ask: /^Delete the unnamed entry\?/ },
+    { name: ' Debt ', toast: 'Deleted Debt', ask: /^Delete "Debt"\?/ },
+  ]) {
+    it(`the entry's delete toast: ${c.toast}`, async () => {
+      opened([el('narrative', 'k1', { name: c.name, subtype: 'knowledge', story: 'Owed.' })]);
+      window.location.hash = knowledgeHash(W, 'k1');
+      const said: string[] = [];
+      const toasts = { info() {}, error() {}, success: (m: string) => said.push(m), warning() {} } as unknown as ToastManager;
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      setActiveStore({ deleteElement: vi.fn(async () => {}), findDependents: async () => [], listElements: async () => [] } as never);
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const unmount = mountKnowledgeRoom(target, toasts);
+      try {
+        target.querySelector<HTMLButtonElement>('.atlas-knowledge-delete')!.click();
+        await vi.waitFor(() => expect(said).toEqual([c.toast]));
+        expect(confirm.mock.calls[0][0]).toMatch(c.ask);
+      } finally {
+        unmount();
+        confirm.mockRestore();
+        setActiveStore(null);
+        window.location.hash = '';
+      }
+    });
+  }
+
+  for (const c of [
+    { name: '  ', toast: 'Deleted the unnamed page', ask: /^Delete the unnamed page\?/ },
+    { name: 'Arrival', toast: 'Deleted Arrival', ask: /^Delete "Arrival"\?/ },
+  ]) {
+    it(`the page's delete toast: ${c.toast}`, async () => {
+      opened([el('narrative', 'p1', { name: c.name, subtype: 'page', atlas_page_blocks: [] })]);
+      window.location.hash = shareHash(W, 'p1');
+      const said: string[] = [];
+      const toasts = { info() {}, error() {}, success: (m: string) => said.push(m), warning() {} } as unknown as ToastManager;
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      setActiveStore({ deleteElement: vi.fn(async () => {}), findDependents: async () => [], listElements: async () => [], readCharts: async () => [] } as never);
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const unmount = mountShareRoom(target, toasts);
+      try {
+        target.querySelector<HTMLButtonElement>('.atlas-share-delete')!.click();
+        await vi.waitFor(() => expect(said).toEqual([c.toast]));
+        expect(confirm.mock.calls[0][0]).toMatch(c.ask);
+      } finally {
+        unmount();
+        confirm.mockRestore();
+        setActiveStore(null);
+        window.location.hash = '';
+      }
+    });
+  }
+
+  /** The room on a draft restored from its stash, as a person left it. */
+  function draftRoom(stash: Record<string, unknown>, elements: Element[] = []) {
+    opened(elements);
+    localStorage.setItem(`atlas_knowledge_draft_${W}`, JSON.stringify({ name: '', story: '', narrator: null, collectives: [], aboutIds: [], ...stash }));
+    window.location.hash = knowledgeHash(W, 'new');
     const target = document.createElement('div');
     document.body.appendChild(target);
+    const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
     const unmount = mountKnowledgeRoom(target, toasts);
+    return {
+      target,
+      done: () => { unmount(); localStorage.removeItem(`atlas_knowledge_draft_${W}`); window.location.hash = ''; },
+    };
+  }
+
+  it("a chip derived from the text says the element's name trimmed, or its unnamed form", () => {
+    // An address in prose names an element by its uuid.
+    const ADA = '0192a000-0000-7000-8000-00000000c002';
+    const NOBODY = '0192a000-0000-7000-8000-00000000c003';
+    const story = `[Ada](ow://character/${ADA}) met [someone](ow://character/${NOBODY}).`;
+    const room = draftRoom({ name: 'Met', story }, [el('character', ADA, { name: ' Ada ' }), el('character', NOBODY, { name: '' })]);
     try {
-      target.querySelector<HTMLButtonElement>('.atlas-knowledge-delete')!.click();
-      await vi.waitFor(() => expect(said).toEqual(['Deleted the unnamed entry']));
-      expect(confirm.mock.calls[0][0]).toMatch(/^Delete the unnamed entry\?/);
+      const titles = [...room.target.querySelectorAll<HTMLElement>('.atlas-knowledge-chip.is-derived .atlas-knowledge-chip-body')].map(b => b.title).sort();
+      expect(titles).toEqual(['Ada · mentioned in the text', 'The unnamed character · mentioned in the text']);
     } finally {
-      unmount();
-      confirm.mockRestore();
-      setActiveStore(null);
-      window.location.hash = '';
+      room.done();
     }
   });
 
-  it("the pages' delete toast says the page as the confirm did", async () => {
-    opened([el('narrative', 'p1', { name: '  ', subtype: 'page', atlas_page_blocks: [] })]);
-    window.location.hash = shareHash(W, 'p1');
-    const said: string[] = [];
-    const toasts = { info() {}, error() {}, success: (m: string) => said.push(m), warning() {} } as unknown as ToastManager;
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    setActiveStore({ deleteElement: vi.fn(async () => {}), findDependents: async () => [], listElements: async () => [], readCharts: async () => [] } as never);
-    const target = document.createElement('div');
-    document.body.appendChild(target);
-    const unmount = mountShareRoom(target, toasts);
+  it("a draft's name may be emptied again: the heading shows the prompt, and Create asks for a name", async () => {
+    const createElement = vi.fn();
+    setActiveStore({ createElement, listElements: async () => [] } as never);
+    const room = draftRoom({ name: 'Half' });
     try {
-      target.querySelector<HTMLButtonElement>('.atlas-share-delete')!.click();
-      await vi.waitFor(() => expect(said).toEqual(['Deleted the unnamed page']));
-      expect(confirm.mock.calls[0][0]).toMatch(/^Delete the unnamed page\?/);
+      const title = room.target.querySelector<HTMLElement>('.atlas-knowledge-entry-header .atlas-element-name')!;
+      expect(title.textContent).toBe('Half');
+      title.click();
+      const input = title.querySelector('input')!;
+      input.value = '';
+      input.dispatchEvent(new Event('blur'));
+      expect(title.textContent).toBe('What is known…');
+      room.target.querySelector<HTMLButtonElement>('.atlas-knowledge-draft-actions .atlas-btn-primary')!.click();
+      await Promise.resolve();
+      expect(room.target.querySelector('[data-role="draft-note"]')!.textContent).toBe('Type a name first');
+      expect(createElement).not.toHaveBeenCalled();
     } finally {
-      unmount();
-      confirm.mockRestore();
+      room.done();
       setActiveStore(null);
-      window.location.hash = '';
     }
   });
 });
@@ -433,38 +495,62 @@ describe('the strand', () => {
 });
 
 describe("a chart card's chips", () => {
+  (globalThis as Record<string, unknown>).ResizeObserver ??= class { observe() {} disconnect() {} unobserve() {} };
+  (HTMLCanvasElement.prototype as unknown as { getContext: () => null }).getContext = () => null;
+  const node = (id: string, name: string, startDate: number, links: unknown[] = []) => ({
+    id, elementType: 'event', name, startDate, endDate: null, color: '#f00',
+    dateSpec: { kind: 'exact', value: startDate }, degree: 0, contentMass: 0, links,
+  }) as unknown as TimelineNode;
+  const fall = node('e2', 'The Fall', 20);
+  const siege = node('e1', 'The Siege', 10, [
+    { id: 'c1', type: 'character', name: 'The unnamed character', unnamed: true, fieldLabel: 'Participants' },
+    { id: 'o1', type: 'object', name: 'Ada', fieldLabel: 'Objects' },
+    { id: 'e2', type: 'event', name: 'The Fall', fieldLabel: 'Events' },
+  ]);
+  /** The card's chips by their visible name, the chart left mounted for a press. */
+  function card(onDateElement?: () => void) {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const onSelect = vi.fn();
+    const h = mountTimelineView(target, { onSelect, onFocus: () => {}, onOpenElement: () => {}, onDateElement });
+    h.setNodes([siege, fall], [siege, fall], { now: null, calendar: null, undated: [], focusId: null, chartLabel: null });
+    h.setSelection(siege.id);
+    const chips = new Map([...target.querySelectorAll<HTMLElement>('.atlas-timeline-chip:not(.atlas-timeline-chip-more)')]
+      .map(c => [c.querySelector('.atlas-timeline-chip-name')!.textContent!, c] as const));
+    return { chips, onSelect, h };
+  }
+
   it('are named for what a press does, the tooltip the same string, the glyph hidden', () => {
-    (globalThis as Record<string, unknown>).ResizeObserver ??= class { observe() {} disconnect() {} unobserve() {} };
-    (HTMLCanvasElement.prototype as unknown as { getContext: () => null }).getContext = () => null;
-    const n = {
-      id: 'e1', elementType: 'event', name: 'The Siege', startDate: 10, endDate: null, color: '#f00',
-      dateSpec: { kind: 'exact', value: 10 }, degree: 0, contentMass: 0,
-      links: [
-        { id: 'c1', type: 'character', name: 'The unnamed character', unnamed: true, fieldLabel: 'Participants' },
-        { id: 'o1', type: 'object', name: 'Ada', fieldLabel: 'Objects' },
-      ],
-    } as unknown as TimelineNode;
-    // A press selects (shows), never opens; the drag hint only where a drag can date it.
-    const chipsWith = (onDateElement?: () => void): HTMLElement[] => {
-      const target = document.createElement('div');
-      document.body.appendChild(target);
-      const h = mountTimelineView(target, { onSelect: () => {}, onFocus: () => {}, onOpenElement: () => {}, onDateElement });
-      h.setNodes([n], [n], { now: null, calendar: null, undated: [], focusId: null, chartLabel: null });
-      h.setSelection(n.id);
-      const chips = [...target.querySelectorAll<HTMLElement>('.atlas-timeline-chip:not(.atlas-timeline-chip-more)')];
-      h.destroy();
-      return chips;
-    };
-    const chips = chipsWith(() => {});
-    expect(chips.map(c => c.getAttribute('aria-label'))).toEqual([
-      'Show the unnamed character (character) on the chart. It is undated: drag it onto the chart to date it',
-      'Show Ada (object) on the chart',
-    ]);
-    expect(chips.map(c => c.title)).toEqual(chips.map(c => c.getAttribute('aria-label')));
-    expect(chips.map(c => c.querySelector('.material-symbols-outlined')!.getAttribute('aria-hidden'))).toEqual(['true', 'true']);
-    expect(chips[0].querySelector('.atlas-timeline-chip-name')!.textContent).toBe('The unnamed character');
+    const { chips, h } = card(() => {});
+    const names = Object.fromEntries([...chips].map(([k, c]) => [k, c.getAttribute('aria-label')]));
+    expect(names).toEqual({
+      // Its own mark on the chart: it is shown.
+      'The Fall': 'Show The Fall (event) on the chart',
+      // No mark of its own: the chart narrows to what it is linked to. The unnamed form says its type once.
+      'The unnamed character': 'Show what the unnamed character is linked to on the chart. It is undated: drag it onto the chart to date it',
+      'Ada': 'Show what Ada (object) is linked to on the chart',
+    });
+    for (const c of chips.values()) {
+      expect(c.title).toBe(c.getAttribute('aria-label'));
+      expect(c.querySelector('.material-symbols-outlined')!.getAttribute('aria-hidden')).toBe('true');
+    }
+    h.destroy();
     // A chart that dates nothing (a view-only world) offers no drag, so it names none.
-    expect(chipsWith()[0].getAttribute('aria-label')).toBe('Show the unnamed character (character) on the chart');
+    const viewOnly = card();
+    expect(viewOnly.chips.get('The unnamed character')!.getAttribute('aria-label')).toBe('Show what the unnamed character is linked to on the chart');
+    viewOnly.h.destroy();
+  });
+
+  it('the undated chip answers Enter and Space (a keyboard click), and a mouse click does not press it twice', () => {
+    const { chips, onSelect, h } = card(() => {});
+    const undated = chips.get('The unnamed character')!;
+    undated.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    expect(onSelect).toHaveBeenCalledWith('c1');
+    onSelect.mockClear();
+    // A mouse click comes after the drag's own release, which already selected: no second press.
+    undated.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(onSelect).not.toHaveBeenCalled();
+    h.destroy();
   });
 });
 

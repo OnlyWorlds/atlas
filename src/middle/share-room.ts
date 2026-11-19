@@ -269,8 +269,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         await folder.deleteElement(id);
         await refreshElementsAfterWrite(folder);
         requestPushIfLinked();
-        // As the confirm said it: the name in quotes, or the unnamed page.
-        toasts.success(`Deleted ${pageInLine(el)}`);
+        // Said as the app's other delete notes say a name, with no quotes: "Deleted Arrival", "Deleted the unnamed page".
+        toasts.success(`Deleted ${nameOrUnnamed(el ?? { type: 'narrative' }, { word: 'page' })}`);
       } catch (err) {
         console.error('[share-room] delete failed', err);
         showProblem(err, { doing: 'deleting the page', toasts });

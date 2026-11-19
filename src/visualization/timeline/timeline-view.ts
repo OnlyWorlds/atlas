@@ -15,7 +15,7 @@
  * same element. See DESIGN_CHARTS.md.
  */
 
-import { nameOrUnnamed, openWords, typeName } from '../../core/type-words';
+import { nameOrUnnamed, openWords, ownName, typeName } from '../../core/type-words';
 import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { effectiveEndDate, TEMPORAL_TYPE_FIELDS } from './temporal-fields';
@@ -2199,10 +2199,13 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
     + (dated ? ' atlas-timeline-chip-dated' : '')
     + (dateable && !dated ? ' atlas-timeline-chip-undated' : '');
   // Its name is what a press does, never the glyph's word, and the tooltip is the same string. A press
-  // selects it on the chart, or narrows the chart to it when it is not here (`onSelect`), so it shows,
-  // never opens: "Show Ada (character) on the chart". The group's label above the row says the field;
-  // the drag hint only where a drag dates it.
-  const shows = `Show ${nameOrUnnamed(link)} (${typeName(link.type)}) on the chart`;
+  // is `onSelect`: a dated element is selected, or the chart narrows to it, and it gets its mark ("Show
+  // Ada (character) on the chart"); an undated or undatable one has no mark of its own, and the chart
+  // narrows to what it is linked to ("Show what Ada (object) is linked to on the chart"). The type is
+  // said once: an unnamed form already holds it. The group's label above the row says the field; the
+  // drag hint only where a drag dates it.
+  const who = ownName(link) ? `${nameOrUnnamed(link)} (${typeName(link.type)})` : nameOrUnnamed(link);
+  const shows = dated ? `Show ${who} on the chart` : `Show what ${who} is linked to on the chart`;
   const named = dateable && !dated && state.onDateElement
     ? `${shows}. It is undated: drag it onto the chart to date it`
     : shows;
@@ -2215,6 +2218,9 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   if (dateable && !dated && state.onDateElement) {
     // Drag-to-date from the card; the no-move click stays a peek.
     chip.addEventListener('mousedown', (e) => startItemDrag(state, { id: link.id, type: link.type, name: link.name }, e, 'select'));
+    // Enter and Space press it too (a keyboard click has no pointer, detail 0): the same show a
+    // no-move mouse press gives through the drag's release, which a mouse click never repeats here.
+    chip.addEventListener('click', (e) => { if (e.detail === 0) state.onSelect(link.id); });
   } else {
     chip.addEventListener('click', () => state.onSelect(link.id));
   }

@@ -298,7 +298,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const worldId = wid();
     if (!folder || !worldId || viewOnly) return;
     const el = elOf(id);
-    // The entry as the confirm and the toast both say it: its name in quotes, or the unnamed entry.
+    // The entry as the confirm asks it: its name in quotes, or the unnamed entry.
     const own = el ? ownName(el) : '';
     const said = own ? `"${own}"` : theUnnamed('narrative', { word: 'entry' });
     if (getEditorSettings(getState().registry).confirm_before_delete) {
@@ -320,7 +320,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       await folder.deleteElement(id);
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
-      toasts.success(`Deleted ${said}`);
+      // Said as the app's other delete notes say a name, with no quotes: "Deleted Debt", "Deleted the unnamed entry".
+      toasts.success(`Deleted ${nameOrUnnamed(el ?? { type: 'narrative' }, { word: 'entry' })}`);
     } catch (err) {
       console.error('[knowledge-room] delete failed', err);
       showProblem(err, { doing: 'deleting the knowledge entry', toasts });
