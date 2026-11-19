@@ -18,7 +18,7 @@
  * for a jump tool. Unnamed elements only surface via description matches.
  */
 
-import { nameOrUnnamed, supertypeWord, typeName } from '../core/type-words';
+import { nameOrUnnamed, ownName, supertypeWord, typeName } from '../core/type-words';
 import { BaseModal } from './modal-base';
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
@@ -57,6 +57,13 @@ export interface PaletteResult {
   /** A pasted OnlyWorlds address: the open door's hash, or why it cannot open. */
   link?: { hash: string } | { refused: string };
   score: number;
+  /** An element's own name, '' when it has none: what a tie sorts by, so an unnamed row sorts first. */
+  sortName?: string;
+}
+
+/** What a tie in score sorts by: an element's own name, else the row's name. */
+function tieName(r: PaletteResult): string {
+  return r.sortName ?? r.name ?? '';
 }
 
 /**
@@ -156,6 +163,7 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
       kind: 'element',
       id: el.id,
       name: nameOrUnnamed(el, { start: true }),
+      sortName: ownName(el),
       type: el.type,
       hint: taxonomy ? `${typeName(el.type, { supertype: el.supertype })} · ${taxonomy}` : typeName(el.type, { supertype: el.supertype }),
       snippet: hit.snippet,
@@ -163,12 +171,12 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     });
   }
 
-  out.sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
+  out.sort((a, b) => (b.score - a.score) || tieName(a).localeCompare(tieName(b)));
 
   const rooms = out.filter(r => r.kind === 'room').slice(0, MAX_ROOM_RESULTS);
   const actions = out.filter(r => r.kind === 'action');
   const els = out.filter(r => r.kind === 'element').slice(0, MAX_ELEMENT_RESULTS);
-  return [...rooms, ...actions, ...els].sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
+  return [...rooms, ...actions, ...els].sort((a, b) => (b.score - a.score) || tieName(a).localeCompare(tieName(b)));
 }
 
 /**

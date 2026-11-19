@@ -16,7 +16,7 @@
 import { getState } from '../core/state';
 import { navigate, writingHash, elementHash } from '../core/router';
 import type { Element } from '../core/types';
-import { buildNarrativeIndex, ancestorIds } from './writing-helpers';
+import { buildNarrativeIndex, ancestorIds, tierWord } from './writing-helpers';
 import { narrativeHasChildren } from './writing-compiled';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { WritingViewMode } from './writing-workspace';
@@ -60,9 +60,10 @@ export function createStickyBar(deps: {
     const crumbs: Array<{ id: string; name: string }> = [];
     for (const ancestorId of chain) {
       const node = idx.byId.get(ancestorId);
-      if (node) crumbs.push({ id: ancestorId, name: nameOrUnnamed(node.el, { start: true }) });
+      if (node) crumbs.push({ id: ancestorId, name: nameOrUnnamed(node.el, { start: true, word: tierWord(node.tier, worldId) }) });
     }
-    crumbs.push({ id: el.id, name: nameOrUnnamed(el, { start: true }) });
+    // A nameless section says its tier, as the tree does: "The unnamed chapter".
+    crumbs.push({ id: el.id, name: nameOrUnnamed(el, { start: true, word: tierWord(idx.byId.get(el.id)?.tier ?? null, worldId) }) });
 
     const crumbsRow = document.createElement('div');
     crumbsRow.className = 'atlas-writing-workspace-crumbs';

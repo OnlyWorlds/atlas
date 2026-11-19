@@ -15,7 +15,7 @@ import { BaseModal } from './modal-base';
 import type { ToastManager } from './toast-manager';
 import { owAccessUrl } from '../core/ow-site';
 import { escapeAttr, escapeText } from '../core/dom-utils';
-import { nameOrUnnamed, typeNameStart } from '../core/type-words';
+import { nameOrUnnamed, ownName, typeNameStart } from '../core/type-words';
 import { getState } from '../core/state';
 import { loadUiPrefs, setInviterNamePref } from '../core/ui-prefs';
 import { problemFor } from '../core/problems';
@@ -45,8 +45,9 @@ export function playableCharacters(worldId: string): Array<{ id: string; name: s
   if (open?.api?.world_id !== worldId) return [];
   return s.data.elements
     .filter(el => el.type === 'character' && !!el.server_updated_at)
-    .map(el => ({ id: el.id, name: nameOrUnnamed(el, { start: true }) }))
-    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    // By the element's own name: an unnamed one sorts first, never among the T's.
+    .sort((a, b) => ownName(a).localeCompare(ownName(b)))
+    .map(el => ({ id: el.id, name: nameOrUnnamed(el, { start: true }) }));
 }
 
 export class InviteModal extends BaseModal {

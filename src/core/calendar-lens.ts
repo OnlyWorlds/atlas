@@ -13,7 +13,7 @@
 
 import type { Element } from './types';
 import { readCalendarConfig, type CalendarConfig } from '@onlyworlds/sdk';
-import { nameOrUnnamed } from './type-words';
+import { nameOrUnnamed, ownName } from './type-words';
 
 /** The calendar room's own word for its Construct: a calendar with no name is "the unnamed calendar". */
 export const CALENDAR_WORD = 'calendar';
@@ -58,7 +58,7 @@ export function worldCalendars(elements: Element[]): WorldCalendar[] {
   for (const el of elements) {
     const config = readCalendarValue((el as Record<string, unknown>)['atlas_calendar']);
     if (!config) continue;
-    out.push({ id: el.id, name: nameOrUnnamed(el, { start: true, word: CALENDAR_WORD }), unnamed: !el.name?.trim() || undefined, type: el.type, supertype: el.supertype, config });
+    out.push({ id: el.id, name: nameOrUnnamed(el, { start: true, word: CALENDAR_WORD }), unnamed: !ownName(el) || undefined, type: el.type, supertype: el.supertype, config });
   }
   return out;
 }

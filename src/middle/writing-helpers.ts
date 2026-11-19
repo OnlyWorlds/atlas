@@ -70,6 +70,11 @@ export function mergeLabels(partial: Partial<WritingLabels> | undefined): Writin
  * not the display label, so callers can compare tiers stably even when the
  * user renames labels.
  */
+/** A tier's word as the writing room says it mid-line ("chapter"), or undefined for no tier. */
+export function tierWord(tier: WritingTier, worldId: string): string | undefined {
+  return tier ? getWritingLabels(worldId)[tier].toLowerCase() : undefined;
+}
+
 export function getTierForNarrative(el: Element, worldId: string): WritingTier {
   if (el.type !== 'narrative') return null;
   const supertype = (el as Element & { supertype?: string | null }).supertype;

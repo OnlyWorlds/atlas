@@ -806,7 +806,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
         <span class="atlas-knowledge-row-main">
-          <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(entry, { start: true }))}</span>
+          <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(entry, { start: true, word: 'entry' }))}</span>
           <span class="atlas-knowledge-row-meta">${escapeText(holderSummary(entry))}</span>
         </span>
       `;
@@ -872,7 +872,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">${isCircle ? 'groups' : (ELEMENT_ICONS[k.type] ?? 'person')}</span>
         <span class="atlas-knowledge-row-main">
-          <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(k, { start: true }))}</span>
+          <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(k, { start: true, word: isCircle ? 'circle' : undefined }))}</span>
           <span class="atlas-knowledge-row-meta">${escapeText(meta.join(' · '))}</span>
         </span>
       `;
@@ -916,7 +916,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
     knowerTitleHandle = makeEditableTitle({
       initial: knower.name || '',
-      placeholder: capitalise(theUnnamed(knower.type, { supertype: knower.supertype })),
+      placeholder: capitalise(theUnnamed(knower.type, { supertype: knower.supertype, word: knower.type === 'collective' ? 'circle' : undefined })),
       ariaLabel: 'Knower name',
       readOnly: viewOnly,
       onCommit: (next) => {
@@ -979,7 +979,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const existing = listPages(getState().data.elements).find(p =>
           blocksOf(p).some(b => b.kind === 'circle' && b.knowerId === knower.id));
         if (existing) {
-          toasts.info(`Opened the existing page for this circle: ${existing.name?.trim() ? `"${existing.name.trim()}"` : nameOrUnnamed(existing)}`);
+          toasts.info(`Opened the existing page for this circle: ${existing.name?.trim() ? `"${existing.name.trim()}"` : nameOrUnnamed(existing, { word: 'page' })}`);
           navigate(shareHash(worldId, existing.id));
           return;
         }
@@ -1040,7 +1040,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         row.innerHTML = `
           <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
           <span class="atlas-knowledge-row-main">
-            <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(entry, { start: true }))}</span>
+            <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(entry, { start: true, word: 'entry' }))}</span>
           </span>
         `;
         row.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
@@ -1105,7 +1105,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           const src = document.createElement('button');
           src.type = 'button';
           src.className = 'atlas-knowledge-known-src';
-          src.textContent = `From ${nameOrUnnamed(entry)}`;
+          src.textContent = `From ${nameOrUnnamed(entry, { word: 'entry' })}`;
           src.title = 'Open this entry';
           src.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
           quote.appendChild(src);

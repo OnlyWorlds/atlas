@@ -18,7 +18,7 @@
 
 import type { Element } from './types';
 import { MIN_NAME_CHARS, findTermSpansMarkdown } from './prose-autolink';
-import { nameOrUnnamed } from './type-words';
+import { nameOrUnnamed, ownName } from './type-words';
 
 export interface NarrativeMentions {
   id: string;
@@ -80,6 +80,8 @@ function scan(el: Element, elements: readonly Element[]): UnlinkedMentions {
   const terms = mentionTermsFor(el);
   if (terms.length === 0) return EMPTY;
   const narratives: NarrativeMentions[] = [];
+  // Sorted by the narrative's own name: an unnamed one sorts first, never among the T's.
+  const sortName = new Map<string, string>();
   let total = 0;
   for (const n of elements) {
     if (n.type !== 'narrative' || n.id === el.id) continue;
@@ -89,9 +91,10 @@ function scan(el: Element, elements: readonly Element[]): UnlinkedMentions {
     if (count === 0) continue;
     // Listed after "Mentioned, unlinked (…):", mid-line, so lower case.
     narratives.push({ id: n.id, name: nameOrUnnamed(n), count });
+    sortName.set(n.id, ownName(n));
     total += count;
   }
-  narratives.sort((a, b) => b.count - a.count || (a.name ?? '').localeCompare(b.name ?? ''));
+  narratives.sort((a, b) => b.count - a.count || (sortName.get(a.id) ?? '').localeCompare(sortName.get(b.id) ?? ''));
   return { total, narratives, terms };
 }
 

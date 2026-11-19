@@ -26,7 +26,7 @@ import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } fr
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS } from '../core/constants';
-import { capitalise, nameOrUnnamed, typeName } from '../core/type-words';
+import { capitalise, nameOrUnnamed, ownName, typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { CALENDAR_WORD, worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
@@ -401,7 +401,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // sitting in the work queue forever reads as nagging, not backlog
       // (datable any time via the element room's Date field).
       if ((el as Record<string, unknown>)['atlas_calendar'] != null) continue;
-      out.push({ id: el.id, type: el.type as ElementType, name: nameOrUnnamed(el, { start: true }), unnamed: !el.name?.trim() || undefined });
+      out.push({ id: el.id, type: el.type as ElementType, name: nameOrUnnamed(el, { start: true }), unnamed: !ownName(el) || undefined });
     }
     return out;
   }

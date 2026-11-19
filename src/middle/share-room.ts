@@ -2047,7 +2047,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-share-row-icon">article</span>
         <span class="atlas-share-row-main">
-          <span class="atlas-share-row-name">${escapeText(nameOrUnnamed(page, { start: true }))}</span>
+          <span class="atlas-share-row-name">${escapeText(nameOrUnnamed(page, { start: true, word: 'page' }))}</span>
           <span class="atlas-share-row-meta">${escapeText(blockSummary(blocks))}</span>
         </span>
         ${pubBadge}

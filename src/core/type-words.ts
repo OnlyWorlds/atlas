@@ -105,6 +105,16 @@ export interface Nameable {
 }
 
 /**
+ * The one test for a usable name: an element's own name, trimmed, or '' when
+ * it has none (missing, not a string, only spaces, or a row flagged unnamed).
+ * The `unnamed` flags and the sort keys read it, so a row is unnamed exactly
+ * when `nameOrUnnamed` says the unnamed form.
+ */
+export function ownName(el: Pick<Nameable, 'name' | 'unnamed'>): string {
+  return el.unnamed === true || typeof el.name !== 'string' ? '' : el.name.trim();
+}
+
+/**
  * An element's own name, trimmed, or the unnamed form when it has none (a
  * missing name or one of spaces). `start` is for a name that stands alone or
  * starts a line (a heading, a row, a chip, a button's whole name, a tab, a menu
@@ -114,7 +124,7 @@ export interface Nameable {
  * the type, as `theUnnamed` takes it.
  */
 export function nameOrUnnamed(el: Nameable, opts: { start?: boolean; word?: string } = {}): string {
-  const own = el.unnamed === true || typeof el.name !== 'string' ? '' : el.name.trim();
+  const own = ownName(el);
   if (own) return own;
   const words = theUnnamed(el.type, { supertype: el.supertype, word: opts.word });
   return opts.start ? capitalise(words) : words;

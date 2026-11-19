@@ -36,7 +36,7 @@
 import type { Element } from './types';
 import { linkIdsOf } from './link-ids';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
-import { nameOrUnnamed } from './type-words';
+import { nameOrUnnamed, ownName } from './type-words';
 
 export type DateConflictKind =
   | 'reversed'
@@ -82,7 +82,7 @@ function raw(el: Element, field: string): unknown {
 function dated(el: Element, field: string): DatedRef | null {
   const date = parseTemporalValue(raw(el, field));
   if (date === null) return null;
-  return { id: el.id, type: el.type, name: nameOrUnnamed(el, { start: true }), unnamed: !el.name?.trim() || undefined, field, date };
+  return { id: el.id, type: el.type, name: nameOrUnnamed(el, { start: true }), unnamed: !ownName(el) || undefined, field, date };
 }
 
 /** A span's start and end, or null when either is missing. */
@@ -174,6 +174,7 @@ export function findDateConflicts(elements: readonly Element[]): DateConflict[] 
 
   return out.sort((x, y) =>
     KIND_ORDER.indexOf(x.kind) - KIND_ORDER.indexOf(y.kind)
-    || (x.a.name ?? '').localeCompare(y.a.name ?? '')
-    || (x.b.name ?? '').localeCompare(y.b.name ?? ''));
+    // By the element's own name: an unnamed one sorts first, as it did, never among the T's.
+    || ownName(x.a).localeCompare(ownName(y.a))
+    || ownName(x.b).localeCompare(ownName(y.b)));
 }

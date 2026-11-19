@@ -25,7 +25,7 @@ import { getState } from '../core/state';
 import { navigate, writingHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
 import { lookupHeldId, readOwHref } from '../core/ow-links';
-import { buildNarrativeIndex, getTierForNarrative, getWritingLabels, iconForTier, type NarrativeNode } from './writing-helpers';
+import { buildNarrativeIndex, getTierForNarrative, getWritingLabels, iconForTier, tierWord, type NarrativeNode } from './writing-helpers';
 import { countMarkdownWords } from './writing-word-count';
 import { nameOrUnnamed } from '../core/type-words';
 
@@ -226,7 +226,8 @@ function buildSectionMarker(
 
   const name = document.createElement('span');
   name.className = 'atlas-writing-compiled-marker-name';
-  name.textContent = nameOrUnnamed(el, { start: true });
+  // A nameless section says its tier, as the tree does: "The unnamed chapter".
+  name.textContent = nameOrUnnamed(el, { start: true, word: tierWord(tier, worldId) });
   title.appendChild(name);
 
   // Tier label badge — "scene" / "chapter" / etc.

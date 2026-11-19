@@ -58,12 +58,12 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.124.27',
     date: '2026-11-19',
-    theme: 'The unnamed, in every room',
+    theme: 'The unnamed, said one way',
     entries: [
       {
-        id: 'unnamed-every-room',
-        title: 'Something with no name is said one way in every room',
-        body: 'Many rooms still showed (unnamed). Now an element with no name, or a name of only spaces, reads as the unnamed character, the unnamed map or the unnamed event everywhere: on its own page, in the sidebar and the lists, in the writing and knowledge rooms, on the maps, the charts, the home page and a shared page, in the world\'s own word for the type; where a room has its own word, it keeps it, so the writing tree reads the unnamed chapter and the calendar menu the unnamed calendar. Where it stands alone, as a heading, a row, a tab or a chip, it starts with a capital, The unnamed event; inside a longer line it stays lower case, Open the unnamed event. The linked chips on a chart\'s card are now named for what a press does, such as Open Ada, and a chip on the home page reads Open the unnamed character where it said Open (unnamed).',
+        id: 'unnamed-one-form',
+        title: 'A missing name is said one way in the rooms that showed (unnamed)',
+        body: 'The rooms that showed (unnamed) now say one form instead: an element with no name, or a name of only spaces, reads as the unnamed character, the unnamed map or the unnamed event. That holds on its own page and its header, in the sidebar, the command palette and the pickers, in the writing and knowledge rooms, on the maps and their tooltips, on the charts, on the home page and on a shared page, in the world\'s own word for the type. Where a room has its own word, it keeps it: the writing room says the unnamed chapter, the calendar menu the unnamed calendar, the pages list the unnamed page. Where the form stands alone, as a heading, a row, a tab or a chip, it starts with a capital, The unnamed event; inside a longer line it stays lower case, Open the unnamed event. The linked chips on a chart\'s card are now named for what a press does, such as Open Ada, and a chip on the home page reads Open the unnamed character where it said Open (unnamed). Not changed yet: the label a new link writes into a story, and a few other words for a missing name, such as Unnamed and (untitled).',
         tags: ['accessibility', 'editor'],
       },
     ],

@@ -9,7 +9,7 @@
  */
 
 import { getState } from '../core/state';
-import { typeName } from '../core/type-words';
+import { ownName, typeName } from '../core/type-words';
 import type { Element } from '../core/types';
 import { newestEditFirst } from '../core/guide';
 import { getRecents } from './writing-workspace-recents';
@@ -96,7 +96,7 @@ function toItem(el: Element): MentionSuggestionItem {
     id: el.id,
     type: el.type,
     name: el.name || '(unnamed)',
-    unnamed: !el.name?.trim() || undefined,
+    unnamed: !ownName(el) || undefined,
     subtitle: buildSubtitle(el),
     aliases,
   };

@@ -6,15 +6,26 @@
  * unnamed event"; inside a longer line it stays lower case, "Open the unnamed
  * event". A name of only spaces counts as none.
  *
- * The census below is a TRIPWIRE over the source: any string literal that
- * still says "(unnamed" fails, unless its file is on the allowlist with the
- * reason it is left. Named limits: a form built from pieces is not seen, and
- * comments are not copy.
+ * The census below is a TRIPWIRE over the raw source, line by line: any
+ * line that holds "(unnamed" and is not a comment line fails, unless its file
+ * is on the allowlist with the reason it is left. It pairs no quotes, so a
+ * form nested in a template (`${n.name || `(unnamed ${t})`}`) is seen too.
+ * Named limits: a form built from pieces ("(un" + "named") is not seen, and a
+ * comment after code on the same line counts (it errs on the side of a look).
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { capitalise, nameOrUnnamed, theUnnamed } from '../../src/core/type-words';
+import { capitalise, nameOrUnnamed, ownName, theUnnamed } from '../../src/core/type-words';
+import { createStickyBar } from '../../src/middle/writing-workspace-sticky-bar';
+import { mountCompiledView } from '../../src/middle/writing-compiled';
+import { mountShareRoom } from '../../src/middle/share-room';
+import { mountKnowledgeRoom } from '../../src/middle/knowledge-room';
+import { shareHash, knowledgeHash } from '../../src/core/router';
+import { buildRecordsSection } from '../../src/middle/element-detail-records';
+import { searchPalette } from '../../src/ui/command-palette';
+import { findUnlinkedMentions } from '../../src/core/unlinked-mentions';
+import { playableCharacters } from '../../src/ui/invite-modal';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry } from '../../src/core/types';
 import type { Element } from '../../src/core/types';
@@ -55,8 +66,6 @@ const LEFT: Record<string, { count: number; why: string }> = {
   },
 };
 
-const LITERAL = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g;
-
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap(name => {
     const p = join(dir, name);
@@ -65,17 +74,16 @@ function walk(dir: string): string[] {
   });
 }
 
-/** Comment text is not copy: drop block comments and line comments first. */
-function stripComments(text: string): string {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+/** A comment line: a line comment, or a block comment's open or inner line. Its words are not copy. */
+function isCommentLine(line: string): boolean {
+  return /^\s*(\/\/|\/\*|\*)/.test(line);
 }
 
-function hitsIn(code: string): number {
-  let n = 0;
-  for (const lit of stripComments(code).match(LITERAL) ?? []) n += lit.split(NEEDLE).length - 1;
-  return n;
+/** The lines that hold the needle and are not comment lines, by number. */
+function hitLines(code: string): number[] {
+  return code.split(/\r?\n/)
+    .map((line, i) => (line.includes(NEEDLE) && !isCommentLine(line) ? i + 1 : 0))
+    .filter(n => n > 0);
 }
 
 function census(): Record<string, number> {
@@ -83,7 +91,7 @@ function census(): Record<string, number> {
   for (const file of walk(SRC)) {
     const rel = relative(ROOT, file).split(sep).join('/');
     if (SKIP.has(rel)) continue;
-    const n = hitsIn(readFileSync(file, 'utf8'));
+    const n = hitLines(readFileSync(file, 'utf8')).length;
     if (n > 0) out[rel] = n;
   }
   return out;
@@ -100,9 +108,16 @@ describe('the census: no "(unnamed" a person can meet', () => {
     expect(Object.keys(LEFT).filter(f => !(f in now))).toEqual([]);
   });
 
-  it('the instrument sees a planted literal and ignores comments', () => {
-    expect(hitsIn("const a = el.name || '(unnamed)'; const b = `x ${y || '(unnamed map)'}`;")).toBe(2);
-    expect(hitsIn("// was '(unnamed)'\n/* \"(unnamed)\" */ const c = 'named';")).toBe(0);
+  it('the instrument sees flat and nested forms and ignores comment lines', () => {
+    expect(hitLines("const a = el.name || '(unnamed)';")).toEqual([1]);
+    expect(hitLines('const t = `New ${c} in "${n.name || `(unnamed ${t})`}"`;')).toEqual([1]);
+    expect(hitLines('const o = `Open ${x ? `(unnamed)` : y}`;\nconst h = `Held by ${n.name || `(unnamed)`}`;')).toEqual([1, 2]);
+    expect(hitLines("// was '(unnamed)'\n/* \"(unnamed)\" */\n * (unnamed: <id>.json)\nconst c = 'named';")).toEqual([]);
+  });
+
+  it('sees both places in the writing tree as it was at 1.124.26, one of them nested in a template', () => {
+    const old = readFileSync(join(__dirname, '..', 'fixtures', 'unnamed-census', 'writing-sidebar-95b9bc5.txt'), 'utf8');
+    expect(hitLines(old)).toEqual([510, 540]);
   });
 });
 
@@ -246,5 +261,122 @@ describe("a room's own word for the type", () => {
       setActiveStore(null);
       window.location.hash = '';
     }
+  });
+});
+
+describe('a room says a nameless thing by its own word', () => {
+  const W = 'w-rooms';
+  const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
+  function openWorld(elements: Element[]): void {
+    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: W, name: 'Rooms', state: 'local-only' }] } as never);
+    patchSlice('active', { worldId: W, meta: { name: 'Rooms' } } as never);
+    patchSlice('data', { elements } as never);
+  }
+  const book = el('narrative', 'b1', { name: 'The Book', supertype: 'Book', order: 0 });
+  const chapter = el('narrative', 'ch1', { name: '  ', supertype: 'Chapter', parent_narrative: 'b1', order: 0, story: 'It rained.' });
+
+  it("the writing room's crumbs say a nameless chapter as the tree does", () => {
+    openWorld([book, chapter]);
+    const bar = createStickyBar({ root: document.body, getViewMode: () => 'edit' as never, onSwitchViewMode: () => {} });
+    const crumbs = [...bar.render(chapter).querySelectorAll('.atlas-writing-workspace-crumb-seg')].map(c => c.textContent);
+    expect(crumbs).toEqual(['The Book', 'The unnamed chapter']);
+  });
+
+  it("the compiled view's section marker says a nameless chapter as the tree does", () => {
+    openWorld([book, chapter]);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const unmount = mountCompiledView(host, book);
+    expect(host.querySelector('.atlas-writing-compiled-marker-name')?.textContent).toBe('The unnamed chapter');
+    unmount();
+  });
+
+  it('a page row says the unnamed page, a knowledge row the unnamed entry', () => {
+    const rooms = [
+      { mount: mountShareRoom, hash: shareHash(W), sub: 'page', row: '.atlas-share-row-name', want: 'The unnamed page' },
+      { mount: mountKnowledgeRoom, hash: knowledgeHash(W), sub: 'knowledge', row: '.atlas-knowledge-row-name', want: 'The unnamed entry' },
+    ];
+    for (const r of rooms) {
+      openWorld([el('narrative', 'n1', { name: '', subtype: r.sub, story: 'Owed.' })]);
+      window.location.hash = r.hash;
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const unmount = r.mount(target, toasts);
+      expect(target.querySelector(r.row)?.textContent).toBe(r.want);
+      unmount();
+      window.location.hash = '';
+    }
+  });
+
+  it("a character's record rows say the unnamed record and the unnamed battle", () => {
+    const tally = { winner: 'Left', sides: [{ name: 'Left', fallen: 3 }, { name: 'Right', fallen: 9 }], units: [] };
+    const els = [
+      el('character', 'c1', { name: 'Ada' }),
+      el('event', 'e1', { name: '', x_record: { tool: 'subs', played_at: '2026-10-20T12:00:00Z' }, characters: ['c1'] }),
+      el('event', 'e2', { name: ' ', x_tangle_battle: tally, characters: ['c1'] }),
+    ];
+    openWorld(els);
+    const sec = buildRecordsSection(els[0])!;
+    expect([...sec.querySelectorAll('.atlas-record-name')].map(n => n.textContent))
+      .toEqual(['The unnamed record', 'The unnamed battle']);
+  });
+});
+
+describe('one test for a usable name', () => {
+  it('ownName is the trimmed own name, or empty for none, a non-string, spaces or a flagged row', () => {
+    expect(ownName({ name: ' Ada ' })).toBe('Ada');
+    for (const name of [undefined, null, '', '   ', 7, {}]) expect(ownName({ name })).toBe('');
+    expect(ownName({ name: 'The unnamed event', unnamed: true })).toBe('');
+  });
+
+  it('the rows that carry a flag read it through ownName, so a non-string name neither throws nor names', () => {
+    const cfg = { version: 1, grain: 'year', eras: [{ name: 'Age', abbrev: 'A', start: 0 }], format: '{year} {era}' };
+    const [cal] = worldCalendars([el('construct', 'k1', { name: 7, atlas_calendar: cfg })]);
+    expect(cal).toMatchObject({ name: 'The unnamed calendar', unnamed: true });
+    const [c] = findDateConflicts([
+      el('character', 'c1', { name: 7, birth_date: 120 }),
+      el('event', 'e1', { name: 'Siege', start_date: 100, end_date: 105, characters: ['c1'] }),
+    ]);
+    expect(c.a).toMatchObject({ name: 'The unnamed character', unnamed: true });
+  });
+});
+
+describe('an unnamed row sorts first, by its own name', () => {
+  it('in the dates to check', () => {
+    const conflicts = findDateConflicts([
+      el('character', 'c2', { name: 'Ada', birth_date: 120 }),
+      el('character', 'c1', { name: '', birth_date: 120 }),
+      el('event', 'e1', { name: 'Siege', start_date: 100, end_date: 105, characters: ['c1', 'c2'] }),
+    ]);
+    expect(conflicts.map(c => c.a.name)).toEqual(['The unnamed character', 'Ada']);
+  });
+
+  it('in the palette, on a tie', () => {
+    const results = searchPalette('harbor', [
+      el('character', 'a1', { name: 'Aaron', description: 'A harbor man.' }),
+      el('character', 'u1', { name: '', description: 'A harbor man.' }),
+    ]);
+    expect(results.map(r => r.name)).toEqual(['The unnamed character', 'Aaron']);
+  });
+
+  it('in the unlinked mentions', () => {
+    const subject = el('character', 's1', { name: 'Brenn' });
+    const m = findUnlinkedMentions(subject, [
+      subject,
+      el('narrative', 'n2', { name: 'Arrival', story: 'Brenn came.' }),
+      el('narrative', 'n1', { name: '', story: 'Brenn left.' }),
+    ]);
+    expect(m.narratives.map(n => n.name)).toEqual(['the unnamed narrative', 'Arrival']);
+  });
+
+  it('in the plays-as list', () => {
+    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: 'w', name: 'W', state: 'api-linked', api: { world_id: 's1', api_key: 'k' } }] } as never);
+    patchSlice('active', { worldId: 'w', meta: { name: 'W' } } as never);
+    const synced = { server_updated_at: '2026-10-19T09:00:00.000Z' };
+    patchSlice('data', { elements: [
+      el('character', 'a1', { name: 'Aaron', ...synced }),
+      el('character', 'u1', { name: ' ', ...synced }),
+    ] } as never);
+    expect(playableCharacters('s1').map(c => c.name)).toEqual(['The unnamed character', 'Aaron']);
   });
 });
