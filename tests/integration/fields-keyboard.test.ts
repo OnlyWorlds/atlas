@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { renderSection } from '../../src/middle/element-detail-fields';
+import { buildCustomFieldsSection } from '../../src/middle/element-detail-custom-fields';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { setActiveStore } from '../../src/core/active-store';
 import { patchSlice } from '../../src/core/state';
@@ -199,6 +200,16 @@ describe('a section\'s fold and a field\'s remove say their own names', () => {
     const rm = s.querySelector<HTMLElement>('.atlas-field-remove')!;
     expect(rm.getAttribute('aria-label')).toBe('Remove the field Mood');
     expect(rm.title).toBe('Remove the field Mood');
+    expect(rm.querySelector('[aria-hidden="true"]')?.textContent).toBe('×');
+  });
+
+  it('a structured field\'s × is named as its title says, its glyph hidden', async () => {
+    const { el } = await world({ x_tally: { won: 3 } });
+    const s = buildCustomFieldsSection(el)!;
+    document.body.appendChild(s);
+    const rm = s.querySelector<HTMLElement>('.atlas-custom-structured-remove')!;
+    expect(rm.title).toBe('Remove Tally from this element');
+    expect(rm.getAttribute('aria-label')).toBe('Remove Tally from this element');
     expect(rm.querySelector('[aria-hidden="true"]')?.textContent).toBe('×');
   });
 });

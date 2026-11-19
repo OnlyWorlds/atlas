@@ -419,12 +419,15 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
 /**
  * A map fold's name and tooltip: what a press does, by its state ("Show the 3
- * maps under Sikelia", "Hide the map under Sikelia").
+ * maps under Sikelia", "Hide the map under Sikelia"). While a search holds the
+ * tree open a press does nothing, and the name says what is true: "The search
+ * shows the 3 maps under Sikelia".
  */
-export function mapFoldName(count: number, mapName: string | undefined, collapsed: boolean): string {
-  const verb = collapsed ? 'Show' : 'Hide';
+export function mapFoldName(count: number, mapName: string | undefined, collapsed: boolean, searching = false): string {
   const what = count === 1 ? 'the map' : `the ${count} maps`;
-  return `${verb} ${what} under ${mapName || '(unnamed map)'}`;
+  const under = `under ${mapName?.trim() || '(unnamed map)'}`;
+  if (searching) return `The search shows ${what} ${under}`;
+  return `${collapsed ? 'Show' : 'Hide'} ${what} ${under}`;
 }
 
 /** The focused tree control's twin in a redrawn tree, by its map and its own mark. */
@@ -510,14 +513,18 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     // named for what a press does to the maps under it, one name for the
     // mouse and the screen reader.
     chevron.setAttribute('aria-expanded', String(!collapsed));
-    const foldName = mapFoldName(node.children.length, m.name, collapsed);
+    const foldName = mapFoldName(node.children.length, m.name, collapsed, ctx.ignoreCollapsed);
     chevron.setAttribute('aria-label', foldName);
     chevron.title = foldName;
+    // A search holds every map open: the fold cannot hide, so it says so and presses nothing.
+    if (ctx.ignoreCollapsed) chevron.setAttribute('aria-disabled', 'true');
     chevron.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${collapsed ? 'chevron_right' : 'expand_more'}</span>`;
     // A drag starts on the row, never on its fold.
     chevron.draggable = false;
     chevron.addEventListener('click', (e) => {
       e.stopPropagation();
+      // During a search a press would flip the stored fold unseen, to show up when the search clears.
+      if (ctx.ignoreCollapsed) return;
       toggleNodeCollapsed(ctx.worldId, m.id);
       ctx.requestRerender();
     });
@@ -618,7 +625,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     del.setAttribute('data-action', 'delete-map');
     // Named for its map, one name for the mouse and the screen reader: every
     // row has one, and Tab meets them in a run.
-    del.title = m.name ? `Delete the map ${m.name}` : 'Delete the unnamed map';
+    del.title = m.name?.trim() ? `Delete the map ${m.name.trim()}` : 'Delete the unnamed map';
     del.setAttribute('aria-label', del.title);
     del.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>';
     del.addEventListener('click', (e) => {

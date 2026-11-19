@@ -165,7 +165,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     parts.push(`
       <div class="atlas-zone-kind ${open ? 'is-open' : ''} ${hidden ? 'is-hidden' : ''}" data-kind-key="${escapeAttr(kind.key)}">
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
-          <button type="button" class="atlas-zone-kind-caret" aria-expanded="${open}" aria-label="${escapeAttr(foldName(kind, matching.length, open))}" title="${escapeAttr(foldName(kind, matching.length, open))}"><span class="material-symbols-outlined" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span></button>
+          <button type="button" class="atlas-zone-kind-caret" aria-expanded="${open}"${q ? ' aria-disabled="true"' : ''} aria-label="${escapeAttr(foldName(kind, matching.length, open, !!q))}" title="${escapeAttr(foldName(kind, matching.length, open, !!q))}"><span class="material-symbols-outlined" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span></button>
           ${hasKind
             ? `<button type="button" class="atlas-zone-kind-swatch" title="Color for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the world)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Color for ${escapeAttr(kindLabel(kind))}">
                  <span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span>
@@ -203,15 +203,21 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
 }
 
 /**
- * A kind's fold says what a press does, by its state, to the zones it holds:
- * "Show the 3 Border zones", "Hide the Border zone", "Show the 2 zones with no kind".
+ * A kind's fold says what a press does to the list of its zones, by its state
+ * (the eye beside it hides the zones on the map): "Show the list of the 3
+ * Border zones", "Hide the list of one Border zone", "Show the list of the 2
+ * zones with no kind". While a search holds every kind open a press does
+ * nothing, and the name says what is true: "The search shows the list of ...".
  */
-export function foldName(kind: { supertype: string; subtype: string; role?: string }, count: number, open: boolean): string {
-  const verb = open ? 'Hide' : 'Show';
+export function foldName(kind: { supertype: string; subtype: string; role?: string }, count: number, open: boolean, searching = false): string {
+  const lead = searching ? 'The search shows' : open ? 'Hide' : 'Show';
+  const how = count === 1 ? 'one' : `the ${count}`;
   const zones = count === 1 ? 'zone' : 'zones';
-  const the = count === 1 ? 'the' : `the ${count}`;
-  if (!kind.supertype && !kind.subtype && !kind.role) return `${verb} ${the} ${zones} with no kind`;
-  return `${verb} ${the} ${kindLabel(kind)} ${zones}`;
+  // A kind-less kind is said in the app's own word, "no kind", after the zones (a role still names them).
+  const what = kind.supertype || kind.subtype
+    ? `${kindLabel(kind)} ${zones}`
+    : `${kind.role ? `${kind.role} ` : ''}${zones} with no kind`;
+  return `${lead} the list of ${how} ${what}`;
 }
 
 /** The focused control's twin in a rebuilt panel, by its zone or kind and its own mark. */
@@ -369,6 +375,8 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
       return;
     }
     if (kindKey && target.closest('[data-action="toggle-kind"]')) {
+      // A search holds every kind open: a press there neither folds nor changes what clearing it brings back.
+      if (ps.search.trim()) return;
       ps.touched = true;
       if (ps.openKinds.has(kindKey)) ps.openKinds.delete(kindKey); else ps.openKinds.add(kindKey);
       rerender();

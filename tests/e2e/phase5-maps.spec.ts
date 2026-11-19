@@ -859,3 +859,28 @@ test('north is up: a pin by the schema\'s bottom-left numbers draws where the st
   expect(placed).not.toBeNull();
   expect(placed as number).toBeGreaterThan(1300);
 });
+
+// 1.124.25: a map's name is a button inside its draggable row; a drag that starts on the name still reorders.
+test('a drag from a map\'s name in the Maps tree reorders its group', async ({ page }) => {
+  const ids = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const out: string[] = [];
+    for (const [i, name] of ['Alpha', 'Beta', 'Gamma'].entries()) out.push((await store.createElement('map', { name, hierarchy: i })).id);
+    api.patchData(await store.listElements());
+    const ui = api.getState().ui;
+    api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+    return out;
+  });
+  const rowOf = (id: string) => page.locator(`.atlas-map-tree-row[data-map-id="${id}"]`);
+  await expect(rowOf(ids[2])).toBeVisible();
+  const src = (await rowOf(ids[2]).locator('.atlas-map-tree-name').boundingBox())!;
+  const dst = (await rowOf(ids[0]).boundingBox())!;
+  await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 - 5, { steps: 3 });
+  await page.mouse.move(dst.x + 40, dst.y + 3, { steps: 10 });
+  await page.mouse.up();
+  const order = () => page.evaluate(() => [...document.querySelectorAll('.atlas-map-tree-row .atlas-map-tree-name')].map(n => n.textContent).join(','));
+  await expect.poll(order, { timeout: 5000 }).toBe('Gamma,Alpha,Beta');
+});

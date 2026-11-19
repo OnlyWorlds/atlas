@@ -3378,6 +3378,12 @@ button.atlas-element-sync-dot {
   transition: color 120ms ease, background-color 120ms ease;
 }
 
+/* A fold a search holds open presses nothing (the 1.124.25 search state). */
+.atlas-map-tree-chevron[aria-disabled="true"],
+.atlas-zone-kind-caret[aria-disabled="true"] {
+  cursor: default;
+}
+
 .atlas-map-tree-chevron:hover {
   color: var(--atlas-text);
   background: rgba(var(--atlas-ink-rgb), 0.06);

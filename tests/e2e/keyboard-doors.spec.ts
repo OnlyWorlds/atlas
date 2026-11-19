@@ -284,11 +284,11 @@ for (const tag of ['', ' @firefox']) {
     const fold = kind.locator('button.atlas-zone-kind-caret');
     // Two kinds start closed; the fold says what a press does to its kind's zones.
     await expect(fold).toHaveAttribute('aria-expanded', 'false');
-    await expect(fold).toHaveAccessibleName('Show the Border zone');
+    await expect(fold).toHaveAccessibleName('Show the list of one Border zone');
     await fold.focus();
     await page.keyboard.press('Enter');
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
-    await expect(fold).toHaveAccessibleName('Hide the Border zone');
+    await expect(fold).toHaveAccessibleName('Hide the list of one Border zone');
     await expect(fold).toBeFocused();
 
     // The zone's name: Enter selects it and opens its page; focus stays on it.
@@ -677,6 +677,42 @@ for (const tag of ['', ' @firefox']) {
     const del = row.locator('[data-action="delete-map"]');
     await expect(del).toHaveAccessibleName('Delete the map Sikelia');
     await expect(del).toHaveAttribute('title', 'Delete the map Sikelia');
+
+    // A map whose name is only spaces (a foreign file) takes the unnamed form on its fold and its delete.
+    const blank = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const p = await store.createElement('map', { name: '   ' });
+      await store.createElement('map', { name: 'Hollow', parent_map: p.id });
+      api.patchData(await store.listElements());
+      return p.id as string;
+    });
+    const blankRow = page.locator(`.atlas-map-tree-row[data-map-id="${blank}"]`);
+    await expect(blankRow.locator('.atlas-map-tree-chevron')).toHaveAccessibleName('Hide the map under (unnamed map)');
+    await expect(blankRow.locator('[data-action="delete-map"]')).toHaveAccessibleName('Delete the unnamed map');
+
+    // A search holds the tree open: the fold says so, is disabled, and a press neither folds nor writes the stored fold.
+    const stored = () => page.evaluate(() => localStorage.getItem('atlas_map_tree_collapsed_v1'));
+    const before = await stored();
+    await page.locator('input[data-role="map-search"]').fill('a');
+    await expect(fold).toHaveAccessibleName('The search shows the 2 maps under Sikelia');
+    await expect(fold).toHaveAttribute('title', 'The search shows the 2 maps under Sikelia');
+    await expect(fold).toHaveAttribute('aria-disabled', 'true');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    // One press at a time (two would flip a stored fold and back): a key, then a mouse press.
+    await fold.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.atlas-map-tree-row', { hasText: 'Akragas' })).toBeVisible();
+    await page.waitForTimeout(200);
+    expect(await stored()).toBe(before);
+    await fold.click({ force: true }); // aria-disabled stops Playwright's plain click, never a person's
+    await page.waitForTimeout(200);
+    expect(await stored()).toBe(before);
+    await page.locator('input[data-role="map-search"]').fill('');
+    // Out of the search, the fold is as it was left: closed.
+    await expect(fold).toHaveAccessibleName('Show the 3 maps under Sikelia');
+    expect(await fold.getAttribute('aria-disabled')).toBeNull();
+
     // A mouse click on the name opens the map, as a click on the row always did.
     await row.locator('.atlas-map-tree-name').click();
     await expect(page.locator('.atlas-tab.active', { hasText: 'Sikelia' })).toBeVisible();
@@ -688,7 +724,7 @@ for (const tag of ['', ' @firefox']) {
     await page.evaluate(async (map) => {
       const api = (window as any).__atlasTestApi;
       const store = api.getActiveStore();
-      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the south march', 'Border', 500], ['', 'Sea', 900]] as const) {
+      for (const [name, supertype, x] of [['the north march', 'Border', 100], ['the south march', 'Border', 500], ['', 'Sea', 900], ['the open ground', '', 1300]] as const) {
         const zone = await store.createZone({ name, supertype });
         let order = 1;
         for (const [px, py] of [[x, 100], [x + 300, 100], [x + 300, 400], [x, 400]]) await store.createMarker({ map_id: map, zone_id: zone.id, x: px, y: py, order: order++ });
@@ -699,11 +735,35 @@ for (const tag of ['', ' @firefox']) {
     const panel = page.locator('[data-role="zones-dropdown-panel"]');
     const border = panel.locator('.atlas-zone-kind', { hasText: 'Border' });
     const fold = border.locator('button.atlas-zone-kind-caret');
-    await expect(fold).toHaveAccessibleName('Show the 2 Border zones');
-    await expect(fold).toHaveAttribute('title', 'Show the 2 Border zones');
+    // The fold names the list; the eye beside it is the one that hides zones on the map.
+    await expect(fold).toHaveAccessibleName('Show the list of the 2 Border zones');
+    await expect(fold).toHaveAttribute('title', 'Show the list of the 2 Border zones');
+    // A kind-less zone's fold, in the app's own word.
+    await expect(panel.locator('.atlas-zone-kind', { hasText: '(no kind)' }).locator('button.atlas-zone-kind-caret')).toHaveAccessibleName('Show the list of one zone with no kind');
+
+    // A search holds the kind open: the fold says so, is disabled, and a press does not change what clearing brings back.
+    const search = panel.locator('input[data-role="zone-search"]');
+    await search.fill('march');
+    await expect(fold).toHaveAccessibleName('The search shows the list of the 2 Border zones');
+    await expect(fold).toHaveAttribute('aria-disabled', 'true');
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    // One press at a time (two would flip the kind and back), each checked by clearing the search.
+    await fold.focus();
+    await page.keyboard.press('Enter');
+    await expect(border.locator('.atlas-zone-chip', { hasText: 'the north march' })).toBeVisible();
+    await search.fill('');
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(fold).toHaveAccessibleName('Show the list of the 2 Border zones');
+    expect(await fold.getAttribute('aria-disabled')).toBeNull();
+    await search.fill('march');
+    await expect(fold).toHaveAttribute('aria-disabled', 'true');
+    await fold.click({ force: true }); // aria-disabled stops Playwright's plain click, never a person's
+    await search.fill('');
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+
     await fold.click();
-    await expect(fold).toHaveAccessibleName('Hide the 2 Border zones');
-    await expect(fold).toHaveAttribute('title', 'Hide the 2 Border zones');
+    await expect(fold).toHaveAccessibleName('Hide the list of the 2 Border zones');
+    await expect(fold).toHaveAttribute('title', 'Hide the list of the 2 Border zones');
     const north = border.locator('.atlas-zone-chip', { hasText: 'the north march' });
     await expect(north.locator('[data-action="delete"]')).toHaveAccessibleName('Delete the zone the north march');
     await expect(north.locator('[data-action="delete"]')).toHaveAttribute('title', 'Delete the zone the north march');

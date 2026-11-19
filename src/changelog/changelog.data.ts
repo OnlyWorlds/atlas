@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'controls-say-their-names',
         title: 'Folds, rows and buttons say what they do',
-        body: 'In the Maps tab, a map\'s name is its own button with its fold beside it, so Tab reaches each once and the map is named once. The folds there and in a map\'s zones list say what a press does, such as Show the 3 maps under Sikelia or Hide the 2 Border zones, in their tooltips too. A zone\'s delete, a map\'s delete, a field\'s remove and a card\'s Open in the charts\' scroll view name what they act on, such as Delete the zone the north march. After hiding element images, the note says how to bring them back in the same words as the button: Show element images.',
+        body: 'In the Maps tab, a map\'s name is its own button with its fold beside it, so Tab reaches each once and the map is named once. The folds there and in a map\'s zones list say what a press does, such as Show the 3 maps under Sikelia or Hide the list of the 2 Border zones, in their tooltips too; while a search holds them open, they say so and a press changes nothing. A zone\'s delete, a map\'s delete, a field\'s remove and a card\'s Open in the charts\' scroll view name what they act on, such as Delete the zone the north march. After hiding element images, the note says how to bring them back in the same words as the button: Show element images.',
         tags: ['accessibility', 'maps', 'editor'],
       },
     ],
