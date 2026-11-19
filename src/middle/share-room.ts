@@ -58,7 +58,13 @@ import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
 import { isPartialSlice } from '../core/provenance';
-import { nameOrUnnamed } from '../core/type-words';
+import { nameOrUnnamed, ownName } from '../core/type-words';
+
+/** A page as a confirm names it: its own name in quotes, or the unnamed page ("The unnamed page" at a line's start). */
+function pageInLine(page: Element | undefined, start = false): string {
+  const own = page ? ownName(page) : '';
+  return own ? `"${own}"` : nameOrUnnamed({ type: 'narrative' }, { start, word: 'page' });
+}
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -226,8 +232,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const client = sharingClientForActiveWorld();
       const url = publicUrlFor(pub.slug);
       const msg = client
-        ? `"${el?.name || 'This page'}" is published at ${url}. Deleting it also takes the published page down. Continue?`
-        : `"${el?.name || 'This page'}" is published at ${url}, but Atlas has no key or PIN for this world, so the published page would stay up with no way to revoke it from here. Delete anyway?`;
+        ? `${pageInLine(el, true)} is published at ${url}. Deleting it also takes the published page down. Continue?`
+        : `${pageInLine(el, true)} is published at ${url}, but Atlas has no key or PIN for this world, so the published page would stay up with no way to revoke it from here. Delete anyway?`;
       if (!window.confirm(msg)) return;
       publishConfirmed = true;
       if (client) {
@@ -251,7 +257,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const extra = dependentCount > 0
         ? ` This also deletes ${dependentCount} element${dependentCount === 1 ? '' : 's'} filed under it.`
         : '';
-      if (!window.confirm(`Delete "${el?.name || 'this page'}"?${extra} This cannot be undone.`)) return;
+      if (!window.confirm(`Delete ${pageInLine(el)}?${extra} This cannot be undone.`)) return;
     }
     teardownEditSession();
     navigate(shareHash(worldId));
@@ -1488,7 +1494,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     try {
       const res = await client.publish({
         slug,
-        title: page.name || '(untitled)',
+        title: nameOrUnnamed(page, { start: true, word: 'page' }),
         intent: pageIntentOf(page),
         payload: buildPagePayload(page, getState().data.elements, pageCharts),
       });
@@ -1526,7 +1532,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       // Mutations are slug-addressed (as-built) — pub.id stays in the mirror
       // for display/debugging but the slug is the wire address.
       const row = await client.republish(pub.slug, {
-        title: page.name || '(untitled)',
+        title: nameOrUnnamed(page, { start: true, word: 'page' }),
         intent: pageIntentOf(page),
         payload: buildPagePayload(page, getState().data.elements, pageCharts),
       });
@@ -1566,7 +1572,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     const pub = page ? pagePubOf(page) : null;
     if (!page || !pub) return;
-    if (!window.confirm(`Revoke "${page.name || 'this page'}"? Its address will show "no longer shared". You keep the address and can republish later.`)) return;
+    if (!window.confirm(`Revoke ${pageInLine(page)}? Its address will show "no longer shared". You keep the address and can republish later.`)) return;
     try {
       await client.revoke(pub.slug);
       await patchPage(pageId, {
@@ -2090,7 +2096,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (autoEdit) renameOnOpen = null;
     pageTitleHandle = makeEditableTitle({
       initial: page.name || '',
-      placeholder: 'Page name…',
+      // Headed by its unnamed form, never the prompt; the prompt is for the typing.
+      placeholder: nameOrUnnamed({ type: 'narrative' }, { start: true, word: 'page' }),
+      prompt: 'Page name…',
       ariaLabel: 'Page name',
       autoEdit: autoEdit && !viewOnly,
       readOnly: viewOnly,

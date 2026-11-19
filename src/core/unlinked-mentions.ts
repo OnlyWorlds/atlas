@@ -89,8 +89,8 @@ function scan(el: Element, elements: readonly Element[]): UnlinkedMentions {
     if (!story) continue;
     const count = findTermSpansMarkdown(story, terms, MENTION_MATCH).length;
     if (count === 0) continue;
-    // Listed after "Mentioned, unlinked (…):", mid-line, so lower case.
-    narratives.push({ id: n.id, name: nameOrUnnamed(n), count });
+    // Each is a link of its own after "Mentioned, unlinked (…):", and a reader may say it alone: the capital.
+    narratives.push({ id: n.id, name: nameOrUnnamed(n, { start: true }), count });
     sortName.set(n.id, ownName(n));
     total += count;
   }

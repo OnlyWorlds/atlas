@@ -16,7 +16,7 @@ import type { Element } from '../core/types';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { ELEMENT_ICONS } from '../core/constants';
-import { nameOrUnnamed, typeName } from '../core/type-words';
+import { nameOrUnnamed, openWords, typeName } from '../core/type-words';
 import { looseIds } from '../core/world-links';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { findDateConflicts, type DateConflict, type DatedRef } from '../core/date-continuity';
@@ -198,7 +198,7 @@ function renderConflicts(expand: HTMLElement, conflicts: DateConflict[], worldId
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-home-thread-chip';
-      btn.title = `Open ${nameOrUnnamed(part)}`;
+      btn.title = openWords(part);
       const icon = document.createElement('span');
       icon.className = 'material-symbols-outlined atlas-home-thread-chip-icon';
       icon.setAttribute('aria-hidden', 'true');
@@ -230,7 +230,7 @@ function renderExpand(expand: HTMLElement, thread: LooseThread, worldId: string)
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'atlas-home-thread-chip';
-    chip.title = `Open ${nameOrUnnamed(el)}`;
+    chip.title = openWords(el);
     const icon = document.createElement('span');
     icon.className = 'material-symbols-outlined atlas-home-thread-chip-icon';
     icon.textContent = thread.icon;

@@ -40,7 +40,7 @@ import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writin
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
-import { capitalise, nameOrUnnamed, ownName, theUnnamed, typeName } from '../core/type-words';
+import { capitalise, nameOrUnnamed, openWords, ownName, theUnnamed, typeName } from '../core/type-words';
 import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { Element } from '../core/types';
@@ -187,6 +187,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   let heldByMount: HTMLElement | null = null;
   let aboutMount: HTMLElement | null = null;
   let entryTitleHandle: EditableTitleHandle | null = null;  // editor header title (sync on tick)
+  let draftNote: HTMLElement | null = null;  // the draft's "Type a name first", beside Create
   let entryAgentMark: ReturnType<typeof mountAgentMarkSlot> | null = null;  // the quiet agent mark (sync on tick)
   let knowerTitleHandle: EditableTitleHandle | null = null;  // knower header title (sync on tick)
   // Whether the mounted view actually found its target. False = not-found
@@ -305,7 +306,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const extra = dependentCount > 0
         ? ` This also deletes ${dependentCount} element${dependentCount === 1 ? '' : 's'} filed under it.`
         : '';
-      if (!window.confirm(`Delete "${el?.name || 'this knowledge entry'}"?${extra} This cannot be undone.`)) return;
+      const own = el ? ownName(el) : '';
+      if (!window.confirm(`Delete ${own ? `"${own}"` : theUnnamed('narrative', { word: 'entry' })}?${extra} This cannot be undone.`)) return;
     }
     cancelPendingSave();
     // The teardown capture (A4) must not write the text back to the entry being
@@ -428,8 +430,17 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const worldId = wid();
     const folder = getActiveStore();
     if (!worldId || !folder || !draft || viewOnly) return;
+    // A name first, as every create where a name is typed asks for one (the create dialog, the home's +,
+    // the strand's cards): nothing invented is written into the world in its place, and the draft stays.
+    const name = (draft.name || '').trim();
+    if (!name) {
+      if (draftNote) draftNote.textContent = 'Type a name first';
+      entryTitleHandle?.edit();
+      return;
+    }
+    if (draftNote) draftNote.textContent = '';
     const data: Record<string, unknown> = {
-      name: (draft.name || '').trim() || 'Unnamed knowledge',
+      name,
       subtype: KNOWLEDGE_SUBTYPE,
       story: draft.story,
       narrator: draft.narrator,
@@ -643,13 +654,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
    */
   function openPromoteToCircle(firstId: string, secondId: string, ctx: EditorCtx): void {
     // "Ada & the unnamed character": the first starts the name, the second is said in lower case.
-    const nameOf = (id: string, start: boolean): string => {
-      const el = getState().data.elements.find(e => e.id === id);
-      return el ? nameOrUnnamed(el, { start }) : '';
-    };
+    // A knower no longer here is left out of the name, never said as a blank ("Ada & ").
+    const present = [firstId, secondId]
+      .map(id => getState().data.elements.find(e => e.id === id))
+      .filter((el): el is Element => !!el);
     new ElementCreateModal(toasts, {
       initialType: 'collective',
-      initialName: `${nameOf(firstId, true)} & ${nameOf(secondId, false)}`,
+      initialName: present.map((el, i) => nameOrUnnamed(el, { start: i === 0 })).join(' & '),
       suppressNavigate: true,
       title: 'Two knowers make a circle',
       extraData: { subtype: CIRCLE_SUBTYPE, characters: [firstId, secondId] },
@@ -802,7 +813,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'atlas-knowledge-row';
-      row.title = `Open ${entry.name || 'this entry'}`;
+      row.title = openWords(entry, { word: 'entry' });
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
         <span class="atlas-knowledge-row-main">
@@ -868,7 +879,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'atlas-knowledge-row';
-      row.title = `Open the known world of ${k.name || 'this knower'}`;
+      row.title = `Open the known world of ${nameOrUnnamed(k, { word: isCircle ? 'circle' : undefined })}`;
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">${isCircle ? 'groups' : (ELEMENT_ICONS[k.type] ?? 'person')}</span>
         <span class="atlas-knowledge-row-main">
@@ -987,7 +998,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const resolveName = (id: string) => elOf(id)?.name || null;
         try {
           const created = await folder.createElement('narrative', {
-            name: `What ${knower.name || 'they'} know${knower.type === 'character' ? 's' : ''}`,
+            // A nameless knower is said in its unnamed form, one of them: "What the unnamed circle knows".
+            name: `What ${nameOrUnnamed(knower, { word: knower.type === 'collective' ? 'circle' : undefined })} know${knower.type === 'character' || !ownName(knower) ? 's' : ''}`,
             subtype: PAGE_SUBTYPE,
             atlas_page_intent: 'reference',
             ...pageBlocksPatch(blocks, resolveName),
@@ -1036,7 +1048,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const row = document.createElement('button');
         row.type = 'button';
         row.className = 'atlas-knowledge-row';
-        row.title = `Open ${entry.name || 'this entry'}`;
+        row.title = openWords(entry, { word: 'entry' });
         row.innerHTML = `
           <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
           <span class="atlas-knowledge-row-main">
@@ -1055,7 +1067,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const knownSection = document.createElement('section');
     knownSection.className = 'atlas-knowledge-section';
     knownSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Known world</h2>
-      <p class="atlas-knowledge-section-hint">The world as ${escapeText(knower.name || 'they')} knows it: compiled from held entries, not the canonical records.</p>`;
+      <p class="atlas-knowledge-section-hint">The world as ${escapeText(nameOrUnnamed(knower, { word: knower.type === 'collective' ? 'circle' : undefined }))} knows it: compiled from held entries, not the canonical records.</p>`;
     if (knownIds.length === 0) {
       const none = document.createElement('p');
       none.className = 'atlas-knowledge-none';
@@ -1076,7 +1088,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const head = document.createElement('button');
         head.type = 'button';
         head.className = 'atlas-knowledge-known-head';
-        head.title = `Open ${nameOrUnnamed(el)}`;
+        head.title = openWords(el);
         head.innerHTML = `
           <span class="material-symbols-outlined">${ELEMENT_ICONS[el.type] ?? 'category'}</span>
           <span class="atlas-knowledge-known-name">${escapeText(nameOrUnnamed(el, { start: true }))}</span>
@@ -1106,7 +1118,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           src.type = 'button';
           src.className = 'atlas-knowledge-known-src';
           src.textContent = `From ${nameOrUnnamed(entry, { word: 'entry' })}`;
-          src.title = 'Open this entry';
+          src.title = openWords(entry, { word: 'entry' });
           src.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
           quote.appendChild(src);
           card.appendChild(quote);
@@ -1204,13 +1216,17 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     kicon.title = 'Knowledge entry';
     header.appendChild(kicon);
 
+    draftNote = null;
     entryTitleHandle = makeEditableTitle({
       initial: isDraft ? draft!.name : (entry!.name || ''),
-      placeholder: 'What is known…',
+      // A saved entry with no name is headed by its unnamed form; the prompt is for the typing. A draft
+      // is not an entry yet: its heading is the prompt, and Create asks for a name.
+      placeholder: isDraft ? 'What is known…' : capitalise(theUnnamed('narrative', { word: 'entry' })),
+      prompt: 'What is known…',
       ariaLabel: 'Knowledge entry name',
       readOnly: viewOnly,
       onCommit: (next) => {
-        if (isDraft) { draft!.name = next; persistDraft(); }
+        if (isDraft) { draft!.name = next; persistDraft(); if (next && draftNote) draftNote.textContent = ''; }
         else {
           // Compare against CURRENT state, not the build-time snapshot.
           const current = elOf(entryId!)?.name || '';
@@ -1304,6 +1320,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       create.className = 'atlas-btn-primary';
       create.textContent = 'Create';
       create.addEventListener('click', () => { void createFromDraft(); });
+      const note = document.createElement('span');
+      note.className = 'atlas-knowledge-draft-note';
+      note.setAttribute('role', 'status');
+      note.setAttribute('data-role', 'draft-note');
+      draftNote = note;
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'atlas-btn-ghost';
@@ -1315,6 +1336,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       });
       actions.appendChild(create);
       actions.appendChild(cancel);
+      actions.appendChild(note);
       body.appendChild(actions);
     }
 

@@ -19,12 +19,20 @@ export interface EditableTitleHandle {
   el: HTMLElement;
   /** Update the displayed name from a data tick (ignored while editing). */
   sync(name: string): void;
+  /** Open the title for typing, as a click does (nothing on a read-only title). */
+  edit(): void;
 }
 
 export function makeEditableTitle(opts: {
   initial: string;
   /** What an empty title shows; every title has one, so none is ever blank. */
   placeholder: string;
+  /**
+   * What the input asks for while it is empty, when that differs from what
+   * the heading says: a saved page with no name is headed "The unnamed page"
+   * and its input asks "Page name…". Without it the input shows `placeholder`.
+   */
+  prompt?: string;
   ariaLabel?: string;
   /** Start directly in edit mode (e.g. a brand-new draft). */
   autoEdit?: boolean;
@@ -46,7 +54,8 @@ export function makeEditableTitle(opts: {
     host.innerHTML = '';
     // A title of only spaces is no title: it shows the placeholder, never a blank heading.
     if (current.trim()) {
-      host.textContent = current;
+      // Shown trimmed, as every heading shows a name; the value itself is left as it is.
+      host.textContent = current.trim();
       host.classList.remove('is-placeholder');
     } else {
       host.textContent = opts.placeholder;
@@ -63,7 +72,7 @@ export function makeEditableTitle(opts: {
     input.className = 'atlas-element-name-input';
     input.value = original;
     if (opts.ariaLabel) input.setAttribute('aria-label', opts.ariaLabel);
-    if (opts.placeholder) input.placeholder = opts.placeholder;
+    input.placeholder = opts.prompt ?? opts.placeholder;
 
     host.classList.remove('is-placeholder');
     host.innerHTML = '';
@@ -114,5 +123,6 @@ export function makeEditableTitle(opts: {
       current = name;
       renderDisplay();
     },
+    edit: startEdit,
   };
 }

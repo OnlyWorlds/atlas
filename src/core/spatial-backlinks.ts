@@ -13,10 +13,11 @@
  */
 
 import type { Element, Marker, Pin } from './types';
+import { nameOrUnnamed } from './type-words';
 
 export interface PinBacklink {
   pin: Pin;
-  /** What the row says: the pin's other end, never "(unnamed)". */
+  /** What the row says: the pin's other end, or its unnamed form at the start ("The unnamed character"). */
   label: string;
   /** Where a click goes (the other end), or null when it resolves to nothing. */
   navId: string | null;
@@ -25,7 +26,7 @@ export interface PinBacklink {
 export interface MarkerFold {
   /** The zone these markers draw, or null for markers with no zone here. */
   zoneId: string | null;
-  /** The zone's name ("unnamed zone" when it has none), or null with no zone or when the zone is the subject. */
+  /** The zone's name ("The unnamed zone" when it has none), or null with no zone or when the zone is the subject. */
   zoneName: string | null;
   count: number;
   /** Where a click goes (the zone), or null when the zone is the subject or missing. */
@@ -50,12 +51,12 @@ export function pinBacklink(pin: Pin, subjectId: string, byId: ReadonlyMap<strin
   const targetName = nameOf(target) || nameOf(pin);
   const mapName = nameOf(map);
   if (pin.map_id === subjectId) {
-    return { pin, label: targetName || 'unnamed pin', navId: target?.id ?? null };
+    return { pin, label: targetName || nameOrUnnamed(target ?? pin, { start: true }), navId: target?.id ?? null };
   }
   if (pin.element_id === subjectId) {
-    return { pin, label: mapName ? `on ${mapName}` : (nameOf(pin) || 'unnamed pin'), navId: map?.id ?? null };
+    return { pin, label: mapName ? `on ${mapName}` : nameOf(pin) || (map ? `on ${nameOrUnnamed(map)}` : nameOrUnnamed(pin, { start: true })), navId: map?.id ?? null };
   }
-  const label = targetName && mapName ? `${targetName}, on ${mapName}` : targetName || mapName || 'unnamed pin';
+  const label = targetName && mapName ? `${targetName}, on ${mapName}` : targetName || mapName || nameOrUnnamed(target ?? pin, { start: true });
   return { pin, label, navId: target?.id ?? map?.id ?? null };
 }
 
@@ -86,7 +87,7 @@ export function foldBacklinks(
         const isSubject = zoneId === subjectId;
         fold = {
           zoneId,
-          zoneName: zoneId === null || isSubject ? null : (nameOf(zone) || 'unnamed zone'),
+          zoneName: zoneId === null || isSubject ? null : nameOrUnnamed(zone ?? { type: 'zone' }, { start: true }),
           count: 0,
           navId: zone && !isSubject ? zone.id : null,
         };

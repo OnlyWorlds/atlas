@@ -33,6 +33,7 @@ import { isZoneGestureActive } from '../core/zone-gesture';
 import { mergeLocalIntoApi, MergeRefusedError, type MergePolicy, type MergeProgress, type MergeResult } from './make-online';
 import { withIdMoveLock, rekeyPersistedState, rekeyLiveUi } from './rekey-run';
 import type { OwApiClient } from './sync-engine';
+import { nameOrUnnamed } from '../core/type-words';
 
 export { MergeRefusedError };
 
@@ -133,7 +134,7 @@ export function runRoute2(opts: Route2RunOpts): Promise<MergeResult> {
  */
 export function ambiguousLine(ambiguous: MergeResult['ambiguous']): string | null {
   if (ambiguous.length === 0) return null;
-  const names = ambiguous.slice(0, 3).map(a => a.name || 'unnamed');
+  const names = ambiguous.slice(0, 3).map(a => nameOrUnnamed(a));
   const rest = ambiguous.length - names.length;
   const list = names.join(', ') + (rest > 0 ? ` and ${rest} more` : '');
   return `${ambiguous.length === 1 ? 'One name was' : `${ambiguous.length} names were`} not matched because more than one element has it (${list}): each stays its own element`;
@@ -145,7 +146,8 @@ export function ambiguousLine(ambiguous: MergeResult['ambiguous']): string | nul
  */
 export function hiddenOnlineLine(held: MergeResult['hiddenOnline']): string | null {
   if (held.length === 0) return null;
-  const names = held.slice(0, 3).map(h => h.name || 'unnamed');
+  // One alone starts the sentence, so it takes the capital ("The unnamed map is hidden here").
+  const names = held.slice(0, 3).map(h => nameOrUnnamed(h, { start: held.length === 1 }));
   const rest = held.length - names.length;
   const list = names.join(', ') + (rest > 0 ? ` and ${rest} more` : '');
   return held.length === 1
@@ -160,7 +162,7 @@ export function hiddenOnlineLine(held: MergeResult['hiddenOnline']): string | nu
  */
 export function childClashLine(clashes: MergeResult['childClashes']): string | null {
   if (clashes.length === 0) return null;
-  const names = clashes.slice(0, 3).map(c => c.name || 'unnamed');
+  const names = clashes.slice(0, 3).map(c => nameOrUnnamed(c));
   const rest = clashes.length - names.length;
   const list = names.join(', ') + (rest > 0 ? ` and ${rest} more` : '');
   const one = clashes.length === 1;

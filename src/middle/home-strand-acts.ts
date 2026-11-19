@@ -16,9 +16,9 @@ import { handsOnAsProposed } from '../core/review-mark';
 import { isHiddenMark } from '../core/hidden-mark';
 import { markEscapeOwned } from '../core/escape-mark';
 import { memberIds, offerable, rawSingle, storedMark, SLOT_TYPE, type StrandSlot } from '../core/strand';
-import { SLOT_PHRASE, SLOT_WORD, type CardValues } from '../core/strand-journey';
+import { SLOT_PHRASE, SLOT_WORD, slotName, strandWord, type CardValues } from '../core/strand-journey';
 import { canonicalExtValue } from '../sync/world-meta-sync';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed, ownName, typeName, type Nameable } from '../core/type-words';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { makeStrandSlot, writeStrandSlot, STRAND_MOVED, type StrandDrawn, type StrandWriteResult } from '../ui/strand-write';
 import { clearDraft, draftOf, flightKey, memory, type Opened, type StrandContext } from './home-strand-model';
@@ -36,8 +36,9 @@ export interface StrandPanelOptions {
   showPicture?: () => void;
 }
 
-export const nameOf = (el: { name?: unknown } | undefined | null, fallback = 'Unnamed'): string =>
-  (el && typeof el.name === 'string' && el.name.trim() ? el.name.trim() : fallback);
+/** An element's name, or its unnamed form in the strand's word ("the unnamed story"; `start` where it begins a line). */
+export const nameOf = (el: Nameable, opts: { start?: boolean } = {}): string =>
+  nameOrUnnamed(el, { start: opts.start, word: strandWord(el.type) });
 
 /** What a slot was drawn with: the mark's ids as stored, and for Character and Now the raw field. */
 export function drawnFor(slot: StrandSlot, c: StrandContext): StrandDrawn {
@@ -79,14 +80,16 @@ export function rawHeld(slot: StrandSlot, c: StrandContext): { label: string; ph
   const el = typeof raw === 'string' ? c.byId.get(raw) : undefined;
   if (!el) return { label: 'An id that names nothing here', phrase: 'an id that names nothing here' };
   const name = nameOf(el);
+  // A mark before a name: "the proposed Mira", and for a nameless one "the proposed unnamed character".
+  const marked = (mark: string): string => (ownName(el) ? `the ${mark} ${name}` : name.replace(/^the /, `the ${mark} `));
   if (el.type !== SLOT_TYPE[slot]) {
     const kind = aKind(el.type);
     return { label: `${kind.charAt(0).toUpperCase()}${kind.slice(1)}: ${name}`, phrase: `${kind}, ${name}` };
   }
-  if (handsOnAsProposed(el)) return { label: `Proposed: ${name}`, phrase: `the proposed ${name}` };
+  if (handsOnAsProposed(el)) return { label: `Proposed: ${name}`, phrase: marked('proposed') };
   // Unreached at the owner rung (a hidden element is in view, so the slot fills); kept for a lower reading.
-  if (isHiddenMark(el)) return { label: `Hidden: ${name}`, phrase: `the hidden ${name}` };
-  return { label: name, phrase: name };
+  if (isHiddenMark(el)) return { label: `Hidden: ${name}`, phrase: marked('hidden') };
+  return { label: nameOf(el, { start: true }), phrase: name };
 }
 
 /** The words for what a field holds (`rawHeld`'s label). */
@@ -100,7 +103,7 @@ export function pickRows(slot: StrandSlot, c: StrandContext): { own: Element[]; 
   // What the slot holds now is no pick for its Use another (C14).
   const holds = c.strand[slot]?.id;
   const all = c.all.filter(e => offerable(e, type) && e.id !== holds && !c.kept(e.id))
-    .sort((a, b) => nameOf(a, '').localeCompare(nameOf(b, ''), undefined, { sensitivity: 'base' }));
+    .sort((a, b) => ownName(a).localeCompare(ownName(b), undefined, { sensitivity: 'base' }));
   const parent = slot === 'event' ? c.strand.narrative?.id : slot === 'location' ? c.strand.event?.id : slot === 'character' ? c.strand.narrative?.id : undefined;
   const field = slot === 'event' ? 'events' : slot === 'location' ? 'locations' : slot === 'character' ? 'characters' : null;
   const list = parent && field ? (c.byId.get(parent) as Record<string, unknown> | undefined)?.[field] : undefined;
@@ -117,12 +120,12 @@ export function needsPromise(slot: StrandSlot, c: StrandContext): boolean {
 /** What the slot holds now, as the middle of a promise names it (C5: lower case there). */
 function holdsWords(slot: StrandSlot, c: StrandContext): string {
   const f = c.strand[slot];
-  return f ? (f.name.trim() || 'Unnamed') : rawHeld(slot, c)?.phrase ?? 'nothing';
+  return f ? slotName(slot, c.strand) : rawHeld(slot, c)?.phrase ?? 'nothing';
 }
 
 /** The promise's line: "Odile will be the main character in place of the proposed Mira." */
 export function promiseLine(slot: StrandSlot, c: StrandContext, o: Pick<Opened, 'name' | 'pick'>): string {
-  const next = o.name ?? nameOf(o.pick ? c.byId.get(o.pick) : undefined);
+  const next = o.name ?? nameOf((o.pick ? c.byId.get(o.pick) : undefined) ?? { type: SLOT_TYPE[slot] }, { start: true });
   return `${next} will be ${SLOT_PHRASE[slot]} in place of ${holdsWords(slot, c)}.`;
 }
 
@@ -193,7 +196,7 @@ export async function run(slot: StrandSlot, c: StrandContext, drawn: StrandDrawn
     memory.inFlight.delete(key);
     memory.pickAtPress.delete(key);
   }
-  const kept = made && result !== 'wrote' ? ` ${nameOf(made)} was made and stays in the world.` : '';
+  const kept = made && result !== 'wrote' ? ` ${nameOf(made, { start: true })} was made and stays in the world.` : '';
   if (result === 'refused') memory.said = { worldId: c.worldId, text: `${STRAND_MOVED}${kept}` };
   else if (kept) memory.said = { worldId: c.worldId, text: kept.trim() };
   // Made and kept after a refusal: the card's name is spent, so a second Make never makes a twin (C14).
@@ -228,7 +231,7 @@ export function actsRow(slot: StrandSlot, c: StrandContext, opts: StrandPanelOpt
   // Where they are now: the place it happened, offered once that slot is filled.
   if (slot === 'now' && c.strand.location && c.strand.location.id !== c.strand.now?.id) {
     const where = c.strand.location.id;
-    row.appendChild(act(`Still at ${c.strand.location.name.trim() || 'Unnamed'}`, `${slot}:same`, () => chosen({ pick: where })));
+    row.appendChild(act(`Still at ${slotName('location', c.strand)}`, `${slot}:same`, () => chosen({ pick: where })));
   }
   row.appendChild(act('Cancel', `${slot}:cancel`, () => {
     memory.opened = null;
@@ -374,7 +377,7 @@ export function openPickList(row: HTMLElement, slot: StrandSlot, c: StrandContex
   };
   const draw = (): void => {
     const q = input.value.trim().toLowerCase();
-    const match = (e: Element) => !q || nameOf(e, '').toLowerCase().includes(q);
+    const match = (e: Element) => !q || ownName(e).toLowerCase().includes(q);
     list.innerHTML = '';
     options = [];
     const group = (word: string | null, els: Element[]): void => {
@@ -393,7 +396,7 @@ export function openPickList(row: HTMLElement, slot: StrandSlot, c: StrandContex
         o.id = `${id}-${options.length}`;
         o.setAttribute('role', 'option');
         o.setAttribute('data-id', e.id);
-        o.textContent = nameOf(e);
+        o.textContent = nameOf(e, { start: true });
         o.addEventListener('pointerdown', ev => ev.preventDefault());
         o.addEventListener('click', () => pickIt(e.id));
         list.appendChild(o);

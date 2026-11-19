@@ -189,8 +189,9 @@ function buildPreview(
   const byId = new Map(getState().data.elements.map(e => [e.id, e] as const));
   const folded = foldBacklinks(findBacklinkingElements(el.id), el.id, byId);
   appendLinkLine(body, 'atlas-context-preview-backlinks', 'Linked from', folded.story.length,
+    // Each link stands alone after the label, and a reader may say it alone, so it takes the capital.
     folded.story.map(n => ({
-      text: nameOrUnnamed(n),
+      text: nameOrUnnamed(n, { start: true }),
       title: typeName(n.type, { supertype: n.supertype }),
       navId: n.id,
     })));
@@ -241,7 +242,7 @@ function buildPreview(
     linkAll.className = 'atlas-btn-ghost atlas-context-preview-mentions-link';
     linkAll.dataset.action = 'link-mentions';
     linkAll.textContent = 'Link all';
-    linkAll.title = `Link every mention of ${el.name || 'this element'} in ${mentions.narratives.length} ${word}${mentions.narratives.length === 1 ? '' : 's'}. Written to the files; no undo.`;
+    linkAll.title = `Link every mention of ${nameOrUnnamed(el)} in ${mentions.narratives.length} ${word}${mentions.narratives.length === 1 ? '' : 's'}. Written to the files; no undo.`;
     linkAll.addEventListener('click', () => {
       linkAll.disabled = true;
       const ids = mentions.narratives.map(n => n.id);

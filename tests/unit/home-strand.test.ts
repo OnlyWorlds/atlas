@@ -502,6 +502,12 @@ describe('the words', () => {
     expect(rawWords('character', strandContext(W)!)).toBeNull();
   });
 
+  it('a nameless one there is said by its unnamed form, the mark before its kind in a promise', () => {
+    const proposed = el('character', C, { x_review_proposed: { by: 'm', evidence: 'seat' }, name: ' ' });
+    world([el('narrative', N, { protagonist: C }), proposed], full);
+    expect(rawHeld('character', strandContext(W)!)).toEqual({ label: 'Proposed: the unnamed character', phrase: 'the proposed unnamed character' });
+  });
+
   it('Pick offers that kind only, the parent\'s own first; never a proposed one, a stub or a room element (G12)', () => {
     world([
       el('narrative', N, { events: [E] }),

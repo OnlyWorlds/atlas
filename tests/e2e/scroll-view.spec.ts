@@ -213,6 +213,8 @@ for (const tag of ['', ' @firefox']) {
       const blankChip = card.getByRole('button', { name: 'Open the unnamed character', exact: true });
       await expect(blankChip).toHaveCount(1);
       await expect(blankChip.locator('span:not(.material-symbols-outlined)')).toHaveText('The unnamed character');
+      // Its tooltip says what it opens, the same string as its name.
+      await expect(blankChip).toHaveAttribute('title', 'Open the unnamed character');
       await expect(blankChip.locator('.material-symbols-outlined')).toHaveAttribute('aria-hidden', 'true');
       await expect(card.getByRole('button', { name: 'Open Ada', exact: true })).toHaveCount(1);
     }

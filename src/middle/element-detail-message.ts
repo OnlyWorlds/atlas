@@ -13,6 +13,7 @@ import { elementHash } from '../core/router';
 import { authorAsServed, messageParties, type MessageParties, type MessageParty } from '../core/message-parties';
 import { sliceOf } from '../core/provenance';
 import type { Element, WorldRegistryEntry } from '../core/types';
+import { capitalise } from '../core/type-words';
 import { rosterFor, rosterNow } from '../sync/world-roster';
 
 export function buildMessageParties(el: Element): HTMLElement | null {
@@ -59,10 +60,12 @@ export function readsWholeWorld(entry: WorldRegistryEntry | undefined, meta: unk
 export function fillMessageParties(line: HTMLElement, parties: MessageParties, worldId: string): void {
   line.replaceChildren();
   line.dataset.sender = parties.sender;
-  const link = (p: MessageParty): HTMLAnchorElement => {
+  // A link that stands alone after its label (From, To), which a reader may say alone, starts with a capital:
+  // "From The unnamed character". Inside a sentence ("written by …'s key") it stays lower case.
+  const link = (p: MessageParty, inLine = false): HTMLAnchorElement => {
     const a = document.createElement('a');
     a.href = elementHash(worldId, p.id);
-    a.textContent = p.name;
+    a.textContent = p.unnamed && !inLine ? capitalise(p.name) : p.name;
     return a;
   };
   const label = (text: string): HTMLElement => {
@@ -89,7 +92,7 @@ export function fillMessageParties(line: HTMLElement, parties: MessageParties, w
     } else {
       line.append(label('Claims to be from'), ' ', who);
       if (parties.sender === 'mismatch') {
-        if (parties.writtenBy) line.append(', written by ', link(parties.writtenBy), "'s key");
+        if (parties.writtenBy) line.append(', written by ', link(parties.writtenBy, true), "'s key");
         else line.append(", written by another member's key");
       }
     }
@@ -101,7 +104,7 @@ export function fillMessageParties(line: HTMLElement, parties: MessageParties, w
   } else {
     // Names joined by commas, as before #888; " and " only before the last of the
     // tail (the ones not shown, the ones unseen), so "BB, Kael" reads as it did.
-    const names: Array<HTMLElement | string> = parties.to.map(link);
+    const names: Array<HTMLElement | string> = parties.to.map(p => link(p));
     const tail: string[] = [];
     const n = parties.toOutside;
     if (n > 0) tail.push(n === 1 ? notShown : names.length > 0 ? `${n} others not shown here` : `${n} not shown here`);

@@ -20,11 +20,11 @@ import { isKeptHere } from '../sync/sync-attach';
 import { clearStrand, writeStrandSlot, STRAND_MOVED, type StrandDrawn, type StrandWriteResult } from '../ui/strand-write';
 import { toastManager } from '../ui/toast-manager';
 import { openStrandTab } from './home-strand';
+import { slotName, strandWord } from '../core/strand-journey';
+import { nameOrUnnamed } from '../core/type-words';
 
 export type StrandOffer = { kind: 'make'; instead: string | null } | { kind: 'is' };
 
-const nameOf = (n: { name?: unknown } | null | undefined): string =>
-  (n && typeof n.name === 'string' && n.name.trim() ? n.name.trim() : 'Unnamed');
 
 /** What this Narrative's page or bar offers the person here, or null. */
 export function strandOfferFor(el: Element, worldId: string): StrandOffer | null {
@@ -35,7 +35,7 @@ export function strandOfferFor(el: Element, worldId: string): StrandOffer | null
   if (!isStrandKeeper(entry, s.active.meta) || !offerable(el, 'narrative') || isKeptHere(worldId, el.id)) return null;
   const strand = strandView(s.active.meta, s.data.elements, id => isKeptHere(worldId, id));
   if (strand.narrative?.id === el.id) return { kind: 'is' };
-  return { kind: 'make', instead: strand.narrative ? nameOf(strand.narrative) : null };
+  return { kind: 'make', instead: strand.narrative ? slotName('narrative', strand) : null };
 }
 
 /** The drawn state a press writes against: the mark's ids as stored now. */
@@ -162,7 +162,7 @@ export function buildPageStrandOffer(el: Element, worldId: string): HTMLElement 
   const promise = document.createElement('p');
   promise.className = 'atlas-strand-offer-line';
   promise.dataset.role = 'strand-clear-promise';
-  promise.textContent = `${nameOf(el)} will no longer be the world's strand, and the world will have none. The story and its links stay as they are.`;
+  promise.textContent = `${nameOrUnnamed(el, { start: true, word: strandWord(el.type) })} will no longer be the world's strand, and the world will have none. The story and its links stay as they are.`;
   box.appendChild(promise);
   const drawn = drawnNow(worldId);
   const row = document.createElement('div');

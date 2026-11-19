@@ -28,8 +28,9 @@ import { resolveCalendarLens } from '../core/calendar-lens';
 import { calendarDateText } from './element-detail-fields';
 import { SLOT_TYPE, type StrandSlot } from '../core/strand';
 import {
-  badWhenWords, cardCopy, changedFields, editOpening, parseWhen, storyForWritingRoom, whenOf, type CardValues,
+  badWhenWords, cardCopy, changedFields, editOpening, parseWhen, slotName, storyForWritingRoom, whenOf, type CardValues,
 } from '../core/strand-journey';
+import { nameOrUnnamed } from '../core/type-words';
 import { getActiveStore } from '../core/active-store';
 import { GRID_OPEN_ATTR, afterPress, gridClosed, watchLeave } from './home-grid-kinds';
 import { editStrandElement } from '../ui/strand-write';
@@ -206,7 +207,7 @@ export function buildMakeCard(slot: StrandSlot, c: StrandContext, opts: StrandPa
   // Where they are now: the place it happened, first, once that slot is filled.
   if (slot === 'now' && c.strand.location) {
     const where = c.strand.location;
-    const still = act(`Still at ${where.name.trim() || 'Unnamed'}`, 'now:same', () => chosen({ pick: where.id }));
+    const still = act(`Still at ${slotName('location', c.strand)}`, 'now:same', () => chosen({ pick: where.id }));
     const row = document.createElement('div');
     row.className = 'atlas-home-strand-card-same';
     row.appendChild(still);
@@ -341,7 +342,8 @@ export function buildEditCard(slot: StrandSlot, c: StrandContext, el: Element, o
     saving = true;
     letGo();
     holdActs(form);
-    const was = ed.opened.name.trim() || 'Unnamed';
+    // It starts the line it is said in: "The unnamed event changed meanwhile."
+    const was = nameOrUnnamed({ name: ed.opened.name, type: el.type }, { start: true });
     void editStrandElement(c.worldId, ed.id, patch, ed.raw).then(async out => {
       saving = false;
       if (out === 'wrote') {

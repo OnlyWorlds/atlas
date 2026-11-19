@@ -28,6 +28,7 @@ import { onHashChange, parseHash } from './router';
 import type { DiskChange, FolderStore } from '../store/folder-store';
 import { editedSince } from '../store/sync-stamp';
 import type { Element } from './types';
+import { nameOrUnnamed } from './type-words';
 
 /** A focus storm (alt-tab, devtools) runs one pass, not five. */
 const FOCUS_THROTTLE_MS = 5_000;
@@ -411,7 +412,7 @@ async function runPass(store: FolderStore, worldId: string, full: boolean): Prom
     marked,
     notSynced,
     unreadable: [...new Set([...prev.unreadable, ...unreadable])],
-    removed: [...prev.removed, ...applied.filter(c => c.kind === 'deleted').map(c => c.before?.name || 'an unnamed element')],
+    removed: [...prev.removed, ...applied.filter(c => c.kind === 'deleted').map(c => nameOrUnnamed(c.before ?? { type: c.type }))],
     held,
     showOnly: prev.showOnly,
   });

@@ -8,6 +8,7 @@
  */
 
 import type { Element } from '../../core/types';
+import { nameOrUnnamed } from '../../core/type-words';
 import { getState } from '../../core/state';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { openElementTarget } from '../../core/element-room';
@@ -56,7 +57,7 @@ export function buildStrandFrame(narrative: Element): HTMLElement | null {
       chip.dataset.action = 'strand-open';
       chip.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true"></span><span class="atlas-context-strand-name"></span>`;
       chip.querySelector('.material-symbols-outlined')!.textContent = ELEMENT_ICONS[type] ?? 'category';
-      chip.querySelector('.atlas-context-strand-name')!.textContent = filled.name.trim() || 'Unnamed';
+      chip.querySelector('.atlas-context-strand-name')!.textContent = nameOrUnnamed({ name: filled.name, type }, { start: true });
       chip.addEventListener('click', () => openElementTarget(el, worldId));
       li.appendChild(chip);
       // Hidden here: others read this slot empty (G23, the code gate's C10).

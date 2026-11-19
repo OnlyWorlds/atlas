@@ -11587,6 +11587,9 @@ td.atlas-writing-setup-promote-count {
   align-items: center;
 }
 
+.atlas-knowledge-draft-note { color: var(--atlas-text); font-size: 0.86rem; }
+.atlas-knowledge-draft-note:empty { display: none; }
+
 .atlas-knowledge-allfields {
   font-size: 11px;
   color: var(--atlas-text-muted);

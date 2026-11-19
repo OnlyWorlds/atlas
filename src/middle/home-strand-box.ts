@@ -21,7 +21,7 @@ import { mayChange } from '../core/may-change';
 import { isKnownOf } from '../sync/known-of';
 import { maySetSlot, SLOT_TYPE, type StrandSlot } from '../core/strand';
 import {
-  boxTextOf, editOpening, sameCellWords, storyLines, whenOf, SLOT_OTHER, SLOT_WORD,
+  boxTextOf, editOpening, sameCellWords, slotName, storyLines, whenOf, SLOT_OTHER, SLOT_WORD,
 } from '../core/strand-journey';
 import type { Element } from '../core/types';
 import { resolveCalendarLens } from '../core/calendar-lens';
@@ -227,8 +227,8 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
   name.className = 'atlas-btn-link atlas-home-strand-name';
   name.setAttribute('data-strand-key', `${slot}:open`);
   name.setAttribute('role', 'link');
-  name.textContent = filled.name.trim() || 'Unnamed';
-  name.title = `Open ${name.textContent}`;
+  name.textContent = slotName(slot, c.strand, true);
+  name.title = `Open ${slotName(slot, c.strand)}`;
   name.addEventListener('click', () => { if (el) openElementTarget(el, c.worldId); });
   const nameRow = document.createElement('div');
   nameRow.className = 'atlas-home-strand-box-name';
@@ -277,7 +277,7 @@ export function buildFilledBox(slot: StrandSlot, c: StrandContext, opts: StrandP
   }
   if (el) items.push(...buildBoxDoors(slot, el, c, opts.redraw));
   if (another) items.push({ label: `Use another ${SLOT_OTHER[slot]}`, key: `${slot}:another`, run: useAnother(slot, c, opts) });
-  if (items.length > 0) nameRow.appendChild(moreMenu(slot, `More for ${name.textContent}`, items));
+  if (items.length > 0) nameRow.appendChild(moreMenu(slot, `More for ${slotName(slot, c.strand)}`, items));
   return box;
 }
 
@@ -297,7 +297,7 @@ export function buildSameLine(c: StrandContext, opts: StrandPanelOptions): HTMLE
     return wrap;
   }
   if (another) {
-    wrap.appendChild(moreMenu('now', `More for where ${c.strand.character?.name.trim() || 'they'} are now`, [
+    wrap.appendChild(moreMenu('now', `More for where ${c.strand.character ? `${slotName('character', c.strand)} is` : 'they are'} now`, [
       { label: 'Use another location', key: 'now:another', run: useAnother('now', c, opts) },
     ]));
   }
@@ -322,7 +322,7 @@ export function buildWholeLine(c: StrandContext, opts: StrandPanelOptions): HTML
     return b;
   };
   p.append(
-    document.createTextNode(`${story.name.trim() || 'Unnamed'} is whole. Your world's picture is on the `),
+    document.createTextNode(`${slotName('narrative', c.strand, true)} is whole. Your world's picture is on the `),
     link('Picture', 'strand-whole-picture', () => opts.showPicture?.()),
     document.createTextNode(' tab, and '),
     link('the Web', 'strand-whole-web', () => openWebOn(c.worldId, story.id)),

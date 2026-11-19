@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.28',
+    date: '2026-11-19',
+    theme: 'The other words for a missing name',
+    entries: [
+      {
+        id: 'unnamed-other-words',
+        title: 'Unnamed, (untitled) and the other words for a missing name say the unnamed form',
+        body: 'Where Atlas still said Unnamed, unnamed pin, unnamed zone, (untitled), this entry or an unnamed element for an element with no name, it now says the unnamed form the other rooms use: the unnamed character, the unnamed zone, the unnamed page. That covers the strand on the home page and its cards, the lenses on the Web, a work packet\'s list, the pins and markers that link to an element, the notes after Make online and after a sync problem, the files removed on disk, a picture\'s removal, a chart\'s delete, a page\'s delete and revoke, and the title of a published page. A knowledge entry with no name is no longer saved as Unnamed knowledge: Create asks for a name first, as the create dialog and the home page\'s cards do. A lens kept on an element with no name is named for its unnamed form, such as The unnamed character\'s world, and a split offers New chapter as the new part\'s name where it offered Unnamed chapter. A link that stands alone after a label, as under Linked from and in a message\'s From and To, now starts with a capital. A saved page or knowledge entry with no name is headed by its unnamed form, not by the prompt to type one. The chips on a chart\'s card are named for what a press does, such as Open Ada (character), and the scroll card\'s chips, the knowledge rows and their From links say in their tooltip what they open. Not changed: the label a new link writes into a story.',
+        tags: ['accessibility', 'editor'],
+      },
+    ],
+  },
+  {
     version: '1.124.27',
     date: '2026-11-19',
     theme: 'The unnamed, said one way',

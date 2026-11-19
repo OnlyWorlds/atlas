@@ -5,7 +5,7 @@
  * (forget = keep folder; delete = remove folder on disk).
  */
 
-import { typeName, aTypeName } from '../core/type-words';
+import { typeName, aTypeName, nameOrUnnamed } from '../core/type-words';
 import { getState, patchActiveMeta, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { diskApiBlock, isSeatWorld, SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE, seatRoleWords, worldPin } from '../core/seat';
@@ -928,7 +928,7 @@ function issueName(issue: SyncIssue): string {
   if (issue.type === 'world') return 'This world\'s details';
   const el = getState().data.elements.find(e => e.id === issue.element_id);
   if (!el) return issue.operation === 'delete' ? `A deleted ${typeName(issue.type)}` : aTypeName(issue.type, { start: true });
-  return el.name?.trim() || `An unnamed ${typeName(issue.type)}`;
+  return nameOrUnnamed(el, { start: true });
 }
 
 function renderSyncIssues(world: WorldRegistryEntry): string {

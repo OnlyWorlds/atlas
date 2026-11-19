@@ -29,11 +29,14 @@
 import { hasUnseenRecipients, isMessage as sdkIsMessage, isToEveryone, recipientsOf, senderStatus, type OwMessageMember, type OwSenderStatus } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { editedSince } from '../store/sync-stamp';
-import { nameOrUnnamed } from './type-words';
+import { nameOrUnnamed, ownName } from './type-words';
 
 export interface MessageParty {
   id: string;
+  /** The name as said inside a sentence: its own, or "the unnamed character". */
   name: string;
+  /** Set only when `name` is the unnamed form, so a link that stands alone after its label can take the capital. */
+  unnamed?: true;
 }
 
 export interface MessageParties {
@@ -89,9 +92,8 @@ export function messageParties(
   const party = (id: string): MessageParty | null => {
     const hit = elements.find(e => e.id === id && e.type === 'character');
     if (!hit) return null;
-    // Said inside the From and To line, so lower case: "From the unnamed character".
-    const name = nameOrUnnamed(hit);
-    return { id, name };
+    // Said in lower case; a link that stands alone after its label (From, To) adds the capital when drawn.
+    return { id, name: nameOrUnnamed(hit), ...(ownName(hit) ? {} : { unnamed: true as const }) };
   };
   const status = senderStatus(el, members);
   const from = status.claimed ? party(status.claimed) : null;

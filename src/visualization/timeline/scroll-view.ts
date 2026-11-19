@@ -17,7 +17,7 @@ import { layoutScroll, type ScrollLayout } from './scroll-layout';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
 import { lastPressWasKey } from '../../ui/input-kind';
-import { capitalise, nameOrUnnamed, theUnnamed } from '../../core/type-words';
+import { capitalise, openWords, theUnnamed } from '../../core/type-words';
 
 /**
  * A card's name as its head and its Open say it: a missing or blank one is
@@ -191,9 +191,11 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
           const chip = document.createElement('button');
           chip.type = 'button';
           chip.className = 'atlas-scroll-card-chip';
-          chip.title = link.fieldLabel;
-          // Its name is what a press does, never the glyph's word: "Open Ada", "Open the unnamed character".
-          chip.setAttribute('aria-label', `Open ${nameOrUnnamed(link)}`);
+          // Its name is what a press does, never the glyph's word, and its tooltip says the same, one
+          // string: "Open Ada", "Open the unnamed character". The chip row already sits under its field.
+          const opens = openWords(link);
+          chip.title = opens;
+          chip.setAttribute('aria-label', opens);
           chip.innerHTML =
             `<span class="material-symbols-outlined" aria-hidden="true">${escapeText((ELEMENT_ICONS as Record<string, string>)[link.type] ?? 'category')}</span>` +
             `<span>${escapeText(link.name)}</span>`;

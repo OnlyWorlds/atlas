@@ -26,7 +26,7 @@ import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } fr
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS } from '../core/constants';
-import { capitalise, nameOrUnnamed, ownName, typeName } from '../core/type-words';
+import { capitalise, nameOrUnnamed, ownName, theUnnamed, typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { CALENDAR_WORD, worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
@@ -837,7 +837,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // the app that took it with no confirmation at all, while the map row and
     // the zone chip both ask first. There is no undo anywhere in atlas, so the
     // confirm IS the safety. Same `window.confirm` shape as those two.
-    if (!window.confirm(`Delete chart "${chart.name ?? 'unnamed'}"? This cannot be undone.`)) return;
+    const own = typeof chart.name === 'string' ? chart.name.trim() : '';
+    if (!window.confirm(`Delete ${own ? `chart "${own}"` : theUnnamed('chart')}? This cannot be undone.`)) return;
     const store = getActiveStore();
     try {
       if (store) await mutateCharts(store, charts => removeChart(charts, chart.id));

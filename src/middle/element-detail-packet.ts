@@ -9,7 +9,7 @@ import { elementHash, navigate } from '../core/router';
 import { readPacket, packetHere } from '../core/work-packet';
 import { openPacketBar } from '../ui/open-packet-bar';
 import type { Element, ElementType } from '../core/types';
-import { typeNameStart } from '../core/type-words';
+import { nameOrUnnamed, typeNameStart } from '../core/type-words';
 
 export function buildWorkPacket(el: Element): HTMLElement | null {
   const state = getState();
@@ -43,7 +43,7 @@ export function buildWorkPacket(el: Element): HTMLElement | null {
     if (target) {
       const a = document.createElement('a');
       a.href = elementHash(worldId, entry.id);
-      a.textContent = typeof target.name === 'string' && target.name.trim() ? target.name.trim() : 'Unnamed';
+      a.textContent = nameOrUnnamed(target, { start: true });
       li.appendChild(a);
     } else {
       const gone = document.createElement('span');

@@ -21,6 +21,7 @@ import {
   type OwLensCutReason, type OwLensWorld,
 } from '@onlyworlds/sdk';
 import type { Element, ElementType } from './types';
+import { nameOrUnnamed } from './type-words';
 import { getState, patchSlice } from './state';
 import { saveRegistry } from '../registry/registry';
 import { isRoomElement } from './parlor-room';
@@ -50,9 +51,9 @@ export interface LensChoice {
   template: boolean;
 }
 
-/** A lens's name as the chip and the line say it. */
-export function lensName(el: Element): string {
-  return (typeof el.name === 'string' && el.name.trim()) || 'Unnamed lens';
+/** A lens's name as the menu, the chip and the line say it: its own, or "the unnamed lens" (`start` at a line's start). */
+export function lensName(el: Element, opts: { start?: boolean } = {}): string {
+  return nameOrUnnamed(el, { start: opts.start, word: 'lens' });
 }
 
 /** A lens the Web may read through: a lens, and not proposed (a doubt mark included). */
@@ -64,7 +65,7 @@ export function choosable(el: Element | undefined): el is Element {
 export function lensChoices(elements: readonly Element[]): LensChoice[] {
   return elements
     .filter(choosable)
-    .map(el => ({ id: el.id, name: lensName(el), template: isTemplate(el) }))
+    .map(el => ({ id: el.id, name: lensName(el, { start: true }), template: isTemplate(el) }))
     .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '') || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -113,7 +114,7 @@ function anchorIdsOf(lens: Element): string[] {
 
 /** Read a lens for the Web. Pure: nothing is written. */
 export function readLensPicture(lens: Element, elements: readonly Element[] = getState().data.elements): LensPicture {
-  const base = { lensId: lens.id, name: lensName(lens), unreadableKey: null, kept: 0, keptIds: [], drawn: [], edges: [], anchors: [], cut: {} };
+  const base = { lensId: lens.id, name: lensName(lens, { start: true }), unreadableKey: null, kept: 0, keptIds: [], drawn: [], edges: [], anchors: [], cut: {} };
   if (isTemplate(lens)) return { ...base, kind: 'template' };
   const world = lensWorld(elements);
   let reading;
@@ -191,7 +192,7 @@ export function lensLine(p: LensPicture, subject?: { name: string; kept: boolean
   if (total > 0) {
     parts.push(`${total} left out: ${[...byWord].map(([w, n]) => `${n} ${w}`).join(', ')}.`);
   }
-  if (subject && !subject.kept) parts.push(`${subject.name || 'This element'} is not in this lens.`);
+  if (subject && !subject.kept) parts.push(`${subject.name} is not in this lens.`);
   return parts.join(' ');
 }
 
@@ -300,11 +301,12 @@ export async function keepLensOn(
   keeping.add(key);
   try {
     const found = lensOnAlone(await store.listElements(), subject.id, field);
-    if (found) return { id: found.id, name: lensName(found), made: false };
+    if (found) return { id: found.id, name: lensName(found, { start: true }), made: false };
     if (store.readSyncState && heldFromPush(await store.readSyncState()).has(subject.id)) {
       throw new PlainError('This element is kept only in this copy, outside what OnlyWorlds shows you, so a lens on it cannot go online with it.');
     }
-    const name = `${(typeof subject.name === 'string' && subject.name.trim()) || 'Unnamed'}'s world`;
+    // Named for its subject; a nameless one by its unnamed form, as every room says it ("The unnamed character's world").
+    const name = `${nameOrUnnamed(subject, { start: true })}'s world`;
     const created = await store.createElement('construct', {
       name, supertype: 'Lens', [field]: [subject.id],
     } as Partial<Element>);

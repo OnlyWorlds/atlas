@@ -9,7 +9,8 @@
  */
 import { DATE_FIELD } from '@onlyworlds/sdk';
 import type { Element } from './types';
-import { STRAND_SLOTS, type OwStrand, type StrandSlot } from './strand';
+import { SLOT_TYPE, STRAND_SLOTS, type OwStrand, type StrandSlot } from './strand';
+import { nameOrUnnamed } from './type-words';
 import { guideElements } from './guide';
 import { aidKind } from './charter';
 import { isMessage } from './message-parties';
@@ -50,7 +51,18 @@ export const SLOT_OTHER: Record<StrandSlot, string> = {
 export const JOIN_PLACE = 'happened in or at';
 export const JOIN_NOW = 'is now in or at';
 
-const named = (slot: { name: string } | null | undefined): string => slot?.name.trim() || 'Unnamed';
+/** The strand's own word for a kind, where it has one: a Narrative is its story. */
+export function strandWord(type: string): string | undefined {
+  return type === 'narrative' ? 'story' : undefined;
+}
+
+/**
+ * A slot's name as the strand says it: the filled element's own name, or the unnamed form of the kind the
+ * slot holds, in the strand's word ("the unnamed story", "the unnamed event"); `start` where it begins a line.
+ */
+export function slotName(slot: StrandSlot, s: OwStrand, start = false): string {
+  return nameOrUnnamed({ name: s[slot]?.name, type: SLOT_TYPE[slot] }, { start, word: strandWord(SLOT_TYPE[slot]) });
+}
 
 /** A card's question, the one line under it (none: null), and its text field's label. */
 export interface CardCopy {
@@ -69,15 +81,15 @@ export function cardCopy(slot: StrandSlot, s: OwStrand): CardCopy {
     case 'narrative':
       return { title: 'Start with a story', what: 'Narratives are stories or tellings of any kind.', text: 'The story' };
     case 'event':
-      return { title: `What happens in ${named(s.narrative)}?`, what: 'Events are happenings of any size, each a part of a larger story.', text: 'What happens' };
+      return { title: `What happens in ${slotName('narrative', s)}?`, what: 'Events are happenings of any size, each a part of a larger story.', text: 'What happens' };
     case 'location':
-      return { title: `Where did ${named(s.event)} happen?`, what: 'Locations are where your stories happen.', text: 'About this location' };
+      return { title: `Where did ${slotName('event', s)} happen?`, what: 'Locations are where your stories happen.', text: 'About this location' };
     case 'character':
       return { title: 'Who is the story about?', what: 'Characters drive your stories: start with its main character.', text: 'About them' };
     case 'now':
       return {
-        title: `Where is ${named(s.character)} now?`,
-        what: s.event ? `${named(s.event)} may be long past; ${named(s.character)} is still somewhere.` : null,
+        title: `Where is ${slotName('character', s)} now?`,
+        what: s.event ? `${slotName('event', s, true)} may be long past; ${slotName('character', s)} is still somewhere.` : null,
         text: 'About this location',
       };
   }
@@ -144,7 +156,8 @@ export function stillThere(s: OwStrand): boolean {
 /** The story card's two lines, only what is filled. */
 export function storyLines(s: OwStrand): LinePart[][] {
   const lines: LinePart[][] = [];
-  const chip = (slot: StrandSlot): LinePart => ({ chip: slot, id: s[slot]!.id, name: named(s[slot]) });
+  // Inside the line's sentence, so lower case: "It tells of the unnamed event."
+  const chip = (slot: StrandSlot): LinePart => ({ chip: slot, id: s[slot]!.id, name: slotName(slot, s) });
   if (s.event) {
     const line: LinePart[] = [{ text: 'It tells of ' }, chip('event')];
     if (s.location) line.push({ text: ', which happened in or at ' }, chip('location'));
@@ -165,7 +178,7 @@ export function storyLines(s: OwStrand): LinePart[][] {
 
 /** The Now cell's words when where they are now is where it happened (R7, by R5's rule). */
 export function sameCellWords(s: OwStrand): string {
-  return `${stillThere(s) ? 'is still in or at' : 'is in or at'} ${named(s.location)}`;
+  return `${stillThere(s) ? 'is still in or at' : 'is in or at'} ${slotName('location', s)}`;
 }
 
 // ---- The cards' fields ----

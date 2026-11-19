@@ -15,7 +15,7 @@
  * same element. See DESIGN_CHARTS.md.
  */
 
-import { nameOrUnnamed, typeName } from '../../core/type-words';
+import { nameOrUnnamed, openWords, typeName } from '../../core/type-words';
 import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { effectiveEndDate, TEMPORAL_TYPE_FIELDS } from './temporal-fields';
@@ -1942,7 +1942,7 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
       b.className = 'atlas-timeline-rail-undated-item';
       // A view-only world (conv. 149): no grip and no drag, a click opens it.
       if (state.readOnly) {
-        b.title = `Open ${nameOrUnnamed(it)}`;
+        b.title = openWords(it);
         b.innerHTML = `<span class="atlas-timeline-rail-undated-name">${escapeText(it.name)}</span>`;
         b.addEventListener('click', () => state.onOpenElement(it.id));
         group.appendChild(b);
@@ -2198,15 +2198,19 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   chip.className = 'atlas-timeline-chip'
     + (dated ? ' atlas-timeline-chip-dated' : '')
     + (dateable && !dated ? ' atlas-timeline-chip-undated' : '');
-  const said = nameOrUnnamed(link);
-  chip.title = dated
-    ? `${link.fieldLabel}: ${said} (${typeName(link.type)}) · on this chart`
+  // Its name is what a press does, never the glyph's word, and the tooltip is the same string: "Open Ada
+  // (character), on this chart". The group's label above the row says the field.
+  const opens = `${openWords(link)} (${typeName(link.type)})`;
+  const named = dated
+    ? `${opens}, on this chart`
     : dateable
-      ? `${link.fieldLabel}: ${said} (${typeName(link.type)}) · undated: drag onto the chart to date it`
-      : `${link.fieldLabel}: ${said} (${typeName(link.type)})`;
+      ? `${opens}, undated: drag onto the chart to date it`
+      : opens;
+  chip.title = named;
+  chip.setAttribute('aria-label', named);
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
   chip.innerHTML =
-    `<span class="material-symbols-outlined">${escapeText(icon)}</span>` +
+    `<span class="material-symbols-outlined" aria-hidden="true">${escapeText(icon)}</span>` +
     `<span class="atlas-timeline-chip-name">${escapeText(link.name)}</span>`;
   if (dateable && !dated && state.onDateElement) {
     // Drag-to-date from the card; the no-move click stays a peek.

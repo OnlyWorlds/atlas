@@ -46,10 +46,10 @@ describe('R3: each card asks from what is filled (1.122.0, W1)', () => {
     expect(cardCopy('now', strand({ narrative: S, character: CH }))).toEqual({ title: 'Where is Odile now?', what: null, text: 'About this location' });
   });
 
-  it('a blank name reads Unnamed, as everywhere', () => {
+  it('a blank name reads its unnamed form, in the strand\'s word for a story', () => {
     const blank = { id: 'x', name: '  ' };
-    expect(cardCopy('event', strand({ narrative: blank }))).toMatchObject({ title: 'What happens in Unnamed?' });
-    expect(cardCopy('now', strand({ narrative: S, event: blank, character: blank })).what).toBe('Unnamed may be long past; Unnamed is still somewhere.');
+    expect(cardCopy('event', strand({ narrative: blank }))).toMatchObject({ title: 'What happens in the unnamed story?' });
+    expect(cardCopy('now', strand({ narrative: S, event: blank, character: blank })).what).toBe('The unnamed event may be long past; the unnamed character is still somewhere.');
   });
 
   it('no word on any card says "hero" or "year", and none carries an em-dash', () => {

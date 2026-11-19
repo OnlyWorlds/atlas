@@ -95,7 +95,8 @@ export function openSplitDialog(opts: SplitOptions): void {
   new SplitConfirmModal({
     tierLabel,
     afterPreview: previewOf(afterMarkdown, PREVIEW_CHARS),
-    defaultName: `Unnamed ${tierLabel.toLowerCase()}`,
+    // A name to start from, as a new page or zone gets one ("New chapter"); the person keeps or changes it.
+    defaultName: `New ${tierLabel.toLowerCase()}`,
     onConfirm: async (newName) => {
       await performSplit({
         currentNarrative: narrative,

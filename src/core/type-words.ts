@@ -131,6 +131,15 @@ export function nameOrUnnamed(el: Nameable, opts: { start?: boolean; word?: stri
 }
 
 /**
+ * What a press on a control that opens an element does, said one way: "Open
+ * Ada", "Open the unnamed entry". The one builder for such a control's
+ * tooltip, and for its name where the two are one string.
+ */
+export function openWords(el: Nameable, opts: { word?: string } = {}): string {
+  return `Open ${nameOrUnnamed(el, { word: opts.word })}`;
+}
+
+/**
  * The open world's words as one stable string, for a surface that redraws
  * only when its inputs move: a surface that prints a type joins this to its
  * key, or a world whose words change keeps the old ones on screen.

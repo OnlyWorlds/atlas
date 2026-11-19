@@ -22,6 +22,7 @@
 
 import { getState, patchSlice, subscribe, type RightTabRef } from '../../core/state';
 import type { Element, ElementType, WorldRegistryEntry } from '../../core/types';
+import { nameOrUnnamed } from '../../core/type-words';
 import { ToastManager } from '../../ui/toast-manager';
 import { elementHash, navigate, onHashChange, parseHash, type Route } from '../../core/router';
 import { saveRegistry } from '../../registry/registry';
@@ -311,7 +312,7 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
       chosen: chosen ? { id: chosen.id, name: lensName(chosen) } : null,
       choices: lensChoices(els),
       keep: field && subject && worldId
-        ? { name: subject.name?.trim() || 'Unnamed', busy: keepingLens(worldId, subject.id) }
+        ? { name: nameOrUnnamed(subject), busy: keepingLens(worldId, subject.id) }
         : null,
       // Said only where Keep would otherwise be weighed: no lens chosen, an element the person opened.
       heldBack: !chosen && subject && currentRender.focused ? keepHeldBackLine(worldId) : null,
@@ -326,7 +327,7 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     const store = getActiveStore();
     if (!worldId || !subject || !field || !store || keepingLens(worldId, subject.id)) return;
     const refreshToolbar = (): void => { toolbarHandle?.update(toolbarState(graphHandle?.getPresentTypes() ?? new Set())); };
-    const name = subject.name?.trim() || 'Unnamed';
+    const name = nameOrUnnamed(subject);
     const stillHere = (): boolean => getState().active?.worldId === worldId;
     // The cache is refreshed only while the world is still open: another world's list never lands on it (C9).
     const run = keepLensOn(worldId, subject, field, store, async () => { if (stillHere()) await refreshElementsAfterWrite(store); });
@@ -522,7 +523,7 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
       // A lens is never in its own reading: on its own page (Read this lens) the line names no subject (C2).
       const named = subjectEl && subjectEl.id !== lensEl.id ? subjectEl : null;
       const line = lensLine(picture, named
-        ? { name: named.name?.trim() || 'This element', kept: picture.keptIds.includes(named.id) }
+        ? { name: nameOrUnnamed(named, { start: true }), kept: picture.keptIds.includes(named.id) }
         : null);
       const title = picture.unreadableKey ? `The setting Atlas can't read: ${picture.unreadableKey}` : undefined;
       return { picture, line, title };

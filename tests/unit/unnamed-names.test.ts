@@ -366,7 +366,7 @@ describe('an unnamed row sorts first, by its own name', () => {
       el('narrative', 'n2', { name: 'Arrival', story: 'Brenn came.' }),
       el('narrative', 'n1', { name: '', story: 'Brenn left.' }),
     ]);
-    expect(m.narratives.map(n => n.name)).toEqual(['the unnamed narrative', 'Arrival']);
+    expect(m.narratives.map(n => n.name)).toEqual(['The unnamed narrative', 'Arrival']);
   });
 
   it('in the plays-as list', () => {

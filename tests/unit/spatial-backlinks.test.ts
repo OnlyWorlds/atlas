@@ -41,7 +41,7 @@ describe('foldBacklinks (pure)', () => {
     const sources = world.filter(e => e.id !== 'map1' && e.id !== 'loc1' && e.id !== 'loc2' && e.id !== 'z2');
     const f = foldBacklinks(sources, 'map1', byId);
     expect(f.story.map(e => e.id).sort()).toEqual(['n1', 'z1']);
-    expect(f.pins.map(p => p.label)).toEqual(['Feltropolis', 'Soggia', 'unnamed pin']);
+    expect(f.pins.map(p => p.label)).toEqual(['Feltropolis', 'Soggia', 'The unnamed pin']);
     expect(f.pins.map(p => p.navId)).toEqual(['loc1', 'loc2', null]);
     expect(f.markerCount).toBe(6);
     expect(f.markers.map(markerFoldLabel)).toEqual([
@@ -80,7 +80,7 @@ describe("the map's element page (Referenced by)", () => {
       .find(g => g.querySelector('.atlas-field-label')?.textContent === label);
     const chipsOf = (label: string) => [...(group(label)?.querySelectorAll('.atlas-link-chip') ?? [])]
       .map(c => c.querySelector('span:not(.atlas-link-chip-icon)')?.textContent);
-    expect(chipsOf('Pins')).toEqual(['Feltropolis', 'Soggia', 'unnamed pin']);
+    expect(chipsOf('Pins')).toEqual(['Feltropolis', 'Soggia', 'The unnamed pin']);
     expect(chipsOf('Markers')).toEqual([
       'Crumblefields: 3 markers', 'Naval Patrol Border: 2 markers', '1 marker with no zone',
     ]);
@@ -100,7 +100,7 @@ describe("the Web tab's card (Linked from)", () => {
     const lines = [...host.querySelectorAll('.atlas-context-preview-backlinks')].map(l => l.textContent);
     expect(lines).toEqual([
       'Linked from (1): The Harbour',
-      'Pins (3): Feltropolis, Soggia, unnamed pin',
+      'Pins (3): Feltropolis, Soggia, The unnamed pin',
       'Markers (6): Crumblefields (3), Naval Patrol Border (2), no zone (1)',
     ]);
     expect(host.textContent).not.toContain('(unnamed)');

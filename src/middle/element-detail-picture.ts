@@ -17,6 +17,7 @@ import { isPartialSlice } from '../core/provenance';
 import { uploadPicture, removePicture, uploadedPictureKey, PICTURE_TYPES } from '../sync/media-upload';
 import { persistFieldPatch } from './element-detail-fields';
 import type { Element, WorldRegistryEntry } from '../core/types';
+import { nameOrUnnamed } from '../core/type-words';
 
 export const PICTURE_PUBLIC_LINE = 'Anyone with its link can see an uploaded picture, even in a private world.';
 
@@ -160,13 +161,13 @@ export function elementsShowing(key: string, elements: readonly Element[]): Elem
 async function removeFlow(el: Element, entry: WorldRegistryEntry, key: string, btn: HTMLButtonElement, toasts: ToastManager): Promise<void> {
   const showing = elementsShowing(key, getState().data.elements);
   const others = showing.filter(e => e.id !== el.id);
-  const name = el.name || 'this element';
+  const name = nameOrUnnamed(el);
   const lines = [
     'Remove this picture from OnlyWorlds for good?',
     'It leaves OnlyWorlds at once, but copies already loaded elsewhere can keep showing for a long time.',
     others.length === 0
       ? `The image URL of ${name} is cleared.`
-      : `It is also the picture of ${others.length} other element${others.length === 1 ? '' : 's'} here (${others.slice(0, 3).map(e => e.name || 'unnamed').join(', ')}${others.length > 3 ? ', and more' : ''}). Atlas clears their image URLs too.`,
+      : `It is also the picture of ${others.length} other element${others.length === 1 ? '' : 's'} here (${others.slice(0, 3).map(e => nameOrUnnamed(e)).join(', ')}${others.length > 3 ? ', and more' : ''}). Atlas clears their image URLs too.`,
   ];
   if (!window.confirm(lines.join('\n\n'))) return;
   btn.disabled = true;

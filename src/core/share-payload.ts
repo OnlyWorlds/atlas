@@ -508,7 +508,7 @@ function buildPayloadFrom(page: Element, elements: Element[], charts: ChartConfi
 
   return {
     schema_version: 1,
-    title: page.name || '(untitled)',
+    title: nameOrUnnamed(page, { start: true, word: 'page' }),
     intent: pageIntentOf(page),
     // Validated, never passthrough — the payload is public wire (S3).
     theme: parsePageTheme((page as Record<string, unknown>).atlas_page_theme),
@@ -688,7 +688,7 @@ export function freezeCircleBlock(
     title: nameOrUnnamed(knower, { start: true }),
     knowerType: knower.type,
     entries: held.map(entry => ({
-      title: entry.name || '(untitled)',
+      title: nameOrUnnamed(entry, { start: true, word: 'entry' }),
       markdown: typeof (entry as Record<string, unknown>).story === 'string'
         ? (entry as Record<string, unknown>).story as string : '',
     })),
