@@ -17,7 +17,7 @@
 import { getState } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed, typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { lookupHeldId } from '../core/ow-links';
@@ -80,7 +80,7 @@ export function createChipPreview(workspaceRoot: HTMLElement): ChipPreviewContro
     card.innerHTML = `
       <div class="atlas-chip-preview-header">
         <span class="material-symbols-outlined atlas-chip-preview-icon">${escapeText(icon)}</span>
-        <span class="atlas-chip-preview-name">${escapeText(el.name || '(unnamed)')}</span>
+        <span class="atlas-chip-preview-name">${escapeText(nameOrUnnamed(el, { start: true }))}</span>
         <span class="atlas-chip-preview-type">${escapeText(typeLabel)}</span>
       </div>
       ${imageUrl ? `<img class="atlas-chip-preview-image" src="${escapeText(imageUrl)}" alt="" />` : ''}

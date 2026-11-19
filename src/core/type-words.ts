@@ -82,10 +82,36 @@ export function aTypeName(type: string, opts: Omit<TypeNameOptions, 'many'> = {}
  * A name for an element that has none, the one form every control says it
  * in: "the unnamed map", "the unnamed event", in the world's own word for the
  * type. Mid-sentence, so never capitalised: "Delete the unnamed zone",
- * "Show the 3 maps under the unnamed map".
+ * "Show the 3 maps under the unnamed map". Where it starts a name or a line,
+ * `capitalise` it (or `nameOrUnnamed(el, { start: true })`): only "the" takes
+ * the capital, so a world's own word stays as the world wrote it.
  */
 export function theUnnamed(type: string, opts: Omit<TypeNameOptions, 'many' | 'start'> = {}): string {
   return `the unnamed ${typeName(type, opts)}`;
+}
+
+/** Anything that carries an element's name and type: an element, or a row built from one. */
+export interface Nameable {
+  name?: unknown;
+  type: string;
+  supertype?: unknown;
+  /** Set on a row whose `name` already holds the unnamed form, so a reader mid-sentence can say it in lower case. */
+  unnamed?: boolean;
+}
+
+/**
+ * An element's own name, trimmed, or the unnamed form when it has none (a
+ * missing name or one of spaces). `start` is for a name that stands alone or
+ * starts a line (a heading, a row, a chip, a button's whole name, a tab, a menu
+ * item): "The unnamed event". Without it the form is lower case, for a name
+ * inside a longer line: "Open the unnamed event", "Held by the unnamed character".
+ * An element's own name is never re-cased.
+ */
+export function nameOrUnnamed(el: Nameable, opts: { start?: boolean } = {}): string {
+  const own = el.unnamed === true || typeof el.name !== 'string' ? '' : el.name.trim();
+  if (own) return own;
+  const words = theUnnamed(el.type, { supertype: el.supertype });
+  return opts.start ? capitalise(words) : words;
 }
 
 /**

@@ -37,6 +37,7 @@ import { decideDeleteConfirm } from '../core/delete-confirm';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { renderGate, keepingFocus } from '../ui/render-gate';
+import { nameOrUnnamed } from '../core/type-words';
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -507,7 +508,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     if (node.tier === 'l4') body.classList.add('atlas-writing-tree-row-body-draft');
     body.innerHTML = `
       <span class="material-symbols-outlined atlas-writing-tree-icon">${icon}</span>
-      <span class="atlas-writing-tree-name">${escapeText(node.el.name || `(unnamed ${tierLabel.toLowerCase()})`)}</span>
+      <span class="atlas-writing-tree-name">${escapeText(nameOrUnnamed(node.el, { start: true }))}</span>
     `;
     body.addEventListener('click', () => {
       navigate(writingHash(worldId, node.el.id));
@@ -537,7 +538,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'atlas-writing-tree-row-add';
-      addBtn.title = `New ${childLabel.toLowerCase()} in "${node.el.name || `(unnamed ${tierLabel.toLowerCase()})`}"`;
+      addBtn.title = `New ${childLabel.toLowerCase()} in ${node.el.name?.trim() ? `"${node.el.name.trim()}"` : nameOrUnnamed(node.el)}`;
       addBtn.innerHTML = `<span class="material-symbols-outlined">add</span>`;
       addBtn.addEventListener('click', (e) => {
         e.stopPropagation();

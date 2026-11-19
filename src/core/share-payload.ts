@@ -38,6 +38,7 @@ import { findAddresses, findLooseAddressRuns, namedId } from './ow-links';
 import { getZoneShape } from '../tabs/right/zone-derived';
 import { freezeChartBlock, type PayloadChartBlock } from '../visualization/timeline/chart-freeze';
 import type { ChartConfig } from '../visualization/timeline/types';
+import { capitalise, nameOrUnnamed, theUnnamed } from './type-words';
 
 // ---------------------------------------------------------------------------
 // Payload types (the §5 wire shape).
@@ -340,7 +341,7 @@ function leftOutBy(page: Element, elements: Element[], charts: ChartConfig[], ou
       if (!pin || !out(pin)) continue;
       const targetId = (pin as Record<string, unknown>).element_id;
       const target = typeof targetId === 'string' ? byId.get(targetId) : undefined;
-      if (target && !out(target)) names.push(`a pin on ${target.name || '(unnamed)'}`);
+      if (target && !out(target)) names.push(`a pin on ${nameOrUnnamed(target)}`);
     }
   }
   const entries = (p: PagePayload) => p.blocks.flatMap(b => b.kind === 'circle' ? b.entries.map(e => e.title) : []);
@@ -532,7 +533,7 @@ export function projectElementEntry(
 ): PayloadElementEntry {
   const rec = el as Record<string, unknown>;
   const entry: PayloadElementEntry = {
-    name: el.name || '(unnamed)',
+    name: nameOrUnnamed(el, { start: true }),
     type: el.type,
     fields: {},
   };
@@ -559,7 +560,7 @@ export function projectElementEntry(
       if (!refId) continue;
       const target = byId.get(refId);
       if (!target) continue; // dangling ref — discloses nothing, drop it
-      const token: RelationToken = { text: target.name || '(unnamed)' };
+      const token: RelationToken = { text: nameOrUnnamed(target, { start: true }) };
       if (includedIds.has(refId)) token.ref = refId;
       tokens.push(token);
     }
@@ -609,7 +610,7 @@ export function freezeMapBlock(
     const token: PayloadMapBlock['pins'][number] = {
       xPct: Math.round(Math.min(100, Math.max(0, (x / width) * 100)) * 100) / 100,
       yPct: Math.round(Math.min(100, Math.max(0, ((height - y) / height) * 100)) * 100) / 100,
-      name: target.name || '(unnamed)',
+      name: nameOrUnnamed(target, { start: true }),
       type: target.type,
     };
     if (includedIds.has(target.id)) token.ref = target.id;
@@ -619,7 +620,7 @@ export function freezeMapBlock(
   const frozen: PayloadMapBlock = {
     id: block.id,
     kind: 'map',
-    title: map.name || '(unnamed map)',
+    title: nameOrUnnamed(map, { start: true }),
     image_url: imageUrl,
     pins,
   };
@@ -653,7 +654,7 @@ export function freezeMapBlock(
       const shape = getZoneShape(zone as Parameters<typeof getZoneShape>[0]);
       if (points.length < (shape === 'line' ? 2 : 3)) continue; // degenerate geometry drops
       const token: NonNullable<PayloadMapBlock['zones']>[number] = {
-        name: zone.name || '(unnamed)', shape, points,
+        name: nameOrUnnamed(zone, { start: true }), shape, points,
       };
       if (includedIds.has(zone.id)) token.ref = zone.id;
       zones.push(token);
@@ -684,7 +685,7 @@ export function freezeCircleBlock(
     id: block.id,
     kind: 'circle',
     knowerId: knower.id,
-    title: knower.name || '(unnamed)',
+    title: nameOrUnnamed(knower, { start: true }),
     knowerType: knower.type,
     entries: held.map(entry => ({
       title: entry.name || '(untitled)',

@@ -27,6 +27,7 @@ import { escapeText } from '../core/dom-utils';
 import { lookupHeldId, readOwHref } from '../core/ow-links';
 import { buildNarrativeIndex, getTierForNarrative, getWritingLabels, iconForTier, type NarrativeNode } from './writing-helpers';
 import { countMarkdownWords } from './writing-word-count';
+import { nameOrUnnamed } from '../core/type-words';
 
 export interface CompiledSection {
   el: Element;
@@ -225,7 +226,7 @@ function buildSectionMarker(
 
   const name = document.createElement('span');
   name.className = 'atlas-writing-compiled-marker-name';
-  name.textContent = el.name || '(unnamed)';
+  name.textContent = nameOrUnnamed(el, { start: true });
   title.appendChild(name);
 
   // Tier label badge — "scene" / "chapter" / etc.

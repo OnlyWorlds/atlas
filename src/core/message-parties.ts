@@ -29,6 +29,7 @@
 import { hasUnseenRecipients, isMessage as sdkIsMessage, isToEveryone, recipientsOf, senderStatus, type OwMessageMember, type OwSenderStatus } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import { editedSince } from '../store/sync-stamp';
+import { nameOrUnnamed } from './type-words';
 
 export interface MessageParty {
   id: string;
@@ -88,7 +89,8 @@ export function messageParties(
   const party = (id: string): MessageParty | null => {
     const hit = elements.find(e => e.id === id && e.type === 'character');
     if (!hit) return null;
-    const name = typeof hit.name === 'string' && hit.name.trim() ? hit.name.trim() : '(unnamed)';
+    // Said inside the From and To line, so lower case: "From the unnamed character".
+    const name = nameOrUnnamed(hit);
     return { id, name };
   };
   const status = senderStatus(el, members);

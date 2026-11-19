@@ -27,7 +27,7 @@ import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type 
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation, pressOncePerKey } from '../../core/dom-utils';
 import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
-import { capitalise, theUnnamed, typeName } from '../../core/type-words';
+import { capitalise, nameOrUnnamed, theUnnamed, typeName } from '../../core/type-words';
 
 // ---- Collapsed tree-node state ----
 
@@ -573,7 +573,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   main.className = 'atlas-row-main atlas-map-tree-name';
   if (ctx.openMapIds.has(m.id)) main.classList.add('atlas-map-tree-row-open');
   // A missing or blank name in the form every control says it in, so the button is never nameless.
-  main.textContent = m.name?.trim() || theUnnamed('map');
+  main.textContent = nameOrUnnamed(m, { start: true });
   row.appendChild(main);
 
   // Location chip — surfaces loc-bound maps and lets users click through to
@@ -601,7 +601,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
       chip.appendChild(icon);
       const label = document.createElement('span');
       // The words seen are the words in its name ("Open the unnamed location").
-      label.textContent = locName || theUnnamed('location');
+      label.textContent = locName || capitalise(theUnnamed('location'));
       chip.appendChild(label);
       const locationId = m.location;
       chip.addEventListener('click', (e) => {
@@ -737,7 +737,7 @@ export function openMapTab(m: WorldMap, preserveElementId?: string): void {
     const newTab: RightTabRef = {
       kind: 'map',
       mapId: m.id,
-      label: m.name || '(unnamed)',
+      label: nameOrUnnamed(m, { start: true }),
       worldId: activeWorldId,
     };
     const nextTabs = [...ui.rightTabs, newTab];

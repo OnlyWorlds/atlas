@@ -12,7 +12,7 @@
 
 import type { ElementType } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed, typeName } from '../core/type-words';
 import { escapeText } from '../core/dom-utils';
 
 export interface MentionSuggestionItem {
@@ -20,8 +20,10 @@ export interface MentionSuggestionItem {
   id: string;
   /** Element type (one of the 22 OW types). */
   type: ElementType;
-  /** Canonical name. */
+  /** Canonical name: the label a pick writes into the story. */
   name: string;
+  /** True when the element has no name: the list row says "The unnamed character". */
+  unnamed?: boolean;
   /** Disambiguating subtitle (parent location, family, etc.) — rendered after the type pill. */
   subtitle?: string;
   /** Aliases — the matcher feeds these in along with `name` for filtering. */
@@ -70,7 +72,7 @@ export function renderMentionSuggestion() {
         return `
           <div class="atlas-mention-item${i === selectedIndex ? ' is-selected' : ''}" data-index="${i}">
             <span class="material-symbols-outlined atlas-mention-item-icon">${escapeText(icon)}</span>
-            <span class="atlas-mention-item-name">${escapeText(it.name)}</span>
+            <span class="atlas-mention-item-name">${escapeText(nameOrUnnamed(it, { start: true }))}</span>
             <span class="atlas-mention-item-meta">${escapeText(typeLabel)}${subtitle}</span>
           </div>
         `;

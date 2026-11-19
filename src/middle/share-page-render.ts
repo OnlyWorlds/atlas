@@ -35,6 +35,7 @@ import { escapeText } from '../core/dom-utils';
 import { freezeChartBlock } from '../visualization/timeline/chart-freeze';
 import { renderChartView } from '../visualization/timeline/chart-static';
 import type { ChartConfig } from '../visualization/timeline/types';
+import { nameOrUnnamed } from '../core/type-words';
 
 // The active world's saved charts — set by the share room so the BUILDER can
 // freeze chart blocks live for preview. The payload path carries pre-frozen
@@ -92,7 +93,7 @@ function renderFieldValue(value: unknown, elements: Map<string, Element>): HTMLE
 function nameChip(el: Element): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'atlas-share-card-chip';
-  chip.innerHTML = `<span class="material-symbols-outlined">${ELEMENT_ICONS[el.type] ?? 'category'}</span>${escapeText(el.name || '(unnamed)')}`;
+  chip.innerHTML = `<span class="material-symbols-outlined">${ELEMENT_ICONS[el.type] ?? 'category'}</span>${escapeText(nameOrUnnamed(el, { start: true }))}`;
   return chip;
 }
 
@@ -134,7 +135,7 @@ export function renderElementCard(block: ElementCardBlock, elements: Map<string,
   head.className = 'atlas-share-card-head';
   head.innerHTML = `
     <span class="material-symbols-outlined atlas-share-card-icon">${ELEMENT_ICONS[el.type] ?? 'category'}</span>
-    <span class="atlas-share-card-name">${escapeText(el.name || '(unnamed)')}</span>
+    <span class="atlas-share-card-name">${escapeText(nameOrUnnamed(el, { start: true }))}</span>
     <span class="atlas-share-card-type">${escapeText(ELEMENT_LABELS[el.type]?.singular ?? el.type)}</span>
   `;
   card.appendChild(head);
@@ -310,7 +311,7 @@ export function renderCollectionView(
     text.className = 'atlas-share-collection-text';
     const name = document.createElement('span');
     name.className = 'atlas-share-collection-name';
-    name.textContent = entry.name || '(unnamed)';
+    name.textContent = nameOrUnnamed(entry, { start: true });
     const type = document.createElement('span');
     type.className = 'atlas-share-collection-type';
     type.textContent = ELEMENT_LABELS[entry.type as keyof typeof ELEMENT_LABELS]?.singular ?? entry.type;
@@ -650,7 +651,7 @@ function worldResolver(elements: Map<string, Element>) {
     if (!el) return null;
     const raw = (el as Record<string, unknown>).image_url;
     return {
-      name: el.name || '(unnamed)',
+      name: nameOrUnnamed(el, { start: true }),
       type: el.type,
       image_url: typeof raw === 'string' && raw.trim() ? raw.trim() : undefined,
     };
@@ -682,7 +683,7 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
       const allIds = new Set(elements.keys());
       const identityEntries: Record<string, PayloadElementEntry> = {};
       for (const el of elements.values()) {
-        identityEntries[el.id] = { name: el.name || '(unnamed)', type: el.type, fields: {} };
+        identityEntries[el.id] = { name: nameOrUnnamed(el, { start: true }), type: el.type, fields: {} };
       }
       const fullElementIds = new Set(
         (block.fullPinIds ?? [])

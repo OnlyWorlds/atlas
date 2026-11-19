@@ -34,7 +34,7 @@ import {
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import type { Element, Pin, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed, typeName } from '../core/type-words';
 import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -171,7 +171,7 @@ export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): 
   const title = document.createElement('h2');
   title.dataset.role = 'element-name';
   title.className = 'atlas-element-name';
-  title.textContent = el.name || '(unnamed)';
+  title.textContent = nameOrUnnamed(el, { start: true });
   // A view-only world's name is not a door (conv. 149), nor keel's stub's (conv. 155).
   const viewOnly = worldIsViewOnly() || isKnownOf(el);
   if (!viewOnly) wireRename(title, el);
@@ -300,6 +300,8 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
   if (host.querySelector('input')) return; // already editing
 
   const original = el.name || '';
+  // What the heading says again when a rename is dropped: the name, or "The unnamed event".
+  const shown = nameOrUnnamed(el, { start: true });
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'atlas-element-name-input';
@@ -324,12 +326,12 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
     const next = input.value.trim();
     // Empty rename is a no-op rather than an unnamed element.
     if (!next || next === original) {
-      host.textContent = original || '(unnamed)';
+      host.textContent = shown;
       return;
     }
     const store = getActiveStore();
     if (!store) {
-      host.textContent = original || '(unnamed)';
+      host.textContent = shown;
       toastManager.error(WORLD_NOT_OPEN);
       return;
     }
@@ -341,7 +343,7 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
       // full header rebuilds.
     } catch (err) {
       console.error('[element-detail] inline rename failed:', err);
-      host.textContent = original || '(unnamed)';
+      host.textContent = shown;
       showProblem(err, { doing: 'renaming this element', retry: () => retryRename(el.id, original, next) });
     }
   };
@@ -364,7 +366,7 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
   input.addEventListener('blur', () => {
     document.removeEventListener('atlas:save-request', saveRequestHandler);
     if (reverting) {
-      host.textContent = original || '(unnamed)';
+      host.textContent = shown;
       return;
     }
     void commit();
@@ -842,10 +844,10 @@ function buildPinnedElementIcon(mapEl: Element, pinnedEl: Element, showName: boo
   btn.className = 'atlas-icon-btn-sm atlas-header-pinned-icon';
   btn.setAttribute('data-action', 'goto-pinned-element');
   btn.setAttribute('data-element-id', pinnedEl.id);
-  btn.title = `${pinnedEl.name || '(unnamed)'} (${typeName(pinnedEl.type, { supertype: pinnedEl.supertype })})`;
+  btn.title = `${nameOrUnnamed(pinnedEl, { start: true })} (${typeName(pinnedEl.type, { supertype: pinnedEl.supertype })})`;
   const iconHtml = `<span class="material-symbols-outlined">${ELEMENT_ICONS[pinnedEl.type] ?? 'category'}</span>`;
   if (showName) {
-    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(pinnedEl.name || '(unnamed)')}</span>`;
+    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(nameOrUnnamed(pinnedEl, { start: true }))}</span>`;
     // Reuse the labeled-affordance CSS pattern so width grows past the
     // 22×22 fixed square. atlas-header-map-affordance-labeled is the
     // semantic name but its rules apply equally here.
@@ -919,10 +921,10 @@ function buildMapAffordance(
   const hasImage = !!(m.image_url || m.image_media_id);
   if (hasImage) btn.classList.add('atlas-map-tree-icon-has-image');
   const titleSuffix = panToZoneId ? ' (will pan to zone)' : '';
-  btn.title = `Open map: ${m.name || '(unnamed)'}${titleSuffix}`;
+  btn.title = `Open map: ${nameOrUnnamed(m)}${titleSuffix}`;
   const iconHtml = '<span class="material-symbols-outlined">map</span>';
   if (showName) {
-    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m.name || '(unnamed)')}</span>`;
+    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(nameOrUnnamed(m, { start: true }))}</span>`;
     btn.classList.add('atlas-header-map-affordance-labeled');
   } else {
     btn.innerHTML = iconHtml;
@@ -974,10 +976,10 @@ function buildOpenMapButton(
   if (m.image_url || m.image_media_id) btn.classList.add('atlas-map-tree-icon-has-image');
   btn.setAttribute('data-action', 'open-map');
   btn.setAttribute('data-map-id', m.id);
-  btn.title = `Open map: ${m.name || '(unnamed)'}`;
+  btn.title = `Open map: ${nameOrUnnamed(m)}`;
   btn.innerHTML =
     '<span class="material-symbols-outlined">map</span>'
-    + `<span class="atlas-header-map-label">${escapeText(m.name || '(unnamed)')}</span>`;
+    + `<span class="atlas-header-map-label">${escapeText(nameOrUnnamed(m, { start: true }))}</span>`;
   btn.addEventListener('click', () => {
     openMapTab(m, sourceElementId);
     if (typeof x === 'number' && typeof y === 'number') panMapTabTo(m.id, x, y);

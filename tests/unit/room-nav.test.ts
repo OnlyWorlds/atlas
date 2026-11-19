@@ -181,11 +181,14 @@ describe('mountRoomNav — the selected-element chip name (truncateName)', () =>
     unmount();
   });
 
-  it('an unnamed element falls back to "(unnamed)" rather than an empty chip', () => {
-    const { target, unmount } = withSelectedElement('');
-    const label = target.querySelector('.atlas-room-nav-selected-name')!;
-    expect(label.textContent).toBe('(unnamed)');
-    unmount();
+  it('an unnamed element, or one named only spaces, is The unnamed <type>, never an empty chip', () => {
+    for (const name of ['', '   ']) {
+      const { target, unmount } = withSelectedElement(name);
+      const label = target.querySelector('.atlas-room-nav-selected-name')!;
+      expect(label.textContent).toBe('The unnamed character');
+      expect(target.querySelector('.atlas-room-nav-selected')?.getAttribute('title')).toBe('The unnamed character · click to view');
+      unmount();
+    }
   });
 
   it('no selected element means no chip at all', () => {

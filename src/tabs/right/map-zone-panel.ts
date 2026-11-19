@@ -22,7 +22,7 @@
 import { getState, patchSlice } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
 import { navigate, elementHash } from '../../core/router';
-import { capitalise, theUnnamed, typeName } from '../../core/type-words';
+import { capitalise, nameOrUnnamed, theUnnamed, typeName } from '../../core/type-words';
 import { escapeText, escapeAttr, hexColourOr, pressOncePerKey } from '../../core/dom-utils';
 import { getZoneShape } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
@@ -277,7 +277,7 @@ function renderChip(z: Zone, selectedId: string | null | undefined, rules: reado
     <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''} ${parts ? 'is-linked' : ''}" data-zone-id="${escapeAttr(z.id)}"${parts ? ` data-parts="${escapeAttr(parts.join(' '))}"` : ''} title="${escapeAttr(title)}">
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
       <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own color' : ''}"></span>
-      <button type="button" class="atlas-zone-chip-name"${z.id === selectedId ? ' aria-current="true"' : ''}>${escapeText(z.name?.trim() || theUnnamed('zone'))}</button>${parts ? `
+      <button type="button" class="atlas-zone-chip-name"${z.id === selectedId ? ' aria-current="true"' : ''}>${escapeText(nameOrUnnamed(z, { start: true }))}</button>${parts ? `
       <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}${viewOnly ? '' : `
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="${escapeAttr(deleteName(z))}" aria-label="${escapeAttr(deleteName(z))}">
         <span class="material-symbols-outlined" aria-hidden="true">delete</span>

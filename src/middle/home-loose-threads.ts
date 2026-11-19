@@ -16,7 +16,7 @@ import type { Element } from '../core/types';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed, typeName } from '../core/type-words';
 import { looseIds } from '../core/world-links';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { findDateConflicts, type DateConflict, type DatedRef } from '../core/date-continuity';
@@ -193,19 +193,20 @@ function renderConflicts(expand: HTMLElement, conflicts: DateConflict[], worldId
     const row = document.createElement('div');
     row.className = 'atlas-home-thread-conflict';
     row.dataset.kind = c.kind;
-    for (const part of conflictParts(c, date)) {
+    for (const [i, part] of conflictParts(c, date).entries()) {
       if (typeof part === 'string') { row.appendChild(document.createTextNode(part)); continue; }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-home-thread-chip';
-      btn.title = `Open ${part.name}`;
+      btn.title = `Open ${nameOrUnnamed(part)}`;
       const icon = document.createElement('span');
       icon.className = 'material-symbols-outlined atlas-home-thread-chip-icon';
       icon.setAttribute('aria-hidden', 'true');
       icon.textContent = ELEMENT_ICONS[part.type as keyof typeof ELEMENT_ICONS] ?? 'circle';
       btn.appendChild(icon);
       const label = document.createElement('span');
-      label.textContent = part.name;
+      // The first element starts the sentence; one further in is said mid-sentence, in lower case.
+      label.textContent = i === 0 ? part.name : nameOrUnnamed(part);
       btn.appendChild(label);
       btn.addEventListener('click', () => {
         const el = getState().data.elements.find(e => e.id === part.id);
@@ -229,13 +230,13 @@ function renderExpand(expand: HTMLElement, thread: LooseThread, worldId: string)
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'atlas-home-thread-chip';
-    chip.title = `Open ${el.name || '(unnamed)'}`;
+    chip.title = `Open ${nameOrUnnamed(el)}`;
     const icon = document.createElement('span');
     icon.className = 'material-symbols-outlined atlas-home-thread-chip-icon';
     icon.textContent = thread.icon;
     chip.appendChild(icon);
     const label = document.createElement('span');
-    label.textContent = el.name || '(unnamed)';
+    label.textContent = nameOrUnnamed(el, { start: true });
     chip.appendChild(label);
     chip.addEventListener('click', () => openElement(worldId, el));
     list.appendChild(chip);

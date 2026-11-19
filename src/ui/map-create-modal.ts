@@ -26,6 +26,7 @@ import { readImageDimsFromFile, readImageDimsFromUrl, IMAGELESS_MAP_SIZE, smallM
 import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
 import { escapeText, escapeAttr } from '../core/dom-utils';
+import { nameOrUnnamed } from '../core/type-words';
 // view-only-ok: opened only from +map and New map, both closed on a view-only world (conv. 149).
 
 export interface MapCreateResult {
@@ -98,7 +99,7 @@ class MapCreateModal extends BaseModal {
     if (!this.opts.existingMapId && this.opts.initialLocationId) {
       const loc = getState().data.elements.find(e => e.id === this.opts.initialLocationId);
       if (loc) {
-        this.locationPreview = { id: loc.id, name: loc.name ?? '(unnamed)' };
+        this.locationPreview = { id: loc.id, name: loc.name ?? '' };
       }
     }
     if (this.opts.existingMapId) {
@@ -409,7 +410,8 @@ class MapCreateModal extends BaseModal {
     if (this.locationPreview) {
       const chip = document.createElement('span');
       chip.className = 'atlas-link-chip';
-      chip.innerHTML = `<span>${escapeText(this.locationPreview.name || '(unnamed)')}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(this.locationPreview.name || 'the location')}"><span class="material-symbols-outlined">close</span></button>`;
+      const loc = { name: this.locationPreview.name, type: 'location' };
+      chip.innerHTML = `<span>${escapeText(nameOrUnnamed(loc, { start: true }))}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(nameOrUnnamed(loc))}"><span class="material-symbols-outlined">close</span></button>`;
       row.appendChild(chip);
       chip.querySelector<HTMLElement>('.atlas-link-chip-remove')!.addEventListener('click', () => {
         this.locationPreview = null;
@@ -437,7 +439,8 @@ class MapCreateModal extends BaseModal {
     if (this.parentMapPreview) {
       const chip = document.createElement('span');
       chip.className = 'atlas-link-chip';
-      chip.innerHTML = `<span>${escapeText(this.parentMapPreview.name || '(unnamed)')}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(this.parentMapPreview.name || 'the parent map')}"><span class="material-symbols-outlined">close</span></button>`;
+      const parent = { name: this.parentMapPreview.name, type: 'map' };
+      chip.innerHTML = `<span>${escapeText(nameOrUnnamed(parent, { start: true }))}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(nameOrUnnamed(parent))}"><span class="material-symbols-outlined">close</span></button>`;
       row.appendChild(chip);
       chip.querySelector<HTMLElement>('.atlas-link-chip-remove')!.addEventListener('click', () => {
         this.parentMapPreview = null;

@@ -18,7 +18,7 @@
  * (future bout) or the pill badge.
  */
 
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed, typeName } from '../core/type-words';
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder } from '../sync/sync-attach';
@@ -118,7 +118,7 @@ export class ServerDeleteReviewModal extends BaseModal {
     row.innerHTML = `
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">${escapeText(typeName(r.type))}</span>
-        <span class="atlas-conflict-name">${escapeText(r.name ?? '(unnamed)')}</span>
+        <span class="atlas-conflict-name">${escapeText(nameOrUnnamed(r, { start: true }))}</span>
         <span class="atlas-conflict-fields">${r.unsynced ? 'Vanished from the server · edited here since the last sync' : 'Vanished from the server'}</span>
         ${r.unsynced ? '<label class="atlas-conflict-include"><input type="checkbox" data-role="include"> Include in Delete all</label>' : ''}
       </div>
@@ -128,7 +128,7 @@ export class ServerDeleteReviewModal extends BaseModal {
       </div>
     `;
     const box = row.querySelector<HTMLInputElement>('input[data-role="include"]');
-    box?.setAttribute('aria-label', `Include ${r.name ?? '(unnamed)'} in Delete all`);
+    box?.setAttribute('aria-label', `Include ${nameOrUnnamed(r)} in Delete all`);
     box?.addEventListener('change', (e) => {
       if (this.bulkRunning) return;
       if ((e.target as HTMLInputElement).checked) this.included.add(r.id);

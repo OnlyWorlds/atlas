@@ -15,7 +15,10 @@ import type { ElementType } from '../../core/types';
 export interface LinkedRef {
   id: string;
   type: string;
+  /** The element's name, or "The unnamed character" (then `unnamed` is set). */
   name: string;
+  /** True when the element has no name, so a line can say it mid-sentence in lower case. */
+  unnamed?: boolean;
   /** Humanised relation-field label, e.g. "Birthplace", "Participants". */
   fieldLabel: string;
 }
@@ -90,9 +93,9 @@ export interface TimelineNode {
    */
   glyph?: string;
   /**
-   * True when the element has no name (`name` then holds the card's
-   * "(unnamed)"), so a control can say "the unnamed event" instead. A pure
-   * render cache, never serialized.
+   * True when the element has no name (`name` then holds "The unnamed
+   * event", for a label that stands alone), so a line can say it mid-sentence
+   * in lower case ("Open the unnamed event"). A pure render cache, never serialized.
    */
   unnamed?: boolean;
   /**

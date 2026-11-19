@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.27',
+    date: '2026-11-19',
+    theme: 'The unnamed, in every room',
+    entries: [
+      {
+        id: 'unnamed-every-room',
+        title: 'Something with no name is said one way in every room',
+        body: 'Many rooms still showed (unnamed). Now an element with no name, or a name of only spaces, reads as the unnamed character, the unnamed map or the unnamed event everywhere: on its own page, in the sidebar and the lists, in the writing and knowledge rooms, on the maps, the charts, the home page and a shared page, in the world\'s own word for the type. Where it stands alone, as a heading, a row, a tab or a chip, it starts with a capital, The unnamed event; inside a longer line it stays lower case, Open the unnamed event. The linked chips on a chart\'s card are now named for what a press does, such as Open Ada, and a chip on the home page reads Open the unnamed character where it said Open (unnamed).',
+        tags: ['accessibility', 'editor'],
+      },
+    ],
+  },
+  {
     version: '1.124.26',
     date: '2026-11-19',
     theme: 'Each name said one way',

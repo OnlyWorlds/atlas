@@ -13,14 +13,20 @@
 
 import type { Element } from './types';
 import { readCalendarConfig, type CalendarConfig } from '@onlyworlds/sdk';
+import { nameOrUnnamed } from './type-words';
 
 export const CALENDAR_SUPERTYPE = 'calendar';
 
 export interface WorldCalendar {
   /** The calendar Construct's element id (the lens reference everywhere). */
   id: string;
-  /** The element's name — the calendar's display name. */
+  /** The element's name, the calendar's display name ("The unnamed construct" when it has none). */
   name: string;
+  /** True when the element has no name: `name` then holds the unnamed form, for `nameOrUnnamed` mid-sentence. */
+  unnamed?: boolean;
+  /** The element's type and supertype, so its unnamed form is said in the world's own words. */
+  type: string;
+  supertype?: unknown;
   config: CalendarConfig;
 }
 
@@ -49,7 +55,7 @@ export function worldCalendars(elements: Element[]): WorldCalendar[] {
   for (const el of elements) {
     const config = readCalendarValue((el as Record<string, unknown>)['atlas_calendar']);
     if (!config) continue;
-    out.push({ id: el.id, name: el.name || '(unnamed calendar)', config });
+    out.push({ id: el.id, name: nameOrUnnamed(el, { start: true }), unnamed: !el.name?.trim() || undefined, type: el.type, supertype: el.supertype, config });
   }
   return out;
 }

@@ -16,7 +16,7 @@ import { onHashChange, navigate, elementHash } from '../core/router';
 import { getEditorSettings } from '../registry/registry';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName, typeNameStart, typeWordsKey, supertypeWord } from '../core/type-words';
+import { nameOrUnnamed, typeName, typeNameStart, typeWordsKey, supertypeWord } from '../core/type-words';
 import { lensKnownSet } from '../core/knowledge';
 import { reservedRowHint } from '../core/taxonomy';
 import { styleRowHint } from '../core/world-styles';
@@ -809,7 +809,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const knower = lens ? elements.find(e => e.id === lens.knowerId) : undefined;
     const knownSet = lens && knower ? lensKnownSet(lens.knowerId, elements) : null;
     lensBanner.setAttribute('data-active', knownSet ? 'true' : 'false');
-    if (knownSet) lensLabel.textContent = `World as ${knower!.name || '(unnamed)'} knows it`;
+    if (knownSet) lensLabel.textContent = `World as ${nameOrUnnamed(knower!)} knows it`;
 
     // Pins + markers are map artifacts, created from map interactions and
     // reached through their map; they used to be excluded from this list
@@ -1074,7 +1074,7 @@ function renderElementRow(
   return `
     <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}"${flashAttr} role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>
-      <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
+      <span class="atlas-row-main">${escapeText(nameOrUnnamed(el, { start: true }))}</span>
       ${diskDot}
       ${mapBadge}
       ${onMapBadge}

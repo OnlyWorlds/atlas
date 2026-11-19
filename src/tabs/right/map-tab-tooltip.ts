@@ -5,13 +5,13 @@
  * Extracted from map-tab.ts. Pure: takes an Element, returns escaped HTML.
  */
 
-import { typeNameStart } from '../../core/type-words';
+import { nameOrUnnamed, typeNameStart } from '../../core/type-words';
 import type { Element } from '../../core/types';
 import { escapeText } from '../../core/dom-utils';
 
 export function buildPinTooltipHtml(el: Element): string {
   const parts: string[] = [];
-  parts.push(`<div class="atlas-pin-tooltip-name">${escapeText(el.name || '(unnamed)')}</div>`);
+  parts.push(`<div class="atlas-pin-tooltip-name">${escapeText(nameOrUnnamed(el, { start: true }))}</div>`);
   const subBits: string[] = [];
   const supertype = (el as any).supertype;
   const subtype = (el as any).subtype;

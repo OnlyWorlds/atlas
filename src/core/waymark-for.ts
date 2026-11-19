@@ -21,6 +21,7 @@ import type { Element, WorldRegistryEntry } from './types';
 import { isHiddenMark } from './hidden-mark';
 import { isRoomElement } from './parlor-room';
 import { handsOnAsProposed } from './review-mark';
+import { nameOrUnnamed } from './type-words';
 
 export type WaymarkReader = 'member' | 'public';
 
@@ -72,7 +73,8 @@ export function waymarkFor(entry: WorldRegistryEntry | null | undefined, el: Ele
   // Marker has no page of its own there (its address opens the world's page).
   if (reader === 'public' && (isHiddenMark(el) || isRoomElement(el) || handsOnAsProposed(el)
     || el.type === 'pin' || el.type === 'marker')) return null;
-  const name = typeof el.name === 'string' && el.name ? el.name : '(unnamed)';
+  // The mark prints it as the name on its own line: "The unnamed event".
+  const name = nameOrUnnamed(el, { start: true });
   const element = facts.stub || reader === 'public'
     ? { id: el.id, type: el.type, name }
     : { ...rec, id: el.id, type: el.type, name, updated_at: rec.server_updated_at };

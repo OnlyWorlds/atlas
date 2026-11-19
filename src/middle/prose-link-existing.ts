@@ -26,6 +26,7 @@ import { toastManager } from '../ui/toast-manager';
 import { pickElement } from '../ui/element-picker-modal';
 import type { Element } from '../core/types';
 import type { WorkspaceEditorHandle } from './writing-workspace-editor';
+import { nameOrUnnamed } from '../core/type-words';
 
 export interface LinkExistingOptions {
   /** Called with the picked element's id after the chip lands (recents etc.). */
@@ -91,7 +92,7 @@ export async function recordAliasIfForeign(picked: Element, label: string): Prom
     await folder.updateElement(picked.id, { atlas_aliases: [...aliases, label] } as Partial<Element>);
     await refreshElementsAfterWrite(folder);
     requestPushIfLinked();
-    toastManager.info(`"${label}" saved as an alias of ${name || '(unnamed)'}`);
+    toastManager.info(`"${label}" saved as an alias of ${nameOrUnnamed(live)}`);
   } catch (err) {
     console.error('[prose-link-existing] alias write failed', err);
     toastManager.error(`Linked, but could not save "${label}" as an alias. The link may show ${name || 'the element name'} instead`);

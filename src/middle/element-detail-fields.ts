@@ -25,7 +25,7 @@ import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType, type WorldMap } from '../core/types';
 import { ElementCreateModal } from '../ui/element-create-modal';
-import { typeName, aTypeName, theUnnamed } from '../core/type-words';
+import { typeName, aTypeName, theUnnamed, nameOrUnnamed } from '../core/type-words';
 import { ELEMENT_ICONS, EXTENSION_FIELD_NAMESPACES, isExtensionField, isCustomEditableField } from '../core/constants';
 import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
@@ -399,7 +399,7 @@ function withCalendarDate(wrap: HTMLElement, valueEl: HTMLElement, meta: FieldMe
     dateEl.className = 'atlas-row-meta atlas-field-calendar-date';
     dateEl.setAttribute('data-role', 'calendar-date');
     dateEl.textContent = dateText;
-    dateEl.title = `Calendar: ${lens.name}. The stored number does not change.`;
+    dateEl.title = `Calendar: ${nameOrUnnamed(lens)}. The stored number does not change.`;
     col.appendChild(dateEl);
     wrap.appendChild(col);
     return wrap;
@@ -424,7 +424,7 @@ function renderAliasesRow(el: Element, readOnly: boolean): HTMLElement {
 
   const openModal = (): void => {
     new AliasesEditModal({
-      elementName: el.name || '(unnamed)',
+      elementName: nameOrUnnamed(el),
       current: aliases,
       onSave: async (next) => {
         await persistFieldPatch(el, 'atlas_aliases', next.length === 0 ? null : next);
@@ -653,7 +653,7 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: (() => void | Prom
   const name = document.createElement('span');
   if (linked) {
     // A missing or blank name as its remove says it, so the link is never nameless.
-    name.textContent = linked.name?.trim() || theUnnamed(linked.type, { supertype: linked.supertype });
+    name.textContent = nameOrUnnamed(linked, { start: true });
     chip.title = `${typeName(linked.type, { supertype: linked.supertype })} · id ${id}`;
   } else {
     name.textContent = id;

@@ -58,6 +58,7 @@ import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
 import { isPartialSlice } from '../core/provenance';
+import { nameOrUnnamed } from '../core/type-words';
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -731,7 +732,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = el ? `Element: ${el.name || '(unnamed)'} · change…` : 'Pick element…';
+    changeBtn.textContent = el ? `Element: ${nameOrUnnamed(el)} · change…` : 'Pick element…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ title: 'Change card to…', excludeIds: [pageId] });
@@ -847,7 +848,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = knower ? `Circle: ${knower.name || '(unnamed)'} · change…` : 'Pick circle…';
+    changeBtn.textContent = knower ? `Circle: ${nameOrUnnamed(knower)} · change…` : 'Pick circle…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ restrictToType: 'collective', title: 'Whose knowledge? (a circle)' });
@@ -916,7 +917,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = map ? `Map: ${map.name || '(unnamed)'} · change…` : 'Pick map…';
+    changeBtn.textContent = map ? `Map: ${nameOrUnnamed(map)} · change…` : 'Pick map…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ restrictToType: 'map', title: 'Which map?' });
@@ -1009,7 +1010,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         });
         row.appendChild(cb);
         const name = document.createElement('span');
-        name.textContent = zone.name || '(unnamed zone)';
+        name.textContent = nameOrUnnamed(zone, { start: true });
         row.appendChild(name);
         zonesWrap.appendChild(row);
       }
@@ -2046,7 +2047,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-share-row-icon">article</span>
         <span class="atlas-share-row-main">
-          <span class="atlas-share-row-name">${escapeText(page.name || '(unnamed)')}</span>
+          <span class="atlas-share-row-name">${escapeText(nameOrUnnamed(page, { start: true }))}</span>
           <span class="atlas-share-row-meta">${escapeText(blockSummary(blocks))}</span>
         </span>
         ${pubBadge}

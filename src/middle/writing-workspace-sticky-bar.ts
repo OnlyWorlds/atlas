@@ -22,6 +22,7 @@ import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { WritingViewMode } from './writing-workspace';
 import { isCoarsePointer } from '../core/pointer';
 import { buildBarStrandOffer } from './strand-offer';
+import { nameOrUnnamed } from '../core/type-words';
 
 export interface StickyBarController {
   /** Build the sticky bar for `el`. */
@@ -59,9 +60,9 @@ export function createStickyBar(deps: {
     const crumbs: Array<{ id: string; name: string }> = [];
     for (const ancestorId of chain) {
       const node = idx.byId.get(ancestorId);
-      if (node) crumbs.push({ id: ancestorId, name: node.el.name || '(unnamed)' });
+      if (node) crumbs.push({ id: ancestorId, name: nameOrUnnamed(node.el, { start: true }) });
     }
-    crumbs.push({ id: el.id, name: el.name || '(unnamed)' });
+    crumbs.push({ id: el.id, name: nameOrUnnamed(el, { start: true }) });
 
     const crumbsRow = document.createElement('div');
     crumbsRow.className = 'atlas-writing-workspace-crumbs';

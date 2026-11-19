@@ -18,6 +18,7 @@
 
 import type { Element } from './types';
 import { MIN_NAME_CHARS, findTermSpansMarkdown } from './prose-autolink';
+import { nameOrUnnamed } from './type-words';
 
 export interface NarrativeMentions {
   id: string;
@@ -86,7 +87,8 @@ function scan(el: Element, elements: readonly Element[]): UnlinkedMentions {
     if (!story) continue;
     const count = findTermSpansMarkdown(story, terms, MENTION_MATCH).length;
     if (count === 0) continue;
-    narratives.push({ id: n.id, name: n.name || '(unnamed)', count });
+    // Listed after "Mentioned, unlinked (…):", mid-line, so lower case.
+    narratives.push({ id: n.id, name: nameOrUnnamed(n), count });
     total += count;
   }
   narratives.sort((a, b) => b.count - a.count || (a.name ?? '').localeCompare(b.name ?? ''));

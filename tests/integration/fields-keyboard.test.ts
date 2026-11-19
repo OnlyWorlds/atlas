@@ -176,7 +176,7 @@ describe('a link chip\'s x by keyboard', () => {
     expect(((await store.getElement(el.id)) as Record<string, unknown>).species).toEqual([]);
   });
 
-  it('a blank name is said as the unnamed species on the link and its x, never a nameless link', async () => {
+  it('a blank name is said as The unnamed species on the link and the unnamed species in its x, never a nameless link', async () => {
     const { store, el } = await world({}, []);
     const sp = await store.createElement('species' as never, { name: '   ' } as Partial<Element>);
     await store.updateElement(el.id, { species: [sp.id] } as never);
@@ -184,7 +184,7 @@ describe('a link chip\'s x by keyboard', () => {
     const fresh = (await store.getElement(el.id)) as Element;
     const s = section(fresh, [{ name: 'species', widget: 'multi-link', target: 'species' }]);
     const link = s.querySelector<HTMLElement>('.atlas-link-chip [role="link"]')!;
-    expect(link.textContent).toBe('the unnamed species');
+    expect(link.textContent).toBe('The unnamed species');
     expect(s.querySelector('.atlas-link-chip-remove')?.getAttribute('aria-label')).toBe('Remove the unnamed species');
   });
 });

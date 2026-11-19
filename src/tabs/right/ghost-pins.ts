@@ -22,6 +22,7 @@ import { pinVisualFor } from './pin-visuals';
 import { getState, patchSlice } from '../../core/state';
 import { navigate, elementHash } from '../../core/router';
 import { escapeText } from '../../core/dom-utils';
+import { nameOrUnnamed } from '../../core/type-words';
 
 /** Pixel radius for ghost ring around the source pin. Tightened in session
  * 211 smoke after Titus feedback that 70px felt "too far away" — 45 keeps
@@ -281,7 +282,7 @@ export function toggleGhostsAtSourcePin(args: ToggleArgs): number {
       // what's around). Default Leaflet zIndexOffset is 0; +500 keeps us
       // above standard markers without clobbering popovers.
       zIndexOffset: 500,
-      title: `${el.name || '(unnamed)'} · left click to select, right click to remove`,
+      title: `${nameOrUnnamed(el, { start: true })} · left click to select, right click to remove`,
     });
 
     // Optional name label rendered as a separate divIcon marker, anchored
@@ -293,7 +294,7 @@ export function toggleGhostsAtSourcePin(args: ToggleArgs): number {
     // into neighbor icons. Inner span clips with ellipsis for long names.
     let labelMarker: L.Marker | undefined;
     if (showLabels) {
-      const labelText = el.name || '(unnamed)';
+      const labelText = nameOrUnnamed(el, { start: true });
       const labelW = 90;
       const labelH = 18;
       const labelAnchorY = -(GHOST_ICON_SIZE / 2 + 14);

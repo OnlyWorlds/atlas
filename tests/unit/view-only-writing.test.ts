@@ -280,8 +280,8 @@ describe('the writing hotkeys', () => {
 
 describe('a read-only title', () => {
   it('opens no input and does not invite a rename; the editable one does', () => {
-    const ro = makeEditableTitle({ initial: 'Arrival', readOnly: true, onCommit: () => {} });
-    const rw = makeEditableTitle({ initial: 'Arrival', onCommit: () => {} });
+    const ro = makeEditableTitle({ initial: 'Arrival', placeholder: 'Page name…', readOnly: true, onCommit: () => {} });
+    const rw = makeEditableTitle({ initial: 'Arrival', placeholder: 'Page name…', onCommit: () => {} });
     document.body.append(ro.el, rw.el);
     ro.el.click();
     rw.el.click();

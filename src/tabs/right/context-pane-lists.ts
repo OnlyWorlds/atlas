@@ -29,6 +29,7 @@ import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink'
 import { currentLore, pageLore } from '../../core/parlor-room';
 import { readerLinksOf } from './context-pane-graph';
 import { findOwLinks, namedId, type HeldId } from '../../core/ow-links';
+import { nameOrUnnamed } from '../../core/type-words';
 
 export interface ContextListsHandle {
   /** Visually emphasize a row whose element id matches (or clear). */
@@ -116,7 +117,7 @@ function buildSuggested(narrative: Element, dismissed: Set<string>): SuggestedRo
       seen.add(adjId);
       out.push({
         el: adj,
-        reason: `via ${c.name || '(unnamed)'}`,
+        reason: `via ${nameOrUnnamed(c)}`,
       });
     }
   }
@@ -149,7 +150,7 @@ function buildSuggested(narrative: Element, dismissed: Set<string>): SuggestedRo
       seen.add(sid);
       out.push({
         el: sEl,
-        reason: `in ${s.name || '(unnamed)'}`,
+        reason: `in ${nameOrUnnamed(s)}`,
       });
     }
   }
@@ -332,7 +333,7 @@ function buildRow(el: Element, opts: RowOpts): HTMLElement {
 
   const nameEl = document.createElement('span');
   nameEl.className = 'atlas-context-pane-row-name';
-  nameEl.textContent = el.name || '(unnamed)';
+  nameEl.textContent = nameOrUnnamed(el, { start: true });
   row.appendChild(nameEl);
 
   if (opts.countBadge !== undefined && opts.countBadge > 0) {

@@ -29,7 +29,7 @@ import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed, typeName } from '../core/type-words';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, installRowKeydownActivation, relativeTime } from '../core/dom-utils';
@@ -922,7 +922,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
       btn.innerHTML = `
         <span class="material-symbols-outlined">${row.icon}</span>
         <span class="atlas-home-continue-verb">${row.verb}</span>
-        <span class="atlas-home-continue-name">${escapeText(row.el.name || '(unnamed)')}</span>
+        <span class="atlas-home-continue-name">${escapeText(nameOrUnnamed(row.el))}</span>
         ${proposedRowWord(row.el)}
         ${hiddenRowWord(row.el, worldState)}
         <span class="atlas-home-continue-kind">${escapeText(typeName(row.el.type, { supertype: row.el.supertype }))}</span>

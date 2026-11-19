@@ -15,7 +15,7 @@
  * same element. See DESIGN_CHARTS.md.
  */
 
-import { typeName } from '../../core/type-words';
+import { nameOrUnnamed, typeName } from '../../core/type-words';
 import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { effectiveEndDate, TEMPORAL_TYPE_FIELDS } from './temporal-fields';
@@ -135,7 +135,7 @@ export interface TimelineViewExtras {
    * yet. Shown in the ambient rail as the undated backlog so the gap between
    * "in the world" and "on the axis" is legible. `undefined` leaves it untouched.
    */
-  undated?: Array<{ id: string; type: string; name: string }>;
+  undated?: Array<{ id: string; type: string; name: string; unnamed?: boolean }>;
   /**
    * The URL-focused element (Act 2A): `/timeline/<id>` makes this the chart's
    * SUBJECT — its span draws emphasized (thick bar; a focused character gets
@@ -230,7 +230,7 @@ interface ViewState {
   onSetNow: ((value: number | null) => void) | null;
   // The undated backlog — dateable elements with no date, shown in
   // the ambient rail. Expanded type groups persist across re-renders.
-  undated: Array<{ id: string; type: string; name: string }>;
+  undated: Array<{ id: string; type: string; name: string; unnamed?: boolean }>;
   undatedExpanded: Set<string>;
   // The URL-focused element (Act 2A) — the chart's subject; its span draws
   // emphasized. null = broad view.
@@ -1772,7 +1772,7 @@ function renderCard(state: ViewState): void {
     const l = other.links.find(x => x.id === node.id);
     if (l && !seenRev.has(other.id)) {
       seenRev.add(other.id);
-      reverse.push({ id: other.id, type: other.elementType, name: other.name, fieldLabel: l.fieldLabel });
+      reverse.push({ id: other.id, type: other.elementType, name: other.name, unnamed: other.unnamed, fieldLabel: l.fieldLabel });
     }
   }
 
@@ -1942,13 +1942,13 @@ function buildUndatedSection(state: ViewState): HTMLElement | null {
       b.className = 'atlas-timeline-rail-undated-item';
       // A view-only world (conv. 149): no grip and no drag, a click opens it.
       if (state.readOnly) {
-        b.title = `Open ${it.name}`;
+        b.title = `Open ${nameOrUnnamed(it)}`;
         b.innerHTML = `<span class="atlas-timeline-rail-undated-name">${escapeText(it.name)}</span>`;
         b.addEventListener('click', () => state.onOpenElement(it.id));
         group.appendChild(b);
         continue;
       }
-      b.title = `Drag onto the timeline to date ${it.name}, or click to open it`;
+      b.title = `Drag onto the timeline to date ${nameOrUnnamed(it)}, or click to open it`;
       // A grip glyph + the name — the grip is the "you can drag this" signal.
       b.innerHTML =
         `<span class="material-symbols-outlined atlas-timeline-rail-undated-grip">drag_indicator</span>` +
@@ -2198,11 +2198,12 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   chip.className = 'atlas-timeline-chip'
     + (dated ? ' atlas-timeline-chip-dated' : '')
     + (dateable && !dated ? ' atlas-timeline-chip-undated' : '');
+  const said = nameOrUnnamed(link);
   chip.title = dated
-    ? `${link.fieldLabel}: ${link.name} (${typeName(link.type)}) · on this chart`
+    ? `${link.fieldLabel}: ${said} (${typeName(link.type)}) · on this chart`
     : dateable
-      ? `${link.fieldLabel}: ${link.name} (${typeName(link.type)}) · undated: drag onto the chart to date it`
-      : `${link.fieldLabel}: ${link.name} (${typeName(link.type)})`;
+      ? `${link.fieldLabel}: ${said} (${typeName(link.type)}) · undated: drag onto the chart to date it`
+      : `${link.fieldLabel}: ${said} (${typeName(link.type)})`;
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
   chip.innerHTML =
     `<span class="material-symbols-outlined">${escapeText(icon)}</span>` +

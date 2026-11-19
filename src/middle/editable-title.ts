@@ -23,7 +23,8 @@ export interface EditableTitleHandle {
 
 export function makeEditableTitle(opts: {
   initial: string;
-  placeholder?: string;
+  /** What an empty title shows; every title has one, so none is ever blank. */
+  placeholder: string;
   ariaLabel?: string;
   /** Start directly in edit mode (e.g. a brand-new draft). */
   autoEdit?: boolean;
@@ -43,15 +44,13 @@ export function makeEditableTitle(opts: {
 
   function renderDisplay(): void {
     host.innerHTML = '';
-    if (current) {
+    // A title of only spaces is no title: it shows the placeholder, never a blank heading.
+    if (current.trim()) {
       host.textContent = current;
       host.classList.remove('is-placeholder');
-    } else if (opts.placeholder) {
+    } else {
       host.textContent = opts.placeholder;
       host.classList.add('is-placeholder');
-    } else {
-      host.textContent = '(unnamed)';
-      host.classList.remove('is-placeholder');
     }
   }
 

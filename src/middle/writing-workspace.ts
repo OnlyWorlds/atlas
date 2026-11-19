@@ -53,6 +53,7 @@ import type { JSONContent } from '@tiptap/core';
 import { onLeaveWorld } from '../core/leave-flush';
 import { currentLore } from '../core/parlor-room';
 import { emptyBookLine } from './writing-helpers';
+import { nameOrUnnamed } from '../core/type-words';
 
 /**
  * Public reset (was used to clear per-narrative disclosure state). Disclosures
@@ -240,7 +241,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     if (!picked) return;
     const target = { id: picked.id, type: picked.type };
     const opts = { caseSensitive: info.caseSensitive, wholeWord: info.wholeWord };
-    const name = picked.name || '(unnamed)';
+    const name = nameOrUnnamed(picked);
 
     // Alias FIRST, chips second: the chip-label sync runs on the next state
     // tick and rewrites any label that is not yet the name or an alias, so

@@ -26,7 +26,7 @@ import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash, writingHash, knowledgeHash, knowledgeKnowerHash, shareHash } from '../core/router';
 import type { Element, ElementType } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName, typeNameStart } from '../core/type-words';
+import { nameOrUnnamed, typeName, typeNameStart } from '../core/type-words';
 import { getTierForNarrative, getWritingLabels, type WritingTier } from './writing-helpers';
 import { isKnowledgeNarrative, aboutIdsOf, heldByOf, knowersOfElement } from '../core/knowledge';
 import { isPageNarrative } from '../core/sharing';
@@ -359,7 +359,7 @@ function buildRefChip(src: Element, navigateTo: NavTarget): HTMLElement {
   icon.textContent = ELEMENT_ICONS[src.type];
   chip.appendChild(icon);
   const name = document.createElement('span');
-  name.textContent = src.name || '(unnamed)';
+  name.textContent = nameOrUnnamed(src, { start: true });
   chip.appendChild(name);
   markChipLink(chip, name);
   chip.addEventListener('click', (e) => {

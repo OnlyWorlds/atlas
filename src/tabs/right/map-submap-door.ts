@@ -20,6 +20,7 @@ import { escapeText } from '../../core/dom-utils';
 import { getAssociatedMaps } from './auto-open-map';
 import { buildMapTree, type LocationLike, type MapTreeNode } from './map-tree';
 import type { MapTabCacheEntry } from './map-tab-cache';
+import { nameOrUnnamed } from '../../core/type-words';
 
 /** Hover text on a pin that wears the map badge: the badge says what it means (Titus, 2026-10-15). */
 export const SUBMAP_PIN_HINT = 'This location has its own map: click it, then Open';
@@ -64,7 +65,7 @@ export function swapMapTab(fromMapId: string, to: WorldMap): void {
     patchSlice('ui', { ...ui, rightActiveIndex: already });
     return;
   }
-  const ref = { kind: 'map' as const, mapId: to.id, label: to.name || '(unnamed)', worldId: getState().active?.worldId };
+  const ref = { kind: 'map' as const, mapId: to.id, label: nameOrUnnamed(to, { start: true }), worldId: getState().active?.worldId };
   const at = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === fromMapId);
   const rightTabs = [...ui.rightTabs];
   if (at >= 0) rightTabs[at] = ref; else rightTabs.push(ref);
@@ -130,10 +131,9 @@ export function refreshUpButton(entry: MapTabCacheEntry): void {
     });
     entry.toolbar.prepend(btn);
   }
-  const name = parent.name || '(unnamed)';
   btn.dataset.mapId = parent.id;
-  btn.title = `Up to ${name}`;
-  btn.setAttribute('aria-label', `Up to ${name}`);
+  btn.title = `Up to ${nameOrUnnamed(parent)}`;
+  btn.setAttribute('aria-label', btn.title);
   btn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">arrow_upward</span>`
-    + `<span class="atlas-map-up-label">${escapeText(name)}</span>`;
+    + `<span class="atlas-map-up-label">${escapeText(nameOrUnnamed(parent, { start: true }))}</span>`;
 }

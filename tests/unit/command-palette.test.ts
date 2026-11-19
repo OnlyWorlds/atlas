@@ -51,12 +51,12 @@ describe('searchPalette ranking', () => {
     expect(byName.get('Brenn')?.snippet).toMatch(/^…/);
   });
 
-  it('matching is case-insensitive; unnamed elements surface via description as (unnamed)', () => {
+  it('matching is case-insensitive; unnamed elements surface via description as The unnamed <type>', () => {
     const results = searchPalette('HARBOR', [
       el({ name: 'old harbor' }),
       el({ name: '', description: 'A quiet harbor town.' }),
     ]);
-    expect(results.map(r => r.name)).toEqual(['old harbor', '(unnamed)']);
+    expect(results.map(r => r.name)).toEqual(['old harbor', 'The unnamed character']);
   });
 
   it('rooms match by name; an element name-prefix outranks them, but rooms beat weaker tiers', () => {

@@ -36,6 +36,7 @@
 import type { Element } from './types';
 import { linkIdsOf } from './link-ids';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
+import { nameOrUnnamed } from './type-words';
 
 export type DateConflictKind =
   | 'reversed'
@@ -48,7 +49,9 @@ export type DateConflictKind =
 export interface DatedRef {
   id: string;
   type: string;
+  /** The element's name, or "The unnamed …" (then `unnamed` is set, for `nameOrUnnamed` mid-sentence). */
   name: string;
+  unnamed?: boolean;
   field: string;
   date: number;
 }
@@ -79,7 +82,7 @@ function raw(el: Element, field: string): unknown {
 function dated(el: Element, field: string): DatedRef | null {
   const date = parseTemporalValue(raw(el, field));
   if (date === null) return null;
-  return { id: el.id, type: el.type, name: el.name || '(unnamed)', field, date };
+  return { id: el.id, type: el.type, name: nameOrUnnamed(el, { start: true }), unnamed: !el.name?.trim() || undefined, field, date };
 }
 
 /** A span's start and end, or null when either is missing. */

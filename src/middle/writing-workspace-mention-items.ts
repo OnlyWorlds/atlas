@@ -96,6 +96,7 @@ function toItem(el: Element): MentionSuggestionItem {
     id: el.id,
     type: el.type,
     name: el.name || '(unnamed)',
+    unnamed: !el.name?.trim() || undefined,
     subtitle: buildSubtitle(el),
     aliases,
   };

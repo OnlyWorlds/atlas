@@ -38,6 +38,7 @@ import { rankAnchors, ANCHOR_CAP } from './degree';
 import { resolveCalendarLens } from '../../core/calendar-lens';
 import { formatStep } from '@onlyworlds/sdk';
 import { calendarTicks } from '../../core/calendar-axis';
+import { capitalise, theUnnamed } from '../../core/type-words';
 
 /** One node in a frozen chart — identity + axis position only. */
 export interface PayloadChartNode {
@@ -114,7 +115,8 @@ export function freezeChartBlock(
     .slice()
     .sort((a, b) => a.startDate - b.startDate || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map(n => {
-      const node: PayloadChartNode = { type: n.elementType, name: n.name || '(unnamed)', date: n.startDate };
+      // The normaliser gives every node a name: its own, or "The unnamed event".
+      const node: PayloadChartNode = { type: n.elementType, name: n.name, date: n.startDate };
       if (n.endDate != null && n.endDate > n.startDate) node.endDate = n.endDate;
       if (anchors.has(n.id)) node.anchor = true;
       if (includedIds.has(n.id)) node.ref = n.id;
@@ -135,7 +137,7 @@ export function freezeChartBlock(
   if (!Number.isFinite(axisMin)) { axisMin = 0; axisMax = 0; }
 
   const block: PayloadChartBlock = {
-    id: blockId, kind: 'chart', title: chart.name || '(unnamed chart)', axisMin, axisMax, nodes: frozen,
+    id: blockId, kind: 'chart', title: chart.name?.trim() || capitalise(theUnnamed('chart')), axisMin, axisMax, nodes: frozen,
   };
   if (lens && axisMax > axisMin) {
     const span = axisMax - axisMin;

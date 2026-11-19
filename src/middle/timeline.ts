@@ -26,7 +26,7 @@ import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } fr
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { capitalise, nameOrUnnamed, typeName } from '../core/type-words';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
@@ -103,7 +103,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
           const el = getState().data.elements.find(e => e.id === id);
           const field = el ? TEMPORAL_TYPE_FIELDS[el.type]?.start : undefined;
           const date = el && field ? parseTemporalValue((el as Record<string, unknown>)[field]) : null;
-          if (el && date != null) showDatedElement(id, el.name || '(unnamed)', date, 'Created');
+          if (el && date != null) showDatedElement(id, nameOrUnnamed(el), date, 'Created');
         });
       },
     });
@@ -270,7 +270,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     calChip.className = 'atlas-cal-chip' + (lensEarly ? ' active' : '');
     calChip.dataset.action = 'calendar-menu';
     calChip.title = lensEarly
-      ? `Dates read in ${lensEarly.name}. Click to switch or edit`
+      ? `Dates read in ${nameOrUnnamed(lensEarly)}. Click to switch or edit`
       : 'These numbers could have names. Create a calendar';
     calChip.innerHTML =
       `<span class="material-symbols-outlined">calendar_month</span>` +
@@ -385,8 +385,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    * date yet — the backlog that could go on the axis. Global (the whole world's
    * undated backlog, not the current scope), grouped for the rail by the caller.
    */
-  function undatedElements(): Array<{ id: string; type: ElementType; name: string }> {
-    const out: Array<{ id: string; type: ElementType; name: string }> = [];
+  function undatedElements(): Array<{ id: string; type: ElementType; name: string; unnamed?: boolean }> {
+    const out: Array<{ id: string; type: ElementType; name: string; unnamed?: boolean }> = [];
     for (const el of currentLore()) {
       const map = TEMPORAL_TYPE_FIELDS[el.type];
       if (!map) continue; // not a dateable type — never counts as "undated"
@@ -401,7 +401,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // sitting in the work queue forever reads as nagging, not backlog
       // (datable any time via the element room's Date field).
       if ((el as Record<string, unknown>)['atlas_calendar'] != null) continue;
-      out.push({ id: el.id, type: el.type as ElementType, name: el.name || '(unnamed)' });
+      out.push({ id: el.id, type: el.type as ElementType, name: nameOrUnnamed(el, { start: true }), unnamed: !el.name?.trim() || undefined });
     }
     return out;
   }
@@ -442,7 +442,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       await store.updateElement(id, { [field]: date });
       const fresh = await refreshElementsAfterWrite(store);
       // Deferred so the re-render's lastScoped is fresh (and only while the world is on screen).
-      if (fresh) queueMicrotask(() => showDatedElement(id, el.name, date));
+      if (fresh) queueMicrotask(() => showDatedElement(id, nameOrUnnamed(el), date));
     } catch (err) {
       console.error('[charts] drag-to-date write failed:', err);
       // Writing the same date again is safe (the bounds are checked again too).
@@ -580,7 +580,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
     if (!viewOnly) {
       if (lens) {
-        item(`Edit ${lens.name}`, {
+        item(`Edit ${nameOrUnnamed(lens)}`, {
           icon: 'edit',
           action: () => new CalendarBuilderModal(toasts, {
             elementId: lens.id,

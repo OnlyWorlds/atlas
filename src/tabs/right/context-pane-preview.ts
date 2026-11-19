@@ -23,7 +23,7 @@
 
 import type { Element } from '../../core/types';
 import { ELEMENT_ICONS } from '../../core/constants';
-import { typeName } from '../../core/type-words';
+import { nameOrUnnamed, typeName } from '../../core/type-words';
 import { getState } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
 import { getEditorSettings } from '../../registry/registry';
@@ -143,7 +143,7 @@ function buildPreview(
   titleWrap.className = 'atlas-context-preview-title';
   const name = document.createElement('div');
   name.className = 'atlas-context-preview-name';
-  name.textContent = el.name || '(unnamed)';
+  name.textContent = nameOrUnnamed(el, { start: true });
   titleWrap.appendChild(name);
   const typeLabel = document.createElement('div');
   typeLabel.className = 'atlas-context-preview-type';
@@ -190,7 +190,7 @@ function buildPreview(
   const folded = foldBacklinks(findBacklinkingElements(el.id), el.id, byId);
   appendLinkLine(body, 'atlas-context-preview-backlinks', 'Linked from', folded.story.length,
     folded.story.map(n => ({
-      text: n.name || '(unnamed)',
+      text: nameOrUnnamed(n),
       title: typeName(n.type, { supertype: n.supertype }),
       navId: n.id,
     })));
@@ -247,7 +247,7 @@ function buildPreview(
       const ids = mentions.narratives.map(n => n.id);
       void bulkLinkTerm(ids, mentions.terms, { id: el.id, type: el.type }, MENTION_MATCH).then(({ changed, count }) => {
         toastManager.info(count > 0
-          ? `Linked ${count} mention${count === 1 ? '' : 's'} of ${el.name || '(unnamed)'} across ${changed} ${word}${changed === 1 ? '' : 's'}`
+          ? `Linked ${count} mention${count === 1 ? '' : 's'} of ${nameOrUnnamed(el)} across ${changed} ${word}${changed === 1 ? '' : 's'}`
           : 'Nothing to link');
         // Rebuild from fresh state: the line is gone, the backlinks grew.
         const fresh = getState().data.elements.find(e => e.id === el.id) ?? el;

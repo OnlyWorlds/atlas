@@ -40,7 +40,7 @@ import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writin
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
-import { typeName } from '../core/type-words';
+import { capitalise, nameOrUnnamed, theUnnamed, typeName } from '../core/type-words';
 import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { Element } from '../core/types';
@@ -642,11 +642,14 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
    * changes; Create = the circle becomes the holder and narrator clears.
    */
   function openPromoteToCircle(firstId: string, secondId: string, ctx: EditorCtx): void {
-    const nameOf = (id: string): string =>
-      getState().data.elements.find(e => e.id === id)?.name || '(unnamed)';
+    // "Ada & the unnamed character": the first starts the name, the second is said in lower case.
+    const nameOf = (id: string, start: boolean): string => {
+      const el = getState().data.elements.find(e => e.id === id);
+      return el ? nameOrUnnamed(el, { start }) : '';
+    };
     new ElementCreateModal(toasts, {
       initialType: 'collective',
-      initialName: `${nameOf(firstId)} & ${nameOf(secondId)}`,
+      initialName: `${nameOf(firstId, true)} & ${nameOf(secondId, false)}`,
       suppressNavigate: true,
       title: 'Two knowers make a circle',
       extraData: { subtype: CIRCLE_SUBTYPE, characters: [firstId, secondId] },
@@ -803,7 +806,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
         <span class="atlas-knowledge-row-main">
-          <span class="atlas-knowledge-row-name">${escapeText(entry.name || '(unnamed)')}</span>
+          <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(entry, { start: true }))}</span>
           <span class="atlas-knowledge-row-meta">${escapeText(holderSummary(entry))}</span>
         </span>
       `;
@@ -818,7 +821,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const held = heldByOf(entry);
     const ids = [...(held.narrator ? [held.narrator] : []), ...held.collectives];
     if (ids.length === 0) return 'No holders yet';
-    const first = elOf(ids[0])?.name || '(unnamed)';
+    const firstEl = elOf(ids[0]);
+    const first = firstEl ? nameOrUnnamed(firstEl) : 'someone not shown here';
     return ids.length === 1 ? `Held by ${first}` : `Held by ${first} +${ids.length - 1}`;
   }
 
@@ -868,7 +872,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">${isCircle ? 'groups' : (ELEMENT_ICONS[k.type] ?? 'person')}</span>
         <span class="atlas-knowledge-row-main">
-          <span class="atlas-knowledge-row-name">${escapeText(k.name || '(unnamed)')}</span>
+          <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(k, { start: true }))}</span>
           <span class="atlas-knowledge-row-meta">${escapeText(meta.join(' · '))}</span>
         </span>
       `;
@@ -912,7 +916,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
     knowerTitleHandle = makeEditableTitle({
       initial: knower.name || '',
-      placeholder: '(unnamed)',
+      placeholder: capitalise(theUnnamed(knower.type, { supertype: knower.supertype })),
       ariaLabel: 'Knower name',
       readOnly: viewOnly,
       onCommit: (next) => {
@@ -975,7 +979,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const existing = listPages(getState().data.elements).find(p =>
           blocksOf(p).some(b => b.kind === 'circle' && b.knowerId === knower.id));
         if (existing) {
-          toasts.info(`Opened the existing page for this circle: "${existing.name || '(unnamed)'}"`);
+          toasts.info(`Opened the existing page for this circle: ${existing.name?.trim() ? `"${existing.name.trim()}"` : nameOrUnnamed(existing)}`);
           navigate(shareHash(worldId, existing.id));
           return;
         }
@@ -1036,7 +1040,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         row.innerHTML = `
           <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
           <span class="atlas-knowledge-row-main">
-            <span class="atlas-knowledge-row-name">${escapeText(entry.name || '(unnamed)')}</span>
+            <span class="atlas-knowledge-row-name">${escapeText(nameOrUnnamed(entry, { start: true }))}</span>
           </span>
         `;
         row.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
@@ -1072,10 +1076,10 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const head = document.createElement('button');
         head.type = 'button';
         head.className = 'atlas-knowledge-known-head';
-        head.title = `Open ${el.name || typeName(el.type, { supertype: el.supertype })}`;
+        head.title = `Open ${nameOrUnnamed(el)}`;
         head.innerHTML = `
           <span class="material-symbols-outlined">${ELEMENT_ICONS[el.type] ?? 'category'}</span>
-          <span class="atlas-knowledge-known-name">${escapeText(el.name || '(unnamed)')}</span>
+          <span class="atlas-knowledge-known-name">${escapeText(nameOrUnnamed(el, { start: true }))}</span>
           <span class="atlas-knowledge-known-type">${escapeText(typeName(el.type, { supertype: el.supertype }))}</span>
         `;
         head.addEventListener('click', () => navigate(elementHash(worldId, el.id)));
@@ -1101,7 +1105,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           const src = document.createElement('button');
           src.type = 'button';
           src.className = 'atlas-knowledge-known-src';
-          src.textContent = `From ${entry.name || '(unnamed)'}`;
+          src.textContent = `From ${nameOrUnnamed(entry)}`;
           src.title = 'Open this entry';
           src.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
           quote.appendChild(src);

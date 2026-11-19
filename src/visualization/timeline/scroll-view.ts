@@ -17,11 +17,16 @@ import { layoutScroll, type ScrollLayout } from './scroll-layout';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
 import { lastPressWasKey } from '../../ui/input-kind';
-import { theUnnamed } from '../../core/type-words';
+import { capitalise, nameOrUnnamed, theUnnamed } from '../../core/type-words';
 
-/** A card's name as its head and its Open say it: a missing or blank one is "the unnamed event". */
-function shownName(node: TimelineNode): string {
-  return node.unnamed || !node.name.trim() ? theUnnamed(node.elementType) : node.name;
+/**
+ * A card's name as its head and its Open say it: a missing or blank one is
+ * "The unnamed event" at the head (`start`), "the unnamed event" inside "Open …".
+ */
+function shownName(node: TimelineNode, start = false): string {
+  if (!node.unnamed && node.name.trim()) return node.name;
+  const words = theUnnamed(node.elementType);
+  return start ? capitalise(words) : words;
 }
 import { formatStep, formatDuration, type CalendarConfig } from '@onlyworlds/sdk';
 
@@ -124,9 +129,9 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
       `<div class="atlas-scroll-card-body">` +
       // The head is the card's press for a keyboard: it opens the card (its
       // links, Focus and Open) and closes it again.
-      `<div class="atlas-scroll-card-head" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeText(`${shownName(node)}, ${dateLine.replace(/\s*→\s*/g, ' to ')}`)}">` +
+      `<div class="atlas-scroll-card-head" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeText(`${shownName(node, true)}, ${dateLine.replace(/\s*→\s*/g, ' to ')}`)}">` +
       `<span class="material-symbols-outlined" style="color:${escapeText(node.color)}">${escapeText(icon)}</span>` +
-      `<span class="atlas-scroll-card-name">${escapeText(shownName(node))}</span>` +
+      `<span class="atlas-scroll-card-name">${escapeText(shownName(node, true))}</span>` +
       `</div>` +
       `<div class="atlas-scroll-card-date">${escapeText(dateLine)}</div>` +
       (node.snippet ? `<div class="atlas-scroll-card-snippet">${escapeText(node.snippet)}</div>` : '') +
@@ -187,8 +192,10 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
           chip.type = 'button';
           chip.className = 'atlas-scroll-card-chip';
           chip.title = link.fieldLabel;
+          // Its name is what a press does, never the glyph's word: "Open Ada", "Open the unnamed character".
+          chip.setAttribute('aria-label', `Open ${nameOrUnnamed(link)}`);
           chip.innerHTML =
-            `<span class="material-symbols-outlined">${escapeText((ELEMENT_ICONS as Record<string, string>)[link.type] ?? 'category')}</span>` +
+            `<span class="material-symbols-outlined" aria-hidden="true">${escapeText((ELEMENT_ICONS as Record<string, string>)[link.type] ?? 'category')}</span>` +
             `<span>${escapeText(link.name)}</span>`;
           chip.addEventListener('click', (e) => { e.stopPropagation(); opts.onSelect(link.id); });
           chips.appendChild(chip);

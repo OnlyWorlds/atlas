@@ -16,7 +16,7 @@ import { getState } from '../core/state';
 import type { Element, ElementType } from '../core/types';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { ELEMENT_ICONS } from '../core/constants';
-import { typeName, aTypeName } from '../core/type-words';
+import { nameOrUnnamed, typeName, aTypeName } from '../core/type-words';
 import { escapeText } from '../core/dom-utils';
 import { loreFor } from '../core/parlor-room';
 
@@ -227,7 +227,7 @@ class ElementPickerModal extends BaseModal {
     row.setAttribute('data-element-id', el.id);
     row.innerHTML = `
       <span class="material-symbols-outlined atlas-picker-row-icon">${ELEMENT_ICONS[el.type]}</span>
-      <span class="atlas-picker-row-name">${escapeText(el.name || '(unnamed)')}</span>
+      <span class="atlas-picker-row-name">${escapeText(nameOrUnnamed(el, { start: true }))}</span>
       <span class="atlas-picker-row-type">${escapeText(typeName(el.type, { supertype: el.supertype }))}</span>
     `;
     row.addEventListener('click', () => {

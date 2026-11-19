@@ -89,7 +89,7 @@ describe('an element\'s mark', () => {
     expect(waymarkFor(linked(), el({ hidden: true }), { meta })?.reader).toBe('member');
   });
 
-  it('a known-of stub passes the name and type only; an empty name reads (unnamed)', () => {
-    expect(waymarkFor(linked(), el({ name: '' }), { meta, stub: true })?.element).toEqual({ id: EID, type: 'event', name: '(unnamed)' });
+  it('a known-of stub passes the name and type only; an empty name reads The unnamed event', () => {
+    expect(waymarkFor(linked(), el({ name: '' }), { meta, stub: true })?.element).toEqual({ id: EID, type: 'event', name: 'The unnamed event' });
   });
 });

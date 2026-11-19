@@ -188,21 +188,33 @@ for (const tag of ['', ' @firefox']) {
 
   test(`an unnamed element's Open says the unnamed event, the one form every control says it in${tag}`, async ({ page }) => {
     await setupWorld(page);
-    await createElement(page, 'event', { name: '', start_date: 10 });
+    const nobody = await createElement(page, 'character', { name: '  ' });
+    const ada = await createElement(page, 'character', { name: 'Ada' });
+    await createElement(page, 'event', { name: '', start_date: 10, characters: [nobody, ada] });
     await createElement(page, 'event', { name: '   ', start_date: 20 });
     await createElement(page, 'event', { name: 'The Cracking', start_date: 380 });
     await openCharts(page);
     await page.click('[data-action="chart-mode-scroll"]');
-    // A missing name and a spaces-only name: each card's head and its Open say the same unnamed form.
+    // A missing name and a spaces-only name: each card's head says the unnamed form with its
+    // capital, as a name that stands alone; its Open says it mid-line, in lower case.
     for (const date of ['10', '20']) {
-      const head = page.getByRole('button', { name: `the unnamed event, ${date}`, exact: true });
+      const head = page.getByRole('button', { name: `The unnamed event, ${date}`, exact: true });
       await expect(head).toHaveCount(1);
       const card = page.locator('.atlas-scroll-card').filter({ has: head });
-      await expect(card.locator('.atlas-scroll-card-name')).toHaveText('the unnamed event');
+      await expect(card.locator('.atlas-scroll-card-name')).toHaveText('The unnamed event');
       await head.click();
       const openBtn = card.locator('.atlas-scroll-card-actions button', { hasText: 'Open' });
       await expect(openBtn).toHaveAccessibleName('Open the unnamed event');
       await expect(openBtn).toHaveAttribute('title', 'Open the unnamed event');
+      if (date !== '10') continue;
+      // Its link chips are named for what a press does, never by their glyph's word.
+      const chips = card.locator('.atlas-scroll-card-chip');
+      await expect(chips).toHaveCount(2);
+      const blankChip = card.getByRole('button', { name: 'Open the unnamed character', exact: true });
+      await expect(blankChip).toHaveCount(1);
+      await expect(blankChip.locator('span:not(.material-symbols-outlined)')).toHaveText('The unnamed character');
+      await expect(blankChip.locator('.material-symbols-outlined')).toHaveAttribute('aria-hidden', 'true');
+      await expect(card.getByRole('button', { name: 'Open Ada', exact: true })).toHaveCount(1);
     }
   });
 }

@@ -16,6 +16,7 @@ import { navigate, elementHash } from '../core/router';
 import type { Element } from '../core/types';
 import { pageLore } from '../core/parlor-room';
 import { characterRecords, toolName, LEGACY_TOOL_NAME, type LegacyRow } from '../core/records';
+import { nameOrUnnamed } from '../core/type-words';
 
 function open(id: string): void {
   const worldId = getState().active?.worldId;
@@ -49,7 +50,7 @@ function storyRows(stories: OwRecord['stories']): HTMLElement | null {
   const list = document.createElement('div');
   list.className = 'atlas-record-stories';
   for (const s of stories) {
-    const b = rowButton('atlas-record-story', s.name || '(unnamed story)', 'Open the story', s.id);
+    const b = rowButton('atlas-record-story', nameOrUnnamed({ name: s.name, type: 'narrative' }, { start: true }), 'Open the story', s.id);
     b.dataset.role = 'record-story';
     const as = document.createElement('span');
     as.className = 'atlas-record-as';
@@ -78,7 +79,7 @@ function recordItem(r: OwRecord): HTMLElement {
   const item = document.createElement('div');
   item.className = 'atlas-record';
   item.dataset.role = 'record';
-  const b = rowButton('atlas-record-row', r.event.name || '(unnamed record)', `Played on ${playedOn(r.played_at)} in ${toolName(r.tool)} · open the record`, r.event.id);
+  const b = rowButton('atlas-record-row', nameOrUnnamed({ name: r.event.name, type: 'event' }, { start: true }), `Played on ${playedOn(r.played_at)} in ${toolName(r.tool)} · open the record`, r.event.id);
   const line = document.createElement('span');
   line.className = 'atlas-record-line';
   line.textContent = recordLine(r);
@@ -93,7 +94,7 @@ function legacyItem(row: LegacyRow): HTMLElement {
   const item = document.createElement('div');
   item.className = 'atlas-record';
   item.dataset.role = 'record-legacy';
-  const b = rowButton('atlas-record-row', row.event.name || '(unnamed battle)', `Recorded from play in ${LEGACY_TOOL_NAME} · open the battle`, row.event.id);
+  const b = rowButton('atlas-record-row', nameOrUnnamed(row.event, { start: true }), `Recorded from play in ${LEGACY_TOOL_NAME} · open the battle`, row.event.id);
   if (row.outcome) {
     const line = document.createElement('span');
     line.className = 'atlas-record-line';

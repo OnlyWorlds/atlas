@@ -16,7 +16,7 @@ const VESSACH: CalendarConfig = {
   ],
   format: '{year} {era}',
 };
-const LENS: WorldCalendar = { id: 'cal-1', name: 'Vessach reckoning', config: VESSACH };
+const LENS: WorldCalendar = { id: 'cal-1', name: 'Vessach reckoning', type: 'construct', config: VESSACH };
 
 const num = (name: string) => ({ name, widget: 'number' as const });
 

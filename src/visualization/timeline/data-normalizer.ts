@@ -17,6 +17,7 @@ import { relationFieldsFor } from '../../editor/field-schema';
 import { ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { computeDegrees } from './degree';
 import { playGlyph, playKindOf } from '../../core/records';
+import { nameOrUnnamed } from '../../core/type-words';
 
 // Node colour is the ONE canonical per-type palette (`ELEMENT_TYPE_COLORS`),
 // shared with pins, the static share renderer (chart-static.ts) and the rest of
@@ -50,7 +51,7 @@ function resolveLinks(el: Element, byId: Map<string, Element>): LinkedRef[] {
       const target = byId.get(id);
       if (!target) continue;
       seen.add(id);
-      out.push({ id, type: target.type, name: target.name || '(unnamed)', fieldLabel: label });
+      out.push({ id, type: target.type, name: nameOrUnnamed(target, { start: true }), unnamed: !target.name?.trim() || undefined, fieldLabel: label });
     }
   }
   return out;
@@ -104,7 +105,7 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
     nodes.push({
       id: el.id,
       elementType: el.type,
-      name: el.name || '(unnamed)',
+      name: nameOrUnnamed(el, { start: true }),
       unnamed: !el.name?.trim() || undefined,
       startDate,
       endDate,
