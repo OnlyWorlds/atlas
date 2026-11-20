@@ -9,9 +9,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import type { ToastAction } from '../../src/ui/toast-manager';
-import { attachSyncEngine, detachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, __test_emitConflictToasts, heldCopyLine, bulkReplacedLine } from '../../src/sync/sync-attach';
+import { attachSyncEngine, detachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, __test_emitConflictToasts, heldCopyLine, bulkReplacedLine, refreshConflictsCount } from '../../src/sync/sync-attach';
 import { toastManager } from '../../src/ui/toast-manager';
-import { ConflictReviewModal } from '../../src/ui/conflict-review-modal';
+import { ConflictReviewModal, openConflictReview } from '../../src/ui/conflict-review-modal';
+import { getState } from '../../src/core/state';
 import { patchSlice } from '../../src/core/state';
 import { defaultRegistry } from '../../src/core/types';
 import { setPin } from '../../src/registry/registry';
@@ -167,8 +168,8 @@ describe('the review list says one pair', () => {
     expect(modal.querySelector('[data-role="keeps-online"]')).toBeNull();
     expect(modal.querySelector('[data-role="proposal-line"]')!.textContent).toBe('The keeper declined your change: "Not yet".');
     expect(modal.querySelector('[data-meta-conflict] .atlas-conflict-fields')!.textContent).toBe('changed here and on OnlyWorlds');
-    // An ordinary row's own line is unchanged: it says which fields differ, nothing of the missing button.
-    expect(modal.querySelector('[data-conflict-id="c2"] .atlas-conflict-fields')!.textContent).toBe('1 field differ: description');
+    // An ordinary row's own line says which fields differ, nothing of the missing button.
+    expect(modal.querySelector('[data-conflict-id="c2"] .atlas-conflict-fields')!.textContent).toBe('1 field differs: description');
     // A writable world's rows offer both (the control).
     document.body.innerHTML = '';
     vi.restoreAllMocks();
@@ -258,5 +259,107 @@ describe("the note that a copy waits carries its own press into the review", () 
     expect(hits.map(h => h.replace(/:\d+ /, ' '))).toEqual(["sync/sync-attach.ts label: 'Review conflicts',"]);
     // The instrument sees the old sentence.
     expect(/['"`][^'"`]*Review conflicts/.test("? 'One element waits in Review conflicts: this copy has no record'")).toBe(true);
+  });
+});
+
+describe('round 3: the note stays true, each label runs what it names, the opener counts', () => {
+  const rowOf = (id: string, noBaseline: boolean, extra: Partial<Conflict> = {}): Conflict => ({
+    ...row(noBaseline), element_id: id, ...(noBaseline ? { theirs: { description: 'theirs' } } : {}), ...extra,
+  });
+  const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+  /** The note through the real toast manager: what is on screen. */
+  const onScreen = () => [...document.querySelectorAll('#toast-container .ow-toast')]
+    .filter(t => (t as HTMLElement).style.opacity !== '0')
+    .map(t => t.querySelector('.ow-toast-message')?.textContent ?? '');
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    document.body.innerHTML = '<div id="toast-container"></div>';
+    toastManager.init();
+    patchSlice('registry', { ...setPin(defaultRegistry(), '1234'), worlds: [entry, { ...entry, id: 'w2', name: 'B', api: { world_id: 'srv-w2', api_key: 'key-w2' } }] } as never);
+    patchSlice('active', { worldId: 'w1', meta: { name: 'A' } } as never);
+    patchSlice('data', { elements: ['c1', 'c2', 'c3', 'c4', 'c5'].map(id => ({ id, type: 'character', name: id.toUpperCase() })) } as never);
+  });
+  afterEach(() => {
+    document.body.innerHTML = '';
+    patchSlice('active', null);
+    patchSlice('data', { elements: [] } as never);
+  });
+
+  it('M1: two rounds, 3 held then 1 more, leave one note saying 4; it follows the review down and goes at 0', async () => {
+    __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true), rowOf('c3', true)]), localWins());
+    __test_emitConflictToasts('pull', result([rowOf('c4', true)]), localWins());
+    await wait(350);
+    expect(onScreen()).toEqual([heldCopyLine(4)]);
+    // The review resolves rows: each count refresh says what it holds now.
+    const engine = getCurrentSyncEngine()!;
+    const list = vi.spyOn(engine, 'listConflicts').mockResolvedValue([rowOf('c2', true), rowOf('c5', false)]);
+    vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue([]);
+    await refreshConflictsCount();
+    expect(onScreen()).toEqual([heldCopyLine(1)]);
+    list.mockResolvedValue([rowOf('c5', false)]);
+    await refreshConflictsCount();
+    await wait(350);
+    expect(onScreen()).toEqual([]);
+  });
+
+  it('M1: the note goes on a world switch (another world attached), on detach, and when no world is open', async () => {
+    const say = () => __test_emitConflictToasts('push', result([rowOf('c1', true)]), localWins());
+    say();
+    expect(onScreen()).toEqual([heldCopyLine(1)]);
+    // Another world opens: its engine attaches, the first detaches.
+    patchSlice('active', { worldId: 'w2', meta: { name: 'B' } } as never);
+    const folder = new MockFolderStore();
+    await folder.open(null);
+    attachSyncEngine({ ...entry, id: 'w2', name: 'B', api: { world_id: 'srv-w2', api_key: 'key-w2' } }, folder);
+    await wait(350);
+    expect(onScreen()).toEqual([]);
+    // Detach alone.
+    say();
+    expect(onScreen()).toEqual([heldCopyLine(1)]);
+    detachSyncEngine();
+    await wait(350);
+    expect(onScreen()).toEqual([]);
+  });
+
+  it('M1: leaving the note\'s world for no world takes it down', async () => {
+    __test_emitConflictToasts('push', result([rowOf('c1', true)]), localWins());
+    expect(onScreen()).toEqual([heldCopyLine(1)]);
+    patchSlice('active', null);
+    await wait(350);
+    expect(onScreen()).toEqual([]);
+  });
+
+  it('S1: each button on each row kind runs the resolution it names', async () => {
+    const engine = getCurrentSyncEngine()!;
+    vi.spyOn(engine, 'listConflicts').mockResolvedValue([rowOf('c1', false), rowOf('c2', false, { proposal: { outcome: 'lapsed' } }), rowOf('c3', true)]);
+    vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue(['x_names']);
+    const resolve = vi.spyOn(engine, 'resolveConflict').mockResolvedValue();
+    const meta = vi.spyOn(engine, 'resolveMetaConflict').mockResolvedValue();
+    for (const [label, action, choice] of [['Keep this copy', 'overwrite-mine', 'mine'], ['Keep the OnlyWorlds copy', 'pull-theirs', 'theirs']] as const) {
+      resolve.mockClear();
+      meta.mockClear();
+      document.body.innerHTML = '<div id="toast-container"></div>';
+      await openConflictReview(toastManager);
+      const rows = [...document.querySelectorAll<HTMLElement>('[data-modal="conflict-review"] .atlas-conflict-row')];
+      expect(rows.length).toBe(4);
+      for (const r of rows) {
+        [...r.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent!.trim() === label)!.click();
+        await wait(10);
+      }
+      expect(resolve.mock.calls).toEqual([['c1', action], ['c2', action], ['c3', action]]);
+      expect(meta.mock.calls).toEqual([['x_names', choice]]);
+    }
+  });
+
+  it('S2: opening the review through the opener counts the conflicts again for the pill', async () => {
+    const engine = getCurrentSyncEngine()!;
+    vi.spyOn(engine, 'listConflicts').mockResolvedValue([rowOf('c1', false), rowOf('c2', true)]);
+    vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue(['x_names']);
+    patchSlice('sync', { ...getState().sync, activeConflictsCount: 0 });
+    await openConflictReview(toastManager);
+    expect(document.querySelector('[data-modal="conflict-review"]')).not.toBeNull();
+    expect(getState().sync.activeConflictsCount).toBe(3);
   });
 });

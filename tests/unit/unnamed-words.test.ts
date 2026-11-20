@@ -375,11 +375,14 @@ describe('the census of stand-ins: no word takes a missing name\'s place', () =>
  * location" inside a sentence (`missingWords`) and "(missing location)" on a chip, a row or a label
  * (`missingLabel`), in the type its field or pin names, else "element". The five forms it replaced
  * ("(unknown)", "(unknown map)", "(missing)", "(pin without element)", "(missing knower)", and the map
- * tab's "(missing map)" literal) are gone. The census finds any quoted "(unknown…" or "(missing…", in any
- * quote form, and "without element" or "missing knower" anywhere in a line that is not a comment line.
+ * tab's "(missing map)" literal) are gone. The census finds "(unknown…" or "(missing…" anywhere on a line
+ * that is not a comment line (at a string's start or inside it: "Back to (unknown)"), a bare "Unknown" in
+ * quotes, and "without element" or "missing knower".
  * Limits, named: a form built from parts (a variable holding "(unknown") is not seen.
  */
-const MISSING_FORM = /['"`]\([Uu]nknown\b|['"`]\([Mm]issing\b|without element|missing knower/;
+const MISSING_FORM = /\([Uu]nknown\b|\([Mm]issing\b|^\s*Unknown\s*$|without element|missing knower/;
+/** A line's string literals, in each quote form (a template's `${…}` parts ride along; a code word like `(missing.length` is no string). */
+const STRINGS = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
 
 /** The missing forms left on purpose, by file: each line's own text, trimmed, and why. */
 const MISSING_LEFT: Record<string, Array<{ line: string; why: string }>> = {
@@ -389,7 +392,7 @@ const MISSING_LEFT: Record<string, Array<{ line: string; why: string }>> = {
 
 function missingLines(code: string): number[] {
   return code.split(/\r?\n/)
-    .map((line, i) => (!isCommentLine(line) && MISSING_FORM.test(line) ? i + 1 : 0))
+    .map((line, i) => (!isCommentLine(line) && (line.match(STRINGS) ?? []).some(lit => MISSING_FORM.test(lit.slice(1, -1))) ? i + 1 : 0))
     .filter(n => n > 0);
 }
 
@@ -421,6 +424,10 @@ describe('a missing element is said one way', () => {
       'const label = el ? nameOrUnnamed(el) : "(Unknown)";',
       'const label = el ? nameOrUnnamed(el) : `(unknown ${t})`;',
       "const x = 'a pin without element here';",
+      // Inside a string, not at its start (the gate's N1), and the bare word.
+      "crumb.title = 'Back to (unknown)';",
+      'label.textContent = `${x} (missing map)`;',
+      "const name = el ? el.name : 'Unknown';",
     ];
     expect(missingLines(planted.join('\n'))).toEqual(planted.map((_, i) => i + 1));
     const clean = [
@@ -429,6 +436,9 @@ describe('a missing element is said one way', () => {
       "// was '(unknown)'",
       " * (missing knower)",
       "showError('Check for a missing comma, quote, or bracket.');",
+      'if (missing.length === 0) continue;',
+      "if (code === 'unknown') return;",
+      'if (missing) {',
     ];
     expect(missingLines(clean.join('\n'))).toEqual([]);
   });

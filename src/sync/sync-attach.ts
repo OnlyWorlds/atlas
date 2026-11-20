@@ -21,7 +21,7 @@ import { OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
 import { sameElements } from './same-elements';
-import { patchSlice, getState } from '../core/state';
+import { patchSlice, getState, subscribe } from '../core/state';
 import { quotedName, typeName, type Nameable } from '../core/type-words';
 import { patchElementsFrom } from '../core/active-store';
 import { toastManager, type ToastAction } from '../ui/toast-manager';
@@ -548,6 +548,8 @@ export function detachSyncEngine(): void {
   currentWorldId = null;
   currentFolder = null;
   currentPolicyNow = null;
+  // The note that copies wait was about this world's review.
+  closeHeldNote();
 }
 
 /**
@@ -939,13 +941,9 @@ function emitConflictToasts(
   // The engine's own policy, never the default: a shared world runs
   // pause-and-review whatever Settings names.
   const policy = from.policy ?? currentEngine?.getPolicy() ?? getState().registry.sync_default_policy ?? 'local-wins';
-  const heldRows = result.conflicts.filter(c => c.no_baseline).length;
+  const heldIds = result.conflicts.filter(c => c.no_baseline).map(c => c.element_id);
   // Under local-wins nothing else says a row waits: said here (pause-and-review's badge says it).
-  if (heldRows > 0 && policy !== 'pause-and-review' && from.current) {
-    // One on screen at a time: a later round's line (its count may differ) replaces the one there.
-    toastManager.dismiss(HELD_COPY_TOAST);
-    toastManager.show(heldCopyLine(heldRows), 'info', 12000, { actions: [reviewAction(from.worldId)], dedupeKey: HELD_COPY_TOAST });
-  }
+  if (heldIds.length > 0 && policy !== 'pause-and-review' && from.current) sayHeldCopies(heldIds, from.worldId);
   if (plain.length === 0) return;
   if (policy === 'pause-and-review') return; // badge + modal handle it
 
@@ -1003,8 +1001,54 @@ export function heldCopyLine(n: number): string {
     : `${n} elements wait for you to choose: these copies have no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.`;
 }
 
-/** One such toast on screen at a time: a later round's replaces it. */
+/** One such toast on screen at a time: a later round's count is said in it, in place. */
 export const HELD_COPY_TOAST = 'held-copy-waits';
+
+/**
+ * What the held-copy note counts: the held rows of the review, as far as Atlas knows them. A round adds
+ * its ids; each count refresh (after a round, a resolve, the review opening) sets them to the review's own.
+ * The note (sticky: it carries a press) always says this count, and goes when it is 0, when the engine
+ * detaches (a world switch attaches another) and when its world is no longer the open one.
+ */
+let heldNoteIds = new Set<string>();
+let heldNoteWorld: string | null = null;
+let heldNoteWatched = false;
+
+function sayHeldCopies(ids: string[], worldId: string | null): void {
+  if (heldNoteWorld !== worldId) heldNoteIds = new Set();
+  for (const id of ids) heldNoteIds.add(id);
+  heldNoteWorld = worldId;
+  watchHeldNoteWorld();
+  const line = heldCopyLine(heldNoteIds.size);
+  if (toastManager.update(HELD_COPY_TOAST, line)) return;
+  toastManager.show(line, 'info', 12000, { actions: [reviewAction(worldId)], dedupeKey: HELD_COPY_TOAST });
+}
+
+/** The review's held rows, read at a count refresh: the note says them, or goes when none is left. */
+function recountHeldNote(rows: ReadonlyArray<{ element_id: string; no_baseline?: true }>): void {
+  if (heldNoteWorld === null || heldNoteWorld !== currentWorldId) return;
+  const ids = rows.filter(c => c.no_baseline).map(c => c.element_id);
+  if (ids.length === 0) { closeHeldNote(); return; }
+  heldNoteIds = new Set(ids);
+  toastManager.update(HELD_COPY_TOAST, heldCopyLine(ids.length));
+}
+
+function closeHeldNote(): void {
+  // No note said: nothing to take down (a detach runs often, and with no toasts at all in some rooms).
+  if (heldNoteWorld === null) return;
+  heldNoteIds = new Set();
+  heldNoteWorld = null;
+  toastManager.dismiss(HELD_COPY_TOAST);
+}
+
+/** Leaving the note's world (another opened, or none) takes the note down: it spoke of that world's review. */
+function watchHeldNoteWorld(): void {
+  if (heldNoteWatched) return;
+  heldNoteWatched = true;
+  subscribe(() => {
+    if (heldNoteWorld !== null && getState().active?.worldId !== heldNoteWorld) closeHeldNote();
+  });
+}
 
 /**
  * A toast's press that opens the review, the same opener the pill's badge calls. Pressed after another
@@ -1102,10 +1146,12 @@ export async function refreshConflictsCount(): Promise<void> {
     if (sync.activeConflictsCount !== 0) {
       patchSlice('sync', { ...sync, activeConflictsCount: 0 });
     }
+    closeHeldNote();
     return;
   }
   try {
     const list = await currentEngine.listConflicts();
+    recountHeldNote(list);
     // World-meta contested fields count toward the badge too —
     // they're the same "decide later" obligation, just world-shaped.
     const metaList = await currentEngine.listMetaConflicts();

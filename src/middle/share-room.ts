@@ -259,6 +259,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const extra = dependentCount > 0
         ? ` This also deletes ${dependentCount} element${dependentCount === 1 ? '' : 's'} filed under it.`
         : '';
+      // `el ?? …` is a fallback the page on screen never reaches: its row holds the element it deletes.
       if (!window.confirm(`Delete ${quotedName(el ?? { type: 'narrative' }, { word: 'page', typed: true })}?${extra} This cannot be undone.`)) return;
     }
     teardownEditSession();

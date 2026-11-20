@@ -12,7 +12,7 @@
 import { getState } from './state';
 import type { WorldRegistryEntry } from './types';
 
-/** A registry entry that is view-only here: a read key's world, or a copy. */
+/** A registry entry that is view-only here: a read key's world, or a copy (never attached to sync, so the conflict review never meets one: counted on purpose). */
 export function entryIsViewOnly(entry: WorldRegistryEntry | null | undefined): boolean {
   return !!entry && (!!entry.api?.read_only || !!entry.copy_of);
 }

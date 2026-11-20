@@ -53,6 +53,7 @@ export class ConflictReviewModal extends BaseModal {
       return;
     }
     this.capturedWorldId = getState().active?.worldId ?? null;
+    // Read once, on purpose: the engine's readOnly is fixed at attach from the same flag, and keel refuses a read key's write.
     this.viewOnly = worldIsViewOnly(this.capturedWorldId);
     try {
       this.conflicts = await engine.listConflicts();
@@ -168,7 +169,7 @@ export class ConflictReviewModal extends BaseModal {
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">${escapeText(typeName(c.type))}</span>
         <span class="atlas-conflict-name">${escapeText(name)}</span>
-        <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} differ${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
+        <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? ' differs' : 's differ'}${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
         ${c.proposal ? `<span class="atlas-conflict-proposal" data-role="proposal-line">${escapeText(proposalReviewLine(c.proposal, { choices: !this.viewOnly }))}</span>` : ''}
       </div>
       <div class="atlas-conflict-row-actions">

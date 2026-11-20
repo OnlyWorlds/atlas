@@ -127,6 +127,20 @@ export class ToastManager {
   }
 
   /** Take down every toast shown with this key: what it said is over (a sign-in it asked for landed). */
+  /**
+   * Say new words in the toast on screen under this key, in place (no new toast, no animation).
+   * False when none is on screen.
+   */
+  update(dedupeKey: string, message: string): boolean {
+    const live = this.toasts.filter(t => t.opts.dedupeKey === dedupeKey);
+    for (const t of live) {
+      t.message = message;
+      const el = document.getElementById(t.id)?.querySelector('.ow-toast-message');
+      if (el) el.textContent = message;
+    }
+    return live.length > 0;
+  }
+
   dismiss(dedupeKey: string): void {
     for (const t of this.toasts.filter(t => t.opts.dedupeKey === dedupeKey)) this.removeToast(t.id);
   }
