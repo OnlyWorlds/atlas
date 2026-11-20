@@ -22,6 +22,7 @@ import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
 import { sameElements } from './same-elements';
 import { patchSlice, getState } from '../core/state';
+import { quotedName, typeName, type Nameable } from '../core/type-words';
 import { patchElementsFrom } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import type { FolderStore } from '../store/folder-store';
@@ -927,8 +928,9 @@ function emitConflictToasts(
   }
 
   // keel replaced an element it held with a `/bulk` item (conv. 192, S5): only a race reaches it.
-  const replaced = result.bulk_replaced_ids?.length ?? 0;
-  if (replaced > 0 && from.current) toastManager.show(bulkReplacedLine(replaced), 'info', 12000);
+  // Named from the open world's copy, which sent them (an id it no longer holds is said without a name).
+  const replaced = (result.bulk_replaced_ids ?? []).map(id => getState().data.elements.find(e => e.id === id) ?? null);
+  if (replaced.length > 0 && from.current) toastManager.show(bulkReplacedLine(replaced), 'info', 12000);
 
   // A proposal the keeper did not take is no overwrite under any policy: it
   // waits in the review, which says why (conv. 163). Nor is a copy with no record
@@ -994,11 +996,21 @@ export function heldCopyLine(n: number): string {
     : `${n} elements wait in Review conflicts: these copies have no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.`;
 }
 
-/** conv. 192, S5: a `/bulk` item replaced an element OnlyWorlds already held. */
-export function bulkReplacedLine(n: number): string {
-  return n === 1
-    ? 'OnlyWorlds already held one element this copy sent as new, and took this copy in its place. Another place may have sent it first.'
-    : `OnlyWorlds already held ${n} elements this copy sent as new, and took these copies in their place. Another place may have sent them first.`;
+/**
+ * conv. 192, S5: a `/bulk` item replaced an element OnlyWorlds already held. One meaning of "this": the
+ * element this copy sent, named through the builders. One: its type's word and quoted name, or its unnamed
+ * form (`null`, not in the open world: "an element"). Several: a count, in their type's word when all
+ * share it, else "elements".
+ */
+export function bulkReplacedLine(els: ReadonlyArray<Nameable | null>): string {
+  if (els.length === 1) {
+    const el = els[0];
+    return `OnlyWorlds already held ${el ? quotedName(el, { typed: true }) : 'an element'} and took this one in its place. Another place may have sent it first.`;
+  }
+  const types = new Set(els.map(el => el?.type ?? ''));
+  const one = types.size === 1 && !types.has('') ? [...types][0] : null;
+  const what = one ? typeName(one, { many: true }) : 'elements';
+  return `OnlyWorlds already held ${els.length} ${what} and took these in their place. Another place may have sent them first.`;
 }
 
 /**

@@ -81,6 +81,21 @@ export function aboutFieldFor(type: string): string | null {
   return NARRATIVE_RELATION_FIELDS[type as keyof typeof NARRATIVE_RELATION_FIELDS] ?? null;
 }
 
+/**
+ * The type of the about-subject `id`, read from the field that holds it (a
+ * subject in `characters` is a character), or null when no about field holds
+ * it. What a chip says for a subject that is not in the world.
+ */
+export function aboutTypeOf(el: Element, id: string): string | null {
+  const rec = el as Record<string, unknown>;
+  for (const [type, field] of Object.entries(NARRATIVE_RELATION_FIELDS)) {
+    if (!field || type === 'collective') continue;
+    const v = rec[field];
+    if (Array.isArray(v) && v.includes(id)) return type;
+  }
+  return null;
+}
+
 /** Ids of the elements a knowledge entry is *about* (subjects), gathered from the about multi-links. */
 export function aboutIdsOf(el: Element): string[] {
   const rec = el as Record<string, unknown>;

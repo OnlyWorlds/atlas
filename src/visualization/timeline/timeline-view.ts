@@ -2202,22 +2202,24 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   // is `onSelect`: a dated element is selected, or the chart narrows to it, and it gets its mark ("Show
   // Ada (character) on the chart"); an undated or undatable one has no mark of its own, and the chart
   // narrows to what it is linked to ("Show what Ada (object) is linked to on the chart"). The type is
-  // said once: an unnamed form already holds it. The group's label above the row says the field; the
-  // drag hint only where a drag dates it, after the press, and as two sentences each ends with its stop.
+  // said once: an unnamed form already holds it. The group's label above the row says the field. The name
+  // says only what a press does; where a drag dates it, the tooltip adds the drag as a second sentence,
+  // each ended with its stop (a screen reader hears it as the description, never as the name).
   const who = ownName(link) ? `${nameOrUnnamed(link)} (${typeName(link.type)})` : nameOrUnnamed(link);
   const shows = dated ? `Show ${who} on the chart` : `Show what ${who} is linked to on the chart`;
-  const named = dateable && !dated && state.onDateElement
+  chip.title = dateable && !dated && state.onDateElement
     ? `${shows}. It is undated: drag it onto the chart to date it.`
     : shows;
-  chip.title = named;
-  chip.setAttribute('aria-label', named);
+  chip.setAttribute('aria-label', shows);
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
+  // The name it shows: its own, or the unnamed form with the capital, never an empty chip.
+  const seen = nameOrUnnamed(link, { start: true });
   chip.innerHTML =
     `<span class="material-symbols-outlined" aria-hidden="true">${escapeText(icon)}</span>` +
-    `<span class="atlas-timeline-chip-name">${escapeText(link.name)}</span>`;
+    `<span class="atlas-timeline-chip-name">${escapeText(seen)}</span>`;
   if (dateable && !dated && state.onDateElement) {
     // Drag-to-date from the card; the no-move click stays a peek.
-    chip.addEventListener('mousedown', (e) => startItemDrag(state, { id: link.id, type: link.type, name: link.name }, e, 'select'));
+    chip.addEventListener('mousedown', (e) => startItemDrag(state, { id: link.id, type: link.type, name: seen }, e, 'select'));
     // Enter and Space press it too (a keyboard click has no pointer, detail 0): the same show a
     // no-move mouse press gives through the drag's release, which a mouse click never repeats here.
     chip.addEventListener('click', (e) => { if (e.detail === 0) state.onSelect(link.id); });

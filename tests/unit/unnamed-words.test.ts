@@ -23,7 +23,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { openWords, nameOrUnnamed } from '../../src/core/type-words';
+import { openWords, nameOrUnnamed, missingLabel, missingWords, quotedWorld } from '../../src/core/type-words';
+import { freezeCircleBlock } from '../../src/core/share-payload';
+import { chipWords } from '../../src/ui/map-create-modal';
+import { DeleteBrowserWorldModal } from '../../src/ui/delete-browser-world-modal';
+import { wireWorldTab } from '../../src/middle/settings-world';
 import { pinBacklink, foldBacklinks } from '../../src/core/spatial-backlinks';
 import { ambiguousLine, childClashLine, hiddenOnlineLine } from '../../src/sync/make-online-run';
 import { lensChoices, lensName, keepLensOn } from '../../src/core/web-lens';
@@ -168,9 +172,9 @@ describe('the census: no bare Unnamed or (untitled) a person can meet', () => {
  * (`Delete map "${m.name}"?`, which says `Delete map ""?` for a nameless
  * one). A name goes through `nameOrUnnamed` in the room's own word; a
  * question quotes it through `quotedName`; an element that is not in the
- * world at all keeps words that say it is missing, and those places are on the
- * allowlist below with that reason. A world's name is not an element's, and
- * "this world" and "that world" stay, as ruled.
+ * world at all is said as missing through `missingWords` and `missingLabel`
+ * (1.124.32; the census of the missing forms follows this one). A world's
+ * name is not an element's, and "this world" and "that world" stay, as ruled.
  *
  * The allowlist holds each allowed line's own text (trimmed), never a count:
  * the line kept on purpose is a presence ternary (`x ? nameOrUnnamed(x) :
@@ -194,41 +198,22 @@ const STAND_IN = new RegExp([
 
 /** The stand-in lines left on purpose, by file: each line's own text, trimmed, and why. */
 const STAND_IN_LEFT: Record<string, Array<{ line: string; why: string }>> = {
-  'src/core/share-payload.ts': [{ line: "return { id: block.id, kind: 'circle', knowerId: block.knowerId, title: '(missing knower)', knowerType: 'collective', entries: [] };", why: 'a circle block whose knower is not in the world' }],
   'src/core/world-styles.ts': [{ line: "const base = k.supertype && k.subtype ? `${k.supertype} · ${k.subtype}` : (k.supertype || k.subtype || '(no kind)');", why: 'a zone kind with neither supertype nor subtype, not a name' }],
-  'src/middle/element-detail-header.ts': [{ line: "const mapName = m ? nameOrUnnamed(m) : '(unknown map)';", why: 'a pin whose map is not in the world' }],
   'src/middle/element-detail-map-image.ts': [{ line: "render(item ? item.filename : '(missing file)');", why: 'a picture file that is gone: a file, not an element' }],
-  'src/middle/element-detail-zone-sections.ts': [{ line: "const mapName = map ? nameOrUnnamed(map, { start: true }) : '(unknown map)';", why: 'markers on a map that is not in the world' }],
   'src/middle/import-room.ts': [
     { line: "else if (f.widget === 'single-link') fields.push(`${f.name}>${cap(f.target ?? 'element')}`);", why: 'a link field\'s target type in a schema line, not a name' },
     { line: "else if (f.widget === 'multi-link') fields.push(`${f.name}>>${cap(f.target ?? 'element')}`);", why: 'the same, for a list field' },
   ],
-  'src/middle/knowledge-room.ts': [{ line: "const name = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';", why: 'a holder or subject not in the world' }],
+  'src/middle/knowledge-room.ts': [{ line: "for (const id of ids) chips.appendChild(elementChip(id, viewOnly ? undefined : () => ctx.removeAbout(id), false, ctx.aboutType?.(id) ?? 'element'));", why: 'a type word handed to the missing builder, not a name' }],
   'src/middle/settings-world.ts': [{ line: '`Remove "${world.name}" from atlas?\\n\\n` +', why: 'a world\'s name in its Remove question' }],
-  'src/middle/share-room.ts': [
-    { line: "name.textContent = target ? nameOrUnnamed(target, { start: true }) : '(pin without element)';", why: 'a pin whose element is not in the world' },
-    { line: "chip.append(el ? nameOrUnnamed(el, { start: true }) : '(missing)');", why: 'a collection member not in the world' },
-  ],
   'src/middle/writing-workspace-add-to-cast.ts': [{ line: "const label = (detail.name || '').trim() || '(unnamed)';", why: 'the label Add to story writes into the story text (stored; see unnamed-names)' }],
   'src/middle/writing-workspace-mention-items.ts': [{ line: "name: el.name || '(unnamed)',", why: 'the label a mention pick writes into the story text (stored; see unnamed-names)' }],
   'src/sidebar/worlds-sidebar.ts': [
     { line: 'if (!window.confirm(`Remove "${entry.name}" from your list? The browser has already cleared its storage.`)) return;', why: 'a world\'s name' },
     { line: 'if (!window.confirm(`Remove "${name}" from your list? It was never downloaded.`)) return;', why: 'a world\'s name' },
   ],
-  'src/tabs/right/context-pane-graph.ts': [
-    { line: "const rawName = said ? nameOrUnnamed(said, { start: true }) : '(unknown)';", why: 'a node whose element is not in the world' },
-    { line: "const centerName = centreEl ? nameOrUnnamed(centreEl) : '(unknown)';", why: 'a centre not in the world' },
-    { line: "const label = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';", why: 'a crumb not in the world' },
-    { line: "const back = el ? nameOrUnnamed(el) : '(unknown)';", why: 'the same crumb\'s Back to' },
-  ],
   'src/tabs/right/map-tab-pins.ts': [{ line: "const name = el?.name ?? '(loading…)';", why: 'a pin drawn before its element is read' }],
-  'src/tabs/right/right-pane.ts': [{ line: "const label = m ? nameOrUnnamed(m, { start: true }) : (tab.label || '(missing map)');", why: 'a map tab whose map is not in the world: its opened label, else missing' }],
-  'src/ui/delete-browser-world-modal.ts': [{ line: "const { overlay, body } = this.buildModalShell({ title: `Delete \"${w.name}\"?`, dataModal: 'delete-browser-world' });", why: 'a world\'s name' }],
   'src/ui/guide-note.ts': [{ line: "return nameOf(id, elementOf(id)?.type ?? 'element');", why: 'a type word handed to the name builder, not a name' }],
-  'src/ui/map-create-modal.ts': [
-    { line: "this.locationPreview = { id: found.location, name: loc ? ownName(loc) : '(unknown)' };", why: 'a place not in the world' },
-    { line: "this.parentMapPreview = { id: found.parent_map, name: parent ? ownName(parent) : '(unknown)' };", why: 'a parent map not in the world' },
-  ],
   'src/visualization/timeline/timeline-view.ts': [{ line: "head.textContent = state.chartLabel ?? 'This chart';", why: 'the chart on screen before it is saved, not an element' }],
 };
 
@@ -239,28 +224,32 @@ function standInLines(code: string): number[] {
     .filter(n => n > 0);
 }
 
-/** Every stand-in line in `src` that is not on the allowlist as written, and every allowed line no longer there. */
 /**
  * The census over given files (path relative to the tree, text). Each allowed
  * row allows ONE copy of its line in its file (a multiset: a line allowed twice
  * is listed twice), so a second copy of an allowed line reds as unexpected,
- * and a row with no copy left reds as stale.
+ * and a row with no copy left reds as stale. `hits` finds the lines, `left`
+ * is the allowlist: the stand-ins' or the missing forms'.
  */
-function standInCensusOf(files: Array<[string, string]>): { unexpected: string[]; stale: string[] } {
+function censusOf(
+  files: Array<[string, string]>,
+  hits: (code: string) => number[] = standInLines,
+  left: Record<string, Array<{ line: string; why: string }>> = STAND_IN_LEFT,
+): { unexpected: string[]; stale: string[] } {
   const seen = new Map<string, number>();
   const unexpected: string[] = [];
   for (const [rel, code] of files) {
     const lines = code.split(/\r?\n/);
-    for (const n of standInLines(code)) {
+    for (const n of hits(code)) {
       const text = lines[n - 1].trim();
       const key = `${rel}|${text}`;
-      const allowed = (STAND_IN_LEFT[rel] ?? []).filter(a => a.line === text).length;
+      const allowed = (left[rel] ?? []).filter(a => a.line === text).length;
       const now = (seen.get(key) ?? 0) + 1;
       seen.set(key, now);
       if (now > allowed) unexpected.push(`${rel}:${n} ${text}`);
     }
   }
-  const stale = Object.entries(STAND_IN_LEFT).flatMap(([f, rows]) => {
+  const stale = Object.entries(left).flatMap(([f, rows]) => {
     const want = new Map<string, number>();
     for (const r of rows) want.set(r.line, (want.get(r.line) ?? 0) + 1);
     return [...want].filter(([line, n]) => (seen.get(`${f}|${line}`) ?? 0) < n).map(([line]) => `${f} ${line}`);
@@ -268,13 +257,23 @@ function standInCensusOf(files: Array<[string, string]>): { unexpected: string[]
   return { unexpected, stale };
 }
 
-function standInCensus(): { unexpected: string[]; stale: string[] } {
+/** The stand-ins' census over given files. */
+function standInCensusOf(files: Array<[string, string]>): { unexpected: string[]; stale: string[] } {
+  return censusOf(files);
+}
+
+/** Every `.ts` file in `src` but the release history, as (path, text). */
+function srcFiles(): Array<[string, string]> {
   const files: Array<[string, string]> = [];
   for (const file of walk(SRC)) {
     const rel = relative(ROOT, file).split(sep).join('/');
     if (!SKIP.has(rel)) files.push([rel, readFileSync(file, 'utf8')]);
   }
-  return standInCensusOf(files);
+  return files;
+}
+
+function standInCensus(): { unexpected: string[]; stale: string[] } {
+  return standInCensusOf(srcFiles());
 }
 
 describe('the census of stand-ins: no word takes a missing name\'s place', () => {
@@ -337,12 +336,12 @@ describe('the census of stand-ins: no word takes a missing name\'s place', () =>
     ];
     for (const [file, line] of old) {
       expect(standInLines(line), line).toEqual([1]);
-      expect(STAND_IN_LEFT[file].some(a => a.line === line), line).toBe(false);
+      expect((STAND_IN_LEFT[file] ?? []).some(a => a.line === line), line).toBe(false);
     }
   });
 
   it('each allowed line allows one copy: a second copy in the same file reds, a missing copy is stale', () => {
-    const file = 'src/tabs/right/context-pane-graph.ts';
+    const file = 'src/sidebar/worlds-sidebar.ts';
     const allowed = STAND_IN_LEFT[file].map(a => a.line);
     // The file as allowed: clean.
     expect(standInCensusOf([[file, allowed.join('\n')]])).toEqual({ unexpected: [], stale: expect.any(Array) });
@@ -369,6 +368,213 @@ describe('the census of stand-ins: no word takes a missing name\'s place', () =>
     ];
     expect(standInLines(clean.join('\n'))).toEqual([]);
   });
+});
+
+/**
+ * A missing element said one way (1.124.32): an element that is not in the world at all is "a missing
+ * location" inside a sentence (`missingWords`) and "(missing location)" on a chip, a row or a label
+ * (`missingLabel`), in the type its field or pin names, else "element". The five forms it replaced
+ * ("(unknown)", "(unknown map)", "(missing)", "(pin without element)", "(missing knower)", and the map
+ * tab's "(missing map)" literal) are gone. The census finds any quoted "(unknown…" or "(missing…", in any
+ * quote form, and "without element" or "missing knower" anywhere in a line that is not a comment line.
+ * Limits, named: a form built from parts (a variable holding "(unknown") is not seen.
+ */
+const MISSING_FORM = /['"`]\([Uu]nknown\b|['"`]\([Mm]issing\b|without element|missing knower/;
+
+/** The missing forms left on purpose, by file: each line's own text, trimmed, and why. */
+const MISSING_LEFT: Record<string, Array<{ line: string; why: string }>> = {
+  'src/core/type-words.ts': [{ line: 'return `(missing ${opts.word?.trim() || typeName(type)})`;', why: 'the builder itself' }],
+  'src/middle/element-detail-map-image.ts': [{ line: "render(item ? item.filename : '(missing file)');", why: 'a picture file that is gone: a file, not an element' }],
+};
+
+function missingLines(code: string): number[] {
+  return code.split(/\r?\n/)
+    .map((line, i) => (!isCommentLine(line) && MISSING_FORM.test(line) ? i + 1 : 0))
+    .filter(n => n > 0);
+}
+
+describe('a missing element is said one way', () => {
+  it('the builders: a missing location in a sentence, (missing location) as a label, element where nothing names a type', () => {
+    expect(missingWords('location')).toBe('a missing location');
+    expect(missingLabel('location')).toBe('(missing location)');
+    expect(missingLabel('map')).toBe('(missing map)');
+    expect(missingLabel('element')).toBe('(missing element)');
+    expect(missingLabel('narrative', { word: 'page' })).toBe('(missing page)');
+    expect(missingLabel('character')).not.toContain('unnamed');
+  });
+
+  it('the census: no other form for a missing element is left in the source', () => {
+    const { unexpected, stale } = censusOf(srcFiles(), missingLines, MISSING_LEFT);
+    expect(unexpected, 'Say a missing element with missingWords in a sentence or missingLabel on a label, or add the line with why').toEqual([]);
+    expect(stale).toEqual([]);
+  });
+
+  it('the instrument sees every form this release folded, in every quote form', () => {
+    const planted = [
+      "const name = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';",
+      "const rawName = said ? nameOrUnnamed(said, { start: true }) : '(unknown)';",
+      "const mapName = m ? nameOrUnnamed(m) : '(unknown map)';",
+      "name.textContent = target ? nameOrUnnamed(target, { start: true }) : '(pin without element)';",
+      "chip.append(el ? nameOrUnnamed(el, { start: true }) : '(missing)');",
+      "return { id: block.id, kind: 'circle', knowerId: block.knowerId, title: '(missing knower)', knowerType: 'collective', entries: [] };",
+      "const label = m ? nameOrUnnamed(m, { start: true }) : (tab.label || '(missing map)');",
+      'const label = el ? nameOrUnnamed(el) : "(Unknown)";',
+      'const label = el ? nameOrUnnamed(el) : `(unknown ${t})`;',
+      "const x = 'a pin without element here';",
+    ];
+    expect(missingLines(planted.join('\n'))).toEqual(planted.map((_, i) => i + 1));
+    const clean = [
+      "const name = el ? nameOrUnnamed(el, { start: true }) : missingLabel('element');",
+      "const back = el ? nameOrUnnamed(el) : missingWords('element');",
+      "// was '(unknown)'",
+      " * (missing knower)",
+      "showError('Check for a missing comma, quote, or bracket.');",
+    ];
+    expect(missingLines(clean.join('\n'))).toEqual([]);
+  });
+
+  it("the knowledge room's chips: a holder or subject not in the world is missing in its field's type", () => {
+    const W2 = 'w-miss';
+    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: W2, name: 'Miss', state: 'local-only' }] } as never);
+    patchSlice('active', { worldId: W2, meta: { name: 'Miss' } } as never);
+    patchSlice('data', { elements: [el('narrative', 'k1', { name: 'Debt', subtype: 'knowledge', narrator: 'gone-c', collectives: ['gone-g'], locations: ['gone-l'], story: 'Owed.' })] } as never);
+    window.location.hash = knowledgeHash(W2, 'k1');
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
+    const unmount = mountKnowledgeRoom(target, toasts);
+    try {
+      const chips = [...target.querySelectorAll<HTMLElement>('.atlas-knowledge-chip-body span:not(.material-symbols-outlined)')].map(c => c.textContent!.trim());
+      expect(chips).toEqual(['(missing character)', '(missing collective)', '(missing location)']);
+      expect(target.textContent).not.toContain('(unknown)');
+    } finally {
+      unmount();
+      window.location.hash = '';
+    }
+  });
+
+  it("a page's collection chip and a map block's pin row: missing, in the pin's type", async () => {
+    const W2 = 'w-miss2';
+    const MAPX = '00000000-0000-4000-8000-0000000000b1';
+    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: W2, name: 'Miss', state: 'local-only' }] } as never);
+    patchSlice('active', { worldId: W2, meta: { name: 'Miss' } } as never);
+    patchSlice('data', { elements: [
+      el('narrative', 'p1', { name: 'Arrival', subtype: 'page', atlas_page_blocks: [
+        { id: 'b1', kind: 'collection', elementIds: ['gone'] },
+        { id: 'b2', kind: 'map', mapId: MAPX, pinIds: [], fullPinIds: [] },
+      ] }),
+      el('map', MAPX, { name: 'Harbour', image_url: 'https://example.com/m.png', width: 100, height: 100 }),
+      el('pin', 'pn1', { name: '', map_id: MAPX, element_id: 'gone-c', element_type: 'character', x: 1, y: 2 }),
+      el('pin', 'pn2', { name: '', map_id: MAPX, element_id: 'gone-x', x: 3, y: 4 }),
+    ] } as never);
+    window.location.hash = shareHash(W2, 'p1');
+    setActiveStore({ listElements: async () => [], readCharts: async () => [], findDependents: async () => [] } as never);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
+    const unmount = mountShareRoom(target, toasts);
+    try {
+      const open = async (kind: string): Promise<HTMLElement> => {
+        target.querySelector<HTMLElement>(`.atlas-share-block[data-block-kind="${kind}"] .is-editable`)!.click();
+        await vi.waitFor(() => expect(target.querySelector(`.atlas-share-block[data-block-kind="${kind}"].is-editing`)).not.toBeNull());
+        return target.querySelector<HTMLElement>(`.atlas-share-block[data-block-kind="${kind}"]`)!;
+      };
+      const coll = await open('collection');
+      expect(coll.querySelector('.atlas-share-collection-member')!.firstChild!.textContent).toBe('(missing element)');
+      const map = await open('map');
+      const rows = [...map.querySelectorAll<HTMLElement>('.atlas-share-card-edit-fieldrow span')].map(s => s.textContent);
+      expect(rows).toEqual(expect.arrayContaining(['(missing character)', '(missing element)']));
+      expect(map.textContent).not.toContain('without element');
+    } finally {
+      unmount();
+      setActiveStore(null);
+      window.location.hash = '';
+    }
+  });
+
+  it("a circle block whose knower is not in the world freezes to (missing element), as the page prints it", () => {
+    const frozen = freezeCircleBlock({ id: 'b1', kind: 'circle', knowerId: 'gone' }, [], new Map());
+    expect(frozen.title).toBe('(missing element)');
+    expect(frozen.entries).toEqual([]);
+  });
+
+  it("the map dialog's place and parent map: (missing location) and (missing map), removed as a missing one", () => {
+    expect(chipWords({ name: '', missing: true }, 'location')).toEqual({ label: '(missing location)', inLine: 'a missing location' });
+    expect(chipWords({ name: '', missing: true }, 'map')).toEqual({ label: '(missing map)', inLine: 'a missing map' });
+    // One that is there: its name, or its unnamed form.
+    expect(chipWords({ name: ' Reef ' }, 'location')).toEqual({ label: 'Reef', inLine: 'Reef' });
+    expect(chipWords({ name: '' }, 'map')).toEqual({ label: 'The unnamed map', inLine: 'the unnamed map' });
+  });
+});
+
+describe('a delete names its type: a published page and a world', () => {
+  const W2 = 'w-pub';
+  const page = (name: string) => el('narrative', 'p1', { name, subtype: 'page', atlas_page_blocks: [], atlas_page_pub: { id: 'pub1', slug: 'arrival-page' } });
+
+  for (const linked of [false, true]) {
+    for (const c of [
+      { name: ' Arrival ', ask: 'Delete page "Arrival"?' },
+      { name: '  ', ask: 'Delete the unnamed page?' },
+    ]) {
+      it(`a published page${linked ? ' with a key to take it down' : ' with no key'}: ${c.ask}`, async () => {
+        const entry = linked
+          ? { id: W2, name: 'Pub', state: 'api-linked', api: { world_id: 'srv', api_key: 'ow_w_test', pin: '1234' } }
+          : { id: W2, name: 'Pub', state: 'local-only' };
+        patchSlice('registry', { ...defaultRegistry(), pin: '1234', worlds: [entry] } as never);
+        patchSlice('active', { worldId: W2, meta: { name: 'Pub' } } as never);
+        patchSlice('data', { elements: [page(c.name)] } as never);
+        window.location.hash = shareHash(W2, 'p1');
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+        setActiveStore({ deleteElement: vi.fn(async () => {}), findDependents: async () => [], listElements: async () => [], readCharts: async () => [] } as never);
+        const target = document.createElement('div');
+        document.body.appendChild(target);
+        const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
+        const unmount = mountShareRoom(target, toasts);
+        try {
+          target.querySelector<HTMLButtonElement>('.atlas-share-delete')!.click();
+          await vi.waitFor(() => expect(confirm).toHaveBeenCalled());
+          const asked = confirm.mock.calls[0][0] as string;
+          // The question leads, as every delete's does; what being published adds follows it.
+          expect(asked.startsWith(`${c.ask} It is published at `)).toBe(true);
+          expect(asked).toContain(linked ? 'Deleting it also takes the published page down.' : 'Atlas has no key or PIN for this world');
+          expect(asked).not.toMatch(/Continue\?|Delete anyway\?/);
+        } finally {
+          unmount();
+          confirm.mockRestore();
+          setActiveStore(null);
+          window.location.hash = '';
+        }
+      });
+    }
+  }
+
+  it('a world as its questions name it: world and its name in quotes, or this world', () => {
+    expect(quotedWorld(' Harbour ')).toBe('world "Harbour"');
+    expect(quotedWorld('')).toBe('this world');
+    expect(quotedWorld('   ')).toBe('this world');
+    expect(quotedWorld(42)).toBe('this world');
+  });
+
+  for (const c of [{ name: 'Harbour', ask: 'Delete world "Harbour"?' }, { name: ' ', ask: 'Delete this world?' }]) {
+    it(`a browser world's delete dialog asks ${c.ask}`, () => {
+      const toasts = { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager;
+      new DeleteBrowserWorldModal({ id: 'wb', name: c.name, state: 'local-only' } as never, toasts).open();
+      expect(document.querySelector('[data-modal="delete-browser-world"] .atlas-modal-title')!.textContent).toBe(c.ask);
+    });
+
+    it(`a folder world's delete with its folder asks ${c.ask.replace('Delete', 'Permanently delete')}`, () => {
+      const world = { id: 'wf', name: c.name, state: 'local-only' } as never;
+      document.body.innerHTML = '<div class="atlas-settings"><button data-action="delete-world-permanent"></button></div>';
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      try {
+        wireWorldTab(world, { info() {}, error() {}, success() {}, warning() {} } as unknown as ToastManager);
+        document.querySelector<HTMLButtonElement>('[data-action="delete-world-permanent"]')!.click();
+        expect((confirm.mock.calls[0][0] as string).split('\n')[0]).toBe(`${c.ask.replace('Delete', 'Permanently delete').replace(/\?$/, '')} and its folder on disk?`);
+      } finally {
+        confirm.mockRestore();
+      }
+    });
+  }
 });
 
 function el(type: string, id: string, extra: Record<string, unknown> = {}): Element {
@@ -731,26 +937,48 @@ describe("a chart card's chips", () => {
     return { chips, onSelect, h };
   }
 
-  it('are named for what a press does, the tooltip the same string, the glyph hidden', () => {
+  it('are named for what a press does, the glyph hidden; only an undated one\'s tooltip adds the drag', () => {
     const { chips, h } = card(() => {});
     const names = Object.fromEntries([...chips].map(([k, c]) => [k, c.getAttribute('aria-label')]));
     expect(names).toEqual({
       // Its own mark on the chart: it is shown.
       'The Fall': 'Show The Fall (event) on the chart',
       // No mark of its own: the chart narrows to what it is linked to. The unnamed form says its type once.
-      // Two sentences: the press first, then the drag, each ended with its stop.
-      'The unnamed character': 'Show what the unnamed character is linked to on the chart. It is undated: drag it onto the chart to date it.',
+      // Its name says only what a press does; the drag is no part of it.
+      'The unnamed character': 'Show what the unnamed character is linked to on the chart',
       'Ada': 'Show what Ada (object) is linked to on the chart',
     });
-    for (const c of chips.values()) {
-      expect(c.title).toBe(c.getAttribute('aria-label'));
+    // The tooltip: the press, then the drag where a drag dates it, two sentences each ended with its stop.
+    expect(chips.get('The unnamed character')!.title).toBe('Show what the unnamed character is linked to on the chart. It is undated: drag it onto the chart to date it.');
+    for (const [k, c] of chips) {
+      if (k !== 'The unnamed character') expect(c.title).toBe(c.getAttribute('aria-label'));
       expect(c.querySelector('.material-symbols-outlined')!.getAttribute('aria-hidden')).toBe('true');
     }
     h.destroy();
     // A chart that dates nothing (a view-only world) offers no drag, so it names none.
     const viewOnly = card();
     expect(viewOnly.chips.get('The unnamed character')!.getAttribute('aria-label')).toBe('Show what the unnamed character is linked to on the chart');
+    expect(viewOnly.chips.get('The unnamed character')!.title).toBe('Show what the unnamed character is linked to on the chart');
     viewOnly.h.destroy();
+  });
+
+  it('a chip whose name is empty or only spaces shows the unnamed form, and its name agrees', () => {
+    const bare = node('e3', 'The Walk', 30, [
+      { id: 'c2', type: 'character', name: '', fieldLabel: 'Participants' },
+      { id: 'l2', type: 'location', name: '   ', fieldLabel: 'Locations' },
+    ]);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const h = mountTimelineView(target, { onSelect: vi.fn(), onFocus: () => {}, onOpenElement: () => {} });
+    h.setNodes([bare], [bare], { now: null, calendar: null, undated: [], focusId: null, chartLabel: null });
+    h.setSelection(bare.id);
+    const seen = [...target.querySelectorAll<HTMLElement>('.atlas-timeline-chip:not(.atlas-timeline-chip-more)')]
+      .map(c => [c.querySelector('.atlas-timeline-chip-name')!.textContent, c.getAttribute('aria-label')]);
+    expect(seen).toEqual([
+      ['The unnamed character', 'Show what the unnamed character is linked to on the chart'],
+      ['The unnamed location', 'Show what the unnamed location is linked to on the chart'],
+    ]);
+    h.destroy();
   });
 
   it('the undated chip answers Enter and Space (a keyboard click), and a mouse click does not press it twice', () => {

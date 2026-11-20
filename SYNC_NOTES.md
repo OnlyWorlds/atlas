@@ -105,7 +105,7 @@ Regression test in `make-online.test.ts` — "matched element references new loc
 | Policy | Push conflict | Pull conflict | UI surface |
 |---|---|---|---|
 | `local-wins` (default) | Push local anyway, server overwritten | Skip applying server change for that element, local stays | One-shot toast per round. NO badge, NO modal. |
-| `pause-and-review` | Skip push, persist conflict | Skip applying, persist conflict | ⚠ badge on pill. Click → modal with overwrite-mine / pull-theirs per row. |
+| `pause-and-review` | Skip push, persist conflict | Skip applying, persist conflict | ⚠ badge on pill. Click → modal with Keep this copy (`overwrite-mine`) / Keep the OnlyWorlds copy (`pull-theirs`) per row. |
 
 **Symmetric across push and pull.** Same divergence, different direction.
 

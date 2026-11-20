@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.32',
+    date: '2026-11-20',
+    theme: 'One word for a missing element, and one pair in Review conflicts',
+    entries: [
+      {
+        id: 'missing-said-one-way',
+        title: 'A missing element is said one way, and every delete names its type',
+        body: 'An element that is not in the world at all is now said one way: a missing location inside a sentence, and (missing location) on a chip, a row or a label, in the type its field or pin names, or (missing element) where nothing names one. That replaces (unknown), (unknown map), (missing), (pin without element) and (missing knower) in the knowledge room\'s chips, the Web\'s names, its links to and its way back, the map a pin is on, the maps a zone is drawn on, a map\'s tab, the map dialog\'s place and parent map, and a page\'s pins, collections and circles. A published page\'s delete asks as the others do, Delete page "Arrival"? It is published at its address, and a world\'s two delete questions say world: Delete world "Harbour"?, or Delete this world? for a world with no name. An undated chip on a chart\'s card is named for what a press does, and its tooltip still says a drag dates it; a chip for an element with no name shows its unnamed form. Not changed: a link field\'s chip for an element not in the world still shows its id, a map tab whose map is gone keeps the name it was opened with, and a picture file that is gone is still (missing file).',
+        tags: ['accessibility', 'editor'],
+      },
+      {
+        id: 'review-one-pair',
+        title: 'Review conflicts offers the same two choices on every row',
+        body: 'Every row in Review conflicts now offers Keep this copy and Keep the OnlyWorlds copy, each with a tooltip saying what it does, where the older rows said Overwrite (mine wins) and Pull (theirs wins), and no row speaks of a server. In a view-only world, a copy with no record of what OnlyWorlds held offers only Keep the OnlyWorlds copy, since this copy cannot be sent. When OnlyWorlds already held an element a batch sent as new, the note names it: OnlyWorlds already held character "Ada" and took this one in its place.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.124.31',
     date: '2026-11-20',
     theme: 'A read key opens to read, and your PIN stays with keys that write',

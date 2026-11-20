@@ -58,7 +58,7 @@ import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
 import { isPartialSlice } from '../core/provenance';
-import { nameOrUnnamed, ownName, quotedName } from '../core/type-words';
+import { missingLabel, nameOrUnnamed, ownName, quotedName } from '../core/type-words';
 
 /** A page as a confirm names it: its own name in quotes, or the unnamed page ("The unnamed page" at a line's start). */
 function pageInLine(page: Element | undefined, start = false): string {
@@ -231,9 +231,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (pub && !pub.revoked) {
       const client = sharingClientForActiveWorld();
       const url = publicUrlFor(pub.slug);
+      // Asked as every delete is, by its type's word and quoted name, then what being published adds.
+      const ask = `Delete ${quotedName(el ?? { type: 'narrative' }, { word: 'page', typed: true })}?`;
       const msg = client
-        ? `${pageInLine(el, true)} is published at ${url}. Deleting it also takes the published page down. Continue?`
-        : `${pageInLine(el, true)} is published at ${url}, but Atlas has no key or PIN for this world, so the published page would stay up with no way to revoke it from here. Delete anyway?`;
+        ? `${ask} It is published at ${url}. Deleting it also takes the published page down.`
+        : `${ask} It is published at ${url}, but Atlas has no key or PIN for this world, so the published page would stay up with no way to revoke it from here.`;
       if (!window.confirm(msg)) return;
       publishConfirmed = true;
       if (client) {
@@ -1075,8 +1077,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         });
         row.appendChild(cb);
         const name = document.createElement('span');
-        // A row's name alone: the pinned element's own name or its unnamed form; a pin whose element is not in the world keeps its own words.
-        name.textContent = target ? nameOrUnnamed(target, { start: true }) : '(pin without element)';
+        // A row's name alone: the pinned element's own name or its unnamed form; one not in the world is
+        // missing, in the type the pin names for it.
+        const pinType = (pin as Record<string, unknown>).element_type;
+        name.textContent = target ? nameOrUnnamed(target, { start: true }) : missingLabel(typeof pinType === 'string' && pinType ? pinType : 'element');
         row.appendChild(name);
         if (included) {
           const isFull = (block.fullPinIds ?? []).includes(pin.id);
@@ -1203,8 +1207,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const el = elOf(id);
       const chip = document.createElement('span');
       chip.className = 'atlas-share-card-chip atlas-share-collection-member';
-      // A chip alone: its own name or the unnamed form; one not in the world says it is missing.
-      chip.append(el ? nameOrUnnamed(el, { start: true }) : '(missing)');
+      // A chip alone: its own name or the unnamed form; one not in the world says it is missing (a collection holds any type).
+      chip.append(el ? nameOrUnnamed(el, { start: true }) : missingLabel('element'));
       const x = document.createElement('button');
       x.type = 'button';
       x.className = 'atlas-share-collection-member-x';

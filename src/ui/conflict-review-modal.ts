@@ -1,16 +1,19 @@
 /**
  * Conflict Review Modal — per-row resolution for sync conflicts (Phase 3.5+).
  *
- * Lists every conflict recorded in `.atlas/sync-state.json`. Each row offers
- * two actions: `overwrite-mine` (push local to server) and `pull-theirs`
- * (overwrite local with server). Closing the modal without picking is a
- * valid "decide later" — the badge stays as a reminder.
+ * Lists every conflict recorded in `.atlas/sync-state.json`. Every row offers
+ * the same pair, by the same names: Keep this copy (`overwrite-mine`, this
+ * copy sent to OnlyWorlds) and Keep the OnlyWorlds copy (`pull-theirs`, this
+ * copy replaced with OnlyWorlds'); a view-only world's held row offers only
+ * the second. Closing the modal without picking is a valid "decide later":
+ * the badge stays as a reminder.
  *
  * The actions call `SyncEngine.resolveConflict(id, action)`; on success the
  * row is removed from the modal. When the list empties, the modal closes.
  */
 
 import { nameOrUnnamed, typeName } from '../core/type-words';
+import { worldIsViewOnly } from '../core/view-only';
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount, refreshMetaCacheNow } from '../sync/sync-attach';
@@ -93,11 +96,10 @@ export class ConflictReviewModal extends BaseModal {
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">world setting</span>
         <span class="atlas-conflict-name">${escapeText(metaFieldWord(field))}</span>
-        <span class="atlas-conflict-fields">changed here and on the server</span>
+        <span class="atlas-conflict-fields">changed here and on OnlyWorlds</span>
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="Push local value to server">Overwrite (mine wins)</button>
-        <button class="atlas-btn-ghost" data-action="pull-theirs" title="Overwrite local with server">Pull (theirs wins)</button>
+        ${keepButtons("Send this copy's setting to OnlyWorlds", "Replace this copy's setting with the one on OnlyWorlds")}
       </div>
     `;
     // The world's strand (S9): each side's story by name, the server's read once the row is drawn.
@@ -158,7 +160,7 @@ export class ConflictReviewModal extends BaseModal {
     const name = nameOrUnnamed({ name: lookupName(c.element_id), type: c.type }, { start: true });
     if (c.no_baseline) {
       row.setAttribute('data-no-baseline', '');
-      row.innerHTML = noBaselineRowHtml(c, name);
+      row.innerHTML = noBaselineRowHtml(c, name, worldIsViewOnly(this.capturedWorldId));
     } else row.innerHTML = `
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">${escapeText(typeName(c.type))}</span>
@@ -167,8 +169,9 @@ export class ConflictReviewModal extends BaseModal {
         ${c.proposal ? `<span class="atlas-conflict-proposal" data-role="proposal-line">${escapeText(proposalReviewLine(c.proposal))}</span>` : ''}
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="${c.proposal ? 'Send your edit for review again' : 'Push local content to server'}">Overwrite (mine wins)</button>
-        <button class="atlas-btn-ghost" data-action="pull-theirs" title="${c.proposal ? "Drop your edit and take the world's copy" : 'Overwrite local with server'}">Pull (theirs wins)</button>
+        ${c.proposal
+          ? keepButtons('Send this copy to OnlyWorlds for review again', 'Drop your edit and replace this copy with the one on OnlyWorlds')
+          : keepButtons('Send this copy to OnlyWorlds', 'Replace this copy with the one on OnlyWorlds')}
       </div>
     `;
     this.wireRow(row, c);
@@ -264,6 +267,16 @@ function lookupName(id: string): string | null {
   return el?.name ?? null;
 }
 
+/**
+ * The review list's one pair, the same names on every row (a world setting, an element, a held copy): Keep this
+ * copy and Keep the OnlyWorlds copy, each titled with what it does. `mine` false leaves Keep this copy out (a
+ * view-only world, which can send nothing).
+ */
+export function keepButtons(mineTitle: string, theirsTitle: string, mine = true): string {
+  return (mine ? `<button class="atlas-btn-ghost" data-action="overwrite-mine" title="${escapeText(mineTitle)}">Keep this copy</button>\n        ` : '')
+    + `<button class="atlas-btn-ghost" data-action="pull-theirs" title="${escapeText(theirsTitle)}">Keep the OnlyWorlds copy</button>`;
+}
+
 /** The words a row for a copy with no record of what OnlyWorlds held opens with (conv. 192, S2). */
 export const NO_BASELINE_LINE = 'This copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer.';
 
@@ -295,9 +308,11 @@ export function sideWord(v: unknown): string {
 /**
  * The row for a copy with no record of what OnlyWorlds held (conv. 192): the line that says so, each
  * field that differs with both values, what Keep this copy leaves or empties on OnlyWorlds (S3), and the two
- * choices by their plain names (S2). The copy's own values are read from the open world.
+ * choices by their plain names (S2). The copy's own values are read from the open world. A view-only world
+ * can send nothing, so its row offers only Keep the OnlyWorlds copy, and says nothing of what Keep this copy
+ * would do; nothing stands in the place of the button it leaves out.
  */
-export function noBaselineRowHtml(c: Conflict, name: string): string {
+export function noBaselineRowHtml(c: Conflict, name: string, viewOnly = false): string {
   const here = (getState().data.elements.find((e) => e.id === c.element_id) ?? {}) as Record<string, unknown>;
   const theirs = c.theirs ?? {};
   const sides = c.fields.map((f) => `
@@ -312,10 +327,10 @@ export function noBaselineRowHtml(c: Conflict, name: string): string {
   const offered = c.fields.filter((f) => !unsetValue(theirs[f]) && unsetValue(here[f]));
   const left = offered.filter((f) => here[f] === undefined);
   const emptied = offered.filter((f) => here[f] !== undefined);
-  const leftLine = (left.length === 0 ? '' : `
+  const leftLine = viewOnly ? '' : ((left.length === 0 ? '' : `
         <span class="atlas-conflict-note" data-role="keeps-online">This copy lacks ${escapeText(left.join(', '))}, so Keep this copy leaves ${left.length === 1 ? 'it' : 'them'} as OnlyWorlds has ${left.length === 1 ? 'it' : 'them'}.</span>`)
     + (emptied.length === 0 ? '' : `
-        <span class="atlas-conflict-note" data-role="empties-online">Keep this copy empties ${escapeText(emptied.join(', '))} on OnlyWorlds.</span>`);
+        <span class="atlas-conflict-note" data-role="empties-online">Keep this copy empties ${escapeText(emptied.join(', '))} on OnlyWorlds.</span>`));
   const moved = c.changed_while_open ? `
         <span class="atlas-conflict-note" data-role="changed-while-open">It changed on OnlyWorlds while this was open: the OnlyWorlds side below is as it is now.</span>` : '';
   return `
@@ -327,8 +342,7 @@ export function noBaselineRowHtml(c: Conflict, name: string): string {
         </div>${leftLine}
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="Send this copy to OnlyWorlds">Keep this copy</button>
-        <button class="atlas-btn-ghost" data-action="pull-theirs" title="Replace this copy with the one on OnlyWorlds">Keep the OnlyWorlds copy</button>
+        ${keepButtons('Send this copy to OnlyWorlds', 'Replace this copy with the one on OnlyWorlds', !viewOnly)}
       </div>
     `;
 }

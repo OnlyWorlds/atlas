@@ -38,7 +38,7 @@ import { findAddresses, findLooseAddressRuns, namedId } from './ow-links';
 import { getZoneShape } from '../tabs/right/zone-derived';
 import { freezeChartBlock, type PayloadChartBlock } from '../visualization/timeline/chart-freeze';
 import type { ChartConfig } from '../visualization/timeline/types';
-import { capitalise, nameOrUnnamed, theUnnamed } from './type-words';
+import { capitalise, missingLabel, nameOrUnnamed, theUnnamed } from './type-words';
 
 // ---------------------------------------------------------------------------
 // Payload types (the §5 wire shape).
@@ -676,7 +676,9 @@ export function freezeCircleBlock(
 ): PayloadCircleBlock {
   const knower = byId.get(block.knowerId);
   if (!knower) {
-    return { id: block.id, kind: 'circle', knowerId: block.knowerId, title: '(missing knower)', knowerType: 'collective', entries: [] };
+    // The knower is not in the world, and the block names no type for it: a missing element. The title is text
+    // to every reader (the page's renderer and its copy in the viewer print it escaped; nothing parses it).
+    return { id: block.id, kind: 'circle', knowerId: block.knowerId, title: missingLabel('element'), knowerType: 'collective', entries: [] };
   }
   const held = knowledgeHeldBy(knower.id, elements)
     .slice()

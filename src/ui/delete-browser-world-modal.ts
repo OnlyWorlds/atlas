@@ -12,6 +12,7 @@ import { navigate } from '../core/router';
 import { deleteBrowserWorld, BROWSER_DELETE_FAILED } from '../setup/browser-world-delete';
 import { downloadWorldFromClick } from './download-world';
 import type { WorldRegistryEntry } from '../core/types';
+import { quotedWorld } from '../core/type-words';
 
 export class DeleteBrowserWorldModal extends BaseModal {
   constructor(private readonly world: WorldRegistryEntry, private readonly toasts: ToastManager) {
@@ -20,7 +21,7 @@ export class DeleteBrowserWorldModal extends BaseModal {
 
   open(): void {
     const w = this.world;
-    const { overlay, body } = this.buildModalShell({ title: `Delete "${w.name}"?`, dataModal: 'delete-browser-world' });
+    const { overlay, body } = this.buildModalShell({ title: `Delete ${quotedWorld(w.name)}?`, dataModal: 'delete-browser-world' });
     body.innerHTML = `
       <p class="atlas-modal-hint">This removes the world from Atlas and deletes it from this browser: elements, maps and media. There is no undo.</p>
       ${w.state === 'api-linked' ? '<p class="atlas-modal-hint" data-role="linked-line">The world on onlyworlds.com is not deleted.</p>' : ''}

@@ -5,7 +5,7 @@
  * (forget = keep folder; delete = remove folder on disk).
  */
 
-import { typeName, aTypeName, nameOrUnnamed } from '../core/type-words';
+import { typeName, aTypeName, nameOrUnnamed, quotedWorld } from '../core/type-words';
 import { getState, patchActiveMeta, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { diskApiBlock, isSeatWorld, SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE, seatRoleWords, worldPin } from '../core/seat';
@@ -590,7 +590,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
   const deletePermBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="delete-world-permanent"]');
   deletePermBtn?.addEventListener('click', async () => {
     const ok = window.confirm(
-      `Permanently delete "${world.name}" and its folder on disk?\n\n` +
+      `Permanently delete ${quotedWorld(world.name)} and its folder on disk?\n\n` +
       `Everything in it (elements, maps, media) is gone for good.` +
       `${world.state === 'api-linked' ? ' The world on onlyworlds.com stays.' : ''}\n\n` +
       `There is no undo.`

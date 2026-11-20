@@ -40,7 +40,7 @@ import { proposedMarkOf, proposedTitle, proposedWord } from '../../core/review-m
 import { hiddenMarkLine } from '../../core/hidden-mark';
 import type { LensPicture } from '../../core/web-lens';
 import { readerEdgesOf, spatialMapOf, spatialOtherOf } from '../../core/world-links';
-import { nameOrUnnamed } from '../../core/type-words';
+import { missingLabel, missingWords, nameOrUnnamed } from '../../core/type-words';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -894,9 +894,9 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       nodeEl.style.top = `${cy - dia / 2}px`;
       const iconName = n.el ? (ELEMENT_ICONS[n.el.type] ?? 'category') : 'edit_note';
       // A node's label stands alone: its own name, or the unnamed form with the capital. A node whose
-      // element is not in the world at all keeps a word that says it is unknown.
+      // element is not in the world at all is said as missing (no type is known for it here).
       const said = n.el ?? (n.isCenter && n.id === homeId ? subject : null);
-      const rawName = said ? nameOrUnnamed(said, { start: true }) : '(unknown)';
+      const rawName = said ? nameOrUnnamed(said, { start: true }) : missingLabel('element');
       // A proposed or hidden element is drawn with its mark, never plain, as on
       // every other surface: a dotted ring, the word in the label and its line in
       // the tooltip. Atlas is the keeper's copy, so they are shown, marked.
@@ -921,7 +921,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       // Mid-line ("links to the unnamed character"); the centre is the subject when its node holds no element.
       const centre = nodes.find(c => c.isCenter);
       const centreEl = centre?.el ?? (centre?.id === homeId ? subject : null);
-      const centerName = centreEl ? nameOrUnnamed(centreEl) : '(unknown)';
+      const centerName = centreEl ? nameOrUnnamed(centreEl) : missingWords('element');
       const markers = n.isCenter ? 0
         : lastMarkerCounts.get(`${paintCenterId}|${n.id}`) ?? lastMarkerCounts.get(`${n.id}|${paintCenterId}`) ?? 0;
       const markerLine = markers ? `\n${markers} marker${markers === 1 ? '' : 's'} on the map` : '';
@@ -1496,9 +1496,9 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       trail.appendChild(sep);
 
       const el = findElement(id);
-      // A crumb alone takes the capital; "Back to …" says it mid-line. Not in the world: a word that says so.
-      const label = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';
-      const back = el ? nameOrUnnamed(el) : '(unknown)';
+      // A crumb alone takes the capital; "Back to …" says it mid-line. Not in the world: missing, as a label and in a sentence.
+      const label = el ? nameOrUnnamed(el, { start: true }) : missingLabel('element');
+      const back = el ? nameOrUnnamed(el) : missingWords('element');
       const isCurrent = idx === centerStack.length - 1;
       if (isCurrent) {
         const cur = document.createElement('span');

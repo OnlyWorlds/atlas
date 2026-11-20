@@ -196,7 +196,7 @@ describe('buildPagePayload', () => {
       { id: 'b1', kind: 'circle', knowerId: GONE },
     ]), world());
     const frozen = p.blocks[0] as PayloadCircleBlock;
-    expect(frozen.title).toBe('(missing knower)');
+    expect(frozen.title).toBe('(missing element)');
     expect(frozen.entries).toEqual([]);
   });
 

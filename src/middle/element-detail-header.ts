@@ -34,7 +34,7 @@ import {
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import type { Element, Pin, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
-import { nameOrUnnamed, ownName, typeName } from '../core/type-words';
+import { missingLabel, missingWords, nameOrUnnamed, ownName, typeName } from '../core/type-words';
 import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -998,8 +998,9 @@ function buildPinAffordance(
   showMapName: boolean,
 ): HTMLElement {
   const m = elements.find((e): e is WorldMap => e.type === 'map' && e.id === pin.map_id);
-  // A map with no name says the unnamed form; one not in the world at all keeps its own word.
-  const mapName = m ? nameOrUnnamed(m) : '(unknown map)';
+  // A map with no name says the unnamed form; one not in the world at all is a missing map, in the
+  // tooltip's sentence ("Pin on a missing map") and as the label ("(missing map)").
+  const mapName = m ? nameOrUnnamed(m) : missingWords('map');
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'atlas-icon-btn-sm atlas-header-pin-affordance';
@@ -1012,7 +1013,7 @@ function buildPinAffordance(
     : `Pin on ${mapName} · click to open and center, right-click to delete pin`;
   const iconHtml = '<span class="material-symbols-outlined">push_pin</span>';
   if (showMapName) {
-    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m ? nameOrUnnamed(m, { start: true }) : mapName)}</span>`;
+    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m ? nameOrUnnamed(m, { start: true }) : missingLabel('map'))}</span>`;
     btn.classList.add('atlas-header-map-affordance-labeled');
   } else {
     btn.innerHTML = iconHtml;

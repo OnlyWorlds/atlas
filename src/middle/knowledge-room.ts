@@ -32,7 +32,7 @@ import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
 import {
-  KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE, listKnowledgeEntries, heldByOf, aboutIdsOf,
+  KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE, listKnowledgeEntries, heldByOf, aboutIdsOf, aboutTypeOf,
   ABOUT_FIELDS, aboutFieldFor, isKnowerType, listKnowers, knowledgeHeldBy, elementsKnownAboutBy,
   circleMembers,
 } from '../core/knowledge';
@@ -40,7 +40,7 @@ import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writin
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
-import { capitalise, nameOrUnnamed, openWords, ownName, quotedName, theUnnamed, typeName } from '../core/type-words';
+import { capitalise, missingLabel, nameOrUnnamed, openWords, ownName, quotedName, theUnnamed, typeName } from '../core/type-words';
 import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { Element } from '../core/types';
@@ -85,6 +85,8 @@ interface EditorCtx {
   addCircle(id: string): void;
   removeCircle(id: string): void;
   aboutIds(): string[];
+  /** The type a subject's field names for it (a draft holds no fields: none). */
+  aboutType?(id: string): string | null;
   addAbout(id: string): void;
   removeAbout(id: string): void;
 }
@@ -482,14 +484,15 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
   // ---- chips ----------------------------------------------------------------
 
-  function elementChip(id: string, onRemove?: () => void, derived?: boolean): HTMLElement {
+  /** `type`: what the chip's field holds (a holder's character or circle), said when its element is not in the world. */
+  function elementChip(id: string, onRemove?: () => void, derived?: boolean, type = 'element'): HTMLElement {
     const el = elOf(id);
     const worldId = wid();
     const chip = document.createElement('span');
     chip.className = 'atlas-knowledge-chip' + (derived ? ' is-derived' : '');
     const icon = el ? (ELEMENT_ICONS[el.type] ?? 'category') : 'help';
-    // An element here is said by its name or its unnamed form; one not here keeps its own word.
-    const name = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';
+    // An element here is said by its name or its unnamed form; one not in the world, as missing in the field's type.
+    const name = el ? nameOrUnnamed(el, { start: true }) : missingLabel(type);
     const body = document.createElement('button');
     body.type = 'button';
     body.className = 'atlas-knowledge-chip-body';
@@ -542,8 +545,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const chips = document.createElement('div');
     chips.className = 'atlas-knowledge-chips';
     // A view-only world shows the holders, without remove or add (conv. 149).
-    if (held.narrator) chips.appendChild(elementChip(held.narrator, viewOnly ? undefined : () => ctx.setNarrator(null)));
-    for (const id of held.collectives) chips.appendChild(elementChip(id, viewOnly ? undefined : () => ctx.removeCircle(id)));
+    if (held.narrator) chips.appendChild(elementChip(held.narrator, viewOnly ? undefined : () => ctx.setNarrator(null), false, 'character'));
+    for (const id of held.collectives) chips.appendChild(elementChip(id, viewOnly ? undefined : () => ctx.removeCircle(id), false, 'collective'));
     if (viewOnly) {
       if (!held.narrator && held.collectives.length === 0) chips.appendChild(noneLine('No one holds this yet.'));
       container.appendChild(chips);
@@ -590,7 +593,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const ids = ctx.aboutIds();
     const chips = document.createElement('div');
     chips.className = 'atlas-knowledge-chips';
-    for (const id of ids) chips.appendChild(elementChip(id, viewOnly ? undefined : () => ctx.removeAbout(id)));
+    for (const id of ids) chips.appendChild(elementChip(id, viewOnly ? undefined : () => ctx.removeAbout(id), false, ctx.aboutType?.(id) ?? 'element'));
     if (derivedExtra) {
       for (const id of derivedExtra) {
         if (ids.includes(id)) continue;
@@ -1154,6 +1157,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       addCircle: (id) => { void patchEntry(entryId, { collectives: [...heldByOf(cur()).collectives, id] }); },
       removeCircle: (id) => { void patchEntry(entryId, { collectives: heldByOf(cur()).collectives.filter(c => c !== id) }); },
       aboutIds: () => aboutIdsOf(cur()),
+      aboutType: (id) => aboutTypeOf(cur(), id),
       addAbout: (id) => {
         const t = elOf(id)?.type;
         const f = t ? aboutFieldFor(t) : null;

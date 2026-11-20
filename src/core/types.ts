@@ -421,7 +421,7 @@ export interface Conflict {
   /**
    * Set when the conflict is a proposal keel did not take (conv. 163): the
    * keeper declined it (with their reason, when given), or it lapsed or was
-   * withdrawn. Overwrite proposes again; Pull drops the edit.
+   * withdrawn. Keep this copy proposes again; Keep the OnlyWorlds copy drops the edit.
    */
   proposal?: { outcome: 'declined' | 'lapsed' | 'withdrawn'; reason?: string };
   /**

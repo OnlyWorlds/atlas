@@ -162,7 +162,7 @@ describe('P5: settled by keel\'s queue', () => {
     expect((await folder.getElement(el.id))!.description).toBe('Proposed.');
   });
 
-  it('declined, then Overwrite proposes again; declined, then Pull drops the edit', async () => {
+  it('declined, then Keep this copy proposes again; declined, then Keep the OnlyWorlds copy drops the edit', async () => {
     const el = await seatOnReviewedWorld();
     await folder.updateElement(el.id, { description: 'Proposed.' });
     await engine.syncNow();
@@ -438,7 +438,7 @@ describe('G3: a refused delete takes back the unlinks it set off (TC 2026-10-22)
 describe('the review line (a live read)', () => {
   it('a reason that ends its own sentence takes no second stop', async () => {
     const { proposalReviewLine } = await import('../../src/sync/proposal-lines');
-    expect(proposalReviewLine({ outcome: 'declined', reason: 'Not canon here.' })).toContain('"Not canon here." Overwrite');
-    expect(proposalReviewLine({ outcome: 'declined', reason: 'Not canon' })).toContain('"Not canon". Overwrite');
+    expect(proposalReviewLine({ outcome: 'declined', reason: 'Not canon here.' })).toContain('"Not canon here." Keep this copy');
+    expect(proposalReviewLine({ outcome: 'declined', reason: 'Not canon' })).toContain('"Not canon". Keep this copy');
   });
 });

@@ -31,7 +31,7 @@ export const PROPOSAL_PENDING_TITLE = "Sent for review: this world's keeper deci
 
 /** The review's line for a proposal keel did not take (P5); the buttons are the review's own. */
 export function proposalReviewLine(p: NonNullable<Conflict['proposal']>): string {
-  const choice = 'Overwrite sends it for review again; Pull drops it.';
+  const choice = 'Keep this copy sends it for review again; Keep the OnlyWorlds copy drops it.';
   if (p.outcome === 'declined') {
     // A reason that ends its own sentence takes no second stop after the quote.
     return p.reason

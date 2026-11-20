@@ -155,6 +155,26 @@ export function missingWords(type: string, opts: { start?: boolean; word?: strin
 }
 
 /**
+ * The same missing element as a chip, a list row or a label says it, where no
+ * sentence holds it: "(missing location)". One form beside `missingWords`;
+ * where nothing names the type, the type is `element`: "(missing element)".
+ */
+export function missingLabel(type: string, opts: { word?: string } = {}): string {
+  return `(missing ${opts.word?.trim() || typeName(type)})`;
+}
+
+/**
+ * A world as its delete question names it: the word and its own name in
+ * quotes (`Delete world "Harbour"?`); a world with no name, or one of spaces,
+ * is "this world", the one asked about on screen. A world is not an element,
+ * so it has no unnamed form.
+ */
+export function quotedWorld(name: unknown): string {
+  const own = typeof name === 'string' ? name.trim() : '';
+  return own ? `world "${own}"` : 'this world';
+}
+
+/**
  * What a press on a control that opens an element does, said one way: "Open
  * Ada", "Open the unnamed entry". The one builder for such a control's
  * tooltip, and for its name where the two are one string.

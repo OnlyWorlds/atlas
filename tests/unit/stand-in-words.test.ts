@@ -504,3 +504,68 @@ describe('the places one phrase over, and the lines the census cannot see (the g
     expect(said).toHaveBeenCalledWith('Linked, but could not save "the stranger" as an alias. The link may show the unnamed character instead');
   });
 });
+
+describe('a missing element is said one way (1.124.32): a missing <type> in a sentence, (missing <type>) as a label', () => {
+  it("a pin's map not in the world: Pin on a missing map in its tooltip, (missing map) as its label", () => {
+    const ada = el('character', 'c1', { name: 'Ada' });
+    const pin = el('pin', 'pn1', { name: '', map_id: 'gone-map', element_id: 'c1', element_type: 'character', x: 1, y: 2 });
+    openWorld([ada, pin]);
+    patchSlice('registry', { ...getState().registry, maps_settings: { show_pin_map_names_in_header: true } } as never);
+    const header = renderHeader(ada);
+    document.body.appendChild(header);
+    const btn = header.querySelector<HTMLElement>('[data-action="goto-pin"]')!;
+    expect(btn.title.startsWith('Pin on a missing map · click to open and center')).toBe(true);
+    expect(btn.querySelector('.atlas-header-map-label')!.textContent).toBe('(missing map)');
+  });
+
+  it("a zone's markers on a map not in the world: the heading says (missing map)", () => {
+    const zone = el('zone', 'z9', { name: 'Reef' }) as unknown as Zone;
+    const marker = el('marker', 'mk9', { name: '', zone_id: 'z9', map_id: 'gone-map', x: 1, y: 2 });
+    openWorld([zone as unknown as Element, marker]);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    for (const s of buildZoneSections(zone, fakeToasts())) host.appendChild(s);
+    expect(host.querySelector('.atlas-zone-markers-group-header span:not(.material-symbols-outlined):not(.atlas-zone-markers-group-count)')!.textContent).toBe('(missing map)');
+  });
+
+  it("the Web's way back to an element no longer in the world: (missing element), and Back to a missing element", () => {
+    clearContextGraphLayoutMemo();
+    const A = '00000000-0000-4000-8000-0000000000c1';
+    const B = '00000000-0000-4000-8000-0000000000c2';
+    const C = '00000000-0000-4000-8000-0000000000c3';
+    const a = el('character', A, { name: 'Ana', friends: [B] });
+    const b = el('character', B, { name: 'Bo', friends: [A, C] });
+    const c = el('character', C, { name: 'Cy', friends: [B] });
+    patchSlice('data', { ...getState().data, elements: [a, b, c] });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const h = mountContextGraph({ host, subject: a, onSelect: () => {}, hopDepth: 1 });
+    const node = (id: string) => host.querySelector<HTMLElement>(`.atlas-context-graph-node[data-element-id="${id}"]`)!;
+    node(B).click();
+    node(C).click();
+    // Bo leaves the world; the trail still holds him.
+    patchSlice('data', { ...getState().data, elements: [a, c] });
+    h.setHiddenTypes(new Set());
+    const crumb = host.querySelector<HTMLElement>('.atlas-context-graph-trail-chip[data-trail-index="0"]')!;
+    expect(crumb.textContent).toBe('(missing element)');
+    expect(crumb.title).toBe('Back to a missing element');
+    h.destroy();
+  });
+
+  it("a map tab whose map is gone and that kept no label: (missing map)", async () => {
+    const { mountRightPane } = await import('../../src/tabs/right/right-pane');
+    openWorld([]);
+    patchSlice('ui', { ...getState().ui, rightTabs: [{ kind: 'map-index' }, { kind: 'map', mapId: 'gone-map', label: '' }], rightActiveIndex: 0 } as never);
+    const tabBar = document.createElement('div');
+    const pane = document.createElement('div');
+    document.body.append(tabBar, pane);
+    const unmount = mountRightPane({ tabBar, pane, toasts: fakeToasts() });
+    try {
+      const tab = tabBar.querySelector<HTMLElement>('[data-tab-index="1"]')!;
+      expect(tab.textContent).toContain('(missing map)');
+    } finally {
+      unmount();
+      patchSlice('ui', { ...getState().ui, rightTabs: [], rightActiveIndex: 0 } as never);
+    }
+  });
+});

@@ -26,7 +26,7 @@ import { readImageDimsFromFile, readImageDimsFromUrl, IMAGELESS_MAP_SIZE, smallM
 import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
 import { escapeText, escapeAttr } from '../core/dom-utils';
-import { nameOrUnnamed, ownName } from '../core/type-words';
+import { missingLabel, missingWords, nameOrUnnamed, ownName } from '../core/type-words';
 // view-only-ok: opened only from +map and New map, both closed on a view-only world (conv. 149).
 
 export interface MapCreateResult {
@@ -66,13 +66,24 @@ export function createMapDialog(
   });
 }
 
+/**
+ * A chip's words: the label alone (its own name, the unnamed form, or a missing element's label) and the
+ * same inside a sentence ("Remove the unnamed map", "Remove a missing map").
+ */
+export function chipWords(p: { name: string; missing?: boolean }, type: string): { label: string; inLine: string } {
+  if (p.missing) return { label: missingLabel(type), inLine: missingWords(type) };
+  const el = { name: p.name, type };
+  return { label: nameOrUnnamed(el, { start: true }), inLine: nameOrUnnamed(el) };
+}
+
 class MapCreateModal extends BaseModal {
   private onDone: (result: MapCreateResult | null) => void;
   private toasts: ToastManager;
   private opts: MapModalOptions;
   private resolved = false;
-  private locationPreview: { id: string; name: string } | null = null;
-  private parentMapPreview: { id: string; name: string } | null = null;
+  /** A chip's element; `missing` when the id names nothing in the world, said as missing, never by a name. */
+  private locationPreview: { id: string; name: string; missing?: boolean } | null = null;
+  private parentMapPreview: { id: string; name: string; missing?: boolean } | null = null;
   private existingMap: WorldMap | null = null;
   private advancedOpen = false;
 
@@ -116,14 +127,14 @@ class MapCreateModal extends BaseModal {
       // up the location's name from state.
       if (found.location) {
         const loc = getState().data.elements.find(e => e.id === found.location);
-        // A place with no name is drawn as the unnamed form by the chip; one not in the world keeps its own word.
-        this.locationPreview = { id: found.location, name: loc ? ownName(loc) : '(unknown)' };
+        // A place with no name is drawn as the unnamed form by the chip; one not in the world as missing.
+        this.locationPreview = loc ? { id: found.location, name: ownName(loc) } : { id: found.location, name: '', missing: true };
       }
       if (typeof found.parent_map === 'string' && found.parent_map) {
         const parent = getState().data.elements.find(
           (e): e is WorldMap => e.type === 'map' && e.id === found.parent_map,
         );
-        this.parentMapPreview = { id: found.parent_map, name: parent ? ownName(parent) : '(unknown)' };
+        this.parentMapPreview = parent ? { id: found.parent_map, name: ownName(parent) } : { id: found.parent_map, name: '', missing: true };
       }
       // Reveal the advanced section by default when any advanced field is
       // already populated — saves a click and signals "there's stuff here."
@@ -411,8 +422,8 @@ class MapCreateModal extends BaseModal {
     if (this.locationPreview) {
       const chip = document.createElement('span');
       chip.className = 'atlas-link-chip';
-      const loc = { name: this.locationPreview.name, type: 'location' };
-      chip.innerHTML = `<span>${escapeText(nameOrUnnamed(loc, { start: true }))}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(nameOrUnnamed(loc))}"><span class="material-symbols-outlined">close</span></button>`;
+      const loc = chipWords(this.locationPreview, 'location');
+      chip.innerHTML = `<span>${escapeText(loc.label)}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(loc.inLine)}"><span class="material-symbols-outlined">close</span></button>`;
       row.appendChild(chip);
       chip.querySelector<HTMLElement>('.atlas-link-chip-remove')!.addEventListener('click', () => {
         this.locationPreview = null;
@@ -440,8 +451,8 @@ class MapCreateModal extends BaseModal {
     if (this.parentMapPreview) {
       const chip = document.createElement('span');
       chip.className = 'atlas-link-chip';
-      const parent = { name: this.parentMapPreview.name, type: 'map' };
-      chip.innerHTML = `<span>${escapeText(nameOrUnnamed(parent, { start: true }))}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(nameOrUnnamed(parent))}"><span class="material-symbols-outlined">close</span></button>`;
+      const parent = chipWords(this.parentMapPreview, 'map');
+      chip.innerHTML = `<span>${escapeText(parent.label)}</span><button type="button" class="atlas-link-chip-remove" data-remove="1" aria-label="Remove ${escapeAttr(parent.inLine)}"><span class="material-symbols-outlined">close</span></button>`;
       row.appendChild(chip);
       chip.querySelector<HTMLElement>('.atlas-link-chip-remove')!.addEventListener('click', () => {
         this.parentMapPreview = null;

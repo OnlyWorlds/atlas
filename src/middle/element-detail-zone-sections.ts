@@ -29,7 +29,7 @@ import { getEditorSettings } from '../registry/registry';
 import { getWritingLabels } from './writing-helpers';
 import { navigate, elementsHash } from '../core/router';
 import { resolveStyle, kindLabel } from '../core/world-styles';
-import { nameOrUnnamed } from '../core/type-words';
+import { missingLabel, nameOrUnnamed } from '../core/type-words';
 
 /** Point tables longer than this fold behind their map row. */
 const MARKERS_FOLD_ABOVE = 8;
@@ -309,8 +309,8 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
 
   for (const [mapId, list] of byMap.entries()) {
     const map = elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
-    // A heading alone: a map with no name says the unnamed form; one not in the world keeps its own word.
-    const mapName = map ? nameOrUnnamed(map, { start: true }) : '(unknown map)';
+    // A heading alone: a map with no name says the unnamed form; one not in the world, the label of a missing map.
+    const mapName = map ? nameOrUnnamed(map, { start: true }) : missingLabel('map');
 
     // The point table is for editing points, which is rare next to reading
     // the page; a long one used to be most of a zone's page (Sikelia's
