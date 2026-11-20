@@ -29,6 +29,11 @@ import { promiseFor, sentenceFor } from '../../src/ui/home-grid-place';
 import { buildHomePicture, resetHomePictureForTests } from '../../src/middle/home-picture';
 import { mountContextGraph, clearContextGraphLayoutMemo } from '../../src/tabs/right/context-pane-graph';
 import { buildCharterMarkOffer } from '../../src/middle/element-detail-charter-mark';
+import { deleteRefusedLine } from '../../src/sync/proposal-lines';
+import { installPlacementHintWatcher } from '../../src/tabs/right/map-placement-hint';
+import { sliceLine } from '../../src/core/provenance';
+import { recordAliasIfForeign } from '../../src/middle/prose-link-existing';
+import { elementHash } from '../../src/core/router';
 
 const W = 'w-stand';
 const MAP = '00000000-0000-4000-8000-0000000000a1';
@@ -276,5 +281,159 @@ describe('this <type> and its family say the unnamed form', () => {
     const entry = getState().registry.worlds[0];
     const box = buildCharterMarkOffer(newer, entry, {}, W, [lead, newer]);
     expect(box?.textContent).toMatch(/This world's charter is the unnamed charter\. Marking this one makes it the charter in place of the unnamed charter, and Home then offers to retire the unnamed charter\./);
+  });
+});
+
+describe('a delete names its type whatever the door (the gate\'s S3)', () => {
+  async function askFromPage(target: Element, hash?: string): Promise<{ asked: string; said: string }> {
+    fakeStore();
+    const asked = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    if (hash) window.location.hash = hash;
+    const { toastManager } = await import('../../src/ui/toast-manager');
+    const said = vi.spyOn(toastManager, 'success').mockImplementation(() => undefined as never);
+    const header = renderHeader(target);
+    document.body.appendChild(header);
+    header.querySelector<HTMLElement>('[data-action="delete-element"]')!.click();
+    await vi.waitFor(() => expect(said).toHaveBeenCalled());
+    return { asked: asked.mock.calls[0][0] as string, said: said.mock.calls[0][0] as string };
+  }
+
+  it("a map's own page asks as the Maps tree does", async () => {
+    const map = el('map', MAP, { name: 'Harbour' });
+    openWorld([map]);
+    expect(await askFromPage(map)).toEqual({ asked: 'Delete map "Harbour"? This cannot be undone.', said: 'Deleted Harbour' });
+  });
+
+  it("a zone's own page asks as the zone list does", async () => {
+    const reef = el('zone', 'z1', { name: 'Reef' }) as unknown as Zone;
+    openWorld([reef as unknown as Element]);
+    fakeStore();
+    const asked = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const toasts = fakeToasts();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    for (const s of buildZoneSections(reef, toasts)) host.appendChild(s);
+    host.querySelector<HTMLElement>('[data-action="delete-zone"]')!.click();
+    await vi.waitFor(() => expect(toasts.success).toHaveBeenCalled());
+    expect(asked.mock.calls[0][0]).toBe('Delete zone "Reef"? This cannot be undone.');
+    expect(toasts.success).toHaveBeenLastCalledWith('Deleted Reef');
+  });
+
+  it('a chapter asked from the writing room keeps the tree\'s word; its plain page says the type\'s', async () => {
+    const chapter = el('narrative', 'ch1', { name: 'One', supertype: 'Chapter' });
+    openWorld([chapter]);
+    expect((await askFromPage(chapter, writingHash(W, 'ch1'))).asked).toBe('Delete chapter "One"? This cannot be undone.');
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+    expect((await askFromPage(chapter, elementHash(W, 'ch1'))).asked).toBe('Delete narrative "One"? This cannot be undone.');
+  });
+
+  it('the writing tree asks a named chapter by its word too', async () => {
+    const book = el('narrative', 'b1', { name: 'The Book', supertype: 'Book', order: 0 });
+    const chapter = el('narrative', 'ch1', { name: 'One', supertype: 'Chapter', parent_narrative: 'b1', order: 0 });
+    openWorld([book, chapter]);
+    fakeStore();
+    const asked = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const toasts = fakeToasts();
+    window.location.hash = writingHash(W);
+    const content = document.createElement('div');
+    document.body.appendChild(content);
+    const unmount = mountWritingBody({ content, toasts });
+    try {
+      const row = [...content.querySelectorAll<HTMLElement>('.atlas-writing-tree-row')]
+        .find(r => r.querySelector('.atlas-writing-tree-name')?.textContent === 'One')!;
+      row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      document.querySelector<HTMLElement>('[data-role="delete-narrative"]')!.click();
+      await vi.waitFor(() => expect(toasts.success).toHaveBeenCalled());
+      expect(asked.mock.calls[0][0]).toBe('Delete chapter "One"? This cannot be undone.');
+      expect(toasts.success).toHaveBeenLastCalledWith('Deleted One');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('a name holding quotes and markup is said as text: quoted and trimmed in the question, plain in the note', async () => {
+    const map = el('map', MAP, { name: '  <b>"Ada"</b> ' });
+    openWorld([map]);
+    fakeStore();
+    const asked = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const toasts = fakeToasts();
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mountMapIndexTab(target, toasts);
+    expect(target.querySelector('[data-action="delete-map"]')!.getAttribute('aria-label')).toBe('Delete the map <b>"Ada"</b>');
+    target.querySelector<HTMLElement>('[data-action="delete-map"]')!.click();
+    await vi.waitFor(() => expect(toasts.success).toHaveBeenCalled());
+    expect(asked.mock.calls[0][0]).toBe('Delete map "<b>"Ada"</b>"? This cannot be undone.');
+    expect(toasts.success).toHaveBeenLastCalledWith('Deleted <b>"Ada"</b>');
+    expect(document.body.querySelector('b')).toBeNull();
+  });
+
+  it('a name that is not a string never throws: the Maps tree and the writing tree read it as none', () => {
+    const map = el('map', MAP, { name: 42 });
+    const book = el('narrative', 'b1', { name: 7, supertype: 'Book', order: 0 });
+    openWorld([map, book]);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mountMapIndexTab(target, fakeToasts());
+    expect(target.querySelector('[data-action="delete-map"]')!.getAttribute('aria-label')).toBe('Delete the unnamed map');
+    window.location.hash = writingHash(W);
+    const content = document.createElement('div');
+    document.body.appendChild(content);
+    const unmount = mountWritingBody({ content, toasts: fakeToasts() });
+    try {
+      expect(content.querySelector<HTMLElement>('.atlas-writing-tree-row-add')?.title).toBe('New chapter in the unnamed book');
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe('the places one phrase over, and the lines the census cannot see (the gate\'s S1, S2)', () => {
+  it("the keeper-only note says the unnamed form mid-line", () => {
+    expect(deleteRefusedLine([{ id: 'c1', type: 'character', name: '' } as never]))
+      .toBe("Only this world's keeper can delete the unnamed character, so it is back.");
+    expect(deleteRefusedLine([{ id: 'c1', type: 'character', name: ' Ada ' } as never]))
+      .toBe("Only this world's keeper can delete Ada, so it is back.");
+  });
+
+  it('the placement banner names the element, or its unnamed form', () => {
+    const ada = el('character', 'c1', { name: '' });
+    openWorld([ada]);
+    const canvas = document.createElement('div');
+    canvas.className = 'atlas-map-canvas-container';
+    document.body.appendChild(canvas);
+    installPlacementHintWatcher();
+    patchSlice('ui', { ...getState().ui, pinPlacement: { elementId: 'c1' } });
+    expect(canvas.querySelector('.atlas-map-placement-hint-text')!.textContent).toBe('Click the map to place the unnamed character');
+    patchSlice('ui', { ...getState().ui, pinPlacement: null });
+  });
+
+  it('a new map of a nameless place starts as New map, of a named one as Map of …', async () => {
+    const place = el('location', 'l1', { name: ' ' });
+    openWorld([place]);
+    fakeStore();
+    const header = renderHeader(place);
+    document.body.appendChild(header);
+    const add = header.querySelector<HTMLElement>('[data-action="add-map"]')!;
+    expect(add.title).toBe('Create a new map of the unnamed location');
+    add.click();
+    await vi.waitFor(() => expect(document.querySelector<HTMLInputElement>('input[name="map-name"]')).not.toBeNull());
+    expect(document.querySelector<HTMLInputElement>('input[name="map-name"]')!.value).toBe('New map');
+  });
+
+  it("a slice's character with no name is the unnamed character", () => {
+    const meta = { exported_as: { kind: 'character', character: { name: '  ' } } };
+    expect(sliceLine(meta, () => null)).toBe("Exported as one Character's view: only what the unnamed character knows of the world.");
+  });
+
+  it("an alias that could not be saved names the element by its unnamed form, never 'the element name'", async () => {
+    const ada = el('character', 'c1', { name: '' });
+    openWorld([ada]);
+    setActiveStore({ updateElement: vi.fn(async () => { throw new Error('disk'); }) } as never);
+    const { toastManager } = await import('../../src/ui/toast-manager');
+    const said = vi.spyOn(toastManager, 'error').mockImplementation(() => undefined as never);
+    await recordAliasIfForeign(ada, 'the stranger');
+    expect(said).toHaveBeenCalledWith('Linked, but could not save "the stranger" as an alias. The link may show the unnamed character instead');
   });
 });

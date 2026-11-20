@@ -299,7 +299,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (!folder || !worldId || viewOnly) return;
     const el = elOf(id);
     // The entry as the confirm asks it: its name in quotes, or the unnamed entry.
-    const said = quotedName(el ?? { type: 'narrative' }, { word: 'entry' });
+    const said = quotedName(el ?? { type: 'narrative' }, { word: 'entry', typed: true });
     if (getEditorSettings(getState().registry).confirm_before_delete) {
       let dependentCount = 0;
       try {

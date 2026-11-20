@@ -1231,7 +1231,7 @@ test('writing tree: delete names the whole subtree in the user vocabulary', asyn
 
   await expect.poll(() => messages.length).toBe(1);
   expect(messages[0]).toBe(
-    'Delete "Chapter One"? This also deletes 2 scenes and 1 other narrative. This cannot be undone.',
+    'Delete chapter "Chapter One"? This also deletes 2 scenes and 1 other narrative. This cannot be undone.',
   );
   // Dismissed = nothing lost.
   // Poll rather than read once: the helper returns -1 while the page is not

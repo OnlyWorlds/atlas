@@ -27,7 +27,7 @@ import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type 
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation, pressOncePerKey } from '../../core/dom-utils';
 import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
-import { capitalise, nameOrUnnamed, quotedName, theUnnamed, typeName } from '../../core/type-words';
+import { capitalise, nameOrUnnamed, ownName, quotedName, theUnnamed, typeName } from '../../core/type-words';
 
 // ---- Collapsed tree-node state ----
 
@@ -359,7 +359,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
     const locationNames = new Map<string, string>();
     for (const e of state.data.elements) {
-      if (e.type === 'location') locationNames.set(e.id, e.name?.trim() ?? '');
+      if (e.type === 'location') locationNames.set(e.id, ownName(e));
     }
 
     const list = document.createElement('div');
@@ -647,7 +647,8 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     del.setAttribute('data-action', 'delete-map');
     // Named for its map, one name for the mouse and the screen reader: every
     // row has one, and Tab meets them in a run.
-    del.title = m.name?.trim() ? `Delete the ${typeName('map')} ${m.name.trim()}` : `Delete ${theUnnamed('map')}`;
+    // Read through ownName: a name that is not a string (a hand-edited file) reads as none, never throws.
+    del.title = ownName(m) ? `Delete the ${typeName('map')} ${ownName(m)}` : `Delete ${theUnnamed('map')}`;
     del.setAttribute('aria-label', del.title);
     del.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">delete</span>';
     del.addEventListener('click', (e) => {

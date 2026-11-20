@@ -37,7 +37,7 @@ import { decideDeleteConfirm } from '../core/delete-confirm';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { renderGate, keepingFocus } from '../ui/render-gate';
-import { nameOrUnnamed } from '../core/type-words';
+import { nameOrUnnamed, quotedName } from '../core/type-words';
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -538,7 +538,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'atlas-writing-tree-row-add';
-      addBtn.title = `New ${childLabel.toLowerCase()} in ${node.el.name?.trim() ? `"${node.el.name.trim()}"` : nameOrUnnamed(node.el, { word: tierLabel.toLowerCase() })}`;
+      addBtn.title = `New ${childLabel.toLowerCase()} in ${quotedName(node.el, { word: tierLabel.toLowerCase() })}`;
       addBtn.innerHTML = `<span class="material-symbols-outlined">add</span>`;
       addBtn.addEventListener('click', (e) => {
         e.stopPropagation();

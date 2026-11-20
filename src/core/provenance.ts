@@ -8,7 +8,7 @@
  */
 
 import pkg from '../../package.json';
-import { typeNameStart } from './type-words';
+import { theUnnamed, typeNameStart } from './type-words';
 
 export interface WorldSource {
   server: string;
@@ -152,7 +152,9 @@ export function sliceLine(meta: unknown, formatDate: (iso: string) => string | n
   if (s.kind === 'owner') return `${from} by its owner: the whole world.`;
   if (s.kind === 'member') return `${from} by ${s.role === 'co_builder' ? 'a co-builder' : s.role === 'contributor' ? 'a contributor' : 'a member'}.`;
   if (s.kind === 'public') return `${from}: the world's public view, not the whole world.`;
-  return `${from} as ${viewOf(s, meta)}: only what ${s.name ?? `that ${characterWord(meta)}`} knows of the world.`;
+  // The slice's character by its name, or its unnamed form in the world's own word (`||`: an empty name is none).
+  const who = s.name || theUnnamed('character', { world: meta && typeof meta === 'object' ? meta : null });
+  return `${from} as ${viewOf(s, meta)}: only what ${who} knows of the world.`;
 }
 
 /** R1, Home: one line for a slice that is not the whole world. */

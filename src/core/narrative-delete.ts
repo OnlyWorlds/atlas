@@ -192,7 +192,7 @@ export function narrativeDeleteConfirmMessage(
   /** The room's word for a nameless one ("the unnamed chapter"); the type's word when absent. */
   word?: string,
 ): string {
-  const subject = quotedName({ name, type: 'narrative' }, { word });
+  const subject = quotedName({ name, type: 'narrative' }, { word, typed: true });
   if (summary.total === 0) return `Delete ${subject}? This cannot be undone.`;
   return `Delete ${subject}? ${summary.sentence} This cannot be undone.`;
 }

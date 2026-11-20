@@ -23,6 +23,7 @@ import type { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { afterPress } from '../ui/press';
 import { humanizeFieldName } from './element-detail-fields';
+import { nameOrUnnamed } from '../core/type-words';
 
 const MAX_LABEL = 80;
 
@@ -293,7 +294,7 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
   async function add(file: File, label: string | null): Promise<void> {
     try {
       await addFile(entry, getState().registry, el.type, el.id, file, label);
-      toasts.success(`${file.name} added to ${el.name || 'the element'}.`);
+      toasts.success(`${file.name} added to ${nameOrUnnamed(el)}.`);
     } catch (err) {
       showProblem(err, { doing: 'adding the file', toasts });
     }

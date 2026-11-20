@@ -170,62 +170,99 @@ describe('the census: no bare Unnamed or (untitled) a person can meet', () => {
  * question quotes it through `quotedName`; an element that is not in the
  * world at all keeps words that say it is missing, and those places are on the
  * allowlist below with that reason. A world's name is not an element's, and
- * "this world" stays, as ruled.
+ * "this world" and "that world" stay, as ruled.
+ *
+ * The allowlist holds each allowed line's own text (trimmed), never a count:
+ * the line kept on purpose is a presence ternary (`x ? nameOrUnnamed(x) :
+ * '(unknown)'`), and the line it replaced (`x?.name || '(unknown)'`) is a
+ * different text, so putting the old line back reds even though the file
+ * still holds one stand-in line. Limits, named: a fallback built some other
+ * way (a variable holding the word, a helper returning it) is not seen; a
+ * quoted name is seen only inside one `${…}` whose text holds `name`.
  */
 const STAND_IN = new RegExp([
-  // A fallback after || or ??: "this …" (not a world or a browser), any "(…)", its map, a map, an element, it, a bare word.
-  /(?:\|\||\?\?)\s*['"`](?:[Tt]his (?!world\b|browser\b)|\(|its map\b|an? (?:map|element)['"`]|it['"`]|(?:element|zone|narrative|page|entry|Domain|Charter|Guide)['"`])/.source,
+  // A fallback after || or ??: "this …"/"that …" (not a world or a browser), "the element", "focused", any "(…)",
+  // its map, a map, an element, it, a bare word.
+  /(?:\|\||\?\?)\s*['"`](?:[Tt]his (?!world\b|browser\b)|[Tt]hat (?!world\b)|[Tt]he element\b|focused['"`]|\(|its map\b|an? (?:map|element)['"`]|it['"`]|(?:element|zone|narrative|page|entry|Domain|Charter|Guide)['"`])/.source,
   // A ternary's other side: a "(…)" word for a name, or "this element" itself.
   /[?:]\s*['"`]\((?:unknown|home|this |missing|pin without)|:\s*['"`]this (?:element|narrative|one)['"`]/.source,
   // The type's word standing in for a name.
   /[Tt]his \$\{typeName\(/.source,
-  // A delete, remove or revoke that quotes a raw name.
-  /(?:Delete|Remove|Revoke)d? [^"`]*"\$\{[\w?.]*\bname\}"/.source,
+  // A delete, remove or revoke that quotes a raw name, trimmed or not.
+  /(?:Delete|Remove|Revoke)d? [^"`]*"\$\{[^}]*\bname\b[^}]*\}"/.source,
 ].join('|'));
 
-/** The stand-in places left on purpose, each with its count and why. */
-const STAND_IN_LEFT: Record<string, { count: number; why: string }> = {
-  'src/core/share-payload.ts': { count: 1, why: 'a circle block whose knower is not in the world: "(missing knower)"' },
-  'src/core/world-styles.ts': { count: 1, why: 'a zone kind with neither supertype nor subtype: "(no kind)", not a name' },
-  'src/middle/element-detail-header.ts': { count: 1, why: 'a pin whose map is not in the world: "(unknown map)"' },
-  'src/middle/element-detail-map-image.ts': { count: 1, why: 'a picture file that is gone: a file, not an element' },
-  'src/middle/element-detail-zone-sections.ts': { count: 1, why: 'markers on a map that is not in the world: "(unknown map)"' },
-  'src/middle/import-room.ts': { count: 2, why: 'a link field\'s target type in a schema line, not a name' },
-  'src/middle/knowledge-room.ts': { count: 1, why: 'a holder or subject not in the world: "(unknown)"' },
-  'src/middle/settings-world.ts': { count: 1, why: 'a world\'s name in its Remove question' },
-  'src/middle/share-room.ts': { count: 2, why: 'a pin or a member whose element is not in the world: "(pin without element)", "(missing)"' },
-  'src/middle/writing-workspace-add-to-cast.ts': { count: 1, why: 'the label Add to story writes into the story text (stored; see unnamed-names)' },
-  'src/middle/writing-workspace-mention-items.ts': { count: 1, why: 'the label a mention pick writes into the story text (stored; see unnamed-names)' },
-  'src/sidebar/worlds-sidebar.ts': { count: 2, why: 'a world\'s name in its Remove questions' },
-  'src/tabs/right/context-pane-graph.ts': { count: 4, why: 'a node or crumb whose element is not in the world: "(unknown)"' },
-  'src/tabs/right/map-tab-pins.ts': { count: 1, why: 'a pin drawn before its element is read: "(loading…)"' },
-  'src/tabs/right/right-pane.ts': { count: 1, why: 'a map tab whose map is not in the world: its opened label, else "(missing map)"' },
-  'src/ui/delete-browser-world-modal.ts': { count: 1, why: 'a world\'s name in its Delete question' },
-  'src/ui/guide-note.ts': { count: 1, why: 'a type word handed to the name builder, not a name' },
-  'src/ui/map-create-modal.ts': { count: 2, why: 'a place or parent map not in the world: "(unknown)"' },
-  'src/visualization/timeline/timeline-view.ts': { count: 1, why: 'the chart on screen before it is saved: "This chart", not an element' },
+/** The stand-in lines left on purpose, by file: each line's own text, trimmed, and why. */
+const STAND_IN_LEFT: Record<string, Array<{ line: string; why: string }>> = {
+  'src/core/share-payload.ts': [{ line: "return { id: block.id, kind: 'circle', knowerId: block.knowerId, title: '(missing knower)', knowerType: 'collective', entries: [] };", why: 'a circle block whose knower is not in the world' }],
+  'src/core/world-styles.ts': [{ line: "const base = k.supertype && k.subtype ? `${k.supertype} · ${k.subtype}` : (k.supertype || k.subtype || '(no kind)');", why: 'a zone kind with neither supertype nor subtype, not a name' }],
+  'src/middle/element-detail-header.ts': [{ line: "const mapName = m ? nameOrUnnamed(m) : '(unknown map)';", why: 'a pin whose map is not in the world' }],
+  'src/middle/element-detail-map-image.ts': [{ line: "render(item ? item.filename : '(missing file)');", why: 'a picture file that is gone: a file, not an element' }],
+  'src/middle/element-detail-zone-sections.ts': [{ line: "const mapName = map ? nameOrUnnamed(map, { start: true }) : '(unknown map)';", why: 'markers on a map that is not in the world' }],
+  'src/middle/import-room.ts': [
+    { line: "else if (f.widget === 'single-link') fields.push(`${f.name}>${cap(f.target ?? 'element')}`);", why: 'a link field\'s target type in a schema line, not a name' },
+    { line: "else if (f.widget === 'multi-link') fields.push(`${f.name}>>${cap(f.target ?? 'element')}`);", why: 'the same, for a list field' },
+  ],
+  'src/middle/knowledge-room.ts': [{ line: "const name = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';", why: 'a holder or subject not in the world' }],
+  'src/middle/settings-world.ts': [{ line: '`Remove "${world.name}" from atlas?\\n\\n` +', why: 'a world\'s name in its Remove question' }],
+  'src/middle/share-room.ts': [
+    { line: "name.textContent = target ? nameOrUnnamed(target, { start: true }) : '(pin without element)';", why: 'a pin whose element is not in the world' },
+    { line: "chip.append(el ? nameOrUnnamed(el, { start: true }) : '(missing)');", why: 'a collection member not in the world' },
+  ],
+  'src/middle/writing-workspace-add-to-cast.ts': [{ line: "const label = (detail.name || '').trim() || '(unnamed)';", why: 'the label Add to story writes into the story text (stored; see unnamed-names)' }],
+  'src/middle/writing-workspace-mention-items.ts': [{ line: "name: el.name || '(unnamed)',", why: 'the label a mention pick writes into the story text (stored; see unnamed-names)' }],
+  'src/sidebar/worlds-sidebar.ts': [
+    { line: 'if (!window.confirm(`Remove "${entry.name}" from your list? The browser has already cleared its storage.`)) return;', why: 'a world\'s name' },
+    { line: 'if (!window.confirm(`Remove "${name}" from your list? It was never downloaded.`)) return;', why: 'a world\'s name' },
+  ],
+  'src/tabs/right/context-pane-graph.ts': [
+    { line: "const rawName = said ? nameOrUnnamed(said, { start: true }) : '(unknown)';", why: 'a node whose element is not in the world' },
+    { line: "const centerName = centreEl ? nameOrUnnamed(centreEl) : '(unknown)';", why: 'a centre not in the world' },
+    { line: "const label = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';", why: 'a crumb not in the world' },
+    { line: "const back = el ? nameOrUnnamed(el) : '(unknown)';", why: 'the same crumb\'s Back to' },
+  ],
+  'src/tabs/right/map-tab-pins.ts': [{ line: "const name = el?.name ?? '(loading…)';", why: 'a pin drawn before its element is read' }],
+  'src/tabs/right/right-pane.ts': [{ line: "const label = m ? nameOrUnnamed(m, { start: true }) : (tab.label || '(missing map)');", why: 'a map tab whose map is not in the world: its opened label, else missing' }],
+  'src/ui/delete-browser-world-modal.ts': [{ line: "const { overlay, body } = this.buildModalShell({ title: `Delete \"${w.name}\"?`, dataModal: 'delete-browser-world' });", why: 'a world\'s name' }],
+  'src/ui/guide-note.ts': [{ line: "return nameOf(id, elementOf(id)?.type ?? 'element');", why: 'a type word handed to the name builder, not a name' }],
+  'src/ui/map-create-modal.ts': [
+    { line: "this.locationPreview = { id: found.location, name: loc ? ownName(loc) : '(unknown)' };", why: 'a place not in the world' },
+    { line: "this.parentMapPreview = { id: found.parent_map, name: parent ? ownName(parent) : '(unknown)' };", why: 'a parent map not in the world' },
+  ],
+  'src/visualization/timeline/timeline-view.ts': [{ line: "head.textContent = state.chartLabel ?? 'This chart';", why: 'the chart on screen before it is saved, not an element' }],
 };
 
+/** The lines that say a stand-in and are not comment lines, by number. */
 function standInLines(code: string): number[] {
   return code.split(/\r?\n/)
     .map((line, i) => (!isCommentLine(line) && STAND_IN.test(line) ? i + 1 : 0))
     .filter(n => n > 0);
 }
 
-describe('the census of stand-ins: no word takes a missing name\'s place', () => {
-  it('every stand-in left in the source is on the allowlist, with its reason and count', () => {
-    const now: Record<string, number> = {};
-    for (const file of walk(SRC)) {
-      const rel = relative(ROOT, file).split(sep).join('/');
-      if (SKIP.has(rel)) continue;
-      const n = standInLines(readFileSync(file, 'utf8')).length;
-      if (n > 0) now[rel] = n;
+/** Every stand-in line in `src` that is not on the allowlist as written, and every allowed line no longer there. */
+function standInCensus(): { unexpected: string[]; stale: string[] } {
+  const seen = new Set<string>();
+  const unexpected: string[] = [];
+  for (const file of walk(SRC)) {
+    const rel = relative(ROOT, file).split(sep).join('/');
+    if (SKIP.has(rel)) continue;
+    const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+    for (const n of standInLines(lines.join('\n'))) {
+      const text = lines[n - 1].trim();
+      if ((STAND_IN_LEFT[rel] ?? []).some(a => a.line === text)) seen.add(`${rel}|${text}`);
+      else unexpected.push(`${rel}:${n} ${text}`);
     }
-    const unexpected = Object.entries(now)
-      .filter(([f, n]) => STAND_IN_LEFT[f]?.count !== n)
-      .map(([f, n]) => `${f}: ${n}`);
-    expect(unexpected, 'Say a missing name with nameOrUnnamed (a question with quotedName), or add the place with why').toEqual([]);
-    expect(Object.keys(STAND_IN_LEFT).filter(f => !(f in now))).toEqual([]);
+  }
+  const stale = Object.entries(STAND_IN_LEFT).flatMap(([f, rows]) => rows.filter(r => !seen.has(`${f}|${r.line}`)).map(r => `${f} ${r.line}`));
+  return { unexpected, stale };
+}
+
+describe('the census of stand-ins: no word takes a missing name\'s place', () => {
+  it('every stand-in left in the source is on the allowlist as written, with its reason', () => {
+    const { unexpected, stale } = standInCensus();
+    expect(unexpected, 'Say a missing name with nameOrUnnamed (a question with quotedName), or add the line with why').toEqual([]);
+    // An allowed line that changed or went takes its row with it.
+    expect(stale).toEqual([]);
   });
 
   it('the instrument sees each form this release took out', () => {
@@ -258,8 +295,30 @@ describe('the census of stand-ins: no word takes a missing name\'s place', () =>
       "addMapBtn.title = `Create a new map of ${el.name || 'this location'}`;",
       "return el?.name || 'element';",
       "toasts.show(`Removed \"${chart.name}\"`, 'info');",
+      // One phrase over (1.124.29's gate): the element, focused, that <type>, a trimmed quoted name, a revoke.
+      "toasts.success(`${file.name} added to ${el.name || 'the element'}.`);",
+      "`<span>${escapeText(target?.name || 'focused')}</span>` +",
+      "return `${from}: only what ${s.name ?? `that ${characterWord(meta)}`} knows of the world.`;",
+      "if (!window.confirm(`Delete \"${el.name.trim()}\"?`)) return;",
+      "if (!window.confirm(`Revoke \"${page.name}\"? Its address will show no longer shared.`)) return;",
     ];
     expect(standInLines(planted.join('\n'))).toEqual(planted.map((_, i) => i + 1));
+  });
+
+  it('putting an old line back in a file that keeps an allowed line reds: the allowlist is the line, not a count', () => {
+    const old: Array<[string, string]> = [
+      ['src/tabs/right/right-pane.ts', "const label = m?.name || tab.label || '(missing map)';"],
+      ['src/middle/share-room.ts', "name.textContent = target?.name || '(pin without element)';"],
+      ['src/middle/share-room.ts', "chip.append(el?.name || '(missing)');"],
+      ['src/ui/map-create-modal.ts', "this.locationPreview = { id: found.location, name: loc?.name ?? '(unknown)' };"],
+      ['src/tabs/right/context-pane-graph.ts', "const label = el?.name || '(unknown)';"],
+      ['src/middle/element-detail-header.ts', "const mapName = m?.name || '(unknown map)';"],
+      ['src/middle/knowledge-room.ts', "const name = el?.name || '(unknown)';"],
+    ];
+    for (const [file, line] of old) {
+      expect(standInLines(line), line).toEqual([1]);
+      expect(STAND_IN_LEFT[file].some(a => a.line === line), line).toBe(false);
+    }
   });
 
   it('the instrument passes the builders, a world\'s own words and comments', () => {
@@ -268,6 +327,7 @@ describe('the census of stand-ins: no word takes a missing name\'s place', () =>
       'const q = quotedName(m, { typed: true });',
       "const w = getState().active?.meta.name || 'This world';",
       "askForCopy(id, world.meta.name?.trim() || 'this world', toasts);",
+      "toasts.info(`… the image URLs that showed it in ${entry.name || 'that world'}.`);",
       "const them = n === 1 ? 'it' : 'them';",
       "toasts.success(`Deleted ${nameOrUnnamed(zone)}`);",
       'const scope = `this ${tierLabel.toLowerCase()}`;',
@@ -443,10 +503,10 @@ describe('the knowledge room says a nameless element and a deleted entry as its 
     }
   });
 
-  // The toast says a name as the app's other delete notes do, with no quotes; the confirm keeps its quotes.
+  // The toast says a name as the app's other delete notes do, with no quotes; the confirm keeps its quotes, after the room's word.
   for (const c of [
     { name: '', toast: 'Deleted the unnamed entry', ask: /^Delete the unnamed entry\?/ },
-    { name: ' Debt ', toast: 'Deleted Debt', ask: /^Delete "Debt"\?/ },
+    { name: ' Debt ', toast: 'Deleted Debt', ask: /^Delete entry "Debt"\?/ },
   ]) {
     it(`the entry's delete toast: ${c.toast}`, async () => {
       opened([el('narrative', 'k1', { name: c.name, subtype: 'knowledge', story: 'Owed.' })]);
@@ -473,7 +533,7 @@ describe('the knowledge room says a nameless element and a deleted entry as its 
 
   for (const c of [
     { name: '  ', toast: 'Deleted the unnamed page', ask: /^Delete the unnamed page\?/ },
-    { name: 'Arrival', toast: 'Deleted Arrival', ask: /^Delete "Arrival"\?/ },
+    { name: 'Arrival', toast: 'Deleted Arrival', ask: /^Delete page "Arrival"\?/ },
   ]) {
     it(`the page's delete toast: ${c.toast}`, async () => {
       opened([el('narrative', 'p1', { name: c.name, subtype: 'page', atlas_page_blocks: [] })]);

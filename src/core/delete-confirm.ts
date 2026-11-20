@@ -90,7 +90,7 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
   if (dependentsUnknown) {
     return {
       needed: true,
-      message: `Delete ${quotedName(el, { word })}? Atlas could not check what else this would delete, so anything filed under it may go too. This cannot be undone.`,
+      message: `Delete ${quotedName(el, { word, typed: true })}? Atlas could not check what else this would delete, so anything filed under it may go too. This cannot be undone.`,
       cascades: true,
     };
   }
@@ -98,7 +98,7 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
   const needed = confirmPref || cascades;
   if (!needed) return { needed: false, message: '', cascades };
 
-  const subject = quotedName(el, { word });
+  const subject = quotedName(el, { word, typed: true });
 
   if (el.type === 'narrative') {
     const summary = summarizeNarrativeDeletion(allElements, el.id, labels);

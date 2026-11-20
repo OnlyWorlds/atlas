@@ -58,7 +58,7 @@ import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
 import { isPartialSlice } from '../core/provenance';
-import { nameOrUnnamed, ownName } from '../core/type-words';
+import { nameOrUnnamed, ownName, quotedName } from '../core/type-words';
 
 /** A page as a confirm names it: its own name in quotes, or the unnamed page ("The unnamed page" at a line's start). */
 function pageInLine(page: Element | undefined, start = false): string {
@@ -257,7 +257,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const extra = dependentCount > 0
         ? ` This also deletes ${dependentCount} element${dependentCount === 1 ? '' : 's'} filed under it.`
         : '';
-      if (!window.confirm(`Delete ${pageInLine(el)}?${extra} This cannot be undone.`)) return;
+      if (!window.confirm(`Delete ${quotedName(el ?? { type: 'narrative' }, { word: 'page', typed: true })}?${extra} This cannot be undone.`)) return;
     }
     teardownEditSession();
     navigate(shareHash(worldId));

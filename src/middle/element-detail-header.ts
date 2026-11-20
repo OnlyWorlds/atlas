@@ -1066,6 +1066,14 @@ async function deletePinFromHeader(pinId: string, mapName: string): Promise<void
 
 // ====== Delete (the trash button in the header) ======
 
+/** The word a delete names this element by: a narrative's tier word in the writing room, else none (the type's word). */
+function deleteWord(el: Element): string | undefined {
+  const worldId = getState().active?.worldId;
+  if (el.type !== 'narrative' || !worldId || parseHash(window.location.hash).mode !== 'writing') return undefined;
+  const tier = getTierForNarrative(el, worldId);
+  return tier ? getWritingLabels(worldId)[tier].toLowerCase() : undefined;
+}
+
 async function onDelete(el: Element): Promise<void> {
   const store = getActiveStore();
   if (!store) return;
@@ -1098,6 +1106,8 @@ async function onDelete(el: Element): Promise<void> {
     allElements: getState().data.elements,
     labels: getWritingLabels(getState().active?.worldId ?? ''),
     confirmPref: getEditorSettings(getState().registry).confirm_before_delete,
+    // A narrative keeps its room's own word: the writing room's tier ("Delete chapter "One"?"); elsewhere the type's.
+    word: deleteWord(el),
   });
   if (decision.needed && !window.confirm(decision.message)) return;
   try {

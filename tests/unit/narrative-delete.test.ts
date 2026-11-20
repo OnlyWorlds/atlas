@@ -201,14 +201,14 @@ describe('summarizeNarrativeDeletion + confirm message', () => {
     const s = summarizeNarrativeDeletion(world, 'book', L);
     expect(s.sentence).toBe('This also deletes 1 chapter.');
     expect(narrativeDeleteConfirmMessage('Book One', s))
-      .toBe('Delete "Book One"? This also deletes 1 chapter. This cannot be undone.');
+      .toBe('Delete narrative "Book One"? This also deletes 1 chapter. This cannot be undone.');
   });
 
   it('says nothing extra for a childless narrative', () => {
     const s = summarizeNarrativeDeletion(standardWorld(), 's1', L);
     expect(s.total).toBe(0);
     expect(s.sentence).toBe('');
-    expect(narrativeDeleteConfirmMessage('Scene one', s)).toBe('Delete "Scene one"? This cannot be undone.');
+    expect(narrativeDeleteConfirmMessage('Scene one', s)).toBe('Delete narrative "Scene one"? This cannot be undone.');
   });
 
   it('names drafts nested under a chapter (the flexible tier)', () => {

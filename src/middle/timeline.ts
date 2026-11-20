@@ -240,7 +240,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       pill.className = 'atlas-chart-focus-pill';
       pill.innerHTML =
         `<span class="material-symbols-outlined">filter_center_focus</span>` +
-        `<span>${escapeText(target?.name || 'focused')}</span>` +
+        // The pill's name alone: the focused element's own name or its unnamed form; one not in the world says "focused".
+        `<span>${escapeText(target ? nameOrUnnamed(target, { start: true }) : 'focused')}</span>` +
         `<button type="button" class="atlas-chart-focus-clear" title="Clear focus (show all)">×</button>`;
       pill.querySelector('.atlas-chart-focus-clear')!
         .addEventListener('click', () => { const w = worldId(); if (w) navigate(timelineHash(w)); });

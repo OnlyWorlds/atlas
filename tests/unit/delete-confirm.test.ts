@@ -51,7 +51,7 @@ describe('the confirm FLOOR (the thing this module exists for)', () => {
     expect(d.needed).toBe(true);
     expect(d.cascades).toBe(true);
     expect(d.message).toBe(
-      'Delete "book"? This also deletes 2 chapters and 4 scenes. This cannot be undone.',
+      'Delete narrative "book"? This also deletes 2 chapters and 4 scenes. This cannot be undone.',
     );
   });
 
@@ -77,7 +77,7 @@ describe('the confirm FLOOR (the thing this module exists for)', () => {
       confirmPref: true,
     });
     expect(d.needed).toBe(true);
-    expect(d.message).toBe('Delete "s1"? This cannot be undone.');
+    expect(d.message).toBe('Delete narrative "s1"? This cannot be undone.');
   });
 
   it('applies the floor to NON-narrative cascades too (a map with pins)', () => {
@@ -92,7 +92,7 @@ describe('the confirm FLOOR (the thing this module exists for)', () => {
     });
     expect(d.needed).toBe(true);
     expect(d.message).toBe(
-      'Delete "m1"? This also deletes 3 elements filed under it. This cannot be undone.',
+      'Delete map "m1"? This also deletes 3 elements filed under it. This cannot be undone.',
     );
   });
 
@@ -117,7 +117,7 @@ describe('narrative vocabulary', () => {
     const d = decideDeleteConfirm({
       el: world[0], dependents: [world[1], world[2]], allElements: world, labels: custom, confirmPref: true,
     });
-    expect(d.message).toBe('Delete "p"? This also deletes 1 episode and 1 beat. This cannot be undone.');
+    expect(d.message).toBe('Delete narrative "p"? This also deletes 1 episode and 1 beat. This cannot be undone.');
   });
 
   it('names an off-tree descendant the writing tree cannot show', () => {
@@ -173,7 +173,7 @@ describe('copy hygiene', () => {
     // A name is quoted, trimmed.
     const named = { ...nameless, name: ' Ada ' } as unknown as Element;
     expect(decideDeleteConfirm({ el: named, dependents: [], allElements: [named], labels: L, confirmPref: true }).message)
-      .toBe('Delete "Ada"? This cannot be undone.');
+      .toBe('Delete narrative "Ada"? This cannot be undone.');
     // The probe that failed says the same subject.
     const unknown = decideDeleteConfirm({
       el: nameless, dependents: [], allElements: [nameless], labels: L, confirmPref: false, dependentsUnknown: true,

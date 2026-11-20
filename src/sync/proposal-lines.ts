@@ -4,6 +4,7 @@
  * text (toasts and titles set text, never HTML).
  */
 import type { Conflict } from '../core/types';
+import { nameOrUnnamed, type Nameable } from '../core/type-words';
 
 /** P4: a round's edits went to the keeper. */
 export function proposalSentLine(worldName: string, n: number): string {
@@ -19,10 +20,10 @@ export function proposalAcceptedLine(worldName: string, n: number): string {
     : `${worldName}'s keeper accepted ${n} of your changes.`;
 }
 
-/** P6: a delete keel keeps for the keeper; the element is back. */
-export function deleteRefusedLine(names: string[]): string {
-  if (names.length === 1) return `Only this world's keeper can delete ${names[0]}, so it is back.`;
-  return `Only this world's keeper can delete these ${names.length} elements, so they are back.`;
+/** P6: a delete keel keeps for the keeper; the element is back, said by its name or its unnamed form, mid-line. */
+export function deleteRefusedLine(refused: Nameable[]): string {
+  if (refused.length === 1) return `Only this world's keeper can delete ${nameOrUnnamed(refused[0])}, so it is back.`;
+  return `Only this world's keeper can delete these ${refused.length} elements, so they are back.`;
 }
 
 /** The element page's sync mark while a proposal waits. */
