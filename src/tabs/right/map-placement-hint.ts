@@ -17,6 +17,7 @@
 import { isNarrow, openDrawer } from '../../layout/narrow-layout';
 import { getState, patchSlice, subscribe } from '../../core/state';
 import { worldIsViewOnly } from '../../core/view-only';
+import { missingWords, nameOrUnnamed } from '../../core/type-words';
 
 const BANNER_CLASS = 'atlas-map-placement-hint';
 
@@ -24,7 +25,8 @@ function armedElementName(): string | null {
   const placement = getState().ui.pinPlacement;
   if (!placement) return null;
   const el = getState().data.elements.find(e => e.id === placement.elementId);
-  return el?.name || 'element';
+  // Mid-line ("Click the map to place the unnamed character"); one not in the world says it is missing.
+  return el ? nameOrUnnamed(el) : missingWords('element');
 }
 
 /** The active (in-document) map container, or null when no map is shown. */

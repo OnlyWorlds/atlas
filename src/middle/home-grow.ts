@@ -48,16 +48,16 @@ import { GRID_OPEN_ATTR, afterPress, gridClosed, openKindList, watchLeave } from
 import { bringInWays } from './home-guide';
 import { homeCentre } from './home-picture';
 import { openWebOn } from '../ui/open-web';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed } from '../core/type-words';
+import { strandWord } from '../core/strand-journey';
 import type { ToastManager } from '../ui/toast-manager';
 
 /** What takes focus after the next draw, by a selector the new card answers to. */
 let focusAfter: string | null = null;
 
-const nameOf = (el: Element | null | undefined): string => {
-  const n = typeof el?.name === 'string' ? el.name.trim() : '';
-  return n || (el ? `this ${typeName(el.type)}` : '');
-};
+/** An element's own name, or its unnamed form ("the unnamed story" for a Narrative, as the strand says it); `start` at a line's start. */
+const nameOf = (el: Element | null | undefined, start = false): string =>
+  (el ? nameOrUnnamed(el, { start, word: strandWord(el.type) }) : '');
 
 /** The plain + square: no kind named, a list of kinds on a press. */
 const PLAIN_PLUS: PlusSquare = { type: null, word: 'add' };
@@ -128,7 +128,7 @@ function speak(step: StepId, dots: Dots, worldId: string): Speech {
       // Only Characters whose place is gone: the field is someone's data, never overwritten.
       const gone = newestOf(ofType('character').filter(c => mine(c) && placeIdOf(c) && !byId.has(placeIdOf(c)!)));
       if (gone) {
-        const line = `${nameOf(gone)}'s place was deleted.`;
+        const line = `${nameOf(gone, true)}'s place was deleted.`;
         return { line, recap: [{ text: '', link: open(gone) }], plus: null, handOver: thenWeb(line) };
       }
       return { line: 'Make someone of your own to place.', hint: 'Press the + and type a name.', recap, plus: 'character',
@@ -143,7 +143,7 @@ function speak(step: StepId, dots: Dots, worldId: string): Speech {
     }
     case 'story': {
       const dated = newestOf(ofType('event').filter(e => dateOf(e) !== null));
-      if (dated) recap.push({ text: `${nameOf(dated)} is on the chart at year ${dateOf(dated)}.`, link: { label: 'See it on the chart', role: 'open-chart', run: () => navigate(timelineHash(worldId, dated.id)) } });
+      if (dated) recap.push({ text: `${nameOf(dated, true)} is on the chart at year ${dateOf(dated)}.`, link: { label: 'See it on the chart', role: 'open-chart', run: () => navigate(timelineHash(worldId, dated.id)) } });
       return { line: 'Tell a story in your world.', hint: 'Press the + and give it a title.', recap, plus: 'narrative',
         fallback: { label: 'Start a story', role: 'create-story', run: () => focusPlus() }, handOver: make('narrative') };
     }
@@ -153,7 +153,7 @@ function speak(step: StepId, dots: Dots, worldId: string): Speech {
       const event = newestOf(ofType('event'));
       if (tale && event && writeBetween(event.id, tale.id) && mine(tale)) {
         const w = writeBetween(event.id, tale.id)!;
-        recap.push({ text: `Drag ${nameOf(event)} onto ${nameOf(tale)}: ${promiseFor(w, tale, event)}.` });
+        recap.push({ text: `Drag ${nameOf(event)} onto ${nameOf(tale)}: ${promiseFor(w, tale, event, false)}.` });
       }
       if (tale) recap.push({ text: '', link: { label: 'Open the writing room', role: 'open-writing', run: () => navigate(writingHash(worldId, tale.id)) } });
       const line = dots.copy ? 'That is a world. Keep making.' : 'That is a world. Keep it, or keep making.';
@@ -442,7 +442,7 @@ function wireActs(host: HTMLElement, worldId: string, input: Input, section: HTM
       const a = el(from);
       const b = el(to);
       if (!a || !b || dragField(a.type, b.type)) return null;
-      return `${nameOf(a)} and ${nameOf(b)} cannot be linked by placing`;
+      return `${nameOf(a, true)} and ${nameOf(b)} cannot be linked by placing`;
     },
     say,
     drop: (from, to) => void drop(worldId, from, to),
@@ -486,7 +486,7 @@ export function buildHomeGrid(worldId: string, onHandOver: () => void, strand: G
     const p = document.createElement('p');
     p.className = 'atlas-home-grow-recap';
     p.setAttribute('data-role', 'grow-loose');
-    p.textContent = `${nameOf(loose)} isn't connected to anything yet.`;
+    p.textContent = `${nameOf(loose, true)} isn't connected to anything yet.`;
     section.appendChild(p);
   }
   appendOpenAndJustNow(section, worldId);

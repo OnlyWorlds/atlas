@@ -24,7 +24,8 @@ import { getState } from '../core/state';
 import { currentLore, loreSwitches } from '../core/parlor-room';
 import { buildWebLinks, mountContextGraph, ringOneOf, type GraphHandle } from '../tabs/right/context-pane-graph';
 import { openWebOn } from '../ui/open-web';
-import { typeName } from '../core/type-words';
+import { nameOrUnnamed } from '../core/type-words';
+import { strandWord } from '../core/strand-journey';
 
 /** How many of the best-linked are tried, and how many the Web must draw around one. */
 const AROUND = 3;
@@ -100,9 +101,9 @@ export function buildHomePicture(worldId: string, said: string): HomePicture | n
   const centreId = homeCentre(worldId, said);
   const centre = centreId ? getState().data.elements.find(e => e.id === centreId) : undefined;
   if (!centre) return null;
-  // An unnamed centre reads as its type, as the guide's notes do (the code gate's C10).
-  const named = typeof centre.name === 'string' && centre.name.trim() ? centre.name.trim() : null;
-  const name = named ?? `this ${typeName(centre.type)}`;
+  // An unnamed centre says the unnamed form, as the guide's notes do (the code gate's C10).
+  const word = strandWord(centre.type);
+  const name = nameOrUnnamed(centre, { word });
 
   const section = document.createElement('section');
   section.className = 'atlas-home-picture';
@@ -111,7 +112,7 @@ export function buildHomePicture(worldId: string, said: string): HomePicture | n
   head.className = 'atlas-home-picture-head';
   const title = document.createElement('h3');
   title.className = 'atlas-home-section-title atlas-home-picture-title';
-  title.textContent = named ? `${named} and what it touches` : `This ${typeName(centre.type)} and what it touches`;
+  title.textContent = `${nameOrUnnamed(centre, { start: true, word })} and what it touches`;
   const see = document.createElement('button');
   see.type = 'button';
   see.className = 'atlas-btn-link atlas-home-picture-see';

@@ -26,7 +26,8 @@ import { getState, patchSlice, subscribe } from '../core/state';
 import { saveRegistry, updateWorldEntry } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
 import { elementHash, navigate, timelineHash, writingHash } from '../core/router';
-import { typeName } from '../core/type-words';
+import { missingWords, nameOrUnnamed } from '../core/type-words';
+import { strandWord } from '../core/strand-journey';
 import { worldIsViewOnly } from '../core/view-only';
 import { isMoppetopiaOpen } from '../core/moppetopia';
 import { isTourFlagActive } from '../tour/tour-flag';
@@ -302,11 +303,14 @@ function clear(): void {
 const elementOf = (id: string | undefined): Element | undefined =>
   id ? getState().data.elements.find(e => e.id === id) : undefined;
 
-/** The person's own name, as text; an empty one reads as its type ("this Character"). */
-function nameOf(id: string | undefined, type: string): string {
+/**
+ * The person's own name, or its unnamed form ("the unnamed character", a Narrative "the unnamed story" as
+ * the home says it); an id that names nothing says it is missing. `start` at a line's start or a button's whole label.
+ */
+function nameOf(id: string | undefined, type: string, start = false): string {
   const el = elementOf(id);
-  const name = typeof el?.name === 'string' ? el.name.trim() : '';
-  return name || `this ${typeName(type)}`;
+  const word = strandWord(type);
+  return el ? nameOrUnnamed(el, { start, word }) : missingWords(type, { start, word });
 }
 
 /** Whether what the note is about still holds; it leaves when not. */
@@ -381,11 +385,13 @@ function fill(): void {
   };
   const ch = nameOf(note.character, 'character');
   const loc = nameOf(note.location, 'location');
+  // The same names where they begin a line.
+  const chStart = nameOf(note.character, 'character', true);
   const worldId = showing.worldId;
 
   switch (note.id) {
     case 'someone':
-      line.textContent = `${ch} is someone.`;
+      line.textContent = `${chStart} is someone.`;
       act('add-place', 'Add a place', async () => {
         leave();
         const { ElementCreateModal } = await import('./element-create-modal');
@@ -393,7 +399,7 @@ function fill(): void {
       });
       break;
     case 'place-offer':
-      line.textContent = `${ch} and ${loc}: place one in the other?`;
+      line.textContent = `${chStart} and ${loc}: place one in the other?`;
       act('place', `Place ${ch} at ${loc}`, async () => {
         const wrote = await writePlace(worldId, note.character!, note.location!);
         if (wrote === 'wrote') reportGesture({ kind: 'location-set', character: note.character! }, { fromAction: true });
@@ -401,7 +407,7 @@ function fill(): void {
       });
       break;
     case 'placed':
-      line.textContent = `${ch} is at ${loc}, and ${loc} lists ${ch}.`;
+      line.textContent = `${chStart} is at ${loc}, and ${loc} lists ${ch}.`;
       act('open-place', `Open ${loc}`, () => { leave(); navigate(elementHash(worldId, note.location!)); });
       break;
     case 'event': {
@@ -410,7 +416,7 @@ function fill(): void {
       const pair = note.pair;
       const names = (f: string): string[] => (Array.isArray(ev?.[f]) ? (ev![f] as unknown[]).filter((v): v is string => typeof v === 'string') : []);
       if (pair && ev && !names('characters').includes(pair.character) && !names('locations').includes(pair.location)) {
-        const pc = nameOf(pair.character, 'character');
+        const pc = nameOf(pair.character, 'character', true);
         const pl = nameOf(pair.location, 'location');
         act('were-there', `${pc} and ${pl} were there`, async () => {
           const wrote = await writeWereThere(worldId, note.event!, pair);
@@ -428,7 +434,7 @@ function fill(): void {
     }
     case 'dated': {
       const ev = elementOf(note.event);
-      line.textContent = `${nameOf(note.event, 'event')} is on the chart at year ${ev ? dateOf(ev) : ''}.`;
+      line.textContent = `${nameOf(note.event, 'event', true)} is on the chart at year ${ev ? dateOf(ev) : ''}.`;
       act('open-chart', 'Open the chart', () => { leave(); navigate(timelineHash(worldId, note.event)); });
       break;
     }
@@ -454,7 +460,7 @@ function fill(): void {
     case 'chapter': {
       const labels = getWritingLabels(worldId);
       const chapter = labels.l2.toLowerCase();
-      line.textContent = `${nameOf(note.narrative, 'narrative')} is open for writing, and a ${chapter} goes inside it.`;
+      line.textContent = `${nameOf(note.narrative, 'narrative', true)} is open for writing, and a ${chapter} goes inside it.`;
       act('add-chapter', `Add a ${chapter}`, async () => {
         const el = elementOf(note.narrative);
         leave();
@@ -495,7 +501,7 @@ function fill(): void {
     case 'reading': {
       const r = note.rider!;
       // "Ada, Hollow Keep and The Fall are linked now.", "and N more" past two.
-      const all = [ch, ...r.names.map(anyName)];
+      const all = [chStart, ...r.names.map(anyName)];
       const last = r.more > 0 ? `${r.more} more` : all.pop()!;
       line.textContent = `${all.join(', ')} and ${last} are linked now.`;
       break;

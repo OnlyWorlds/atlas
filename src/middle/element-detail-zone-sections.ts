@@ -29,6 +29,7 @@ import { getEditorSettings } from '../registry/registry';
 import { getWritingLabels } from './writing-helpers';
 import { navigate, elementsHash } from '../core/router';
 import { resolveStyle, kindLabel } from '../core/world-styles';
+import { nameOrUnnamed } from '../core/type-words';
 
 /** Point tables longer than this fold behind their map row. */
 const MARKERS_FOLD_ABOVE = 8;
@@ -203,12 +204,12 @@ async function deleteZone(zone: Zone, toasts: ToastManager): Promise<void> {
     await store.deleteElement(zone.id);
     if (!patchElementsFrom(store, await store.listElements())) {
       // The world switched during the delete: the selection, the push and the page belong to the world on screen now.
-      toasts.success(`Deleted ${zone.name || 'zone'}`);
+      toasts.success(`Deleted ${nameOrUnnamed(zone)}`);
       return;
     }
     patchSlice('ui', { ...getState().ui, selectedElementId: null });
     requestPushIfLinked();
-    toasts.success(`Deleted ${zone.name || 'zone'}`);
+    toasts.success(`Deleted ${nameOrUnnamed(zone)}`);
     if (worldId) navigate(elementsHash(worldId));
   } catch (err) {
     console.error('[zone-sections] delete zone failed:', err);
@@ -308,7 +309,8 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
 
   for (const [mapId, list] of byMap.entries()) {
     const map = elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
-    const mapName = map?.name ?? '(unknown map)';
+    // A heading alone: a map with no name says the unnamed form; one not in the world keeps its own word.
+    const mapName = map ? nameOrUnnamed(map, { start: true }) : '(unknown map)';
 
     // The point table is for editing points, which is rare next to reading
     // the page; a long one used to be most of a zone's page (Sikelia's

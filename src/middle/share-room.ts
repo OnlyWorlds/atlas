@@ -1075,7 +1075,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         });
         row.appendChild(cb);
         const name = document.createElement('span');
-        name.textContent = target?.name || '(pin without element)';
+        // A row's name alone: the pinned element's own name or its unnamed form; a pin whose element is not in the world keeps its own words.
+        name.textContent = target ? nameOrUnnamed(target, { start: true }) : '(pin without element)';
         row.appendChild(name);
         if (included) {
           const isFull = (block.fullPinIds ?? []).includes(pin.id);
@@ -1202,7 +1203,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const el = elOf(id);
       const chip = document.createElement('span');
       chip.className = 'atlas-share-card-chip atlas-share-collection-member';
-      chip.append(el?.name || '(missing)');
+      // A chip alone: its own name or the unnamed form; one not in the world says it is missing.
+      chip.append(el ? nameOrUnnamed(el, { start: true }) : '(missing)');
       const x = document.createElement('button');
       x.type = 'button';
       x.className = 'atlas-share-collection-member-x';

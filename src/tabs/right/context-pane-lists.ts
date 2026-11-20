@@ -362,7 +362,8 @@ function buildRow(el: Element, opts: RowOpts): HTMLElement {
   wrap.dataset.elementId = el.id;
   wrap.dataset.elementType = el.type;
   wrap.appendChild(row);
-  const name = el.name || 'it';
+  // Mid-line in both titles: "Link the unnamed character where the text names it".
+  const name = nameOrUnnamed(el);
 
   if (opts.onLink) {
     const linkBtn = document.createElement('button');

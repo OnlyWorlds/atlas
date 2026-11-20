@@ -13,7 +13,8 @@ import { getState } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { pairWrite, patchFor, undoPatchFor, type PairWrite } from '../core/home-grid-pair';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
-import { typeName } from '../core/type-words';
+import { missingWords, nameOrUnnamed } from '../core/type-words';
+import { strandWord } from '../core/strand-journey';
 import { showProblem } from './problem-fixes';
 import { toastManager } from './toast-manager';
 import { reportGesture } from './guide-note';
@@ -48,25 +49,27 @@ export function justNowIn(worldId: string): JustNow | null {
   return { ...justNow, sentence: sentenceFor(justNow.write, on, els.find(e => e.id === justNow!.write.target)) };
 }
 
-const nameOf = (el: Element | undefined): string => {
-  const n = typeof el?.name === 'string' ? el.name.trim() : '';
-  return n || (el ? `this ${typeName(el.type)}` : 'this element');
-};
+/**
+ * An element's own name or its unnamed form, a Narrative "the unnamed story" as the home says it; one not
+ * in the world says it is missing. `start` at a line's start.
+ */
+const nameOf = (el: Element | undefined, start = false): string =>
+  (el ? nameOrUnnamed(el, { start, word: strandWord(el.type) }) : missingWords('element', { start }));
 
 const recordOf = (el: Element): Record<string, unknown> => el as unknown as Record<string, unknown>;
 
-/** The sentence a write says, true of its field: "is in" for a Character's place only; "now lists" for a list. */
-export function sentenceFor(w: PairWrite, on: Element | undefined, target: Element | undefined): string {
-  if (w.single && w.field === 'location' && on?.type === 'character') return `${nameOf(on)} is in ${nameOf(target)}`;
-  if (w.single) return `${nameOf(on)}'s ${fieldLabel(w.field).toLowerCase()} is ${nameOf(target)}`;
-  return `${nameOf(on)} now lists ${nameOf(target)}`;
+/** The sentence a write says, true of its field: "is in" for a Character's place only; "now lists" for a list. `start`: it begins a line (the default). */
+export function sentenceFor(w: PairWrite, on: Element | undefined, target: Element | undefined, start = true): string {
+  if (w.single && w.field === 'location' && on?.type === 'character') return `${nameOf(on, start)} is in ${nameOf(target)}`;
+  if (w.single) return `${nameOf(on, start)}'s ${fieldLabel(w.field).toLowerCase()} is ${nameOf(target)}`;
+  return `${nameOf(on, start)} now lists ${nameOf(target)}`;
 }
 
-/** The line before a drop: what the write would say, in the future. */
-export function promiseFor(w: PairWrite, on: Element | undefined, target: Element | undefined): string {
-  if (w.single && w.field === 'location' && on?.type === 'character') return `${nameOf(on)} will be in ${nameOf(target)}`;
-  if (w.single) return `${nameOf(on)}'s ${fieldLabel(w.field).toLowerCase()} will be ${nameOf(target)}`;
-  return `${nameOf(on)} will list ${nameOf(target)}`;
+/** The line before a drop: what the write would say, in the future. `start`: it begins a line (the default). */
+export function promiseFor(w: PairWrite, on: Element | undefined, target: Element | undefined, start = true): string {
+  if (w.single && w.field === 'location' && on?.type === 'character') return `${nameOf(on, start)} will be in ${nameOf(target)}`;
+  if (w.single) return `${nameOf(on, start)}'s ${fieldLabel(w.field).toLowerCase()} will be ${nameOf(target)}`;
+  return `${nameOf(on, start)} will list ${nameOf(target)}`;
 }
 
 /** What dropping `a` on `b` would write in the world as it is drawn, or null. */

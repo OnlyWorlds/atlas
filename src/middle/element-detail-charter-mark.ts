@@ -35,6 +35,7 @@ import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { WORLD_NOT_OPEN } from './element-detail-fields';
+import { nameOrUnnamed } from '../core/type-words';
 
 /** The world id the mark names: the account world's when linked, else the folder's own (the 1.100 contract gate's M4). */
 export function charterMarkValue(entry: WorldRegistryEntry | undefined, meta: unknown, worldId: string): string {
@@ -74,7 +75,8 @@ export function offersCharterMark(el: Element, meta: unknown, elements: readonly
   return markOfferFor(el, meta, elements) !== null;
 }
 
-const nameOf = (el: Element, fallback: string): string => (typeof el.name === 'string' && el.name.trim() ? el.name.trim() : fallback);
+/** The leading one's own name, or its unnamed form in the mark's word ("the unnamed charter"), mid-line. */
+const nameOf = (el: Element, word: string): string => nameOrUnnamed(el, { word });
 
 /** The offer's line: what the press does, and that the element then leaves the lists (1.101's G11). */
 function offerLine(el: Element, offer: MarkOffer): string {

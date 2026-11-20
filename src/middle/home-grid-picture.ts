@@ -22,7 +22,8 @@ import type { Element } from '../core/types';
 import { gridOf, strandPinsOf, STRAND_CELL, STRAND_COLS, type Grid, type GridPins } from '../core/home-grid';
 import { looseIds } from '../core/world-links';
 import { drawGrid, geometryFor, gridHeight, withoutPlusLine, type GridGeometry, type PlusSquare } from './home-grid-view';
-import { typeName } from '../core/type-words';
+import { missingWords, nameOrUnnamed } from '../core/type-words';
+import { strandWord } from '../core/strand-journey';
 import { GRID_CLOSED, GRID_OPEN_ATTR } from './home-grid-kinds';
 
 /** The grid gives way past this height (a lean from the design's drawings, 2026-10-30: about the first screen under the card's head). */
@@ -87,10 +88,10 @@ export function gridInput(lore: readonly Element[], all: readonly Element[], pin
       return g;
     },
     names: {
+      // A square's name stands alone: its own, or the unnamed form with the capital.
       nameOf: id => {
         const n = graph.nodes.find(x => x.id === id);
-        const name = n?.name?.trim();
-        return name || `this ${typeName(n?.type ?? 'element')}`;
+        return n ? nameOrUnnamed(n, { start: true, word: strandWord(n.type) }) : missingWords('element', { start: true });
       },
       typeOf: id => graph.nodes.find(x => x.id === id)?.type ?? '',
       isLoose: id => loose.has(id),

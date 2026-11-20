@@ -27,7 +27,7 @@ import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type 
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation, pressOncePerKey } from '../../core/dom-utils';
 import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
-import { capitalise, nameOrUnnamed, theUnnamed, typeName } from '../../core/type-words';
+import { capitalise, nameOrUnnamed, quotedName, theUnnamed, typeName } from '../../core/type-words';
 
 // ---- Collapsed tree-node state ----
 
@@ -676,7 +676,8 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
   const store = getActiveStore();
   if (!store) return;
   const cascadeNote = pinCount > 0 ? ` This also removes ${pinCount} pin${pinCount === 1 ? '' : 's'} on this map.` : '';
-  if (!confirm(`Delete map "${m.name}"?${cascadeNote} This cannot be undone.`)) return;
+  // The question quotes the name after the type's word, or says the unnamed map; the note after says it plainly.
+  if (!confirm(`Delete ${quotedName(m, { typed: true })}?${cascadeNote} This cannot be undone.`)) return;
   try {
     await store.deleteMap(m.id);
     // Drop the saved camera state for this map — no point retaining a view
@@ -693,7 +694,7 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
       const active = ui.rightActiveIndex >= tabIdx ? Math.max(0, ui.rightActiveIndex - 1) : ui.rightActiveIndex;
       patchSlice('ui', { ...getState().ui, rightTabs: next, rightActiveIndex: active });
     }
-    toasts.success(`Deleted map "${m.name}"`);
+    toasts.success(`Deleted ${nameOrUnnamed(m)}`);
   } catch (err) {
     console.error('[map-index] delete failed:', err);
     showProblem(err, { doing: 'deleting the map', toasts });

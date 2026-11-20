@@ -159,12 +159,26 @@ describe('copy hygiene', () => {
     expect(d.message).toContain('This cannot be undone.');
   });
 
-  it('says "this element" when the name is blank, never the id', () => {
-    const nameless = { id: 'abc-123', type: 'narrative', name: '', supertype: L.l3 } as unknown as Element;
+  it('says the unnamed form when the name is blank, never quoted, never the id', () => {
+    const nameless = { id: 'abc-123', type: 'narrative', name: '  ', supertype: L.l3 } as unknown as Element;
     const d = decideDeleteConfirm({
       el: nameless, dependents: [], allElements: [nameless], labels: L, confirmPref: true,
     });
-    expect(d.message).toBe('Delete this element? This cannot be undone.');
+    expect(d.message).toBe('Delete the unnamed narrative? This cannot be undone.');
+    // In the room's own word, as the writing tree asks it.
+    const tree = decideDeleteConfirm({
+      el: nameless, dependents: [], allElements: [nameless], labels: L, confirmPref: true, word: 'scene',
+    });
+    expect(tree.message).toBe('Delete the unnamed scene? This cannot be undone.');
+    // A name is quoted, trimmed.
+    const named = { ...nameless, name: ' Ada ' } as unknown as Element;
+    expect(decideDeleteConfirm({ el: named, dependents: [], allElements: [named], labels: L, confirmPref: true }).message)
+      .toBe('Delete "Ada"? This cannot be undone.');
+    // The probe that failed says the same subject.
+    const unknown = decideDeleteConfirm({
+      el: nameless, dependents: [], allElements: [nameless], labels: L, confirmPref: false, dependentsUnknown: true,
+    });
+    expect(unknown.message.startsWith('Delete the unnamed narrative? Atlas could not check')).toBe(true);
   });
 });
 

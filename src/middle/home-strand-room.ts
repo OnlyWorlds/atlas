@@ -57,6 +57,7 @@ import { createMapDialog } from '../ui/map-create-modal';
 import { toastManager } from '../ui/toast-manager';
 import { memory, type StrandContext } from './home-strand-model';
 import { act } from './home-strand-acts';
+import { nameOrUnnamed } from '../core/type-words';
 
 const byName = (a: Element, b: Element): number =>
   (a.name ?? '').localeCompare(b.name ?? '', 'en') || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -80,7 +81,7 @@ export function mapFor(locationId: string, elements: Iterable<Element>): { id: s
   maps.sort(byName);
   const held = maps.find(m => pinnedOn.has(m.id));
   const m = held ?? maps[0];
-  return { id: m.id, name: m.name?.trim() || 'a map', pinned: !!held };
+  return { id: m.id, name: nameOrUnnamed(m), pinned: !!held };
 }
 
 /**

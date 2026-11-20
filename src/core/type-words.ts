@@ -131,6 +131,30 @@ export function nameOrUnnamed(el: Nameable, opts: { start?: boolean; word?: stri
 }
 
 /**
+ * An element as a question before a delete names it: its own name, trimmed,
+ * in quotes (`Delete "Harbour"?`), after the type's word when `typed` asks
+ * (`Delete map "Harbour"?`); a missing name is the unnamed form, never quoted
+ * and never empty quotes (`Delete the unnamed map?`). The note after the act
+ * says the name plainly through `nameOrUnnamed` ("Deleted Harbour").
+ */
+export function quotedName(el: Nameable, opts: { word?: string; typed?: boolean } = {}): string {
+  const own = ownName(el);
+  if (!own) return nameOrUnnamed(el, { word: opts.word });
+  if (!opts.typed) return `"${own}"`;
+  return `${opts.word?.trim() || typeName(el.type, { supertype: el.supertype })} "${own}"`;
+}
+
+/**
+ * Words for an element that is not in the world at all (an id that names
+ * nothing): they say it is missing, never the unnamed form, which would claim
+ * an element that is there. "a missing location"; `start` for a line's start.
+ */
+export function missingWords(type: string, opts: { start?: boolean; word?: string } = {}): string {
+  const words = `a missing ${opts.word?.trim() || typeName(type)}`;
+  return opts.start ? capitalise(words) : words;
+}
+
+/**
  * What a press on a control that opens an element does, said one way: "Open
  * Ada", "Open the unnamed entry". The one builder for such a control's
  * tooltip, and for its name where the two are one string.

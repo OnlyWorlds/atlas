@@ -696,7 +696,7 @@ function openTreeContextMenu(
 
   menu.querySelector<HTMLElement>('[data-role="delete-narrative"]')?.addEventListener('click', () => {
     dismissTreeMenu();
-    void deleteNarrativeSubtree(node, toasts);
+    void deleteNarrativeSubtree(node, toasts, tierLabel.toLowerCase());
   });
 
   queueMicrotask(() => {
@@ -721,7 +721,7 @@ function openTreeContextMenu(
  * middle pane mounted on a element that no longer exists, and — worse — the
  * editor's debounced save could still be holding the deleted narrative.
  */
-async function deleteNarrativeSubtree(node: NarrativeNode, toasts: ToastManager): Promise<void> {
+async function deleteNarrativeSubtree(node: NarrativeNode, toasts: ToastManager, word: string): Promise<void> {
   const store = getActiveStore();
   const worldId = getState().active?.worldId;
   if (!store || !worldId) return;
@@ -738,6 +738,8 @@ async function deleteNarrativeSubtree(node: NarrativeNode, toasts: ToastManager)
     allElements: getState().data.elements,
     labels: getWritingLabels(worldId),
     confirmPref: getEditorSettings(getState().registry).confirm_before_delete,
+    // The tree's word for a nameless one: "Delete the unnamed chapter?"
+    word,
   });
   if (decision.needed && !window.confirm(decision.message)) return;
 
@@ -750,7 +752,7 @@ async function deleteNarrativeSubtree(node: NarrativeNode, toasts: ToastManager)
     await store.deleteElement(el.id);
     await refreshElementsAfterWrite(store);
     requestPushIfLinked();
-    toasts.success(`Deleted ${el.name || 'narrative'}`);
+    toasts.success(`Deleted ${nameOrUnnamed(el, { word })}`);
   } catch (err) {
     console.error('[writing-sidebar] delete failed', err);
     showProblem(err, { doing: 'deleting the narrative', toasts });

@@ -160,6 +160,124 @@ describe('the census: no bare Unnamed or (untitled) a person can meet', () => {
   });
 });
 
+/**
+ * The stand-ins (1.124.29): words that took a missing name's place without
+ * saying the unnamed form ("this character", `this ${typeName(t)}`, "this
+ * element", "(unknown)", "(home)", "its map", "a map", "an element", "it", a
+ * bare type word, "Domain"), and a delete question that quotes a raw name
+ * (`Delete map "${m.name}"?`, which says `Delete map ""?` for a nameless
+ * one). A name goes through `nameOrUnnamed` in the room's own word; a
+ * question quotes it through `quotedName`; an element that is not in the
+ * world at all keeps words that say it is missing, and those places are on the
+ * allowlist below with that reason. A world's name is not an element's, and
+ * "this world" stays, as ruled.
+ */
+const STAND_IN = new RegExp([
+  // A fallback after || or ??: "this …" (not a world or a browser), any "(…)", its map, a map, an element, it, a bare word.
+  /(?:\|\||\?\?)\s*['"`](?:[Tt]his (?!world\b|browser\b)|\(|its map\b|an? (?:map|element)['"`]|it['"`]|(?:element|zone|narrative|page|entry|Domain|Charter|Guide)['"`])/.source,
+  // A ternary's other side: a "(…)" word for a name, or "this element" itself.
+  /[?:]\s*['"`]\((?:unknown|home|this |missing|pin without)|:\s*['"`]this (?:element|narrative|one)['"`]/.source,
+  // The type's word standing in for a name.
+  /[Tt]his \$\{typeName\(/.source,
+  // A delete, remove or revoke that quotes a raw name.
+  /(?:Delete|Remove|Revoke)d? [^"`]*"\$\{[\w?.]*\bname\}"/.source,
+].join('|'));
+
+/** The stand-in places left on purpose, each with its count and why. */
+const STAND_IN_LEFT: Record<string, { count: number; why: string }> = {
+  'src/core/share-payload.ts': { count: 1, why: 'a circle block whose knower is not in the world: "(missing knower)"' },
+  'src/core/world-styles.ts': { count: 1, why: 'a zone kind with neither supertype nor subtype: "(no kind)", not a name' },
+  'src/middle/element-detail-header.ts': { count: 1, why: 'a pin whose map is not in the world: "(unknown map)"' },
+  'src/middle/element-detail-map-image.ts': { count: 1, why: 'a picture file that is gone: a file, not an element' },
+  'src/middle/element-detail-zone-sections.ts': { count: 1, why: 'markers on a map that is not in the world: "(unknown map)"' },
+  'src/middle/import-room.ts': { count: 2, why: 'a link field\'s target type in a schema line, not a name' },
+  'src/middle/knowledge-room.ts': { count: 1, why: 'a holder or subject not in the world: "(unknown)"' },
+  'src/middle/settings-world.ts': { count: 1, why: 'a world\'s name in its Remove question' },
+  'src/middle/share-room.ts': { count: 2, why: 'a pin or a member whose element is not in the world: "(pin without element)", "(missing)"' },
+  'src/middle/writing-workspace-add-to-cast.ts': { count: 1, why: 'the label Add to story writes into the story text (stored; see unnamed-names)' },
+  'src/middle/writing-workspace-mention-items.ts': { count: 1, why: 'the label a mention pick writes into the story text (stored; see unnamed-names)' },
+  'src/sidebar/worlds-sidebar.ts': { count: 2, why: 'a world\'s name in its Remove questions' },
+  'src/tabs/right/context-pane-graph.ts': { count: 4, why: 'a node or crumb whose element is not in the world: "(unknown)"' },
+  'src/tabs/right/map-tab-pins.ts': { count: 1, why: 'a pin drawn before its element is read: "(loading…)"' },
+  'src/tabs/right/right-pane.ts': { count: 1, why: 'a map tab whose map is not in the world: its opened label, else "(missing map)"' },
+  'src/ui/delete-browser-world-modal.ts': { count: 1, why: 'a world\'s name in its Delete question' },
+  'src/ui/guide-note.ts': { count: 1, why: 'a type word handed to the name builder, not a name' },
+  'src/ui/map-create-modal.ts': { count: 2, why: 'a place or parent map not in the world: "(unknown)"' },
+  'src/visualization/timeline/timeline-view.ts': { count: 1, why: 'the chart on screen before it is saved: "This chart", not an element' },
+};
+
+function standInLines(code: string): number[] {
+  return code.split(/\r?\n/)
+    .map((line, i) => (!isCommentLine(line) && STAND_IN.test(line) ? i + 1 : 0))
+    .filter(n => n > 0);
+}
+
+describe('the census of stand-ins: no word takes a missing name\'s place', () => {
+  it('every stand-in left in the source is on the allowlist, with its reason and count', () => {
+    const now: Record<string, number> = {};
+    for (const file of walk(SRC)) {
+      const rel = relative(ROOT, file).split(sep).join('/');
+      if (SKIP.has(rel)) continue;
+      const n = standInLines(readFileSync(file, 'utf8')).length;
+      if (n > 0) now[rel] = n;
+    }
+    const unexpected = Object.entries(now)
+      .filter(([f, n]) => STAND_IN_LEFT[f]?.count !== n)
+      .map(([f, n]) => `${f}: ${n}`);
+    expect(unexpected, 'Say a missing name with nameOrUnnamed (a question with quotedName), or add the place with why').toEqual([]);
+    expect(Object.keys(STAND_IN_LEFT).filter(f => !(f in now))).toEqual([]);
+  });
+
+  it('the instrument sees each form this release took out', () => {
+    const planted = [
+      "return n || (el ? `this ${typeName(el.type)}` : '');",
+      "return name || `this ${typeName(type)}`;",
+      "return n || (el ? `this ${typeName(el.type)}` : 'this element');",
+      "return name ? `\"${name}\"` : 'this element';",
+      "const subject = name.trim() ? `\"${name.trim()}\"` : 'this narrative';",
+      "const named = typeof el.name === 'string' && el.name.trim() ? el.name.trim() : 'this one';",
+      "title.textContent = named ? `${named} and what it touches` : `This ${typeName(centre.type)} and what it touches`;",
+      "const centerName = nodes.find(c => c.isCenter)?.el?.name || 'this element';",
+      "|| (n.isCenter && n.id === homeId ? subject.name || '(home)' : '(unknown)');",
+      "homeChip.title = `Back to ${subject.name || '(home)'}`;",
+      "title: `Pinned on ${mapEl.name || '(this map)'}`,",
+      "const mapName = m?.name || '(unknown map)';",
+      "this.locationPreview = { id: found.location, name: loc?.name ?? '(unknown)' };",
+      "toastManager.success(`Deleted ${el.name || 'element'}`);",
+      "toasts.success(`Deleted ${zone.name || 'zone'}`);",
+      "toasts.success(`Deleted ${el.name || 'narrative'}`);",
+      "if (!confirm(`Delete map \"${m.name}\"?${cascadeNote} This cannot be undone.`)) return;",
+      "? `Delete zone \"${zone.name}\"? This also removes its markers. This cannot be undone.`",
+      "toasts.success(`Deleted map \"${m.name}\"`);",
+      "+ `<span>Open ${escapeText(m.name || 'its map')}</span></button>`).join('');",
+      "return { id: m.id, name: m.name?.trim() || 'a map', pinned: !!held };",
+      "deleteRefusedLine(refused.map(r => r.name?.trim() || 'an element'))",
+      "const name = el.name || 'it';",
+      "`<li>${link(d.id, d.name.trim() || 'Domain', 'atlas-home-charter-link')}`",
+      "const nameOf = (el: Element, fallback: string): string => (el.name || fallback); nameOf(x, 'Charter') || 'Charter'",
+      "addMapBtn.title = `Create a new map of ${el.name || 'this location'}`;",
+      "return el?.name || 'element';",
+      "toasts.show(`Removed \"${chart.name}\"`, 'info');",
+    ];
+    expect(standInLines(planted.join('\n'))).toEqual(planted.map((_, i) => i + 1));
+  });
+
+  it('the instrument passes the builders, a world\'s own words and comments', () => {
+    const clean = [
+      'const n = nameOrUnnamed(el, { start: true });',
+      'const q = quotedName(m, { typed: true });',
+      "const w = getState().active?.meta.name || 'This world';",
+      "askForCopy(id, world.meta.name?.trim() || 'this world', toasts);",
+      "const them = n === 1 ? 'it' : 'them';",
+      "toasts.success(`Deleted ${nameOrUnnamed(zone)}`);",
+      'const scope = `this ${tierLabel.toLowerCase()}`;',
+      "// was `this ${typeName(t)}`",
+      " * (unknown)",
+    ];
+    expect(standInLines(clean.join('\n'))).toEqual([]);
+  });
+});
+
 function el(type: string, id: string, extra: Record<string, unknown> = {}): Element {
   return { id, type, name: id, ...extra } as unknown as Element;
 }
@@ -527,7 +645,8 @@ describe("a chart card's chips", () => {
       // Its own mark on the chart: it is shown.
       'The Fall': 'Show The Fall (event) on the chart',
       // No mark of its own: the chart narrows to what it is linked to. The unnamed form says its type once.
-      'The unnamed character': 'Show what the unnamed character is linked to on the chart. It is undated: drag it onto the chart to date it',
+      // Two sentences: the press first, then the drag, each ended with its stop.
+      'The unnamed character': 'Show what the unnamed character is linked to on the chart. It is undated: drag it onto the chart to date it.',
       'Ada': 'Show what Ada (object) is linked to on the chart',
     });
     for (const c of chips.values()) {

@@ -235,9 +235,10 @@ describe('summarizeNarrativeDeletion + confirm message', () => {
     expect(s.sentence).toBe('This also deletes 1 chapter, 1 scene, 1 draft and 1 pin.');
   });
 
-  it('falls back to a generic subject for an unnamed narrative', () => {
+  it('says the unnamed form for an unnamed narrative, never quoted, in the room\'s word when given', () => {
     const s = summarizeNarrativeDeletion(standardWorld(), 's1', L);
-    expect(narrativeDeleteConfirmMessage('   ', s)).toBe('Delete this narrative? This cannot be undone.');
+    expect(narrativeDeleteConfirmMessage('   ', s)).toBe('Delete the unnamed narrative? This cannot be undone.');
+    expect(narrativeDeleteConfirmMessage('', s, 'scene')).toBe('Delete the unnamed scene? This cannot be undone.');
   });
 
   it('carries no em-dash (house voice law)', () => {

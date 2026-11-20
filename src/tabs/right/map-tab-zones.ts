@@ -23,6 +23,7 @@ import { resolveStyle, groupByKind } from '../../core/world-styles';
 import { mapStyleOf, overPicture, zoneKindOf, PLAIN_ZONE_LAYER, MAP_STYLE_IDS, type MapStylePreset, type InkTreatment } from '../../core/map-ink';
 import { renderZonePanel, wireZonePanel } from './map-zone-panel';
 import type { Zone, WorldMap } from '../../core/types';
+import { nameOrUnnamed, quotedName } from '../../core/type-words';
 import { pickMapImageSource } from './map-image-source';
 import { getActiveStore, patchElementsFrom } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
@@ -211,15 +212,17 @@ async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise
   let markerCount: number | null = null;
   try { markerCount = (await store.findDependents(zoneId)).length; }
   catch (err) { console.warn('[zone-chip] dependents probe failed:', err); }
+  // The question quotes the name after the type's word, or says the unnamed zone; the note after says it plainly.
+  const asked = quotedName(zone, { typed: true });
   const ok = window.confirm(markerCount === null
-    ? `Delete zone "${zone.name}"? This also removes its markers. This cannot be undone.`
-    : `Delete zone "${zone.name}"? This also removes ${markerCount} marker(s). This cannot be undone.`);
+    ? `Delete ${asked}? This also removes its markers. This cannot be undone.`
+    : `Delete ${asked}? This also removes ${markerCount} marker(s). This cannot be undone.`);
   if (!ok) return;
   try {
     await store.deleteZone(zoneId);
     if (!patchElementsFrom(store, await store.listElements())) {
       // The world switched during the delete: the selection and the push belong to the world on screen now.
-      toasts.success(`Zone deleted`);
+      toasts.success(`Deleted ${nameOrUnnamed(zone)}`);
       return;
     }
     // Clear selection if we just deleted the selected zone.
@@ -227,7 +230,7 @@ async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise
       patchSlice('ui', { ...getState().ui, selectedElementId: null });
     }
     requestPushIfLinked();
-    toasts.success(`Zone deleted`);
+    toasts.success(`Deleted ${nameOrUnnamed(zone)}`);
   } catch (err) {
     console.error('[zone-chip] delete failed:', err);
     showProblem(err, { doing: 'deleting the zone', toasts });

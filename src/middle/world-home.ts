@@ -791,7 +791,8 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
   const byId = (id: string) => elements.find(e => e.id === id);
   const guide = packet.guide ? byId(packet.guide.id) : undefined;
   if (!charter && !guide && packet.domains.length === 0) return null;
-  const nameOf = (el: { name?: unknown }, fallback: string) => (typeof el.name === 'string' && el.name.trim() ? el.name.trim() : fallback);
+  // A link alone, or after a label: its own name, or the unnamed form in the aid's word ("The unnamed charter").
+  const nameOf = (el: { name?: unknown; type?: string }, word: string) => nameOrUnnamed({ name: el.name, type: el.type ?? 'law' }, { start: true, word });
   const link = (id: string, name: string, cls: string) => `<a class="${cls}" href="${escapeText(elementHash(worldId, id))}">${escapeText(name)}</a>`;
   const block = document.createElement('div');
   block.className = 'atlas-home-aids';
@@ -801,7 +802,7 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
     block.insertAdjacentHTML('beforeend', `
       <div class="atlas-home-charter" data-role="charter">
         <span class="atlas-home-charter-label">This world's charter</span>
-        ${link(charter.id, nameOf(charter, 'Charter'), 'atlas-home-charter-link')}
+        ${link(charter.id, nameOf(charter, 'charter'), 'atlas-home-charter-link')}
         ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
       </div>`);
   }
@@ -810,13 +811,13 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
     block.insertAdjacentHTML('beforeend', `
       <div class="atlas-home-charter atlas-home-guide" data-role="guide">
         <span class="atlas-home-charter-label">Start here</span>
-        ${link(guide.id, nameOf(guide, 'Guide'), 'atlas-home-charter-link')}
+        ${link(guide.id, nameOf(guide, 'guide'), 'atlas-home-charter-link')}
         ${lead ? `<p class="atlas-home-charter-lead">${escapeText(lead)}</p>` : ''}
       </div>`);
   }
   if (packet.domains.length > 0) {
     const rows = packet.domains.map(d =>
-      `<li>${link(d.id, d.name.trim() || 'Domain', 'atlas-home-charter-link')}${d.sentence ? `<span class="atlas-home-domain-line"> · ${escapeText(d.sentence)}</span>` : ''}</li>`).join('');
+      `<li>${link(d.id, nameOf(d, 'domain'), 'atlas-home-charter-link')}${d.sentence ? `<span class="atlas-home-domain-line"> · ${escapeText(d.sentence)}</span>` : ''}</li>`).join('');
     block.insertAdjacentHTML('beforeend', `
       <div class="atlas-home-charter atlas-home-domains" data-role="domains">
         <span class="atlas-home-charter-label">${packet.domains.length === 1 ? 'Its domain' : 'Its domains'}</span>
@@ -833,7 +834,7 @@ function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement 
       const line = document.createElement('p');
       line.className = 'atlas-home-aid-other';
       line.dataset.role = 'aid-other';
-      line.innerHTML = `Another ${word} is also marked: ${link(el.id, nameOf(el, word === 'charter' ? 'Charter' : 'Guide'), 'atlas-home-charter-link')} · `;
+      line.innerHTML = `Another ${word} is also marked: ${link(el.id, nameOf(el, word), 'atlas-home-charter-link')} · `;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-btn-link';

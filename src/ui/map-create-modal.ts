@@ -26,7 +26,7 @@ import { readImageDimsFromFile, readImageDimsFromUrl, IMAGELESS_MAP_SIZE, smallM
 import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
 import { escapeText, escapeAttr } from '../core/dom-utils';
-import { nameOrUnnamed } from '../core/type-words';
+import { nameOrUnnamed, ownName } from '../core/type-words';
 // view-only-ok: opened only from +map and New map, both closed on a view-only world (conv. 149).
 
 export interface MapCreateResult {
@@ -116,13 +116,14 @@ class MapCreateModal extends BaseModal {
       // up the location's name from state.
       if (found.location) {
         const loc = getState().data.elements.find(e => e.id === found.location);
-        this.locationPreview = { id: found.location, name: loc?.name ?? '(unknown)' };
+        // A place with no name is drawn as the unnamed form by the chip; one not in the world keeps its own word.
+        this.locationPreview = { id: found.location, name: loc ? ownName(loc) : '(unknown)' };
       }
       if (typeof found.parent_map === 'string' && found.parent_map) {
         const parent = getState().data.elements.find(
           (e): e is WorldMap => e.type === 'map' && e.id === found.parent_map,
         );
-        this.parentMapPreview = { id: found.parent_map, name: parent?.name ?? '(unknown)' };
+        this.parentMapPreview = { id: found.parent_map, name: parent ? ownName(parent) : '(unknown)' };
       }
       // Reveal the advanced section by default when any advanced field is
       // already populated — saves a click and signals "there's stuff here."

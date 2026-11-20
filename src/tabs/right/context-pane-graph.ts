@@ -40,6 +40,7 @@ import { proposedMarkOf, proposedTitle, proposedWord } from '../../core/review-m
 import { hiddenMarkLine } from '../../core/hidden-mark';
 import type { LensPicture } from '../../core/web-lens';
 import { readerEdgesOf, spatialMapOf, spatialOtherOf } from '../../core/world-links';
+import { nameOrUnnamed } from '../../core/type-words';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -892,8 +893,10 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       nodeEl.style.left = `${cx - dia / 2}px`;
       nodeEl.style.top = `${cy - dia / 2}px`;
       const iconName = n.el ? (ELEMENT_ICONS[n.el.type] ?? 'category') : 'edit_note';
-      const rawName = n.el?.name?.trim()
-        || (n.isCenter && n.id === homeId ? subject.name || '(home)' : '(unknown)');
+      // A node's label stands alone: its own name, or the unnamed form with the capital. A node whose
+      // element is not in the world at all keeps a word that says it is unknown.
+      const said = n.el ?? (n.isCenter && n.id === homeId ? subject : null);
+      const rawName = said ? nameOrUnnamed(said, { start: true }) : '(unknown)';
       // A proposed or hidden element is drawn with its mark, never plain, as on
       // every other surface: a dotted ring, the word in the label and its line in
       // the tooltip. Atlas is the keeper's copy, so they are shown, marked.
@@ -915,7 +918,10 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       // A backlink's tooltip says so in words, for the reader who has not
       // yet learned the muted ring + arrow. A zone beside its map
       // says how many markers draw it there (#185: they are one line now).
-      const centerName = nodes.find(c => c.isCenter)?.el?.name || 'this element';
+      // Mid-line ("links to the unnamed character"); the centre is the subject when its node holds no element.
+      const centre = nodes.find(c => c.isCenter);
+      const centreEl = centre?.el ?? (centre?.id === homeId ? subject : null);
+      const centerName = centreEl ? nameOrUnnamed(centreEl) : '(unknown)';
       const markers = n.isCenter ? 0
         : lastMarkerCounts.get(`${paintCenterId}|${n.id}`) ?? lastMarkerCounts.get(`${n.id}|${paintCenterId}`) ?? 0;
       const markerLine = markers ? `\n${markers} marker${markers === 1 ? '' : 's'} on the map` : '';
@@ -1470,11 +1476,11 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     const homeChip = document.createElement('button');
     homeChip.type = 'button';
     homeChip.className = 'atlas-context-graph-trail-chip';
-    homeChip.title = `Back to ${subject.name || '(home)'}`;
+    homeChip.title = `Back to ${nameOrUnnamed(subject)}`;
     homeChip.dataset.trailIndex = '-1';
     homeChip.innerHTML =
       `<span class="material-symbols-outlined">home</span>` +
-      `<span>${escapeText(subject.name || '(home)')}</span>`;
+      `<span>${escapeText(nameOrUnnamed(subject, { start: true }))}</span>`;
     homeChip.addEventListener('click', (e) => {
       e.stopPropagation();
       jumpToBreadcrumbIndex(-1);
@@ -1490,7 +1496,9 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       trail.appendChild(sep);
 
       const el = findElement(id);
-      const label = el?.name || '(unknown)';
+      // A crumb alone takes the capital; "Back to …" says it mid-line. Not in the world: a word that says so.
+      const label = el ? nameOrUnnamed(el, { start: true }) : '(unknown)';
+      const back = el ? nameOrUnnamed(el) : '(unknown)';
       const isCurrent = idx === centerStack.length - 1;
       if (isCurrent) {
         const cur = document.createElement('span');
@@ -1502,7 +1510,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'atlas-context-graph-trail-chip';
-        chip.title = `Back to ${label}`;
+        chip.title = `Back to ${back}`;
         chip.dataset.trailIndex = String(idx);
         chip.textContent = label;
         chip.addEventListener('click', (e) => {

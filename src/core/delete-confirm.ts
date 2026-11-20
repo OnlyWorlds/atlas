@@ -34,6 +34,8 @@
 import type { Element } from './types';
 import type { WritingLabels } from '../middle/writing-helpers';
 import { summarizeNarrativeDeletion } from './narrative-delete';
+// The subject: the name in quotes, or the unnamed form, never quoted (never an id).
+import { quotedName } from './type-words';
 
 export interface DeleteConfirmDecision {
   /** Whether the caller must ask before deleting. */
@@ -55,6 +57,8 @@ export interface DeleteConfirmInput {
   labels: WritingLabels;
   /** The user's `confirm_before_delete` setting. */
   confirmPref: boolean;
+  /** The room's own word for the element, for its unnamed form ("the unnamed chapter" in the writing tree). */
+  word?: string;
   /**
    * True when the dependents probe THREW, so `dependents` is empty because we
    * could not look, not because nothing depends on this element.
@@ -77,7 +81,7 @@ export interface DeleteConfirmInput {
  * speak.
  */
 export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDecision {
-  const { el, dependents, allElements, labels, confirmPref, dependentsUnknown } = input;
+  const { el, dependents, allElements, labels, confirmPref, dependentsUnknown, word } = input;
   const cascades = dependents.length > 0;
 
   // Could not determine the blast radius: always ask, and say so plainly.
@@ -86,7 +90,7 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
   if (dependentsUnknown) {
     return {
       needed: true,
-      message: `Delete ${subjectOf(el)}? Atlas could not check what else this would delete, so anything filed under it may go too. This cannot be undone.`,
+      message: `Delete ${quotedName(el, { word })}? Atlas could not check what else this would delete, so anything filed under it may go too. This cannot be undone.`,
       cascades: true,
     };
   }
@@ -94,7 +98,7 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
   const needed = confirmPref || cascades;
   if (!needed) return { needed: false, message: '', cascades };
 
-  const subject = subjectOf(el);
+  const subject = quotedName(el, { word });
 
   if (el.type === 'narrative') {
     const summary = summarizeNarrativeDeletion(allElements, el.id, labels);
@@ -116,10 +120,4 @@ export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDec
     ? ` This also deletes ${n} element${n === 1 ? '' : 's'} filed under it.`
     : '';
   return { needed: true, message: `Delete ${subject}?${extra} This cannot be undone.`, cascades };
-}
-
-/** The confirm's subject: the name in quotes, or "this element" (never an id). */
-function subjectOf(el: { name?: string | null }): string {
-  const name = (el.name ?? '').trim();
-  return name ? `"${name}"` : 'this element';
 }

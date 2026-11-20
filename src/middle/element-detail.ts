@@ -52,6 +52,7 @@ import { doorTrail, type DoorRead, type TrailStep } from '../core/door-trail';
 import { doorsNow, onDoorsChanged, refreshDoors } from '../sync/element-doors';
 import { buildCharterMarkOffer } from './element-detail-charter-mark';
 import { buildPageStrandOffer } from './strand-offer';
+import { nameOrUnnamed } from '../core/type-words';
 
 /**
  * Per-element scroll position memory. Survives re-renders (field edits, link
@@ -330,8 +331,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const note = document.createElement('p');
       note.className = 'atlas-known-of-note';
       note.dataset.role = 'known-of';
-      const named = typeof el.name === 'string' && el.name.trim() ? el.name.trim() : 'this one';
-      note.textContent = `Known of: you know only what anyone could see of ${named}.`;
+      note.textContent = `Known of: you know only what anyone could see of ${nameOrUnnamed(el)}.`;
       detail.appendChild(note);
       const description = typeof el.description === 'string' ? el.description.trim() : '';
       if (description) {

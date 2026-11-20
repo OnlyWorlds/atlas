@@ -41,6 +41,7 @@ import { keptEditsLine, keptLine, roleChangeLine } from './role-change';
 import { hiddenHeldLine, hiddenShownLine } from '../core/hidden-mark';
 import { deleteRefusedLine, proposalAcceptedLine, proposalSentLine } from './proposal-lines';
 import type { SyncResult } from '../core/types';
+import { nameOrUnnamed } from '../core/type-words';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -518,7 +519,8 @@ async function noteProposalNews(worldId: string, folder: FolderStore, result: Sy
   if (accepted.length > 0) toastManager.show(proposalAcceptedLine(entry.name, accepted.length), 'success', 6000);
   const refused = result.delete_refused ?? [];
   if (refused.length > 0) {
-    toastManager.show(deleteRefusedLine(refused.map(r => r.name?.trim() || 'an element')), 'info', 10000);
+    // Mid-line: "Only this world's keeper can delete the unnamed character, so it is back."
+    toastManager.show(deleteRefusedLine(refused.map(r => nameOrUnnamed(r))), 'info', 10000);
   }
   if (sent.length > 0 || accepted.length > 0 || result.conflicts.some(c => c.proposal) || proposedSets[worldId] === undefined) {
     await refreshProposedSet(worldId, folder);

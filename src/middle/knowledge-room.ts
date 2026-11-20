@@ -40,7 +40,7 @@ import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writin
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
-import { capitalise, nameOrUnnamed, openWords, ownName, theUnnamed, typeName } from '../core/type-words';
+import { capitalise, nameOrUnnamed, openWords, ownName, quotedName, theUnnamed, typeName } from '../core/type-words';
 import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { Element } from '../core/types';
@@ -299,8 +299,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (!folder || !worldId || viewOnly) return;
     const el = elOf(id);
     // The entry as the confirm asks it: its name in quotes, or the unnamed entry.
-    const own = el ? ownName(el) : '';
-    const said = own ? `"${own}"` : theUnnamed('narrative', { word: 'entry' });
+    const said = quotedName(el ?? { type: 'narrative' }, { word: 'entry' });
     if (getEditorSettings(getState().registry).confirm_before_delete) {
       let dependentCount = 0;
       try {
@@ -994,7 +993,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const existing = listPages(getState().data.elements).find(p =>
           blocksOf(p).some(b => b.kind === 'circle' && b.knowerId === knower.id));
         if (existing) {
-          toasts.info(`Opened the existing page for this circle: ${ownName(existing) ? `"${ownName(existing)}"` : nameOrUnnamed(existing, { word: 'page' })}`);
+          toasts.info(`Opened the existing page for this circle: ${quotedName(existing, { word: 'page' })}`);
           navigate(shareHash(worldId, existing.id));
           return;
         }

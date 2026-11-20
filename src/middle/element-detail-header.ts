@@ -34,7 +34,7 @@ import {
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import type { Element, Pin, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
-import { nameOrUnnamed, typeName } from '../core/type-words';
+import { nameOrUnnamed, ownName, typeName } from '../core/type-words';
 import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -698,14 +698,17 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
     addMapBtn.type = 'button';
     addMapBtn.className = 'atlas-icon-btn-sm atlas-header-add-glyph';
     addMapBtn.setAttribute('data-action', 'add-map');
-    addMapBtn.title = `Create a new map of ${el.name || 'this location'}`;
+    addMapBtn.title = `Create a new map of ${nameOrUnnamed(el)}`;
     // Two-glyph composition reads as "add map" — small + plus the action
     // glyph. Same shape as [+pin]; the two read as a coherent pair.
     addMapBtn.innerHTML =
       '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
       '<span class="material-symbols-outlined atlas-add-glyph-main">map</span>';
     addMapBtn.addEventListener('click', async () => {
-      const suggestedName = `Map of ${el.name || 'this location'}`;
+      // A name the person sees and may keep: a nameless place offers the form a new map starts from,
+      // never a derived name that would go stale once the place is named.
+      const own = ownName(el);
+      const suggestedName = own ? `Map of ${own}` : `New ${typeName('map')}`;
       await createMapDialog(toastManager, {
         initialName: suggestedName,
         initialLocationId: el.id,
@@ -826,7 +829,7 @@ function renderMapPinnedElementStrip(
       // filter by type; click any row → navigate to that element + keep
       // the map open via chained URL.
       const picked = await pickElement({
-        title: `Pinned on ${mapEl.name || '(this map)'}`,
+        title: `Pinned on ${nameOrUnnamed(mapEl)}`,
         restrictToIds: pinnedEls.map(e => e.id),
       });
       if (!picked) return;
@@ -994,7 +997,8 @@ function buildPinAffordance(
   showMapName: boolean,
 ): HTMLElement {
   const m = elements.find((e): e is WorldMap => e.type === 'map' && e.id === pin.map_id);
-  const mapName = m?.name || '(unknown map)';
+  // A map with no name says the unnamed form; one not in the world at all keeps its own word.
+  const mapName = m ? nameOrUnnamed(m) : '(unknown map)';
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'atlas-icon-btn-sm atlas-header-pin-affordance';
@@ -1007,7 +1011,7 @@ function buildPinAffordance(
     : `Pin on ${mapName} · click to open and center, right-click to delete pin`;
   const iconHtml = '<span class="material-symbols-outlined">push_pin</span>';
   if (showMapName) {
-    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(mapName)}</span>`;
+    btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m ? nameOrUnnamed(m, { start: true }) : mapName)}</span>`;
     btn.classList.add('atlas-header-map-affordance-labeled');
   } else {
     btn.innerHTML = iconHtml;
@@ -1124,13 +1128,14 @@ async function onDelete(el: Element): Promise<void> {
       }
     }
     patchSlice('ui', nextUi);
+    // The note after the act says the name plainly, as the question named it (quoted there).
     if (!here) {
-      toastManager.success(`Deleted ${el.name || 'element'}`);
+      toastManager.success(`Deleted ${nameOrUnnamed(el)}`);
       return;
     }
     // Local delete + tombstones written — schedule a push to DELETE on server.
     requestPushIfLinked();
-    toastManager.success(`Deleted ${el.name || 'element'}`);
+    toastManager.success(`Deleted ${nameOrUnnamed(el)}`);
     const worldId = getState().active?.worldId;
     if (worldId) {
       // If the delete happened from the writing room, stay there — drop the

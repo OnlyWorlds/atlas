@@ -2203,11 +2203,11 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   // Ada (character) on the chart"); an undated or undatable one has no mark of its own, and the chart
   // narrows to what it is linked to ("Show what Ada (object) is linked to on the chart"). The type is
   // said once: an unnamed form already holds it. The group's label above the row says the field; the
-  // drag hint only where a drag dates it.
+  // drag hint only where a drag dates it, after the press, and as two sentences each ends with its stop.
   const who = ownName(link) ? `${nameOrUnnamed(link)} (${typeName(link.type)})` : nameOrUnnamed(link);
   const shows = dated ? `Show ${who} on the chart` : `Show what ${who} is linked to on the chart`;
   const named = dateable && !dated && state.onDateElement
-    ? `${shows}. It is undated: drag it onto the chart to date it`
+    ? `${shows}. It is undated: drag it onto the chart to date it.`
     : shows;
   chip.title = named;
   chip.setAttribute('aria-label', named);

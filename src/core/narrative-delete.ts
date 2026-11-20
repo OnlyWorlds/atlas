@@ -36,6 +36,7 @@
 
 import type { Element } from './types';
 import type { WritingLabels, WritingTier } from '../middle/writing-helpers';
+import { quotedName } from './type-words';
 
 /** Tier buckets, plus the two honesty buckets the tree cannot see. */
 export interface NarrativeDeletionSummary {
@@ -188,8 +189,10 @@ export function summarizeNarrativeDeletion(
 export function narrativeDeleteConfirmMessage(
   name: string,
   summary: NarrativeDeletionSummary,
+  /** The room's word for a nameless one ("the unnamed chapter"); the type's word when absent. */
+  word?: string,
 ): string {
-  const subject = name.trim() ? `"${name.trim()}"` : 'this narrative';
+  const subject = quotedName({ name, type: 'narrative' }, { word });
   if (summary.total === 0) return `Delete ${subject}? This cannot be undone.`;
   return `Delete ${subject}? ${summary.sentence} This cannot be undone.`;
 }

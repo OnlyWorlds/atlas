@@ -35,6 +35,7 @@ import { SEAT_SECRET_MISSING_LINE } from '../../core/seat';
 import { renderGate } from '../../ui/render-gate';
 import { copyLine, worldIsCopiedBy } from '../../core/world-copy';
 import { drawnFrame } from './map-frame';
+import { nameOrUnnamed } from '../../core/type-words';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -235,7 +236,9 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       // affordance per DESIGN_MAPS.md §10b MR.
       const isStale = !m;
       if (isStale) btn.classList.add('atlas-tab-stale');
-      const label = m?.name || tab.label || '(missing map)';
+      // A tab's name alone: the map's own name or its unnamed form; a map not in the world keeps the
+      // label it was opened with, or says it is missing.
+      const label = m ? nameOrUnnamed(m, { start: true }) : (tab.label || '(missing map)');
       // The × answers a mouse; the keyboard's close is Delete on the focused tab.
       btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-hidden="true">×</span>`;
       btn.setAttribute('aria-keyshortcuts', 'Delete');

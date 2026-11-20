@@ -20,7 +20,7 @@ import { escapeText } from '../../core/dom-utils';
 import { getAssociatedMaps } from './auto-open-map';
 import { buildMapTree, type LocationLike, type MapTreeNode } from './map-tree';
 import type { MapTabCacheEntry } from './map-tab-cache';
-import { nameOrUnnamed } from '../../core/type-words';
+import { nameOrUnnamed, openWords } from '../../core/type-words';
 
 /** Hover text on a pin that wears the map badge: the badge says what it means (Titus, 2026-10-15). */
 export const SUBMAP_PIN_HINT = 'This location has its own map: click it, then Open';
@@ -92,7 +92,7 @@ export function refreshSubmapDoor(entry: MapTabCacheEntry): void {
   const html = targets.slice(0, 3).map(m =>
     `<button type="button" class="atlas-submap-door-btn" data-action="open-submap" data-map-id="${escapeText(m.id)}">`
     + `<span class="material-symbols-outlined" aria-hidden="true">zoom_in_map</span>`
-    + `<span>Open ${escapeText(m.name || 'its map')}</span></button>`).join('');
+    + `<span>${escapeText(openWords(m))}</span></button>`).join('');
   const door = L.marker(drawn.marker.getLatLng(), {
     // Above and right of the pin: below it sit the pin's own label and the
     // hover tooltip, which stays up while the pointer rests on the pin.

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.29',
+    date: '2026-11-20',
+    theme: 'The stand-ins for a missing name',
+    entries: [
+      {
+        id: 'unnamed-stand-ins',
+        title: 'This character, (unknown), (home) and the delete notes say the unnamed form',
+        body: 'A delete asks with a name in quotation marks, such as Delete map "Harbour"?, and the note after it says the name plainly: Deleted Harbour. An element with no name is asked and told in its unnamed form, Delete the unnamed map? and Deleted the unnamed map, never empty quotation marks. That now holds for maps, zones from a map\'s list and from their own page, an element\'s page, the writing tree in its own word (Delete the unnamed chapter?) and a chart, whose note no longer says Removed, Zone deleted, Deleted element or Deleted zone. Where Atlas said this character, this location, this element, it, (unknown), (home) or the type\'s word alone for an element with no name, it now says the unnamed form, with a capital where it starts a line: the home page\'s guide and its cards (The unnamed character\'s place was deleted.), the home grid and its picture, the notes that follow your first steps, the Web\'s names, its links to and its way back home, a charter\'s mark, Home\'s charter, guide and domains, a map\'s tab, the map a pin is on, the maps a zone is drawn on, the door to a map within a map, the Link and Dismiss of a suggestion, the banner while a pin is placed, a known-of element\'s note and the note when only a keeper may delete. An element that is not in the world at all keeps words that say it is missing. A new map of a place with no name starts as New map. An undated chip on a chart\'s card ends its second sentence with a full stop. Not changed: the label a new link writes into a story for an element with no name.',
+        tags: ['accessibility', 'editor'],
+      },
+    ],
+  },
+  {
     version: '1.124.28',
     date: '2026-11-19',
     theme: 'The other words for a missing name',

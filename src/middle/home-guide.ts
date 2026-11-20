@@ -29,7 +29,8 @@ import { advancePath, setDoor, startPath, type Door } from '../core/guide-path';
 import { hasFolderMode } from '../core/capabilities';
 import { isPartialSlice } from '../core/provenance';
 import { linkIdsOf } from '../core/link-ids';
-import { typeName } from '../core/type-words';
+import { missingWords, nameOrUnnamed } from '../core/type-words';
+import { strandWord } from '../core/strand-journey';
 import { isStoryNarrative } from '../core/narrative-kind';
 import { playNarrativeIds } from '../core/records';
 import { getTierForNarrative, getWritingLabels } from './writing-helpers';
@@ -342,10 +343,13 @@ interface CardAction {
   stays?: boolean;
 }
 
-/** An element's name as text; an empty one reads as its type ("this Character"). */
-function nameOf(el: Element | null | undefined, type: string): string {
-  const name = typeof el?.name === 'string' ? el.name.trim() : '';
-  return name || `this ${typeName(type)}`;
+/**
+ * An element's own name, or its unnamed form ("the unnamed character", a Narrative "the unnamed story" as
+ * the home says it); one not in the world says it is missing. `start` at a line's start or a button's whole label.
+ */
+function nameOf(el: Element | null | undefined, type: string, start = false): string {
+  const word = strandWord(type);
+  return el ? nameOrUnnamed(el, { start, word }) : missingWords(type, { start, word });
 }
 
 const STEP_LABEL: Record<DotId, string> = Object.fromEntries(DOTS.map(d => [d.id, d.label])) as Record<DotId, string>;
@@ -394,7 +398,7 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
         line = 'Start with someone.';
         actions.push({ verb: 'create-character', label: 'Create a Character', run: () => create('character') });
       } else {
-        line = `${nameOf(ada, 'character')} is in your world.`;
+        line = `${nameOf(ada, 'character', true)} is in your world.`;
         actions.push(next());
       }
       break;
@@ -402,7 +406,7 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
     case 'placed': {
       if (dots.placed) {
         const ada = newestOf(placedChars);
-        line = `${nameOf(ada, 'character')} is at ${nameOf(byId.get(placeIdOf(ada!) ?? ''), 'location')}.`;
+        line = `${nameOf(ada, 'character', true)} is at ${nameOf(byId.get(placeIdOf(ada!) ?? ''), 'location')}.`;
         actions.push(next());
         break;
       }
@@ -419,12 +423,12 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
         const ada = nameOf(free, 'character');
         const hollow = nameOf(keep, 'location');
         const [character, location] = [free.id, keep.id];
-        line = `${ada} has no place yet. ${hollow} could be it.`;
+        line = `${nameOf(free, 'character', true)} has no place yet. ${nameOf(keep, 'location', true)} could be it.`;
         actions.push({ verb: 'place', label: `Place ${ada} at ${hollow}`, stays: true, run: () => placeFromCard(worldId, character, location) });
       } else {
         // Only Characters whose place is gone: the field is someone's data, never overwritten.
         const gone = newestOf(chars)!;
-        line = `${nameOf(gone, 'character')}'s place was deleted.`;
+        line = `${nameOf(gone, 'character', true)}'s place was deleted.`;
         actions.push({ verb: 'open-character', label: `Open ${nameOf(gone, 'character')}`, run: () => navigate(elementHash(worldId, gone.id)) });
       }
       break;
@@ -451,11 +455,11 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
         const ada = nameOf(pairChar, 'character');
         const hollow = nameOf(byId.get(pair.location), 'location');
         const event = dated.id;
-        line = `${founding} happened in year ${year}. Were ${ada} and ${hollow} at ${founding}?`;
+        line = `${nameOf(dated, 'event', true)} happened in year ${year}. Were ${ada} and ${hollow} at ${founding}?`;
         actions.push({ verb: 'were-there', label: `Add ${ada} and ${hollow} to ${founding}`, stays: true, run: () => wereThereFromCard(worldId, event, pair) });
       } else {
         // Not yet seen: the sentence says the chart is the way on, since Next waits for it.
-        line = `${founding} is on the chart at year ${year}.${done ? '' : ' Open the chart to see it, then go on.'}`;
+        line = `${nameOf(dated, 'event', true)} is on the chart at year ${year}.${done ? '' : ' Open the chart to see it, then go on.'}`;
       }
       // Were there is offered, never required: Next stands once the chart was seen.
       actions.push(done ? next() : chart);
@@ -477,7 +481,7 @@ function card(step: DotId, dots: Dots, worldId: string, toasts: ToastManager): H
       const tier = getTierForNarrative(tale, worldId);
       const word = tier ? labels[tier].toLowerCase() : null;
       // The world's own word arrives with its place, not as a jump from "story".
-      line = word ? `${nameOf(tale, 'narrative')} is in your world, listed as ${/^[aeiou]/.test(word) ? 'an' : 'a'} ${word}.` : `${nameOf(tale, 'narrative')} is a story.`;
+      line = word ? `${nameOf(tale, 'narrative', true)} is in your world, listed as ${/^[aeiou]/.test(word) ? 'an' : 'a'} ${word}.` : `${nameOf(tale, 'narrative', true)} is a story.`;
       actions.push(done ? next() : { verb: 'open-writing', label: 'Open the writing room', run: () => navigate(writingHash(worldId, tale.id)) });
       break;
     }
