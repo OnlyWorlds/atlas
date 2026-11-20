@@ -52,7 +52,7 @@ import { problemFor } from '../../src/core/problems';
 import { SharingClient } from '../../src/sync/sharing-client';
 import { rosterFor } from '../../src/sync/world-roster';
 import { removeFile } from '../../src/sync/element-files';
-import { loadRegistry } from '../../src/registry/registry';
+import { adoptStoredRegistry, createApiLinkedWorld, loadRegistry, saveRegistry } from '../../src/registry/registry';
 import { REGISTRY_STORAGE_KEY } from '../../src/core/constants';
 import { diagnoseSyncUnavailable } from '../../src/sync/sync-attach';
 import { removePicture, uploadPicture } from '../../src/sync/media-upload';
@@ -340,6 +340,64 @@ describe('a world saved before 1.124.31, writable with a read key', () => {
       expect(diagnoseSyncUnavailable()).not.toEqual({ kind: 'pin-missing', worldId: 'old-1' });
     } finally {
       localStorage.removeItem(REGISTRY_STORAGE_KEY);
+      patchSlice('active', null);
+    }
+  });
+
+  const entryWith = (id: string, api: Record<string, unknown>) => ({
+    id, name: id, state: 'api-linked', api: { world_id: `w-${id}`, ...api },
+    folder: { handle_key: `v-${id}`, folder_name: id }, created_at: '2026-01-01T00:00:00Z',
+  });
+
+  it('a save of another change writes the mark back, and the writer stays as it was', () => {
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify({ version: 1, worlds: [entryWith('w', { api_key: 'ow_w_writer' }), entryWith('r', { api_key: 'ow_r_oldkey' })] }));
+    try {
+      saveRegistry({ ...loadRegistry(), pin: RIGHT });
+      const stored = JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY)!) as { worlds: Array<{ api: { read_only?: boolean } }> };
+      expect(stored.worlds.map(w => w.api.read_only)).toEqual([undefined, true]);
+    } finally {
+      localStorage.removeItem(REGISTRY_STORAGE_KEY);
+    }
+  });
+
+  it('another tab\'s save, adopted here (the storage event), reads marked', () => {
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify({ version: 1, worlds: [] }));
+    try {
+      const here = loadRegistry();
+      localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify({ version: 1, worlds: [entryWith('r', { api_key: 'ow_r_oldkey' })] }));
+      expect(adoptStoredRegistry(here)?.worlds[0].api?.read_only).toBe(true);
+    } finally {
+      localStorage.removeItem(REGISTRY_STORAGE_KEY);
+    }
+  });
+
+  it('an entry whose key is not a string is left as stored, and the rest of the registry still loads', () => {
+    const odd = entryWith('odd', { api_key: 12345 });
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify({ version: 1, worlds: [odd, entryWith('r', { api_key: 'ow_r_oldkey' })] }));
+    try {
+      const reg = loadRegistry();
+      expect(reg.worlds).toHaveLength(2);
+      expect(reg.worlds[0]).toEqual(odd);
+      expect(reg.worlds[1].api?.read_only).toBe(true);
+    } finally {
+      localStorage.removeItem(REGISTRY_STORAGE_KEY);
+    }
+  });
+
+  it('a world registered fresh from its world.json with a read key is view-only this session', () => {
+    const { next, entry } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'Old', apiWorldId: 'w-9', apiKey: 'ow_r_oldkey', handleKey: 'k', folderName: 'f', pathHint: 'p', readOnly: false,
+    });
+    expect(entry.api?.read_only).toBe(true);
+    patchSlice('registry', next);
+    patchSlice('active', { worldId: entry.id, meta: { id: 'w-9', name: 'Old' }, opened: true } as never);
+    try {
+      expect(diagnoseSyncUnavailable()).not.toEqual({ kind: 'pin-missing', worldId: entry.id });
+      const writer = createApiLinkedWorld(defaultRegistry(), {
+        name: 'Mine', apiWorldId: 'w-8', apiKey: 'ow_w_writer', handleKey: 'k2', folderName: 'f2', pathHint: 'p', readOnly: false,
+      });
+      expect(writer.entry.api?.read_only).toBeUndefined();
+    } finally {
       patchSlice('active', null);
     }
   });

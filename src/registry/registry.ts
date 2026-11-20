@@ -264,8 +264,11 @@ export function createApiLinkedWorld(
     api_key: opts.apiKey,
   };
   if (opts.apiWorldName) apiBlock.world_name = opts.apiWorldName;
-  if (opts.readOnly) apiBlock.read_only = true;
-  if (opts.seat && !opts.readOnly) {
+  // A key that reads only by its shape is view-only whatever the caller read
+  // (a world.json an older Atlas wrote without the flag), in this session too.
+  const readOnly = !!opts.readOnly || readsOnlyByShape(opts.apiKey);
+  if (readOnly) apiBlock.read_only = true;
+  if (opts.seat && !readOnly) {
     apiBlock.seat = { ...opts.seat };
     if (opts.seatSecret) apiBlock.seat_secret = opts.seatSecret;
   }
