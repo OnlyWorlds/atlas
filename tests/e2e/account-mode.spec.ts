@@ -208,6 +208,8 @@ test('Forget never revokes a pasted token (no id): it may be used elsewhere', as
 const V2 = 'https://www.onlyworlds.com/api/v2';
 const TOKEN = 'ow_a_e2e0shared0token000000000000000000000000';
 const SHARED_ID = '33333333-4444-4555-8666-777777777777';
+/** The member's own account PIN, the one keel checks beside their key. */
+const MEMBER_PIN = '4242';
 
 interface SharedKeel { mints: Array<Record<string, unknown>>; revokes: string[] }
 
@@ -238,6 +240,21 @@ async function mockSharedKeel(page: Page, opts: { memberRole: 'contributor' | 'g
     }
     if (path === '/world' || path === '/world/') {
       return route.fulfill({ json: { id: SHARED_ID, name: 'Shared Realm', updated_at: now } });
+    }
+    if (path === '/me') {
+      // keel's GET /me (accounts/roster_api.py `me_answer`): a member key's sent
+      // PIN is checked against the member's own account PIN, a wrong one a 401
+      // with param API-Pin; the body names the key's scope and the member.
+      const headers = route.request().headers();
+      const key = headers['api-key'] ?? '';
+      const pin = headers['api-pin'];
+      if (pin && pin !== MEMBER_PIN) {
+        return route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } } });
+      }
+      return route.fulfill({ json: {
+        world: { id: SHARED_ID, name: 'Shared Realm' }, scope: key.startsWith('ow_r_') ? 'read' : 'write',
+        kind: 'person', role: opts.memberRole, membership: 'mem-1', character: null,
+      } });
     }
     const type = path.split('/').filter(Boolean)[0];
     const data = type === 'character'
@@ -347,6 +364,19 @@ test('a member who cancels the PIN question opens nothing, and the key made for 
   await expect.poll(() => keel.revokes).toEqual(['k-1']);
   await expect(page.locator('[data-role="loading-overlay"]')).toHaveCount(0);
   expect(await sharedEntry(page)).toMatchObject({ found: false });
+});
+
+test('a member whose PIN keel refuses opens nothing, keeps no PIN, and the key made for them is taken back', async ({ page }) => {
+  await setupAtlasRoot(page);
+  const keel = await mockSharedKeel(page, { memberRole: 'contributor', accountHasPin: true });
+  await signInWith(page, null);
+  await openSharedRow(page);
+  const prompt = page.locator('[data-modal="pin-prompt"]');
+  await prompt.locator('input[name="pin"]').fill('9999');
+  await prompt.locator('[data-action="confirm"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'did not accept that PIN' })).toBeVisible();
+  await expect.poll(() => keel.revokes).toEqual(['k-1']);
+  expect(await sharedEntry(page)).toMatchObject({ found: false, pin: null });
 });
 
 // ---- The first screen offers a signed-in account's worlds ----
