@@ -16,8 +16,8 @@ import {
   ATLAS_ROOT_MARKER,
   ATLAS_ROOT_SUBFOLDER,
   ATLAS_ROOT_SUBFOLDER_LEGACY_NAMES,
-  isDemoKey,
 } from '../core/constants';
+import { readsOnlyByShape } from '../core/key-scope';
 import { getState, patchSlice } from '../core/state';
 import { pickDirectory } from '../ui/directory-picker';
 import { storeHandle, loadHandle, ensureWritable, deleteHandle, listHandleKeys, queryWritable } from '../store/handle-vault';
@@ -988,31 +988,51 @@ export async function linkExistingApiWorldInRoot(
   // Normalizing here (not at the call sites) makes every downstream guard —
   // the registry flag, the world.json mirror, the store arm, the engine's
   // pull-only attach — fire correctly from one decision.
-  const readOnly = !!opts.readOnly || isDemoKey(apiKey);
+  // An `ow_r_` key the same (keel names a key by its scope): pasted into
+  // Download a world, it opens to read and no PIN is asked or sent.
+  let readOnly = !!opts.readOnly || readsOnlyByShape(apiKey);
   // A view-only link carries NO PIN, structurally: the link modal prefills a
   // saved PIN, and letting that ride would send an irrelevant credential on
   // the wire and persist it globally below (which the registry comment there
   // already says must never happen from a view-only link).
-  const apiPin = readOnly ? '' : opts.apiPin.trim();
+  let apiPin = readOnly ? '' : opts.apiPin.trim();
   // View-only links run on a READ key — keel reads are keyless-PIN.
   if (!apiPin && !readOnly) throw new PlainError('Enter your PIN first.');
   // A seat (#104): its secret is this world's PIN alone, kept on its entry.
-  const seat = readOnly ? undefined : (opts.seat ?? (isSeatSecret(apiPin) ? {} : undefined));
+  let seat = readOnly ? undefined : (opts.seat ?? (isSeatSecret(apiPin) ? {} : undefined));
 
   // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
-  // lane). A refused key, an unknown world or no connection is worded by
+  // lane), then what the key can do from `GET /me` (`keyScope`): a key keel
+  // says reads only opens to read, and the PIN is proved only beside a key
+  // that writes. A refused key, an unknown world or no connection is worded by
   // `keyCheckError`; anything else is rethrown as it came, for the
   // modal to word.
-  // Skipped when the caller already holds the world identity (account-mode
-  // list → open; the fresh minted key needs no re-validation).
+  // The world read is skipped when the caller already holds its identity
+  // (account-mode list → open; the fresh minted key needs no re-validation);
+  // the PIN is still proved there when it is about to be kept as the account's.
   let world: { id?: string; name?: string };
+  let pinProved = false;
+  const keepsPin = (): boolean => !readOnly && !!apiPin && !seat && !getState().registry.pin;
   if (opts.knownWorld) {
     world = opts.knownWorld;
+    if (keepsPin()) {
+      try {
+        pinProved = (await buildV2Adapter(apiKey, apiPin).keyScope()).pinProved;
+      } catch (err) {
+        throw keyCheckError(err, { readOnly });
+      }
+    }
   } else {
     const client = buildV2Adapter(apiKey, apiPin);
     try {
       world = await client.getWorld();
-      await client.checkPin();
+      const read = await client.keyScope();
+      pinProved = read.pinProved;
+      if (read.scope === 'read' && !readOnly) {
+        readOnly = true;
+        apiPin = '';
+        seat = undefined;
+      }
     } catch (err) {
       throw keyCheckError(err, { readOnly });
     }
@@ -1043,7 +1063,7 @@ export async function linkExistingApiWorldInRoot(
     );
   }
 
-  if (inBrowser) return linkIntoBrowser(opts, { apiKey, apiPin, readOnly, world, serverWorldId, displayName, seat });
+  if (inBrowser) return linkIntoBrowser(opts, { apiKey, apiPin, pinProved, readOnly, world, serverWorldId, displayName, seat });
 
   const rootHandle = await loadHandle(reg.atlas_root!.handle_key);
   if (!rootHandle) {
@@ -1129,9 +1149,10 @@ export async function linkExistingApiWorldInRoot(
 
   // Register the world in registry. Persist PIN globally if not set yet
   // (never from a view-only link — there is no PIN to persist — and never a
-  // seat's secret, which is this world's alone).
+  // seat's secret, which is this world's alone), and only once keel took it
+  // beside a key that writes.
   let regAfter = getState().registry;
-  if (!regAfter.pin && apiPin && !seat) regAfter = setPin(regAfter, apiPin);
+  if (!regAfter.pin && apiPin && !seat && pinProved) regAfter = setPin(regAfter, apiPin);
   const { next, entry } = createApiLinkedWorld(regAfter, {
     name: displayName,
     apiWorldId: serverWorldId,
@@ -1190,9 +1211,9 @@ export async function linkExistingApiWorldInRoot(
  */
 async function linkIntoBrowser(
   opts: LinkExistingApiWorldOpts,
-  v: { apiKey: string; apiPin: string; readOnly: boolean; world: { id?: string; name?: string }; serverWorldId: string; displayName: string; seat?: { role?: string } },
+  v: { apiKey: string; apiPin: string; pinProved: boolean; readOnly: boolean; world: { id?: string; name?: string }; serverWorldId: string; displayName: string; seat?: { role?: string } },
 ): Promise<LinkExistingApiWorldResult> {
-  const { apiKey, apiPin, readOnly, world, serverWorldId, displayName, seat } = v;
+  const { apiKey, apiPin, pinProved, readOnly, world, serverWorldId, displayName, seat } = v;
   const { store, subName, make } = await scaffoldBrowserWorld(displayName, serverWorldId, { open: false });
   // Identity stays `world-<id>`; a key some entry already holds gets a suffix,
   // as the folder path's vault loop does.
@@ -1212,7 +1233,7 @@ async function linkIntoBrowser(
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }
   let regAfter = getState().registry;
-  if (!regAfter.pin && apiPin && !seat) regAfter = setPin(regAfter, apiPin);
+  if (!regAfter.pin && apiPin && !seat && pinProved) regAfter = setPin(regAfter, apiPin);
   const { next, entry: made } = createApiLinkedWorld(regAfter, {
     name: displayName, apiWorldId: serverWorldId, apiKey, folderName: subName, handleKey,
     pathHint: `browser storage/${subName}`, apiWorldName: world.name, readOnly,

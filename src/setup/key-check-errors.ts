@@ -14,6 +14,12 @@
 import { PlainError } from '../core/plain-error';
 import { classifyError } from '../core/problems';
 
+/**
+ * keel refused the PIN beside a key that writes. Its own class so a flow that
+ * made the key a moment ago (an account world's open) can take it back.
+ */
+export class PinRefusedError extends PlainError {}
+
 /** Said when the check could not reach OnlyWorlds at all. */
 export const CANNOT_REACH_LINE = 'Atlas could not reach OnlyWorlds. Check your connection, then try again.';
 
@@ -36,7 +42,7 @@ export function keyCheckError(err: unknown, opts: { readOnly?: boolean } = {}): 
   // has none (#417's live walk: a wrong PIN was told as a wrong key).
   const param = (err as { param?: unknown } | null)?.param;
   if (status === 401 && !opts.readOnly && typeof param === 'string' && param.toLowerCase() === 'api-pin') {
-    return new PlainError('OnlyWorlds did not accept that PIN. Check it, then try again.');
+    return new PinRefusedError('OnlyWorlds did not accept that PIN. Check it, then try again.');
   }
   if (status === 401 || status === 403) {
     return new PlainError(opts.readOnly

@@ -18,6 +18,10 @@ import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { OwV2Error, type MediaTicket, type MediaRemovalTicket } from './ow-v2-client-adapter';
 import { buildV2Adapter } from './make-online';
+import { readsOnlyByShape } from '../core/key-scope';
+
+/** A read key under a world that thinks it writes: said as the key, never as a PIN, and no PIN goes beside it. */
+const READ_KEY_LINE = (doing: string): string => `This world's key can only read, so Atlas cannot ${doing}. Put in a write key in Settings, This world.`;
 
 /** What the edge takes, read from the file's bytes there; the browser's type is a first check. */
 export const PICTURE_TYPES = ['image/webp', 'image/png', 'image/jpeg', 'image/avif'] as const;
@@ -97,6 +101,7 @@ export async function uploadPicture(
 ): Promise<string> {
   if (!entry.api || entry.state !== 'api-linked') throw new PlainError('Pictures are hosted on OnlyWorlds: use Make online first.');
   if (entry.api.read_only) throw new PlainError('This world is view-only here, so it cannot take a new picture.');
+  if (readsOnlyByShape(entry.api.api_key)) throw new PlainError(READ_KEY_LINE('take a new picture'));
   const pin = worldPin(entry, reg);
   if (!pin) {
     throw new PlainError(isSeatWorld(entry) ? SEAT_SECRET_MISSING_LINE
@@ -178,6 +183,7 @@ export async function removePicture(
 ): Promise<{ referenced: number; cacheMayLinger: boolean }> {
   if (!entry.api || entry.state !== 'api-linked') throw new PlainError('This world is not online, so Atlas cannot remove its pictures.');
   if (entry.api.read_only) throw new PlainError('This world is view-only here, so it cannot remove a picture.');
+  if (readsOnlyByShape(entry.api.api_key)) throw new PlainError(READ_KEY_LINE('remove a picture'));
   const pin = worldPin(entry, reg);
   if (!pin) {
     throw new PlainError(isSeatWorld(entry) ? SEAT_SECRET_MISSING_LINE

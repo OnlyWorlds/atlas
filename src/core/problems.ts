@@ -18,6 +18,7 @@ import { PlainError, isPlainError } from './plain-error';
 import { damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { isAuthError, isHostBlocked, isHostRefusal, isTransientError, memberRefusal } from '../sync/sync-engine';
 import { hostRefusalCause } from '../sync/sync-failure-copy';
+import { keyRefusalOf } from '../sync/world-key-lines';
 import { getState } from './state';
 import { hasFolderMode } from './capabilities';
 import { filesWhereOf, type FilesWhere } from './browser-worlds';
@@ -179,6 +180,10 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
         ? `Only the world's owner can change its details on OnlyWorlds, so Atlas could not finish ${doing}.${saved}`
         : `This world lets Atlas change only what it made, and someone else made this, so Atlas could not finish ${doing}.${saved}`;
     case 'auth':
+      // keel's 403 for a read key on a write: the key, never the PIN.
+      if (keyRefusalOf(err) === 'read_only_key') {
+        return `This world's key can only read, so Atlas could not finish ${doing}.${saved} Put in a write key in Settings, This world.`;
+      }
       return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
     case 'offline':
       return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;

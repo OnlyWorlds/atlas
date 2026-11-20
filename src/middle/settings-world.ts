@@ -45,6 +45,7 @@ import {
 import { sharedRuleHolds, sharedWorldLine } from '../sync/shared-world';
 import { memberRoleLine } from '../sync/role-change';
 import { buildV2Adapter } from '../sync/make-online';
+import { readsOnlyByShape } from '../core/key-scope';
 import { keyRefusalFor, makeNewWorldKey, newKeyCures, offersMakeKey } from '../sync/world-key';
 import { takeBackMintedKey } from '../sync/key-takeback';
 import { keyRefusalHere, keyRefusalOf, seatRefusalLine } from '../sync/world-key-lines';
@@ -462,63 +463,9 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
 
   const testBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="test-connection"]');
   testBtn?.addEventListener('click', async () => {
-    if (!world.api) return;
-    const pin = worldPin(world, getState().registry);
-    if (!pin) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN on the OnlyWorlds tab first.'); return; }
     testBtn.disabled = true;
     try {
-      // Test Connection via v2 GET /world (live 2026-07-12), and the PIN on
-      // GET /me (reads go bare, 1.79.0); buildV2Adapter applies any
-      // dev/staging origin override.
-      const client = buildV2Adapter(world.api.api_key, pin);
-      const fetched = await client.getWorld();
-      await client.checkPin();
-      const liveName: string | undefined = fetched?.name;
-      // If the server name differs from what we cached at link time, refresh
-      // both the registry's api.world_name AND world.json so the Settings →
-      // World tab reflects the live state immediately. The local entry name
-      // is NOT touched — those are intentionally separate identities.
-      const cachedName = world.api.world_name;
-      if (liveName && liveName !== cachedName) {
-        const next = setApiWorldName(getState().registry, world.id, liveName);
-        saveRegistry(next);
-        patchSlice('registry', next);
-        const folder = getActiveStore();
-        // A view-only world's store refuses the write (conv. 149); the registry holds the name.
-        if (folder && !worldIsViewOnly(world.id)) {
-          try {
-            await folder.writeWorldMeta({
-              api: diskApiBlock(world.api, { world_name: liveName }),
-            });
-          } catch (err) {
-            console.warn('[settings] persist api.world_name to world.json failed:', err);
-          }
-        }
-        toasts.success(`The key works. Online name is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
-      } else {
-        toasts.success(`The key works: ${liveName ?? 'world'}`);
-      }
-    } catch (err) {
-      // Branch on the TYPED code, not on the status number. A revoked key and
-      // a wrong PIN are both 401, and telling someone to check their PIN when
-      // their key was revoked sends them to a control that cannot fix it. The
-      // engine has distinguished these for a while (sync-engine noteAuthBail);
-      // "test connection" was still giving one answer for three causes.
-      const code = (err as { code?: string } | null)?.code;
-      const status = (err as { status?: number } | null)?.status;
-      const refusal = keyRefusalOf(err);
-      if (isSeatWorld(world) && (code === 'invalid_credentials' || status === 401)) {
-        toasts.error(seatRefusalLine(refusal, { paused: false }));
-      } else if (refusal) {
-        // The cause keel named, and the fix in this tab (#198): never Unlink.
-        toasts.error(keyRefusalHere(refusal));
-      } else if (status === 401 || status === 403) {
-        toasts.error(keyRefusalHere(null));
-      } else if (status === 404) {
-        toasts.error('OnlyWorlds has no world for this key. It may have been deleted there.');
-      } else {
-        showProblem(err, { doing: 'testing the connection', worldId: world.id, toasts });
-      }
+      await testWorldConnection(world, toasts);
     } finally {
       testBtn.disabled = false;
     }
@@ -829,6 +776,83 @@ const ISSUE_ROWS_SHOWN = 50;
  * One plain line per issue. Matches only text Atlas itself writes, never
  * server text. Place words follow where the world keeps its files (1.17).
  */
+/**
+ * Test connection, said in Settings, This world: the key read once against
+ * keel (`GET /world`), then what it can do from `GET /me` (`keyScope`). A world
+ * that reads asks for no PIN and sends none, and its answer says the key works
+ * and reads only, never a PIN question.
+ */
+export async function testWorldConnection(world: WorldRegistryEntry, toasts: ToastManager): Promise<void> {
+  if (!world.api) return;
+  // A world that reads, by its registry or its key, asks for no PIN and sends none.
+  const reads = !!world.api.read_only || readsOnlyByShape(world.api.api_key);
+  const pin = reads ? '' : worldPin(world, getState().registry);
+  if (!pin && !reads) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN on the OnlyWorlds tab first.'); return; }
+  try {
+    // Test Connection via v2 GET /world (live 2026-07-12), then what the
+    // key can do from GET /me (`keyScope`): the PIN is proved there only
+    // beside a key that writes. buildV2Adapter applies any dev/staging
+    // origin override.
+    const client = buildV2Adapter(world.api.api_key, pin ?? '');
+    const fetched = await client.getWorld();
+    const { scope } = await client.keyScope();
+    // The key works and reads only: said as such, never as a PIN question.
+    const readsLine = scope === 'read'
+      ? (world.api.read_only ? '. It reads only, so this world opens to read.' : '. It reads only, so edits can\'t sync. Put in a write key below.')
+      : '';
+    const say = (line: string): void => {
+      if (scope === 'read' && !world.api?.read_only) toasts.info(line);
+      else toasts.success(line);
+    };
+    const liveName: string | undefined = fetched?.name;
+    // If the server name differs from what we cached at link time, refresh
+    // both the registry's api.world_name AND world.json so the Settings →
+    // World tab reflects the live state immediately. The local entry name
+    // is NOT touched — those are intentionally separate identities.
+    const cachedName = world.api.world_name;
+    if (liveName && liveName !== cachedName) {
+      const next = setApiWorldName(getState().registry, world.id, liveName);
+      saveRegistry(next);
+      patchSlice('registry', next);
+      const folder = getActiveStore();
+      // A view-only world's store refuses the write (conv. 149); the registry holds the name.
+      if (folder && !worldIsViewOnly(world.id)) {
+        try {
+          await folder.writeWorldMeta({
+            api: diskApiBlock(world.api, { world_name: liveName }),
+          });
+        } catch (err) {
+          console.warn('[settings] persist api.world_name to world.json failed:', err);
+        }
+      }
+      say(`The key works. Online name is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}${readsLine}`);
+    } else {
+      say(`The key works: ${liveName ?? 'world'}${readsLine}`);
+    }
+  } catch (err) {
+    // Branch on the TYPED code, not on the status number. A revoked key and
+    // a wrong PIN are both 401, and telling someone to check their PIN when
+    // their key was revoked sends them to a control that cannot fix it. The
+    // engine has distinguished these for a while (sync-engine noteAuthBail);
+    // "test connection" was still giving one answer for three causes.
+    const code = (err as { code?: string } | null)?.code;
+    const status = (err as { status?: number } | null)?.status;
+    const refusal = keyRefusalOf(err);
+    if (isSeatWorld(world) && (code === 'invalid_credentials' || status === 401)) {
+      toasts.error(seatRefusalLine(refusal, { paused: false }));
+    } else if (refusal) {
+      // The cause keel named, and the fix in this tab (#198): never Unlink.
+      toasts.error(keyRefusalHere(refusal));
+    } else if (status === 401 || status === 403) {
+      toasts.error(keyRefusalHere(null));
+    } else if (status === 404) {
+      toasts.error('OnlyWorlds has no world for this key. It may have been deleted there.');
+    } else {
+      showProblem(err, { doing: 'testing the connection', worldId: world.id, toasts });
+    }
+  }
+}
+
 export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'folder', alone = false): string {
   const f = issue.failure;
   const inBrowser = where === 'browser';

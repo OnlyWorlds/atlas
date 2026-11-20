@@ -2,7 +2,9 @@
  * keel's PIN rule in Atlas's own client (1.79.0; Skeld 2026-10-22;
  * the PIN-on-writes contract): the
  * secret on every write, on GET /me, and on every call of a ten-digit key; a
- * prefixed key's other reads bare. The link doors ask /me for the PIN.
+ * prefixed key's other reads bare; never beside a key that reads only
+ * (1.124.31). The link doors read the key at /me (`keyScope`): its scope, and
+ * the PIN proved only beside a key that writes.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -62,31 +64,58 @@ describe('the header by the rule', () => {
     expect(Object.values(await everyKind('ow_r_abc', '')).every(p => p === null)).toBe(true);
   });
 
+  it('never beside a read key, though one is held: not on /me, not on a write', async () => {
+    expect(Object.values(await everyKind('ow_r_abc', '1234')).every(p => p === null)).toBe(true);
+    seen = [];
+    expect(Object.values(await everyKind('0000000003', '1234')).every(p => p === null)).toBe(true);
+  });
+
   it('sendsPin, the sentence', () => {
     expect(sendsPin('GET', '/changes', 'ow_w_x')).toBe(false);
     expect(sendsPin('GET', '/me', 'ow_w_x')).toBe(true);
     expect(sendsPin('POST', '/bulk', 'ow_w_x')).toBe(true);
     expect(sendsPin('GET', '/changes', '0123456789')).toBe(true);
     expect(sendsPin('GET', '/changes', '01234567890')).toBe(false);
+    expect(sendsPin('GET', '/me', 'ow_r_x')).toBe(false);
+    expect(sendsPin('POST', '/bulk', 'ow_r_x')).toBe(false);
+    expect(sendsPin('GET', '/me', '0000000003')).toBe(false);
   });
 });
 
-describe('a door asks /me for the PIN', () => {
-  it('checkPin asks /me with the PIN, and a refusal there reads as the PIN', async () => {
+describe('a door reads the key at /me', () => {
+  it('a write key asks /me with the PIN, and a refusal there reads as the PIN', async () => {
     mswServer.use(http.get(`${BASE}/me`, ({ request }) => {
       seen.push({ call: 'GET /me', pin: request.headers.get('API-Pin') });
       return HttpResponse.json({ error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } }, { status: 401 });
     }));
     const a = new OwV2ClientAdapter({ apiKey: 'ow_w_abc', apiPin: '9999', baseUrl: BASE });
     await expect(a.getWorld()).resolves.toMatchObject({ id: 'w-1' });
-    const err = await a.checkPin().then(() => null, e => e);
+    const err = await a.keyScope().then(() => null, (e: unknown) => e);
     expect(seen.find(s => s.call === 'GET /me')?.pin).toBe('9999');
     expect(String((keyCheckError(err) as Error).message)).toMatch(/did not accept that PIN/);
   });
 
-  it('nothing to ask without a PIN, or for a ten-digit key (its /world sent it)', async () => {
-    await new OwV2ClientAdapter({ apiKey: 'ow_r_abc', apiPin: '', baseUrl: BASE }).checkPin();
-    await new OwV2ClientAdapter({ apiKey: '4815162342', apiPin: '1234', baseUrl: BASE }).checkPin();
+  it('a write key with its PIN accepted: write, and the PIN proved', async () => {
+    mswServer.use(http.get(`${BASE}/me`, () => HttpResponse.json({ role: 'owner', scope: 'write' })));
+    await expect(new OwV2ClientAdapter({ apiKey: 'ow_w_abc', apiPin: '1234', baseUrl: BASE }).keyScope())
+      .resolves.toEqual({ scope: 'write', pinProved: true });
+  });
+
+  it('a read key is read, with nothing sent and nothing proved', async () => {
+    await expect(new OwV2ClientAdapter({ apiKey: 'ow_r_abc', apiPin: '1234', baseUrl: BASE }).keyScope())
+      .resolves.toEqual({ scope: 'read', pinProved: false });
     expect(seen).toEqual([]);
+  });
+
+  it('a key of no shape keel names asks /me bare, and its read scope keeps the PIN off every call after', async () => {
+    mswServer.use(http.get(`${BASE}/me`, ({ request }) => {
+      seen.push({ call: 'GET /me', pin: request.headers.get('API-Pin') });
+      return HttpResponse.json({ role: 'guest', scope: 'read' });
+    }));
+    const a = new OwV2ClientAdapter({ apiKey: 'odd-key', apiPin: '1234', baseUrl: BASE });
+    await expect(a.keyScope()).resolves.toEqual({ scope: 'read', pinProved: false });
+    await a.me();
+    await a.updateElement('character', 'c-1', { description: 'x' }).catch(() => {});
+    expect(seen.map(s => s.pin)).toEqual([null, null, null]);
   });
 });

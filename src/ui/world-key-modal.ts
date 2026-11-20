@@ -13,11 +13,10 @@ import { PinPromptModal } from './pin-prompt-modal';
 import { showProblem } from './problem-fixes';
 import type { ToastManager } from './toast-manager';
 import { PlainError } from '../core/plain-error';
-import { getState, patchSlice } from '../core/state';
+import { getState } from '../core/state';
 import { worldPin } from '../core/seat';
-import { saveRegistry, setPin } from '../registry/registry';
 import type { WorldRegistryEntry } from '../core/types';
-import { checkNewKey, putKeyInPlace } from '../sync/world-key';
+import { checkNewKey, keepPinProvedBy, putKeyInPlace } from '../sync/world-key';
 
 export class NewKeyModal extends BaseModal {
   private busy = false;
@@ -79,9 +78,8 @@ export class NewKeyModal extends BaseModal {
           `A write key saves your edits with your OnlyWorlds PIN. It is the one PIN of your account, set on onlyworlds.com in Account settings under World PIN.`
         );
         if (!pin) return;
-        const next = setPin(getState().registry, pin);
-        saveRegistry(next);
-        patchSlice('registry', next);
+        // Kept as the account's only once keel takes it beside this key.
+        await keepPinProvedBy(raw.trim(), pin);
       }
       // The key was read against this online world; it lands only if the
       // world is still linked to it (another tab could

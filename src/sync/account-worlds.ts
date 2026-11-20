@@ -20,9 +20,10 @@ import { getState, patchSlice, subscribe } from '../core/state';
 import { SIGNED_IN_AGAIN_LINE } from './token-revoke';
 import { mintRecordOf } from './key-takeback';
 import { navigate, homeHash } from '../core/router';
-import { saveRegistry, setPin, findWorldByServerId, findLinkedWorld } from '../registry/registry';
+import { findWorldByServerId, findLinkedWorld } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
+import { PinRefusedError } from '../setup/key-check-errors';
 import { AccountClient, accountErrorMessage, isAccountAuthError, type MintedWorldKey } from './account-client';
 import { OwV2Error } from './ow-v2-client-adapter';
 import { PinPromptModal } from '../ui/pin-prompt-modal';
@@ -290,11 +291,8 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
       pin = enteredPin;
       overlay.show();
     }
-    if (enteredPin && !readOnly) {
-      const next = setPin(getState().registry, enteredPin);
-      saveRegistry(next);
-      patchSlice('registry', next);
-    }
+    // A PIN typed here is kept as the account's by the link below, once keel
+    // has taken it beside the new write key; a refused one takes the key back.
     toasts.info(`Made a key for ${row.name}`);
 
     // ---- Download + register, serialized on the activation chain (R2) ----
@@ -318,7 +316,12 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
           }
         },
       })
-    );
+    ).catch(async (err: unknown) => {
+      // keel refused the PIN beside the key made a moment ago: nothing was
+      // kept, so the key goes back too.
+      if (err instanceof PinRefusedError) await client.revokeWorldKey(row.id, minted.id).catch(() => {});
+      throw err;
+    });
     overlay.update('Opening…');
 
     // ---- Complete the handoff (R5 — parity with LinkWorldModal) ----

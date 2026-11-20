@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.31',
+    date: '2026-11-20',
+    theme: 'A read key opens to read, and your PIN stays with keys that write',
+    entries: [
+      {
+        id: 'read-key-no-pin',
+        title: 'A read key needs no PIN, and Atlas never sends one with it',
+        body: 'A read key pasted into Download a world now opens the world to read, with no PIN asked. Atlas no longer sends your PIN with a key that can only read, so a mistyped PIN there can never count against your account. Test connection on a world that reads says the key works and reads only. Your PIN is saved for your other worlds only once OnlyWorlds has accepted it with a key that can write. If a key that can only read meets an edit, Atlas says the key reads only and where a write key goes, instead of asking about your PIN.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.30',
     date: '2026-11-20',
     theme: 'A copy restored from a backup waits for you',

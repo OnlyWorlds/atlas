@@ -48,6 +48,7 @@ import { isHiddenMark } from '../core/hidden-mark';
 import { publicPageUrl } from '../core/public-page';
 import { isHostBlockedPage } from './host-blocked-page';
 import { withChangeSeq } from './change-seq';
+import { readsOnlyByShape } from '../core/key-scope';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -62,9 +63,23 @@ export const LIST_BY_IDS_MAX = 200;
  * call of a legacy ten-digit key. A prefixed key's other reads go bare: each
  * PIN sent is a verify on keel, and a read never needs one. So a wrong PIN
  * shows on `/me` and on writes, never on a read (the link doors ask `/me`).
+ * Never beside a key that can only read (`readsOnlyByShape`): a PIN proves a
+ * writer, keel does not read one beside a read key, and while it still does,
+ * a wrong one counts against the account the PIN belongs to.
  */
 export function sendsPin(method: string, path: string, apiKey: string): boolean {
+  if (readsOnlyByShape(apiKey)) return false;
   return method !== 'GET' || path === '/me' || /^\d{10}$/.test(apiKey);
+}
+
+/** What `GET /me` said this key can do. */
+export type KeyScope = 'read' | 'write';
+
+/** A door's read of a key (`keyScope`): what it can do, and whether its PIN was proved beside it. */
+export interface KeyScopeRead {
+  scope: KeyScope;
+  /** True when keel accepted the PIN (or a seat's secret) beside a key that writes. */
+  pinProved: boolean;
 }
 
 /** Atlas's name on every write (keel's `X-OW-Client`: lower case, digits, hyphens, 1 to 32). */
@@ -303,6 +318,8 @@ export class OwV2ClientAdapter implements OwApiClient {
   private readonly apiKey: string;
   private readonly apiPin: string;
   private readonly readTimeoutMs: number | null;
+  /** True once `GET /me` said this key reads only: no PIN goes beside it after that. */
+  private readScope = false;
 
   /**
    * Types whose most recent listElements() walk may be INCOMPLETE (safety cap
@@ -331,14 +348,16 @@ export class OwV2ClientAdapter implements OwApiClient {
     method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     path: string,
     body?: unknown,
-    extraHeaders?: Record<string, string>
+    extraHeaders?: Record<string, string>,
+    opts: { bare?: boolean } = {}
   ): Promise<unknown> {
     const headers: Record<string, string> = {
       'API-Key': this.apiKey,
       // Omit the PIN header entirely when there is no PIN (view-only worlds
       // run on a READ key): an empty-string header is a malformed
-      // credential, not an absent one. With one, only where keel reads it.
-      ...(this.apiPin && sendsPin(method, path, this.apiKey) ? { 'API-Pin': this.apiPin } : {}),
+      // credential, not an absent one. With one, only where keel reads it,
+      // and never beside a key that reads only (by its shape, or by `/me`).
+      ...(this.apiPin && !opts.bare && !this.readScope && sendsPin(method, path, this.apiKey) ? { 'API-Pin': this.apiPin } : {}),
       ...extraHeaders,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -431,31 +450,50 @@ export class OwV2ClientAdapter implements OwApiClient {
   /**
    * GET /me — who this key is: its role (owner, co_builder, contributor,
    * guest) is what a resync and a guest's 404 are read against (conv. 151).
-   * A read key's call too.
+   * A read key's call too. Its `scope` says what the key can do; once it says
+   * read, no PIN goes beside this key again. `bare` asks without the PIN.
    */
-  async me(): Promise<{ role: string; membership?: string | null }> {
-    const response = await this.request('GET', '/me') as { role?: unknown; membership?: unknown } | undefined;
+  async me(opts: { bare?: boolean } = {}): Promise<{ role: string; membership?: string | null; scope?: KeyScope }> {
+    const response = await this.request('GET', '/me', undefined, undefined, opts) as { role?: unknown; membership?: unknown; scope?: unknown } | undefined;
     if (!response || typeof response.role !== 'string') throw new Error('v2 /me response missing role');
     const m = response.membership;
-    return { role: response.role, ...(typeof m === 'string' || m === null ? { membership: m } : {}) };
+    const s = response.scope;
+    if (s === 'read') this.readScope = true;
+    return {
+      role: response.role,
+      ...(typeof m === 'string' || m === null ? { membership: m } : {}),
+      ...(s === 'read' || s === 'write' ? { scope: s } : {}),
+    };
   }
 
   /**
-   * A door's PIN check (1.79.0): reads go bare (`sendsPin`), so `GET /world`
-   * no longer refuses a wrong PIN; `GET /me` checks whatever is sent (keel
-   * D93) and refuses it with param `API-Pin`, as before. No PIN, nothing to
-   * check; a ten-digit key's `getWorld()` already sent it.
+   * A door's read of the key: what it can do, from `GET /me`'s scope, and
+   * its PIN proved only beside a key that writes. A key keel names as reading
+   * only (`ow_r_`, a demo-range classic key) is read, with nothing sent or
+   * proved. A key of no shape keel names, or one with no PIN to prove, asks
+   * `/me` bare first. A write key with a PIN asks `/me` with it: keel checks
+   * it there and refuses a wrong one (401, param `API-Pin`); a ten-digit key
+   * sends it on every call, `/me` included.
    */
-  async checkPin(): Promise<void> {
-    if (!this.apiPin || /^\d{10}$/.test(this.apiKey)) return;
-    await this.me();
+  async keyScope(): Promise<KeyScopeRead> {
+    if (readsOnlyByShape(this.apiKey)) {
+      this.readScope = true;
+      return { scope: 'read', pinProved: false };
+    }
+    const named = this.apiKey.startsWith('ow_w_') || /^\d{10}$/.test(this.apiKey);
+    if (!named || !this.apiPin) {
+      const bare = await this.me({ bare: true });
+      if (bare.scope === 'read' || !this.apiPin) return { scope: bare.scope ?? 'write', pinProved: false };
+    }
+    const me = await this.me();
+    return me.scope === 'read' ? { scope: 'read', pinProved: false } : { scope: 'write', pinProved: true };
   }
 
   /**
    * GET /world — the key's validation + world identity in one read call
    * (Skeld's v2 tail, live 2026-07-12; replaced the v1 SDK worlds.get lane).
    * A prefixed key reads it bare, so it never checks a PIN: a door that holds
-   * one asks `me()` too (`checkPin`). A legacy ten-digit key sends it here.
+   * one asks `me()` too (`keyScope`). A legacy ten-digit key sends it here.
    */
   /** The world's public page address, read live (`core/public-page.ts`); null when it is off. */
   async publicPage(): Promise<string | null> {

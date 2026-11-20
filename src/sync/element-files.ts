@@ -23,6 +23,7 @@ import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { isHostBlocked, isHostRefusal } from './sync-engine';
+import { readsOnlyByShape } from '../core/key-scope';
 
 const STALE_AFTER_MS = 60_000;
 const READ_TIMEOUT_MS = 15_000;
@@ -251,6 +252,8 @@ export function mayRemove(row: OwFileRow, me: OwMe | null, readOnly: boolean): b
 function writeClient(entry: WorldRegistryEntry, reg: WorldsRegistry, doing: string): FilesClient {
   if (!entry.api || entry.state !== 'api-linked') throw new PlainError('Files live on OnlyWorlds: use Make online first.');
   if (entry.api.read_only) throw new PlainError(`This world is view-only here, so Atlas cannot ${doing}.`);
+  // A read key under a world that thinks it writes: said as the key, and no PIN goes beside it.
+  if (readsOnlyByShape(entry.api.api_key)) throw new PlainError(`This world's key can only read, so Atlas cannot ${doing}. Put in a write key in Settings, This world.`);
   const pin = worldPin(entry, reg);
   if (!pin) {
     throw new PlainError(isSeatWorld(entry) ? SEAT_SECRET_MISSING_LINE

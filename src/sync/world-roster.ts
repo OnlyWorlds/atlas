@@ -14,6 +14,7 @@ import { OwV2Client, type OwMember } from '@onlyworlds/sdk';
 import type { WorldRegistryEntry } from '../core/types';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
+import { pinBeside } from '../core/key-scope';
 
 const RETRY_AFTER_FAILURE_MS = 60_000;
 const ROSTER_TIMEOUT_MS = 15_000;
@@ -63,9 +64,11 @@ export function rosterFor(
   if (slot.pending) return slot.pending;
   if (!fresh && slot.failedAt !== null && now() - slot.failedAt < RETRY_AFTER_FAILURE_MS) return Promise.resolve(null);
   const s = slot;
+  // The SDK sends a PIN it holds on `/me` and writes: none is handed over beside a read key.
+  const pin = pinBeside(entry.api!.api_key, opts.pin);
   const client = new OwV2Client({
     apiKey: entry.api!.api_key,
-    ...(opts.pin ? { apiPin: opts.pin } : {}),
+    ...(pin ? { apiPin: pin } : {}),
     baseUrl: devV2Base() ?? DEFAULT_V2_BASE,
     client: ATLAS_CLIENT_NAME,
   });

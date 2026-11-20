@@ -41,7 +41,7 @@ Two states. The difference is **whether sync is wired**, not where the data live
 
 There is no api-only mode. If you want a world online, you attach credentials and the engine starts reconciling.
 
-- **View-only worlds** are a FLAG on api-linked, not a third state: `api.read_only` (registry and `world.json`). Linked with a READ key and no PIN; the engine is pull-only and the store refuses every UI write. The sister-shares-with-her-DM flow.
+- **View-only worlds** are a FLAG on api-linked, not a third state: `api.read_only` (registry and `world.json`). Linked with a READ key and no PIN (a read key pasted into Download a world too: what a key can do is `GET /me`'s scope, and no PIN goes beside a key that reads only, DESIGN_LAWS conv. 193); the engine is pull-only and the store refuses every UI write. The sister-shares-with-her-DM flow.
 - **View-only copies** (conv. 177): a world file of a world already here opens beside it as a copy (a fresh id, `snapshot_of`, `writable: false`), local-only, view-only and never online; any world.json marked `writable: false` opens the same way. Since 1.123 (conv. 188) a public world opens from its `#/open/<world id>` link the same way, with no account: read by keel's keyless door, after an ask, as a view-only copy with a fresh id.
 - **local-only to api-linked**: Make Online, two routes (create a new api world, or link into an existing one). DESIGN_SYNC "Make Online".
 - **api-linked to local-only**: unlink. The folder stays, sync stops, the baselines are wiped (conv. 24), and the server world id is remembered as `former_api_world_id`.

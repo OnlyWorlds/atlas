@@ -15,6 +15,7 @@
  * derives from the key server-side. The public GET sends no auth.
  */
 import { isHostBlockedPage } from './host-blocked-page';
+import { pinBeside } from '../core/key-scope';
 import { hostRefusalCause } from './sync-failure-copy';
 
 /**
@@ -227,7 +228,9 @@ export class SharingClient {
     const headers: Record<string, string> = {};
     if (opts.auth) {
       headers['API-Key'] = this.apiKey;
-      headers['API-Pin'] = this.pin;
+      // Never beside a key that can only read (`pinBeside`).
+      const pin = pinBeside(this.apiKey, this.pin);
+      if (pin) headers['API-Pin'] = pin;
     }
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
 

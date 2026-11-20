@@ -30,11 +30,13 @@ import { AccountClient } from './account-client';
 import { accountWorldsWhenFetched, mintOwnKey, sharedOpenLine, type ReadOnlyWhy } from './account-worlds';
 import { keyRefusalOf } from './world-key-lines';
 import { PinPromptModal } from '../ui/pin-prompt-modal';
+import { readsOnlyByShape } from '../core/key-scope';
+import { keyCheckError } from '../setup/key-check-errors';
 import { mintRecordOf, takeBackMintedKey, type KeyMint } from './key-takeback';
 
-/** A read key, by keel's prefix; a write key or a legacy ten-digit one otherwise. */
+/** A read key, by keel's prefix or the demo range (`readsOnlyByShape`); a write key otherwise. */
 export function isReadKey(key: string): boolean {
-  return key.startsWith('ow_r_');
+  return readsOnlyByShape(key);
 }
 
 /** True when the world can take a new key at all: linked, and not a seat. */
@@ -91,12 +93,31 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
   if (fetched.id !== entry.api.world_id) {
     throw new PlainError(`That key is for another world, "${fetched.name}". Copy the key from this world's page on onlyworlds.com.`);
   }
+  // What the key can do, from `/me`: the PIN goes only beside a key that writes.
   try {
-    await client.checkPin();
+    const { scope } = await client.keyScope();
+    return { readOnly: readOnly || scope === 'read' };
   } catch (err) {
     throw refused(err);
   }
-  return { readOnly };
+}
+
+/**
+ * Keep `pin` as the account's PIN only once keel took it beside `key`, a key
+ * that writes (`keyScope`'s proof at `GET /me`). A key that reads only proves
+ * nothing, and nothing is kept. A refused PIN throws, worded.
+ */
+export async function keepPinProvedBy(key: string, pin: string): Promise<void> {
+  let proved: boolean;
+  try {
+    proved = (await buildV2Adapter(key, pin).keyScope()).pinProved;
+  } catch (err) {
+    throw keyCheckError(err);
+  }
+  if (!proved) return;
+  const next = setPin(getState().registry, pin);
+  saveRegistry(next);
+  patchSlice('registry', next);
 }
 
 /**
@@ -220,9 +241,12 @@ async function makeNewWorldKeyOnce(entry: WorldRegistryEntry & { api: NonNullabl
       `${entry.name} has a new key: Atlas needs your OnlyWorlds PIN to save your edits. It is the one PIN of your account, set on onlyworlds.com in Account settings under World PIN.`
     );
     if (!pin) { await takeBack(); return { kind: 'cancelled' }; }
-    const withPin = setPin(getState().registry, pin);
-    saveRegistry(withPin);
-    patchSlice('registry', withPin);
+    try {
+      await keepPinProvedBy(minted.minted.key, pin);
+    } catch (err) {
+      await takeBack();
+      return { kind: 'failed', error: err };
+    }
   }
   const current = getState().registry.worlds.find(w => w.id === entry.id);
   if (!canTakeNewKey(current) || current.api.world_id !== worldId) {

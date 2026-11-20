@@ -31,7 +31,15 @@ vi.mock('../../src/sync/ow-v2-client-adapter', async (importOriginal) => {
 });
 vi.mock('../../src/sync/make-online', async (importOriginal) => {
   const m = await importOriginal<typeof import('../../src/sync/make-online')>();
-  return { ...m, buildV2Adapter: (key: string) => ({ getWorld: () => h.getWorld!(key), checkPin: () => h.checkPin?.(key) ?? Promise.resolve() }) };
+  // keyScope: the /me proof (`h.checkPin`) for a key that writes; a read key proves nothing.
+  return { ...m, buildV2Adapter: (key: string) => ({
+    getWorld: () => h.getWorld!(key),
+    keyScope: async () => {
+      const reads = key.startsWith('ow_r_');
+      if (!reads) await (h.checkPin?.(key) ?? Promise.resolve());
+      return { scope: reads ? 'read' : 'write', pinProved: !reads };
+    },
+  }) };
 });
 vi.mock('../../src/sync/account-client', async (importOriginal) => {
   const m = await importOriginal<typeof import('../../src/sync/account-client')>();

@@ -50,6 +50,10 @@ import type { PerElementFailure } from '../core/types';
 import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
 import { keyCheckError } from '../setup/key-check-errors';
+import { readsOnlyByShape } from '../core/key-scope';
+
+/** Make online's link route given a key that reads only. */
+const READ_KEY_CANNOT_LINK = 'That key can only read, so Atlas cannot put this world\'s elements online with it. Copy a write key from the world\'s page on onlyworlds.com.';
 import { slicePushRefusal } from '../core/provenance';
 // view-only-ok: a view-only world is already online, and Make online is for a local world (conv. 149).
 
@@ -483,6 +487,12 @@ export class MakeOnlineModal extends BaseModal {
       errorBox.hidden = false;
       return;
     }
+    // A read key cannot take this world's elements up, and no PIN goes beside one.
+    if (readsOnlyByShape(apiKey)) {
+      errorBox.textContent = READ_KEY_CANNOT_LINK;
+      errorBox.hidden = false;
+      return;
+    }
     if (!pin) {
       errorBox.textContent = 'PIN is required';
       errorBox.hidden = false;
@@ -506,9 +516,13 @@ export class MakeOnlineModal extends BaseModal {
       progressBox.hidden = false;
       const client = buildV2Adapter(apiKey, pin);
       let world: { id?: string; name?: string };
+      let pinProved: boolean;
       try {
         world = await client.getWorld();
-        await client.checkPin();
+        // What the key can do, from /me: the PIN is proved only beside a key that writes.
+        const read = await client.keyScope();
+        if (read.scope === 'read') throw new PlainError(READ_KEY_CANNOT_LINK);
+        pinProved = read.pinProved;
       } catch (err) {
         // A refused key, an unknown world or no connection, in words (A38;
         // offline used to show "Failed to fetch"); the rest as it came.
@@ -561,7 +575,7 @@ export class MakeOnlineModal extends BaseModal {
           let reg = getState().registry;
           // A seat's secret is this world's PIN only (#104), never the account's.
           const seatSecret = isSeatSecret(pin) ? pin : undefined;
-          if (!reg.pin && !seatSecret) reg = setPin(reg, pin);
+          if (!reg.pin && !seatSecret && pinProved) reg = setPin(reg, pin);
           reg = attachApi(reg, worldId, { worldId: world.id!, apiKey, worldName: world.name, seatSecret });
           saveRegistry(reg);
           patchSlice('registry', reg);

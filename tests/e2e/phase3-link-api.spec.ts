@@ -233,3 +233,41 @@ test('Cancel link removes the new folder and registers nothing', async ({ page }
   const linked = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length);
   expect(linked).toBe(0);
 });
+
+test('a read key opens the world to read with no PIN sent, and Test connection says it reads only', async ({ page }) => {
+  await setupAtlasRoot(page);
+  // keel as it reads a PIN beside a read key today: a wrong one is refused.
+  const pins: Array<string | null> = [];
+  const now = '2026-11-20T12:00:00.000Z';
+  await page.route(`${V2}/**`, async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname.replace('/api/v2', '');
+    const pin = req.headers()['api-pin'] ?? null;
+    pins.push(pin);
+    if (pin) {
+      return route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } } });
+    }
+    if (path === '/me') return route.fulfill({ json: { world: { id: WORLD_ID, name: 'Shared World' }, scope: 'read', role: 'owner', membership: null } });
+    if (path === '/world' || path === '/world/') return route.fulfill({ json: { id: WORLD_ID, name: 'Shared World', updated_at: now } });
+    return route.fulfill({ json: { data: [], has_more: false, next_cursor: null } });
+  });
+  await page.click('[data-action="link-api"]');
+  await page.fill('input[name="api-key"]', 'ow_r_sharedkey');
+  // A saved PIN that is not this account's, prefilled as the modal does.
+  await page.fill('input[name="api-pin"]', '9999');
+  await page.click('[data-modal="link-world"] [data-action="link"]');
+  await expect(page.locator('.ow-toast', { hasText: 'can only read' })).toBeVisible();
+  const state = await page.evaluate((id) => {
+    const st = (window as any).__atlasTestApi.getState();
+    const w = st.registry.worlds.find((x: any) => x.api?.world_id === id);
+    return { readOnly: w?.api?.read_only ?? false, pin: st.registry.pin ?? null };
+  }, WORLD_ID);
+  expect(state).toEqual({ readOnly: true, pin: null });
+
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="world"]');
+  await page.click('[data-action="test-connection"]');
+  await expect(page.locator('.ow-toast', { hasText: 'It reads only, so this world opens to read' })).toBeVisible();
+  expect(pins.length).toBeGreaterThan(0);
+  expect(pins.every(p => p === null)).toBe(true);
+});

@@ -68,7 +68,7 @@ export class LinkWorldModal extends BaseModal {
         </label>
         ${whereChoiceHtml({ online: true })}
         <p class="atlas-modal-hint">
-          Atlas downloads every element of this world. You can keep editing while offline; changes sync back the next time you open it.
+          Atlas downloads every element of this world. You can keep editing while offline; changes sync back the next time you open it. A read key needs no PIN: the world opens to read.
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
@@ -191,6 +191,9 @@ export class LinkWorldModal extends BaseModal {
           this.toasts.info(`Linked ${result.entry.name} with ${result.downloaded} of ${result.stoppedEarly.total} elements. Use Refresh from OnlyWorlds to download the rest.`);
         } else if (failures > 0) {
           this.toasts.error(`Linked ${result.entry.name}. ${failures} element${failures === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${failures === 1 ? 'it' : 'them'}.`);
+        } else if (result.entry.api?.read_only) {
+          // A read key: the world opens to read (no PIN was asked or sent).
+          this.toasts.success(`Viewing ${result.entry.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded. Its key can only read, so the world opens to read.`);
         } else {
           this.toasts.success(`Linked ${result.entry.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
