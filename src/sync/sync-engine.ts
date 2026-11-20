@@ -47,6 +47,7 @@ import { isKnownOf, knownOfMove, stubShape } from './known-of';
 import { editedSince, editedSinceBaseline, stampOrder } from '../store/sync-stamp';
 import { BASELINE_UNKNOWN, hasNoBaseline, isBaselineUnknown, readableBaseline } from '../core/baseline-unknown';
 import { copyDiff, narratorMayBeFilled, theirsOf } from './same-copy';
+import { numberFieldsFor } from '../editor/field-schema';
 import { changeSeqOf, preconditionCurrent } from './change-seq';
 import type {
   Conflict,
@@ -657,6 +658,9 @@ export class SyncEngine {
   private outgoing(elem: Element): Record<string, unknown> {
     // The mark of a copy with no record of what OnlyWorlds held is sync's own note (conv. 192): never sent.
     const { [BASELINE_UNKNOWN]: _mark, ...body } = stripSyncFields(elem);
+    // A number held as "" (an outside writer's empty) is unset: keel refuses `int("")` and takes null,
+    // so it goes as null, and Keep this copy's "empties" stays true for a number too.
+    for (const f of numberFieldsFor(elem.type)) if (body[f] === '') body[f] = null;
     return withoutKeptLinks(elem.type, body, this.roundLinkHeld);
   }
 

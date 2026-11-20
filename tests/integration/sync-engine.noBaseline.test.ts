@@ -808,3 +808,33 @@ describe('gate S3: each reading of the mark held by a test', () => {
     expect(isBaselineUnknown(file(A))).toBe(false);
   });
 });
+
+describe('gate 2: a DELETE answered 404, and a number held as ""', () => {
+  for (const policy of POLICIES) {
+    it(`[${policy}] S1: keel answers the DELETE with 404 (gone already): it counts as landed, and the row goes`, async () => {
+      const engine = await online(policy);
+      client.__server_mutate('character', A, { description: 'member' });
+      await restore(A, { name: 'Ada', description: 'mine' });
+      await engine.pushOnce();
+      expect((await rows()).map(c => c.element_id)).toEqual([A]);
+      await store.deleteElement(A);
+      client.deleteElement = async () => { throw Object.assign(new Error('API Error 404: not found'), { status: 404, code: 'not_found', param: null }); };
+      await engine.syncNow();
+      expect(await rows()).toEqual([]);
+      expect(await store.listTombstonesSince(null)).toEqual([]);
+    });
+  }
+
+  it('N1: a number this copy holds as "" goes as null, which keel takes: Keep this copy empties it there', async () => {
+    const engine = await online('pause-and-review', { name: 'Ada', description: 'v1', height: 5 });
+    client.__server_mutate('character', A, { description: 'member' });
+    await restore(A, { name: 'Ada', description: 'mine', height: '' });
+    await engine.pushOnce();
+    expect((await rows())[0].fields.sort()).toEqual(['description', 'height']);
+    client.calls = [];
+    await engine.resolveConflict(A, 'overwrite-mine');
+    const sent = client.calls.find(c => c.method === 'update') as { body: Record<string, unknown> };
+    expect(sent.body.height).toBeNull();
+    expect(onKeel(A).height).toBeNull();
+  });
+});
