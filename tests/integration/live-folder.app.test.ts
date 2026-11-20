@@ -90,6 +90,15 @@ describe('the live folder on a linked world', () => {
     expect([...getDiskNotice()!.notSynced]).toEqual([ids[1]]);
   });
 
+  it('a held copy (no record of what OnlyWorlds held) changed outside with no new stamp still uploads, never "not synced" (conv. 192)', async () => {
+    const { root, store, ids } = await linkedWorld(2);
+    await store.stampServerUpdatedAt(ids[0], 'character', SYNCED, undefined, { atlas_baseline_unknown: true });
+    editOutside(root, ids[0], { description: 'restored' });
+    await rescanNow({ force: true });
+    expect(requestPushIfLinked).toHaveBeenCalledTimes(1);
+    expect(getDiskNotice()?.notSynced.size).toBe(0);
+  });
+
   it('Q4: a batch above the threshold holds sync; "Upload them" releases it', async () => {
     const { root, ids } = await linkedWorld(BIG_BATCH + 1);
     for (const id of ids) editOutside(root, id, { description: 'branch b', local_updated_at: '2026-04-01T00:00:00.000Z' });

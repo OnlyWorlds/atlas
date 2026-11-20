@@ -547,17 +547,40 @@ describe('I7: the row resolves, from every state', () => {
     expect(file(A).description).toBe('member');
   });
 
-  it('M3: a row written before the mark (no stamp on the copy): the row\'s stamp lands first, then an UPDATE, never a POST', async () => {
+  it('M3: a row written before the mark (no stamp on the copy): the row\'s stamp lands first, keel is read, then an UPDATE with that read\'s If-Match, never a POST', async () => {
     const engine = await online('pause-and-review');
     client.__server_mutate('character', A, { description: 'member' });
     await restore(A, { name: 'Ada', description: 'mine' });
     const keelStamp = onKeel(A).updated_at as string;
     await store.updateSyncState(() => ({ conflicts: [{ element_id: A, type: 'character', detected_at: stamp(), local_updated_at: file(A).local_updated_at as string, server_updated_at: keelStamp, fields: ['description'] }] }));
     client.calls = [];
+    client.ifMatchSent = [];
     await engine.resolveConflict(A, 'overwrite-mine');
-    expect(client.calls.map(c => c.method)).toEqual(['update']);
+    expect(client.calls.map(c => c.method)).toEqual(['get', 'update']);
+    expect(client.ifMatchSent.map(m => m.id)).toEqual([A]);
     expect(onKeel(A).description).toBe('mine');
     expect(await rows()).toEqual([]);
+  });
+
+  it('gate S1 (Q2): a row written by 1.124.29 with no counter, and a member\'s edit after it: Keep this copy reads keel, takes its copy into the row, writes nothing', async () => {
+    const engine = await online('pause-and-review');
+    await engine.pullNow();
+    client.__server_mutate('character', A, { description: 'v3 member' });
+    await restore(A, { name: 'Ada', description: 'v1' });
+    await engine.pullNow();
+    // As a 1.124.29 pull wrote it: no flag, no counter, the copy unstamped.
+    await store.updateSyncState(s => ({ conflicts: s.conflicts.map(c => ({ element_id: c.element_id, type: c.type, detected_at: c.detected_at, local_updated_at: c.local_updated_at, server_updated_at: c.server_updated_at, fields: c.fields })) }));
+    const f = file(A); delete f.server_updated_at; delete f.atlas_baseline_unknown;
+    root.put(pathOf(A), j(f)); await store.rescanDisk();
+    client.__server_mutate('character', A, { description: 'v4 member, after the row' });
+    client.calls = [];
+    await expect(engine.resolveConflict(A, 'overwrite-mine')).rejects.toThrow(CHANGED_WHILE_OPEN);
+    expect(client.calls.map(c => c.method)).toEqual(['get']);
+    expect(onKeel(A).description).toBe('v4 member, after the row');
+    const [row] = await rows();
+    expect([row.no_baseline, row.changed_while_open, row.theirs]).toEqual([true, true, { description: 'v4 member, after the row' }]);
+    await engine.resolveConflict(A, 'overwrite-mine');
+    expect(onKeel(A).description).toBe('v1');
   });
 
   it('S6: a view-only world: Keep this copy is refused with the words, Keep the OnlyWorlds copy works', async () => {
@@ -572,6 +595,16 @@ describe('I7: the row resolves, from every state', () => {
     expect(client.calls.filter(c => c.method !== 'get')).toEqual([]);
     await viewOnly.resolveConflict(A, 'pull-theirs');
     expect(file(A).description).toBe('member');
+  });
+
+  it('gate M1 (Q1): a field this copy holds as "" is sent, and Keep this copy empties it on OnlyWorlds', async () => {
+    const engine = await online('pause-and-review');
+    client.__server_mutate('character', A, { description: 'member', background: 'member bg' });
+    await restore(A, { name: 'Ada', description: 'mine', background: '' });
+    await engine.pushOnce();
+    expect((await rows())[0].fields.sort()).toEqual(['background', 'description']);
+    await engine.resolveConflict(A, 'overwrite-mine');
+    expect(onKeel(A).background).toBe('');
   });
 
   it('S3: Keep this copy sends no empties: a field this copy lacks stays on OnlyWorlds', async () => {
@@ -646,5 +679,132 @@ describe('M4: finding 3 is banked (the gate\'s G1, recorded)', () => {
     const sent = client.calls.find(c => c.method === 'update') as { body: Record<string, unknown> };
     expect(Object.keys(sent.body)).not.toContain('background');
     expect(onKeel(A).background).toBe('member wrote this');
+  });
+});
+
+describe('gate S2: a delete made here still goes, and the row goes with it (Q4, Q4b)', () => {
+  for (const policy of POLICIES) {
+    it(`[${policy}] deleting a held copy sends the DELETE, and its row is gone after the round`, async () => {
+      const engine = await online(policy);
+      client.__server_mutate('character', A, { description: 'member' });
+      await restore(A, { name: 'Ada', description: 'mine' });
+      await engine.pushOnce();
+      expect((await rows()).map(c => c.element_id)).toEqual([A]);
+      await store.deleteElement(A);
+      client.calls = [];
+      await engine.syncNow();
+      expect(client.calls.filter(c => c.method === 'delete').map(c => (c as { id: string }).id)).toEqual([A]);
+      expect(client.__server_get('character', A)).toBeUndefined();
+      expect(await rows()).toEqual([]);
+      await engine.syncNow();
+      expect(await rows()).toEqual([]);
+    });
+  }
+});
+
+describe('gate S3: each reading of the mark held by a test', () => {
+  /** A held copy whose edit time is before keel's stamp: only the mark says it is changed. */
+  async function heldOld(policy: Policy = 'pause-and-review'): Promise<SyncEngine> {
+    const engine = await online(policy);
+    // The feed walked past keel's first version: a copy equal to an older version is that version
+    // (adopted on its op, then pulled forward), which is not what these cases are about.
+    await engine.pullNow();
+    const oldLocal = file(A).local_updated_at as string;
+    client.__server_mutate('character', A, { description: 'member' });
+    await put(A, { name: 'Ada', description: 'v1', local_updated_at: oldLocal });
+    await engine.pushOnce();
+    expect(isBaselineUnknown(file(A))).toBe(true);
+    expect(Date.parse(file(A).local_updated_at as string) < Date.parse(file(A).server_updated_at as string)).toBe(true);
+    return engine;
+  }
+
+  it('C7: an id written in capitals meets the /bulk check as keel\'s own id, never a /bulk item', async () => {
+    client.__enable_bulk();
+    await client.createElement('character', { id: A, name: 'Ada', description: 'member' });
+    const UP = A.toUpperCase();
+    root.put(`${DIR}/ada--upper.json`, j({ id: UP, type: 'character', name: 'Ada', description: 'mine', local_updated_at: stamp() }));
+    await put(B, { name: 'Bo', local_updated_at: stamp() });
+    await put(C, { name: 'Cy', local_updated_at: stamp() });
+    const sent: string[] = [];
+    const real = client.bulkCreate!;
+    client.bulkCreate = async (items: BulkItem[], opts) => {
+      sent.push(...items.map(it => String(it.element.id).toLowerCase()));
+      return real(items, opts);
+    };
+    await engineFor('local-wins').pushOnce();
+    expect(sent.sort()).toEqual([B, C]);
+    expect(onKeel(A).description).toBe('member');
+    expect((await rows()).map(c => c.element_id)).toEqual([UP]);
+  });
+
+  it('C3: the hide sweep leaves a held copy alone: no hide sent for it, nothing pulled over it', async () => {
+    const engine = await heldOld();
+    root.put(pathOf(A), j({ ...file(A), hidden: true, atlas_hidden_shown_online: true }));
+    await store.rescanDisk();
+    client.calls = [];
+    await engine.pushOnce();
+    expect(client.calls.filter(c => c.method === 'hide')).toEqual([]);
+    expect(file(A).description).toBe('v1');
+  });
+
+  it('C4: keel hides the element from this key: a held copy stays in the copy', async () => {
+    const engine = await heldOld();
+    client.__server_hide('character', A);
+    await engine.pullNow();
+    expect(root.get(pathOf(A))).toBeTruthy();
+    expect(file(A).description).toBe('v1');
+  });
+
+  it('C5: a view reset whose walk no longer names a held copy keeps it, never drops it', async () => {
+    const engine = await heldOld();
+    await engine.pullNow();
+    const inner = client.pullChanges!;
+    let refused = false;
+    client.pullChanges = async (since, limit) => {
+      if (since && !refused) {
+        refused = true;
+        throw Object.assign(new Error('API Error 409: resync'), { status: 409, code: 'resync_required', param: null, reason: 'view' });
+      }
+      const page = await inner(since, limit);
+      return { ...page, changes: page.changes.filter(op => op.id !== A) };
+    };
+    await engine.pullNow();
+    expect(root.get(pathOf(A))).toBeTruthy();
+    expect(file(A).description).toBe('v1');
+    expect((await store.readSyncState()).kept_outside_view ?? []).toContain(A);
+  });
+
+  it('C9: clearing a held copy\'s baseline takes the mark with it', async () => {
+    await heldOld();
+    await store.clearServerBaseline(A);
+    expect(file(A).server_updated_at).toBeUndefined();
+    expect('atlas_baseline_unknown' in file(A)).toBe(false);
+  });
+
+  it('C13: keel\'s live copy on a 412 now holds what this copy holds: adopted, the row goes, nothing more written', async () => {
+    const engine = await online('pause-and-review');
+    client.__server_mutate('character', A, { description: 'member' });
+    await restore(A, { name: 'Ada', description: 'mine' });
+    await engine.pushOnce();
+    client.__server_mutate('character', A, { description: 'mine' });
+    client.calls = [];
+    await engine.resolveConflict(A, 'overwrite-mine');
+    expect(client.calls.map(c => c.method)).toEqual(['update']);
+    expect(await rows()).toEqual([]);
+    expect(isBaselineUnknown(file(A))).toBe(false);
+    expect(file(A).server_updated_at).toBe(onKeel(A).updated_at);
+  });
+
+  it('C19: the list pull that finds keel now holds the same content drops the row', async () => {
+    const engine = await online('pause-and-review');
+    client.__server_mutate('character', A, { description: 'member' });
+    await restore(A, { name: 'Ada', description: 'mine' });
+    await engine.pushOnce();
+    expect((await rows()).length).toBe(1);
+    client.__server_mutate('character', A, { description: 'mine' });
+    client.__enable_changes(false);
+    await engine.pullNow();
+    expect(await rows()).toEqual([]);
+    expect(isBaselineUnknown(file(A))).toBe(false);
   });
 });

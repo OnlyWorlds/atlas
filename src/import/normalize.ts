@@ -64,6 +64,9 @@ const STRIP_ALWAYS = new Set([
   'atlas_page_pub',
   // keel's word on the hidden mark in the SOURCE world (conv. 170).
   'atlas_hidden_shown_online',
+  // Sync's note that the SOURCE copy had no record of what its world held (conv. 192): about a
+  // stamp the import strips anyway, so never carried.
+  'atlas_baseline_unknown',
 ]);
 
 /** keel's hidden mark, kept on import (folder spec §4.8; `src/core/hidden-mark.ts`). */

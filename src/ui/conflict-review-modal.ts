@@ -294,7 +294,7 @@ export function sideWord(v: unknown): string {
 
 /**
  * The row for a copy with no record of what OnlyWorlds held (conv. 192): the line that says so, each
- * field that differs with both values, what Keep this copy leaves on OnlyWorlds (S3), and the two
+ * field that differs with both values, what Keep this copy leaves or empties on OnlyWorlds (S3), and the two
  * choices by their plain names (S2). The copy's own values are read from the open world.
  */
 export function noBaselineRowHtml(c: Conflict, name: string): string {
@@ -306,10 +306,16 @@ export function noBaselineRowHtml(c: Conflict, name: string): string {
             <span class="atlas-conflict-side-here">Here: ${escapeText(sideWord(here[f]))}</span>
             <span class="atlas-conflict-side-theirs">On OnlyWorlds: ${escapeText(sideWord(theirs[f]))}</span>
           </div>`).join('');
-  // A field this copy leaves empty keeps its OnlyWorlds value when this copy is kept (S3).
-  const left = c.fields.filter((f) => unsetValue(here[f]) && !unsetValue(theirs[f]));
-  const leftLine = left.length === 0 ? '' : `
-        <span class="atlas-conflict-note" data-role="keeps-online">Keep this copy does not empty what this copy leaves empty: ${escapeText(left.join(', '))} ${left.length === 1 ? 'stays' : 'stay'} as OnlyWorlds has ${left.length === 1 ? 'it' : 'them'}.</span>`;
+  // What Keep this copy does to a field OnlyWorlds holds and this copy does not (S3): Keep this copy
+  // sends every key the copy holds, so a key it lacks stays on OnlyWorlds, while one it holds as "",
+  // null or [] goes out and empties it there (keel writes a text's null as "").
+  const offered = c.fields.filter((f) => !unsetValue(theirs[f]) && unsetValue(here[f]));
+  const left = offered.filter((f) => here[f] === undefined);
+  const emptied = offered.filter((f) => here[f] !== undefined);
+  const leftLine = (left.length === 0 ? '' : `
+        <span class="atlas-conflict-note" data-role="keeps-online">This copy lacks ${escapeText(left.join(', '))}, so Keep this copy leaves ${left.length === 1 ? 'it' : 'them'} as OnlyWorlds has ${left.length === 1 ? 'it' : 'them'}.</span>`)
+    + (emptied.length === 0 ? '' : `
+        <span class="atlas-conflict-note" data-role="empties-online">Keep this copy empties ${escapeText(emptied.join(', '))} on OnlyWorlds.</span>`);
   const moved = c.changed_while_open ? `
         <span class="atlas-conflict-note" data-role="changed-while-open">It changed on OnlyWorlds while this was open: the OnlyWorlds side below is as it is now.</span>` : '';
   return `

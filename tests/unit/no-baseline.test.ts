@@ -133,10 +133,19 @@ describe('S2, S3: the row\'s words', () => {
     expect(side('description')).toBe('description Here: mine On OnlyWorlds: theirs');
     expect(side('birthplace')).toBe('birthplace Here: empty On OnlyWorlds: Dock');
     expect([...box.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Keep this copy', 'Keep the OnlyWorlds copy']);
-    // S3: what this copy leaves empty stays as OnlyWorlds has it.
-    expect(box.querySelector('[data-role="keeps-online"]')!.textContent).toBe('Keep this copy does not empty what this copy leaves empty: background, birthplace stay as OnlyWorlds has them.');
+    // S3: a key this copy lacks stays as OnlyWorlds has it, and nothing here is said as emptied.
+    expect(box.querySelector('[data-role="keeps-online"]')!.textContent).toBe('This copy lacks background, birthplace, so Keep this copy leaves them as OnlyWorlds has them.');
+    expect(box.querySelector('[data-role="empties-online"]')).toBeNull();
     expect(box.querySelector('[data-role="changed-while-open"]')).toBeNull();
     expect(html).not.toMatch(/—/);
+  });
+
+  it('gate M1 (Q1m): a field this copy holds as "" or null is said as emptied, never as staying', () => {
+    patchSlice('data', { elements: [{ id: 'a', type: 'character', name: 'Ada', description: 'mine', background: '', motivations: null } as unknown as Element] } as never);
+    const box = document.createElement('div');
+    box.innerHTML = noBaselineRowHtml({ element_id: 'a', type: 'character', detected_at: 't', local_updated_at: 'l', server_updated_at: 's', fields: ['description', 'background', 'motivations', 'reputation'], no_baseline: true, theirs: { description: 'theirs', background: 'member bg', motivations: 'member m', reputation: 'member r' } }, 'Ada');
+    expect(box.querySelector('[data-role="empties-online"]')!.textContent).toBe('Keep this copy empties background, motivations on OnlyWorlds.');
+    expect(box.querySelector('[data-role="keeps-online"]')!.textContent).toBe('This copy lacks reputation, so Keep this copy leaves it as OnlyWorlds has it.');
   });
 
   it('M6: a row that changed while open says so', () => {

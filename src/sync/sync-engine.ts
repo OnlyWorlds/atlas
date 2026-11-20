@@ -1028,6 +1028,20 @@ export class SyncEngine {
         await this.folder.stampServerUpdatedAt(id, local.type, conflict.server_updated_at, local.local_updated_at ?? '', { [BASELINE_UNKNOWN]: true });
         local = (await this.folder.getElement(id)) ?? local;
       }
+      // A row with no counter (written by 1.124.29 or earlier, drawn without keel's copy): keel is read
+      // first. Moved since the row, the row takes keel's copy as it is now and nothing is written (M6's
+      // way); unmoved, that read's counter goes as If-Match. Never a blind PATCH over a newer edit.
+      let readSeq: number | null = null;
+      if (noBaseline && typeof conflict.change_seq !== 'number') {
+        const live = await this.client.getElement(local.type, id);
+        if (live) {
+          if (stampOrder(live.updated_at, conflict.server_updated_at) !== 0) {
+            if (await this.refreshHeldRow(local, live)) return;
+            throw new PlainError(CHANGED_WHILE_OPEN);
+          }
+          readSeq = changeSeqOf(live);
+        }
+      }
       // conv. 173: keeping mine sends the edit, so a mark keel does not hold goes
       // as its hide first, by a role read now; a role that cannot be read sends nothing.
       if (local.server_updated_at && isHiddenMark(local)) {
@@ -1044,7 +1058,8 @@ export class SyncEngine {
       try {
         // M6: keel's If-Match with the counter of the copy the row shows, so a write made there since
         // comes back as a 412 instead of being written over.
-        const ifMatch = noBaseline && typeof conflict.change_seq === 'number' ? { ifMatch: conflict.change_seq } : undefined;
+        const ifMatch = noBaseline && typeof conflict.change_seq === 'number' ? { ifMatch: conflict.change_seq }
+          : readSeq !== null ? { ifMatch: readSeq } : undefined;
         const response = local.server_updated_at
           ? (ifMatch ? await this.client.updateElement(local.type, id, body, ifMatch) : await this.client.updateElement(local.type, id, body))
           : await this.client.createElement(local.type, body);
@@ -3291,10 +3306,14 @@ export class SyncEngine {
     }
     this.roundHeldRows = [];
 
+    // A delete made here still goes, a copy with no record of what OnlyWorlds held included (conv. 192):
+    // a delete is the person's own choice. The row for such a copy then goes with its element.
+    const landedDeletes = new Set<string>();
     for (const tomb of tombstones) {
       if (authBlocked || transient || this.stopped) break;
       try {
         await this.client.deleteElement(tomb.type, tomb.id);
+        landedDeletes.add(tomb.id);
         // OnlyWorlds has the delete: a tombstone that cannot be cleared waits for the next round's 404.
         if (await this.localStep(failures, tomb.id, tomb.type, 'delete', 'note', () => this.folder.clearTombstone(tomb.id))) deletes++;
       } catch (err) {
@@ -3347,6 +3366,7 @@ export class SyncEngine {
           console.info('[atlas:sync] tombstone target already gone (404) — clearing', {
             id: tomb.id, type: tomb.type,
           });
+          landedDeletes.add(tomb.id);
           if (await this.localStep(failures, tomb.id, tomb.type, 'delete', 'note', () => this.folder.clearTombstone(tomb.id))) {
             deletes++;
           }
@@ -3422,7 +3442,9 @@ export class SyncEngine {
           const held = curr.conflicts ?? [];
           const reviewIds = new Set(held.map(c => c.element_id));
           const reviewFresh = this.policy === 'local-wins' ? reviewHeld.filter(c => !reviewIds.has(c.element_id) || c.no_baseline) : [];
-          const reviewPart = reviewFresh.length > 0 ? { conflicts: withRows(held, reviewFresh) } : {};
+          const rowsNow = reviewFresh.length > 0 ? withRows(held, reviewFresh) : held;
+          const rowsKept = rowsNow.filter(c => !(c.no_baseline && landedDeletes.has(c.element_id)));
+          const reviewPart = rowsKept.length !== held.length || reviewFresh.length > 0 ? { conflicts: rowsKept } : {};
           return { last_push_at: roundNow, ...foreignNext, ...keptPart, ...deletesPart, ...heldPart, ...reviewPart };
         });
       } catch (err) {
