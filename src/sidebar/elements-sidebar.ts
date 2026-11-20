@@ -59,6 +59,16 @@ function joinTypeNames(names: string[]): string {
  * hidden by default, are not. Strip order. The made-by filter and the room's
  * hiding follow after a dot (#350). Pure; exported for unit tests.
  */
+/**
+ * The "removed on disk" pill's words. A linked world's refresh pulls only what the change feed names
+ * past its cursor, so it promises nothing here: a file comes back when its element changes on
+ * OnlyWorlds, or when the file is put back.
+ */
+export function removedOnDiskTip(names: readonly string[], linked: boolean): string {
+  return `Removed from the world folder by another program: ${names.join(', ')}.`
+    + (linked ? ' Only this folder lost them: they stay on your OnlyWorlds account, and Atlas does not delete them there. One comes back here when it changes on OnlyWorlds. To have them back now, put the files back in the folder.' : '');
+}
+
 export function filterSummary(
   filters: ReadonlySet<ElementType>,
   muted: ReadonlySet<ElementType>,
@@ -479,8 +489,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
     if (n && n.removed.length > 0) {
       const linked = getState().registry.worlds.find(w => w.id === n.worldId)?.state === 'api-linked';
-      const tip = `Removed from the world folder by another program: ${n.removed.join(', ')}.`
-        + (linked ? ' They are gone from this folder only and stay on your OnlyWorlds account; Refresh from OnlyWorlds brings them back.' : '');
+      const tip = removedOnDiskTip(n.removed, linked);
       parts.push(`<span class="atlas-disk-notice-warn" title="${escapeAttr(tip)}">${n.removed.length} removed on disk</span>`);
     }
     if (n && n.unreadable.length > 0) {

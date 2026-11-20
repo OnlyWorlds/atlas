@@ -10,6 +10,7 @@ import type { Element } from '../core/types';
 import { PlainError } from '../core/plain-error';
 import { SERVER_AUTHOR_FIELDS } from '../core/constants';
 import { editedSince } from '../store/sync-stamp';
+import { hasNoBaseline } from '../core/baseline-unknown';
 
 /** The keys a stub keeps (`change_seq` never lands on disk). */
 export const KNOWN_OF_KEPT_KEYS: readonly string[] = [
@@ -71,7 +72,7 @@ export function knownOfMove(
   const now = isKnownOf(remote);
   if (was === now) return 'same';
   if (was) return 'apply';
-  const unsent = !local.server_updated_at || editedSince(local.local_updated_at, local.server_updated_at);
+  const unsent = hasNoBaseline(local) || editedSince(local.local_updated_at, local.server_updated_at);
   return viewWalk && !unsent && !keptWhole ? 'apply' : 'keep';
 }
 

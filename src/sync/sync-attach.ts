@@ -131,6 +131,7 @@ export function attachSyncEngine(
     readOnly,
     where: filesWhereOf(entry),
     apiWorldId: entry.api.world_id,
+    seat: isSeatWorld(entry),
     policy: policyNow(),
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => {
@@ -925,13 +926,21 @@ function emitConflictToasts(
     }));
   }
 
+  // keel replaced an element it held with a `/bulk` item (conv. 192, S5): only a race reaches it.
+  const replaced = result.bulk_replaced_ids?.length ?? 0;
+  if (replaced > 0 && from.current) toastManager.show(bulkReplacedLine(replaced), 'info', 12000);
+
   // A proposal the keeper did not take is no overwrite under any policy: it
-  // waits in the review, which says why (conv. 163).
-  const plain = result.conflicts.filter(c => !c.proposal);
-  if (plain.length === 0) return;
+  // waits in the review, which says why (conv. 163). Nor is a copy with no record
+  // of what OnlyWorlds held (conv. 192): it waits in the review under every policy.
+  const plain = result.conflicts.filter(c => !c.proposal && !c.no_baseline);
   // The engine's own policy, never the default: a shared world runs
   // pause-and-review whatever Settings names.
   const policy = from.policy ?? currentEngine?.getPolicy() ?? getState().registry.sync_default_policy ?? 'local-wins';
+  const heldRows = result.conflicts.filter(c => c.no_baseline).length;
+  // Under local-wins nothing else says a row waits: said here (pause-and-review's badge says it).
+  if (heldRows > 0 && policy !== 'pause-and-review' && from.current) toastManager.show(heldCopyLine(heldRows), 'info', 12000);
+  if (plain.length === 0) return;
   if (policy === 'pause-and-review') return; // badge + modal handle it
 
   const n = plain.length;
@@ -976,6 +985,20 @@ function emitConflictToasts(
     ? `Your version replaced the online one for ${n} element${n === 1 ? '' : 's'}`
     : `Your version replaced the online one for ${n} element${n === 1 ? '' : 's'}`;
   toastManager.info(message);
+}
+
+/** conv. 192: copies with no record of what OnlyWorlds held, waiting for the person (said under local-wins). */
+export function heldCopyLine(n: number): string {
+  return n === 1
+    ? 'One element waits in Review conflicts: this copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.'
+    : `${n} elements wait in Review conflicts: these copies have no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.`;
+}
+
+/** conv. 192, S5: a `/bulk` item replaced an element OnlyWorlds already held. */
+export function bulkReplacedLine(n: number): string {
+  return n === 1
+    ? 'OnlyWorlds already held one element this copy sent as new, and took this copy in its place. Another place may have sent it first.'
+    : `OnlyWorlds already held ${n} elements this copy sent as new, and took these copies in their place. Another place may have sent them first.`;
 }
 
 /**

@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.30',
+    date: '2026-11-20',
+    theme: 'A copy restored from a backup waits for you',
+    entries: [
+      {
+        id: 'restored-copy-waits',
+        title: 'A copy restored from a backup or another computer waits for you to choose',
+        body: 'When a file comes back without its record of what OnlyWorlds held, from a backup, a zip, an older commit, a copy of the folder on another computer or a world file opened again, and OnlyWorlds holds a different version of that element, Atlas no longer sends the file over it. The element waits in Review conflicts under every sync setting, with each field that differs shown both ways: Keep this copy sends it, Keep the OnlyWorlds copy takes the online one. A copy that holds the same as OnlyWorlds settles on its own, and nothing is sent.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'removed-on-disk-words',
+        title: 'Files removed outside Atlas: the note says how they come back',
+        body: 'The note for files another program removed from a linked world\'s folder no longer promises that a refresh brings them back. They stay on your OnlyWorlds account; one comes back when it changes there, and putting the files back brings them now.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.124.29',
     date: '2026-11-20',
     theme: 'The stand-ins for a missing name',

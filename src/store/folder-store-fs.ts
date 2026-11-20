@@ -103,11 +103,12 @@ interface LayoutScan {
   unreadableLc: Set<string>;
 }
 import { PerIdWriteChain } from './write-chain';
-import { stampedBody, editStamp, dropLastWriter, editedSince } from './sync-stamp';
+import { stampedBody, editStamp, dropLastWriter, editedSince, type StampOpts } from './sync-stamp';
 import { scrubReferrers } from './scrub-links';
 import { isKnownOf, KNOWN_OF_DROPS_LOCAL, KNOWN_OF_REFUSAL, stubShape } from '../sync/known-of';
 import { withoutSeatSecret } from '../core/seat';
 import { HIDDEN_SHOWN_ONLINE } from '../core/hidden-mark';
+import { BASELINE_UNKNOWN, isBaselineUnknown } from '../core/baseline-unknown';
 import {
   elementDirSegmentsIn,
   elementFilename,
@@ -2148,6 +2149,7 @@ export class FsFolderStore implements FolderStore {
     return all.filter(elem => {
       if (isKnownOf(elem)) return false; // keel's stub never waits to be sent (conv. 155, I4)
       if (!elem.server_updated_at) return true;
+      if (isBaselineUnknown(elem)) return true; // no record of what OnlyWorlds held: changed (conv. 192)
       // By instant; an absent or unreadable stamp reads as changed (conv. 190, R3).
       return editedSince(elem.local_updated_at, baseline ?? elem.server_updated_at);
     });
@@ -2254,14 +2256,14 @@ export class FsFolderStore implements FolderStore {
     await removeFile(dir, filename);
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>): Promise<void> {
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>, opts?: StampOpts): Promise<void> {
     // Serialize with update/delete on the same id (#79). The SyncEngine calls
     // this after a push; without the chain a concurrent local edit could land
     // between this read and write, and the stamp would revert it to a stale body.
     return this.writeChain.run(id, async () => {
       const existing = await this.readForWrite(id);
       if (!existing) return;
-      const next = stampedBody(existing, server_updated_at, sentLocalUpdatedAt, kept);
+      const next = stampedBody(existing, server_updated_at, sentLocalUpdatedAt, kept, opts);
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await this.dirForElement(id, existing.type);
@@ -2274,7 +2276,8 @@ export class FsFolderStore implements FolderStore {
     return this.writeChain.run(id, async () => {
       const existing = await this.readForWrite(id);
       if (!existing) return;
-      const { server_updated_at: _drop, ...rest } = existing;
+      // The mark says what the baseline is (conv. 192): it goes with it.
+      const { server_updated_at: _drop, [BASELINE_UNKNOWN]: _mark, ...rest } = existing as Element & Record<string, unknown>;
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await this.dirForElement(id, existing.type);
@@ -2397,6 +2400,7 @@ export class FsFolderStore implements FolderStore {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
         if (opts.dropLocal?.includes(field)) continue;
         if (field === HIDDEN_SHOWN_ONLINE) continue; // the record is keel's word on the mark (conv. 170)
+        if (field === BASELINE_UNKNOWN) continue; // keel's record is a known history (conv. 192)
         if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;

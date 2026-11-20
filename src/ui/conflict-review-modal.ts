@@ -156,7 +156,10 @@ export class ConflictReviewModal extends BaseModal {
     row.className = 'atlas-conflict-row';
     row.setAttribute('data-conflict-id', c.element_id);
     const name = nameOrUnnamed({ name: lookupName(c.element_id), type: c.type }, { start: true });
-    row.innerHTML = `
+    if (c.no_baseline) {
+      row.setAttribute('data-no-baseline', '');
+      row.innerHTML = noBaselineRowHtml(c, name);
+    } else row.innerHTML = `
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">${escapeText(typeName(c.type))}</span>
         <span class="atlas-conflict-name">${escapeText(name)}</span>
@@ -168,6 +171,11 @@ export class ConflictReviewModal extends BaseModal {
         <button class="atlas-btn-ghost" data-action="pull-theirs" title="${c.proposal ? "Drop your edit and take the world's copy" : 'Overwrite local with server'}">Pull (theirs wins)</button>
       </div>
     `;
+    this.wireRow(row, c);
+    return row;
+  }
+
+  private wireRow(row: HTMLElement, c: Conflict): void {
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const action = btn.dataset.action as 'overwrite-mine' | 'pull-theirs';
@@ -212,10 +220,23 @@ export class ConflictReviewModal extends BaseModal {
           // The row's buttons are live again: pressing one is the retry.
           console.error('[conflict-review] resolve failed:', err);
           showProblem(err, { doing: 'resolving the conflict', toasts: this.toasts });
+          // A copy with no record of what OnlyWorlds held: the row may have taken the OnlyWorlds copy as
+          // it is now (it changed while this was open, M6). Drawn again from what the engine holds.
+          if (c.no_baseline) await this.redrawRow(row, c.element_id);
         }
       });
     });
-    return row;
+  }
+
+  private async redrawRow(row: HTMLElement, id: string): Promise<void> {
+    try {
+      const fresh = (await getCurrentSyncEngine()?.listConflicts())?.find((x) => x.element_id === id);
+      if (!fresh || !row.isConnected) return;
+      this.conflicts = this.conflicts.map((x) => (x.element_id === id ? fresh : x));
+      row.replaceWith(this.renderRow(fresh));
+    } catch {
+      // The row stays as drawn; its buttons still work.
+    }
   }
 
   private renderFooter(): HTMLElement {
@@ -241,6 +262,69 @@ export class ConflictReviewModal extends BaseModal {
 function lookupName(id: string): string | null {
   const el = getState().data.elements.find((e) => e.id === id);
   return el?.name ?? null;
+}
+
+/** The words a row for a copy with no record of what OnlyWorlds held opens with (conv. 192, S2). */
+export const NO_BASELINE_LINE = 'This copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer.';
+
+/** An unset value, the folder format's way: absent, null, an empty text or list. */
+function unsetValue(v: unknown): boolean {
+  return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
+/** One side's value in words: names for linked elements this copy holds, text cut short. */
+export function sideWord(v: unknown): string {
+  if (unsetValue(v)) return 'empty';
+  const one = (x: unknown): string => {
+    if (typeof x === 'string') {
+      const named = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x) ? lookupName(x) : null;
+      const s = named && named.trim() ? named.trim() : x;
+      return s.length > 120 ? `${s.slice(0, 117)}...` : s;
+    }
+    if (typeof x === 'number' || typeof x === 'boolean') return String(x);
+    const s = JSON.stringify(x);
+    return s.length > 120 ? `${s.slice(0, 117)}...` : s;
+  };
+  if (Array.isArray(v)) {
+    const words = v.map(one).join(', ');
+    return words.length > 160 ? `${words.slice(0, 157)}...` : words;
+  }
+  return one(v);
+}
+
+/**
+ * The row for a copy with no record of what OnlyWorlds held (conv. 192): the line that says so, each
+ * field that differs with both values, what Keep this copy leaves on OnlyWorlds (S3), and the two
+ * choices by their plain names (S2). The copy's own values are read from the open world.
+ */
+export function noBaselineRowHtml(c: Conflict, name: string): string {
+  const here = (getState().data.elements.find((e) => e.id === c.element_id) ?? {}) as Record<string, unknown>;
+  const theirs = c.theirs ?? {};
+  const sides = c.fields.map((f) => `
+          <div class="atlas-conflict-side" data-field="${escapeText(f)}">
+            <span class="atlas-conflict-side-field">${escapeText(f)}</span>
+            <span class="atlas-conflict-side-here">Here: ${escapeText(sideWord(here[f]))}</span>
+            <span class="atlas-conflict-side-theirs">On OnlyWorlds: ${escapeText(sideWord(theirs[f]))}</span>
+          </div>`).join('');
+  // A field this copy leaves empty keeps its OnlyWorlds value when this copy is kept (S3).
+  const left = c.fields.filter((f) => unsetValue(here[f]) && !unsetValue(theirs[f]));
+  const leftLine = left.length === 0 ? '' : `
+        <span class="atlas-conflict-note" data-role="keeps-online">Keep this copy does not empty what this copy leaves empty: ${escapeText(left.join(', '))} ${left.length === 1 ? 'stays' : 'stay'} as OnlyWorlds has ${left.length === 1 ? 'it' : 'them'}.</span>`;
+  const moved = c.changed_while_open ? `
+        <span class="atlas-conflict-note" data-role="changed-while-open">It changed on OnlyWorlds while this was open: the OnlyWorlds side below is as it is now.</span>` : '';
+  return `
+      <div class="atlas-conflict-row-meta">
+        <span class="atlas-conflict-type">${escapeText(typeName(c.type))}</span>
+        <span class="atlas-conflict-name">${escapeText(name)}</span>
+        <span class="atlas-conflict-fields" data-role="no-baseline-line">${escapeText(NO_BASELINE_LINE)}</span>${moved}
+        <div class="atlas-conflict-sides" data-role="conflict-sides">${sides}
+        </div>${leftLine}
+      </div>
+      <div class="atlas-conflict-row-actions">
+        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="Send this copy to OnlyWorlds">Keep this copy</button>
+        <button class="atlas-btn-ghost" data-action="pull-theirs" title="Replace this copy with the one on OnlyWorlds">Keep the OnlyWorlds copy</button>
+      </div>
+    `;
 }
 
 /** A contested world key in words: the world's own words for the types, the world's strand, else the key. */

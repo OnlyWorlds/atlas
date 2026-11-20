@@ -382,6 +382,9 @@ export class MakeOnlineModal extends BaseModal {
         folder,
         client: adapter,
         apiWorldId: world.id,
+        // The world was made empty in this flow: its first round skips the check of ids keel holds
+        // before `/bulk` (conv. 192, R4); the engine attached after it never does.
+        freshWorld: true,
         // No onIdSwap: keel preserves client ids on CREATE (create-path
         // id-swap excised 2026-07-12).
         onPushProgress: (done, total) => {

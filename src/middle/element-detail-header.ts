@@ -21,7 +21,7 @@
 import { getState, patchSlice } from '../core/state';
 import { worldIsViewOnly } from '../core/view-only';
 import { isKnownOf } from '../sync/known-of';
-import { editedSince } from '../store/sync-stamp';
+import { editedSinceBaseline } from '../store/sync-stamp';
 import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
 import {
   parseHash, navigate, homeHash, elementHash, writingHash, mapHash, settingsHash,
@@ -455,8 +455,9 @@ function buildSyncDot(el: Element): HTMLElement {
     title = filesWhereOf(worldEntry) === 'browser' ? 'Saved in this browser' : 'Saved to folder';
     state = 'local';
   } else {
-    // By instant; an unreadable stamp shows as changed (conv. 190, R3).
-    const dirty = !el.server_updated_at || editedSince(el.local_updated_at, el.server_updated_at);
+    // By instant; an unreadable stamp shows as changed (conv. 190, R3), and so does a copy with no record
+    // of what OnlyWorlds held (conv. 192).
+    const dirty = !el.server_updated_at || editedSinceBaseline(el);
     if (activeId && isProposedHere(activeId, el.id)) {
       // keel holds this edit as a proposal for the world's keeper (conv. 163).
       icon = 'rate_review';

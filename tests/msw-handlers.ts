@@ -13,6 +13,7 @@ import { http, HttpResponse, type HttpHandler } from 'msw';
 import { ATLAS_LOCAL_EXTENSION_FIELDS, ATLAS_LOCAL_ONLY_FIELDS } from '../src/core/constants';
 import { WORLD_EXTENSION_KEY, jsonbStored } from './fixtures/fake-ow-client';
 import { keelStampClock } from './fixtures/keel-stamp';
+import { keelBody } from './fixtures/keel-body';
 
 const DEFAULT_BASE = 'https://www.onlyworlds.com/api/worldapi';
 /** Single source of truth list — keep in lockstep with constants.ts. */
@@ -509,7 +510,35 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
 
   function logUpsert(type: string, record: ServerRecord): void {
     seq += 1;
+    elementSeq.set(record.id, seq);
     opLog.push({ op: 'upsert', type, id: record.id, change_seq: seq, updated_at: record.updated_at, element: { ...record } });
+  }
+
+  /** keel's counter per element: the seq of its last write (`change_seq`, served on every body). */
+  const elementSeq = new Map<string, number>();
+
+  /**
+   * A stored record as keel serves it (conv. 20; keel elements/serialize.py): `type` first, every
+   * schema field with keel's unset value (`""`, `null`, `[]`), `created_at`, who wrote it and
+   * `change_seq`. Before 1.124.30 this server echoed only the keys sent.
+   */
+  function served(type: string, r: ServerRecord, atSeq?: number): Record<string, unknown> {
+    return { ...keelBody(type, { type, ...r }, 'wire'), change_seq: atSeq ?? elementSeq.get(r.id) ?? null };
+  }
+
+  /** The type this world holds `id` as, if any (keel checks every type's table). */
+  function heldAs(id: string): string | null {
+    for (const [t, mm] of state) if (mm.has(id)) return t;
+    return null;
+  }
+
+  /** keel's 409 for writing `id` as a new `type` when the world holds it (`held_conflict`). */
+  function heldConflict(type: string, id: string): ErrDesc | null {
+    const held = heldAs(id);
+    if (!held) return null;
+    return held === type
+      ? { status: 409, code: 'id_conflict', message: `An element with id ${id} already exists. Use PUT to upsert, or POST without an id.`, param: 'id' }
+      : { status: 409, code: 'id_conflict', message: `An element with id ${id} already exists as a ${held} in this world. Element ids are unique across every type: PUT it as a ${held}, or POST without an id.`, param: 'id' };
   }
   function logDelete(type: string, id: string, deletedAt: string): void {
     seq += 1;
@@ -624,7 +653,13 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       // `head` = the world's current change_seq (v2 tail) — the engine's
       // rewind detector reads it.
       const head = opLog.reduce((m, op) => Math.max(m, op.change_seq), 0);
-      return HttpResponse.json({ cursor, has_more: hasMore, head, changes });
+      // keel's feed bodies are whole, with no `doors` (core/changes.py `without_doors`).
+      const whole = changes.map(op => {
+        if (op.op !== 'upsert') return op;
+        const { doors: _doors, ...body } = served(op.type, op.element, op.change_seq);
+        return { ...op, element: body };
+      });
+      return HttpResponse.json({ cursor, has_more: hasMore, head, changes: whole });
     }),
 
     // GET /world — credential validation + world identity (v2 tail,
@@ -722,7 +757,14 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
         if (err) {
           return { ok: false as const, status: err.status, id, error: { code: err.code, message: err.message, param: err.param } };
         }
-        return { ok: true as const, status: 201, id, item: it };
+        // keel's /bulk is an upsert by id (elements/bulk.py): an id held as another type is the 409
+        // naming that type; one held as this type is replaced whole, its slot 200.
+        const held = id ? heldAs(id) : null;
+        if (held && held !== it.type) {
+          const c = heldConflict(it.type, id)!;
+          return { ok: false as const, status: c.status, id, error: { code: c.code, message: c.message, param: c.param } };
+        }
+        return { ok: true as const, status: held ? 200 : 201, id, item: it };
       });
       const anyError = evaluated.some(r => !r.ok);
 
@@ -768,7 +810,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const id = String(params.id);
       const r = bucket(type).get(id);
       if (!r) return envelope({ status: 404, code: 'not_found', message: `${type} '${id}' not found.`, param: null });
-      return HttpResponse.json({ ...r });
+      return HttpResponse.json(served(type, r));
     }),
 
     // LIST — cursor-paginated `{data, has_more, next_cursor}` envelope.
@@ -776,18 +818,35 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const blocked = authBlocked();
       if (blocked) return blocked;
       const type = String(params.type);
-      const all = Array.from(bucket(type).values());
+      const url = new URL(request.url);
+      let all = Array.from(bucket(type).values());
+      // keel's list filter: `ids=` names up to 200 ids, a malformed or longer list is a 422 naming it.
+      const idsParam = url.searchParams.get('ids');
+      if (idsParam !== null) {
+        const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean);
+        if (ids.length === 0 || ids.length > 200 || !ids.every(i => V2_UUID_RE.test(i))) {
+          return envelope({ status: 422, code: 'invalid_request', message: ids.length > 200 ? `ids takes at most 200 ids (got ${ids.length}).` : 'ids must be a comma-separated list of ids.', param: 'ids' });
+        }
+        const want = new Set(ids.map(i => i.toLowerCase()));
+        all = all.filter(r => want.has(r.id.toLowerCase()));
+      }
+      // keel's page: `limit` when given (clamped to 1..1000), else 100 (elements/pagination.py).
+      const limitParam = url.searchParams.get('limit');
+      const page = limitParam !== null && Number.isFinite(parseInt(limitParam, 10))
+        ? Math.min(1000, Math.max(1, parseInt(limitParam, 10)))
+        : pageSize;
+      const size = options.pageSize !== undefined ? Math.min(page, options.pageSize) : page;
       if (options.brokenCursor) {
         // Always page 1, always "more", never a new cursor → the adapter's
         // non-advancing-cursor guard must abort the walk as incomplete.
-        return HttpResponse.json({ data: all.slice(0, pageSize), has_more: true, next_cursor: 'STUCK' });
+        return HttpResponse.json({ data: all.slice(0, size).map(r => served(type, r)), has_more: true, next_cursor: 'STUCK' });
       }
-      const cursorParam = new URL(request.url).searchParams.get('cursor');
+      const cursorParam = url.searchParams.get('cursor');
       const offset = cursorParam ? (cursorOffsets.get(cursorParam) ?? 0) : 0;
-      const slice = all.slice(offset, offset + pageSize);
+      const slice = all.slice(offset, offset + size);
       const nextOffset = offset + slice.length;
       const hasMore = nextOffset < all.length;
-      return HttpResponse.json({ data: slice, has_more: hasMore, next_cursor: hasMore ? mintCursor(nextOffset) : null });
+      return HttpResponse.json({ data: slice.map(r => served(type, r)), has_more: hasMore, next_cursor: hasMore ? mintCursor(nextOffset) : null });
     }),
 
     // CREATE — 201, preserves client id, echoes full element + timestamps.
@@ -799,14 +858,13 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const err = validateBody(body, { requireName: true, hasId: existsAnywhere });
       if (err) return envelope(err);
       const id = (body.id as string | undefined) ?? crypto.randomUUID();
-      if (bucket(type).has(id)) {
-        return envelope({ status: 409, code: 'id_conflict', message: `${type} '${id}' already exists.`, param: null });
-      }
+      const held = heldConflict(type, id);
+      if (held) return envelope(held);
       const ts = clock();
       const record: ServerRecord = { ...body, id, created_at: ts, updated_at: ts };
       bucket(type).set(id, record);
       logUpsert(type, record);
-      return HttpResponse.json({ ...record }, { status: 201 });
+      return HttpResponse.json(served(type, record), { status: 201 });
     }),
 
     // UPDATE — 200 full-element echo (partial merge; name not required).
@@ -818,13 +876,30 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const existing = bucket(type).get(id);
       if (!existing) return envelope({ status: 404, code: 'not_found', message: `${type} '${id}' not found.`, param: null });
       const body = (await request.json()) as Record<string, unknown>;
+      delete body.id; // keel pops it: the path names the element
       const err = validateBody(body, { requireName: false, hasId: existsAnywhere });
       if (err) return envelope(err);
+      // keel's If-Match: `"41"`, `41` or `W/"41"`; a moved element is a 412 with the live one beside
+      // the envelope as `current`, nothing written.
+      const ifMatch = request.headers.get('If-Match');
+      if (ifMatch !== null && ifMatch.trim() !== '*') {
+        const raw = ifMatch.trim().replace(/^W\//, '').replace(/^"(.*)"$/, '$1');
+        if (!/^\d+$/.test(raw)) {
+          return envelope({ status: 422, code: 'invalid_request', message: "If-Match must be the element's change_seq (a whole number, quoted or bare) or *.", param: 'If-Match' });
+        }
+        const now = elementSeq.get(id);
+        if (now !== parseInt(raw, 10)) {
+          return HttpResponse.json({
+            error: { type: 'invalid_request', code: 'precondition_failed', message: `The element has changed since change_seq ${raw} (now ${now}).`, param: 'If-Match' },
+            current: served(type, existing),
+          }, { status: 412 });
+        }
+      }
       const ts = clock();
       const record: ServerRecord = { ...existing, ...body, id, created_at: existing.created_at, updated_at: ts };
       bucket(type).set(id, record);
       logUpsert(type, record);
-      return HttpResponse.json({ ...record });
+      return HttpResponse.json(served(type, record));
     }),
 
     // PUT — upsert: 201 when fresh, 200 replace when existing.
@@ -841,7 +916,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const record: ServerRecord = { ...body, id, created_at: existing?.created_at ?? ts, updated_at: ts };
       bucket(type).set(id, record);
       logUpsert(type, record);
-      return HttpResponse.json({ ...record }, { status: existing ? 200 : 201 });
+      return HttpResponse.json(served(type, record), { status: existing ? 200 : 201 });
     }),
 
     // DELETE — idempotent: 204 whether or not the id existed. Only a real

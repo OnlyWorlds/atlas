@@ -23,6 +23,8 @@ import type { ElementType } from '../../src/core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS, SERVER_AUTHOR_FIELDS } from '../../src/core/constants';
 import { OwProposed, type ProposalRow } from '../../src/sync/proposals';
 import { keelStampClock } from './keel-stamp';
+import { keelBody } from './keel-body';
+import { withChangeSeq } from '../../src/sync/change-seq';
 
 interface ServerRecord {
   id: string;
@@ -179,9 +181,38 @@ export class FakeOwApiClient implements OwApiClient {
     return m;
   }
 
+  /**
+   * keel's counter per element (`change_seq`): the seq of its last write. Served beside each record
+   * as the adapter serves it (`change-seq.ts`), never in it; `If-Match` on a PATCH is read against it.
+   */
+  private elementSeq = new Map<string, number>();
+
+  /**
+   * A stored record as keel serves it (conv. 20; keel `elements/serialize.py`): every schema field,
+   * the unset ones as keel stores them (`""`, `null`, `[]`), `created_at`, who wrote it, and the
+   * counter beside it. Before 1.124.30 the fake echoed only the keys sent, so a sparse file and
+   * keel's copy of the same content compared equal here and different against keel.
+   */
+  private served(record: ServerRecord): ServerRecord {
+    return withChangeSeq(keelBody(record.type, { ...record }, 'disk'), this.elementSeq.get(record.id));
+  }
+
+  /** keel's 409 for an id held anywhere in this world (keel checks every type's table): its own type's words, or the type it is (`other_type_conflict`). */
+  private heldConflict(type: ElementType, id: string): Error | null {
+    for (const [held, m] of this.byType) {
+      if (!m.has(id) || this.outOfView.has(id)) continue;
+      const message = held === type
+        ? `API Error 409: An element with id ${id} already exists. Use PUT to upsert, or POST without an id.`
+        : `API Error 409: An element with id ${id} already exists as a ${held} in this world. Element ids are unique across every type: PUT it as a ${held}, or POST without an id.`;
+      return Object.assign(new Error(message), { status: 409, code: 'id_conflict', param: 'id' });
+    }
+    return null;
+  }
+
   /** Append an upsert op carrying the element snapshot at commit time. */
   private appendUpsert(record: ServerRecord): void {
     this.opSeq += 1;
+    this.elementSeq.set(record.id, this.opSeq);
     this.opLog.push({
       op: 'upsert',
       type: record.type,
@@ -190,6 +221,11 @@ export class FakeOwApiClient implements OwApiClient {
       updated_at: record.updated_at,
       element: { ...record },
     });
+  }
+
+  /** A feed body as keel serves it: whole, `doors` left out, with the counter of that write. */
+  private servedAt(record: ServerRecord, seq: number): ServerRecord {
+    return withChangeSeq(withoutDoors(keelBody(record.type, { ...record }, 'disk')), seq);
   }
 
   /** Append a delete op (no element body — mirrors keel's delete op). */
@@ -250,20 +286,25 @@ export class FakeOwApiClient implements OwApiClient {
     if (!this.assignServerIds && this.outOfView.has(id)) {
       throw new Error(`API Error 404: ${type} '${id}' not found.`);
     }
-    if (!this.assignServerIds && this.bucket(type).has(id)) {
-      throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
-    }
-    const record: ServerRecord = this.stampDoors({ ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() });
+    // keel checks every type's table: an id this world holds as another type is a 409
+    // naming that type, never a twin (the fake made one before 1.124.30).
+    const held = this.assignServerIds ? null : this.heldConflict(type, id);
+    if (held) throw held;
+    const at = this.clock();
+    const record: ServerRecord = this.stampDoors({ ...wireBody, ...this.writeDoor, id, type, created_at: at, updated_at: at });
     // keel, as probed live: a seat's new element on a reviewed world carries the mark,
     // and the 201 answers with it.
     if (this.proposeWrites) record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' };
     this.bucket(type).set(id, record);
     if (this.proposeWrites) this.seatMade.add(id);
     this.appendUpsert(record);
-    return { ...record };
+    return this.served(record);
   }
 
-  async updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<ServerRecord> {
+  /** Every `If-Match` a PATCH carried, in order (apart from `calls`, whose shape the suites assert). */
+  ifMatchSent: Array<{ id: string; ifMatch: number }> = [];
+
+  async updateElement(type: ElementType, id: string, body: Record<string, unknown>, opts?: { ifMatch?: number }): Promise<ServerRecord> {
     this.throwIfAuthBlocked();
     this.throwIfWritePermission();
     // Same wire-semantics rule as createElement: drop undefined before the
@@ -271,7 +312,18 @@ export class FakeOwApiClient implements OwApiClient {
     // explicit `null` (or a new value) overwrites the field.
     const wireBody = stripUndefined(body);
     this.calls.push({ method: 'update', type, id, body: { ...wireBody } });
+    if (typeof opts?.ifMatch === 'number') this.ifMatchSent.push({ id, ifMatch: opts.ifMatch });
     this.throwIfInjected('update', id);
+    // keel's order (elements/service.py patch): the element looked up, then on a reviewed world
+    // If-Match before the proposal, otherwise the author rule before If-Match.
+    const stale = (): void => {
+      const live = this.outOfView.has(id) ? undefined : this.bucket(type).get(id);
+      if (!live || typeof opts?.ifMatch !== 'number' || this.elementSeq.get(id) === opts.ifMatch) return;
+      throw Object.assign(new Error(`API Error 412: The element has changed since change_seq ${opts.ifMatch} (now ${this.elementSeq.get(id)}).`), {
+        status: 412, code: 'precondition_failed', param: 'If-Match', current: this.served(live),
+      });
+    };
+    if (this.proposeWrites) stale();
     this.throwIfMemberRefuses('element', id);
     rejectDoubleSuffix(type, wireBody, 'update');
     rejectAtlasLocalFields(type, wireBody, 'update');
@@ -289,12 +341,13 @@ export class FakeOwApiClient implements OwApiClient {
       this.proposalRows.set(row.id, row);
       throw new OwProposed({ ...row });
     }
+    stale();
     // keel (probed live): an update ignores `hidden` both ways; only the site's Hide moves it.
     const { hidden: _ignored, ...patch } = wireBody;
     const next: ServerRecord = this.stampDoors({ ...existing, ...patch, ...this.writeDoor, id, type, updated_at: this.clock() });
     m.set(id, next);
     this.appendUpsert(next);
-    return { ...next };
+    return this.served(next);
   }
 
   /**
@@ -436,7 +489,7 @@ export class FakeOwApiClient implements OwApiClient {
   async listElements(type: ElementType): Promise<ServerRecord[]> {
     this.throwIfAuthBlocked();
     this.calls.push({ method: 'list', type });
-    return Array.from(this.bucket(type).values()).map(r => ({ ...r }));
+    return Array.from(this.bucket(type).values()).map(r => this.served(r));
   }
 
   async getElement(type: ElementType, id: string): Promise<ServerRecord | null> {
@@ -444,7 +497,30 @@ export class FakeOwApiClient implements OwApiClient {
     this.calls.push({ method: 'get', type, id });
     if (this.outOfView.has(id)) return null;
     const r = this.bucket(type).get(id);
-    return r ? { ...r } : null;
+    return r ? this.served(r) : null;
+  }
+
+  /** Every `ids=` read (conv. 192, R4), apart from `calls`, so the exact-sequence suites keep their meaning. */
+  idsReads: Array<{ type: ElementType; ids: string[] }> = [];
+  /** Test seam: the `ids=` read answers only this many records and says a page is left (M5); null = whole. */
+  idsReadCut: number | null = null;
+  /** Test seam: the `ids=` read fails with this error. */
+  idsReadFails: Error | null = null;
+
+  /**
+   * `GET /{type}?ids=` as the adapter walks it (keel's list filter: an id this key cannot see is absent, a
+   * type's other ids are not this type's). `complete` false under `idsReadCut`.
+   */
+  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean }> {
+    this.throwIfAuthBlocked();
+    this.idsReads.push({ type, ids: [...ids] });
+    if (this.idsReadFails) throw this.idsReadFails;
+    const want = new Set(ids.map(i => i.toLowerCase()));
+    const found = Array.from(this.bucket(type).values())
+      .filter(r => want.has(r.id.toLowerCase()) && !this.outOfView.has(r.id))
+      .map(r => this.served(r));
+    if (this.idsReadCut !== null && found.length > this.idsReadCut) return { records: found.slice(0, this.idsReadCut), complete: false };
+    return { records: found, complete: true };
   }
 
   /**
@@ -643,12 +719,19 @@ export class FakeOwApiClient implements OwApiClient {
       // Injection seam takes priority over intrinsic validation.
       const err = this.takeInjectedBulkError(id)
         ?? validateBulkItem(it.type, wireBody, id, existingIds, batchIds);
+      // keel's /bulk is an upsert by id (elements/bulk.py): an id held as another type in this world
+      // is the 409 naming that type; one held as this type is replaced, answered 200 below.
+      const other = !err && typeof wireBody.id === 'string' && !this.bucket(it.type).has(id) ? this.heldConflict(it.type, id) : null;
       if (err) {
         anyError = true;
-        results.push({ status: 400, id, error: err });
+        results.push({ status: err.code === 'id_conflict' ? 409 : 400, id, error: err });
+        wireBodies.push(null);
+      } else if (other) {
+        anyError = true;
+        results.push({ status: 409, id, error: { code: 'id_conflict', message: other.message.replace(/^API Error 409: /, ''), param: 'id' } });
         wireBodies.push(null);
       } else {
-        results.push({ status: 201, id });
+        results.push({ status: this.bucket(it.type).has(id) ? 200 : 201, id });
         wireBodies.push(wireBody);
       }
     }
@@ -671,9 +754,13 @@ export class FakeOwApiClient implements OwApiClient {
       if (!wireBody) continue;
       const type = items[i].type;
       const id = results[i].id;
-      const record: ServerRecord = this.stampDoors({ ...wireBody, ...this.writeDoor, id, type, updated_at: this.clock() });
+      // A replace is whole (keel `_reset_to_defaults`): what the item leaves out is unset, extension
+      // keys it leaves out are dropped; the row keeps its created_at. Before 1.124.30 the fake answered 201.
+      const before = this.bucket(type).get(id);
+      const at = this.clock();
+      const record: ServerRecord = this.stampDoors({ ...wireBody, ...this.writeDoor, id, type, created_at: before?.created_at ?? at, updated_at: at });
       // keel's bulk marks a seat's new element too, and its slot echoes only the time.
-      if (this.proposeWrites) { record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' }; this.seatMade.add(id); }
+      if (this.proposeWrites && !before) { record.x_review_proposed = { by: FAKE_SEAT_ID, evidence: 'seat', expires: '2099-01-01' }; this.seatMade.add(id); }
       this.bucket(type).set(id, record);
       this.appendUpsert(record);
       if (!this.omitBulkTimestamps) results[i].updatedAt = record.updated_at;
@@ -734,7 +821,7 @@ export class FakeOwApiClient implements OwApiClient {
             updatedAt: o.updated_at ?? '',
             // keel's feed bodies carry no `doors` (core/changes.py, `without_doors`: the feed is
             // the trail already); only a read of the element and a write's answer serve them.
-            element: withoutDoors(o.element as ServerRecord),
+            element: this.servedAt(o.element as ServerRecord, o.seq),
           }
         : {
             op: 'delete' as const,

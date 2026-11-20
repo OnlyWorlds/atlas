@@ -28,11 +28,12 @@ import type {
 } from '../../src/core/types';
 import type { ChartConfig } from '../../src/visualization/timeline/types';
 import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
-import { stampedBody, editStamp, dropLastWriter, editedSince } from '../../src/store/sync-stamp';
+import { stampedBody, editStamp, dropLastWriter, editedSince, type StampOpts } from '../../src/store/sync-stamp';
 import { scrubReferrers } from '../../src/store/scrub-links';
 import { CorruptFileError } from '../../src/store/fs-utils';
 import { withoutSeatSecret } from '../../src/core/seat';
 import { HIDDEN_SHOWN_ONLINE } from '../../src/core/hidden-mark';
+import { BASELINE_UNKNOWN, isBaselineUnknown } from '../../src/core/baseline-unknown';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
 const defaultSyncState: SyncState = {
@@ -530,6 +531,7 @@ export class MockFolderStore implements FolderStore {
       if (isKnownOf(elem)) return false;
       // Never synced → always pending.
       if (!elem.server_updated_at) return true;
+      if (isBaselineUnknown(elem)) return true; // parity with FsFolderStore (conv. 192)
       // By instant; an absent or unreadable stamp reads as changed (conv. 190, R3).
       return editedSince(elem.local_updated_at, baseline ?? elem.server_updated_at);
     });
@@ -598,16 +600,16 @@ export class MockFolderStore implements FolderStore {
     this.worldPrefs = structuredClone(prefs);
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>): Promise<void> {
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>, opts?: StampOpts): Promise<void> {
     const existing = this.elements.get(id);
     if (!existing) return;
-    this.elements.set(id, stampedBody(existing, server_updated_at, sentLocalUpdatedAt, kept));
+    this.elements.set(id, stampedBody(existing, server_updated_at, sentLocalUpdatedAt, kept, opts));
   }
 
   async clearServerBaseline(id: string): Promise<void> {
     const existing = this.elements.get(id);
     if (!existing) return;
-    const { server_updated_at: _drop, ...rest } = existing;
+    const { server_updated_at: _drop, [BASELINE_UNKNOWN]: _mark, ...rest } = existing as Element & Record<string, unknown>;
     this.elements.set(id, rest as Element);
   }
 
@@ -679,6 +681,7 @@ export class MockFolderStore implements FolderStore {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
         if (opts.dropLocal?.includes(field)) continue;
         if (field === HIDDEN_SHOWN_ONLINE) continue; // the record is keel's word on the mark (conv. 170, F3)
+        if (field === BASELINE_UNKNOWN) continue; // parity with FsFolderStore (conv. 192)
         if (stub && KNOWN_OF_DROPS_LOCAL.includes(field)) continue; // a mirror of a field the stub leaves unset (gate G6)
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;

@@ -424,6 +424,17 @@ export interface Conflict {
    * withdrawn. Overwrite proposes again; Pull drops the edit.
    */
   proposal?: { outcome: 'declined' | 'lapsed' | 'withdrawn'; reason?: string };
+  /**
+   * A copy with no record of what OnlyWorlds held (conv. 192): held under every policy until the
+   * person chooses. `fields` are the ones that differ under the folder format's fold.
+   */
+  no_baseline?: true;
+  /** keel's values of `fields` as read, for the row to show beside this copy's (conv. 192). */
+  theirs?: Record<string, unknown>;
+  /** keel's counter of the copy the row shows: Keep this copy sends it as `If-Match` (conv. 192, M6). */
+  change_seq?: number;
+  /** Keep this copy found it changed on OnlyWorlds while the review was open (M6). */
+  changed_while_open?: true;
 }
 
 /** One edit keel holds as a proposal (conv. 163; SyncState.proposed). */
@@ -535,6 +546,11 @@ export interface SyncResult {
   delete_refused?: Array<{ id: string; type: ElementType; name?: string }>;
   /** Proposals the round settled (conv. 163, P5): accepted ones took the server's copy. */
   proposals_accepted?: string[];
+  /**
+   * `/bulk` slots keel answered 200: an element it already held, replaced whole by this copy (conv. 192,
+   * S5). The check before `/bulk` leaves out every id keel holds, so only a race reaches here; said.
+   */
+  bulk_replaced_ids?: string[];
 }
 
 export interface PerElementFailure {

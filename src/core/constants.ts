@@ -280,6 +280,10 @@ export const ATLAS_LOCAL_ONLY_FIELDS = [
   // (keel takes it in a write on a create only; a key that can hide sends the hide, conv. 173). Written and removed with the push
   // stamp (`stampedBody`), dropped by every pull and on import; never sent.
   'atlas_hidden_shown_online',
+  // A copy with no record of what OnlyWorlds held (conv. 192, `core/baseline-unknown.ts`): true beside
+  // keel's stamp when a file with no baseline met an id keel holds with other content. Written only with
+  // a sync stamp, dropped by the next push stamp and by every pull; never sent.
+  'atlas_baseline_unknown',
 ] as const;
 
 /**

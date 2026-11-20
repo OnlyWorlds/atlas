@@ -26,6 +26,7 @@ import type {
 } from '../core/types';
 import type { ChartConfig } from '../visualization/timeline/types';
 import type { WorldStyles } from '../core/world-styles';
+import type { StampOpts } from './sync-stamp';
 import { PlainError } from '../core/plain-error';
 
 /**
@@ -255,8 +256,9 @@ export interface FolderStore {
    * kept dirty so the edit goes out next round (`store/sync-stamp.ts`).
    * `null` = the server is known to hold different content: keep it dirty.
    * `kept`: fields keel wrote on that write, kept with the stamp in the same write (conv. 168).
+   * `opts.asServed`: the copy is keel's as served, so with no edit in flight its local stamp is keel's too (conv. 192).
    */
-  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>): Promise<void>;
+  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null, kept?: Readonly<Record<string, unknown>>, opts?: StampOpts): Promise<void>;
 
   /**
    * Clear `server_updated_at` on a local element. Used when resolving a

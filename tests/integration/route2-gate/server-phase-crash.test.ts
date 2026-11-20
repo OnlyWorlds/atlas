@@ -70,7 +70,9 @@ async function checkConverged(server: Server, adapter: OwV2ClientAdapter, root: 
     for (const k of WIRE) {
       const a = (el as Record<string, unknown>)[k];
       const b = remote![k];
-      if (a === undefined && (b === undefined || b === null || b === '' || (Array.isArray(b) && b.length === 0))) continue;
+      // Unset is one value whichever form each side holds it in (folder spec; keel serves every field).
+      const unset = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+      if (unset(a) && unset(b)) continue;
       expect(a, `${label}: ${el.name}.${k} reads clean but differs from the server`).toEqual(b);
     }
   }

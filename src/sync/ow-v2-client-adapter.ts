@@ -47,10 +47,14 @@ const CHECKED_MARK = 'x_review_checked';
 import { isHiddenMark } from '../core/hidden-mark';
 import { publicPageUrl } from '../core/public-page';
 import { isHostBlockedPage } from './host-blocked-page';
+import { withChangeSeq } from './change-seq';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
 export const DEFAULT_V2_BASE = 'https://www.onlyworlds.com/api/v2';
+
+/** keel's cap on `ids=` (`IDS_MAX`, elements/api.py), and the page asked for beside it. */
+export const LIST_BY_IDS_MAX = 200;
 
 /**
  * keel's PIN rule (Skeld 2026-10-22; SDK 4.59.0's own): the secret (a
@@ -112,6 +116,11 @@ export class OwV2Error extends Error {
   readonly hostBlocked: boolean;
   /** True when the body parsed as JSON: keel's or a proxy's JSON, never the web host's page, with or without an envelope. */
   readonly jsonBody: boolean;
+  /**
+   * keel's 412 (`precondition_failed`, its `If-Match` answer): the live element beside the envelope, nothing
+   * written. Raw from the wire here; `updateElement` replaces it with the adapted record.
+   */
+  current: Record<string, unknown> | null = null;
 
   constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown } | null, rawBody: string, retryAfter: string | null = null, opts: { sentBody?: boolean; hostBlocked?: boolean; jsonBody?: boolean } = {}) {
     const serverMsg = envelope?.message ?? (rawBody || 'request failed');
@@ -263,6 +272,7 @@ export function adaptV2Record(raw: unknown, type: ElementType): ServerRecord {
     // Server bookkeeping counter — never lands on disk (a stale copy in an
     // element file would ride the next PATCH and 422 "change_seq is read-only";
     // the /changes cursor machinery reads the op envelope, never the element).
+    // It rides beside the record instead, for `If-Match` (conv. 192, `change-seq.ts`).
     if (k === 'change_seq') continue;
     out[rename.get(k) ?? k] = v;
   }
@@ -270,7 +280,7 @@ export function adaptV2Record(raw: unknown, type: ElementType): ServerRecord {
   if (typeof out.updated_at !== 'string') throw new Error('adaptV2Record: response missing string updated_at');
   // keel's stub becomes a record in its own shape here, before any compare (conv. 155, I1).
   if (isKnownOf(out)) return stubShape(out) as ServerRecord;
-  return out as ServerRecord;
+  return withChangeSeq(out, src.change_seq) as ServerRecord;
 }
 
 export interface OwV2ClientOptions {
@@ -374,15 +384,19 @@ export class OwV2ClientAdapter implements OwApiClient {
       type Envelope = { type?: string; code?: string; message?: string; param?: string | null; reason?: unknown };
       let envelope: Envelope | null = null;
       let jsonBody = false;
+      let current: Record<string, unknown> | null = null;
       try {
-        const parsed = JSON.parse(text) as { error?: Envelope; reason?: unknown };
+        const parsed = JSON.parse(text) as { error?: Envelope; reason?: unknown; current?: unknown };
         jsonBody = true;
+        if (parsed?.current && typeof parsed.current === 'object' && !Array.isArray(parsed.current)) current = parsed.current as Record<string, unknown>;
         const inner: Envelope | null = parsed?.error ?? null;
         // keel's 409 resync_required says why (role or view, Skeld 2026-10-20):
         // read inside the envelope or beside it, whichever keel sends.
         envelope = inner && inner.reason === undefined && typeof parsed.reason === 'string' ? { ...inner, reason: parsed.reason } : inner;
       } catch { /* non-JSON error body — envelope stays null */ }
-      throw new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'), { sentBody: body !== undefined, hostBlocked: isHostBlockedPage(response.status, text), jsonBody });
+      const error = new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'), { sentBody: body !== undefined, hostBlocked: isHostBlockedPage(response.status, text), jsonBody });
+      error.current = current;
+      throw error;
     }
     if (!text) return undefined;
     try {
@@ -513,12 +527,21 @@ export class OwV2ClientAdapter implements OwApiClient {
     }
   }
 
-  async updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<ServerRecord> {
+  /**
+   * PATCH. `opts.ifMatch`: keel's `If-Match` with the counter of the copy the caller
+   * read; a moved element answers 412 with the live one as `current` (adapted here) and nothing is
+   * written. Sent only by Keep this copy on a copy with no record of what OnlyWorlds held (conv. 192, M6).
+   */
+  async updateElement(type: ElementType, id: string, body: Record<string, unknown>, opts?: { ifMatch?: number }): Promise<ServerRecord> {
     const wireBody = toV2WireShape(body, type, 'update');
     try {
-      const response = await this.request('PATCH', `/${type}/${id}`, wireBody);
+      const headers = typeof opts?.ifMatch === 'number' ? { 'If-Match': `"${opts.ifMatch}"` } : undefined;
+      const response = await this.request('PATCH', `/${type}/${id}`, wireBody, headers);
       return adaptV2Record(response, type);
     } catch (err) {
+      if (err instanceof OwV2Error && err.status === 412 && err.current) {
+        try { err.current = adaptV2Record(err.current, type); } catch { err.current = null; }
+      }
       logWireError('PATCH', type, id, wireBody, err);
       throw err;
     }
@@ -571,6 +594,36 @@ export class OwV2ClientAdapter implements OwApiClient {
       if (isOwV2Error(err) && err.status === 404) return null;
       throw err;
     }
+  }
+
+  /**
+   * Which of these ids keel holds as this type (`GET /{type}?ids=`, keel's list filter: at most 200 ids a
+   * call, its pages 100 long unless `limit` says more), with each body as served (conv. 192, R4).
+   * Its own walk, never `listElements`: that one resets the type's incomplete flag the server-delete
+   * inference reads. `complete` false when a page was left unread: the caller treats every id it did
+   * not see as held (M5).
+   */
+  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean }> {
+    const records: ServerRecord[] = [];
+    let complete = true;
+    for (let i = 0; i < ids.length; i += LIST_BY_IDS_MAX) {
+      const chunk = ids.slice(i, i + LIST_BY_IDS_MAX);
+      let cursor: string | null = null;
+      for (let page = 0; page < 20; page++) {
+        const q = new URLSearchParams({ ids: chunk.join(','), limit: String(LIST_BY_IDS_MAX) });
+        if (cursor) q.set('cursor', cursor);
+        const env = await this.request('GET', `/${type}?${q.toString()}`) as { data?: unknown[]; has_more?: boolean; next_cursor?: string | null } | undefined;
+        for (const r of env?.data ?? []) {
+          try { records.push(adaptV2Record(r, type)); } catch { complete = false; }
+        }
+        if (!env?.has_more) { cursor = null; break; }
+        const next = env.next_cursor ?? null;
+        if (!next || next === cursor) { complete = false; cursor = null; break; }
+        cursor = next;
+      }
+      if (cursor) complete = false;
+    }
+    return { records, complete };
   }
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {

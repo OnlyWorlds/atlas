@@ -25,7 +25,7 @@
   "src/setup/world-doors.ts": 28,
   "src/setup/world-download.ts": 1,
   "src/setup/world-parent.ts": 1,
-  "src/sidebar/elements-sidebar.ts": 25,
+  "src/sidebar/elements-sidebar.ts": 26,
   "src/sidebar/worlds-sidebar.ts": 20,
   "src/store/folder-store-fs.ts": 25,
   "src/store/fs-utils.ts": 2,

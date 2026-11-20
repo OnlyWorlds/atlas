@@ -6587,6 +6587,39 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
   flex-shrink: 0;
 }
 
+/* A copy with no record of what OnlyWorlds held (conv. 192): its line, notes and both sides read whole. */
+.atlas-conflict-row[data-no-baseline] .atlas-conflict-fields,
+.atlas-conflict-note {
+  font-size: 12px;
+  color: var(--atlas-text);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.atlas-conflict-sides {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.atlas-conflict-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.atlas-conflict-side-field {
+  color: var(--atlas-text-muted);
+}
+
+.atlas-conflict-side-here,
+.atlas-conflict-side-theirs {
+  color: var(--atlas-text);
+}
+
 .atlas-conflict-footer {
   display: flex;
   justify-content: flex-end;

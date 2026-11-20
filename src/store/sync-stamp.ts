@@ -23,6 +23,7 @@
 import { instantOf } from '@onlyworlds/sdk';
 import type { Element } from '../core/types';
 import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
+import { BASELINE_UNKNOWN, readableBaseline } from '../core/baseline-unknown';
 
 /**
  * The one ORDERING of two element times (DESIGN_LAWS conv. 190, R1): each read
@@ -59,6 +60,14 @@ export function editedSince(stamp: unknown, baseline: unknown): boolean {
 }
 
 /**
+ * `editedSince` against the copy's own baseline, read as conv. 192 says: a baseline marked as no
+ * record of what OnlyWorlds held is one that cannot be read, so the copy reads as changed.
+ */
+export function editedSinceBaseline(el: Element): boolean {
+  return editedSince(el.local_updated_at, readableBaseline(el));
+}
+
+/**
  * The first millisecond stamp after keel's instant (R4a): floor to the
  * millisecond, plus one, in `toISOString()`'s form. Equal to keel's instant plus
  * one microsecond rounded up to the millisecond, so it sorts after keel's stamp
@@ -71,11 +80,22 @@ export function stampJustAfter(serverUpdatedAt: unknown): string | null {
   return new Date(at.seconds * 1000 + Math.floor(at.microseconds / 1000) + 1).toISOString();
 }
 
+/** How a stamp reads the copy it lands on. */
+export interface StampOpts {
+  /**
+   * The copy is keel's as served (conv. 192, R1: a file with no baseline found holding the same
+   * content keel holds): with no edit in flight its local stamp becomes keel's too, so a local
+   * stamp after keel's never reads as an edit to send.
+   */
+  asServed?: boolean;
+}
+
 export function stampedBody(
   existing: Element,
   serverUpdatedAt: string,
   sentLocalUpdatedAt?: string | null,
   kept?: Readonly<Record<string, unknown>>,
+  opts: StampOpts = {},
 ): Element {
   // A push that landed is keel's last write, through Atlas's own door: whoever wrote the copy on
   // disk before is no longer the last writer (#347: an outside edit adopted from the
@@ -83,6 +103,11 @@ export function stampedBody(
   // `kept`: what keel wrote into the element on that write and the copy keeps with the stamp, in the
   // same write (the review profile's mark on a seat's new element, conv. 168).
   const next: Element = dropLastWriter({ ...existing, ...kept, server_updated_at: serverUpdatedAt });
+  // conv. 192: the mark that this stamp is no known history rides only the stamp that says so (in
+  // `kept`); every other stamp is a write keel answered or a copy adopted as keel's, and drops it.
+  if ((next as Record<string, unknown>)[BASELINE_UNKNOWN] !== true || kept?.[BASELINE_UNKNOWN] !== true) {
+    delete (next as Record<string, unknown>)[BASELINE_UNKNOWN];
+  }
   // keel's word on the hidden mark (`hiddenWordOf`): kept only while the file holds the mark and the
   // answer showed it; an answer with no body leaves the word as it was.
   // A first stamp with no answer body (a `/bulk` echo) is a create keel took, which takes the mark or
@@ -103,7 +128,7 @@ export function stampedBody(
   // differs from it and goes on to the lift below instead of being read as "no edit".
   if (sentLocalUpdatedAt === undefined
     || (sentLocalUpdatedAt !== null && (existing.local_updated_at ?? '') === sentLocalUpdatedAt)) {
-    if (instantOf(existing.local_updated_at) === null) next.local_updated_at = serverUpdatedAt;
+    if (opts.asServed || instantOf(existing.local_updated_at) === null) next.local_updated_at = serverUpdatedAt;
     return next;
   }
   // Edited in flight. Already after the baseline: nothing to do. Otherwise lift it just past

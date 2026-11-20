@@ -26,7 +26,7 @@ import { isZoneGestureActive } from './zone-gesture';
 import { flushBeforeLeavingWorld } from './leave-flush';
 import { onHashChange, parseHash } from './router';
 import type { DiskChange, FolderStore } from '../store/folder-store';
-import { editedSince } from '../store/sync-stamp';
+import { editedSinceBaseline } from '../store/sync-stamp';
 import type { Element } from './types';
 import { nameOrUnnamed } from './type-words';
 
@@ -47,8 +47,9 @@ export interface DiskNotice {
   unreadable: string[];
   /**
    * Names of elements whose files were removed outside Atlas (Titus:
-   * say so). Dropped from view only: never deleted on the account, and a
-   * linked world's next full pull can bring them back.
+   * say so). Dropped from view only: never deleted on the account. A linked
+   * world's pull brings one back only when the change feed names it past the
+   * cursor (an edit there, or Atlas's own push not yet walked past).
    */
   removed: string[];
   /** Linked world, big batch: sync is held until the user answers. */
@@ -128,7 +129,7 @@ export function notSyncedNow(n: DiskNotice, elements: readonly Element[]): numbe
   let count = 0;
   for (const id of n.notSynced) {
     const el = byId.get(id);
-    if (el && el.server_updated_at && !editedSince(el.local_updated_at, el.server_updated_at)) count++;
+    if (el && el.server_updated_at && !editedSinceBaseline(el)) count++;
   }
   return count;
 }
@@ -375,8 +376,9 @@ async function runPass(store: FolderStore, worldId: string, full: boolean): Prom
       if (c.kind === 'deleted') continue;
       const el = byId.get(c.id);
       if (!el) continue;
-      // By instant (an outside tool's offset), an unreadable stamp as an edit (conv. 190, R3).
-      const willUpload = !el.server_updated_at || editedSince(el.local_updated_at, el.server_updated_at);
+      // By instant (an outside tool's offset), an unreadable stamp as an edit (conv. 190, R3); a copy with
+      // no record of what OnlyWorlds held as changed (conv. 192).
+      const willUpload = !el.server_updated_at || editedSinceBaseline(el);
       if (willUpload) { pending++; notSynced.delete(c.id); }
       else notSynced.add(c.id);
     }

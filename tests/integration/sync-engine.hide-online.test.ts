@@ -162,9 +162,13 @@ describe('an owner\'s key', () => {
     expect((await onKeel()).hidden).toBe(true);
     expect((await onKeel()).description).toBe('A sailor.');
     expect((await wren()).server_updated_at).toBeTruthy();
-    // Different content: dirty, so the next round sends it as an update, onto a hidden element.
+    // Different content, and no record of what OnlyWorlds held (conv. 192): a review row, nothing
+    // sent; Keep this copy sends it as an update, onto a hidden element.
     client.calls.length = 0;
     await engine.syncNow();
+    expect(writes()).toEqual([]);
+    expect((await folder.readSyncState()).conflicts.map(c => c.element_id)).toEqual([WREN]);
+    await engine.resolveConflict(WREN, 'overwrite-mine');
     expect(writes()).toEqual(['update']);
     expect((await onKeel()).description).toBe('The traitor.');
     expect((await onKeel()).hidden).toBe(true);

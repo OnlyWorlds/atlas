@@ -44,16 +44,24 @@ function loseFirstCreateResponse(onInFlight?: () => Promise<void>): void {
 }
 
 describe('adopting a create that is already on the server', () => {
-  it('an edit made while the lost create was in flight still reaches the server', async () => {
+  it('an edit made while the lost create was in flight is a review row like any differing copy, and Keep this copy sends it', async () => {
+    // conv. 192, ruling 1: no record of the create sent, so the edit and a member's edit look
+    // alike from here. Never pushed unseen; the person's choice sends it as an UPDATE.
     const el = await folder.createElement('character', { name: 'Rhea', description: 'one' });
     loseFirstCreateResponse(() => folder.updateElement(el.id, { description: 'two' }).then(() => {}));
 
     await engine.syncNow(); // create commits "one", response lost, local says "two"
-    await engine.syncNow(); // 409 id_conflict → adopt
-    await engine.syncNow(); // the edit goes out as an UPDATE
+    await engine.syncNow(); // held: nothing sent
+    await engine.syncNow();
 
+    expect((await client.getElement('character', el.id))!.description).toBe('one');
+    expect(client.calls.filter(c => (c as { method: string }).method === 'update')).toHaveLength(0);
+    expect((await folder.readSyncState()).conflicts.map(c => [c.element_id, c.no_baseline])).toEqual([[el.id, true]]);
+
+    await engine.resolveConflict(el.id, 'overwrite-mine');
     expect((await client.getElement('character', el.id))!.description).toBe('two');
     expect(await folder.listLocallyChangedSince(null)).toHaveLength(0);
+    expect((await folder.readSyncState()).conflicts).toEqual([]);
   });
 
   it('an unchanged element adopts clean and sends nothing more', async () => {

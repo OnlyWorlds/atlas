@@ -44,7 +44,10 @@ import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
 import { stampKeptOf, stampWordOf } from '../core/door-trail';
 import { withKeptLinks, withoutKeptLinks } from './kept-links';
 import { isKnownOf, knownOfMove, stubShape } from './known-of';
-import { editedSince, stampOrder } from '../store/sync-stamp';
+import { editedSince, editedSinceBaseline, stampOrder } from '../store/sync-stamp';
+import { BASELINE_UNKNOWN, hasNoBaseline, isBaselineUnknown, readableBaseline } from '../core/baseline-unknown';
+import { copyDiff, narratorMayBeFilled, theirsOf } from './same-copy';
+import { changeSeqOf, preconditionCurrent } from './change-seq';
 import type {
   Conflict,
   Element,
@@ -137,13 +140,20 @@ export interface ChangesPage {
  */
 export interface OwApiClient {
   createElement(type: ElementType, body: Record<string, unknown>): Promise<{ id: string; updated_at: string } & Record<string, unknown>>;
-  updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<{ id: string; updated_at: string } & Record<string, unknown>>;
+  /** PATCH; `opts.ifMatch` is keel's `If-Match` (a 412 with the live element as `current` when it moved; conv. 192, M6). */
+  updateElement(type: ElementType, id: string, body: Record<string, unknown>, opts?: { ifMatch?: number }): Promise<{ id: string; updated_at: string } & Record<string, unknown>>;
   deleteElement(type: ElementType, id: string): Promise<void>;
   /** keel's hide (conv. 173). Absent: a mark added after the element went online stays here only. */
   hideElement?(type: ElementType, id: string): Promise<void>;
   listElements(type: ElementType): Promise<Array<{ id: string; updated_at: string } & Record<string, unknown>>>;
   /** Fetch single element. Used by SyncEngine pre-update conflict check. */
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
+  /**
+   * Which of these ids keel holds as this type, with each body (`GET /{type}?ids=`; conv. 192, R4),
+   * read before a `/bulk` so no item carries an id keel holds. `complete` false: a page went unread,
+   * and an id not seen is treated as held. Absent: no check (the production adapter always has it).
+   */
+  listByIds?(type: ElementType, ids: readonly string[]): Promise<{ records: Array<{ id: string; updated_at: string } & Record<string, unknown>>; complete: boolean }>;
   /**
    * World-meta read — GET /world's 13-field body in DISK names (world-meta
    * sync). REQUIRED, not optional: an optional method would silently
@@ -254,6 +264,16 @@ export interface SyncEngineOptions {
    * (sync-state `foreign`): ids refused by one world say nothing about another.
    */
   apiWorldId?: string | null;
+  /**
+   * The world is opened on an agent seat (conv. 132): keel fills a held seat's Narrative narrator on
+   * create, which a copy with no baseline does not count as a difference (conv. 192, M1).
+   */
+  seat?: boolean;
+  /**
+   * Make Online, Create new: the engine of its first round, on a world made empty in the same flow.
+   * Only it skips the `/bulk` check of ids keel holds (conv. 192, R4): nothing can be there yet.
+   */
+  freshWorld?: boolean;
   /** Called when a conflict is detected. */
   onConflict?: (conflict: Conflict) => void;
   /** Called whenever engine state changes (for UI). */
@@ -309,6 +329,8 @@ export class SyncEngine {
   private readOnly = false;
   private where: 'folder' | 'browser' = 'folder';
   private apiWorldId: string | null = null;
+  private seat = false;
+  private freshWorld = false;
   private onConflict: (conflict: Conflict) => void;
   private onStateChange: (state: SyncEngineState) => void;
   private onPushProgress: (done: number, total: number) => void;
@@ -374,6 +396,8 @@ export class SyncEngine {
     this.readOnly = !!opts.readOnly;
     this.where = opts.where ?? 'folder';
     this.apiWorldId = opts.apiWorldId ?? null;
+    this.seat = !!opts.seat;
+    this.freshWorld = !!opts.freshWorld;
     this.policy = normalizePolicy(opts.policy);
     this.onConflict = opts.onConflict ?? (() => {});
     this.onStateChange = opts.onStateChange ?? (() => {});
@@ -614,6 +638,10 @@ export class SyncEngine {
   private roundHiddenRefused: string[] = [];
   /** Hidden locals whose id OnlyWorlds shows (conv. 170): not adopted, said once. */
   private roundHiddenShown: string[] = [];
+  /** `/bulk` slots keel answered 200 this round: an element it held, replaced (conv. 192, S5). */
+  private roundReplaced: string[] = [];
+  /** Rows the `/bulk` phase held for copies with no record of what OnlyWorlds held (conv. 192). */
+  private roundHeldRows: Conflict[] = [];
   /** The role as the running push read it, afresh once per round: a lowering while open moves it. */
   private roundRole: Promise<string | null> | null = null;
 
@@ -627,7 +655,9 @@ export class SyncEngine {
 
   /** An element's body as sent: sync stamps off, links to kept or left elements left out (keel keeps them). */
   private outgoing(elem: Element): Record<string, unknown> {
-    return withoutKeptLinks(elem.type, stripSyncFields(elem), this.roundLinkHeld);
+    // The mark of a copy with no record of what OnlyWorlds held is sync's own note (conv. 192): never sent.
+    const { [BASELINE_UNKNOWN]: _mark, ...body } = stripSyncFields(elem);
+    return withoutKeptLinks(elem.type, body, this.roundLinkHeld);
   }
 
   /**
@@ -689,7 +719,7 @@ export class SyncEngine {
     const owes = (e: Element) =>
       typeof e.server_updated_at === 'string' && isHiddenMark(e)
       && (e as Record<string, unknown>)[HIDDEN_SHOWN_ONLINE] === true
-      && !editedSince(e.local_updated_at, e.server_updated_at) && !skip.has(e.id) && !isKnownOf(e);
+      && !editedSinceBaseline(e) && !skip.has(e.id) && !isKnownOf(e);
     const owed = (await this.folder.listElements()).filter(owes).slice(0, HIDE_SWEEP_CAP);
     for (const listed of owed) {
       if (this.stopped) return;
@@ -967,6 +997,8 @@ export class SyncEngine {
     // links to them never go out.
     this.roundKept = new Set(syncState.kept_outside_view ?? []);
     this.roundLinkHeld = linkHeld(syncState);
+    /** The row is a copy with no record of what OnlyWorlds held (conv. 192). */
+    let noBaseline = false;
     const keepHere = async (): Promise<void> => {
       await this.folder.updateSyncState(s => ({
         conflicts: s.conflicts.filter(c => c.element_id !== id),
@@ -980,12 +1012,21 @@ export class SyncEngine {
       action = 'pull-theirs';
     }
     if (action === 'overwrite-mine') {
-      const local = await this.folder.getElement(id);
+      let local = await this.folder.getElement(id);
       if (!local) throw new Error(`element ${id} not found locally`);
       if (this.roundKept.has(id)) {
         console.info('[atlas:sync] resolveConflict overwrite-mine: kept outside this key\'s view — stays here', { id });
         await keepHere();
         return;
+      }
+      // A copy with no record of what OnlyWorlds held (conv. 192). A view-only world sends nothing
+      // (S6). The stamp the row shows becomes the baseline first, marked, so the stamped path below
+      // runs with every branch it has: a proposal, keel's delete, a guest's 404, a 412 (M3).
+      noBaseline = !!conflict.no_baseline || hasNoBaseline(local);
+      if (noBaseline && this.readOnly) throw new PlainError(VIEW_ONLY_KEEP_THIS);
+      if (noBaseline && !local.server_updated_at) {
+        await this.folder.stampServerUpdatedAt(id, local.type, conflict.server_updated_at, local.local_updated_at ?? '', { [BASELINE_UNKNOWN]: true });
+        local = (await this.folder.getElement(id)) ?? local;
       }
       // conv. 173: keeping mine sends the edit, so a mark keel does not hold goes
       // as its hide first, by a role read now; a role that cannot be read sends nothing.
@@ -1001,13 +1042,23 @@ export class SyncEngine {
         id, type: local.type, hasServerBaseline: !!local.server_updated_at,
       });
       try {
+        // M6: keel's If-Match with the counter of the copy the row shows, so a write made there since
+        // comes back as a 412 instead of being written over.
+        const ifMatch = noBaseline && typeof conflict.change_seq === 'number' ? { ifMatch: conflict.change_seq } : undefined;
         const response = local.server_updated_at
-          ? await this.client.updateElement(local.type, id, body)
+          ? (ifMatch ? await this.client.updateElement(local.type, id, body, ifMatch) : await this.client.updateElement(local.type, id, body))
           : await this.client.createElement(local.type, body);
         await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at ?? '',
           keptFrom(response, !local.server_updated_at));
         console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
       } catch (err) {
+        // M6: it changed on OnlyWorlds while the review was open. Nothing was written; the row takes
+        // keel's live copy as its OnlyWorlds side and says so, and nothing is tried again.
+        const current = noBaseline ? preconditionCurrent(err) : null;
+        if (current) {
+          if (await this.refreshHeldRow(local, current)) return;
+          throw new PlainError(CHANGED_WHILE_OPEN);
+        }
         // Keep mine on a reviewed world proposes again (conv. 163, P5): the
         // conflict goes and the new proposal waits for the keeper.
         if (isOwProposed(err) && local.server_updated_at) {
@@ -1054,7 +1105,23 @@ export class SyncEngine {
         await keepHere();
         return;
       }
-      if (!remote) throw new Error(`element ${id} not found on server (already deleted?)`);
+      if (!remote) {
+        // M3: a copy with no record of what OnlyWorlds held, whose element OnlyWorlds no longer has:
+        // the delete review takes the row (Keep sends it again, Delete removes it here).
+        const here = await this.folder.getElement(id);
+        if (here && (conflict.no_baseline || hasNoBaseline(here))) {
+          if (!here.server_updated_at) {
+            await this.folder.stampServerUpdatedAt(id, here.type, conflict.server_updated_at, here.local_updated_at ?? '', { [BASELINE_UNKNOWN]: true });
+          }
+          await this.folder.updateSyncState(s => ({
+            conflicts: s.conflicts.filter(c => c.element_id !== id),
+            server_deletes: [...(s.server_deletes ?? []).filter(d => d.id !== id), { id, type: here.type, detected_at: nowIso(), name: here.name }],
+          }));
+          console.info('[atlas:sync] resolveConflict pull-theirs: gone on OnlyWorlds — the delete review takes it', { id });
+          return;
+        }
+        throw new Error(`element ${id} not found on server (already deleted?)`);
+      }
       const local = await this.folder.getElement(id);
       const { updated_at, ...fetched } = remote;
       const body = local ? withKeptLinks(conflict.type, fetched, local, this.roundLinkHeld) : fetched;
@@ -1137,27 +1204,113 @@ export class SyncEngine {
     }
   }
 
-  private async adoptServerCopy(local: Element, served: { updated_at: string } & Record<string, unknown>): Promise<void> {
-    // conv. 173: the owner's or a co-builder's key hides it there first, and keel's read back is the
-    // copy adopted. A failed hide sends nothing: today's way, and the next round asks again.
+  /**
+   * conv. 192, the one decision for a copy with no record of what OnlyWorlds held (no baseline, or
+   * one marked unknown) whose id keel holds, whichever door met it: the single create's 409, the
+   * `/bulk` check, the pull, a marked copy's next push (I6).
+   * - The same content (`copyDiff`): the copy is keel's. keel's stamp becomes the baseline and the
+   *   local stamp (R1, M2), keel's review mark is kept (M1), nothing is sent, nothing is said.
+   * - Other content: neither side can say which is newer (conv. 190, R3). keel's stamp lands with the
+   *   mark in one write, so every later reading of the baseline takes it as unreadable, and a review
+   *   row holds it under every policy (R2): nothing is sent, stamped or pulled over the copy until the
+   *   person chooses. The row carries keel's values of the fields that differ and keel's counter.
+   * Ahead of it, as before: the hidden rules on the push (conv. 170, 173), and keel's stub, kept as
+   * last known on the push and left to the pull's `knownOfMove` (conv. 155), never a row.
+   * Writes through the store and throws a refused write, so a caller's `localStep` or `pullWrite`
+   * keeps a held file per element. `door`: who met it.
+   */
+  private async settleCopy(
+    local: Element,
+    served: { updated_at: string } & Record<string, unknown>,
+    door: 'push' | 'pull',
+  ): Promise<SettleResult> {
     let remote = served;
-    if (isHiddenMark(local) && !isHiddenMark(served)
-      && await this.hideOnline(local.type, local.id).catch(() => 'not-sent' as const) === 'hidden') {
-      const back = await this.client.getElement(local.type, local.id).catch(() => null);
-      if (back) remote = back;
+    if (door === 'push') {
+      // conv. 173: the owner's or a co-builder's key hides it there first, and keel's read back is the
+      // copy compared. A failed hide sends nothing: the next round asks again.
+      if (isHiddenMark(local) && !isHiddenMark(served)
+        && await this.hideOnline(local.type, local.id).catch(() => 'not-sent' as const) === 'hidden') {
+        const back = await this.client.getElement(local.type, local.id).catch(() => null);
+        if (back) remote = back;
+      }
+      // keel's stub: this key knows of it and no more. The whole copy is kept as last known, never sent.
+      if (isKnownOf(remote)) {
+        this.roundKeptAdd.push(local.id);
+        console.info('[atlas:sync] a copy with no baseline meets keel\'s stub — kept here, nothing sent', { id: local.id });
+        return { kind: 'stub' };
+      }
     }
+    const remoteBody = withKeptLinks(local.type, stripServerOnlyFields(remote), local, this.roundLinkHeld);
+    const fields = await this.copyFields(local, remoteBody);
     // conv. 170: a hidden local whose id OnlyWorlds shows is not adopted, or its content would go up as
-    // an update onto what every member sees. It stays here, said once, until hidden there.
-    if (isHiddenMark(local) && !isHiddenMark(remote) && !sameWireContent(local, remote)) {
-      this.roundHiddenShown.push(local.id);
-      console.info('[atlas:sync] a hidden element here is shown online under its id — not adopted, nothing sent', { id: local.id });
-      return;
+    // an update onto what every member sees. It stays here, said once, until hidden there. The pull
+    // leaves it to its plain conflict, as before (no stamp, no mark).
+    if (isHiddenMark(local) && !isHiddenMark(remote) && fields.length > 0) {
+      if (door === 'push') {
+        this.roundHiddenShown.push(local.id);
+        console.info('[atlas:sync] a hidden element here is shown online under its id — not adopted, nothing sent', { id: local.id });
+      }
+      return { kind: 'hidden-shown' };
     }
-    await this.folder.stampServerUpdatedAt(
-      local.id, local.type as ElementType, remote.updated_at,
-      sameWireContent(local, remote) ? (local.local_updated_at ?? '') : null,
-      stampWordOf(remote),
-    );
+    if (fields.length === 0) {
+      await this.folder.stampServerUpdatedAt(local.id, local.type, remote.updated_at, local.local_updated_at ?? '',
+        { ...keptOnCreate(remote), ...stampWordOf(remote) }, { asServed: true });
+      console.info(`[atlas:sync] ${door}: ${local.type}/${local.id} has no baseline and holds what OnlyWorlds holds; keel's stamp adopted`);
+      return { kind: 'adopted' };
+    }
+    await this.folder.stampServerUpdatedAt(local.id, local.type, remote.updated_at, local.local_updated_at ?? '',
+      { ...stampWordOf(remote), [BASELINE_UNKNOWN]: true });
+    const seq = changeSeqOf(remote);
+    const conflict: Conflict = {
+      element_id: local.id,
+      type: local.type,
+      detected_at: nowIso(),
+      local_updated_at: local.local_updated_at,
+      server_updated_at: remote.updated_at,
+      fields,
+      no_baseline: true,
+      theirs: theirsOf(remoteBody, fields),
+      ...(seq !== null ? { change_seq: seq } : {}),
+    };
+    console.info(`[atlas:sync] ${door}: ${local.type}/${local.id} has no record of what OnlyWorlds held and differs — held for review`, { fields });
+    return { kind: 'held', conflict };
+  }
+
+  /** `copyDiff` with the narrator fold M1 needs, the role read only when the narrator could be keel's. */
+  private async copyFields(local: Element, remoteBody: Record<string, unknown>): Promise<string[]> {
+    const narratorFilled = narratorMayBeFilled(local, remoteBody, local.type)
+      ? this.seat || (await this.ownRole().catch(() => null)) === 'guest'
+      : false;
+    return copyDiff(local, remoteBody, local.type, { narratorFilled });
+  }
+
+  /**
+   * M6: Keep this copy met keel's 412. The row takes keel's live copy as its OnlyWorlds side, with
+   * that copy's stamp (marked) and counter, and says it changed while open. When the live copy now
+   * holds what this copy holds, there is nothing to choose: adopted, the row goes (returns true).
+   */
+  private async refreshHeldRow(local: Element, current: { updated_at: string } & Record<string, unknown>): Promise<boolean> {
+    const id = local.id;
+    const remoteBody = withKeptLinks(local.type, stripServerOnlyFields(current), local, this.roundLinkHeld);
+    const fields = await this.copyFields(local, remoteBody);
+    if (fields.length === 0) {
+      await this.folder.stampServerUpdatedAt(id, local.type, current.updated_at, local.local_updated_at ?? '',
+        { ...keptOnCreate(current), ...stampWordOf(current) }, { asServed: true });
+      await this.folder.updateSyncState(s => ({ conflicts: s.conflicts.filter(c => c.element_id !== id) }));
+      return true;
+    }
+    await this.folder.stampServerUpdatedAt(id, local.type, current.updated_at, local.local_updated_at ?? '',
+      { ...stampWordOf(current), [BASELINE_UNKNOWN]: true });
+    const seq = changeSeqOf(current);
+    await this.folder.updateSyncState(s => ({
+      conflicts: s.conflicts.map(c => c.element_id !== id ? c : {
+        ...c, no_baseline: true as const, server_updated_at: current.updated_at, fields,
+        theirs: theirsOf(remoteBody, fields), changed_while_open: true as const,
+        ...(seq !== null ? { change_seq: seq } : {}),
+      }),
+    }));
+    console.info('[atlas:sync] resolveConflict overwrite-mine: 412, the row takes keel\'s live copy', { id });
+    return false;
   }
 
   /**
@@ -1192,15 +1345,16 @@ export class SyncEngine {
     failures: PerElementFailure[],
     local: Element,
     type: ElementType,
-    remoteBody: Record<string, unknown>,
-    serverStamp: string,
-  ): Promise<'no' | 'adopted' | 'held'> {
-    if (local.server_updated_at || !sameWireContent(local, remoteBody)) return 'no';
-    const wrote = await this.pullWrite(failures, local.id, type, () =>
-      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at ?? '', stampWordOf(remoteBody)));
-    if (!wrote) return 'held'; // the /changes walk must not pass it
-    console.info(`[atlas:sync] pull: ${type}/${local.id} is our own create with an unrecorded stamp; baseline adopted`);
-    return 'adopted';
+    served: { updated_at: string } & Record<string, unknown>,
+  ): Promise<'no' | 'adopted' | 'held' | { conflict: Conflict }> {
+    // conv. 192: the pull meets a copy with no record of what OnlyWorlds held through the same
+    // decision as the push (I6): the same content adopted, other content a row under every policy (R5).
+    if (!hasNoBaseline(local)) return 'no';
+    const out: { r?: SettleResult } = {};
+    const wrote = await this.pullWrite(failures, local.id, type, async () => { out.r = await this.settleCopy(local, served, 'pull'); });
+    if (!wrote) return 'held';
+    if (out.r?.kind === 'hidden-shown') return 'no';
+    return out.r?.kind === 'held' ? { conflict: out.r.conflict } : 'adopted';
   }
 
   async resolveMetaConflict(field: string, choice: 'mine' | 'theirs'): Promise<void> {
@@ -2135,9 +2289,9 @@ export class SyncEngine {
     if (conflicts.length === 0) return;
     await this.folder.updateSyncState(curr => {
       const existingIds = new Set(curr.conflicts.map(c => c.element_id));
-      const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
+      const fresh = conflicts.filter(c => !existingIds.has(c.element_id) || c.no_baseline);
       if (fresh.length === 0) return {};
-      return { conflicts: [...curr.conflicts, ...fresh] };
+      return { conflicts: withRows(curr.conflicts, fresh) };
     });
   }
 
@@ -2289,6 +2443,11 @@ export class SyncEngine {
       // retries (500 creates once cost ~15 minutes). They
       // stay dirty; the next round's re-POST answers 409 and adopts.
       let heldInARow = 0;
+      // keel's `/bulk` replaces an id it holds and answers 200 (conv. 192, S5): the check before the
+      // batch leaves those out, so a 200 is a race lost (a second place sent the same new element).
+      for (let i = 0; i < items.length; i++) {
+        if (result.items[i]?.status === 200) this.roundReplaced.push(items[i].element.id as string);
+      }
       for (let i = 0; i < items.length; i++) {
         if (this.stopped) break;
         const echo = result.items[i]?.updatedAt;
@@ -2335,16 +2494,26 @@ export class SyncEngine {
       // id_conflict item: already on the server (prior backfill miss). Adopt
       // the baseline instead of failing — same self-heal as the POST path;
       // without it the bulk batch re-fails this item every round forever.
+      const otherType = errObj.code === 'id_conflict' ? heldAsOtherType(errObj.message) : null;
+      if (otherType) {
+        // keel holds it as another type in this world (S7): a failure in plain words, never foreign.
+        failures.push({
+          element_id: item.element.id as string, type: item.type, operation: 'create',
+          message: `OnlyWorlds already holds this id as a ${otherType} in this world`,
+          ...(typeof res?.status === 'number' ? { status: res.status } : {}), code: 'id_conflict', source: 'server',
+        });
+        onItemDone();
+        continue;
+      }
       if (errObj.code === 'id_conflict') {
         const id = item.element.id as string;
         const remote = await this.client.getElement(item.type, id).catch(() => null);
-        const local = candidates.find(c => c.id === id);
+        const local = (await this.folder.getElement(id)) ?? candidates.find(c => c.id === id);
         if (remote && local) {
-          if (await this.localStep(failures, id, item.type, 'create', 'note', () => this.adoptServerCopy(local, remote))) {
-            console.info('[atlas:sync] bulk item id_conflict — element already on server; baseline adopted', {
-              id, type: item.type,
-            });
-          }
+          // conv. 192: the one decision (I6); a held row goes into this round's conflicts.
+          const out: { r?: SettleResult } = {};
+          if (await this.localStep(failures, id, item.type, 'create', 'note', async () => { out.r = await this.settleCopy(local, remote, 'push'); })
+            && out.r?.kind === 'held') this.roundHeldRows.push(out.r.conflict);
           onItemDone();
           continue;
         }
@@ -2549,26 +2718,29 @@ export class SyncEngine {
     this.roundRole = null;
     this.roundHiddenRefused = [];
     this.roundHiddenShown = [];
+    this.roundReplaced = [];
+    this.roundHeldRows = [];
     const stateAtStart = await this.folder.readSyncState();
     const keptAtStart = new Set(stateAtStart.kept_outside_view ?? []);
+    // conv. 192, R5 (scoped to these rows, S4): a review row for a copy with no record of what
+    // OnlyWorlds held holds its id on the push, a create, an adopt or an update: nothing is sent
+    // or read for it until the person chooses.
+    const heldNoBaseline = new Set((stateAtStart.conflicts ?? []).filter(c => c.no_baseline).map(c => c.element_id));
     // keel's stub is never pushed (conv. 155, I4): the store never lists one as changed.
     const keptCreates = allChanged.filter(e => !e.server_updated_at && keptAtStart.has(e.id));
     // A hidden element this key cannot put online (folder spec §4.8, conv. 170) is held with what is
     // anchored on it: worked out from the key's role each round, never sent, said once.
     const hiddenHeld = await this.hiddenHeldNow(allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id)));
-    const allCreates = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id));
+    const allCreates = allChanged.filter(e => !e.server_updated_at && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id) && !heldNoBaseline.has(e.id));
     // A version keel holds as a proposal is sent once (conv. 163, P3): an edit after it is a new version.
     // A proposal keel did not take waits in the review: its edit is not sent again on its own (P5).
     const inProposalReview = new Set((stateAtStart.conflicts ?? []).filter(c => c.proposal).map(c => c.element_id));
     const heldAsProposed = allChanged.filter(e => !!e.server_updated_at
       && (alreadyProposed(this.proposedNow(stateAtStart.proposed), e.id, e.local_updated_at) || inProposalReview.has(e.id)));
-    const updatesOnly = allChanged.filter(e => !!e.server_updated_at && !heldAsProposed.includes(e));
-    const useBulk = typeof this.client.bulkCreate === 'function' && allCreates.length >= 2;
-    let changed = useBulk
-      ? updatesOnly
-      : [...this.sortCreatesByDependencies(allCreates), ...updatesOnly];
+    const updatesOnly = allChanged.filter(e => !!e.server_updated_at && !heldAsProposed.includes(e) && !heldNoBaseline.has(e.id));
+    const heldRowsNow = allChanged.filter(e => heldNoBaseline.has(e.id) && !keptAtStart.has(e.id) && !hiddenHeld.has(e.id)).length;
     const total = allChanged.length + tombstones.length;
-    let done = 0;
+    let done = heldRowsNow;
 
     let creates = 0;
     let updates = 0;
@@ -2638,6 +2810,43 @@ export class SyncEngine {
       return true;
     };
 
+    // conv. 192, R4: no `/bulk` item carries an id keel holds. Before a batch, keel is asked which of
+    // its ids it holds (`createsHeldOnline`, the one place a create-only `/bulk` would replace): those
+    // leave the batch and meet the one decision with the bodies read, unsent; an id the check did not
+    // answer leaves it too and goes as a single create, whose 409 is the honest check (M5).
+    let createsNow = allCreates;
+    let heldOnline = new Map<string, { id: string; updated_at: string } & Record<string, unknown>>();
+    let unanswered = new Set<string>();
+    if (typeof this.client.bulkCreate === 'function' && allCreates.length >= 2 && !this.freshWorld) {
+      const check = await this.createsHeldOnline(allCreates);
+      heldOnline = check.held;
+      unanswered = check.unanswered;
+      if (check.authErr) { authBlocked = true; this.noteAuthBail(check.authErr); }
+      if (check.transient) transient = check.transient;
+      createsNow = allCreates.filter(e => !heldOnline.has(e.id));
+    }
+    const forBulk = createsNow.filter(e => !unanswered.has(e.id));
+    const useBulk = typeof this.client.bulkCreate === 'function' && forBulk.length >= 2 && !authBlocked && !transient;
+    let changed = useBulk
+      ? [...this.sortCreatesByDependencies(createsNow.filter(e => unanswered.has(e.id))), ...updatesOnly]
+      : [...this.sortCreatesByDependencies(createsNow), ...updatesOnly];
+    for (const local of allCreates) {
+      const served = heldOnline.get(local.id);
+      if (!served || authBlocked || transient || this.stopped) continue;
+      const current = await this.folder.getElement(local.id);
+      if (current && !current.server_updated_at) {
+        const out: { r?: SettleResult } = {};
+        if (await this.localStep(failures, local.id, local.type, 'create', 'note', async () => { out.r = await this.settleCopy(current, served, 'push'); })
+          && out.r?.kind === 'held') {
+          conflicts.push(out.r.conflict);
+          reviewHeld.push(out.r.conflict);
+          this.onConflict(out.r.conflict);
+        }
+      }
+      done++;
+      this.onPushProgress(done, total);
+    }
+
     /** The creates a host-refused `/bulk` sent one at a time this round (R4). */
     const oneByOneIds = new Set<string>();
     /** Creates the web host refused this round, and the creates held for linking one. */
@@ -2645,7 +2854,7 @@ export class SyncEngine {
     /** One-at-a-time creates refused only for a link to a peer not made yet: the peer's id and the failure recorded. */
     const linkFailed = new Map<string, { refId: string; failure: PerElementFailure }>();
     if (useBulk) {
-      const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
+      const bulk = await this.bulkCreatePhase(forBulk, failures, serverDeletesDetected, () => {
         done++;
         this.onPushProgress(done, total);
       }, false, roundForeign, attemptedCreates);
@@ -2783,6 +2992,26 @@ export class SyncEngine {
             continue;
           }
 
+          // conv. 192: a copy marked as no record of what OnlyWorlds held, with no row holding it (the
+          // row's write was refused, or a pull refreshed it): the one decision again, never the
+          // stamped conflict test, whose baseline it cannot read.
+          if (isBaselineUnknown(current)) {
+            const served = await this.client.getElement(current.type, current.id);
+            if (!served) {
+              if (await keepsOn404(current.id)) continue;
+              serverDeletesDetected.push({ id: current.id, type: current.type, detected_at: nowIso(), name: current.name });
+              continue;
+            }
+            const out: { r?: SettleResult } = {};
+            if (await this.localStep(failures, current.id, current.type, 'update', 'note', async () => { out.r = await this.settleCopy(current, served, 'push'); })
+              && out.r?.kind === 'held') {
+              conflicts.push(out.r.conflict);
+              reviewHeld.push(out.r.conflict);
+              this.onConflict(out.r.conflict);
+            }
+            continue;
+          }
+
           // Pre-update server check: detect concurrent external changes OR
           // server-side delete. `getElement` returns null on 404 (adapter
           // catches it); a null remote with a non-null local baseline means
@@ -2823,7 +3052,7 @@ export class SyncEngine {
               detected_at: nowIso(),
               local_updated_at: current.local_updated_at,
               server_updated_at: remote.updated_at,
-              fields: diffFieldNames(current, stripServerOnlyFields(remote)),
+              fields: copyDiff(current, stripServerOnlyFields(remote), current.type),
             };
             conflicts.push(conflict);
             this.onConflict(conflict);
@@ -2963,6 +3192,14 @@ export class SyncEngine {
         // miss on a prior /bulk, or a re-push after an interrupted round).
         // Adopt the server's timestamp as baseline instead of failing forever;
         // any pending local divergence flows as UPDATE next round.
+        else if (isCreate && isIdConflictError(err) && heldAsOtherType(err)) {
+          // keel holds this id as another type in this world (S7): never another world, so no new
+          // ids are offered; nothing was written.
+          failures.push({
+            ...failureOf(elem.id, elem.type, 'create', err),
+            message: `OnlyWorlds already holds this id as a ${heldAsOtherType(err)} in this world`,
+          });
+        }
         else if (isCreate && isIdConflictError(err)) {
           // The read-back is guarded: a network error, 503
           // or 401 here used to escape the loop, skipping the rest of the
@@ -2980,10 +3217,14 @@ export class SyncEngine {
             }
           }
           if (remote) {
-            if (await this.localStep(failures, elem.id, elem.type, 'create', 'note', () => this.adoptServerCopy(elem, remote))) {
-              console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
-                id: elem.id, type: elem.type,
-              });
+            // conv. 192: the copy as it is now, through the one decision (I6).
+            const current = (await this.folder.getElement(elem.id)) ?? elem;
+            const out: { r?: SettleResult } = {};
+            if (await this.localStep(failures, elem.id, elem.type, 'create', 'note', async () => { out.r = await this.settleCopy(current, remote!, 'push'); })
+              && out.r?.kind === 'held') {
+              conflicts.push(out.r.conflict);
+              reviewHeld.push(out.r.conflict);
+              this.onConflict(out.r.conflict);
             }
           } else if (readErr === null) {
             // A single POST 409s for a same-world id too, so only a read-back
@@ -3041,6 +3282,14 @@ export class SyncEngine {
         if (bulk.oneByOne) failures.push(...[...dropped].filter(f => bulk.oneByOne!.some(e => e.id === f.element_id)));
       }
     }
+
+    // Rows the `/bulk` phase held for copies with no record of what OnlyWorlds held (conv. 192).
+    for (const c of this.roundHeldRows) {
+      conflicts.push(c);
+      reviewHeld.push(c);
+      this.onConflict(c);
+    }
+    this.roundHeldRows = [];
 
     for (const tomb of tombstones) {
       if (authBlocked || transient || this.stopped) break;
@@ -3168,11 +3417,12 @@ export class SyncEngine {
           const heldNow = [...new Set([...hiddenHeld, ...this.roundHiddenRefused])];
           const heldPart = heldNow.length > 0 || (curr.hidden_held?.length ?? 0) > 0 ? { hidden_held: heldNow } : {};
           // Under local-wins a push conflict is informational and never kept; one held for an
-          // unreadable baseline waits in the review (pause-and-review's callers keep their own).
+          // unreadable baseline waits in the review (pause-and-review's callers keep their own), and so
+          // does a copy with no record of what OnlyWorlds held (conv. 192), its row refreshed.
           const held = curr.conflicts ?? [];
           const reviewIds = new Set(held.map(c => c.element_id));
-          const reviewFresh = this.policy === 'local-wins' ? reviewHeld.filter(c => !reviewIds.has(c.element_id)) : [];
-          const reviewPart = reviewFresh.length > 0 ? { conflicts: [...held, ...reviewFresh] } : {};
+          const reviewFresh = this.policy === 'local-wins' ? reviewHeld.filter(c => !reviewIds.has(c.element_id) || c.no_baseline) : [];
+          const reviewPart = reviewFresh.length > 0 ? { conflicts: withRows(held, reviewFresh) } : {};
           return { last_push_at: roundNow, ...foreignNext, ...keptPart, ...deletesPart, ...heldPart, ...reviewPart };
         });
       } catch (err) {
@@ -3205,7 +3455,55 @@ export class SyncEngine {
       ...(proposedIds.length > 0 ? { proposed_ids: proposedIds } : {}),
       ...(refusedDeletes.length > 0 ? { delete_refused: refusedDeletes } : {}),
       ...(settled.accepted.length > 0 ? { proposals_accepted: settled.accepted } : {}),
+      ...(this.roundReplaced.length > 0 ? { bulk_replaced_ids: [...new Set(this.roundReplaced)] } : {}),
     };
+  }
+
+  /**
+   * conv. 192, R4 (M5): which of these never-sent creates keel already holds, asked before a `/bulk`
+   * (`GET /{type}?ids=`, per type). The one place the check lives: a create-only `/bulk` from keel
+   * would replace it here. It fails closed: an id the read did not answer (a page left unread, a
+   * refused read) is `unanswered` and goes as a single create, whose 409 is the honest check. A
+   * refused key or a busy server ends the round, as the batch itself would.
+   */
+  private async createsHeldOnline(creates: readonly Element[]): Promise<{
+    held: Map<string, { id: string; updated_at: string } & Record<string, unknown>>;
+    unanswered: Set<string>;
+    authErr?: unknown;
+    transient?: unknown;
+  }> {
+    const held = new Map<string, { id: string; updated_at: string } & Record<string, unknown>>();
+    const unanswered = new Set<string>();
+    if (typeof this.client.listByIds !== 'function') return { held, unanswered };
+    const byType = new Map<ElementType, string[]>();
+    for (const c of creates) {
+      const ids = byType.get(c.type) ?? [];
+      ids.push(c.id);
+      byType.set(c.type, ids);
+    }
+    for (const [type, ids] of byType) {
+      if (this.stopped) break;
+      const byLower = new Map(ids.map(id => [id.toLowerCase(), id]));
+      try {
+        const { records, complete } = await this.client.listByIds(type, ids);
+        const seen = new Set<string>();
+        for (const r of records) {
+          const id = byLower.get(String(r.id).toLowerCase());
+          if (!id) continue;
+          held.set(id, r);
+          seen.add(id);
+        }
+        if (!complete) for (const id of ids) if (!seen.has(id)) unanswered.add(id);
+      } catch (err) {
+        if (isAuthError(err)) return { held, unanswered, authErr: err };
+        if (isTransientError(err)) return { held, unanswered, transient: err };
+        console.warn(`[atlas:sync] the check of ${type} ids before /bulk failed — each goes as a single create`, {
+          message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
+        });
+        for (const id of ids) unanswered.add(id);
+      }
+    }
+    return { held, unanswered };
   }
 
   /**
@@ -3356,7 +3654,7 @@ export class SyncEngine {
           detected_at: nowIso(),
           local_updated_at: local.local_updated_at,
           server_updated_at: remote.updated_at,
-          fields: diffFieldNames(local, stripServerOnlyFields(remote)),
+          fields: copyDiff(local, stripServerOnlyFields(remote), entry.type),
           proposal: outcome.proposal,
         });
       }
@@ -3426,6 +3724,8 @@ export class SyncEngine {
     const newServerDeletes: import('../core/types').ServerDeleteRecord[] = [];
     /** Ids proven ALIVE by an upsert — cancel any delete-review entry. */
     const revivedIds = new Set<string>();
+    /** Copies with no record of what OnlyWorlds held that a later op found the same as keel's: their rows go (conv. 192). */
+    const settledIds = new Set<string>();
     const pulledIds: string[] = [];
     let authBlocked = false;
 
@@ -3461,6 +3761,7 @@ export class SyncEngine {
     const keptBefore = new Set(syncState.kept_outside_view ?? []);
     /** Links held in the copy on a redacted read: kept and left ids (I4). */
     const linkHeldBefore = linkHeld(syncState);
+    this.roundLinkHeld = linkHeldBefore; // the one decision for a copy with no baseline reads it (conv. 192)
     /** Ids that left the view this round (I2, I3) and ids the feed named again (I5), in feed order. */
     const leftAdd = new Set<string>();
     const leftDel = new Set<string>();
@@ -3494,11 +3795,9 @@ export class SyncEngine {
         const existing = (curr.server_deletes ?? []).filter(d => !revivedIds.has(d.id));
         const existingIds = new Set(existing.map(d => d.id));
         const fresh = newServerDeletes.filter(d => !existingIds.has(d.id));
-        let persistedConflicts = curr.conflicts;
-        if (this.policy === 'pause-and-review') {
-          const ids = new Set(curr.conflicts.map(c => c.element_id));
-          persistedConflicts = [...curr.conflicts, ...conflicts.filter(c => !ids.has(c.element_id))];
-        }
+        // A copy with no record of what OnlyWorlds held is a row under every policy (conv. 192, R5).
+        const kept = this.policy === 'pause-and-review' ? conflicts : conflicts.filter(c => c.no_baseline);
+        const persistedConflicts = withRows(curr.conflicts, kept);
         const keptBefore = curr.kept_outside_view ?? [];
         const keptNext = [...new Set([...keptBefore.filter(id => !revealed.has(id)), ...keptNow, ...keptHidden])];
         // A kept element is neither deleted nor reachable: no review row and
@@ -3514,7 +3813,7 @@ export class SyncEngine {
           ...(walkComplete ? { last_pull_at: nowIso() } : {}),
           changes_cursor: lastAppliedCursor,
           changes_last_seq: lastAppliedSeq,
-          conflicts: persistedConflicts.filter(c => !gone.has(c.element_id)),
+          conflicts: persistedConflicts.filter(c => !gone.has(c.element_id) && !(c.no_baseline && settledIds.has(c.element_id))),
           server_deletes: [...existing, ...fresh].filter(d => !gone.has(d.id)),
           ...(keptBefore.length > 0 || keptNext.length > 0 ? { kept_outside_view: keptNext } : {}),
           ...(leftBefore.length > 0 || leftNext.length > 0 ? { left_view: leftNext } : {}),
@@ -3640,13 +3939,20 @@ export class SyncEngine {
             const baseline = local.server_updated_at ?? '';
             // By instant (conv. 190): a baseline that cannot be read reads as keel moved, a local
             // stamp that cannot be read as an edit, so the row is a conflict, never a pull over it.
-            const serverChanged = editedSince(serverStamp, local.server_updated_at);
+            // A copy with no record of what OnlyWorlds held has no baseline to read (conv. 192).
+            const serverChanged = editedSince(serverStamp, readableBaseline(local));
             // keel's stub holds no edit of its own here, so the server always wins it (conv. 155, I5).
-            const localChanged = !isKnownOf(local) && editedSince(local.local_updated_at, local.server_updated_at);
+            const localChanged = !isKnownOf(local) && editedSinceBaseline(local);
             if (!serverChanged) continue; // own echo or stale replay — idempotent skip
             if (localChanged) {
-              const adopt = await this.adoptOwnCreate(failures, local, op.type, remoteBody, serverStamp);
+              const adopt = await this.adoptOwnCreate(failures, local, op.type, op.element);
               if (adopt === 'held') heldStop = true;
+              if (typeof adopt === 'object') { conflicts.push(adopt.conflict); settledIds.delete(op.id); continue; }
+              if (adopt === 'adopted') {
+                // Nothing left to choose: an earlier op's row in this walk, or a kept one, goes.
+                for (let i = conflicts.length - 1; i >= 0; i--) if (conflicts[i].element_id === op.id) conflicts.splice(i, 1);
+                settledIds.add(op.id);
+              }
               if (adopt !== 'no') continue;
               conflicts.push({
                 element_id: op.id,
@@ -3654,7 +3960,7 @@ export class SyncEngine {
                 detected_at: nowIso(),
                 local_updated_at: local.local_updated_at,
                 server_updated_at: serverStamp,
-                fields: diffFieldNames(local, remoteBody),
+                fields: copyDiff(local, remoteBody, op.type),
               });
               console.warn(`[atlas:sync] changes conflict ${op.type}/${op.id}`, {
                 local_updated_at: local.local_updated_at,
@@ -3699,7 +4005,7 @@ export class SyncEngine {
                 continue;
               }
               if (keptBefore.has(op.id)) continue;
-              if (!local.server_updated_at || editedSince(local.local_updated_at, local.server_updated_at)) {
+              if (hasNoBaseline(local) || editedSince(local.local_updated_at, local.server_updated_at)) {
                 keptHidden.add(op.id);
                 continue;
               }
@@ -3721,7 +4027,7 @@ export class SyncEngine {
               continue;
             }
             if (!local) continue; // already gone locally
-            if (!local.server_updated_at) {
+            if (hasNoBaseline(local)) {
               // Never-synced local sharing the id (uuid collision territory).
               // Never destroy a never-synced local from a feed op.
               console.warn(`[atlas:sync] changes: delete op for never-synced local ${op.type}/${op.id} — skipping`);
@@ -3821,7 +4127,7 @@ export class SyncEngine {
         // Only a drop waits for the person; a keep supersedes the row (conv. 151).
         if (!this.readOnly && drops && inReview.has(el.id)) continue;
         // An edit never sent stays here, kept, never sent again (conv. 151).
-        if (!drops || editedSince(el.local_updated_at, el.server_updated_at)) {
+        if (!drops || editedSinceBaseline(el)) {
           keptNow.push(el.id);
           continue;
         }
@@ -3901,6 +4207,9 @@ export class SyncEngine {
     // Track which previously-synced local elements were SEEN on the server
     // this pull; any unseen ones (with server_updated_at set) were deleted.
     const seenLocalIds = new Set<string>();
+    /** Copies with no record of what OnlyWorlds held found the same as keel's: their rows go (conv. 192). */
+    const settledIds = new Set<string>();
+    this.roundLinkHeld = linkHeld(await this.folder.readSyncState()); // conv. 192's decision reads it
 
     for (const type of ALL_ELEMENT_TYPES) {
       if (authBlocked) break;
@@ -3959,8 +4268,8 @@ export class SyncEngine {
         // Local has it. Decide based on timestamps.
         const localBaseline = local.server_updated_at ?? '';
         // By instant (conv. 190): an unknown local stamp is an edit, an unknown baseline a move.
-        const localChanged = !isKnownOf(local) && editedSince(local.local_updated_at, local.server_updated_at);
-        const serverChanged = editedSince(remote.updated_at, local.server_updated_at);
+        const localChanged = !isKnownOf(local) && editedSinceBaseline(local);
+        const serverChanged = editedSince(remote.updated_at, readableBaseline(local));
 
         if (!serverChanged) {
           // Server matches our baseline — nothing to pull for this element.
@@ -3973,7 +4282,10 @@ export class SyncEngine {
         }
 
         if (localChanged) {
-          if (await this.adoptOwnCreate(failures, local, type, remoteBody, remote.updated_at) !== 'no') continue;
+          const adopt = await this.adoptOwnCreate(failures, local, type, remote);
+          if (typeof adopt === 'object') { conflicts.push(adopt.conflict); continue; }
+          if (adopt === 'adopted') settledIds.add(remote.id);
+          if (adopt !== 'no') continue;
           // Both sides changed since last sync → conflict.
           conflicts.push({
             element_id: remote.id,
@@ -3981,13 +4293,13 @@ export class SyncEngine {
             detected_at: nowIso(),
             local_updated_at: local.local_updated_at,
             server_updated_at: remote.updated_at,
-            fields: diffFieldNames(local, remoteBody),
+            fields: copyDiff(local, remoteBody, type),
           });
           console.warn(`[atlas:sync] pull conflict ${type}/${remote.id}`, {
             local_updated_at: local.local_updated_at,
             server_updated_at: remote.updated_at,
             baseline: localBaseline,
-            divergedFields: diffFieldNames(local, remoteBody),
+            divergedFields: copyDiff(local, remoteBody, type),
           });
           // Don't overwrite local; preserve the user's change.
           continue;
@@ -4081,12 +4393,9 @@ export class SyncEngine {
         const existingServerDeletes = currentState.server_deletes ?? [];
         const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
         const freshServerDeletes = newServerDeletes.filter(d => !existingDeleteIds.has(d.id));
-        let persistedConflicts = currentState.conflicts;
-        if (this.policy === 'pause-and-review') {
-          const existingIds = new Set(currentState.conflicts.map(c => c.element_id));
-          const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
-          persistedConflicts = [...currentState.conflicts, ...fresh];
-        }
+        // A copy with no record of what OnlyWorlds held is a row under every policy (conv. 192, R5).
+        const kept = this.policy === 'pause-and-review' ? conflicts : conflicts.filter(c => c.no_baseline);
+        const persistedConflicts = withRows(currentState.conflicts, kept).filter(c => !(c.no_baseline && settledIds.has(c.element_id)));
         return {
           last_pull_at: nowIso(),
           conflicts: persistedConflicts,
@@ -4184,10 +4493,13 @@ function keptFrom(answer: unknown, onCreate: boolean): Record<string, unknown> |
   return Object.keys(kept).length > 0 ? kept : undefined;
 }
 
+/**
+ * The same content on the folder format's terms (`same-copy.ts`, conv. 192): keel serves every field,
+ * the unset ones as `""`, `null` or `[]`, so a byte comparison with a sparse file never read the same
+ * against keel itself (the fakes served only the keys sent, which hid it until 1.124.30).
+ */
 function sameWireContent(local: Element, remote: Record<string, unknown>): boolean {
-  // Who wrote it never reaches here: diffFieldNames skips SERVER_AUTHOR_FIELDS.
-  const ignore = new Set<string>(['created_at', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
-  return !diffFieldNames(local, remote).some(k => !ignore.has(k));
+  return copyDiff(local, remote, local.type).length === 0;
 }
 
 export function diffFieldNames(local: Element, remote: Record<string, unknown>): string[] {
@@ -4238,7 +4550,7 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result; the latest phase's role wins. */
-function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_membership' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted' | 'hidden_held_ids' | 'hidden_shown_ids'> {
+function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_membership' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted' | 'hidden_held_ids' | 'hidden_shown_ids' | 'bulk_replaced_ids'> {
   const role = parts.map(p => p.own_role).filter(r => r !== undefined).pop();
   const membership = parts.map(p => p.own_membership).filter(m => m !== undefined).pop();
   const kept = parts.reduce((n, p) => n + (p.kept ?? 0), 0);
@@ -4249,6 +4561,7 @@ function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_
   const accepted = [...new Set(parts.flatMap(p => p.proposals_accepted ?? []))];
   const hiddenHeld = [...new Set(parts.flatMap(p => p.hidden_held_ids ?? []))];
   const hiddenShown = [...new Set(parts.flatMap(p => p.hidden_shown_ids ?? []))];
+  const replaced = [...new Set(parts.flatMap(p => p.bulk_replaced_ids ?? []))];
   return {
     ...(role !== undefined ? { own_role: role } : {}),
     ...(membership !== undefined ? { own_membership: membership } : {}),
@@ -4259,6 +4572,7 @@ function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_
     ...(accepted.length > 0 ? { proposals_accepted: accepted } : {}),
     ...(hiddenHeld.length > 0 ? { hidden_held_ids: hiddenHeld } : {}),
     ...(hiddenShown.length > 0 ? { hidden_shown_ids: hiddenShown } : {}),
+    ...(replaced.length > 0 ? { bulk_replaced_ids: replaced } : {}),
   };
 }
 
@@ -4524,6 +4838,41 @@ export function splitByRefusedLinks(
 
 /** A change held this round because it links a create the web host refused (the Not syncing row reads it). */
 export const HOST_HELD_MESSAGE = 'waits for an element the OnlyWorlds web host refused';
+
+/** S6: Keep this copy in a view-only world (the meta's words, `resolveMetaConflict`). */
+export const VIEW_ONLY_KEEP_THIS = 'This world is view-only here, so this copy cannot be sent to OnlyWorlds. Keep the OnlyWorlds copy instead, or close this and decide later.';
+
+/** M6: Keep this copy met a change made on OnlyWorlds while the review was open. */
+export const CHANGED_WHILE_OPEN = 'This element changed on OnlyWorlds while the review was open, so nothing was sent. The row now shows the OnlyWorlds copy as it is: choose again.';
+
+/** What `settleCopy` decided for a copy with no record of what OnlyWorlds held (conv. 192). */
+type SettleResult =
+  | { kind: 'adopted' }
+  | { kind: 'held'; conflict: Conflict }
+  | { kind: 'hidden-shown' }
+  | { kind: 'stub' };
+
+/**
+ * The review rows after adding `fresh`, one per element. A row for a copy with no record of what
+ * OnlyWorlds held (conv. 192) refreshes that element's row with what was read now (keeping when it
+ * was first found), and takes the place of an older plain row; any other row already there stays.
+ */
+export function withRows(curr: readonly Conflict[], fresh: readonly Conflict[]): Conflict[] {
+  const out = [...curr];
+  for (const c of fresh) {
+    const i = out.findIndex(x => x.element_id === c.element_id);
+    if (i < 0) out.push(c);
+    else if (c.no_baseline && !out[i].proposal) out[i] = { ...c, detected_at: out[i].detected_at };
+  }
+  return out;
+}
+
+/** keel's 409 for an id this world holds as another type (`other_type_conflict`): that type, else null (S7). */
+export function heldAsOtherType(errOrMessage: unknown): string | null {
+  const text = typeof errOrMessage === 'string' ? errOrMessage : errOrMessage instanceof Error ? errOrMessage.message : ''; // raw-error-ok: a classification by keel's words, never shown
+  const m = /already exists as an? ([a-z_]+) in this world/i.exec(text);
+  return m ? m[1].toLowerCase() : null;
+}
 
 const NOT_ON_THE_WIRE = new Set<string>(['id', 'local_updated_at', 'server_updated_at', ...ATLAS_LOCAL_ONLY_FIELDS]);
 
