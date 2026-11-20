@@ -419,9 +419,10 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 }
 
 /** The maps a fold folds, mid-sentence: "the 3 maps under Sikelia", "the map under the unnamed map". */
-function mapFoldList(count: number, mapName: string | undefined): string {
+function mapFoldList(count: number, mapName: unknown): string {
   const what = count === 1 ? 'the map' : `the ${count} maps`;
-  return `${what} under ${mapName?.trim() || theUnnamed('map')}`;
+  // Read through ownName: a name that is not a string (a hand-edited file) reads as none, never throws.
+  return `${what} under ${ownName({ name: mapName }) || theUnnamed('map')}`;
 }
 
 /**

@@ -21,6 +21,7 @@ import { playNarrativeIds } from '../core/records';
 import type { Element, WorldRegistryEntry } from '../core/types';
 import { entryIsViewOnly } from '../core/view-only';
 import { compareCodePoints } from '../core/code-point';
+import { ownName } from '../core/type-words';
 
 export type WritingTier = 'l1' | 'l2' | 'l3' | 'l4' | null;
 
@@ -201,7 +202,8 @@ function cutParentCycles(byId: Map<string, NarrativeNode>, roots: NarrativeNode[
   const rank = (a: NarrativeNode, b: NarrativeNode): number =>
     (TIER_RANK[a.tier ?? ''] ?? 9) - (TIER_RANK[b.tier ?? ''] ?? 9)
     || ((a.el as Element & { order?: number }).order ?? 0) - ((b.el as Element & { order?: number }).order ?? 0)
-    || (a.el.name ?? '').localeCompare(b.el.name ?? '')
+    // Through ownName: a name that is not a string (a hand-edited file) reads as none, never throws.
+    || ownName(a.el).localeCompare(ownName(b.el))
     || compareCodePoints(a.el.id, b.el.id); // by code point, no folding: 'B' before 'a'
   for (const start of byId.values()) {
     if (reached.has(start)) continue;
@@ -252,7 +254,7 @@ export function buildNarrativeIndex(elements: Element[], worldId: string): Narra
     const ao = (a.el as Element & { order?: number }).order ?? 0;
     const bo = (b.el as Element & { order?: number }).order ?? 0;
     if (ao !== bo) return ao - bo;
-    return (a.el.name ?? '').localeCompare(b.el.name ?? '');
+    return ownName(a.el).localeCompare(ownName(b.el));
   };
   const sortTree = (nodes: NarrativeNode[]): void => {
     nodes.sort(orderFn);

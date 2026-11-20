@@ -37,7 +37,7 @@ import { decideDeleteConfirm } from '../core/delete-confirm';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { renderGate, keepingFocus } from '../ui/render-gate';
-import { nameOrUnnamed, quotedName } from '../core/type-words';
+import { nameOrUnnamed, ownName, quotedName } from '../core/type-words';
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -126,7 +126,8 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       const ao = (a as Element & { order?: number }).order ?? 0;
       const bo = (b as Element & { order?: number }).order ?? 0;
       if (ao !== bo) return ao - bo;
-      return (a.name ?? '').localeCompare(b.name ?? '');
+      // Through ownName: a name that is not a string reads as none, never throws.
+      return ownName(a).localeCompare(ownName(b));
     });
     siblings = siblings.filter(s => s.id !== draggedId);
     const targetIdx = siblings.findIndex(s => s.id === targetId);
@@ -370,7 +371,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
   function collectMatchingIds(idx: NarrativeIndex, q: string): Set<string> {
     const matches = new Set<string>();
     for (const node of idx.byId.values()) {
-      if ((node.el.name ?? '').toLowerCase().includes(q)) {
+      if (ownName(node.el).toLowerCase().includes(q)) {
         matches.add(node.el.id);
       }
     }

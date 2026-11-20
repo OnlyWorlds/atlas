@@ -240,21 +240,41 @@ function standInLines(code: string): number[] {
 }
 
 /** Every stand-in line in `src` that is not on the allowlist as written, and every allowed line no longer there. */
-function standInCensus(): { unexpected: string[]; stale: string[] } {
-  const seen = new Set<string>();
+/**
+ * The census over given files (path relative to the tree, text). Each allowed
+ * row allows ONE copy of its line in its file (a multiset: a line allowed twice
+ * is listed twice), so a second copy of an allowed line reds as unexpected,
+ * and a row with no copy left reds as stale.
+ */
+function standInCensusOf(files: Array<[string, string]>): { unexpected: string[]; stale: string[] } {
+  const seen = new Map<string, number>();
   const unexpected: string[] = [];
-  for (const file of walk(SRC)) {
-    const rel = relative(ROOT, file).split(sep).join('/');
-    if (SKIP.has(rel)) continue;
-    const lines = readFileSync(file, 'utf8').split(/\r?\n/);
-    for (const n of standInLines(lines.join('\n'))) {
+  for (const [rel, code] of files) {
+    const lines = code.split(/\r?\n/);
+    for (const n of standInLines(code)) {
       const text = lines[n - 1].trim();
-      if ((STAND_IN_LEFT[rel] ?? []).some(a => a.line === text)) seen.add(`${rel}|${text}`);
-      else unexpected.push(`${rel}:${n} ${text}`);
+      const key = `${rel}|${text}`;
+      const allowed = (STAND_IN_LEFT[rel] ?? []).filter(a => a.line === text).length;
+      const now = (seen.get(key) ?? 0) + 1;
+      seen.set(key, now);
+      if (now > allowed) unexpected.push(`${rel}:${n} ${text}`);
     }
   }
-  const stale = Object.entries(STAND_IN_LEFT).flatMap(([f, rows]) => rows.filter(r => !seen.has(`${f}|${r.line}`)).map(r => `${f} ${r.line}`));
+  const stale = Object.entries(STAND_IN_LEFT).flatMap(([f, rows]) => {
+    const want = new Map<string, number>();
+    for (const r of rows) want.set(r.line, (want.get(r.line) ?? 0) + 1);
+    return [...want].filter(([line, n]) => (seen.get(`${f}|${line}`) ?? 0) < n).map(([line]) => `${f} ${line}`);
+  });
   return { unexpected, stale };
+}
+
+function standInCensus(): { unexpected: string[]; stale: string[] } {
+  const files: Array<[string, string]> = [];
+  for (const file of walk(SRC)) {
+    const rel = relative(ROOT, file).split(sep).join('/');
+    if (!SKIP.has(rel)) files.push([rel, readFileSync(file, 'utf8')]);
+  }
+  return standInCensusOf(files);
 }
 
 describe('the census of stand-ins: no word takes a missing name\'s place', () => {
@@ -319,6 +339,19 @@ describe('the census of stand-ins: no word takes a missing name\'s place', () =>
       expect(standInLines(line), line).toEqual([1]);
       expect(STAND_IN_LEFT[file].some(a => a.line === line), line).toBe(false);
     }
+  });
+
+  it('each allowed line allows one copy: a second copy in the same file reds, a missing copy is stale', () => {
+    const file = 'src/tabs/right/context-pane-graph.ts';
+    const allowed = STAND_IN_LEFT[file].map(a => a.line);
+    // The file as allowed: clean.
+    expect(standInCensusOf([[file, allowed.join('\n')]])).toEqual({ unexpected: [], stale: expect.any(Array) });
+    expect(standInCensusOf([[file, allowed.join('\n')]]).stale.filter(s => s.startsWith(file))).toEqual([]);
+    // A second copy of one allowed line: unexpected, by its line number.
+    const twice = [...allowed, allowed[0]];
+    expect(standInCensusOf([[file, twice.join('\n')]]).unexpected).toEqual([`${file}:${twice.length} ${allowed[0]}`]);
+    // One copy gone: that row is stale.
+    expect(standInCensusOf([[file, allowed.slice(1).join('\n')]]).stale.filter(s => s.startsWith(file))).toEqual([`${file} ${allowed[0]}`]);
   });
 
   it('the instrument passes the builders, a world\'s own words and comments', () => {

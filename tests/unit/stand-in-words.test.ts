@@ -34,6 +34,7 @@ import { installPlacementHintWatcher } from '../../src/tabs/right/map-placement-
 import { sliceLine } from '../../src/core/provenance';
 import { recordAliasIfForeign } from '../../src/middle/prose-link-existing';
 import { elementHash } from '../../src/core/router';
+import { buildNarrativeIndex } from '../../src/middle/writing-helpers';
 
 const W = 'w-stand';
 const MAP = '00000000-0000-4000-8000-0000000000a1';
@@ -383,6 +384,72 @@ describe('a delete names its type whatever the door (the gate\'s S3)', () => {
     const unmount = mountWritingBody({ content, toasts: fakeToasts() });
     try {
       expect(content.querySelector<HTMLElement>('.atlas-writing-tree-row-add')?.title).toBe('New chapter in the unnamed book');
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe('a name that is not a string reads as none, wherever the trees read it (gate 2\'s S1)', () => {
+  it("the Maps tree: a map named 42 with a map under it draws, its fold names the unnamed map", () => {
+    const parent = el('map', MAP, { name: 42 });
+    const child = el('map', MAP2, { name: 'Shore', parent_map: MAP });
+    openWorld([parent, child]);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mountMapIndexTab(target, fakeToasts());
+    const fold = target.querySelector<HTMLElement>('[aria-label="The map under the unnamed map"]');
+    expect(fold).not.toBeNull();
+    expect(fold!.title).toMatch(/the map under the unnamed map$/);
+  });
+
+  it('the writing tree: a search with a narrative named 7 filters, never throws', () => {
+    const book = el('narrative', 'b1', { name: 7, supertype: 'Book', order: 0 });
+    const one = el('narrative', 'ch1', { name: 'One', supertype: 'Chapter', parent_narrative: 'b1', order: 0 });
+    const zed = el('narrative', 'ch2', { name: 'Zed', supertype: 'Chapter', parent_narrative: 'b1', order: 1 });
+    openWorld([book, one, zed]);
+    window.location.hash = writingHash(W);
+    const content = document.createElement('div');
+    document.body.appendChild(content);
+    const unmount = mountWritingBody({ content, toasts: fakeToasts() });
+    try {
+      const names = () => [...content.querySelectorAll('.atlas-writing-tree-name')].map(n => n.textContent);
+      expect(names()).toEqual(['The unnamed book', 'One', 'Zed']);
+      const search = content.querySelector<HTMLInputElement>('[data-role="writing-search"]')!;
+      search.value = 'on';
+      search.dispatchEvent(new Event('input'));
+      expect(names()).toEqual(['The unnamed book', 'One']);
+    } finally {
+      unmount();
+    }
+  });
+
+  it("the writing tree: a parent cycle whose cut ties on tier and order, with a name 5, is cut by id", () => {
+    // ch1 and ch2 hold each other: one cycle, both chapters, order 0; the cut goes to the first by name, then id.
+    const a = el('narrative', 'ch1', { name: 5, supertype: 'Chapter', parent_narrative: 'ch2', order: 0 });
+    const b = el('narrative', 'ch2', { name: '', supertype: 'Chapter', parent_narrative: 'ch1', order: 0 });
+    openWorld([a, b]);
+    const idx = buildNarrativeIndex([a, b], W);
+    expect(idx.roots.map(r => r.el.id)).toEqual(['ch1']);
+  });
+
+  it('the writing tree: a reorder whose tie-break meets a name 5 still writes the new order', async () => {
+    const book = el('narrative', 'b1', { name: 'The Book', supertype: 'Book', order: 0 });
+    const a = el('narrative', 'ch1', { name: 'Alpha', supertype: 'Chapter', parent_narrative: 'b1', order: 0 });
+    const b = el('narrative', 'ch2', { name: 5, supertype: 'Chapter', parent_narrative: 'b1', order: 0 });
+    openWorld([book, a, b]);
+    const store = { ...fakeStore(), updateElement: vi.fn(async () => {}) };
+    setActiveStore(store as never);
+    window.location.hash = writingHash(W);
+    const content = document.createElement('div');
+    document.body.appendChild(content);
+    const unmount = mountWritingBody({ content, toasts: fakeToasts() });
+    try {
+      const row = (text: string) => [...content.querySelectorAll<HTMLElement>('.atlas-writing-tree-row')]
+        .find(r => r.querySelector('.atlas-writing-tree-name')?.textContent === text)!;
+      row('Alpha').dispatchEvent(new Event('dragstart'));
+      row('The unnamed chapter').dispatchEvent(new Event('drop', { cancelable: true }));
+      await vi.waitFor(() => expect(store.updateElement).toHaveBeenCalled());
     } finally {
       unmount();
     }
