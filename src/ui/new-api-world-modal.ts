@@ -122,14 +122,9 @@ export class NewApiWorldModal extends BaseModal {
           progressEl.textContent = 'Signing in to OnlyWorlds…';
           await signInFromFields(body, '', this.toasts);
         }
-        // 1. Persist the PIN if not already set.
-        let regAfter = getState().registry;
-        if (!regAfter.pin) regAfter = setPin(regAfter, pin);
-        if (regAfter !== getState().registry) {
-          saveRegistry(regAfter);
-          patchSlice('registry', regAfter);
-        }
-
+        // The PIN is kept as the account's only once the create below has
+        // resolved: keel checks it against the account there, and a refused
+        // one keeps nothing.
         const reuse = reusableLocal();
         let entry: { id: string; name: string };
         if (reuse) {
@@ -157,7 +152,10 @@ export class NewApiWorldModal extends BaseModal {
         // Flip registry to api-linked + persist credentials to disk.
         // Cache the server-side world name so settings can flag api-vs-local
         // name divergence without a network fetch.
-        regAfter = attachApi(getState().registry, entry.id, {
+        // The create resolved, so keel took the PIN: kept now if none was.
+        let regAfter = getState().registry;
+        if (!regAfter.pin) regAfter = setPin(regAfter, pin);
+        regAfter = attachApi(regAfter, entry.id, {
           worldId: world.id,
           apiKey,
           worldName: world.name,

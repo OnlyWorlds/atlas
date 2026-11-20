@@ -11,6 +11,7 @@
  */
 
 import { REGISTRY_STORAGE_KEY } from '../core/constants';
+import { readsOnlyByShape } from '../core/key-scope';
 import { defaultRegistry } from '../core/types';
 import type { TypeStripNames, WorldRegistryEntry, WorldsRegistry } from '../core/types';
 
@@ -119,6 +120,17 @@ export function storedWorldEntry(worldId: string): WorldRegistryEntry | undefine
   return readRegistry().worlds.find(w => w.id === worldId);
 }
 
+/**
+ * A world linked with a key that reads only (by its shape: `ow_r_`, a demo
+ * classic key) is view-only, whatever an older Atlas saved: before 1.124.31
+ * Download a world registered an `ow_r_` key writable, and such a world met
+ * PIN sentences (no PIN, no sync) for a key that has no use for one.
+ */
+function readKeyReadsOnly(w: WorldRegistryEntry): WorldRegistryEntry {
+  if (!w?.api || w.api.read_only || typeof w.api.api_key !== 'string' || !readsOnlyByShape(w.api.api_key)) return w;
+  return { ...w, api: { ...w.api, read_only: true } };
+}
+
 function readRegistry(): WorldsRegistry {
   try {
     const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
@@ -135,7 +147,7 @@ function readRegistry(): WorldsRegistry {
     return {
       ...parsed,
       version: parsed.version ?? 1,
-      worlds: parsed.worlds,
+      worlds: parsed.worlds.map(readKeyReadsOnly),
       sync_default_policy: policy as 'local-wins' | 'pause-and-review' | undefined,
     };
   } catch (err) {

@@ -180,8 +180,9 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
         ? `Only the world's owner can change its details on OnlyWorlds, so Atlas could not finish ${doing}.${saved}`
         : `This world lets Atlas change only what it made, and someone else made this, so Atlas could not finish ${doing}.${saved}`;
     case 'auth':
-      // keel's 403 for a read key on a write: the key, never the PIN.
-      if (keyRefusalOf(err) === 'read_only_key') {
+      // keel's 403 for a read key on a write: the key, never the PIN. Its code
+      // (`permission_error`) is keel's generic one, so its words narrow it.
+      if (keyRefusalOf(err) === 'read_only_key' && err instanceof Error && /read-only/i.test(err.message)) {
         return `This world's key can only read, so Atlas could not finish ${doing}.${saved} Put in a write key in Settings, This world.`;
       }
       return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;

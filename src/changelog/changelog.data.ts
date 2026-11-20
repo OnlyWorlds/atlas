@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'read-key-no-pin',
         title: 'A read key needs no PIN, and Atlas never sends one with it',
-        body: 'A read key pasted into Download a world now opens the world to read, with no PIN asked. Atlas no longer sends your PIN with a key that can only read, so a mistyped PIN there can never count against your account. Test connection on a world that reads says the key works and reads only. Your PIN is saved for your other worlds only once OnlyWorlds has accepted it with a key that can write. If a key that can only read meets an edit, Atlas says the key reads only and where a write key goes, instead of asking about your PIN.',
+        body: 'A read key pasted into Download a world now opens the world to read, with no PIN asked. Atlas no longer sends your PIN with a key that can only read, so a mistyped PIN there can never count against your account. Test connection on a world that reads says the key works and reads only, and a world downloaded earlier with a read key now opens to read. When you download, link or open a world, put in a new key, or make a new world on OnlyWorlds, the PIN you typed is saved for your other worlds only once OnlyWorlds has accepted it: beside a key that can write, or when it makes the world. The PIN field in Settings still saves what you type there. If a key that can only read meets an edit, Atlas says the key reads only and where a write key goes, instead of asking about your PIN.',
         tags: ['sync', 'fix'],
       },
     ],

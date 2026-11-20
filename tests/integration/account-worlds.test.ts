@@ -517,3 +517,55 @@ describe('openAccountWorld — a sign-in elsewhere while it asks (conv. 179, 202
     localStorage.removeItem('atlas_ui_prefs');
   });
 });
+
+describe('openAccountWorld: a PIN keel refuses beside the key just made (1.124.31)', () => {
+  it('nothing is kept: no PIN saved, no world, and the key made a moment ago is taken back', async () => {
+    localStorage.setItem('atlas_ui_prefs', JSON.stringify({ sidebarMode: 'worlds', defaultCreateType: 'character', newWorldWhere: 'browser' }));
+    const state = mount();
+    const revoked: string[] = [];
+    const mePins: Array<string | null> = [];
+    mswServer.use(
+      // Any v2 base: an earlier test here may have pointed make-online's at its own.
+      http.get('*/api/v2/me', ({ request }) => {
+        mePins.push(request.headers.get('API-Pin'));
+        return HttpResponse.json({ error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } }, { status: 401 });
+      }),
+      http.delete(`${V2_BASE}/account/worlds/:id/keys/:kid`, ({ params }) => {
+        revoked.push(`${params.id}/${params.kid}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+    const toasts = makeToasts();
+    const owned: AccountWorldRow = { id: 'srv-owned', name: 'Owned World', role: 'owner', public_read: false, keys: [] };
+
+    // No folder picker here, so the world goes to this browser without the where-question.
+    // This browser's storage, usable: the open goes on to the PIN.
+    const { FakeDirHandle } = await import('../fixtures/fake-fs');
+    const { __resetOpfsStatusForTests } = await import('../../src/core/capabilities');
+    const opfs = new FakeDirHandle('opfs');
+    const hadStorage = Object.getOwnPropertyDescriptor(navigator, 'storage');
+    Object.defineProperty(navigator, 'storage', { configurable: true, value: { getDirectory: async () => opfs } });
+    const w = window as unknown as { FileSystemFileHandle?: unknown };
+    const hadHandle = w.FileSystemFileHandle;
+    w.FileSystemFileHandle = class { createWritable() { return undefined; } };
+    __resetOpfsStatusForTests();
+    const pending = openAccountWorld(owned, toasts);
+    await vi.waitFor(() => expect(document.querySelector('form[data-form="pin-prompt"]')).not.toBeNull(), { timeout: 10_000 });
+    document.querySelector<HTMLInputElement>('form[data-form="pin-prompt"] input[name="pin"]')!.value = '9999';
+    document.querySelector<HTMLFormElement>('form[data-form="pin-prompt"]')!.requestSubmit();
+
+    expect(await pending).toBe(false);
+    expect(state.minted).toHaveLength(1);
+    expect(mePins).toEqual(['9999']);
+    expect(revoked).toEqual(['srv-owned/key-1']);
+    expect(getState().registry.pin).toBeUndefined();
+    expect(getState().registry.worlds).toEqual([]);
+    expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual(['OnlyWorlds did not accept that PIN. Check it, then try again.']);
+    localStorage.removeItem('atlas_ui_prefs');
+    if (hadStorage) Object.defineProperty(navigator, 'storage', hadStorage);
+    else delete (navigator as unknown as { storage?: unknown }).storage;
+    w.FileSystemFileHandle = hadHandle;
+    __resetOpfsStatusForTests();
+  });
+});

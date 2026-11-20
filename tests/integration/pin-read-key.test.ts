@@ -52,6 +52,9 @@ import { problemFor } from '../../src/core/problems';
 import { SharingClient } from '../../src/sync/sharing-client';
 import { rosterFor } from '../../src/sync/world-roster';
 import { removeFile } from '../../src/sync/element-files';
+import { loadRegistry } from '../../src/registry/registry';
+import { REGISTRY_STORAGE_KEY } from '../../src/core/constants';
+import { diagnoseSyncUnavailable } from '../../src/sync/sync-attach';
 import { removePicture, uploadPicture } from '../../src/sync/media-upload';
 import { MakeOnlineModal } from '../../src/ui/make-online-modal';
 import { ToastManager } from '../../src/ui/toast-manager';
@@ -212,6 +215,40 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
       }
     });
 
+    it('Make online\'s link given a read key and an empty PIN field: the key\'s words, never "PIN is required"', async () => {
+      document.body.innerHTML = '<div class="atlas-shell"></div>';
+      const store = new MockFolderStore();
+      await store.open(null);
+      setActiveStore(store as never);
+      patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: 'w1', name: 'W', state: 'local-only', folder: { handle_key: 'k', folder_name: 'f' } } as never] });
+      patchSlice('active', { worldId: 'w1', meta: { id: 'w1', name: 'W' }, opened: true } as never);
+      try {
+        new MakeOnlineModal(new ToastManager()).open();
+        const modal = document.querySelector<HTMLElement>('[data-modal="make-online"]')!;
+        modal.querySelector<HTMLButtonElement>('[data-route-tab="link"]')!.click();
+        modal.querySelector<HTMLInputElement>('input[name="link-api-key"]')!.value = 'ow_r_owner';
+        modal.querySelector<HTMLInputElement>('input[name="link-pin"]')!.value = '';
+        modal.querySelector<HTMLFormElement>('[data-form="link-route"]')!.requestSubmit();
+        const error = modal.querySelector<HTMLElement>('[data-role="link-error"]')!;
+        await vi.waitFor(() => expect(error.hidden).toBe(false), { timeout: 3000 });
+        expect(error.textContent).toMatch(/That key can only read/);
+        expect(error.textContent).not.toMatch(/PIN/);
+        expect(keel.seen).toEqual([]);
+      } finally {
+        document.body.innerHTML = '';
+      }
+    });
+
+    it('the roster on a demo-key world handed a PIN: none rides /members (the SDK sends a classic key\'s PIN on every call)', async () => {
+      const pins: Array<string | null> = [];
+      mswServer.use(http.get('*/api/v2/members*', ({ request }) => {
+        pins.push(request.headers.get('API-Pin'));
+        return HttpResponse.json({ data: [{ id: null, kind: 'owner', role: 'owner', character: null, status: 'active' }] });
+      }));
+      await rosterFor(linked({ api_key: '0000000003' }), Date.now, { maxAgeMs: 0, pin: WRONG });
+      expect(pins).toEqual([null]);
+    });
+
     it('a key put in place, which /me says reads: taken as read only, the saved PIN never sent', async () => {
       const entry = linked({ api_key: 'ow_w_owner' });
       patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [entry] });
@@ -285,6 +322,29 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
   });
 });
 
+describe('a world saved before 1.124.31, writable with a read key', () => {
+  it('reads as view-only from the registry, so no PIN sentence meets it (sync, share section)', () => {
+    const old = {
+      id: 'old-1', name: 'Old', state: 'api-linked',
+      api: { world_id: 'w-x', api_key: 'ow_r_oldkey', world_name: 'Old' },
+      folder: { handle_key: 'v', folder_name: 'o' }, created_at: '2026-01-01T00:00:00Z',
+    };
+    const writer = { ...old, id: 'w-1', api: { ...old.api, api_key: 'ow_w_writer' } };
+    const demo = { ...old, id: 'demo-1', api: { ...old.api, api_key: '0000000003' } };
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify({ version: 1, worlds: [old, writer, demo] }));
+    try {
+      const reg = loadRegistry();
+      expect(reg.worlds.map(w => !!w.api?.read_only)).toEqual([true, false, true]);
+      patchSlice('registry', reg);
+      patchSlice('active', { worldId: 'old-1', meta: { id: 'old-1', name: 'Old' }, opened: true } as never);
+      expect(diagnoseSyncUnavailable()).not.toEqual({ kind: 'pin-missing', worldId: 'old-1' });
+    } finally {
+      localStorage.removeItem(REGISTRY_STORAGE_KEY);
+      patchSlice('active', null);
+    }
+  });
+});
+
 describe('the played keel answers both ways', () => {
   const ask = (key: string, pin: string | null, path = '/me', method = 'GET') =>
     fetch(`${TEST_BASE}${path}`, { method, headers: { 'API-Key': key, ...(pin ? { 'API-Pin': pin } : {}) } });
@@ -315,5 +375,10 @@ describe('the first write refused for a read key', () => {
     expect(sentence).toMatch(/key can only read/);
     expect(sentence).toMatch(/write key/);
     expect(sentence).not.toMatch(/PIN/);
+  });
+
+  it('keel\'s same code for another refusal is not said as a read key', () => {
+    const err = new OwV2Error(403, { type: 'permission_error', code: 'permission_error', message: 'Only the owner can do this.', param: null }, '');
+    expect(problemFor(err, { doing: 'linking the world' }).sentence).not.toMatch(/can only read/);
   });
 });
