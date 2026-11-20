@@ -83,5 +83,7 @@ describe('New world on OnlyWorlds', () => {
     await create('1234');
     await vi.waitFor(() => expect(getState().registry.worlds[0]?.state).toBe('api-linked'));
     expect(getState().registry.pin).toBe('1234');
+    // The create was a write keel took with that PIN: proved.
+    expect(getState().registry.pin_state).toBe('proved');
   });
 });

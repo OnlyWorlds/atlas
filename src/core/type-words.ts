@@ -135,13 +135,16 @@ export function nameOrUnnamed(el: Nameable, opts: { start?: boolean; word?: stri
  * in quotes (`Delete "Harbour"?`), after the type's word when `typed` asks
  * (`Delete map "Harbour"?`); a missing name is the unnamed form, never quoted
  * and never empty quotes (`Delete the unnamed map?`). The note after the act
- * says the name plainly through `nameOrUnnamed` ("Deleted Harbour").
+ * says the name plainly through `nameOrUnnamed` ("Deleted Harbour"). `article`, with `typed`, is for a
+ * typed name inside a sentence: `the map "Harbour"` ("OnlyWorlds already held the map "Harbour""); the
+ * unnamed form already carries its own "the". A delete question keeps the bare form, `Delete map "Harbour"?`.
  */
-export function quotedName(el: Nameable, opts: { word?: string; typed?: boolean } = {}): string {
+export function quotedName(el: Nameable, opts: { word?: string; typed?: boolean; article?: boolean } = {}): string {
   const own = ownName(el);
   if (!own) return nameOrUnnamed(el, { word: opts.word });
   if (!opts.typed) return `"${own}"`;
-  return `${opts.word?.trim() || typeName(el.type, { supertype: el.supertype })} "${own}"`;
+  const typed = `${opts.word?.trim() || typeName(el.type, { supertype: el.supertype })} "${own}"`;
+  return opts.article ? `the ${typed}` : typed;
 }
 
 /**

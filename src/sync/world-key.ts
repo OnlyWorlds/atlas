@@ -33,6 +33,7 @@ import { PinPromptModal } from '../ui/pin-prompt-modal';
 import { readsOnlyByShape } from '../core/key-scope';
 import { keyCheckError } from '../setup/key-check-errors';
 import { mintRecordOf, takeBackMintedKey, type KeyMint } from './key-takeback';
+import { isPinRefusal, notePinState, recordPinState } from '../registry/pin-proof';
 
 /** A read key, by keel's prefix or the demo range (`readsOnlyByShape`); a write key otherwise. */
 export function isReadKey(key: string): boolean {
@@ -112,10 +113,11 @@ export async function keepPinProvedBy(key: string, pin: string): Promise<void> {
   try {
     proved = (await buildV2Adapter(key, pin).keyScope()).pinProved;
   } catch (err) {
+    if (isPinRefusal(err)) recordPinState(pin, 'refused');
     throw keyCheckError(err);
   }
   if (!proved) return;
-  const next = setPin(getState().registry, pin);
+  const next = notePinState(setPin(getState().registry, pin), pin, 'proved');
   saveRegistry(next);
   patchSlice('registry', next);
 }

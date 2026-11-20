@@ -52,13 +52,18 @@ import { problemFor } from '../../src/core/problems';
 import { SharingClient } from '../../src/sync/sharing-client';
 import { rosterFor } from '../../src/sync/world-roster';
 import { removeFile } from '../../src/sync/element-files';
-import { adoptStoredRegistry, createApiLinkedWorld, loadRegistry, saveRegistry } from '../../src/registry/registry';
+import { adoptStoredRegistry, createApiLinkedWorld, loadRegistry, mergeRegistry, saveRegistry, setPin } from '../../src/registry/registry';
+import { notePinState } from '../../src/registry/pin-proof';
+import { keyRefusalHere, keyRefusalPill, keyRefusalLine } from '../../src/sync/world-key-lines';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { REGISTRY_STORAGE_KEY } from '../../src/core/constants';
 import { diagnoseSyncUnavailable } from '../../src/sync/sync-attach';
 import { removePicture, uploadPicture } from '../../src/sync/media-upload';
 import { MakeOnlineModal } from '../../src/ui/make-online-modal';
 import { ToastManager } from '../../src/ui/toast-manager';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
+import { renderAccountTab, wireAccountTab, pinStateLine, __resetPinAskedForTests } from '../../src/middle/settings-account';
 
 const KEYS = {
   'ow_r_owner': { scope: 'read' as const },
@@ -300,7 +305,7 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
       patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [entry] });
       const { said, toasts } = fakeToasts();
       await testWorldConnection(entry, toasts);
-      expect(said).toEqual([{ kind: 'success', line: 'The key works: Played world. It reads only, so this world opens to read.' }]);
+      expect(said).toEqual([{ kind: 'success', line: 'The key works: Played world. This key can only read, so this world opens to read.' }]);
       expect(pinsBeside('ow_r_owner').every(p => p === null)).toBe(true);
     });
 
@@ -317,8 +322,153 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
       patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [entry] });
       const { said, toasts } = fakeToasts();
       await testWorldConnection(entry, toasts);
-      expect(said).toEqual([{ kind: 'info', line: 'The key works: Played world. It reads only, so edits can\'t sync. Put in a write key below.' }]);
+      expect(said).toEqual([{ kind: 'info', line: 'The key works: Played world. This key can only read, so edits can\'t sync. Put in a write key below.' }]);
     });
+  });
+});
+
+describe.each(['checked', 'ignored'] as const)('the PIN kept here says what OnlyWorlds said of it (keel: %s)', (mode) => {
+  beforeEach(() => {
+    setUp(mode);
+    __resetPinAskedForTests();
+  });
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  /** The open world, linked with `key`; the registry keeping `pin` (and `pin_state`). */
+  function openWorld(key: string, pin?: string, state?: 'proved' | 'refused'): WorldRegistryEntry {
+    const entry = linked({ api_key: key });
+    patchSlice('registry', { ...defaultRegistry(), pin, ...(state ? { pin_state: state } : {}), worlds: [entry] });
+    patchSlice('active', { worldId: entry.id, meta: { name: 'Here' } } as never);
+    return entry;
+  }
+  /** Settings' OnlyWorlds account section, wired. */
+  function settings() {
+    document.body.innerHTML = `<div class="atlas-settings">${renderAccountTab(getState().registry)}</div>`;
+    const { said, toasts } = fakeToasts();
+    wireAccountTab(toasts);
+    const field = document.querySelector<HTMLInputElement>('.atlas-settings input[name="pin"]')!;
+    const line = () => document.querySelector<HTMLElement>('.atlas-settings [data-role="pin-state"]')!;
+    const save = async (pin: string) => {
+      field.value = pin;
+      field.dispatchEvent(new Event('change'));
+      await vi.waitFor(() => expect(said.length).toBeGreaterThan(0));
+    };
+    return { said, save, line };
+  }
+  const withPin = (key: string) => keel.seen.filter(s => s.key === key && s.pin !== null).length;
+
+  it('the field saves at once, and says PIN saved only once OnlyWorlds took it beside a key that writes', async () => {
+    openWorld('ow_w_owner');
+    const { said, save, line } = settings();
+    await save(RIGHT);
+    expect(said).toEqual([{ kind: 'info', line: 'PIN saved' }]);
+    expect(getState().registry).toMatchObject({ pin: RIGHT, pin_state: 'proved' });
+    expect(line().textContent).toBe('PIN saved');
+    // One question for the save, with the PIN once.
+    expect(withPin('ow_w_owner')).toBe(1);
+  });
+
+  it('a PIN OnlyWorlds refuses is kept, and said refused', async () => {
+    openWorld('ow_w_owner');
+    const { said, save, line } = settings();
+    await save(WRONG);
+    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN' }]);
+    expect(getState().registry).toMatchObject({ pin: WRONG, pin_state: 'refused' });
+    expect(line().textContent).toBe('OnlyWorlds did not accept this PIN');
+    expect(withPin('ow_w_owner')).toBe(1);
+  });
+
+  it('with nothing to ask with (no world, a read key, a seat), it is kept here, not checked yet, and no PIN is sent', async () => {
+    for (const setup of [
+      () => patchSlice('registry', { ...defaultRegistry(), worlds: [] }),
+      () => openWorld('ow_r_owner'),
+      () => { const e = openWorld('ow_w_owner'); patchSlice('registry', { ...getState().registry, worlds: [{ ...e, api: { ...e.api!, seat: { role: 'narrator' }, seat_secret: 'ow_s_x' } }] } as never); },
+    ]) {
+      setup();
+      document.body.innerHTML = '';
+      const { said, save, line } = settings();
+      await save(RIGHT);
+      expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+      expect(getState().registry.pin).toBe(RIGHT);
+      expect(getState().registry.pin_state).toBeUndefined();
+      expect(line().textContent).toBe('Kept here, not checked yet');
+      patchSlice('registry', { ...defaultRegistry(), worlds: [] });
+    }
+    expect(keel.seen.filter(s => s.pin !== null)).toEqual([]);
+  });
+
+  it('no answer (offline) leaves it not checked yet, never refused', async () => {
+    openWorld('ow_w_owner');
+    mswServer.use(http.get(`${TEST_BASE}/me`, () => HttpResponse.error()));
+    const { said, save } = settings();
+    await save(RIGHT);
+    expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    expect(getState().registry.pin_state).toBeUndefined();
+  });
+
+  it('opening Settings asks once about a PIN kept but not checked yet, and not again that session', async () => {
+    openWorld('ow_w_owner', RIGHT);
+    settings();
+    await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
+    expect(withPin('ow_w_owner')).toBe(1);
+    // A PIN already proved, or opened again: no question.
+    document.body.innerHTML = '';
+    patchSlice('registry', { ...getState().registry, pin_state: undefined } as never);
+    settings();
+    await new Promise(r => setTimeout(r, 30));
+    expect(withPin('ow_w_owner')).toBe(1);
+  });
+
+  it('a new value is not checked yet; the same value keeps what was said of it', () => {
+    openWorld('ow_w_owner', RIGHT, 'proved');
+    expect(pinStateLine(getState().registry)).toBe('PIN saved');
+    expect(setPin(getState().registry, ` ${RIGHT} `).pin_state).toBe('proved');
+    const next = setPin(getState().registry, WRONG);
+    expect(next.pin).toBe(WRONG);
+    expect(next.pin_state).toBeUndefined();
+    expect(pinStateLine(next)).toBe('Kept here, not checked yet');
+    expect(pinStateLine(setPin(next, ''))).toBe('');
+    // A proof of another PIN says nothing of the one kept.
+    expect(notePinState(next, RIGHT, 'proved')).toBe(next);
+  });
+
+  it('every proof site records it: a link, a new key, Test connection; their refusals too', async () => {
+    await link({ apiPin: RIGHT });
+    expect(getState().registry).toMatchObject({ pin: RIGHT, pin_state: 'proved' });
+    patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [] });
+    await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept that PIN/);
+    expect(getState().registry.pin_state).toBe('refused');
+    patchSlice('registry', { ...defaultRegistry(), pin: RIGHT, worlds: [] });
+    await keepPinProvedBy('ow_w_owner', RIGHT);
+    expect(getState().registry.pin_state).toBe('proved');
+    patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [] });
+    await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept that PIN/);
+    expect(getState().registry.pin_state).toBe('refused');
+    // Test connection on a world that writes.
+    const entry = openWorld('ow_w_owner', RIGHT);
+    await testWorldConnection(entry, fakeToasts().toasts);
+    expect(getState().registry.pin_state).toBe('proved');
+    openWorld('ow_w_owner', WRONG);
+    await testWorldConnection(getState().registry.worlds[0], fakeToasts().toasts);
+    expect(getState().registry.pin_state).toBe('refused');
+  });
+});
+
+describe('the PIN and what OnlyWorlds said of it travel together across tabs', () => {
+  it('a PIN changed here drops the state another tab stored for the old one', () => {
+    const base = { ...defaultRegistry(), pin: '1111', pin_state: 'proved' as const, worlds: [] };
+    const mine = setPin(base, '2222');
+    const stored = { ...base, pin: '1111', pin_state: 'refused' as const };
+    const out = mergeRegistry(base, mine, stored);
+    expect(out.pin).toBe('2222');
+    expect(out.pin_state).toBeUndefined();
+    // Only the PIN changed here, while another tab refused the old one: the pair is this tab's, no state.
+    const bare = { ...defaultRegistry(), pin: '1111', worlds: [] };
+    const out2 = mergeRegistry(bare, setPin(bare, '2222'), { ...bare, pin_state: 'refused' as const });
+    expect(out2.pin).toBe('2222');
+    expect(out2.pin_state).toBeUndefined();
+    // Unchanged here: storage's pair, whole.
+    expect(mergeRegistry(base, base, stored)).toMatchObject({ pin: '1111', pin_state: 'refused' });
   });
 });
 
@@ -438,5 +588,36 @@ describe('the first write refused for a read key', () => {
   it('keel\'s same code for another refusal is not said as a read key', () => {
     const err = new OwV2Error(403, { type: 'permission_error', code: 'permission_error', message: 'Only the owner can do this.', param: null }, '');
     expect(problemFor(err, { doing: 'linking the world' }).sentence).not.toMatch(/can only read/);
+  });
+});
+
+describe('one phrase for a key that can only read', () => {
+  it('the sync pill, the This world tab and the paused note say the key can only read', () => {
+    expect(keyRefusalPill('read_only_key')).toBe('This key can only read, so edits can\'t sync. Put in a write key in Settings, This world');
+    expect(keyRefusalHere('read_only_key')).toBe('This key can only read, so edits can\'t sync. Put in a write key below.');
+    expect(keyRefusalLine('read_only_key')).toMatch(/can only read/);
+  });
+
+  it('the census: no sentence a person reads says a key reads only any other way', () => {
+    const SRC = join(__dirname, '..', '..', 'src');
+    const walk = (d: string): string[] => readdirSync(d).flatMap(n => {
+      const p = join(d, n);
+      return statSync(p).isDirectory() ? walk(p) : /\.ts$/.test(n) ? [p] : [];
+    });
+    const STRINGS = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
+    const OTHER = /\breads only\b|\bonly reads\b|\bis a read key\b|\bread-only key\b|\bview-only key\b|\bkey reads\b/i;
+    const hits: string[] = [];
+    for (const file of walk(SRC)) {
+      const rel = relative(SRC, file).split(sep).join('/');
+      if (rel === 'changelog/changelog.data.ts') continue;
+      readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
+        if (/^\s*(\/\/|\/\*|\*)/.test(line) || /console\.|new (Type)?Error\(/.test(line)) return;
+        if ((line.match(STRINGS) ?? []).some(lit => OTHER.test(lit))) hits.push(`${rel}:${i + 1} ${line.trim()}`);
+      });
+    }
+    expect(hits).toEqual([]);
+    // The instrument sees the old words.
+    expect(OTHER.test('. It reads only, so this world opens to read.')).toBe(true);
+    expect(OTHER.test('This is a read key, so edits can\'t sync.')).toBe(true);
   });
 });

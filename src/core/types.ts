@@ -981,6 +981,11 @@ export interface WorldsRegistry {
   worlds: WorldRegistryEntry[];
   /** Global PIN for OW api access. */
   pin?: string;
+  /**
+   * What OnlyWorlds said of `pin` (`registry/pin-proof.ts`): `proved` (taken beside a key that writes),
+   * `refused`, or absent: not checked yet. Cleared whenever `pin` changes.
+   */
+  pin_state?: 'proved' | 'refused';
   /** Global email for OW account: prefills the sign-in in Make online and New world on OnlyWorlds. */
   email?: string;
   /**

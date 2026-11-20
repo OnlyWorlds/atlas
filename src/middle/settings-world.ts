@@ -59,6 +59,7 @@ import { findDanglingLinks, scrubReferrers } from '../store/scrub-links';
 import { WORLD_UNIT_FIELDS, WORLD_UNIT_MAX_LENGTH, type WorldUnitField } from '../core/world-units';
 import { downloadLabel, exportDate, isPartialSlice, sliceLine } from '../core/provenance';
 import { unlinkProvenance } from '../sync/export-provenance';
+import { recordPinState } from '../registry/pin-proof';
 
 /** World units (Atlas #149): label, placeholder, the fields it labels. */
 const UNIT_ROWS: Readonly<Record<WorldUnitField, { label: string; placeholder: string; toast: string }>> = {
@@ -795,10 +796,12 @@ export async function testWorldConnection(world: WorldRegistryEntry, toasts: Toa
     // origin override.
     const client = buildV2Adapter(world.api.api_key, pin ?? '');
     const fetched = await client.getWorld();
-    const { scope } = await client.keyScope();
+    const { scope, pinProved } = await client.keyScope();
+    // The account PIN, proved beside this world's key that writes (never a seat's secret).
+    if (pinProved && !isSeatWorld(world)) recordPinState(pin, 'proved');
     // The key works and reads only: said as such, never as a PIN question.
     const readsLine = scope === 'read'
-      ? (world.api.read_only ? '. It reads only, so this world opens to read.' : '. It reads only, so edits can\'t sync. Put in a write key below.')
+      ? (world.api.read_only ? '. This key can only read, so this world opens to read.' : '. This key can only read, so edits can\'t sync. Put in a write key below.')
       : '';
     const say = (line: string): void => {
       if (scope === 'read' && !world.api?.read_only) toasts.info(line);
@@ -838,6 +841,7 @@ export async function testWorldConnection(world: WorldRegistryEntry, toasts: Toa
     const code = (err as { code?: string } | null)?.code;
     const status = (err as { status?: number } | null)?.status;
     const refusal = keyRefusalOf(err);
+    if (refusal === 'pin' && !isSeatWorld(world)) recordPinState(pin, 'refused');
     if (isSeatWorld(world) && (code === 'invalid_credentials' || status === 401)) {
       toasts.error(seatRefusalLine(refusal, { paused: false }));
     } else if (refusal) {

@@ -367,7 +367,7 @@ describe('I5: /bulk never replaces an element keel held', () => {
     client.listByIds = async () => ({ records: [], complete: true }); // another place sent A in the window
     const r = await engine.pushOnce();
     expect(r.bulk_replaced_ids).toEqual([A]);
-    expect(bulkReplacedLine([{ type: 'character', name: 'Ada' }])).toBe('OnlyWorlds already held character "Ada" and took this one in its place. Another place may have sent it first.');
+    expect(bulkReplacedLine([{ type: 'character', name: 'Ada' }])).toBe('OnlyWorlds already held the character "Ada" and took this one in its place. Another place may have sent it first.');
   });
 
   it('N2: only Make Online\'s first round on a world made empty skips the check', async () => {

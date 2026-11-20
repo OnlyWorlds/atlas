@@ -53,6 +53,7 @@ import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { PlainError } from '../core/plain-error';
 import { browserStorageFullSentence } from '../core/problems';
 import { keyCheckError } from './key-check-errors';
+import { isPinRefusal, notePinState, recordPinState } from '../registry/pin-proof';
 
 // The refusals below are user copy: each is a `PlainError`, so the
 // catch site shows it as its own sentence. Developer text stays a plain
@@ -1019,6 +1020,7 @@ export async function linkExistingApiWorldInRoot(
       try {
         pinProved = (await buildV2Adapter(apiKey, apiPin).keyScope()).pinProved;
       } catch (err) {
+        if (!seat && isPinRefusal(err)) recordPinState(apiPin, 'refused');
         throw keyCheckError(err, { readOnly });
       }
     }
@@ -1034,6 +1036,7 @@ export async function linkExistingApiWorldInRoot(
         seat = undefined;
       }
     } catch (err) {
+      if (!seat && !readOnly && isPinRefusal(err)) recordPinState(apiPin, 'refused');
       throw keyCheckError(err, { readOnly });
     }
   }
@@ -1153,6 +1156,7 @@ export async function linkExistingApiWorldInRoot(
   // beside a key that writes.
   let regAfter = getState().registry;
   if (!regAfter.pin && apiPin && !seat && pinProved) regAfter = setPin(regAfter, apiPin);
+  if (!seat && pinProved) regAfter = notePinState(regAfter, apiPin, 'proved');
   const { next, entry } = createApiLinkedWorld(regAfter, {
     name: displayName,
     apiWorldId: serverWorldId,
@@ -1234,6 +1238,7 @@ async function linkIntoBrowser(
   }
   let regAfter = getState().registry;
   if (!regAfter.pin && apiPin && !seat && pinProved) regAfter = setPin(regAfter, apiPin);
+  if (!seat && pinProved) regAfter = notePinState(regAfter, apiPin, 'proved');
   const { next, entry: made } = createApiLinkedWorld(regAfter, {
     name: displayName, apiWorldId: serverWorldId, apiKey, folderName: subName, handleKey,
     pathHint: `browser storage/${subName}`, apiWorldName: world.name, readOnly,

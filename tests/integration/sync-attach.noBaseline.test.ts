@@ -84,7 +84,7 @@ describe('a row with no record under local-wins', () => {
     patchSlice('data', { elements: [{ id: 'c1', type: 'character', name: ' Ada ' }, { id: 'c2', type: 'character', name: '' }, { id: 'l1', type: 'location', name: 'Reef' }] } as never);
     try {
       __test_emitConflictToasts('push', result([], { bulk_replaced_ids: ['c1'] }), localWins());
-      expect(said).toEqual(['OnlyWorlds already held character "Ada" and took this one in its place. Another place may have sent it first.']);
+      expect(said).toEqual(['OnlyWorlds already held the character "Ada" and took this one in its place. Another place may have sent it first.']);
       said = [];
       // Two of one type: a count in its word; two types, or one not in the copy: elements.
       __test_emitConflictToasts('push', result([], { bulk_replaced_ids: ['c1', 'c2'] }), localWins());
@@ -490,5 +490,41 @@ describe('the held-copy note says what the review holds; each label runs what it
     attachSyncEngine({ ...entry, state: 'local-only' } as never, folder);
     await wait(350);
     expect(onScreen()).toEqual([]);
+  });
+});
+
+describe("a sync round says what OnlyWorlds took of the account PIN it sent", () => {
+  /** The attached engine's round, as the engine reports it. */
+  const round = (r: Partial<SyncResult>) => (getCurrentSyncEngine() as unknown as { onSyncResult: (p: 'push', r: SyncResult) => void })
+    .onSyncResult('push', { ...result([]), ...r });
+  const attachAs = async (e: WorldRegistryEntry) => {
+    detachSyncEngine();
+    patchSlice('registry', { ...setPin(defaultRegistry(), '1234'), worlds: [e] } as never);
+    const folder = new MockFolderStore();
+    await folder.open(null);
+    attachSyncEngine(e, folder);
+  };
+
+  it('a write that landed proves it; a round that wrote nothing says nothing', async () => {
+    await attachAs(entry);
+    round({});
+    expect(getState().registry.pin_state).toBeUndefined();
+    round({ pushed: { creates: 0, updates: 1, deletes: 0 } });
+    expect(getState().registry.pin_state).toBe('proved');
+  });
+
+  it("keel refusing the PIN says refused", async () => {
+    await attachAs(entry);
+    round({ auth_blocked: true, auth_reason: 'pin' });
+    expect(getState().registry.pin_state).toBe('refused');
+  });
+
+  it("a seat's secret or a world that reads proves nothing of the account PIN", async () => {
+    await attachAs({ ...entry, api: { ...entry.api!, seat: { role: 'narrator' }, seat_secret: 'ow_s_x' } } as never);
+    round({ pushed: { creates: 1, updates: 0, deletes: 0 } });
+    expect(getState().registry.pin_state).toBeUndefined();
+    await attachAs({ ...entry, api: { ...entry.api!, read_only: true } });
+    round({ pushed: { creates: 1, updates: 0, deletes: 0 } });
+    expect(getState().registry.pin_state).toBeUndefined();
   });
 });

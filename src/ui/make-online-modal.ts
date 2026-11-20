@@ -55,6 +55,7 @@ import { readsOnlyByShape } from '../core/key-scope';
 /** Make online's link route given a key that reads only. */
 const READ_KEY_CANNOT_LINK = 'That key can only read, so Atlas cannot put this world\'s elements online with it. Copy a write key from the world\'s page on onlyworlds.com.';
 import { slicePushRefusal } from '../core/provenance';
+import { isPinRefusal, notePinState, recordPinState } from '../registry/pin-proof';
 // view-only-ok: a view-only world is already online, and Make online is for a local world (conv. 149).
 
 /**
@@ -407,6 +408,9 @@ export class MakeOnlineModal extends BaseModal {
       // A seat's secret is this world's PIN only (#104), never the account's.
       const seatSecret = isSeatSecret(pin) ? pin : undefined;
       if (!reg.pin && !seatSecret) reg = setPin(reg, pin);
+      // The push created the world's elements with this PIN: keel took it.
+      const landed = pushResult.pushed.creates + pushResult.pushed.updates > 0 && !pushResult.auth_blocked;
+      if (!seatSecret && landed) reg = notePinState(reg, pin, 'proved');
       reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name, seatSecret });
       saveRegistry(reg);
       patchSlice('registry', reg);
@@ -526,6 +530,7 @@ export class MakeOnlineModal extends BaseModal {
       } catch (err) {
         // A refused key, an unknown world or no connection, in words (A38;
         // offline used to show "Failed to fetch"); the rest as it came.
+        if (!isSeatSecret(pin) && isPinRefusal(err)) recordPinState(pin, 'refused');
         throw keyCheckError(err);
       }
       if (!world.id) throw new Error('Server returned no world ID');
@@ -576,6 +581,7 @@ export class MakeOnlineModal extends BaseModal {
           // A seat's secret is this world's PIN only (#104), never the account's.
           const seatSecret = isSeatSecret(pin) ? pin : undefined;
           if (!reg.pin && !seatSecret && pinProved) reg = setPin(reg, pin);
+          if (!seatSecret && pinProved) reg = notePinState(reg, pin, 'proved');
           reg = attachApi(reg, worldId, { worldId: world.id!, apiKey, worldName: world.name, seatSecret });
           saveRegistry(reg);
           patchSlice('registry', reg);

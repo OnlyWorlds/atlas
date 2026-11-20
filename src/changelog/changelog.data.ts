@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.33',
+    date: '2026-11-20',
+    theme: 'Your PIN is saved once OnlyWorlds takes it',
+    entries: [
+      {
+        id: 'pin-saved-when-accepted',
+        title: 'The PIN in Settings says PIN saved only once OnlyWorlds has taken it',
+        body: 'The PIN you type in Settings is still kept at once, and the field now says what OnlyWorlds said of it: PIN saved once OnlyWorlds has taken it with a key that can write, OnlyWorlds did not accept this PIN when it refused it, and Kept here, not checked yet until then. Atlas asks once when you save it, beside the open world\'s key that can write, and once when you open Settings with a PIN it has not checked yet. A change that syncs, Test connection, downloading or linking a world, a new key and a new world on OnlyWorlds also count. A PIN kept by an earlier Atlas reads as not checked yet until one of these happens. No PIN is ever sent beside a key that can only read.',
+        tags: ['sync', 'settings'],
+      },
+      {
+        id: 'read-key-one-phrase',
+        title: 'A key that can only read is said one way',
+        body: 'Test connection, the sync pill\'s tooltip and the This world tab now say This key can only read, where they said It reads only and This is a read key. When OnlyWorlds already held an element a batch sent, the note says it with its article: OnlyWorlds already held the character "Ada" and took this one in its place.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.124.32',
     date: '2026-11-20',
     theme: 'One word for a missing element, and one pair in Review conflicts',

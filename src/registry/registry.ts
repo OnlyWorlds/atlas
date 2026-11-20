@@ -54,15 +54,19 @@ function mergeFields(b: Record<string, unknown>, m: Record<string, unknown>, d: 
  * other token's id, and the next Forget revoked by it.
  */
 const ACCOUNT_GROUP = ['account_token', 'account_token_id', 'account_token_id_tail', 'account_username'] as const;
+/** The PIN and what OnlyWorlds said of it travel together: a state is only ever about its own PIN. */
+const PIN_GROUP = ['pin', 'pin_state'] as const;
 
 /** The merge behind `saveRegistry`: per entry, and per field inside an entry. Pure; exported for tests. */
 export function mergeRegistry(base: WorldsRegistry, mine: WorldsRegistry, stored: WorldsRegistry): WorldsRegistry {
   const out = mergeFields(base as unknown as Record<string, unknown>, mine as unknown as Record<string, unknown>, stored as unknown as Record<string, unknown>, 'worlds');
-  const changedHere = ACCOUNT_GROUP.some(k => !same(mine[k], base[k]));
-  for (const k of ACCOUNT_GROUP) {
-    const v = (changedHere ? mine : stored)[k];
-    if (v !== undefined) out[k] = v;
-    else delete out[k];
+  for (const group of [ACCOUNT_GROUP, PIN_GROUP] as const) {
+    const changedHere = group.some(k => !same(mine[k], base[k]));
+    for (const k of group) {
+      const v = (changedHere ? mine : stored)[k];
+      if (v !== undefined) out[k] = v;
+      else delete out[k];
+    }
   }
   const baseById = new Map(base.worlds.map(w => [w.id, w]));
   const storedById = new Map(stored.worlds.map(w => [w.id, w]));
@@ -651,8 +655,12 @@ export function setParent(
 
 // ---- Global identity ----
 
+/** Keep `pin` as the account's PIN. A new value is not checked yet: its `pin_state` goes (`pin-proof.ts`). */
 export function setPin(reg: WorldsRegistry, pin: string | undefined): WorldsRegistry {
-  return { ...reg, pin: pin?.trim() || undefined };
+  const next = pin?.trim() || undefined;
+  if (next === reg.pin) return { ...reg, pin: next };
+  const { pin_state: _was, ...rest } = reg;
+  return { ...rest, pin: next };
 }
 
 export function setEmail(reg: WorldsRegistry, email: string | undefined): WorldsRegistry {

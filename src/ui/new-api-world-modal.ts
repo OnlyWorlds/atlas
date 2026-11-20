@@ -24,6 +24,7 @@ import { escapeAttr, escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
 import { signInFieldsHtml, missingSignIn, signInInputs, signInFromFields, PIN_REASON_HTML } from './sign-in-fields';
 import { wireOnlyWorldsSignIn } from './onlyworlds-sign-in-button';
+import { notePinState } from '../registry/pin-proof';
 // view-only-ok: writes a new world of its own, never the active one (conv. 149).
 
 export class NewApiWorldModal extends BaseModal {
@@ -155,6 +156,7 @@ export class NewApiWorldModal extends BaseModal {
         // The create resolved, so keel took the PIN: kept now if none was.
         let regAfter = getState().registry;
         if (!regAfter.pin) regAfter = setPin(regAfter, pin);
+        regAfter = notePinState(regAfter, pin, 'proved');
         regAfter = attachApi(regAfter, entry.id, {
           worldId: world.id,
           apiKey,

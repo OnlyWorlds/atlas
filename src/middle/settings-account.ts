@@ -10,7 +10,7 @@
  * token; worlds already opened keep their own keys and keep syncing.
  */
 
-import { getState, patchSlice } from '../core/state';
+import { getState, patchSlice, subscribe } from '../core/state';
 import { saveRegistry, setPin, setEmail, setAccountToken, mintedTokenId } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine } from '../sync/sync-attach';
@@ -26,6 +26,9 @@ import { signInWithPassword, passwordSignInLine } from '../sync/password-sign-in
 import { keepSignIn } from '../sync/after-sign-in';
 import { revokeAtlasToken } from '../sync/token-revoke';
 import { onlyWorldsSignInButtonHtml, wireOnlyWorldsSignIn } from '../ui/onlyworlds-sign-in-button';
+import { isPinRefusal, recordPinState, type PinState } from '../registry/pin-proof';
+import { isSeatWorld } from '../core/seat';
+import { buildV2Adapter } from '../sync/make-online';
 
 /**
  * The sign-in error line (B6). `accountErrorMessage`'s code branches
@@ -69,6 +72,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
         </div>
       </label>
       <p class="atlas-settings-hint" data-role="pin-hint">One PIN for all your worlds. You set it on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
+      <p class="atlas-settings-hint" data-role="pin-state" role="status"${reg.pin ? '' : ' hidden'}>${escapeText(pinStateLine(reg))}</p>
       ${reg.account_token ? '' : renderEmailField(reg)}
     </section>
   `;
@@ -145,6 +149,49 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
   `;
 }
 
+/**
+ * What the PIN field says of the PIN it keeps: saved only once OnlyWorlds took it beside a key that writes
+ * (`registry/pin-proof.ts`), refused when OnlyWorlds said so, and otherwise kept here, not checked yet.
+ */
+export function pinStateLine(reg: WorldsRegistry): string {
+  if (!reg.pin) return '';
+  if (reg.pin_state === 'proved') return 'PIN saved';
+  if (reg.pin_state === 'refused') return 'OnlyWorlds did not accept this PIN';
+  return 'Kept here, not checked yet';
+}
+
+/** The PINs Settings has asked about this session: one question per PIN on opening, so a wrong one is not asked twice. */
+const askedOnOpen = new Set<string>();
+
+/** Tests: a fresh session, nothing asked yet. */
+export function __resetPinAskedForTests(): void {
+  askedOnOpen.clear();
+}
+
+/**
+ * Ask OnlyWorlds about `pin` once, beside the open world's key that writes: one `GET /me` through
+ * `keyScope` (a key of no known shape asks `/me` bare first, then once with the PIN), no retry. Never beside
+ * a read key or for a seat's world. Returns what OnlyWorlds said, or null when there is nothing to ask with
+ * or no answer came (offline, busy): then the PIN stays not checked, never refused.
+ */
+export async function askAboutPin(pin: string | undefined): Promise<PinState | null> {
+  const reg = getState().registry;
+  const active = getState().active;
+  const entry = active ? reg.worlds.find((w) => w.id === active.worldId) : undefined;
+  // A key that reads by its shape is asked nothing with a PIN: `keyScope` answers it read with no call.
+  if (!pin || !entry?.api || entry.state !== 'api-linked' || entry.api.read_only || isSeatWorld(entry)) return null;
+  try {
+    const { pinProved } = await buildV2Adapter(entry.api.api_key, pin).keyScope();
+    if (!pinProved) return null;
+    recordPinState(pin, 'proved');
+    return 'proved';
+  } catch (err) {
+    if (!isPinRefusal(err)) return null;
+    recordPinState(pin, 'refused');
+    return 'refused';
+  }
+}
+
 export function wireAccountTab(toasts: ToastManager): void {
   const emailInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="email"]');
   const pinInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="pin"]');
@@ -161,12 +208,28 @@ export function wireAccountTab(toasts: ToastManager): void {
     patchSlice('registry', next);
     toasts.info('Email saved');
   });
+  // The line under the field follows the PIN's state, whoever proves it (a write that lands, a door).
+  const stateLine = document.querySelector<HTMLElement>('.atlas-settings [data-role="pin-state"]');
+  if (stateLine) {
+    const off = subscribe(() => {
+      if (!stateLine.isConnected) { off(); return; }
+      const line = pinStateLine(getState().registry);
+      if (stateLine.textContent !== line) stateLine.textContent = line;
+      stateLine.hidden = !line;
+    });
+  }
+  // Opening Settings asks once about a PIN kept but not checked yet (an older Atlas kept it, or no world
+  // was open when it was typed): one question per PIN in a session.
+  const kept = getState().registry;
+  if (kept.pin && !kept.pin_state && !askedOnOpen.has(kept.pin)) {
+    askedOnOpen.add(kept.pin);
+    void askAboutPin(kept.pin);
+  }
   pinInput?.addEventListener('change', async () => {
     const prevPin = getState().registry.pin;
     const next = setPin(getState().registry, pinInput.value);
     saveRegistry(next);
     patchSlice('registry', next);
-    toasts.info('PIN saved');
     // Re-attach engine with new credentials if the active world is api-linked
     // and the PIN actually changed. Otherwise stale creds would persist.
     const newPin = next.pin;
@@ -178,6 +241,13 @@ export function wireAccountTab(toasts: ToastManager): void {
         attachSyncEngine(entry, folder);
       }
     }
+    // Saved here at once; "PIN saved" only once OnlyWorlds took it. One question per save.
+    if (!newPin) { toasts.info('PIN removed'); return; }
+    if (newPin === prevPin && next.pin_state) { toasts.info(pinStateLine(next)); return; }
+    askedOnOpen.add(newPin);
+    const said = await askAboutPin(newPin);
+    if (said === 'refused') toasts.error('OnlyWorlds did not accept this PIN');
+    else toasts.info(said === 'proved' ? 'PIN saved' : 'Kept here, not checked yet');
   });
   wireAccountTokenBlock(toasts);
 }

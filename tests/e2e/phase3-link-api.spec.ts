@@ -267,7 +267,7 @@ test('a read key opens the world to read with no PIN sent, and Test connection s
   await page.click('[data-action="open-settings"]');
   await page.click('[data-settings-tab="world"]');
   await page.click('[data-action="test-connection"]');
-  await expect(page.locator('.ow-toast', { hasText: 'It reads only, so this world opens to read' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'This key can only read, so this world opens to read' })).toBeVisible();
   expect(pins.length).toBeGreaterThan(0);
   expect(pins.every(p => p === null)).toBe(true);
 });

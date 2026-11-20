@@ -42,6 +42,7 @@ import { keptEditsLine, keptLine, roleChangeLine } from './role-change';
 import { hiddenHeldLine, hiddenShownLine } from '../core/hidden-mark';
 import { deleteRefusedLine, proposalAcceptedLine, proposalSentLine } from './proposal-lines';
 import type { SyncResult } from '../core/types';
+import { recordPinState } from '../registry/pin-proof';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -138,6 +139,13 @@ export function attachSyncEngine(
     policy: policyNow(),
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => {
+      // What this round said of the account PIN it sent (never a seat's secret, never beside a read key):
+      // a write landed proves it; keel's refusal of the PIN says so.
+      if (!readOnly && !isSeatWorld(entry) && currentEngine === engine) {
+        const landed = result.pushed.creates + result.pushed.updates + result.pushed.deletes > 0;
+        if (result.auth_blocked && result.auth_reason === 'pin') recordPinState(pin, 'refused');
+        else if (landed) recordPinState(pin, 'proved');
+      }
       // The review ends only after a round that really compared (not offline,
       // busy or refused) and left nothing open: a held conflict stays dirty,
       // and the next round under local-wins would push it.
@@ -1075,14 +1083,14 @@ export function reviewAction(worldId: string | null): ToastAction {
 
 /**
  * conv. 192, S5: a `/bulk` item replaced an element OnlyWorlds already held. One meaning of "this": the
- * element this copy sent, named through the builders. One: its type's word and quoted name, or its unnamed
+ * element this copy sent, named through the builders. One: "the", its type's word and quoted name, or its unnamed
  * form (`null`, not in the open world: "an element"). Several: a count, in their type's word when all
  * share it, else "elements".
  */
 export function bulkReplacedLine(els: ReadonlyArray<Nameable | null>): string {
   if (els.length === 1) {
     const el = els[0];
-    return `OnlyWorlds already held ${el ? quotedName(el, { typed: true }) : 'an element'} and took this one in its place. Another place may have sent it first.`;
+    return `OnlyWorlds already held ${el ? quotedName(el, { typed: true, article: true }) : 'an element'} and took this one in its place. Another place may have sent it first.`;
   }
   const types = new Set(els.map(el => el?.type ?? ''));
   const one = types.size === 1 && !types.has('') ? [...types][0] : null;
