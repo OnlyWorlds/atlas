@@ -6,6 +6,9 @@
  * A `/bulk` slot that replaced an element is said (S5).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
+import type { ToastAction } from '../../src/ui/toast-manager';
 import { attachSyncEngine, detachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, __test_emitConflictToasts, heldCopyLine, bulkReplacedLine } from '../../src/sync/sync-attach';
 import { toastManager } from '../../src/ui/toast-manager';
 import { ConflictReviewModal } from '../../src/ui/conflict-review-modal';
@@ -29,6 +32,15 @@ const result = (conflicts: Conflict[], extra: Partial<SyncResult> = {}): SyncRes
   pushed: { creates: 0, updates: 0, deletes: 0 }, pulled: { creates: 0, updates: 0, deletes: 0 }, conflicts, failures: [], ...extra,
 });
 const localWins = () => ({ worldId: getCurrentSyncWorldId(), current: true, policy: 'local-wins' as const });
+
+const SRC = join(__dirname, '..', '..', 'src');
+/** Every `.ts` file under `src`. */
+function srcFiles(dir = SRC): string[] {
+  return readdirSync(dir).flatMap(name => {
+    const p = join(dir, name);
+    return statSync(p).isDirectory() ? srcFiles(p) : /\.ts$/.test(name) ? [p] : [];
+  });
+}
 
 let said: string[];
 beforeEach(async () => {
@@ -142,19 +154,109 @@ describe('the review list says one pair', () => {
     expect(read).not.toMatch(/server|mine wins|theirs wins|Overwrite|Pull \(/i);
   });
 
-  it("a view-only world's held row offers only Keep the OnlyWorlds copy, with nothing in the other's place", async () => {
+  it("a view-only world's rows, every one, offer only Keep the OnlyWorlds copy, with nothing in the other's place", async () => {
     const modal = await review(true);
-    const heldRow = modal.querySelector<HTMLElement>('[data-conflict-id="c4"]')!;
-    expect([...heldRow.querySelectorAll('button')].map(b => b.textContent!.trim())).toEqual(['Keep the OnlyWorlds copy']);
-    expect(heldRow.querySelector('[data-action="overwrite-mine"]')).toBeNull();
-    // Nothing says what the missing button would have done.
-    expect(heldRow.textContent).not.toContain('Keep this copy');
-    expect(heldRow.querySelector('[data-role="keeps-online"]')).toBeNull();
-    // A writable world's held row offers both (the control).
+    const rows = [...modal.querySelectorAll<HTMLElement>('.atlas-conflict-row')];
+    expect(rows.length).toBe(4);
+    for (const r of rows) {
+      expect([...r.querySelectorAll('button')].map(b => b.textContent!.trim())).toEqual(['Keep the OnlyWorlds copy']);
+      expect(r.querySelector('[data-action="overwrite-mine"]')).toBeNull();
+    }
+    // Nothing says what the missing button would have done: the held row's notes and the proposal's choice sentence go.
+    expect(modal.textContent).not.toContain('Keep this copy');
+    expect(modal.querySelector('[data-role="keeps-online"]')).toBeNull();
+    expect(modal.querySelector('[data-role="proposal-line"]')!.textContent).toBe('The keeper declined your change: "Not yet".');
+    expect(modal.querySelector('[data-meta-conflict] .atlas-conflict-fields')!.textContent).toBe('changed here and on OnlyWorlds');
+    // An ordinary row's own line is unchanged: it says which fields differ, nothing of the missing button.
+    expect(modal.querySelector('[data-conflict-id="c2"] .atlas-conflict-fields')!.textContent).toBe('1 field differ: description');
+    // A writable world's rows offer both (the control).
     document.body.innerHTML = '';
     vi.restoreAllMocks();
     const writable = await review(false);
-    expect([...writable.querySelector<HTMLElement>('[data-conflict-id="c4"]')!.querySelectorAll('button')].map(b => b.textContent!.trim())).toEqual(['Keep this copy', 'Keep the OnlyWorlds copy']);
+    for (const r of writable.querySelectorAll<HTMLElement>('.atlas-conflict-row')) {
+      expect([...r.querySelectorAll('button')].map(b => b.textContent!.trim())).toEqual(['Keep this copy', 'Keep the OnlyWorlds copy']);
+    }
     expect(writable.querySelector('[data-conflict-id="c4"] [data-role="keeps-online"]')!.textContent).toBe('This copy lacks background, so Keep this copy leaves it as OnlyWorlds has it.');
+  });
+});
+
+describe("the note that a copy waits carries its own press into the review", () => {
+  const held: Conflict = { ...row(true), element_id: 'c4', theirs: { description: 'theirs' } };
+
+  function heldToast(): { message: string; actions: ToastAction[] } {
+    vi.useRealTimers();
+    patchSlice('registry', { ...setPin(defaultRegistry(), '1234'), worlds: [entry] } as never);
+    patchSlice('active', { worldId: 'w1', meta: { name: 'A' } } as never);
+    patchSlice('data', { elements: [{ id: 'c4', type: 'character', name: 'Di' }] } as never);
+    const engine = getCurrentSyncEngine()!;
+    vi.spyOn(engine, 'listConflicts').mockResolvedValue([held]);
+    vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue([]);
+    __test_emitConflictToasts('push', result([held]), localWins());
+    const call = vi.mocked(toastManager.show).mock.calls.find(c => c[0] === heldCopyLine(1))!;
+    return { message: call[0], actions: (call[3] as { actions?: ToastAction[] } | undefined)?.actions ?? [] };
+  }
+  const reviews = () => document.querySelectorAll('[data-modal="conflict-review"]').length;
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    patchSlice('active', null);
+    patchSlice('data', { elements: [] } as never);
+  });
+
+  it('the sentence names no button; the toast offers Review conflicts, which opens the review', async () => {
+    const { message, actions } = heldToast();
+    expect(message).toBe('One element waits for you to choose: this copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.');
+    expect(heldCopyLine(3)).toBe('3 elements wait for you to choose: these copies have no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.');
+    expect(actions.map(a => a.label)).toEqual(['Review conflicts']);
+    await actions[0].run();
+    expect(reviews()).toBe(1);
+    expect(document.querySelector('[data-conflict-id="c4"]')).not.toBeNull();
+  });
+
+  it('pressed while the review is open or opening, it opens no second one', async () => {
+    const { actions } = heldToast();
+    const opens = vi.spyOn(ConflictReviewModal.prototype, 'open');
+    // Two presses at once: one review opened.
+    await Promise.all([actions[0].run(), actions[0].run()]);
+    expect(reviews()).toBe(1);
+    expect(opens).toHaveBeenCalledTimes(1);
+    // A press with the review on screen: it stays as it is.
+    await actions[0].run();
+    expect(reviews()).toBe(1);
+    expect(opens).toHaveBeenCalledTimes(1);
+  });
+
+  it('pressed after another world was opened, it opens nothing and says so', async () => {
+    const { actions } = heldToast();
+    patchSlice('active', { worldId: 'w-other', meta: { name: 'B' } } as never);
+    await actions[0].run();
+    expect(reviews()).toBe(0);
+    expect(said).toContain('Another world is open now. Switch back to review its conflicts.');
+  });
+
+  it('the pill\'s badge and the toast share one opener: no other place makes the review', () => {
+    const hits: string[] = [];
+    for (const file of srcFiles()) {
+      readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
+        if (/new ConflictReviewModal\(/.test(line)) hits.push(`${relative(SRC, file).split(sep).join('/')}:${i + 1}`);
+      });
+    }
+    expect(hits.map(h => h.replace(/:\d+$/, ''))).toEqual(['ui/conflict-review-modal.ts']);
+    expect(readFileSync(join(SRC, 'tabs/right/right-pane.ts'), 'utf8')).toContain('openConflictReview(toasts)');
+  });
+
+  it('the census: no sentence sends a person to Review conflicts as a place; the words are only the press\'s label', () => {
+    const hits: string[] = [];
+    for (const file of srcFiles()) {
+      const rel = relative(SRC, file).split(sep).join('/');
+      if (rel === 'changelog/changelog.data.ts') continue;
+      readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
+        if (/^\s*(\/\/|\/\*|\*)/.test(line)) return;
+        if (/['"`][^'"`]*Review conflicts/.test(line)) hits.push(`${rel}:${i + 1} ${line.trim()}`);
+      });
+    }
+    expect(hits.map(h => h.replace(/:\d+ /, ' '))).toEqual(["sync/sync-attach.ts label: 'Review conflicts',"]);
+    // The instrument sees the old sentence.
+    expect(/['"`][^'"`]*Review conflicts/.test("? 'One element waits in Review conflicts: this copy has no record'")).toBe(true);
   });
 });

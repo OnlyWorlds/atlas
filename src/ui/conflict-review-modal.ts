@@ -4,9 +4,9 @@
  * Lists every conflict recorded in `.atlas/sync-state.json`. Every row offers
  * the same pair, by the same names: Keep this copy (`overwrite-mine`, this
  * copy sent to OnlyWorlds) and Keep the OnlyWorlds copy (`pull-theirs`, this
- * copy replaced with OnlyWorlds'); a view-only world's held row offers only
- * the second. Closing the modal without picking is a valid "decide later":
- * the badge stays as a reminder.
+ * copy replaced with OnlyWorlds'); a view-only world's rows offer only the
+ * second. Closing the modal without picking is a valid "decide later": the
+ * badge stays as a reminder. `openConflictReview` is the one way in.
  *
  * The actions call `SyncEngine.resolveConflict(id, action)`; on success the
  * row is removed from the modal. When the list empties, the modal closes.
@@ -39,6 +39,8 @@ export class ConflictReviewModal extends BaseModal {
    * world's engine. (SYNC_NOTES M5.)
    */
   private capturedWorldId: string | null = null;
+  /** The world was view-only when the review opened: every row offers only Keep the OnlyWorlds copy. */
+  private viewOnly = false;
 
   constructor(private toasts: ToastManager) {
     super();
@@ -51,6 +53,7 @@ export class ConflictReviewModal extends BaseModal {
       return;
     }
     this.capturedWorldId = getState().active?.worldId ?? null;
+    this.viewOnly = worldIsViewOnly(this.capturedWorldId);
     try {
       this.conflicts = await engine.listConflicts();
       this.metaConflicts = await engine.listMetaConflicts();
@@ -99,7 +102,7 @@ export class ConflictReviewModal extends BaseModal {
         <span class="atlas-conflict-fields">changed here and on OnlyWorlds</span>
       </div>
       <div class="atlas-conflict-row-actions">
-        ${keepButtons("Send this copy's setting to OnlyWorlds", "Replace this copy's setting with the one on OnlyWorlds")}
+        ${keepButtons("Send this copy's setting to OnlyWorlds", "Replace this copy's setting with the one on OnlyWorlds", !this.viewOnly)}
       </div>
     `;
     // The world's strand (S9): each side's story by name, the server's read once the row is drawn.
@@ -160,18 +163,18 @@ export class ConflictReviewModal extends BaseModal {
     const name = nameOrUnnamed({ name: lookupName(c.element_id), type: c.type }, { start: true });
     if (c.no_baseline) {
       row.setAttribute('data-no-baseline', '');
-      row.innerHTML = noBaselineRowHtml(c, name, worldIsViewOnly(this.capturedWorldId));
+      row.innerHTML = noBaselineRowHtml(c, name, this.viewOnly);
     } else row.innerHTML = `
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">${escapeText(typeName(c.type))}</span>
         <span class="atlas-conflict-name">${escapeText(name)}</span>
         <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} differ${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
-        ${c.proposal ? `<span class="atlas-conflict-proposal" data-role="proposal-line">${escapeText(proposalReviewLine(c.proposal))}</span>` : ''}
+        ${c.proposal ? `<span class="atlas-conflict-proposal" data-role="proposal-line">${escapeText(proposalReviewLine(c.proposal, { choices: !this.viewOnly }))}</span>` : ''}
       </div>
       <div class="atlas-conflict-row-actions">
         ${c.proposal
-          ? keepButtons('Send this copy to OnlyWorlds for review again', 'Drop your edit and replace this copy with the one on OnlyWorlds')
-          : keepButtons('Send this copy to OnlyWorlds', 'Replace this copy with the one on OnlyWorlds')}
+          ? keepButtons('Send this copy to OnlyWorlds for review again', 'Drop your edit and replace this copy with the one on OnlyWorlds', !this.viewOnly)
+          : keepButtons('Send this copy to OnlyWorlds', 'Replace this copy with the one on OnlyWorlds', !this.viewOnly)}
       </div>
     `;
     this.wireRow(row, c);
@@ -260,6 +263,24 @@ export class ConflictReviewModal extends BaseModal {
     const total = this.conflicts.length + this.metaConflicts.length;
     if (title) title.textContent = `${total} conflict${total === 1 ? '' : 's'} to review`;
   }
+}
+
+/** A review opening now (its rows being read), so a second press joins it instead of opening another. */
+let reviewOpening: Promise<void> | null = null;
+
+/**
+ * The one way to open the review: the pill's badge and a toast's Review conflicts both call it. A review
+ * already on screen stays as it is and no second one opens; a press while one is opening joins it. With no
+ * sync running, the review says so (`surfaceSyncUnavailable`), as the badge always did. The pill's count is
+ * read again once the review is drawn.
+ */
+export function openConflictReview(toasts: ToastManager): Promise<void> {
+  if (document.querySelector('[data-modal="conflict-review"]')) return Promise.resolve();
+  if (reviewOpening) return reviewOpening;
+  reviewOpening = new ConflictReviewModal(toasts).open()
+    .then(() => refreshConflictsCount())
+    .finally(() => { reviewOpening = null; });
+  return reviewOpening;
 }
 
 function lookupName(id: string): string | null {

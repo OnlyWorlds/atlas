@@ -24,7 +24,7 @@ import { sameElements } from './same-elements';
 import { patchSlice, getState } from '../core/state';
 import { quotedName, typeName, type Nameable } from '../core/type-words';
 import { patchElementsFrom } from '../core/active-store';
-import { toastManager } from '../ui/toast-manager';
+import { toastManager, type ToastAction } from '../ui/toast-manager';
 import type { FolderStore } from '../store/folder-store';
 import type { Element, WorldRegistryEntry, SyncEngineState } from '../core/types';
 import { failureToastOnce, classifyFailure } from './sync-failure-copy';
@@ -941,7 +941,11 @@ function emitConflictToasts(
   const policy = from.policy ?? currentEngine?.getPolicy() ?? getState().registry.sync_default_policy ?? 'local-wins';
   const heldRows = result.conflicts.filter(c => c.no_baseline).length;
   // Under local-wins nothing else says a row waits: said here (pause-and-review's badge says it).
-  if (heldRows > 0 && policy !== 'pause-and-review' && from.current) toastManager.show(heldCopyLine(heldRows), 'info', 12000);
+  if (heldRows > 0 && policy !== 'pause-and-review' && from.current) {
+    // One on screen at a time: a later round's line (its count may differ) replaces the one there.
+    toastManager.dismiss(HELD_COPY_TOAST);
+    toastManager.show(heldCopyLine(heldRows), 'info', 12000, { actions: [reviewAction(from.worldId)], dedupeKey: HELD_COPY_TOAST });
+  }
   if (plain.length === 0) return;
   if (policy === 'pause-and-review') return; // badge + modal handle it
 
@@ -989,11 +993,35 @@ function emitConflictToasts(
   toastManager.info(message);
 }
 
-/** conv. 192: copies with no record of what OnlyWorlds held, waiting for the person (said under local-wins). */
+/**
+ * conv. 192: copies with no record of what OnlyWorlds held, waiting for the person (said under local-wins).
+ * The sentence names no button: the toast carries the press itself (`reviewAction`).
+ */
 export function heldCopyLine(n: number): string {
   return n === 1
-    ? 'One element waits in Review conflicts: this copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.'
-    : `${n} elements wait in Review conflicts: these copies have no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.`;
+    ? 'One element waits for you to choose: this copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.'
+    : `${n} elements wait for you to choose: these copies have no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.`;
+}
+
+/** One such toast on screen at a time: a later round's replaces it. */
+export const HELD_COPY_TOAST = 'held-copy-waits';
+
+/**
+ * A toast's press that opens the review, the same opener the pill's badge calls. Pressed after another
+ * world was opened, it opens nothing and says so, as the review does on a world switch.
+ */
+export function reviewAction(worldId: string | null): ToastAction {
+  return {
+    label: 'Review conflicts',
+    run: async () => {
+      if (getState().active?.worldId !== worldId) {
+        toastManager.info('Another world is open now. Switch back to review its conflicts.');
+        return;
+      }
+      const { openConflictReview } = await import('../ui/conflict-review-modal');
+      await openConflictReview(toastManager);
+    },
+  };
 }
 
 /**

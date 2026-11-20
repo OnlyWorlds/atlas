@@ -29,15 +29,19 @@ export function deleteRefusedLine(refused: Nameable[]): string {
 /** The element page's sync mark while a proposal waits. */
 export const PROPOSAL_PENDING_TITLE = "Sent for review: this world's keeper decides. Your edit stays here until then";
 
-/** The review's line for a proposal keel did not take (P5); the buttons are the review's own. */
-export function proposalReviewLine(p: NonNullable<Conflict['proposal']>): string {
-  const choice = 'Keep this copy sends it for review again; Keep the OnlyWorlds copy drops it.';
+/**
+ * The review's line for a proposal keel did not take (P5); the buttons are the review's own. `choices`
+ * false (a view-only world, whose row offers only Keep the OnlyWorlds copy) leaves out the sentence on the two.
+ */
+export function proposalReviewLine(p: NonNullable<Conflict['proposal']>, opts: { choices?: boolean } = {}): string {
+  const said = (line: string): string => (opts.choices === false ? line
+    : `${line} Keep this copy sends it for review again; Keep the OnlyWorlds copy drops it.`);
   if (p.outcome === 'declined') {
     // A reason that ends its own sentence takes no second stop after the quote.
-    return p.reason
-      ? `The keeper declined your change: "${p.reason}"${/[.!?]$/.test(p.reason) ? '' : '.'} ${choice}`
-      : `The keeper declined your change. ${choice}`;
+    return said(p.reason
+      ? `The keeper declined your change: "${p.reason}"${/[.!?]$/.test(p.reason) ? '' : '.'}`
+      : 'The keeper declined your change.');
   }
-  if (p.outcome === 'lapsed') return `Your change waited too long for review and lapsed. ${choice}`;
-  return `Your change is no longer waiting for review. ${choice}`;
+  if (p.outcome === 'lapsed') return said('Your change waited too long for review and lapsed.');
+  return said('Your change is no longer waiting for review.');
 }

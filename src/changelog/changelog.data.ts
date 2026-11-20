@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'review-one-pair',
         title: 'Review conflicts offers the same two choices on every row',
-        body: 'Every row in Review conflicts now offers Keep this copy and Keep the OnlyWorlds copy, each with a tooltip saying what it does, where the older rows said Overwrite (mine wins) and Pull (theirs wins), and no row speaks of a server. In a view-only world, a copy with no record of what OnlyWorlds held offers only Keep the OnlyWorlds copy, since this copy cannot be sent. When OnlyWorlds already held an element a batch sent as new, the note names it: OnlyWorlds already held character "Ada" and took this one in its place.',
+        body: 'Every row in Review conflicts now offers Keep this copy and Keep the OnlyWorlds copy, each with a tooltip saying what it does, where the older rows said Overwrite (mine wins) and Pull (theirs wins), and no row speaks of a server. In a view-only world every row offers only Keep the OnlyWorlds copy, since this copy cannot be sent from there. The note that an element restored without its record waits for you now carries its own Review conflicts button, which opens the review. When OnlyWorlds already held an element a batch sent as new, the note names it: OnlyWorlds already held character "Ada" and took this one in its place.',
         tags: ['sync'],
       },
     ],

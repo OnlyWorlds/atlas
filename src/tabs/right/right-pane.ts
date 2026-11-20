@@ -22,11 +22,11 @@ import { mountContextTab } from './context-tab';
 import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash, settingsHash } from '../../core/router';
-import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount, diagnoseSyncUnavailable } from '../../sync/sync-attach';
+import { getCurrentSyncEngine, pullNowAndRefresh, diagnoseSyncUnavailable } from '../../sync/sync-attach';
 import { surfaceSyncUnavailable, upToDate } from '../../ui/sync-toasts';
 import { issuesFor } from '../../sync/sync-issues';
 import { showProblem } from '../../ui/problem-fixes';
-import { ConflictReviewModal } from '../../ui/conflict-review-modal';
+import { openConflictReview } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
@@ -525,7 +525,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // so the pill's parent click handler doesn't fire a refresh.
   if (wrote) pill.querySelector<HTMLElement>('[data-role="review-conflicts"]')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    void new ConflictReviewModal(toasts).open().then(() => refreshConflictsCount());
+    void openConflictReview(toasts);
   });
 
   // Click anywhere on the pill triggers a manual pull (when not already syncing).

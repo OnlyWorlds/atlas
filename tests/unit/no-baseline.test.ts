@@ -162,8 +162,8 @@ describe('S2, S3: the row\'s words', () => {
   });
 
   it('under local-wins, a held row is said, plainly', () => {
-    expect(heldCopyLine(1)).toBe('One element waits in Review conflicts: this copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.');
-    expect(heldCopyLine(2)).toMatch(/^2 elements wait in Review conflicts/);
+    expect(heldCopyLine(1)).toBe('One element waits for you to choose: this copy has no record of what OnlyWorlds held, so Atlas cannot tell which is newer. Nothing was sent.');
+    expect(heldCopyLine(2)).toMatch(/^2 elements wait for you to choose: these copies/);
   });
 });
 
