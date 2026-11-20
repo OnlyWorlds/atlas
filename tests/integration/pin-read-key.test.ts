@@ -53,7 +53,9 @@ import { SharingClient } from '../../src/sync/sharing-client';
 import { rosterFor } from '../../src/sync/world-roster';
 import { removeFile } from '../../src/sync/element-files';
 import { adoptStoredRegistry, createApiLinkedWorld, loadRegistry, mergeRegistry, saveRegistry, setPin } from '../../src/registry/registry';
-import { notePinState } from '../../src/registry/pin-proof';
+import { notePinState, recordPinState } from '../../src/registry/pin-proof';
+import { __setRegistryTabBaseForTests, storedRegistry } from '../../src/registry/registry';
+import { pushProvedPin } from '../../src/ui/make-online-modal';
 import { keyRefusalHere, keyRefusalPill, keyRefusalLine } from '../../src/sync/world-key-lines';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -452,9 +454,192 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     await testWorldConnection(getState().registry.worlds[0], fakeToasts().toasts);
     expect(getState().registry.pin_state).toBe('refused');
   });
+
+  it('the field moved on while its question was out: the answer says nothing of the new PIN, nor does the toast', async () => {
+    openWorld('ow_w_owner');
+    let release!: () => void;
+    const held = new Promise<void>(r => { release = r; });
+    let asked = 0;
+    mswServer.use(http.get(`${TEST_BASE}/me`, async () => {
+      asked += 1;
+      await held;
+      return HttpResponse.json({ world: { id: 'w-played', name: 'Played world' }, scope: 'write', kind: 'owner', role: 'owner', membership: null });
+    }));
+    const { said, save } = settings();
+    const saving = save(RIGHT);
+    await vi.waitFor(() => expect(asked).toBe(1));
+    patchSlice('registry', setPin(getState().registry, '5555'));
+    release();
+    await saving;
+    expect(getState().registry.pin).toBe('5555');
+    expect(getState().registry.pin_state).toBeUndefined();
+    expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+  });
+
+  it('only keel naming the PIN refuses it: a 401 for the key, a 5xx, a 429 or a 403 leave it not checked', async () => {
+    const answers: Array<[number, Record<string, unknown>]> = [
+      [401, { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.' }],
+      [401, { type: 'authentication_error', code: 'key_revoked', message: 'Revoked.' }],
+      [500, { type: 'api_error', code: 'server_error', message: 'm', param: 'API-Pin' }],
+      [429, { type: 'rate_limit', code: 'too_many_requests', message: 'm', param: 'API-Pin' }],
+      [403, { type: 'permission_error', code: 'permission_error', message: 'm', param: 'API-Pin' }],
+    ];
+    for (const [status, error] of answers) {
+      document.body.innerHTML = '';
+      __resetPinAskedForTests();
+      openWorld('ow_w_owner');
+      mswServer.use(http.get(`${TEST_BASE}/me`, () => HttpResponse.json({ error }, { status })));
+      const { said, save } = settings();
+      await save(RIGHT);
+      expect(getState().registry.pin_state, `${status} ${String(error.code)}`).toBeUndefined();
+      expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    }
+  });
+
+  it('Test connection records no refusal of the PIN for a key keel refused itself (revoked, unknown)', async () => {
+    for (const [code, param] of [['key_revoked', null], ['invalid_credentials', null]] as const) {
+      const entry = openWorld('ow_w_owner', RIGHT);
+      mswServer.use(http.get(`${TEST_BASE}/world`, () => HttpResponse.json({ error: { type: 'authentication_error', code, message: 'm', param } }, { status: 401 })));
+      await testWorldConnection(entry, fakeToasts().toasts);
+      expect(getState().registry.pin_state, code).toBeUndefined();
+    }
+  });
+
+  it('opening Settings with nothing to ask with spends no question: once a world that writes is open, it asks', async () => {
+    patchSlice('registry', { ...defaultRegistry(), pin: RIGHT, worlds: [] });
+    settings();
+    await new Promise(r => setTimeout(r, 20));
+    expect(keel.seen.filter(s => s.pin !== null)).toEqual([]);
+    document.body.innerHTML = '';
+    const entry = linked({ api_key: 'ow_w_owner' });
+    patchSlice('registry', { ...getState().registry, worlds: [entry] });
+    patchSlice('active', { worldId: entry.id, meta: { name: 'Here' } } as never);
+    settings();
+    await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
+    expect(withPin('ow_w_owner')).toBe(1);
+  });
+
+  it('a PIN typed with no world open is asked about once a world that writes is open', async () => {
+    patchSlice('registry', { ...defaultRegistry(), worlds: [] });
+    const first = settings();
+    await first.save(RIGHT);
+    expect(first.said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    document.body.innerHTML = '';
+    const entry = linked({ api_key: 'ow_w_owner' });
+    patchSlice('registry', { ...getState().registry, worlds: [entry] });
+    patchSlice('active', { worldId: entry.id, meta: { name: 'Here' } } as never);
+    settings();
+    await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
+  });
+
+  it('saving again a PIN OnlyWorlds refused says so as an error', async () => {
+    openWorld('ow_w_owner', RIGHT, 'refused');
+    const { said, save } = settings();
+    // The same PIN, saved again (the field's value differs only in spaces).
+    await save(` ${RIGHT} `);
+    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN' }]);
+  });
+
+  it('Make online\'s link with no PIN kept: the link keeps the PIN it proved, and says it proved', async () => {
+    document.body.innerHTML = '<div class="atlas-shell"></div>';
+    const store = new MockFolderStore();
+    await store.open(null);
+    setActiveStore(store as never);
+    try {
+      patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: 'w1', name: 'W', state: 'local-only', folder: { handle_key: 'k', folder_name: 'f' } } as never] });
+      patchSlice('active', { worldId: 'w1', meta: { id: 'w1', name: 'W' }, opened: true } as never);
+      new MakeOnlineModal(new ToastManager()).open();
+      const modal = document.querySelector<HTMLElement>('[data-modal="make-online"]')!;
+      modal.querySelector<HTMLButtonElement>('[data-route-tab="link"]')!.click();
+      modal.querySelector<HTMLInputElement>('input[name="link-api-key"]')!.value = 'ow_w_owner';
+      modal.querySelector<HTMLInputElement>('input[name="link-pin"]')!.value = RIGHT;
+      modal.querySelector<HTMLFormElement>('[data-form="link-route"]')!.requestSubmit();
+      await vi.waitFor(() => expect(getState().registry.worlds[0]?.state).toBe('api-linked'), { timeout: 5000 });
+      expect(getState().registry).toMatchObject({ pin: RIGHT, pin_state: 'proved' });
+    } finally {
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('Make online\'s link that stops after keel took the PIN (the world already linked here) still says it proved', async () => {
+    document.body.innerHTML = '<div class="atlas-shell"></div>';
+    const store = new MockFolderStore();
+    await store.open(null);
+    setActiveStore(store as never);
+    try {
+      const already = linked({ api_key: 'ow_w_owner' });
+      patchSlice('registry', { ...defaultRegistry(), pin: RIGHT, worlds: [{ id: 'w1', name: 'W', state: 'local-only', folder: { handle_key: 'k', folder_name: 'f' } } as never, already] });
+      patchSlice('active', { worldId: 'w1', meta: { id: 'w1', name: 'W' }, opened: true } as never);
+      new MakeOnlineModal(new ToastManager()).open();
+      const modal = document.querySelector<HTMLElement>('[data-modal="make-online"]')!;
+      modal.querySelector<HTMLButtonElement>('[data-route-tab="link"]')!.click();
+      modal.querySelector<HTMLInputElement>('input[name="link-api-key"]')!.value = 'ow_w_owner';
+      modal.querySelector<HTMLInputElement>('input[name="link-pin"]')!.value = RIGHT;
+      modal.querySelector<HTMLFormElement>('[data-form="link-route"]')!.requestSubmit();
+      const error = modal.querySelector<HTMLElement>('[data-role="link-error"]')!;
+      await vi.waitFor(() => expect(error.hidden).toBe(false), { timeout: 3000 });
+      expect(getState().registry.worlds[0].state).toBe('local-only');
+      expect(getState().registry.pin_state).toBe('proved');
+    } finally {
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('Make online\'s link: keel taking the PIN kept here says proved; refusing it says refused', async () => {
+    document.body.innerHTML = '<div class="atlas-shell"></div>';
+    const store = new MockFolderStore();
+    await store.open(null);
+    setActiveStore(store as never);
+    const local = { id: 'w1', name: 'W', state: 'local-only', folder: { handle_key: 'k', folder_name: 'f' } } as never;
+    try {
+      for (const [pin, want] of [[RIGHT, 'proved'], [WRONG, 'refused']] as const) {
+        patchSlice('registry', { ...defaultRegistry(), pin, worlds: [local] });
+        patchSlice('active', { worldId: 'w1', meta: { id: 'w1', name: 'W' }, opened: true } as never);
+        new MakeOnlineModal(new ToastManager()).open();
+        const modal = document.querySelector<HTMLElement>('[data-modal="make-online"]')!;
+        modal.querySelector<HTMLButtonElement>('[data-route-tab="link"]')!.click();
+        modal.querySelector<HTMLInputElement>('input[name="link-api-key"]')!.value = 'ow_w_owner';
+        modal.querySelector<HTMLInputElement>('input[name="link-pin"]')!.value = pin;
+        modal.querySelector<HTMLFormElement>('[data-form="link-route"]')!.requestSubmit();
+        await vi.waitFor(() => expect(getState().registry.pin_state).toBe(want), { timeout: 3000 });
+        modal.closest('.atlas-modal-overlay')?.remove();
+        modal.remove();
+      }
+    } finally {
+      document.body.innerHTML = '';
+    }
+  });
 });
 
 describe('the PIN and what OnlyWorlds said of it travel together across tabs', () => {
+  it('a tab behind another\'s new PIN never puts the old one back by saying what OnlyWorlds said of it', () => {
+    const base = { ...defaultRegistry(), pin: '1111', worlds: [] };
+    const out = mergeRegistry(base, { ...base, pin_state: 'refused' as const }, { ...defaultRegistry(), pin: '2222', worlds: [] });
+    expect({ pin: out.pin, pin_state: out.pin_state }).toEqual({ pin: '2222', pin_state: undefined });
+    // Through the save path, refused and proved: storage keeps the other tab's new PIN, with no state.
+    for (const state of ['refused', 'proved'] as const) {
+      const behind = { ...defaultRegistry(), pin: '1111', worlds: [] };
+      localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify({ ...defaultRegistry(), pin: '2222', worlds: [] }));
+      __setRegistryTabBaseForTests(behind);
+      patchSlice('registry', behind);
+      recordPinState('1111', state);
+      const stored = storedRegistry();
+      __setRegistryTabBaseForTests(null);
+      localStorage.removeItem(REGISTRY_STORAGE_KEY);
+      expect({ pin: stored.pin, pin_state: stored.pin_state }, state).toEqual({ pin: '2222', pin_state: undefined });
+    }
+    // The same PIN in storage: the state goes.
+    const same = mergeRegistry(base, { ...base, pin_state: 'proved' as const }, base);
+    expect({ pin: same.pin, pin_state: same.pin_state }).toEqual({ pin: '1111', pin_state: 'proved' });
+  });
+
+  it('Make online\'s create proves the PIN only when its push landed something and keel refused nothing', () => {
+    expect(pushProvedPin({ pushed: { creates: 2, updates: 0 } })).toBe(true);
+    expect(pushProvedPin({ pushed: { creates: 0, updates: 1 } })).toBe(true);
+    expect(pushProvedPin({ pushed: { creates: 0, updates: 0 } })).toBe(false);
+    expect(pushProvedPin({ pushed: { creates: 2, updates: 0 }, auth_blocked: true })).toBe(false);
+  });
+
   it('a PIN changed here drops the state another tab stored for the old one', () => {
     const base = { ...defaultRegistry(), pin: '1111', pin_state: 'proved' as const, worlds: [] };
     const mine = setPin(base, '2222');

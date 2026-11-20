@@ -8,8 +8,11 @@
  * engine landed). Never beside a read key, never a seat's secret (a seat's PIN is its world's alone). What
  * refuses it: keel's 401 naming `API-Pin` for this PIN. A failed read (offline, busy) says nothing.
  *
- * Limit, named: keel compares nothing where a world holds no PIN hash, so a `/me` or a write there is
- * counted as proof though nothing was checked.
+ * Limits, named: keel compares nothing where a world holds no PIN hash, so a `/me` or a write there is
+ * counted as proof though nothing was checked. And the PIN is one account's: an owner key is checked
+ * against its world's owner's PIN, a member key against the member's own, so a key from another
+ * account's world (a shared owner key, a world linked under another sign-in) answers about a PIN that is
+ * not this one, and its answer is recorded against the one PIN kept here.
  */
 import { getState, patchSlice } from '../core/state';
 import type { WorldsRegistry } from '../core/types';

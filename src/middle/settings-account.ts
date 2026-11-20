@@ -171,15 +171,16 @@ export function __resetPinAskedForTests(): void {
 /**
  * Ask OnlyWorlds about `pin` once, beside the open world's key that writes: one `GET /me` through
  * `keyScope` (a key of no known shape asks `/me` bare first, then once with the PIN), no retry. Never beside
- * a read key or for a seat's world. Returns what OnlyWorlds said, or null when there is nothing to ask with
- * or no answer came (offline, busy): then the PIN stays not checked, never refused.
+ * a read key or for a seat's world. Returns what OnlyWorlds said; null when it asked and no answer came
+ * (offline, busy), so the PIN stays not checked, never refused; 'unasked' when there was nothing to ask
+ * with (no world open, a read key, a seat), so no question was spent.
  */
-export async function askAboutPin(pin: string | undefined): Promise<PinState | null> {
+export async function askAboutPin(pin: string | undefined): Promise<PinState | null | 'unasked'> {
   const reg = getState().registry;
   const active = getState().active;
   const entry = active ? reg.worlds.find((w) => w.id === active.worldId) : undefined;
   // A key that reads by its shape is asked nothing with a PIN: `keyScope` answers it read with no call.
-  if (!pin || !entry?.api || entry.state !== 'api-linked' || entry.api.read_only || isSeatWorld(entry)) return null;
+  if (!pin || !entry?.api || entry.state !== 'api-linked' || entry.api.read_only || isSeatWorld(entry)) return 'unasked';
   try {
     const { pinProved } = await buildV2Adapter(entry.api.api_key, pin).keyScope();
     if (!pinProved) return null;
@@ -222,8 +223,10 @@ export function wireAccountTab(toasts: ToastManager): void {
   // was open when it was typed): one question per PIN in a session.
   const kept = getState().registry;
   if (kept.pin && !kept.pin_state && !askedOnOpen.has(kept.pin)) {
-    askedOnOpen.add(kept.pin);
-    void askAboutPin(kept.pin);
+    const asking = kept.pin;
+    askedOnOpen.add(asking);
+    // Nothing to ask with (no world open that writes): the question is not spent.
+    void askAboutPin(asking).then((said) => { if (said === 'unasked') askedOnOpen.delete(asking); });
   }
   pinInput?.addEventListener('change', async () => {
     const prevPin = getState().registry.pin;
@@ -243,9 +246,16 @@ export function wireAccountTab(toasts: ToastManager): void {
     }
     // Saved here at once; "PIN saved" only once OnlyWorlds took it. One question per save.
     if (!newPin) { toasts.info('PIN removed'); return; }
-    if (newPin === prevPin && next.pin_state) { toasts.info(pinStateLine(next)); return; }
+    if (newPin === prevPin && next.pin_state) {
+      if (next.pin_state === 'refused') toasts.error(pinStateLine(next)); else toasts.info(pinStateLine(next));
+      return;
+    }
     askedOnOpen.add(newPin);
     const said = await askAboutPin(newPin);
+    if (said === 'unasked') askedOnOpen.delete(newPin);
+    // The field moved on while the question was out: say what is kept now, never this save's answer.
+    const now = getState().registry;
+    if (now.pin !== newPin) { toasts.info(pinStateLine(now) || 'PIN removed'); return; }
     if (said === 'refused') toasts.error('OnlyWorlds did not accept this PIN');
     else toasts.info(said === 'proved' ? 'PIN saved' : 'Kept here, not checked yet');
   });

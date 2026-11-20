@@ -1020,7 +1020,7 @@ export async function linkExistingApiWorldInRoot(
       try {
         pinProved = (await buildV2Adapter(apiKey, apiPin).keyScope()).pinProved;
       } catch (err) {
-        if (!seat && isPinRefusal(err)) recordPinState(apiPin, 'refused');
+        // No state to record: this path asks only when no PIN is kept here.
         throw keyCheckError(err, { readOnly });
       }
     }

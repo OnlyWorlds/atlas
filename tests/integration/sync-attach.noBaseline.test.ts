@@ -513,6 +513,15 @@ describe("a sync round says what OnlyWorlds took of the account PIN it sent", ()
     expect(getState().registry.pin_state).toBe('proved');
   });
 
+  it('a round for a PIN no longer kept (changed with no re-attach) says nothing of the new one', async () => {
+    await attachAs(entry);
+    patchSlice('registry', setPin(getState().registry, '5555'));
+    round({ pushed: { creates: 0, updates: 1, deletes: 0 } });
+    round({ auth_blocked: true, auth_reason: 'pin' });
+    expect(getState().registry.pin).toBe('5555');
+    expect(getState().registry.pin_state).toBeUndefined();
+  });
+
   it("keel refusing the PIN says refused", async () => {
     await attachAs(entry);
     round({ auth_blocked: true, auth_reason: 'pin' });

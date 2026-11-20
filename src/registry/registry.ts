@@ -61,7 +61,12 @@ const PIN_GROUP = ['pin', 'pin_state'] as const;
 export function mergeRegistry(base: WorldsRegistry, mine: WorldsRegistry, stored: WorldsRegistry): WorldsRegistry {
   const out = mergeFields(base as unknown as Record<string, unknown>, mine as unknown as Record<string, unknown>, stored as unknown as Record<string, unknown>, 'worlds');
   for (const group of [ACCOUNT_GROUP, PIN_GROUP] as const) {
-    const changedHere = group.some(k => !same(mine[k], base[k]));
+    // The PIN's pair goes from this tab when its PIN changed here, or when only its state did and storage
+    // still holds that same PIN: a tab behind another's new PIN never puts the old one back by saying
+    // what OnlyWorlds said of it.
+    const changedHere = group === PIN_GROUP
+      ? !same(mine.pin, base.pin) || (!same(mine.pin_state, base.pin_state) && same(mine.pin, stored.pin))
+      : group.some(k => !same(mine[k], base[k]));
     for (const k of group) {
       const v = (changedHere ? mine : stored)[k];
       if (v !== undefined) out[k] = v;

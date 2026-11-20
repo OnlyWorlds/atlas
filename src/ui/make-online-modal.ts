@@ -52,6 +52,11 @@ import { PlainError, problemFor } from '../core/problems';
 import { keyCheckError } from '../setup/key-check-errors';
 import { readsOnlyByShape } from '../core/key-scope';
 
+/** Route 1's push proved the PIN it sent: it landed a create or an update, and keel refused nothing. */
+export function pushProvedPin(r: { pushed: { creates: number; updates: number }; auth_blocked?: boolean }): boolean {
+  return r.pushed.creates + r.pushed.updates > 0 && !r.auth_blocked;
+}
+
 /** Make online's link route given a key that reads only. */
 const READ_KEY_CANNOT_LINK = 'That key can only read, so Atlas cannot put this world\'s elements online with it. Copy a write key from the world\'s page on onlyworlds.com.';
 import { slicePushRefusal } from '../core/provenance';
@@ -408,9 +413,7 @@ export class MakeOnlineModal extends BaseModal {
       // A seat's secret is this world's PIN only (#104), never the account's.
       const seatSecret = isSeatSecret(pin) ? pin : undefined;
       if (!reg.pin && !seatSecret) reg = setPin(reg, pin);
-      // The push created the world's elements with this PIN: keel took it.
-      const landed = pushResult.pushed.creates + pushResult.pushed.updates > 0 && !pushResult.auth_blocked;
-      if (!seatSecret && landed) reg = notePinState(reg, pin, 'proved');
+      if (!seatSecret && pushProvedPin(pushResult)) reg = notePinState(reg, pin, 'proved');
       reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name, seatSecret });
       saveRegistry(reg);
       patchSlice('registry', reg);
@@ -527,6 +530,8 @@ export class MakeOnlineModal extends BaseModal {
         const read = await client.keyScope();
         if (read.scope === 'read') throw new PlainError(READ_KEY_CANNOT_LINK);
         pinProved = read.pinProved;
+        // keel took the PIN beside this key that writes: said of the PIN kept here, if it is this one.
+        if (pinProved && !isSeatSecret(pin)) recordPinState(pin, 'proved');
       } catch (err) {
         // A refused key, an unknown world or no connection, in words (A38;
         // offline used to show "Failed to fetch"); the rest as it came.
