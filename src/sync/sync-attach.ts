@@ -80,12 +80,14 @@ export function attachSyncEngine(
   /** `justMoved`: the world just moved from this browser to a folder (1.17): what waits is the user's own editing. */
   opts: { justLinked?: boolean; justMoved?: boolean } = {},
 ): SyncEngine | null {
-  // Always detach the previous engine first — at most one active at a time.
-  detachSyncEngine();
+  // Always detach the previous engine first: at most one active at a time. The same world attached
+  // again keeps its held-copy note: the count refresh at the end says it again, or takes it down.
+  detachSyncEngine({ keepHeldNote: heldNoteWorld !== null && heldNoteWorld === entry.id });
 
   // A view-only copy (conv. 177) never syncs: its element ids are another
   // world's, and keel's ids are global.
   if (entry.state !== 'api-linked' || !entry.api || entry.copy_of) {
+    closeHeldNote(); // no sync here now: nothing will count the note again
     return null;
   }
 
@@ -536,7 +538,7 @@ async function noteProposalNews(worldId: string, folder: FolderStore, result: Sy
  * Detach the current engine: pause it, clear the world's slice entry, and
  * reset `activeSync` to null. Safe to call when no engine is attached.
  */
-export function detachSyncEngine(): void {
+export function detachSyncEngine(opts: { keepHeldNote?: boolean } = {}): void {
   if (currentWorldId !== null) {
     currentEngine?.stop();
     const sync = getState().sync;
@@ -548,8 +550,8 @@ export function detachSyncEngine(): void {
   currentWorldId = null;
   currentFolder = null;
   currentPolicyNow = null;
-  // The note that copies wait was about this world's review.
-  closeHeldNote();
+  // The note that copies wait was about this world's review (kept only for the same world attached again).
+  if (!opts.keepHeldNote) closeHeldNote();
 }
 
 /**
@@ -1016,11 +1018,14 @@ let heldNoteWatched = false;
 
 function sayHeldCopies(ids: string[], worldId: string | null): void {
   if (heldNoteWorld !== worldId) heldNoteIds = new Set();
+  const before = heldNoteIds.size;
   for (const id of ids) heldNoteIds.add(id);
   heldNoteWorld = worldId;
   watchHeldNoteWorld();
   const line = heldCopyLine(heldNoteIds.size);
   if (toastManager.update(HELD_COPY_TOAST, line)) return;
+  // Not on screen (closed by the person, or never said): it comes back only for a row not counted yet.
+  if (heldNoteIds.size === before && before > 0) return;
   toastManager.show(line, 'info', 12000, { actions: [reviewAction(worldId)], dedupeKey: HELD_COPY_TOAST });
 }
 
@@ -1149,12 +1154,16 @@ export async function refreshConflictsCount(): Promise<void> {
     closeHeldNote();
     return;
   }
+  // The engine asked: a world switch during a read leaves its answer unsaid (the new world's own refresh counts).
+  const engine = currentEngine;
   try {
-    const list = await currentEngine.listConflicts();
+    const list = await engine.listConflicts();
+    if (currentEngine !== engine) return;
     recountHeldNote(list);
     // World-meta contested fields count toward the badge too —
     // they're the same "decide later" obligation, just world-shaped.
-    const metaList = await currentEngine.listMetaConflicts();
+    const metaList = await engine.listMetaConflicts();
+    if (currentEngine !== engine) return;
     const total = list.length + metaList.length;
     const sync = getState().sync;
     if (sync.activeConflictsCount !== total) {

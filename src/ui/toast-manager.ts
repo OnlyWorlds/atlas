@@ -126,7 +126,6 @@ export class ToastManager {
     this.show(message, 'info', duration);
   }
 
-  /** Take down every toast shown with this key: what it said is over (a sign-in it asked for landed). */
   /**
    * Say new words in the toast on screen under this key, in place (no new toast, no animation).
    * False when none is on screen.
@@ -141,6 +140,7 @@ export class ToastManager {
     return live.length > 0;
   }
 
+  /** Take down every toast shown with this key: what it said is over (a sign-in it asked for landed). */
   dismiss(dedupeKey: string): void {
     for (const t of this.toasts.filter(t => t.opts.dedupeKey === dedupeKey)) this.removeToast(t.id);
   }

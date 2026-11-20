@@ -378,7 +378,9 @@ describe('the census of stand-ins: no word takes a missing name\'s place', () =>
  * tab's "(missing map)" literal) are gone. The census finds "(unknown…" or "(missing…" anywhere on a line
  * that is not a comment line (at a string's start or inside it: "Back to (unknown)"), a bare "Unknown" in
  * quotes, and "without element" or "missing knower".
- * Limits, named: a form built from parts (a variable holding "(unknown") is not seen.
+ * Limits, named: a form built from parts (a variable holding "(unknown") is not seen; quotes pair left to
+ * right, so a regex literal holding a quote (`/'/.test(s) ? '(unknown)' : ''`) hides the strings after it on
+ * its line; a continuation line of a multi-line template, with no quote of its own, is not read.
  */
 const MISSING_FORM = /\([Uu]nknown\b|\([Mm]issing\b|^\s*Unknown\s*$|without element|missing knower/;
 /** A line's string literals, in each quote form (a template's `${…}` parts ride along; a code word like `(missing.length` is no string). */
@@ -424,7 +426,7 @@ describe('a missing element is said one way', () => {
       'const label = el ? nameOrUnnamed(el) : "(Unknown)";',
       'const label = el ? nameOrUnnamed(el) : `(unknown ${t})`;',
       "const x = 'a pin without element here';",
-      // Inside a string, not at its start (the gate's N1), and the bare word.
+      // Inside a string, not only at its start, and the bare word.
       "crumb.title = 'Back to (unknown)';",
       'label.textContent = `${x} (missing map)`;',
       "const name = el ? el.name : 'Unknown';",

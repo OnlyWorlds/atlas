@@ -135,6 +135,8 @@ export class ConflictReviewModal extends BaseModal {
           // The row's buttons are live again: pressing one is the retry.
           console.error('[conflict-review] resolve failed:', err);
           showProblem(err, { doing: 'resolving the conflict', toasts: this.toasts });
+          // A failed resolve may have written part of its answer: the count is read again.
+          await refreshConflictsCount();
         }
       });
     });
@@ -227,6 +229,8 @@ export class ConflictReviewModal extends BaseModal {
           // The row's buttons are live again: pressing one is the retry.
           console.error('[conflict-review] resolve failed:', err);
           showProblem(err, { doing: 'resolving the conflict', toasts: this.toasts });
+          // A failed resolve may have written part of its answer: the count is read again.
+          await refreshConflictsCount();
           // A copy with no record of what OnlyWorlds held: the row may have taken the OnlyWorlds copy as
           // it is now (it changed while this was open, M6). Drawn again from what the engine holds.
           if (c.no_baseline) await this.redrawRow(row, c.element_id);

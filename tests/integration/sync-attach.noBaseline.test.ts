@@ -262,7 +262,7 @@ describe("the note that a copy waits carries its own press into the review", () 
   });
 });
 
-describe('round 3: the note stays true, each label runs what it names, the opener counts', () => {
+describe('the held-copy note says what the review holds; each label runs what it names; opening counts again', () => {
   const rowOf = (id: string, noBaseline: boolean, extra: Partial<Conflict> = {}): Conflict => ({
     ...row(noBaseline), element_id: id, ...(noBaseline ? { theirs: { description: 'theirs' } } : {}), ...extra,
   });
@@ -287,7 +287,7 @@ describe('round 3: the note stays true, each label runs what it names, the opene
     patchSlice('data', { elements: [] } as never);
   });
 
-  it('M1: two rounds, 3 held then 1 more, leave one note saying 4; it follows the review down and goes at 0', async () => {
+  it('two rounds, 3 held then 1 more, leave one note saying 4; it follows the review down and goes at 0', async () => {
     __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true), rowOf('c3', true)]), localWins());
     __test_emitConflictToasts('pull', result([rowOf('c4', true)]), localWins());
     await wait(350);
@@ -304,7 +304,7 @@ describe('round 3: the note stays true, each label runs what it names, the opene
     expect(onScreen()).toEqual([]);
   });
 
-  it('M1: the note goes on a world switch (another world attached), on detach, and when no world is open', async () => {
+  it('the note goes on a world switch (another world attached) and on detach', async () => {
     const say = () => __test_emitConflictToasts('push', result([rowOf('c1', true)]), localWins());
     say();
     expect(onScreen()).toEqual([heldCopyLine(1)]);
@@ -323,7 +323,7 @@ describe('round 3: the note stays true, each label runs what it names, the opene
     expect(onScreen()).toEqual([]);
   });
 
-  it('M1: leaving the note\'s world for no world takes it down', async () => {
+  it('leaving the note\'s world for no world takes it down', async () => {
     __test_emitConflictToasts('push', result([rowOf('c1', true)]), localWins());
     expect(onScreen()).toEqual([heldCopyLine(1)]);
     patchSlice('active', null);
@@ -331,7 +331,7 @@ describe('round 3: the note stays true, each label runs what it names, the opene
     expect(onScreen()).toEqual([]);
   });
 
-  it('S1: each button on each row kind runs the resolution it names', async () => {
+  it('each button on each row kind runs the resolution it names', async () => {
     const engine = getCurrentSyncEngine()!;
     vi.spyOn(engine, 'listConflicts').mockResolvedValue([rowOf('c1', false), rowOf('c2', false, { proposal: { outcome: 'lapsed' } }), rowOf('c3', true)]);
     vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue(['x_names']);
@@ -353,7 +353,7 @@ describe('round 3: the note stays true, each label runs what it names, the opene
     }
   });
 
-  it('S2: opening the review through the opener counts the conflicts again for the pill', async () => {
+  it('opening the review through the opener counts the conflicts again for the pill', async () => {
     const engine = getCurrentSyncEngine()!;
     vi.spyOn(engine, 'listConflicts').mockResolvedValue([rowOf('c1', false), rowOf('c2', true)]);
     vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue(['x_names']);
@@ -361,5 +361,134 @@ describe('round 3: the note stays true, each label runs what it names, the opene
     await openConflictReview(toastManager);
     expect(document.querySelector('[data-modal="conflict-review"]')).not.toBeNull();
     expect(getState().sync.activeConflictsCount).toBe(3);
+  });
+
+  it('a count read that lands after another world attached changes nothing in that world\'s note', async () => {
+    const first = getCurrentSyncEngine()!;
+    let land!: (rows: Conflict[]) => void;
+    vi.spyOn(first, 'listConflicts').mockReturnValue(new Promise<Conflict[]>(r => { land = r; }));
+    vi.spyOn(first, 'listMetaConflicts').mockResolvedValue([]);
+    const pending = refreshConflictsCount();
+    // World B opens while A's read is out, and B says its own note.
+    patchSlice('active', { worldId: 'w2', meta: { name: 'B' } } as never);
+    const folder = new MockFolderStore();
+    await folder.open(null);
+    // B's review holds its two rows (so B's own count, read at its attach, agrees).
+    await folder.updateSyncState(() => ({ conflicts: [rowOf('c1', true), rowOf('c2', true)] }));
+    attachSyncEngine({ ...entry, id: 'w2', name: 'B', api: { world_id: 'srv-w2', api_key: 'key-w2' } }, folder);
+    __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true)]), { worldId: 'w2', current: true, policy: 'local-wins' as const });
+    expect(onScreen()).toEqual([heldCopyLine(2)]);
+    land([]);
+    await pending;
+    await wait(350);
+    expect(onScreen()).toEqual([heldCopyLine(2)]);
+  });
+
+  it('a note the person closed comes back only for a held row not counted yet', async () => {
+    __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true)]), localWins());
+    document.querySelector<HTMLButtonElement>('#toast-container .ow-toast-close')!.click();
+    await wait(350);
+    expect(onScreen()).toEqual([]);
+    // The same rows found again: still closed.
+    __test_emitConflictToasts('pull', result([rowOf('c2', true)]), localWins());
+    await wait(50);
+    expect(onScreen()).toEqual([]);
+    // A row not counted yet: the note again, at the full count.
+    __test_emitConflictToasts('pull', result([rowOf('c3', true)]), localWins());
+    expect(onScreen()).toEqual([heldCopyLine(3)]);
+  });
+
+  it('the same world attached again keeps its note, counted from the review; with no held row left it goes', async () => {
+    const reattach = async (held: string[]) => {
+      const folder = new MockFolderStore();
+      await folder.open(null);
+      await folder.updateSyncState(() => ({ conflicts: held.map(id => rowOf(id, true)) }));
+      attachSyncEngine(entry, folder);
+      await wait(50);
+    };
+    __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true), rowOf('c3', true)]), localWins());
+    await reattach(['c1', 'c2', 'c3']);
+    expect(onScreen()).toEqual([heldCopyLine(3)]);
+    // A new held row after the reattach counts on from the review's three.
+    __test_emitConflictToasts('pull', result([rowOf('c4', true)]), localWins());
+    expect(onScreen()).toEqual([heldCopyLine(4)]);
+    await reattach([]);
+    await wait(350);
+    expect(onScreen()).toEqual([]);
+  });
+
+  it('a failed resolve counts the conflicts again for the pill', async () => {
+    const engine = getCurrentSyncEngine()!;
+    const list = vi.spyOn(engine, 'listConflicts').mockResolvedValue([rowOf('c1', false), rowOf('c2', false)]);
+    vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue(['x_names']);
+    vi.spyOn(engine, 'resolveConflict').mockRejectedValue(new Error('API Error 500'));
+    vi.spyOn(engine, 'resolveMetaConflict').mockRejectedValue(new Error('API Error 500'));
+    await openConflictReview(toastManager);
+    // The failed press wrote part of its answer: one row went from the review.
+    list.mockResolvedValue([rowOf('c2', false)]);
+    patchSlice('sync', { ...getState().sync, activeConflictsCount: 99 });
+    document.querySelector<HTMLButtonElement>('[data-conflict-id="c1"] [data-action="pull-theirs"]')!.click();
+    await vi.waitFor(() => expect(getState().sync.activeConflictsCount).toBe(2));
+    // A world setting's failed press too.
+    patchSlice('sync', { ...getState().sync, activeConflictsCount: 99 });
+    document.querySelector<HTMLButtonElement>('[data-meta-conflict] [data-action="pull-theirs"]')!.click();
+    await vi.waitFor(() => expect(getState().sync.activeConflictsCount).toBe(2));
+  });
+
+  it('a note for a world whose engine is not the attached one is not recounted from the attached engine', async () => {
+    // Said for a world the attached engine does not serve (its id is the note's, not the engine's).
+    patchSlice('active', { worldId: 'w-else', meta: { name: 'E' } } as never);
+    __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true)]), { worldId: 'w-else', current: true, policy: 'local-wins' as const });
+    const engine = getCurrentSyncEngine()!;
+    vi.spyOn(engine, 'listConflicts').mockResolvedValue([]);
+    vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue([]);
+    await refreshConflictsCount();
+    await wait(350);
+    expect(onScreen()).toEqual([heldCopyLine(2)]);
+  });
+
+  it("a round for another world starts that world's count afresh", () => {
+    __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true), rowOf('c3', true)]), localWins());
+    __test_emitConflictToasts('pull', result([rowOf('c4', true)]), { worldId: 'w-else', current: true, policy: 'local-wins' as const });
+    expect(onScreen()).toEqual([heldCopyLine(1)]);
+  });
+
+  it('a count refresh, then a round adding one row: the note counts from the review', async () => {
+    __test_emitConflictToasts('push', result([rowOf('c1', true), rowOf('c2', true), rowOf('c3', true)]), localWins());
+    const engine = getCurrentSyncEngine()!;
+    vi.spyOn(engine, 'listConflicts').mockResolvedValue([rowOf('c2', true)]);
+    vi.spyOn(engine, 'listMetaConflicts').mockResolvedValue([]);
+    await refreshConflictsCount();
+    expect(onScreen()).toEqual([heldCopyLine(1)]);
+    __test_emitConflictToasts('pull', result([rowOf('c4', true)]), localWins());
+    expect(onScreen()).toEqual([heldCopyLine(2)]);
+  });
+
+  it('a settings count that lands after another world attached leaves the pill as that world counts it', async () => {
+    const first = getCurrentSyncEngine()!;
+    vi.spyOn(first, 'listConflicts').mockResolvedValue([rowOf('c1', false)]);
+    let land!: (rows: string[]) => void;
+    vi.spyOn(first, 'listMetaConflicts').mockReturnValue(new Promise<string[]>(r => { land = r; }));
+    const pending = refreshConflictsCount();
+    await wait(10);
+    patchSlice('active', { worldId: 'w2', meta: { name: 'B' } } as never);
+    const folder = new MockFolderStore();
+    await folder.open(null);
+    attachSyncEngine({ ...entry, id: 'w2', name: 'B', api: { world_id: 'srv-w2', api_key: 'key-w2' } }, folder);
+    await wait(50);
+    expect(getState().sync.activeConflictsCount).toBe(0);
+    land(['x_names']);
+    await pending;
+    expect(getState().sync.activeConflictsCount).toBe(0);
+  });
+
+  it('the same world attached again with no sync (unlinked) takes its note down', async () => {
+    __test_emitConflictToasts('push', result([rowOf('c1', true)]), localWins());
+    expect(onScreen()).toEqual([heldCopyLine(1)]);
+    const folder = new MockFolderStore();
+    await folder.open(null);
+    attachSyncEngine({ ...entry, state: 'local-only' } as never, folder);
+    await wait(350);
+    expect(onScreen()).toEqual([]);
   });
 });
