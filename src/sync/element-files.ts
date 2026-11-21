@@ -286,7 +286,7 @@ export function addRefusal(err: unknown, file: { size: number }): string {
   if (err.code === 'media_unavailable') return 'Files are not available on OnlyWorlds right now. Try again later.';
   if (err.code === 'write_failed') return 'OnlyWorlds could not store the file just now. Nothing was kept; try again.';
   if (err.status === 404) return FILES_NOT_SYNCED_LINE;
-  if (err.isAuthError && err.param === 'API-Pin') return 'OnlyWorlds did not accept that PIN. Check it in Settings, under OnlyWorlds.';
+  if (err.isAuthError && err.param === 'API-Pin') return 'OnlyWorlds did not accept this PIN. Check it in Settings, under OnlyWorlds.';
   if (err.isAuthError) return SIGN_IN_AGAIN;
   // The web host in front of OnlyWorlds refused the request for its text (the
   // file's name or label), before OnlyWorlds saw it: never the key (conv. 191).
@@ -424,7 +424,7 @@ export async function removeFile(
       notify();
       if (err instanceof OwNetworkError) throw new PlainError(`${NOT_REACHED} The file is still there.`);
       if (err instanceof OwApiError && err.status === 403) throw new PlainError('Only the person who added this file, or the world\'s owner, can remove it.');
-      if (err instanceof OwApiError && err.isAuthError && err.param === 'API-Pin') throw new PlainError('OnlyWorlds did not accept that PIN. Check it in Settings, under OnlyWorlds.');
+      if (err instanceof OwApiError && err.isAuthError && err.param === 'API-Pin') throw new PlainError('OnlyWorlds did not accept this PIN. Check it in Settings, under OnlyWorlds.');
       if (err instanceof OwApiError && err.isAuthError) throw new PlainError(SIGN_IN_AGAIN);
       throw new PlainError('The file was not removed. Try again in a moment.');
     }

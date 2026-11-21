@@ -30,7 +30,7 @@ import { isPageNarrative, pageBlocksFromStory } from '../core/sharing';
 
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
-import { isHostBlocked, isHostRefusal } from './sync-engine';
+import { isHostBlocked, isHostRefusal, REPLACED_HELD_LINE } from './sync-engine';
 import { isKnownOf } from './known-of';
 import { isHiddenMark } from '../core/hidden-mark';
 import { stampWordOf } from '../core/door-trail';
@@ -492,6 +492,14 @@ export async function mergeLocalIntoApi(
       // pushed type). Never stamp client now().
       const needBackfill: typeof batch = [];
       for (let i = 0; i < batch.length; i++) {
+        // create_only never replaces (conv. 192, R5), as the engine's push says: a 200 slot is that element's
+        // failure, never stamped or counted as created.
+        if (result.items[i]?.status === 200) {
+          console.error('[atlas:sync] merge /bulk create_only answered 200 (replaced) for an id Atlas sent: a broken contract', { id: batch[i].dec.local.id, type: batch[i].dec.type });
+          failures.push({ element_id: batch[i].dec.local.id, type: batch[i].dec.type, operation: 'create', status: 200, source: 'server', message: REPLACED_HELD_LINE });
+          tick();
+          continue;
+        }
         const echo = result.items[i]?.updatedAt;
         if (typeof echo === 'string' && echo) {
           // A stamp that throws (a file gone corrupt) is that element's
@@ -610,9 +618,10 @@ export async function mergeLocalIntoApi(
     for (const c of creates) await createOne(c);
   }
   // An id keel answered 409 for (another place sent it first, or another world holds it) was never this
-  // route's upload: a rerun must not take it as its own and write over it.
+  // route's upload: a rerun must not take it as its own and write over it. Nor is a slot keel answered 200
+  // (it replaced what it held, never counted as created).
   const createdIds = new Set(creates.map(c => c.local.id));
-  const raced = new Set(failures.filter(f => f.operation === 'create' && createdIds.has(f.element_id) && (f.code === 'id_conflict' || f.status === 409)).map(f => f.element_id));
+  const raced = new Set(failures.filter(f => f.operation === 'create' && createdIds.has(f.element_id) && (f.code === 'id_conflict' || f.status === 409 || f.status === 200)).map(f => f.element_id));
   if (raced.size > 0) {
     await folder.updateSyncState(st => ({ route2_created: (st.route2_created ?? []).filter(id => !raced.has(id)) }));
   }

@@ -516,7 +516,7 @@ export class FakeOwApiClient implements OwApiClient {
    * `GET /{type}?ids=` as the adapter walks it (keel's list filter: an id this key cannot see is absent, a
    * type's other ids are not this type's, any letter case names the same id).
    */
-  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean }> {
+  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean; unread: string[] }> {
     this.throwIfAuthBlocked();
     this.idsReads.push({ type, ids: [...ids] });
     if (this.idsReadFails) throw this.idsReadFails;
@@ -524,7 +524,7 @@ export class FakeOwApiClient implements OwApiClient {
     const found = Array.from(this.bucket(type).values())
       .filter(r => want.has(r.id.toLowerCase()) && !this.outOfView.has(r.id))
       .map(r => this.served(r));
-    return { records: found, complete: true };
+    return { records: found, complete: true, unread: [] };
   }
 
   /**

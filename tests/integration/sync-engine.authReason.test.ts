@@ -61,7 +61,7 @@ describe('SyncEngine push auth_reason', () => {
     const pin = await again.pushOnce();
     expect(pin.auth_reason).toBe('pin');
     state = again.getState();
-    expect(state.kind === 'error' && state.message).toMatch(/did not accept your PIN/);
+    expect(state.kind === 'error' && state.message).toMatch(/did not accept this PIN/);
     expect(state.kind === 'error' && state.message).not.toMatch(/Unlink/);
   });
 

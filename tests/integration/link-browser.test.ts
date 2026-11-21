@@ -93,7 +93,7 @@ describe('linking a world into this browser', () => {
         ? HttpResponse.json({ role: 'owner' })
         : HttpResponse.json({ error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } }, { status: 401 });
     }));
-    await expect(link({ apiKey: 'ow_w_k', apiPin: '9999', knownWorld: undefined })).rejects.toThrow(/did not accept that PIN/);
+    await expect(link({ apiKey: 'ow_w_k', apiPin: '9999', knownWorld: undefined })).rejects.toThrow(/did not accept this PIN/);
     expect(getState().registry.worlds).toEqual([]);
     const { entry } = await link({ apiKey: 'ow_w_k', apiPin: '1234', knownWorld: undefined });
     expect(entry.state).toBe('api-linked');

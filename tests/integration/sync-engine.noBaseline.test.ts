@@ -383,6 +383,8 @@ describe('I5: /bulk never replaces an element keel held (create_only)', () => {
       if (want === 'auth') expect(r.auth_blocked).toBe(true);
       else expect(r.transient_blocked).toBe(true);
       expect(file(L).server_updated_at).toBeUndefined();
+      // The rolled-back survivor is said, as a whole request's failure says each item.
+      expect(r.failures.find(f => f.element_id === L)?.message).toMatch(/^rolled back with the batch, and reading a held id failed: /);
     }
   });
 
@@ -497,6 +499,102 @@ describe('I5: /bulk never replaces an element keel held (create_only)', () => {
     expect(sent.length).toBe(2);
     expect(r.failures.some(f => f.element_id === C && /retry exhausted/.test(f.message))).toBe(true);
     expect(onKeel(B).name).toBe('Bo elsewhere');
+  });
+});
+
+describe('where a 409 slot\'s id is held is keel\'s words, never whether a read worked', () => {
+  const ANOTHER = (id: string) => `An element with id ${id} already exists in another world. Element ids are unique across all worlds: give this element a new id (a copied world folder needs fresh ids).`;
+  const IN_USE = (id: string) => `The id ${id} is already in use. Give this element a new id.`;
+  const HERE = (id: string) => `An element with id ${id} already exists. Use PUT to upsert, or POST without an id.`;
+  const readFails = () => Object.assign(new Error('API Error 422: bad'), { status: 422, code: 'invalid_request' });
+  const foreignIds = async () => ((await store.readSyncState()).foreign?.ids ?? []).map(f => f.id);
+  const WAITS = 'waits for an element OnlyWorlds refused in the same upload';
+
+  /** The place L here, which keel answers with `message`; B is new and names L; C is new. Returns the batches sent. */
+  async function linkedToL(message: string): Promise<string[][]> {
+    client.__enable_bulk();
+    root.put(`elements/location/lu--${L.slice(-8)}.json`, j({ id: L, type: 'location', name: 'Lu', local_updated_at: stamp() }));
+    await store.rescanDisk();
+    await put(B, { name: 'Bo', birthplace: L, local_updated_at: stamp() });
+    await put(C, { name: 'Cy', local_updated_at: stamp() });
+    client.__inject_bulk_item_failure(L, { code: 'id_conflict', message, param: 'id' } as never);
+    const sent: string[][] = [];
+    const real = client.bulkCreate!;
+    client.bulkCreate = async (items: BulkItem[], opts) => { sent.push(items.map(it => it.element.id as string)); return real(items, opts); };
+    return sent;
+  }
+  /** C landed in the round's one retry and B waits for L: the refusal took nothing else down. */
+  function cLandsBWaits(sent: string[][], r: Awaited<ReturnType<SyncEngine['pushOnce']>>): void {
+    expect(sent.length).toBe(2);
+    expect(sent[1]).toEqual([C]);
+    expect(file(C).server_updated_at).toBeTruthy();
+    expect(r.failures.find(f => f.element_id === B)?.message).toBe(WAITS);
+    expect(r.failures.some(f => /retry exhausted/.test(f.message))).toBe(false);
+  }
+
+  for (const read of ['fails', 'answers "not here"'] as const) {
+    it(`another world's id whose read ${read}: never read, never held here, so B waits and C lands in the same round`, async () => {
+      const sent = await linkedToL(ANOTHER(L));
+      if (read === 'fails') client.idsReadFails = readFails();
+      const r = await engineFor('local-wins').pushOnce();
+      cLandsBWaits(sent, r);
+      expect(client.idsReads).toEqual([]);
+      expect(await foreignIds()).toEqual([L]);
+    });
+  }
+
+  it('an id a membership holds: a failure in keel\'s words, never another world\'s, never held here', async () => {
+    const sent = await linkedToL(IN_USE(L));
+    const r = await engineFor('local-wins').pushOnce();
+    cLandsBWaits(sent, r);
+    expect(client.idsReads).toEqual([]);
+    expect(r.failures.find(f => f.element_id === L)?.message).toBe(IN_USE(L));
+    expect(await foreignIds()).toEqual([]);
+  });
+
+  it('this world\'s words, and a read that now answers "not here" (it went meanwhile): never another world\'s, no longer held', async () => {
+    const sent = await linkedToL(HERE(L));
+    const r = await engineFor('local-wins').pushOnce();
+    cLandsBWaits(sent, r);
+    expect(r.failures.find(f => f.element_id === L)?.message).toMatch(/no longer holds it/);
+    expect(await foreignIds()).toEqual([]);
+  });
+
+  it('words it does not know: the read decides, and "not here" is another world\'s, refused', async () => {
+    const sent = await linkedToL('Conflict.');
+    const r = await engineFor('local-wins').pushOnce();
+    cLandsBWaits(sent, r);
+    expect(client.idsReads.length).toBe(1);
+    expect(await foreignIds()).toEqual([L]);
+  });
+
+  it('words it does not know and a read that fails: a failure, never another world\'s, and still refused', async () => {
+    const sent = await linkedToL('Conflict.');
+    client.idsReadFails = readFails();
+    const r = await engineFor('local-wins').pushOnce();
+    cLandsBWaits(sent, r);
+    expect(r.failures.find(f => f.element_id === L)?.message).toMatch(/^id_conflict, and checking it failed/);
+    expect(await foreignIds()).toEqual([]);
+  });
+
+  it('one record keel answers that would not read is that id\'s failed read; the call\'s other answers stand', async () => {
+    client.__enable_bulk();
+    // keel holds A as this world's; L's 409 is in words Atlas does not know and keel does not hold it.
+    await client.createElement('character', { id: A, name: 'Ada', description: 'theirs' });
+    await put(A, { name: 'Ada', description: 'mine', local_updated_at: stamp() });
+    await put(C, { name: 'Cy', local_updated_at: stamp() });
+    await put(B, { name: 'Bo', local_updated_at: stamp() });
+    client.__inject_bulk_item_failure(B, { code: 'id_conflict', message: 'Conflict.', param: 'id' } as never);
+    const realRead = client.listByIds.bind(client);
+    client.listByIds = async (type, ids) => {
+      const out = await realRead(type, ids);
+      return { records: out.records.filter(r => r.id !== A), complete: true, unread: [A] };
+    };
+    const r = await engineFor('local-wins').pushOnce();
+    expect(r.failures.find(f => f.element_id === A)?.message).toMatch(/^id_conflict, and checking it failed/);
+    // B was answered "not here" in the same call: another world's, not a failed read.
+    expect(await foreignIds()).toEqual([B]);
+    expect(file(C).server_updated_at).toBeTruthy();
   });
 });
 

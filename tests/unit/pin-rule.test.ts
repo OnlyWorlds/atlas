@@ -92,7 +92,7 @@ describe('a door reads the key at /me', () => {
     await expect(a.getWorld()).resolves.toMatchObject({ id: 'w-1' });
     const err = await a.keyScope().then(() => null, (e: unknown) => e);
     expect(seen.find(s => s.call === 'GET /me')?.pin).toBe('9999');
-    expect(String((keyCheckError(err) as Error).message)).toMatch(/did not accept that PIN/);
+    expect(String((keyCheckError(err) as Error).message)).toMatch(/did not accept this PIN/);
   });
 
   it('a write key with its PIN accepted: write, and the PIN proved', async () => {

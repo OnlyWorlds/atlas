@@ -69,7 +69,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'pin-words-again',
         title: 'The PIN field says what to do when OnlyWorlds refuses it',
-        body: 'A PIN OnlyWorlds did not accept now says: OnlyWorlds did not accept this PIN. Check it and save it again. One not checked yet says Saved in this browser, not checked yet. When Atlas asked about it and got no answer, because you were offline or OnlyWorlds was busy, it asks again the next time you open Settings, still once each time.',
+        body: 'A PIN OnlyWorlds did not accept now says: OnlyWorlds did not accept this PIN. Check it and save it again. One not checked yet says Saved in this browser, not checked yet. When Atlas asked about it and got no answer, because you were offline or OnlyWorlds was busy, it asks again the next time you open Settings, still once each time, and never while its last question is still waiting for an answer, so a wrong PIN reaches OnlyWorlds once. Every other place that tells you OnlyWorlds refused your PIN now says it the same way, then what to do there.',
         tags: ['settings'],
       },
     ],

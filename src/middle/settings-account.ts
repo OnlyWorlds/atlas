@@ -167,18 +167,23 @@ export const PIN_UNCHECKED_LINE = 'Saved in this browser, not checked yet';
 /**
  * The PINs asked about in this opening of Settings: one question per PIN per opening (its redraws ask
  * nothing more). A question that got an answer leaves a state, so it is never asked again; one that got
- * none (offline, a busy server) is asked again at the next opening.
+ * none (offline, a busy server) is asked again at the next opening. A question still out is never sent
+ * again, whatever opens or saves meanwhile: `askAboutPin` hands back the one in flight.
  */
 const askedOnOpen = new Set<string>();
+
+/** The questions still out, by PIN: a second ask of the same PIN waits on this one's answer. */
+const inFlight = new Map<string, Promise<PinState | null | 'unasked'>>();
 
 /** Settings opens: a new opening, nothing asked in it yet. */
 export function beginSettingsOpening(): void {
   askedOnOpen.clear();
 }
 
-/** Tests: a fresh opening, nothing asked yet. */
+/** Tests: a fresh opening, nothing asked yet and nothing out. */
 export function __resetPinAskedForTests(): void {
   beginSettingsOpening();
+  inFlight.clear();
 }
 
 /**
@@ -186,9 +191,22 @@ export function __resetPinAskedForTests(): void {
  * `keyScope` (a key of no known shape asks `/me` bare first, then once with the PIN), no retry. Never beside
  * a read key or for a seat's world. Returns what OnlyWorlds said; null when it asked and no answer came
  * (offline, busy), so the PIN stays not checked, never refused; 'unasked' when there was nothing to ask
- * with (no world open, a read key, a seat), so no question was spent.
+ * with (no world open, a read key, a seat), so no question was spent. A question about the same PIN
+ * still out is not sent again: this ask waits on its answer, so a wrong PIN reaches OnlyWorlds once.
  */
-export async function askAboutPin(pin: string | undefined): Promise<PinState | null | 'unasked'> {
+export function askAboutPin(pin: string | undefined): Promise<PinState | null | 'unasked'> {
+  const out = pin ? inFlight.get(pin) : undefined;
+  if (out) return out;
+  const asking = askOnce(pin);
+  if (pin) {
+    inFlight.set(pin, asking);
+    const done = (): void => { if (inFlight.get(pin) === asking) inFlight.delete(pin); };
+    asking.then(done, done);
+  }
+  return asking;
+}
+
+async function askOnce(pin: string | undefined): Promise<PinState | null | 'unasked'> {
   const reg = getState().registry;
   const active = getState().active;
   const entry = active ? reg.worlds.find((w) => w.id === active.worldId) : undefined;

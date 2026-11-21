@@ -156,7 +156,7 @@ describe('keyCheckError', () => {
     // keel's own answers, read on live 2026-10-19: param "API-Pin" for a right key with a wrong PIN.
     const pin = keyCheckError(new OwV2Error(401, { code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' }, ''));
     expect(isPlainError(pin)).toBe(true);
-    expect((pin as Error).message).toBe('OnlyWorlds did not accept that PIN. Check it, then try again.');
+    expect((pin as Error).message).toBe('OnlyWorlds did not accept this PIN. Check it, then try again.');
     const key = keyCheckError(new OwV2Error(401, { code: 'invalid_credentials', message: 'No valid API-Key.', param: null }, ''));
     expect((key as Error).message).toMatch(/that API key\. Check it/);
   });

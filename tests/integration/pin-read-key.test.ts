@@ -65,7 +65,9 @@ import { removePicture, uploadPicture } from '../../src/sync/media-upload';
 import { MakeOnlineModal } from '../../src/ui/make-online-modal';
 import { ToastManager } from '../../src/ui/toast-manager';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
-import { renderAccountTab, wireAccountTab, pinStateLine, __resetPinAskedForTests, beginSettingsOpening } from '../../src/middle/settings-account';
+import { renderAccountTab, wireAccountTab, pinStateLine, __resetPinAskedForTests, beginSettingsOpening, PIN_REFUSED_LINE } from '../../src/middle/settings-account';
+import { mountSettingsPanel } from '../../src/middle/settings-panel';
+import { settingsHash } from '../../src/core/router';
 
 const KEYS = {
   'ow_r_owner': { scope: 'read' as const },
@@ -275,7 +277,7 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
 
   describe('a PIN is kept as the account\'s only after a write key proves it', () => {
     it('a write key with a wrong PIN: refused, nothing kept; the right one: kept', async () => {
-      await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept that PIN/);
+      await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept this PIN/);
       expect(getState().registry.pin).toBeUndefined();
       expect(getState().registry.worlds).toEqual([]);
       await link({ apiPin: RIGHT });
@@ -284,7 +286,7 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
 
     it('an account world\'s open (the world known, the key made): the PIN proved before it is kept', async () => {
       const known = { id: 'w-played', name: 'Played world' };
-      await expect(link({ apiPin: WRONG, knownWorld: known })).rejects.toThrow(/did not accept that PIN/);
+      await expect(link({ apiPin: WRONG, knownWorld: known })).rejects.toThrow(/did not accept this PIN/);
       expect(getState().registry.pin).toBeUndefined();
       await link({ apiPin: RIGHT, knownWorld: known });
       expect(getState().registry.pin).toBe(RIGHT);
@@ -294,7 +296,7 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
       await keepPinProvedBy('ow_r_owner', WRONG);
       expect(getState().registry.pin).toBeUndefined();
       expect(pinsBeside('ow_r_owner')).toEqual([]);
-      await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept that PIN/);
+      await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept this PIN/);
       expect(getState().registry.pin).toBeUndefined();
       await keepPinProvedBy('ow_w_owner', RIGHT);
       expect(getState().registry.pin).toBe(RIGHT);
@@ -435,6 +437,93 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     expect(asked).toBe(2);
   });
 
+  it('a question still out is never sent again: quick openings and a save of the same PIN wait on its one answer', async () => {
+    openWorld('ow_w_owner', WRONG);
+    let release!: () => void;
+    const held = new Promise<void>(r => { release = r; });
+    let asked = 0;
+    mswServer.use(http.get(`${TEST_BASE}/me`, async () => {
+      asked += 1;
+      await held;
+      return HttpResponse.json({ error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } }, { status: 401 });
+    }));
+    const opening = () => { beginSettingsOpening(); document.body.innerHTML = ''; return settings(); };
+    opening();
+    await vi.waitFor(() => expect(asked).toBe(1));
+    // Settings closed and opened four more times before OnlyWorlds answers.
+    for (let i = 0; i < 4; i++) { opening(); await new Promise(r => setTimeout(r, 2)); }
+    // The same PIN saved again, then one more opening, all while the question is out.
+    const { said, save } = settings();
+    const saving = save(WRONG);
+    await new Promise(r => setTimeout(r, 5));
+    opening();
+    await new Promise(r => setTimeout(r, 20));
+    expect(asked).toBe(1);
+    release();
+    await saving;
+    await vi.waitFor(() => expect(getState().registry.pin_state).toBe('refused'));
+    // One wrong PIN reached OnlyWorlds; the save says the answer it waited on.
+    expect(asked).toBe(1);
+    expect(said).toEqual([{ kind: 'error', line: PIN_REFUSED_LINE }]);
+    // A refused PIN is asked about no more.
+    opening();
+    await new Promise(r => setTimeout(r, 20));
+    expect(asked).toBe(1);
+  });
+
+  it('each mount of the Settings panel is an opening: one question per mount, none on a tab switch, none while one is out', async () => {
+    const entry = openWorld('ow_w_owner', RIGHT);
+    let asked = 0;
+    let offline = true;
+    const out = { release: () => {} };
+    mswServer.use(http.get(`${TEST_BASE}/me`, async () => {
+      asked += 1;
+      if (offline) return HttpResponse.error();
+      await new Promise<void>(r => { out.release = r; });
+      return HttpResponse.json({ world: { id: 'w-played', name: 'Played world' }, scope: 'write', kind: 'owner', role: 'owner', membership: null });
+    }));
+    const tick = () => new Promise(r => setTimeout(r, 20));
+    const go = async (tab: 'onlyworlds' | 'general') => {
+      window.location.hash = settingsHash(entry.id, tab);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      await tick();
+    };
+    await go('onlyworlds');
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const { toasts } = fakeToasts();
+    let unmount = mountSettingsPanel({ target, toasts });
+    try {
+      // Opening, offline: one question, no answer.
+      await vi.waitFor(() => expect(asked).toBe(1));
+      await tick();
+      expect(document.querySelector('.atlas-settings input[name="pin"]')).not.toBeNull();
+      // A tab switch inside the same opening redraws and asks nothing.
+      await go('general');
+      await go('onlyworlds');
+      expect(document.querySelector('.atlas-settings input[name="pin"]')).not.toBeNull();
+      expect(asked).toBe(1);
+      // Settings mounted again: a new opening asks again.
+      offline = false;
+      unmount();
+      unmount = mountSettingsPanel({ target, toasts });
+      await vi.waitFor(() => expect(asked).toBe(2));
+      // Mounted twice more while that question is out: nothing more is sent.
+      unmount();
+      unmount = mountSettingsPanel({ target, toasts });
+      unmount();
+      unmount = mountSettingsPanel({ target, toasts });
+      await tick();
+      expect(asked).toBe(2);
+      out.release();
+      await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
+      expect(asked).toBe(2);
+    } finally {
+      unmount();
+      window.location.hash = '';
+    }
+  });
+
   it('opening Settings asks once about a PIN kept but not checked yet, and not again in that opening', async () => {
     openWorld('ow_w_owner', RIGHT);
     settings();
@@ -465,13 +554,13 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     await link({ apiPin: RIGHT });
     expect(getState().registry).toMatchObject({ pin: RIGHT, pin_state: 'proved' });
     patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [] });
-    await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept that PIN/);
+    await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept this PIN/);
     expect(getState().registry.pin_state).toBe('refused');
     patchSlice('registry', { ...defaultRegistry(), pin: RIGHT, worlds: [] });
     await keepPinProvedBy('ow_w_owner', RIGHT);
     expect(getState().registry.pin_state).toBe('proved');
     patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [] });
-    await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept that PIN/);
+    await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept this PIN/);
     expect(getState().registry.pin_state).toBe('refused');
     // Test connection on a world that writes.
     const entry = openWorld('ow_w_owner', RIGHT);
@@ -868,5 +957,40 @@ describe('one phrase for a key that can only read', () => {
     // The instrument sees the old words.
     expect(OTHER.test('. It reads only, so this world opens to read.')).toBe(true);
     expect(OTHER.test('This is a read key, so edits can\'t sync.')).toBe(true);
+  });
+});
+
+describe('a PIN OnlyWorlds refused is said one way', () => {
+  it('every door that names the PIN alone says "OnlyWorlds did not accept this PIN." and then its own next step', () => {
+    expect(PIN_REFUSED_LINE.startsWith('OnlyWorlds did not accept this PIN. ')).toBe(true);
+    expect(keyRefusalPill('pin')).toBe('OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds');
+    expect(keyRefusalLine('pin')).toBe('Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.');
+    expect(keyRefusalHere('pin')).toBe('OnlyWorlds did not accept this PIN. Check it on the OnlyWorlds tab.');
+  });
+
+  it('the census: no sentence a person reads says a refused PIN any other way', () => {
+    const SRC = join(__dirname, '..', '..', 'src');
+    const walk = (d: string): string[] => readdirSync(d).flatMap(n => {
+      const p = join(d, n);
+      return statSync(p).isDirectory() ? walk(p) : /\.ts$/.test(n) ? [p] : [];
+    });
+    const STRINGS = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
+    // The PIN alone refused, in any wording but the ruled one. "the key or PIN" (a refusal that does not say
+    // which) and "wrong PIN tries" (a wall, not a refusal) are other sentences.
+    const OTHER = /did not accept (?:that|your|the) PIN\b|\bPIN (?:was|is) (?:not accepted|refused|wrong)\b|\bincorrect PIN\b/i;
+    const hits: string[] = [];
+    for (const file of walk(SRC)) {
+      const rel = relative(SRC, file).split(sep).join('/');
+      if (rel === 'changelog/changelog.data.ts') continue;
+      readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
+        if (/^\s*(\/\/|\/\*|\*)/.test(line) || /console\./.test(line)) return;
+        if ((line.match(STRINGS) ?? []).some(lit => OTHER.test(lit))) hits.push(`${rel}:${i + 1} ${line.trim()}`);
+      });
+    }
+    expect(hits).toEqual([]);
+    // The instrument sees the old words.
+    expect(OTHER.test('OnlyWorlds did not accept that PIN. Check it, then try again.')).toBe(true);
+    expect(OTHER.test('OnlyWorlds did not accept your PIN with that key.')).toBe(true);
+    expect(OTHER.test('OnlyWorlds did not accept the key or PIN.')).toBe(false);
   });
 });

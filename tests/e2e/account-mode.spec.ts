@@ -374,7 +374,7 @@ test('a member whose PIN keel refuses opens nothing, keeps no PIN, and the key m
   const prompt = page.locator('[data-modal="pin-prompt"]');
   await prompt.locator('input[name="pin"]').fill('9999');
   await prompt.locator('[data-action="confirm"]').click();
-  await expect(page.locator('.ow-toast', { hasText: 'did not accept that PIN' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'did not accept this PIN' })).toBeVisible();
   await expect.poll(() => keel.revokes).toEqual(['k-1']);
   expect(await sharedEntry(page)).toMatchObject({ found: false, pin: null });
 });

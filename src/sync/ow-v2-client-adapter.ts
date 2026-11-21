@@ -640,10 +640,12 @@ export class OwV2ClientAdapter implements OwApiClient {
    * call, its pages 100 long unless `limit` says more), with each body as served: how a `/bulk`'s 409
    * slots are read together (conv. 192, R5), never a check before a batch. Its own walk, never
    * `listElements`: that one resets the type's incomplete flag the server-delete inference reads.
-   * `complete` false when a page was left unread.
+   * `complete` false when a page was left unread. A record that would not read is skipped and its id named in
+   * `unread` (that id only; the rest of the answer stands), or, with no id to name, the call is incomplete.
    */
-  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean }> {
+  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean; unread: string[] }> {
     const records: ServerRecord[] = [];
+    const unread: string[] = [];
     let complete = true;
     for (let i = 0; i < ids.length; i += LIST_BY_IDS_MAX) {
       const chunk = ids.slice(i, i + LIST_BY_IDS_MAX);
@@ -653,7 +655,10 @@ export class OwV2ClientAdapter implements OwApiClient {
         if (cursor) q.set('cursor', cursor);
         const env = await this.request('GET', `/${type}?${q.toString()}`) as { data?: unknown[]; has_more?: boolean; next_cursor?: string | null } | undefined;
         for (const r of env?.data ?? []) {
-          try { records.push(adaptV2Record(r, type)); } catch { complete = false; }
+          try { records.push(adaptV2Record(r, type)); } catch {
+            const id = (r as { id?: unknown } | null)?.id;
+            if (typeof id === 'string' && id) unread.push(id); else complete = false;
+          }
         }
         if (!env?.has_more) { cursor = null; break; }
         const next = env.next_cursor ?? null;
@@ -662,7 +667,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       }
       if (cursor) complete = false;
     }
-    return { records, complete };
+    return { records, complete, unread };
   }
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {

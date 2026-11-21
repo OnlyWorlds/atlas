@@ -561,7 +561,7 @@ describe('openAccountWorld: a PIN keel refuses beside the key just made (1.124.3
     expect(revoked).toEqual(['srv-owned/key-1']);
     expect(getState().registry.pin).toBeUndefined();
     expect(getState().registry.worlds).toEqual([]);
-    expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual(['OnlyWorlds did not accept that PIN. Check it, then try again.']);
+    expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual(['OnlyWorlds did not accept this PIN. Check it, then try again.']);
     localStorage.removeItem('atlas_ui_prefs');
     if (hadStorage) Object.defineProperty(navigator, 'storage', hadStorage);
     else delete (navigator as unknown as { storage?: unknown }).storage;

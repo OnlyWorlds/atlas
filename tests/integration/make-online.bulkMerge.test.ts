@@ -13,6 +13,7 @@ import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { mergeLocalIntoApi } from '../../src/sync/make-online';
+import { REPLACED_HELD_LINE } from '../../src/sync/sync-engine';
 
 let folder: MockFolderStore;
 let client: FakeOwApiClient;
@@ -49,6 +50,24 @@ describe('mergeLocalIntoApi /bulk create phase', () => {
     // A rerun of the merge must not take the raced id as its own upload.
     expect((await folder.readSyncState()).route2_created ?? []).not.toContain(a1.id);
     expect((await folder.readSyncState()).route2_created ?? []).toEqual(expect.arrayContaining([b1.id, c1.id]));
+  });
+
+  it('a 200 slot in a create_only batch is a broken contract: that element\'s failure, never stamped, never this route\'s upload', async () => {
+    const a1 = await folder.createElement('character', { name: 'Replaced' });
+    const b1 = await folder.createElement('character', { name: 'Free' });
+    const real = client.bulkCreate!;
+    client.bulkCreate = async (items, opts) => {
+      const out = await real(items, opts);
+      const i = items.findIndex(it => it.element.id === a1.id);
+      out.items[i] = { ...out.items[i], status: 200 };
+      return out;
+    };
+    const result = await mergeLocalIntoApi(folder, client, 'b');
+    const f = result.failures.find(x => x.element_id === a1.id)!;
+    expect(f).toMatchObject({ status: 200, message: REPLACED_HELD_LINE });
+    expect((await folder.getElement(a1.id))!.server_updated_at).toBeUndefined();
+    expect((await folder.getElement(b1.id))!.server_updated_at).toBeTruthy();
+    expect((await folder.readSyncState()).route2_created ?? []).not.toContain(a1.id);
   });
 
   it('merges a cyclic local-only pair through ONE bulk call, stamps server baselines, downloads server-only', async () => {

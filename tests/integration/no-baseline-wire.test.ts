@@ -118,6 +118,19 @@ describe('the held slots\' reader: keel\'s list filter, 200 ids a call', () => {
     expect(stuck.complete).toBe(false);
   });
 
+  it('a record that would not read is skipped and named, and the rest of the answer stands', async () => {
+    const page = (data: unknown[]) => http.get(`${BASE}/character`, () => HttpResponse.json({ data, has_more: false, next_cursor: null }));
+    mswServer.use(page([{ id: id(1), name: 'No stamp' }, { id: id(2), name: 'Fine', updated_at: '2026-01-01T00:00:00.000Z' }]));
+    const read = await adapter().listByIds('character', [id(1), id(2), id(3)]);
+    // id(1) did not read; id(2) did; id(3) is not here, and the call still says so.
+    expect(read.unread).toEqual([id(1)]);
+    expect(read.complete).toBe(true);
+    expect(read.records.map(r => r.id)).toEqual([id(2)]);
+    // A record with no id to name leaves the call incomplete.
+    mswServer.use(page([{ name: 'No id' }]));
+    expect((await adapter().listByIds('character', [id(1)])).complete).toBe(false);
+  });
+
   it('never resets the server-delete flag of listElements', async () => {
     const { handlers } = statefulV2Handlers({ baseUrl: BASE, clock: clock.next, brokenCursor: true });
     mswServer.use(...handlers);
