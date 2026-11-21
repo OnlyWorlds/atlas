@@ -7,7 +7,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const engine = { pause: vi.fn(), resume: vi.fn(), setDebounceMs: vi.fn(), setPolicy: vi.fn(), pushOnce: vi.fn() };
+const REFUSED = 'Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.';
 vi.mock('../../src/sync/sync-attach', () => ({
+  refusedEngineLine: () => REFUSED,
   getCurrentSyncEngine: () => engine,
   getCurrentSyncFolder: () => null,
   getCurrentSyncWorldId: () => 'w1',
@@ -41,12 +43,12 @@ function seed(worldPaused: boolean, pauseAll: boolean) {
   return reg;
 }
 
-function togglePauseAllOff(reg: ReturnType<typeof seed>) {
+function togglePauseAllOff(reg: ReturnType<typeof seed>, said = toasts()) {
   const host = document.createElement('div');
   host.className = 'atlas-settings';
   host.innerHTML = renderStorageTab(reg);
   document.body.appendChild(host);
-  wireStorageTab(toasts());
+  wireStorageTab(said);
   const box = host.querySelector<HTMLInputElement>('input[name="pause-all"]')!;
   expect(box.checked).toBe(true);
   box.checked = false;
@@ -75,6 +77,15 @@ describe('Settings > Sync: Pause all off', () => {
   it('resumes a world with no Stay offline', () => {
     togglePauseAllOff(seed(false, true));
     expect(engine.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('an engine a refused key or PIN stopped stays stopped: the toggle says the refusal, never "Sync resumed"', () => {
+    engine.resume.mockReturnValueOnce(false as never);
+    const said = toasts();
+    togglePauseAllOff(seed(false, true), said);
+    expect(engine.resume).toHaveBeenCalledTimes(1);
+    expect(said.error).toHaveBeenCalledWith(REFUSED);
+    expect(said.info).not.toHaveBeenCalled();
   });
 });
 

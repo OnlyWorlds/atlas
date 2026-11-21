@@ -22,7 +22,7 @@ import { mountContextTab } from './context-tab';
 import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash, settingsHash } from '../../core/router';
-import { getCurrentSyncEngine, pullNowAndRefresh, diagnoseSyncUnavailable, sayRateWait } from '../../sync/sync-attach';
+import { getCurrentSyncEngine, pullNowAndRefresh, diagnoseSyncUnavailable, pausedPressLine, sayRateWait } from '../../sync/sync-attach';
 import { surfaceSyncUnavailable, upToDate } from '../../ui/sync-toasts';
 import { issuesFor } from '../../sync/sync-issues';
 import { showProblem } from '../../ui/problem-fixes';
@@ -571,12 +571,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       return;
     }
     if (cur?.kind === 'paused') {
-      toasts.info(cur.reason === 'network' ? 'Offline, so nothing was refreshed.'
-        : cur.reason === 'held' && cur.held_for === 'disk' ? 'Files changed on disk are waiting for your answer in the element list.'
-        : cur.reason === 'held' && cur.held_for === 'move' ? 'This world is being moved to a folder. Refresh when that finishes.'
-        : cur.reason === 'held' && cur.held_for === 'download' ? 'This world is being saved as one file. Refresh when that finishes.'
-        : cur.reason === 'held' ? 'Ids are being updated in this world. Refresh when that finishes.'
-        : 'Sync is paused. Turn off Pause sync or Pause all sync in Settings to refresh.');
+      toasts.info(pausedPressLine(cur));
       return;
     }
     try {

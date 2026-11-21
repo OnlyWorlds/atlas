@@ -193,6 +193,17 @@ export async function answerHeldBatch(upload: boolean): Promise<void> {
   const held = n?.held;
   if (!n || !held) return;
   const worldId = n.worldId;
+  if (upload) {
+    // A refused key or PIN uploads nothing: the question stays, asked again once a new one is in, and the
+    // press says what stops sync.
+    const { getCurrentSyncWorldId, refusedEngineLine } = await import('../sync/sync-attach');
+    const refused = getCurrentSyncWorldId() === worldId ? refusedEngineLine() : null;
+    if (refused) {
+      const { toastManager } = await import('../ui/toast-manager');
+      toastManager.error(refused);
+      return;
+    }
+  }
   persistHeld(worldId, null);
   setNotice({ ...n, held: null });
   if (!upload) {

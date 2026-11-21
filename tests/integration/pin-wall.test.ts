@@ -28,7 +28,7 @@ import {
 import { setPin } from '../../src/registry/registry';
 import { toastManager, type ToastManager } from '../../src/ui/toast-manager';
 import { __resetRateWaitsForTests, rateWaitOf, setRateWait, waitWords } from '../../src/sync/rate-wait';
-import { holdBigBatchAtOpen, answerHeldBatch } from '../../src/core/live-folder';
+import { holdBigBatchAtOpen, answerHeldBatch, isDiskHoldPersisted, forgetPersistedDiskHold } from '../../src/core/live-folder';
 import { __resetPinAskedForTests, renderAccountTab, wireAccountTab } from '../../src/middle/settings-account';
 import { settingsHash } from '../../src/core/router';
 import { SyncEngine } from '../../src/sync/sync-engine';
@@ -85,6 +85,7 @@ async function unstamped(folder: MockFolderStore): Promise<string[]> {
 
 let infos: string[];
 let shown: string[];
+let errors: string[];
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
@@ -103,13 +104,15 @@ beforeEach(() => {
   );
   infos = [];
   vi.spyOn(toastManager, 'info').mockImplementation((m: string) => { infos.push(m); return undefined as never; });
-  vi.spyOn(toastManager, 'error').mockImplementation(() => undefined as never);
+  errors = [];
+  vi.spyOn(toastManager, 'error').mockImplementation((m: string) => { errors.push(m); return undefined as never; });
   vi.spyOn(toastManager, 'success').mockImplementation(() => undefined as never);
   shown = [];
   vi.spyOn(toastManager, 'show').mockImplementation((m: string) => { shown.push(m); return undefined as never; });
 });
 
 afterEach(() => {
+  forgetPersistedDiskHold('w1');
   detachSyncEngine();
   setActiveStore(null);
   patchSlice('active', null);
@@ -395,7 +398,7 @@ describe('round 2: the world settings, the pause, the hold, another tab, the pil
     expect(refusedEngineLine()).toBe('Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.');
   });
 
-  it('a big batch held at open with the PIN refused: the pill shows the refusal, and answering the batch leaves it', async () => {
+  it('a big batch held at open with the PIN refused: the pill shows the refusal; Upload them keeps the question and says the refusal', async () => {
     useRegistry(WRONG, 'refused');
     const folder = await newFolder(['Waiting']);
     setActiveStore(folder as never);
@@ -406,9 +409,16 @@ describe('round 2: the world settings, the pause, the hold, another tab, the pil
     expect(getState().sync.activeSync).toMatchObject({ kind: 'error', auth_reason: 'pin' });
     await answerHeldBatch(true);
     await settle(10_000);
-    expect(engine.isHeld()).toBe(false);
+    // Nothing uploads under a refused PIN: the question is not spent, and is asked again after a new PIN.
+    expect(isDiskHoldPersisted('w1')).toBe(true);
+    expect(errors).toContain('Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.');
     expect(getState().sync.activeSync).toMatchObject({ kind: 'error', auth_reason: 'pin' });
     expect(keel.seen).toEqual([]);
+    patchSlice('registry', setPin(getState().registry, RIGHT));
+    const next = attachSyncEngine(entry('w1', KEY), folder)!;
+    await settle();
+    expect(next.isHeld()).toBe(true);
+    expect(writes()).toEqual([]);
   });
 
   it('another tab\'s new PIN, proved there, brings this tab\'s refused engine back; the same refused PIN again sends nothing', async () => {
@@ -485,5 +495,73 @@ describe('round 2: the world settings, the pause, the hold, another tab, the pil
     } finally {
       unmount();
     }
+  });
+});
+
+describe('round 3: a press on a stopped engine, the same PIN proved elsewhere, a held pull', () => {
+  async function waitingEngine(): Promise<{ folder: MockFolderStore; engine: ReturnType<typeof getCurrentSyncEngine> }> {
+    useRegistry(RIGHT, 'proved');
+    const folder = await newFolder();
+    const engine = attachSyncEngine(entry('w1', KEY), folder)!;
+    await settle();
+    await folder.createElement('character', { name: 'Waiting' });
+    setRateWait(KEY, 60_000, false);
+    return { folder, engine };
+  }
+
+  it('a press inside a wait on a paused, offline or held engine says that state, never "tries again in"', async () => {
+    const { engine } = await waitingEngine();
+    const before = sent();
+    infos.length = 0;
+    engine!.pause('manual');
+    expect(sayRateWait()).toBe(true);
+    await pullNowAndRefresh();
+    engine!.resume();
+    engine!.pause('network');
+    expect(sayRateWait()).toBe(true);
+    engine!.resume();
+    const release = await engine!.hold('disk');
+    expect(sayRateWait()).toBe(true);
+    release();
+    expect(infos.slice(0, 4)).toEqual([
+      'Sync is paused. Turn off Pause sync or Pause all sync in Settings to refresh.',
+      'Sync is paused. Turn off Pause sync or Pause all sync in Settings to refresh.',
+      'Offline, so nothing was refreshed.',
+      'Files changed on disk are waiting for your answer in the element list.',
+    ]);
+    expect(infos.some(l => /tries again in/.test(l))).toBe(false);
+    expect(sent()).toBe(before);
+  });
+
+  it('the same refused PIN recorded proved by another tab, again and again: one more try, never a loop', async () => {
+    useRegistry(WRONG, 'refused');
+    const folder = await newFolder(['Waiting']);
+    attachSyncEngine(entry('w1', KEY), folder);
+    await settle();
+    for (let i = 0; i < 3; i++) {
+      patchSlice('registry', { ...getState().registry, pin_state: 'proved' });
+      await settle(2_000);
+    }
+    expect(writes().map(s => s.pin)).toEqual([WRONG]);
+    // A new PIN still brings it back.
+    patchSlice('registry', { ...getState().registry, pin: RIGHT, pin_state: undefined });
+    await settle(2_000);
+    expect(writes().map(s => s.pin)).toEqual([WRONG, RIGHT]);
+  });
+
+  it('a pull held by a wait is carried: the retry at the wait\'s end runs a full round, its pull included', async () => {
+    useRegistry(RIGHT, 'proved');
+    const folder = await newFolder();
+    attachSyncEngine(entry('w1', KEY), folder);
+    await settle();
+    setRateWait(KEY, 60_000, false);
+    const before = sent();
+    await pullNowAndRefresh({ auto: true });
+    await settle(30_000);
+    expect(sent()).toBe(before);
+    expect(infos.filter(l => l.startsWith('OnlyWorlds asked Atlas to wait'))).toEqual([]);
+    await settle(31_000);
+    const after = keel.seen.slice(before).map(s => s.call);
+    expect(after.some(c => c.startsWith('GET /changes'))).toBe(true);
   });
 });

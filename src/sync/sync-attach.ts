@@ -735,20 +735,44 @@ function watchRefusedPin(): void {
       const now = getState().registry;
       const entry = now.worlds.find(w => w.id === currentWorldId);
       if (currentEngine !== engine || !entry || !currentFolder || isSeatWorld(entry) || entry.api?.read_only) return;
-      if (now.pin && (now.pin !== currentPin || now.pin_state !== 'refused')) attachSyncEngine(entry, currentFolder);
+      if (!now.pin) return;
+      // A new PIN: always. The same PIN proved again (another tab, maybe beside another account's key,
+      // whose answer is recorded against this one PIN): once, ever, so two tabs never ping-pong a resend.
+      const changed = now.pin !== currentPin;
+      if (!changed && (now.pin_state !== 'proved' || samePinRevived.has(now.pin))) return;
+      if (!changed) samePinRevived.add(now.pin);
+      attachSyncEngine(entry, currentFolder);
     }, 0);
   });
 }
+/** The refused PINs already tried once more because another tab recorded them proved. */
+const samePinRevived = new Set<string>();
 
 /**
  * A person's press of Sync now or refresh inside a 429's wait sends nothing: it says the wait, in the
  * toast's own words, and answers true. False when no wait runs on the attached engine (the press goes on).
  */
 export function sayRateWait(): boolean {
-  const wait = currentEngine?.rateWaitNow();
-  if (!wait) return false;
-  toastManager.info(rateWaitLine(wait.pin, wait.leftMs, savedPlaceOfSyncWorld()));
+  const engine = currentEngine;
+  const wait = engine?.rateWaitNow();
+  if (!engine || !wait) return false;
+  // A paused, offline or held engine sends nothing at the wait's end either: its own state is what is
+  // true, never "tries again in".
+  const state = engine.getState();
+  if (state.kind === 'paused') toastManager.info(pausedPressLine(state));
+  else if (state.kind === 'error') toastManager.error(refusedEngineLine() ?? state.message);
+  else toastManager.info(rateWaitLine(wait.pin, wait.leftMs, savedPlaceOfSyncWorld()));
   return true;
+}
+
+/** What a press of the pill, refresh or Sync now says of an engine paused, offline or held: why nothing goes. */
+export function pausedPressLine(state: Extract<SyncEngineState, { kind: 'paused' }>): string {
+  if (state.reason === 'network') return 'Offline, so nothing was refreshed.';
+  if (state.reason === 'held' && state.held_for === 'disk') return 'Files changed on disk are waiting for your answer in the element list.';
+  if (state.reason === 'held' && state.held_for === 'move') return 'This world is being moved to a folder. Refresh when that finishes.';
+  if (state.reason === 'held' && state.held_for === 'download') return 'This world is being saved as one file. Refresh when that finishes.';
+  if (state.reason === 'held') return 'Ids are being updated in this world. Refresh when that finishes.';
+  return 'Sync is paused. Turn off Pause sync or Pause all sync in Settings to refresh.';
 }
 
 export function getCurrentSyncFolder(): FolderStore | null {
@@ -820,6 +844,8 @@ export async function pullNowAndRefresh(
   // Inside a 429's wait nothing is sent: a press says the wait, and its answer is the wait (never "up to date").
   const wait = currentEngine.rateWaitNow();
   if (wait) {
+    // Carried: the retry at the wait's end runs a full round, its pull included.
+    currentEngine.holdPull();
     if (!opts.auto) sayRateWait();
     const none = { creates: 0, updates: 0, deletes: 0 };
     return {

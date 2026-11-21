@@ -798,7 +798,10 @@ export class SyncEngine {
       // would never push: wait for it, then push.
       const retry = (): void => {
         if (this.stopped || this.blocked) return;
-        void this.pushOnce().catch(err => console.warn('[atlas:sync] transient retry failed:', err));
+        // A pull the wait held goes with it: a full round. Otherwise the push alone, as before.
+        const full = this.pullHeld;
+        this.pullHeld = false;
+        void (full ? this.syncNow() : this.pushOnce()).catch(err => console.warn('[atlas:sync] transient retry failed:', err));
       };
       if (this.inFlight && this.inFlightKind === 'pull') void this.inFlight.then(retry, retry);
       else retry();
@@ -830,6 +833,17 @@ export class SyncEngine {
     }
     return true;
   }
+
+  /**
+   * A pull a 429's wait held (the cadence, the open's pull, a press): the retry at the wait's end runs a
+   * full round, push then pull, so a shared world opened inside the wait still gets its pull.
+   */
+  holdPull(): void {
+    if (this.heldByWait()) this.pullHeld = true;
+  }
+
+  /** Set while a pull waits for the wait's end (`holdPull`). */
+  private pullHeld = false;
 
   /** A round keel stopped with a 429: its wait is kept on the key, and the one retry goes at its end. */
   private waitOutTransient(r: Pick<SyncResult, 'transient_reason' | 'retry_after_ms' | 'rate_limited_pin'>): void {
@@ -2138,7 +2152,7 @@ export class SyncEngine {
    */
   pullNow(): Promise<SyncResult> {
     if (this.inFlight) return this.inFlight;
-    if (this.heldByWait()) return Promise.resolve(emptyResult());
+    if (this.heldByWait()) { this.pullHeld = true; return Promise.resolve(emptyResult()); }
     this.inFlightKind = 'pull';
     this.inFlight = this.runPullOnly().finally(() => {
       this.inFlight = null;

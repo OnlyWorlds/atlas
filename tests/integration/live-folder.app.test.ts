@@ -20,6 +20,8 @@ vi.mock('../../src/sync/sync-attach', () => ({
   getCurrentSyncWorldId: () => 'w-linked',
   requestPushIfLinked: () => requestPushIfLinked(),
   refreshMetaCacheNow: async () => {},
+  // A refused key or PIN stops Upload them (none here).
+  refusedEngineLine: () => null,
 }));
 
 import { FakeDirHandle } from '../fixtures/fake-fs';
