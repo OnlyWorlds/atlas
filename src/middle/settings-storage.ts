@@ -363,7 +363,7 @@ function wireSyncTab(toasts: ToastManager): void {
     if (engine) {
       if (stillPaused) engine.pause('manual');
       // A refused key or PIN stays refused: nothing is sent, and the toggle says what stops sync.
-      else if (!engine.resume()) { toasts.error(refusedEngineLine() ?? 'Sync stays stopped.'); return; }
+      else if (engine.resume() === false) { toasts.error(refusedEngineLine() ?? 'Sync stays stopped.'); return; }
     }
     toasts.info(pauseAll.checked
       ? 'All sync paused'

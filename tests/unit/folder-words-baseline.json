@@ -34,7 +34,7 @@
   "src/sync/account-worlds.ts": 1,
   "src/sync/sync-attach.ts": 2,
   "src/sync/sync-failure-copy.ts": 15,
-  "src/tabs/right/right-pane.ts": 5,
+  "src/tabs/right/right-pane.ts": 6,
   "src/tour/tour-bar.ts": 4,
   "src/tour/tour-data.ts": 5,
   "src/tour/tour-keep.ts": 2,
