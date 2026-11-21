@@ -24,7 +24,9 @@ import { setActiveStore } from '../../src/core/active-store';
 import { DEFAULT_V2_BASE } from '../../src/sync/ow-v2-client-adapter';
 import {
   attachSyncEngine, detachSyncEngine, getCurrentSyncEngine, pullNowAndRefresh, refusedEngineLine, sayRateWait,
+  __resetSamePinRevivedForTests,
 } from '../../src/sync/sync-attach';
+import { testWorldConnection } from '../../src/middle/settings-world';
 import { setPin } from '../../src/registry/registry';
 import { toastManager, type ToastManager } from '../../src/ui/toast-manager';
 import { __resetRateWaitsForTests, rateWaitOf, setRateWait, waitWords } from '../../src/sync/rate-wait';
@@ -93,6 +95,7 @@ beforeEach(() => {
   detachSyncEngine();
   __resetRateWaitsForTests();
   __resetPinAskedForTests();
+  __resetSamePinRevivedForTests();
   const played = playedKeel(BASE, { keys: { [KEY]: { scope: 'write' }, [OTHER_KEY]: { scope: 'write' } }, worldPin: RIGHT });
   keel = played.state;
   const clock = new MonotonicClock('2026-01-01T00:00:00.000Z');
@@ -563,5 +566,54 @@ describe('round 3: a press on a stopped engine, the same PIN proved elsewhere, a
     await settle(31_000);
     const after = keel.seen.slice(before).map(s => s.call);
     expect(after.some(c => c.startsWith('GET /changes'))).toBe(true);
+  });
+});
+
+describe('round 4: a press that proves the PIN gives its try back; a held pull outlives no wait', () => {
+  it('refused, revived once by another tab\'s proof and refused again, then the person\'s own Test connection proves it: sync comes back', async () => {
+    useRegistry(WRONG, 'refused');
+    const folder = await newFolder(['Waiting']);
+    setActiveStore(folder as never);
+    attachSyncEngine(entry('w1', KEY), folder);
+    await settle();
+    // Another tab records the same PIN proved (beside another account's key): one try, refused here.
+    patchSlice('registry', { ...getState().registry, pin_state: 'proved' });
+    await settle(2_000);
+    expect(writes().map(s => s.pin)).toEqual([WRONG]);
+    expect(getState().registry.pin_state).toBe('refused');
+    // The PIN is put right on OnlyWorlds, and the person presses Test connection.
+    keel.worldPin = WRONG;
+    const said = { success: vi.fn(), info: vi.fn(), error: vi.fn(), warning: vi.fn() } as unknown as ToastManager;
+    await testWorldConnection(getState().registry.worlds[0], said);
+    await settle(2_000);
+    expect(getState().registry.pin_state).toBe('proved');
+    expect(writes().map(s => s.pin)).toEqual([WRONG, WRONG]);
+    expect(getState().sync.activeSync?.kind).toBe('idle');
+    expect(await unstamped(folder)).toEqual([]);
+  });
+
+  it('a held pull whose wait ends while paused goes with the resume\'s round, and a later retry is a push alone', async () => {
+    useRegistry(RIGHT, 'proved');
+    const folder = await newFolder();
+    const engine = attachSyncEngine(entry('w1', KEY), folder)!;
+    await settle();
+    setRateWait(KEY, 30_000, false);
+    await pullNowAndRefresh({ auto: true });
+    engine.pause('manual');
+    const before = sent();
+    await settle(40_000);
+    expect(sent()).toBe(before);
+    engine.resume();
+    await settle(1_000);
+    expect(keel.seen.slice(before).some(s => s.call.startsWith('GET /changes'))).toBe(true);
+    // A later wait with an edit, no pull held: its retry pushes alone.
+    const mid = sent();
+    await folder.createElement('character', { name: 'Later' });
+    setRateWait(KEY, 20_000, false);
+    engine.requestPush();
+    await settle(25_000);
+    const after = keel.seen.slice(mid).map(s => s.call);
+    expect(after.filter(c => c.startsWith('POST'))).toHaveLength(1);
+    expect(after.some(c => c.startsWith('GET /changes'))).toBe(false);
   });
 });

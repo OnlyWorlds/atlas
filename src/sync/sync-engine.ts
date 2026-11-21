@@ -601,7 +601,10 @@ export class SyncEngine {
     //
     // Three callers benefit: per-world "stay offline" uncheck, global
     // pause-all uncheck, and the `online` event listener (network return).
-    void this.pushOnce().catch(err => {
+    // A pull a wait held, whose wait ended while paused, goes with this round.
+    const full = this.pullOnResume;
+    this.pullOnResume = false;
+    void (full ? this.syncNow() : this.pushOnce()).catch(err => {
       console.warn('[atlas:sync] resume-flush push failed:', err);
     });
     return true;
@@ -788,7 +791,13 @@ export class SyncEngine {
     const delay = clampWaitMs(Math.max(ms ?? TRANSIENT_RETRY_DEFAULT_MS, waitLeft));
     this.transientRetryTimer = setTimeout(() => {
       this.transientRetryTimer = null;
-      if (this.stopped || this.blocked) return;
+      if (this.stopped || this.blocked) {
+        // Nothing goes now. A pull the wait held goes with the resume's round (a paused engine), or
+        // with nothing (a stopped one); either way it no longer turns a later retry into a full round.
+        if (this.pullHeld && !this.stopped) this.pullOnResume = true;
+        this.pullHeld = false;
+        return;
+      }
       // The wait's end: it is over (a timer may fire a hair early), and this retry is what goes. A wait
       // moved later meanwhile (Settings' check met the 429 again) is waited out first.
       const left = (rateWaitOf(this.rateWaitKey)?.until ?? 0) - Date.now();
@@ -844,6 +853,8 @@ export class SyncEngine {
 
   /** Set while a pull waits for the wait's end (`holdPull`). */
   private pullHeld = false;
+  /** A held pull whose wait ended while the engine was paused: the resume's round carries it. */
+  private pullOnResume = false;
 
   /** A round keel stopped with a 429: its wait is kept on the key, and the one retry goes at its end. */
   private waitOutTransient(r: Pick<SyncResult, 'transient_reason' | 'retry_after_ms' | 'rate_limited_pin'>): void {
@@ -1106,6 +1117,8 @@ export class SyncEngine {
     this.paused = true;
     this.pauseReason = 'manual';
     this.stopped = true;
+    this.pullHeld = false;
+    this.pullOnResume = false;
   }
 
   /**

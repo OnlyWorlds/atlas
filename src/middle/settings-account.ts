@@ -13,7 +13,7 @@
 import { getState, patchSlice, subscribe } from '../core/state';
 import { saveRegistry, setPin, setEmail, setAccountToken, mintedTokenId } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
-import { attachSyncEngine } from '../sync/sync-attach';
+import { attachSyncEngine, pinProvedByPress } from '../sync/sync-attach';
 import { ToastManager, WAITS_FOR_SIGN_IN } from '../ui/toast-manager';
 import type { WorldsRegistry } from '../core/types';
 import { escapeAttr, escapeText } from '../core/dom-utils';
@@ -327,6 +327,7 @@ export function wireAccountTab(toasts: ToastManager): void {
     // The field moved on while the question was out: say what is kept now, never this save's answer.
     const now = getState().registry;
     if (now.pin !== newPin) { toasts.info(pinStateLine(now) || 'PIN removed'); return; }
+    if (said === 'proved') pinProvedByPress(newPin);
     if (said === 'refused') toasts.error(PIN_REFUSED_LINE);
     else if (said === 'waiting') toasts.info(waitLineFor(now));
     else toasts.info(said === 'proved' ? 'PIN saved' : PIN_UNCHECKED_LINE);

@@ -40,6 +40,7 @@ import {
   pullNowAndRefresh,
   reapplySyncPolicy,
   refreshElementsAfterWrite,
+  pinProvedByPress,
   requestPushIfLinked,
   refusedEngineLine,
   sayRateWait,
@@ -826,7 +827,11 @@ export async function testWorldConnection(world: WorldRegistryEntry, toasts: Toa
     const fetched = await client.getWorld();
     const { scope, pinProved } = await client.keyScope();
     // The account PIN, proved beside this world's key that writes (never a seat's secret).
-    if (pinProved && !isSeatWorld(world)) recordPinState(pin, 'proved');
+    if (pinProved && !isSeatWorld(world)) {
+      recordPinState(pin, 'proved');
+      // The person's own proof: an engine refused on this PIN comes back.
+      pinProvedByPress(pin);
+    }
     // The key works and reads only: said as such, never as a PIN question.
     const readsLine = scope === 'read'
       ? (world.api.read_only ? '. This key can only read, so this world opens to read.' : '. This key can only read, so edits can\'t sync. Put in a write key below.')

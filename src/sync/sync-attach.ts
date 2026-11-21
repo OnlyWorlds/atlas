@@ -731,22 +731,43 @@ function watchRefusedPin(): void {
     seen = reg;
     const engine = currentEngine;
     if (engine?.authRefusal() !== 'pin') return;
-    setTimeout(() => {
-      const now = getState().registry;
-      const entry = now.worlds.find(w => w.id === currentWorldId);
-      if (currentEngine !== engine || !entry || !currentFolder || isSeatWorld(entry) || entry.api?.read_only) return;
-      if (!now.pin) return;
-      // A new PIN: always. The same PIN proved again (another tab, maybe beside another account's key,
-      // whose answer is recorded against this one PIN): once, ever, so two tabs never ping-pong a resend.
-      const changed = now.pin !== currentPin;
-      if (!changed && (now.pin_state !== 'proved' || samePinRevived.has(now.pin))) return;
-      if (!changed) samePinRevived.add(now.pin);
-      attachSyncEngine(entry, currentFolder);
-    }, 0);
+    setTimeout(() => reviveRefusedEngine(engine), 0);
   });
 }
-/** The refused PINs already tried once more because another tab recorded them proved. */
+
+/** Re-attach `engine`, still the attached one and refused on the PIN, when the account PIN moved on. */
+function reviveRefusedEngine(engine: SyncEngine): void {
+  const now = getState().registry;
+  const entry = now.worlds.find(w => w.id === currentWorldId);
+  if (currentEngine !== engine || engine.authRefusal() !== 'pin' || !entry || !currentFolder || isSeatWorld(entry) || entry.api?.read_only) return;
+  if (!now.pin) return;
+  // A new PIN: always. The same PIN recorded proved (another tab, maybe beside another account's key,
+  // whose answer is recorded against this one PIN): once per PIN by the watch, so two tabs never
+  // ping-pong a resend; a person's own press that proves it gives that try back (`pinProvedByPress`).
+  const changed = now.pin !== currentPin;
+  if (!changed && (now.pin_state !== 'proved' || samePinRevived.has(now.pin))) return;
+  if (!changed) samePinRevived.add(now.pin);
+  attachSyncEngine(entry, currentFolder);
+}
+
+/** The refused PINs the watch already tried once more because they were recorded proved elsewhere. */
 const samePinRevived = new Set<string>();
+
+/**
+ * A person's own press proved `pin` (Test connection, Settings' save): its try is given back, and an
+ * engine refused on that PIN comes back now, though the registry may already have read proved.
+ */
+export function pinProvedByPress(pin: string | undefined): void {
+  if (!pin) return;
+  samePinRevived.delete(pin);
+  const engine = currentEngine;
+  if (engine?.authRefusal() === 'pin') setTimeout(() => reviveRefusedEngine(engine), 0);
+}
+
+/** Tests: no PIN's try spent. */
+export function __resetSamePinRevivedForTests(): void {
+  samePinRevived.clear();
+}
 
 /**
  * A person's press of Sync now or refresh inside a 429's wait sends nothing: it says the wait, in the
