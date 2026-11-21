@@ -22,7 +22,7 @@ import { mountContextTab } from './context-tab';
 import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash, settingsHash } from '../../core/router';
-import { getCurrentSyncEngine, pullNowAndRefresh, diagnoseSyncUnavailable } from '../../sync/sync-attach';
+import { getCurrentSyncEngine, pullNowAndRefresh, diagnoseSyncUnavailable, sayRateWait } from '../../sync/sync-attach';
 import { surfaceSyncUnavailable, upToDate } from '../../ui/sync-toasts';
 import { issuesFor } from '../../sync/sync-issues';
 import { showProblem } from '../../ui/problem-fixes';
@@ -31,7 +31,7 @@ import { savePersistedRightTabs } from './right-tabs-persistence';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
 import { filesWhereOf } from '../../core/browser-worlds';
-import { SEAT_SECRET_MISSING_LINE } from '../../core/seat';
+import { isSeatWorld, SEAT_SECRET_MISSING_LINE } from '../../core/seat';
 import { renderGate } from '../../ui/render-gate';
 import { copyLine, worldIsCopiedBy } from '../../core/world-copy';
 import { drawnFrame } from './map-frame';
@@ -462,10 +462,12 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   pill.dataset.clickable = 'true';
   // The click's own test: an errored engine opens Settings (no engine says why in a toast).
   const errored = engine?.kind === 'error';
+  // The account PIN refused (never a seat's secret): the fix is putting it in again, on the OnlyWorlds tab.
+  const pinRefused = engine?.kind === 'error' && engine.auth_reason === 'pin' && !isSeatWorld(entry);
   // A press while a round runs does nothing (the round is already asking), so
   // neither the title nor the button offers one then.
   const busyRound = engine?.kind === 'syncing';
-  pill.title = title + (conflictCount > 0 || busyRound ? '' : errored ? ' · click to see why in Settings' : ' · click to refresh from OnlyWorlds');
+  pill.title = title + (conflictCount > 0 || busyRound ? '' : errored ? (pinRefused ? ' · click to put in the PIN again in Settings' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
   // Each badge's title is its name, so a screen reader says it once.
   const conflictName = `Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}`;
   const conflictBadge = conflictCount > 0
@@ -486,7 +488,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // place for the keyboard.
   const roundOnly = busyRound && !currentPendingPush;
   const refreshName = currentPendingPush ? 'Save to OnlyWorlds now'
-    : errored ? 'See why in Settings'
+    : errored ? (pinRefused ? 'Put in the PIN again in Settings' : 'See why in Settings')
     : roundOnly ? `${syncPhaseWords(engine?.kind === 'syncing' ? engine.phase : undefined)} now`
     : 'Refresh from OnlyWorlds';
   // "Review N" is the badge's name too: the label is not said twice.
@@ -537,6 +539,8 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       surfaceSyncUnavailable(toasts);
       return;
     }
+    // Inside a 429's wait a press sends nothing and says the wait (an errored pill still opens Settings).
+    if (state.sync.activeSync?.kind !== 'error' && sayRateWait()) return;
     if (currentPendingPush) {
       const pushNow = async (): Promise<void> => {
         try {
@@ -551,9 +555,10 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     }
     const cur = state.sync.activeSync;
     // An errored pill says why in Settings → World, with the fix:
-    // a pull cannot help a dead key or a damaged file.
+    // a pull cannot help a dead key or a damaged file. A refused PIN sends
+    // nothing either: its press opens the OnlyWorlds tab, where the PIN goes in again.
     if (cur?.kind === 'error') {
-      navigate(settingsHash(active.worldId, 'world'));
+      navigate(settingsHash(active.worldId, pinRefused ? 'onlyworlds' : 'world'));
       return;
     }
     if (cur?.kind === 'syncing') {

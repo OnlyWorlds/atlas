@@ -61,6 +61,10 @@ import type {
   SyncResult,
 } from '../core/types';
 import { alreadyProposed, isOwProposed, isProposedOnly, settle, withProposed } from './proposals';
+import { clampWaitMs, clearRateWait, rateWaitOf, setRateWait } from './rate-wait';
+
+/** Names an engine's own wait when it is given no key. */
+let engineSerial = 0;
 
 // ---- Adapter shape: the minimum the engine needs from the API client ----
 
@@ -270,6 +274,11 @@ export interface SyncEngineOptions {
    * create, which a copy with no baseline does not count as a difference (conv. 192, M1).
    */
   seat?: boolean;
+  /**
+   * The key a 429's wait is kept under (`rate-wait.ts`): the world's API key, so another engine on the
+   * same key finds a wait this one met. Absent: the wait is this engine's own.
+   */
+  rateWaitKey?: string;
   /** Called when a conflict is detected. */
   onConflict?: (conflict: Conflict) => void;
   /** Called whenever engine state changes (for UI). */
@@ -385,6 +394,9 @@ export class SyncEngine {
    */
   private lastSyncAt: string | null = null;
 
+  /** Where this engine's 429 wait is kept (`rate-wait.ts`). */
+  private readonly rateWaitKey: string;
+
   constructor(opts: SyncEngineOptions) {
     this.folder = opts.folder;
     this.client = opts.client;
@@ -392,6 +404,7 @@ export class SyncEngine {
     this.where = opts.where ?? 'folder';
     this.apiWorldId = opts.apiWorldId ?? null;
     this.seat = !!opts.seat;
+    this.rateWaitKey = opts.rateWaitKey ?? `engine:${++engineSerial}`;
     this.policy = normalizePolicy(opts.policy);
     this.onConflict = opts.onConflict ?? (() => {});
     this.onStateChange = opts.onStateChange ?? (() => {});
@@ -749,10 +762,17 @@ export class SyncEngine {
    *  single, and a round that fails again schedules the next one itself. */
   private scheduleTransientRetry(ms: number | undefined): void {
     if (this.transientRetryTimer) clearTimeout(this.transientRetryTimer);
-    const delay = Math.min(Math.max(ms ?? TRANSIENT_RETRY_DEFAULT_MS, 1000), 15 * 60_000);
+    // Never before a running 429 wait ends: a busy retry asked inside it goes at its end.
+    const waitLeft = (rateWaitOf(this.rateWaitKey)?.until ?? 0) - Date.now();
+    const delay = clampWaitMs(Math.max(ms ?? TRANSIENT_RETRY_DEFAULT_MS, waitLeft));
     this.transientRetryTimer = setTimeout(() => {
       this.transientRetryTimer = null;
       if (this.stopped || this.blocked) return;
+      // The wait's end: it is over (a timer may fire a hair early), and this retry is what goes. A wait
+      // moved later meanwhile (Settings' check met the 429 again) is waited out first.
+      const left = (rateWaitOf(this.rateWaitKey)?.until ?? 0) - Date.now();
+      if (left > 50) { this.scheduleTransientRetry(left); return; }
+      clearRateWait(this.rateWaitKey);
       // A pull in flight would hand pushOnce its own promise and the retry
       // would never push: wait for it, then push.
       const retry = (): void => {
@@ -762,6 +782,60 @@ export class SyncEngine {
       if (this.inFlight && this.inFlightKind === 'pull') void this.inFlight.then(retry, retry);
       else retry();
     }, delay);
+  }
+
+  /**
+   * The 429 wait running on this engine's key (`rate-wait.ts`): what is left of it, and whether keel named
+   * the PIN. Null when none runs. A person's press reads it to say the wait instead of sending.
+   */
+  rateWaitNow(): { leftMs: number; pin: boolean } | null {
+    const w = rateWaitOf(this.rateWaitKey);
+    return w ? { leftMs: w.until - Date.now(), pin: w.pin } : null;
+  }
+
+  /**
+   * Whether a 429's wait holds this send back. While one runs nothing goes on the wire by itself: the
+   * edit stays dirty, and the one retry, armed here for the wait's end if no timer is (another engine on
+   * the key met the 429, or a stop took this one's timer), pushes it then.
+   */
+  private heldByWait(): boolean {
+    const w = rateWaitOf(this.rateWaitKey);
+    if (!w) return false;
+    if (!this.transientRetryTimer && !this.stopped) this.scheduleTransientRetry(w.until - Date.now());
+    if (this.debouncePushTimer) {
+      clearTimeout(this.debouncePushTimer);
+      this.debouncePushTimer = null;
+      this.setPendingPush(null);
+    }
+    return true;
+  }
+
+  /** A round keel stopped with a 429: its wait is kept on the key, and the one retry goes at its end. */
+  private waitOutTransient(r: Pick<SyncResult, 'transient_reason' | 'retry_after_ms' | 'rate_limited_pin'>): void {
+    if (r.transient_reason === 'rate_limited') {
+      setRateWait(this.rateWaitKey, r.retry_after_ms ?? TRANSIENT_RETRY_DEFAULT_MS, r.rate_limited_pin === true);
+      // An edit's push armed before the 429 came would go inside the wait.
+      this.heldByWait();
+    }
+    this.scheduleTransientRetry(r.retry_after_ms);
+  }
+
+  /** A pull keel answered with a 429 (it throws to its caller): the wait is kept as a push's is. */
+  private noteThrown429(err: unknown): void {
+    if (!isTransientError(err)) return;
+    const f = transientFields(err);
+    if (f.transient_reason !== 'rate_limited') return;
+    setRateWait(this.rateWaitKey, f.retry_after_ms ?? TRANSIENT_RETRY_DEFAULT_MS, f.rate_limited_pin === true);
+  }
+
+  /**
+   * Start as a refusal leaves the engine (paused, the refusal's pill): the world's attach when the PIN it
+   * would send is one keel already refused (`registry.pin_state`). Nothing goes until a new PIN brings a
+   * new engine.
+   */
+  startRefused(reason: KeyRefusal): void {
+    this.lastAuthReason = reason;
+    this.setAuthError();
   }
 
   /**
@@ -793,6 +867,8 @@ export class SyncEngine {
   }
 
   private settleThrownRound(err: unknown): void {
+    // A pull keel answered with a 429 throws to its caller; its wait holds the next sends as a push's does.
+    this.noteThrown429(err);
     if (err instanceof CorruptFileError) {
       this.paused = true;
       this.pauseReason = 'manual';
@@ -810,6 +886,7 @@ export class SyncEngine {
       kind: 'error',
       message: keyRefusalPill(this.lastAuthReason),
       recoverable: true,
+      ...(this.lastAuthReason ? { auth_reason: this.lastAuthReason } : {}),
     });
   }
 
@@ -840,6 +917,11 @@ export class SyncEngine {
     if (this.readOnly) return; // view-only world — nothing ever pushes
     if (this.blocked) {
       console.info('[atlas:sync] push requested but engine paused — skipping');
+      return;
+    }
+    // Inside a 429's wait the edit stays dirty: the retry at the wait's end pushes it.
+    if (this.heldByWait()) {
+      console.info('[atlas:sync] push requested inside a 429 wait: it goes with the retry at the wait\'s end');
       return;
     }
     if (this.debouncePushTimer) clearTimeout(this.debouncePushTimer);
@@ -913,7 +995,7 @@ export class SyncEngine {
    * silently do nothing — chain the push behind the pull instead.
    */
   flushPendingPush(): Promise<SyncResult> | null {
-    if (this.blocked) return null;
+    if (this.blocked || this.heldByWait()) return null;
     if (!this.debouncePushTimer) return null;
     clearTimeout(this.debouncePushTimer);
     this.debouncePushTimer = null;
@@ -1505,7 +1587,8 @@ export class SyncEngine {
    * every open; a new change to world.json is a new state and goes up.
    */
   async claimWorldSettingsAtOpen(): Promise<boolean> {
-    if (this.stopped || this.blocked) return false;
+    // Inside a 429's wait nothing goes, so nothing is claimed: the retry's round carries them.
+    if (this.stopped || this.blocked || rateWaitOf(this.rateWaitKey)) return false;
     if ((await this.localMetaAgainstBaseline()) !== 'dirty') return false;
     try {
       const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
@@ -1548,6 +1631,7 @@ export class SyncEngine {
         this.noteAuthBail(err);
         return { ...empty, auth_blocked: true };
       }
+      this.noteThrown429(err);
       console.warn('[atlas:sync] meta step: GET /world failed — skipping meta this round', err);
       return { ...empty, failures: [metaFailure('read', err)] };
     }
@@ -1719,6 +1803,7 @@ export class SyncEngine {
           await persistOnBail();
           return { meta_pushed: [], meta_pulled: pulled, failures, auth_blocked: true };
         }
+        this.noteThrown429(err);
         console.warn('[atlas:sync] meta step: PATCH /world failed — fields stay dirty', err);
         const failure = metaFailure('update', err);
         failures.push(failure);
@@ -1943,6 +2028,8 @@ export class SyncEngine {
   syncNow(): Promise<SyncResult> {
     if (this.readOnly) return this.pullNow(); // view-only: sync means refresh
     if (this.inFlight) return this.inFlight;
+    // Inside a 429's wait no round goes, by itself or by a press (the press says the wait: `rateWaitNow`).
+    if (this.heldByWait()) return Promise.resolve(emptyResult());
     this.inFlightKind = 'sync';
     this.inFlight = this.runSync().finally(() => {
       this.inFlight = null;
@@ -1963,6 +2050,7 @@ export class SyncEngine {
     // one guard closes them all.
     if (this.readOnly) return Promise.resolve(emptyResult());
     if (this.inFlight) return this.inFlight;
+    if (this.heldByWait()) return Promise.resolve(emptyResult());
     this.inFlightKind = 'push';
     this.inFlight = this.runPushOnly().finally(() => {
       this.inFlight = null;
@@ -1982,6 +2070,7 @@ export class SyncEngine {
    */
   pullNow(): Promise<SyncResult> {
     if (this.inFlight) return this.inFlight;
+    if (this.heldByWait()) return Promise.resolve(emptyResult());
     this.inFlightKind = 'pull';
     this.inFlight = this.runPullOnly().finally(() => {
       this.inFlight = null;
@@ -2033,7 +2122,7 @@ export class SyncEngine {
     } else {
       this.settleIdle(nowIso());
     }
-    if (pushResult.transient_blocked) this.scheduleTransientRetry(pushResult.retry_after_ms);
+    if (pushResult.transient_blocked) this.waitOutTransient(pushResult);
     const result: SyncResult = {
       pushed: pushResult.pushed,
       pulled: zero(),
@@ -2044,6 +2133,7 @@ export class SyncEngine {
       transient_blocked: pushResult.transient_blocked,
       transient_reason: pushResult.transient_reason,
       retry_after_ms: pushResult.retry_after_ms,
+      ...(pushResult.rate_limited_pin ? { rate_limited_pin: true as const } : {}),
       meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
       meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
       ...keptFields(pushResult),
@@ -2153,7 +2243,7 @@ export class SyncEngine {
     // meet the same wait. Retry once later.
     if (pushResult.transient_blocked) {
       this.settleIdle(null);
-      this.scheduleTransientRetry(pushResult.retry_after_ms);
+      this.waitOutTransient(pushResult);
       const result: SyncResult = {
         pushed: pushResult.pushed,
         pulled: zero(),
@@ -2162,6 +2252,7 @@ export class SyncEngine {
         transient_blocked: true,
         transient_reason: pushResult.transient_reason,
         retry_after_ms: pushResult.retry_after_ms,
+        ...(pushResult.rate_limited_pin ? { rate_limited_pin: true as const } : {}),
         ...keptFields(pushResult),
       };
       this.armBusyRetry(result.failures, true);
@@ -5024,7 +5115,7 @@ export function isTransientError(err: unknown): boolean {
   return /api error (429|503)/i.test(err.message);
 }
 
-function transientFields(err: unknown): Pick<SyncResult, 'transient_blocked' | 'transient_reason' | 'retry_after_ms'> {
+function transientFields(err: unknown): Pick<SyncResult, 'transient_blocked' | 'transient_reason' | 'retry_after_ms' | 'rate_limited_pin'> {
   const t = typedError(err);
   const retry = (err as { retryAfterMs?: unknown }).retryAfterMs;
   const reason: SyncResult['transient_reason'] = !t ? 'offline'
@@ -5033,7 +5124,14 @@ function transientFields(err: unknown): Pick<SyncResult, 'transient_blocked' | '
     transient_blocked: true,
     transient_reason: reason,
     retry_after_ms: typeof retry === 'number' ? retry : TRANSIENT_RETRY_DEFAULT_MS,
+    // keel's PIN wall names the PIN; its other throttles do not (the words tell them apart).
+    ...(reason === 'rate_limited' && isPinParam(t?.param) ? { rate_limited_pin: true as const } : {}),
   };
+}
+
+/** keel's `param` naming the PIN header, in any letter case. */
+export function isPinParam(param: unknown): boolean {
+  return typeof param === 'string' && param.toLowerCase() === 'api-pin';
 }
 
 export function isIdConflictError(err: unknown): boolean {

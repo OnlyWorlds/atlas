@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { classifyFailure, describeFailures, failureToastOnce, __resetFailureToasts } from '../../src/sync/sync-failure-copy';
 import type { PerElementFailure } from '../../src/core/types';
+import { syncIssueLine } from '../../src/middle/settings-world';
+import { REPLACED_HELD_LINE } from '../../src/sync/sync-engine';
 
 const f = (id: string, message: string): PerElementFailure => ({ element_id: id, type: 'character', operation: 'create', message });
 // keel's own texts (elements/service.py _upsert_once, serialize.py) and atlas's read-back text.
@@ -92,6 +94,28 @@ describe('sync failure copy', () => {
   it('counts a held world record once however many steps report it', () => {
     const w = (): PerElementFailure => ({ element_id: 'world', type: 'world', operation: 'update', message: HELD, error_name: 'InvalidStateError' });
     expect(describeFailures([busy('a'), w(), w()])).toContain('2 changes could not sync yet');
+  });
+
+  it('keel\'s keeper rule (403 keeper_only): every Charter Law and every Object a Law names, said as the element, never the mark or the API path', () => {
+    const keeper = (id: string): PerElementFailure => ({ element_id: id, type: 'law', operation: 'update', status: 403, code: 'keeper_only', message: 'Only the world\'s owner and co-builders change this element. Nothing was written. Ask one of them, or propose the change: POST /api/v2/law/x/propose' });
+    expect(classifyFailure(keeper('a'))).toBe('keeper_only');
+    expect(describeFailures([keeper('a')])).toBe('1 change could not sync because only the world\'s owner and co-builders can change that element. Ask one of them. The change stays on your disk.');
+    expect(describeFailures([keeper('a'), keeper('b')], 'browser')).toBe('2 changes could not sync because only the world\'s owner and co-builders can change those elements. Ask one of them. The changes stay in this browser.');
+    const row = syncIssueLine({ kind: 'keeper_only', element_id: 'a', type: 'law', failure: keeper('a') } as never, 'folder');
+    expect(row).toBe('Only the world\'s owner and co-builders can change it on OnlyWorlds. Ask one of them. Your change stays in the folder.');
+    for (const line of [describeFailures([keeper('a')]), row]) {
+      expect(line).not.toMatch(/charter|mark|\/api\/|propose/i);
+    }
+  });
+
+  it('a create keel answered as replaced (a 200 under create-only) says what happened, and that the next save sends it again', () => {
+    const replaced = (id: string): PerElementFailure => ({ element_id: id, type: 'character', operation: 'create', status: 200, source: 'server', message: REPLACED_HELD_LINE });
+    expect(classifyFailure(replaced('a'))).toBe('replaced_held');
+    expect(describeFailures([replaced('a')])).toBe('OnlyWorlds answered as if it had replaced an element it already held, though Atlas asked it only to create. The copy here is unchanged and not marked as sent; your next save sends it again.');
+    expect(describeFailures([replaced('a'), replaced('b')])).toBe('OnlyWorlds answered as if it had replaced 2 elements it already held, though Atlas asked it only to create. The copies here are unchanged and not marked as sent; your next save sends them again.');
+    const row = syncIssueLine({ kind: 'replaced_held', element_id: 'a', type: 'character', failure: replaced('a') } as never, 'folder');
+    expect(row).toBe('OnlyWorlds answered as if it had replaced a copy it already held, though Atlas asked it only to create one. The copy here is unchanged and not marked as sent. Your next save sends it again, and Atlas compares it with the copy OnlyWorlds holds.');
+    for (const line of [describeFailures([replaced('a')]), row]) expect(line).not.toMatch(/tries again/);
   });
 
   it('shows a persistent failure set once per session', () => {

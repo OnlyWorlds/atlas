@@ -33,7 +33,7 @@ describe('classifyFailure: host_refused by status and absent code', () => {
     expect(classifyFailure(blockedF('a', { code: 'permission_error' }))).toBe('other');
     expect(classifyFailure(otherF('a', { code: 'unknown' }))).toBe('other');
     expect(classifyFailure(otherF('a', { code: 'not_author' }))).toBe('not_yours');
-    expect(classifyFailure(otherF('a', { code: 'keeper_only' }))).toBe('keeper_mark');
+    expect(classifyFailure(otherF('a', { code: 'keeper_only' }))).toBe('keeper_only');
     expect(classifyFailure(otherF('a', { status: 401 }))).toBe('other');
     expect(classifyFailure(otherF('a', { status: 429 }))).toBe('other');
     // No status at all (a disk failure, an old record) is never the host's.

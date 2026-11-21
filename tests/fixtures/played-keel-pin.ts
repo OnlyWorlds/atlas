@@ -18,6 +18,14 @@
  *
  * The gate answers `GET /world` and `GET /me` itself and lets every other
  * request it allows fall through to the handlers after it (the stateful fake).
+ *
+ * The PIN wall (keel's lockout): a wrong PIN is a 401 each time, and the same
+ * wrong PIN sent again counts once. Ten DIFFERENT wrong PINs on one key within
+ * 15 minutes lock that key for `lockMs`: every later request that carries a
+ * PIN, the right one included, answers 429 `rate_limited` with `param`
+ * `API-Pin` and a `Retry-After` of the seconds left. A request that carries no
+ * PIN goes through the lock. `throttleUntil` plays keel's other throttles: a
+ * 429 `rate_limited` with no `param`, on every request, while it runs.
  */
 import { http, HttpResponse } from 'msw';
 
@@ -42,6 +50,14 @@ export interface PlayedKeel {
   seen: Array<{ call: string; key: string | null; pin: string | null }>;
   /** Wrong PINs keel counted, by key. */
   counted: Record<string, number>;
+  /** The different wrong PINs each key met, with when (the wall's count). */
+  wrongPins: Record<string, Map<string, number>>;
+  /** A key's lock ends at this time (`Date.now()` clock). Set it to play a key already locked. */
+  lockedUntil: Record<string, number>;
+  /** How long the wall locks a key. */
+  lockMs: number;
+  /** keel's other throttles: every request answers 429 with no `param` until this time. */
+  throttleUntil: number;
 }
 
 const LEGACY = /^\d{10}$/;
@@ -51,8 +67,28 @@ function err(status: number, type: string, code: string, message: string, param:
   return HttpResponse.json({ error: { type, code, message, param } }, { status });
 }
 
+const WALL_WINDOW_MS = 15 * 60_000;
+const WALL_DIFFERENT = 10;
+
+function wait429(seconds: number, param: string | null): Response {
+  return HttpResponse.json(
+    { error: { type: 'rate_limit_error', code: 'rate_limited', message: 'Too many requests. Try again later.', param } },
+    { status: 429, headers: { 'Retry-After': String(Math.max(1, Math.ceil(seconds))) } },
+  );
+}
+
 function wrongPin(state: PlayedKeel, key: string, pin: string | null): Response {
   state.counted[key] = (state.counted[key] ?? 0) + 1;
+  if (pin) {
+    const now = Date.now();
+    const seen = state.wrongPins[key] ?? (state.wrongPins[key] = new Map());
+    for (const [p, at] of seen) if (now - at > WALL_WINDOW_MS) seen.delete(p);
+    if (!seen.has(pin)) seen.set(pin, now);
+    if (seen.size >= WALL_DIFFERENT) {
+      state.lockedUntil[key] = now + state.lockMs;
+      seen.clear();
+    }
+  }
   return err(401, 'authentication_error', 'invalid_credentials', pin ? 'Incorrect PIN.' : 'A PIN is required: send it as API-Pin.', 'API-Pin');
 }
 
@@ -63,6 +99,10 @@ export function playedKeel(base: string, init: Partial<PlayedKeel> & { keys: Rec
     readKeyPin: 'checked',
     seen: [],
     counted: {},
+    wrongPins: {},
+    lockedUntil: {},
+    lockMs: 15 * 60_000,
+    throttleUntil: 0,
     ...init,
   };
 
@@ -79,6 +119,11 @@ export function playedKeel(base: string, init: Partial<PlayedKeel> & { keys: Rec
     const key = request.headers.get('API-Key');
     const pin = request.headers.get('API-Pin');
     state.seen.push({ call: `${request.method} ${path}`, key, pin });
+    const now = Date.now();
+    if (state.throttleUntil > now) return wait429((state.throttleUntil - now) / 1000, null);
+    // The wall: a locked key takes no PIN, the right one included; a request with none goes through.
+    const locked = key ? state.lockedUntil[key] ?? 0 : 0;
+    if (pin && locked > now) return wait429((locked - now) / 1000, 'API-Pin');
     const k = key ? keyOf(key) : null;
     if (!key || !k) return err(401, 'authentication_error', 'invalid_credentials', 'No valid API-Key.', null);
     const write = request.method !== 'GET';

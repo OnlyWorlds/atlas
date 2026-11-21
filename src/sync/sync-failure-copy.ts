@@ -14,7 +14,7 @@
 import type { PerElementFailure } from '../core/types';
 import { isFileBusyError } from '../store/fs-utils';
 
-export type FailureKind = 'foreign_id' | 'id_in_use' | 'too_large' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_mark' | 'review_mark' | 'other';
+export type FailureKind = 'foreign_id' | 'id_in_use' | 'too_large' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_only' | 'review_mark' | 'replaced_held' | 'other';
 
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
@@ -44,8 +44,11 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
   // A member seat's refusals (#104): by keel's code, never its text.
   if (f.status === 403 && (f.code === 'not_author' || f.code === 'owner_only')) return 'not_yours';
-  // keel takes the charter mark (`x_charter_of`) only from the owner or a co-builder (the charter profile).
-  if (f.status === 403 && f.code === 'keeper_only') return 'keeper_mark';
+  // keel's keeper rule: a world's Charter Laws, every Object a Law's text names, and the charter mark
+  // (`x_charter_of`) are changed only by the owner and co-builders; anyone else's write is 403 `keeper_only`.
+  if (f.status === 403 && f.code === 'keeper_only') return 'keeper_only';
+  // A create sent create-only that keel answered 200 (replaced what it held): never counted as sent.
+  if (f.status === 200 && f.operation === 'create') return 'replaced_held';
   // Below co-builder, keel takes a review mark only as the element already holds it or with the writer's own id as its `by`
   // (403 `review_by_another`): a folder's pack-written mark names a Character, so it goes up through the owner or a co-builder.
   if (f.status === 403 && f.code === 'review_by_another') return 'review_mark';
@@ -165,10 +168,17 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
     if (els > 0) parts.push(`${plural(els, 'change', 'changes')} could not sync because this world lets Atlas change only what it made: ${els === 1 ? 'that element was' : 'those elements were'} made by someone else. ${els === 1 ? 'The change stays' : 'The changes stay'} ${place}.`);
     if (world) parts.push(`This world's details changed here, and only its owner can change them on OnlyWorlds. The change stays ${place}.`);
   }
-  const keeperMark = byKind.get('keeper_mark');
-  if (keeperMark) {
-    const n = new Set(keeperMark.map(f => f.element_id)).size;
-    parts.push(`${plural(n, 'change', 'changes')} could not sync because only the world's owner or a co-builder can mark its charter. ${n === 1 ? 'The change stays' : 'The changes stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+  const keeper = byKind.get('keeper_only');
+  if (keeper) {
+    const n = new Set(keeper.map(f => f.element_id)).size;
+    parts.push(`${plural(n, 'change', 'changes')} could not sync because only the world's owner and co-builders can change ${n === 1 ? 'that element' : 'those elements'}. Ask one of them. ${n === 1 ? 'The change stays' : 'The changes stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+  }
+  // Not counted as sent, so the next round sends it again as a create: keel answers that it holds it,
+  // and Atlas compares the two copies (adopts the same content, holds other content for the person).
+  const replaced = byKind.get('replaced_held');
+  if (replaced) {
+    const n = new Set(replaced.map(f => f.element_id)).size;
+    parts.push(`OnlyWorlds answered as if it had replaced ${n === 1 ? 'an element' : `${n} elements`} it already held, though Atlas asked it only to create. ${n === 1 ? 'The copy here is' : 'The copies here are'} unchanged and not marked as sent; your next save sends ${n === 1 ? 'it' : 'them'} again.`);
   }
   const reviewMark = byKind.get('review_mark');
   if (reviewMark) {

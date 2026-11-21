@@ -61,6 +61,18 @@ describe('a busy or unreachable server', () => {
     const result = await engine.pushOnce();
     expect(result.transient_reason).toBe('rate_limited');
     expect(result.retry_after_ms).toBe(900_000);
+    expect(result.rate_limited_pin).toBeUndefined();
+  });
+
+  it('a 429 naming the PIN (keel\'s PIN wall) says so on the result; a busy 503 naming it does not', async () => {
+    await folder.createElement('character', { name: 'A' });
+    await throwOnCreate(new OwV2Error(429, { type: 'rate_limit_error', code: 'rate_limited', message: 'm', param: 'API-Pin' }, '', '60'));
+    const wall = await engine.pushOnce();
+    expect(wall).toMatchObject({ transient_reason: 'rate_limited', rate_limited_pin: true, retry_after_ms: 60_000 });
+    engine.stop();
+    engine = new SyncEngine({ folder, client });
+    await throwOnCreate(new OwV2Error(503, { code: 'server_busy', message: 'm', param: 'API-Pin' }, '', '5'));
+    expect((await engine.pushOnce()).rate_limited_pin).toBeUndefined();
   });
 
   it('a sync round skips the pull behind a busy push', async () => {

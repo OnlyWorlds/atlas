@@ -81,7 +81,7 @@ describe('SyncEngine auth-blocked rounds', () => {
       const state = engine.getState();
       expect(state.kind).toBe('error');
       if (state.kind === 'error') {
-        expect(state.message).toMatch(/did not accept this world's key or your PIN/);
+        expect(state.message).toMatch(/did not accept this world's key or the PIN/);
         expect(state.recoverable).toBe(true);
       }
     });

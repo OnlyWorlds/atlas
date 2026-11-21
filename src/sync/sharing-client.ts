@@ -75,6 +75,8 @@ export class SharingApiError extends Error {
     public code: SharingErrorCode,
     public status: number,
     detail?: string,
+    /** keel's `param`, when its envelope named one (`API-Pin` on its PIN wall's 429). */
+    public param?: string,
   ) {
     super(detail || code);
     this.name = 'SharingApiError';
@@ -97,7 +99,10 @@ export function sharingErrorMessage(err: SharingApiError): string {
     case 'payload_too_large': return 'This page is over the 256KB publish limit. Remove some blocks to fit.';
     case 'revoked': return 'This page has been revoked.';
     case 'not_found': return 'Page not found on the server.';
-    case 'rate_limited': return 'Too many publishes or wrong PIN tries. Wait a bit and try again.';
+    // By keel's `param`: its PIN wall (ten different wrong PINs on this key), or any other throttle.
+    case 'rate_limited': return err.param?.toLowerCase() === 'api-pin'
+      ? 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check your PIN in Settings, then try again later.'
+      : 'OnlyWorlds asked Atlas to wait. Nothing changed; wait a bit and try again.';
     case 'admin_locked': return 'An administrator locked this URL. Use a different URL.';
     case 'title_too_long': return 'Page name is too long to publish (200 characters max).';
     case 'intent_invalid': return 'OnlyWorlds did not accept this page\'s type. Tell us at onlyworlds.com/feedback.';
@@ -255,14 +260,16 @@ export class SharingClient {
     // Error path: prefer the contract's machine code; fall back by status.
     let code: SharingErrorCode = 'unknown';
     let detail: string | undefined;
+    let param: string | undefined;
     let text = '';
     try { text = await res.text(); } catch { /* no body to read */ }
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
-      const body = parsed as { error?: { code?: string; detail?: string } } | null;
+      const body = parsed as { error?: { code?: string; detail?: string; param?: unknown } } | null;
       const raw = body?.error?.code;
       detail = body?.error?.detail;
+      if (typeof body?.error?.param === 'string') param = body.error.param;
       if (raw && isKnownCode(raw)) code = raw;
     } catch { /* non-JSON error body */ }
     if (code === 'unknown') {
@@ -278,7 +285,7 @@ export class SharingClient {
       else if (res.status === 410) code = 'revoked';
       else if (res.status === 429) code = 'rate_limited';
     }
-    throw new SharingApiError(code, res.status, detail);
+    throw new SharingApiError(code, res.status, detail, param);
   }
 }
 

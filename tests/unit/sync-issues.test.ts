@@ -77,8 +77,8 @@ describe('noteRoundIssues', () => {
     expect(foreignLine(1)).toBe('1 element could not upload: its id belongs to another OnlyWorlds world.');
     expect(foreignLine(1, 1)).toBe('1 element could not upload: its id is already in use on OnlyWorlds.');
     expect(foreignLine(2, 2)).toBe('2 elements could not upload: their ids are already in use on OnlyWorlds.');
-    expect(foreignLine(3, 1)).toBe('3 elements could not upload: their ids are already taken on OnlyWorlds, 1 in use and 2 by another world.');
-    expect(foreignLine(5, 2)).toBe('5 elements could not upload: their ids are already taken on OnlyWorlds, 2 in use and 3 by another world.');
+    expect(foreignLine(3, 1)).toBe('3 elements could not upload: 1 id is already in use on OnlyWorlds and 2 are in other worlds.');
+    expect(foreignLine(5, 2)).toBe('5 elements could not upload: 2 ids are already in use on OnlyWorlds and 3 are in other worlds.');
   });
 
   it('says whether the list moved', () => {

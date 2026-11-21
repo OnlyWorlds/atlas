@@ -392,10 +392,10 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
       document.body.innerHTML = '';
       const { said, save, line } = settings();
       await save(RIGHT);
-      expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+      expect(said).toEqual([{ kind: 'info', line: 'Not checked by OnlyWorlds yet' }]);
       expect(getState().registry.pin).toBe(RIGHT);
       expect(getState().registry.pin_state).toBeUndefined();
-      expect(line().textContent).toBe('Saved in this browser, not checked yet');
+      expect(line().textContent).toBe('Not checked by OnlyWorlds yet');
       patchSlice('registry', { ...defaultRegistry(), worlds: [] });
     }
     expect(keel.seen.filter(s => s.pin !== null)).toEqual([]);
@@ -406,7 +406,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     mswServer.use(http.get(`${TEST_BASE}/me`, () => HttpResponse.error()));
     const { said, save } = settings();
     await save(RIGHT);
-    expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+    expect(said).toEqual([{ kind: 'info', line: 'Not checked by OnlyWorlds yet' }]);
     expect(getState().registry.pin_state).toBeUndefined();
   });
 
@@ -544,7 +544,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     const next = setPin(getState().registry, WRONG);
     expect(next.pin).toBe(WRONG);
     expect(next.pin_state).toBeUndefined();
-    expect(pinStateLine(next)).toBe('Saved in this browser, not checked yet');
+    expect(pinStateLine(next)).toBe('Not checked by OnlyWorlds yet');
     expect(pinStateLine(setPin(next, ''))).toBe('');
     // A proof of another PIN says nothing of the one kept.
     expect(notePinState(next, RIGHT, 'proved')).toBe(next);
@@ -589,7 +589,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     await saving;
     expect(getState().registry.pin).toBe('5555');
     expect(getState().registry.pin_state).toBeUndefined();
-    expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+    expect(said).toEqual([{ kind: 'info', line: 'Not checked by OnlyWorlds yet' }]);
   });
 
   it('a question that hangs ends as no answer: not checked yet, never refused, and the next opening asks again', async () => {
@@ -606,7 +606,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
       const { said, save } = settings();
       await save(RIGHT);
       expect(asked).toBe(1);
-      expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+      expect(said).toEqual([{ kind: 'info', line: 'Not checked by OnlyWorlds yet' }]);
       expect(getState().registry.pin_state).toBeUndefined();
       // Not spent: the next opening asks again, and keel answers now.
       hang = false;
@@ -620,12 +620,11 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     }
   });
 
-  it('only keel naming the PIN refuses it: a 401 for the key, a 5xx, a 429 or a 403 leave it not checked', async () => {
+  it('only keel naming the PIN refuses it: a 401 for the key, a 5xx or a 403 leave it not checked', async () => {
     const answers: Array<[number, Record<string, unknown>]> = [
       [401, { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.' }],
       [401, { type: 'authentication_error', code: 'key_revoked', message: 'Revoked.' }],
       [500, { type: 'api_error', code: 'server_error', message: 'm', param: 'API-Pin' }],
-      [429, { type: 'rate_limit', code: 'too_many_requests', message: 'm', param: 'API-Pin' }],
       [403, { type: 'permission_error', code: 'permission_error', message: 'm', param: 'API-Pin' }],
     ];
     for (const [status, error] of answers) {
@@ -636,7 +635,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
       const { said, save } = settings();
       await save(RIGHT);
       expect(getState().registry.pin_state, `${status} ${String(error.code)}`).toBeUndefined();
-      expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+      expect(said).toEqual([{ kind: 'info', line: 'Not checked by OnlyWorlds yet' }]);
     }
   });
 
@@ -667,7 +666,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     patchSlice('registry', { ...defaultRegistry(), worlds: [] });
     const first = settings();
     await first.save(RIGHT);
-    expect(first.said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+    expect(first.said).toEqual([{ kind: 'info', line: 'Not checked by OnlyWorlds yet' }]);
     document.body.innerHTML = '';
     const entry = linked({ api_key: 'ow_w_owner' });
     patchSlice('registry', { ...getState().registry, worlds: [entry] });
@@ -703,7 +702,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     openWorld('odd-read-key');
     const first = settings();
     await first.save(RIGHT);
-    expect(first.said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+    expect(first.said).toEqual([{ kind: 'info', line: 'Not checked by OnlyWorlds yet' }]);
     expect(keel.seen.filter(s => s.pin !== null)).toEqual([]);
     document.body.innerHTML = '';
     const entry = linked({ api_key: 'ow_w_owner' });
@@ -1000,7 +999,7 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     // With the changes saved here, the next step still names the PIN, never "it".
     expect(problemFor(pinRefused, { doing: 'saving', savedLocally: true, where: 'folder' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Your changes are saved in the folder. Check the PIN in Settings, under OnlyWorlds.');
     const keyRefused = Object.assign(new Error('API Error 401: Invalid API key.'), { status: 401, code: 'invalid_credentials', param: null });
-    expect(problemFor(keyRefused, { doing: 'saving' }).sentence).toMatch(/^OnlyWorlds did not accept this world's key or your PIN/);
+    expect(problemFor(keyRefused, { doing: 'saving' }).sentence).toMatch(/^OnlyWorlds did not accept this world's key or the PIN/);
   });
 
   it('the census: no sentence a person reads says a refused PIN any other way', () => {
@@ -1032,5 +1031,51 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     expect(OTHER.test('A wrong PIN.')).toBe(true);
     expect(OTHER.test('Too many wrong PIN tries.')).toBe(false);
     expect(OTHER.test('OnlyWorlds did not accept this PIN with that key.')).toBe(false);
+  });
+
+  /** Every string a person reads in src (comments, console lines and the changelog left out), with where it is. */
+  function literals(): Array<{ at: string; lit: string }> {
+    const SRC = join(__dirname, '..', '..', 'src');
+    const walk = (d: string): string[] => readdirSync(d).flatMap(n => {
+      const p = join(d, n);
+      return statSync(p).isDirectory() ? walk(p) : /\.ts$/.test(n) ? [p] : [];
+    });
+    const STRINGS = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
+    const out: Array<{ at: string; lit: string }> = [];
+    for (const file of walk(SRC)) {
+      const rel = relative(SRC, file).split(sep).join('/');
+      if (rel === 'changelog/changelog.data.ts') continue;
+      readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
+        if (/^\s*(\/\/|\/\*|\*)/.test(line) || /console\./.test(line)) return;
+        for (const lit of line.match(STRINGS) ?? []) out.push({ at: `${rel}:${i + 1}`, lit });
+      });
+    }
+    return out;
+  }
+
+  it('the census: keel\'s PIN wall is said one way, and only where keel named the PIN', () => {
+    // The old words blamed wrong PIN tries for every 429; the wall's own sentence starts one way everywhere.
+    const OLD = /wrong PIN tries|after wrong PINs|Too many (?:wrong )?PINs?\b/i;
+    const WALL = "OnlyWorlds refused too many different PINs for this world\\'s key, so it takes none for a while";
+    const WALL_PLAIN = "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while";
+    const all = literals();
+    expect(all.filter(({ lit }) => OLD.test(lit)).map(h => h.at)).toEqual([]);
+    const wall = all.filter(({ lit }) => /different PINs/.test(lit));
+    expect(wall.filter(({ lit }) => !lit.slice(1).startsWith(WALL_PLAIN) && !lit.slice(1).startsWith(WALL)).map(h => h.at)).toEqual([]);
+    // Where the wall is said: the sync and Settings' check, a problem's sentence, a file's add and remove, a page.
+    expect([...new Set(wall.map(h => h.at.split(':')[0]))].sort()).toEqual([
+      'core/problems.ts', 'sync/element-files.ts', 'sync/rate-wait.ts', 'sync/sharing-client.ts',
+    ]);
+    // The instrument sees the old words and the new.
+    expect(OLD.test('Too many wrong PIN tries. Check your PIN in Settings.')).toBe(true);
+    expect(OLD.test('OnlyWorlds is holding writes back after wrong PINs.')).toBe(true);
+    expect(OLD.test('Too many publishes or wrong PIN tries.')).toBe(true);
+    expect(OLD.test(WALL_PLAIN)).toBe(false);
+  });
+
+  it('the census: a refusal that may be the key or the PIN says "the PIN", never "your PIN"', () => {
+    const hits = literals().filter(({ lit }) => /key or your PIN/.test(lit)).map(h => h.at);
+    expect(hits).toEqual([]);
+    expect(literals().filter(({ lit }) => /key or the PIN/.test(lit)).length).toBe(4);
   });
 });

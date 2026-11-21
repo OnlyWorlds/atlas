@@ -42,6 +42,7 @@ import { hiddenHeldLine, hiddenShownLine } from '../core/hidden-mark';
 import { deleteRefusedLine, proposalAcceptedLine, proposalSentLine } from './proposal-lines';
 import type { SyncResult } from '../core/types';
 import { recordPinState } from '../registry/pin-proof';
+import { rateWaitLine, waitWords } from './rate-wait';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -135,6 +136,8 @@ export function attachSyncEngine(
     where: filesWhereOf(entry),
     apiWorldId: entry.api.world_id,
     seat: isSeatWorld(entry),
+    // keel's 429 wait is the key's: a world opened again, or a PIN saved, finds the one still running.
+    rateWaitKey: entry.api.api_key,
     policy: policyNow(),
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => {
@@ -223,6 +226,11 @@ export function attachSyncEngine(
   if (shouldPause) {
     engine.pause('manual');
   }
+  // The account PIN keel already refused (`registry.pin_state`) is never sent again by itself: the engine
+  // starts as that refusal left it (paused, the PIN's pill), and nothing below sends. A new PIN saved in
+  // Settings clears the state and attaches afresh. Never a seat's secret or a read key (no account PIN).
+  const pinRefused = !readOnly && !isSeatWorld(entry) && reg.pin_state === 'refused' && reg.pin === pin;
+  if (pinRefused) engine.startRefused('pin');
 
   // Seed the slice with the engine's initial state.
   publishSyncState(entry.id, engine.getState());
@@ -249,9 +257,11 @@ export function attachSyncEngine(
   // world others kept writing), so its policy must be known before it runs.
   // The read is bounded (`world-roster.ts`, 15 s); offline or refused, the
   // world stays under the review until keel answers.
-  if (!shouldPause) {
+  if (!shouldPause && !pinRefused) {
     void (async () => {
-      if (!readOnly) {
+      // Inside a 429's wait the roster is not asked (it goes on the same key); the world stays under the
+      // review until a round after the wait asks it.
+      if (!readOnly && !engine.rateWaitNow()) {
         await settle(0);
         if (currentEngine !== engine) return;
       }
@@ -271,7 +281,7 @@ export function attachSyncEngine(
       const now = getState().registry;
       if (readOnly || worldPullsOnOpen(now.worlds.find(w => w.id === entry.id), now)) {
         try {
-          await pullNowAndRefresh();
+          await pullNowAndRefresh({ auto: true });
         } catch (err) {
           console.warn('[sync-attach] pull-on-activate failed:', err);
         }
@@ -382,7 +392,7 @@ function toastFailuresOnce(
   // A round is safe to repeat; only on the engine (and world) that failed. A
   // full sync, so a held file on the pull side is retried too.
   const retry = engine ? () => {
-    if (currentEngine !== engine) return;
+    if (currentEngine !== engine || sayRateWait()) return;
     void engine.syncNow().catch(err => console.warn('[atlas:sync] retry sync failed:', err));
   } : undefined;
   toastManager.show(text, 'error', 8000, {
@@ -687,6 +697,17 @@ function savedPlaceOfSyncWorld(): string {
   return filesWhereOf(getState().registry.worlds.find(w => w.id === id)) === 'browser' ? 'in this browser' : 'in the folder';
 }
 
+/**
+ * A person's press of Sync now or refresh inside a 429's wait sends nothing: it says the wait, in the
+ * toast's own words, and answers true. False when no wait runs on the attached engine (the press goes on).
+ */
+export function sayRateWait(): boolean {
+  const wait = currentEngine?.rateWaitNow();
+  if (!wait) return false;
+  toastManager.info(rateWaitLine(wait.pin, wait.leftMs, savedPlaceOfSyncWorld()));
+  return true;
+}
+
 export function getCurrentSyncFolder(): FolderStore | null {
   return currentFolder;
 }
@@ -745,10 +766,24 @@ export function diagnoseSyncUnavailable(): SyncUnavailableReason | null {
  * Returns the SyncResult or null if no engine is attached. Throws on failure
  * — callers surface as toast.
  */
-export async function pullNowAndRefresh(): Promise<import('../core/types').SyncResult | null> {
+export async function pullNowAndRefresh(
+  /** `auto`: a pull nobody pressed for (the cadence, the open's pull): inside a 429's wait it is silent. */
+  opts: { auto?: boolean } = {},
+): Promise<import('../core/types').SyncResult | null> {
   if (!currentEngine || !currentFolder) {
     console.info('[atlas:sync] pullNowAndRefresh: no engine attached');
     return null;
+  }
+  // Inside a 429's wait nothing is sent: a press says the wait, and its answer is the wait (never "up to date").
+  const wait = currentEngine.rateWaitNow();
+  if (wait) {
+    if (!opts.auto) sayRateWait();
+    const none = { creates: 0, updates: 0, deletes: 0 };
+    return {
+      pushed: { ...none }, pulled: { ...none }, conflicts: [], failures: [],
+      transient_blocked: true, transient_reason: 'rate_limited', retry_after_ms: wait.leftMs,
+      ...(wait.pin ? { rate_limited_pin: true as const } : {}),
+    };
   }
   console.info('[atlas:sync] pull starting');
   const result = await currentEngine.pullNow();
@@ -878,11 +913,11 @@ function emitConflictToasts(
   // Busy, rate limited or offline: one plain sentence with
   // the wait, instead of a wall of per-element failures.
   if (result.transient_blocked) {
-    const secs = Math.max(1, Math.round((result.retry_after_ms ?? 30_000) / 1000));
-    const when = secs >= 90 ? `${Math.round(secs / 60)} minutes` : `${secs} seconds`;
+    const waitMs = result.retry_after_ms ?? 30_000;
+    const when = waitWords(waitMs);
     toastManager.info(
       result.transient_reason === 'rate_limited'
-        ? `Too many wrong PIN tries. Check your PIN in Settings; Atlas tries again in ${when}.`
+        ? rateWaitLine(result.rate_limited_pin === true, waitMs, savedPlaceOfSyncWorld())
         : result.transient_reason === 'offline'
           ? `OnlyWorlds could not be reached. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas tries again in ${when}.`
           : `OnlyWorlds is busy. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas tries again in ${when}.`

@@ -100,3 +100,17 @@ describe('Atlas\'s page test reads as the SDK\'s', () => {
     }
   });
 });
+
+describe('a 429 on a page, by keel\'s param (1.124.35)', () => {
+  const json = (param: string | null) => JSON.stringify({ error: { code: 'rate_limited', detail: 'Too many requests.', param } });
+  it('keel\'s PIN wall says the wall and the PIN to check; any other 429 says the wait, never the PIN', async () => {
+    const wall = await refusal(client(429, json('API-Pin'), 'application/json').publish(page));
+    expect(wall.code).toBe('rate_limited');
+    expect(wall.param).toBe('API-Pin');
+    expect(sharingErrorMessage(wall)).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing changed. Check your PIN in Settings, then try again later.");
+    const other = await refusal(client(429, json(null), 'application/json').publish(page));
+    expect(sharingErrorMessage(other)).toBe('OnlyWorlds asked Atlas to wait. Nothing changed; wait a bit and try again.');
+    // A 429 with no envelope at all is a wait too.
+    expect(sharingErrorMessage(await refusal(client(429, '').publish(page)))).toBe('OnlyWorlds asked Atlas to wait. Nothing changed; wait a bit and try again.');
+  });
+});

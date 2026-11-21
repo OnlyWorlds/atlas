@@ -92,6 +92,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 - `src/sync/sync-engine.ts`: push (`/bulk` for 2+ CREATEs; topo-sort only as fallback) + pull (`/changes` cursor, full-list fallback) + conflict detect; auth bail, transient bail, `hold()`. FK constraint detection routes orphan peers to server_deletes.
 - `src/sync/sync-attach.ts`: the singleton; `flushPendingOnAttach` BEFORE pull-on-activate; `diagnoseSyncUnavailable()` for engine-not-ready UI.
+- `src/sync/rate-wait.ts`: keel's 429 waits by world key (in memory), and their words split by keel's `param` (the PIN wall or any other wait); read by the engine, the attach, Settings' PIN check and the pill (conv. 100).
 - `src/sync/sync-failure-copy.ts`: what a failed sync SAYS (foreign ids, 64 KB, held files, the web host's refusal; push vs pull side); once per set per session.
 - `src/sync/host-blocked-page.ts`: `isHostBlockedPage`, the one test for the web host's page titled "Blocked" (conv. 191); the adapter reads it on the whole body.
 - `src/sync/sync-issues.ts`: NOT SYNCING (conv. 126): per world, session only, replaced per side; Settings › This world + the pill's warning count.

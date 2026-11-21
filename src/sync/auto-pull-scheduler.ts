@@ -129,7 +129,7 @@ function tickPull(): void {
   }
   console.info('[auto-pull] tick: firing pullNow');
   lastPullAt = Date.now();
-  pullNowAndRefresh().catch(err => {
+  pullNowAndRefresh({ auto: true }).catch(err => {
     console.warn('[auto-pull] scheduled pull failed:', err);
   });
 }
@@ -155,7 +155,7 @@ function maybeCatchUpOnVisible(): void {
     cadenceMs: activeCadenceMs,
   });
   lastPullAt = Date.now();
-  pullNowAndRefresh().catch(err => {
+  pullNowAndRefresh({ auto: true }).catch(err => {
     console.warn('[auto-pull] catch-up pull failed:', err);
   });
 }

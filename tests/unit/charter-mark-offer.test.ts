@@ -148,6 +148,6 @@ describe("keel's refusal of the mark (M5)", () => {
     expect(isAuthError(Object.assign(new Error('x'), { status: 403, code: 'permission_error' }))).toBe(true); // the control
   });
   it('is said as its own kind', () => {
-    expect(classifyFailure({ status: 403, code: 'keeper_only', element_id: 'l1' } as never)).toBe('keeper_mark');
+    expect(classifyFailure({ status: 403, code: 'keeper_only', element_id: 'l1' } as never)).toBe('keeper_only');
   });
 });

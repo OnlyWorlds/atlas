@@ -31,7 +31,7 @@ describe('Settings\' new-id row, as foreignIdsFor answers it', () => {
       { id: x.id, type: 'character', first_seen: 't', in_use: true },
       { id: y.id, type: 'character', first_seen: 't' },
     ] } }));
-    expect(foreignRowLine(await foreignIdsFor(store as never, entry))).toBe('2 elements could not upload: their ids are already taken on OnlyWorlds, 1 in use and 1 by another world.');
+    expect(foreignRowLine(await foreignIdsFor(store as never, entry))).toBe('2 elements could not upload: 1 id is already in use on OnlyWorlds and 1 is in another world.');
   });
 });
 

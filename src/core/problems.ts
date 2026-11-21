@@ -16,7 +16,8 @@
 import pkg from '../../package.json';
 import { PlainError, isPlainError } from './plain-error';
 import { damagedFileSentence, isFileBusyError } from '../store/fs-utils';
-import { isAuthError, isHostBlocked, isHostRefusal, isTransientError, memberRefusal } from '../sync/sync-engine';
+import { isAuthError, isHostBlocked, isHostRefusal, isPinParam, isTransientError, memberRefusal } from '../sync/sync-engine';
+import { waitWords } from '../sync/rate-wait';
 import { hostRefusalCause } from '../sync/sync-failure-copy';
 import { keyRefusalOf } from '../sync/world-key-lines';
 import { getState } from './state';
@@ -189,11 +190,23 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       if (keyRefusalOf(err) === 'pin') {
         return `OnlyWorlds did not accept this PIN. Atlas could not finish ${doing}.${saved} Check the PIN in Settings, under OnlyWorlds.`;
       }
-      return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
+      return `OnlyWorlds did not accept this world's key or the PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
     case 'offline':
       return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;
-    case 'server-busy':
+    case 'server-busy': {
+      // A 429 is OnlyWorlds asking for a wait, by keel's `param`: its PIN wall (ten different wrong PINs on
+      // one key), or any other throttle. Its Retry-After says how long, when it came.
+      const e = err as { status?: unknown; param?: unknown; retryAfterMs?: unknown; retryAfter?: unknown } | null;
+      if (e?.status === 429) {
+        const ms = typeof e.retryAfterMs === 'number' ? e.retryAfterMs
+          : typeof e.retryAfter === 'number' ? e.retryAfter * 1000 : null;
+        const when = ms === null ? 'a minute' : waitWords(ms);
+        return isPinParam(e.param)
+          ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish ${doing}.${saved} Check your PIN in Settings; try again in ${when}.`
+          : `OnlyWorlds asked Atlas to wait, so Atlas could not finish ${doing}.${saved} Try again in ${when}.`;
+      }
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
+    }
     case 'server-refused':
       return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
     case 'host-refused':

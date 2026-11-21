@@ -29,6 +29,8 @@ import { onlyWorldsSignInButtonHtml, wireOnlyWorldsSignIn } from '../ui/onlyworl
 import { isPinRefusal, recordPinState, type PinState } from '../registry/pin-proof';
 import { isSeatWorld } from '../core/seat';
 import { buildV2Adapter } from '../sync/make-online';
+import { isPinParam } from '../sync/sync-engine';
+import { pinCheckWaitLine, rateWaitOf, setRateWait } from '../sync/rate-wait';
 
 /**
  * The sign-in error line (B6). `accountErrorMessage`'s code branches
@@ -162,7 +164,7 @@ export function pinStateLine(reg: WorldsRegistry): string {
 
 /** What the field says of a PIN OnlyWorlds refused, and of one not checked yet. */
 export const PIN_REFUSED_LINE = 'OnlyWorlds did not accept this PIN. Check it and save it again.';
-export const PIN_UNCHECKED_LINE = 'Saved in this browser, not checked yet';
+export const PIN_UNCHECKED_LINE = 'Not checked by OnlyWorlds yet';
 
 /**
  * The PINs asked about in this opening of Settings: one question per PIN per opening (its redraws ask
@@ -173,7 +175,15 @@ export const PIN_UNCHECKED_LINE = 'Saved in this browser, not checked yet';
 const askedOnOpen = new Set<string>();
 
 /** The questions still out, by PIN: a second ask of the same PIN waits on this one's answer. */
-const inFlight = new Map<string, Promise<PinState | null | 'unasked'>>();
+const inFlight = new Map<string, Promise<PinAnswer>>();
+
+/**
+ * What a question about the PIN got: OnlyWorlds' word; null for no answer (offline, busy); 'unasked' when
+ * there was nothing to ask with; 'waiting' inside a 429's wait on the world's key (`rate-wait.ts`), met by
+ * this question or by an earlier send: the PIN is kept, not checked, never refused, and the question is not
+ * spent.
+ */
+export type PinAnswer = PinState | null | 'unasked' | 'waiting';
 
 /** How long a question waits for `/me`: past it, no answer came (not checked yet, never refused), and it is not spent. */
 let pinAskTimeoutMs = 15_000;
@@ -201,7 +211,7 @@ export function __resetPinAskedForTests(): void {
  * with (no world open, a read key, a seat), so no question was spent. A question about the same PIN
  * still out is not sent again: this ask waits on its answer, so a wrong PIN reaches OnlyWorlds once.
  */
-export function askAboutPin(pin: string | undefined): Promise<PinState | null | 'unasked'> {
+export function askAboutPin(pin: string | undefined): Promise<PinAnswer> {
   const out = pin ? inFlight.get(pin) : undefined;
   if (out) return out;
   const asking = askOnce(pin);
@@ -213,12 +223,14 @@ export function askAboutPin(pin: string | undefined): Promise<PinState | null | 
   return asking;
 }
 
-async function askOnce(pin: string | undefined): Promise<PinState | null | 'unasked'> {
+async function askOnce(pin: string | undefined): Promise<PinAnswer> {
   const reg = getState().registry;
   const active = getState().active;
   const entry = active ? reg.worlds.find((w) => w.id === active.worldId) : undefined;
   // A key that reads by its shape is asked nothing with a PIN: `keyScope` answers it read with no call.
   if (!pin || !entry?.api || entry.state !== 'api-linked' || entry.api.read_only || isSeatWorld(entry)) return 'unasked';
+  // Inside a 429's wait on this key nothing is asked: the answer would be the wait again.
+  if (rateWaitOf(entry.api.api_key)) return 'waiting';
   try {
     const { scope, pinProved } = await buildV2Adapter(entry.api.api_key, pin, undefined, { readTimeoutMs: pinAskTimeoutMs }).keyScope();
     // A key that turned out to read: no PIN went beside it, so nothing was asked.
@@ -227,10 +239,25 @@ async function askOnce(pin: string | undefined): Promise<PinState | null | 'unas
     recordPinState(pin, 'proved');
     return 'proved';
   } catch (err) {
+    // keel's 429 (its PIN wall refuses even the right PIN): the wait is kept on the key, and the sync
+    // waits it out too. The PIN is never recorded refused by it.
+    const e = err as { status?: unknown; retryAfterMs?: unknown; param?: unknown } | null;
+    if (e?.status === 429) {
+      setRateWait(entry.api.api_key, typeof e.retryAfterMs === 'number' ? e.retryAfterMs : 30_000, isPinParam(e.param));
+      return 'waiting';
+    }
     if (!isPinRefusal(err)) return null;
     recordPinState(pin, 'refused');
     return 'refused';
   }
+}
+
+/** The wait on the open world's key in Settings' words (the PIN kept, not checked); the plain line when it ended meanwhile. */
+function waitLineFor(reg: WorldsRegistry): string {
+  const active = getState().active;
+  const key = active ? reg.worlds.find((w) => w.id === active.worldId)?.api?.api_key : undefined;
+  const wait = rateWaitOf(key);
+  return wait ? pinCheckWaitLine(wait.pin, wait.until - Date.now()) : PIN_UNCHECKED_LINE;
 }
 
 export function wireAccountTab(toasts: ToastManager): void {
@@ -266,7 +293,7 @@ export function wireAccountTab(toasts: ToastManager): void {
     const asking = kept.pin;
     askedOnOpen.add(asking);
     // Nothing to ask with (no world open that writes): the question is not spent.
-    void askAboutPin(asking).then((said) => { if (said === 'unasked') askedOnOpen.delete(asking); });
+    void askAboutPin(asking).then((said) => { if (said === 'unasked' || said === 'waiting') askedOnOpen.delete(asking); });
   }
   pinInput?.addEventListener('change', async () => {
     const prevPin = getState().registry.pin;
@@ -296,11 +323,12 @@ export function wireAccountTab(toasts: ToastManager): void {
     }
     askedOnOpen.add(newPin);
     const said = await askAboutPin(newPin);
-    if (said === 'unasked') askedOnOpen.delete(newPin);
+    if (said === 'unasked' || said === 'waiting') askedOnOpen.delete(newPin);
     // The field moved on while the question was out: say what is kept now, never this save's answer.
     const now = getState().registry;
     if (now.pin !== newPin) { toasts.info(pinStateLine(now) || 'PIN removed'); return; }
     if (said === 'refused') toasts.error(PIN_REFUSED_LINE);
+    else if (said === 'waiting') toasts.info(waitLineFor(now));
     else toasts.info(said === 'proved' ? 'PIN saved' : PIN_UNCHECKED_LINE);
   });
   wireAccountTokenBlock(toasts);

@@ -262,3 +262,21 @@ describe('details never leak (every kind)', () => {
       .toBe('Firefox 131, Windows');
   });
 });
+
+describe('a 429 in words, by keel\'s param (1.124.35)', () => {
+  const wall = (retry: string | null) => new OwV2Error(429, { code: 'rate_limited', message: 'm', param: 'API-Pin' }, '', retry);
+  const other = (retry: string | null) => new OwV2Error(429, { code: 'rate_limited', message: 'm', param: null }, '', retry);
+  it('keel\'s PIN wall says the wall, the PIN to check and the wait', () => {
+    expect(problemFor(wall('900'), { doing: 'linking this world' }).sentence)
+      .toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish linking this world. Check your PIN in Settings; try again in 15 minutes.");
+  });
+  it('any other 429 says the wait alone, never the PIN', () => {
+    const s = problemFor(other('30'), { doing: 'refreshing from OnlyWorlds', savedLocally: true, where: 'folder' }).sentence;
+    expect(s).toBe('OnlyWorlds asked Atlas to wait, so Atlas could not finish refreshing from OnlyWorlds. Your changes are saved in the folder. Try again in 30 seconds.');
+    expect(s).not.toMatch(/PIN/);
+    expect(problemFor(other(null), { doing: 'saving' }).sentence).toMatch(/Try again in a minute\.$/);
+  });
+  it('a 503 stays busy', () => {
+    expect(problemFor(new OwV2Error(503, { code: 'server_busy', message: 'm' }, ''), { doing: 'saving' }).sentence).toBe('OnlyWorlds is busy, so Atlas could not finish saving. Try again in a minute.');
+  });
+});

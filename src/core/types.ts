@@ -467,7 +467,8 @@ export type SyncEngineState =
   | { kind: 'syncing'; phase: 'pull' | 'push'; progress?: { done: number; total: number } }
   /** `held`: an exclusive local operation (the re-key) owns the world; nothing syncs until it ends. */
   | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number; held_for?: SyncHoldReason }
-  | { kind: 'error'; message: string; recoverable: boolean };
+  /** `auth_reason`: a refused key's cause, when keel named it (the pill's press goes where it is fixed). */
+  | { kind: 'error'; message: string; recoverable: boolean; auth_reason?: KeyRefusal };
 
 /**
  * Why keel refused a world's key (#198), from its typed error: `key_revoked`
@@ -520,6 +521,8 @@ export interface SyncResult {
   transient_blocked?: boolean;
   transient_reason?: 'busy' | 'rate_limited' | 'offline';
   retry_after_ms?: number;
+  /** A `rate_limited` stop whose 429 named the PIN (`param` `API-Pin`): keel's PIN wall, not a general throttle. */
+  rate_limited_pin?: true;
   /**
    * World-meta fields (disk names) the meta step PUSHED to / PULLED from
    * `PATCH|GET /world` this round (world-meta sync). Lets the UI

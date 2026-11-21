@@ -41,6 +41,7 @@ import {
   reapplySyncPolicy,
   refreshElementsAfterWrite,
   requestPushIfLinked,
+  sayRateWait,
 } from '../sync/sync-attach';
 import { sharedRuleHolds, sharedWorldLine } from '../sync/shared-world';
 import { memberRoleLine } from '../sync/role-change';
@@ -658,8 +659,9 @@ export function foreignLine(n: number, inUse = 0): string {
       ? '1 element could not upload: its id is already in use on OnlyWorlds.'
       : `${n} elements could not upload: their ids are already in use on OnlyWorlds.`;
   }
-  // Both kinds counted the one way the row counts elements: in numerals.
-  return `${n} elements could not upload: their ids are already taken on OnlyWorlds, ${inUse} in use and ${n - inUse} by another world.`;
+  // Both kinds in the two lines' own words, counted the one way the row counts elements: in numerals.
+  const other = n - inUse;
+  return `${n} elements could not upload: ${inUse} ${inUse === 1 ? 'id is' : 'ids are'} already in use on OnlyWorlds and ${other} ${other === 1 ? 'is in another world' : 'are in other worlds'}.`;
 }
 
 /** How many of the row's live entries a membership holds. */
@@ -901,8 +903,10 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
         : `Someone else made it, and this world lets Atlas change only what it made. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'host_refused':
       return `The web host in front of OnlyWorlds refused the change before it reached OnlyWorlds.${f.host_blocked ? ` ${HOST_REFUSAL_CAUSE}` : ''} Nothing was lost: your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
-    case 'keeper_mark':
-      return `It carries the mark that makes it the world's charter, and only the owner or a co-builder can set that on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
+    case 'keeper_only':
+      return `Only the world's owner and co-builders can change it on OnlyWorlds. Ask one of them. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
+    case 'replaced_held':
+      return `OnlyWorlds answered as if it had replaced a copy it already held, though Atlas asked it only to create one. The copy here is unchanged and not marked as sent. Your next save sends it again, and Atlas compares it with the copy OnlyWorlds holds.`;
     case 'review_mark':
       return `It carries a review mark made by someone else (proposed or checked), and only the owner or a co-builder can send such a mark to OnlyWorlds. Ask one of them to sync it. It stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'file_busy': {
@@ -1032,6 +1036,7 @@ function wireSyncIssues(world: WorldRegistryEntry, toasts: ToastManager): void {
     } else if (action === 'retry-sync-issues') {
       const engine = getCurrentSyncWorldId() === world.id ? getCurrentSyncEngine() : null;
       if (!engine) { surfaceSyncUnavailable(toasts); return; }
+      if (sayRateWait()) return; // inside a 429's wait: nothing goes, the wait is said
       void engine.syncNow().catch(err => showProblem(err, { doing: 'syncing with OnlyWorlds', savedLocally: true, worldId: world.id, toasts }));
     }
   });

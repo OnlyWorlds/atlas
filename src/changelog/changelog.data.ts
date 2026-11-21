@@ -56,6 +56,49 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.35',
+    date: '2026-11-21',
+    theme: 'A PIN OnlyWorlds refused is never sent again by itself',
+    entries: [
+      {
+        id: 'refused-pin-stays-unsent',
+        title: 'A PIN OnlyWorlds refused is not sent again when you open the world',
+        body: 'When OnlyWorlds has refused the PIN kept in Settings, Atlas no longer tries it again each time you open the world or reload the page. Sync stays paused as it did right after the refusal, and the sync pill says so. Pressing the pill opens Settings, under OnlyWorlds, where you put in the PIN again; saving a different PIN starts sync again at once.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'wait-out-429',
+        title: 'When OnlyWorlds asks Atlas to wait, Atlas sends nothing until the wait is over',
+        body: 'OnlyWorlds sometimes asks Atlas to wait, for example after too many different PINs were tried for one world\'s key. Atlas used to send a new edit before the wait was over, which only met the same answer. Now everything you change during the wait stays saved where the world keeps it and goes up once, when the wait ends. Sync now and refresh say how long is left instead of sending. The wait holds when you switch worlds and back, or save a new PIN in Settings: a PIN saved during the wait is kept and not called wrong, and Settings says the wait. A page reload forgets the wait, and OnlyWorlds names it again at the first try.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'wait-words-by-cause',
+        title: 'A wait for too many PINs is told apart from any other wait',
+        body: 'When the wait is for too many different PINs, Atlas says: OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Check your PIN in Settings; Atlas tries again in the time left. Any other wait says OnlyWorlds asked Atlas to wait, where your changes are saved, and when Atlas tries again. Before, every wait blamed wrong PINs. The same split holds for files on an element, pages, and every other place that can meet a wait.',
+        tags: ['sync'],
+      },
+      {
+        id: 'keeper-only-words',
+        title: 'A change only the owner and co-builders can make says so',
+        body: 'OnlyWorlds lets only a world\'s owner and co-builders change its Charter Laws and the Objects those Laws name. A change to one of them from anyone else now says that only the world\'s owner and co-builders can change that element, and to ask one of them; the change stays where the world keeps it. Before, it said this only of the charter mark. The other changes in the same sync still go up.',
+        tags: ['sync'],
+      },
+      {
+        id: 'sync-words-1124-35',
+        title: 'Clearer words in Settings',
+        body: 'A PIN not checked yet now says Not checked by OnlyWorlds yet. A refusal that may be the key or the PIN says this world\'s key or the PIN. When some ids are in use on OnlyWorlds and others are in another world, This world says it in the two lines\' own words, for example: 3 elements could not upload: 2 ids are already in use on OnlyWorlds and 1 is in another world. If OnlyWorlds ever answers a new element as if it had replaced a copy it held, Atlas says that, keeps the copy here unchanged, and sends it again with your next save.',
+        tags: ['settings'],
+      },
+      {
+        id: 'keyboard-rings-1124-35',
+        title: 'Keyboard focus shows in full, and lands where a press opened something',
+        body: 'The focus ring on a field section\'s header shows all four edges, and a scroll card\'s head shows its ring at full strength even when the card is faded toward the edge. Enter or Space on a map\'s name in the Maps tab puts focus on the map\'s tab it opened, and on a chip in a chart card puts it on that card, instead of the page. A mouse click still leaves no ring. In a map\'s zones list, each kind\'s look and eye buttons now have names of their own that say what they do and for which zones.',
+        tags: ['accessibility'],
+      },
+    ],
+  },
+  {
     version: '1.124.34',
     date: '2026-11-21',
     theme: 'Sending many new elements never replaces one OnlyWorlds already holds',
