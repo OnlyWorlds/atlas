@@ -160,7 +160,12 @@ test('a linked world moved to a folder syncs its next edit', async ({ page }) =>
     if (req.method() !== 'GET') {
       writes.push(`${req.method()} ${path}`);
       const body = req.postDataJSON?.() ?? {};
-      if (path.startsWith('/bulk')) return route.fulfill({ json: { created: [], updated: [], errors: [] } });
+      if (path.startsWith('/bulk')) {
+        // keel reads `items`, `atomic` and `create_only` and refuses any other name with 422 (keel's body rule).
+        const unknown = Object.keys(body).filter(k => !['items', 'atomic', 'create_only'].includes(k));
+        if (unknown.length) return route.fulfill({ status: 422, json: { error: { type: 'invalid_request', code: 'invalid_request', message: `Unknown keys ${unknown.join(', ')}.`, param: null } } });
+        return route.fulfill({ json: { created: [], updated: [], errors: [] } });
+      }
       return route.fulfill({ json: { ...body, id: path.split('/').filter(Boolean)[1] ?? body.id, updated_at: now } });
     }
     if (path === '/world' || path === '/world/') return route.fulfill({ json: { id: SERVER, name: 'Alpha', updated_at: '2026-01-01T00:00:00.000Z' } });

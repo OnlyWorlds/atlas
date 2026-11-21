@@ -3,13 +3,12 @@
  * OnlyWorlds held are never a local-wins overwrite. Under local-wins the
  * pull's row sets off no convergence push (R5) and the push's is never said
  * as "Your version replaced the online one"; the line says the row waits.
- * A `/bulk` slot that replaced an element is said (S5).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import type { ToastAction } from '../../src/ui/toast-manager';
-import { attachSyncEngine, detachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, __test_emitConflictToasts, heldCopyLine, bulkReplacedLine, refreshConflictsCount } from '../../src/sync/sync-attach';
+import { attachSyncEngine, detachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, __test_emitConflictToasts, heldCopyLine, refreshConflictsCount } from '../../src/sync/sync-attach';
 import { toastManager } from '../../src/ui/toast-manager';
 import { ConflictReviewModal, openConflictReview } from '../../src/ui/conflict-review-modal';
 import { getState } from '../../src/core/state';
@@ -78,31 +77,6 @@ describe('a row with no record under local-wins', () => {
     said = [];
     __test_emitConflictToasts('push', result([row(false)]), localWins());
     expect(said).toEqual(['Your version replaced the online one for 1 element']);
-  });
-
-  it('S5: a /bulk slot that replaced an element is said, naming the element from the open copy', () => {
-    patchSlice('data', { elements: [{ id: 'c1', type: 'character', name: ' Ada ' }, { id: 'c2', type: 'character', name: '' }, { id: 'l1', type: 'location', name: 'Reef' }] } as never);
-    try {
-      __test_emitConflictToasts('push', result([], { bulk_replaced_ids: ['c1'] }), localWins());
-      expect(said).toEqual(['OnlyWorlds already held the character "Ada" and took this one in its place. Another place may have sent it first.']);
-      said = [];
-      // Two of one type: a count in its word; two types, or one not in the copy: elements.
-      __test_emitConflictToasts('push', result([], { bulk_replaced_ids: ['c1', 'c2'] }), localWins());
-      __test_emitConflictToasts('push', result([], { bulk_replaced_ids: ['c1', 'l1'] }), localWins());
-      __test_emitConflictToasts('push', result([], { bulk_replaced_ids: ['c1', 'gone'] }), localWins());
-      expect(said).toEqual([
-        'OnlyWorlds already held 2 characters and took these in their place. Another place may have sent them first.',
-        'OnlyWorlds already held 2 elements and took these in their place. Another place may have sent them first.',
-        'OnlyWorlds already held 2 elements and took these in their place. Another place may have sent them first.',
-      ]);
-    } finally {
-      patchSlice('data', { elements: [] } as never);
-    }
-  });
-
-  it('S5: one replaced element with no name is said in its unnamed form, one the copy no longer holds without a name', () => {
-    expect(bulkReplacedLine([{ type: 'location', name: '  ' }])).toBe('OnlyWorlds already held the unnamed location and took this one in its place. Another place may have sent it first.');
-    expect(bulkReplacedLine([null])).toBe('OnlyWorlds already held an element and took this one in its place. Another place may have sent it first.');
   });
 });
 

@@ -161,7 +161,7 @@ export class FakeOwApiClient implements OwApiClient {
     | { method: 'hide'; type: ElementType; id: string }
     | { method: 'list'; type: ElementType }
     | { method: 'get'; type: ElementType; id: string }
-    | { method: 'bulk'; items: number; atomic: boolean }
+    | { method: 'bulk'; items: number; atomic: boolean; createOnly: boolean }
     | { method: 'getWorldMeta' }
     | { method: 'patchWorldMeta'; body: Record<string, unknown> }
   > = [];
@@ -200,7 +200,9 @@ export class FakeOwApiClient implements OwApiClient {
   /** keel's 409 for an id held anywhere in this world (keel checks every type's table): its own type's words, or the type it is (`other_type_conflict`). */
   private heldConflict(type: ElementType, id: string): Error | null {
     for (const [held, m] of this.byType) {
-      if (!m.has(id) || this.outOfView.has(id)) continue;
+      // keel's ids are UUIDs: an id in any letter case names the same row.
+      const stored = m.has(id) ? id : [...m.keys()].find(k => k.toLowerCase() === id.toLowerCase());
+      if (!stored || this.outOfView.has(stored)) continue;
       const message = held === type
         ? `API Error 409: An element with id ${id} already exists. Use PUT to upsert, or POST without an id.`
         : `API Error 409: An element with id ${id} already exists as a ${held} in this world. Element ids are unique across every type: PUT it as a ${held}, or POST without an id.`;
@@ -496,31 +498,9 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfAuthBlocked();
     this.calls.push({ method: 'get', type, id });
     if (this.outOfView.has(id)) return null;
-    const r = this.bucket(type).get(id);
-    return r ? this.served(r) : null;
-  }
-
-  /** Every `ids=` read (conv. 192, R4), apart from `calls`, so the exact-sequence suites keep their meaning. */
-  idsReads: Array<{ type: ElementType; ids: string[] }> = [];
-  /** Test seam: the `ids=` read answers only this many records and says a page is left (M5); null = whole. */
-  idsReadCut: number | null = null;
-  /** Test seam: the `ids=` read fails with this error. */
-  idsReadFails: Error | null = null;
-
-  /**
-   * `GET /{type}?ids=` as the adapter walks it (keel's list filter: an id this key cannot see is absent, a
-   * type's other ids are not this type's). `complete` false under `idsReadCut`.
-   */
-  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean }> {
-    this.throwIfAuthBlocked();
-    this.idsReads.push({ type, ids: [...ids] });
-    if (this.idsReadFails) throw this.idsReadFails;
-    const want = new Set(ids.map(i => i.toLowerCase()));
-    const found = Array.from(this.bucket(type).values())
-      .filter(r => want.has(r.id.toLowerCase()) && !this.outOfView.has(r.id))
-      .map(r => this.served(r));
-    if (this.idsReadCut !== null && found.length > this.idsReadCut) return { records: found.slice(0, this.idsReadCut), complete: false };
-    return { records: found, complete: true };
+    // keel's ids are UUIDs: an id in any letter case reads the same row.
+    const r = this.bucket(type).get(id) ?? [...this.bucket(type).values()].find(x => x.id.toLowerCase() === id.toLowerCase());
+    return r && !this.outOfView.has(r.id) ? this.served(r) : null;
   }
 
   /**
@@ -667,17 +647,27 @@ export class FakeOwApiClient implements OwApiClient {
    *     (rollback verified live); per-item 201s still reported as
    *     would-have-succeeded.
    *   - `atomic:false` + failure → good items persist, bad items carry errors.
+   *   - `create_only` (`opts.createOnly`): an item with an id goes through the single
+   *     create, so an id the world holds is that slot's 409 `id_conflict` (the POST's words) and is
+   *     never replaced; without it, keel's upsert (a held id replaced, 200). An option keel's body
+   *     does not know throws: keel refuses an unknown key with 422 and writes nothing.
    */
-  bulkCreate?: (items: BulkItem[], opts?: { atomic?: boolean; idempotencyKey?: string }) => Promise<BulkResult>;
+  bulkCreate?: (items: BulkItem[], opts: { atomic?: boolean; idempotencyKey?: string; createOnly: true }) => Promise<BulkResult>;
 
   private async runBulkCreate(
     items: BulkItem[],
-    opts?: { atomic?: boolean; idempotencyKey?: string },
+    opts: { atomic?: boolean; idempotencyKey?: string; createOnly?: boolean },
   ): Promise<BulkResult> {
+    // keel reads `items`, `atomic` and `create_only` and refuses any other name (keel's body rule): an option
+    // this fake does not know is a loud failure, never ignored.
+    const unknown = Object.keys(opts ?? {}).filter(k => !['atomic', 'idempotencyKey', 'createOnly'].includes(k));
+    if (unknown.length) throw Object.assign(new Error(`API Error 422: Unknown key ${unknown.join(', ')}.`), { status: 422, code: 'invalid_request' });
+    if (opts?.createOnly !== undefined && typeof opts.createOnly !== 'boolean') throw Object.assign(new Error('API Error 422: create_only must be true, false or null.'), { status: 422, code: 'invalid_request', param: 'create_only' });
     this.throwIfAuthBlocked();
     this.throwIfWritePermission();
     const atomic = opts?.atomic ?? false;
-    this.calls.push({ method: 'bulk', items: items.length, atomic });
+    const createOnly = opts?.createOnly === true;
+    this.calls.push({ method: 'bulk', items: items.length, atomic, createOnly });
 
     // Snapshot the resolvable id-space for the dangling-reference check:
     // everything already stored PLUS every id in THIS batch (in-batch cycles
@@ -720,8 +710,9 @@ export class FakeOwApiClient implements OwApiClient {
       const err = this.takeInjectedBulkError(id)
         ?? validateBulkItem(it.type, wireBody, id, existingIds, batchIds);
       // keel's /bulk is an upsert by id (elements/bulk.py): an id held as another type in this world
-      // is the 409 naming that type; one held as this type is replaced, answered 200 below.
-      const other = !err && typeof wireBody.id === 'string' && !this.bucket(it.type).has(id) ? this.heldConflict(it.type, id) : null;
+      // is the 409 naming that type; one held as this type is replaced, answered 200 below. Under
+      // create_only every item with an id is the single create: an id held in any type is its 409.
+      const other = !err && typeof wireBody.id === 'string' && (createOnly || !this.bucket(it.type).has(id)) ? this.heldConflict(it.type, id) : null;
       if (err) {
         anyError = true;
         results.push({ status: err.code === 'id_conflict' ? 409 : 400, id, error: err });
@@ -1178,8 +1169,9 @@ function validateBulkItem(
   // record and no in-batch id. Only uuid-shaped strings qualify (never
   // names/descriptions). Multi-link fields report the FIRST dangling id.
   const isDangling = (v: unknown): v is string =>
-    typeof v === 'string' && UUID_RE.test(v) && v !== id
-    && !existingIds.has(v) && !batchIds.has(v);
+    typeof v === 'string' && UUID_RE.test(v) && v.toLowerCase() !== id.toLowerCase()
+    // keel parses a link as a UUID: any letter case names the same element.
+    && !existingIds.has(v) && !batchIds.has(v) && !existingIds.has(v.toLowerCase()) && !batchIds.has(v.toLowerCase());
   for (const [key, value] of Object.entries(wireBody)) {
     if (key === 'id' || key === 'type') continue;
     if (isDangling(value)) return danglingErr(key, value);

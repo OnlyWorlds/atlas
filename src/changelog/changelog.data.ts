@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.124.34',
+    date: '2026-11-21',
+    theme: 'Sending many new elements never replaces one OnlyWorlds already holds',
+    entries: [
+      {
+        id: 'bulk-create-only',
+        title: 'A batch of new elements can no longer replace one already on OnlyWorlds',
+        body: 'When Atlas sends several new elements at once, OnlyWorlds now takes them only as new. If one of them is already there, for example because another device or person sent it a moment earlier, OnlyWorlds keeps its own copy and Atlas compares the two: the same, it simply takes it; different, it waits in Review conflicts for you to choose, as a copy restored from a backup does. Before, a batch sent in that moment could replace the element there, a member\'s edits included, and Atlas could only tell you afterwards. The other elements of the batch are still sent in the same round. Atlas also no longer asks OnlyWorlds which elements it holds before each batch.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.33',
     date: '2026-11-20',
     theme: 'Your PIN is saved once OnlyWorlds takes it',

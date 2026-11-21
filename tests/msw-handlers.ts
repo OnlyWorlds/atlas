@@ -729,7 +729,18 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const blocked = authBlocked();
       if (blocked) return blocked;
       const idemKey = request.headers.get('Idempotency-Key');
-      const body = (await request.json()) as { atomic?: boolean; items?: Array<{ type: string; element: Record<string, unknown> }> };
+      const body = (await request.json()) as { atomic?: boolean; create_only?: unknown; items?: Array<{ type: string; element: Record<string, unknown> }> };
+      // keel reads `items`, `atomic` and `create_only` on the body, `type` and `element` on an item, and
+      // refuses any other name with 422, nothing written (keel's body rule); create_only is true, false or null.
+      const unknownTop = Object.keys(body ?? {}).filter(k => !['items', 'atomic', 'create_only'].includes(k));
+      const unknownItem = (Array.isArray(body?.items) ? body.items : []).flatMap((it, i) => Object.keys(it ?? {}).filter(k => k !== 'type' && k !== 'element').map(k => `items[${i}].${k}`));
+      if (unknownTop.length || unknownItem.length) {
+        return envelope({ status: 422, code: 'invalid_request', message: `Unknown keys ${[...unknownTop, ...unknownItem].map(k => `'${k}'`).join(', ')}.`, param: null });
+      }
+      if (body.create_only !== undefined && body.create_only !== null && typeof body.create_only !== 'boolean') {
+        return envelope({ status: 422, code: 'invalid_request', message: 'create_only must be true, false or null.', param: 'create_only' });
+      }
+      const createOnly = body.create_only === true;
       const payloadStr = JSON.stringify(body);
       if (idemKey) {
         const seen = idempotency.get(idemKey);
@@ -758,9 +769,10 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
           return { ok: false as const, status: err.status, id, error: { code: err.code, message: err.message, param: err.param } };
         }
         // keel's /bulk is an upsert by id (elements/bulk.py): an id held as another type is the 409
-        // naming that type; one held as this type is replaced whole, its slot 200.
+        // naming that type; one held as this type is replaced whole, its slot 200. Under create_only
+        // an item with an id is the single create: any held id is its 409, nothing replaced.
         const held = id ? heldAs(id) : null;
-        if (held && held !== it.type) {
+        if (held && (createOnly || held !== it.type)) {
           const c = heldConflict(it.type, id)!;
           return { ok: false as const, status: c.status, id, error: { code: c.code, message: c.message, param: c.param } };
         }

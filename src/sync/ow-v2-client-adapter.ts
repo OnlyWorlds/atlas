@@ -24,7 +24,8 @@
  *   - Extension passthrough: `atlas_*` / `x_*` / `shadow_*` fields round-trip.
  *     Only ATLAS_LOCAL_ONLY_FIELDS are stripped from write bodies; wire
  *     extensions (zone visual prefs, user custom fields) ride along.
- *   - /bulk: `{atomic?, items: [{type, element}]}` (+ Idempotency-Key header),
+ *   - /bulk: `{atomic?, create_only: true, items: [{type, element}]}` (+ Idempotency-Key header),
+ *     create_only on every batch: an item whose id keel holds is that slot's 409, never a replace,
  *     fixpoint FK resolution including cycles. Response is HTTP 200 always,
  *     `{errors, items: [{status, id, error?}]}` — no per-item updated_at yet
  *     (backfill until Skeld ships the echo).
@@ -53,9 +54,6 @@ import { readsOnlyByShape } from '../core/key-scope';
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
 export const DEFAULT_V2_BASE = 'https://www.onlyworlds.com/api/v2';
-
-/** keel's cap on `ids=` (`IDS_MAX`, elements/api.py), and the page asked for beside it. */
-export const LIST_BY_IDS_MAX = 200;
 
 /**
  * keel's PIN rule (Skeld 2026-10-22; SDK 4.59.0's own): the secret (a
@@ -634,36 +632,6 @@ export class OwV2ClientAdapter implements OwApiClient {
     }
   }
 
-  /**
-   * Which of these ids keel holds as this type (`GET /{type}?ids=`, keel's list filter: at most 200 ids a
-   * call, its pages 100 long unless `limit` says more), with each body as served (conv. 192, R4).
-   * Its own walk, never `listElements`: that one resets the type's incomplete flag the server-delete
-   * inference reads. `complete` false when a page was left unread: the caller treats every id it did
-   * not see as held (M5).
-   */
-  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean }> {
-    const records: ServerRecord[] = [];
-    let complete = true;
-    for (let i = 0; i < ids.length; i += LIST_BY_IDS_MAX) {
-      const chunk = ids.slice(i, i + LIST_BY_IDS_MAX);
-      let cursor: string | null = null;
-      for (let page = 0; page < 20; page++) {
-        const q = new URLSearchParams({ ids: chunk.join(','), limit: String(LIST_BY_IDS_MAX) });
-        if (cursor) q.set('cursor', cursor);
-        const env = await this.request('GET', `/${type}?${q.toString()}`) as { data?: unknown[]; has_more?: boolean; next_cursor?: string | null } | undefined;
-        for (const r of env?.data ?? []) {
-          try { records.push(adaptV2Record(r, type)); } catch { complete = false; }
-        }
-        if (!env?.has_more) { cursor = null; break; }
-        const next = env.next_cursor ?? null;
-        if (!next || next === cursor) { complete = false; cursor = null; break; }
-        cursor = next;
-      }
-      if (cursor) complete = false;
-    }
-    return { records, complete };
-  }
-
   async listElements(type: ElementType): Promise<ServerRecord[]> {
     this.incompleteListTypes.delete(type);
 
@@ -745,16 +713,19 @@ export class OwV2ClientAdapter implements OwApiClient {
    */
   async bulkCreate(
     items: BulkItem[],
-    opts?: { atomic?: boolean; idempotencyKey?: string }
+    opts: { atomic?: boolean; idempotencyKey?: string; createOnly: true }
   ): Promise<BulkResult> {
     const wireItems = items.map(it => ({
       type: it.type,
       element: toV2WireShape(it.element, it.type, 'create'),
     }));
     const headers: Record<string, string> = {};
-    if (opts?.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
+    if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
+    // keel's create_only: an item whose id keel holds answers 409 `id_conflict` in its
+    // slot and is never replaced, as the single POST answers it (conv. 192, R5).
     const response = await this.request('POST', '/bulk', {
-      atomic: opts?.atomic ?? true,
+      atomic: opts.atomic ?? true,
+      create_only: opts.createOnly,
       items: wireItems,
     }, headers) as {
       errors?: boolean;

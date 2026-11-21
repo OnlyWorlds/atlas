@@ -29,7 +29,15 @@ async function mockKeel(page: Page) {
     if (parts[0] === 'world') return route.fulfill({ json: { id: API_WORLD, name: 'Server World', updated_at: '2026-10-11T09:00:00.000Z' } });
     if (parts[0] === 'changes') return route.fulfill({ json: { cursor: `c-${seq}`, changes: queued.splice(0), has_more: false, head: seq } });
     if (parts[0] === 'bulk' && method === 'POST') {
-      const body = req.postDataJSON() as { items: Array<{ type: string; element: Rec }> };
+      const body = req.postDataJSON() as { items: Array<{ type: string; element: Rec }>; atomic?: boolean; create_only?: boolean };
+      // keel reads `items`, `atomic` and `create_only` and refuses any other name with 422 (keel's body rule).
+      const unknown = Object.keys(body).filter(k => !['items', 'atomic', 'create_only'].includes(k));
+      if (unknown.length) return route.fulfill({ status: 422, json: { error: { type: 'invalid_request', code: 'invalid_request', message: `Unknown keys ${unknown.join(', ')}.`, param: null } } });
+      // create_only: an id keel holds is its slot's 409, never replaced; atomic writes nothing then.
+      const held = (it: { element: Rec }) => body.create_only === true && db.has(it.element.id);
+      if ((body.atomic ?? true) && body.items.some(held)) {
+        return route.fulfill({ json: { errors: true, items: body.items.map(it => held(it) ? { status: 409, id: it.element.id, error: { code: 'id_conflict', message: `An element with id ${it.element.id} already exists. Use PUT to upsert, or POST without an id.`, param: 'id' } } : { status: 201, id: it.element.id }) } });
+      }
       const items = body.items.map(it => { const r = put({ ...it.element, type: it.type }); return { status: 201, id: r.id, updated_at: r.updated_at }; });
       return route.fulfill({ json: { errors: false, items } });
     }

@@ -29,6 +29,25 @@ beforeEach(async () => {
 });
 
 describe('mergeLocalIntoApi /bulk create phase', () => {
+  it('a create whose id keel came to hold after the plan is its slot\'s 409 (create_only): never replaced, the rest land', async () => {
+    const a1 = await folder.createElement('character', { name: 'Raced' });
+    const b1 = await folder.createElement('character', { name: 'Free' });
+    const c1 = await folder.createElement('character', { name: 'Also free' });
+    // Between the plan's list and the batch, another place sends the same id with its own words.
+    const real = client.bulkCreate!;
+    let raced = false;
+    client.bulkCreate = async (items, opts) => {
+      if (!raced) { raced = true; await client.createElement('character', { id: a1.id, name: 'Raced elsewhere', description: 'theirs' }); }
+      return real(items, opts);
+    };
+    const result = await mergeLocalIntoApi(folder, client, 'b');
+    expect(client.calls.filter(c => c.method === 'bulk').every(c => (c as { createOnly: boolean }).createOnly)).toBe(true);
+    expect(client.__server_get('character', a1.id)!.description).toBe('theirs');
+    expect(result.failures.map(f => [f.element_id, f.code])).toEqual([[a1.id, 'id_conflict']]);
+    expect(client.__server_get('character', b1.id)).toBeTruthy();
+    expect(client.__server_get('character', c1.id)).toBeTruthy();
+  });
+
   it('merges a cyclic local-only pair through ONE bulk call, stamps server baselines, downloads server-only', async () => {
     // Server has one pre-existing element (downloads to local).
     await client.createElement('location', { id: '00000000-0000-4000-8000-00000000cafe', name: 'Server Keep' });

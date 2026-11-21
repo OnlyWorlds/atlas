@@ -467,9 +467,13 @@ export async function mergeLocalIntoApi(
 
     let result: Awaited<ReturnType<NonNullable<OwApiClient['bulkCreate']>>>;
     try {
+      // create_only (conv. 192, R5): an id keel holds is its slot's 409, never replaced. Here such a slot
+      // is that element's failure; the engine's first round meets the id again and its held-copy path
+      // decides (the same content adopted, other content held for the person).
       result = await adapter.bulkCreate!(batch.map(b => b.item), {
         atomic: true,
         idempotencyKey: crypto.randomUUID(),
+        createOnly: true,
       });
     } catch (err) {
       const message = errText(err);

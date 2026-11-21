@@ -50,7 +50,10 @@ export function mountKeel(): Keel {
 /** keel's `/bulk` answer when the ids in `foreign` live in another world (atomic: nothing kept). A batch with none passes through. */
 export function refuseBulkAsForeign(foreign?: ReadonlySet<string>): void {
   mswServer.use(http.post(`${V2}/bulk`, async ({ request }) => {
-    const body = await request.clone().json() as { items: Array<{ element: { id: string } }> };
+    const body = await request.clone().json() as { items: Array<{ element: { id: string } }> } & Record<string, unknown>;
+    // keel reads `items`, `atomic` and `create_only` and refuses any other name with 422 (keel's body rule).
+    const unknown = Object.keys(body).filter(k => !['items', 'atomic', 'create_only'].includes(k));
+    if (unknown.length) return HttpResponse.json({ error: { type: 'invalid_request', code: 'invalid_request', message: `Unknown keys ${unknown.join(', ')}.`, param: null } }, { status: 422 });
     const isForeign = (id: string) => !foreign || foreign.has(id);
     if (!body.items.some(it => isForeign(it.element.id))) return undefined;
     return HttpResponse.json({

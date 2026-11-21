@@ -3,8 +3,8 @@
  * `server_updated_at` (or one marked unknown) whose id keel already holds. The
  * contract's promises I1 to I7 and the gate's MUSTs, on the real FsFolderStore
  * over the in-memory FS and the real SyncEngine, against FakeOwApiClient as
- * keel serves (every field, `change_seq`, `/bulk` as an upsert, `?ids=`,
- * `If-Match`). Each probe of the contract's round (`probe:N`, `adopt:A1..A3`)
+ * keel serves (every field, `change_seq`, `/bulk` with `create_only`, whose
+ * held id is its slot's 409, `If-Match`). Each probe of the contract's round (`probe:N`, `adopt:A1..A3`)
  * and of its gate (G2 to G5) is here inverted; G1 is the banked case (M4).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -14,7 +14,6 @@ import { FsFolderStore } from '../../src/store/folder-store-fs';
 import { SyncEngine, CHANGED_WHILE_OPEN, VIEW_ONLY_KEEP_THIS } from '../../src/sync/sync-engine';
 import { isBaselineUnknown } from '../../src/core/baseline-unknown';
 import { classifyFailure } from '../../src/sync/sync-failure-copy';
-import { bulkReplacedLine } from '../../src/sync/sync-attach';
 import type { BulkItem } from '../../src/sync/sync-engine';
 import type { Element } from '../../src/core/types';
 
@@ -125,7 +124,7 @@ describe('I1: a newer account edit is never overwritten unseen', () => {
       expect((await rows()).map(c => c.element_id)).toEqual([A]);
     });
 
-    it(`[${policy}] two restored copies through /bulk (adopt:A1): the check finds both, nothing replaced, the member's field kept`, async () => {
+    it(`[${policy}] two restored copies through /bulk (adopt:A1): each its slot's 409, nothing replaced, the member's field kept`, async () => {
       client.__enable_bulk();
       const engine = engineFor(policy);
       await put(A, { name: 'Ada', description: 'v1', local_updated_at: stamp() });
@@ -137,7 +136,9 @@ describe('I1: a newer account edit is never overwritten unseen', () => {
       await restore(B, { name: 'Bo', description: 'v1' });
       client.calls = [];
       await engine.pushOnce();
-      expect(client.calls.map(c => c.method)).not.toContain('bulk');
+      // The batch went, create_only: each held id answered its 409 and was read, never replaced.
+      expect(client.calls.filter(c => c.method === 'bulk')).toEqual([{ method: 'bulk', items: 2, atomic: true, createOnly: true }]);
+      expect(client.calls.filter(c => c.method === 'create' || c.method === 'update')).toEqual([]);
       expect(onKeel(A).description).toBe('member');
       expect(onKeel(A).background).toBe('member added');
       expect(onKeel(B).description).toBe('member');
@@ -206,7 +207,7 @@ describe('I2: the lost create still settles silently', () => {
     expect(await rows()).toEqual([]);
   });
 
-  it('the /bulk form: a lost /bulk answer, retried: the check finds both the same, adopted, no /bulk again', async () => {
+  it('the /bulk form: a lost /bulk answer, retried: both slots 409, the same content, adopted; nothing written', async () => {
     client.__enable_bulk();
     const engine = engineFor('local-wins');
     await put(A, { name: 'Ada', description: 'a', local_updated_at: stamp() });
@@ -223,9 +224,13 @@ describe('I2: the lost create still settles silently', () => {
     client.calls = [];
     const r = await engine.pushOnce();
     expect(r.conflicts).toEqual([]);
-    expect(client.calls.map(c => c.method)).toEqual([]);
-    expect(client.idsReads[client.idsReads.length - 1].ids.sort()).toEqual([A, B]);
+    // The retry's batch, create_only: both held, so each slot is a 409 and a read; no create or update.
+    expect(client.calls.map(c => c.method)).toEqual(['bulk', 'get', 'get']);
     expect(await store.listLocallyChangedSince(null)).toEqual([]);
+    // A third round sends nothing at all.
+    client.calls = [];
+    await engine.pushOnce();
+    expect(client.calls).toEqual([]);
   });
 });
 
@@ -307,7 +312,7 @@ describe('I4: a shared world on pause-and-review holds it', () => {
   });
 });
 
-describe('I5: /bulk never replaces an element keel held', () => {
+describe('I5: /bulk never replaces an element keel held (create_only)', () => {
   function captureBulk(): string[][] {
     const sent: string[][] = [];
     const real = client.bulkCreate!;
@@ -318,68 +323,90 @@ describe('I5: /bulk never replaces an element keel held', () => {
     return sent;
   }
 
-  it('no item carries an id the check answered as held', async () => {
+  it('every batch says create_only; a held id is its slot\'s 409 and leaves the batch, the rest land in the same round', async () => {
     client.__enable_bulk();
     const engine = await online('local-wins');
     client.__server_mutate('character', A, { description: 'member' });
     await restore(A, { name: 'Ada', description: 'v1' });
     await put(B, { name: 'Bo', local_updated_at: stamp() });
     await put(C, { name: 'Cy', local_updated_at: stamp() });
-    const sent = captureBulk();
-    await engine.pushOnce();
-    expect(sent).toEqual([[B, C]]);
-    expect(onKeel(A).description).toBe('member');
-  });
-
-  it('M5: an id the check did not answer (a page left unread) leaves the batch and goes alone: its 409 is the check', async () => {
-    client.__enable_bulk();
-    const engine = await online('local-wins');
-    client.__server_mutate('character', A, { description: 'member' });
-    await restore(A, { name: 'Ada', description: 'v1' });
-    await put(B, { name: 'Bo', local_updated_at: stamp() });
-    await put(C, { name: 'Cy', local_updated_at: stamp() });
-    client.idsReadCut = 0;
     const sent = captureBulk();
     client.calls = [];
+    const r = await engine.pushOnce();
+    // The held one is a row, never a failure and never another world's id.
+    expect(r.failures.filter(f => f.element_id === A)).toEqual([]);
+    expect((await store.readSyncState()).foreign?.ids ?? []).toEqual([]);
+    // The atomic batch answered A's 409 and wrote nothing; A left it, and B and C went again once.
+    expect(sent).toEqual([[A, B, C], [B, C]]);
+    expect(client.calls.filter(c => c.method === 'bulk').every(c => (c as { createOnly: boolean }).createOnly)).toBe(true);
+    expect(onKeel(A).description).toBe('member');
+    expect(file(B).server_updated_at && file(C).server_updated_at).toBeTruthy();
+    expect((await rows()).map(c => c.element_id)).toEqual([A]);
+    // The held one is never sent again as a create.
+    client.calls = [];
+    sent.length = 0;
     await engine.pushOnce();
     expect(sent).toEqual([]);
-    expect(client.calls.filter(c => c.method === 'create').length).toBe(3);
-    expect(onKeel(A).description).toBe('member');
-    expect((await rows()).map(c => c.element_id)).toEqual([A]);
+    expect(writesFor(A)).toEqual([]);
   });
 
-  it('M5: a check that fails sends each alone, never a batch', async () => {
-    client.__enable_bulk();
-    await put(B, { name: 'Bo', local_updated_at: stamp() });
-    await put(C, { name: 'Cy', local_updated_at: stamp() });
-    client.idsReadFails = Object.assign(new Error('API Error 422: ids must be a comma-separated list of ids.'), { status: 422, code: 'invalid_request', param: 'ids' });
-    const sent = captureBulk();
-    await engineFor('local-wins').pushOnce();
-    expect(sent).toEqual([]);
-    expect(file(B).server_updated_at && file(C).server_updated_at).toBeTruthy();
-  });
-
-  it('S5: a slot answered 200 (a race the check lost) is said, never silent', async () => {
+  it('a 409 slot whose read fails is a failure, never another world; the id is not sent again this round', async () => {
     client.__enable_bulk();
     const engine = await online('local-wins');
-    await restore(A, { name: 'Ada', description: 'v1' });
+    await restore(A, { name: 'Ada', description: 'mine' });
     await put(B, { name: 'Bo', local_updated_at: stamp() });
-    client.listByIds = async () => ({ records: [], complete: true }); // another place sent A in the window
+    const realGet = client.getElement.bind(client);
+    client.getElement = async (type, id) => {
+      if (id === A) throw Object.assign(new Error('API Error 503: busy'), { status: 503 });
+      return realGet(type, id);
+    };
+    const sent = captureBulk();
     const r = await engine.pushOnce();
-    expect(r.bulk_replaced_ids).toEqual([A]);
-    expect(bulkReplacedLine([{ type: 'character', name: 'Ada' }])).toBe('OnlyWorlds already held the character "Ada" and took this one in its place. Another place may have sent it first.');
+    expect(sent).toEqual([[A, B], [B]]);
+    expect(r.failures.find(f => f.element_id === A)!.message).toMatch(/^id_conflict, and checking it failed/);
+    expect((await store.readSyncState()).foreign ?? []).toEqual([]);
+    expect(file(B).server_updated_at).toBeTruthy();
   });
 
-  it('N2: only Make Online\'s first round on a world made empty skips the check', async () => {
+  it('a 409 slot keel reads as not in this world is another world\'s id', async () => {
     client.__enable_bulk();
     await put(B, { name: 'Bo', local_updated_at: stamp() });
     await put(C, { name: 'Cy', local_updated_at: stamp() });
-    await engineFor('local-wins', { freshWorld: true }).pushOnce();
-    expect(client.idsReads).toEqual([]);
-    await put(A, { name: 'Ada', local_updated_at: stamp() });
-    await put(L, { name: 'Lu', local_updated_at: stamp() });
+    client.__inject_bulk_item_failure(B, { code: 'id_conflict', message: 'This id already exists in another world.', param: 'id' });
     await engineFor('local-wins').pushOnce();
-    expect(client.idsReads.length).toBe(1);
+    expect(((await store.readSyncState()).foreign?.ids ?? []).map(f => f.id)).toEqual([B]);
+    expect(file(C).server_updated_at).toBeTruthy();
+  });
+
+  it('the fake plays keel: an option it does not know fails loudly, and without create_only a held id is replaced', async () => {
+    client.__enable_bulk();
+    await client.createElement('character', { id: A, name: 'Ada', description: 'theirs' });
+    const call = (opts: Record<string, unknown>) => client.bulkCreate!([{ type: 'character', element: { id: A, name: 'Ada', description: 'mine' } }], opts as never);
+    await expect(call({ atomic: true, createOnly: true, replace: true })).rejects.toThrow(/422/);
+    expect((await call({ atomic: true, createOnly: true })).items[0].status).toBe(409);
+    expect(onKeel(A).description).toBe('theirs');
+    expect((await call({ atomic: true })).items[0].status).toBe(200);
+    expect(onKeel(A).description).toBe('mine');
+  });
+
+  it('a retry that meets another held id ends the round for its survivors: one retry, never a loop', async () => {
+    client.__enable_bulk();
+    await put(A, { name: 'Ada', local_updated_at: stamp() });
+    await put(B, { name: 'Bo', local_updated_at: stamp() });
+    await put(C, { name: 'Cy', local_updated_at: stamp() });
+    // A is held from the start; B is made elsewhere between the batch and its retry.
+    await client.createElement('character', { id: A, name: 'Ada', description: 'theirs' });
+    const sent: string[][] = [];
+    const real = client.bulkCreate!;
+    client.bulkCreate = async (items: BulkItem[], opts) => {
+      sent.push(items.map(it => it.element.id as string));
+      if (sent.length === 2) await client.createElement('character', { id: B, name: 'Bo elsewhere' });
+      return real(items, opts);
+    };
+    const r = await engineFor('local-wins').pushOnce();
+    expect(sent.length).toBe(2);
+    expect(r.failures.some(f => f.element_id === C && /retry exhausted/.test(f.message))).toBe(true);
+    expect(onKeel(B).name).toBe('Bo elsewhere');
   });
 });
 
@@ -394,7 +421,7 @@ describe('I6: one decision whichever door', () => {
     { name: 'a number keel coerced from a text (S1: a row, said)', file: { name: 'Ada', description: 'd', height: '5' }, keel: { height: 5 }, same: false, fields: ['height'] },
     { name: 'other content', file: { name: 'Ada', description: 'mine' }, keel: { description: 'theirs' }, same: false, fields: ['description'] },
   ];
-  const doors = ['post', 'bulk', 'bulk-409', 'pull', 'pull-then-push'] as const;
+  const doors = ['post', 'bulk', 'pull', 'pull-then-push'] as const;
 
   for (const c of cases) {
     for (const door of doors) {
@@ -405,13 +432,13 @@ describe('I6: one decision whichever door', () => {
         await c.setup?.();
         const keelStamp = onKeel(A).updated_at as string;
         await put(A, { ...c.file, local_updated_at: stamp() });
-        if (door.startsWith('bulk')) {
+        if (door === 'bulk') {
+          // create_only: A's slot is keel's 409, B lands on the retry. keel checks an item's links before
+          // its id (Phase 1, as the single POST does), so the elements A links to are on keel here.
           client.__enable_bulk();
+          if (!onKeel(F)) await client.createElement('character', { id: F, name: 'Fe' });
+          if (!onKeel(L, 'location')) await client.createElement('location', { id: L, name: 'Lu' });
           await put(B, { name: 'Bo', local_updated_at: stamp() });
-          if (door === 'bulk-409') {
-            client.listByIds = async () => ({ records: [], complete: true });
-            client.__inject_bulk_item_failure(A, { code: 'id_conflict', message: `An element with id ${A} already exists. Use PUT to upsert, or POST without an id.`, param: 'id' });
-          }
         }
         const engine = engineFor('local-wins');
         const said: unknown[] = [];
@@ -718,7 +745,7 @@ describe('gate S3: each reading of the mark held by a test', () => {
     return engine;
   }
 
-  it('C7: an id written in capitals meets the /bulk check as keel\'s own id, never a /bulk item', async () => {
+  it('C7: an id written in capitals is keel\'s own id: its slot\'s 409, read and held, never replaced', async () => {
     client.__enable_bulk();
     await client.createElement('character', { id: A, name: 'Ada', description: 'member' });
     const UP = A.toUpperCase();
@@ -732,7 +759,8 @@ describe('gate S3: each reading of the mark held by a test', () => {
       return real(items, opts);
     };
     await engineFor('local-wins').pushOnce();
-    expect(sent.sort()).toEqual([B, C]);
+    // The batch, then its retry without the held id.
+    expect(sent.sort()).toEqual([A, B, B, C, C]);
     expect(onKeel(A).description).toBe('member');
     expect((await rows()).map(c => c.element_id)).toEqual([UP]);
   });

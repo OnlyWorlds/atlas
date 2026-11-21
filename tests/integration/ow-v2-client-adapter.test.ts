@@ -339,7 +339,7 @@ describe('OwV2ClientAdapter — /bulk', () => {
         { type: 'character', element: { id: a, name: 'A', friends: [b] } },
         { type: 'character', element: { id: b, name: 'B', friends: [a] } },
       ],
-      { atomic: true },
+      { atomic: true, createOnly: true },
     );
 
     expect(result.errors).toBe(false);
@@ -363,7 +363,7 @@ describe('OwV2ClientAdapter — /bulk', () => {
         { type: 'character', element: { id: good, name: 'Would Succeed' } },
         { type: 'character', element: { id: bad, name: 'Dangling', birthplace: uuid() } },
       ],
-      { atomic: true },
+      { atomic: true, createOnly: true },
     );
 
     expect(result.errors).toBe(true);

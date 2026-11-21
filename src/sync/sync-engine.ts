@@ -150,12 +150,6 @@ export interface OwApiClient {
   /** Fetch single element. Used by SyncEngine pre-update conflict check. */
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
   /**
-   * Which of these ids keel holds as this type, with each body (`GET /{type}?ids=`; conv. 192, R4),
-   * read before a `/bulk` so no item carries an id keel holds. `complete` false: a page went unread,
-   * and an id not seen is treated as held. Absent: no check (the production adapter always has it).
-   */
-  listByIds?(type: ElementType, ids: readonly string[]): Promise<{ records: Array<{ id: string; updated_at: string } & Record<string, unknown>>; complete: boolean }>;
-  /**
    * World-meta read — GET /world's 13-field body in DISK names (world-meta
    * sync). REQUIRED, not optional: an optional method would silently
    * reroute every legacy suite off the meta path (the
@@ -177,7 +171,7 @@ export interface OwApiClient {
    * batches of ≥2 through it (the cyclic-Make-Online fix); when absent, the
    * engine falls back to the per-element topo-sorted loop.
    */
-  bulkCreate?(items: BulkItem[], opts?: { atomic?: boolean; idempotencyKey?: string }): Promise<BulkResult>;
+  bulkCreate?(items: BulkItem[], opts: { atomic?: boolean; idempotencyKey?: string; createOnly: true }): Promise<BulkResult>;
   /**
    * Optional: one page of the per-world change feed — keel v2 `/changes`.
    * When present, pullPhase uses cursor-delta pull with EXPLICIT delete ops
@@ -270,11 +264,6 @@ export interface SyncEngineOptions {
    * create, which a copy with no baseline does not count as a difference (conv. 192, M1).
    */
   seat?: boolean;
-  /**
-   * Make Online, Create new: the engine of its first round, on a world made empty in the same flow.
-   * Only it skips the `/bulk` check of ids keel holds (conv. 192, R4): nothing can be there yet.
-   */
-  freshWorld?: boolean;
   /** Called when a conflict is detected. */
   onConflict?: (conflict: Conflict) => void;
   /** Called whenever engine state changes (for UI). */
@@ -331,7 +320,6 @@ export class SyncEngine {
   private where: 'folder' | 'browser' = 'folder';
   private apiWorldId: string | null = null;
   private seat = false;
-  private freshWorld = false;
   private onConflict: (conflict: Conflict) => void;
   private onStateChange: (state: SyncEngineState) => void;
   private onPushProgress: (done: number, total: number) => void;
@@ -398,7 +386,6 @@ export class SyncEngine {
     this.where = opts.where ?? 'folder';
     this.apiWorldId = opts.apiWorldId ?? null;
     this.seat = !!opts.seat;
-    this.freshWorld = !!opts.freshWorld;
     this.policy = normalizePolicy(opts.policy);
     this.onConflict = opts.onConflict ?? (() => {});
     this.onStateChange = opts.onStateChange ?? (() => {});
@@ -639,8 +626,6 @@ export class SyncEngine {
   private roundHiddenRefused: string[] = [];
   /** Hidden locals whose id OnlyWorlds shows (conv. 170): not adopted, said once. */
   private roundHiddenShown: string[] = [];
-  /** `/bulk` slots keel answered 200 this round: an element it held, replaced (conv. 192, S5). */
-  private roundReplaced: string[] = [];
   /** Rows the `/bulk` phase held for copies with no record of what OnlyWorlds held (conv. 192). */
   private roundHeldRows: Conflict[] = [];
   /** The role as the running push read it, afresh once per round: a lowering while open moves it. */
@@ -2418,9 +2403,11 @@ export class SyncEngine {
     for (const it of items) attempted.add(it.element.id as string);
     let result: BulkResult;
     try {
+      // create_only (conv. 192, R5): an id keel holds is its slot's 409, never replaced.
       result = await this.client.bulkCreate!(items, {
         atomic: true,
         idempotencyKey: crypto.randomUUID(),
+        createOnly: true,
       });
     } catch (err) {
       // The web host refused the whole request for one element's text (R4):
@@ -2462,11 +2449,6 @@ export class SyncEngine {
       // retries (500 creates once cost ~15 minutes). They
       // stay dirty; the next round's re-POST answers 409 and adopts.
       let heldInARow = 0;
-      // keel's `/bulk` replaces an id it holds and answers 200 (conv. 192, S5): the check before the
-      // batch leaves those out, so a 200 is a race lost (a second place sent the same new element).
-      for (let i = 0; i < items.length; i++) {
-        if (result.items[i]?.status === 200) this.roundReplaced.push(items[i].element.id as string);
-      }
       for (let i = 0; i < items.length; i++) {
         if (this.stopped) break;
         const echo = result.items[i]?.updatedAt;
@@ -2495,9 +2477,9 @@ export class SyncEngine {
       return { created: stamped, authBlocked: false };
     }
 
-    // errors: true under atomic → server rolled EVERYTHING back. Split by
-    // per-item status (positional with input), fail the bad ones, retry the
-    // survivors once.
+    // errors: true under atomic → server rolled EVERYTHING back (keel answers the other slots as they
+    // would have been). Split by per-item status (positional with input), settle or fail the refused
+    // ones, retry the survivors once: a held id leaves the batch after its 409 and the rest go again.
     const failedIdx = new Set<number>();
     result.items.forEach((it, i) => { if (it.status >= 400) failedIdx.add(i); });
     const survivors: Element[] = [];
@@ -2525,19 +2507,28 @@ export class SyncEngine {
         continue;
       }
       if (errObj.code === 'id_conflict') {
+        // create_only's slot is the single POST's answer (conv. 192, R5): keel holds the id. Read it, and
+        // the one decision takes it (I6): the same content adopted, other content a held row. Never sent
+        // again as a create: it leaves the batch here.
         const id = item.element.id as string;
-        const remote = await this.client.getElement(item.type, id).catch(() => null);
+        let remote: Awaited<ReturnType<OwApiClient['getElement']>> = null;
+        let readErr: unknown = null;
+        try { remote = await this.client.getElement(item.type, id); } catch (err) { readErr = err; }
         const local = (await this.folder.getElement(id)) ?? candidates.find(c => c.id === id);
         if (remote && local) {
-          // conv. 192: the one decision (I6); a held row goes into this round's conflicts.
           const out: { r?: SettleResult } = {};
-          if (await this.localStep(failures, id, item.type, 'create', 'note', async () => { out.r = await this.settleCopy(local, remote, 'push'); })
+          if (await this.localStep(failures, id, item.type, 'create', 'note', async () => { out.r = await this.settleCopy(local, remote!, 'push'); })
             && out.r?.kind === 'held') this.roundHeldRows.push(out.r.conflict);
           onItemDone();
           continue;
         }
-        // /bulk upserts ids of THIS world, so an id_conflict nothing here
-        // could adopt belongs to another world.
+        if (readErr !== null) {
+          // A read that failed proves nothing: never another world (as the single POST's 409).
+          failures.push(failureOf(id, item.type, 'create', readErr, 'id_conflict, and checking it failed: '));
+          onItemDone();
+          continue;
+        }
+        // keel answered the read "not here": the id belongs to another world.
         foreign.push({ id, type: item.type });
       }
       // keel would not make it hidden for this key (conv. 170): held, never a failure.
@@ -2737,7 +2728,6 @@ export class SyncEngine {
     this.roundRole = null;
     this.roundHiddenRefused = [];
     this.roundHiddenShown = [];
-    this.roundReplaced = [];
     this.roundHeldRows = [];
     const stateAtStart = await this.folder.readSyncState();
     const keptAtStart = new Set(stateAtStart.kept_outside_view ?? []);
@@ -2829,42 +2819,12 @@ export class SyncEngine {
       return true;
     };
 
-    // conv. 192, R4: no `/bulk` item carries an id keel holds. Before a batch, keel is asked which of
-    // its ids it holds (`createsHeldOnline`, the one place a create-only `/bulk` would replace): those
-    // leave the batch and meet the one decision with the bodies read, unsent; an id the check did not
-    // answer leaves it too and goes as a single create, whose 409 is the honest check (M5).
-    let createsNow = allCreates;
-    let heldOnline = new Map<string, { id: string; updated_at: string } & Record<string, unknown>>();
-    let unanswered = new Set<string>();
-    if (typeof this.client.bulkCreate === 'function' && allCreates.length >= 2 && !this.freshWorld) {
-      const check = await this.createsHeldOnline(allCreates);
-      heldOnline = check.held;
-      unanswered = check.unanswered;
-      if (check.authErr) { authBlocked = true; this.noteAuthBail(check.authErr); }
-      if (check.transient) transient = check.transient;
-      createsNow = allCreates.filter(e => !heldOnline.has(e.id));
-    }
-    const forBulk = createsNow.filter(e => !unanswered.has(e.id));
-    const useBulk = typeof this.client.bulkCreate === 'function' && forBulk.length >= 2 && !authBlocked && !transient;
+    // conv. 192, R5: every `/bulk` is create_only, so an id keel holds is its slot's 409 and meets the one
+    // decision there (`bulkCreatePhase`), never a replace. No check before the batch.
+    const useBulk = typeof this.client.bulkCreate === 'function' && allCreates.length >= 2;
     let changed = useBulk
-      ? [...this.sortCreatesByDependencies(createsNow.filter(e => unanswered.has(e.id))), ...updatesOnly]
-      : [...this.sortCreatesByDependencies(createsNow), ...updatesOnly];
-    for (const local of allCreates) {
-      const served = heldOnline.get(local.id);
-      if (!served || authBlocked || transient || this.stopped) continue;
-      const current = await this.folder.getElement(local.id);
-      if (current && !current.server_updated_at) {
-        const out: { r?: SettleResult } = {};
-        if (await this.localStep(failures, local.id, local.type, 'create', 'note', async () => { out.r = await this.settleCopy(current, served, 'push'); })
-          && out.r?.kind === 'held') {
-          conflicts.push(out.r.conflict);
-          reviewHeld.push(out.r.conflict);
-          this.onConflict(out.r.conflict);
-        }
-      }
-      done++;
-      this.onPushProgress(done, total);
-    }
+      ? [...updatesOnly]
+      : [...this.sortCreatesByDependencies(allCreates), ...updatesOnly];
 
     /** The creates a host-refused `/bulk` sent one at a time this round (R4). */
     const oneByOneIds = new Set<string>();
@@ -2873,7 +2833,7 @@ export class SyncEngine {
     /** One-at-a-time creates refused only for a link to a peer not made yet: the peer's id and the failure recorded. */
     const linkFailed = new Map<string, { refId: string; failure: PerElementFailure }>();
     if (useBulk) {
-      const bulk = await this.bulkCreatePhase(forBulk, failures, serverDeletesDetected, () => {
+      const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
         done++;
         this.onPushProgress(done, total);
       }, false, roundForeign, attemptedCreates);
@@ -3481,55 +3441,7 @@ export class SyncEngine {
       ...(proposedIds.length > 0 ? { proposed_ids: proposedIds } : {}),
       ...(refusedDeletes.length > 0 ? { delete_refused: refusedDeletes } : {}),
       ...(settled.accepted.length > 0 ? { proposals_accepted: settled.accepted } : {}),
-      ...(this.roundReplaced.length > 0 ? { bulk_replaced_ids: [...new Set(this.roundReplaced)] } : {}),
     };
-  }
-
-  /**
-   * conv. 192, R4 (M5): which of these never-sent creates keel already holds, asked before a `/bulk`
-   * (`GET /{type}?ids=`, per type). The one place the check lives: a create-only `/bulk` from keel
-   * would replace it here. It fails closed: an id the read did not answer (a page left unread, a
-   * refused read) is `unanswered` and goes as a single create, whose 409 is the honest check. A
-   * refused key or a busy server ends the round, as the batch itself would.
-   */
-  private async createsHeldOnline(creates: readonly Element[]): Promise<{
-    held: Map<string, { id: string; updated_at: string } & Record<string, unknown>>;
-    unanswered: Set<string>;
-    authErr?: unknown;
-    transient?: unknown;
-  }> {
-    const held = new Map<string, { id: string; updated_at: string } & Record<string, unknown>>();
-    const unanswered = new Set<string>();
-    if (typeof this.client.listByIds !== 'function') return { held, unanswered };
-    const byType = new Map<ElementType, string[]>();
-    for (const c of creates) {
-      const ids = byType.get(c.type) ?? [];
-      ids.push(c.id);
-      byType.set(c.type, ids);
-    }
-    for (const [type, ids] of byType) {
-      if (this.stopped) break;
-      const byLower = new Map(ids.map(id => [id.toLowerCase(), id]));
-      try {
-        const { records, complete } = await this.client.listByIds(type, ids);
-        const seen = new Set<string>();
-        for (const r of records) {
-          const id = byLower.get(String(r.id).toLowerCase());
-          if (!id) continue;
-          held.set(id, r);
-          seen.add(id);
-        }
-        if (!complete) for (const id of ids) if (!seen.has(id)) unanswered.add(id);
-      } catch (err) {
-        if (isAuthError(err)) return { held, unanswered, authErr: err };
-        if (isTransientError(err)) return { held, unanswered, transient: err };
-        console.warn(`[atlas:sync] the check of ${type} ids before /bulk failed — each goes as a single create`, {
-          message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
-        });
-        for (const id of ids) unanswered.add(id);
-      }
-    }
-    return { held, unanswered };
   }
 
   /**
@@ -4576,7 +4488,7 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /** A round's role and kept news (conv. 151), carried from its push and pull phases into the round's result; the latest phase's role wins. */
-function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_membership' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted' | 'hidden_held_ids' | 'hidden_shown_ids' | 'bulk_replaced_ids'> {
+function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_membership' | 'kept' | 'kept_edit_ids' | 'proposed_ids' | 'delete_refused' | 'proposals_accepted' | 'hidden_held_ids' | 'hidden_shown_ids'> {
   const role = parts.map(p => p.own_role).filter(r => r !== undefined).pop();
   const membership = parts.map(p => p.own_membership).filter(m => m !== undefined).pop();
   const kept = parts.reduce((n, p) => n + (p.kept ?? 0), 0);
@@ -4587,7 +4499,6 @@ function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_
   const accepted = [...new Set(parts.flatMap(p => p.proposals_accepted ?? []))];
   const hiddenHeld = [...new Set(parts.flatMap(p => p.hidden_held_ids ?? []))];
   const hiddenShown = [...new Set(parts.flatMap(p => p.hidden_shown_ids ?? []))];
-  const replaced = [...new Set(parts.flatMap(p => p.bulk_replaced_ids ?? []))];
   return {
     ...(role !== undefined ? { own_role: role } : {}),
     ...(membership !== undefined ? { own_membership: membership } : {}),
@@ -4598,7 +4509,6 @@ function keptFields(...parts: SyncResult[]): Pick<SyncResult, 'own_role' | 'own_
     ...(accepted.length > 0 ? { proposals_accepted: accepted } : {}),
     ...(hiddenHeld.length > 0 ? { hidden_held_ids: hiddenHeld } : {}),
     ...(hiddenShown.length > 0 ? { hidden_shown_ids: hiddenShown } : {}),
-    ...(replaced.length > 0 ? { bulk_replaced_ids: replaced } : {}),
   };
 }
 

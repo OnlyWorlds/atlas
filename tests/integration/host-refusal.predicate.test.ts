@@ -49,7 +49,7 @@ describe('isHostRefusal: the host\'s page on a write', () => {
     const errs = [
       await thrown(a.updateElement('character', ID, { name: 'run `python -m http.server`' })),
       await thrown(a.createElement('character', { id: ID, name: 'x' })),
-      await thrown(a.bulkCreate([{ type: 'character', element: { id: ID, name: 'x' } }], { atomic: true, idempotencyKey: 'k' })),
+      await thrown(a.bulkCreate([{ type: 'character', element: { id: ID, name: 'x' } }], { atomic: true, idempotencyKey: 'k', createOnly: true })),
       await thrown(a.patchWorldMeta({ description: 'run `python -m http.server`' })),
     ];
     for (const err of errs) {

@@ -134,7 +134,11 @@ test('Create new on a copy whose ids keel refuses: the fix on the toast and in S
     if (path === '/account') return route.fulfill({ json: { username: 'e2e-member', email: null } });
     if (path === '/world') return route.fulfill({ json: { id: '0e2e0000-0000-4000-8000-0000000000c9', name: 'Copy', updated_at: '2026-11-07T00:00:00.000Z' } });
     if (path === '/bulk' && req.method() === 'POST') {
-      const body = req.postDataJSON() as { items: Array<{ element: { id: string } }> };
+      const body = req.postDataJSON() as { items: Array<{ element: { id: string } }>; atomic?: boolean; create_only?: boolean };
+      // keel reads `items`, `atomic` and `create_only` and refuses any other name with 422 (keel's body rule).
+      const unknown = Object.keys(body).filter(k => !['items', 'atomic', 'create_only'].includes(k));
+      if (unknown.length) return route.fulfill({ status: 422, json: { error: { type: 'invalid_request', code: 'invalid_request', message: `Unknown keys ${unknown.join(', ')}.`, param: null } } });
+      // Every id here lives in another world: create_only or not, each slot is that 409.
       return route.fulfill({
         status: 207,
         json: { errors: true, items: body.items.map(it => ({ status: 409, id: it.element.id, error: { code: 'id_conflict', message: 'This id already exists in another world: a copied world folder needs fresh ids.', param: 'id' } })) },

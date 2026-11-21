@@ -546,11 +546,6 @@ export interface SyncResult {
   delete_refused?: Array<{ id: string; type: ElementType; name?: string }>;
   /** Proposals the round settled (conv. 163, P5): accepted ones took the server's copy. */
   proposals_accepted?: string[];
-  /**
-   * `/bulk` slots keel answered 200: an element it already held, replaced whole by this copy (conv. 192,
-   * S5). The check before `/bulk` leaves out every id keel holds, so only a race reaches here; said.
-   */
-  bulk_replaced_ids?: string[];
 }
 
 export interface PerElementFailure {
