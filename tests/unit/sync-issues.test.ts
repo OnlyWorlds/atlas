@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { noteRoundIssues, issuesFor, clearSyncIssues, __resetSyncIssues } from '../../src/sync/sync-issues';
-import { syncIssueLine } from '../../src/middle/settings-world';
+import { syncIssueLine, foreignLine } from '../../src/middle/settings-world';
 import type { PerElementFailure } from '../../src/core/types';
 
 const fail = (id: string, extra: Partial<PerElementFailure> = {}): PerElementFailure => ({
@@ -62,6 +62,22 @@ describe('noteRoundIssues', () => {
     clearSyncIssues('w');
     expect(issuesFor('w')).toEqual([]);
     expect(issuesFor('v')).toHaveLength(1);
+  });
+
+  it('an id a membership holds is its own row, first with the foreign ids, and says the way out without another world', () => {
+    noteRoundIssues('w', 'push', round([
+      fail('other'),
+      fail('used', { operation: 'create', status: 409, code: 'id_conflict', message: 'this id is already in use on OnlyWorlds' }),
+    ]));
+    const [used] = issuesFor('w');
+    expect(used.kind).toBe('id_in_use');
+    expect(syncIssueLine(used, 'folder', true)).toBe('Its id is already in use on OnlyWorlds. Settings, under This world, can give it a new id.');
+    expect(syncIssueLine(used, 'folder')).toBe('Its id is already in use on OnlyWorlds. Give it a new id above.');
+    // The re-key row's line: another world's ids, ids in use, or both.
+    expect(foreignLine(1)).toBe('1 element could not upload: its id belongs to another OnlyWorlds world.');
+    expect(foreignLine(1, 1)).toBe('1 element could not upload: its id is already in use on OnlyWorlds.');
+    expect(foreignLine(2, 2)).toBe('2 elements could not upload: their ids are already in use on OnlyWorlds.');
+    expect(foreignLine(3, 1)).toBe('3 elements could not upload: their ids are already taken on OnlyWorlds, one in use and the rest by another world.');
   });
 
   it('says whether the list moved', () => {

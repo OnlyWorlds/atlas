@@ -2376,7 +2376,7 @@ export class SyncEngine {
     serverDeletesDetected: import('../core/types').ServerDeleteRecord[],
     onItemDone: () => void,
     isRetry = false,
-    foreign: Array<{ id: string; type: ElementType }> = [],
+    foreign: ForeignNote[] = [],
     attempted: Set<string> = new Set(),
     /** Ids keel holds in this world (a `create_only` slot's 409): never refused, so a link to one lands. */
     heldHere: Set<string> = new Set(),
@@ -2646,21 +2646,17 @@ export class SyncEngine {
     held: Array<{ id: string; type: ElementType; message: string }>,
     candidates: Element[],
     failures: PerElementFailure[],
-    foreign: Array<{ id: string; type: ElementType }>,
+    foreign: ForeignNote[],
     heldHere: Set<string>,
     onItemDone: () => void,
   ): Promise<{ authErr?: unknown; transient?: unknown }> {
     const slots: Array<{ id: string; type: ElementType; where: ReturnType<typeof heldIdWhere> }> = [];
     for (const sl of held) {
       const where = heldIdWhere(sl.message);
-      if (where === 'another-world') {
-        foreign.push({ id: sl.id, type: sl.type });
-        failures.push({ element_id: sl.id, type: sl.type, operation: 'create', message: 'this id already exists in another world', status: 409, code: 'id_conflict', source: 'server' });
-        onItemDone();
-        continue;
-      }
-      if (where === 'in-use') {
-        failures.push({ element_id: sl.id, type: sl.type, operation: 'create', message: sl.message, status: 409, code: 'id_conflict', source: 'server' });
+      if (heldOutside(where)) {
+        const out = heldOutsideAnswer(where, sl.id, sl.type);
+        foreign.push(out.note);
+        failures.push(out.failure);
         onItemDone();
         continue;
       }
@@ -2727,7 +2723,7 @@ export class SyncEngine {
         // keel's 409 said this world holds it and its read now answers "not here": it went meanwhile. Never
         // another world's (no new ids offered), and no longer held, so a link to it waits; it goes again next round.
         heldHere.delete(sl.id);
-        failures.push({ element_id: sl.id, type: sl.type, operation: 'create', message: 'id_conflict, and OnlyWorlds no longer holds it: it goes again next round', status: 409, code: 'id_conflict', source: 'server' });
+        failures.push({ element_id: sl.id, type: sl.type, operation: 'create', message: GONE_MEANWHILE_LINE, status: 409, code: 'id_conflict', source: 'server' });
         onItemDone();
         continue;
       }
@@ -2918,7 +2914,7 @@ export class SyncEngine {
      *  pending element. */
     let transient: unknown = null;
     /** Creates refused because their id lives in another world (sync-state `foreign`). */
-    const roundForeign: Array<{ id: string; type: ElementType }> = [];
+    const roundForeign: ForeignNote[] = [];
     /** Every create actually SENT this round: one that is not refused as foreign again leaves the list. */
     const attemptedCreates = new Set<string>();
     /**
@@ -3321,6 +3317,13 @@ export class SyncEngine {
             message: `OnlyWorlds already holds this id as a ${heldAsOtherType(err)} in this world`,
           });
         }
+        else if (isCreate && isIdConflictError(err) && heldOutside(heldIdWhere(err))) {
+          // keel's words say the id is held outside this world (another world's, or a membership's): the
+          // `/bulk` slot's answer (conv. 192, R5), never read. A new id is offered.
+          const out = heldOutsideAnswer(heldIdWhere(err) as 'another-world' | 'in-use', elem.id, elem.type);
+          roundForeign.push(out.note);
+          failures.push(out.failure);
+        }
         else if (isCreate && isIdConflictError(err)) {
           // The read-back is guarded: a network error, 503
           // or 401 here used to escape the loop, skipping the rest of the
@@ -3347,9 +3350,13 @@ export class SyncEngine {
               reviewHeld.push(out.r.conflict);
               this.onConflict(out.r.conflict);
             }
+          } else if (readErr === null && heldIdWhere(err) === 'this-world') {
+            // keel's words said this world holds it and its read now answers "not here": it went meanwhile, as
+            // at a `/bulk` slot. Never another world's (no new id offered); it goes again next round.
+            failures.push({ element_id: elem.id, type: elem.type, operation: 'create', message: GONE_MEANWHILE_LINE, status: 409, code: 'id_conflict', source: 'server' });
           } else if (readErr === null) {
-            // A single POST 409s for a same-world id too, so only a read-back
-            // that ANSWERED "not here" proves the id belongs to another world.
+            // Words it does not know: only a read-back that ANSWERED "not here" proves the id belongs to
+            // another world.
             roundForeign.push({ id: elem.id, type: elem.type });
             failures.push({
               element_id: elem.id, type: elem.type, operation: 'create',
@@ -4967,6 +4974,33 @@ export function heldIdWhere(errOrMessage: unknown): 'this-world' | 'another-worl
   if (/is already in use/i.test(text)) return 'in-use';
   if (/already exists\.\s*Use PUT/i.test(text)) return 'this-world';
   return null;
+}
+
+/** A create refused for an id held outside this world, for the new-id worklist (sync-state `foreign`); `in_use`: a membership's. */
+export type ForeignNote = { id: string; type: ElementType; in_use?: true };
+
+/** The failure for an id keel holds outside this world as a membership's (`id_in_use_conflict`); `sync-failure-copy` says it. */
+export const ID_IN_USE_LINE = 'this id is already in use on OnlyWorlds';
+/** A same-world 409 whose read then answered "not here": the element went meanwhile, and the create goes again. */
+export const GONE_MEANWHILE_LINE = 'id_conflict, and OnlyWorlds no longer holds it: it goes again next round';
+
+function heldOutside(where: ReturnType<typeof heldIdWhere>): where is 'another-world' | 'in-use' {
+  return where === 'another-world' || where === 'in-use';
+}
+
+/**
+ * One answer for an id keel's words place outside this world, at the single create and a `/bulk` slot alike
+ * (conv. 192, R5): never read, never held here, on the new-id worklist, and a failure in its own words.
+ */
+function heldOutsideAnswer(where: 'another-world' | 'in-use', id: string, type: ElementType): { note: ForeignNote; failure: PerElementFailure } {
+  const inUse = where === 'in-use';
+  return {
+    note: inUse ? { id, type, in_use: true } : { id, type },
+    failure: {
+      element_id: id, type, operation: 'create', status: 409, code: 'id_conflict', source: 'server',
+      message: inUse ? ID_IN_USE_LINE : 'this id already exists in another world',
+    },
+  };
 }
 
 const NOT_ON_THE_WIRE = new Set<string>(['id', 'local_updated_at', 'server_updated_at', ...ATLAS_LOCAL_ONLY_FIELDS]);

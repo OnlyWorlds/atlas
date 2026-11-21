@@ -183,7 +183,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </label>
       ${sharedLineHtml(world)}
       <div class="atlas-settings-dangling" data-role="foreign-ids" ${lastForeignCount[world.id] ? '' : 'hidden'}>
-        <p class="atlas-settings-hint" data-role="foreign-text">${escapeText(foreignLine(lastForeignCount[world.id] ?? 0))}</p>
+        <p class="atlas-settings-hint" data-role="foreign-text">${escapeText(foreignLine(lastForeignCount[world.id] ?? 0, lastForeignInUse[world.id] ?? 0))}</p>
         <button class="atlas-btn-ghost" data-action="give-new-ids">${lastForeignCount[world.id] === 1 ? 'Give it a new id' : 'Give them new ids'}</button>
       </div>
       ${isSeatWorld(world) ? `<p class="atlas-settings-hint" data-role="seat-line">${escapeText(seatLine(world))}</p>` : ''}
@@ -643,11 +643,22 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
  *  and a row that starts hidden and appears after two awaits blinks each time.
  * The row renders from this, then refreshes. */
 const lastForeignCount: Record<string, number> = {};
+/** How many of those a membership holds (keel's "already in use"), for the line's words. */
+const lastForeignInUse: Record<string, number> = {};
 
-function foreignLine(n: number): string {
-  return n === 1
-    ? '1 element could not upload: its id belongs to another OnlyWorlds world.'
-    : `${n} elements could not upload: their ids belong to another OnlyWorlds world.`;
+/** The re-key row's line: another world's ids, ids a membership holds (`in_use`), or both. */
+export function foreignLine(n: number, inUse = 0): string {
+  if (inUse === 0) {
+    return n === 1
+      ? '1 element could not upload: its id belongs to another OnlyWorlds world.'
+      : `${n} elements could not upload: their ids belong to another OnlyWorlds world.`;
+  }
+  if (inUse === n) {
+    return n === 1
+      ? '1 element could not upload: its id is already in use on OnlyWorlds.'
+      : `${n} elements could not upload: their ids are already in use on OnlyWorlds.`;
+  }
+  return `${n} elements could not upload: their ids are already taken on OnlyWorlds, ${inUse === 1 ? 'one' : String(inUse)} in use and the rest by another world.`;
 }
 
 async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): Promise<void> {
@@ -688,10 +699,12 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
       ? '1 element still links to an old id: its file could not be read when the ids changed.'
       : `${staleN} elements still link to old ids: their files could not be read when the ids changed.`;
     if (!box || !text || !btn) return;
-    count = interrupted ? 0 : (await rk.foreignIdsFor(store, world).catch(() => [])).length;
+    const live = interrupted ? [] : await rk.foreignIdsFor(store, world).catch(() => []);
+    count = live.length;
     lastForeignCount[world.id] = count;
+    lastForeignInUse[world.id] = live.filter(f => f.in_use).length;
     box.hidden = count === 0;
-    text.textContent = foreignLine(count);
+    text.textContent = foreignLine(count, lastForeignInUse[world.id]);
     btn.textContent = count === 1 ? 'Give it a new id' : 'Give them new ids';
   };
   await show();
@@ -865,6 +878,10 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       return alone
         ? 'Its id belongs to another OnlyWorlds world. Settings, under This world, can give it a new id.'
         : 'Its id belongs to another OnlyWorlds world. Give it a new id above.';
+    case 'id_in_use':
+      return alone
+        ? 'Its id is already in use on OnlyWorlds. Settings, under This world, can give it a new id.'
+        : 'Its id is already in use on OnlyWorlds. Give it a new id above.';
     case 'too_large':
       return 'It holds more than 64 KB of custom fields, more than OnlyWorlds accepts. Shorten one to let it sync.';
     case 'not_yours':

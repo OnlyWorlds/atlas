@@ -1,6 +1,7 @@
 /**
  * Foreign ids: elements keel will not create because their id already lives
- * in ANOTHER OnlyWorlds world (the re-key's worklist).
+ * in ANOTHER OnlyWorlds world, or a membership holds it (`in_use`): the re-key's worklist, since a new id is
+ * keel's way out of both.
  *
  * Pure. The engine merges each round's evidence with `mergeForeignIds`
  * inside its end-of-round sync-state mutator; the Settings line and the
@@ -24,13 +25,13 @@ import type { Element, ElementType, ForeignIds } from '../core/types';
 export function mergeForeignIds(
   previous: ForeignIds | undefined,
   apiWorldId: string | null,
-  thisRound: ReadonlyArray<{ id: string; type: ElementType }>,
+  thisRound: ReadonlyArray<{ id: string; type: ElementType; in_use?: true }>,
   stillUnsynced: ReadonlySet<string>,
   now: string,
   attempted: ReadonlySet<string> = new Set(),
 ): ForeignIds {
   const carried = previous && previous.api_world_id === apiWorldId ? previous.ids : [];
-  const byId = new Map<string, { id: string; type: ElementType; first_seen: string }>();
+  const byId = new Map<string, ForeignIds['ids'][number]>();
   const refusedAgain = new Set(thisRound.map(e => e.id));
   for (const e of carried) {
     if (!stillUnsynced.has(e.id)) continue;
@@ -39,7 +40,7 @@ export function mergeForeignIds(
   }
   for (const e of thisRound) {
     if (!stillUnsynced.has(e.id) || byId.has(e.id)) continue;
-    byId.set(e.id, { id: e.id, type: e.type, first_seen: now });
+    byId.set(e.id, { id: e.id, type: e.type, first_seen: now, ...(e.in_use ? { in_use: true as const } : {}) });
   }
   return { api_world_id: apiWorldId, ids: Array.from(byId.values()) };
 }
@@ -49,11 +50,11 @@ export function liveForeignIds(
   stored: ForeignIds | undefined,
   apiWorldId: string | null,
   elements: readonly Element[],
-): Array<{ id: string; type: ElementType }> {
+): Array<{ id: string; type: ElementType; in_use?: true }> {
   if (!stored || stored.api_world_id !== apiWorldId) return [];
   const unsynced = new Map<string, Element>();
   for (const e of elements) if (!e.server_updated_at) unsynced.set(e.id, e);
   return stored.ids
     .filter(e => unsynced.has(e.id))
-    .map(e => ({ id: e.id, type: unsynced.get(e.id)!.type }));
+    .map(e => ({ id: e.id, type: unsynced.get(e.id)!.type, ...(e.in_use ? { in_use: true as const } : {}) }));
 }

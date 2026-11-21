@@ -14,7 +14,7 @@
 import type { PerElementFailure } from '../core/types';
 import { isFileBusyError } from '../store/fs-utils';
 
-export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_mark' | 'review_mark' | 'other';
+export type FailureKind = 'foreign_id' | 'id_in_use' | 'too_large' | 'file_busy' | 'host_refused' | 'not_yours' | 'keeper_mark' | 'review_mark' | 'other';
 
 /** Chromium's stock text for a file another program holds; the name is the real signal. */
 const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
@@ -38,6 +38,9 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   // Evidence only: a 409 whose read-back FAILED says nothing about
   // which world holds the id, so its message no longer matches here.
   if (/already exists in another world|a copied world folder needs fresh ids/i.test(m)) return 'foreign_id';
+  // keel's words for an id a membership holds (the engine's `ID_IN_USE_LINE`, or keel's own): a new id is the
+  // way out, as for another world's, but nothing about another world is true.
+  if ((f.code === 'id_conflict' || f.status === 409) && /\bis already in use\b/i.test(m)) return 'id_in_use';
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
   // A member seat's refusals (#104): by keel's code, never its text.
   if (f.status === 403 && (f.code === 'not_author' || f.code === 'owner_only')) return 'not_yours';
@@ -84,6 +87,10 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   const foreign = byKind.get('foreign_id');
   if (foreign) {
     parts.push(`${plural(foreign.length, 'element', 'elements')} could not upload because ${foreign.length === 1 ? 'its id already belongs' : 'their ids already belong'} to another OnlyWorlds world. This happens with ${inBrowser ? 'a copied or imported world' : 'a copied or imported folder'}, or a world taken online a second time. ${foreign.length === 1 ? 'It stays safe' : 'They stay safe'} ${inBrowser ? 'in this browser' : 'on your disk'}, and Settings, under This world, can give ${foreign.length === 1 ? 'it a new id' : 'them new ids'}.`);
+  }
+  const inUse = byKind.get('id_in_use');
+  if (inUse) {
+    parts.push(`${plural(inUse.length, 'element', 'elements')} could not upload because ${inUse.length === 1 ? 'its id is' : 'their ids are'} already in use on OnlyWorlds. ${inUse.length === 1 ? 'It stays safe' : 'They stay safe'} ${inBrowser ? 'in this browser' : 'on your disk'}, and Settings, under This world, can give ${inUse.length === 1 ? 'it a new id' : 'them new ids'}.`);
   }
   const large = byKind.get('too_large');
   if (large) {

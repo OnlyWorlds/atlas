@@ -406,8 +406,8 @@ describe('createApiWorld — the signed-in v2 lane; signed out it refuses', () =
     const state = mount({ accountHasPin: true });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
 
-    await expect(createApiWorld({ name: 'Typo World', pin: '1111' })).rejects.toThrow('That PIN does not match your account. Nothing was made.');
-    await expect(createApiWorld({ name: 'Typo World', pin: '42420' })).rejects.toThrow('That PIN does not match your account. Nothing was made.');
+    await expect(createApiWorld({ name: 'Typo World', pin: '1111' })).rejects.toThrow('OnlyWorlds did not accept this PIN. Nothing was made. Check it, then try again.');
+    await expect(createApiWorld({ name: 'Typo World', pin: '42420' })).rejects.toThrow('OnlyWorlds did not accept this PIN. Nothing was made. Check it, then try again.');
     expect(state.pinRefused).toBe(2);
     expect(state.created).toHaveLength(0);
   });

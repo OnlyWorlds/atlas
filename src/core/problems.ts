@@ -185,6 +185,10 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       if (keyRefusalOf(err) === 'read_only_key' && err instanceof Error && /read-only/i.test(err.message)) {
         return `This world's key can only read, so Atlas could not finish ${doing}.${saved} Put in a write key in Settings, This world.`;
       }
+      // keel named the PIN (401 `invalid_credentials`, param `API-Pin`): the PIN's own sentence.
+      if (keyRefusalOf(err) === 'pin') {
+        return `OnlyWorlds did not accept this PIN. Atlas could not finish ${doing}.${saved} Check it in Settings, under OnlyWorlds.`;
+      }
       return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
     case 'offline':
       return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;

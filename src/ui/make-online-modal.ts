@@ -68,7 +68,7 @@ import { isPinRefusal, notePinState, recordPinState } from '../registry/pin-proo
  * toast carries (sync-attach), since this toast stands in for that one.
  */
 function newIdsFix(failures: readonly PerElementFailure[], worldId: string) {
-  return failures.some(f => classifyFailure(f) === 'foreign_id') ? resolveFixes(['new-ids'], { worldId }) : [];
+  return failures.some(f => classifyFailure(f) === 'foreign_id' || classifyFailure(f) === 'id_in_use') ? resolveFixes(['new-ids'], { worldId }) : [];
 }
 
 /** Where the world being taken online keeps its files: the open world (1.17). */

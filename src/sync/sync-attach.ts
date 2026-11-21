@@ -365,10 +365,10 @@ function toastFailuresOnce(
   if (!text) return;
   const kinds = new Set(failures.map(classifyFailure));
   const fixIds: FixId[] = [];
-  if (kinds.has('foreign_id')) fixIds.push('new-ids');
+  if (kinds.has('foreign_id') || kinds.has('id_in_use')) fixIds.push('new-ids');
   if (kinds.has('file_busy')) fixIds.push('retry');
   // Give new ids already leads to the same Settings tab.
-  if (!kinds.has('foreign_id')) fixIds.push('sync-issues');
+  if (!kinds.has('foreign_id') && !kinds.has('id_in_use')) fixIds.push('sync-issues');
   // A round is safe to repeat; only on the engine (and world) that failed. A
   // full sync, so a held file on the pull side is retried too.
   const retry = engine ? () => {

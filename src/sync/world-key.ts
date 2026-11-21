@@ -79,7 +79,7 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
     const why = keyRefusalOf(err);
     if (why === 'key_revoked') return new PlainError('That key was revoked too. Make a new one on the world\'s page on onlyworlds.com.');
     if (why === 'key_unknown') return new PlainError('OnlyWorlds does not know that key. Copy it again from the world\'s page on onlyworlds.com.');
-    if (why === 'pin') return new PlainError('OnlyWorlds did not accept this PIN. Check it on the OnlyWorlds tab.');
+    if (why === 'pin') return new PlainError('OnlyWorlds did not accept this PIN with that key. Check that the key is from your own account, then your PIN on the OnlyWorlds tab.');
     return err;
   };
   const client = buildV2Adapter(key, pin);

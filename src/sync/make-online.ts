@@ -145,7 +145,7 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
       created = await create(sendPin);
     } catch (err) {
       if (err instanceof OwApiError && err.status === 401 && err.param === 'pin') {
-        throw new PlainError('That PIN does not match your account. Nothing was made.');
+        throw new PlainError('OnlyWorlds did not accept this PIN. Nothing was made. Check it, then try again.');
       }
       if (err instanceof OwApiError && err.status === 422 && err.param === 'pin') {
         if (sendPin !== undefined) {

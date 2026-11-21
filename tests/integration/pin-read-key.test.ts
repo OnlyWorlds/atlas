@@ -38,7 +38,7 @@ vi.mock('../../src/store/folder-store-fs', async () => {
 vi.mock('../../src/setup/browser-first-download', () => import('../fixtures/mock-first-download'));
 vi.mock('../../src/sync/make-online', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/sync/make-online')>()),
-  buildV2Adapter: (apiKey: string, apiPin: string) => new OwV2ClientAdapter({ apiKey, apiPin, baseUrl: TEST_BASE }),
+  buildV2Adapter: (apiKey: string, apiPin: string, _base?: string, opts: { readTimeoutMs?: number } = {}) => new OwV2ClientAdapter({ apiKey, apiPin, baseUrl: TEST_BASE, readTimeoutMs: opts.readTimeoutMs }),
 }));
 vi.mock('../../src/sync/sync-attach', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/sync/sync-attach')>()),
@@ -65,7 +65,7 @@ import { removePicture, uploadPicture } from '../../src/sync/media-upload';
 import { MakeOnlineModal } from '../../src/ui/make-online-modal';
 import { ToastManager } from '../../src/ui/toast-manager';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
-import { renderAccountTab, wireAccountTab, pinStateLine, __resetPinAskedForTests, beginSettingsOpening, PIN_REFUSED_LINE } from '../../src/middle/settings-account';
+import { renderAccountTab, wireAccountTab, pinStateLine, __resetPinAskedForTests, beginSettingsOpening, PIN_REFUSED_LINE, __setPinAskTimeoutForTests } from '../../src/middle/settings-account';
 import { mountSettingsPanel } from '../../src/middle/settings-panel';
 import { settingsHash } from '../../src/core/router';
 
@@ -592,6 +592,34 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
   });
 
+  it('a question that hangs ends as no answer: not checked yet, never refused, and the next opening asks again', async () => {
+    openWorld('ow_w_owner');
+    let asked = 0;
+    let hang = true;
+    mswServer.use(http.get(`${TEST_BASE}/me`, async () => {
+      asked += 1;
+      if (hang) await new Promise(() => {});
+      return HttpResponse.json({ world: { id: 'w-played', name: 'Played world' }, scope: 'write', kind: 'owner', role: 'owner', membership: null });
+    }));
+    __setPinAskTimeoutForTests(60);
+    try {
+      const { said, save } = settings();
+      await save(RIGHT);
+      expect(asked).toBe(1);
+      expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
+      expect(getState().registry.pin_state).toBeUndefined();
+      // Not spent: the next opening asks again, and keel answers now.
+      hang = false;
+      beginSettingsOpening();
+      document.body.innerHTML = '';
+      settings();
+      await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
+      expect(asked).toBe(2);
+    } finally {
+      __setPinAskTimeoutForTests(15_000);
+    }
+  });
+
   it('only keel naming the PIN refuses it: a 401 for the key, a 5xx, a 429 or a 403 leave it not checked', async () => {
     const answers: Array<[number, Record<string, unknown>]> = [
       [401, { type: 'authentication_error', code: 'invalid_credentials', message: 'No valid API-Key.' }],
@@ -966,6 +994,11 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     expect(keyRefusalPill('pin')).toBe('OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds');
     expect(keyRefusalLine('pin')).toBe('Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.');
     expect(keyRefusalHere('pin')).toBe('OnlyWorlds did not accept this PIN. Check it on the OnlyWorlds tab.');
+    // Where a problem's code knows keel named the PIN, its sentence is the PIN's; where it does not, key or PIN.
+    const pinRefused = Object.assign(new Error('API Error 401: Incorrect PIN.'), { status: 401, code: 'invalid_credentials', param: 'API-Pin' });
+    expect(problemFor(pinRefused, { doing: 'saving' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Check it in Settings, under OnlyWorlds.');
+    const keyRefused = Object.assign(new Error('API Error 401: Invalid API key.'), { status: 401, code: 'invalid_credentials', param: null });
+    expect(problemFor(keyRefused, { doing: 'saving' }).sentence).toMatch(/^OnlyWorlds did not accept this world's key or your PIN/);
   });
 
   it('the census: no sentence a person reads says a refused PIN any other way', () => {
@@ -976,8 +1009,9 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     });
     const STRINGS = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g;
     // The PIN alone refused, in any wording but the ruled one. "the key or PIN" (a refusal that does not say
-    // which) and "wrong PIN tries" (a wall, not a refusal) are other sentences.
-    const OTHER = /did not accept (?:that|your|the) PIN\b|\bPIN (?:was|is) (?:not accepted|refused|wrong)\b|\bincorrect PIN\b/i;
+    // which) and "wrong PIN tries" (a wall, not a refusal) are other sentences, and so is "this PIN with that
+    // key" (the new-key door: the key decides which account's PIN keel checks).
+    const OTHER = /did not accept (?:that|your|the) PIN\b|\bPIN (?:was|is) (?:not accepted|refused|wrong|invalid|incorrect)\b|\bincorrect PIN\b|\bPIN (?:does not|doesn't|did not) match\b|\bwrong PIN\b(?!\s+tries)/i;
     const hits: string[] = [];
     for (const file of walk(SRC)) {
       const rel = relative(SRC, file).split(sep).join('/');
@@ -992,5 +1026,9 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     expect(OTHER.test('OnlyWorlds did not accept that PIN. Check it, then try again.')).toBe(true);
     expect(OTHER.test('OnlyWorlds did not accept your PIN with that key.')).toBe(true);
     expect(OTHER.test('OnlyWorlds did not accept the key or PIN.')).toBe(false);
+    expect(OTHER.test('That PIN does not match your account. Nothing was made.')).toBe(true);
+    expect(OTHER.test('A wrong PIN.')).toBe(true);
+    expect(OTHER.test('Too many wrong PIN tries.')).toBe(false);
+    expect(OTHER.test('OnlyWorlds did not accept this PIN with that key.')).toBe(false);
   });
 });

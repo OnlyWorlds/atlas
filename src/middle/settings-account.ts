@@ -175,6 +175,13 @@ const askedOnOpen = new Set<string>();
 /** The questions still out, by PIN: a second ask of the same PIN waits on this one's answer. */
 const inFlight = new Map<string, Promise<PinState | null | 'unasked'>>();
 
+/** How long a question waits for `/me`: past it, no answer came (not checked yet, never refused), and it is not spent. */
+let pinAskTimeoutMs = 15_000;
+/** Tests: a shorter wait for a question that hangs. */
+export function __setPinAskTimeoutForTests(ms: number): void {
+  pinAskTimeoutMs = ms;
+}
+
 /** Settings opens: a new opening, nothing asked in it yet. */
 export function beginSettingsOpening(): void {
   askedOnOpen.clear();
@@ -213,7 +220,7 @@ async function askOnce(pin: string | undefined): Promise<PinState | null | 'unas
   // A key that reads by its shape is asked nothing with a PIN: `keyScope` answers it read with no call.
   if (!pin || !entry?.api || entry.state !== 'api-linked' || entry.api.read_only || isSeatWorld(entry)) return 'unasked';
   try {
-    const { scope, pinProved } = await buildV2Adapter(entry.api.api_key, pin).keyScope();
+    const { scope, pinProved } = await buildV2Adapter(entry.api.api_key, pin, undefined, { readTimeoutMs: pinAskTimeoutMs }).keyScope();
     // A key that turned out to read: no PIN went beside it, so nothing was asked.
     if (scope === 'read') return 'unasked';
     if (!pinProved) return null;

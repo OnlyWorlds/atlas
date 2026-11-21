@@ -390,7 +390,8 @@ export interface SyncState {
 
 export interface ForeignIds {
   api_world_id: string | null;
-  ids: Array<{ id: string; type: ElementType; first_seen: string }>;
+  /** `in_use`: keel's words said a membership holds the id, not another world; a new id is its way out too. */
+  ids: Array<{ id: string; type: ElementType; first_seen: string; in_use?: true }>;
 }
 
 export interface ServerDeleteRecord {

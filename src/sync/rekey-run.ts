@@ -81,7 +81,7 @@ export function isRekeyRunning(): boolean {
 export async function foreignIdsFor(
   store: FolderStore,
   entry: WorldRegistryEntry,
-): Promise<Array<{ id: string; type: ElementType }>> {
+): Promise<Array<{ id: string; type: ElementType; in_use?: true }>> {
   if (entry.state !== 'api-linked' || !entry.api || entry.api.read_only) return [];
   // The shown world's elements are already in memory; listing a 12k world from
   // the store clones every body, and Settings asks on every render.

@@ -11,9 +11,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { FakeDirHandle } from '../fixtures/fake-fs';
 import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { FsFolderStore } from '../../src/store/folder-store-fs';
-import { SyncEngine, CHANGED_WHILE_OPEN, VIEW_ONLY_KEEP_THIS } from '../../src/sync/sync-engine';
+import { SyncEngine, CHANGED_WHILE_OPEN, VIEW_ONLY_KEEP_THIS, ID_IN_USE_LINE, GONE_MEANWHILE_LINE } from '../../src/sync/sync-engine';
 import { isBaselineUnknown } from '../../src/core/baseline-unknown';
-import { classifyFailure } from '../../src/sync/sync-failure-copy';
+import { classifyFailure, describeFailures } from '../../src/sync/sync-failure-copy';
 import type { BulkItem } from '../../src/sync/sync-engine';
 import type { Element } from '../../src/core/types';
 
@@ -543,13 +543,66 @@ describe('where a 409 slot\'s id is held is keel\'s words, never whether a read 
     });
   }
 
-  it('an id a membership holds: a failure in keel\'s words, never another world\'s, never held here', async () => {
+  it('an id a membership holds: its own kind and words, on the new-id list round after round, never another world\'s, never held here', async () => {
     const sent = await linkedToL(IN_USE(L));
     const r = await engineFor('local-wins').pushOnce();
     cLandsBWaits(sent, r);
     expect(client.idsReads).toEqual([]);
-    expect(r.failures.find(f => f.element_id === L)?.message).toBe(IN_USE(L));
-    expect(await foreignIds()).toEqual([]);
+    const f = r.failures.find(x => x.element_id === L)!;
+    expect(f.message).toBe(ID_IN_USE_LINE);
+    expect(classifyFailure(f)).toBe('id_in_use');
+    expect(describeFailures([f])).toBe('1 element could not upload because its id is already in use on OnlyWorlds. It stays safe on your disk, and Settings, under This world, can give it a new id.');
+    expect((await store.readSyncState()).foreign?.ids.map(e => [e.id, e.in_use])).toEqual([[L, true]]);
+    // The next round, with its sibling again: still on the list, so Settings keeps its way out.
+    client.__inject_bulk_item_failure(L, { code: 'id_conflict', message: IN_USE(L), param: 'id' } as never);
+    await engineFor('local-wins').pushOnce();
+    expect((await store.readSyncState()).foreign?.ids.map(e => [e.id, e.in_use])).toEqual([[L, true]]);
+  });
+
+  it('words it does not know and a read that finds keel\'s copy: held here, so B linking it lands in the same round', async () => {
+    const sent = await linkedToL('Conflict.');
+    await client.createElement('location', { id: L, name: 'Lu' });
+    const r = await engineFor('local-wins').pushOnce();
+    expect(sent.length).toBe(2);
+    expect(sent[1].sort()).toEqual([B, C].sort());
+    expect(r.failures).toEqual([]);
+    expect(onKeel(B).birthplace).toBe(L);
+  });
+
+  describe('the single create gives the /bulk slot\'s answer for each of keel\'s words', () => {
+    /** The place L alone in the round (so the single POST), keel answering its create with `message`. */
+    async function aloneWith(message: string): Promise<void> {
+      root.put(`elements/location/lu--${L.slice(-8)}.json`, j({ id: L, type: 'location', name: 'Lu', local_updated_at: stamp() }));
+      await store.rescanDisk();
+      client.__inject_failure('create', L, `API Error 409: ${message}`);
+    }
+    const reads = () => client.calls.filter(c => c.method === 'get').length;
+
+    it('another world\'s words with a read that would fail: another world\'s, never read', async () => {
+      await aloneWith(ANOTHER(L));
+      const realGet = client.getElement.bind(client);
+      client.getElement = async (t, id) => { if (id === L) throw readFails(); return realGet(t, id); };
+      const r = await engineFor('local-wins').pushOnce();
+      expect(reads()).toBe(0);
+      expect(classifyFailure(r.failures.find(f => f.element_id === L)!)).toBe('foreign_id');
+      expect(await foreignIds()).toEqual([L]);
+    });
+
+    it('an id a membership holds: its own kind, on the new-id list, never another world\'s, never read', async () => {
+      await aloneWith(IN_USE(L));
+      const r = await engineFor('local-wins').pushOnce();
+      expect(reads()).toBe(0);
+      expect(classifyFailure(r.failures.find(f => f.element_id === L)!)).toBe('id_in_use');
+      expect((await store.readSyncState()).foreign?.ids.map(e => [e.id, e.in_use])).toEqual([[L, true]]);
+    });
+
+    it('this world\'s words and a read answering "not here": it went meanwhile, a failure that goes again, never foreign', async () => {
+      await aloneWith(HERE(L));
+      const r = await engineFor('local-wins').pushOnce();
+      expect(reads()).toBe(1);
+      expect(r.failures.find(f => f.element_id === L)?.message).toBe(GONE_MEANWHILE_LINE);
+      expect(await foreignIds()).toEqual([]);
+    });
   });
 
   it('this world\'s words, and a read that now answers "not here" (it went meanwhile): never another world\'s, no longer held', async () => {

@@ -67,6 +67,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['sync', 'fix'],
       },
       {
+        id: 'id-in-use-new-id',
+        title: 'An element whose id OnlyWorlds already uses can get a new one',
+        body: 'Rarely, OnlyWorlds already uses an element\'s id for something that is not an element. Atlas used to say only that the change could not sync, every time it tried. It now says the id is already in use on OnlyWorlds, and Settings, under This world, can give the element a new id, as it does for an id that belongs to another world. Atlas now says the same whether the element was sent alone or with others.',
+        tags: ['sync', 'fix'],
+      },
+      {
         id: 'pin-words-again',
         title: 'The PIN field says what to do when OnlyWorlds refuses it',
         body: 'A PIN OnlyWorlds did not accept now says: OnlyWorlds did not accept this PIN. Check it and save it again. One not checked yet says Saved in this browser, not checked yet. When Atlas asked about it and got no answer, because you were offline or OnlyWorlds was busy, it asks again the next time you open Settings, still once each time, and never while its last question is still waiting for an answer, so a wrong PIN reaches OnlyWorlds once. Every other place that tells you OnlyWorlds refused your PIN now says it the same way, then what to do there.',
