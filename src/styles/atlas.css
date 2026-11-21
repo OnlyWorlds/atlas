@@ -1910,6 +1910,11 @@ button.atlas-map-tree-name {
   background: rgba(var(--atlas-ink-rgb), 0.03);
 }
 
+/* The section clips its overflow, so a ring outside the header showed only its bottom edge: drawn inside, all four show. */
+.atlas-detail-section-header:focus-visible {
+  outline-offset: -2px;
+}
+
 .atlas-detail-section-header .material-symbols-outlined {
   font-size: 16px;
   color: var(--atlas-text-muted);
@@ -16947,7 +16952,19 @@ body.atlas-share-fullpreview > * {
   width: min(42%, 420px);
   transform: translateY(-14px);
   cursor: pointer;
+  /* The recede toward the viewport's edges (scroll-view.ts sets the fade). */
+  opacity: var(--atlas-scroll-fade, 1);
   transition: opacity 120ms linear;
+}
+
+/* A fade on the card fades its head's ring too, which then reads as another colour. While the head
+   shows its ring the card stays whole and the fade moves to its parts: the ring at full, the rest as faded. */
+.atlas-scroll-card:has(.atlas-scroll-card-head:focus-visible) {
+  opacity: 1;
+  transition: none;
+}
+.atlas-scroll-card:has(.atlas-scroll-card-head:focus-visible) :is(.atlas-scroll-card-dot, .atlas-scroll-card-body > :not(.atlas-scroll-card-head), .atlas-scroll-card-head > *) {
+  opacity: var(--atlas-scroll-fade, 1);
 }
 
 .atlas-scroll-card[data-side='right'] { left: calc(50% + 28px); }

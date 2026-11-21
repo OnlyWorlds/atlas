@@ -177,8 +177,8 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
             : `<span class="atlas-zone-kind-swatch is-inert"><span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span></span>`}
           <span class="atlas-zone-kind-name">${escapeText(kindLabel(kind))}</span>
           <span class="atlas-zone-kind-count">${matching.length}${q ? ` of ${members.length}` : ''}</span>
-          ${hasKind ? `<button type="button" class="atlas-zone-kind-btn ${tuning ? 'is-active' : ''}" data-action="tune" title="Fill, line and label for this kind"><span class="material-symbols-outlined">tune</span></button>` : ''}
-          ${linkedOnly ? '' : `<button type="button" class="atlas-zone-kind-btn atlas-zone-kind-eye" data-action="toggle-kind-visible" title="${hidden ? 'Show' : 'Hide'} these zones on this map"><span class="material-symbols-outlined">${hidden ? 'visibility_off' : 'visibility'}</span></button>`}
+          ${hasKind ? `<button type="button" class="atlas-zone-kind-btn ${tuning ? 'is-active' : ''}" data-action="tune" aria-label="${escapeAttr(lookName(kind))}" aria-expanded="${tuning}" title="Fill, line and label for this kind"><span class="material-symbols-outlined" aria-hidden="true">tune</span></button>` : ''}
+          ${linkedOnly ? '' : `<button type="button" class="atlas-zone-kind-btn atlas-zone-kind-eye" data-action="toggle-kind-visible" aria-label="${escapeAttr(eyeName(kind, hidden))}" title="${hidden ? 'Show' : 'Hide'} these zones on this map"><span class="material-symbols-outlined" aria-hidden="true">${hidden ? 'visibility_off' : 'visibility'}</span></button>`}
         </div>
         ${tuning && hasKind ? renderTune(kind, rule, resolved) : ''}
         <div class="atlas-zone-kind-members" ${open ? '' : 'hidden'}>
@@ -213,12 +213,34 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
  */
 function foldList(kind: { supertype: string; subtype: string; role?: string }, count: number): string {
   const how = count === 1 ? 'one' : `the ${count}`;
-  const zones = count === 1 ? 'zone' : 'zones';
-  // A kind-less kind is said in the app's own word, "no kind", after the zones (a role still names them).
-  const what = kind.supertype || kind.subtype
+  return `the list of ${how} ${kindZones(kind, count === 1 ? 'zone' : 'zones')}`;
+}
+
+/**
+ * A kind's zones in words, after "the" or a count: "Border zones", "Region · Coast zones". A
+ * kind-less kind is said in the app's own word, "no kind", after the zones (a role still names them).
+ */
+function kindZones(kind: { supertype: string; subtype: string; role?: string }, zones: 'zone' | 'zones'): string {
+  return kind.supertype || kind.subtype
     ? `${kindLabel(kind)} ${zones}`
     : `${kind.role ? `${kind.role} ` : ''}${zones} with no kind`;
-  return `the list of ${how} ${what}`;
+}
+
+/**
+ * A kind's look button's accessible name: what it opens, for which kind, with no verb ("The fill,
+ * line and label of the Border zones"); its aria-expanded says whether those controls show, as a
+ * fold's does.
+ */
+export function lookName(kind: { supertype: string; subtype: string; role?: string }): string {
+  return `The fill, line and label of the ${kindZones(kind, 'zones')}`;
+}
+
+/**
+ * A kind's eye's accessible name: what a press does to which zones ("Hide the Border zones on this
+ * map", "Show the zones with no kind on this map"). It acts on the map, so it takes the verb.
+ */
+export function eyeName(kind: { supertype: string; subtype: string; role?: string }, hidden: boolean): string {
+  return `${hidden ? 'Show' : 'Hide'} the ${kindZones(kind, 'zones')} on this map`;
 }
 
 /**

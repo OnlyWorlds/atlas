@@ -1004,6 +1004,53 @@ describe("a chart card's chips", () => {
     expect(onSelect).not.toHaveBeenCalled();
     h.destroy();
   });
+
+  /** The card as the room drives it: a press peeks the chip's element, which draws the card again. */
+  function drivenCard() {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    let h: ReturnType<typeof mountTimelineView> | null = null;
+    h = mountTimelineView(target, { onSelect: (id) => h?.setSelection(id), onFocus: () => {}, onOpenElement: () => {}, onDateElement: () => {} });
+    h.setNodes([siege, fall], [siege, fall], { now: null, calendar: null, undated: [], focusId: null, chartLabel: null });
+    h.setSelection(siege.id);
+    const chip = (name: string) => [...target.querySelectorAll<HTMLElement>('.atlas-timeline-chip')]
+      .find(c => c.querySelector('.atlas-timeline-chip-name')?.textContent === name)!;
+    return { target, h, chip, cardEl: target.querySelector<HTMLElement>('.atlas-timeline-card')! };
+  }
+
+  it('Enter or Space on a chip lands focus on the card it opened, and it stays through the next draws', () => {
+    const { h, chip, cardEl } = drivenCard();
+    const fallChip = chip('The Fall');
+    fallChip.focus();
+    fallChip.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    // The card now shows The Fall, the chip that was pressed is gone with the old inside.
+    expect(cardEl.querySelector('.atlas-timeline-card-title')!.textContent).toBe('The Fall');
+    expect(fallChip.isConnected).toBe(false);
+    expect(document.activeElement).toBe(cardEl);
+    // A later draw (a data tick, the room's own second draw) keeps it: the card itself is never replaced.
+    h.setNodes([siege, fall], [siege, fall], { now: null, calendar: null, undated: [], focusId: null, chartLabel: null });
+    expect(document.activeElement).toBe(cardEl);
+    // It takes focus from a script only, and leaves the order again as focus moves on.
+    expect(cardEl.getAttribute('tabindex')).toBe('-1');
+    cardEl.querySelector<HTMLElement>('.atlas-timeline-card-close')!.focus();
+    expect(cardEl.hasAttribute('tabindex')).toBe(false);
+    h.destroy();
+  });
+
+  it('Enter on an undated chip lands focus on the card too; a mouse click moves no focus', () => {
+    const keyed = drivenCard();
+    keyed.chip('The unnamed character').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    expect(document.activeElement).toBe(keyed.cardEl);
+    keyed.h.destroy();
+    document.body.innerHTML = '';
+    const clicked = drivenCard();
+    const fallChip = clicked.chip('The Fall');
+    fallChip.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(clicked.cardEl.querySelector('.atlas-timeline-card-title')!.textContent).toBe('The Fall');
+    expect(document.activeElement).toBe(document.body);
+    expect(clicked.cardEl.hasAttribute('tabindex')).toBe(false);
+    clicked.h.destroy();
+  });
 });
 
 describe('a published page', () => {

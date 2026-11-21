@@ -27,6 +27,7 @@ import { buildMapTree, filterTreeByName, siblingGroupOf, type MapTreeNode, type 
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText, installRowKeydownActivation, pressOncePerKey } from '../../core/dom-utils';
 import { renderGate, keepingFocus, keepingFocusOn } from '../../ui/render-gate';
+import { focusArrival } from '../../ui/focus-arrival';
 import { capitalise, nameOrUnnamed, ownName, quotedName, theUnnamed, typeName } from '../../core/type-words';
 
 // ---- Collapsed tree-node state ----
@@ -660,7 +661,12 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     row.appendChild(actions);
   }
 
-  row.addEventListener('click', () => openMapTab(m));
+  row.addEventListener('click', (e) => {
+    // Enter or Space on the name (a click with no pointer, detail 0): the map's tab replaces this
+    // list, so focus lands on that tab, never the page. A mouse click leaves focus where it falls.
+    if (e.detail === 0) focusArrival(() => openedMapTab(m.id));
+    openMapTab(m);
+  });
   // Right-click → select this map ELEMENT (navigate to element-detail). The
   // left-click already opens the map's tab; right-click is the "I want to
   // edit this map's fields" gesture.
@@ -726,6 +732,11 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
  * navigate to `/map/<mid>` and flip the middle pane to timeline (the
  * world-active default for routes with no elementId).
  */
+/** The right pane's tab of an open map, while it is the active one (the bar may draw it again). */
+function openedMapTab(mapId: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`.atlas-tab.active[data-tab-map-id="${CSS.escape(mapId)}"]`);
+}
+
 export function openMapTab(m: WorldMap, preserveElementId?: string): void {
   const ui = getState().ui;
   const activeWorldId = getState().active?.worldId;

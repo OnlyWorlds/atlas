@@ -7,9 +7,13 @@
  * press does nothing and the tooltip says why. A map with no name is "the
  * unnamed map", the one form every control says a missing name in.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { mapFoldName, mapFoldTitle } from '../../src/tabs/right/map-index-tab';
-import { foldName, foldTitle } from '../../src/tabs/right/map-zone-panel';
+import { foldName, foldTitle, lookName, eyeName, renderZonePanel } from '../../src/tabs/right/map-zone-panel';
+import { patchSlice, getState } from '../../src/core/state';
+import { defaultRegistry } from '../../src/core/types';
+import type { Element, WorldRegistryEntry } from '../../src/core/types';
+import type { MapTabCacheEntry } from '../../src/tabs/right/map-tab-cache';
 import { theUnnamed } from '../../src/core/type-words';
 import { removeFieldName } from '../../src/middle/element-detail-fields';
 
@@ -64,6 +68,66 @@ describe('a zone kind\'s fold', () => {
   it('during a search keeps its plain name, and the tooltip says the search shows the list', () => {
     expect(foldTitle(border, 2, true, true)).toBe('The search shows the list of the 2 Border zones');
     expect(foldTitle(border, 1, true, true)).toBe('The search shows the list of one Border zone');
+  });
+});
+
+describe('a zone kind\'s look and eye', () => {
+  const coast = { supertype: 'Region', subtype: 'Coast' };
+
+  it('the look is named by what it opens and for which kind, with no verb (its aria-expanded says the state)', () => {
+    expect(lookName(coast)).toBe('The fill, line and label of the Region · Coast zones');
+    expect(lookName({ supertype: 'Border', subtype: '', role: 'march' })).toBe('The fill, line and label of the Border · march zones');
+    expect(lookName({ supertype: '', subtype: '', role: 'vassal' })).toBe('The fill, line and label of the vassal zones with no kind');
+  });
+
+  it('the eye says what a press does to which zones, by state', () => {
+    expect(eyeName(coast, false)).toBe('Hide the Region · Coast zones on this map');
+    expect(eyeName(coast, true)).toBe('Show the Region · Coast zones on this map');
+    expect(eyeName({ supertype: '', subtype: '' }, false)).toBe('Hide the zones with no kind on this map');
+  });
+
+  describe('as drawn in the zone panel', () => {
+    const WORLD = 'w-kind-names';
+    const zone = { id: '00000000-0000-4000-8000-0000000000d1', type: 'zone', name: 'The north march', supertype: 'Region', subtype: 'Coast', local_updated_at: '2026-11-21T10:00:00.000Z' } as unknown as Element;
+    afterEach(() => {
+      patchSlice('data', { ...getState().data, elements: [] });
+      patchSlice('active', null);
+      patchSlice('registry', defaultRegistry());
+    });
+    /** The panel drawn for one Region · Coast zone; `hide` then hides its kind on the map and draws again. */
+    function draw(hide = false): HTMLElement {
+      const entry = { id: WORLD, name: 'Kinds', state: 'local-only' } as unknown as WorldRegistryEntry;
+      patchSlice('registry', { ...defaultRegistry(), worlds: [entry] });
+      patchSlice('active', { worldId: WORLD, meta: { name: 'Kinds' } } as never);
+      patchSlice('data', { ...getState().data, elements: [zone] });
+      const zoneStrip = document.createElement('div');
+      zoneStrip.classList.add('is-open');
+      const tab = {
+        mapId: '00000000-0000-4000-8000-0000000000a9', zoneStrip, toolbar: document.createElement('div'),
+        hiddenZoneKinds: new Set<string>(), zoneDate: { kind: 'all' },
+      } as unknown as MapTabCacheEntry;
+      renderZonePanel(tab, [zone as never], null);
+      if (hide) {
+        tab.hiddenZoneKinds.add(zoneStrip.querySelector<HTMLElement>('.atlas-zone-kind')!.dataset.kindKey!);
+        renderZonePanel(tab, [zone as never], null);
+      }
+      return zoneStrip;
+    }
+
+    it('each button carries its own name, the glyph hidden, and the look its state', () => {
+      const strip = draw();
+      const look = strip.querySelector<HTMLElement>('[data-action="tune"]')!;
+      const eye = strip.querySelector<HTMLElement>('[data-action="toggle-kind-visible"]')!;
+      expect(look.getAttribute('aria-label')).toBe('The fill, line and label of the Region · Coast zones');
+      expect(look.getAttribute('aria-expanded')).toBe('false');
+      expect(eye.getAttribute('aria-label')).toBe('Hide the Region · Coast zones on this map');
+      for (const b of [look, eye]) expect(b.querySelector('.material-symbols-outlined')!.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('a hidden kind\'s eye says Show', () => {
+      const eye = draw(true).querySelector<HTMLElement>('[data-action="toggle-kind-visible"]')!;
+      expect(eye.getAttribute('aria-label')).toBe('Show the Region · Coast zones on this map');
+    });
   });
 });
 

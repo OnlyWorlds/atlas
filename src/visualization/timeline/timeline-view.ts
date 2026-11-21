@@ -2174,9 +2174,10 @@ function buildChipGroup(state: ViewState, label: string, refs: LinkedRef[]): HTM
     more.className = 'atlas-timeline-chip atlas-timeline-chip-more';
     more.textContent = `+${refs.length - CARD_GROUP_CHIP_CAP} more`;
     more.title = `Show all ${refs.length}`;
-    more.addEventListener('click', () => {
+    more.addEventListener('click', (e) => {
       state.expandedGroups.add(key);
       renderCard(state);
+      if (e.detail === 0) focusCard(state);
     });
     row.appendChild(more);
   }
@@ -2222,11 +2223,25 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
     chip.addEventListener('mousedown', (e) => startItemDrag(state, { id: link.id, type: link.type, name: seen }, e, 'select'));
     // Enter and Space press it too (a keyboard click has no pointer, detail 0): the same show a
     // no-move mouse press gives through the drag's release, which a mouse click never repeats here.
-    chip.addEventListener('click', (e) => { if (e.detail === 0) state.onSelect(link.id); });
+    chip.addEventListener('click', (e) => { if (e.detail === 0) { state.onSelect(link.id); focusCard(state); } });
   } else {
-    chip.addEventListener('click', () => state.onSelect(link.id));
+    chip.addEventListener('click', (e) => { state.onSelect(link.id); if (e.detail === 0) focusCard(state); });
   }
   return chip;
+}
+
+/**
+ * Enter or Space on a chip (a click with no pointer, detail 0): the card it opened is drawn again in
+ * place and the chip goes with it, so focus lands on the card, never the page. The card itself is
+ * never redrawn, only its inside, so every later draw keeps it. It takes focus from a script only,
+ * and only until focus leaves it. A mouse click leaves focus where it falls.
+ */
+function focusCard(state: ViewState): void {
+  const { card } = state;
+  if (state.destroyed || !card.isConnected) return;
+  card.tabIndex = -1;
+  card.addEventListener('blur', () => card.removeAttribute('tabindex'), { once: true });
+  card.focus({ preventScroll: true });
 }
 
 // (The old float-near-the-dot positioning is gone — S7: the card is a docked

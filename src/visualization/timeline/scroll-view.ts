@@ -254,7 +254,9 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
         const y = parseFloat(card.style.top);
         if (y < lo || y > hi) continue;
         const dist = Math.abs(y - center) / (viewH / 2 + 1);
-        card.style.opacity = String(Math.max(0.55, 1 - Math.max(0, dist - 0.55) * 0.9).toFixed(3));
+        // A custom property, never the card's own opacity: the stylesheet moves the fade off a head
+        // that shows its focus ring, so the ring keeps its colour.
+        card.style.setProperty('--atlas-scroll-fade', Math.max(0.55, 1 - Math.max(0, dist - 0.55) * 0.9).toFixed(3));
       }
     });
   }
