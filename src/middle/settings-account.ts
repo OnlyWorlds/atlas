@@ -156,16 +156,29 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
 export function pinStateLine(reg: WorldsRegistry): string {
   if (!reg.pin) return '';
   if (reg.pin_state === 'proved') return 'PIN saved';
-  if (reg.pin_state === 'refused') return 'OnlyWorlds did not accept this PIN';
-  return 'Kept here, not checked yet';
+  if (reg.pin_state === 'refused') return PIN_REFUSED_LINE;
+  return PIN_UNCHECKED_LINE;
 }
 
-/** The PINs Settings has asked about this session: one question per PIN on opening, so a wrong one is not asked twice. */
+/** What the field says of a PIN OnlyWorlds refused, and of one not checked yet. */
+export const PIN_REFUSED_LINE = 'OnlyWorlds did not accept this PIN. Check it and save it again.';
+export const PIN_UNCHECKED_LINE = 'Saved in this browser, not checked yet';
+
+/**
+ * The PINs asked about in this opening of Settings: one question per PIN per opening (its redraws ask
+ * nothing more). A question that got an answer leaves a state, so it is never asked again; one that got
+ * none (offline, a busy server) is asked again at the next opening.
+ */
 const askedOnOpen = new Set<string>();
 
-/** Tests: a fresh session, nothing asked yet. */
-export function __resetPinAskedForTests(): void {
+/** Settings opens: a new opening, nothing asked in it yet. */
+export function beginSettingsOpening(): void {
   askedOnOpen.clear();
+}
+
+/** Tests: a fresh opening, nothing asked yet. */
+export function __resetPinAskedForTests(): void {
+  beginSettingsOpening();
 }
 
 /**
@@ -262,8 +275,8 @@ export function wireAccountTab(toasts: ToastManager): void {
     // The field moved on while the question was out: say what is kept now, never this save's answer.
     const now = getState().registry;
     if (now.pin !== newPin) { toasts.info(pinStateLine(now) || 'PIN removed'); return; }
-    if (said === 'refused') toasts.error('OnlyWorlds did not accept this PIN');
-    else toasts.info(said === 'proved' ? 'PIN saved' : 'Kept here, not checked yet');
+    if (said === 'refused') toasts.error(PIN_REFUSED_LINE);
+    else toasts.info(said === 'proved' ? 'PIN saved' : PIN_UNCHECKED_LINE);
   });
   wireAccountTokenBlock(toasts);
 }

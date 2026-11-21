@@ -609,6 +609,13 @@ export async function mergeLocalIntoApi(
   } else {
     for (const c of creates) await createOne(c);
   }
+  // An id keel answered 409 for (another place sent it first, or another world holds it) was never this
+  // route's upload: a rerun must not take it as its own and write over it.
+  const createdIds = new Set(creates.map(c => c.local.id));
+  const raced = new Set(failures.filter(f => f.operation === 'create' && createdIds.has(f.element_id) && (f.code === 'id_conflict' || f.status === 409)).map(f => f.element_id));
+  if (raced.size > 0) {
+    await folder.updateSyncState(st => ({ route2_created: (st.route2_created ?? []).filter(id => !raced.has(id)) }));
+  }
 
   // 4c. Matched elements.
   for (const m of matched) {

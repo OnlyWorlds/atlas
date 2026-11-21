@@ -150,6 +150,12 @@ export interface OwApiClient {
   /** Fetch single element. Used by SyncEngine pre-update conflict check. */
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
   /**
+   * Which of these ids keel holds as this type, with each body (`GET /{type}?ids=`, 200 ids a call; conv. 192,
+   * R5): how a batch's 409 slots are read together. `complete` false when a page went unread. Absent: one
+   * read each.
+   */
+  listByIds?(type: ElementType, ids: readonly string[]): Promise<{ records: Array<{ id: string; updated_at: string } & Record<string, unknown>>; complete: boolean }>;
+  /**
    * World-meta read — GET /world's 13-field body in DISK names (world-meta
    * sync). REQUIRED, not optional: an optional method would silently
    * reroute every legacy suite off the meta path (the
@@ -1211,7 +1217,7 @@ export class SyncEngine {
   /**
    * conv. 192, the one decision for a copy with no record of what OnlyWorlds held (no baseline, or
    * one marked unknown) whose id keel holds, whichever door met it: the single create's 409, the
-   * `/bulk` check, the pull, a marked copy's next push (I6).
+   * `/bulk` slot's 409, the pull, a marked copy's next push (I6).
    * - The same content (`copyDiff`): the copy is keel's. keel's stamp becomes the baseline and the
    *   local stamp (R1, M2), keel's review mark is kept (M1), nothing is sent, nothing is said.
    * - Other content: neither side can say which is newer (conv. 190, R3). keel's stamp lands with the
@@ -2372,7 +2378,9 @@ export class SyncEngine {
     isRetry = false,
     foreign: Array<{ id: string; type: ElementType }> = [],
     attempted: Set<string> = new Set(),
-  ): Promise<{ created: number; authBlocked: boolean; transient?: unknown; oneByOne?: Element[] }> {
+    /** Ids keel holds in this world (a `create_only` slot's 409): never refused, so a link to one lands. */
+    heldHere: Set<string> = new Set(),
+  ): Promise<{ created: number; authBlocked: boolean; transient?: unknown; oneByOne?: Element[]; heldHere: Set<string> }> {
     // Re-fetch each candidate from disk (freshness) + pin element_type
     // self-heal, mirroring the per-element loop's pre-send discipline.
     const items: BulkItem[] = [];
@@ -2397,7 +2405,7 @@ export class SyncEngine {
       items.push({ type: current.type, element: this.outgoing(current) });
       sentStamps.set(current.id, current.local_updated_at ?? ''); // '' = sent with none (never "passed nothing")
     }
-    if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false };
+    if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false, heldHere };
 
     console.info(`[atlas:sync] bulk CREATE ${items.length} element(s)${isRetry ? ' (retry)' : ''}`);
     for (const it of items) attempted.add(it.element.id as string);
@@ -2416,7 +2424,7 @@ export class SyncEngine {
       if (isHostRefusal(err)) {
         const sent = new Set(items.map(it => it.element.id as string));
         console.warn(`[atlas:sync] bulk CREATE refused by the web host: sending ${sent.size} one at a time`);
-        return { created: 0, authBlocked: false, oneByOne: candidates.filter(c => sent.has(c.id)) };
+        return { created: 0, authBlocked: false, oneByOne: candidates.filter(c => sent.has(c.id)), heldHere };
       }
       const auth = isAuthError(err);
       const message = err instanceof Error ? err.message : String(err); // raw-error-ok: internal, classified below; never shown
@@ -2432,7 +2440,7 @@ export class SyncEngine {
       } else {
         console.warn('[atlas:sync] bulk CREATE request failed', { message });
       }
-      return { created: 0, authBlocked: auth, transient: !auth && isTransientError(err) ? err : null };
+      return { created: 0, authBlocked: auth, transient: !auth && isTransientError(err) ? err : null, heldHere };
     }
 
     if (!result.errors) {
@@ -2451,6 +2459,17 @@ export class SyncEngine {
       let heldInARow = 0;
       for (let i = 0; i < items.length; i++) {
         if (this.stopped) break;
+        // create_only never replaces (conv. 192, R5): a 200 here is OnlyWorlds breaking that promise. The
+        // element is not counted as sent and the person is told; it stays as it is here.
+        if (result.items[i]?.status === 200) {
+          const sentId = items[i].element.id as string;
+          console.error('[atlas:sync] /bulk create_only answered 200 (replaced) for an id Atlas sent: a broken contract', { id: sentId, type: items[i].type });
+          failures.push({
+            element_id: sentId, type: items[i].type, operation: 'create', status: 200, source: 'server',
+            message: 'OnlyWorlds replaced an element it already held, which it promised not to do; Atlas did not count it as sent',
+          });
+          continue;
+        }
         const echo = result.items[i]?.updatedAt;
         if (typeof echo === 'string' && echo && !readBack) {
           const sentId = items[i].element.id as string;
@@ -2474,7 +2493,7 @@ export class SyncEngine {
         stamped += await this.backfillBulkTimestamps(needBackfill, failures, sentStamps);
       }
       for (const _ of items) onItemDone();
-      return { created: stamped, authBlocked: false };
+      return { created: stamped, authBlocked: false, heldHere };
     }
 
     // errors: true under atomic → server rolled EVERYTHING back (keel answers the other slots as they
@@ -2483,6 +2502,8 @@ export class SyncEngine {
     const failedIdx = new Set<number>();
     result.items.forEach((it, i) => { if (it.status >= 400) failedIdx.add(i); });
     const survivors: Element[] = [];
+    /** create_only's 409 slots for an id this world holds as the same type: read together below. */
+    const heldSlots: Array<{ id: string; type: ElementType }> = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const res = result.items[i];
@@ -2507,29 +2528,10 @@ export class SyncEngine {
         continue;
       }
       if (errObj.code === 'id_conflict') {
-        // create_only's slot is the single POST's answer (conv. 192, R5): keel holds the id. Read it, and
-        // the one decision takes it (I6): the same content adopted, other content a held row. Never sent
-        // again as a create: it leaves the batch here.
-        const id = item.element.id as string;
-        let remote: Awaited<ReturnType<OwApiClient['getElement']>> = null;
-        let readErr: unknown = null;
-        try { remote = await this.client.getElement(item.type, id); } catch (err) { readErr = err; }
-        const local = (await this.folder.getElement(id)) ?? candidates.find(c => c.id === id);
-        if (remote && local) {
-          const out: { r?: SettleResult } = {};
-          if (await this.localStep(failures, id, item.type, 'create', 'note', async () => { out.r = await this.settleCopy(local, remote!, 'push'); })
-            && out.r?.kind === 'held') this.roundHeldRows.push(out.r.conflict);
-          onItemDone();
-          continue;
-        }
-        if (readErr !== null) {
-          // A read that failed proves nothing: never another world (as the single POST's 409).
-          failures.push(failureOf(id, item.type, 'create', readErr, 'id_conflict, and checking it failed: '));
-          onItemDone();
-          continue;
-        }
-        // keel answered the read "not here": the id belongs to another world.
-        foreign.push({ id, type: item.type });
+        // create_only's slot is the single POST's answer (conv. 192, R5): keel holds the id. Read below, all
+        // together, and the one decision takes each (I6). Never sent again as a create: it leaves the batch.
+        heldSlots.push({ id: item.element.id as string, type: item.type });
+        continue;
       }
       // keel would not make it hidden for this key (conv. 170): held, never a failure.
       if (errObj.code === 'hidden_not_allowed') {
@@ -2572,6 +2574,18 @@ export class SyncEngine {
       onItemDone();
     }
 
+    if (heldSlots.length > 0) {
+      const settled = await this.settleHeldSlots(heldSlots, candidates, failures, foreign, heldHere, onItemDone);
+      if (settled.authErr || settled.transient) {
+        // The read was refused or keel was busy: the round ends as the single create's would, and the
+        // survivors go with the next round (they were rolled back, not refused).
+        if (settled.authErr) this.noteAuthBail(settled.authErr);
+        for (const _ of survivors) onItemDone();
+        return { created: 0, authBlocked: !!settled.authErr, transient: settled.transient ?? null, heldHere };
+      }
+    }
+    if (this.stopped) return { created: 0, authBlocked: false, heldHere };
+
     if (isRetry || survivors.length === 0) {
       // Retry exhausted (or nothing survived): the survivors of THIS attempt
       // were rolled back and get surfaced as failures rather than retried
@@ -2585,15 +2599,20 @@ export class SyncEngine {
         });
         onItemDone();
       }
-      return { created: 0, authBlocked: false };
+      return { created: 0, authBlocked: false, heldHere };
     }
 
     // A survivor that links to a refused element (directly or through another
     // survivor that does) fails the atomic retry too, and used to take every
     // independent survivor down with it, every round.
     // Hold those back as failures; the rest go through.
+    // An id keel holds in this world is no refusal (conv. 192, M1): keel takes a link to it, so a new element
+    // naming it goes with the retry.
     const refused = new Set<string>();
-    result.items.forEach((it, i) => { if (it.status >= 400) refused.add(items[i].element.id as string); });
+    result.items.forEach((it, i) => {
+      const sentId = items[i].element.id as string;
+      if (it.status >= 400 && !heldHere.has(sentId)) refused.add(sentId);
+    });
     const { ready, blocked } = splitByRefusedLinks(survivors, refused);
     for (const s of blocked) {
       failures.push({
@@ -2604,9 +2623,95 @@ export class SyncEngine {
       });
       onItemDone();
     }
-    if (ready.length === 0) return { created: 0, authBlocked: false };
+    if (ready.length === 0) return { created: 0, authBlocked: false, heldHere };
     console.info(`[atlas:sync] bulk CREATE retrying ${ready.length} survivor(s) after atomic rollback (${blocked.length} held back)`);
-    return this.bulkCreatePhase(ready, failures, serverDeletesDetected, onItemDone, /* isRetry */ true, foreign, attempted);
+    return this.bulkCreatePhase(ready, failures, serverDeletesDetected, onItemDone, /* isRetry */ true, foreign, attempted, heldHere);
+  }
+
+  /**
+   * create_only's 409 slots (conv. 192, R5): keel's copies read together, by type, through keel's list filter
+   * (`listByIds`, 200 ids a call) where the client has it, else one read each; then the one decision
+   * (`settleCopy`) for each: the same content adopted, other content a held row. An id keel answered "not
+   * here" is another world's. A read that failed is a failure, never another world's, and the id is still
+   * held here (keel's 409 said so). A refused key or a busy server stops it: the caller ends the round.
+   * A stop stamps nothing.
+   */
+  private async settleHeldSlots(
+    slots: Array<{ id: string; type: ElementType }>,
+    candidates: Element[],
+    failures: PerElementFailure[],
+    foreign: Array<{ id: string; type: ElementType }>,
+    heldHere: Set<string>,
+    onItemDone: () => void,
+  ): Promise<{ authErr?: unknown; transient?: unknown }> {
+    for (const sl of slots) heldHere.add(sl.id);
+    const served = new Map<string, ({ id: string; updated_at: string } & Record<string, unknown>) | null>();
+    const failedRead = new Map<string, unknown>();
+    const byType = new Map<ElementType, string[]>();
+    for (const sl of slots) byType.set(sl.type, [...(byType.get(sl.type) ?? []), sl.id]);
+    const fail = (err: unknown): { authErr?: unknown; transient?: unknown } | null =>
+      isAuthError(err) ? { authErr: err } : isTransientError(err) ? { transient: err } : null;
+    for (const [type, ids] of byType) {
+      if (this.stopped) break;
+      if (typeof this.client.listByIds === 'function') {
+        try {
+          const { records, complete } = await this.client.listByIds(type, ids);
+          const byLower = new Map(records.map(r => [String(r.id).toLowerCase(), r]));
+          for (const id of ids) {
+            const r = byLower.get(id.toLowerCase());
+            if (r) served.set(id, r);
+            else if (complete) served.set(id, null);
+            else failedRead.set(id, new Error('a page of the read was left unread'));
+          }
+        } catch (err) {
+          const stop = fail(err);
+          if (stop) { this.failHeldSlots(slots, failures, err, onItemDone); return stop; }
+          for (const id of ids) failedRead.set(id, err);
+        }
+        continue;
+      }
+      for (const id of ids) {
+        if (this.stopped) break;
+        try { served.set(id, await this.client.getElement(type, id)); } catch (err) {
+          const stop = fail(err);
+          if (stop) { this.failHeldSlots(slots, failures, err, onItemDone); return stop; }
+          failedRead.set(id, err);
+        }
+      }
+    }
+    for (const sl of slots) {
+      if (this.stopped) return {};
+      const err = failedRead.get(sl.id);
+      if (err !== undefined) {
+        failures.push(failureOf(sl.id, sl.type, 'create', err, 'id_conflict, and checking it failed: '));
+        onItemDone();
+        continue;
+      }
+      const remote = served.get(sl.id);
+      if (remote === undefined) continue; // a stop before it was read
+      const local = (await this.folder.getElement(sl.id)) ?? candidates.find(c => c.id === sl.id);
+      if (remote && local) {
+        const out: { r?: SettleResult } = {};
+        if (await this.localStep(failures, sl.id, sl.type, 'create', 'note', async () => { out.r = await this.settleCopy(local, remote, 'push'); })
+          && out.r?.kind === 'held') this.roundHeldRows.push(out.r.conflict);
+        onItemDone();
+        continue;
+      }
+      // keel answered the read "not here": the id belongs to another world, which keel refuses a link to.
+      heldHere.delete(sl.id);
+      foreign.push({ id: sl.id, type: sl.type });
+      failures.push({ element_id: sl.id, type: sl.type, operation: 'create', message: 'this id already exists in another world', status: 409, code: 'id_conflict', source: 'server' });
+      onItemDone();
+    }
+    return {};
+  }
+
+  /** Every held slot a failure of the read that ended the round (none read further). */
+  private failHeldSlots(slots: Array<{ id: string; type: ElementType }>, failures: PerElementFailure[], err: unknown, onItemDone: () => void): void {
+    for (const sl of slots) {
+      failures.push(failureOf(sl.id, sl.type, 'create', err, 'id_conflict, and checking it failed: '));
+      onItemDone();
+    }
   }
 
   /**
@@ -2832,12 +2937,15 @@ export class SyncEngine {
     const hostRefusedCreates = new Set<string>();
     /** One-at-a-time creates refused only for a link to a peer not made yet: the peer's id and the failure recorded. */
     const linkFailed = new Map<string, { refId: string; failure: PerElementFailure }>();
+    /** Ids keel holds in this world, met as a `/bulk` slot's 409: an update linking one is never held back. */
+    const bulkHeldHere = new Set<string>();
     if (useBulk) {
       const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
         done++;
         this.onPushProgress(done, total);
       }, false, roundForeign, attemptedCreates);
       creates += bulk.created;
+      for (const id of bulk.heldHere) bulkHeldHere.add(id);
       if (bulk.authBlocked) authBlocked = true;
       if (bulk.transient) transient = bulk.transient;
       // The web host refused the batch (R4): its creates take the per-element
@@ -2859,7 +2967,7 @@ export class SyncEngine {
     // referrers once waited under "OnlyWorlds refused" copy).
     const acceptedButHeld = (f: PerElementFailure) => isFileBusyError({ name: f.error_name });
     const refusedCreates = new Set<string>(
-      failures.filter(f => f.operation === 'create' && !acceptedButHeld(f)).map(f => f.element_id),
+      failures.filter(f => f.operation === 'create' && !acceptedButHeld(f) && !bulkHeldHere.has(f.element_id)).map(f => f.element_id),
     );
 
     for (const elem of changed) {

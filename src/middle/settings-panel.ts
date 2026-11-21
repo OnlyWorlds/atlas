@@ -35,6 +35,7 @@ import { renderWritingTab, wireWritingTab } from './settings-writing';
 import { renderContextTab, wireContextTab } from './settings-context';
 import pkg from '../../package.json';
 import { renderGate, typingInside } from '../ui/render-gate';
+import { beginSettingsOpening } from './settings-account';
 
 export interface SettingsMount {
   target: HTMLElement;
@@ -197,6 +198,8 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     });
   }
 
+  // A new opening of Settings: a PIN not checked yet is asked about once in it (`settings-account.ts`).
+  beginSettingsOpening();
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
   // The guide's notes switch lives outside the store: the OnlyWorlds tab redraws

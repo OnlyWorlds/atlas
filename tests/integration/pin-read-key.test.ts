@@ -65,7 +65,7 @@ import { removePicture, uploadPicture } from '../../src/sync/media-upload';
 import { MakeOnlineModal } from '../../src/ui/make-online-modal';
 import { ToastManager } from '../../src/ui/toast-manager';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
-import { renderAccountTab, wireAccountTab, pinStateLine, __resetPinAskedForTests } from '../../src/middle/settings-account';
+import { renderAccountTab, wireAccountTab, pinStateLine, __resetPinAskedForTests, beginSettingsOpening } from '../../src/middle/settings-account';
 
 const KEYS = {
   'ow_r_owner': { scope: 'read' as const },
@@ -374,9 +374,9 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     openWorld('ow_w_owner');
     const { said, save, line } = settings();
     await save(WRONG);
-    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN' }]);
+    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN. Check it and save it again.' }]);
     expect(getState().registry).toMatchObject({ pin: WRONG, pin_state: 'refused' });
-    expect(line().textContent).toBe('OnlyWorlds did not accept this PIN');
+    expect(line().textContent).toBe('OnlyWorlds did not accept this PIN. Check it and save it again.');
     expect(withPin('ow_w_owner')).toBe(1);
   });
 
@@ -390,10 +390,10 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
       document.body.innerHTML = '';
       const { said, save, line } = settings();
       await save(RIGHT);
-      expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+      expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
       expect(getState().registry.pin).toBe(RIGHT);
       expect(getState().registry.pin_state).toBeUndefined();
-      expect(line().textContent).toBe('Kept here, not checked yet');
+      expect(line().textContent).toBe('Saved in this browser, not checked yet');
       patchSlice('registry', { ...defaultRegistry(), worlds: [] });
     }
     expect(keel.seen.filter(s => s.pin !== null)).toEqual([]);
@@ -404,11 +404,38 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     mswServer.use(http.get(`${TEST_BASE}/me`, () => HttpResponse.error()));
     const { said, save } = settings();
     await save(RIGHT);
-    expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
     expect(getState().registry.pin_state).toBeUndefined();
   });
 
-  it('opening Settings asks once about a PIN kept but not checked yet, and not again that session', async () => {
+  it('a question with no answer is not spent: the next opening of Settings asks again, still once per opening', async () => {
+    openWorld('ow_w_owner', RIGHT);
+    let asked = 0;
+    let offline = true;
+    mswServer.use(http.get(`${TEST_BASE}/me`, () => {
+      asked += 1;
+      if (offline) return HttpResponse.error();
+      return HttpResponse.json({ world: { id: 'w-played', name: 'Played world' }, scope: 'write', kind: 'owner', role: 'owner', membership: null });
+    }));
+    settings();
+    await vi.waitFor(() => expect(asked).toBe(1));
+    await new Promise(r => setTimeout(r, 20));
+    // Redraws of the same opening ask nothing more.
+    document.body.innerHTML = '';
+    settings();
+    await new Promise(r => setTimeout(r, 20));
+    expect(asked).toBe(1);
+    expect(getState().registry.pin_state).toBeUndefined();
+    // The next opening asks again; keel answers now.
+    offline = false;
+    beginSettingsOpening();
+    document.body.innerHTML = '';
+    settings();
+    await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
+    expect(asked).toBe(2);
+  });
+
+  it('opening Settings asks once about a PIN kept but not checked yet, and not again in that opening', async () => {
     openWorld('ow_w_owner', RIGHT);
     settings();
     await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
@@ -428,7 +455,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     const next = setPin(getState().registry, WRONG);
     expect(next.pin).toBe(WRONG);
     expect(next.pin_state).toBeUndefined();
-    expect(pinStateLine(next)).toBe('Kept here, not checked yet');
+    expect(pinStateLine(next)).toBe('Saved in this browser, not checked yet');
     expect(pinStateLine(setPin(next, ''))).toBe('');
     // A proof of another PIN says nothing of the one kept.
     expect(notePinState(next, RIGHT, 'proved')).toBe(next);
@@ -473,7 +500,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     await saving;
     expect(getState().registry.pin).toBe('5555');
     expect(getState().registry.pin_state).toBeUndefined();
-    expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
   });
 
   it('only keel naming the PIN refuses it: a 401 for the key, a 5xx, a 429 or a 403 leave it not checked', async () => {
@@ -492,7 +519,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
       const { said, save } = settings();
       await save(RIGHT);
       expect(getState().registry.pin_state, `${status} ${String(error.code)}`).toBeUndefined();
-      expect(said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+      expect(said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
     }
   });
 
@@ -523,7 +550,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     patchSlice('registry', { ...defaultRegistry(), worlds: [] });
     const first = settings();
     await first.save(RIGHT);
-    expect(first.said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    expect(first.said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
     document.body.innerHTML = '';
     const entry = linked({ api_key: 'ow_w_owner' });
     patchSlice('registry', { ...getState().registry, worlds: [entry] });
@@ -559,7 +586,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     openWorld('odd-read-key');
     const first = settings();
     await first.save(RIGHT);
-    expect(first.said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    expect(first.said).toEqual([{ kind: 'info', line: 'Saved in this browser, not checked yet' }]);
     expect(keel.seen.filter(s => s.pin !== null)).toEqual([]);
     document.body.innerHTML = '';
     const entry = linked({ api_key: 'ow_w_owner' });
@@ -574,7 +601,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     const { said, save } = settings();
     // The same PIN, saved again (the field's value differs only in spaces).
     await save(` ${RIGHT} `);
-    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN' }]);
+    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN. Check it and save it again.' }]);
   });
 
   it('Make online\'s link with no PIN kept: the link keeps the PIN it proved, and says it proved', async () => {

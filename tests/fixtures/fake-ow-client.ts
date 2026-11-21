@@ -291,6 +291,10 @@ export class FakeOwApiClient implements OwApiClient {
     // keel checks every type's table: an id this world holds as another type is a 409
     // naming that type, never a twin (the fake made one before 1.124.30).
     const held = this.assignServerIds ? null : this.heldConflict(type, id);
+    // keel's create checks links before the id (`validate_links`, then the holder): a held id whose
+    // body names an element keel lacks answers that 400 first. Here for a held id (the lenient fake
+    // leaves other creates' links to `strictUpdateLinks`).
+    if (held) this.throwIfDanglingOnUpdate(id, wireBody);
     if (held) throw held;
     const at = this.clock();
     const record: ServerRecord = this.stampDoors({ ...wireBody, ...this.writeDoor, id, type, created_at: at, updated_at: at });
@@ -503,6 +507,26 @@ export class FakeOwApiClient implements OwApiClient {
     return r && !this.outOfView.has(r.id) ? this.served(r) : null;
   }
 
+  /** Every `ids=` read, apart from `calls`, so the exact-sequence suites keep their meaning. */
+  idsReads: Array<{ type: ElementType; ids: string[] }> = [];
+  /** Test seam: the `ids=` read fails with this error. */
+  idsReadFails: Error | null = null;
+
+  /**
+   * `GET /{type}?ids=` as the adapter walks it (keel's list filter: an id this key cannot see is absent, a
+   * type's other ids are not this type's, any letter case names the same id).
+   */
+  async listByIds(type: ElementType, ids: readonly string[]): Promise<{ records: ServerRecord[]; complete: boolean }> {
+    this.throwIfAuthBlocked();
+    this.idsReads.push({ type, ids: [...ids] });
+    if (this.idsReadFails) throw this.idsReadFails;
+    const want = new Set(ids.map(i => i.toLowerCase()));
+    const found = Array.from(this.bucket(type).values())
+      .filter(r => want.has(r.id.toLowerCase()) && !this.outOfView.has(r.id))
+      .map(r => this.served(r));
+    return { records: found, complete: true };
+  }
+
   /**
    * GET /me (B12 Q2, conv. 151): the key's role, `owner` unless a test sets
    * `keyRole`. Counted in `meReads`, apart from `calls`, so the suites that
@@ -536,7 +560,8 @@ export class FakeOwApiClient implements OwApiClient {
   strictUpdateLinks = false;
 
   private throwIfDanglingOnUpdate(id: string, body: Record<string, unknown>): void {
-    const known = (v: string) => !this.outOfView.has(v) && [...this.byType.values()].some(m => m.has(v));
+    // keel parses a link as a UUID: any letter case names the same element.
+    const known = (v: string) => !this.outOfView.has(v) && [...this.byType.values()].some(m => m.has(v) || [...m.keys()].some(k => k.toLowerCase() === v.toLowerCase()));
     for (const [key, value] of Object.entries(body)) {
       if (key === 'id' || key === 'type') continue;
       for (const v of Array.isArray(value) ? value : [value]) {

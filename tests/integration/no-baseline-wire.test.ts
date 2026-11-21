@@ -1,5 +1,7 @@
 /**
  * The wire half of conv. 192, on the real adapter against the MSW keel:
+ * - The held slots' reader (`listByIds`): `ids=` with `limit=200`, every page
+ *   read, never `listElements`; 1,000 held ids are five calls.
  * - R5: every `/bulk` body carries `create_only: true` (keel's `create_only`): an id
  *   keel holds is its slot's 409, the single POST's answer, never replaced;
  *   keel refuses a body key it does not know with 422, nothing written.
@@ -13,7 +15,7 @@ import { http, HttpResponse } from 'msw';
 import { mswServer } from '../setup';
 import { statefulV2Handlers } from '../msw-handlers';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
-import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
+import { OwV2ClientAdapter, LIST_BY_IDS_MAX } from '../../src/sync/ow-v2-client-adapter';
 import { changeSeqOf, preconditionCurrent } from '../../src/sync/change-seq';
 
 const BASE = 'https://test-ow.local/api/v2';
@@ -77,6 +79,54 @@ describe('R5: every /bulk is create_only', () => {
       body: JSON.stringify({ atomic: true, create_only: 'yes', items: [{ type: 'character', element: { id: id(5), name: 'Z' } }] }),
     });
     expect(bad.status).toBe(422);
+  });
+});
+
+describe('the held slots\' reader: keel\'s list filter, 200 ids a call', () => {
+  it('asks ids= with limit=200, reads every page, and answers each held id with its whole body', async () => {
+    const { handlers } = statefulV2Handlers({ baseUrl: BASE, clock: clock.next });
+    const asked: URL[] = [];
+    mswServer.use(...handlers);
+    mswServer.events.on('request:start', ({ request }) => { if (request.method === 'GET') asked.push(new URL(request.url)); });
+    const a = adapter();
+    for (let n = 1; n <= 150; n++) await a.createElement('character', { id: id(n), name: `C${n}` });
+    const ids = Array.from({ length: 250 }, (_, i) => id(i + 1));
+    const { records, complete } = await a.listByIds('character', ids);
+    mswServer.events.removeAllListeners();
+    expect(complete).toBe(true);
+    expect(records.map(r => r.id).sort()).toEqual(ids.slice(0, 150).sort());
+    expect(records[0].description).toBe(''); // keel's whole body
+    expect(changeSeqOf(records[0])).toEqual(expect.any(Number));
+    const reads = asked.filter(u => u.searchParams.has('ids'));
+    expect(reads.length).toBe(2); // 200 ids a call, keel's cap
+    expect(reads.every(u => u.searchParams.get('limit') === String(LIST_BY_IDS_MAX))).toBe(true);
+    expect(reads[0].searchParams.get('ids')!.split(',').length).toBe(200);
+  });
+
+  it('walks the cursor when keel pages, and says so when a page is left unread', async () => {
+    const { handlers } = statefulV2Handlers({ baseUrl: BASE, clock: clock.next, pageSize: 100 });
+    mswServer.use(...handlers);
+    const a = adapter();
+    for (let n = 1; n <= 150; n++) await a.createElement('character', { id: id(n), name: `C${n}` });
+    const ids = Array.from({ length: 150 }, (_, i) => id(i + 1));
+    const walked = await a.listByIds('character', ids);
+    expect(walked.records.length).toBe(150);
+    expect(walked.complete).toBe(true);
+    // A cursor that does not advance: the page is left unread, and said.
+    mswServer.use(http.get(`${BASE}/character`, () => HttpResponse.json({ data: [], has_more: true, next_cursor: 'STUCK' })));
+    const stuck = await adapter().listByIds('character', ids);
+    expect(stuck.complete).toBe(false);
+  });
+
+  it('never resets the server-delete flag of listElements', async () => {
+    const { handlers } = statefulV2Handlers({ baseUrl: BASE, clock: clock.next, brokenCursor: true });
+    mswServer.use(...handlers);
+    const a = adapter();
+    await a.createElement('character', { id: id(1), name: 'C1' });
+    await a.listElements('character');
+    expect(a.getIncompleteListTypes().has('character')).toBe(true);
+    await a.listByIds('character', [id(1)]);
+    expect(a.getIncompleteListTypes().has('character')).toBe(true);
   });
 });
 

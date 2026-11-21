@@ -224,8 +224,9 @@ describe('I2: the lost create still settles silently', () => {
     client.calls = [];
     const r = await engine.pushOnce();
     expect(r.conflicts).toEqual([]);
-    // The retry's batch, create_only: both held, so each slot is a 409 and a read; no create or update.
-    expect(client.calls.map(c => c.method)).toEqual(['bulk', 'get', 'get']);
+    // The retry's batch, create_only: both held, so each slot is a 409, both read in one ids= call; no create or update.
+    expect(client.calls.map(c => c.method)).toEqual(['bulk']);
+    expect(client.idsReads.map(r => r.ids.slice().sort())).toEqual([[A, B]]);
     expect(await store.listLocallyChangedSince(null)).toEqual([]);
     // A third round sends nothing at all.
     client.calls = [];
@@ -355,17 +356,106 @@ describe('I5: /bulk never replaces an element keel held (create_only)', () => {
     const engine = await online('local-wins');
     await restore(A, { name: 'Ada', description: 'mine' });
     await put(B, { name: 'Bo', local_updated_at: stamp() });
-    const realGet = client.getElement.bind(client);
-    client.getElement = async (type, id) => {
-      if (id === A) throw Object.assign(new Error('API Error 503: busy'), { status: 503 });
-      return realGet(type, id);
-    };
+    client.idsReadFails = Object.assign(new Error('API Error 422: ids must be a comma-separated list of ids.'), { status: 422, code: 'invalid_request', param: 'ids' });
     const sent = captureBulk();
     const r = await engine.pushOnce();
     expect(sent).toEqual([[A, B], [B]]);
     expect(r.failures.find(f => f.element_id === A)!.message).toMatch(/^id_conflict, and checking it failed/);
-    expect((await store.readSyncState()).foreign ?? []).toEqual([]);
+    expect((await store.readSyncState()).foreign?.ids ?? []).toEqual([]);
     expect(file(B).server_updated_at).toBeTruthy();
+  });
+
+  it('a read of the held slots refused or busy ends the round as the single create does (auth reads as auth)', async () => {
+    for (const [err, want] of [
+      [Object.assign(new Error('API Error 401: Unauthorized'), { status: 401, code: 'key_revoked' }), 'auth'],
+      [Object.assign(new Error('API Error 429: slow down'), { status: 429, code: 'too_many_requests' }), 'transient'],
+    ] as const) {
+      client = new FakeOwApiClient();
+      client.setClock(tick);
+      client.__enable_bulk();
+      for (const id of [A, B, C]) await client.createElement('character', { id, name: id, description: 'theirs' });
+      for (const id of [A, B, C]) await put(id, { name: id, description: 'mine', local_updated_at: stamp() });
+      await put(L, { name: 'Lu', local_updated_at: stamp() });
+      client.idsReadFails = err;
+      const r = await engineFor('local-wins').pushOnce();
+      // One read for the three held ids, then the round ends.
+      expect(client.idsReads.length).toBe(1);
+      if (want === 'auth') expect(r.auth_blocked).toBe(true);
+      else expect(r.transient_blocked).toBe(true);
+      expect(file(L).server_updated_at).toBeUndefined();
+    }
+  });
+
+  it('a stop during the read stamps nothing', async () => {
+    client.__enable_bulk();
+    await client.createElement('character', { id: A, name: 'Ada', description: 'same' });
+    await put(A, { name: 'Ada', description: 'same', local_updated_at: stamp() });
+    await put(B, { name: 'Bo', local_updated_at: stamp() });
+    const engine = engineFor('local-wins');
+    const realRead = client.listByIds.bind(client);
+    client.listByIds = async (type, ids) => { engine.stop(); return realRead(type, ids); };
+    await engine.pushOnce().catch(() => undefined);
+    expect(file(A).server_updated_at).toBeUndefined();
+  });
+
+  it('a new element that links to a held copy lands in the same round: the held id is no refusal (M1)', async () => {
+    client.__enable_bulk();
+    // keel holds the place L; the copy holds the same; B is new and names L; C is new.
+    await client.createElement('location', { id: L, name: 'Lu' });
+    root.put(`elements/location/lu--${L.slice(-8)}.json`, j({ id: L, type: 'location', name: 'Lu', local_updated_at: stamp() }));
+    await store.rescanDisk();
+    await put(B, { name: 'Bo', birthplace: L, local_updated_at: stamp() });
+    await put(C, { name: 'Cy', local_updated_at: stamp() });
+    const sent = captureBulk();
+    const r = await engineFor('local-wins').pushOnce();
+    expect(sent.length).toBe(2);
+    expect(sent[1].sort()).toEqual([B, C].sort());
+    expect(r.failures).toEqual([]);
+    expect(onKeel(B).birthplace).toBe(L);
+    expect(file(B).server_updated_at && file(C).server_updated_at).toBeTruthy();
+    expect(await rows()).toEqual([]);
+  });
+
+  it('an update that links a held copy whose read failed is not held back: keel holds that id', async () => {
+    client.__enable_bulk();
+    const engine = await online('local-wins');
+    await client.createElement('location', { id: L, name: 'Lu', description: 'theirs' });
+    root.put(`elements/location/lu--${L.slice(-8)}.json`, j({ id: L, type: 'location', name: 'Lu', description: 'mine', local_updated_at: stamp() }));
+    await store.rescanDisk();
+    await put(C, { name: 'Cy', local_updated_at: stamp() });
+    await put(A, { ...file(A), birthplace: L, local_updated_at: stamp() });
+    client.idsReadFails = Object.assign(new Error('API Error 422: bad'), { status: 422, code: 'invalid_request' });
+    const r = await engine.pushOnce();
+    expect(r.failures.find(f => f.element_id === L)!.message).toMatch(/^id_conflict, and checking it failed/);
+    expect(r.failures.find(f => f.element_id === A)).toBeUndefined();
+    expect(onKeel(A).birthplace).toBe(L);
+  });
+
+  it('the named cost at the single create: a held copy whose body links to nowhere answers the link\'s 400 first, no row, keel unchanged', async () => {
+    await client.createElement('character', { id: A, name: 'Ada', description: 'theirs' });
+    await put(A, { name: 'Ada', description: 'mine', birthplace: F, local_updated_at: stamp() });
+    const r = await engineFor('local-wins').pushOnce();
+    expect(r.failures.find(f => f.element_id === A)!.message).toMatch(/not found on the server|references/);
+    expect(await rows()).toEqual([]);
+    expect(onKeel(A).description).toBe('theirs');
+    expect(file(A).server_updated_at).toBeUndefined();
+  });
+
+  it('a 200 slot in a create_only batch is a broken contract: that element\'s failure, never landed', async () => {
+    client.__enable_bulk();
+    await put(B, { name: 'Bo', local_updated_at: stamp() });
+    await put(C, { name: 'Cy', local_updated_at: stamp() });
+    const real = client.bulkCreate!;
+    client.bulkCreate = async (items, opts) => {
+      const out = await real(items, opts);
+      out.items[0] = { ...out.items[0], status: 200 };
+      return out;
+    };
+    const r = await engineFor('local-wins').pushOnce();
+    const f = r.failures.find(x => x.element_id === B)!;
+    expect(f.message).toBe('OnlyWorlds replaced an element it already held, which it promised not to do; Atlas did not count it as sent');
+    expect(file(B).server_updated_at).toBeUndefined();
+    expect(file(C).server_updated_at).toBeTruthy();
   });
 
   it('a 409 slot keel reads as not in this world is another world\'s id', async () => {
@@ -432,12 +522,15 @@ describe('I6: one decision whichever door', () => {
         await c.setup?.();
         const keelStamp = onKeel(A).updated_at as string;
         await put(A, { ...c.file, local_updated_at: stamp() });
-        if (door === 'bulk') {
-          // create_only: A's slot is keel's 409, B lands on the retry. keel checks an item's links before
-          // its id (Phase 1, as the single POST does), so the elements A links to are on keel here.
-          client.__enable_bulk();
+        if (door === 'post' || door === 'bulk') {
+          // keel checks a create's links before its id (Phase 1 in a batch, `validate_links` in the single
+          // POST), so the elements A links to are on keel here.
           if (!onKeel(F)) await client.createElement('character', { id: F, name: 'Fe' });
           if (!onKeel(L, 'location')) await client.createElement('location', { id: L, name: 'Lu' });
+        }
+        if (door === 'bulk') {
+          // create_only: A's slot is keel's 409, B lands on the retry.
+          client.__enable_bulk();
           await put(B, { name: 'Bo', local_updated_at: stamp() });
         }
         const engine = engineFor('local-wins');

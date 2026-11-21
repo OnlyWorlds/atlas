@@ -63,8 +63,14 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'bulk-create-only',
         title: 'A batch of new elements can no longer replace one already on OnlyWorlds',
-        body: 'When Atlas sends several new elements at once, OnlyWorlds now takes them only as new. If one of them is already there, for example because another device or person sent it a moment earlier, OnlyWorlds keeps its own copy and Atlas compares the two: the same, it simply takes it; different, it waits in Review conflicts for you to choose, as a copy restored from a backup does. Before, a batch sent in that moment could replace the element there, a member\'s edits included, and Atlas could only tell you afterwards. The other elements of the batch are still sent in the same round. Atlas also no longer asks OnlyWorlds which elements it holds before each batch.',
+        body: 'When Atlas sends several new elements at once, OnlyWorlds now takes them only as new. If one of them is already there, for example because another device or person sent it a moment earlier, OnlyWorlds keeps its own copy and Atlas compares the two: the same, it simply takes it; different, it waits in Review conflicts for you to choose, as a copy restored from a backup does. Before, a batch sent in that moment could replace the element there, a member\'s edits included, and Atlas could only tell you afterwards. The other elements of the batch are still sent in the same round. Atlas also no longer asks OnlyWorlds which elements it holds before each batch, and the note that one was replaced is gone, since that can no longer happen.',
         tags: ['sync', 'fix'],
+      },
+      {
+        id: 'pin-words-again',
+        title: 'The PIN field says what to do when OnlyWorlds refuses it',
+        body: 'A PIN OnlyWorlds did not accept now says: OnlyWorlds did not accept this PIN. Check it and save it again. One not checked yet says Saved in this browser, not checked yet. When Atlas asked about it and got no answer, because you were offline or OnlyWorlds was busy, it asks again the next time you open Settings, still once each time.',
+        tags: ['settings'],
       },
     ],
   },

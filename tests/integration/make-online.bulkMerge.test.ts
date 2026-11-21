@@ -46,6 +46,9 @@ describe('mergeLocalIntoApi /bulk create phase', () => {
     expect(result.failures.map(f => [f.element_id, f.code])).toEqual([[a1.id, 'id_conflict']]);
     expect(client.__server_get('character', b1.id)).toBeTruthy();
     expect(client.__server_get('character', c1.id)).toBeTruthy();
+    // A rerun of the merge must not take the raced id as its own upload.
+    expect((await folder.readSyncState()).route2_created ?? []).not.toContain(a1.id);
+    expect((await folder.readSyncState()).route2_created ?? []).toEqual(expect.arrayContaining([b1.id, c1.id]));
   });
 
   it('merges a cyclic local-only pair through ONE bulk call, stamps server baselines, downloads server-only', async () => {

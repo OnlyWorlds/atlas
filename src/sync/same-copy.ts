@@ -2,7 +2,7 @@
  * "Same content" for a copy with no record of what OnlyWorlds held (conv. 192).
  *
  * One comparison for every door that meets such a copy (the single create, the
- * `/bulk` check, the pull, Keep this copy): the type's schema fields and the
+ * `/bulk` slot's 409, the pull, Keep this copy): the type's schema fields and the
  * extension keys either side holds, compared as the folder format reads them,
  * so a sparse file and keel's full body of the same content read the same:
  *   - a text: absent, `null` and `""` are one unset value;

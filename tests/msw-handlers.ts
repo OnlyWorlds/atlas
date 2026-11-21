@@ -748,7 +748,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
           if (seen.payload !== payloadStr) {
             return envelope({ status: 409, code: 'idempotency_error', message: 'Idempotency-Key reused with a different payload.', param: null });
           }
-          return HttpResponse.json(seen.response as Record<string, unknown>); // exact replay
+          return HttpResponse.json(seen.response as Record<string, unknown>, { headers: { 'Idempotent-Replay': 'true' } }); // exact replay
         }
       }
       const atomic = body.atomic ?? true;
