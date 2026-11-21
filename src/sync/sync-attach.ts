@@ -349,13 +349,6 @@ async function flushPendingOnAttach(
 }
 
 /**
- * The failure toast for a round: the plain sentence from
- * `failureToastOnce`, a button for the fix it names (Give new ids for a
- * foreign id, Retry now for a held file), and the causes behind Details,
- * scrubbed, for Copy details and Send feedback. Nothing when this set was
- * already shown.
- */
-/**
  * The fixes a round's failure toast carries: new ids for an id another world or a membership holds, a retry
  * for a held file, else the list of what is not syncing.
  */
@@ -370,6 +363,13 @@ export function failureFixIds(failures: readonly PerElementFailure[]): FixId[] {
   return fixIds;
 }
 
+/**
+ * The failure toast for a round: the plain sentence from
+ * `failureToastOnce`, a button for the fix it names (Give new ids for a
+ * foreign id, Retry now for a held file), and the causes behind Details,
+ * scrubbed, for Copy details and Send feedback. Nothing when this set was
+ * already shown.
+ */
 function toastFailuresOnce(
   failures: readonly PerElementFailure[],
   engine: SyncEngine | null,
