@@ -1,16 +1,24 @@
-# Atlas's typecheck and unit suite, off the maintainers' machine. Manual only, like e2e.yml:
-# it runs when someone dispatches it (`gh workflow run unit.yml --ref master`), never on a push
-# or a pull request, so a fork cannot start it. It reads the repository and nothing else.
+# Atlas's typecheck and unit suite, off the maintainers' machine. Like e2e.yml it runs when
+# someone dispatches it (`gh workflow run unit.yml --ref master`) and on every pull request
+# opened from a branch of this repository. A fork's pull request starts nothing, and no push
+# does. It reads the repository and nothing else.
 name: unit
 
 on:
   workflow_dispatch:
+  pull_request:
 
 permissions:
   contents: read
 
+# A newer push to the same pull request replaces the run in flight.
+concurrency:
+  group: unit-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   unit:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
