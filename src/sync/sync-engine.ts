@@ -432,6 +432,8 @@ export class SyncEngine {
 
   pause(reason: 'manual' | 'network' = 'manual'): void {
     this.paused = true;
+    // A refused key or PIN keeps its pill: a pause on top of it says nothing new.
+    if (this.authRefused) return;
     this.pauseReason = reason;
     // Under a hold the pill keeps saying what is happening; the release
     // republishes this pause.
@@ -502,7 +504,8 @@ export class SyncEngine {
     const before = this.state;
     // `held_for` is what the pill says: a re-key and a big batch of
     // outside edits waiting for the user's answer are different sentences.
-    this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: reason });
+    // A refused key or PIN keeps its pill through the hold: it is what stops sync.
+    if (!this.authRefused) this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: reason });
     let released = false;
     return () => {
       if (released) return;
@@ -511,6 +514,8 @@ export class SyncEngine {
       const at = this.holdReasons.indexOf(reason);
       if (at >= 0) this.holdReasons.splice(at, 1);
       if (this.stopped) return;
+      // A refusal stands whatever the hold was: its pill, paused, nothing sent.
+      if (this.authRefused) { this.setState(this.refusedState()); return; }
       if (this.holds > 0) {
         // Another hold still stands: the pill says ITS sentence.
         this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: this.holdReasons[this.holdReasons.length - 1] });
@@ -555,11 +560,26 @@ export class SyncEngine {
     return true;
   }
 
-  resume(): void {
+  /**
+   * Whether a refused key or PIN stopped this engine (`setAuthError`): nothing lifts it but a new engine
+   * (a new PIN or key attaches one). `resume()` answers false then and sends nothing.
+   */
+  isAuthRefused(): boolean {
+    return this.authRefused;
+  }
+
+  /** The cause of the refusal that stopped this engine, when keel named it; null when none stopped it. */
+  authRefusal(): KeyRefusal | null {
+    return this.authRefused ? this.lastAuthReason : null;
+  }
+
+  resume(): boolean {
+    // A refused key or PIN is never sent again by unticking a pause: the refusal stands, its pill too.
+    if (this.authRefused) return false;
     this.paused = false;
     this.pauseReason = null;
     // A hold outlives a resume: the holder's release does the push.
-    if (this.holds > 0) return;
+    if (this.holds > 0) return true;
     // Preserve last_sync_at from before pause — toggling stay-offline off
     // shouldn't erase the pill's "synced X min ago" tooltip. The push round
     // below (or a subsequent successful sync) will stamp a fresher value if
@@ -584,6 +604,7 @@ export class SyncEngine {
     void this.pushOnce().catch(err => {
       console.warn('[atlas:sync] resume-flush push failed:', err);
     });
+    return true;
   }
 
   /**
@@ -882,12 +903,39 @@ export class SyncEngine {
   private setAuthError(): void {
     this.paused = true;
     this.pauseReason = 'manual';
-    this.setState({
+    this.authRefused = true;
+    this.setState(this.refusedState());
+  }
+
+  /** The pill a refused key or PIN shows: the cause keel named and the fix. */
+  private refusedState(): SyncEngineState {
+    return {
       kind: 'error',
       message: keyRefusalPill(this.lastAuthReason),
       recoverable: true,
       ...(this.lastAuthReason ? { auth_reason: this.lastAuthReason } : {}),
-    });
+    };
+  }
+
+  /** Set by `setAuthError`: a refused key or PIN stopped this engine, for its life. */
+  private authRefused = false;
+
+  /**
+   * keel's 429 in the world-settings step ends the round as an element's does: the wait kept on the
+   * key, the one retry at its end, the round said in the wait's words, never a failure row.
+   */
+  private metaWaitStop(phase: 'push' | 'pull' | 'sync', meta: { meta_pushed: string[]; meta_pulled: string[]; failures: PerElementFailure[]; wait?: unknown }): SyncResult {
+    const f = transientFields(meta.wait);
+    this.waitOutTransient(f);
+    this.settleIdle(this.lastSyncAt);
+    const result: SyncResult = {
+      pushed: zero(), pulled: zero(), conflicts: [], failures: meta.failures,
+      ...f,
+      meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
+      meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
+    };
+    this.onSyncResult(phase, result);
+    return result;
   }
 
   /**
@@ -1536,6 +1584,8 @@ export class SyncEngine {
     meta_pulled: string[];
     failures: PerElementFailure[];
     auth_blocked: boolean;
+    /** keel's 429 on `GET` or `PATCH /world`: the round's stop, as an element's 429 is (its wait, its one retry). */
+    wait?: unknown;
   }> {
     try {
       return await this.executeMetaStep(opts);
@@ -1587,9 +1637,15 @@ export class SyncEngine {
    * every open; a new change to world.json is a new state and goes up.
    */
   async claimWorldSettingsAtOpen(): Promise<boolean> {
-    // Inside a 429's wait nothing goes, so nothing is claimed: the retry's round carries them.
-    if (this.stopped || this.blocked || rateWaitOf(this.rateWaitKey)) return false;
-    if ((await this.localMetaAgainstBaseline()) !== 'dirty') return false;
+    if (this.stopped || this.blocked) return false;
+    const dirty = (await this.localMetaAgainstBaseline()) === 'dirty';
+    // Inside a 429's wait nothing goes and nothing is claimed: settings waiting arm the one retry at the
+    // wait's end, whose round carries them (the meta step rides every push).
+    if (rateWaitOf(this.rateWaitKey)) {
+      if (dirty) this.heldByWait();
+      return false;
+    }
+    if (!dirty) return false;
     try {
       const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
       const state = canonicalExtValue({ fields: pickSyncedMeta(local), ext: pickExtensionBaseline(local) });
@@ -1607,6 +1663,8 @@ export class SyncEngine {
     meta_pulled: string[];
     failures: PerElementFailure[];
     auth_blocked: boolean;
+    /** keel's 429 on `GET` or `PATCH /world`: the round's stop, as an element's 429 is (its wait, its one retry). */
+    wait?: unknown;
   }> {
     const empty = { meta_pushed: [], meta_pulled: [], failures: [], auth_blocked: false };
     if (this.stopped || this.blocked) return empty;
@@ -1631,7 +1689,8 @@ export class SyncEngine {
         this.noteAuthBail(err);
         return { ...empty, auth_blocked: true };
       }
-      this.noteThrown429(err);
+      // keel's 429: the round's stop (its wait and one retry), never a failure row.
+      if (isWaitStop(err)) return { ...empty, wait: err };
       console.warn('[atlas:sync] meta step: GET /world failed — skipping meta this round', err);
       return { ...empty, failures: [metaFailure('read', err)] };
     }
@@ -1803,7 +1862,12 @@ export class SyncEngine {
           await persistOnBail();
           return { meta_pushed: [], meta_pulled: pulled, failures, auth_blocked: true };
         }
-        this.noteThrown429(err);
+        // keel's 429: the round's stop. What the round learned is kept; the fields stay dirty for the retry.
+        if (isWaitStop(err)) {
+          pushedNames = [];
+          await persistOnBail();
+          return { meta_pushed: [], meta_pulled: pulled, failures, auth_blocked: false, wait: err };
+        }
         console.warn('[atlas:sync] meta step: PATCH /world failed — fields stay dirty', err);
         const failure = metaFailure('update', err);
         failures.push(failure);
@@ -1853,6 +1917,10 @@ export class SyncEngine {
             this.noteAuthBail(err);
             await persistOnBail();
             return { meta_pushed: [...pushedNames], meta_pulled: pulled, failures, auth_blocked: true };
+          }
+          if (isWaitStop(err)) {
+            await persistOnBail();
+            return { meta_pushed: [...pushedNames], meta_pulled: pulled, failures, auth_blocked: false, wait: err };
           }
           console.warn('[atlas:sync] meta step: PATCH /world of x_ keys failed — they stay dirty', err);
           const failure = metaFailure('update', err);
@@ -2098,6 +2166,7 @@ export class SyncEngine {
       this.onSyncResult('push', result);
       return result;
     }
+    if (meta.wait) return this.metaWaitStop('push', meta);
     let pushResult: Awaited<ReturnType<SyncEngine['pushPhase']>>;
     try {
       pushResult = await this.pushPhase();
@@ -2117,12 +2186,14 @@ export class SyncEngine {
     if (this.policy === 'pause-and-review') {
       await this.persistConflictsGuarded(pushResult.conflicts, pushResult.failures);
     }
+    // A round stopped by a wait keeps it before the pill settles (the pill reads it), and moves no
+    // "synced" time: nothing synced.
+    if (pushResult.transient_blocked) this.waitOutTransient(pushResult);
     if (pushResult.auth_blocked) {
       this.setAuthError();
     } else {
-      this.settleIdle(nowIso());
+      this.settleIdle(pushResult.transient_blocked ? this.lastSyncAt : nowIso());
     }
-    if (pushResult.transient_blocked) this.waitOutTransient(pushResult);
     const result: SyncResult = {
       pushed: pushResult.pushed,
       pulled: zero(),
@@ -2157,6 +2228,7 @@ export class SyncEngine {
       this.onSyncResult('pull', result);
       return result;
     }
+    if (meta.wait) return this.metaWaitStop('pull', meta);
     let pullResult: SyncResult;
     try {
       pullResult = await this.pullPhase();
@@ -2209,6 +2281,7 @@ export class SyncEngine {
       this.onSyncResult('sync', result);
       return result;
     }
+    if (meta.wait) return this.metaWaitStop('sync', meta);
     // Settled like runPushOnly's: a throw here left the
     // pill on 'Saving' forever on the full-sync path.
     let pushResult: Awaited<ReturnType<SyncEngine['pushPhase']>>;
@@ -2242,8 +2315,8 @@ export class SyncEngine {
     // A busy or unreachable server ends the round here too: the pull would
     // meet the same wait. Retry once later.
     if (pushResult.transient_blocked) {
-      this.settleIdle(null);
       this.waitOutTransient(pushResult);
+      this.settleIdle(this.lastSyncAt);
       const result: SyncResult = {
         pushed: pushResult.pushed,
         pulled: zero(),
@@ -5127,6 +5200,11 @@ function transientFields(err: unknown): Pick<SyncResult, 'transient_blocked' | '
     // keel's PIN wall names the PIN; its other throttles do not (the words tell them apart).
     ...(reason === 'rate_limited' && isPinParam(t?.param) ? { rate_limited_pin: true as const } : {}),
   };
+}
+
+/** keel's 429 (`rate_limited`): a stop that keeps a wait, never a busy server or a lost network. */
+function isWaitStop(err: unknown): boolean {
+  return isTransientError(err) && transientFields(err).transient_reason === 'rate_limited';
 }
 
 /** keel's `param` naming the PIN header, in any letter case. */

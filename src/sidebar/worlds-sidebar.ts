@@ -39,7 +39,7 @@ import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 import { takeBackMintedKey } from '../sync/key-takeback';
-import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
+import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh, refusedEngineLine } from '../sync/sync-attach';
 import { surfaceSyncUnavailable, upToDate } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
 import { ToastManager } from '../ui/toast-manager';
@@ -361,7 +361,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         const engine = getCurrentSyncEngine();
         if (engine) {
           if (stillPaused) engine.pause('manual');
-          else engine.resume();
+          // A refused key or PIN stays refused: nothing is sent, and the toggle says what stops sync.
+          else if (!engine.resume()) { toasts.error(refusedEngineLine() ?? 'Sync stays stopped.'); return; }
         }
       }
       toasts.info(!entry.sync_paused

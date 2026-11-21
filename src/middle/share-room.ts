@@ -29,6 +29,7 @@ import { navigate, shareHash, elementHash, settingsHash, parseHash, onHashChange
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
 import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
+import { rateWaitOf } from '../sync/rate-wait';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
 import {
@@ -1909,6 +1910,15 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   const reconciledWorlds = new Set<string>();
 
   async function reconcilePubMirrors(worldId: string): Promise<void> {
+    // The list goes with the stored PIN: never one keel refused, and nothing inside a 429's wait on the
+    // world's key. The heal waits for the next room entry.
+    const reg = getState().registry;
+    const entry = reg.worlds.find(w => w.id === worldId);
+    const refused = !!entry && !isSeatWorld(entry) && reg.pin_state === 'refused' && worldPin(entry, reg) === reg.pin;
+    if (refused || rateWaitOf(entry?.api?.api_key)) {
+      reconciledWorlds.delete(worldId);
+      return;
+    }
     const client = sharingClientForActiveWorld();
     if (!client) return;
     // Capture the world's store before the await; bail if the

@@ -46,6 +46,8 @@ import { rateWaitLine, waitWords } from './rate-wait';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
+/** The PIN the attached engine sends (the account's, or a seat's secret): what a refusal was of. */
+let currentPin: string | undefined;
 /** The attached engine's policy as its world stands now: read by `reapplySyncPolicy`. */
 let currentPolicyNow: (() => SyncPolicy) | null = null;
 
@@ -189,7 +191,9 @@ export function attachSyncEngine(
 
   currentEngine = engine;
   currentWorldId = entry.id;
+  currentPin = pin;
   currentPolicyNow = policyNow;
+  watchRefusedPin();
   /** Ask the roster, and move the engine to what it says once keel has answered. */
   const settle = async (maxAgeMs: number): Promise<void> => {
     let answered = false;
@@ -207,6 +211,12 @@ export function attachSyncEngine(
   // the hold goes on BEFORE the flush-on-attach below, which would push it.
   // The link's own attach answers any question saved before it.
   if (opts.justLinked) forgetPersistedDiskHold(entry.id);
+  // The account PIN keel already refused (`registry.pin_state`) is never sent again by itself: the engine
+  // starts as that refusal left it (paused, the PIN's pill), and nothing below sends. A new PIN saved in
+  // Settings, here or in another tab, clears the state and attaches afresh (`watchRefusedPin`). Never a
+  // seat's secret or a read key (no account PIN). Before the disk hold: the refusal outlasts its answer.
+  const pinRefused = !readOnly && !isSeatWorld(entry) && reg.pin_state === 'refused' && reg.pin === pin;
+  if (pinRefused) engine.startRefused('pin');
   if (!readOnly) adoptPersistedDiskHold(entry.id, engine);
   currentFolder = folder;
 
@@ -226,11 +236,6 @@ export function attachSyncEngine(
   if (shouldPause) {
     engine.pause('manual');
   }
-  // The account PIN keel already refused (`registry.pin_state`) is never sent again by itself: the engine
-  // starts as that refusal left it (paused, the PIN's pill), and nothing below sends. A new PIN saved in
-  // Settings clears the state and attaches afresh. Never a seat's secret or a read key (no account PIN).
-  const pinRefused = !readOnly && !isSeatWorld(entry) && reg.pin_state === 'refused' && reg.pin === pin;
-  if (pinRefused) engine.startRefused('pin');
 
   // Seed the slice with the engine's initial state.
   publishSyncState(entry.id, engine.getState());
@@ -575,6 +580,7 @@ export function detachSyncEngine(opts: { keepHeldNote?: boolean } = {}): void {
   }
   currentEngine = null;
   currentWorldId = null;
+  currentPin = undefined;
   currentFolder = null;
   currentPolicyNow = null;
   // The note that copies wait was about this world's review (kept only for the same world attached again).
@@ -695,6 +701,43 @@ let currentFolder: FolderStore | null = null;
 function savedPlaceOfSyncWorld(): string {
   const id = getCurrentSyncWorldId();
   return filesWhereOf(getState().registry.worlds.find(w => w.id === id)) === 'browser' ? 'in this browser' : 'in the folder';
+}
+
+/**
+ * What a toggle says when unticking a pause cannot resume the attached engine: a refused key or PIN
+ * stopped it, and only a new one brings it back. Null when it resumed (or nothing is attached).
+ */
+export function refusedEngineLine(): string | null {
+  if (!currentEngine?.isAuthRefused()) return null;
+  const reason = currentEngine.authRefusal();
+  const entry = getState().registry.worlds.find(w => w.id === currentWorldId);
+  return isSeatWorld(entry) ? seatRefusalLine(reason) : keyRefusalLine(reason);
+}
+
+/**
+ * The attached engine stopped on the account PIN comes back when that PIN changes or keel's word on it
+ * is no longer a refusal: a save in Settings here re-attaches by itself, and another tab's save or proof
+ * reaches this tab through the registry's storage event. The same refused PIN saved again changes
+ * neither, so nothing is sent. Checked a task later, so a save's own re-attach (or a round recording its
+ * refusal) is seen first.
+ */
+let refusedPinWatch: (() => void) | null = null;
+function watchRefusedPin(): void {
+  if (refusedPinWatch) return;
+  let seen = getState().registry;
+  refusedPinWatch = subscribe(() => {
+    const reg = getState().registry;
+    if (reg === seen) return;
+    seen = reg;
+    const engine = currentEngine;
+    if (engine?.authRefusal() !== 'pin') return;
+    setTimeout(() => {
+      const now = getState().registry;
+      const entry = now.worlds.find(w => w.id === currentWorldId);
+      if (currentEngine !== engine || !entry || !currentFolder || isSeatWorld(entry) || entry.api?.read_only) return;
+      if (now.pin && (now.pin !== currentPin || now.pin_state !== 'refused')) attachSyncEngine(entry, currentFolder);
+    }, 0);
+  });
 }
 
 /**

@@ -25,6 +25,7 @@ import { MockFolderStore } from '../fixtures/mock-folder-store';
 import type { WorldRegistryEntry } from '../../src/core/types';
 import type { ToastManager } from '../../src/ui/toast-manager';
 import type { FsFolderStore } from '../../src/store/folder-store-fs';
+import { __resetRateWaitsForTests, setRateWait } from '../../src/sync/rate-wait';
 
 function entry(id: string, key: string): WorldRegistryEntry {
   return {
@@ -167,5 +168,36 @@ describe('share room reconcile', () => {
 
     await vi.waitFor(() => expect(toasts.info).toHaveBeenCalledWith(expect.stringContaining('Publish state refreshed')), { timeout: 3000 });
     expect(await pubOf(store, page.id)).toMatchObject({ revoked: true, content_sig: 'sig-at-publish' });
+  });
+
+  it('the heal sends no PIN keel refused, and nothing inside a 429 wait on the world\'s key', async () => {
+    const lists: Array<string | null> = [];
+    mswServer.use(http.get(`${SHARING_BASE_URL}/pages/`, ({ request }) => {
+      lists.push(request.headers.get('API-Pin'));
+      return HttpResponse.json([]);
+    }));
+    const store = await openStore();
+    const enter = async (reg: ReturnType<typeof defaultRegistry>): Promise<void> => {
+      unmounts.forEach(u => u()); unmounts.length = 0;
+      patchSlice('registry', reg);
+      await activate(store, 'wR');
+      window.location.hash = '#/w/wR/share';
+      mount();
+      await delay(100);
+    };
+    const base = { ...setPin(defaultRegistry(), '1234'), worlds: [entry('wR', 'ow_w_refused')] };
+    try {
+      await enter({ ...base, pin_state: 'refused' });
+      expect(lists).toEqual([]);
+      setRateWait('ow_w_refused', 60_000, true);
+      await enter({ ...base, pin_state: 'proved' });
+      expect(lists).toEqual([]);
+      __resetRateWaitsForTests();
+      // The control: the PIN not refused, no wait: the list goes, with the PIN.
+      await enter({ ...base, pin_state: 'proved' });
+      expect(lists).toEqual(['1234']);
+    } finally {
+      __resetRateWaitsForTests();
+    }
   });
 });

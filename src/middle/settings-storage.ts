@@ -25,6 +25,7 @@ import {
   getCurrentSyncEngine,
   getCurrentSyncWorldId,
   reapplySyncPolicy,
+  refusedEngineLine,
 } from '../sync/sync-attach';
 import type { WorldsRegistry } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -361,7 +362,8 @@ function wireSyncTab(toasts: ToastManager): void {
     const stillPaused = effectiveSyncPaused(entry, next);
     if (engine) {
       if (stillPaused) engine.pause('manual');
-      else engine.resume();
+      // A refused key or PIN stays refused: nothing is sent, and the toggle says what stops sync.
+      else if (!engine.resume()) { toasts.error(refusedEngineLine() ?? 'Sync stays stopped.'); return; }
     }
     toasts.info(pauseAll.checked
       ? 'All sync paused'

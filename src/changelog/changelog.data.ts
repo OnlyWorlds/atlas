@@ -63,13 +63,13 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'refused-pin-stays-unsent',
         title: 'A PIN OnlyWorlds refused is not sent again when you open the world',
-        body: 'When OnlyWorlds has refused the PIN kept in Settings, Atlas no longer tries it again each time you open the world or reload the page. Sync stays paused as it did right after the refusal, and the sync pill says so. Pressing the pill opens Settings, under OnlyWorlds, where you put in the PIN again; saving a different PIN starts sync again at once.',
+        body: 'When OnlyWorlds has refused the PIN kept in Settings, Atlas no longer tries it again each time you open the world or reload the page. Sync stays paused as it did right after the refusal, and the sync pill says so. Pressing the pill opens Settings, under OnlyWorlds, where you put in the PIN again; saving a different PIN starts sync again at once, and so does a new PIN saved in another tab. Turning a pause off does not send the refused PIN either: it says the PIN is what stops sync.',
         tags: ['sync', 'fix'],
       },
       {
         id: 'wait-out-429',
         title: 'When OnlyWorlds asks Atlas to wait, Atlas sends nothing until the wait is over',
-        body: 'OnlyWorlds sometimes asks Atlas to wait, for example after too many different PINs were tried for one world\'s key. Atlas used to send a new edit before the wait was over, which only met the same answer. Now everything you change during the wait stays saved where the world keeps it and goes up once, when the wait ends. Sync now and refresh say how long is left instead of sending. The wait holds when you switch worlds and back, or save a new PIN in Settings: a PIN saved during the wait is kept and not called wrong, and Settings says the wait. A page reload forgets the wait, and OnlyWorlds names it again at the first try.',
+        body: 'OnlyWorlds sometimes asks Atlas to wait, for example after too many different PINs were tried for one world\'s key. Atlas used to send a new edit before the wait was over, which only met the same answer. Now everything you change during the wait, the world\'s own settings included, stays saved where the world keeps it and goes up once, when the wait ends. The sync pill says Waiting, and its tooltip how long, and Sync now and refresh say how long is left instead of sending. The wait holds when you switch worlds and back, or save a new PIN in Settings: a PIN saved during the wait is kept and not called wrong, and Settings says the wait. A page reload forgets the wait, and OnlyWorlds names it again at the first try.',
         tags: ['sync', 'fix'],
       },
       {

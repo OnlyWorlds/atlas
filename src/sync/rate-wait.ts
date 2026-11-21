@@ -17,7 +17,8 @@ export interface RateWait {
   pin: boolean;
 }
 
-const waits = new Map<string, RateWait>();
+/** Each key's wait: its end, and the end of the PIN wall's share of it (0 when keel never named the PIN). */
+const waits = new Map<string, { until: number; pinUntil: number }>();
 
 /** The longest wait Atlas keeps, whatever `Retry-After` says (the engine's retry clamp). */
 export const RATE_WAIT_MAX_MS = 15 * 60_000;
@@ -29,13 +30,19 @@ export function clampWaitMs(ms: number): number {
   return Math.min(Math.max(ms, RATE_WAIT_MIN_MS), RATE_WAIT_MAX_MS);
 }
 
-/** Start (or move) the wait on `key`: `ms` from now. A later end never shortens to an earlier one. */
+/**
+ * Start (or move) the wait on `key`: `ms` from now. A later end never shortens to an earlier one, and the
+ * PIN wall, once met, stays named until its own wait ends, whatever 429 came after it.
+ */
 export function setRateWait(key: string, ms: number, pin: boolean, now = Date.now()): RateWait {
   const until = now + clampWaitMs(ms);
-  const had = rateWaitOf(key, now);
-  const next: RateWait = had && had.until > until ? { until: had.until, pin: had.pin || pin } : { until, pin };
+  const had = rateWaitOf(key, now) ? waits.get(key) : undefined;
+  const next = {
+    until: Math.max(had?.until ?? 0, until),
+    pinUntil: Math.max(had && had.pinUntil > now ? had.pinUntil : 0, pin ? until : 0),
+  };
   waits.set(key, next);
-  return next;
+  return { until: next.until, pin: next.pinUntil > now };
 }
 
 /** The wait running on `key`, or null when none runs (an ended one is forgotten). */
@@ -47,7 +54,7 @@ export function rateWaitOf(key: string | null | undefined, now = Date.now()): Ra
     waits.delete(key);
     return null;
   }
-  return w;
+  return { until: w.until, pin: w.pinUntil > now };
 }
 
 /** End the wait on `key` (its retry is going out). */
@@ -82,8 +89,8 @@ export function rateWaitLine(pin: boolean, ms: number, place: string): string {
 export function pinCheckWaitLine(pin: boolean, ms: number): string {
   const when = waitWords(ms);
   return pin
-    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This PIN is kept here, not checked yet; OnlyWorlds takes PINs again in ${when}.`
-    : `OnlyWorlds asked Atlas to wait. This PIN is kept here, not checked yet; Atlas can ask about it again in ${when}.`;
+    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This PIN is kept here, not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in ${when}.`
+    : `OnlyWorlds asked Atlas to wait. This PIN is kept here, not checked by OnlyWorlds yet; Atlas can ask about it again in ${when}.`;
 }
 
 /** Tests: no wait anywhere. */

@@ -41,6 +41,7 @@ import {
   reapplySyncPolicy,
   refreshElementsAfterWrite,
   requestPushIfLinked,
+  refusedEngineLine,
   sayRateWait,
 } from '../sync/sync-attach';
 import { sharedRuleHolds, sharedWorldLine } from '../sync/shared-world';
@@ -419,7 +420,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     const engine = getCurrentSyncWorldId() === world.id ? getCurrentSyncEngine() : null;
     if (engine) {
       if (stillPaused) engine.pause('manual');
-      else engine.resume();
+      // A refused key or PIN stays refused: nothing is sent, and the toggle says what stops sync.
+      else if (!engine.resume()) { toasts.error(refusedEngineLine() ?? 'Sync stays stopped.'); return; }
     }
     toasts.info(pausedInput.checked
       ? 'Sync paused for this world'
