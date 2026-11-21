@@ -658,7 +658,18 @@ export function foreignLine(n: number, inUse = 0): string {
       ? '1 element could not upload: its id is already in use on OnlyWorlds.'
       : `${n} elements could not upload: their ids are already in use on OnlyWorlds.`;
   }
-  return `${n} elements could not upload: their ids are already taken on OnlyWorlds, ${inUse === 1 ? 'one' : String(inUse)} in use and the rest by another world.`;
+  // Both kinds counted the one way the row counts elements: in numerals.
+  return `${n} elements could not upload: their ids are already taken on OnlyWorlds, ${inUse} in use and ${n - inUse} by another world.`;
+}
+
+/** How many of the row's live entries a membership holds. */
+function inUseCount(live: ReadonlyArray<{ in_use?: true }>): number {
+  return live.filter(f => f.in_use).length;
+}
+
+/** The re-key row's line for what `foreignIdsFor` answered: its count, and how many of those are in use. */
+export function foreignRowLine(live: ReadonlyArray<{ in_use?: true }>): string {
+  return foreignLine(live.length, inUseCount(live));
 }
 
 async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): Promise<void> {
@@ -702,9 +713,9 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
     const live = interrupted ? [] : await rk.foreignIdsFor(store, world).catch(() => []);
     count = live.length;
     lastForeignCount[world.id] = count;
-    lastForeignInUse[world.id] = live.filter(f => f.in_use).length;
+    lastForeignInUse[world.id] = inUseCount(live);
     box.hidden = count === 0;
-    text.textContent = foreignLine(count, lastForeignInUse[world.id]);
+    text.textContent = foreignRowLine(live);
     btn.textContent = count === 1 ? 'Give it a new id' : 'Give them new ids';
   };
   await show();

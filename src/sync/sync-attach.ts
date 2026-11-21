@@ -355,6 +355,21 @@ async function flushPendingOnAttach(
  * scrubbed, for Copy details and Send feedback. Nothing when this set was
  * already shown.
  */
+/**
+ * The fixes a round's failure toast carries: new ids for an id another world or a membership holds, a retry
+ * for a held file, else the list of what is not syncing.
+ */
+export function failureFixIds(failures: readonly PerElementFailure[]): FixId[] {
+  const kinds = new Set(failures.map(classifyFailure));
+  const newIds = kinds.has('foreign_id') || kinds.has('id_in_use');
+  const fixIds: FixId[] = [];
+  if (newIds) fixIds.push('new-ids');
+  if (kinds.has('file_busy')) fixIds.push('retry');
+  // Give new ids already leads to the same Settings tab.
+  if (!newIds) fixIds.push('sync-issues');
+  return fixIds;
+}
+
 function toastFailuresOnce(
   failures: readonly PerElementFailure[],
   engine: SyncEngine | null,
@@ -363,12 +378,7 @@ function toastFailuresOnce(
   if (failures.length === 0) return;
   const text = failureToastOnce(failures, filesWhereOf(getState().registry.worlds.find(w => w.id === worldId)));
   if (!text) return;
-  const kinds = new Set(failures.map(classifyFailure));
-  const fixIds: FixId[] = [];
-  if (kinds.has('foreign_id') || kinds.has('id_in_use')) fixIds.push('new-ids');
-  if (kinds.has('file_busy')) fixIds.push('retry');
-  // Give new ids already leads to the same Settings tab.
-  if (!kinds.has('foreign_id') && !kinds.has('id_in_use')) fixIds.push('sync-issues');
+  const fixIds = failureFixIds(failures);
   // A round is safe to repeat; only on the engine (and world) that failed. A
   // full sync, so a held file on the pull side is retried too.
   const retry = engine ? () => {

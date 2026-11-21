@@ -996,7 +996,9 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     expect(keyRefusalHere('pin')).toBe('OnlyWorlds did not accept this PIN. Check it on the OnlyWorlds tab.');
     // Where a problem's code knows keel named the PIN, its sentence is the PIN's; where it does not, key or PIN.
     const pinRefused = Object.assign(new Error('API Error 401: Incorrect PIN.'), { status: 401, code: 'invalid_credentials', param: 'API-Pin' });
-    expect(problemFor(pinRefused, { doing: 'saving' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Check it in Settings, under OnlyWorlds.');
+    expect(problemFor(pinRefused, { doing: 'saving' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Check the PIN in Settings, under OnlyWorlds.');
+    // With the changes saved here, the next step still names the PIN, never "it".
+    expect(problemFor(pinRefused, { doing: 'saving', savedLocally: true, where: 'folder' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Your changes are saved in the folder. Check the PIN in Settings, under OnlyWorlds.');
     const keyRefused = Object.assign(new Error('API Error 401: Invalid API key.'), { status: 401, code: 'invalid_credentials', param: null });
     expect(problemFor(keyRefused, { doing: 'saving' }).sentence).toMatch(/^OnlyWorlds did not accept this world's key or your PIN/);
   });

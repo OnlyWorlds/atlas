@@ -40,7 +40,7 @@ export function classifyFailure(f: PerElementFailure): FailureKind {
   if (/already exists in another world|a copied world folder needs fresh ids/i.test(m)) return 'foreign_id';
   // keel's words for an id a membership holds (the engine's `ID_IN_USE_LINE`, or keel's own): a new id is the
   // way out, as for another world's, but nothing about another world is true.
-  if ((f.code === 'id_conflict' || f.status === 409) && /\bis already in use\b/i.test(m)) return 'id_in_use';
+  if (f.code === 'id_conflict' && /\bis already in use\b/i.test(m)) return 'id_in_use';
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
   // A member seat's refusals (#104): by keel's code, never its text.
   if (f.status === 403 && (f.code === 'not_author' || f.code === 'owner_only')) return 'not_yours';

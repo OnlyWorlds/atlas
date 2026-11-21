@@ -39,8 +39,11 @@ export function mergeForeignIds(
     byId.set(e.id, e);
   }
   for (const e of thisRound) {
-    if (!stillUnsynced.has(e.id) || byId.has(e.id)) continue;
-    byId.set(e.id, { id: e.id, type: e.type, first_seen: now, ...(e.in_use ? { in_use: true as const } : {}) });
+    if (!stillUnsynced.has(e.id)) continue;
+    // This round's words are the newer evidence: a carried entry keeps when it was first seen and takes this
+    // round's holder (another world's, or a membership's).
+    const first_seen = byId.get(e.id)?.first_seen ?? now;
+    byId.set(e.id, { id: e.id, type: e.type, first_seen, ...(e.in_use ? { in_use: true as const } : {}) });
   }
   return { api_world_id: apiWorldId, ids: Array.from(byId.values()) };
 }

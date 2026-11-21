@@ -67,7 +67,7 @@ import { isPinRefusal, notePinState, recordPinState } from '../registry/pin-proo
  * The fix that goes with a foreign-id sentence: the button the round's own
  * toast carries (sync-attach), since this toast stands in for that one.
  */
-function newIdsFix(failures: readonly PerElementFailure[], worldId: string) {
+export function newIdsFix(failures: readonly PerElementFailure[], worldId: string) {
   return failures.some(f => classifyFailure(f) === 'foreign_id' || classifyFailure(f) === 'id_in_use') ? resolveFixes(['new-ids'], { worldId }) : [];
 }
 
