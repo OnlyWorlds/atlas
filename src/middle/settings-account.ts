@@ -182,7 +182,9 @@ export async function askAboutPin(pin: string | undefined): Promise<PinState | n
   // A key that reads by its shape is asked nothing with a PIN: `keyScope` answers it read with no call.
   if (!pin || !entry?.api || entry.state !== 'api-linked' || entry.api.read_only || isSeatWorld(entry)) return 'unasked';
   try {
-    const { pinProved } = await buildV2Adapter(entry.api.api_key, pin).keyScope();
+    const { scope, pinProved } = await buildV2Adapter(entry.api.api_key, pin).keyScope();
+    // A key that turned out to read: no PIN went beside it, so nothing was asked.
+    if (scope === 'read') return 'unasked';
     if (!pinProved) return null;
     recordPinState(pin, 'proved');
     return 'proved';
@@ -230,6 +232,10 @@ export function wireAccountTab(toasts: ToastManager): void {
   }
   pinInput?.addEventListener('change', async () => {
     const prevPin = getState().registry.pin;
+    // Spent before the save lands: the panel redraws on the save (a click away leaves nothing focused) and
+    // its opening path must not ask too. The save's own question below is the one; 'unasked' gives it back.
+    const typed = pinInput.value.trim();
+    if (typed) askedOnOpen.add(typed);
     const next = setPin(getState().registry, pinInput.value);
     saveRegistry(next);
     patchSlice('registry', next);

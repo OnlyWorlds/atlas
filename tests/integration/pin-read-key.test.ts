@@ -14,7 +14,7 @@ import { mswServer } from '../setup';
 import { statefulV2Handlers } from '../msw-handlers';
 import { playedKeel, type PlayedKeel, type ReadKeyPin } from '../fixtures/played-keel-pin';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
-import { patchSlice, getState } from '../../src/core/state';
+import { patchSlice, getState, subscribe } from '../../src/core/state';
 import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
 import { setActiveStore } from '../../src/core/active-store';
 import { FakeDirHandle } from '../fixtures/fake-fs';
@@ -524,6 +524,43 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     const first = settings();
     await first.save(RIGHT);
     expect(first.said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    document.body.innerHTML = '';
+    const entry = linked({ api_key: 'ow_w_owner' });
+    patchSlice('registry', { ...getState().registry, worlds: [entry] });
+    patchSlice('active', { worldId: entry.id, meta: { name: 'Here' } } as never);
+    settings();
+    await vi.waitFor(() => expect(getState().registry.pin_state).toBe('proved'));
+  });
+
+  it('one save asks once, though the panel redraws on the save as the page does (the field not focused)', async () => {
+    openWorld('ow_w_owner');
+    const { said, toasts } = fakeToasts();
+    const draw = () => {
+      document.body.innerHTML = `<div class="atlas-settings">${renderAccountTab(getState().registry)}</div>`;
+      wireAccountTab(toasts);
+    };
+    // Settings redraws on every state change while nothing in it is being typed in.
+    const off = subscribe(draw);
+    try {
+      draw();
+      const field = document.querySelector<HTMLInputElement>('.atlas-settings input[name="pin"]')!;
+      field.value = RIGHT;
+      field.dispatchEvent(new Event('change'));
+      await vi.waitFor(() => expect(said.length).toBeGreaterThan(0));
+      await new Promise(r => setTimeout(r, 50));
+    } finally {
+      off();
+    }
+    expect(withPin('ow_w_owner')).toBe(1);
+    expect(getState().registry.pin_state).toBe('proved');
+  });
+
+  it('a key of no known shape that turns out to read spends no question: a world that writes, opened later, is asked', async () => {
+    openWorld('odd-read-key');
+    const first = settings();
+    await first.save(RIGHT);
+    expect(first.said).toEqual([{ kind: 'info', line: 'Kept here, not checked yet' }]);
+    expect(keel.seen.filter(s => s.pin !== null)).toEqual([]);
     document.body.innerHTML = '';
     const entry = linked({ api_key: 'ow_w_owner' });
     patchSlice('registry', { ...getState().registry, worlds: [entry] });

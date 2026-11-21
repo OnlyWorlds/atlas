@@ -35,7 +35,8 @@ vi.mock('../../src/sync/make-online', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/sync/make-online')>()),
   createApiWorld: async ({ pin }: { pin: string }) => {
     h.createPins.push(pin);
-    if (pin !== '1234') throw new PlainError('That PIN does not match your account. Nothing was made.');
+    // A seat's secret is held back from keel (never checked there), so the create resolves without it.
+    if (pin !== '1234' && !pin.startsWith('ow_s_')) throw new PlainError('That PIN does not match your account. Nothing was made.');
     return { apiKey: 'ow_w_made', worldId: 'w-made', worldName: 'Hollow Reach' };
   },
 }));
@@ -85,5 +86,12 @@ describe('New world on OnlyWorlds', () => {
     expect(getState().registry.pin).toBe('1234');
     // The create was a write keel took with that PIN: proved.
     expect(getState().registry.pin_state).toBe('proved');
+  });
+
+  it("a seat's secret kept as the PIN is never marked proved by a create that never sent it", async () => {
+    patchSlice('registry', { ...getState().registry, pin: 'ow_s_seatsecretlong0001' });
+    await create('ow_s_seatsecretlong0001');
+    await vi.waitFor(() => expect(getState().registry.worlds[0]?.state).toBe('api-linked'));
+    expect(getState().registry.pin_state).toBeUndefined();
   });
 });
