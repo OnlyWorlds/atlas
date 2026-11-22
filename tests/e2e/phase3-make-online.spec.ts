@@ -109,7 +109,7 @@ test('Signed in, Make online asks only the PIN and makes the world on the accoun
   await expect(pane.locator('[data-role="no-account"]')).toHaveCount(0);
   await expect(pane.locator('[data-role="signed-in"]')).toContainText('e2e-member');
   // The PIN's reason sits under its field, said once (2026-10-22).
-  await expect(pane.getByText("The PIN lets Atlas upload the world's contents.")).toHaveCount(1);
+  await expect(pane.getByText("The World PIN lets Atlas upload the world's contents.")).toHaveCount(1);
   await expect(page.locator('[data-route-pane="link"] label', { has: page.locator('input[name="link-pin"]') }))
     .toContainText('PIN, or a seat secret');
   await pane.locator('input[name="create-pin"]').fill('1234');
