@@ -1061,12 +1061,26 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
   it('the census: keel\'s PIN wall is said one way, and only where keel named the PIN', () => {
     // The old words blamed wrong PIN tries for every 429; the wall's own sentence starts one way everywhere.
     const OLD = /wrong PIN tries|after wrong PINs|Too many (?:wrong )?PINs?\b/i;
-    const WALL = "OnlyWorlds refused too many different PINs for this world\\'s key, so it takes none for a while";
-    const WALL_PLAIN = "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while";
+    // keel counts different wrong values of API-Pin: an account world's are World PINs, and where Atlas cannot
+    // tell, World PINs or seat secrets.
+    const WALLS_PLAIN = [
+      "OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while",
+      "OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while",
+    ];
+    const WALLS = [...WALLS_PLAIN, ...WALLS_PLAIN.map(w => w.replace("world's", "world\\'s"))];
+    const WALL_PLAIN = WALLS_PLAIN[0];
     const all = literals();
     expect(all.filter(({ lit }) => OLD.test(lit)).map(h => h.at)).toEqual([]);
-    const wall = all.filter(({ lit }) => /different PINs/.test(lit));
-    expect(wall.filter(({ lit }) => !lit.slice(1).startsWith(WALL_PLAIN) && !lit.slice(1).startsWith(WALL)).map(h => h.at)).toEqual([]);
+    expect(all.filter(({ lit }) => /different PINs/.test(lit)).map(h => h.at)).toEqual([]);
+    const wall = all.filter(({ lit }) => /different World PINs/.test(lit));
+    expect(wall.filter(({ lit }) => !WALLS.some(w => lit.slice(1).startsWith(w))).map(h => h.at)).toEqual([]);
+    // Each place says both forms.
+    for (const w of WALLS_PLAIN) {
+      const said = wall.filter(({ lit }) => lit.slice(1).replace("world\\'s", "world's").startsWith(w));
+      expect([...new Set(said.map(h => h.at.split(':')[0]))].sort()).toEqual([
+        'core/problems.ts', 'sync/element-files.ts', 'sync/rate-wait.ts', 'sync/sharing-client.ts',
+      ]);
+    }
     // Where the wall is said: the sync and Settings' check, a problem's sentence, a file's add and remove, a page.
     expect([...new Set(wall.map(h => h.at.split(':')[0]))].sort()).toEqual([
       'core/problems.ts', 'sync/element-files.ts', 'sync/rate-wait.ts', 'sync/sharing-client.ts',

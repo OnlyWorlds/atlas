@@ -282,11 +282,13 @@ export function pinRefusedLine(who: PinWho): string {
     : 'OnlyWorlds did not accept the World PIN or seat secret. Check it in Settings, under OnlyWorlds.';
 }
 
-/** The PIN wall's first sentence: keel counts different wrong values of `API-Pin`, a seat's its seat secrets. */
+/** The PIN wall's first sentence: keel counts different wrong values of `API-Pin`, an account world's its World PINs, a seat's its seat secrets. */
 function pinWallLine(who: PinWho): string {
   return who === 'seat'
     ? "OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while."
-    : "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while.";
+    : who === 'account'
+      ? "OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while."
+      : "OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while.";
 }
 
 /** The PIN wall's next step: check the World PIN (or, not known, either credential) and wait; a seat only waits. */

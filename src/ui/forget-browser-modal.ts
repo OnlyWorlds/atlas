@@ -54,7 +54,7 @@ export class ForgetBrowserModal extends BaseModal {
       online.hidden = false;
     }
     body.querySelector<HTMLElement>('[data-role="also"]')!.textContent = inv.seatWorlds > 0
-      ? `Also removed: your World PIN and sign-in, the secret of each world opened on a seat (${inv.seatWorlds === 1 ? 'it stops' : 'they stop'} syncing), the folders Atlas remembers, and every setting.`
+      ? `Also removed: your World PIN and sign-in, the seat secret of each world opened on a seat (${inv.seatWorlds === 1 ? 'it stops' : 'they stop'} syncing), the folders Atlas remembers, and every setting.`
       : 'Also removed: your World PIN and sign-in, the folders Atlas remembers, and every setting.';
     if (inv.heldSeats.length) {
       // A held seat's secret is only here.

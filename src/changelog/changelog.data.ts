@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.6',
+    date: '2026-11-23',
+    theme: 'Refusals that name what OnlyWorlds counts',
+    entries: [
+      {
+        id: 'pin-wall-names-world-pins',
+        title: 'The PIN wall names World PINs, and a seat world names its seat secret',
+        body: 'When OnlyWorlds refuses too many different World PINs for a world\'s key, the line now says World PINs, or World PINs or seat secrets where Atlas cannot tell which, where it said PINs. A seat world whose secret this browser lost says it no longer has its seat secret, and Forget everything in this browser names the seat secret of each world opened on a seat.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.5',
     date: '2026-11-22',
     theme: 'The World PIN or the seat secret by name, and the Data room\'s review in reading order',

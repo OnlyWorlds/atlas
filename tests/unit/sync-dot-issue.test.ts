@@ -77,7 +77,7 @@ describe('the sync dot and a failed element', () => {
     patchSlice('registry', { ...defaultRegistry(), pin: '1234', worlds: [{ id: WORLD, name: 'Linked', state: 'api-linked', api: { world_id: 's1', api_key: 'k', seat: { role: 'narrator' } } } as unknown as WorldRegistryEntry] });
     mount(e);
     expect(dot().dataset.state).toBe('local');
-    expect(dot().title).toBe('Kept here. This world was opened on a seat, and this browser no longer has its secret, so it cannot sync.');
+    expect(dot().title).toBe('Kept here. This world was opened on a seat, and this browser no longer has its seat secret, so it cannot sync.');
     expect(dot().title).not.toContain('World PIN');
     document.body.innerHTML = '';
     const same = el({ local_updated_at: '2026-11-17T09:00:00.000Z' });

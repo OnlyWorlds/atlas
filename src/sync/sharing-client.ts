@@ -105,8 +105,8 @@ export function sharingErrorMessage(err: SharingApiError, who: PinWho = 'unknown
     case 'rate_limited': return err.param?.toLowerCase() !== 'api-pin'
       ? 'OnlyWorlds asked Atlas to wait. Nothing changed; wait a bit and try again.'
       : who === 'seat' ? 'OnlyWorlds refused too many different seat secrets for this world\'s key, so it takes none for a while. Nothing changed. Try again later.'
-      : who === 'account' ? 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check the World PIN in Settings, then try again later.'
-      : 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check the World PIN or seat secret in Settings, then try again later.';
+      : who === 'account' ? 'OnlyWorlds refused too many different World PINs for this world\'s key, so it takes none for a while. Nothing changed. Check the World PIN in Settings, then try again later.'
+      : 'OnlyWorlds refused too many different World PINs or seat secrets for this world\'s key, so it takes none for a while. Nothing changed. Check the World PIN or seat secret in Settings, then try again later.';
     case 'admin_locked': return 'An administrator locked this URL. Use a different URL.';
     case 'title_too_long': return 'Page name is too long to publish (200 characters max).';
     case 'intent_invalid': return 'OnlyWorlds did not accept this page\'s type. Tell us at onlyworlds.com/feedback.';

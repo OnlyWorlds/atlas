@@ -13,7 +13,7 @@ import type { WorldMeta, WorldRegistryEntry, WorldsRegistry } from './types';
 
 /** A seat world whose secret this browser no longer has (a cleared registry, a folder opened again). */
 export const SEAT_SECRET_MISSING_LINE =
-  'This world was opened on a seat, and this browser no longer has its secret, so it cannot sync.';
+  'This world was opened on a seat, and this browser no longer has its seat secret, so it cannot sync.';
 
 /** keel's seat secret: `ow_s_` + urlsafe characters (accounts/agents.py). */
 const SEAT_SECRET_RE = /^ow_s_[\w-]{16,}$/;

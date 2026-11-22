@@ -3,7 +3,8 @@
  * onlyworlds.com gives it in Account settings. A person met "World PIN", "your OnlyWorlds PIN", "your
  * PIN" and "the PIN" for the same four digits. Two short labels keep the bare word: the pill's and the
  * keepsafe's action Add PIN, and the world list's state chip no PIN. A seat secret is not the World PIN
- * and keeps its own words. "different PINs" and "takes PINs" (keel's PIN wall) count tries, not the PIN.
+ * and keeps its own words. keel's PIN wall counts "different World PINs" (or, not known whose, "World
+ * PINs or seat secrets"), and no line says "PINs" alone (tests/unit/pin-wall-names.test.ts).
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -71,7 +72,7 @@ describe('the World PIN by one name', () => {
     expect(bare("`${seatWaits ? 'not syncing' : 'no PIN'}`")).toBe(false);
     expect(bare("'Its changes stay here until you add your PIN: press Add PIN at the bottom.'")).toBe(true);
     expect(bare("'Check your World PIN in Settings.'")).toBe(false);
-    expect(bare("'OnlyWorlds refused too many different PINs for this world.'")).toBe(false);
+    expect(bare("'OnlyWorlds refused too many different World PINs for this world.'")).toBe(false);
   });
 
   // The pill's press, which opens Settings, OnlyWorlds, is named in tests/integration/pin-wall.test.ts.

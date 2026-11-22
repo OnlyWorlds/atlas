@@ -82,10 +82,9 @@ export function rateWaitLine(pin: boolean, ms: number, place: string, who: PinWh
   const when = waitWords(ms);
   if (!pin) return `OnlyWorlds asked Atlas to wait. Your changes are saved ${place}, and Atlas tries again in ${when}.`;
   if (who === 'seat') return `OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while. Your changes are saved ${place}, and Atlas tries again in ${when}.`;
-  const wall = "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while.";
   return who === 'account'
-    ? `${wall} Check the World PIN in Settings; Atlas tries again in ${when}.`
-    : `${wall} Check the World PIN or seat secret in Settings; Atlas tries again in ${when}.`;
+    ? `OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while. Check the World PIN in Settings; Atlas tries again in ${when}.`
+    : `OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while. Check the World PIN or seat secret in Settings; Atlas tries again in ${when}.`;
 }
 
 /**
@@ -96,7 +95,7 @@ export function rateWaitLine(pin: boolean, ms: number, place: string, who: PinWh
 export function pinCheckWaitLine(pin: boolean, ms: number): string {
   const when = waitWords(ms);
   return pin
-    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This World PIN is not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in ${when}.`
+    ? `OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while. This World PIN is not checked by OnlyWorlds yet; OnlyWorlds takes World PINs again in ${when}.`
     : `OnlyWorlds asked Atlas to wait. This World PIN is not checked by OnlyWorlds yet; Atlas can ask about it again in ${when}.`;
 }
 
@@ -107,7 +106,7 @@ export function pinCheckWaitLine(pin: boolean, ms: number): string {
 export function pinAskWaitLine(pin: boolean, ms: number): string {
   const when = waitWords(ms);
   return pin
-    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Try again in ${when}.`
+    ? `OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while. Try again in ${when}.`
     : `OnlyWorlds asked Atlas to wait. Try again in ${when}.`;
 }
 

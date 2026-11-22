@@ -59,9 +59,9 @@ describe('a problem\'s sentence (problems.ts)', () => {
     const s = problemFor(wall(), { doing: 'saving', worldId: SEAT.id }).sentence;
     expect(s).toBe("OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while, and Atlas could not finish saving. Try again in 10 minutes.");
     expect(problemFor(wall(), { doing: 'saving', worldId: OWN.id }).sentence)
-      .toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish saving. Check the World PIN in Settings; try again in 10 minutes.");
+      .toBe("OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while, and Atlas could not finish saving. Check the World PIN in Settings; try again in 10 minutes.");
     expect(problemFor(wall(), { doing: 'saving' }).sentence)
-      .toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish saving. Check the World PIN or seat secret in Settings; try again in 10 minutes.");
+      .toBe("OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while, and Atlas could not finish saving. Check the World PIN or seat secret in Settings; try again in 10 minutes.");
   });
 
   // The open world is not always the step's: a join, a link or a new world runs beside it.
@@ -97,8 +97,8 @@ describe('a problem\'s fix (problem-fixes.ts)', () => {
 describe('the sync\'s PIN wall (rate-wait.ts)', () => {
   it('a seat\'s wall counts its seat secrets and says the wait, never the World PIN', () => {
     expect(rateWaitLine(true, 60_000, 'in this browser', 'seat')).toBe("OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while. Your changes are saved in this browser, and Atlas tries again in 60 seconds.");
-    expect(rateWaitLine(true, 60_000, 'in this browser', 'account')).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check the World PIN in Settings; Atlas tries again in 60 seconds.");
-    expect(rateWaitLine(true, 60_000, 'in this browser')).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check the World PIN or seat secret in Settings; Atlas tries again in 60 seconds.");
+    expect(rateWaitLine(true, 60_000, 'in this browser', 'account')).toBe("OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while. Check the World PIN in Settings; Atlas tries again in 60 seconds.");
+    expect(rateWaitLine(true, 60_000, 'in this browser')).toBe("OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while. Check the World PIN or seat secret in Settings; Atlas tries again in 60 seconds.");
   });
 });
 
@@ -109,8 +109,8 @@ describe('a file\'s add and remove (element-files.ts)', () => {
     const wallErr = new OwApiError(429, 'rate_limited', 'm', null, {}, null, 'API-Pin', 600);
     expect(addRefusal(pin, { size: 1 }, 'seat')).toBe('OnlyWorlds did not accept this seat secret.');
     expect(addRefusal(wallErr, { size: 1 }, 'seat')).toBe("OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while. Nothing was added. Try again in 10 minutes.");
-    expect(addRefusal(wallErr, { size: 1 }, 'account')).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing was added. Check the World PIN in Settings; try again in 10 minutes.");
-    expect(addRefusal(wallErr, { size: 1 }, 'unknown')).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing was added. Check the World PIN or seat secret in Settings; try again in 10 minutes.");
+    expect(addRefusal(wallErr, { size: 1 }, 'account')).toBe("OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while. Nothing was added. Check the World PIN in Settings; try again in 10 minutes.");
+    expect(addRefusal(wallErr, { size: 1 }, 'unknown')).toBe("OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while. Nothing was added. Check the World PIN or seat secret in Settings; try again in 10 minutes.");
     expect(addRefusal(pin, { size: 1 }, 'unknown')).toBe('OnlyWorlds did not accept the World PIN or seat secret. Check it in Settings, under OnlyWorlds.');
   });
 });
@@ -126,7 +126,7 @@ describe('a page\'s publish (sharing-client.ts, share-room.ts)', () => {
   it('not known whose, a page\'s refusal and wall name both', () => {
     expect(sharingErrorMessage(new SharingApiError('auth_failed', 401))).toBe('OnlyWorlds did not accept the key, or its World PIN or seat secret. Check them in Settings, under OnlyWorlds.');
     const wallErr = new SharingApiError('rate_limited', 429, undefined, 'API-Pin');
-    expect(sharingErrorMessage(wallErr)).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing changed. Check the World PIN or seat secret in Settings, then try again later.");
+    expect(sharingErrorMessage(wallErr)).toBe("OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while. Nothing changed. Check the World PIN or seat secret in Settings, then try again later.");
   });
 
   it('a world with no sharing client lacks its seat secret, or the World PIN, or (no world) either', () => {

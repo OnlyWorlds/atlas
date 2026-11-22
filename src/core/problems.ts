@@ -217,7 +217,9 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
         const who = pinWhoFor(opts);
         const lead = who === 'seat'
           ? "OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while"
-          : "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while";
+          : who === 'account'
+            ? "OnlyWorlds refused too many different World PINs for this world's key, so it takes none for a while"
+            : "OnlyWorlds refused too many different World PINs or seat secrets for this world's key, so it takes none for a while";
         const wall = `${lead}, and Atlas could not finish ${doing}.${saved}`;
         return who === 'seat' ? `${wall} Try again in ${when}.`
           : who === 'account' ? `${wall} Check the World PIN in Settings; try again in ${when}.`
