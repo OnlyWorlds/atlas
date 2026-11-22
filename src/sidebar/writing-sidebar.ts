@@ -16,7 +16,7 @@ import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { PlainError } from '../core/plain-error';
 import { WritingCreateModal } from '../ui/writing-create-modal';
-import { getActiveStore } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { saveRegistry, toggleWritingTreeCollapsed, getEditorSettings } from '../registry/registry';
 import {
@@ -145,11 +145,13 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     // produced an unhandled rejection: no toast, not even a console line.
     // Same class as the `void setNow(...)` silence fixed earlier — a write
     // the user can see the result of must never fail invisibly.
+    let wrote = 0;
     try {
       for (let i = 0; i < siblings.length; i++) {
         const current = (siblings[i] as Element & { order?: number }).order;
         if (current !== i) {
           await folder.updateElement(siblings[i].id, { order: i } as Partial<Element>);
+          wrote++;
         }
       }
     } catch (err) {
@@ -157,8 +159,10 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       toasts.error('Could not reorder: the list may be partly changed. Refresh to see the saved order.');
     }
     // Always re-prime from disk, success or failure — after a partial write
-    // the in-memory order is a guess and the disk is the truth.
-    await refreshElementsAfterWrite(folder);
+    // the in-memory order is a guess and the disk is the truth. A drop that
+    // moved nothing asks for no push (1.125.0: no first-change line either).
+    if (wrote > 0) await refreshElementsAfterWrite(folder);
+    else patchElementsFrom(folder, await folder.listElements());
   }
 
   // Track the activeId from the LAST navigation. We force-expand ancestors

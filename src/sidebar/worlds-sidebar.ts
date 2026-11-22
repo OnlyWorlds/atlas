@@ -28,10 +28,12 @@ import {
 import { getState, patchSlice, subscribe } from '../core/state';
 import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused, storedRegistry, updateWorldEntry } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
+import { isPlainError } from '../core/plain-error';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { copyChip, copyLine } from '../core/world-copy';
 import { dropHeldSeat, heldSeat, heldSeatBusy, heldSeats, type HeldSeat } from '../core/held-seats';
-import { SEAT_REMOVE_WHERE } from '../core/seat';
+import { SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE } from '../core/seat';
+import { resumeWaitLine, waitsOnPin } from '../core/saves-online';
 import { LANDING_FAILED_HERE, LANDING_IN_ANOTHER_TAB, MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
@@ -367,7 +369,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       }
       toasts.info(!entry.sync_paused
         ? 'Sync paused for this world'
-        : stillPaused ? 'This world can sync again, but Pause all sync is still on' : 'Sync resumed');
+        : stillPaused ? 'This world can sync again, but Pause all sync is still on'
+        : resumeWaitLine(getState().registry.worlds.find(w => w.id === entry.id), getState().registry) ?? 'Sync resumed');
       return;
     }
     const refreshBtn = target.closest<HTMLElement>('[data-role="refresh-world"]');
@@ -529,7 +532,11 @@ function addIconButton(
         </button>`;
 }
 
-function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean, globalPaused: boolean): string {
+/** The chip's words for a linked world waiting on the World PIN (1.125.0). */
+export const PIN_WAITS_CHIP_TITLE = 'Does not save to OnlyWorlds yet. Add your World PIN to save it there.';
+
+/** One world's row (exported for the not-online readers' unit, 1.125.0). */
+export function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean, globalPaused: boolean): string {
   // `cloud_off` (strike-through cloud) when this world is paused — either by
   // its own toggle or by the global "pause all sync" master switch. Local-only
   // worlds always render `folder` regardless of pause state (no sync to pause).
@@ -544,9 +551,15 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // A view-only copy (conv. 177): the eye, and a chip with its day, so two
   // rows of one name say which is the world and which the copy.
   const copy = world.copy_of;
+  // Linked, and waiting on the World PIN (1.125.0): nothing saves to OnlyWorlds yet, so the row shows where
+  // its changes are kept and a chip that says so; its sync controls stay (they are keyed to the link).
+  const pinWaits = waitsOnPin(world, getState().registry);
+  // A seat that lost its secret waits on that secret, never the account PIN: a seat's words, no Add PIN.
+  const seatWaits = pinWaits && !!world.api?.seat;
+  const waitsTitle = seatWaits ? SEAT_SECRET_MISSING_LINE : PIN_WAITS_CHIP_TITLE;
   const stateIcon = cleared ? 'browser_not_supported'
     : viewOnly || copy ? 'visibility'
-    : world.state === 'api-linked'
+    : world.state === 'api-linked' && !pinWaits
       ? (isPaused ? 'cloud_off' : 'cloud')
       : inBrowser ? 'web' : 'folder';
   const stateChip = cleared
@@ -555,6 +568,8 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
     ? `<span class="atlas-world-state-chip view-only" title="${escapeAttr(copyLine(world.name, copy, false))}">${escapeText(copyChip(copy))}</span>`
     : viewOnly
     ? '<span class="atlas-world-state-chip view-only">view</span>'
+    : pinWaits
+    ? `<span class="atlas-world-state-chip pin-waits" title="${escapeAttr(waitsTitle)}">${seatWaits ? 'not syncing' : 'no PIN'}</span>`
     : world.state === 'api-linked'
       ? '<span class="atlas-world-state-chip api-linked">online</span>'
       : '';
@@ -589,7 +604,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
         </button>`
     : '';
   const stateIconHtml = world.state === 'api-linked' && !cleared
-    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from OnlyWorlds">
+    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="${pinWaits ? escapeAttr(waitsTitle) : 'Refresh from OnlyWorlds'}">
         <span class="material-symbols-outlined">${stateIcon}</span>
       </button>`
     : `<span class="material-symbols-outlined"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>${stateIcon}</span>`;
@@ -683,6 +698,26 @@ export interface ActivateWorldOpts {
    * `query` calls `queryPermission` only — silent, used at boot when no gesture is available.
    */
   permissionMode?: 'request' | 'query';
+  /**
+   * With `silent`: a world held by a live Atlas page is still said, with no
+   * take-over offered (the open from the address at startup, which would
+   * otherwise leave "No world open." with no word).
+   */
+  sayLockHeld?: boolean;
+}
+
+/** Said at startup when the world's own make-and-move lock is busy: another page has it, or moves it, and a move cannot be taken over. */
+export function stayedClosedWhileBusy(name: string): string {
+  return `"${name}" stayed closed here. Another Atlas page may still have it open, or be moving it. Open it again here once that page is done.`;
+}
+
+/**
+ * Said when a held world stays closed: true for a live second page, a page
+ * in another browser or on another computer sharing the folder, and a page
+ * the browser still keeps after it was left.
+ */
+export function stayedClosedHere(name: string): string {
+  return `"${name}" stayed closed here. Another Atlas page may still have it open. Close that page and open it again here, or take it over.`;
 }
 
 /**
@@ -729,7 +764,7 @@ export async function activateWorld(
       }
     }, 15_000);
     try {
-      return await doActivateWorld(worldId, toasts, opts);
+      return await doActivateWorld(worldId, toasts, opts, gen);
     } catch (err) {
       // An open never rejects (conv. 142): a toast's Open it, a
       // retry and a row click fire this and forget it, so whatever escapes the
@@ -752,7 +787,8 @@ export async function activateWorld(
 async function doActivateWorld(
   worldId: string,
   toasts: ToastManager,
-  opts: ActivateWorldOpts = {}
+  opts: ActivateWorldOpts,
+  gen: number,
 ): Promise<boolean> {
   const { silent = false, quietRekey = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
@@ -880,6 +916,10 @@ async function doActivateWorld(
     const free = await ifWorldLockFree(entry.folder.folder_name, async () => true);
     if (!free.ran) {
       if (!silent) toasts.info(MOVING_IN_ANOTHER_TAB);
+      // The open from the address at startup is never left with no word: a
+      // page that moves it, makes it, or checks it this moment has it. No
+      // take-over is offered: a move cannot be taken over.
+      else if (opts.sayLockHeld) toasts.show(stayedClosedWhileBusy(entry.name), 'info', 8000);
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }
@@ -1041,6 +1081,14 @@ async function doActivateWorld(
     // stranded (Titus, 2026-07-10) — offer an explicit, consented takeover.
     // Never prompt on the silent boot path.
     if (err instanceof ELockHeld && !silent) {
+      // The claim waited for the other page's Web Lock (conv. 13): a click
+      // made meanwhile is the person's word now, and no confirm asks about a
+      // world they have left. The address goes back first, so the newer
+      // activation reads the true prior address (and restores it if it fails).
+      if (gen !== currentActivationGen()) {
+        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        return false;
+      }
       const hb = Date.parse(err.lock.last_heartbeat);
       const ageS = Number.isFinite(hb) ? Math.max(0, Math.round((Date.now() - hb) / 1000)) : null;
       const take = window.confirm(
@@ -1049,6 +1097,7 @@ async function doActivateWorld(
         `.\n\nClose the other tab, or take over here. Taking over while the other tab is still in use can lose changes.\n\nTake over?`
       );
       if (!take) {
+        toasts.show(stayedClosedHere(entry.name), 'info', 8000);
         if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
         return false;
       }
@@ -1064,6 +1113,10 @@ async function doActivateWorld(
     } else {
       console.warn('[worlds-sidebar] open failed:', err);
       if (!silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
+      // The world named by the address at startup, held by a live page: said, never asked.
+      else if (err instanceof ELockHeld && opts.sayLockHeld) toasts.show(stayedClosedHere(entry.name), 'info', 8000);
+      // A plain sentence ("Atlas could not open this world just now. Try again in a moment.") says itself, with its retry.
+      else if (isPlainError(err) && opts.sayLockHeld) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }

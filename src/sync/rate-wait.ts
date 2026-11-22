@@ -93,6 +93,17 @@ export function pinCheckWaitLine(pin: boolean, ms: number): string {
     : `OnlyWorlds asked Atlas to wait. This PIN is kept here, not checked by OnlyWorlds yet; Atlas can ask about it again in ${when}.`;
 }
 
+/**
+ * The World PIN dialog's question inside a 429's wait (1.125.0): nothing is kept there until OnlyWorlds took
+ * the PIN, so the line says when to press Continue again, never that a PIN is kept.
+ */
+export function pinAskWaitLine(pin: boolean, ms: number): string {
+  const when = waitWords(ms);
+  return pin
+    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Try again in ${when}.`
+    : `OnlyWorlds asked Atlas to wait. Try again in ${when}.`;
+}
+
 /** Tests: no wait anywhere. */
 export function __resetRateWaitsForTests(): void {
   waits.clear();

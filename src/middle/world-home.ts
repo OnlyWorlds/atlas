@@ -35,6 +35,8 @@ import { isWritingNarrative } from './writing-helpers';
 import { escapeText, installRowKeydownActivation, relativeTime } from '../core/dom-utils';
 import { dismissTourCard, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { keepSafeCard, snoozeUntil } from './home-keepsafe';
+import { waitsOnPin } from '../core/saves-online';
+import { isSeatWorld } from '../core/seat';
 import { buildLandingLine } from './home-landing';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { hasFolderMode } from '../core/capabilities';
@@ -986,10 +988,12 @@ function persistDismiss(worldId: string, cardId: string): void {
 }
 
 /** The keep-safe band (contract §6.1): what `keepSafeCard` answers, with its three ways out and ×. */
-function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManager): HTMLElement | null {
+export function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManager): HTMLElement | null {
   const s = getState();
   const entry = s.registry.worlds.find(w => w.id === worldId);
-  const card = keepSafeCard({ entry, elements, loading: !!s.data.loading, now: Date.now(), strand: keepSafeStrand(worldId) });
+  // A linked world waiting on the World PIN saves nothing to onlyworlds.com yet: the full card, with Add PIN (1.125.0).
+  const pinWaits = waitsOnPin(entry, s.registry);
+  const card = keepSafeCard({ entry, elements, loading: !!s.data.loading, now: Date.now(), strand: keepSafeStrand(worldId), waitsOnPin: pinWaits });
   if (!card || !entry) return null;
   const line = card.reduced
     ? `${card.reduced === 'online' ? 'Your OnlyWorlds account holds' : 'Your JSON file holds'} this world's elements, but not its pages, aliases, notes, writing formatting, saved charts or images kept in Atlas. A download holds all of it.`
@@ -1011,6 +1015,7 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
       <button type="button" class="atlas-btn-primary" data-action="keepsafe-download">${downloadLabel(getState().active?.meta)}</button>
       ${hasFolderMode() ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-move">Move to a folder</button>' : ''}
       ${entry.state !== 'api-linked' && !entry.copy_of && !isPartialSlice(getState().active?.meta) ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Make online</button>' : ''}
+      ${pinWaits && !isSeatWorld(entry) ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-add-pin">Add PIN</button>' : ''}
     </div>`;
   section.querySelector<HTMLElement>('.atlas-home-onboarding-copy')!.textContent = line;
   section.querySelector<HTMLButtonElement>('[data-action="keepsafe-hide"]')!.addEventListener('click', () => {
@@ -1033,6 +1038,10 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
   section.querySelector<HTMLButtonElement>('[data-action="keepsafe-online"]')?.addEventListener('click', async () => {
     const { MakeOnlineModal } = await import('../ui/make-online-modal');
     new MakeOnlineModal(toasts).open();
+  });
+  section.querySelector<HTMLButtonElement>('[data-action="keepsafe-add-pin"]')?.addEventListener('click', async () => {
+    const { askWorldPin } = await import('../ui/world-pin-modal');
+    askWorldPin(toasts);
   });
   return section;
 }

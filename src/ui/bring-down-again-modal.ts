@@ -57,7 +57,8 @@ export class BringDownAgainModal extends BaseModal {
         this.hide();
         const missing = out.failures > 0 ? ` ${out.failures} element${out.failures === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${out.failures === 1 ? 'it' : 'them'}.` : '';
         // Back without the PIN (a v2 key reads without it, #200): say what sync waits on.
-        const waits = out.syncWaits === 'pin' ? ' It syncs once your PIN is in Settings, under OnlyWorlds.'
+        // The PIN is asked in the world (1.125.0): the pill's Add PIN.
+        const waits = out.syncWaits === 'pin' ? ' Its changes stay here until you add your World PIN: press Add PIN at the bottom.'
           : out.syncWaits === 'seat' ? ` ${SEAT_SECRET_MISSING_LINE}` : '';
         if (missing) this.toasts.error(`"${w.name}" is back in this browser.${missing}${waits}`);
         else if (waits) this.toasts.info(`"${w.name}" is back in this browser.${waits}`, 10_000);

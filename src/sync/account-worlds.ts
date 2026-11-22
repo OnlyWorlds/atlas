@@ -8,7 +8,8 @@
  * as a quiet error string; local rendering never waits on this.
  *
  * `openAccountWorld` is a row's click, owned or shared (#199): preconditions
- * (where it lands, the PIN when it will write) → mint this account's own key
+ * (where it lands; a member's PIN, asked after the mint; an owner's PIN is
+ * asked later, in the world, 1.125.0) → mint this account's own key
  * → download via the existing link pipeline ON the activation chain →
  * navigate home. Ordering matters: every precondition
  * resolves BEFORE the mint so a failed open never leaves an orphaned
@@ -22,7 +23,7 @@ import { mintRecordOf } from './key-takeback';
 import { navigate, homeHash } from '../core/router';
 import { findWorldByServerId, findLinkedWorld } from '../registry/registry';
 import { enqueueActivationTask } from '../core/activation-chain';
-import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
+import { linkExistingApiWorldInRoot, PinNeededError } from '../setup/atlas-root-flow';
 import { PinRefusedError } from '../setup/key-check-errors';
 import { AccountClient, accountErrorMessage, isAccountAuthError, type MintedWorldKey } from './account-client';
 import { OwV2Error } from './ow-v2-client-adapter';
@@ -197,18 +198,34 @@ export function sharedOpenLine(row: AccountWorldRow, why: ReadOnlyWhy | undefine
   return null;
 }
 
+/** What the open door says when another open holds the one-open guard (1.125.0). */
+export const OPENING_ANOTHER_LINE = 'Atlas is opening another world. Open this one again from onlyworlds.com when it is done.';
+
+/** How `#/open/<id>` opens a row (1.125.0, 2026-11-22, R2): the where-question names it, and goes down on a move. */
+export interface AccountOpenOpts {
+  fromLink?: boolean;
+}
+
+/** The where-question's title for a link from onlyworlds.com: the first and only question, named. */
+export function openFromLinkTitle(row: AccountWorldRow): string {
+  return `Open "${row.name}"${row.role === 'owner' ? '' : ', shared with you'}, from your worlds on OnlyWorlds`;
+}
+
 /**
  * Open an account world, owned or shared with this account (#199): mint this
  * account's own key, download into a fresh folder, activate.
  */
-export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManager): Promise<boolean> {
+export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManager, opts: AccountOpenOpts = {}): Promise<boolean> {
   // One open at a time from the first click: the `opening` slice is set only
   // after the where-question, so a double tap on a browser that asks nothing
   // started two opens and made two keys.
-  if (openStarted) return false;
+  if (openStarted) {
+    if (opts.fromLink) toasts.info(OPENING_ANOTHER_LINE);
+    return false;
+  }
   openStarted = true;
   try {
-    return await openAccountWorldOnce(row, toasts);
+    return await openAccountWorldOnce(row, toasts, opts);
   } finally {
     openStarted = false;
   }
@@ -216,11 +233,14 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
 
 let openStarted = false;
 
-async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager): Promise<boolean> {
+async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, opts: AccountOpenOpts): Promise<boolean> {
   const state = getState();
   const token = state.registry.account_token;
   if (!token) return false;
-  if (state.accountWorlds.opening) return false; // one open at a time
+  if (state.accountWorlds.opening) { // one open at a time
+    if (opts.fromLink) toasts.info(OPENING_ANOTHER_LINE);
+    return false;
+  }
   // Without the folder picker the world lands in this browser: ask the
   // browser to keep worlds inside the click, before the first await
   // (contract §2.3).
@@ -238,27 +258,27 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
   // with the home folder asked for inside it when the folder is the answer
   // and none is set. A Cancel is the user's answer: stop quietly.
   const { askWhere } = await import('../ui/where-choice');
+  // From a link (1.125.0, R2) the question is the arrival's first and only one, named, and it goes down
+  // on the tour's start or a real move of the address, as the public ask does.
   const where = await askWhere({
-    title: `Open "${row.name}"`,
+    title: opts.fromLink ? openFromLinkTitle(row) : `Open "${row.name}"`,
     action: 'Open',
     purpose: 'Opening an online world downloads it into a new folder.',
     toasts,
+    ...(opts.fromLink ? { putDownOnMove: true } : {}),
   });
   if (!where) return false;
   // A guest reads, so only a world that opens to write asks for the PIN. The
-  // owner is asked before the mint (keel's create requires a PIN, so they
-  // have one). A member is asked only after it: the mint says whether their
-  // account has a PIN at all, and one who joined with a new account has none
-  // and opens to read without a question they cannot answer (#294's walk).
+  // owner is asked nothing here (1.125.0, 2026-11-22, R3): keel reads the key just
+  // made without a PIN, so the world comes down with none kept and asks for it
+  // in the world (the pill's Add PIN, the first change), where onlyworlds.com
+  // says it will. A member is asked only after the mint, as before: the mint
+  // says whether their account has a PIN at all, and one who joined with a new
+  // account has none and opens to read without a question they cannot answer
+  // (#294's walk).
   let pin = state.registry.pin;
   let enteredPin: string | null = null;
-  if (!pin && opensToWrite(row) && row.role === 'owner') {
-    enteredPin = await new PinPromptModal().prompt(
-      `Opening "${row.name}": Atlas needs your OnlyWorlds PIN to sync edits. It is saved in settings for every online world.`
-    );
-    if (!enteredPin) return false;
-    pin = enteredPin;
-  }
+  const pinLater = !pin && opensToWrite(row) && row.role === 'owner';
   // A sign-in in another tab while the questions waited replaced the token, and the old one is
   // revoked (conv. 179): stop here rather than say the new one was refused.
   if (getState().registry.account_token !== token) {
@@ -279,7 +299,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
     // A member with a PIN on their account and none saved here: asked now,
     // with the overlay down. A Cancel takes the new key back, so a refusal
     // leaves nothing on keel.
-    if (!pin && !readOnly) {
+    if (!pin && !readOnly && !pinLater) {
       overlay.hide();
       enteredPin = await new PinPromptModal().prompt(
         `Opening "${row.name}", shared with you: Atlas needs your OnlyWorlds PIN to save your edits. It is the one PIN of your account, set on onlyworlds.com in Account settings under World PIN.`
@@ -301,8 +321,9 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
       linkExistingApiWorldInRoot({
         where,
         apiKey: minted.key,
-        apiPin: readOnly ? '' : pin!,
+        apiPin: readOnly ? '' : (pin ?? ''),
         readOnly,
+        ...(pinLater ? { pinLater: true } : {}),
         displayName: row.name,
         knownWorld: { id: row.id, name: row.name },
         keyMint: mintRecordOf(minted.key, minted.id),
@@ -317,9 +338,10 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
         },
       })
     ).catch(async (err: unknown) => {
-      // keel refused the PIN beside the key made a moment ago: nothing was
+      // keel refused the PIN beside the key made a moment ago, or the owner's
+      // key turned out to need a PIN to read (`pinLater` refused): nothing was
       // kept, so the key goes back too.
-      if (err instanceof PinRefusedError) await client.revokeWorldKey(row.id, minted.id).catch(() => {});
+      if (err instanceof PinRefusedError || err instanceof PinNeededError) await client.revokeWorldKey(row.id, minted.id).catch(() => {});
       throw err;
     });
     overlay.update('Opening…');
@@ -327,7 +349,12 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager):
     // ---- Complete the handoff (R5 — parity with LinkWorldModal) ----
     navigate(homeHash(result.entry.id));
     if (result.failures.length > 0) {
-      toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
+      // With the PIN later, a refresh first asks for the PIN (1.125.0): say so.
+      const n = result.failures.length;
+      const what = `${n} element${n === 1 ? '' : 's'} did not download`;
+      toasts.error(pinLater
+        ? `Opened ${row.name}. ${what}: once your World PIN is in, a refresh from OnlyWorlds brings ${n === 1 ? 'it' : 'them'}.`
+        : `Opened ${row.name}. ${what}. Refresh from OnlyWorlds brings ${n === 1 ? 'it' : 'them'}.`);
     } else {
       toasts.success(`Opened ${row.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'}`);
     }

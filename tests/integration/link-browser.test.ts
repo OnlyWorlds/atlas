@@ -43,7 +43,7 @@ vi.mock('../../src/sync/sync-attach', async (importOriginal) => ({
   attachSyncEngine: vi.fn(),
 }));
 
-import { linkExistingApiWorldInRoot, BROWSER_STORAGE_FULL } from '../../src/setup/atlas-root-flow';
+import { linkExistingApiWorldInRoot, BROWSER_STORAGE_FULL, PinNeededError } from '../../src/setup/atlas-root-flow';
 import { DownloadCancelledError } from '../../src/sync/initial-download';
 import { attachSyncEngine } from '../../src/sync/sync-attach';
 import { storeHandle } from '../../src/store/handle-vault';
@@ -217,5 +217,25 @@ describe('linking a world into this browser', () => {
     expect(getState().registry.worlds).toHaveLength(0);
     expect(home()?.children.size ?? 0).toBe(0);
     expect(attachSyncEngine).not.toHaveBeenCalled();
+  });
+});
+
+describe('the owner\'s open with the PIN later (1.125.0, 2026-11-22, R3)', () => {
+  it('a v2 key with no PIN links when the caller is the owner\'s open: linked, no PIN kept, no /me asked', async () => {
+    let me = 0;
+    mswServer.use(http.get(`${TEST_BASE}/me`, () => { me++; return HttpResponse.json({ role: 'owner' }); }));
+    const { entry } = await link({ apiKey: 'ow_w_owner', apiPin: '', pinLater: true });
+    expect(entry.state).toBe('api-linked');
+    expect(entry.api?.read_only).toBeFalsy();
+    expect(getState().registry.pin).toBeUndefined();
+    expect(getState().registry.pin_state).toBeUndefined();
+    expect(me).toBe(0);
+  });
+
+  it('every other caller with no PIN is still refused, and so is a key keel cannot read without one', async () => {
+    await expect(link({ apiKey: 'ow_w_owner', apiPin: '' })).rejects.toThrow('Enter your PIN first.');
+    await expect(link({ apiKey: '1234567890', apiPin: '', pinLater: true })).rejects.toBeInstanceOf(PinNeededError);
+    expect(getState().registry.worlds).toEqual([]);
+    expect(home()?.children.size ?? 0).toBe(0);
   });
 });

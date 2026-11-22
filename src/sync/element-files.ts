@@ -46,6 +46,8 @@ export const FILES_KINDS_LINE = 'text, pdf, an image, or a world\'s own bundle';
 const EXTENSIONS = Object.keys(FILE_EXTENSIONS).map(e => `.${e}`);
 export const FILES_ACCEPT = EXTENSIONS.join(',');
 export const FILES_NOT_SYNCED_LINE = 'Files can be added once this element is on OnlyWorlds. It goes up with the next sync.';
+/** The same, in a world waiting on the World PIN (1.125.0): no sync runs until it is given. */
+export const FILES_PIN_WAITS_LINE = 'Files can be added once this element is on OnlyWorlds. It goes up once you add your World PIN.';
 
 // --- Sizes ------------------------------------------------------------------
 

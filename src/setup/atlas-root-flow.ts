@@ -17,7 +17,7 @@ import {
   ATLAS_ROOT_SUBFOLDER,
   ATLAS_ROOT_SUBFOLDER_LEGACY_NAMES,
 } from '../core/constants';
-import { readsOnlyByShape } from '../core/key-scope';
+import { readsOnlyByShape, readsWithoutPin } from '../core/key-scope';
 import { getState, patchSlice } from '../core/state';
 import { pickDirectory } from '../ui/directory-picker';
 import { storeHandle, loadHandle, ensureWritable, deleteHandle, listHandleKeys, queryWritable } from '../store/handle-vault';
@@ -925,6 +925,31 @@ export interface LinkExistingApiWorldOpts {
    * so that removing the world can take the key back on the account.
    */
   keyMint?: { id: string; tail: string };
+  /**
+   * The owner's open from the account list (1.125.0, 2026-11-22, R3): a write link
+   * with no PIN, asked later in the world. Let past the PIN's refusal only
+   * for a key keel reads without one (`readsWithoutPin`); the world
+   * registers linked with no PIN kept and no engine, as Bring it down again
+   * lands one (law 129). The one caller that passes it is `openAccountWorld`.
+   */
+  pinLater?: boolean;
+}
+
+/** A write link with no PIN, refused for a key keel cannot read without one (`pinLater` beside a ten-digit key). */
+export class PinNeededError extends PlainError {
+  constructor() {
+    super('This world\'s key needs your World PIN to open. Add your World PIN in Settings, under OnlyWorlds, then open the world again.');
+  }
+}
+
+/**
+ * A write link with no PIN is refused, unless it is the owner's open (`pinLater`, 1.125.0) beside a key keel
+ * reads without one. Null when the link may go on.
+ */
+export function linkPinRefusal(apiKey: string, apiPin: string, readOnly: boolean, pinLater?: boolean): PlainError | null {
+  if (apiPin || readOnly) return null;
+  if (pinLater) return readsWithoutPin(apiKey) ? null : new PinNeededError();
+  return new PlainError('Enter your PIN first.');
 }
 
 export interface LinkExistingApiWorldResult {
@@ -998,7 +1023,8 @@ export async function linkExistingApiWorldInRoot(
   // already says must never happen from a view-only link).
   let apiPin = readOnly ? '' : opts.apiPin.trim();
   // View-only links run on a READ key — keel reads are keyless-PIN.
-  if (!apiPin && !readOnly) throw new PlainError('Enter your PIN first.');
+  const noPin = linkPinRefusal(apiKey, apiPin, readOnly, opts.pinLater);
+  if (noPin) throw noPin;
   // A seat (#104): its secret is this world's PIN alone, kept on its entry.
   let seat = readOnly ? undefined : (opts.seat ?? (isSeatSecret(apiPin) ? {} : undefined));
 
@@ -1121,22 +1147,27 @@ export async function linkExistingApiWorldInRoot(
   // can rebuild the engine from registry+world.json alone.
   const store = new FsFolderStore();
   await store.open(worldHandle);
-  await store.writeWorldMeta(linkedWorldMeta({
-    serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat,
-  }));
 
   // Initial download — all elements of all types stamped with
   // `server_updated_at`, fetched over the v2 dialect.
   const adapter = buildV2Adapter(apiKey, apiPin);
   let downloadResult;
   try {
+    await store.writeWorldMeta(linkedWorldMeta({
+      serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat,
+    }));
     downloadResult = await initialDownloadAll(store, adapter, opts.onProgress, opts.shouldStop);
+    // Its settings and own words come down with it.
+    await seedLinkedWorldMeta(store, adapter);
   } catch (err) {
+    // Any failure before the commit point closes the store, so its heartbeat and its Web Lock end
+    // here: left open, this page's own lock would hold the folder until the page closed, and opening
+    // the folder again here would ask to take it over from another tab.
+    await store.close().catch(() => {});
     if (err instanceof DownloadCancelledError) {
       // Cancel = nothing kept. The folder and its vault handle were created by
       // THIS call a moment ago (the collision guard above never reuses an
       // existing folder), so removing them touches nothing the user owned.
-      await store.close().catch(() => {});
       await rootHandle.removeEntry(subName, { recursive: true }).catch((e) => {
         console.warn('[link-api] could not remove the cancelled folder:', e);
       });
@@ -1144,8 +1175,6 @@ export async function linkExistingApiWorldInRoot(
     }
     throw err;
   }
-  // Its settings and own words come down with it.
-  await seedLinkedWorldMeta(store, adapter);
 
   // The commit point: the download succeeded, so leave the prior world now.
   await releasePriorWorld();

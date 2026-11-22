@@ -8,7 +8,8 @@
  * one, or while the world is still loading. A download hides it until the
  * world changed since AND a week has passed; × hides it for a week. A world
  * that is online, or exported as JSON, still gets it, reduced: the account or
- * the file holds the elements but not what Atlas keeps beside them.
+ * the file holds the elements but not what Atlas keeps beside them. A linked
+ * world waiting on the World PIN is not online here: it saves nothing there yet.
  *
  * Named limit: "changed" is the newest `local_updated_at` of the elements the
  * home holds; notes, charts, styles and the world's name do not move it.
@@ -39,9 +40,9 @@ export interface KeepSafeStrand {
  * gate). The story of a strand still being made does not ask: its text is the journey's first answer.
  * Any other written story still does.
  */
-function worthKeeping(entry: WorldRegistryEntry, elements: Element[], strand: KeepSafeStrand | null): boolean {
+function worthKeeping(entry: WorldRegistryEntry, elements: Element[], strand: KeepSafeStrand | null, online: boolean): boolean {
   if (elements.length >= KEEPSAFE_THRESHOLD) return true;
-  if (strand?.whole && entry.state !== 'api-linked' && !entry.kept_export_at) return true;
+  if (strand?.whole && !online && !entry.kept_export_at) return true;
   const strandStory = strand ? strand.story : null;
   return elements.some(el => {
     const e = el as Element & { story?: unknown; image_url?: unknown; image_media_id?: unknown };
@@ -67,12 +68,18 @@ export function keepSafeCard(input: {
   now: number;
   /** The world's strand (`keepSafeStrand`); null or absent when the world is not the open one. */
   strand?: KeepSafeStrand | null;
+  /**
+   * Linked and waiting on the World PIN (`waitsOnPin`, 1.125.0): nothing made here has reached
+   * onlyworlds.com yet, so the card is the full one, never "Your OnlyWorlds account holds".
+   */
+  waitsOnPin?: boolean;
 }): KeepSafeCard | null {
   const { entry, elements, loading, now } = input;
   if (!entry || loading || !isBrowserWorld(entry) || entry.demo === true || entry.cleared_at) return null;
   // A view-only copy (conv. 177) is kept safe by the world it copies.
   if (entryIsViewOnly(entry)) return null;
-  if (!worthKeeping(entry, elements, input.strand ?? null)) return null;
+  const online = entry.state === 'api-linked' && !!entry.api && !input.waitsOnPin;
+  if (!worthKeeping(entry, elements, input.strand ?? null, online)) return null;
   const snoozed = Date.parse(entry.keep_nudge_snoozed_until ?? '');
   if (Number.isFinite(snoozed) && now < snoozed) return null;
   const downloaded = Date.parse(entry.kept_download_at ?? '');
@@ -80,7 +87,7 @@ export function keepSafeCard(input: {
     const changedSince = newestChangeAt(elements) > downloaded;
     if (!changedSince || now < downloaded + WEEK_MS) return null;
   }
-  const reduced = entry.state === 'api-linked' && entry.api ? 'online' : entry.kept_export_at ? 'export' : null;
+  const reduced = online ? 'online' : entry.kept_export_at ? 'export' : null;
   return { reduced };
 }
 
