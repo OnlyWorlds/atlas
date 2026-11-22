@@ -496,7 +496,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             ${r.updated ? `<span class="atlas-import-stat"><b>${r.updated}</b> update</span>` : ''}
             ${r.skipped ? `<span class="atlas-import-stat is-dim"><b>${r.skipped}</b> skip</span>` : ''}
             ${r.invalidRecords ? `<span class="atlas-import-stat is-warn"><b>${r.invalidRecords}</b> invalid</span>` : ''}
-            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to other elements not found in this import. The connection is dropped; each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
+            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to elements found neither in this import nor in the world. The connection is dropped; each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
           </div>
           ` : `
           <p class="atlas-import-subnote"><span class="material-symbols-outlined">info</span> Opens ${escapeText(mergeTargetName)} and merges these ${parsed.totalElements} element${parsed.totalElements === 1 ? '' : 's'} in. Existing elements are kept (choose overwrite once it's open to replace them).</p>

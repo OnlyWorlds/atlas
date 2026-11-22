@@ -134,7 +134,10 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
             // A literal value only where it is known; never a placeholder an AI would paste as written.
             suggestion: named && found.length === 1
               ? `Replace "${k}" with "${pair.typeField}": "${cap(found[0])}" and "${pair.idField}": "${named}".`
-              : `Replace "${k}" with "${pair.typeField}", the element's type (like "Character"), and "${pair.idField}", its name${named ? ` ("${named}")` : ''}.`,
+              : named && found.length === 0
+                // A name made nowhere: the two keys alone would still drop the link.
+                ? `"${named}" is not in the import or the world: add it as an element first, then replace "${k}" with "${pair.typeField}", that element's type, and "${pair.idField}": "${named}".`
+                : `Replace "${k}" with "${pair.typeField}", the element's type (${found.length ? found.map(cap).join(' or ') : 'like "Character"'}), and "${pair.idField}", its name${named ? ` ("${named}")` : ''}.`,
           });
           continue;
         }
@@ -246,7 +249,8 @@ function missingRefIssue(
         field,
         value,
         issue: `"${value}" is ${madeAs.length === 1 ? aType(madeAs[0]) : `made as ${madeAs.map(aType).join(' and as ')}`}, and "${typeField}" says ${cap(target)}`,
-        expected,
+        // Expected is copied beside the Fix: it must not ask for the twin the Fix rules out.
+        expected: `"${typeField}" naming the type "${value}" was made as`,
         suggestion: t
           ? `Set "${typeField}" to "${t}" and keep "${field}": "${value}".`
           : `Set "${typeField}" to the type "${value}" was made as (${madeAs.map(cap).join(' or ')}) and keep "${field}": "${value}".`,
@@ -261,7 +265,7 @@ function missingRefIssue(
       field,
       value,
       issue: `"${value}" is ${aType(other)}, and "${field}" takes ${aType(target)}`,
-      expected,
+      expected: `Only ${cap(target)} names in "${field}"`,
       suggestion: `"${value}" is ${aType(other)}: ${where}. No new ${cap(target)} is needed.`,
     };
   }
@@ -292,7 +296,10 @@ function untypedLinkIssue(path: string, field: string, value: string, given: unk
     expected: 'An element type, like "Character"',
     suggestion: madeAs.length === 1
       ? `"${typeField}": "${cap(madeAs[0])}"`
-      : `Set "${typeField}" to the type of the element "${value}"${madeAs.length ? ` (${madeAs.map(cap).join(' or ')})` : ', like "Character"'}.`,
+      : madeAs.length
+        ? `Set "${typeField}" to the type of the element "${value}" (${madeAs.map(cap).join(' or ')}).`
+        // A name made nowhere: a type alone would still drop the link.
+        : `"${value}" is not in the import or the world: add it as an element first, then set "${typeField}" to that element's type.`,
   };
 }
 

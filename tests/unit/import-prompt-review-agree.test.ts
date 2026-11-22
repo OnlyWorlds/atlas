@@ -98,6 +98,24 @@ describe("a Fix never loses the link it is about", () => {
     expect(issues[0].suggestion).not.toContain('"its name"');
   });
 
+  it('a Pin naming an element made nowhere is told to add it first: a type alone would still drop the link', () => {
+    for (const pin of [{ element_id: 'Zed' }, { element_id: 'Zed', element_type: 'NPC' }, { element: 'Zed' }]) {
+      const issues = review({ ...world, Pin: [{ map: 'The Coast', x: 1, y: 2, ...pin }] });
+      expect(issues).toHaveLength(1);
+      expect(issues[0].suggestion).toContain('add it as an element first');
+    }
+    // With a true type beside it, the plain "add" Fix already keeps the link.
+    const typed = review({ ...world, Pin: [{ map: 'The Coast', x: 1, y: 2, element_type: 'Character', element_id: 'Zed' }] });
+    expect(typed[0].suggestion).toMatch(/^Add a Character:/);
+  });
+
+  it('Expected never asks for the twin its Fix rules out', () => {
+    const made = review({ Collective: [{ name: 'The Guard' }], Event: [{ name: 'The Watch', characters: ['The Guard'] }] });
+    expect(made[0].expected).not.toMatch(/include|named "The Guard"/);
+    const pin = review({ ...world, Pin: [{ map: 'The Coast', element_type: 'Character', element_id: 'Vallaki', x: 1, y: 2 }] });
+    expect(pin[0].expected).not.toMatch(/include/);
+  });
+
   it('a marked key the type lacks is kept as a custom field without its mark', () => {
     const issues = review({ Character: [{ name: 'A', '#age': 30 }] });
     expect(issues[0].suggestion).toContain('"x_age"');
