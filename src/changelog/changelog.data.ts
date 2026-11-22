@@ -58,13 +58,13 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.125.5',
     date: '2026-11-22',
-    theme: 'Each refusal names the World PIN or the seat secret',
+    theme: 'The World PIN or the seat secret by name, and the Data room\'s review in reading order',
     entries: [
       {
         id: 'world-pin-or-seat-secret',
-        title: 'A refusal names the World PIN, the seat secret, or both',
-        body: 'Where Atlas cannot tell whose credential OnlyWorlds refused, the line now names both, the World PIN or seat secret, where it said this PIN or the PIN, and uploading or removing a picture, resolving a conflict, Make online\'s Create new, Bring down again and a seat\'s check before its download now name the one they sent. Lines say Check the World PIN, a seat\'s credential is spelled seat secret everywhere, and when OnlyWorlds refuses too many different seat secrets for a seat world\'s key, the line says seat secrets, not PINs. A chart not yet saved is called Unsaved chart, on the rail and as the card\'s name, where it said This chart. In the Data room\'s review, each row now leads with what is wrong and the path follows it; the note under the review says what Import does with a Pin\'s element, a link that names an element of another type and a Pin with no element_type; and a missing link asks for An existing Location, by name or id, with the type capitalised as everywhere else.',
-        tags: ['sync', 'fix'],
+        title: 'A refusal names the World PIN, the seat secret or both, an unsaved chart says so, and the review reads line first',
+        body: 'Where Atlas cannot tell whose credential OnlyWorlds refused, the line now names both, the World PIN or seat secret, where it said this PIN or the PIN, and uploading or removing a picture, resolving a conflict, Make online\'s Create new, Bring down again and a seat\'s check before its download now name the one they sent. Lines say Check the World PIN, a seat\'s credential is spelled seat secret everywhere, and when OnlyWorlds refuses too many different seat secrets for a seat world\'s key, the line says seat secrets, not PINs. A chart not yet saved is called Unsaved chart, on the rail and as the card\'s name, where it said This chart. In the Data room\'s review, each row now leads with what is wrong and the path follows it; the note under the review says what Import does with a Pin\'s element, a link that names an element of another type and a Pin with no element_type; and a missing link\'s expected value writes its type capitalised, as in An existing Location, by name or id.',
+        tags: ['sync', 'charts', 'import', 'fix'],
       },
     ],
   },
