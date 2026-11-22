@@ -11,7 +11,7 @@
  * strips them.
  */
 
-import { knownFieldsFor, relationFieldsFor } from '../editor/field-schema';
+import { knownFieldsFor, relationFieldsFor, scalarKindsFor } from '../editor/field-schema';
 import { isExtensionField, SERVER_AUTHOR_FIELDS, SERVER_MARK_FIELDS, SPATIAL_TYPES } from '../core/constants';
 import { typeName } from '../core/type-words';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
@@ -64,6 +64,7 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
     const known = knownFieldsFor(type);
     const isSpatial = SPATIAL_TYPES.has(type);
     const relBySchemaField = new Map(relationFieldsFor(type).map(r => [r.schemaField, r]));
+    const scalars = scalarKindsFor(type);
     const label = typeName(type, { world: null });
 
     records.forEach((rec, i) => {
@@ -111,6 +112,15 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
           continue;
         }
 
+        // A text or number field holding the wrong kind of value is said here, before anything is
+        // added: the file keeps whatever the import writes, and only a lint would ever say it.
+        const kind = scalars.get(k);
+        if (kind) {
+          const fault = scalarFault(kind, v);
+          if (fault) issues.push(scalarIssue(path, k, v, kind, fault, elementWords(rec, label, i)));
+          continue;
+        }
+
         // Extension-namespace fields (atlas_/x_/shadow_) are legal custom
         // data — keel v2 round-trips them; never cry wolf on them.
         // Envelope imports (spec §8c) MUST ignore unknown element fields — a
@@ -141,6 +151,44 @@ function polymorphicTarget(record: RawRecord): ElementType | null {
     return et.toLowerCase() as ElementType;
   }
   return null;
+}
+
+/**
+ * What is wrong with a scalar value, or null when the import can take it. A number field takes a number or
+ * a numeric string (normalize turns "12" into 12, as onlyworlds.com writes every scalar), an integer field a
+ * whole one; "" and null are an unset field. A text field takes a string, or a number keel keeps as text;
+ * an object, a list or a true/false is no text.
+ */
+function scalarFault(kind: 'text' | 'integer' | 'number', v: unknown): 'whole' | 'number' | 'text' | null {
+  if (v === null || v === undefined) return null;
+  if (kind === 'text') return typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)) ? null : 'text';
+  if (v === '') return null;
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+  if (!Number.isFinite(n)) return 'number';
+  return kind === 'integer' && !Number.isInteger(n) ? 'whole' : null;
+}
+
+/** The element as the review names it: its own name, or its type and place in the import. */
+function elementWords(rec: RawRecord, label: string, i: number): string {
+  return typeof rec.name === 'string' && rec.name.trim() ? `"${rec.name.trim()}"` : `${cap(label)} ${i + 1}`;
+}
+
+function scalarIssue(
+  path: string, field: string, value: unknown, kind: 'text' | 'integer' | 'number',
+  fault: 'whole' | 'number' | 'text', who: string,
+): ValidationIssue {
+  const shown = typeof value === 'string' ? `"${value}"` : Array.isArray(value) ? 'a list' : typeof value === 'object' ? 'a group of fields' : String(value);
+  const takes = kind === 'text' ? 'text' : fault === 'whole' || kind === 'integer' ? 'a whole number' : 'a number';
+  return {
+    path: `${path}.${field}`,
+    field,
+    value,
+    issue: `${who}: "${field}" takes ${takes}, and here it holds ${shown}`,
+    expected: kind === 'text' ? 'A string of text' : kind === 'integer' ? 'A whole number, like 12' : 'A number, like 1.5',
+    suggestion: kind === 'text'
+      ? `Write "${field}" as one string of text.`
+      : `Write "${field}" as ${takes}, or move the words into a text field such as "description".`,
+  };
 }
 
 function cardinalityIssue(path: string, field: string, value: unknown, expected: string): ValidationIssue {

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.2',
+    date: '2026-11-22',
+    theme: 'The Data room says a field holding the wrong kind of value',
+    entries: [
+      {
+        id: 'review-says-wrong-kind',
+        title: 'A text or number field holding the wrong kind of value is said before you import',
+        body: 'When the JSON you paste or open in the Data room puts words in a number field, such as a birth date of "the spring of 1899" or a height of "tall", or a group of fields or a list where text belongs, the review now says it, naming the element and the field, before anything is added. Numbers written as text, like "1899", are still taken as numbers, as onlyworlds.com writes them. The fix prompt for your AI carries the same lines, so it can correct the JSON for you.',
+        tags: ['import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.35',
     date: '2026-11-21',
     theme: 'A PIN OnlyWorlds refused is never sent again by itself',
