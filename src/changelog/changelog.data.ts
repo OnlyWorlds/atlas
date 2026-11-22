@@ -96,6 +96,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'When a world stays closed because another Atlas tab may have it open, the line now says tab, as the question before it does, and names what to do: close that tab and open the world again here, or open it again and choose to take it over. Opening a world that another tab may hold can take a few seconds while Atlas checks; after a second, a line now says Checking whether another tab has the world open, and it goes when the open ends.',
         tags: ['world', 'fix'],
       },
+      {
+        id: 'review-link-path-once',
+        title: 'A missing name in a list of links is pointed at once',
+        body: 'In the Data room\'s review, a name in a list of links that is not in the import or the world printed its place with the field twice, such as Character[1].rivals[1].rivals. It now reads Character[1].rivals[1], and so does the fix prompt for your AI.',
+        tags: ['import', 'fix'],
+      },
     ],
   },
   {

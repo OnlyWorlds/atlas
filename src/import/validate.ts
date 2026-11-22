@@ -96,7 +96,7 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
             if (v !== null && v !== '' && typeof v !== 'string') {
               issues.push(cardinalityIssue(path, k, v, 'A single element name or id (string)'));
             } else if (typeof v === 'string' && v.trim() && !isUuid(v) && target && !nameExists(target, v)) {
-              issues.push(missingRefIssue(path, k, v, target));
+              issues.push(missingRefIssue(`${path}.${k}`, k, v, target));
             }
           } else {
             if (v !== undefined && v !== null && !Array.isArray(v)) {
@@ -202,9 +202,10 @@ function cardinalityIssue(path: string, field: string, value: unknown, expected:
   };
 }
 
+/** `path` is the link's whole path: `Character[1].birthplace`, or in a list `Character[1].rivals[1]`. */
 function missingRefIssue(path: string, field: string, value: string, target: ElementType): ValidationIssue {
   return {
-    path: `${path}.${field}`,
+    path,
     field,
     value,
     issue: `"${value}" not found in the import or the existing world`,
