@@ -3,10 +3,9 @@
  * Promoted from the composition gate (lens B).
  * Gate lens B (app side of Route 2). Each test asserts the FIXED
  * behaviour: RED today = the finding reproduced. Promote by moving into
- * tests/integration/make-online-run.test.ts once the keeper fixes it.
+ * tests/integration/make-online-run.test.ts once the finding is fixed.
  *
- * Run: from tools/atlas,
- *   npx vitest run --config ../../Notes/Archive/2026-09-29-s367-gate/probes/lens-b/vitest.lensb.config.ts
+ * Run with a local probe config (2026-09-29, not in this repository).
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { MockFolderStore } from '../../fixtures/mock-folder-store';

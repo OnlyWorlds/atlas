@@ -26,7 +26,7 @@ describe('worldCalendars', () => {
     const elements: Element[] = [
       el({ id: 'c1', type: 'construct', name: 'Imperial Reckoning', supertype: 'calendar', atlas_calendar: CONFIG } as never),
       // Lore-only "Calendar" Construct: supertype says calendar, no config —
-      // must NOT surface as a lens (Skeld's swap).
+      // must NOT surface as a lens (a case raised in review).
       el({ id: 'c2', type: 'construct', name: 'The Old Calendar', supertype: 'Calendar' }),
       // Config on a non-construct still counts (presence is the whole rule).
       el({ id: 'c3', type: 'phenomenon', name: 'Tide Count', atlas_calendar: CONFIG } as never),

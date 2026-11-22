@@ -4,7 +4,7 @@
  * Independent from statefulV2Handlers (element CRUD / bulk / changes): the
  * account wall authenticates with `Authorization: Bearer ow_a_...` and NOTHING
  * else — no API-Key / API-Pin. Wire contract pinned from keel source 2026-07-13
- * (see src/sync/account-client.ts header + Notes/2026-07-13-account-mode-design.md):
+ * (see src/sync/account-client.ts header):
  *
  *   GET  /account                    → 200 {id, username, email, date_joined}
  *   GET  /account/worlds             → 200 {data:[AccountWorldRow]}
@@ -189,7 +189,7 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
     // (`accountHasPin`, else 409 pin_required, membership.mint_member_key).
     // Optional {name} (live 2026-07-13): stored verbatim + echoed, "" when
     // absent, >255 chars → 422 param=name. Unknown body fields are silently
-    // IGNORED (spec §2 — the route never 422'd unknowns; Skeld's correction).
+    // IGNORED (spec §2 — the route never 422'd unknowns; a later correction).
     http.post(`${base}/account/worlds/:id/keys`, async ({ request, params }) => {
       const fail = authFail(request);
       if (fail) return fail;

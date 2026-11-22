@@ -5,9 +5,9 @@ imperfect, that any implementation claiming to READ the OnlyWorlds Folder
 Format can run against. It answers "does your reader handle X?" with a failing
 test instead of a question asked of a person.
 
-**Created**: 2026-07-28 (Temper) · fixture **v1.2.2** · built to
-folder-format spec **v0.3.6** · proposed by Kael, adopted by every
-pass of Skeld's review round. **Report the fixture version you ran** —
+**Created**: 2026-07-28 · fixture **v1.2.2** · built to
+folder-format spec **v0.3.6** · proposed by the format's author, adopted by every
+pass of the spec review round. **Report the fixture version you ran** —
 `expected.json`'s `fixture_history` says what each one contained, and 1.0.0
 shipped two different answer keys under one string before that array existed.
 Destined for a public sibling repo alongside the spec; built portable (plain
@@ -95,7 +95,7 @@ and which are just underspecified.
 
 - **`only-name`'s type.** The body declares none. A reader may infer `character`
   from the directory or serve the element untyped; both conform. **Recommended
-  (Quillon's reading, adopted 2026-07-29): infer it, but FLAG it** —
+  (an independent reader's reading, adopted 2026-07-29): infer it, but FLAG it** —
   surface the inference as inferred rather than as a declaration, and never
   write it back to disk. Two readers that both infer silently will agree on the
   field and differ on whether a caller can tell, which is the worse failure.

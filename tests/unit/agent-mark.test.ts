@@ -1,6 +1,6 @@
 /**
  * #347: the quiet mark on agent-made work. Since 1.68.1 the SEAT decides, not
- * the door (Skeld 2026-10-21: keel's MCP takes a person's own key): with the
+ * the door (2026-10-21: keel's MCP takes a person's own key): with the
  * roster, the row for changed_by decides and the door is said beside it; a seat
  * and a declared client are agents by definition; only without a roster, or
  * for a membership it does not hold yet, does the door decide alone.
@@ -17,7 +17,7 @@ const el = (extra: Record<string, unknown>): Element =>
   ({ id: 'e1', type: 'character', name: 'Rhea', ...extra }) as unknown as Element;
 const roster: OwMember[] = [
   { id: null, kind: 'owner', role: 'owner', character: null, status: 'active', lenses: [], lenses_from: 'chosen' },
-  { id: SEAT, kind: 'agent', role: 'contributor', character: CHAR, status: 'active', lenses: [], lenses_from: 'chosen', name: 'Skeld' },
+  { id: SEAT, kind: 'agent', role: 'contributor', character: CHAR, status: 'active', lenses: [], lenses_from: 'chosen', name: 'Sable' },
   { id: PERSON, kind: 'person', role: 'co_builder', character: null, status: 'active', lenses: [], lenses_from: 'chosen' },
 ];
 const names = (id: string) => (id === CHAR ? 'The Boatswain' : undefined);
@@ -36,16 +36,16 @@ describe('agentMarkFor', () => {
 
   it('an agent\'s membership marks through any door, the door said beside it', () => {
     expect(agentMarkFor(el({ changed_via: 'api', changed_by: SEAT }), roster, names)?.line)
-      .toBe('Last changed by Skeld, an agent, through the API');
+      .toBe('Last changed by Sable, an agent, through the API');
     expect(agentMarkFor(el({ changed_via: 'mcp', changed_by: SEAT }), roster, names)?.line)
-      .toBe('Last changed by Skeld, an agent, through MCP');
+      .toBe('Last changed by Sable, an agent, through MCP');
     expect(agentMarkFor(el({ changed_via: 'server', changed_by: SEAT }), roster, names)?.line)
-      .toBe('Last changed by Skeld, an agent');
+      .toBe('Last changed by Sable, an agent');
   });
 
   it('an agent seat is named from the roster', () => {
     expect(agentMarkFor(el({ changed_via: 'seat', changed_by: SEAT }), roster, names)?.line)
-      .toBe('Last changed by Skeld, an agent');
+      .toBe('Last changed by Sable, an agent');
   });
 
   it('a seat with no name of its own is named by its Character', () => {
@@ -71,6 +71,6 @@ describe('agentMarkFor', () => {
     expect(agentMarkFor(el({ changed_via: 'declared', changed_by: PERSON }), roster, names)?.line)
       .toBe('Last changed by an agent (the tool said so)');
     expect(agentMarkFor(el({ changed_via: 'declared', changed_by: SEAT }), roster, names)?.line)
-      .toBe('Last changed by Skeld, an agent (the tool said so)');
+      .toBe('Last changed by Sable, an agent (the tool said so)');
   });
 });

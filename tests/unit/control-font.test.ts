@@ -4,7 +4,7 @@
  * named a family drew its words in Arial (the Settings tabs, the chart chips,
  * the filter counts). One zero-specificity rule at the top of atlas.css hands
  * every control the page's face; a class that sets its own (the icon font)
- * still wins. The live check is `Notes/ui-snapshots/2026-10-20-s446/button-fonts.mjs`.
+ * still wins. The live check was a local script of 2026-10-20, not in this repository.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

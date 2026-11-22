@@ -1,5 +1,5 @@
 /**
- * SyncEngine resume() last_sync_at preservation (Bout BB / M7 fix).
+ * SyncEngine resume() last_sync_at preservation (M7 fix).
  *
  * Pre-fix, `resume()` unconditionally set state to `{kind:'idle', last_sync_at:
  * null}` — even if a prior sync round had stamped a fresh `last_sync_at`. The

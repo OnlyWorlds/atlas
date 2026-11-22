@@ -143,7 +143,7 @@ async function opensAndReopens(page: Page, folder: boolean) {
 
   if (folder) {
     // In another world, a link never moves the person out of it without
-    // their click (Kael, 2026-10-16): it asks, and Open it opens.
+    // their click (2026-10-16): it asks, and Open it opens.
     await page.click('[data-action="create-local"]');
     await page.fill('input[name="world-name"]', 'Other Desk');
     await page.click('[data-modal="create-world"] [data-action="pick"]');
@@ -217,7 +217,7 @@ test('signed out, a card holds the sign-in, never Settings by itself; its Email 
   await page.click('[data-action="account-sign-in"]');
   // Signed in, with a world open nowhere and the folder picker here: the named where-question, at once.
   await expect(page.locator('[data-modal="where-ask"] .atlas-modal-title')).toHaveText('Open "Open Realm", from your worlds on OnlyWorlds');
-  // The ask to sign in is answered, so it is gone (Kael's walk, 2026-10-16).
+  // The ask to sign in is answered, so it is gone (a collaborator's walk, 2026-10-16).
   await expect(page.locator('.ow-toast', { hasText: 'Sign in here with your OnlyWorlds account' })).toHaveCount(0);
   expect(keel.mints).toBe(0);
 });

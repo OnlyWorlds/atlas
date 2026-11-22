@@ -1,5 +1,5 @@
 /**
- * A linked world's public page (Skeld 2026-10-23): Settings'
+ * A linked world's public page (2026-10-23): Settings'
  * OnlyWorlds tab reads keel's `GET /world` live and, when the owner turned the
  * page on, offers "View its public page" at `/w/<slug>` (else the world id).
  * Off, the tab says nothing about it. keel routed as it answers on 2026-10-23

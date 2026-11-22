@@ -68,7 +68,7 @@ describe('memberRoleLine: Settings says the role, not the scope alone (I5)', () 
   });
 });
 
-describe('keel\'s 409 reason, read off the wire (Skeld 2026-10-20)', () => {
+describe('keel\'s 409 reason, read off the wire (2026-10-20)', () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
   async function refusalFor(body: unknown): Promise<unknown> {

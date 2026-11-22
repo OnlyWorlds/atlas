@@ -1,7 +1,7 @@
 /**
- * sync-attach flush-before-pull sequencing test (Bout BB).
+ * sync-attach flush-before-pull sequencing test.
  *
- * Pre-Bout-BB, `attachSyncEngine` fired pull-on-activate and flush-on-attach as
+ * Before the fix, `attachSyncEngine` fired pull-on-activate and flush-on-attach as
  * two separate fire-and-forget paths. Both then raced for the engine's shared
  * `inFlight` lock. In practice the pull always won (its `pullNow()` is
  * synchronous through the inFlight assignment, while flush awaits two folder
@@ -70,7 +70,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('sync-attach: flush runs before pull-on-activate (Bout BB)', () => {
+describe('sync-attach: flush runs before pull-on-activate', () => {
   it('calls engine.pushOnce before engine.pullNow when pending writes + pull-on-activate are both present', async () => {
     const folder = new MockFolderStore();
     await folder.open(null);

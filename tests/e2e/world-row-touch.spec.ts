@@ -1,5 +1,5 @@
 /**
- * #303, from Titus's own phone (Boss 2026-10-15): the world row
+ * #303, from Titus's own phone (2026-10-15): the world row
  * was a control (`role="button"`) holding the star and sync buttons, axe's
  * nested-interactive; and with the Worlds drawer open, the update banner
  * covered the drawer's footer row. The row's name is now its one button, and
@@ -20,7 +20,7 @@ async function makeWorld(page: Page, name: string): Promise<void> {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  // Creating a world flips the sidebar into elements mode (S255v3).
+  // Creating a world flips the sidebar into elements mode.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 

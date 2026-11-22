@@ -286,13 +286,13 @@ test('a map shows its pins by their element\'s dates: a birth on, an event insid
   await page.evaluate(async () => {
     const { mapTabCache } = await import('/src/tabs/right/map-tab-cache.ts');
     const w = window as any;
-    w.__s416 = { update: 0, add: 0 };
+    w.__pinWrites = { update: 0, add: 0 };
     for (const entry of mapTabCache.values()) {
       const m = entry.manager as any;
       const update = m.updatePin.bind(m);
       const add = m.addPin.bind(m);
-      m.updatePin = (...a: unknown[]) => { w.__s416.update++; return update(...a); };
-      m.addPin = (...a: unknown[]) => { w.__s416.add++; return add(...a); };
+      m.updatePin = (...a: unknown[]) => { w.__pinWrites.update++; return update(...a); };
+      m.addPin = (...a: unknown[]) => { w.__pinWrites.add++; return add(...a); };
     }
   });
   await slider.focus();
@@ -301,7 +301,7 @@ test('a map shows its pins by their element\'s dates: a birth on, an event insid
   await expect(pins).toHaveCount(3);
   await page.keyboard.press('End');
   await expect(pins).toHaveCount(2);
-  expect(await page.evaluate(() => (window as any).__s416)).toEqual({ update: 0, add: 0 });
+  expect(await page.evaluate(() => (window as any).__pinWrites)).toEqual({ update: 0, add: 0 });
 
   // New pin, placing an element by name while the date hides it.
   const placeByName = async (type: string, prefix: string) => {

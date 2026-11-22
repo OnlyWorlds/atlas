@@ -11,8 +11,8 @@ import type { Element, WorldRegistryEntry } from '../../src/core/types';
 const el = (o: Record<string, unknown>): Element => o as unknown as Element;
 const world = [
   el({ id: 'c1', type: 'character', name: 'Codex' }),
-  el({ id: 'c2', type: 'character', name: 'BB' }),
-  el({ id: 'c3', type: 'character', name: 'Kael' }),
+  el({ id: 'c2', type: 'character', name: 'Bea' }),
+  el({ id: 'c3', type: 'character', name: 'Kit' }),
 ];
 const members = [{ id: null, character: 'c1' }, { id: 'm2', character: 'c2' }, { id: 'm3', character: 'c3' }];
 
@@ -28,16 +28,16 @@ function said(o: Record<string, unknown>, roster: typeof members | null = null, 
 
 describe('the message line says what the profile proves', () => {
   it('a proved sender reads plainly, and only then', () => {
-    expect(said({ narrator: 'c2', created_by: 'm2', characters: ['c3'] }, members)).toBe('From BB · To Kael');
-    expect(said({ narrator: 'c2', created_by: 'm2', characters: ['c3'] })).toBe('Claims to be from BB · To Kael');
-    expect(said({ narrator: 'c2', characters: ['c3'] }, members)).toBe('Claims to be from BB · To Kael');
+    expect(said({ narrator: 'c2', created_by: 'm2', characters: ['c3'] }, members)).toBe('From Bea · To Kit');
+    expect(said({ narrator: 'c2', created_by: 'm2', characters: ['c3'] })).toBe('Claims to be from Bea · To Kit');
+    expect(said({ narrator: 'c2', characters: ['c3'] }, members)).toBe('Claims to be from Bea · To Kit');
   });
 
   it('a mismatch names the key that wrote it', () => {
     expect(said({ narrator: 'c1', created_by: 'm3', characters: ['c2'] }, members))
-      .toBe("Claims to be from Codex, written by Kael's key · To BB");
+      .toBe("Claims to be from Codex, written by Kit's key · To Bea");
     expect(said({ narrator: 'c1', created_by: 'm9', characters: ['c2'] }, [...members, { id: 'm9', character: 'c9' }]))
-      .toBe("Claims to be from Codex, written by another member's key · To BB");
+      .toBe("Claims to be from Codex, written by another member's key · To Bea");
   });
 
   it('an empty list is everyone, a list of nothing valid is nobody', () => {
@@ -46,12 +46,12 @@ describe('the message line says what the profile proves', () => {
   });
 
   it('ids Atlas holds no Character for are counted, never named', () => {
-    expect(said({ narrator: 'gone', characters: ['c2', 'x1', 'x2'] })).toBe('Claims to be from someone not shown here · To BB and 2 others not shown here');
+    expect(said({ narrator: 'gone', characters: ['c2', 'x1', 'x2'] })).toBe('Claims to be from someone not shown here · To Bea and 2 others not shown here');
     expect(said({ narrator: 'c1', characters: ['x1'] })).toBe('Claims to be from Codex · To someone not shown here');
   });
 
   it('no Narrator is from nobody, never to everyone', () => {
-    expect(said({ characters: ['c2'] })).toBe('From nobody · To BB');
+    expect(said({ characters: ['c2'] })).toBe('From nobody · To Bea');
     expect(said({ characters: [] })).toBe('(no line)');
   });
 
@@ -70,10 +70,10 @@ describe('the message line says what the profile proves', () => {
     expect(readsWholeWorld(local, { exported_as: { kind: 'character' } })).toBe(false);
   });
 
-  it('a key that does not read the whole world never says everyone or nobody alone (the S484 gate G1)', () => {
+  it('a key that does not read the whole world never says everyone or nobody alone (review gate G1)', () => {
     // keel strips links to what the key cannot see, so an empty list may be a private message.
     expect(said({ narrator: 'c1', characters: [] }, null, false)).toBe('Claims to be from Codex · To everyone, or someone hidden from you');
-    expect(said({ characters: ['c2'] }, null, false)).toBe('From nobody, or someone hidden from you · To BB');
+    expect(said({ characters: ['c2'] }, null, false)).toBe('From nobody, or someone hidden from you · To Bea');
   });
 
   // #888: keel names in `x_served_trimmed` each field it served with ids this key may not see left out.
@@ -82,32 +82,32 @@ describe('the message line says what the profile proves', () => {
     expect(said({ narrator: 'c1', characters: [], ...trimmed }, null, false)).toBe('Claims to be from Codex · To someone you cannot see');
     expect(said({ narrator: 'c1', characters: [], ...trimmed })).toBe('Claims to be from Codex · To someone you cannot see');
     expect(said({ narrator: 'c1', ...trimmed }, null, false)).toBe('Claims to be from Codex · To someone you cannot see');
-    expect(said({ narrator: 'c1', characters: ['c2'], ...trimmed }, null, false)).toBe('Claims to be from Codex · To BB and someone you cannot see');
+    expect(said({ narrator: 'c1', characters: ['c2'], ...trimmed }, null, false)).toBe('Claims to be from Codex · To Bea and someone you cannot see');
     expect(said({ narrator: 'c1', characters: ['c2', 'x1'], ...trimmed }, null, false))
-      .toBe('Claims to be from Codex · To BB, someone not shown here and someone you cannot see');
+      .toBe('Claims to be from Codex · To Bea, someone not shown here and someone you cannot see');
   });
 
   it('a sender served trimmed is from someone you cannot see, never from nobody, proved or not', () => {
     const trimmed = { narrator: null, x_served_trimmed: ['narrator'] };
-    expect(said({ characters: ['c2'], ...trimmed }, null, false)).toBe('From someone you cannot see · To BB');
-    expect(said({ characters: ['c2'], created_by: 'm2', ...trimmed }, members, false)).toBe('From someone you cannot see · To BB');
+    expect(said({ characters: ['c2'], ...trimmed }, null, false)).toBe('From someone you cannot see · To Bea');
+    expect(said({ characters: ['c2'], created_by: 'm2', ...trimmed }, members, false)).toBe('From someone you cannot see · To Bea');
     // A field the mark does not name lost nobody: an empty list is everyone, unhedged (the gate's G2), and the line is drawn.
     expect(said({ characters: [], ...trimmed }, null, false)).toBe('From someone you cannot see · To everyone');
     expect(said({ narrator: null, characters: ['c2'], x_served_trimmed: ['characters'] }, null, false))
-      .toBe('From nobody · To BB and someone you cannot see');
+      .toBe('From nobody · To Bea and someone you cannot see');
     expect(said({ characters: [], narrator: null, x_served_trimmed: ['narrator', 'characters'] }, null, false))
       .toBe('From someone you cannot see · To someone you cannot see');
   });
 
   it('named recipients join with commas as before; " and " only before what is not named (the #888 gate\'s G1)', () => {
-    expect(said({ narrator: 'c1', characters: ['c2', 'c3'] })).toBe('Claims to be from Codex · To BB, Kael');
-    expect(said({ narrator: 'c1', characters: ['c2', 'c3', 'c1'] })).toBe('Claims to be from Codex · To BB, Kael, Codex');
-    expect(said({ narrator: 'c1', characters: ['c2', 'c3'], x_served_trimmed: ['characters'] })).toBe('Claims to be from Codex · To BB, Kael and someone you cannot see');
+    expect(said({ narrator: 'c1', characters: ['c2', 'c3'] })).toBe('Claims to be from Codex · To Bea, Kit');
+    expect(said({ narrator: 'c1', characters: ['c2', 'c3', 'c1'] })).toBe('Claims to be from Codex · To Bea, Kit, Codex');
+    expect(said({ narrator: 'c1', characters: ['c2', 'c3'], x_served_trimmed: ['characters'] })).toBe('Claims to be from Codex · To Bea, Kit and someone you cannot see');
     expect(said({ narrator: 'c1', characters: ['x1', 'x2'], x_served_trimmed: ['characters'] })).toBe('Claims to be from Codex · To 2 not shown here and someone you cannot see');
   });
 
   it('a mark that names neither field changes nothing', () => {
     expect(said({ narrator: 'c1', characters: [], x_served_trimmed: [] })).toBe('Claims to be from Codex · To everyone');
-    expect(said({ characters: ['c2'], x_served_trimmed: ['characters'].slice(1) })).toBe('From nobody · To BB');
+    expect(said({ characters: ['c2'], x_served_trimmed: ['characters'].slice(1) })).toBe('From nobody · To Bea');
   });
 });

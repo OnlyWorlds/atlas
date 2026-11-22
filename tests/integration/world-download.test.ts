@@ -165,7 +165,7 @@ describe('downloadWorld', () => {
   });
 });
 
-// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld 2026-10-22; SDK 4.63.0):
+// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; 2026-10-22; SDK 4.63.0):
 // a download leaves a producer's private records out unless the person asks.
 describe('downloadWorld and private records', () => {
   const list = (body: unknown) => world.put('records/RECORDS.json', typeof body === 'string' ? body : JSON.stringify(body));

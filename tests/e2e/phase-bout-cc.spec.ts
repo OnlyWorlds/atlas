@@ -55,7 +55,7 @@ test.describe('Bout CC — sidebar toggle + gear + selection UX', () => {
 
   test('right tab is hidden when no world is active', async ({ page }) => {
     await freshBoot(page);
-    // Pre-root the whole sidebar header is silent (S255v3) — the toggle only
+    // Pre-root the whole sidebar header is silent — the toggle only
     // exists once an atlas root is set. Set one up (no world) so the test's
     // real subject — no right tab without an active world — is observable.
     await setupAtlasRoot(page);

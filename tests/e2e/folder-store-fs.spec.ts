@@ -678,7 +678,7 @@ test('still reads a legacy spatial/map/ and edits it there, while a NEW map goes
 
 test('an id present in BOTH layouts serves one copy and deletes neither file', async ({ page }) => {
   // Both seeded at their CANONICAL filenames, so the open-time tidy is a
-  // no-op and this test measures deletion only (Kael's differential, 998
+  // no-op and this test measures deletion only (a differential run of 998
   // comparisons: a name that already matches short-circuits before any I/O).
   await seedRawElement(page, 'elements', 'map', 'canonical-copy--cccccccc.json', {
     id: MAP_A, type: 'map', name: 'Canonical Copy', local_updated_at: '2026-07-28T10:00:00.000Z',
@@ -734,7 +734,7 @@ test('a foreign capture serves its content AND spatial elements in one list', as
 });
 
 /**
- * ── BORN BARE (Skeld's ruling 2026-09-28) ──────────────────────────
+ * ── BORN BARE (a ruling of 2026-09-28) ──────────────────────────
  *
  * A folder atlas creates writes pin/marker links under the format's bare
  * names (`map`, `zone`), the spelling every other implementation reads. In

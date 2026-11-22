@@ -84,7 +84,7 @@ test('a work world shows its own words in the sidebar, its supertype word, and m
   expect(await page.locator('img[src="x"]').count()).toBe(0);
 });
 
-// Seethe 2026-10-23: the supertype chip says the world's word as the rows do, and search says it once.
+// 2026-10-23: the supertype chip says the world's word as the rows do, and search says it once.
 for (const own of [true, false]) {
   test(`the supertype chip and search's hint, ${own ? 'in the world\'s words' : 'without them'}`, async ({ page }) => {
     await setupWorld(page);

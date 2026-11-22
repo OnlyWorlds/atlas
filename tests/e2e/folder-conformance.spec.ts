@@ -279,7 +279,7 @@ test('a read leaves the fixture folder byte-identical, id-less file included', a
   expect(after['elements/character/idless.json']).toBe(before['elements/character/idless.json']);
   // Every seeded element file survives at its original path with its original
   // bytes: the fixture's filenames are already canonical, so the open-time
-  // tidy short-circuits before any I/O (Kael's 998-comparison differential).
+  // tidy short-circuits before any I/O (a 998-comparison differential).
   for (const [path, text] of Object.entries(before)) {
     expect(after[path], `fixture file ${path} should be unchanged`).toBe(text);
   }

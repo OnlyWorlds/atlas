@@ -1,6 +1,6 @@
 /**
  * Tour copy hygiene: mechanical text defects that survive every eye
- * because they live at string-concatenation seams. Three of Skeld's launch
+ * because they live at string-concatenation seams. Three of the launch
  * blockers were this class ("top,and", "is,as", a swallowed sentence break);
  * the survivor found live was ",the" in the yours-to-keep step. The scan
  * locks the CLASS across every body/meta/deeper string, so a future segment

@@ -9,22 +9,22 @@ import type { Element } from '../../src/core/types';
 
 const el = (o: Record<string, unknown>): Element => o as unknown as Element;
 const codex = el({ id: 'c1', type: 'character', name: 'Codex' });
-const bb = el({ id: 'c2', type: 'character', name: 'BB' });
-const kael = el({ id: 'c3', type: 'character', name: ' Kael ' });
+const bea = el({ id: 'c2', type: 'character', name: 'Bea' });
+const kit = el({ id: 'c3', type: 'character', name: ' Kit ' });
 const place = el({ id: 'l1', type: 'location', name: 'Harbour' });
-const world = [codex, bb, kael, place];
+const world = [codex, bea, kit, place];
 
 describe('messageParties, by the message profile', () => {
   // As keel served it: a stamp and no edit since (a pull writes both stamps), so its created_by counts.
   const msg = (o: Record<string, unknown>) => el({ id: 'n1', type: 'narrative', supertype: 'Message', server_updated_at: '2026-10-26T10:00:00Z', local_updated_at: '2026-10-26T10:00:00Z', ...o });
-  // keel's members list: the owner's row has id null; m2 plays BB, m3 plays Kael.
+  // keel's members list: the owner's row has id null; m2 plays Bea, m3 plays Kit.
   const members = [{ id: null, character: 'c1' }, { id: 'm2', character: 'c2' }, { id: 'm3', character: 'c3' }];
 
   it('reads the claimed sender from the Narrator and the recipients from the Characters, in order', () => {
     const m = msg({ narrator: 'c1', characters: ['c2', 'c3'] });
     expect(messageParties(m, world)).toEqual({
       sender: 'unverifiable', from: { id: 'c1', name: 'Codex' }, fromOutside: false, writtenBy: null, writtenByOutside: false,
-      toEveryone: false, to: [{ id: 'c2', name: 'BB' }, { id: 'c3', name: 'Kael' }], toOutside: 0, toUnseen: false, wholeWorld: true,
+      toEveryone: false, to: [{ id: 'c2', name: 'Bea' }, { id: 'c3', name: 'Kit' }], toOutside: 0, toUnseen: false, wholeWorld: true,
     });
   });
 
@@ -45,7 +45,7 @@ describe('messageParties, by the message profile', () => {
     expect(messageParties(msg({ narrator: 'c2' }), world, { members })?.sender).toBe('unverifiable');
   });
 
-  it('created_by proves nothing on a body keel did not serve as it is (the S484 gate G2)', () => {
+  it('created_by proves nothing on a body keel did not serve as it is (review gate G2)', () => {
     // Never stamped (made or hand-written here), or edited since the stamp: a claim.
     const unstamped = el({ id: 'n1', type: 'narrative', supertype: 'Message', narrator: 'c1', created_by: null });
     expect(messageParties(unstamped, world, { members })?.sender).toBe('unverifiable');
@@ -59,7 +59,7 @@ describe('messageParties, by the message profile', () => {
     const p = messageParties(msg({ narrator: 'c1', created_by: 'm3' }), world, { members });
     expect(p?.sender).toBe('mismatch');
     expect(p?.from?.name).toBe('Codex');
-    expect(p?.writtenBy).toEqual({ id: 'c3', name: 'Kael' });
+    expect(p?.writtenBy).toEqual({ id: 'c3', name: 'Kit' });
   });
 
   it('an empty Characters list is addressed to everyone; a list of nothing valid to nobody', () => {
@@ -75,7 +75,7 @@ describe('messageParties, by the message profile', () => {
     const p = messageParties(msg({ narrator: 'gone', characters: ['l1', 'c2', 'gone', 'c2'] }), world);
     expect(p?.from).toBeNull();
     expect(p?.fromOutside).toBe(true);
-    expect(p?.to).toEqual([{ id: 'c2', name: 'BB' }]);
+    expect(p?.to).toEqual([{ id: 'c2', name: 'Bea' }]);
     expect(p?.toOutside).toBe(2);
   });
 

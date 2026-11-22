@@ -107,7 +107,7 @@ afterEach(() => {
 });
 
 // Each keep re-keys the whole tour bundle through the real store: well inside
-// 5 s on a quiet machine, past it with the machine at 100% (Boss 2026-10-15:
+// 5 s on a quiet machine, past it with the machine at 100% (2026-10-15:
 // three red at 728a95a and 935fc7d alike, 19 of 19 at 60 s).
 describe('the keep (contract §7.3, invariants 15-16)', { timeout: 60_000 }, () => {
   beforeEach(() => setUpFinale());

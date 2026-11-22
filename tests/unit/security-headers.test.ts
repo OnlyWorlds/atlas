@@ -1,5 +1,5 @@
 /**
- * The host's security headers (#302, Boss 2026-10-15).
+ * The host's security headers (#302, 2026-10-15).
  *
  * `public/_headers` is the one home of the production policy: Cloudflare Pages
  * serves it, and `vite preview` serves its CSP line so a walk runs under it.
@@ -66,7 +66,7 @@ describe('public/_headers (#302)', () => {
     expect(all.has('x-robots-tag')).toBe(false);
   });
 
-  it('never lets a cache hold the service worker (Boss 2026-10-15: the zone rewrote it to max-age=14400)', () => {
+  it('never lets a cache hold the service worker (2026-10-15: the zone rewrote it to max-age=14400)', () => {
     expect(headerBlock('/sw.js').get('cache-control')).toBe('no-store');
   });
 

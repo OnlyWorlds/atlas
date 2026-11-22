@@ -35,8 +35,8 @@ async function createLocalWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  // Creating a local world flips the sidebar to elements mode automatically
-  // (S255v3) — wait for the elements body rather than a worlds-list row.
+  // Creating a local world flips the sidebar to elements mode automatically,
+  // so wait for the elements body rather than a worlds-list row.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
@@ -108,7 +108,7 @@ test('Signed in, Make online asks only the PIN and makes the world on the accoun
   await expect(pane.locator('input[name="create-email"]')).toHaveCount(0);
   await expect(pane.locator('[data-role="no-account"]')).toHaveCount(0);
   await expect(pane.locator('[data-role="signed-in"]')).toContainText('e2e-member');
-  // The PIN's reason sits under its field, said once (Seethe 2026-10-22).
+  // The PIN's reason sits under its field, said once (2026-10-22).
   await expect(pane.getByText("The PIN lets Atlas upload the world's contents.")).toHaveCount(1);
   await expect(page.locator('[data-route-pane="link"] label', { has: page.locator('input[name="link-pin"]') }))
     .toContainText('PIN, or a seat secret');
@@ -242,7 +242,7 @@ test('Make Online button is hidden for an already-api-linked world', async ({ pa
   await page.reload();
   await page.waitForSelector('.atlas-shell');
   // The world was left active (in elements mode) before reload, and that
-  // state persists across reload (S255v3) — swap back to worlds mode first,
+  // state persists across reload — swap back to worlds mode first,
   // then re-open the world via its row.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
   await page.click('.atlas-mode-btn[data-action="mode-worlds"]');

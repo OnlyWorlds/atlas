@@ -27,7 +27,7 @@ const ring = Array.from({ length: 40 }, (_, i) => {
 });
 const key = (p: { x: number; y: number }) => `${p.x},${p.y}`;
 
-describe('zone kinds (Skeld 2026-10-17: the subtype)', () => {
+describe('zone kinds (2026-10-17: the subtype)', () => {
   it('reads the words case-insensitively and trimmed', () => {
     expect(zoneKindOf('Landmass')).toBe('landmass');
     expect(zoneKindOf('  RIVER ')).toBe('river');
@@ -36,7 +36,7 @@ describe('zone kinds (Skeld 2026-10-17: the subtype)', () => {
     expect(zoneKindOf('Route')).toBe('road');
     expect(zoneKindOf('path')).toBe('road');
   });
-  it('reads a "Class: kind" subtype by its halves, the class first (Skeld 2026-10-18)', () => {
+  it('reads a "Class: kind" subtype by its halves, the class first (2026-10-18)', () => {
     expect(zoneKindOf('Border: treaty line')).toBe('border');
     expect(zoneKindOf('Itinerary: route')).toBe('road');
     expect(zoneKindOf('River: Forest')).toBe('river');

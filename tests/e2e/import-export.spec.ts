@@ -33,7 +33,7 @@ async function setupWorld(page: Page, name = 'Barovia') {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  // Creating a local world flips the sidebar to elements mode (S255v3); use
+  // Creating a local world flips the sidebar to elements mode; use
   // that as the mode-independent completion signal instead of a worlds-list row.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
