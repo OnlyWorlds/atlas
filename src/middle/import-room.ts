@@ -24,9 +24,9 @@ import { hasFolderMode } from '../core/capabilities';
 import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { homeHash, importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
-import { sectionsFor } from '../editor/field-schema';
+import { polymorphicPairFor, sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
-import { parsePayload } from '../import/parse';
+import { jsonFaultAdvice, jsonTextOf, parsePayload } from '../import/parse';
 import { reconcile } from '../import/reconcile';
 import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
 import { generateFixPrompt, validatePayload } from '../import/validate';
@@ -95,7 +95,9 @@ export function buildSchemaDigest(): string {
       for (const f of section.fields) {
         if (f.name === 'name' || f.name.startsWith('atlas_') || seen.has(f.name)) continue;
         seen.add(f.name);
-        if (f.widget === 'number') fields.push(`#${f.name}`);
+        const pair = polymorphicPairFor(type, f.name);
+        if (pair) fields.push(pair.typeField, `${pair.idField}>Any`);
+        else if (f.widget === 'number') fields.push(`#${f.name}`);
         else if (f.widget === 'single-link') fields.push(`${f.name}>${cap(f.target ?? 'element')}`);
         else if (f.widget === 'multi-link') fields.push(`${f.name}>>${cap(f.target ?? 'element')}`);
         else fields.push(f.name);
@@ -119,8 +121,9 @@ export function buildConvertNotesPrompt(): string {
     '',
     '- Top-level keys are element types in PascalCase, each holding an array of elements.',
     '- Every element needs a "name" (a non-empty string). Everything else is optional: sparse is valid.',
-    '- Only the fields listed below exist. Do not invent field names (no Character.age, no Object.owner). A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
-    '- Field grammar in the list: a bare field is text · #field is a number (dates are plain numbers in the world\'s own timeline) · field>Type is a single link, its value the target element\'s name · field>>Type is a list of links.',
+    '- Only the fields listed below exist, each only on the type it is listed under. Do not invent field names. A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
+    '- Field grammar in the list: a bare field is text · #field is a number (dates are plain numbers in the world\'s own timeline) · field>Type is a single link, its value the target element\'s name · field>>Type is a list of links · field>Any links to an element of any type: its value the element\'s name, with that element\'s type in the _type field beside it (a Pin: "element_type": "Character", "element_id": "Aralia").',
+    '- A link names an element of the type it takes: a group made as a Collective goes in "collectives", never in "characters".',
     '- Only reference elements you also include. Prefer fields over tiny elements (physicality: "tall" beats a Trait named "Tall"). Only make elements for things specific to this world.',
     '- Convert only what the notes say: add no people, places, events or details that are not in them.',
     '- Optionally add a "World" block with "name" and "description" to make it a full world.',
@@ -133,7 +136,7 @@ export function buildConvertNotesPrompt(): string {
     '',
     buildSchemaDigest(),
     '',
-    'Return only the JSON, nothing else.',
+    'Return only the JSON, nothing else: no code block around it, and no words before or after.',
     '',
     'My notes:',
     '<paste your notes here>',
@@ -307,14 +310,16 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   }
 
   let lastIngest: { text: string; sourceLabel: string; pasted: boolean } | null = null;
-  function ingest(text: string, sourceLabel: string): void {
-    lastIngest = { text, sourceLabel, pasted: sourceLabel === 'The pasted text' };
+  function ingest(pastedOrRead: string, sourceLabel: string): void {
+    lastIngest = { text: pastedOrRead, sourceLabel, pasted: sourceLabel === 'The pasted text' };
     errorEl.hidden = true;
+    // A reply copied with its code fence loads as the JSON inside it.
+    const text = jsonTextOf(pastedOrRead);
     let raw: unknown;
     try {
       raw = JSON.parse(text);
     } catch (err) {
-      showError(`${sourceLabel} isn't valid JSON${jsonErrorWhere(text, err)}. Check for a missing comma, quote, or bracket.`);
+      showError(`${sourceLabel} isn't valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
       return;
     }
     const result = parsePayload(raw);
@@ -372,16 +377,17 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
    * never auto-loads (the load button stays the explicit step).
    */
   function liveValidate(): void {
-    const text = pasteEl.value.trim();
+    const typed = pasteEl.value.trim();
     pasteEl.classList.remove('is-valid', 'is-invalid');
-    if (!text) { liveEl.hidden = true; liveEl.textContent = ''; return; }
+    if (!typed) { liveEl.hidden = true; liveEl.textContent = ''; return; }
+    const text = jsonTextOf(typed);
 
     let raw: unknown;
     try {
       raw = JSON.parse(text);
     } catch (err) {
       pasteEl.classList.add('is-invalid');
-      setLive('invalid', `Not valid JSON${jsonErrorWhere(text, err)}. Check for a missing comma, quote, or bracket.`);
+      setLive('invalid', `Not valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
       return;
     }
     const result = parsePayload(raw);
@@ -493,7 +499,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             ${r.updated ? `<span class="atlas-import-stat"><b>${r.updated}</b> update</span>` : ''}
             ${r.skipped ? `<span class="atlas-import-stat is-dim"><b>${r.skipped}</b> skip</span>` : ''}
             ${r.invalidRecords ? `<span class="atlas-import-stat is-warn"><b>${r.invalidRecords}</b> invalid</span>` : ''}
-            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to other elements not found in this import. The connection is dropped; each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
+            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to elements found neither in this import nor in the world. The connection is dropped; each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
           </div>
           ` : `
           <p class="atlas-import-subnote"><span class="material-symbols-outlined">info</span> Opens ${escapeText(mergeTargetName)} and merges these ${parsed.totalElements} element${parsed.totalElements === 1 ? '' : 's'} in. Existing elements are kept (choose overwrite once it's open to replace them).</p>
@@ -527,7 +533,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           ${shown.map(i => `<li><code>${escapeText(i.path)}</code>: ${escapeText(i.issue)}</li>`).join('')}
           ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
         </ul>
-        <p class="atlas-import-issues-note">Import still runs: an entry with no name is skipped, an unknown field dropped, a broken link removed, and a value of the wrong kind kept as written. Paste the fix prompt to your AI to repair the source.</p>
+        <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an entry with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. Paste the fix prompt to your AI to repair the source.</p>
       </div>
     `;
   }

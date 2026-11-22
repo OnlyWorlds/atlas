@@ -192,6 +192,22 @@ export function relationFieldsFor(type: ElementType): RelationField[] {
   return out;
 }
 
+/**
+ * A section field that the wire writes as two keys: the editor's `element` on a Pin is the schema's
+ * `element_id` (a link to any type) with `element_type` beside it. Returns the two wire keys, or null when
+ * the section name is a plain schema field. The import instruction and the review both read this, so a
+ * reply that follows the instruction is one the review takes.
+ */
+export function polymorphicPairFor(type: ElementType, sectionField: string): { idField: string; typeField: string } | null {
+  const schema = (FIELD_SCHEMA as any)[type];
+  if (!schema || schema[sectionField]) return null;
+  const idField = `${sectionField}_id`;
+  const typeField = `${sectionField}_type`;
+  const rel = relationFieldsFor(type).find(r => r.schemaField === idField);
+  if (!rel || rel.kind !== 'single' || rel.target !== null || !schema[typeField]) return null;
+  return { idField, typeField };
+}
+
 /** Field names whose SDK schema type is numeric (number / integer / integer_max). */
 export function numberFieldsFor(type: ElementType): Set<string> {
   const schema = (FIELD_SCHEMA as any)[type];

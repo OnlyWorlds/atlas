@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.4',
+    date: '2026-11-22',
+    theme: 'The Data room\'s AI instruction and its review agree',
+    entries: [
+      {
+        id: 'ai-instruction-pin-and-fixes',
+        title: 'A reply that follows the AI instruction keeps every link',
+        body: 'The instruction the Data room copies for your AI listed a Pin\'s place as element, a key the review then dropped; it now asks for element_type and element_id, the two keys the import reads. When a reply names a group made as a Collective in an Event\'s characters, the review\'s fix now says to link it in collectives, where it used to ask for a Character of the same name. A key written with the list\'s own mark, such as #count, is read as count, and a field written on a type that lacks it names the types that have it. A reply pasted with its code block around it now loads as the JSON inside, where it used to be refused as not valid JSON.',
+        tags: ['import', 'fix'],
+      },
+      {
+        id: 'review-wrong-kind-words',
+        title: 'The review names a field the way the editor does',
+        body: 'A value of the wrong kind is said once with the field\'s own name, as in "Vera": Birth date takes a whole number; here it holds "the spring of 1899", and true or false in a text field is said as a yes or no. The note under the review now names every kind Import treats, a list of an unknown type and a link of the wrong shape among them. When OnlyWorlds refuses a seat\'s secret on a refresh or a push from the sync pill, the line now names the seat\'s secret where it said this PIN.',
+        tags: ['import', 'sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.3',
     date: '2026-11-22',
     theme: 'The World PIN by one name, and the keyboard and phone notes',
