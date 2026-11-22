@@ -36,6 +36,7 @@ import { escapeText, installRowKeydownActivation, relativeTime } from '../core/d
 import { dismissTourCard, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { keepSafeCard, snoozeUntil } from './home-keepsafe';
 import { waitsOnPin } from '../core/saves-online';
+import { isSeatWorld } from '../core/seat';
 import { buildLandingLine } from './home-landing';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { hasFolderMode } from '../core/capabilities';
@@ -987,7 +988,7 @@ function persistDismiss(worldId: string, cardId: string): void {
 }
 
 /** The keep-safe band (contract §6.1): what `keepSafeCard` answers, with its three ways out and ×. */
-function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManager): HTMLElement | null {
+export function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManager): HTMLElement | null {
   const s = getState();
   const entry = s.registry.worlds.find(w => w.id === worldId);
   // A linked world waiting on the World PIN saves nothing to onlyworlds.com yet: the full card, with Add PIN (1.125.0).
@@ -1014,7 +1015,7 @@ function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManage
       <button type="button" class="atlas-btn-primary" data-action="keepsafe-download">${downloadLabel(getState().active?.meta)}</button>
       ${hasFolderMode() ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-move">Move to a folder</button>' : ''}
       ${entry.state !== 'api-linked' && !entry.copy_of && !isPartialSlice(getState().active?.meta) ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Make online</button>' : ''}
-      ${pinWaits ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-add-pin">Add PIN</button>' : ''}
+      ${pinWaits && !isSeatWorld(entry) ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-add-pin">Add PIN</button>' : ''}
     </div>`;
   section.querySelector<HTMLElement>('.atlas-home-onboarding-copy')!.textContent = line;
   section.querySelector<HTMLButtonElement>('[data-action="keepsafe-hide"]')!.addEventListener('click', () => {

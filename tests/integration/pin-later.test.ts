@@ -65,6 +65,8 @@ async function settle(ms = 50): Promise<void> {
 }
 
 let shown: Array<{ msg: string; actions: string[] }>;
+/** The toasts' action presses, in order. */
+let runs: Array<() => void>;
 let successes: string[];
 /** Every line said, and whether an engine was attached when it was: the door's own attach, never the watch's later one. */
 let said: Array<{ msg: string; engine: boolean }>;
@@ -87,8 +89,10 @@ beforeEach(() => {
     ...statefulV2Handlers({ baseUrl: BASE, clock: clock.next }).handlers,
   );
   shown = [];
-  vi.spyOn(toastManager, 'show').mockImplementation((m: string, _k?: unknown, _d?: unknown, o?: { actions?: Array<{ label: string }> }) => {
+  runs = [];
+  vi.spyOn(toastManager, 'show').mockImplementation((m: string, _k?: unknown, _d?: unknown, o?: { actions?: Array<{ label: string; run: () => void }> }) => {
     shown.push({ msg: m, actions: o?.actions?.map(a => a.label) ?? [] });
+    runs.push(...(o?.actions?.map(a => a.run) ?? []));
     return undefined as never;
   });
   successes = [];
@@ -131,6 +135,24 @@ describe('the world waits on the World PIN', () => {
     expect(shown).toEqual([{ msg: firstChangeLine('Tangle ground'), actions: ['Add PIN'] }]);
     expect(firstChangeLine('Tangle ground')).toBe('Your change to "Tangle ground" is kept here. Add your World PIN to save it to OnlyWorlds.');
     expect(keel.seen).toEqual([]);
+  });
+
+  it('the line is its world\'s: another world opened takes it down, and its Add PIN asks nothing there', async () => {
+    const folder = await openWithNoPin();
+    attachSyncEngine(entry('w1'), folder);
+    requestPushIfLinked();
+    expect(runs).toHaveLength(1);
+    // The person opens w2 (no engine there either; its own question is the pill's).
+    patchSlice('active', { worldId: 'w2', meta: { name: 'w2' } } as never);
+    expect(dismissed).toContain('pin-waits:w1');
+    runs[0]();
+    await settle();
+    expect(document.querySelector('[data-modal="world-pin"]')).toBeNull();
+    // Back in w1, its own press opens it.
+    patchSlice('active', { worldId: 'w1', meta: { name: 'Tangle ground' } } as never);
+    runs[0]();
+    await settle();
+    expect(document.querySelector('[data-modal="world-pin"]')).not.toBeNull();
   });
 
   it('a world with its PIN kept says nothing of the PIN on a change', async () => {
@@ -311,6 +333,17 @@ describe('Settings\' field asks first, then attaches on every answer', () => {
     attachSyncEngine(entry('w1'), folder);
     expect(getCurrentSyncEngine()).not.toBeNull();
     await settings()('');
+    expect(getCurrentSyncEngine()).toBeNull();
+    expect(diagnoseSyncUnavailable()).toEqual({ kind: 'pin-missing', worldId: 'w1' });
+  });
+});
+
+describe('a PIN removed in another tab', () => {
+  it('detaches this tab\'s engine on it, as one removed here does', async () => {
+    const folder = await openWithNoPin(RIGHT);
+    attachSyncEngine(entry('w1'), folder);
+    expect(getCurrentSyncEngine()).not.toBeNull();
+    patchSlice('registry', setPin(getState().registry, undefined));
     expect(getCurrentSyncEngine()).toBeNull();
     expect(diagnoseSyncUnavailable()).toEqual({ kind: 'pin-missing', worldId: 'w1' });
   });

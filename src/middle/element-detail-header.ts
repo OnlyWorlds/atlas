@@ -54,6 +54,7 @@ import { filesWhereOf } from '../core/browser-worlds';
 import { buildAgentMark, buildHiddenMark, buildProposedMark } from './element-agent-mark';
 import { choosable } from '../core/web-lens';
 import { openWebOn } from '../ui/open-web';
+import { waitsOnPin } from '../core/saves-online';
 
 /**
  * Pending "auto-edit on next render" signal. When set to an element id, the
@@ -419,6 +420,9 @@ function watchIssueDots(): void {
   });
 }
 
+/** The dot of a change in a world waiting on the World PIN: kept here, never "will push". */
+export const PIN_WAITS_DOT_TITLE = 'Kept here. Add your World PIN to save it to OnlyWorlds.';
+
 function buildSyncDot(el: Element): HTMLElement {
   watchIssueDots();
   const activeId = getState().active?.worldId;
@@ -467,6 +471,11 @@ function buildSyncDot(el: Element): HTMLElement {
       // Kept outside this key's view (conv. 151): it no longer syncs, edited or not.
       icon = 'cloud_off';
       title = 'Kept here: OnlyWorlds no longer shows this to you, so it no longer syncs';
+      state = 'local';
+    } else if (dirty && waitsOnPin(worldEntry, getState().registry)) {
+      // Linked, and waiting on the World PIN (1.125.0): nothing pushes until it is given.
+      icon = 'save';
+      title = PIN_WAITS_DOT_TITLE;
       state = 'local';
     } else if (dirty) {
       icon = 'cloud_upload';

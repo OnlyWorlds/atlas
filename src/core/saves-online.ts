@@ -19,6 +19,9 @@ export function waitsOnPin(entry: WorldRegistryEntry | null | undefined, reg: Wo
   return !!entry && entry.state === 'api-linked' && !!entry.api && !entry.api.read_only && !worldPin(entry, reg);
 }
 
+/** What a resumed sync says of a world waiting on the World PIN: nothing runs until the PIN is given. */
+export const PIN_WAITS_RESUME_LINE = 'Sync is no longer paused. This world saves to OnlyWorlds once you add your World PIN.';
+
 /** Linked and saving to OnlyWorlds (or reading from it, a view-only link): what "online" means to a person. */
 export function savesOnline(entry: WorldRegistryEntry | null | undefined, reg: WorldsRegistry): boolean {
   return !!entry && entry.state === 'api-linked' && !!entry.api && !waitsOnPin(entry, reg);

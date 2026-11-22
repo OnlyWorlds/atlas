@@ -81,12 +81,16 @@ export class OpenSignInCard extends BaseModal {
       this.opts.onOnlyWorlds?.();
     });
     (this.opts.focusNotNow ? notNow : (onlyWorlds ?? password)).focus();
-    window.addEventListener('hashchange', this.putDown);
+    this.at = window.location.hash;
+    window.addEventListener('hashchange', this.moved);
     document.addEventListener(TOUR_STARTED_EVENT, this.putDown);
   }
 
   /** The page moved on, or the tour began: down, and the id goes. */
   private readonly putDown = (): void => { this.hide(); };
+  /** The hash at open: `navigate()` to the same hash fires a synthetic hashchange, which is not a move. */
+  private at = '';
+  private readonly moved = (): void => { if (window.location.hash !== this.at) this.hide(); };
 
   /** Another card takes its place: down, keeping what it held. */
   private replaced(): void {
@@ -98,7 +102,7 @@ export class OpenSignInCard extends BaseModal {
   protected override hide(): void {
     if (!this.modal) return;
     if (shown === this) shown = null;
-    window.removeEventListener('hashchange', this.putDown);
+    window.removeEventListener('hashchange', this.moved);
     document.removeEventListener(TOUR_STARTED_EVENT, this.putDown);
     super.hide();
     if (!this.keeps) this.opts.onDrop();

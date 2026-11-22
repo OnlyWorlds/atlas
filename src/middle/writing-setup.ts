@@ -307,6 +307,8 @@ export function mountWritingSetup(
     let here = true;
     const entry = reg.worlds.find(w => w.id === worldId);
     const wasInitialized = entry?.writing_initialized === true;
+    // What the setup wrote into elements, counted for the push at the end: the label renames and the promotes.
+    let renamed = 0;
     if (wasInitialized && entry?.writing_labels && !viewOnly) {
       const oldLabels: WritingLabels = {
         l1: entry.writing_labels.l1 ?? DEFAULT_WRITING_LABELS.l1,
@@ -315,7 +317,7 @@ export function mountWritingSetup(
         l4: (entry.writing_labels as Partial<WritingLabels>).l4 ?? DEFAULT_WRITING_LABELS.l4,
       };
       // This world's own elements, read from its folder: after an await the state can hold another world's.
-      const renamed = await applyLabelRenameMigration(folder, await folder.listElements(), oldLabels, labels);
+      renamed = await applyLabelRenameMigration(folder, await folder.listElements(), oldLabels, labels);
       if (renamed > 0) {
         const fresh = await folder.listElements();
         here = patchElementsFrom(folder, fresh) && here;
@@ -378,7 +380,7 @@ export function mountWritingSetup(
       here = patchElementsFrom(folder, fresh) && here;
     }
 
-    if (here && !viewOnly && written > 0) requestPushIfLinked();
+    if (here && !viewOnly && (written > 0 || renamed > 0)) requestPushIfLinked();
     onFinish();
   }
 

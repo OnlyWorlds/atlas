@@ -349,7 +349,9 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, 
     // ---- Complete the handoff (R5 — parity with LinkWorldModal) ----
     navigate(homeHash(result.entry.id));
     if (result.failures.length > 0) {
-      toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. Refresh from OnlyWorlds brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
+      // With the PIN later, a refresh first asks for the PIN (1.125.0): say so.
+      const later = pinLater ? 'Add your World PIN, then ' : '';
+      toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. ${later}${later ? 'refresh' : 'Refresh'} from OnlyWorlds brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
     } else {
       toasts.success(`Opened ${row.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'}`);
     }

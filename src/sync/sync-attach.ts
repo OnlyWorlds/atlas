@@ -198,7 +198,7 @@ export function attachSyncEngine(
   currentWorldId = entry.id;
   currentPin = pin;
   // "Kept here until you add your World PIN" is no longer true once an engine runs on a PIN.
-  if (!readOnly) toastManager.dismiss(firstChangeKey(entry.id));
+  if (!readOnly) takeDownFirstChange(entry.id);
   currentPolicyNow = policyNow;
   watchRefusedPin();
   /** Ask the roster, and move the engine to what it says once keel has answered. */
@@ -677,11 +677,29 @@ export function requestPushIfLinked(): void {
   const why = diagnoseSyncUnavailable();
   if (why?.kind !== 'pin-missing' || toldPinWaits.has(why.worldId)) return;
   toldPinWaits.add(why.worldId);
-  const name = getState().registry.worlds.find(w => w.id === why.worldId)?.name ?? 'this world';
+  const worldId = why.worldId;
+  const name = getState().registry.worlds.find(w => w.id === worldId)?.name ?? 'this world';
+  // The line is this world's: its Add PIN asks for this world only, and it goes when another world opens.
   toastManager.show(firstChangeLine(name), 'info', 0, {
-    dedupeKey: firstChangeKey(why.worldId),
-    actions: [{ label: 'Add PIN', run: () => { void import('../ui/world-pin-modal').then(m => m.askWorldPin(toastManager)); } }],
+    dedupeKey: firstChangeKey(worldId),
+    actions: [{ label: 'Add PIN', run: () => { void import('../ui/world-pin-modal').then(m => m.askWorldPin(toastManager, worldId)); } }],
   });
+  firstChangeShownFor = worldId;
+  if (!firstChangeWatch) {
+    firstChangeWatch = subscribe(() => {
+      if (firstChangeShownFor && getState().active?.worldId !== firstChangeShownFor) takeDownFirstChange(firstChangeShownFor);
+    });
+  }
+}
+
+/** The world whose first-change line is up, if one is, and the watch that takes it down on a switch. */
+let firstChangeShownFor: string | null = null;
+let firstChangeWatch: (() => void) | null = null;
+
+/** Take down `worldId`'s first-change line (a switch to another world, or its attach on a PIN). */
+function takeDownFirstChange(worldId: string): void {
+  toastManager.dismiss(firstChangeKey(worldId));
+  if (firstChangeShownFor === worldId) firstChangeShownFor = null;
 }
 
 /** The first-change line's key: taken down once the world attaches, when it is no longer true. */
@@ -700,6 +718,7 @@ const toldPinWaits = new Set<string>();
 /** Tests: no first change said yet. */
 export function __resetFirstChangeToldForTests(): void {
   toldPinWaits.clear();
+  firstChangeShownFor = null;
 }
 
 /**
@@ -798,6 +817,8 @@ function watchRefusedPin(): void {
     const was = seen;
     seen = reg;
     const engine = currentEngine;
+    // The account PIN removed (another tab's Settings): this tab's engine on it goes too.
+    if (engine && was.pin && !reg.pin) { detachOnPinRemoved(); return; }
     if (engine?.authRefusal() === 'pin') {
       setTimeout(() => { void reviveRefusedEngine(engine); }, 0);
       return;

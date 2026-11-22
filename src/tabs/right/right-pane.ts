@@ -493,7 +493,9 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // runs it presses nothing: it says so and is marked disabled, keeping its
   // place for the keyboard.
   const roundOnly = busyRound && !currentPendingPush;
-  const refreshName = currentPendingPush ? 'Save to OnlyWorlds now'
+  // The Add PIN pill's button asks for the PIN (1.125.0): its name says so, never a refresh.
+  const refreshName = dataState === 'add-pin' ? 'Add your World PIN'
+    : currentPendingPush ? 'Save to OnlyWorlds now'
     : errored ? (pinRefused ? 'Put in the PIN again in Settings' : 'See why in Settings')
     : roundOnly ? `${syncPhaseWords(engine?.kind === 'syncing' ? engine.phase : undefined)} now`
     : 'Refresh from OnlyWorlds';

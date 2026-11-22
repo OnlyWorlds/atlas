@@ -252,6 +252,14 @@ describe('R1: signed out, one card that holds the sign-in', () => {
     });
   }
 
+  it('a navigate() to the same hash (a synthetic hashchange) is not a move: the card and the id stay', async () => {
+    signedOut();
+    await runOpenLink(ID, fakeToasts().t);
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(card()).not.toBeNull();
+    expect(openHeldForSignIn()).toBe(ID);
+  });
+
   it('the public ask\'s Sign in opens this card, named', async () => {
     signedOut();
     mswServer.use(http.get('*/api/v2/world/', () => HttpResponse.json({ id: ID, name: 'Open Lands', meta: { name: 'Open Lands', counts: {} } })));

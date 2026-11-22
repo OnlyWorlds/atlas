@@ -31,8 +31,8 @@ import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { copyChip, copyLine } from '../core/world-copy';
 import { dropHeldSeat, heldSeat, heldSeatBusy, heldSeats, type HeldSeat } from '../core/held-seats';
-import { SEAT_REMOVE_WHERE } from '../core/seat';
-import { waitsOnPin } from '../core/saves-online';
+import { SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE } from '../core/seat';
+import { PIN_WAITS_RESUME_LINE, waitsOnPin } from '../core/saves-online';
 import { LANDING_FAILED_HERE, LANDING_IN_ANOTHER_TAB, MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
@@ -368,7 +368,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       }
       toasts.info(!entry.sync_paused
         ? 'Sync paused for this world'
-        : stillPaused ? 'This world can sync again, but Pause all sync is still on' : 'Sync resumed');
+        : stillPaused ? 'This world can sync again, but Pause all sync is still on'
+        : waitsOnPin(getState().registry.worlds.find(w => w.id === entry.id), getState().registry) ? PIN_WAITS_RESUME_LINE : 'Sync resumed');
       return;
     }
     const refreshBtn = target.closest<HTMLElement>('[data-role="refresh-world"]');
@@ -552,6 +553,9 @@ export function renderRow(world: WorldRegistryEntry, active: boolean, _settingsA
   // Linked, and waiting on the World PIN (1.125.0): nothing saves to OnlyWorlds yet, so the row shows where
   // its changes are kept and a chip that says so; its sync controls stay (they are keyed to the link).
   const pinWaits = waitsOnPin(world, getState().registry);
+  // A seat that lost its secret waits on that secret, never the account PIN: a seat's words, no Add PIN.
+  const seatWaits = pinWaits && !!world.api?.seat;
+  const waitsTitle = seatWaits ? SEAT_SECRET_MISSING_LINE : PIN_WAITS_CHIP_TITLE;
   const stateIcon = cleared ? 'browser_not_supported'
     : viewOnly || copy ? 'visibility'
     : world.state === 'api-linked' && !pinWaits
@@ -564,7 +568,7 @@ export function renderRow(world: WorldRegistryEntry, active: boolean, _settingsA
     : viewOnly
     ? '<span class="atlas-world-state-chip view-only">view</span>'
     : pinWaits
-    ? `<span class="atlas-world-state-chip pin-waits" title="${escapeAttr(PIN_WAITS_CHIP_TITLE)}">no PIN</span>`
+    ? `<span class="atlas-world-state-chip pin-waits" title="${escapeAttr(waitsTitle)}">${seatWaits ? 'not syncing' : 'no PIN'}</span>`
     : world.state === 'api-linked'
       ? '<span class="atlas-world-state-chip api-linked">online</span>'
       : '';
@@ -599,7 +603,7 @@ export function renderRow(world: WorldRegistryEntry, active: boolean, _settingsA
         </button>`
     : '';
   const stateIconHtml = world.state === 'api-linked' && !cleared
-    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="${pinWaits ? escapeAttr(PIN_WAITS_CHIP_TITLE) : 'Refresh from OnlyWorlds'}">
+    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="${pinWaits ? escapeAttr(waitsTitle) : 'Refresh from OnlyWorlds'}">
         <span class="material-symbols-outlined">${stateIcon}</span>
       </button>`
     : `<span class="material-symbols-outlined"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>${stateIcon}</span>`;

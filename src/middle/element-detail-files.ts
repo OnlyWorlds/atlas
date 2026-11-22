@@ -13,11 +13,12 @@
  */
 import type { OwFileRow } from '@onlyworlds/sdk';
 import { getState } from '../core/state';
+import { waitsOnPin } from '../core/saves-online';
 import type { Element, WorldRegistryEntry } from '../core/types';
 import { knownFieldsFor } from '../editor/field-schema';
 import {
   addFile, fileLink, filesNow, formatBytes, formatQuota, mayRemove, onFilesChanged, refreshFiles, removeFile,
-  FILES_ACCEPT, FILES_KINDS_LINE, FILES_NOT_SYNCED_LINE,
+  FILES_ACCEPT, FILES_KINDS_LINE, FILES_NOT_SYNCED_LINE, FILES_PIN_WAITS_LINE,
 } from '../sync/element-files';
 import type { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -100,7 +101,7 @@ export function buildFilesSection(el: Element, entry: WorldRegistryEntry, toasts
     const focused = formFor && formFor.node.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
     body.replaceChildren();
     if (!onServer || view.missing) {
-      body.appendChild(note(FILES_NOT_SYNCED_LINE));
+      body.appendChild(note(waitsOnPin(filesWorld(), getState().registry) ? FILES_PIN_WAITS_LINE : FILES_NOT_SYNCED_LINE));
       return;
     }
     if (view.loading) body.appendChild(note('Reading the files…'));

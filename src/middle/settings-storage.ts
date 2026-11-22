@@ -7,6 +7,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { PIN_WAITS_RESUME_LINE, waitsOnPin } from '../core/saves-online';
 import {
   saveRegistry,
   setSyncPullOnActivate,
@@ -367,7 +368,8 @@ function wireSyncTab(toasts: ToastManager): void {
     }
     toasts.info(pauseAll.checked
       ? 'All sync paused'
-      : entry?.sync_paused ? 'Sync resumed. This world\'s own pause is still on.' : 'Sync resumed');
+      : entry?.sync_paused ? 'Sync resumed. This world\'s own pause is still on.'
+      : waitsOnPin(entry, getState().registry) ? PIN_WAITS_RESUME_LINE : 'Sync resumed');
   });
 
   pullOnAct?.addEventListener('change', () => {

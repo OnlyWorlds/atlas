@@ -11,6 +11,10 @@ import { savesOnline, waitsOnPin } from '../../src/core/saves-online';
 import { keepSafeCard, KEEPSAFE_THRESHOLD } from '../../src/middle/home-keepsafe';
 import { guideDots } from '../../src/core/guide';
 import { renderRow, PIN_WAITS_CHIP_TITLE } from '../../src/sidebar/worlds-sidebar';
+import { buildKeepSafe } from '../../src/middle/world-home';
+import { askWorldPin } from '../../src/ui/world-pin-modal';
+import { SEAT_SECRET_MISSING_LINE } from '../../src/core/seat';
+import type { ToastManager } from '../../src/ui/toast-manager';
 
 const NOW = Date.parse('2026-11-22T12:00:00.000Z');
 
@@ -76,5 +80,37 @@ describe('the sidebar\'s row', () => {
     const saving = renderRow(linked(), false, false, false);
     expect(saving).toContain('>online<');
     expect(saving).toMatch(/<span class="material-symbols-outlined">cloud<\/span>/);
+  });
+});
+
+describe('a seat that lost its secret waits on its secret, never the World PIN (1.125.0 round 2)', () => {
+  const seat = () => linked({ api: { world_id: 'srv-1', api_key: 'ow_w_seatkey', seat: { role: 'narrator' } } });
+
+  it('the chip says not syncing in a seat\'s words, and offers no World PIN', () => {
+    patchSlice('registry', { ...defaultRegistry(), pin: '1234', worlds: [seat()] });
+    const row = renderRow(seat(), false, false, false);
+    expect(row).toContain('>not syncing<');
+    expect(row).not.toContain('>no PIN<');
+    expect(row).not.toContain('World PIN');
+    expect(row).toContain(SEAT_SECRET_MISSING_LINE.slice(0, 30));
+  });
+
+  it('Home\'s card offers no Add PIN, and the dialog never opens for it', async () => {
+    const entry = seat();
+    patchSlice('registry', { ...defaultRegistry(), pin: '1234', worlds: [entry] });
+    patchSlice('active', { worldId: entry.id, meta: { name: entry.name } } as never);
+    const said: string[] = [];
+    const toasts = { info: (m: string) => { said.push(m); }, error() {}, success() {}, show() {} } as unknown as ToastManager;
+    const card = buildKeepSafe(entry.id, chars(KEEPSAFE_THRESHOLD), toasts);
+    expect(card).not.toBeNull();
+    expect(card!.querySelector('[data-action="keepsafe-add-pin"]')).toBeNull();
+    askWorldPin(toasts);
+    expect(document.querySelector('[data-modal="world-pin"]')).toBeNull();
+    expect(said).toEqual([SEAT_SECRET_MISSING_LINE]);
+    // Control: the same world as an owner's offers it.
+    const own = linked();
+    patchSlice('registry', { ...defaultRegistry(), worlds: [own] });
+    expect(buildKeepSafe(own.id, chars(KEEPSAFE_THRESHOLD), toasts)!.querySelector('[data-action="keepsafe-add-pin"]')).not.toBeNull();
+    patchSlice('active', null as never);
   });
 });

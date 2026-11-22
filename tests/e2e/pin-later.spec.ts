@@ -62,9 +62,11 @@ async function playKeel(page: Page): Promise<Keel> {
       const bulk = path.startsWith('/bulk') ? (body.items ?? []) as Array<{ element: { id: string; name?: unknown } }> : null;
       for (const one of bulk ?? [body]) keel.writes.push({ call: `${req.method()} ${path}`, pin, name: bulk ? (one as { element: { name?: unknown } }).element?.name : (one as { name?: unknown }).name });
       if (pin !== PIN) return route.fulfill({ status: 401, json: { error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } } });
-      // keel's /bulk answer: a slot per item, its stamps echoed.
-      if (bulk) return route.fulfill({ json: { errors: false, items: bulk.map(it => ({ status: 201, id: it.element.id, created_at: now, updated_at: now })) } });
-      return route.fulfill({ status: req.method() === 'POST' ? 201 : 200, json: { ...body, id: body.id ?? path.split('/').filter(Boolean)[1], updated_at: now, created_at: now } });
+      // keel's /bulk answer: a slot per item, its stamps echoed. A write is stamped at keel's own now, as keel does
+      // (a stamp older than the edit would read as a change still waiting).
+      const at = new Date().toISOString();
+      if (bulk) return route.fulfill({ json: { errors: false, items: bulk.map(it => ({ status: 201, id: it.element.id, created_at: at, updated_at: at })) } });
+      return route.fulfill({ status: req.method() === 'POST' ? 201 : 200, json: { ...body, id: body.id ?? path.split('/').filter(Boolean)[1], updated_at: at, created_at: at } });
     }
     if (path === '/world' || path === '/world/') return route.fulfill({ json: { id: ID, name: NAME, updated_at: now } });
     const type = path.split('/').filter(Boolean)[0];
@@ -150,6 +152,12 @@ async function opensWithNoPinAndAsksInTheWorld(page: Page, folderPicker: boolean
   }
   await expect(page.locator('.ow-toast', { hasText: line })).toHaveCount(1);
   expect(keel.writes).toEqual([]);
+  // The element's own sync dot agrees: kept here, never "will push".
+  const dot = page.locator('[data-role="element-sync-dot"]').first();
+  await expect(dot).toHaveAttribute('title', 'Kept here. Add your World PIN to save it to OnlyWorlds.');
+  // Its files section says when it can carry files, and the pill's button names what it does.
+  await expect(page.getByText('It goes up once you add your World PIN.')).toBeVisible();
+  await expect(pill.locator('[data-role="refresh"]')).toHaveAttribute('aria-label', 'Add your World PIN');
 
   // The World PIN dialog: a wrong PIN is said in place, nothing kept, nothing sent.
   await pill.click();
@@ -173,6 +181,8 @@ async function opensWithNoPinAndAsksInTheWorld(page: Page, folderPicker: boolean
   // The dialog's two questions came first; the engine's own rounds read /me after them.
   expect(keel.mePins.slice(0, 2)).toEqual(['1111', PIN]);
   await expect(pill).not.toContainText('Add PIN');
+  // Once it reached OnlyWorlds, the element's dot says so.
+  await expect(dot).toHaveAttribute('title', 'Synced', { timeout: 15_000 });
   await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-world-state-chip.api-linked')).toBeVisible();
   await expect(page.locator('.atlas-world-state-chip.pin-waits')).toHaveCount(0);

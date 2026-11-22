@@ -40,6 +40,7 @@ import { isProposed, proposedCount, proposedRowWord, settledOf } from '../core/r
 import { hiddenRowWord } from '../core/hidden-mark';
 import { LEGACY_TOOL_NAME, playGlyph, playKindOf, toolName } from '../core/records';
 import { rosterFor, rosterNow } from '../sync/world-roster';
+import { savesOnline } from '../core/saves-online';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 // Pins and markers close the strip: browsable when asked for, muted
@@ -488,7 +489,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       parts.push(`<button type="button" class="atlas-disk-notice-btn" data-disk-action="show">${n.showOnly ? 'Show all' : 'Show'}</button>`);
     }
     if (n && n.removed.length > 0) {
-      const linked = getState().registry.worlds.find(w => w.id === n.worldId)?.state === 'api-linked';
+      // Only a world that saves to OnlyWorlds has the removed elements there (1.125.0: not one waiting on the World PIN).
+      const reg = getState().registry;
+      const linked = savesOnline(reg.worlds.find(w => w.id === n.worldId), reg);
       const tip = removedOnDiskTip(n.removed, linked);
       parts.push(`<span class="atlas-disk-notice-warn" title="${escapeAttr(tip)}">${n.removed.length} removed on disk</span>`);
     }

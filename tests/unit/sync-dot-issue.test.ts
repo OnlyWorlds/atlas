@@ -24,12 +24,14 @@ function el(extra: Record<string, unknown> = {}): Element {
     local_updated_at: '2026-11-17T10:00:00.000Z', server_updated_at: '2026-11-17T09:00:00.000Z', ...extra,
   } as unknown as Element;
 }
-function openWorld(state: 'api-linked' | 'local-only', elements: Element[]): void {
+/** A linked world syncs on a PIN kept here (since 1.125.0 a linked world with none waits on the World PIN). */
+function openWorld(state: 'api-linked' | 'local-only', elements: Element[], opts: { pin?: string | null } = {}): void {
   const entry = {
     id: WORLD, name: 'Linked', state,
     ...(state === 'api-linked' ? { api: { world_id: 's1', api_key: 'k' } } : {}),
   } as unknown as WorldRegistryEntry;
-  patchSlice('registry', { ...defaultRegistry(), worlds: [entry] });
+  const pin = opts.pin === undefined ? '1234' : opts.pin;
+  patchSlice('registry', { ...defaultRegistry(), ...(pin ? { pin } : {}), worlds: [entry] });
   patchSlice('active', { worldId: WORLD, meta: { name: 'Linked' } } as never);
   patchSlice('data', { elements } as never);
 }
@@ -59,6 +61,21 @@ describe('the sync dot and a failed element', () => {
     mount(e);
     expect(dot().dataset.state).toBe('dirty');
     expect(dot().title).toMatch(/^Pending sync/);
+  });
+
+  it('a change in a world waiting on the World PIN is kept here, never "will push" (1.125.0)', () => {
+    const e = el();
+    openWorld('api-linked', [e], { pin: null });
+    mount(e);
+    expect(dot().dataset.state).toBe('local');
+    expect(dot().title).toBe('Kept here. Add your World PIN to save it to OnlyWorlds.');
+    expect(dot().textContent).toContain('save');
+    // What came down from OnlyWorlds and is unchanged is there: Synced.
+    document.body.innerHTML = '';
+    const same = el({ local_updated_at: '2026-11-17T09:00:00.000Z' });
+    openWorld('api-linked', [same], { pin: null });
+    mount(same);
+    expect(dot().dataset.state).toBe('synced');
   });
 
   it('a failed round turns the mounted dot into Not syncing, with Settings\' reason, in place', () => {

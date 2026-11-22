@@ -16,7 +16,7 @@
 import { BaseModal } from './modal-base';
 import type { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
-import { isSeatSecret } from '../core/seat';
+import { isSeatSecret, isSeatWorld, SEAT_SECRET_MISSING_LINE } from '../core/seat';
 import { saveRegistry, setPin } from '../registry/registry';
 import { notePinState } from '../registry/pin-proof';
 import { askAboutPin } from '../sync/pin-ask';
@@ -38,13 +38,18 @@ export function worldPinLine(name: string): string {
 /** The dialog on screen, so a second press brings it rather than stacking another. */
 let shown: WorldPinModal | null = null;
 
-/** Open the question for the open world, or bring the one already up. */
-export function askWorldPin(toasts: ToastManager): void {
+/**
+ * Open the question for the open world, or bring the one already up. `forWorld`: the press was made for that
+ * world (the first change's line): nothing opens when another world is open now. A seat's world never asks
+ * for the account PIN: its own secret is what it lacks, said in a seat's words.
+ */
+export function askWorldPin(toasts: ToastManager, forWorld?: string): void {
   if (shown?.overlay()?.isConnected) { shown.bring(); return; }
   const s = getState();
   const worldId = s.active?.worldId ?? null;
   const entry = worldId ? s.registry.worlds.find(w => w.id === worldId) : undefined;
-  if (!worldId || !entry) return;
+  if (!worldId || !entry || (forWorld !== undefined && forWorld !== worldId)) return;
+  if (isSeatWorld(entry)) { toasts.info(SEAT_SECRET_MISSING_LINE); return; }
   new WorldPinModal(worldId, entry.name, toasts).open();
 }
 
