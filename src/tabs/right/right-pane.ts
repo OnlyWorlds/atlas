@@ -438,7 +438,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         if (upToDate(result)) toasts.info('Already up to date');
       } catch (err) {
         console.warn('[right-pane] view-only refresh failed:', err);
-        showProblem(err, { doing: 'refreshing from OnlyWorlds', retry: refreshView, toasts });
+        showProblem(err, { doing: 'refreshing from OnlyWorlds', worldId: active.worldId, retry: refreshView, toasts });
       }
     };
     pill.onclick = refreshView;
@@ -555,7 +555,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
           await eng.flushPendingPush();
         } catch (err) {
           console.warn('[right-pane] push now failed:', err);
-          showProblem(err, { doing: 'saving to OnlyWorlds', savedLocally: true, retry: pushNow, toasts });
+          showProblem(err, { doing: 'saving to OnlyWorlds', worldId: active.worldId, savedLocally: true, retry: pushNow, toasts });
         }
       };
       await pushNow();
@@ -596,7 +596,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       }
     } catch (err) {
       console.warn('[right-pane] refresh failed:', err);
-      showProblem(err, { doing: 'refreshing from OnlyWorlds', savedLocally: true, retry: () => { void pullNowAndRefresh().catch(e => showProblem(e, { doing: 'refreshing from OnlyWorlds', savedLocally: true, toasts })); }, toasts });
+      showProblem(err, { doing: 'refreshing from OnlyWorlds', worldId: active.worldId, savedLocally: true, retry: () => { void pullNowAndRefresh().catch(e => showProblem(e, { doing: 'refreshing from OnlyWorlds', worldId: active.worldId, savedLocally: true, toasts })); }, toasts });
     }
   };
 }

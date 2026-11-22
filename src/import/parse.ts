@@ -20,7 +20,28 @@
  */
 
 import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';
+import { knownFieldsFor } from '../editor/field-schema';
 import type { ParseResult, RawRecord } from './types';
+
+/**
+ * The import instruction's field list marks a number `#field` and a link `field>Type`; a reply now and then
+ * writes the mark into the key. A key that is a field of this type once its mark is read off becomes that
+ * field, so the review and the import read it alike. Never over a bare key written beside it; a mark on a
+ * name the type does not have stays as written, for the review to say.
+ */
+const LIST_MARK = /^#([A-Za-z_]\w*)$|^([A-Za-z_]\w*)>{1,2}[A-Za-z]+$/;
+function readListMarks(type: ElementType, rec: RawRecord): RawRecord {
+  let out: RawRecord | null = null;
+  for (const key of Object.keys(rec)) {
+    const m = LIST_MARK.exec(key);
+    const bare = m ? (m[1] ?? m[2]) : undefined;
+    if (!bare || bare in rec || !knownFieldsFor(type).has(bare)) continue;
+    out ??= { ...rec };
+    out[bare] = out[key];
+    delete out[key];
+  }
+  return out ?? rec;
+}
 
 const TYPE_SET = new Set<string>(ALL_ELEMENT_TYPES);
 
@@ -115,9 +136,9 @@ export function parsePayload(data: unknown): ParseResult {
     if (key === 'World') continue;
     const lower = key.toLowerCase();
     if (TYPE_SET.has(lower) && Array.isArray(value)) {
-      const records = value.filter(
-        (r): r is RawRecord => !!r && typeof r === 'object' && !Array.isArray(r),
-      );
+      const records = value
+        .filter((r): r is RawRecord => !!r && typeof r === 'object' && !Array.isArray(r))
+        .map(r => readListMarks(lower as ElementType, r));
       const existing = byType.get(lower as ElementType) ?? [];
       byType.set(lower as ElementType, [...existing, ...records]);
       total += records.length;

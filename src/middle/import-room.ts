@@ -24,7 +24,7 @@ import { hasFolderMode } from '../core/capabilities';
 import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { homeHash, importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
-import { sectionsFor } from '../editor/field-schema';
+import { polymorphicPairFor, sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
 import { parsePayload } from '../import/parse';
 import { reconcile } from '../import/reconcile';
@@ -95,7 +95,9 @@ export function buildSchemaDigest(): string {
       for (const f of section.fields) {
         if (f.name === 'name' || f.name.startsWith('atlas_') || seen.has(f.name)) continue;
         seen.add(f.name);
-        if (f.widget === 'number') fields.push(`#${f.name}`);
+        const pair = polymorphicPairFor(type, f.name);
+        if (pair) fields.push(pair.typeField, `${pair.idField}>Any`);
+        else if (f.widget === 'number') fields.push(`#${f.name}`);
         else if (f.widget === 'single-link') fields.push(`${f.name}>${cap(f.target ?? 'element')}`);
         else if (f.widget === 'multi-link') fields.push(`${f.name}>>${cap(f.target ?? 'element')}`);
         else fields.push(f.name);
@@ -119,8 +121,9 @@ export function buildConvertNotesPrompt(): string {
     '',
     '- Top-level keys are element types in PascalCase, each holding an array of elements.',
     '- Every element needs a "name" (a non-empty string). Everything else is optional: sparse is valid.',
-    '- Only the fields listed below exist. Do not invent field names (no Character.age, no Object.owner). A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
-    '- Field grammar in the list: a bare field is text · #field is a number (dates are plain numbers in the world\'s own timeline) · field>Type is a single link, its value the target element\'s name · field>>Type is a list of links.',
+    '- Only the fields listed below exist, each only on the type it is listed under. Do not invent field names. A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
+    '- Field grammar in the list: a bare field is text · #field is a number (dates are plain numbers in the world\'s own timeline) · field>Type is a single link, its value the target element\'s name · field>>Type is a list of links · field>Any links to an element of any type: its value the element\'s name, with that element\'s type in the _type field beside it (a Pin: "element_type": "Character", "element_id": "Aralia").',
+    '- A link names an element of the type it takes: a group made as a Collective goes in "collectives", never in "characters".',
     '- Only reference elements you also include. Prefer fields over tiny elements (physicality: "tall" beats a Trait named "Tall"). Only make elements for things specific to this world.',
     '- Convert only what the notes say: add no people, places, events or details that are not in them.',
     '- Optionally add a "World" block with "name" and "description" to make it a full world.',
@@ -527,7 +530,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           ${shown.map(i => `<li><code>${escapeText(i.path)}</code>: ${escapeText(i.issue)}</li>`).join('')}
           ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
         </ul>
-        <p class="atlas-import-issues-note">Import still runs: an entry with no name is skipped, an unknown field dropped, a broken link removed, and a value of the wrong kind kept as written. Paste the fix prompt to your AI to repair the source.</p>
+        <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an entry with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. Paste the fix prompt to your AI to repair the source.</p>
       </div>
     `;
   }
