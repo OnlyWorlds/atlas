@@ -54,7 +54,8 @@ import { filesWhereOf } from '../core/browser-worlds';
 import { buildAgentMark, buildHiddenMark, buildProposedMark } from './element-agent-mark';
 import { choosable } from '../core/web-lens';
 import { openWebOn } from '../ui/open-web';
-import { waitsOnPin } from '../core/saves-online';
+import { waitsOnPin, waitsOnWorldPin } from '../core/saves-online';
+import { SEAT_SECRET_MISSING_LINE } from '../core/seat';
 
 /**
  * Pending "auto-edit on next render" signal. When set to an element id, the
@@ -475,7 +476,8 @@ function buildSyncDot(el: Element): HTMLElement {
     } else if (dirty && waitsOnPin(worldEntry, getState().registry)) {
       // Linked, and waiting on the World PIN (1.125.0): nothing pushes until it is given.
       icon = 'save';
-      title = PIN_WAITS_DOT_TITLE;
+      // A seat that lost its secret: kept here, in the seat's own words (no World PIN gives it back).
+      title = waitsOnWorldPin(worldEntry, getState().registry) ? PIN_WAITS_DOT_TITLE : `Kept here. ${SEAT_SECRET_MISSING_LINE}`;
       state = 'local';
     } else if (dirty) {
       icon = 'cloud_upload';

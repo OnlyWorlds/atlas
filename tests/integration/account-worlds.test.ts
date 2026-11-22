@@ -43,7 +43,7 @@ import type { ToastManager } from '../../src/ui/toast-manager';
 
 // The link's own PIN rule runs for real (`linkPinRefusal`); the download is the link's own tests'
 // (link-browser.test.ts). Each call's options are kept, so the open's choices are read (1.125.0).
-const linked = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
+const linked = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>>, failures: [] as unknown[] }));
 vi.mock('../../src/setup/atlas-root-flow', async (orig) => {
   const real = await orig<typeof import('../../src/setup/atlas-root-flow')>();
   return {
@@ -52,7 +52,7 @@ vi.mock('../../src/setup/atlas-root-flow', async (orig) => {
       linked.calls.push(o as unknown as Record<string, unknown>);
       const refused = real.linkPinRefusal(o.apiKey, o.apiPin, !!o.readOnly, o.pinLater);
       if (refused) throw refused;
-      return { entry: { id: 'local-owned', name: o.displayName ?? 'World' }, downloaded: 0, failures: [] };
+      return { entry: { id: 'local-owned', name: o.displayName ?? 'World' }, downloaded: 0, failures: linked.failures };
     }),
   };
 });
@@ -606,6 +606,23 @@ describe('openAccountWorld: the owner\'s open asks no PIN; the world asks for it
       expect(revoked).toEqual(['srv-owned/key-ten']);
       expect(getState().registry.pin).toBeUndefined();
       expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual([new PinNeededError().message]);
+    });
+  });
+
+  it('elements that did not download are said plainly: they come with a refresh once the World PIN is in', async () => {
+    await withBrowserStorage(async () => {
+      mount();
+      patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+      linked.failures = [{ element_id: 'a' }, { element_id: 'b' }];
+      const toasts = makeToasts();
+      try {
+        expect(await openAccountWorld(owned, toasts)).toBe(true);
+      } finally {
+        linked.failures = [];
+      }
+      expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual([
+        'Opened Owned World. 2 elements did not download: once your World PIN is in, a refresh from OnlyWorlds brings them.',
+      ]);
     });
   });
 

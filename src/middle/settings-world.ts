@@ -7,7 +7,7 @@
 
 import { typeName, aTypeName, nameOrUnnamed, quotedWorld } from '../core/type-words';
 import { getState, patchActiveMeta, patchSlice } from '../core/state';
-import { PIN_WAITS_RESUME_LINE, waitsOnPin } from '../core/saves-online';
+import { resumeWaitLine } from '../core/saves-online';
 import { worldIsViewOnly } from '../core/view-only';
 import { diskApiBlock, isSeatWorld, SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE, seatRoleWords, worldPin } from '../core/seat';
 import {
@@ -428,7 +428,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     toasts.info(pausedInput.checked
       ? 'Sync paused for this world'
       : stillPaused ? 'This world will sync when Pause all sync is turned off'
-      : waitsOnPin(next.worlds.find(w => w.id === world.id), next) ? PIN_WAITS_RESUME_LINE : 'Sync resumed for this world');
+      : resumeWaitLine(next.worlds.find(w => w.id === world.id), next) ?? 'Sync resumed for this world');
   });
 
   // A shared world's own switch for the rule (Settings, Storage's

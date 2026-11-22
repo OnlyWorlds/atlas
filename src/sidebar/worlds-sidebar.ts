@@ -32,7 +32,7 @@ import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vau
 import { copyChip, copyLine } from '../core/world-copy';
 import { dropHeldSeat, heldSeat, heldSeatBusy, heldSeats, type HeldSeat } from '../core/held-seats';
 import { SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE } from '../core/seat';
-import { PIN_WAITS_RESUME_LINE, waitsOnPin } from '../core/saves-online';
+import { resumeWaitLine, waitsOnPin } from '../core/saves-online';
 import { LANDING_FAILED_HERE, LANDING_IN_ANOTHER_TAB, MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
@@ -369,7 +369,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       toasts.info(!entry.sync_paused
         ? 'Sync paused for this world'
         : stillPaused ? 'This world can sync again, but Pause all sync is still on'
-        : waitsOnPin(getState().registry.worlds.find(w => w.id === entry.id), getState().registry) ? PIN_WAITS_RESUME_LINE : 'Sync resumed');
+        : resumeWaitLine(getState().registry.worlds.find(w => w.id === entry.id), getState().registry) ?? 'Sync resumed');
       return;
     }
     const refreshBtn = target.closest<HTMLElement>('[data-role="refresh-world"]');

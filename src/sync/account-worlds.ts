@@ -350,8 +350,11 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, 
     navigate(homeHash(result.entry.id));
     if (result.failures.length > 0) {
       // With the PIN later, a refresh first asks for the PIN (1.125.0): say so.
-      const later = pinLater ? 'Add your World PIN, then ' : '';
-      toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. ${later}${later ? 'refresh' : 'Refresh'} from OnlyWorlds brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
+      const n = result.failures.length;
+      const what = `${n} element${n === 1 ? '' : 's'} did not download`;
+      toasts.error(pinLater
+        ? `Opened ${row.name}. ${what}: once your World PIN is in, a refresh from OnlyWorlds brings ${n === 1 ? 'it' : 'them'}.`
+        : `Opened ${row.name}. ${what}. Refresh from OnlyWorlds brings ${n === 1 ? 'it' : 'them'}.`);
     } else {
       toasts.success(`Opened ${row.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'}`);
     }

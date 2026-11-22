@@ -72,6 +72,14 @@ describe('the sync dot and a failed element', () => {
     expect(dot().textContent).toContain('save');
     // What came down from OnlyWorlds and is unchanged is there: Synced.
     document.body.innerHTML = '';
+    // A seat that lost its secret is kept here too, in a seat's words: no World PIN gives a seat its secret.
+    document.body.innerHTML = '';
+    patchSlice('registry', { ...defaultRegistry(), pin: '1234', worlds: [{ id: WORLD, name: 'Linked', state: 'api-linked', api: { world_id: 's1', api_key: 'k', seat: { role: 'narrator' } } } as unknown as WorldRegistryEntry] });
+    mount(e);
+    expect(dot().dataset.state).toBe('local');
+    expect(dot().title).toBe('Kept here. This world was opened on a seat, and this browser no longer has its secret, so it cannot sync.');
+    expect(dot().title).not.toContain('World PIN');
+    document.body.innerHTML = '';
     const same = el({ local_updated_at: '2026-11-17T09:00:00.000Z' });
     openWorld('api-linked', [same], { pin: null });
     mount(same);
