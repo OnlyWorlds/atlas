@@ -14,11 +14,11 @@ import { rmSync } from 'node:fs';
 
 const SALTMERE = { name: 'Saltmere', worldId: '0192c000-0000-7000-8000-00000000cccc', dir: 'saltmere-0192c000-5e6f' };
 const HARBOR = { name: 'Harbor', worldId: '0192d000-0000-7000-8000-00000000dddd', dir: 'harbor-0192d000-7a8b' };
-const STAYED = 'stayed closed here. Another Atlas page may still have it open.';
+const STAYED = 'stayed closed here. Another Atlas tab may still have it open. Close that tab and open the world again here, or open it again and choose to take it over.';
 /** Said when the world's own make-and-move lock is busy: no take-over offered. */
-const BUSY = 'stayed closed here. Another Atlas page may still have it open, or be moving it. Open it again here once that page is done.';
+const BUSY = 'stayed closed here. Another Atlas tab may still have it open, or be moving it. Open it again here once that tab is done.';
 /** Either of the two: a page that loses a start race loses at one check or the other. */
-const EITHER = /stayed closed here\. Another Atlas page may still have it open/;
+const EITHER = /stayed closed here\. Another Atlas tab may still have it open/;
 const TRY_AGAIN = 'Atlas could not open this world just now. Try again in a moment.';
 
 async function boot(page: Page): Promise<void> {
@@ -219,6 +219,34 @@ async function trueSecondPage(page: Page, context: BrowserContext): Promise<void
   await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
   expect(await activeWorld(second)).toBeNull();
   expect((await readLock(second, SALTMERE.dir))!.web_lock).toBe(held);
+  await second.close();
+}
+
+/**
+ * The claim's wait on a live second page lasts about two seconds with nothing else drawn: after one
+ * second a line says what it checks, and it is gone once the open ends (1.125.3). The line is sticky,
+ * so only the open's end takes it down: read once after the confirm, never by a retrying count.
+ */
+async function checkingLineDuringTheWait(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  await shell(page);
+  await clickWorld(page, SALTMERE.name);
+  await expect.poll(() => activeWorld(page)).toBe(id);
+  // The first page's own open asked no other tab: no line came.
+  expect(await page.locator('.ow-toast', { hasText: 'Checking whether another tab' }).count()).toBe(0);
+
+  const second = await context.newPage();
+  const dialogs = countDialogs(second);
+  await shell(second);
+  const line = second.locator('.ow-toast', { hasText: `Checking whether another tab has "${SALTMERE.name}" open…` });
+  const t0 = Date.now();
+  await clickWorld(second, SALTMERE.name);
+  await expect(line).toBeVisible();
+  expect(Date.now() - t0).toBeGreaterThanOrEqual(900);
+  await expect.poll(() => dialogs.at.length).toBe(1);
+  await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
+  expect(await line.count()).toBe(0);
   await second.close();
 }
 
@@ -459,6 +487,10 @@ for (const tag of ['', ' @firefox']) {
 
     test(`a true second page holding the world: the confirm after the wait, and Cancel says why${tag}`, async ({ page, context }) => {
       await trueSecondPage(page, context);
+    });
+
+    test(`the wait on a live second page says what it checks after a second, and the line goes with the open${tag}`, async ({ page, context }) => {
+      await checkingLineDuringTheWait(page, context);
     });
 
     test(`the address at startup, the world held by a live page: said, never asked${tag}`, async ({ page, context }) => {

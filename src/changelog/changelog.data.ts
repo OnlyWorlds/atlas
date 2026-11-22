@@ -90,6 +90,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'On a phone, the buttons of the card an Open in Atlas link shows now draw their words at 14 px, up from 12, and stay a thumb tall. After Escape or Not now, focus goes back to what you were on, or to the first control of the page behind, instead of resting on nothing.',
         tags: ['accessibility', 'layout'],
       },
+      {
+        id: 'world-lock-says-tab',
+        title: 'A world open in another tab is said in plain steps, and the wait says what it checks',
+        body: 'When a world stays closed because another Atlas tab may have it open, the line now says tab, as the question before it does, and names what to do: close that tab and open the world again here, or open it again and choose to take it over. Opening a world that another tab may hold can take a few seconds while Atlas checks; after a second, a line now says Checking whether another tab has the world open, and it goes when the open ends.',
+        tags: ['world', 'fix'],
+      },
     ],
   },
   {

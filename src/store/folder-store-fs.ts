@@ -187,6 +187,12 @@ export interface FsFolderStoreOptions {
   /** Override how long a claim waits for a named Web Lock (tests). Default LOCK_CLAIM_WAIT_MS. */
   claimWaitMs?: number;
   /**
+   * Called once, when the claim first asks whether another tab still holds
+   * this world's lock: the ask can wait `claimWaitMs`, up to MAX_CLAIM_ROUNDS
+   * times, so the opener may say what the wait is.
+   */
+  onOtherTabCheck?: () => void;
+  /**
    * If true, opening with a stale lock is allowed and silently takes the lock.
    * If false and another tab holds a live lock, open() throws ELockHeld.
    * Default true (matches the "one writer per folder, with stale recovery" rule).
@@ -609,6 +615,7 @@ export class FsFolderStore implements FolderStore {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
     let dead: { name: string; release: () => void } | null = null;
     let refused: string | null = null;
+    let asked = false;
     try {
       for (let round = 0; ; round++) {
         const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
@@ -630,6 +637,7 @@ export class FsFolderStore implements FolderStore {
           dead?.release();
           dead = null;
           if (round >= MAX_CLAIM_ROUNDS) throw new ELockHeld(existing);
+          if (!asked) { asked = true; this.opts.onOtherTabCheck?.(); }
           dead = await this.askWebLock(existing.web_lock);
           if (!dead) refused = existing.web_lock;
           continue; // read the file again: holding the dead name, or after the wait
