@@ -146,7 +146,7 @@ export interface TimelineViewExtras {
   /**
    * The active saved chart's name — becomes the ambient rail's heading
    * so the open chart is named where you read it. null = no saved chart active
-   * (the rail falls back to "This chart"). `undefined` leaves it untouched.
+   * (the rail falls back to "Unsaved chart"). `undefined` leaves it untouched.
    */
   chartLabel?: string | null;
   /**
@@ -2264,9 +2264,9 @@ export function chartCardName(selectedName: string | null, chartLabel: string | 
   return `Chart card: ${selectedName ?? chartHeading(chartLabel)}`;
 }
 
-/** The chart's name as the rail heads it: the saved chart's, or "This chart" before it is saved. */
-function chartHeading(chartLabel: string | null): string {
-  return chartLabel ?? 'This chart';
+/** The chart's name as the rail heads it: the saved chart's, or "Unsaved chart" before it is saved. */
+export function chartHeading(chartLabel: string | null): string {
+  return chartLabel ?? 'Unsaved chart';
 }
 
 function nameCard(state: ViewState): void {

@@ -118,7 +118,7 @@ test('a type-chip click releases an applied chart (the chart is a lens, not a lo
   // Picking a type lens releases the chart: active mark drops, rail reverts.
   await page.locator('.atlas-chart-type-chip', { hasText: 'events' }).click();
   await expect(chip).not.toHaveClass(/active/);
-  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('This chart');
+  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('Unsaved chart');
 });
 
 test('deleting the applied chart releases its lens (the ghost-scope bug)', async ({ page }) => {
