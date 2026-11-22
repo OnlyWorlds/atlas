@@ -258,8 +258,8 @@ export interface SyncState {
   /**
    * Highest change_seq ever APPLIED from the /changes feed. The rewind
    * detector's memory: a /changes response whose `head` is BELOW this means
-   * the server was restored from backup (the one legal rewind path, design
-   * §8) — the engine re-baselines with a cold walk instead of trusting a
+   * the server was restored from backup (a restore from backup, the one
+   * legal rewind path) — the engine re-baselines with a cold walk instead of trusting a
    * cursor pointing past the world's history. Cleared with the cursor by
    * resetSyncBaseline.
    */
