@@ -67,10 +67,10 @@ function pageInLine(page: Element | undefined, start = false): string {
   return own ? `"${own}"` : nameOrUnnamed({ type: 'narrative' }, { start, word: 'page' });
 }
 
-/** What a world without a sharing client lacks beside its key: a seat's secret, the World PIN, or (no world) the PIN. */
+/** What a world without a sharing client lacks beside its key: a seat secret, the World PIN, or (no world) either. */
 export function missingCredentialWords(worldId: string | null): string {
   const who = pinWhoOf(worldId ? getState().registry.worlds.find(w => w.id === worldId) : undefined);
-  return who === 'seat' ? 'seat secret' : who === 'account' ? 'World PIN' : 'PIN';
+  return who === 'seat' ? 'seat secret' : who === 'account' ? 'World PIN' : 'World PIN or seat secret';
 }
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {

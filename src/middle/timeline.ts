@@ -1011,7 +1011,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const scoped = filterNodesByScope(allNodes, scope);
     lastScoped = scoped;
     // The active saved chart, if the live scope matches one — its name becomes
-    // the rail's heading ("This chart" should speak the chart's name).
+    // the rail's heading (the chart's name, never "Unsaved chart").
     const activeChart = savedCharts.find(c => sameScope(c.scope, scope)) ?? null;
     const extras: TimelineViewExtras = {
       chartLabel: activeChart?.name ?? null,

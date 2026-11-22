@@ -894,7 +894,7 @@ for (const tag of ['', ' @firefox']) {
     await expect(canvas).toHaveAttribute('data-window', /,/);
     const card = page.locator('.atlas-timeline-card');
     // Nothing selected and no saved chart: the rail is the chart's, and it takes no name while unfocused.
-    await expect(card).toContainText('This chart');
+    await expect(card).toContainText('Unsaved chart');
     expect(await card.getAttribute('aria-label')).toBeNull();
     // Peek The Siege with the mouse: its card shows Ada's chip.
     const at = async (date: number) => {

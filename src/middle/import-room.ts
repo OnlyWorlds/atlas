@@ -166,6 +166,33 @@ export function jsonErrorWhere(text: string, err: unknown): string {
 /** The clipboard refused a write (no focus, or the permission is off). */
 export const CLIPBOARD_BLOCKED = 'The browser did not let Atlas use the clipboard. Click in the page, then try again.';
 
+/**
+ * The review's list of what to check, with the note on what Import does with each kind. A row leads with
+ * its line, which names the field as the editor labels it; the path follows as the locator, quieter (the
+ * copied fix prompt keeps the path first). The note's sentences are held to the import's own behaviour
+ * (tests/unit/import-review-words.test.ts).
+ */
+export function importIssuesHtml(issues: ValidationIssue[]): string {
+  if (issues.length === 0) {
+    return `<p class="atlas-import-ok"><span class="material-symbols-outlined">check_circle</span> Looks well-formed.</p>`;
+  }
+  const shown = issues.slice(0, 6);
+  const more = issues.length - shown.length;
+  return `
+    <div class="atlas-import-issues" data-role="issues">
+      <div class="atlas-import-issues-head">
+        <span><span class="material-symbols-outlined">warning</span> ${issues.length} thing${issues.length === 1 ? '' : 's'} to check</span>
+        <button type="button" class="atlas-btn-ghost" data-action="copy-fix">Copy fix prompt</button>
+      </div>
+      <ul class="atlas-import-issue-list">
+        ${shown.map(i => `<li><span class="atlas-import-issue-line">${escapeText(i.issue)}</span> <code class="atlas-import-issue-path">${escapeText(i.path)}</code></li>`).join('')}
+        ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
+      </ul>
+      <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an entry with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. A link by name to an element of another type is removed too; a link by id is kept as written. A Pin's "element" is not read: the pin keeps the link in its "element_id", and a pin with only "element" comes in with no element. A Pin with no "element_type" loses a link written as a name; one written as an id is kept, and its type is filled in when the import or the world holds that element. Paste the fix prompt to your AI to repair the source.</p>
+    </div>
+  `;
+}
+
 /** Rough token estimate for the size hint (chars/4 is close enough for UI). */
 function estimateTokens(s: string): number {
   return Math.round(s.length / 4);
@@ -491,7 +518,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             </div>
           ` : ''}
 
-          ${renderValidation(issues)}
+          ${importIssuesHtml(issues)}
 
           ${accuratePreview ? `
           <div class="atlas-import-preview">
@@ -515,27 +542,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       </div>
     `;
     wireReview(issues);
-  }
-
-  function renderValidation(issues: ValidationIssue[]): string {
-    if (issues.length === 0) {
-      return `<p class="atlas-import-ok"><span class="material-symbols-outlined">check_circle</span> Looks well-formed.</p>`;
-    }
-    const shown = issues.slice(0, 6);
-    const more = issues.length - shown.length;
-    return `
-      <div class="atlas-import-issues" data-role="issues">
-        <div class="atlas-import-issues-head">
-          <span><span class="material-symbols-outlined">warning</span> ${issues.length} thing${issues.length === 1 ? '' : 's'} to check</span>
-          <button type="button" class="atlas-btn-ghost" data-action="copy-fix">Copy fix prompt</button>
-        </div>
-        <ul class="atlas-import-issue-list">
-          ${shown.map(i => `<li><code>${escapeText(i.path)}</code>: ${escapeText(i.issue)}</li>`).join('')}
-          ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
-        </ul>
-        <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an entry with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. Paste the fix prompt to your AI to repair the source.</p>
-      </div>
-    `;
   }
 
   function wireReview(issues: ValidationIssue[]): void {

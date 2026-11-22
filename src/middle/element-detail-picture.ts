@@ -137,7 +137,7 @@ export function buildPictureUploadRow(el: Element, entry: WorldRegistryEntry, to
       await persistFieldPatch(el, 'image_url', url).catch(() => { /* toasted in persist */ });
       toasts.success('Picture uploaded and set as the image URL.');
     } catch (err) {
-      showProblem(err, { doing: 'uploading the picture', toasts });
+      showProblem(err, { doing: 'uploading the picture', worldId: entry.id, toasts });
     } finally {
       btn.disabled = false;
       btn.textContent = 'Choose a picture';
@@ -186,7 +186,7 @@ async function removeFlow(el: Element, entry: WorldRegistryEntry, key: string, b
       + (now.length > 0 ? ` and cleared from ${now.length === 1 ? 'its element' : `${now.length} elements`}.` : '.')
       + (elsewhere > 0 ? ` ${elsewhere} more element${elsewhere === 1 ? '' : 's'} on OnlyWorlds, not yet in this copy, use it; they will show no picture.` : ''));
   } catch (err) {
-    showProblem(err, { doing: 'removing the picture', toasts });
+    showProblem(err, { doing: 'removing the picture', worldId: entry.id, toasts });
   } finally {
     btn.disabled = false;
     btn.textContent = 'Remove picture';

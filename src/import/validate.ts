@@ -238,7 +238,7 @@ function missingRefIssue(
   path: string, field: string, value: string, target: ElementType,
   madeAs: ElementType[], rels: RelationField[], polymorphic: boolean,
 ): ValidationIssue {
-  const expected = `An existing ${target} name/id, or include ${aType(target)} named "${value}" in the import`;
+  const expected = `An existing ${cap(target)}, by name or id, or include ${aType(target)} named "${value}" in the import`;
   if (madeAs.length) {
     // A link to any type (a Pin's element_id) keeps its name: only the type beside it is wrong.
     if (polymorphic) {

@@ -188,18 +188,19 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
         return `This world's key can only read, so Atlas could not finish ${doing}.${saved} Put in a write key in Settings, This world.`;
       }
       // keel named the PIN (401 `invalid_credentials`, param `API-Pin`): the PIN's own sentence. A seat
-      // world sends its seat's secret there, never the World PIN (R1), and has no PIN to put in again.
+      // world sends its seat secret there, never the World PIN (R1), and has no PIN to put in again; not
+      // known whose, the line names both.
       if (keyRefusalOf(err) === 'pin') {
         const who = pinWhoFor(opts);
-        return who === 'seat' ? `OnlyWorlds did not accept this seat's secret, so Atlas could not finish ${doing}.${saved}`
+        return who === 'seat' ? `OnlyWorlds did not accept this seat secret, so Atlas could not finish ${doing}.${saved}`
           : who === 'account' ? `OnlyWorlds did not accept this World PIN. Atlas could not finish ${doing}.${saved} Check the World PIN in Settings, under OnlyWorlds.`
-          : `OnlyWorlds did not accept this PIN. Atlas could not finish ${doing}.${saved} Check the PIN in Settings, under OnlyWorlds.`;
+          : `OnlyWorlds did not accept the World PIN or seat secret. Atlas could not finish ${doing}.${saved} Check it in Settings, under OnlyWorlds.`;
       }
       {
         const who = pinWhoFor(opts);
-        return who === 'seat' ? `OnlyWorlds did not accept this world's key or its seat's secret, so Atlas could not finish ${doing}.`
-          : who === 'account' ? `OnlyWorlds did not accept this world's key or the World PIN, so Atlas could not finish ${doing}. Check your World PIN in Settings, under OnlyWorlds.`
-          : `OnlyWorlds did not accept this world's key or the PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
+        return who === 'seat' ? `OnlyWorlds did not accept this world's key or its seat secret, so Atlas could not finish ${doing}.`
+          : who === 'account' ? `OnlyWorlds did not accept this world's key or the World PIN, so Atlas could not finish ${doing}. Check the World PIN in Settings, under OnlyWorlds.`
+          : `OnlyWorlds did not accept this world's key, or its World PIN or seat secret, so Atlas could not finish ${doing}. Check them in Settings, under OnlyWorlds.`;
       }
     case 'offline':
       return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;
@@ -212,11 +213,15 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
           : typeof e.retryAfter === 'number' ? e.retryAfter * 1000 : null;
         const when = ms === null ? 'a minute' : waitWords(ms);
         if (!isPinParam(e.param)) return `OnlyWorlds asked Atlas to wait, so Atlas could not finish ${doing}.${saved} Try again in ${when}.`;
-        const wall = `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish ${doing}.${saved}`;
+        // keel counts different wrong values of API-Pin on one key: a seat's are its seat secrets.
         const who = pinWhoFor(opts);
+        const lead = who === 'seat'
+          ? "OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while"
+          : "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while";
+        const wall = `${lead}, and Atlas could not finish ${doing}.${saved}`;
         return who === 'seat' ? `${wall} Try again in ${when}.`
-          : who === 'account' ? `${wall} Check your World PIN in Settings; try again in ${when}.`
-          : `${wall} Check your PIN in Settings; try again in ${when}.`;
+          : who === 'account' ? `${wall} Check the World PIN in Settings; try again in ${when}.`
+          : `${wall} Check the World PIN or seat secret in Settings; try again in ${when}.`;
       }
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
     }
@@ -276,7 +281,8 @@ export interface ProblemOpts {
   /**
    * Whose credential the step sent as `API-Pin`, so a line about it names the World PIN or a seat's
    * secret (1.125.3): said by a caller that knows it (a seat's join, a link form's typed secret, a new
-   * world on the account), or read from `worldId`'s entry. Neither given, the line says "the PIN": the
+   * world on the account), or read from `worldId`'s entry. Neither given, the line names both (the World
+   * PIN or seat secret): the
    * open world is not always the step's (a download or a link runs beside it).
    */
   who?: PinWho;

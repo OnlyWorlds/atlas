@@ -198,7 +198,7 @@ describe('a pasted key', () => {
   it('a wrong PIN is told by /me, now that /world reads bare (1.79.0)', async () => {
     h.getWorld = async () => ({ id: current().api!.world_id, name: 'Here' });
     h.checkPin = async () => { throw refused('invalid_credentials', 401, 'API-Pin'); };
-    await expect(checkNewKey(current(), NEW)).rejects.toThrow('OnlyWorlds did not accept this World PIN with that key. Check that the key is from your own account, then your World PIN on the OnlyWorlds tab.');
+    await expect(checkNewKey(current(), NEW)).rejects.toThrow('OnlyWorlds did not accept this World PIN with that key. Check that the key is from your own account, then the World PIN on the OnlyWorlds tab.');
   });
 
   it('reads an ow_r_ key as read only', async () => {

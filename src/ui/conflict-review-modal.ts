@@ -46,6 +46,11 @@ export class ConflictReviewModal extends BaseModal {
     super();
   }
 
+  /** The world a resolve was for (checked open before each one), so its refusal names that world's credential. */
+  private problemWorld(): { worldId?: string } {
+    return this.capturedWorldId ? { worldId: this.capturedWorldId } : {};
+  }
+
   async open(): Promise<void> {
     const engine = getCurrentSyncEngine();
     if (!engine) {
@@ -134,7 +139,7 @@ export class ConflictReviewModal extends BaseModal {
           row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = false));
           // The row's buttons are live again: pressing one is the retry.
           console.error('[conflict-review] resolve failed:', err);
-          showProblem(err, { doing: 'resolving the conflict', toasts: this.toasts });
+          showProblem(err, { doing: 'resolving the conflict', ...this.problemWorld(), toasts: this.toasts });
           // A failed resolve may have written part of its answer: the count is read again.
           await refreshConflictsCount();
         }
@@ -228,7 +233,7 @@ export class ConflictReviewModal extends BaseModal {
           row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = false));
           // The row's buttons are live again: pressing one is the retry.
           console.error('[conflict-review] resolve failed:', err);
-          showProblem(err, { doing: 'resolving the conflict', toasts: this.toasts });
+          showProblem(err, { doing: 'resolving the conflict', ...this.problemWorld(), toasts: this.toasts });
           // A failed resolve may have written part of its answer: the count is read again.
           await refreshConflictsCount();
           // A copy with no record of what OnlyWorlds held: the row may have taken the OnlyWorlds copy as
