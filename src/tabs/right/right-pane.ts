@@ -472,7 +472,8 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // A press while a round runs does nothing (the round is already asking), so
   // neither the title nor the button offers one then.
   const busyRound = engine?.kind === 'syncing';
-  pill.title = title + (conflictCount > 0 || busyRound || wait ? '' : errored ? (pinRefused ? ' · click to put in the PIN again in Settings' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
+  // Add PIN's title already says what its press does (it asks for the PIN here, 1.125.0).
+  pill.title = title + (conflictCount > 0 || busyRound || wait || dataState === 'add-pin' ? '' : errored ?(pinRefused ? ' · click to put in the PIN again in Settings' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
   // Each badge's title is its name, so a screen reader says it once.
   const conflictName = `Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}`;
   const conflictBadge = conflictCount > 0
