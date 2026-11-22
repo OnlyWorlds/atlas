@@ -112,7 +112,7 @@ export function sharingErrorMessage(err: SharingApiError): string {
     case 'host_blocked': return `The web host in front of OnlyWorlds refused this page before it reached OnlyWorlds. ${hostRefusalCause('and it publishes')} Nothing was lost: the page is still here.`;
     case 'host_refused': return 'The web host in front of OnlyWorlds refused this page before it reached OnlyWorlds. Nothing was lost: the page is still here.';
     // A contributor or guest seat (keel sharing `_require_page_manager`, #104).
-    case 'owner_only': return 'Only the world\'s owner or a co-builder can publish, change or revoke its pages.';
+    case 'owner_only': return 'Only the owner and co-builders can publish, change or revoke the world\'s pages.';
     case 'unauthorized':
     case 'auth_failed': return 'OnlyWorlds did not accept the key or the World PIN. Check your World PIN in Settings, under OnlyWorlds.';
     case 'network': return 'Could not reach OnlyWorlds. Check your connection, then try again.';

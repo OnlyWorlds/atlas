@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Atlas called the four digits of your account the World PIN in some places, and your OnlyWorlds PIN, your PIN or the PIN in others. Every sentence, field and dialog now says World PIN, the name onlyworlds.com gives it in Account settings; the pill\'s Add PIN and the world list\'s no PIN stay short. When OnlyWorlds refuses it, the pill now says Put in the World PIN again in Settings, OnlyWorlds, which is where its press opens, and Settings no longer says a World PIN waiting on OnlyWorlds is kept here.',
         tags: ['sync', 'fix'],
       },
+      {
+        id: 'owner-and-co-builders',
+        title: 'Who may make a keeper\'s change is said one way',
+        body: 'Where only some members may make a change, such as a world\'s Charter Laws, its strand, a review mark or its published pages, Atlas now always says the owner and co-builders, where it said the world\'s owner and co-builders in some places and the owner or a co-builder in others. A world\'s details still say only the world\'s owner can change them, since OnlyWorlds takes those from the owner alone.',
+        tags: ['sync', 'fix'],
+      },
     ],
   },
   {
