@@ -3428,12 +3428,13 @@ button.atlas-element-sync-dot {
   transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 
+/* Keyboard focus keeps the house ring (A4's `:focus-visible` rule): the hover's border alone read 2.24:1
+   against the pane, under the 3:1 a focus mark needs. */
 .atlas-row-chip-location:hover,
 .atlas-row-chip-location:focus-visible {
   color: var(--atlas-accent-text);
   background: rgba(var(--atlas-accent-rgb), 0.08);
   border-color: rgba(var(--atlas-accent-rgb), 0.30);
-  outline: none;
 }
 
 /* Map tree row metadata group — pin count + image badge, pushed right with

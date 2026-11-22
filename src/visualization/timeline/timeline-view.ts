@@ -1705,7 +1705,13 @@ function zoomToCluster(state: ViewState, badge: PlusBadge): void {
 
 // ====== The DOM card (the wedge) ======
 
+/** Draw the card, and while a script holds focus on it, its name follows what it now shows. */
 function renderCard(state: ViewState): void {
+  drawCard(state);
+  if (state.card.hasAttribute('tabindex')) nameCard(state);
+}
+
+function drawCard(state: ViewState): void {
   const { card } = state;
   const node = state.selectedId ? state.nodes.find(n => n.id === state.selectedId) ?? null : null;
   // The rail is ALWAYS reserved (no canvas reflow when a peek opens — the
@@ -2240,8 +2246,28 @@ function focusCard(state: ViewState): void {
   const { card } = state;
   if (state.destroyed || !card.isConnected) return;
   card.tabIndex = -1;
-  card.addEventListener('blur', () => card.removeAttribute('tabindex'), { once: true });
+  nameCard(state);
+  card.addEventListener('blur', () => {
+    card.removeAttribute('tabindex');
+    card.removeAttribute('role');
+    card.removeAttribute('aria-label');
+  }, { once: true });
   card.focus({ preventScroll: true });
+}
+
+/**
+ * The focused card's own name, never its whole text (a screen reader read every chip and the
+ * snippet, some 230 characters, as the name): "Chart card: " and the selected element's name, or
+ * the chart's when nothing is selected. A plain div takes no name, so it is a group while it holds focus.
+ */
+export function chartCardName(selectedName: string | null, chartLabel: string | null): string {
+  return `Chart card: ${selectedName ?? chartLabel ?? 'This chart'}`;
+}
+
+function nameCard(state: ViewState): void {
+  const node = state.selectedId ? state.nodes.find(n => n.id === state.selectedId) ?? null : null;
+  state.card.setAttribute('role', 'group');
+  state.card.setAttribute('aria-label', chartCardName(node ? node.name : null, state.chartLabel));
 }
 
 // (The old float-near-the-dot positioning is gone — S7: the card is a docked

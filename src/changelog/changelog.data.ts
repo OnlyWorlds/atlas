@@ -72,6 +72,18 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Where only some members may make a change, such as a world\'s Charter Laws, its strand, a review mark or its published pages, Atlas now always says the owner and co-builders, where it said the world\'s owner and co-builders in some places and the owner or a co-builder in others. A world\'s details still say only the world\'s owner can change them, since OnlyWorlds takes those from the owner alone.',
         tags: ['sync', 'fix'],
       },
+      {
+        id: 'chart-card-named',
+        title: 'The chart\'s card has a short name when it takes focus',
+        body: 'Pressing a chip on the chart\'s card with Enter or Space moves focus to the card, and a screen reader read the whole card as its name, every chip included. It now hears Chart card and the selected element\'s name, or the chart\'s name when nothing is selected.',
+        tags: ['accessibility', 'charts'],
+      },
+      {
+        id: 'location-chip-focus-ring',
+        title: 'A map\'s location chip shows the focus ring',
+        body: 'In the Maps tab, a map\'s location chip reached with the keyboard drew only a faint border, too faint to see against the pane. It now draws the same focus ring as every other control, in dark and light mode.',
+        tags: ['accessibility', 'maps'],
+      },
     ],
   },
   {
