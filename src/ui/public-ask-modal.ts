@@ -9,9 +9,10 @@
  * Not now, Escape and a full outside click dismiss it: nothing made, nothing
  * held. So does any move of the address and the tour's start (`TOUR_STARTED_EVENT`):
  * a modal must not sit over another world or the tour. Open runs inside its own click (the storage request needs the
- * gesture); focus goes to Open when the card shows and back when it closes.
+ * gesture); focus goes to Open when the card shows and back when it closes,
+ * or to Home's first control when nothing on the page opened it (1.125.3).
  */
-import { BaseModal } from './modal-base';
+import { BaseModal, homeFirstControl } from './modal-base';
 import { TOUR_STARTED_EVENT } from '../tour/tour-flag';
 
 export interface PublicAskOpts {
@@ -74,6 +75,11 @@ export class PublicAskModal extends BaseModal {
 
   close(): void {
     this.hide();
+  }
+
+  /** The ask most often comes up with the page: down, focus goes to Home's first control, never the body. */
+  protected override focusWhenOpenerGone(): HTMLElement | null {
+    return homeFirstControl();
   }
 
   /** Every way down (a button, Escape, an outside click) passes here. */

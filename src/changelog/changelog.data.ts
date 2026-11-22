@@ -84,6 +84,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'In the Maps tab, a map\'s location chip reached with the keyboard drew only a faint border, too faint to see against the pane. It now draws the same focus ring as every other control, in dark and light mode.',
         tags: ['accessibility', 'maps'],
       },
+      {
+        id: 'open-link-cards-phone-and-focus',
+        title: 'The cards of an Open in Atlas link read better on a phone and leave focus in place',
+        body: 'On a phone, the buttons of the card an Open in Atlas link shows now draw their words at 14 px, up from 12, and stay a thumb tall. After Escape or Not now, focus goes back to what you were on, or to the first control of the page behind, instead of resting on nothing.',
+        tags: ['accessibility', 'layout'],
+      },
     ],
   },
   {

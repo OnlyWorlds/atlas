@@ -249,7 +249,44 @@ test.describe('on a touch phone', () => {
     // The smallest measured is the size reported.
     console.log(`[touch] card ${card.join(', ')} | toast actions ${toast.join(', ')}`);
   });
+
+  // The buttons drew their words at the house buttons' 12 px; on a phone the floor is 14 (1.125.3).
+  test('both open-link cards draw their button words at 14 px or more, each press 44 px tall', async ({ page }) => {
+    await playKeel(page);
+    const measure = (modal: string) => page.locator(`[data-modal="${modal}"] .atlas-modal-actions button`).evaluateAll(els =>
+      els.map(e => ({ size: parseFloat(getComputedStyle(e).fontSize), height: e.getBoundingClientRect().height })));
+    for (const [modal, link, count] of [['public-ask', `#/open/${PUB}/writing/${CH1}`, 3], ['open-sign-in', `#/open/${PRIVATE}/writing`, 2]] as const) {
+      await arriveAt(page, link);
+      await expect(page.locator(`[data-modal="${modal}"]`)).toBeVisible();
+      const buttons = await measure(modal);
+      expect(buttons, modal).toHaveLength(count);
+      expect(Math.min(...buttons.map(b => b.size)), modal).toBeGreaterThanOrEqual(14);
+      expect(Math.min(...buttons.map(b => b.height)), modal).toBeGreaterThanOrEqual(44);
+      console.log(`[touch] ${modal}: ${buttons.map(b => `${b.size}px/${Math.round(b.height)}`).join(', ')}`);
+    }
+  });
 });
+
+// The ask comes up with the page: its Not now leaves focus on Home's first control, never the page body (1.125.3).
+for (const tag of ['', ' @firefox']) {
+  test(`the public ask's Not now leaves focus on Home's first control${tag}`, async ({ page }) => {
+    await playKeel(page);
+    await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
+    const ask = askCard(page);
+    await expect(ask.locator('[data-action="open"]')).toBeFocused();
+    await ask.locator('[data-action="not-now"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(ask).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => {
+      const a = document.activeElement;
+      const pane = document.querySelector('.atlas-shell .atlas-middle-content');
+      const first = pane && Array.from(pane.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href]:not([target="_blank"]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'))
+        .find(el => !el.closest('[hidden], [inert]') && el.getClientRects().length > 0);
+      return !!a && a !== document.body && a === first;
+    })).toBe(true);
+  });
+}
 
 test('signed in as the owner, the account path opens it, and no copy is offered', async ({ page }) => {
   const keel = await playKeel(page, { ownerRows: true });

@@ -240,6 +240,55 @@ test('signed out with a world open, the card focuses Not now, and Not now drops 
   expect(keel.lists).toBe(0);
 });
 
+/** Home's first control: the first thing the keyboard reaches in the middle pane, as a selector-free description. */
+function focusNow(page: Page) {
+  return page.evaluate(() => {
+    const a = document.activeElement as HTMLElement | null;
+    const pane = document.querySelector('.atlas-shell .atlas-middle-content');
+    const ways = pane ? Array.from(pane.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href]:not([target="_blank"]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'))
+      .filter(el => !el.closest('[hidden], [inert]') && el.getClientRects().length > 0) : [];
+    return { body: a === document.body || a === null, homeFirst: !!a && a === ways[0], what: a ? a.outerHTML.slice(0, 200) : 'none' };
+  });
+}
+
+// The card comes up with the page, so nothing opened it: once it goes, by Escape or Not now, focus rests on
+// Home's first control, never the page body (1.125.3). Was: the body, and the next Tab started from the top.
+for (const tag of ['', ' @firefox']) {
+  test(`signed out, the card's Escape and Not now leave focus on Home's first control, never the page body${tag}`, async ({ page }) => {
+    await mockKeel(page);
+    const card = page.locator('[data-modal="open-sign-in"]');
+    for (const way of ['Escape', 'Not now'] as const) {
+      await arriveAt(page, `#/open/${ID}`);
+      await expect(card).toBeVisible();
+      if (way === 'Escape') await page.keyboard.press('Escape');
+      else { await card.locator('[data-action="not-now"]').focus(); await page.keyboard.press('Enter'); }
+      await expect(card).toHaveCount(0);
+      await expect.poll(async () => (await focusNow(page)).homeFirst, way).toBe(true);
+      expect((await focusNow(page)).body, way).toBe(false);
+      console.log(`[focus] after ${way}: ${(await focusNow(page)).what}`);
+    }
+  });
+}
+
+test('with a world open, the card gives focus back to what held it when it came up', async ({ page }) => {
+  await setupAtlasRoot(page);
+  await mockKeel(page);
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Typing Desk');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect.poll(async () => (await entryFor(page)).active).not.toBeNull();
+  // The sidebar's Help held focus when the link arrived: the card gives it back there.
+  const help = page.getByRole('button', { name: 'Help', exact: true });
+  await help.focus();
+  await page.evaluate((id) => { location.hash = `#/open/${id}`; }, ID);
+  const card = page.locator('[data-modal="open-sign-in"]');
+  await expect(card.locator('[data-action="not-now"]')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(card).toHaveCount(0);
+  await expect(help).toBeFocused();
+});
+
 test('a truncated link is said, and the address bar is cleared (#104)', async ({ page }) => {
   const keel = await mockKeel(page);
   await seedSignIn(page);

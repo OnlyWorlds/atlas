@@ -5929,8 +5929,9 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-modal-panel.atlas-public-ask-panel { width: min(460px, calc(100vw - 32px)); min-width: 0; }
 .atlas-public-ask-line { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: var(--atlas-text); overflow-wrap: anywhere; }
 .atlas-public-ask-panel .atlas-modal-actions { flex-wrap: wrap; }
+/* On a phone the presses take a thumb and their words the house's 14 px floor (they drew at the buttons' 12 px). */
 @media (pointer: coarse) {
-  .atlas-public-ask-panel .atlas-modal-actions button { min-height: 44px; }
+  .atlas-public-ask-panel .atlas-modal-actions button { min-height: 44px; font-size: 14px; }
 }
 .atlas-invite-choices {
   display: flex;

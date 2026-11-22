@@ -14,9 +14,10 @@
  *
  * Focus: the primary when no world is open; Not now when a world is open in
  * the tab, so a person typing never leaves for onlyworlds.com by their next
- * Enter.
+ * Enter. Down, focus goes back to what opened the card when it is still
+ * there, else to Home's first control (1.125.3), never the page body.
  */
-import { BaseModal } from './modal-base';
+import { BaseModal, homeFirstControl } from './modal-base';
 import { TOUR_STARTED_EVENT } from '../tour/tour-flag';
 
 export interface OpenSignInCardOpts {
@@ -96,6 +97,11 @@ export class OpenSignInCard extends BaseModal {
   private replaced(): void {
     this.keeps = true;
     this.hide();
+  }
+
+  /** The card most often comes up with the page: down, focus goes to Home's first control, never the body. */
+  protected override focusWhenOpenerGone(): HTMLElement | null {
+    return homeFirstControl();
   }
 
   /** Every way down passes here: the listeners go first, then the held id unless a sign-in or a new card keeps it. */
