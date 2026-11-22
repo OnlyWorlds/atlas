@@ -233,6 +233,7 @@ The guided tour (DESIGN_TOUR).
 - `tests/fixtures/mock-folder-store.ts`: the in-memory FolderStore (no directories: kernel tests also need fake-fs).
 - `tests/fixtures/fake-fs.ts`: an in-memory FS so the REAL FsFolderStore runs in vitest (lastModified, touch, read counter, `hold()/release()`, byte writes).
 - `tests/fixtures/fake-locks.ts`: a Web Locks API for vitest (`hold(name)` plays another tab).
+- `tests/fixtures/fake-lock-pages.ts`: one browser's Web Locks seen from several pages (`page(id)`, `kill`, `cache`, time limits): the writer lock's units (conv. 13).
 - `tests/fixtures/fake-ow-client.ts`: `FakeOwApiClient`: speaks `/changes` by default; rejects LOCAL_ONLY fields + stamps.
 - `tests/fixtures/monotonic-clock.ts`: strictly increasing ISO timestamps.
 - `tests/fixtures/folder-conformance/`: the Folder Format conformance fixture (an ecosystem artifact). `tests/fixtures/map-worlds/`: map fixture worlds.

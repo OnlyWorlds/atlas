@@ -203,3 +203,17 @@ export function numberFieldsFor(type: ElementType): Set<string> {
   }
   return out;
 }
+
+/** The schema's scalar fields of a type by kind: `text`, `integer` (integer / integer_max) or `number`. */
+export function scalarKindsFor(type: ElementType): Map<string, 'text' | 'integer' | 'number'> {
+  const schema = (FIELD_SCHEMA as any)[type];
+  const out = new Map<string, 'text' | 'integer' | 'number'>();
+  if (!schema) return out;
+  for (const [name, raw] of Object.entries(schema)) {
+    const t = (raw as { type?: string })?.type;
+    if (t === 'text') out.set(name, 'text');
+    else if (t === 'integer' || t === 'integer_max') out.set(name, 'integer');
+    else if (t === 'number') out.set(name, 'number');
+  }
+  return out;
+}

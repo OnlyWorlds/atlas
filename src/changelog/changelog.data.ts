@@ -56,6 +56,32 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.2',
+    date: '2026-11-22',
+    theme: 'The Data room says a field holding the wrong kind of value',
+    entries: [
+      {
+        id: 'review-says-wrong-kind',
+        title: 'A text or number field holding the wrong kind of value is said before you import',
+        body: 'When the JSON you paste or open in the Data room puts words in a number field, such as a birth date of "the spring of 1899" or a height of "tall", or a group of fields or a list where text belongs, the review now says it, naming the element and the field, before anything is added. Numbers written as text, like "1899", are still taken as numbers, as onlyworlds.com writes them. The fix prompt for your AI carries the same lines, so it can correct the JSON for you.',
+        tags: ['import', 'fix'],
+      },
+    ],
+  },
+  {
+    version: '1.125.1',
+    date: '2026-11-22',
+    theme: 'A world closed with its tab opens again at once',
+    entries: [
+      {
+        id: 'world-free-when-its-tab-closes',
+        title: 'A world closed with its tab, or with the whole browser, opens again with no question',
+        body: 'Closing the tab, or the whole browser, with a world open used to keep it locked for about a minute and a half: opening it again asked whether to take it over from another Atlas tab, when there was none. Now Atlas asks the browser whether the page that had the world open is still there, and when it is gone the world just opens. A world another Atlas page really has open still asks, after a moment of checking, and so does a duplicated tab, instead of opening the same world twice. If you answer Cancel, or a world you open from its address is open in another page, Atlas now says why it stayed closed. A world open in another browser or on another computer still asks, as before. And a world from onlyworlds.com whose download into your OnlyWorlds folder fails no longer keeps that folder held by this page until it closes.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.0',
     date: '2026-11-22',
     theme: 'Open in Atlas: one card, one question, and the World PIN when you first change the world',

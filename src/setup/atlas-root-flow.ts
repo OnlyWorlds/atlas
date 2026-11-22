@@ -1147,22 +1147,27 @@ export async function linkExistingApiWorldInRoot(
   // can rebuild the engine from registry+world.json alone.
   const store = new FsFolderStore();
   await store.open(worldHandle);
-  await store.writeWorldMeta(linkedWorldMeta({
-    serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat,
-  }));
 
   // Initial download — all elements of all types stamped with
   // `server_updated_at`, fetched over the v2 dialect.
   const adapter = buildV2Adapter(apiKey, apiPin);
   let downloadResult;
   try {
+    await store.writeWorldMeta(linkedWorldMeta({
+      serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat,
+    }));
     downloadResult = await initialDownloadAll(store, adapter, opts.onProgress, opts.shouldStop);
+    // Its settings and own words come down with it.
+    await seedLinkedWorldMeta(store, adapter);
   } catch (err) {
+    // Any failure before the commit point closes the store, so its heartbeat and its Web Lock end
+    // here: left open, this page's own lock would hold the folder until the page closed, and opening
+    // the folder again here would ask to take it over from another tab.
+    await store.close().catch(() => {});
     if (err instanceof DownloadCancelledError) {
       // Cancel = nothing kept. The folder and its vault handle were created by
       // THIS call a moment ago (the collision guard above never reuses an
       // existing folder), so removing them touches nothing the user owned.
-      await store.close().catch(() => {});
       await rootHandle.removeEntry(subName, { recursive: true }).catch((e) => {
         console.warn('[link-api] could not remove the cancelled folder:', e);
       });
@@ -1170,8 +1175,6 @@ export async function linkExistingApiWorldInRoot(
     }
     throw err;
   }
-  // Its settings and own words come down with it.
-  await seedLinkedWorldMeta(store, adapter);
 
   // The commit point: the download succeeded, so leave the prior world now.
   await releasePriorWorld();
