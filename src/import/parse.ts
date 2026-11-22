@@ -24,6 +24,28 @@ import { knownFieldsFor } from '../editor/field-schema';
 import type { ParseResult, RawRecord } from './types';
 
 /**
+ * The JSON inside a reply pasted with its code fence. A chat's "copy message" hands over the fence
+ * lines, and some models fence their JSON whatever the instruction says; the box then met "Not valid
+ * JSON" with nothing naming the fence. Text that already starts as JSON is returned as it is. Otherwise,
+ * when the text holds exactly one fenced block, the block's inside is returned, with as many line ends
+ * before it as the pasted text had, so a fault's line number is the pasted text's own. Two blocks, or one
+ * never closed, are no guess: the text comes back whole. Index searches only: linear in the text's length.
+ */
+export function jsonTextOf(text: string): string {
+  const lead = text.trimStart();
+  if (lead.startsWith('{') || lead.startsWith('[')) return text;
+  const open = text.indexOf('```');
+  if (open < 0) return text;
+  const lineEnd = text.indexOf('\n', open + 3);
+  if (lineEnd < 0) return text;
+  const close = text.indexOf('```', lineEnd + 1);
+  if (close < 0 || text.indexOf('```', close + 3) >= 0) return text;
+  let lines = 0;
+  for (let i = text.indexOf('\n'); i >= 0 && i <= lineEnd; i = text.indexOf('\n', i + 1)) lines++;
+  return '\n'.repeat(lines) + text.slice(lineEnd + 1, close);
+}
+
+/**
  * The import instruction's field list marks a number `#field` and a link `field>Type`; a reply now and then
  * writes the mark into the key. A key that is a field of this type once its mark is read off becomes that
  * field, so the review and the import read it alike. Never over a bare key written beside it; a mark on a

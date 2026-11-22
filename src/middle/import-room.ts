@@ -26,7 +26,7 @@ import { homeHash, importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { polymorphicPairFor, sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
-import { parsePayload } from '../import/parse';
+import { jsonTextOf, parsePayload } from '../import/parse';
 import { reconcile } from '../import/reconcile';
 import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
 import { generateFixPrompt, validatePayload } from '../import/validate';
@@ -136,7 +136,7 @@ export function buildConvertNotesPrompt(): string {
     '',
     buildSchemaDigest(),
     '',
-    'Return only the JSON, nothing else.',
+    'Return only the JSON, nothing else: no code block around it, and no words before or after.',
     '',
     'My notes:',
     '<paste your notes here>',
@@ -310,9 +310,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   }
 
   let lastIngest: { text: string; sourceLabel: string; pasted: boolean } | null = null;
-  function ingest(text: string, sourceLabel: string): void {
-    lastIngest = { text, sourceLabel, pasted: sourceLabel === 'The pasted text' };
+  function ingest(pastedOrRead: string, sourceLabel: string): void {
+    lastIngest = { text: pastedOrRead, sourceLabel, pasted: sourceLabel === 'The pasted text' };
     errorEl.hidden = true;
+    // A reply copied with its code fence loads as the JSON inside it.
+    const text = jsonTextOf(pastedOrRead);
     let raw: unknown;
     try {
       raw = JSON.parse(text);
@@ -375,9 +377,10 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
    * never auto-loads (the load button stays the explicit step).
    */
   function liveValidate(): void {
-    const text = pasteEl.value.trim();
+    const typed = pasteEl.value.trim();
     pasteEl.classList.remove('is-valid', 'is-invalid');
-    if (!text) { liveEl.hidden = true; liveEl.textContent = ''; return; }
+    if (!typed) { liveEl.hidden = true; liveEl.textContent = ''; return; }
+    const text = jsonTextOf(typed);
 
     let raw: unknown;
     try {

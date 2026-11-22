@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'ai-instruction-pin-and-fixes',
         title: 'A reply that follows the AI instruction keeps every link',
-        body: 'The instruction the Data room copies for your AI listed a Pin\'s place as element, a key the review then dropped; it now asks for element_type and element_id, the two keys the import reads. When a reply names a group made as a Collective in an Event\'s characters, the review\'s fix now says to link it in collectives, where it used to ask for a Character of the same name. A key written with the list\'s own mark, such as #count, is read as count, and a field written on a type that lacks it names the types that have it.',
+        body: 'The instruction the Data room copies for your AI listed a Pin\'s place as element, a key the review then dropped; it now asks for element_type and element_id, the two keys the import reads. When a reply names a group made as a Collective in an Event\'s characters, the review\'s fix now says to link it in collectives, where it used to ask for a Character of the same name. A key written with the list\'s own mark, such as #count, is read as count, and a field written on a type that lacks it names the types that have it. A reply pasted with its code block around it now loads as the JSON inside, where it used to be refused as not valid JSON.',
         tags: ['import', 'fix'],
       },
       {

@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildSchemaDigest, buildConvertNotesPrompt } from '../../src/middle/import-room';
-import { parsePayload } from '../../src/import/parse';
+import { buildSchemaDigest, buildConvertNotesPrompt, jsonErrorWhere } from '../../src/middle/import-room';
+import { jsonTextOf, parsePayload } from '../../src/import/parse';
 import { validatePayload } from '../../src/import/validate';
 import { knownFieldsFor } from '../../src/editor/field-schema';
 import { ALL_ELEMENT_TYPES } from '../../src/core/types';
@@ -138,6 +138,51 @@ describe('a name made as another type', () => {
     const issues = review({ Event: [{ name: 'The Ball', characters: ['The Soldier'] }] });
     expect(issues).toHaveLength(1);
     expect(issues[0].suggestion).toMatch(/Add a character/i);
+  });
+});
+
+describe('a reply pasted with its code fence', () => {
+  const body = '{"Character": [{"name": "Aralia"}]}';
+  const loads = (t: string) => parsePayload(JSON.parse(jsonTextOf(t))).ok;
+
+  it('loads with a json fence, a bare fence, Windows line ends, and words around one fence', () => {
+    expect(loads('```json\n' + body + '\n```')).toBe(true);
+    expect(loads('```\n' + body + '\n```\n')).toBe(true);
+    expect(loads('```json\r\n' + body + '\r\n```\r\n')).toBe(true);
+    expect(loads('Here is your world:\n\n```json\n' + body + '\n```\n\nLet me know if you want more.')).toBe(true);
+  });
+
+  it('leaves bare JSON alone, a fence inside a value included', () => {
+    const withFence = '{"Character": [{"name": "A", "description": "```js\\ncode\\n```"}]}';
+    expect(jsonTextOf(withFence)).toBe(withFence);
+    expect(jsonTextOf('  ' + body + '\n')).toBe('  ' + body + '\n');
+  });
+
+  it('guesses nothing when there are two fences, or one never closed', () => {
+    const two = '```json\n' + body + '\n```\nand\n```json\n' + body + '\n```';
+    expect(jsonTextOf(two)).toBe(two);
+    const open = '```json\n' + body;
+    expect(jsonTextOf(open)).toBe(open);
+  });
+
+  it('a fault inside the fence is reported at its line in the pasted text', () => {
+    const pasted = 'Sure:\n```json\n{\n  "Character": [{"name": "A",}]\n}\n```';
+    const text = jsonTextOf(pasted);
+    let where = '';
+    try { JSON.parse(text); } catch (err) { where = jsonErrorWhere(text, err); }
+    expect(where).toMatch(/line 4/);
+  });
+
+  it('stays quick on a large paste full of backticks', () => {
+    const big = '`'.repeat(1_000_000) + '\n```json\n' + body + '\n```';
+    const t0 = performance.now();
+    jsonTextOf(big);
+    jsonTextOf('```'.repeat(300_000));
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
+
+  it('the instruction asks for no code block', () => {
+    expect(buildConvertNotesPrompt()).toContain('no code block');
   });
 });
 
