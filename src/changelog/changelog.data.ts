@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.1',
+    date: '2026-11-22',
+    theme: 'A world closed with its tab opens again at once',
+    entries: [
+      {
+        id: 'world-free-when-its-tab-closes',
+        title: 'A world closed with its tab, or with the whole browser, opens again with no question',
+        body: 'Closing the tab, or the whole browser, with a world open used to keep it locked for about a minute and a half: opening it again asked whether to take it over from another Atlas tab, when there was none. Now Atlas asks the browser whether the page that had the world open is still there, and when it is gone the world just opens. A world another Atlas page really has open still asks, after a moment of checking, and so does a duplicated tab, instead of opening the same world twice. If you answer Cancel, or a world you open from its address is open in another page, Atlas now says why it stayed closed. A world open in another browser or on another computer still asks, as before.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.35',
     date: '2026-11-21',
     theme: 'A PIN OnlyWorlds refused is never sent again by itself',

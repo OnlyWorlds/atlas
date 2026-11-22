@@ -575,6 +575,7 @@ async function tryAutoActivateFromUrl(toasts: ToastManager): Promise<void> {
       silent: true,
       preserveSelection: true,
       permissionMode: 'query',
+      sayLockHeld: true,
     });
   } catch (err) {
     // Errors here would be surprising — log and move on. The user can always

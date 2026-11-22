@@ -683,6 +683,21 @@ export interface ActivateWorldOpts {
    * `query` calls `queryPermission` only — silent, used at boot when no gesture is available.
    */
   permissionMode?: 'request' | 'query';
+  /**
+   * With `silent`: a world held by a live Atlas page is still said, with no
+   * take-over offered (the open from the address at startup, which would
+   * otherwise leave "No world open." with no word).
+   */
+  sayLockHeld?: boolean;
+}
+
+/**
+ * Said when a held world stays closed: true for a live second page, a page
+ * in another browser or on another computer sharing the folder, and a page
+ * the browser still keeps after it was left.
+ */
+export function stayedClosedHere(name: string): string {
+  return `"${name}" stayed closed here. Another Atlas page may still have it open. Close that page and open it again here, or take it over.`;
 }
 
 /**
@@ -729,7 +744,7 @@ export async function activateWorld(
       }
     }, 15_000);
     try {
-      return await doActivateWorld(worldId, toasts, opts);
+      return await doActivateWorld(worldId, toasts, opts, gen);
     } catch (err) {
       // An open never rejects (conv. 142): a toast's Open it, a
       // retry and a row click fire this and forget it, so whatever escapes the
@@ -752,7 +767,8 @@ export async function activateWorld(
 async function doActivateWorld(
   worldId: string,
   toasts: ToastManager,
-  opts: ActivateWorldOpts = {}
+  opts: ActivateWorldOpts,
+  gen: number,
 ): Promise<boolean> {
   const { silent = false, quietRekey = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
@@ -1041,6 +1057,10 @@ async function doActivateWorld(
     // stranded (Titus, 2026-07-10) — offer an explicit, consented takeover.
     // Never prompt on the silent boot path.
     if (err instanceof ELockHeld && !silent) {
+      // The claim waited for the other page's Web Lock (conv. 13): a click
+      // made meanwhile is the person's word now, and no confirm asks about a
+      // world they have left. The newer activation sets the address.
+      if (gen !== currentActivationGen()) return false;
       const hb = Date.parse(err.lock.last_heartbeat);
       const ageS = Number.isFinite(hb) ? Math.max(0, Math.round((Date.now() - hb) / 1000)) : null;
       const take = window.confirm(
@@ -1049,6 +1069,7 @@ async function doActivateWorld(
         `.\n\nClose the other tab, or take over here. Taking over while the other tab is still in use can lose changes.\n\nTake over?`
       );
       if (!take) {
+        toasts.show(stayedClosedHere(entry.name), 'info', 8000);
         if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
         return false;
       }
@@ -1064,6 +1085,8 @@ async function doActivateWorld(
     } else {
       console.warn('[worlds-sidebar] open failed:', err);
       if (!silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
+      // The world named by the address at startup, held by a live page: said, never asked.
+      else if (err instanceof ELockHeld && opts.sayLockHeld) toasts.show(stayedClosedHere(entry.name), 'info', 8000);
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }

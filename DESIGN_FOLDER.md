@@ -17,7 +17,7 @@ A world is a folder. Atlas keeps new world folders inside one user-chosen home f
       world.json                        metadata + api block when linked; format_version and `producer` stamped at birth (spec §4.2); a linked world's world file adds `source` and `exported_as` (below);
                                         a LINKED folder's id IS the server world id (spec §4.1, 2026-09-04; older links keep their minted id)
       .atlas/                           atlas internal state
-        lock                            {tab_id, started_at, last_heartbeat}: one writer at a time (conv. 13)
+        lock                            {tab_id, browser_id, web_lock, started_at, last_heartbeat}: one writer at a time (conv. 13)
         sync-state.json                 /changes cursor, conflicts, server-delete review list, world-meta baseline, foreign ids, finished re-key map
         tombstones.json                 deletion log (id, type, deleted_at)
         charts.json                     saved chart configs (DESIGN_CHARTS)
@@ -131,7 +131,7 @@ There is no per-element entry: each element's baseline is its own `server_update
 
 ## The other `.atlas/` files
 
-- **`lock`**: `{ tab_id, started_at, last_heartbeat }`, heartbeat every 30 s, stale after 90 s (`LOCK_HEARTBEAT_MS`, `LOCK_STALE_MS`). A live lock refuses the open with `ELockHeld` and the caller offers a consented take-over (conv. 13). A parked store stales its heartbeat so another tab can take the world at once.
+- **`lock`**: `{ tab_id, browser_id, web_lock, started_at, last_heartbeat }` (without Web Locks, `{ tab_id, started_at, last_heartbeat }`), heartbeat every 30 s, stale after 90 s (`LOCK_HEARTBEAT_MS`, `LOCK_STALE_MS`). `web_lock` names the writing store's own Web Lock: in the browser that wrote it (`browser_id`), a live lock whose Web Lock is free is a store that is gone, and is taken. A live lock held by a living store refuses the open with `ELockHeld` and the caller offers a consented take-over (conv. 13). A parked store stales its heartbeat so another tab can take the world at once.
 - **`tombstones.json`**: `{ "deletions": [ { "id", "type", "deleted_at" } ] }`, appended before the file is unlinked (conv. 12). The engine pushes each entry as a DELETE and clears it on success; a 404 counts as success.
 - **`charts.json`**: saved `ChartConfig`s, read-modify-write through `mutateCharts` (conv. 109). DESIGN_CHARTS.
 - **`styles.json`**: world style rules (`core/world-styles.ts`), DESIGN_ZONES §5b. Values from this file pass `hexColourOr` before any style attribute (conv. 93).
