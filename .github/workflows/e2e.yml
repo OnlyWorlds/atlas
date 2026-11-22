@@ -1,7 +1,7 @@
 # Atlas's full end-to-end suite, off the maintainers' machine (#596).
 # It runs when someone dispatches it (`gh workflow run e2e.yml --ref master`) and on every
-# pull request opened from a branch of this repository. A fork's pull request starts
-# nothing, and no push does. It reads the repository and nothing else.
+# pull request, a fork's included. No push starts it. It reads the repository and nothing
+# else and uses no secret; a fork's run gets none.
 name: e2e
 
 on:
@@ -18,7 +18,6 @@ concurrency:
 
 jobs:
   e2e:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     # Pinned: ubuntu-latest moved to 26.04, where Playwright 1.60 installs no browsers.
     runs-on: ubuntu-24.04
     timeout-minutes: 75

@@ -1,12 +1,15 @@
 # Atlas's typecheck and unit suite, off the maintainers' machine. It runs when someone
 # dispatches it (`gh workflow run unit.yml --ref master`) and on every pull request, a fork's
 # included: master requires it, so a pull request that never ran it could never merge. It reads
-# the repository and nothing else, uses no secret, and a fork's run gets none. No push starts it.
+# the repository and nothing else, uses no secret, and a fork's run gets none. A push to master
+# runs it too, so master's own head always carries the check it requires.
 name: unit
 
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches: [master]
 
 permissions:
   contents: read
