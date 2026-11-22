@@ -71,6 +71,8 @@ export const SHELL_RATIOS_STORAGE_KEY = 'atlas_shell_ratios_v2';
 export const RIGHT_TABS_STORAGE_KEY = 'atlas_right_tabs';
 /** Per-world unsaved knowledge draft (`/knowledge/new`). Key = prefix + worldId. */
 export const KNOWLEDGE_DRAFT_STASH_PREFIX = 'atlas_knowledge_draft_';
+/** This browser profile's id, written into a folder's writer lock (conv. 13). Read once per page. */
+export const BROWSER_ID_STORAGE_KEY = 'atlas_browser_id';
 
 // IDB schema (handle-vault only — no world data in IDB)
 export const HANDLE_VAULT_DB = 'atlas-handles';
@@ -143,6 +145,12 @@ export const SPATIAL_TYPES = new Set(['map', 'pin', 'zone', 'marker']);
 // Lock file lifecycle
 export const LOCK_HEARTBEAT_MS = 30_000;
 export const LOCK_STALE_MS = 90_000;
+/**
+ * How long a claim waits for the Web Lock a live file lock names (conv. 13):
+ * granted in time, the page that held it is gone; not, it lives. The wait
+ * also evicts a page Chromium keeps in its back-forward cache.
+ */
+export const LOCK_CLAIM_WAIT_MS = 2_000;
 
 /**
  * The public OnlyWorlds demo keys, `0000000000`-`0000000009`.
