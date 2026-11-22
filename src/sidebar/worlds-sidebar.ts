@@ -564,7 +564,7 @@ export function renderRow(world: WorldRegistryEntry, active: boolean, _settingsA
     : viewOnly
     ? '<span class="atlas-world-state-chip view-only">view</span>'
     : pinWaits
-    ? `<span class="atlas-world-state-chip pin-waits" title="${escapeAttr(PIN_WAITS_CHIP_TITLE)}">not online yet</span>`
+    ? `<span class="atlas-world-state-chip pin-waits" title="${escapeAttr(PIN_WAITS_CHIP_TITLE)}">no PIN</span>`
     : world.state === 'api-linked'
       ? '<span class="atlas-world-state-chip api-linked">online</span>'
       : '';

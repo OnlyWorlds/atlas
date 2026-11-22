@@ -68,6 +68,7 @@ let shown: Array<{ msg: string; actions: string[] }>;
 let successes: string[];
 /** Every line said, and whether an engine was attached when it was: the door's own attach, never the watch's later one. */
 let said: Array<{ msg: string; engine: boolean }>;
+let dismissed: string[];
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
@@ -92,6 +93,8 @@ beforeEach(() => {
   });
   successes = [];
   said = [];
+  dismissed = [];
+  vi.spyOn(toastManager, 'dismiss').mockImplementation((k: string) => { dismissed.push(k); });
   const note = (m: string) => { said.push({ msg: m, engine: !!getCurrentSyncEngine() }); return undefined as never; };
   vi.spyOn(toastManager, 'success').mockImplementation((m: string) => { successes.push(m); return note(m); });
   vi.spyOn(toastManager, 'info').mockImplementation(note);
@@ -150,8 +153,9 @@ describe('the World PIN dialog', () => {
     expect(dialog()!.textContent).toContain(worldPinLine('Tangle ground'));
     await giveInDialog(RIGHT);
     expect(dialog()).toBeNull();
-    // The dialog attached it itself, before it said so.
+    // The dialog attached it itself, before it said so; the first change's line is taken down.
     expect(said).toContainEqual({ msg: 'World PIN saved. Your changes save to OnlyWorlds now.', engine: true });
+    expect(dismissed).toContain('pin-waits:w1');
     expect(getState().registry).toMatchObject({ pin: RIGHT, pin_state: 'proved' });
     expect(getCurrentSyncEngine()).not.toBeNull();
     await settle(8_000);

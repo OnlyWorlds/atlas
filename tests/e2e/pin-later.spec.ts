@@ -136,7 +136,7 @@ async function opensWithNoPinAndAsksInTheWorld(page: Page, folderPicker: boolean
   await expect(card).toContainText('This world lives only in this browser');
   await expect(card).not.toContainText('Your OnlyWorlds account holds');
   await expect(card.locator('[data-action="keepsafe-add-pin"]')).toBeVisible();
-  await expect(page.locator('.atlas-world-state-chip.pin-waits')).toHaveText(/not online yet/i);
+  await expect(page.locator('.atlas-world-state-chip.pin-waits')).toHaveText(/no PIN/i);
   await expect(page.locator('.atlas-world-state-chip.api-linked')).toHaveCount(0);
 
   // The first change says so, once.

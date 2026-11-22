@@ -67,7 +67,7 @@ describe('the sidebar\'s row', () => {
   it('waiting on the PIN: its place for an icon and a chip that says it does not save yet; its sync controls stay', () => {
     patchSlice('registry', { ...defaultRegistry(), worlds: [linked()] });
     const waiting = renderRow(linked(), false, false, false);
-    expect(waiting).toContain('not online yet');
+    expect(waiting).toContain('>no PIN<');
     expect(waiting).toContain(PIN_WAITS_CHIP_TITLE.replace(/'/g, '&#39;').slice(0, 20));
     expect(waiting).not.toContain('>online<');
     expect(waiting).toMatch(/data-role="refresh-world"[^>]*>\s*<span class="material-symbols-outlined">web<\/span>/);

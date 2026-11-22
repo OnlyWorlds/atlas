@@ -197,6 +197,8 @@ export function attachSyncEngine(
   currentEngine = engine;
   currentWorldId = entry.id;
   currentPin = pin;
+  // "Kept here until you add your World PIN" is no longer true once an engine runs on a PIN.
+  if (!readOnly) toastManager.dismiss(firstChangeKey(entry.id));
   currentPolicyNow = policyNow;
   watchRefusedPin();
   /** Ask the roster, and move the engine to what it says once keel has answered. */
@@ -677,8 +679,14 @@ export function requestPushIfLinked(): void {
   toldPinWaits.add(why.worldId);
   const name = getState().registry.worlds.find(w => w.id === why.worldId)?.name ?? 'this world';
   toastManager.show(firstChangeLine(name), 'info', 0, {
+    dedupeKey: firstChangeKey(why.worldId),
     actions: [{ label: 'Add PIN', run: () => { void import('../ui/world-pin-modal').then(m => m.askWorldPin(toastManager)); } }],
   });
+}
+
+/** The first-change line's key: taken down once the world attaches, when it is no longer true. */
+function firstChangeKey(worldId: string): string {
+  return `pin-waits:${worldId}`;
 }
 
 /** What the first change in a world waiting on the World PIN says (once a session per world). */

@@ -3488,6 +3488,7 @@ button.atlas-element-sync-dot {
 
 /* Linked, and waiting on the World PIN (1.125.0): neutral like view-only, never the online cyan. */
 .atlas-world-state-chip.pin-waits {
+  white-space: nowrap;
   background: rgba(var(--atlas-ink-rgb), 0.06);
   color: var(--atlas-text-soft);
 }
