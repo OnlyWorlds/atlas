@@ -10,7 +10,7 @@
  * authority — the SDK exports `ELEMENT_ICONS` but has never exported a colour,
  * which is precisely why icons are consistent everywhere and colours are not.
  *
- * Skeld ran every candidate through a CVD-separation validator (2026-07-22) and
+ * Every candidate was run through a CVD-separation validator (2026-07-22) and
  * none passed, including atlas's own:
  *
  *   - Character #f97316 vs Creature #ea580c: ΔE 6.3 for normal vision (floor 15)
@@ -33,9 +33,9 @@
  *
  * ── Where this is going ───────────────────────────────────────────────────
  *
- * Titus ruled four families (2026-07-22). Skeld is preparing
+ * Titus ruled four families (2026-07-22). A shared set is being prepared:
  * `ELEMENT_FAMILIES` + `FAMILY_COLORS` + `getElementColor(type, mode)` for the
- * SDK, co-signed by Kael, published post-launch. THIS FILE IS DELIBERATELY THAT
+ * SDK, published post-launch. THIS FILE IS DELIBERATELY THAT
  * SHAPE so the migration is a re-export, not a rewrite: when the SDK ships,
  * delete the two consts below and re-export the SDK's.
  *
@@ -54,7 +54,7 @@ export type ElementFamily = 'agents' | 'world' | 'abstract' | 'temporal';
  * The names stay Atlas's so no consumer moves; which type sits in which group,
  * and every hex, are the SDK's. The standard moved Construct to pink and
  * Ability to amber (serial 86): Atlas follows the standard, never its own copy.
- * Spatial types fold into green (Skeld's ruling of 2026-07-22, kept by the
+ * Spatial types fold into green (a ruling of 2026-07-22, kept by the
  * standard): a pin is coloured by its TARGET's type (`pinVisualFor`), so the
  * map, pin, marker and zone entries mostly colour lists and the graph.
  */
@@ -72,7 +72,7 @@ export const ELEMENT_FAMILIES: Record<ElementType, ElementFamily> = Object.fromE
 
 /**
  * Family to hex: the SDK's `GROUP_COLORS`. Both modes were validated against
- * their own surface (Skeld's CVD validator), so one is never derived from the
+ * their own surface (the CVD validator), so one is never derived from the
  * other, and green is the same in both by validation, not by oversight.
  */
 export const FAMILY_COLORS: Record<ElementFamily, { light: string; dark: string }> = Object.fromEntries(
@@ -93,9 +93,9 @@ export function elementColor(type: string, mode: 'light' | 'dark' = 'dark'): str
 }
 
 /**
- * ── The World-green lift, and why it is not in Skeld's proposal ────────────
+ * ── The World-green lift, and why it is not in the proposed set ────────────
  *
- * Skeld's set validates PAIR SEPARATION: every family is far enough from every
+ * The proposed set validates PAIR SEPARATION: every family is far enough from every
  * other in both modes, including for CVD viewers. That is the hard constraint
  * and it is met. What it does not constrain is LUMINANCE PARITY against the
  * surface the marks are drawn on — a separate axis, and one that only shows up
@@ -117,7 +117,7 @@ export function elementColor(type: string, mode: 'light' | 'dark' = 'dark'): str
  * and drops the spread to 1.29x. Own-eyes on the charts room before and after:
  * the recession goes away.
  *
- * THE VERDICT (Skeld, 2026-07-22, same day): `#009a00` FAILS CVD — it collides
+ * THE VERDICT (2026-07-22, same day): `#009a00` FAILS CVD — it collides
  * with Temporal amber at ΔE 0.2 for protan viewers, and the margin falls off a
  * cliff along the whole ramp (#008300 6.9 → #008e00 3.5 → #009400 1.6 →
  * #009a00 0.2). The green is pinned at its low-contrast end BY the CVD budget:
@@ -125,6 +125,6 @@ export function elementColor(type: string, mode: 'light' | 'dark' = 'dark'): str
  * REVERTED to #008300 per his recommendation. The recession finding STANDS as
  * a real, measured trade (perception vs accessibility on one value) and goes
  * to Titus: keep #008300 and let icon+label carry World forward, or brighten
- * and lose family separation for red-blind readers. Skeld's full numbers
+ * and lose family separation for red-blind readers. The full numbers
  * are in a palette-measurements design note.
  */

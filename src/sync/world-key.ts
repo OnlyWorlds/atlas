@@ -11,7 +11,7 @@
  * - made by Atlas from the account token (`makeNewWorldKey`): signed in, for
  *   a world on the account's list. Sync calls it once per world and session
  *   when keel refuses the key (`recoverRefusedKey`: a member removed and
- *   invited back, the owner rotating keys, Skeld 2026-10-16); the button in
+ *   invited back, the owner rotating keys, 2026-10-16); the button in
  *   Settings calls it too.
  *
  * A seat world never takes either: its key and secret come back only through

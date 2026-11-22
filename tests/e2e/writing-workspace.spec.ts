@@ -35,7 +35,7 @@ async function createWorld(page: Page, name: string) {
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
   // Creating a local world now flips the sidebar into elements mode
-  // automatically (S255v3) — the elements-search input is the mode-
+  // automatically — the elements-search input is the mode-
   // independent signal that world creation completed.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }

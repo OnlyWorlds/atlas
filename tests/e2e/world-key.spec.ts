@@ -1,6 +1,6 @@
 /**
  * #198, a linked world takes a new key in place (Titus's go, 2026-10-16).
- * keel routed as it answers since #357 (Skeld 2026-10-16): a key it does not
+ * keel routed as it answers since #357 (2026-10-16): a key it does not
  * know (a removed member's, a deleted world's) is 401 invalid_credentials with
  * no param; the member's next mint makes a key that works.
  *

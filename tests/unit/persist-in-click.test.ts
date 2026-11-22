@@ -54,7 +54,7 @@ describe('requestPersistOnFirstBrowserWorld', () => {
   });
 });
 
-describe("the Firefox line at a door with no dialog (K7, built as Temper's lean)", () => {
+describe("the Firefox line at a door with no dialog (K7, built lean)", () => {
   it('is said on Firefox while the origin is not persisted', async () => {
     asFirefox();
     patchSlice('registry', { ...defaultRegistry(), worlds: [] });

@@ -35,7 +35,7 @@ async function createWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  // Creating a local world flips the sidebar to elements mode (S255v3); use
+  // Creating a local world flips the sidebar to elements mode; use
   // that as the mode-independent completion signal instead of a worlds-list row.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
@@ -685,7 +685,7 @@ test('the zone panel: kinds group, a kind colour is a world style that survives 
   await expect(page.locator('.atlas-zone-visuals-section .atlas-detail-section-hint')).toHaveText('Synced');
 });
 
-// F-60 (Seethe 2026-10-22): Tab walked out of an open dialog into the page behind, where Enter
+// F-60 (2026-10-22): Tab walked out of an open dialog into the page behind, where Enter
 // could open a second dialog over the first. What sits behind the topmost modal is inert.
 test('an open dialog keeps the keyboard: Tab never reaches the page behind, and closing it gives the page back (F-60)', async ({ page }) => {
   const opener = page.locator('[data-action="new-map"]');

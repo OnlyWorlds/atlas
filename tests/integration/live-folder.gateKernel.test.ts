@@ -3,8 +3,7 @@
  * Gate lens A (store kernel) probes. REAL FsFolderStore over fake-fs.
  * "DEFECT" cases assert the CORRECT behaviour, so a red test = a live defect.
  * "UPHELD" cases assert behaviour the lens tried to break and could not.
- * Run from tools/atlas:
- *   npx vitest run --config ../../Notes/2026-09-29-s364-gate/probes/vitest.lensa.config.mts
+ * Run with a local probe config (2026-09-29, not in this repository).
  */
 import { describe, it, expect } from 'vitest';
 import { FakeDirHandle, FakeFileHandle, fakeContentReads } from '../fixtures/fake-fs';

@@ -24,7 +24,7 @@ const AGENT = 'a0000000-0000-4000-8000-000000000001';
 const PERSON = 'b0000000-0000-4000-8000-000000000002';
 const roster: OwMember[] = [
   { id: null, kind: 'owner', role: 'owner', character: null, status: 'active', lenses: [], lenses_from: 'chosen' },
-  { id: AGENT, kind: 'agent', role: 'co_builder', character: null, status: 'active', lenses: [], lenses_from: 'chosen', name: 'Skeld' },
+  { id: AGENT, kind: 'agent', role: 'co_builder', character: null, status: 'active', lenses: [], lenses_from: 'chosen', name: 'Sable' },
   { id: PERSON, kind: 'person', role: 'co_builder', character: null, status: 'active', lenses: [], lenses_from: 'chosen' },
 ];
 const el = (via: string, by: string | null) =>
@@ -42,9 +42,9 @@ const line = (h: HTMLElement) => h.querySelector('[data-role="agent-mark"]')?.ge
 
 beforeEach(() => {
   cached = null;
-  const entry = { id: 'w', name: 'BB', state: 'api-linked', api: { world_id: 's', api_key: 'k' } } as unknown as WorldRegistryEntry;
+  const entry = { id: 'w', name: 'Bea', state: 'api-linked', api: { world_id: 's', api_key: 'k' } } as unknown as WorldRegistryEntry;
   patchSlice('registry', { ...defaultRegistry(), worlds: [entry] });
-  patchSlice('active', { worldId: 'w', meta: { name: 'BB' } } as never);
+  patchSlice('active', { worldId: 'w', meta: { name: 'Bea' } } as never);
   patchSlice('data', { elements: [] } as never);
 });
 afterEach(() => { document.body.innerHTML = ''; patchSlice('active', null); });
@@ -55,7 +55,7 @@ describe('the agent mark before the roster has answered', () => {
     expect(line(h)).toBeNull();
     answer(roster);
     await tick();
-    expect(line(h)).toBe('Last changed by Skeld, an agent');
+    expect(line(h)).toBe('Last changed by Sable, an agent');
   });
 
   it("a person's write through MCP loses the door's guess once the roster answers", async () => {
@@ -74,12 +74,12 @@ describe('the agent mark before the roster has answered', () => {
     answer(roster);
     await tick();
     expect(h.querySelector('[data-role="agent-mark"]')).toBe(before);
-    expect(line(h)).toBe('Last changed by Skeld, an agent');
+    expect(line(h)).toBe('Last changed by Sable, an agent');
   });
 
   it('control: with the roster known, nothing waits', () => {
     cached = roster;
-    expect(line(mount(el('server', AGENT)))).toBe('Last changed by Skeld, an agent');
+    expect(line(mount(el('server', AGENT)))).toBe('Last changed by Sable, an agent');
     expect(mount(el('api', PERSON)).children).toHaveLength(0);
   });
 });

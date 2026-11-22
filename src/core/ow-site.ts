@@ -24,7 +24,7 @@ export function owWorldUrl(apiWorldId: string): string {
   return `https://www.onlyworlds.com/account/worlds/${encodeURIComponent(apiWorldId)}`;
 }
 
-/** A world's page on onlyworlds.com, opened at Access: its own path, kept through the site's sign-in (Skeld 2026-10-19). */
+/** A world's page on onlyworlds.com, opened at Access: its own path, kept through the site's sign-in (2026-10-19). */
 export function owAccessUrl(apiWorldId: string): string {
   return `https://www.onlyworlds.com/account/worlds/${encodeURIComponent(apiWorldId)}/access`;
 }

@@ -40,7 +40,7 @@ test('the share room no longer links to the demo; #/demo still renders map, pins
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Demo Entry World');
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  // Creating a world flips the sidebar into elements mode (S255v3) — sync on
+  // Creating a world flips the sidebar into elements mode — sync on
   // the elements body, not a worlds-list row.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 

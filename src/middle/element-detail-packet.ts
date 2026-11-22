@@ -48,7 +48,7 @@ export function buildWorkPacket(el: Element): HTMLElement | null {
     } else {
       const gone = document.createElement('span');
       gone.className = 'atlas-work-packet-missing';
-      // The type as the rest of the page says it, capitalised (Seethe's read of 1.69.0, 2026-10-22).
+      // The type as the rest of the page says it, capitalised (a designer's read of 1.69.0, 2026-10-22).
       const typeWord = entry.type ? typeNameStart(entry.type) : '';
       gone.textContent = `Not in this world${typeWord ? ` (${typeWord})` : ''}`;
       li.appendChild(gone);

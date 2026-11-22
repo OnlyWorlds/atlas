@@ -34,8 +34,8 @@ async function createWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  // Creating a local world flips the sidebar to elements mode automatically
-  // (S255v3) — wait for the elements body rather than a worlds-list row.
+  // Creating a local world flips the sidebar to elements mode automatically,
+  // so wait for the elements body rather than a worlds-list row.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 

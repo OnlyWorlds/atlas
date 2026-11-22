@@ -1,5 +1,5 @@
 /**
- * Date continuity (#281, after Kael's notes on date-continuity checkers):
+ * Date continuity (#281, after notes on date-continuity checkers):
  * the dates in a world worth a second look. Pure and read-only: Home's loose
  * threads list them as "dates to check", each a statement of both dates,
  * never a verdict; nothing is written.
@@ -20,7 +20,7 @@
  *    after the event it set off.
  *  - born-after-event (to check): a character or creature an Event lists
  *    (`characters`, `creatures`), born once the event was over: at or after
- *    its `end_date` (half-open, as Skeld ruled every dated type, 2026-10-15),
+ *    its `end_date` (half-open, as ruled for every dated type, 2026-10-15),
  *    or after its `start_date` when it has no end (a moment). An end that is
  *    there but is not a number (felt text) is unknown: no check.
  *  - born-after-relation (to check): the same for a Relation's `characters`

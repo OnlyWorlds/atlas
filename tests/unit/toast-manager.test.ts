@@ -129,7 +129,7 @@ describe('toast manager', () => {
     expect(live()[0].getAttribute('role')).toBe('alert');
   });
 
-  // Seethe's phone pass: a tap fired the emulated mouseenter and
+  // A phone pass: a tap fired the emulated mouseenter and
   // nothing left, so one tap pinned a toast for good.
   const pointer = (el: HTMLElement, type: string, pointerType: string) => {
     const e = new Event(type, { bubbles: type === 'pointerup' });

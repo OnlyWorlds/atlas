@@ -271,7 +271,7 @@ Two paths:
 
 ### What atlas CAN'T detect (server-side limitation)
 
-When the OW server deletes a world, the api_key for it becomes invalid. Every subsequent call returns 401 — same response as wrong PIN or revoked key. Atlas can't distinguish "deleted" from "bad creds" without a server-side signal (e.g., a 410 Gone with `{"error": "world_deleted"}`). Worth asking Skeld for; for now we treat all three the same, because the recovery path is the same.
+When the OW server deletes a world, the api_key for it becomes invalid. Every subsequent call returns 401 — same response as wrong PIN or revoked key. Atlas can't distinguish "deleted" from "bad creds" without a server-side signal (e.g., a 410 Gone with `{"error": "world_deleted"}`). Worth asking keel's maintainers for; for now we treat all three the same, because the recovery path is the same.
 
 ### Bail-the-round is not bail-the-engine
 
@@ -311,7 +311,7 @@ Pull detects a per-element conflict when:
 - `remote.updated_at > local.server_updated_at` (server moved since our baseline)
 - AND `local.local_updated_at > local.server_updated_at` (local moved since baseline)
 
-HISTORY (pre-keel): the old Django server didn't bump `updated_at` on m2m_changed signals (`auto_now` skips them); Skeld shipped a signal-receiver fix in May 2026. That server was replaced by keel on 2026-07-11, so the receiver note no longer applies — whether keel bumps `updated_at` on m2m changes is UNVERIFIED (2026-07-12 sweep). If "server-side change not propagating" appears, probe keel's m2m semantics first.
+HISTORY (pre-keel): the old Django server didn't bump `updated_at` on m2m_changed signals (`auto_now` skips them); a signal-receiver fix shipped in May 2026. That server was replaced by keel on 2026-07-11, so the receiver note no longer applies — whether keel bumps `updated_at` on m2m changes is UNVERIFIED (2026-07-12 sweep). If "server-side change not propagating" appears, probe keel's m2m semantics first.
 
 Atlas-side workaround if the server ever under-bumps: edit a non-m2m field on the same element on web to force a bump, then refresh.
 
@@ -505,11 +505,11 @@ Listed by surface — none are cutover blockers.
 ### v2 close-gate deferrals (2026-07-12, documented not fixed)
 - **skipIds on the /changes path is event-once**: an op for a push-conflicted id is skipped for the whole round and the cursor passes it; a genuinely newer third-party op for that id in the SAME round is never re-seen (the full-list pull re-derived it next round; the cursor path doesn't). Requires a 3-device same-round race; self-heals on any later edit to the element. Fix shape when it matters: scope the skip to ops at-or-below the conflict's seq, or drop skipIds on the changes path and rely on !serverChanged idempotence + conflict dedup.
 - History (pre-keel), no longer the code path. CLOSED 2026-07-12: the v1 adapter and its dedicated suites were deleted and the flow suites moved to the v2 fake. Was: **~7 flow suites still drive the v1 OwClientAdapter** (initial-download, knowledge-sync, zoneMarkerOrder, sharing-sync, make-online legacy, ow-client-adapter*): their integration confidence for the v2 production dialect is partial (the v2 adapter has its own direct suite + the bulkMerge/bulkPush/changesPull suites). Migrate them to statefulV2Handlers / the v2 fake in the SAME named cleanup bout that deletes the v1 adapter + excises id-swap.
-- **list items missing `updated_at`** are skipped-and-marked-incomplete (defensive, mirrors the /changes hardening); whether keel's list serializer can ever omit it is an open Skeld question.
+- **list items missing `updated_at`** are skipped-and-marked-incomplete (defensive, mirrors the /changes hardening); whether keel's list serializer can ever omit it is an open question for keel.
 
 ### Sync engine internals
 - ~~**Concurrent-edit race on autosave**~~ CLOSED: an edit landing while its push is in flight stays dirty (`store/sync-stamp.ts`, convention 96); a create found on keel after a lost response compares content (`settleCopy`): the same adopted, other content a review row since 1.124.30 (conv. 192, "A copy with no record of what OnlyWorlds held" below). Pull-apply rides the per-id chain with its race check inside the slot (`applyServerRecordIfUnchanged`). Push still stamps only, never applies the response body (by design).
-- **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from session-205 pressure-test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
+- **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from an earlier pressure test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
 - History (pre-keel), no longer the code path. **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
 - ~~**`rewriteIdReferences` bumps `local_updated_at`**~~ GONE: the function went with the old Route 2. The kernel's referrer rewrites stamp too, and the server phase then uploads them (a referrer is created or matched in the same run).
 
@@ -520,7 +520,7 @@ Listed by surface — none are cutover blockers.
 ### Polish
 - **Per-element refresh API method**: today's per-type refresh (right-click filter chip) is the workaround. A dedicated single-element refresh would be a precise escape hatch.
 - **Drag-from-element-list pin drop**: right-click + create covers primary spatial flow.
-- **`getElement` O(types) probe**: walks 22 directories per lookup. Cache id→type in FsFolderStore for hot-path operations. (Partly mitigated by session-220's `fileIndex` cache; cross-type cold lookups still iterate.)
+- **`getElement` O(types) probe**: walks 22 directories per lookup. Cache id→type in FsFolderStore for hot-path operations. (Partly mitigated by the `fileIndex` cache; cross-type cold lookups still iterate.)
 - **Conflict log review UI for resolved/historical conflicts**: today's modal handles only active conflicts.
 
 ### Closed earlier (kept here for searchability)
@@ -532,8 +532,8 @@ Listed by surface — none are cutover blockers.
 - **Unlink leaves stale sync metadata** → fixed by Bout Y (new `resetSyncBaseline()`).
 - **M1** — `engine.resume()` doesn't flush pending writes → fixed by Bout AA.
 - **Api-vs-local name divergence invisible** → fixed by Bout Z (`api.world_name` cached + Settings row).
-- **Pre-T2-smoke F1** — flush-on-attach raced pull-on-activate via shared inFlight lock, silently no-op'd → fixed by Bout BB (sequence flush BEFORE pull via single async IIFE in `attachSyncEngine`). Convention #25.
-- **M7** — `engine.resume()` reset `last_sync_at` to null, pill briefly read "never synced" → fixed by Bout BB (engine tracks `lastSyncAt` privately, `resume()` restores). Convention #26.
+- **Pre-T2-smoke F1** — flush-on-attach raced pull-on-activate via shared inFlight lock, silently no-op'd → fixed by the flush-before-pull fix (sequence flush BEFORE pull via single async IIFE in `attachSyncEngine`). Convention #25.
+- **M7** — `engine.resume()` reset `last_sync_at` to null, pill briefly read "never synced" → fixed by the resume fix (engine tracks `lastSyncAt` privately, `resume()` restores). Convention #26.
 
 ### Closed later
 - **M2** — pill-click during debounced push toasted "already up to date" misleadingly → fixed by gating the toast on both `pulled.*` AND `pushed.*` counts.
@@ -608,7 +608,7 @@ Verified by `tests/integration/sync-engine.fkConstraint.test.ts` (4 tests, incl.
 
 Protocol (gate 10.6, rollback verified live):
 - `errors: true` under atomic → NOTHING persisted server-side, even for items reporting 201. Stamp NOTHING; fail the bad items (invalid_link items get dangling-peer routing; id_conflict items self-heal by adopting the server baseline); retry the survivors ONCE atomically; then surface.
-- Timestamp backfill (gate 10.1): /bulk items return `{status, id}` with no `updated_at` — NEVER stamp client now() (clock skew = mass spurious pulls or never-pulled elements). ≤20 creates → per-element GET; larger → one cursor list-walk per pushed type. Skeld ships a per-item `updated_at` echo next keel session; delete the backfill then.
+- Timestamp backfill (gate 10.1): /bulk items return `{status, id}` with no `updated_at` — NEVER stamp client now() (clock skew = mass spurious pulls or never-pulled elements). ≤20 creates → per-element GET; larger → one cursor list-walk per pushed type. keel is to ship a per-item `updated_at` echo in its next release; delete the backfill then.
 - The Kahn topo-sort (`sortCreatesByDependencies`) survives ONLY as the fallback path's orderer (single creates + clients without bulkCreate).
 
 ## /changes cursor pull (v2) — explicit delete ops replace absence inference
@@ -617,11 +617,11 @@ Protocol (gate 10.6, rollback verified live):
 
 **Test fakes speak /changes**: `FakeOwApiClient.pullChanges` is ON by default, because production's adapter always has it; 25 test files had been running a full-list pull no user gets. Tests of the full-list fallback opt out by name with `__enable_changes(false)` (the serverDelete pagination trio and dedupe case, one authBlocked case, the pullConflictPolicy dedupe case); they go when `pullPhaseFullList` does. `client.changesPulls` counts feed pages, so "no pull ran" is assertable without `list` calls. `__server_evict` drops a record WITHOUT a delete op (the feed never reports it).
 
-⚠ The /changes continuation param is **`since=`**, not `cursor=`. HISTORY: keel originally ignored unknown query params silently (a wrong param name replayed page 1 forever with has_more:true); since Skeld's v2 tail (2026-07-12 evening) unknown params get a loud 422 naming the param, killing the trap at the root. The adapter's advance-verification stays as belt-and-suspenders. Both fakes encode the 422.
+⚠ The /changes continuation param is **`since=`**, not `cursor=`. HISTORY: keel originally ignored unknown query params silently (a wrong param name replayed page 1 forever with has_more:true); since keel's v2 tail (2026-07-12 evening) unknown params get a loud 422 naming the param, killing the trap at the root. The adapter's advance-verification stays as belt-and-suspenders. Both fakes encode the 422.
 
 ## Rewind guard + the v1 validation-lane retirement (v2 tail, 2026-07-12)
 
-Skeld's v2 tail (all five asks, live on production the same day) closed the remaining v1 remnants and the last /changes soft-edge:
+keel's v2 tail (all five asks, live on production the same day) closed the remaining v1 remnants and the last /changes soft-edge:
 
 - **`GET /api/v2/world`** replaced the v1 SDK `worlds.get()` validation lane: all five validation sites (link modal, make-online both routes' fallbacks, new-api-world fallback, settings Test Connection, atlas-root link flow) now call `OwV2ClientAdapter.getWorld()` via `buildV2Adapter`. `buildOwClient` is deleted; the SDK survives ONLY for FIELD_SCHEMA statics. `OwV2Error` keeps the `API Error NNN:` message prefix, so the sites' status-regex error mapping was untouched.
 - **Rewind guard**: every /changes response now carries `head` (the world's current change_seq). Normal operation never rewinds (§8 law); the one legal rewind is disaster restore-from-backup. The engine persists `changes_last_seq` (highest APPLIED seq, advanced in the same lockstep as the cursor) and, when a page's `head` is strictly below it, drops cursor + seq memory and cold-walks from the epoch (retention law makes the cold walk complete-state; upserts idempotent, deletes explicit). Single-reset-per-round latch prevents a pathological head from looping. Regression: `sync-engine.changesPull.test.ts` rewind describe-block; fake seam `__rewind_op_log(maxSeq)`.
@@ -787,7 +787,7 @@ keel serves an element's `doors` (which tools wrote it, each with its last write
 
 ## A copy with no record of what OnlyWorlds held (1.124.30, conv. 192)
 
-A file with no `server_updated_at` is a create. Until 1.124.30, when keel already held its id, nothing compared anything on the way out: one such file went as a POST, keel answered 409, Atlas read keel's copy and adopted keel's **newest** stamp as the baseline (kept dirty when the bodies differed), and the next round's conflict test compared keel's stamp with that same stamp, saw nothing moved, and PATCHed the file over keel's copy; two or more went through `/bulk`, which keel runs as an upsert by id (a full replace answered 200, the fakes answered 201), so the file replaced keel's element whole, a member's added field included. Under both policies, with no conflict, toast or row. A pause-and-review row the pull recorded held nothing either: the push never read persisted rows for a create, and Keep mine on such a row POSTed and threw keel's 409. The 1.8 fix (the S361 gate's F3) had assumed a differing body meant the local side was newer; nothing checked it.
+A file with no `server_updated_at` is a create. Until 1.124.30, when keel already held its id, nothing compared anything on the way out: one such file went as a POST, keel answered 409, Atlas read keel's copy and adopted keel's **newest** stamp as the baseline (kept dirty when the bodies differed), and the next round's conflict test compared keel's stamp with that same stamp, saw nothing moved, and PATCHed the file over keel's copy; two or more went through `/bulk`, which keel runs as an upsert by id (a full replace answered 200, the fakes answered 201), so the file replaced keel's element whole, a member's added field included. Under both policies, with no conflict, toast or row. A pause-and-review row the pull recorded held nothing either: the push never read persisted rows for a create, and Keep mine on such a row POSTed and threw keel's 409. The 1.8 fix (a review gate's F3) had assumed a differing body meant the local side was newer; nothing checked it.
 
 **The ways in** are ordinary moves: a backup restored (the OS's, a cloud drive's history, a zip, `git restore` of a commit before the first push), a world file opened again into a cleared row, a linked folder copied to a second computer, a file copied in from an unlinked or exported copy, a Mode B import of an id keel holds, Keep in the server-delete review over a keel restore, a foreign id's create that landed with its backfill lost, Atlas's own lost create with a member's edit in the gap, and an outside AI writing back its own earlier bytes. Not reachable: Make Online, Create new (a new empty world), Make Online, Link to existing (its merge policy decides), linking or opening an account world, Bring it down again (a fresh download, every file stamped).
 

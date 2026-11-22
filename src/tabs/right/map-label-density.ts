@@ -1,7 +1,7 @@
 /**
  * The density layer for the map canvas.
  *
- * Born on Skeld's Sikelia: 196 pins, 319 zones and their labels on one
+ * Born on the Sikelia world: 196 pins, 319 zones and their labels on one
  * 8000x5200 canvas, every label "always" on, every pin a 32px icon over a
  * 24px median gap to its nearest neighbour. Unreadable. The charts room
  * already knew the answer (timeline-view's drawLabels): build candidates in

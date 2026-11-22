@@ -459,7 +459,7 @@ calendar pushed, orphan zone deleted). ⚠ `TOUR_MEDIA_URLS` in tour-engine must
 name every `x_tour_media` asset or the attach silently skips (an e2e
 catch). ⚠ **Map y is BOTTOM-left since atlas 1.8**: the bundle's pin and six swamp markers were flipped
 (`y' = 1492 - y`) with the converter, but the LIVE demo world still holds the old y-down numbers, so a
-re-bake must flip them again (or the live world is flipped first; Skeld told). No test catches a wrong
+re-bake must flip them again (or the live world is flipped first; keel's maintainers told). No test catches a wrong
 choice (swamp containment is reflection-invariant): look at the map step. Offline; images ship as webp and attach as LOCAL media at reveal. `_bake_notes` lists every editorial
 deviation: zone-twin merge, the SHARED event date (both at 7), the link
 weave, pin rename, book+chapter mint, atlas_aliases for the sentence's surface
@@ -477,7 +477,7 @@ links them) with NO richtext sidecar — the first sidecar-less narrative ever t
 hit the markdown-fallback
 path (which was silently broken until it did; fixed with
 `contentType: 'markdown'`).
-**Skeld asks owed**: adopt link weave + event dates server-side; freeze
+**Asks owed to keel**: adopt link weave + event dates server-side; freeze
 0000000000 as tour source.
 
 ## Browser support

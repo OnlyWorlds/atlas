@@ -20,7 +20,7 @@
  * on disk, and on a linked world only the owner or a co-builder (keel answers
  * anyone else 403 `keeper_only`).
  *
- * Retire (Skeld's ruling, 2026-10-28): a superseded Charter or Guide is not
+ * Retire (a ruling of 2026-10-28): a superseded Charter or Guide is not
  * deleted; the keeper's press sets its mark to null in one write, so it stays
  * in the world as lore and can be marked again.
  */
@@ -201,7 +201,7 @@ async function markAid(el: Element, kind: AidKind, value: string, btn: HTMLButto
   await writeMark(el, patch, btn, doing);
 }
 
-/** The retire: the mark to null, one write (Skeld's ruling); the element stays as lore. */
+/** The retire: the mark to null, one write (a ruling of 2026-10-28); the element stays as lore. */
 export async function retireAid(el: Element, btn: HTMLButtonElement): Promise<void> {
   await writeMark(el, { x_charter_of: null }, btn, 'retiring this one');
 }

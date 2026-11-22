@@ -73,7 +73,7 @@ test.describe('hidden, in a world on disk', () => {
     await expect(row('Ada').locator('[data-role="hidden-word"]')).toHaveCount(0);
 
     // Its page: the folder line in a sentence under the name, and no glyph in the header,
-    // so the name keeps its room (Seethe 2026-10-23); Ada's page says nothing.
+    // so the name keeps its room (2026-10-23); Ada's page says nothing.
     await go(`#/w/${wid}/element/${WREN}`);
     await expect(page.locator('[data-role="hidden-note"]')).toHaveText(FOLDER_LINE);
     await expect(page.locator('.atlas-middle-header [data-role="hidden-mark"]')).toHaveCount(0);

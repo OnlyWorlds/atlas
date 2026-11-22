@@ -4,7 +4,7 @@
  * as Settings does (`password-sign-in.ts`), and then makes the world on the
  * account. The classic API's create-world-external lane, which took an
  * email and a PIN, is gone: keel keeps v1 frozen, and this was its last
- * caller outside keel's tests (Skeld 2026-10-19).
+ * caller outside keel's tests (2026-10-19).
  *
  * Used by Make online's Create new pane and New world on OnlyWorlds. The
  * field names are their own (`signin-*`): Settings' sign-in block can sit
@@ -39,7 +39,7 @@ export function signInFieldsHtml(prefillLogin = ''): string {
     </div>`;
 }
 
-/** Why a form that makes a world online asks a PIN, under the field before any sign-in (Seethe 2026-10-22). */
+/** Why a form that makes a world online asks a PIN, under the field before any sign-in (2026-10-22). */
 export const PIN_REASON_HTML = '<span class="atlas-modal-hint">The World PIN lets Atlas upload the world\'s contents.</span>';
 
 /** The line that stands where the fields were, once signed in. */

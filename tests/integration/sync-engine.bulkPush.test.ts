@@ -8,7 +8,7 @@
  * fake's `/changes` op log (the engine's changes-pull is a separate gated
  * bout, so pullChanges is exercised on the fake, not through the engine).
  *
- * Wire contract: Notes/2026-07-12-v2-probed-facts.md.
+ * Wire contract: the 2026-07-12 live probe of keel v2 (kept in a local note).
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

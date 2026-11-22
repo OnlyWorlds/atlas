@@ -31,7 +31,7 @@ export function getZoneShape(zone: Zone | undefined | null): ZoneShape {
   const atlasShape = (zone as { atlas_shape?: string }).atlas_shape;
   if (atlasShape === 'line' || atlasShape === 'polygon') return atlasShape;
   // Legacy fallback: pre-ZD6 zones stored shape in supertype. Other writers
-  // still do — zoner writes `line`, Skeld's Sikelia writer `Line` — and only
+  // still do — zoner writes `line`, the Sikelia writer `Line` — and only
   // atlas carries `atlas_shape`, so a zone that arrives from any other tool
   // has nothing else to say what it is. Case-folded (318 Sikelia
   // rivers and routes drew as filled polygons on `Line`).

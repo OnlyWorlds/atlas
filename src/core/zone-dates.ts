@@ -4,7 +4,7 @@
  * A Zone's `start_date` and `end_date` are its validity. A border with eras is
  * several Zones, one per era, chained by `linked_zones`; moving the date swaps
  * which era draws. The span is half-open, `[start, end)`, the standard's rule
- * (Skeld ruled it for every dated type, 2026-10-15; Windrose reads it the
+ * (ruled for every dated type, 2026-10-15; Windrose reads it the
  * same), so two eras that meet at a date never both draw there. (The charts'
  * `rangeVsNow` agrees at the end, a span ending AT the now is past, but calls a
  * span starting AT the now future: a seam for its forward half, not a

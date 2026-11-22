@@ -1,5 +1,5 @@
 /**
- * A river on a styled map ends at the coast (Seethe's receipt,
+ * A river on a styled map ends at the coast (a designer's receipt,
  * 2026-10-17): `clipLineToLand` keeps the parts of a line on land and off water.
  */
 

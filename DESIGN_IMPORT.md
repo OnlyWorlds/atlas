@@ -4,10 +4,10 @@
 **Status**: SHIPPED (bouts B0-B4). The room is live and branded **Data** in the
 UI (route segment stays `import`). The header below is the original pre-build
 design; the code and the changelog are current for what actually shipped.
-**Owner**: Temper
+**Owner**: Atlas
 **Relationship**: companion to `DESIGN_FOLDER.md` (folder-first model, FolderStore) and `DESIGN_SYNC.md` (SyncEngine). Import is the last main data pillar. This doc is the stable reference for the import/export subsystem.
 
-Grounded by the session-241 research sweep (6 read-only agents: atlas reconcile machinery · FolderStore surface · base-tool pipeline audit · validation/schema · test idioms · UI integration).
+Grounded by an earlier research sweep (6 read-only agents: atlas reconcile machinery · FolderStore surface · base-tool pipeline audit · validation/schema · test idioms · UI integration).
 
 ---
 
@@ -75,7 +75,7 @@ OW export content elements use **bare** relation names (`location`, `objects`, `
 
 ### keel world-export envelope (CURRENT — `keel portal/views.py:509-560`, the world-export spec)
 
-**This is what ow.com's "Export JSON" button emits today** (keel rebuild; registry `world_export`; confirmed with Skeld 2026-07-23, canonical, spec § being frozen). It SUPERSEDES the session-241 `services.py` note below, which described the retired Django backend.
+**This is what ow.com's "Export JSON" button emits today** (keel rebuild; registry `world_export`; confirmed with keel's maintainers 2026-07-23, canonical, spec § being frozen). It SUPERSEDES the earlier `services.py` note below, which described the retired Django backend.
 
 ```
 { format: "onlyworlds-world-export",
@@ -87,7 +87,7 @@ OW export content elements use **bare** relation names (`location`, `objects`, `
 
 - **World id is PRESENT now** (the old backend dropped it "for security"; the rebuild keeps it so a round-trip is lossless). Element bodies come through the same `serialize` the API uses: uuid ids, **bare-name v2 relations** (`location`, `map`, `zone`, `element_id`), extension fields (`atlas_*`/`x_*`/`shadow_*`) intact, `type`/`change_seq`/timestamps present.
 - **Only types with ≥1 element appear** (unlike the old always-emit-22).
-- **Atlas reads it** (`parseEnvelope` in `parse.ts`). **World-id adoption on import is RULED (Skeld) but NOT yet wired** — atlas currently mints a fresh world id; element ids are kept verbatim (keep-ids path), so `ow://element` refs already survive. Adopting the world id (lossless world identity + same-id→same-world) is a tracked follow-up (needs the scaffold path + a collision decision).
+- **Atlas reads it** (`parseEnvelope` in `parse.ts`). **World-id adoption on import is RULED (by keel's maintainers) but NOT yet wired** — atlas currently mints a fresh world id; element ids are kept verbatim (keep-ids path), so `ow://element` refs already survive. Adopting the world id (lossless world identity + same-id→same-world) is a tracked follow-up (needs the scaffold path + a collision decision).
 - **Atlas's EXPORT writes this envelope too (2026-09-02)**: `format`, `schema_version` (the SDK's `ONLYWORLDS_VERSION`), `exported_at`, `exporter: 'atlas'`, `world` WITH id, lowercase `elements` buckets (all 22 by default, the requested subset otherwise). The old `World`+PascalCase shape is read forever and written never. Q2 closed.
 
 ### legacy ow.com export format (RETIRED backend — `django/ow/worldsync/services.py`)

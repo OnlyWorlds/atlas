@@ -69,7 +69,7 @@ describe('computeLooseThreads', () => {
   });
 
   it('counts a link out as much as a link in: unlinked means what the grid draws as loose', () => {
-    // Seethe's read of 1.118.2 (N6): Bo's only link is his own friends field; the grid drew him linked
+    // A read of 1.118.2 (N6): Bo's only link is his own friends field; the grid drew him linked
     // while the band listed him as unlinked.
     const elements: Element[] = [
       el('character', 'bo', { friends: ['ines'] }),

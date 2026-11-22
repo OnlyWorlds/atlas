@@ -1,6 +1,6 @@
 /**
  * The review profile's proposed mark (schema-dist dist.52 `profiles/review.md`,
- * keel's reader rule, Skeld 2026-10-23; conv. 168). An element whose
+ * keel's reader rule, 2026-10-23; conv. 168). An element whose
  * `x_review_proposed` is an object was written as proposed (an AI seat's new
  * element on a world whose keeper reviews them) and is not canon until a keeper
  * settles it: accept writes the mark null, decline deletes the element.
@@ -11,7 +11,7 @@
  *
  * Two readings, on purpose. Shown as proposed: an object (the profile's point
  * 4, any other value is ignored and stays a read-only custom field). Handed on
- * as proposed: any value but null (Kael's pack, `is_proposed`: a doubt leaves
+ * as proposed: any value but null (`is_proposed`: a doubt leaves
  * the element out rather than handing it on as fact).
  *
  * Both readings are the SDK's since 4.84 (the profile's readers: `proposedMarkOf`
@@ -137,7 +137,7 @@ export function markNames(
   const served = (row: OwMember | undefined) => (typeof row?.name === 'string' && row.name.trim() ? row.name.trim() : null);
   // keel writes the exact word `owner` as the `by` of the world's owner, who has no membership. Only a
   // platform resolves it: a world with no roster (a folder, an unlinked world, a roster not read) has
-  // nobody to resolve it to, so there the word is the mark's raw value (the S591 gate's M1).
+  // nobody to resolve it to, so there the word is the mark's raw value (a review gate's M1).
   if (by === 'owner') {
     if (!roster) return null;
     const name = served(roster?.find(m => m.kind === 'owner'));

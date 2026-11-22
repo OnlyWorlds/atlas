@@ -67,7 +67,7 @@ function crossings(grid: Grid, width: number): string[] {
   });
 }
 
-const seethe: Grid = {
+const sorrel: Grid = {
   cells: [cell('harbour', 0), cell('mira', 0, 1, 1, 'harbour'), cell('ilse', 1), cell('founding', 2), cell('tale', 3)],
   plus: { col: 4, line: 0, pos: 4 },
   links: [{ source: 'founding', target: 'mira', field: 'characters' }],
@@ -78,13 +78,13 @@ const seethe: Grid = {
 describe('a link two or more columns apart', () => {
   for (const width of [1100, 390]) {
     it(`crosses no square or name between its ends at ${width}`, () => {
-      expect(crossings(seethe, width)).toEqual([]);
+      expect(crossings(sorrel, width)).toEqual([]);
     });
   }
 
   it('two top-row squares apart, and two such links, each keep clear and never share a run', () => {
     const grid: Grid = {
-      ...seethe,
+      ...sorrel,
       links: [{ source: 'founding', target: 'harbour', field: 'location' }, { source: 'tale', target: 'harbour', field: 'locations' }],
     };
     expect(crossings(grid, 1100)).toEqual([]);
@@ -94,7 +94,7 @@ describe('a link two or more columns apart', () => {
   });
 
   it('a stacked square to the left of its partner leaves by its side, from the middle of its square', () => {
-    const { d, g } = linkPaths(seethe, 1100);
+    const { d, g } = linkPaths(sorrel, 1100);
     const [start, ...rest] = points(d[0]);
     const end = rest[rest.length - 1];
     // The Founding (top row) leaves from its top edge; Mira (row 1) is entered from its right side, at its middle.

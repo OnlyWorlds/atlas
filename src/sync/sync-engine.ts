@@ -369,7 +369,7 @@ export class SyncEngine {
    * While the dirty fields are exactly these, the meta step does not PATCH
    * again: it reports the SAME failure object, which `failureToastOnce` has
    * already decided, so the change stays honest in the status and is told once
-   * (Kael's collaborator walk 2026-10-18: it was re-sent and
+   * (a collaborator walk 2026-10-18: it was re-sent and
    * re-told on every round). A new edit changes the fields and tries again.
    */
   private metaOwnerRefusal: { sig: string; failure: PerElementFailure } | null = null;
@@ -713,7 +713,7 @@ export class SyncEngine {
   private hideRefusedRole: string | null = null;
 
   /**
-   * conv. 173 (folder spec 4.8, Skeld 2026-10-24): keel's hide for an element online that the file
+   * conv. 173 (folder spec 4.8, 2026-10-24): keel's hide for an element online that the file
    * marks hidden, by the owner's or a co-builder's key only. `hidden` on keel's 204. `not-sent` for
    * another role, a client without the route, keel's 403 or its 404 (the route off, or the element
    * gone: the write after it says which): the copy keeps today's word and line. `role-unknown` when the
@@ -1902,7 +1902,7 @@ export class SyncEngine {
         pushedNames = []; // nothing landed; baselines for them unchanged
         // A co-builder may send the world's now alone, and keel
         // refuses a mixed body whole. So a refused body that held the now sends
-        // the now by itself once; the rest stays refused (Kael 2026-10-19).
+        // the now by itself once; the rest stays refused (2026-10-19).
         if (memberRefusal(err) === 'owner_only' && 'time_current' in pushFields && Object.keys(pushFields).length > 1) {
           try {
             const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush({ time_current: pushFields.time_current }));
@@ -2556,7 +2556,7 @@ export class SyncEngine {
    *   - A thrown auth error bails the round like everywhere else.
    *
    * Timestamp backfill: /bulk items return `{status, id}` with no
-   * `updated_at` (Skeld ships the echo next keel session — delete this then).
+   * `updated_at` (keel ships the echo next session — delete this then).
    * NEVER stamp client now(): clock skew yields mass spurious pulls or
    * silently-never-pulled elements. Small batches → per-element GET; large
    * batches (Make-Online scale) → one cursor list-walk per pushed type.
@@ -2728,7 +2728,7 @@ export class SyncEngine {
         onItemDone();
         continue;
       }
-      // A 404 item names an id hidden from this key (keel's /bulk, Skeld,
+      // A 404 item names an id hidden from this key (keel's /bulk,
       // 2026-10-20): kept, never sent again.
       if ((res?.status === 404 || errObj.code === 'not_found') && hiddenCanBeDenied(await this.roundRoleNow())) {
         this.roundKeptAdd.push(item.element.id as string);
@@ -3442,7 +3442,7 @@ export class SyncEngine {
         // Don't add to failures (would surface as a raw error elsewhere).
         // A create answered 404, for a key that can be denied a hidden element
         // (a contributor or a guest; owners and co-builders see them all),
-        // names an id hidden from it (keel's create, Skeld 2026-10-20: never
+        // names an id hidden from it (keel's create, 2026-10-20: never
         // id_conflict, nothing made). Kept, never sent again.
         else if (isCreate && isNotFoundError(err) && hiddenCanBeDenied(await this.roundRoleNow())) {
           keptAdd.push(elem.id);
@@ -3815,7 +3815,7 @@ export class SyncEngine {
    * A delete keel refused (P6) brought its element back, but the delete's
    * scrub (conv. 101) had already cut the links to it from every referrer,
    * and those edits went out first, as proposals a keeper could accept for a
-   * delete that never happened (TC, 2026-10-22). For each
+   * delete that never happened (2026-10-22). For each
    * changed element whose keel copy still links to an id in `back`: withdraw
    * its open proposal and put the links back. A copy that then matches keel's
    * takes keel's record (nothing left to send); one with other edits stays
@@ -4904,7 +4904,7 @@ function hiddenHeldReport(changed: readonly Element[], held: ReadonlySet<string>
 }
 
 /**
- * Why keel moved this reader (one-rule §3, Skeld 2026-10-20): `view` (a delete,
+ * Why keel moved this reader (one-rule §3, 2026-10-20): `view` (a delete,
  * a hide, a Character change: drop what the walk no longer names) or `role`
  * (a role or roster move: keep). Null when keel did not say; any other value
  * reads as `role`, Titus's side of the error (conv. 151).

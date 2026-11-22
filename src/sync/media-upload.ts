@@ -10,7 +10,7 @@
  * The key and PIN never go to the edge.
  *
  * Every picture is public to anyone with its link, even in a private world,
- * and is never overwritten (Skeld's ticket-split letter): the UI says so.
+ * and is never overwritten (the ticket split): the UI says so.
  */
 
 import { PlainError } from '../core/plain-error';
@@ -134,7 +134,7 @@ export async function uploadPicture(
   }
 }
 
-// --- Removing a picture (Boss's removal contract, 2026-10-10) -----------------
+// --- Removing a picture (the removal contract, 2026-10-10) -----------------
 
 /** Where an uploaded picture is served; its object key is the rest of the URL. */
 const MEDIA_ORIGIN = 'https://media.onlyworlds.com/';
@@ -142,7 +142,7 @@ const MEDIA_ORIGIN = 'https://media.onlyworlds.com/';
 /**
  * The object key of a picture uploaded into this world through a ticket
  * (`u/<worldId>/<name>`), or null for any other address. Only those can be
- * removed: keel answers not_found for everything else (the crew's batch
+ * removed: keel answers not_found for everything else (batch
  * uploads, other worlds' pictures, other hosts).
  */
 export function uploadedPictureKey(url: unknown, serverWorldId: string): string | null {
@@ -171,7 +171,7 @@ function removalTicketSentence(err: unknown): string | null {
  * Remove one uploaded picture from OnlyWorlds. Resolves once the edge has
  * deleted it; the caller clears the image URLs that showed it (keel leaves
  * them, by contract). A removal asked the instant an upload replied can meet
- * keel before the edge's upload report does (about 600 ms, Skeld 2026-10-10):
+ * keel before the edge's upload report does (about 600 ms, 2026-10-10):
  * a 404, or the coming 409 upload_pending, gets one retry after a second (or
  * the Retry-After). Rejects with a `PlainError` when the reason has its own
  * sentence, else the raw error for `showProblem`.

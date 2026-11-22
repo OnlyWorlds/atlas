@@ -5,7 +5,7 @@
  * itself as the bearer (keel asks no PIN here). Never a lookup by last four or
  * name: a delete runs only on an id Atlas made and recorded.
  *
- * keel's answers (probed on a crew account, and read in its source):
+ * keel's answers (probed on a test account, and read in its source):
  * 204 revoked; 401 the token works no more (revoked already); 404 the
  * bearer works and the id is not its account's, so the token is still LIVE.
  * Revoking a token minted by Sign in with OnlyWorlds ends the

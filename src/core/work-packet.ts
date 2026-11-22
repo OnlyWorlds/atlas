@@ -1,5 +1,5 @@
 /**
- * A work packet (schema-dist `profiles/packet.md`, dist.36; Skeld 2026-10-21):
+ * A work packet (schema-dist `profiles/packet.md`, dist.36; 2026-10-21):
  * a Work item Relation's `x_packet_elements`, each `{type, id, reason}` in the
  * producer's order, with `x_packet_source` naming the world the ids are from
  * and `x_packet_producer` the tool that made it. The Relation's typed links

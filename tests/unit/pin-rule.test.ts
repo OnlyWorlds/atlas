@@ -1,5 +1,5 @@
 /**
- * keel's PIN rule in Atlas's own client (1.79.0; Skeld 2026-10-22;
+ * keel's PIN rule in Atlas's own client (1.79.0; 2026-10-22;
  * the PIN-on-writes contract): the
  * secret on every write, on GET /me, and on every call of a ten-digit key; a
  * prefixed key's other reads bare; never beside a key that reads only

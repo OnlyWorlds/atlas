@@ -1,6 +1,6 @@
 /**
  * waymarkFor: the mark shows only where the site has a page for this reader
- * (contract `2026-10-30-s519-atlas-waymark-contract.md`, R1 to R3, and its
+ * (the waymark contract of 2026-10-30, R1 to R3, and its
  * code gate's C2 and C3): keel's world address sends on the owner and every member; an
  * element's address also a signed-in member; a read key, a player's link or
  * an agent seat reach the site only through the public page, which shows no

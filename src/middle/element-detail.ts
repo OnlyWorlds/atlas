@@ -247,7 +247,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     detail.className = 'atlas-detail';
 
     // Proposed, not yet reviewed (conv. 168): said in a sentence under the name, not only
-    // in the header word's label (Seethe's read of 1.84.0, 2026-10-23).
+    // in the header word's label (a designer's read of 1.84.0, 2026-10-23).
     const proposed = proposedNoteFor(el);
     if (proposed) {
       const note = document.createElement('p');
@@ -257,7 +257,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       detail.appendChild(note);
     }
     // Hidden (conv. 170): said in a sentence under the name too, so a hidden-only page has
-    // more than a glyph (Seethe's read of 1.86.0, 2026-10-23); the header leaves the glyph out.
+    // more than a glyph (a designer's read of 1.86.0, 2026-10-23); the header leaves the glyph out.
     const st = getState();
     const hiddenLine = hiddenMarkLine(el, st.registry.worlds.find(w => w.id === st.active?.worldId)?.state);
     if (hiddenLine) {
@@ -293,7 +293,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
         hide.type = 'button';
         hide.className = 'atlas-element-image-hide';
         // An eye, not a ×: it hides every element's picture (a view setting), and a × read as
-        // "remove this picture" (Seethe's phone pass, 2026-10-14).
+        // "remove this picture" (a phone pass, 2026-10-14).
         hide.title = 'Hide element images';
         hide.setAttribute('aria-label', 'Hide element images');
         const glyph = document.createElement('span');

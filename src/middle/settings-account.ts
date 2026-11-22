@@ -121,7 +121,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
   // #387: email and password first, as Lantern signs in; the token paste
   // stays for whoever already made one, behind its own line. Where the
   // Sign in with OnlyWorlds button stands, the lead paragraph introduces it and
-  // a label saying the same above it goes (Seethe 2026-10-24).
+  // a label saying the same above it goes (2026-10-24).
   const owButton = onlyWorldsSignInButtonHtml('Or with your email or username and password:');
   return `
     <div class="atlas-settings-field atlas-account-token-block" data-role="account-token-block">

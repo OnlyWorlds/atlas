@@ -98,7 +98,7 @@ export function reservedValueHint(el: Element, fieldName: string): string | null
   }
   if (el.type === 'construct' && fieldName === 'supertype') {
     // Display convention only — calendar DETECTION keys on the atlas_calendar
-    // field's presence, never the supertype (2B design §4, Skeld's swap). The
+    // field's presence, never the supertype (2B design §4). The
     // hint teaches the convention without the label carrying machinery weight.
     if (v.toLowerCase() === 'calendar') return `"${v}" is the calendar convention; the time structure is edited in the charts room`;
   }

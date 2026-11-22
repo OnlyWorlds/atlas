@@ -1,6 +1,6 @@
 /**
  * The hidden mark sent for an element already online (conv. 173; folder spec
- * 4.8 at fe366935, Skeld 2026-10-24). A mark a file gains
+ * 4.8 at fe366935, 2026-10-24). A mark a file gains
  * while keel shows the element goes as keel's hide (`PUT /{type}/{id}/hidden`)
  * by the owner's or a co-builder's key, BEFORE the edit, so the edit never
  * reaches members between the two; a contributor's or a guest's key never asks;

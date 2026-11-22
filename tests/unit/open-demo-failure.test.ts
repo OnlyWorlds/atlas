@@ -1,5 +1,5 @@
 /**
- * The demo door never rejects (Boss 2026-10-14). `#/try-demo` fires
+ * The demo door never rejects (2026-10-14). `#/try-demo` fires
  * `openDemoWorld` and forgets it, and a copy already here opens outside the
  * download's own catch, so a failure there reached the unhandled-rejection
  * reporter: "Atlas ran into a problem it did not expect while working in the

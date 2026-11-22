@@ -5,7 +5,7 @@
  *
  *   1. keel world-export ENVELOPE — `{format:"onlyworlds-world-export",
  *      schema_version, world:{id,...}, elements:{ <type>: [...] }}`. What
- *      ow.com emits today (keel `portal/views.py`; canonical, Skeld's spec
+ *      ow.com emits today (keel `portal/views.py`; canonical, the spec
  *      § world-export). Nested lowercase `elements`, world id PRESENT.
  *   2. `World`+PascalCase-at-root — `{World:{...}, Character:[...]}`. The
  *      older shape atlas's base-tool lineage used; kept for backward compat
@@ -30,7 +30,7 @@ function isRecord(r: unknown): r is RawRecord {
 
 /**
  * The keel world-export envelope, by its self-describing `format` tag (the
- * reliable signal — Skeld) with a structural fallback (a `world` object beside
+ * reliable signal) with a structural fallback (a `world` object beside
  * an `elements` object) so a future emitter that drops the tag still reads.
  */
 function isExportEnvelope(obj: Record<string, unknown>): boolean {

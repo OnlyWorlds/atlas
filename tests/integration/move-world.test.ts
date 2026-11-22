@@ -265,7 +265,7 @@ describe('the crash matrix: a failure before the commit changes nothing (invaria
 
   // Two rows below wait out a removal's real busy backoff (100 + 250 + 500 +
   // 1000 ms, REMOVE_RETRY_MS in browser-world-move.ts and browser-worlds.ts):
-  // about 1.9 s alone, past 15 s once in a loaded full run (Boss, 2026-10-14).
+  // about 1.9 s alone, past 15 s once in a loaded full run (2026-10-14).
   // The wait is the code's own, not work, so the limit is wide.
   const BACKOFF_TIMEOUT_MS = 30_000;
 

@@ -1791,7 +1791,7 @@ function drawCard(state: ViewState): void {
     none.textContent = 'No linked elements.';
     chipsWrap.appendChild(none);
   } else {
-    // Forward links grouped by ROLE (fieldLabel) — Simmer's molecule: the event
+    // Forward links grouped by ROLE (fieldLabel) — the molecule model: the event
     // is a hub, its links are spokes grouped by typed bond. 10 chips in 4 labeled
     // clusters reads; 10 bare chips don't.
     const groups = new Map<string, LinkedRef[]>();

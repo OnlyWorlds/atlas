@@ -1,5 +1,5 @@
 /**
- * The faint-text floor (F-39, Seethe 2026-10-20): every text a
+ * The faint-text floor (F-39, 2026-10-20): every text a
  * person reads, and every control drawn only as an icon, sits at
  * `--atlas-text-muted` or brighter, which clears AA on Atlas's grounds.
  *
@@ -61,7 +61,7 @@ describe('the faint-text floor (F-39)', () => {
     expect(new Set(uses)).toEqual(ORNAMENTS);
   });
 
-  // F-43 (Seethe 2026-10-20): light mode's own faint tier. Ink that flips with
+  // F-43 (2026-10-20): light mode's own faint tier. Ink that flips with
   // the theme reads 4.5:1 on paper only from about 0.62 alpha, though it
   // passes on black from 0.48, so a quiet text below that takes muted (an
   // opaque #6a675f in light). White literals live on dark floors and keep 0.48.
@@ -100,7 +100,7 @@ describe('the faint-text floor (F-39)', () => {
 
   // F-43: the light theme's opaque word colours each clear 4.5:1 on its three
   // grounds (paper, a raised white, the deep writing surface). The loose-threads
-  // count in --atlas-warn-soft read 3.57 (Seethe 2026-10-20).
+  // count in --atlas-warn-soft read 3.57 (2026-10-20).
   it("light mode's word colours clear AA on every light ground (F-43)", () => {
     const light = RULES.find(r => r.selector === ":root[data-theme='light']")!.body;
     const hex = (name: string) => light.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6});`))?.[1];

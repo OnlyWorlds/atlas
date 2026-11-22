@@ -412,8 +412,8 @@ function validateWorldMetaField(field: string, v: unknown): { message: string; p
 }
 
 /**
- * Stateful MSW server speaking the FROZEN keel v2 dialect (see
- * Notes/2026-07-12-v2-probed-facts.md — the single source of truth for every
+ * Stateful MSW server speaking the FROZEN keel v2 dialect (the 2026-07-12
+ * live probe, kept in a local note, is the single source of truth for every
  * shape and status code below). Independent from statefulOwHandlers (which
  * stays for the v1 SDK adapter): different envelopes, error shape, pagination,
  * and the /bulk + /changes endpoints v1 never had.

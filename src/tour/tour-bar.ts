@@ -10,7 +10,7 @@
  * ✦ deeper flyout) · controls. Steps carry no titles (v2.1): the act label
  * orients, the divider separates material from narration.
  *
- * The sentence is the progress bar (Skeld's grammar): parsed words carry
+ * The sentence is the progress bar (the onlyworlds.com grammar): parsed words carry
  * their element-type color; every span's end word carries an inline glyph,
  * PRE-SPACED as a dim ghost and LIT (pop-in) when its step is reached — zero
  * reflow. Clicking a parsed word jumps to its step. The OPENER is the one

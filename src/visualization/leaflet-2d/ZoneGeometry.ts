@@ -404,7 +404,7 @@ function inRing(p: Point, r: Ring): boolean {
 }
 
 /**
- * The parts of a line that lie on land (Seethe's receipt 2026-10-17:
+ * The parts of a line that lie on land (a designer's receipt 2026-10-17:
  * a river ends at the coast). A point is on land when it is inside some
  * `land` ring (or there are none: the map's own ground is the land) and
  * inside no `water` ring (a sea, a lake). Each segment is cut where it

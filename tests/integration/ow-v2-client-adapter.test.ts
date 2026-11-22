@@ -3,7 +3,7 @@
  *
  * Every case drives a REAL OwV2ClientAdapter (thin fetch, no SDK) against
  * statefulV2Handlers, so the frozen v2 wire contract
- * (Notes/2026-07-12-v2-probed-facts.md) is exercised end to end:
+ * (the 2026-07-12 live probe, kept in a local note) is exercised end to end:
  *
  * - toV2WireShape: disk map_id/zone_id → bare map/zone on the wire; pin
  *   element_id/element_type + content bare names untouched.
@@ -434,7 +434,7 @@ describe('OwV2ClientAdapter — /changes cursor pull', () => {
   });
 });
 
-describe('OwV2ClientAdapter — a read that never answers (Boss 2026-10-14)', () => {
+describe('OwV2ClientAdapter — a read that never answers (2026-10-14)', () => {
   // A stalled connection never fails on its own: keel is played by a handler
   // that never answers, and the adapter must give up on reads only.
   const PENDING = Symbol('pending');

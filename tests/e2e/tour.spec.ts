@@ -1301,7 +1301,7 @@ test('replay from settings with a world open clears the stage and can be complet
   // The PRESENT half of the pair below. Without this the absence assertion
   // could pass because the selector matches nothing — which is exactly how
   // the first draft of this test passed with the filter reverted.
-  // (Creating a world flips the sidebar into elements mode — S255v3 — and
+  // (Creating a world flips the sidebar into elements mode, and
   // sidebar mode is its own state, not a function of the URL, so this needs
   // the real toggle rather than a hash change.)
   await page.click('.atlas-mode-btn[data-action="mode-worlds"]');

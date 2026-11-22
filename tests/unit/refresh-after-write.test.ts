@@ -1,7 +1,7 @@
 /**
  * refreshElementsAfterWrite after a world switch: a write that finishes once another world is open
  * answers null and never puts its world's elements into the open world's state (they would show in
- * its lists and pickers until the next refresh; the S521 strand gate's D4).
+ * its lists and pickers until the next refresh; a strand review gate's D4).
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';

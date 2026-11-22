@@ -103,7 +103,7 @@ export function buildPictureUploadRow(el: Element, entry: WorldRegistryEntry, to
   btn.addEventListener('click', () => input.click());
   value.appendChild(btn);
 
-  // An uploaded picture of this world can be removed from OnlyWorlds (Boss's
+  // An uploaded picture of this world can be removed from OnlyWorlds (the
   // removal contract, 2026-10-10).
   const key = uploadedPictureKey(el.image_url, entry.api?.world_id ?? '');
   if (key) {

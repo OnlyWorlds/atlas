@@ -251,7 +251,7 @@ describe('rescanDisk and sync: a compliant outside edit', () => {
   });
 });
 
-describe('unreadableFiles: what an open left out (conv. 176, Seethe 2026-10-24)', () => {
+describe('unreadableFiles: what an open left out (conv. 176, 2026-10-24)', () => {
   it('names a cut-short file and an id-less one after the index, leaves both on disk, and drops one fixed since', async () => {
     const root = world();
     const id = '0192a000-0000-7000-8000-00000000b0b0';

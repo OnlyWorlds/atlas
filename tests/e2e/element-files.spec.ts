@@ -45,7 +45,7 @@ async function onlineWorld(page: Page, holdTotal?: Hold): Promise<Seen> {
   let files = [
     fileRow('scan', { name: 'Blood Meridian, ch. I-XXIII (scan).pdf', label: 'Source' }),
     fileRow('notes', { name: 'The Kid, timeline notes.md', kind: 'md', size: 6 * 1024, label: null,
-      added_by: { name: 'Quillon\'s seat', membership: 'm-seat', agent: true } }),
+      added_by: { name: 'Quincy\'s seat', membership: 'm-seat', agent: true } }),
   ];
   const char = { id: CHAR_ID, type: 'character', name: 'The Kid', updated_at: now, created_at: now };
   await page.route(`${V2}/**`, async (route: Route) => {
@@ -97,7 +97,7 @@ async function onlineWorld(page: Page, holdTotal?: Hold): Promise<Seen> {
     const h = route.request().headers();
     seen.host.push({ auth: h['authorization'] ?? null, key: h['api-key'] ?? null, pin: h['api-pin'] ?? null });
     files = [fileRow('f-new', { name: 'kid, quotes.txt', kind: 'txt', size: 2048, label: 'Description',
-      added_by: { name: 'Quillon\'s seat', membership: 'm-seat', agent: true } }), ...files];
+      added_by: { name: 'Quincy\'s seat', membership: 'm-seat', agent: true } }), ...files];
     return route.fulfill({ status: 201, json: { key: 'k', fid: 'f-new', bytes: 2048, type: 'text/plain', etag: 'e' } });
   });
   await page.route('https://files.onlyworlds.com/**', (route: Route) =>

@@ -28,7 +28,7 @@ export function getActiveStore(): FsFolderStore | null {
  * The on-screen elements, read from `store`, only while `store` is the open world's: a write that finishes
  * after a world switch or a close must not put its world's elements into another world's lists and
  * pickers. True when patched. Every write that reads its store's list back into state after an await goes
- * through here (S577, the S521 strand gate's D4 carried to every writer).
+ * through here (the strand review gate's D4, carried to every writer).
  */
 export function patchElementsFrom(store: unknown, elements: Element[]): boolean {
   if (store === null || activeStore !== store) return false;

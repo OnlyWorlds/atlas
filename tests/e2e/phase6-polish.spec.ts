@@ -30,7 +30,7 @@ async function setupAtlasRoot(page: Page, dirName: string = 'polish-test-root') 
 }
 
 async function createWorld(page: Page, name: string) {
-  // Creating a world flips the sidebar to elements mode (S255v3). If a prior
+  // Creating a world flips the sidebar to elements mode. If a prior
   // world was already created in this test, switch back to worlds mode first
   // so the create-local button (worlds-mode only) is reachable again.
   const worldsModeBtn = page.locator('.atlas-mode-btn[data-action="mode-worlds"]');

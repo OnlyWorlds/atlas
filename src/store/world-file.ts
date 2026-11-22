@@ -1,7 +1,7 @@
 /**
  * The world file: one `.zip` that holds one whole world, and the reader that
  * opens one back (1.17, conv. 129; contract §5; Folder Format spec
- * §4.1 "a portable copy", Skeld 2026-10-04).
+ * §4.1 "a portable copy", 2026-10-04).
  *
  * THE PORTABLE COPY: every file of the world as it is on disk, except the
  * OnlyWorlds link and its key (`world.json` without `api`), the sync files
@@ -10,7 +10,7 @@
  * is deflated, media stored as it is.
  *
  * THE FORMAT is the SDK's since 4.10 (`readWorldFile`, `writeWorldFile`;
- * Kael, 2026-10-11): one reader and writer for every tool. It refuses before
+ * 2026-10-11): one reader and writer for every tool. It refuses before
  * anything is written: a path that climbs out, is absolute or names a drive,
  * an empty path part, a path that is both a file and a folder, a declared size
  * or a file count past the budget, no world, more than one world or files
@@ -155,7 +155,7 @@ const RECORDS_MANIFEST = 'records/RECORDS.json';
 /**
  * The world's records list will not read, so which records are private is
  * unknown, and nothing is left out by guess (folder spec §4.7 OW-8, v0.3.15;
- * Skeld 2026-10-22): the caller asks the person, or makes no file.
+ * 2026-10-22): the caller asks the person, or makes no file.
  */
 export class RecordsListUnreadable extends PlainError {
   constructor() {
@@ -250,7 +250,7 @@ export function readWorldZip(
   bytes: Uint8Array,
   opts: { maxBytes?: number; maxEntries?: number } = {},
 ): ReadWorld {
-  // The format and its refusals are the SDK's (4.10, Kael 2026-10-11): one
+  // The format and its refusals are the SDK's (4.10, 2026-10-11): one
   // reader for every tool. Atlas keeps its own sentences, its `.atlas/` rules
   // and the tour mark left out.
   let read: ReturnType<typeof readWorldFile>;

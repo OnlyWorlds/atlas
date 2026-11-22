@@ -4,7 +4,7 @@
   "legacy marker-based zone twin merged into the creature-referenced zone (markers retargeted, order from names)",
   "imgur image_urls replaced by bundled webp via x_tour_media (offline tour); boot writes them as local media",
   "pin renamed from 'Pin @ (237,305)'",
-  "link weave added (title issuer/holders, consul abilities/objects/institutions, creature species, collective members/zones, event participants) -- upstream demo carries no links; suggest Skeld adopt server-side",
+  "link weave added (title issuer/holders, consul abilities/objects/institutions, creature species, collective members/zones, event participants) -- upstream demo carries no links; suggest upstream adopt server-side",
   "book 'Hyperion' + 'Chapter 1' narratives minted for the writing act (not upstream) -- chapter story is the sentence verbatim with ow:// chips; chip labels are deliberate display overrides so the sentence stays word-exact",
   "atlas_aliases baked for the sentence surface forms -- keeps the chapter chips word-exact under label sync and feeds the @ picker",
   "Rachmaninov birth_date (1873, Earth chronology) removed -- it stretched the chart axis to 0..1873 and crushed the dated events; the world clock runs 0..100",

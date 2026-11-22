@@ -66,7 +66,7 @@ describe('the stamp ratchet', () => {
     expect(stampReadings(own).map(h => `${h.line} ${h.text}`)).toEqual([]);
   });
 
-  // The census's sites as master held them (S603), each one a line the guard must flag.
+  // The census's sites as master held them, each one a line the guard must flag.
   const MASTER: Record<string, string> = {
     liveFolderNotSynced: "if (el && el.server_updated_at && (el.local_updated_at ?? '') <= el.server_updated_at) count++;",
     liveFolderWillUpload: "const willUpload = !el.server_updated_at || (el.local_updated_at ?? '') > el.server_updated_at;",
