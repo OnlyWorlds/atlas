@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'world-pin-or-seat-secret',
         title: 'A refusal names the World PIN, the seat secret, or both',
-        body: 'Where Atlas cannot tell whose credential OnlyWorlds refused, the line now names both, the World PIN or seat secret, where it said this PIN or the PIN. Lines say Check the World PIN, a seat\'s credential is spelled seat secret everywhere, and when OnlyWorlds refuses too many different seat secrets for a seat world\'s key, the line says seat secrets, not PINs.',
+        body: 'Where Atlas cannot tell whose credential OnlyWorlds refused, the line now names both, the World PIN or seat secret, where it said this PIN or the PIN, and uploading or removing a picture, resolving a conflict, Make online\'s Create new, Bring down again and a seat\'s check before its download now name the one they sent. Lines say Check the World PIN, a seat\'s credential is spelled seat secret everywhere, and when OnlyWorlds refuses too many different seat secrets for a seat world\'s key, the line says seat secrets, not PINs.',
         tags: ['sync', 'fix'],
       },
     ],

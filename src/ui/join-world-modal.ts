@@ -416,7 +416,7 @@ export class JoinWorldModal extends BaseModal {
             openBtn.hidden = true;
             removeHeldBtn.hidden = false;
           } else {
-            say(problemFor(err, { inline: true, doing: 'checking the seat on OnlyWorlds' }).sentence);
+            say(problemFor(err, { inline: true, doing: 'checking the seat on OnlyWorlds', ...(held.kind === 'agent' ? { who: 'seat' as const } : {}) }).sentence);
             openBtn.textContent = 'Retry';
           }
           return;

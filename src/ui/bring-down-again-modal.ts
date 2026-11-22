@@ -67,7 +67,7 @@ export class BringDownAgainModal extends BaseModal {
       } catch (err) {
         console.warn('[bring-down-again] failed:', err);
         this.dismissLocked = false;
-        progress.textContent = problemFor(err, { doing: 'downloading the world', where: 'browser', inline: true }).sentence;
+        progress.textContent = problemFor(err, { doing: 'downloading the world', where: 'browser', inline: true, worldId: w.id }).sentence;
         cancel.disabled = false;
         cancel.textContent = 'Close';
         go.hidden = true;
