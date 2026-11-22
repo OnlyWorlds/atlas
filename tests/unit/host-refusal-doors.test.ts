@@ -107,7 +107,7 @@ describe('a 429 on a page, by keel\'s param (1.124.35)', () => {
     const wall = await refusal(client(429, json('API-Pin'), 'application/json').publish(page));
     expect(wall.code).toBe('rate_limited');
     expect(wall.param).toBe('API-Pin');
-    expect(sharingErrorMessage(wall)).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing changed. Check your PIN in Settings, then try again later.");
+    expect(sharingErrorMessage(wall)).toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing changed. Check your World PIN in Settings, then try again later.");
     const other = await refusal(client(429, json(null), 'application/json').publish(page));
     expect(sharingErrorMessage(other)).toBe('OnlyWorlds asked Atlas to wait. Nothing changed; wait a bit and try again.');
     // A 429 with no envelope at all is a wait too.

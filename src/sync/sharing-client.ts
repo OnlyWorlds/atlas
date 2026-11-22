@@ -101,7 +101,7 @@ export function sharingErrorMessage(err: SharingApiError): string {
     case 'not_found': return 'Page not found on the server.';
     // By keel's `param`: its PIN wall (ten different wrong PINs on this key), or any other throttle.
     case 'rate_limited': return err.param?.toLowerCase() === 'api-pin'
-      ? 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check your PIN in Settings, then try again later.'
+      ? 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check your World PIN in Settings, then try again later.'
       : 'OnlyWorlds asked Atlas to wait. Nothing changed; wait a bit and try again.';
     case 'admin_locked': return 'An administrator locked this URL. Use a different URL.';
     case 'title_too_long': return 'Page name is too long to publish (200 characters max).';
@@ -114,7 +114,7 @@ export function sharingErrorMessage(err: SharingApiError): string {
     // A contributor or guest seat (keel sharing `_require_page_manager`, #104).
     case 'owner_only': return 'Only the world\'s owner or a co-builder can publish, change or revoke its pages.';
     case 'unauthorized':
-    case 'auth_failed': return 'OnlyWorlds did not accept the key or PIN. Check your PIN in Settings, under OnlyWorlds.';
+    case 'auth_failed': return 'OnlyWorlds did not accept the key or the World PIN. Check your World PIN in Settings, under OnlyWorlds.';
     case 'network': return 'Could not reach OnlyWorlds. Check your connection, then try again.';
     default: return 'OnlyWorlds could not finish that. Try again.';
   }

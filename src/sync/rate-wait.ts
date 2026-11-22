@@ -77,7 +77,7 @@ export function waitWords(ms: number): string {
 export function rateWaitLine(pin: boolean, ms: number, place: string): string {
   const when = waitWords(ms);
   return pin
-    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check your PIN in Settings; Atlas tries again in ${when}.`
+    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check your World PIN in Settings; Atlas tries again in ${when}.`
     : `OnlyWorlds asked Atlas to wait. Your changes are saved ${place}, and Atlas tries again in ${when}.`;
 }
 
@@ -89,8 +89,8 @@ export function rateWaitLine(pin: boolean, ms: number, place: string): string {
 export function pinCheckWaitLine(pin: boolean, ms: number): string {
   const when = waitWords(ms);
   return pin
-    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This PIN is kept here, not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in ${when}.`
-    : `OnlyWorlds asked Atlas to wait. This PIN is kept here, not checked by OnlyWorlds yet; Atlas can ask about it again in ${when}.`;
+    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This World PIN is not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in ${when}.`
+    : `OnlyWorlds asked Atlas to wait. This World PIN is not checked by OnlyWorlds yet; Atlas can ask about it again in ${when}.`;
 }
 
 /**

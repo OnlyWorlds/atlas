@@ -473,7 +473,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // neither the title nor the button offers one then.
   const busyRound = engine?.kind === 'syncing';
   // Add PIN's title already says what its press does (it asks for the PIN here, 1.125.0).
-  pill.title = title + (conflictCount > 0 || busyRound || wait || dataState === 'add-pin' ? '' : errored ?(pinRefused ? ' · click to put in the PIN again in Settings' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
+  pill.title = title + (conflictCount > 0 || busyRound || wait || dataState === 'add-pin' ? '' : errored ?(pinRefused ? ' · click to put in the World PIN again in Settings, OnlyWorlds' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
   // Each badge's title is its name, so a screen reader says it once.
   const conflictName = `Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}`;
   const conflictBadge = conflictCount > 0
@@ -496,7 +496,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // The Add PIN pill's button asks for the PIN (1.125.0): its name says so, never a refresh.
   const refreshName = dataState === 'add-pin' ? 'Add your World PIN'
     : currentPendingPush ? 'Save to OnlyWorlds now'
-    : errored ? (pinRefused ? 'Put in the PIN again in Settings' : 'See why in Settings')
+    : errored ? (pinRefused ? 'Put in the World PIN again in Settings, OnlyWorlds' : 'See why in Settings')
     : roundOnly ? `${syncPhaseWords(engine?.kind === 'syncing' ? engine.phase : undefined)} now`
     : 'Refresh from OnlyWorlds';
   // "Review N" is the badge's name too: the label is not said twice.

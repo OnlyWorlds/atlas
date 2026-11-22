@@ -188,9 +188,9 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       }
       // keel named the PIN (401 `invalid_credentials`, param `API-Pin`): the PIN's own sentence.
       if (keyRefusalOf(err) === 'pin') {
-        return `OnlyWorlds did not accept this PIN. Atlas could not finish ${doing}.${saved} Check the PIN in Settings, under OnlyWorlds.`;
+        return `OnlyWorlds did not accept this World PIN. Atlas could not finish ${doing}.${saved} Check the World PIN in Settings, under OnlyWorlds.`;
       }
-      return `OnlyWorlds did not accept this world's key or the PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
+      return `OnlyWorlds did not accept this world's key or the World PIN, so Atlas could not finish ${doing}. Check your World PIN in Settings, under OnlyWorlds.`;
     case 'offline':
       return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;
     case 'server-busy': {
@@ -202,7 +202,7 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
           : typeof e.retryAfter === 'number' ? e.retryAfter * 1000 : null;
         const when = ms === null ? 'a minute' : waitWords(ms);
         return isPinParam(e.param)
-          ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish ${doing}.${saved} Check your PIN in Settings; try again in ${when}.`
+          ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish ${doing}.${saved} Check your World PIN in Settings; try again in ${when}.`
           : `OnlyWorlds asked Atlas to wait, so Atlas could not finish ${doing}.${saved} Try again in ${when}.`;
       }
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;

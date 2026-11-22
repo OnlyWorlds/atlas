@@ -198,7 +198,7 @@ describe('a pasted key', () => {
   it('a wrong PIN is told by /me, now that /world reads bare (1.79.0)', async () => {
     h.getWorld = async () => ({ id: current().api!.world_id, name: 'Here' });
     h.checkPin = async () => { throw refused('invalid_credentials', 401, 'API-Pin'); };
-    await expect(checkNewKey(current(), NEW)).rejects.toThrow('OnlyWorlds did not accept this PIN with that key. Check that the key is from your own account, then your PIN on the OnlyWorlds tab.');
+    await expect(checkNewKey(current(), NEW)).rejects.toThrow('OnlyWorlds did not accept this World PIN with that key. Check that the key is from your own account, then your World PIN on the OnlyWorlds tab.');
   });
 
   it('reads an ow_r_ key as read only', async () => {
@@ -270,7 +270,7 @@ describe('a key Atlas makes, signed in', () => {
     };
     const out = await makeNewWorldKey(current(), { keyDead: false });
     expect(out.kind).toBe('kept');
-    expect(out.kind === 'kept' && out.line).toMatch(/needs a PIN on your account/);
+    expect(out.kind === 'kept' && out.line).toMatch(/needs a World PIN on your account/);
     expect(h.revoked).toEqual(['k-read-2']);
     expect(current().api!.api_key).toBe(READ);
   });

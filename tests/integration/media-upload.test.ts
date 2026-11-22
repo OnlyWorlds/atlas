@@ -119,7 +119,7 @@ describe('uploadPicture', () => {
     expect(await sentenceOf(uploadPicture(world(undefined, 'local-only'), reg('1234'), png()))).toMatch(/use Make online first/);
     expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k', read_only: true }), reg('1234'), png()))).toMatch(/view-only/);
     expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k', seat: {} }), reg('1234'), png()))).toMatch(/opened on a seat/);
-    expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k' }), reg(), png()))).toMatch(/needs your OnlyWorlds PIN/);
+    expect(await sentenceOf(uploadPicture(world({ world_id: 'w1', api_key: 'k' }), reg(), png()))).toMatch(/needs your World PIN/);
     expect(seen.tickets).toHaveLength(0);
   });
 });

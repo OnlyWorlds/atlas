@@ -59,7 +59,7 @@ export class LinkWorldModal extends BaseModal {
           <input class="atlas-input" type="text" name="api-key" placeholder="From onlyworlds.com" autocomplete="off" spellcheck="false" />
         </label>
         <label class="atlas-modal-field">
-          <span>PIN, or a seat secret</span>
+          <span>World PIN, or a seat secret</span>
           <input class="atlas-input" type="password" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four digits, or ow_s_…" autocomplete="off" maxlength="64" />
         </label>
         <label class="atlas-modal-field">
@@ -68,7 +68,7 @@ export class LinkWorldModal extends BaseModal {
         </label>
         ${whereChoiceHtml({ online: true })}
         <p class="atlas-modal-hint">
-          Atlas downloads every element of this world. You can keep editing while offline; changes sync back the next time you open it. A read key needs no PIN: the world opens to read.
+          Atlas downloads every element of this world. You can keep editing while offline; changes sync back the next time you open it. A read key needs no World PIN: the world opens to read.
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>

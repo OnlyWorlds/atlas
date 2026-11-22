@@ -42,7 +42,7 @@ const OTHER_KEY = 'ow_w_other';
 const RIGHT = '1234';
 const WRONG = '9999';
 
-const WALL_LINE = (when: string) => `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check your PIN in Settings; Atlas tries again in ${when}.`;
+const WALL_LINE = (when: string) => `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check your World PIN in Settings; Atlas tries again in ${when}.`;
 const WAIT_LINE = (when: string) => `OnlyWorlds asked Atlas to wait. Your changes are saved in the folder, and Atlas tries again in ${when}.`;
 
 let keel: PlayedKeel;
@@ -188,8 +188,8 @@ describe('a PIN keel refused is never sent again by itself', () => {
     const unmount = mountRightPane({ tabBar, pane, toasts });
     try {
       const pill = document.querySelector<HTMLElement>('[data-role="sync-pill"]')!;
-      expect(pill.title).toBe('OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds · click to put in the PIN again in Settings');
-      expect(pill.querySelector('[data-role="refresh"]')!.getAttribute('aria-label')).toBe('Put in the PIN again in Settings');
+      expect(pill.title).toBe('OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds · click to put in the World PIN again in Settings, OnlyWorlds');
+      expect(pill.querySelector('[data-role="refresh"]')!.getAttribute('aria-label')).toBe('Put in the World PIN again in Settings, OnlyWorlds');
       pill.click();
       await settle();
       expect(window.location.hash).toBe(settingsHash('w1', 'onlyworlds'));
@@ -276,7 +276,7 @@ describe('inside a 429 wait nothing goes by itself', () => {
     await settle(1_000);
     expect(getState().registry.pin).toBe('4321');
     expect(getState().registry.pin_state).toBeUndefined();
-    expect(said).toEqual([`OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This PIN is kept here, not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in 5 minutes.`]);
+    expect(said).toEqual([`OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This World PIN is not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in 5 minutes.`]);
     // The engine the save attached waits too.
     await settle(60_000);
     expect(sent()).toBe(before);
@@ -297,7 +297,7 @@ describe('inside a 429 wait nothing goes by itself', () => {
     await settle(1_000);
     expect(keel.seen.filter(s => s.call === 'GET /me' && s.pin === '4321')).toHaveLength(1);
     expect(getState().registry.pin_state).toBeUndefined();
-    expect(said).toEqual([`OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This PIN is kept here, not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in 2 minutes.`]);
+    expect(said).toEqual([`OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This World PIN is not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in 2 minutes.`]);
     const before = sent();
     await folder.createElement('character', { name: 'Edit' });
     getCurrentSyncEngine()!.requestPush();
@@ -398,7 +398,7 @@ describe('round 2: the world settings, the pause, the hold, another tab, the pil
     await settle(60_000);
     expect(keel.seen).toEqual([]);
     expect(getState().sync.activeSync).toMatchObject({ kind: 'error', auth_reason: 'pin' });
-    expect(refusedEngineLine()).toBe('Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.');
+    expect(refusedEngineLine()).toBe('Sync paused: OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds.');
   });
 
   it('a big batch held at open with the PIN refused: the pill shows the refusal; Upload them keeps the question and says the refusal', async () => {
@@ -414,7 +414,7 @@ describe('round 2: the world settings, the pause, the hold, another tab, the pil
     await settle(10_000);
     // Nothing uploads under a refused PIN: the question is not spent, and is asked again after a new PIN.
     expect(isDiskHoldPersisted('w1')).toBe(true);
-    expect(errors).toContain('Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.');
+    expect(errors).toContain('Sync paused: OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds.');
     expect(getState().sync.activeSync).toMatchObject({ kind: 'error', auth_reason: 'pin' });
     expect(keel.seen).toEqual([]);
     patchSlice('registry', setPin(getState().registry, RIGHT));

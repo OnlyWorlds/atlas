@@ -181,8 +181,8 @@ export class MakeOnlineModal extends BaseModal {
           </label>
           ${signInFields}
           <label class="atlas-modal-field">
-            <span>PIN</span>
-            <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
+            <span>World PIN</span>
+            <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit World PIN" maxlength="64" autocomplete="off" />
             ${PIN_REASON_HTML}
           </label>
           ${accountLine}
@@ -205,7 +205,7 @@ export class MakeOnlineModal extends BaseModal {
             <input class="atlas-input" type="text" name="link-api-key" placeholder="From onlyworlds.com" autocomplete="off" spellcheck="false" />
           </label>
           <label class="atlas-modal-field">
-            <span>PIN, or a seat secret</span>
+            <span>World PIN, or a seat secret</span>
             <input class="atlas-input" type="password" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four digits, or ow_s_…" maxlength="64" autocomplete="off" />
           </label>
           <fieldset class="atlas-modal-field atlas-policy-fieldset">
@@ -311,7 +311,7 @@ export class MakeOnlineModal extends BaseModal {
     const signIn = missingSignIn(form);
     const missing = !name ? { input: form.querySelector<HTMLInputElement>('input[name="create-name"]'), line: 'Name is required' }
       : signIn ? signIn
-      : !pin ? { input: form.querySelector<HTMLInputElement>('input[name="create-pin"]'), line: 'PIN is required' }
+      : !pin ? { input: form.querySelector<HTMLInputElement>('input[name="create-pin"]'), line: 'World PIN is required' }
       : null;
     if (missing) {
       errorBox.textContent = missing.line;
@@ -498,7 +498,7 @@ export class MakeOnlineModal extends BaseModal {
       return;
     }
     if (!pin) {
-      errorBox.textContent = 'PIN is required';
+      errorBox.textContent = 'World PIN or seat secret is required';
       errorBox.hidden = false;
       return;
     }

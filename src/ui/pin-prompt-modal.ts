@@ -20,14 +20,14 @@ export class PinPromptModal extends BaseModal {
     return new Promise((resolve) => {
       this.resolve = resolve;
       const { overlay, body } = this.buildModalShell({
-        title: 'OnlyWorlds PIN',
+        title: 'World PIN',
         dataModal: 'pin-prompt',
       });
       body.innerHTML = `
         <form data-form="pin-prompt">
           <p class="atlas-modal-hint" data-role="context"></p>
           <label class="atlas-modal-field">
-            <span>PIN</span>
+            <span>World PIN</span>
             <input class="atlas-input" type="password" name="pin"
                    placeholder="Four digits"
                    autocomplete="off" maxlength="64" />
@@ -54,12 +54,12 @@ export class PinPromptModal extends BaseModal {
         // A seat secret (ow_s_) opens one world and never becomes the account
         // PIN (conv. 132, R1).
         if (isSeatSecret(pin)) {
-          errorEl.textContent = 'That is a seat secret, which opens one world. Here Atlas needs your account PIN: four digits.';
+          errorEl.textContent = 'That is a seat secret, which opens one world. Here Atlas needs your World PIN: four digits.';
           errorEl.hidden = false;
           return;
         }
         if (!/^\d{4}$/.test(pin)) {
-          errorEl.textContent = 'The PIN is four digits.';
+          errorEl.textContent = 'The World PIN is four digits.';
           errorEl.hidden = false;
           return;
         }

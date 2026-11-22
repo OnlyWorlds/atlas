@@ -36,7 +36,7 @@ vi.mock('../../src/sync/make-online', async (importOriginal) => ({
   createApiWorld: async ({ pin }: { pin: string }) => {
     h.createPins.push(pin);
     // A seat's secret is held back from keel (never checked there), so the create resolves without it.
-    if (pin !== '1234' && !pin.startsWith('ow_s_')) throw new PlainError('OnlyWorlds did not accept this PIN. Nothing was made. Check it, then try again.');
+    if (pin !== '1234' && !pin.startsWith('ow_s_')) throw new PlainError('OnlyWorlds did not accept this World PIN. Nothing was made. Check it, then try again.');
     return { apiKey: 'ow_w_made', worldId: 'w-made', worldName: 'Hollow Reach' };
   },
 }));
@@ -75,7 +75,7 @@ describe('New world on OnlyWorlds', () => {
     const body = await create('9999');
     const error = body.querySelector<HTMLElement>('[data-role="error"]')!;
     await vi.waitFor(() => expect(error.hidden).toBe(false));
-    expect(error.textContent).toMatch(/did not accept this PIN. Nothing was made/);
+    expect(error.textContent).toMatch(/did not accept this World PIN. Nothing was made/);
     expect(h.createPins).toEqual(['9999']);
     expect(getState().registry.pin).toBeUndefined();
   });

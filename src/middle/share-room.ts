@@ -236,7 +236,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const ask = `Delete ${quotedName(el ?? { type: 'narrative' }, { word: 'page', typed: true })}?`;
       const msg = client
         ? `${ask} It is published at ${url}. Deleting it also takes the published page down.`
-        : `${ask} It is published at ${url}, but Atlas has no key or PIN for this world, so the published page would stay up with no way to revoke it from here.`;
+        : `${ask} It is published at ${url}, but Atlas has no key or World PIN for this world, so the published page would stay up with no way to revoke it from here.`;
       if (!window.confirm(msg)) return;
       publishConfirmed = true;
       if (client) {
@@ -1758,7 +1758,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         return section;
       }
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
-      hint.append('Set your PIN in ');
+      hint.append('Set your World PIN in ');
       hint.appendChild(settingsLink(worldId, 'onlyworlds', 'Settings → OnlyWorlds'));
       hint.append(' to publish.');
       section.appendChild(hint);

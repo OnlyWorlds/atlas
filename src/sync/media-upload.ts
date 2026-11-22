@@ -105,7 +105,7 @@ export async function uploadPicture(
   const pin = worldPin(entry, reg);
   if (!pin) {
     throw new PlainError(isSeatWorld(entry) ? SEAT_SECRET_MISSING_LINE
-      : 'Atlas needs your OnlyWorlds PIN to upload a picture. Enter it in Settings, under OnlyWorlds.');
+      : 'Atlas needs your World PIN to upload a picture. Enter it in Settings, under OnlyWorlds.');
   }
   if (file.type && !(PICTURE_TYPES as readonly string[]).includes(file.type)) {
     throw new PlainError(`${PICTURE_TYPES_LINE} This file is ${file.type.replace(/^image\//, '').toUpperCase() || 'another kind'}.`);
@@ -187,7 +187,7 @@ export async function removePicture(
   const pin = worldPin(entry, reg);
   if (!pin) {
     throw new PlainError(isSeatWorld(entry) ? SEAT_SECRET_MISSING_LINE
-      : 'Atlas needs your OnlyWorlds PIN to remove a picture. Enter it in Settings, under OnlyWorlds.');
+      : 'Atlas needs your World PIN to remove a picture. Enter it in Settings, under OnlyWorlds.');
   }
   const adapter = buildV2Adapter(entry.api.api_key, pin);
   let ticket: MediaRemovalTicket;

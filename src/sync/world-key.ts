@@ -79,7 +79,7 @@ export async function checkNewKey(entry: WorldRegistryEntry, raw: string): Promi
     const why = keyRefusalOf(err);
     if (why === 'key_revoked') return new PlainError('That key was revoked too. Make a new one on the world\'s page on onlyworlds.com.');
     if (why === 'key_unknown') return new PlainError('OnlyWorlds does not know that key. Copy it again from the world\'s page on onlyworlds.com.');
-    if (why === 'pin') return new PlainError('OnlyWorlds did not accept this PIN with that key. Check that the key is from your own account, then your PIN on the OnlyWorlds tab.');
+    if (why === 'pin') return new PlainError('OnlyWorlds did not accept this World PIN with that key. Check that the key is from your own account, then your World PIN on the OnlyWorlds tab.');
     return err;
   };
   const client = buildV2Adapter(key, pin);
@@ -235,12 +235,12 @@ async function makeNewWorldKeyOnce(entry: WorldRegistryEntry & { api: NonNullabl
       kind: 'kept',
       line: minted.why === 'guest'
         ? `You are a guest in ${entry.name}, so its key can only read.`
-        : `Editing ${entry.name} needs a PIN on your account, set on onlyworlds.com in Account settings under World PIN. Then make a new key here again.`,
+        : `Editing ${entry.name} needs a World PIN on your account, set on onlyworlds.com in Account settings under World PIN. Then make a new key here again.`,
     };
   }
   if (!minted.readOnly && !worldPin(entry, getState().registry)) {
     const pin = await new PinPromptModal().prompt(
-      `${entry.name} has a new key: Atlas needs your OnlyWorlds PIN to save your edits. It is the one PIN of your account, set on onlyworlds.com in Account settings under World PIN.`
+      `${entry.name} has a new key: Atlas needs your World PIN to save your edits. It is one for your whole account, set on onlyworlds.com in Account settings under World PIN.`
     );
     if (!pin) { await takeBack(); return { kind: 'cancelled' }; }
     try {

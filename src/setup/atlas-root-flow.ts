@@ -949,7 +949,7 @@ export class PinNeededError extends PlainError {
 export function linkPinRefusal(apiKey: string, apiPin: string, readOnly: boolean, pinLater?: boolean): PlainError | null {
   if (apiPin || readOnly) return null;
   if (pinLater) return readsWithoutPin(apiKey) ? null : new PinNeededError();
-  return new PlainError('Enter your PIN first.');
+  return new PlainError('Enter your World PIN first.');
 }
 
 export interface LinkExistingApiWorldResult {

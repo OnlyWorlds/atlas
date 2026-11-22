@@ -820,7 +820,7 @@ export async function testWorldConnection(world: WorldRegistryEntry, toasts: Toa
   // A world that reads, by its registry or its key, asks for no PIN and sends none.
   const reads = !!world.api.read_only || readsOnlyByShape(world.api.api_key);
   const pin = reads ? '' : worldPin(world, getState().registry);
-  if (!pin && !reads) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN on the OnlyWorlds tab first.'); return; }
+  if (!pin && !reads) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your World PIN on the OnlyWorlds tab first.'); return; }
   try {
     // Test Connection via v2 GET /world (live 2026-07-12), then what the
     // key can do from GET /me (`keyScope`): the PIN is proved there only

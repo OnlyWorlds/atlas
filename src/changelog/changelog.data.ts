@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.3',
+    date: '2026-11-22',
+    theme: 'The World PIN by one name, and the keyboard and phone notes',
+    entries: [
+      {
+        id: 'world-pin-one-name',
+        title: 'The World PIN has one name everywhere',
+        body: 'Atlas called the four digits of your account the World PIN in some places, and your OnlyWorlds PIN, your PIN or the PIN in others. Every sentence, field and dialog now says World PIN, the name onlyworlds.com gives it in Account settings; the pill\'s Add PIN and the world list\'s no PIN stay short. When OnlyWorlds refuses it, the pill now says Put in the World PIN again in Settings, OnlyWorlds, which is where its press opens, and Settings no longer says a World PIN waiting on OnlyWorlds is kept here.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.1',
     date: '2026-11-22',
     theme: 'A world closed with its tab opens again at once',

@@ -166,7 +166,7 @@ async function opensWithNoPinAndAsksInTheWorld(page: Page, folderPicker: boolean
   await expect(dialog).toContainText(`Your World PIN for "${NAME}": the four digits you chose on onlyworlds.com.`);
   await dialog.locator('input[name="pin"]').fill('1111');
   await dialog.locator('[data-action="confirm"]').click();
-  await expect(dialog.locator('[data-role="error"]')).toHaveText('OnlyWorlds did not accept this PIN. Check it and try again.');
+  await expect(dialog.locator('[data-role="error"]')).toHaveText('OnlyWorlds did not accept this World PIN. Check it and try again.');
   await expect(dialog.locator('input[name="pin"]')).toHaveValue('');
   expect((await entry(page)).pin).toBeNull();
   expect(keel.writes).toEqual([]);

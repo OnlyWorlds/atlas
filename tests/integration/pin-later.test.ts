@@ -284,7 +284,7 @@ describe('Settings\' field asks first, then attaches on every answer', () => {
     await settings()(WRONG);
     await settle(200);
     // Settings attached it itself, before it said the refusal.
-    expect(said).toContainEqual({ msg: 'OnlyWorlds did not accept this PIN. Check it and save it again.', engine: true });
+    expect(said).toContainEqual({ msg: 'OnlyWorlds did not accept this World PIN. Check it and save it again.', engine: true });
     const engine = getCurrentSyncEngine();
     expect(engine).not.toBeNull();
     expect(engine!.authRefusal()).toBe('pin');

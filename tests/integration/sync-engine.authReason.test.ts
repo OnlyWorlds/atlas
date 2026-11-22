@@ -61,7 +61,7 @@ describe('SyncEngine push auth_reason', () => {
     const pin = await again.pushOnce();
     expect(pin.auth_reason).toBe('pin');
     state = again.getState();
-    expect(state.kind === 'error' && state.message).toMatch(/did not accept this PIN/);
+    expect(state.kind === 'error' && state.message).toMatch(/did not accept this World PIN/);
     expect(state.kind === 'error' && state.message).not.toMatch(/Unlink/);
   });
 
@@ -78,7 +78,7 @@ describe('SyncEngine push auth_reason', () => {
     expect(state.kind).toBe('error');
     if (state.kind === 'error') {
       // Default guidance, not the revoked-key copy.
-      expect(state.message).toMatch(/Check your PIN in Settings/);
+      expect(state.message).toMatch(/Check your World PIN in Settings/);
     }
   });
 });

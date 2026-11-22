@@ -40,7 +40,7 @@ export function signInFieldsHtml(prefillLogin = ''): string {
 }
 
 /** Why a form that makes a world online asks a PIN, under the field before any sign-in (Seethe 2026-10-22). */
-export const PIN_REASON_HTML = '<span class="atlas-modal-hint">The PIN lets Atlas upload the world\'s contents.</span>';
+export const PIN_REASON_HTML = '<span class="atlas-modal-hint">The World PIN lets Atlas upload the world\'s contents.</span>';
 
 /** The line that stands where the fields were, once signed in. */
 export function signedInLineHtml(username: string | undefined, rest = ''): string {

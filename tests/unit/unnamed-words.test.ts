@@ -548,7 +548,7 @@ describe('a delete names its type: a published page and a world', () => {
           const asked = confirm.mock.calls[0][0] as string;
           // The question leads, as every delete's does; what being published adds follows it.
           expect(asked.startsWith(`${c.ask} It is published at `)).toBe(true);
-          expect(asked).toContain(linked ? 'Deleting it also takes the published page down.' : 'Atlas has no key or PIN for this world');
+          expect(asked).toContain(linked ? 'Deleting it also takes the published page down.' : 'Atlas has no key or World PIN for this world');
           expect(asked).not.toMatch(/Continue\?|Delete anyway\?/);
         } finally {
           unmount();

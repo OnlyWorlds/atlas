@@ -240,10 +240,10 @@ describe('addFile', () => {
       [apiErr(403, 'files_full'), /no room left/],
       [apiErr(429, 'quota_exceeded', { retryAfter: 7200 }), /today\. Try again in 2 hours/],
       // A 429 by keel's param: its PIN wall, or any other wait.
-      [apiErr(429, 'rate_limited', { param: 'API-Pin', retryAfter: 600 }), /^OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while\. Nothing was added\. Check your PIN in Settings; try again in 10 minutes\.$/],
+      [apiErr(429, 'rate_limited', { param: 'API-Pin', retryAfter: 600 }), /^OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while\. Nothing was added\. Check your World PIN in Settings; try again in 10 minutes\.$/],
       [apiErr(429, 'rate_limited', { retryAfter: 120 }), /^OnlyWorlds asked Atlas to wait\. Nothing was added; try again in 2 minutes\.$/],
       [apiErr(403, 'not_author'), /elements you made/],
-      [apiErr(401, 'invalid_credentials', { param: 'API-Pin' }), /did not accept this PIN/],
+      [apiErr(401, 'invalid_credentials', { param: 'API-Pin' }), /did not accept this World PIN/],
       [new OwNetworkError('down', null), /could not reach/],
     ];
     for (const [err, words] of cases) {

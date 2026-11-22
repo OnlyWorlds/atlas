@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const engine = { pause: vi.fn(), resume: vi.fn(), setDebounceMs: vi.fn(), setPolicy: vi.fn(), pushOnce: vi.fn() };
-const REFUSED = 'Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.';
+const REFUSED = 'Sync paused: OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds.';
 vi.mock('../../src/sync/sync-attach', () => ({
   refusedEngineLine: () => REFUSED,
   getCurrentSyncEngine: () => engine,
