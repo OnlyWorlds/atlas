@@ -12,7 +12,7 @@ import { signedInLineHtml } from '../../src/ui/sign-in-fields';
 import type { ToastManager } from '../../src/ui/toast-manager';
 
 const toasts = { show: vi.fn(), dismiss: vi.fn() } as unknown as ToastManager;
-const REASON = "The PIN lets Atlas upload the world's contents.";
+const REASON = "The World PIN lets Atlas upload the world's contents.";
 
 function pinLabel(modal: string, input: string): string {
   const field = document.querySelector(`[data-modal="${modal}"] input[name="${input}"]`)!.closest('label')!;
@@ -27,7 +27,7 @@ beforeEach(() => {
 describe('the PIN rows', () => {
   it('Download names the seat secret in the label', () => {
     new LinkWorldModal(toasts).open();
-    expect(pinLabel('link-world', 'api-pin')).toBe('PIN, or a seat secret');
+    expect(pinLabel('link-world', 'api-pin')).toBe('World PIN, or a seat secret');
   });
 
   it('New world says why it asks a PIN under the field, signed out', () => {

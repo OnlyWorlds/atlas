@@ -22,11 +22,11 @@ describe("keel's review_by_another", () => {
     expect(classifyFailure({ ...(f as object), code: 'permission_error' } as never)).toBe('other'); // the control
     const toast = describeFailures([f, { ...(f as object) } as never], 'browser');
     expect(toast).toMatch(/^1 element could not sync because it carries a review mark made by someone else/);
-    expect(toast).toContain('only the world\'s owner or a co-builder can send such a mark');
+    expect(toast).toContain('only the owner and co-builders can send such a mark');
     expect(toast).toContain('in this browser');
     expect(toast).not.toMatch(/PIN/);
     const line = syncIssueLine({ kind: 'review_mark', type: 'character', failure: f } as never, 'folder');
-    expect(line).toContain('only the owner or a co-builder can send such a mark');
+    expect(line).toContain('only the owner and co-builders can send such a mark');
     expect(line).toContain('in the folder');
   });
 });

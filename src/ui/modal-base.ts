@@ -82,6 +82,24 @@ function syncInertBehindModals(): void {
     }
 }
 
+/**
+ * Home's first control: the first thing the keyboard reaches in the middle
+ * pane, the room on screen (Home, or the first screen with no world open).
+ * A link that opens another site is passed over (the first screen starts with
+ * onlyworlds.com's mark): a person's next Enter never leaves the tab. Null
+ * when the pane holds none.
+ */
+export const HOME_CONTROLS = 'button:not([disabled]), a[href]:not([target="_blank"]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+export function homeFirstControl(): HTMLElement | null {
+    const pane = document.querySelector<HTMLElement>('.atlas-shell .atlas-middle-content');
+    if (!pane) return null;
+    for (const el of Array.from(pane.querySelectorAll<HTMLElement>(HOME_CONTROLS))) {
+        if (el.closest('[hidden], [inert]') || el.getClientRects().length === 0) continue;
+        return el;
+    }
+    return null;
+}
+
 export class BaseModal {
     /** The overlay this modal mounted, while it is mounted. */
     overlay(): HTMLElement | null {
@@ -100,6 +118,15 @@ export class BaseModal {
 
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
     private returnFocusTo: HTMLElement | null = null;
+
+    /**
+     * Where focus goes on close when nothing opened the modal (it came up with
+     * the page) or what did is gone. None by default: focus then rests on the
+     * page body, as before.
+     */
+    protected focusWhenOpenerGone(): HTMLElement | null {
+        return null;
+    }
 
     /** True when this is the most recently opened modal still on screen. */
     protected isTopmost(): boolean {
@@ -190,10 +217,11 @@ export class BaseModal {
             // The page behind (or the modal below) takes keys again before focus goes back to it.
             syncInertBehindModals();
             // Only when focus was inside the modal: never steal it from
-            // something the user moved to meanwhile.
+            // something the user moved to meanwhile. What opened it, when it is
+            // still there; else the modal's own fallback, when it names one.
             const back = this.returnFocusTo;
             this.returnFocusTo = null;
-            if (hadFocus && back && back.isConnected) back.focus({ preventScroll: true });
+            if (hadFocus) (back && back.isConnected ? back : this.focusWhenOpenerGone())?.focus({ preventScroll: true });
         }
     }
 

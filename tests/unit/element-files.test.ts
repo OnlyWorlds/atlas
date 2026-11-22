@@ -240,10 +240,10 @@ describe('addFile', () => {
       [apiErr(403, 'files_full'), /no room left/],
       [apiErr(429, 'quota_exceeded', { retryAfter: 7200 }), /today\. Try again in 2 hours/],
       // A 429 by keel's param: its PIN wall, or any other wait.
-      [apiErr(429, 'rate_limited', { param: 'API-Pin', retryAfter: 600 }), /^OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while\. Nothing was added\. Check your PIN in Settings; try again in 10 minutes\.$/],
+      [apiErr(429, 'rate_limited', { param: 'API-Pin', retryAfter: 600 }), /^OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while\. Nothing was added\. Check your World PIN in Settings; try again in 10 minutes\.$/],
       [apiErr(429, 'rate_limited', { retryAfter: 120 }), /^OnlyWorlds asked Atlas to wait\. Nothing was added; try again in 2 minutes\.$/],
       [apiErr(403, 'not_author'), /elements you made/],
-      [apiErr(401, 'invalid_credentials', { param: 'API-Pin' }), /did not accept this PIN/],
+      [apiErr(401, 'invalid_credentials', { param: 'API-Pin' }), /did not accept this World PIN/],
       [new OwNetworkError('down', null), /could not reach/],
     ];
     for (const [err, words] of cases) {
@@ -275,6 +275,18 @@ describe('removeFile', () => {
     expect(f.removeFile).toHaveBeenCalledWith('character', 'e1', 'f1');
     expect(filesNow(entry, 'character', 'e1').rows).toEqual([]);
   });
+  // A seat world sends its seat's secret, never the World PIN (1.125.3): its add and remove say so.
+  it('on a seat world, a refused secret and the PIN wall never say World PIN', async () => {
+    const seat = { ...entry, id: 'local-seat', api: { ...entry.api!, seat: { role: 'contributor' }, seat_secret: 'ow_s_' + 'a'.repeat(24) } } as WorldRegistryEntry;
+    const seatReg = { worlds: [seat], pin: '1234' } as unknown as WorldsRegistry;
+    fake({ removeFile: vi.fn(async () => { throw apiErr(401, 'invalid_credentials', { param: 'API-Pin' }); }) });
+    await expect(removeFile(seat, seatReg, 'character', 'e1', 'f1')).rejects.toThrow(/^OnlyWorlds did not accept this seat's secret\.$/);
+    fake({ removeFile: vi.fn(async () => { throw apiErr(429, 'rate_limited', { param: 'API-Pin', retryAfter: 600 }); }) });
+    await expect(removeFile(seat, seatReg, 'character', 'e1', 'f1')).rejects.toThrow(/^OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while\. The file is still there\. Try again in 10 minutes\.$/);
+    fake({ createFileTicket: vi.fn(async () => { throw apiErr(401, 'invalid_credentials', { param: 'API-Pin' }); }) });
+    await expect(addFile(seat, seatReg, 'character', 'e1', file(), null)).rejects.toThrow(/^OnlyWorlds did not accept this seat's secret\.$/);
+  });
+
   it('a file already gone counts as removed; a 403 is said', async () => {
     fake({ removeFile: vi.fn(async () => { throw apiErr(404, 'not_found'); }) });
     await expect(removeFile(entry, reg, 'character', 'e1', 'f1')).resolves.toBeUndefined();

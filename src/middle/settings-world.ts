@@ -820,7 +820,7 @@ export async function testWorldConnection(world: WorldRegistryEntry, toasts: Toa
   // A world that reads, by its registry or its key, asks for no PIN and sends none.
   const reads = !!world.api.read_only || readsOnlyByShape(world.api.api_key);
   const pin = reads ? '' : worldPin(world, getState().registry);
-  if (!pin && !reads) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN on the OnlyWorlds tab first.'); return; }
+  if (!pin && !reads) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your World PIN on the OnlyWorlds tab first.'); return; }
   try {
     // Test Connection via v2 GET /world (live 2026-07-12), then what the
     // key can do from GET /me (`keyScope`): the PIN is proved there only
@@ -914,11 +914,11 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
     case 'host_refused':
       return `The web host in front of OnlyWorlds refused the change before it reached OnlyWorlds.${f.host_blocked ? ` ${HOST_REFUSAL_CAUSE}` : ''} Nothing was lost: your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'keeper_only':
-      return `Only the world's owner and co-builders can change it on OnlyWorlds. Ask one of them. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
+      return `Only the owner and co-builders can change it on OnlyWorlds. Ask one of them. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'replaced_held':
       return `OnlyWorlds answered as if it had replaced a copy it already held, though Atlas asked it only to create one. The copy here is unchanged and not marked as sent. Your next save sends it again, and Atlas compares it with the copy OnlyWorlds holds.`;
     case 'review_mark':
-      return `It carries a review mark made by someone else (proposed or checked), and only the owner or a co-builder can send such a mark to OnlyWorlds. Ask one of them to sync it. It stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
+      return `It carries a review mark made by someone else (proposed or checked), and only the owner and co-builders can send such a mark to OnlyWorlds. Ask one of them to sync it. It stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'file_busy': {
       // No round redoes these two, busy or not: never "tries again by itself".
       if (f.local_step === 'restore_links' || f.local_step === 'remove') return diskStepLine(f, inBrowser, alone);

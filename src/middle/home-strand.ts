@@ -37,7 +37,7 @@ export { SLOT_WORD } from '../core/strand-journey';
 export { strandContext, type HomeTab, type StrandContext } from './home-strand-model';
 export { drawnFor, pickRows, rawHeld, rawWords, type StrandPanelOptions } from './home-strand-acts';
 
-export const READ_ONLY_LINE = 'The owner or a co-builder chooses the strand.';
+export const READ_ONLY_LINE = 'The owner and co-builders choose the strand.';
 
 /** S3, G16: a tab when the strand has a story, or when some slot is writable here. */
 export function strandTabShows(worldId: string, c: StrandContext | null = strandContext(worldId)): boolean {

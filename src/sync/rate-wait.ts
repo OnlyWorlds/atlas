@@ -10,6 +10,8 @@
  * the first request after the load.
  */
 
+import type { PinWho } from '../core/seat';
+
 export interface RateWait {
   /** When the wait ends (`Date.now()` clock). */
   until: number;
@@ -72,13 +74,17 @@ export function waitWords(ms: number): string {
 /**
  * The sync's words for a 429's wait, by keel's `param`: its PIN wall, or any other throttle. `place` is
  * where the world keeps its changes ("in this browser", "in the folder"). The toast at the 429 and a
- * press made inside the wait say the same sentence.
+ * press made inside the wait say the same sentence. `who` is whose `API-Pin` the world sends: a seat
+ * has no World PIN to check, so its wall says the wait alone; not known, the line says "your PIN".
  */
-export function rateWaitLine(pin: boolean, ms: number, place: string): string {
+export function rateWaitLine(pin: boolean, ms: number, place: string, who: PinWho = 'unknown'): string {
   const when = waitWords(ms);
-  return pin
-    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check your PIN in Settings; Atlas tries again in ${when}.`
-    : `OnlyWorlds asked Atlas to wait. Your changes are saved ${place}, and Atlas tries again in ${when}.`;
+  if (!pin) return `OnlyWorlds asked Atlas to wait. Your changes are saved ${place}, and Atlas tries again in ${when}.`;
+  const wall = "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while.";
+  if (who === 'seat') return `${wall} Your changes are saved ${place}, and Atlas tries again in ${when}.`;
+  return who === 'account'
+    ? `${wall} Check your World PIN in Settings; Atlas tries again in ${when}.`
+    : `${wall} Check your PIN in Settings; Atlas tries again in ${when}.`;
 }
 
 /**
@@ -89,8 +95,8 @@ export function rateWaitLine(pin: boolean, ms: number, place: string): string {
 export function pinCheckWaitLine(pin: boolean, ms: number): string {
   const when = waitWords(ms);
   return pin
-    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This PIN is kept here, not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in ${when}.`
-    : `OnlyWorlds asked Atlas to wait. This PIN is kept here, not checked by OnlyWorlds yet; Atlas can ask about it again in ${when}.`;
+    ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. This World PIN is not checked by OnlyWorlds yet; OnlyWorlds takes PINs again in ${when}.`
+    : `OnlyWorlds asked Atlas to wait. This World PIN is not checked by OnlyWorlds yet; Atlas can ask about it again in ${when}.`;
 }
 
 /**

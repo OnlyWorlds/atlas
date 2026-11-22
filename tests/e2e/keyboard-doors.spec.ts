@@ -859,3 +859,116 @@ for (const tag of ['', ' @firefox']) {
     await expect(rm).toHaveAttribute('title', 'Remove the field Mood');
   });
 }
+
+/** WCAG contrast of two `rgb()`/`rgba()` colours, the second opaque. */
+function contrast(a: string, b: string): number {
+  const ch = (s: string) => s.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+  const lum = ([r, g, b]: number[]) => {
+    const f = (c: number) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const [la, lb] = [lum(ch(a)), lum(ch(b))];
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// The keyboard and screen-reader notes of 1.125.3: the chart card that takes focus has a name of its
+// own, and the Maps tree's location chip draws the house focus ring.
+for (const tag of ['', ' @firefox']) {
+  test(`the chart card a chip's Enter focuses is named for what it shows, never its whole text${tag}`, async ({ page }) => {
+    await freshWorld(page, 'kd-chart-card');
+    const ids = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const ada = await store.createElement('character', { name: 'Ada', birth_date: -10 });
+      await store.createElement('event', { name: 'The Sundering', start_date: -20 });
+      const siege = await store.createElement('event', { name: 'The Siege', start_date: 5, characters: [ada.id] });
+      await store.createElement('event', { name: 'The Long War', start_date: 30 });
+      api.patchData(await store.listElements());
+      return { ada: ada.id as string, siege: siege.id as string };
+    });
+    await page.evaluate(() => {
+      const s = (window as any).__atlasTestApi.getState();
+      window.location.hash = `#/w/${s.active.worldId}/timeline`;
+    });
+    const canvas = page.locator('.atlas-timeline-view-canvas');
+    await expect(canvas).toHaveAttribute('data-window', /,/);
+    const card = page.locator('.atlas-timeline-card');
+    // Nothing selected and no saved chart: the rail is the chart's, and it takes no name while unfocused.
+    await expect(card).toContainText('This chart');
+    expect(await card.getAttribute('aria-label')).toBeNull();
+    // Peek The Siege with the mouse: its card shows Ada's chip.
+    const at = async (date: number) => {
+      const cb = (await canvas.boundingBox())!;
+      const [start, end] = ((await canvas.getAttribute('data-window')) ?? '').split(',').map(Number);
+      return { x: cb.x + 32 + ((date - start) / (end - start)) * (cb.width - 48), y: cb.y + (20 + (cb.height - 56 - 8)) / 2 };
+    };
+    const p = await at(5);
+    await page.mouse.click(p.x, p.y);
+    await expect(page.locator('.atlas-timeline-card-title')).toHaveText('The Siege');
+    const chip = card.locator('.atlas-timeline-chip', { hasText: 'Ada' });
+    await chip.focus();
+    await page.keyboard.press('Enter');
+    // Ada is selected and the card holds focus, named for her, never its chips and snippet read whole.
+    await expect(page.locator('.atlas-timeline-card-title')).toHaveText('Ada');
+    await expect(card).toBeFocused();
+    await expect(card).toHaveAccessibleName('Chart card: Ada');
+    expect((await card.getAttribute('aria-label'))!.length).toBeLessThan(40);
+    // Focus leaves: the card is a plain rail again, with no name or role of its own.
+    await page.keyboard.press('Tab');
+    await expect(card).not.toBeFocused();
+    expect(await card.getAttribute('aria-label')).toBeNull();
+    expect(await card.getAttribute('role')).toBeNull();
+  });
+
+  test(`a map's location chip draws the house focus ring from the keyboard, in both themes${tag}`, async ({ page }) => {
+    await freshWorld(page, 'kd-chip-ring');
+    const harbour = await page.evaluate(async () => {
+      const api = (window as any).__atlasTestApi;
+      const store = api.getActiveStore();
+      const loc = await store.createElement('location', { name: 'Syracuse' });
+      const map = await store.createElement('map', { name: 'Harbour', location: loc.id });
+      api.patchData(await store.listElements());
+      const ui = api.getState().ui;
+      api.patchSlice('ui', { ...ui, rightActiveIndex: ui.rightTabs.findIndex((t: any) => t.kind === 'map-index') });
+      return map.id as string;
+    });
+    const row = page.locator(`.atlas-map-tree-row[data-map-id="${harbour}"]`);
+    const chip = row.locator('.atlas-row-chip-location');
+    await expect(chip).toBeVisible();
+    // Reached by Tab from the row's name, so the focus is the keyboard's (:focus-visible).
+    await row.locator('.atlas-map-tree-name').focus();
+    await page.keyboard.press('Tab');
+    await expect(chip).toBeFocused();
+    const ring = () => chip.evaluate((el) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--atlas-cyan)';
+      document.body.appendChild(probe);
+      const house = getComputedStyle(probe).color;
+      probe.remove();
+      // The pane under the chip: its ancestors' grounds, the translucent ones laid over the first opaque one.
+      const layers: number[][] = [];
+      for (let n: HTMLElement | null = el.parentElement; n; n = n.parentElement) {
+        const [r, g, b, a = 1] = (getComputedStyle(n).backgroundColor.match(/[\d.]+/g) ?? []).map(Number);
+        if (r === undefined || a === 0) continue;
+        layers.push([r, g, b, a]);
+        if (a === 1) break;
+      }
+      let [gr, gg, gb] = [0, 0, 0];
+      for (const [r, g, b, a] of layers.reverse()) [gr, gg, gb] = [r * a + gr * (1 - a), g * a + gg * (1 - a), b * a + gb * (1 - a)];
+      const ground = `rgb(${Math.round(gr)}, ${Math.round(gg)}, ${Math.round(gb)})`;
+      const s = getComputedStyle(el);
+      return { style: s.outlineStyle, width: s.outlineWidth, color: s.outlineColor, house, ground };
+    });
+    for (const theme of ['dark', 'light'] as const) {
+      if (theme === 'light') {
+        await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+        await expect(chip).toBeFocused();
+      }
+      const r = await ring();
+      expect(r.style, theme).toBe('solid');
+      expect(r.width, theme).toBe('2px');
+      expect(r.color, theme).toBe(r.house);
+      expect(contrast(r.color, r.ground), `${theme}: ${r.color} on ${r.ground}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+}

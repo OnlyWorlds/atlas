@@ -145,7 +145,7 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
       created = await create(sendPin);
     } catch (err) {
       if (err instanceof OwApiError && err.status === 401 && err.param === 'pin') {
-        throw new PlainError('OnlyWorlds did not accept this PIN. Nothing was made. Check it, then try again.');
+        throw new PlainError('OnlyWorlds did not accept this World PIN. Nothing was made. Check it, then try again.');
       }
       if (err instanceof OwApiError && err.status === 422 && err.param === 'pin') {
         if (sendPin !== undefined) {
@@ -156,13 +156,13 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
             created = await create();
           } catch (err2) {
             if (err2 instanceof OwApiError && err2.status === 422 && err2.param === 'pin') {
-              throw new PlainError('A new account sets its PIN here: four digits, from 1000 to 9999.');
+              throw new PlainError('A new account sets its World PIN here: four digits, from 1000 to 9999.');
             }
             throw err2;
           }
         } else {
           // Fresh account: the PIN is required and becomes the account PIN.
-          if (!pin) throw new PlainError('Enter your PIN first. A new account sets its PIN here.');
+          if (!pin) throw new PlainError('Enter your World PIN first. A new account sets its World PIN here.');
           created = await create(pin);
         }
       } else {

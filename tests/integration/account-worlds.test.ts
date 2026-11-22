@@ -425,8 +425,8 @@ describe('createApiWorld — the signed-in v2 lane; signed out it refuses', () =
     const state = mount({ accountHasPin: true });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
 
-    await expect(createApiWorld({ name: 'Typo World', pin: '1111' })).rejects.toThrow('OnlyWorlds did not accept this PIN. Nothing was made. Check it, then try again.');
-    await expect(createApiWorld({ name: 'Typo World', pin: '42420' })).rejects.toThrow('OnlyWorlds did not accept this PIN. Nothing was made. Check it, then try again.');
+    await expect(createApiWorld({ name: 'Typo World', pin: '1111' })).rejects.toThrow('OnlyWorlds did not accept this World PIN. Nothing was made. Check it, then try again.');
+    await expect(createApiWorld({ name: 'Typo World', pin: '42420' })).rejects.toThrow('OnlyWorlds did not accept this World PIN. Nothing was made. Check it, then try again.');
     expect(state.pinRefused).toBe(2);
     expect(state.created).toHaveLength(0);
   });
@@ -445,7 +445,7 @@ describe('createApiWorld — the signed-in v2 lane; signed out it refuses', () =
     const state = mount({ accountHasPin: false });
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
 
-    await expect(createApiWorld({ name: 'Zero World', pin: '0123' })).rejects.toThrow('A new account sets its PIN here: four digits, from 1000 to 9999.');
+    await expect(createApiWorld({ name: 'Zero World', pin: '0123' })).rejects.toThrow('A new account sets its World PIN here: four digits, from 1000 to 9999.');
     expect(state.created).toHaveLength(0);
   });
 

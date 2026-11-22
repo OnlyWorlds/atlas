@@ -14,11 +14,11 @@ import { rmSync } from 'node:fs';
 
 const SALTMERE = { name: 'Saltmere', worldId: '0192c000-0000-7000-8000-00000000cccc', dir: 'saltmere-0192c000-5e6f' };
 const HARBOR = { name: 'Harbor', worldId: '0192d000-0000-7000-8000-00000000dddd', dir: 'harbor-0192d000-7a8b' };
-const STAYED = 'stayed closed here. Another Atlas page may still have it open.';
+const STAYED = 'stayed closed here. Another Atlas tab may still have it open. Close that tab and open the world again here, or open it again and choose to take it over.';
 /** Said when the world's own make-and-move lock is busy: no take-over offered. */
-const BUSY = 'stayed closed here. Another Atlas page may still have it open, or be moving it. Open it again here once that page is done.';
+const BUSY = 'stayed closed here. Another Atlas tab may still have it open, or be moving it. Open it again here once that tab is done.';
 /** Either of the two: a page that loses a start race loses at one check or the other. */
-const EITHER = /stayed closed here\. Another Atlas page may still have it open/;
+const EITHER = /stayed closed here\. Another Atlas tab may still have it open/;
 const TRY_AGAIN = 'Atlas could not open this world just now. Try again in a moment.';
 
 async function boot(page: Page): Promise<void> {
@@ -219,6 +219,72 @@ async function trueSecondPage(page: Page, context: BrowserContext): Promise<void
   await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
   expect(await activeWorld(second)).toBeNull();
   expect((await readLock(second, SALTMERE.dir))!.web_lock).toBe(held);
+  await second.close();
+}
+
+/**
+ * The claim's wait on a live second page says what it checks: after one second a line, which stays
+ * while the check waits and goes once the open ends (1.125.3). The wait here runs two asks (about four
+ * seconds): during the first, the first page writes its lock again naming another Web Lock it holds, as
+ * a store that wrote meanwhile does, and the claim asks about that one too. A sampler in the page reads
+ * the line every 50 ms from the click, and the confirm (the open's end, held) is marked when it is
+ * called. Was: the line, shown with no timer of its own, went about 300 ms after it came.
+ */
+async function checkingLineDuringTheWait(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  await shell(page);
+  await clickWorld(page, SALTMERE.name);
+  await expect.poll(() => activeWorld(page)).toBe(id);
+  // The first page's own open asked no other tab: no line came.
+  expect(await page.locator('.ow-toast', { hasText: 'Checking whether another tab' }).count()).toBe(0);
+  // A second Web Lock of the first page, held for the test's length, for its lock to name mid-wait.
+  const EXTRA = 'atlas-writer:checking-line-extra';
+  await page.evaluate((name) => new Promise<void>((held) => {
+    void navigator.locks.request(name, () => { held(); return new Promise(() => {}); });
+  }), EXTRA);
+  const lock = (await readLock(page, SALTMERE.dir))!;
+
+  const second = await context.newPage();
+  const dialogs = countDialogs(second);
+  await shell(second);
+  const text = `Checking whether another tab has "${SALTMERE.name}" open…`;
+  await second.evaluate((want) => {
+    const w = window as any;
+    const has = () => Array.from(document.querySelectorAll('.ow-toast')).some(t => (t.textContent ?? '').includes(want));
+    const seen = w.__checking = { t0: null as number | null, samples: [] as Array<[number, boolean]>, confirmAt: null as number | null };
+    document.addEventListener('click', () => {
+      if (seen.t0 !== null) return;
+      seen.t0 = performance.now();
+      setInterval(() => seen.samples.push([performance.now() - seen.t0!, has()]), 50);
+    }, { capture: true });
+    const confirm = window.confirm.bind(window);
+    window.confirm = (message?: string) => {
+      if (seen.t0 !== null && seen.confirmAt === null) seen.confirmAt = performance.now() - seen.t0;
+      return confirm(message);
+    };
+  }, text);
+  await clickWorld(second, SALTMERE.name);
+  await page.waitForTimeout(1_000);
+  await writeLock(page, SALTMERE.dir, { ...lock, web_lock: EXTRA, last_heartbeat: new Date().toISOString() });
+  await expect.poll(() => dialogs.at.length, { timeout: 15_000 }).toBe(1);
+  await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
+  await second.waitForTimeout(600);
+  const seen = await second.evaluate(() => (window as any).__checking as { samples: Array<[number, boolean]>; confirmAt: number | null });
+  const at = (ms: number) => [...seen.samples].reverse().find(([t]) => t <= ms)?.[1] ?? false;
+  const firstShown = seen.samples.find(([, on]) => on)?.[0] ?? null;
+  console.log(`[checking line] first shown at ${firstShown === null ? 'never' : Math.round(firstShown)} ms, the confirm at ${seen.confirmAt === null ? 'never' : Math.round(seen.confirmAt)} ms`);
+  // The wait ran two asks, past three seconds.
+  expect(seen.confirmAt, 'the open ended held, at the confirm').not.toBeNull();
+  expect(seen.confirmAt!).toBeGreaterThan(3_300);
+  // Nothing in the first second; then the line, at 1.5 s and again at 3 s, while the check still waits.
+  expect(firstShown, 'the line came').not.toBeNull();
+  expect(firstShown!).toBeGreaterThanOrEqual(900);
+  expect(at(1_500), 'the line at 1.5 s').toBe(true);
+  expect(at(3_000), 'the line at 3 s').toBe(true);
+  // Gone within a moment of the open's end (its fade is 300 ms).
+  expect(seen.samples.filter(([t, on]) => on && t > seen.confirmAt! + 450)).toEqual([]);
+  expect(await second.locator('.ow-toast', { hasText: text }).count()).toBe(0);
   await second.close();
 }
 
@@ -459,6 +525,10 @@ for (const tag of ['', ' @firefox']) {
 
     test(`a true second page holding the world: the confirm after the wait, and Cancel says why${tag}`, async ({ page, context }) => {
       await trueSecondPage(page, context);
+    });
+
+    test(`the wait on a live second page says what it checks after a second, and the line goes with the open${tag}`, async ({ page, context }) => {
+      await checkingLineDuringTheWait(page, context);
     });
 
     test(`the address at startup, the world held by a live page: said, never asked${tag}`, async ({ page, context }) => {

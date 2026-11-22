@@ -384,13 +384,13 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'link-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">link</span>
             <h3>Download a world from OnlyWorlds</h3>
-            <p>Already have a world online? Its API key and PIN bring down a full copy, kept in sync.</p>
+            <p>Already have a world online? Its API key and your World PIN or seat secret bring down a full copy, kept in sync.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
           'view-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">visibility</span>
             <h3>View a shared world</h3>
-            <p>Someone shared a read key with you? Paste it: Atlas downloads their world to browse, view only. No PIN needed.</p>
+            <p>Someone shared a read key with you? Paste it: Atlas downloads their world to browse, view only. No World PIN needed.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
           // Open-folder was the ONE create button with no entry here —

@@ -45,12 +45,12 @@ describe('the PIN prompt takes the account PIN, never a seat secret', () => {
   }
 
   it.each([[SECRET], [`  ${SECRET}  `]])('refuses the seat secret %j by name', async (value) => {
-    expect(await refused(value)).toBe('That is a seat secret, which opens one world. Here Atlas needs your account PIN: four digits.');
+    expect(await refused(value)).toBe('That is a seat secret, which opens one world. Here Atlas needs your World PIN: four digits.');
   });
 
   it.each([['12345'], ['abcd'], ['ow_s_short'], ['ow_x_' + 'a'.repeat(32)], ['ow_s_' + 'a'.repeat(31) + '!']])(
     'refuses %j with its line', async (value) => {
-      expect(await refused(value)).toBe('The PIN is four digits.');
+      expect(await refused(value)).toBe('The World PIN is four digits.');
     });
 
   it('lets a whole secret into the field, so it is named rather than cut', async () => {

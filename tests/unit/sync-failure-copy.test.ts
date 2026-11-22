@@ -99,10 +99,10 @@ describe('sync failure copy', () => {
   it('keel\'s keeper rule (403 keeper_only): every Charter Law and every Object a Law names, said as the element, never the mark or the API path', () => {
     const keeper = (id: string): PerElementFailure => ({ element_id: id, type: 'law', operation: 'update', status: 403, code: 'keeper_only', message: 'Only the world\'s owner and co-builders change this element. Nothing was written. Ask one of them, or propose the change: POST /api/v2/law/x/propose' });
     expect(classifyFailure(keeper('a'))).toBe('keeper_only');
-    expect(describeFailures([keeper('a')])).toBe('1 change could not sync because only the world\'s owner and co-builders can change that element. Ask one of them. The change stays on your disk.');
-    expect(describeFailures([keeper('a'), keeper('b')], 'browser')).toBe('2 changes could not sync because only the world\'s owner and co-builders can change those elements. Ask one of them. The changes stay in this browser.');
+    expect(describeFailures([keeper('a')])).toBe('1 change could not sync because only the owner and co-builders can change that element. Ask one of them. The change stays on your disk.');
+    expect(describeFailures([keeper('a'), keeper('b')], 'browser')).toBe('2 changes could not sync because only the owner and co-builders can change those elements. Ask one of them. The changes stay in this browser.');
     const row = syncIssueLine({ kind: 'keeper_only', element_id: 'a', type: 'law', failure: keeper('a') } as never, 'folder');
-    expect(row).toBe('Only the world\'s owner and co-builders can change it on OnlyWorlds. Ask one of them. Your change stays in the folder.');
+    expect(row).toBe('Only the owner and co-builders can change it on OnlyWorlds. Ask one of them. Your change stays in the folder.');
     for (const line of [describeFailures([keeper('a')]), row]) {
       expect(line).not.toMatch(/charter|mark|\/api\/|propose/i);
     }

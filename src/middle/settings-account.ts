@@ -61,10 +61,10 @@ export function renderAccountTab(reg: WorldsRegistry): string {
   return `
     <section class="atlas-settings-section">
       <h3>Account</h3>
-      <p class="atlas-settings-hint" data-role="account-lead">Sign in to see your onlyworlds.com worlds here. Your PIN lets Atlas save changes to your online worlds.</p>
+      <p class="atlas-settings-hint" data-role="account-lead">Sign in to see your onlyworlds.com worlds here. Your World PIN lets Atlas save changes to your online worlds.</p>
       ${renderAccountTokenBlock(reg)}
       <label class="atlas-settings-field">
-        <span>PIN</span>
+        <span>World PIN</span>
         <div class="atlas-settings-pin-row">
           <input class="atlas-input" type="password" name="pin"
                  value="${escapeAttr(reg.pin ?? '')}"
@@ -74,7 +74,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
           <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">Show</button>
         </div>
       </label>
-      <p class="atlas-settings-hint" data-role="pin-hint">One PIN for all your worlds. You set it on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
+      <p class="atlas-settings-hint" data-role="pin-hint">One World PIN for all your worlds. You set it on onlyworlds.com, in <a class="atlas-settings-link atlas-link-inline" data-link="account-settings" href="${OW_SETTINGS_URL}" target="_blank" rel="noopener">Account settings</a> under World PIN. Typing it here does not change it there.</p>
       <p class="atlas-settings-hint" data-role="pin-state" role="status"${reg.pin ? '' : ' hidden'}>${escapeText(pinStateLine(reg))}</p>
       ${reg.account_token ? '' : renderEmailField(reg)}
     </section>
@@ -158,13 +158,13 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
  */
 export function pinStateLine(reg: WorldsRegistry): string {
   if (!reg.pin) return '';
-  if (reg.pin_state === 'proved') return 'PIN saved';
+  if (reg.pin_state === 'proved') return 'World PIN saved';
   if (reg.pin_state === 'refused') return PIN_REFUSED_LINE;
   return PIN_UNCHECKED_LINE;
 }
 
 /** What the field says of a PIN OnlyWorlds refused, and of one not checked yet. */
-export const PIN_REFUSED_LINE = 'OnlyWorlds did not accept this PIN. Check it and save it again.';
+export const PIN_REFUSED_LINE = 'OnlyWorlds did not accept this World PIN. Check it and save it again.';
 export const PIN_UNCHECKED_LINE = 'Not checked by OnlyWorlds yet';
 
 /**
@@ -241,7 +241,7 @@ export function wireAccountTab(toasts: ToastManager): void {
     const newPin = next.pin;
     // A PIN removed: the open world's engine on it goes too, so nothing calls the world online that no
     // longer saves there (gate 4 S3).
-    if (!newPin) { detachOnPinRemoved(); toasts.info('PIN removed'); return; }
+    if (!newPin) { detachOnPinRemoved(); toasts.info('World PIN removed'); return; }
     // Saved here at once; "PIN saved" only once OnlyWorlds took it. One question per save.
     if (newPin === prevPin && next.pin_state) {
       if (next.pin_state === 'refused') toasts.error(pinStateLine(next)); else toasts.info(pinStateLine(next));
@@ -256,13 +256,13 @@ export function wireAccountTab(toasts: ToastManager): void {
     if (said === 'unasked' || said === 'waiting') askedOnOpen.delete(newPin);
     // The field moved on while the question was out: say what is kept now, never this save's answer.
     const now = getState().registry;
-    if (now.pin !== newPin) { toasts.info(pinStateLine(now) || 'PIN removed'); return; }
+    if (now.pin !== newPin) { toasts.info(pinStateLine(now) || 'World PIN removed'); return; }
     // Read again after the await: a world switched meanwhile is never attached to another's store (gate 4 S2).
     attachOnPinAnswer(askedFor, newPin);
     if (said === 'proved') pinProvedByPress(newPin);
     if (said === 'refused') toasts.error(PIN_REFUSED_LINE);
     else if (said === 'waiting') toasts.info(waitLineFor(now));
-    else toasts.info(said === 'proved' ? 'PIN saved' : PIN_UNCHECKED_LINE);
+    else toasts.info(said === 'proved' ? 'World PIN saved' : PIN_UNCHECKED_LINE);
   });
   wireAccountTokenBlock(toasts);
 }

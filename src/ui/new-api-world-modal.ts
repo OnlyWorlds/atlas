@@ -51,8 +51,8 @@ export class NewApiWorldModal extends BaseModal {
       <p class="atlas-modal-hint atlas-account-create-as">Creating on your OnlyWorlds account${reg.account_username ? ` (${escapeText(reg.account_username)})` : ''}.</p>
       ` : signInFieldsHtml(reg.email ?? '')}
       <label class="atlas-modal-field">
-        <span>PIN</span>
-        <input class="atlas-input" type="password" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
+        <span>World PIN</span>
+        <input class="atlas-input" type="password" name="api-pin" placeholder="World PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
         ${PIN_REASON_HTML}
       </label>
       ${whereChoiceHtml()}
@@ -92,7 +92,7 @@ export class NewApiWorldModal extends BaseModal {
       if (!name) { errorEl.textContent = 'A world needs a name.'; errorEl.hidden = false; return; }
       const signIn = missingSignIn(body);
       if (signIn) { errorEl.textContent = signIn.line; errorEl.hidden = false; signIn.input.focus(); return; }
-      if (!pin) { errorEl.textContent = 'Enter your PIN.'; errorEl.hidden = false; return; }
+      if (!pin) { errorEl.textContent = 'Enter your World PIN.'; errorEl.hidden = false; return; }
 
       // Taken synchronously, inside the click, before the first await. A retry
       // that reuses the world already made skips the question's step.
@@ -183,7 +183,8 @@ export class NewApiWorldModal extends BaseModal {
       } catch (err) {
         progressEl.hidden = true;
         console.warn('[new-api-world] create failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'creating the world online', where, oneLine: true }).sentence;
+        // A new world on the account goes up with the World PIN, whatever world is open.
+        const sentence = problemFor(err, { inline: true, doing: 'creating the world online', where, oneLine: true, who: 'account' }).sentence;
         // Once the folder exists, say so: Create now retries only the online
         // step, under the same name (the name field stays locked).
         const reusable = !!reusableLocal();

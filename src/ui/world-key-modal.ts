@@ -75,7 +75,7 @@ export class NewKeyModal extends BaseModal {
       const { readOnly } = await checkNewKey(entry, raw);
       if (!readOnly && !worldPin(entry, getState().registry)) {
         const pin = await new PinPromptModal().prompt(
-          `A write key saves your edits with your OnlyWorlds PIN. It is the one PIN of your account, set on onlyworlds.com in Account settings under World PIN.`
+          `A write key saves your edits with your World PIN. It is one for your whole account, set on onlyworlds.com in Account settings under World PIN.`
         );
         if (!pin) return;
         // Kept as the account's only once keel takes it beside this key.

@@ -171,7 +171,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   const keeper = byKind.get('keeper_only');
   if (keeper) {
     const n = new Set(keeper.map(f => f.element_id)).size;
-    parts.push(`${plural(n, 'change', 'changes')} could not sync because only the world's owner and co-builders can change ${n === 1 ? 'that element' : 'those elements'}. Ask one of them. ${n === 1 ? 'The change stays' : 'The changes stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+    parts.push(`${plural(n, 'change', 'changes')} could not sync because only the owner and co-builders can change ${n === 1 ? 'that element' : 'those elements'}. Ask one of them. ${n === 1 ? 'The change stays' : 'The changes stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
   }
   // Not counted as sent, so the next round sends it again as a create: keel answers that it holds it,
   // and Atlas compares the two copies (adopts the same content, holds other content for the person).
@@ -183,7 +183,7 @@ export function describeFailures(failures: readonly PerElementFailure[], where: 
   const reviewMark = byKind.get('review_mark');
   if (reviewMark) {
     const n = new Set(reviewMark.map(f => f.element_id)).size;
-    parts.push(`${plural(n, 'element', 'elements')} could not sync because ${n === 1 ? 'it carries a review mark' : 'they carry review marks'} made by someone else, and only the world's owner or a co-builder can send such a mark. Settings, under This world, ${n === 1 ? 'names it' : 'names them'}. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
+    parts.push(`${plural(n, 'element', 'elements')} could not sync because ${n === 1 ? 'it carries a review mark' : 'they carry review marks'} made by someone else, and only the owner and co-builders can send such a mark. Settings, under This world, ${n === 1 ? 'names it' : 'names them'}. ${n === 1 ? 'It stays' : 'They stay'} ${inBrowser ? 'in this browser' : 'on your disk'}.`);
   }
   const other = byKind.get('other');
   if (other) {

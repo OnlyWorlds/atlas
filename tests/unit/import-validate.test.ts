@@ -53,6 +53,15 @@ describe('validatePayload', () => {
     expect(issues.some(i => i.field === 'Widgets' && /unknown element type/i.test(i.issue))).toBe(true);
   });
 
+  // The review printed a missing name in a list with its field twice, "Character[1].rivals[1].rivals" (1.125.3).
+  it('a missing link names its path once: the field, and in a list its place', () => {
+    const issues = validatePayload(parsePayload({
+      Character: [{ name: 'Ada' }, { name: 'Bo', birthplace: 'Nowhere', rivals: ['Ada', 'Ghost'] }],
+    }));
+    const missing = issues.filter(i => /not found in the import/.test(i.issue)).map(i => i.path).sort();
+    expect(missing).toEqual(['Character[1].birthplace', 'Character[1].rivals[1]']);
+  });
+
   it('flags a single_link given an array (wrong cardinality)', () => {
     const issues = validatePayload(parsePayload({ Character: [{ name: 'A', birthplace: ['x', 'y'] }] }));
     expect(issues.some(i => i.field === 'birthplace' && /wrong shape/i.test(i.issue))).toBe(true);

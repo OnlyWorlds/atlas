@@ -283,7 +283,7 @@ export function bringInWays(worldId: string, toasts: ToastManager, quiet = false
       void import('../setup/world-doors').then(m => m.pickAndOpenWorldFolder(toasts));
     });
   }
-  way('download', 'Download a world', 'Asks for the API key and PIN of a world on OnlyWorlds, downloads a full copy of it, and keeps the copy and that world in sync.', () => {
+  way('download', 'Download a world', 'Asks for the API key of a world on OnlyWorlds and your World PIN or seat secret, downloads a full copy of it, and keeps the copy and that world in sync.', () => {
     void import('../setup/world-doors').then(m => m.runAddWorldAction('link-api', toasts));
   });
   return wrap;

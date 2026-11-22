@@ -56,6 +56,55 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.3',
+    date: '2026-11-22',
+    theme: 'The World PIN by one name, and the keyboard and phone notes',
+    entries: [
+      {
+        id: 'world-pin-one-name',
+        title: 'The World PIN has one name everywhere',
+        body: 'Atlas called the four digits of your account the World PIN in some places, and your OnlyWorlds PIN, your PIN or the PIN in others. Every sentence, field and dialog that knows it is the account\'s now says World PIN, the name onlyworlds.com gives it in Account settings; the pill\'s Add PIN and the world list\'s no PIN stay short. A world opened on a seat sends its seat\'s secret, never the World PIN, so its lines name the seat\'s secret. When OnlyWorlds refuses it, the pill now says Put in the World PIN again in Settings, OnlyWorlds, which is where its press opens, and Settings no longer says a World PIN waiting on OnlyWorlds is kept here.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'owner-and-co-builders',
+        title: 'Who may make a keeper\'s change is said one way',
+        body: 'Where only some members may make a change, such as a world\'s Charter Laws, its strand, a review mark or its published pages, Atlas now always says the owner and co-builders, where it said the world\'s owner and co-builders in some places and the owner or a co-builder in others. A world\'s details still say only the world\'s owner can change them, since OnlyWorlds takes those from the owner alone.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'chart-card-named',
+        title: 'The chart\'s card has a short name when it takes focus',
+        body: 'Pressing a chip on the chart\'s card with Enter or Space moves focus to the card, and a screen reader read the whole card as its name, every chip included. It now hears Chart card and the selected element\'s name, or the chart\'s name when nothing is selected.',
+        tags: ['accessibility', 'charts'],
+      },
+      {
+        id: 'location-chip-focus-ring',
+        title: 'A map\'s location chip shows the focus ring',
+        body: 'In the Maps tab, a map\'s location chip reached with the keyboard drew only a faint border, too faint to see against the pane. It now draws the same focus ring as every other control, in dark and light mode.',
+        tags: ['accessibility', 'maps'],
+      },
+      {
+        id: 'open-link-cards-phone-and-focus',
+        title: 'The cards of an Open in Atlas link read better on a phone and leave focus in place',
+        body: 'On a phone, the buttons of the card an Open in Atlas link shows now draw their words at 14 px, up from 12, and stay a thumb tall. After Escape or Not now, focus goes back to what you were on, or to the first control of the page behind, instead of resting on nothing.',
+        tags: ['accessibility', 'layout'],
+      },
+      {
+        id: 'world-lock-says-tab',
+        title: 'A world open in another tab is said in plain steps, and the wait says what it checks',
+        body: 'When a world stays closed because another Atlas tab may have it open, the line now says tab, as the question before it does, and names what to do: close that tab and open the world again here, or open it again and choose to take it over. Opening a world that another tab may hold can take a few seconds while Atlas checks; after a second, a line now says Checking whether another tab has the world open, and it goes when the open ends.',
+        tags: ['world', 'fix'],
+      },
+      {
+        id: 'review-link-path-once',
+        title: 'A missing name in a list of links is pointed at once',
+        body: 'In the Data room\'s review, a name in a list of links that is not in the import or the world printed its place with the field twice, such as Character[1].rivals[1].rivals. It now reads Character[1].rivals[1], and so does the fix prompt for your AI.',
+        tags: ['import', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.2',
     date: '2026-11-22',
     theme: 'The Data room says a field holding the wrong kind of value',

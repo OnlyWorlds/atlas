@@ -105,7 +105,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   // private world still needs it to read.
   if (!readOnly && !pin && !readsWithoutPin(entry.api.api_key)) {
     if (isSeatWorld(entry)) throw new PlainError(SEAT_SECRET_MISSING_LINE);
-    throw new PlainError('Atlas needs your OnlyWorlds PIN to download this world. Enter it in Settings, under OnlyWorlds, then try again.');
+    throw new PlainError('Atlas needs your World PIN to download this world. Enter it in Settings, under OnlyWorlds, then try again.');
   }
   const ownId = ownWorldIdOf(entry);
   const oldDir = entry.folder.folder_name;

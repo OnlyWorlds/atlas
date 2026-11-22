@@ -12,6 +12,7 @@
  */
 import { buildDetails, markProblemShown, problemFor, type DetailsContext, type FixId, type Problem, type ProblemOpts } from '../core/problems';
 import { getState } from '../core/state';
+import { isSeatWorld, type PinWho } from '../core/seat';
 import { navigate, settingsHash } from '../core/router';
 import { effectiveSyncPaused } from '../registry/registry';
 import { ensureWritable, loadHandle } from '../store/handle-vault';
@@ -26,6 +27,8 @@ export interface FixContext {
   toasts?: ToastManager;
   /** What the problem is about ("scene:<id>"): a repeat for the same key replaces its toast. */
   dedupeKey?: string;
+  /** Whose credential the step sent: a seat's problem offers no Open settings (its secret is not kept there). */
+  who?: PinWho;
 }
 
 /** The open world's mode for the details block. Never its name. */
@@ -82,8 +85,11 @@ export function resolveFixes(ids: readonly FixId[], ctx: FixContext = {}): Toast
         if (worldId) out.push({ label: 'Give new ids', run: () => navigate(settingsHash(worldId, 'world')) });
         break;
       case 'open-settings':
-        // The PIN lives on the OnlyWorlds tab (where sync-toasts sends a missing PIN too).
-        if (worldId) out.push({ label: 'Open settings', run: () => navigate(settingsHash(worldId, 'onlyworlds')) });
+        // The PIN lives on the OnlyWorlds tab (where sync-toasts sends a missing PIN too). A seat's secret
+        // does not: its sentence names no step there, so it offers none.
+        if (worldId && ctx.who !== 'seat' && !isSeatWorld(getState().registry.worlds.find(w => w.id === worldId))) {
+          out.push({ label: 'Open settings', run: () => navigate(settingsHash(worldId, 'onlyworlds')) });
+        }
         break;
       case 'sync-issues':
         // Settings → World lists what is still not syncing, with the fixes.
@@ -112,6 +118,8 @@ export function showProblem(err: unknown, opts: FixContext & ProblemOpts & { doi
   const problem = problemFor(err, {
     doing: opts.doing, savedLocally: opts.savedLocally, folder: opts.folder, unexpected: opts.unexpected,
     where: opts.where ?? whereFor(opts.worldId),
+    ...(opts.worldId ? { worldId: opts.worldId } : {}),
+    ...(opts.who ? { who: opts.who } : {}),
   });
   markProblemShown(err);
   if (problem.quiet) return problem;

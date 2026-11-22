@@ -25,8 +25,8 @@ import { pinAskWaitLine, rateWaitOf } from '../sync/rate-wait';
 import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
 
 export const WORLD_PIN_TITLE = 'World PIN';
-export const WORLD_PIN_REFUSED_LINE = 'OnlyWorlds did not accept this PIN. Check it and try again.';
-export const WORLD_PIN_UNASKED_LINE = 'This world cannot be asked about a PIN just now. Open it again, then add your World PIN.';
+export const WORLD_PIN_REFUSED_LINE = 'OnlyWorlds did not accept this World PIN. Check it and try again.';
+export const WORLD_PIN_UNASKED_LINE = 'This world cannot be asked about a World PIN just now. Open it again, then add your World PIN.';
 const CONTINUE = 'Continue';
 const ASKING = 'Checking with OnlyWorlds…';
 

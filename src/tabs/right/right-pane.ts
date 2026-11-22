@@ -31,7 +31,7 @@ import { savePersistedRightTabs } from './right-tabs-persistence';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
 import { filesWhereOf } from '../../core/browser-worlds';
-import { isSeatWorld, SEAT_SECRET_MISSING_LINE } from '../../core/seat';
+import { isSeatWorld, pinWhoOf, SEAT_SECRET_MISSING_LINE } from '../../core/seat';
 import { rateWaitLine } from '../../sync/rate-wait';
 import { renderGate } from '../../ui/render-gate';
 import { copyLine, worldIsCopiedBy } from '../../core/world-copy';
@@ -451,7 +451,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // Inside a 429's wait an idle engine is waiting, never "Synced just now": the pill says the wait.
   const wait = engine?.kind === 'idle' ? getCurrentSyncEngine()?.rateWaitNow() : null;
   const base = wait
-    ? { dataState: 'pending', label: 'Waiting', title: rateWaitLine(wait.pin, wait.leftMs, filesWhereOf(entry) === 'browser' ? 'in this browser' : 'in the folder') }
+    ? { dataState: 'pending', label: 'Waiting', title: rateWaitLine(wait.pin, wait.leftMs, filesWhereOf(entry) === 'browser' ? 'in this browser' : 'in the folder', pinWhoOf(entry)) }
     : mapEngineStateToPill(engine);
   // Pending conflicts override "synced" — sync is technically idle but the
   // user has unresolved divergence. Show warm "review N" label instead of
@@ -473,7 +473,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // neither the title nor the button offers one then.
   const busyRound = engine?.kind === 'syncing';
   // Add PIN's title already says what its press does (it asks for the PIN here, 1.125.0).
-  pill.title = title + (conflictCount > 0 || busyRound || wait || dataState === 'add-pin' ? '' : errored ?(pinRefused ? ' · click to put in the PIN again in Settings' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
+  pill.title = title + (conflictCount > 0 || busyRound || wait || dataState === 'add-pin' ? '' : errored ?(pinRefused ? ' · click to put in the World PIN again in Settings, OnlyWorlds' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
   // Each badge's title is its name, so a screen reader says it once.
   const conflictName = `Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}`;
   const conflictBadge = conflictCount > 0
@@ -496,7 +496,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // The Add PIN pill's button asks for the PIN (1.125.0): its name says so, never a refresh.
   const refreshName = dataState === 'add-pin' ? 'Add your World PIN'
     : currentPendingPush ? 'Save to OnlyWorlds now'
-    : errored ? (pinRefused ? 'Put in the PIN again in Settings' : 'See why in Settings')
+    : errored ? (pinRefused ? 'Put in the World PIN again in Settings, OnlyWorlds' : 'See why in Settings')
     : roundOnly ? `${syncPhaseWords(engine?.kind === 'syncing' ? engine.phase : undefined)} now`
     : 'Refresh from OnlyWorlds';
   // "Review N" is the badge's name too: the label is not said twice.

@@ -138,7 +138,7 @@ describe('removePicture', () => {
 
   it('no PIN, a view-only world or an offline one: refused before any call', async () => {
     const seen = serve();
-    expect(await sentenceOf(removePicture(world(), reg(), KEY))).toMatch(/needs your OnlyWorlds PIN/);
+    expect(await sentenceOf(removePicture(world(), reg(), KEY))).toMatch(/needs your World PIN/);
     const viewOnly = { ...world(), api: { world_id: 'w1', api_key: 'r', read_only: true } } as WorldRegistryEntry;
     expect(await sentenceOf(removePicture(viewOnly, reg('1234'), KEY))).toMatch(/view-only/);
     expect(seen.tickets).toHaveLength(0);

@@ -38,7 +38,7 @@ import { isBusyFailure } from './sync-failure-copy';
 import { restoredLinkPatch } from '../store/scrub-links';
 import { mergeForeignIds } from './foreign-ids';
 import { isHostBlockedPage } from './host-blocked-page';
-import { keyRefusalOf, keyRefusalPill } from './world-key-lines';
+import { keyRefusalOf, keyRefusalPill, seatRefusalPill } from './world-key-lines';
 import { hiddenHeldOf } from './hidden-held';
 import { HIDDEN_SHOWN_ONLINE, isHiddenMark } from '../core/hidden-mark';
 import { stampKeptOf, stampWordOf } from '../core/door-trail';
@@ -936,7 +936,8 @@ export class SyncEngine {
   private refusedState(): SyncEngineState {
     return {
       kind: 'error',
-      message: keyRefusalPill(this.lastAuthReason),
+      // A seat sends its seat's secret, never the World PIN (R1): its own words.
+      message: this.seat ? seatRefusalPill(this.lastAuthReason) : keyRefusalPill(this.lastAuthReason),
       recoverable: true,
       ...(this.lastAuthReason ? { auth_reason: this.lastAuthReason } : {}),
     };

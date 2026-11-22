@@ -277,7 +277,7 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
 
   describe('a PIN is kept as the account\'s only after a write key proves it', () => {
     it('a write key with a wrong PIN: refused, nothing kept; the right one: kept', async () => {
-      await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept this PIN/);
+      await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept this World PIN/);
       expect(getState().registry.pin).toBeUndefined();
       expect(getState().registry.worlds).toEqual([]);
       await link({ apiPin: RIGHT });
@@ -286,7 +286,7 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
 
     it('an account world\'s open (the world known, the key made): the PIN proved before it is kept', async () => {
       const known = { id: 'w-played', name: 'Played world' };
-      await expect(link({ apiPin: WRONG, knownWorld: known })).rejects.toThrow(/did not accept this PIN/);
+      await expect(link({ apiPin: WRONG, knownWorld: known })).rejects.toThrow(/did not accept this World PIN/);
       expect(getState().registry.pin).toBeUndefined();
       await link({ apiPin: RIGHT, knownWorld: known });
       expect(getState().registry.pin).toBe(RIGHT);
@@ -296,7 +296,7 @@ describe.each(['checked', 'ignored'] as const)('keel reading a PIN beside a read
       await keepPinProvedBy('ow_r_owner', WRONG);
       expect(getState().registry.pin).toBeUndefined();
       expect(pinsBeside('ow_r_owner')).toEqual([]);
-      await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept this PIN/);
+      await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept this World PIN/);
       expect(getState().registry.pin).toBeUndefined();
       await keepPinProvedBy('ow_w_owner', RIGHT);
       expect(getState().registry.pin).toBe(RIGHT);
@@ -365,9 +365,9 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     openWorld('ow_w_owner');
     const { said, save, line } = settings();
     await save(RIGHT);
-    expect(said).toEqual([{ kind: 'info', line: 'PIN saved' }]);
+    expect(said).toEqual([{ kind: 'info', line: 'World PIN saved' }]);
     expect(getState().registry).toMatchObject({ pin: RIGHT, pin_state: 'proved' });
-    expect(line().textContent).toBe('PIN saved');
+    expect(line().textContent).toBe('World PIN saved');
     // One question for the save, with the PIN once.
     expect(withPin('ow_w_owner')).toBe(1);
   });
@@ -376,9 +376,9 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     openWorld('ow_w_owner');
     const { said, save, line } = settings();
     await save(WRONG);
-    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN. Check it and save it again.' }]);
+    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this World PIN. Check it and save it again.' }]);
     expect(getState().registry).toMatchObject({ pin: WRONG, pin_state: 'refused' });
-    expect(line().textContent).toBe('OnlyWorlds did not accept this PIN. Check it and save it again.');
+    expect(line().textContent).toBe('OnlyWorlds did not accept this World PIN. Check it and save it again.');
     expect(withPin('ow_w_owner')).toBe(1);
   });
 
@@ -539,7 +539,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
 
   it('a new value is not checked yet; the same value keeps what was said of it', () => {
     openWorld('ow_w_owner', RIGHT, 'proved');
-    expect(pinStateLine(getState().registry)).toBe('PIN saved');
+    expect(pinStateLine(getState().registry)).toBe('World PIN saved');
     expect(setPin(getState().registry, ` ${RIGHT} `).pin_state).toBe('proved');
     const next = setPin(getState().registry, WRONG);
     expect(next.pin).toBe(WRONG);
@@ -554,13 +554,13 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     await link({ apiPin: RIGHT });
     expect(getState().registry).toMatchObject({ pin: RIGHT, pin_state: 'proved' });
     patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [] });
-    await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept this PIN/);
+    await expect(link({ apiPin: WRONG })).rejects.toThrow(/did not accept this World PIN/);
     expect(getState().registry.pin_state).toBe('refused');
     patchSlice('registry', { ...defaultRegistry(), pin: RIGHT, worlds: [] });
     await keepPinProvedBy('ow_w_owner', RIGHT);
     expect(getState().registry.pin_state).toBe('proved');
     patchSlice('registry', { ...defaultRegistry(), pin: WRONG, worlds: [] });
-    await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept this PIN/);
+    await expect(keepPinProvedBy('ow_w_owner', WRONG)).rejects.toThrow(/did not accept this World PIN/);
     expect(getState().registry.pin_state).toBe('refused');
     // Test connection on a world that writes.
     const entry = openWorld('ow_w_owner', RIGHT);
@@ -717,7 +717,7 @@ describe.each(['checked', 'ignored'] as const)('the PIN kept here says what Only
     const { said, save } = settings();
     // The same PIN, saved again (the field's value differs only in spaces).
     await save(` ${RIGHT} `);
-    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this PIN. Check it and save it again.' }]);
+    expect(said).toEqual([{ kind: 'error', line: 'OnlyWorlds did not accept this World PIN. Check it and save it again.' }]);
   });
 
   it('Make online\'s link with no PIN kept: the link keeps the PIN it proved, and says it proved', async () => {
@@ -988,18 +988,23 @@ describe('one phrase for a key that can only read', () => {
 });
 
 describe('a PIN OnlyWorlds refused is said one way', () => {
-  it('every door that names the PIN alone says "OnlyWorlds did not accept this PIN." and then its own next step', () => {
-    expect(PIN_REFUSED_LINE.startsWith('OnlyWorlds did not accept this PIN. ')).toBe(true);
-    expect(keyRefusalPill('pin')).toBe('OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds');
-    expect(keyRefusalLine('pin')).toBe('Sync paused: OnlyWorlds did not accept this PIN. Check it in Settings, OnlyWorlds.');
-    expect(keyRefusalHere('pin')).toBe('OnlyWorlds did not accept this PIN. Check it on the OnlyWorlds tab.');
+  it('every door that names the PIN alone says "OnlyWorlds did not accept this World PIN." and then its own next step', () => {
+    expect(PIN_REFUSED_LINE.startsWith('OnlyWorlds did not accept this World PIN. ')).toBe(true);
+    expect(keyRefusalPill('pin')).toBe('OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds');
+    expect(keyRefusalLine('pin')).toBe('Sync paused: OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds.');
+    expect(keyRefusalHere('pin')).toBe('OnlyWorlds did not accept this World PIN. Check it on the OnlyWorlds tab.');
     // Where a problem's code knows keel named the PIN, its sentence is the PIN's; where it does not, key or PIN.
+    // The world is an account's (a seat's secret is said apart, and a world not known says "the PIN", 1.125.3).
+    const before = getState().registry;
+    patchSlice('registry', { ...before, worlds: [...before.worlds, { id: 'local-own', name: 'Owned', state: 'api-linked', api: { world_id: 'w-own', api_key: 'ow_w_' + 'o'.repeat(32) } } as unknown as WorldRegistryEntry] });
+    const own = { worldId: 'local-own' };
     const pinRefused = Object.assign(new Error('API Error 401: Incorrect PIN.'), { status: 401, code: 'invalid_credentials', param: 'API-Pin' });
-    expect(problemFor(pinRefused, { doing: 'saving' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Check the PIN in Settings, under OnlyWorlds.');
+    expect(problemFor(pinRefused, { doing: 'saving', ...own }).sentence).toBe('OnlyWorlds did not accept this World PIN. Atlas could not finish saving. Check the World PIN in Settings, under OnlyWorlds.');
     // With the changes saved here, the next step still names the PIN, never "it".
-    expect(problemFor(pinRefused, { doing: 'saving', savedLocally: true, where: 'folder' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Your changes are saved in the folder. Check the PIN in Settings, under OnlyWorlds.');
+    expect(problemFor(pinRefused, { doing: 'saving', savedLocally: true, where: 'folder', ...own }).sentence).toBe('OnlyWorlds did not accept this World PIN. Atlas could not finish saving. Your changes are saved in the folder. Check the World PIN in Settings, under OnlyWorlds.');
     const keyRefused = Object.assign(new Error('API Error 401: Invalid API key.'), { status: 401, code: 'invalid_credentials', param: null });
-    expect(problemFor(keyRefused, { doing: 'saving' }).sentence).toMatch(/^OnlyWorlds did not accept this world's key or the PIN/);
+    expect(problemFor(keyRefused, { doing: 'saving', ...own }).sentence).toMatch(/^OnlyWorlds did not accept this world's key or the World PIN/);
+    patchSlice('registry', before);
   });
 
   it('the census: no sentence a person reads says a refused PIN any other way', () => {
@@ -1030,7 +1035,7 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     expect(OTHER.test('That PIN does not match your account. Nothing was made.')).toBe(true);
     expect(OTHER.test('A wrong PIN.')).toBe(true);
     expect(OTHER.test('Too many wrong PIN tries.')).toBe(false);
-    expect(OTHER.test('OnlyWorlds did not accept this PIN with that key.')).toBe(false);
+    expect(OTHER.test('OnlyWorlds did not accept this World PIN with that key.')).toBe(false);
   });
 
   /** Every string a person reads in src (comments, console lines and the changelog left out), with where it is. */
@@ -1067,15 +1072,17 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
       'core/problems.ts', 'sync/element-files.ts', 'sync/rate-wait.ts', 'sync/sharing-client.ts',
     ]);
     // The instrument sees the old words and the new.
-    expect(OLD.test('Too many wrong PIN tries. Check your PIN in Settings.')).toBe(true);
+    expect(OLD.test('Too many wrong PIN tries. Check your World PIN in Settings.')).toBe(true);
     expect(OLD.test('OnlyWorlds is holding writes back after wrong PINs.')).toBe(true);
     expect(OLD.test('Too many publishes or wrong PIN tries.')).toBe(true);
     expect(OLD.test(WALL_PLAIN)).toBe(false);
   });
 
-  it('the census: a refusal that may be the key or the PIN says "the PIN", never "your PIN"', () => {
-    const hits = literals().filter(({ lit }) => /key or your PIN/.test(lit)).map(h => h.at);
+  // Since 1.125.3 the PIN is the World PIN in every sentence, so "the PIN" here reads "the World PIN"; the
+  // sharing door's "the key or PIN" said it that way too, which makes five.
+  it('the census: a refusal that may be the key or the PIN says "the World PIN", never "your World PIN"', () => {
+    const hits = literals().filter(({ lit }) => /key or your (?:World )?PIN/.test(lit)).map(h => h.at);
     expect(hits).toEqual([]);
-    expect(literals().filter(({ lit }) => /key or the PIN/.test(lit)).length).toBe(4);
+    expect(literals().filter(({ lit }) => /key or the World PIN/.test(lit)).length).toBe(5);
   });
 });

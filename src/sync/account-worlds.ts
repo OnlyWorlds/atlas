@@ -193,7 +193,7 @@ export async function mintOwnKey(
 export function sharedOpenLine(row: AccountWorldRow, why: ReadOnlyWhy | undefined): string | null {
   if (why === 'guest') return `${row.name} is open to read: you are a guest in it, so you see only part of it.`;
   // After a PIN is set, the key is swapped in place (#198, `world-key.ts`).
-  if (why === 'no-pin') return `${row.name} is open to read: editing a world shared with you needs a PIN on your account, set on onlyworlds.com in Account settings under World PIN. Then press Make a new key in Settings, This world, and it opens to edit.`;
+  if (why === 'no-pin') return `${row.name} is open to read: editing a world shared with you needs a World PIN on your account, set on onlyworlds.com in Account settings under World PIN. Then press Make a new key in Settings, This world, and it opens to edit.`;
   if (row.member_role === 'contributor') return `As a contributor in ${row.name}, you can add to it and change what you add.`;
   return null;
 }
@@ -302,7 +302,7 @@ async function openAccountWorldOnce(row: AccountWorldRow, toasts: ToastManager, 
     if (!pin && !readOnly && !pinLater) {
       overlay.hide();
       enteredPin = await new PinPromptModal().prompt(
-        `Opening "${row.name}", shared with you: Atlas needs your OnlyWorlds PIN to save your edits. It is the one PIN of your account, set on onlyworlds.com in Account settings under World PIN.`
+        `Opening "${row.name}", shared with you: Atlas needs your World PIN to save your edits. It is one for your whole account, set on onlyworlds.com in Account settings under World PIN.`
       );
       if (!enteredPin) {
         await client.revokeWorldKey(row.id, minted.id).catch(() => {});
