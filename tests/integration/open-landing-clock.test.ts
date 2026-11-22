@@ -55,13 +55,15 @@ describe('the landing waits for its own door', () => {
   it('an Open pressed long after the link was captured still lands on the element', async () => {
     patchSlice('registry', { ...getState().registry, worlds: [], account_token: TOKEN, account_username: 'me' });
     setOpenLanding(ID, [EL]);
-    const { actions, t } = toastsWithActions();
+    const { t } = toastsWithActions();
     await runOpenLink(ID, t);
-    const open = actions.find(a => a.label === 'Open');
-    expect(open).toBeDefined();
-    // The person reads, signs in, comes back: the toast is still there.
+    // No world open and no folder picker here (1.125.0, R2): the question is the card, and it waits as the
+    // corner toast did. Was: the toast's Open action.
+    const open = document.querySelector<HTMLButtonElement>('[data-modal="open-account"] [data-action="open"]');
+    expect(open).not.toBeNull();
+    // The person reads, signs in, comes back: the card is still there.
     vi.setSystemTime(LATE);
-    open!.run();
+    open!.click();
     expect(opened).toEqual([ID]);
     expect(stepAt(LATE + 60_000)).toEqual({ kind: 'land', localWorldId: 'local-1', found: [EL], missing: 0 });
   });

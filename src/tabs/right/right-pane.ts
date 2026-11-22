@@ -23,7 +23,7 @@ import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash, settingsHash } from '../../core/router';
 import { getCurrentSyncEngine, pullNowAndRefresh, diagnoseSyncUnavailable, pausedPressLine, sayRateWait } from '../../sync/sync-attach';
-import { surfaceSyncUnavailable, upToDate } from '../../ui/sync-toasts';
+import { ADD_PIN_TITLE, surfaceSyncUnavailable, upToDate } from '../../ui/sync-toasts';
 import { issuesFor } from '../../sync/sync-issues';
 import { showProblem } from '../../ui/problem-fixes';
 import { openConflictReview } from '../../ui/conflict-review-modal';
@@ -472,7 +472,8 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // A press while a round runs does nothing (the round is already asking), so
   // neither the title nor the button offers one then.
   const busyRound = engine?.kind === 'syncing';
-  pill.title = title + (conflictCount > 0 || busyRound || wait ? '' : errored ? (pinRefused ? ' · click to put in the PIN again in Settings' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
+  // Add PIN's title already says what its press does (it asks for the PIN here, 1.125.0).
+  pill.title = title + (conflictCount > 0 || busyRound || wait || dataState === 'add-pin' ? '' : errored ?(pinRefused ? ' · click to put in the PIN again in Settings' : ' · click to see why in Settings') : ' · click to refresh from OnlyWorlds');
   // Each badge's title is its name, so a screen reader says it once.
   const conflictName = `Review ${conflictCount} conflict${conflictCount === 1 ? '' : 's'}`;
   const conflictBadge = conflictCount > 0
@@ -492,7 +493,9 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // runs it presses nothing: it says so and is marked disabled, keeping its
   // place for the keyboard.
   const roundOnly = busyRound && !currentPendingPush;
-  const refreshName = currentPendingPush ? 'Save to OnlyWorlds now'
+  // The Add PIN pill's button asks for the PIN (1.125.0): its name says so, never a refresh.
+  const refreshName = dataState === 'add-pin' ? 'Add your World PIN'
+    : currentPendingPush ? 'Save to OnlyWorlds now'
     : errored ? (pinRefused ? 'Put in the PIN again in Settings' : 'See why in Settings')
     : roundOnly ? `${syncPhaseWords(engine?.kind === 'syncing' ? engine.phase : undefined)} now`
     : 'Refresh from OnlyWorlds';
@@ -612,11 +615,9 @@ function mapEngineStateToPill(
     // said 'engine starting up' forever). diagnoseSyncUnavailable knows.
     const reason = diagnoseSyncUnavailable();
     if (reason?.kind === 'pin-missing') {
-      return {
-        dataState: 'error',
-        label: 'No PIN',
-        title: 'This world is linked but cannot sync: no PIN is set. Add your PIN in Settings, under OnlyWorlds.',
-      };
+      // A state a person can choose (an owner's open from onlyworlds.com asks no PIN, 1.125.0): plain,
+      // never an error, and its press asks for the PIN here (`surfaceSyncUnavailable`).
+      return { dataState: 'add-pin', label: 'Add PIN', title: ADD_PIN_TITLE };
     }
     if (reason?.kind === 'seat-secret-missing') {
       return { dataState: 'error', label: 'Not syncing', title: SEAT_SECRET_MISSING_LINE };

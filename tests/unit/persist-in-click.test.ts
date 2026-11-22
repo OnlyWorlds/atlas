@@ -86,6 +86,23 @@ describe('the doors without a folder picker ask before their first await', () =>
     await pending;
   });
 
+  it("the open door's card for an account world (1.125.0, 2026-11-22, R2): its Open asks inside its click", async () => {
+    const { mswServer } = await import('../setup');
+    const { http, HttpResponse } = await import('msw');
+    const { runOpenLink } = await import('../../src/setup/open-door');
+    const id = '33333333-4444-4555-8666-777777777777';
+    mswServer.use(http.get('*/account/worlds', () => HttpResponse.json({ data: [{ id, name: 'Online', role: 'owner', member_role: null, public_read: false, keys: [] }] })));
+    patchSlice('registry', { ...defaultRegistry(), worlds: [], account_token: 't' });
+    patchSlice('active', null as never);
+    await runOpenLink(id, { ...toasts, show: vi.fn() } as unknown as ToastManager);
+    const open = document.querySelector<HTMLButtonElement>('[data-modal="open-account"] [data-action="open"]');
+    expect(open).not.toBeNull();
+    expect(persist).not.toHaveBeenCalled();
+    open!.click();
+    expect(persist).toHaveBeenCalledTimes(1); // synchronous, inside the click
+    document.body.innerHTML = '';
+  });
+
   // The Data room and the finale are whole rooms to mount; their call sites
   // are read structurally: the ask sits before the await it must precede.
   const src = (p: string) => readFileSync(resolve(process.cwd(), 'src', p), 'utf8');

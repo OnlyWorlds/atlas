@@ -7,6 +7,7 @@
 
 import { typeName, aTypeName, nameOrUnnamed, quotedWorld } from '../core/type-words';
 import { getState, patchActiveMeta, patchSlice } from '../core/state';
+import { resumeWaitLine } from '../core/saves-online';
 import { worldIsViewOnly } from '../core/view-only';
 import { diskApiBlock, isSeatWorld, SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE, seatRoleWords, worldPin } from '../core/seat';
 import {
@@ -426,7 +427,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     }
     toasts.info(pausedInput.checked
       ? 'Sync paused for this world'
-      : stillPaused ? 'This world will sync when Pause all sync is turned off' : 'Sync resumed for this world');
+      : stillPaused ? 'This world will sync when Pause all sync is turned off'
+      : resumeWaitLine(next.worlds.find(w => w.id === world.id), next) ?? 'Sync resumed for this world');
   });
 
   // A shared world's own switch for the rule (Settings, Storage's
@@ -783,7 +785,8 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
   stale.querySelector<HTMLButtonElement>('[data-action="rekey-repair"]')?.addEventListener('click', async () => {
     try {
       const fixed = await rk.repairStaleLinks(store);
-      requestPushIfLinked();
+      // Nothing fixed, nothing to send (and no first-change line, 1.125.0).
+      if (fixed.length > 0) requestPushIfLinked();
       toasts.success(fixed.length === 1 ? 'Updated the links in 1 element.' : `Updated the links in ${fixed.length} elements.`);
     } catch (err) {
       console.error('[settings] updating stale links failed:', err);

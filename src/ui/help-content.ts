@@ -51,6 +51,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'a new world opens on its strand and asks one question at a time: a story, who it is about, what happens in it, where it happened and where they are now, each a name and a few lines, with an optional Born for the main character and Founded for a location',
       'already have notes or a file? While the world is empty, Bring it in, under the strand',
       'in a world on OnlyWorlds, press the OnlyWorlds mark beside its name to open it on onlyworlds.com (signed in there) or in another tool, or to copy its link',
+      'opened from onlyworlds.com, your world asks for your World PIN when you first change it: press Add PIN at the bottom, give the four digits you chose on onlyworlds.com, and your changes save there; until then they are kept here',
       "once the world holds more than its strand, press Strand beside the picture to see it: the story, an event in it, where it happened, its main character and where they are now; a part's name opens its page (a story kept in a room opens there, and its menu has Open its page), and its ⋯ menu holds Edit here, the room that edits it (Edit in the writing room, Edit in Charts, or Pin it on a map, Create a map while the world has none) and Use another; Picture and Strand keep your place on Home",
       "a short line above the story, the event, where it happened and the main character takes you where it can grow, its link in the words: the writing room, the timeline in Charts, a map, the main character's page; it goes once you have opened that room or page, or pinned the place, or on its ×, in this browser only",
       "on the Picture the strand's parts stand first, in the same places every time, with everything else beside and below them",
@@ -158,7 +159,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     keys: ['Global'],
     purpose: 'Atlas-wide preferences and per-world configuration.',
     can: [
-      'connect your OnlyWorlds account for sync and publishing',
+      'connect your OnlyWorlds account for sync and publishing: Sign in with OnlyWorlds, or your email and password',
+      'keep your World PIN here for every online world; a world can also ask for it itself, with Add PIN at the bottom',
       'choose how sync behaves, or keep a world fully local',
       'rename the writing tiers',
       'tune editing and web-pane behavior',

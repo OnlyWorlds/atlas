@@ -7,6 +7,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { resumeWaitLine } from '../core/saves-online';
 import {
   saveRegistry,
   setSyncPullOnActivate,
@@ -23,7 +24,6 @@ import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import {
   getCurrentSyncEngine,
-  getCurrentSyncWorldId,
   reapplySyncPolicy,
   refusedEngineLine,
 } from '../sync/sync-attach';
@@ -358,7 +358,8 @@ function wireSyncTab(toasts: ToastManager): void {
     // Match the engine to the EFFECTIVE pause: turning Pause all off must not
     // resume a world the user keeps offline.
     const engine = getCurrentSyncEngine();
-    const entry = next.worlds.find(w => w.id === getCurrentSyncWorldId());
+    // The open world: the engine's when one runs, and a world waiting on the PIN has none (round 3, gate 2 S1).
+    const entry = next.worlds.find(w => w.id === getState().active?.worldId);
     const stillPaused = effectiveSyncPaused(entry, next);
     if (engine) {
       if (stillPaused) engine.pause('manual');
@@ -367,7 +368,8 @@ function wireSyncTab(toasts: ToastManager): void {
     }
     toasts.info(pauseAll.checked
       ? 'All sync paused'
-      : entry?.sync_paused ? 'Sync resumed. This world\'s own pause is still on.' : 'Sync resumed');
+      : entry?.sync_paused ? 'Sync resumed. This world\'s own pause is still on.'
+      : resumeWaitLine(entry, getState().registry) ?? 'Sync resumed');
   });
 
   pullOnAct?.addEventListener('change', () => {

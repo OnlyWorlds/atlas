@@ -18,6 +18,14 @@ export function readsOnlyByShape(apiKey: string): boolean {
   return key.startsWith('ow_r_') || isDemoKey(key);
 }
 
+/**
+ * A v2 key (`ow_w_`, `ow_r_`): keel never asks its PIN on a read route, so a world comes down with it and no
+ * PIN (Bring it down again, an owner's open from onlyworlds.com). A legacy ten-digit key reads only with it.
+ */
+export function readsWithoutPin(apiKey: string): boolean {
+  return /^ow_[rw]_/.test(apiKey.trim());
+}
+
 /** The PIN to send beside this key: none beside a key that can only read. */
 export function pinBeside(apiKey: string, pin: string | null | undefined): string {
   if (!pin || readsOnlyByShape(apiKey)) return '';

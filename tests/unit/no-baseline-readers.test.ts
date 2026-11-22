@@ -41,7 +41,8 @@ describe('the mark read as no baseline', () => {
 
   it('C18: the element\'s sync dot shows a held copy as waiting, never as synced', () => {
     const W = 'w-dot';
-    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: W, name: 'W', state: 'api-linked', api: { world_id: 's', api_key: 'k' }, created_at: 't' } as unknown as WorldRegistryEntry] });
+    // A linked world that syncs keeps a PIN here: with none it waits on the World PIN, and its dot says kept here (1.125.0).
+    patchSlice('registry', { ...defaultRegistry(), pin: '1234', worlds: [{ id: W, name: 'W', state: 'api-linked', api: { world_id: 's', api_key: 'k' }, created_at: 't' } as unknown as WorldRegistryEntry] });
     patchSlice('active', { worldId: W, meta: { name: 'W' } } as never);
     patchSlice('data', { ...getState().data, elements: [held] });
     const dot = renderHeader(held).querySelector<HTMLElement>('[data-role="element-sync-dot"]')!;

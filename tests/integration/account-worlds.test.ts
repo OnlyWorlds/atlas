@@ -36,9 +36,26 @@ import {
   sharedOpenLine,
 } from '../../src/sync/account-worlds';
 import { AccountClient } from '../../src/sync/account-client';
+import { PinNeededError } from '../../src/setup/atlas-root-flow';
 import { SIGNED_IN_AGAIN_LINE } from '../../src/sync/token-revoke';
 import type { AccountWorldRow } from '../../src/core/types';
 import type { ToastManager } from '../../src/ui/toast-manager';
+
+// The link's own PIN rule runs for real (`linkPinRefusal`); the download is the link's own tests'
+// (link-browser.test.ts). Each call's options are kept, so the open's choices are read (1.125.0).
+const linked = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>>, failures: [] as unknown[] }));
+vi.mock('../../src/setup/atlas-root-flow', async (orig) => {
+  const real = await orig<typeof import('../../src/setup/atlas-root-flow')>();
+  return {
+    ...real,
+    linkExistingApiWorldInRoot: vi.fn(async (o: { apiKey: string; apiPin: string; readOnly?: boolean; pinLater?: boolean; displayName?: string }) => {
+      linked.calls.push(o as unknown as Record<string, unknown>);
+      const refused = real.linkPinRefusal(o.apiKey, o.apiPin, !!o.readOnly, o.pinLater);
+      if (refused) throw refused;
+      return { entry: { id: 'local-owned', name: o.displayName ?? 'World' }, downloaded: 0, failures: linked.failures };
+    }),
+  };
+});
 
 const V2_BASE = 'https://www.onlyworlds.com/api/v2';
 const TOKEN = 'ow_a_valid_token';
@@ -360,7 +377,9 @@ describe('mintOwnKey — a shared world takes a key made for the member (#199, k
     expect(state.minted).toHaveLength(0);
   });
 
-  it('who asks for the PIN, and the line each open leaves', () => {
+  // Was "who asks for the PIN": opensToWrite named who was asked. Since 1.125.0 the owner opens to write
+  // and is asked later, in the world; of these only a member is asked at open, after the mint.
+  it('who opens to write, and the line each open leaves', () => {
     expect([owned, contributor, { ...contributor, member_role: 'co_builder' as const }, guest].map(opensToWrite))
       .toEqual([true, true, true, false]);
     expect(sharedOpenLine(owned, undefined)).toBeNull();
@@ -518,29 +537,13 @@ describe('openAccountWorld — a sign-in elsewhere while it asks (conv. 179, 202
   });
 });
 
-describe('openAccountWorld: a PIN keel refuses beside the key just made (1.124.31)', () => {
-  it('nothing is kept: no PIN saved, no world, and the key made a moment ago is taken back', async () => {
+describe('openAccountWorld: the owner\'s open asks no PIN; the world asks for it (1.125.0, 2026-11-22, R3)', () => {
+  // Was (1.124.31): the owner was asked the PIN before the mint and the link proved it with /me, a refusal
+  // taking the key back. Now the owner's open makes no prompt and sends no PIN; the proof is the in-world
+  // question's (world-pin-modal). The member's question after the mint stays (account-mode.spec.ts).
+  async function withBrowserStorage(run: () => Promise<void>): Promise<void> {
     localStorage.setItem('atlas_ui_prefs', JSON.stringify({ sidebarMode: 'worlds', defaultCreateType: 'character', newWorldWhere: 'browser' }));
-    const state = mount();
-    const revoked: string[] = [];
-    const mePins: Array<string | null> = [];
-    mswServer.use(
-      // Any v2 base: an earlier test here may have pointed make-online's at its own.
-      http.get('*/api/v2/me', ({ request }) => {
-        mePins.push(request.headers.get('API-Pin'));
-        return HttpResponse.json({ error: { type: 'authentication_error', code: 'invalid_credentials', message: 'Incorrect PIN.', param: 'API-Pin' } }, { status: 401 });
-      }),
-      http.delete(`${V2_BASE}/account/worlds/:id/keys/:kid`, ({ params }) => {
-        revoked.push(`${params.id}/${params.kid}`);
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-    patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
-    const toasts = makeToasts();
-    const owned: AccountWorldRow = { id: 'srv-owned', name: 'Owned World', role: 'owner', public_read: false, keys: [] };
-
     // No folder picker here, so the world goes to this browser without the where-question.
-    // This browser's storage, usable: the open goes on to the PIN.
     const { FakeDirHandle } = await import('../fixtures/fake-fs');
     const { __resetOpfsStatusForTests } = await import('../../src/core/capabilities');
     const opfs = new FakeDirHandle('opfs');
@@ -550,22 +553,86 @@ describe('openAccountWorld: a PIN keel refuses beside the key just made (1.124.3
     const hadHandle = w.FileSystemFileHandle;
     w.FileSystemFileHandle = class { createWritable() { return undefined; } };
     __resetOpfsStatusForTests();
-    const pending = openAccountWorld(owned, toasts);
-    await vi.waitFor(() => expect(document.querySelector('form[data-form="pin-prompt"]')).not.toBeNull(), { timeout: 10_000 });
-    document.querySelector<HTMLInputElement>('form[data-form="pin-prompt"] input[name="pin"]')!.value = '9999';
-    document.querySelector<HTMLFormElement>('form[data-form="pin-prompt"]')!.requestSubmit();
+    try {
+      await run();
+    } finally {
+      localStorage.removeItem('atlas_ui_prefs');
+      if (hadStorage) Object.defineProperty(navigator, 'storage', hadStorage);
+      else delete (navigator as unknown as { storage?: unknown }).storage;
+      w.FileSystemFileHandle = hadHandle;
+      __resetOpfsStatusForTests();
+    }
+  }
+  const owned: AccountWorldRow = { id: 'srv-owned', name: 'Owned World', role: 'owner', public_read: false, keys: [] };
 
-    expect(await pending).toBe(false);
-    expect(state.minted).toHaveLength(1);
-    expect(mePins).toEqual(['9999']);
-    expect(revoked).toEqual(['srv-owned/key-1']);
-    expect(getState().registry.pin).toBeUndefined();
-    expect(getState().registry.worlds).toEqual([]);
-    expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual(['OnlyWorlds did not accept this PIN. Check it, then try again.']);
-    localStorage.removeItem('atlas_ui_prefs');
-    if (hadStorage) Object.defineProperty(navigator, 'storage', hadStorage);
-    else delete (navigator as unknown as { storage?: unknown }).storage;
-    w.FileSystemFileHandle = hadHandle;
-    __resetOpfsStatusForTests();
+  it('no prompt, one mint, and the link with pinLater and no PIN; nothing proved, nothing kept', async () => {
+    await withBrowserStorage(async () => {
+      const state = mount();
+      const mePins: Array<string | null> = [];
+      mswServer.use(http.get('*/api/v2/me', ({ request }) => { mePins.push(request.headers.get('API-Pin')); return HttpResponse.json({ role: 'owner' }); }));
+      patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+      let asked = 0;
+      const seen = new MutationObserver(() => { if (document.querySelector('form[data-form="pin-prompt"]')) asked++; });
+      seen.observe(document.body, { childList: true, subtree: true });
+      const toasts = makeToasts();
+      expect(await openAccountWorld(owned, toasts)).toBe(true);
+      seen.disconnect();
+      expect(asked).toBe(0);
+      expect(state.minted).toHaveLength(1);
+      expect(state.minted[0].scope).toBe('WRITE');
+      expect(linked.calls).toHaveLength(1);
+      expect(linked.calls[0]).toMatchObject({ apiKey: state.minted[0].key, apiPin: '', readOnly: false, pinLater: true });
+      expect(mePins).toEqual([]);
+      expect(getState().registry.pin).toBeUndefined();
+    });
+  });
+
+  it('a key keel cannot read without a PIN (ten digits) is refused, and taken back before the open stops', async () => {
+    await withBrowserStorage(async () => {
+      mount();
+      const revoked: string[] = [];
+      mswServer.use(
+        http.post(`${V2_BASE}/account/worlds/srv-owned/keys`, () =>
+          HttpResponse.json({ id: 'key-ten', last4: '7890', scope: 'WRITE', name: '', revoked: false, key: '1234567890' }, { status: 201 })),
+        http.delete(`${V2_BASE}/account/worlds/:id/keys/:kid`, ({ params }) => {
+          revoked.push(`${params.id}/${params.kid}`);
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+      const toasts = makeToasts();
+      expect(await openAccountWorld(owned, toasts)).toBe(false);
+      expect(linked.calls[linked.calls.length - 1]).toMatchObject({ apiKey: '1234567890', apiPin: '', pinLater: true });
+      expect(revoked).toEqual(['srv-owned/key-ten']);
+      expect(getState().registry.pin).toBeUndefined();
+      expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual([new PinNeededError().message]);
+    });
+  });
+
+  it('elements that did not download are said plainly: they come with a refresh once the World PIN is in', async () => {
+    await withBrowserStorage(async () => {
+      mount();
+      patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
+      linked.failures = [{ element_id: 'a' }, { element_id: 'b' }];
+      const toasts = makeToasts();
+      try {
+        expect(await openAccountWorld(owned, toasts)).toBe(true);
+      } finally {
+        linked.failures = [];
+      }
+      expect(toasts.calls.filter(c => c.level === 'error').map(c => c.msg)).toEqual([
+        'Opened Owned World. 2 elements did not download: once your World PIN is in, a refresh from OnlyWorlds brings them.',
+      ]);
+    });
+  });
+
+  it('an owner with a PIN kept here: no pinLater, the PIN goes beside the key as before', async () => {
+    await withBrowserStorage(async () => {
+      mount({ accountHasPin: true });
+      patchSlice('registry', { ...setAccountToken(defaultRegistry(), TOKEN, 'titus'), pin: '4242' });
+      expect(await openAccountWorld(owned, makeToasts())).toBe(true);
+      expect(linked.calls[linked.calls.length - 1]).toMatchObject({ apiPin: '4242' });
+      expect(linked.calls[linked.calls.length - 1]!.pinLater).toBeUndefined();
+    });
   });
 });

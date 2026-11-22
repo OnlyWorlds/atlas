@@ -16,6 +16,8 @@ import type { Element, WorldRegistryEntry } from './types';
 import { isStoryNarrative } from './narrative-kind';
 import { playNarrativeIds } from './records';
 import { isBrowserWorld } from './browser-worlds';
+import { getState } from './state';
+import { waitsOnPin } from './saves-online';
 import { isRoomElement } from './parlor-room';
 import { isProposed } from './review-mark';
 import { linkIdsOf } from './link-ids';
@@ -74,7 +76,8 @@ export function isFilled(value: unknown): boolean {
 export function guideDots(
   all: readonly Element[],
   entry: WorldRegistryEntry | undefined,
-  opts: { keepSafeShowing?: boolean } = {},
+  /** `pinWaits`: linked but waiting on the World PIN, so not a copy online (default: read from the registry). */
+  opts: { keepSafeShowing?: boolean; pinWaits?: boolean } = {},
 ): Dots {
   const locations = new Set<string>();
   const places: string[] = [];
@@ -103,7 +106,9 @@ export function guideDots(
     }
   }
   const placed = places.some(p => locations.has(p));
-  const copy = !!entry && !opts.keepSafeShowing && (!isBrowserWorld(entry) || entry.state === 'api-linked'
+  // A linked world waiting on the World PIN has nothing online yet (1.125.0): only a download or an export is its copy.
+  const pinWaits = opts.pinWaits ?? (!!entry && waitsOnPin(entry, getState().registry));
+  const copy = !!entry && !opts.keepSafeShowing && (!isBrowserWorld(entry) || (entry.state === 'api-linked' && !pinWaits)
     || !!entry.kept_download_at || !!entry.kept_export_at);
   return { someone, placed, happened, story, copy };
 }

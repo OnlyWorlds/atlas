@@ -551,11 +551,11 @@ When a UI surface tries to run a sync action and `getCurrentSyncEngine()` return
 `diagnoseSyncUnavailable()` in `sync-attach.ts` returns a structured reason:
 - `'no-active-world'` — sidebar should pick a world
 - `'local-only'` — sync isn't applicable
-- `'pin-missing'` — api-linked world, PIN field empty in registry → user fixes in settings
+- `'pin-missing'` — api-linked world that writes, no PIN kept (`waitsOnPin`, `src/core/saves-online.ts`). Since 1.125.0 a state a person can choose (an owner's open from onlyworlds.com asks no PIN): fixed in the world, by the World PIN dialog (`src/ui/world-pin-modal.ts`), which the pill's Add PIN, the first change's toast and Refresh open
 - `'attached-but-paused'` — reserved for future use
 - `'engine-not-ready'` — fallback (attach in flight, race during world switch, etc.)
 
-`surfaceSyncUnavailable(toasts)` in `src/ui/sync-toasts.ts` consumes the reason and emits the right toast. For `pin-missing` it also `navigate(settingsHash(worldId, 'identity'))` to deep-link the user to the fix.
+`surfaceSyncUnavailable(toasts)` in `src/ui/sync-toasts.ts` consumes the reason and emits the right toast. For `pin-missing` it opens the World PIN dialog in place (1.125.0; it used to send the person to Settings).
 
 **Convention**: every UI surface that gates on `getCurrentSyncEngine()` should call `surfaceSyncUnavailable(toasts)` on the null path. Don't toast inline. Sites today: pill, worlds-sidebar refresh, settings refresh-from-API, conflict-review-modal open, server-delete-modal open, elements-sidebar filter-chip right-click.
 

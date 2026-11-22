@@ -147,24 +147,66 @@ test('a sign-in over a token Atlas minted revokes the old one by its id', async 
   expect(keel.tokenBodies).toHaveLength(1);
 });
 
-// An Open link that waits for a sign-in keeps where it lands across the round trip (1.123): the
-// landing is parked beside the held id in the resume, and is held again on the return.
-test('an Open link waiting for the sign-in keeps its writing landing through the round trip', async ({ page }) => {
-  const world = '33333333-4444-4555-8666-777777777777';
-  const chapter = '01a1b17c-f4a2-7537-ba96-b51d6eb4cc6c';
-  await serveAtlasAtItsOrigin(page, 'code');
-  // keel's public reader: this world is not public, its one 404.
+const OPEN_WORLD = '33333333-4444-4555-8666-777777777777';
+
+/** keel's public reader: this world is not public, its one 404; signed in, the account's row, its mint and its world. */
+async function playThePrivateWorld(page: Page): Promise<{ mints: number }> {
+  const seen = { mints: 0 };
   await page.route('https://www.onlyworlds.com/api/v2/world/**', async (route) => {
-    if (route.request().headers()['authorization'] || route.request().headers()['api-key']) return route.fallback();
+    if (route.request().headers()['authorization'] || route.request().headers()['api-key']) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: OPEN_WORLD, name: 'Wren Hollow', updated_at: '2026-11-22T00:00:00Z' }) });
+    }
     await route.fulfill({ status: 404, headers: { 'Cache-Control': 'no-store' }, contentType: 'application/json', body: '{"error":{"type":"not_found","code":"not_found","message":"World not found.","param":null}}' });
   });
-  await boot(page, `#/open/${world}/writing/${chapter}`);
-  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
-  await page.locator('[data-action="sign-in-onlyworlds"]').click();
+  await page.route('https://www.onlyworlds.com/api/v2/account/worlds', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ id: OPEN_WORLD, name: 'Wren Hollow', role: 'owner', member_role: null, public_read: false, keys: [] }] }) });
+  });
+  await page.route(`https://www.onlyworlds.com/api/v2/account/worlds/${OPEN_WORLD}/keys`, async (route) => {
+    seen.mints++;
+    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'k-465', last4: 'WWWW', scope: 'WRITE', name: '', revoked: false, key: 'ow_w_' + 'W'.repeat(32) }) });
+  });
+  return seen;
+}
+
+// An Open link that waits for a sign-in keeps where it lands across the round trip (1.123): the
+// landing is parked beside the held id in the resume, and is held again on the return. Since
+// 1.125.0 (R1) the sign-in is the door's own card, never Settings, and the world opens after it.
+test('an Open link waiting for the sign-in: the card, the round trip, its writing landing kept, and the world opens', async ({ page }) => {
+  const chapter = '01a1b17c-f4a2-7537-ba96-b51d6eb4cc6c';
+  await serveAtlasAtItsOrigin(page, 'code');
+  const keel = await playThePrivateWorld(page);
+  await boot(page, `#/open/${OPEN_WORLD}/writing/${chapter}`);
+  const card = page.locator('[data-modal="open-sign-in"]');
+  await expect(card).toContainText('This link opens a world on onlyworlds.com. Sign in to Atlas with your OnlyWorlds account and it opens here.');
+  await expect(page.locator('input[name="account-login"]')).toHaveCount(0);
+  await expect(card.locator('[data-action="sign-in-onlyworlds"]')).toBeFocused();
+  await card.locator('[data-action="sign-in-onlyworlds"]').click();
   await expect(page.locator('.ow-toast', { hasText: 'Signed in as wren' })).toBeVisible();
   const landing = await page.evaluate(async () => {
     const m = await import('/src/core/open-landing.ts');
     return m.peekOpenLanding();
   });
-  expect(landing).toMatchObject({ serverWorldId: world, elementIds: [], writing: { kind: 'writing', narrativeId: chapter } });
+  expect(landing).toMatchObject({ serverWorldId: OPEN_WORLD, elementIds: [], writing: { kind: 'writing', narrativeId: chapter } });
+  // Back, signed in: the one question, named, and the world opens with no PIN asked.
+  const where = page.locator('[data-modal="where-ask"]');
+  await expect(where.locator('.atlas-modal-title')).toHaveText('Open "Wren Hollow", from your worlds on OnlyWorlds');
+  expect(keel.mints).toBe(0);
+  await where.locator('input[name="where"][value="browser"]').check();
+  await where.locator('[data-action="go"]').click();
+  await expect.poll(() => page.evaluate((id) => (window as any).__atlasTestApi.getState().registry.worlds.some((w: any) => w.api?.world_id === id), OPEN_WORLD)).toBe(true);
+  expect(keel.mints).toBe(1);
+  await expect(page.locator('[data-modal="pin-prompt"]')).toHaveCount(0);
+});
+
+test('an Open link whose sign-in came back cancelled shows the card again, the id held', async ({ page }) => {
+  await serveAtlasAtItsOrigin(page, 'cancel');
+  await playThePrivateWorld(page);
+  await boot(page, `#/open/${OPEN_WORLD}`);
+  const card = page.locator('[data-modal="open-sign-in"]');
+  await card.locator('[data-action="sign-in-onlyworlds"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'Sign in with OnlyWorlds was cancelled' })).toBeVisible();
+  await expect(card).toBeVisible();
+  await expect(page.locator('.ow-toast-action', { hasText: 'Open Settings' })).toHaveCount(0);
+  const held = await page.evaluate(async () => (await import('/src/setup/open-door.ts')).openHeldForSignIn());
+  expect(held).toBe(OPEN_WORLD);
 });

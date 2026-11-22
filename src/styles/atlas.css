@@ -3486,6 +3486,13 @@ button.atlas-element-sync-dot {
   color: var(--atlas-text-soft); /* F-55: muted read 4.32:1 on the active row's tint */
 }
 
+/* Linked, and waiting on the World PIN (1.125.0): neutral like view-only, never the online cyan. */
+.atlas-world-state-chip.pin-waits {
+  white-space: nowrap;
+  background: rgba(var(--atlas-ink-rgb), 0.06);
+  color: var(--atlas-text-soft);
+}
+
 /* A browser world the browser cleared (1.17, conv. 129): the warn tokens,
    which flip with the theme. The row stays until the user removes it. */
 .atlas-world-state-chip.cleared {
@@ -6368,6 +6375,11 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 .atlas-sync-pill[data-state="api"] .atlas-sync-pill-dot {
   background: var(--atlas-cyan);
+}
+
+/* A linked world waiting on the World PIN (1.125.0): a state a person chose, in plain colour, never an error. */
+.atlas-sync-pill[data-state="add-pin"] .atlas-sync-pill-dot {
+  background: rgba(var(--atlas-ink-rgb), 0.35);
 }
 
 .atlas-sync-pill[data-state="none"] {

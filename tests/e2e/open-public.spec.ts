@@ -260,7 +260,9 @@ test('signed in as the owner, the account path opens it, and no copy is offered'
     localStorage.setItem('atlas_worlds_registry', JSON.stringify(reg));
   }, TOKEN);
   await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
-  await expect(page.locator('.ow-toast', { hasText: 'Open "Blood Meridian", from your worlds on OnlyWorlds?' })).toBeVisible();
+  // No world open, the folder picker here (1.125.0, R2): the named where-question at once. Was the Open toast.
+  await expect(page.locator('[data-modal="where-ask"] .atlas-modal-title')).toHaveText('Open "Blood Meridian", from your worlds on OnlyWorlds');
+  await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
   await expect(page.locator('.ow-toast', { hasText: ASK })).toHaveCount(0);
   await expect(page.locator('[data-modal="public-ask"]')).toHaveCount(0);
   expect(keel.worldReads).toBe(0);
@@ -285,25 +287,39 @@ test('a held seat for the world stays held beside a public copy of it', async ({
   await expect(page.locator('.ow-toast', { hasText: 'is unused now' })).toHaveCount(0);
 });
 
-test('a world the public cannot read keeps the sign-in line, and nothing is made', async ({ page }) => {
+// Was: the sign-in toast over Settings' login field. Since 1.125.0 (R1): the sign-in card, Settings not opened.
+test('a world the public cannot read gets the sign-in card, and nothing is made', async ({ page }) => {
   const keel = await playKeel(page);
   await arriveAt(page, `#/open/${PRIVATE}/writing`);
-  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
-  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await expect(page.locator('[data-modal="open-sign-in"]')).toContainText('This link opens a world on onlyworlds.com. Sign in to Atlas with your OnlyWorlds account and it opens here.');
+  await expect(page.locator('input[name="account-login"]')).toHaveCount(0);
   await expect(page.locator('.ow-toast', { hasText: 'view-only copy' })).toHaveCount(0);
   await expect(page.locator('[data-modal="public-ask"]')).toHaveCount(0);
   expect(keel.lists).toBe(0);
   expect((await copies(page)).worlds).toBe(0);
 });
 
-test('with keel\'s public reader switched off, a signed-out link keeps the sign-in line', async ({ page }) => {
+test('with keel\'s public reader switched off, a signed-out link gets the sign-in card', async ({ page }) => {
   const keel = await playKeel(page, { readerOff: true });
   await arriveAt(page, `#/open/${PUB}/writing/${CH1}`);
-  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
-  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  await expect(page.locator('[data-modal="open-sign-in"]')).toContainText('This link opens a world on onlyworlds.com. Sign in to Atlas with your OnlyWorlds account and it opens here.');
+  await expect(page.locator('input[name="account-login"]')).toHaveCount(0);
   await expect(page.locator('.ow-toast', { hasText: 'view-only copy' })).toHaveCount(0);
   await expect(page.locator('[data-modal="public-ask"]')).toHaveCount(0);
   await expect(page.locator('.ow-toast', { hasText: 'could not reach OnlyWorlds' })).toHaveCount(0);
+  expect(keel.lists).toBe(0);
+  expect((await copies(page)).worlds).toBe(0);
+});
+
+test('the public ask\'s Sign in opens the sign-in card, named, with nothing made and Settings not opened (2026-11-22)', async ({ page }) => {
+  const keel = await playKeel(page);
+  await arriveAt(page, `#/open/${PUB}`);
+  const ask = askCard(page);
+  await ask.locator('[data-action="sign-in"]').click();
+  const card = page.locator('[data-modal="open-sign-in"]');
+  await expect(card).toContainText('Sign in to Atlas with your OnlyWorlds account to open "Blood Meridian" here.');
+  await expect(ask).toHaveCount(0);
+  await expect(page.locator('input[name="account-login"]')).toHaveCount(0);
   expect(keel.lists).toBe(0);
   expect((await copies(page)).worlds).toBe(0);
 });
