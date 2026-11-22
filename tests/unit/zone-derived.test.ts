@@ -201,7 +201,7 @@ describe('getZoneShape', () => {
   });
 
   // Only atlas writes atlas_shape. Every other writer puts the shape in
-  // supertype under its own casing (zoner: `line`; Skeld's Sikelia writer:
+  // supertype under its own casing (zoner: `line`; the Sikelia writer:
   // `Line`), and a zone from any of them has nothing else to say what it is.
   it('falls back to supertype in any casing', () => {
     expect(getZoneShape(zone('z', 'z', { supertype: 'line' }))).toBe('line');

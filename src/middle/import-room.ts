@@ -50,7 +50,7 @@ type Mode = 'new' | 'merge';
 
 /**
  * Where the ways to convert notes with an AI are written up: the docs' AI
- *  page, not the toolkit repo (Titus, 2026-10-09); the bare form, as Boss's URL contract and Kael's docs write it (Skeld, 2026-10-09).
+ *  page, not the toolkit repo (Titus, 2026-10-09); the bare form, as the URL contract and the docs write it (2026-10-09).
  */
 const OW_AI_DOCS_URL = 'https://onlyworlds.github.io/docs/development/ai';
 

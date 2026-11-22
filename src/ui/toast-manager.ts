@@ -209,7 +209,7 @@ export class ToastManager {
     // shouldn't race a timer), with a short grace after leave.
     // Only a mouse holds it: a tap fires the emulated mouseenter too, with no
     // mouseleave until the next tap elsewhere, so one tap pinned a toast for
-    // good (Seethe's phone pass). A tap dismisses instead.
+    // good (a phone pass). A tap dismisses instead.
     let timer = setTimeout(() => this.removeToast(toast.id), toast.duration);
     toastEl.addEventListener('pointerenter', (e) => {
       if (e.pointerType === 'mouse') clearTimeout(timer);

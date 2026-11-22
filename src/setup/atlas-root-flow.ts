@@ -79,7 +79,7 @@ export interface SetupAtlasRootResult {
   /**
    * Set when the picked folder IS a world (it holds a `world.json`) rather
    * than a place to keep worlds (Titus pointed "Change folder" at
-   * Skeld's `sikelia-world` and expected an import). No root was created and
+   * the `sikelia-world` and expected an import). No root was created and
    * nothing was written: nesting an atlas root inside someone's world repo is
    * exactly the litter this guards against. Every door hands the handle to
    * `finishSetupDoor` (setup/world-doors.ts), which opens the world in place,
@@ -288,7 +288,7 @@ export async function openWorldFolder(
   // told where it is. A CLEARED one takes this folder as its home, its row,
   // link and settings kept, only when it holds this exact id (the file
   // door's rule, `clearedOwnTwin`); a linked one's first sync then reviews
-  // before it writes, since an unzipped copy has no sync history (Skeld's
+  // before it writes, since an unzipped copy has no sync history (contract
   // condition 3). A cleared row matched only through a former
   // link is not this world: the folder opens as its own.
   const browserTwin = worldAlreadyHere(getState().registry, meta.id);
@@ -629,7 +629,7 @@ export async function scaffoldWorldInRoot(
   parentOverride?: { handle: FileSystemDirectoryHandle; label: string },
   // Import round-trip: adopt the exported world id verbatim instead of minting
   // a fresh one, so a world re-imported into atlas keeps its identity and any
-  // cross-tool `ow://` reference resolves (Skeld's id-is-identity law).
+  // cross-tool `ow://` reference resolves (the id-is-identity law).
   // The caller guarantees no local world already uses this id (collision is a
   // merge-or-new choice made upstream in the import room).
   adoptId?: string,

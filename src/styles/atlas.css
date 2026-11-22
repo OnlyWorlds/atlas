@@ -125,7 +125,7 @@ html {
   --atlas-text-muted: rgba(var(--atlas-ink-rgb), 0.48);
   /* bumped from 0.36 → 0.48 for link icons + similar accents */
   /* Muted is the quietest text: words, placeholders and icon-only controls
-     all clear AA there (F-39, Seethe 2026-10-20). Ornament is for what is
+     all clear AA there (F-39, 2026-10-20). Ornament is for what is
      neither read nor clicked (a separator, a large empty-state glyph), and
      never for words. A disabled state may stay fainter (WCAG exempts it). */
   --atlas-ornament: rgba(var(--atlas-ink-rgb), 0.28);
@@ -991,7 +991,7 @@ button.atlas-map-tree-name {
    fill, one per screen at most, where someone begins. Standard
    .atlas-btn-primary, the wash and edge, the everyday default. Quiet
    .atlas-btn-ghost, a neutral edge, for cancel, back and toolbar actions
-   (keel's Quiet wears the same, Skeld 2026-10-20). Link .atlas-btn-link.
+   (keel's Quiet wears the same, 2026-10-20). Link .atlas-btn-link.
    A destructive action is Standard in the danger colour (.atlas-btn-danger).
    Inside the rooms they keep Atlas's compact size; the front door takes
    the ladder's full shape (.atlas-landing-compact .atlas-landing-btn).
@@ -1143,7 +1143,7 @@ button.atlas-map-tree-name {
 .atlas-select:focus {
   outline: none;
   /* Full cyan, not the soft one: against the rest border the soft read 2.7:1 in dark and
-     1.6:1 in light, under 3:1 (Seethe's F-57); full reads 8.8:1 and 3.6:1. */
+     1.6:1 in light, under 3:1 (a designer's F-57); full reads 8.8:1 and 3.6:1. */
   border-color: var(--atlas-cyan);
   background: var(--atlas-input-bg-focus);
 }
@@ -1603,7 +1603,7 @@ button.atlas-map-tree-name {
   border-color: var(--atlas-text-muted);
 }
 /* On a phone the page's sentence under the name says it whole, so the header's
-   word steps aside and the name keeps its room (Seethe 2026-10-23). */
+   word steps aside and the name keeps its room (2026-10-23). */
 @media (max-width: 560px) {
   .atlas-middle-content:has([data-role="proposed-note"]) .atlas-middle-header .atlas-proposed-mark {
     display: none;
@@ -2423,7 +2423,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 /* Ghost glyphs — pre-spaced from step 0 (zero reflow), lit when earned.
    Titus's call: unlit glyphs go practically invisible rather than grey. The
    SPACE is still reserved, so lighting one still causes zero reflow; what
-   dies is Skeld's "the ghosts promise the journey" read, traded for a calmer
+   dies is the "ghosts promise the journey" read, traded for a calmer
    sentence. A hair above zero so the shape is faintly there on a bright
    display rather than popping from nothing. */
 .atlas-tour-sentence .atlas-tour-glyph {
@@ -3504,7 +3504,7 @@ button.atlas-element-sync-dot {
 /* A seat a link left held: the row is a world waiting to come
    down, not a problem. Its state is a quiet line under the name, not a chip
    beside it: a chip took half the row and cut the name a person picks by to
-   ten characters (Seethe, 2026-10-25). The button's label says it too. */
+   ten characters (2026-10-25). The button's label says it too. */
 .atlas-held-text {
   flex: 1 1 auto;
   min-width: 0;
@@ -3516,7 +3516,7 @@ button.atlas-element-sync-dot {
   color: var(--atlas-text-soft);
 }
 /* A long name wraps rather than ending in an ellipsis: the row has no hover
-   that names it, and the name is what a person picks by (Seethe, 2026-10-25). */
+   that names it, and the name is what a person picks by (2026-10-25). */
 .atlas-held-text .atlas-row-main {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -4833,7 +4833,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* The OnlyWorlds sigil + eyebrow above the Atlas mark — routed users see the
    OW mark and the stated relationship before anything else (same-universe
-   continuity with onlyworlds.com; Skeld's opener note, 2026-07-19). */
+   continuity with onlyworlds.com; an opener note, 2026-07-19). */
 .atlas-landing-sigil {
   /* ow.com landing scale (240px) — the small render also read pixelated. */
   width: 240px;
@@ -5083,7 +5083,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* The doors' look is their rung's (Entry, Standard): this rule used to paint
    both doors one wash with a glow, so the main door and the demo door read
-   alike (Seethe's catch, 2026-10-20). */
+   alike (a designer's catch, 2026-10-20). */
 .atlas-landing-btn {
   padding: 12px 32px;
   font-size: 14px;
@@ -6951,8 +6951,8 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
   color: var(--atlas-text-muted);
 }
 
-/* Modern atlas: Seethe's lettering (map-atlas.ts, 2026-10-17), a plain
-   sans over soft tints, her sizes on a 12.5px base; the selectors carry the
+/* Modern atlas: the designer's lettering (map-atlas.ts, 2026-10-17), a plain
+   sans over soft tints, the designer's sizes on a 12.5px base; the selectors carry the
    style's class, so they win over the ink rules above. */
 .atlas-map-style-atlas .atlas-zone-label-ink span {
   color: #253040;
@@ -7020,10 +7020,10 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
   text-shadow: 0 0 3px #f5efe0, 0 0 3px #f5efe0, 0 0 2px #f5efe0;
 }
 
-/* Hatched: Seethe's lettering (map-hatched.ts, 2026-10-17), small caps
-   and italic as the two voices, one sepia, her sizes on a 12.5px base. EB
+/* Hatched: the designer's lettering (map-hatched.ts, 2026-10-17), small caps
+   and italic as the two voices, one sepia, the designer's sizes on a 12.5px base. EB
    Garamond is not bundled: a reader who has it gets it, everyone else Georgia,
-   which she named as the honest fallback. */
+   which the designer named as the honest fallback. */
 .atlas-map-style-hatched .atlas-zone-label-ink span {
   color: #3a2c1a;
   font: 400 12.5px 'EB Garamond', 'Cormorant Garamond', Garamond, Georgia, serif;
@@ -7068,9 +7068,9 @@ button.atlas-sync-pill-refresh[aria-disabled="true"]:focus-visible,
   text-transform: uppercase;
 }
 /* A washed sepia, not a black stamp: at a map's own zoom a dark icon read as a cartoon over the
-   terrain (Seethe, 2026-10-18). The icon still carries its type. */
+   terrain (2026-10-18). The icon still carries its type. */
 .atlas-map-pane .atlas-map-style-hatched .leaflet-marker-pane img.leaflet-marker-icon {
-  /* invert lifts the black glyph to a grey, sepia warms it: about #5a4a30, her secondary ink */
+  /* invert lifts the black glyph to a grey, sepia warms it: about #5a4a30, the designer's secondary ink */
   filter: grayscale(1) invert(0.26) sepia(1);
   opacity: 0.9;
 }
@@ -13502,7 +13502,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: 300px;    /* the backlog "fills fast" (Simmer) — scroll it, don't clip the card */
+  max-height: 300px;    /* the backlog "fills fast" (a tester's note) — scroll it, don't clip the card */
   overflow-y: auto;
 }
 .atlas-timeline-rail-undated-head {
@@ -14012,8 +14012,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 
 /* On and off are a step apart in ink now that off reads at muted (F-39), so
-   on also fills its glyph: a second cue that is not colour (WCAG 1.4.1, Seethe
-   2026-10-20), and a filled glyph is as wide as an outlined one. The same rule
+   on also fills its glyph: a second cue that is not colour (WCAG 1.4.1, 2026-10-20), and a filled glyph is as wide as an outlined one. The same rule
    holds for the chart mode switch and the context pane's type chips. */
 .atlas-chart-type-chip.active .material-symbols-outlined,
 .atlas-chart-mode button.active .material-symbols-outlined,
@@ -15154,7 +15153,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-element-image-hide .material-symbols-outlined { font-size: 16px; }
 .atlas-element-image-wrap:hover .atlas-element-image-hide { opacity: 1; }
 /* A touch screen has no hover to reveal it, and a tap that shows it invites the wrong reading:
-   Settings, Elements keeps the switch (Seethe's phone pass). */
+   Settings, Elements keeps the switch (a phone pass). */
 @media (hover: none) {
   .atlas-element-image-hide { display: none; }
 }
@@ -16377,7 +16376,7 @@ body.atlas-share-fullpreview > * {
 .atlas-guide-room-back { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; padding: 4px 0; }
 .atlas-guide-room-back .material-symbols-outlined { font-size: 16px; }
 .atlas-guide-room-step { font-size: 12px; color: var(--atlas-text-muted); }
-/* A narrow pane: the line above, the button the bar's full width (Seethe's look). */
+/* A narrow pane: the line above, the button the bar's full width (a designer's look). */
 @media (max-width: 820px) {
   /* The room header's own 24 px sides: on a phone the middle pane starts 12 px off the screen's edge. */
   .atlas-guide-room-bar { flex-direction: column; align-items: stretch; padding: 6px 24px; }
@@ -17602,7 +17601,7 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     font-size: 22px;
   }
 
-  /* An element's fields: the label over its value, not a 150px column beside it (Boss's phone
+  /* An element's fields: the label over its value, not a 150px column beside it (a phone
      walk, #242: the value had less than half the width). */
   .atlas-field {
     grid-template-columns: 1fr;
@@ -17676,7 +17675,7 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
     min-height: 40px;
   }
 
-  /* The left drawer and its row of types at a finger's size (Seethe's phone pass: 25px
+  /* The left drawer and its row of types at a finger's size (a phone pass: 25px
      chips with the counts crammed above them, and the page's own words showing beside the
      drawer). The drawer takes more of the width and the dim behind it deepens. */
   body:not(.atlas-touring).atlas-narrow-sidebar .atlas-sidebar {
@@ -17741,7 +17740,7 @@ body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
   }
 }
 
-/* A touch screen has no keys to name and nothing to drop (Seethe's phone pass). */
+/* A touch screen has no keys to name and nothing to drop (a phone pass). */
 @media (pointer: coarse) {
   .atlas-edit-popover-hint {
     display: none;
@@ -17940,7 +17939,7 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 
 /* With the side drawer open, its footer row (gear, help, the sync pill) sits at
    the bottom left too: the banner rises above it (#303, Titus's,
-   Boss 2026-10-15). */
+   2026-10-15). */
 body.atlas-drawer-sidebar-open .atlas-update-banner {
   bottom: 72px;
 }
@@ -18031,7 +18030,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
   user-select: text;
 }
 
-/* Files on an element (Seethe's mock 04). The row is a field row
+/* Files on an element (the designer's mock 04). The row is a field row
    with a third column for its two acts. */
 .atlas-files-meta {
   font-size: 11px;
@@ -18341,7 +18340,7 @@ button.atlas-settings-issue-name:hover { text-decoration: underline; }
 .atlas-home-strand-note { margin: 0 0 8px; color: var(--atlas-text-soft); font-size: 0.86rem; }
 .atlas-home-strand-say { margin: 8px 0 0; color: var(--atlas-text); font-size: 0.9rem; }
 .atlas-home-strand-say:empty { display: none; }
-/* The journey's grid (1.120.0, Seethe's): the story across the top; the Event and the main character on
+/* The journey's grid (1.120.0, the designer's): the story across the top; the Event and the main character on
    the left, their places on the right. The places' cells span the middle `auto` column and the right one
    as a subgrid; since 1.122.0 (G11) the joining words stand in the box's own column, between its line and
    the box, so the middle column is empty and the half columns sit 12 px apart (6 + 0 + 6), kept so the

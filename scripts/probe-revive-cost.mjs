@@ -1,6 +1,6 @@
 // PROBE: on reviving a parked world, is a stat pass over every file
 // (getFile().lastModified) much cheaper than simply re-reading every body?
-// Answers the revive question in Notes/2026-09-28-shared-surface-design.md §2.
+// Answers the revive question of the shared-surface design (a private note, not in this repository).
 // Seeds the folder's element files into OPFS in real Chromium, then times:
 //   stat: getFile() per handle, read lastModified only
 //   read: getFile().text() per handle (what a cold open's index pays)

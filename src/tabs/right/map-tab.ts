@@ -108,7 +108,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   wrapper.appendChild(container);
 
   // Floating zones dropdown panel (ZC9 — was the bottom-of-canvas chip strip
-  // in sessions 213-216). Hidden until the toolbar's dropdown button opens
+  // in an earlier build). Hidden until the toolbar's dropdown button opens
   // it; anchored top-right under that button via CSS. The DOM element is
   // still owned by entry.zoneStrip so renderChipStrip + wireChipStrip from
   // map-tab-zones.ts keep working without refactor.

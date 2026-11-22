@@ -1,6 +1,6 @@
 // PROBE: what does a content hash per element file cost when a world
-// opens? Answers Skeld's design question for the sync-manifest bout
-// (Notes/2026-09-28-shared-surface-design.md). Atlas already reads every
+// opens? Answers a design question for the sync-manifest bout
+// (a private design note, not in this repository). Atlas already reads every
 // element body at open (the index is built from bodies), so the hash's
 // marginal cost is the digest, not the read. This measures both, in real
 // Chromium, over the real bytes of a folder:

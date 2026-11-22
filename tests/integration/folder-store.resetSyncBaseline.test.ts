@@ -145,7 +145,7 @@ describe('FolderStore.resetSyncBaseline — contract', () => {
   });
 });
 
-describe('FolderStore.resetSyncBaseline — re-link Route 1 after unlink (the captain bug)', () => {
+describe('FolderStore.resetSyncBaseline — re-link Route 1 after unlink (the re-link bug)', () => {
   it('after sync + reset, a fresh push CREATEs every element (no UPDATE → 404 → server-delete routing)', async () => {
     // Setup: two elements, freshly created locally. They'll get
     // server_updated_at stamps from the first push.

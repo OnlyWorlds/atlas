@@ -17,7 +17,7 @@
  * off-screen elements as visible, which is precisely how the tour suite ran
  * green at 390px on a screen no human could read. The assertions here are
  * geometric (measured boxes against the viewport), and the look was checked
- * by keeper own-eyes at 1440 / 1024 / 760 / 390 (Notes/ui-snapshots/).
+ * by eye at 1440 / 1024 / 760 / 390 (local screenshots, not in this repository).
  */
 
 import { test, expect, Page } from '@playwright/test';

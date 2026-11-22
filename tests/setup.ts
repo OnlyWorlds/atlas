@@ -36,7 +36,7 @@ Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: t
 // jsdom has no Range layout. A TipTap `focus()` scrolls the selection into
 // view (prosemirror `scrollToSelection` → `Range.getClientRects`), inside a
 // rAF, so a test that opens an editor ended the RUN with an unhandled
-// TypeError and exit 1 while every test passed (Boss, 1.11). Zero rects:
+// TypeError and exit 1 while every test passed (1.11). Zero rects:
 // nothing here measures layout; e2e owns geometry.
 const zeroRect = (): DOMRect => ({
   x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0,

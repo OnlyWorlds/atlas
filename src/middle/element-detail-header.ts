@@ -119,7 +119,7 @@ export function imagesFocusBack(selector: string): void {
 /**
  * `hiddenNote`: the page says the hidden line in a sentence under the name, so the header
  * leaves its glyph out and the name keeps its room beside a Location's map controls on a
- * phone (Seethe's read of 1.86.0, 2026-10-23). The writing workspace keeps the glyph.
+ * phone (a designer's read of 1.86.0, 2026-10-23). The writing workspace keeps the glyph.
  */
 export function renderHeader(el: Element, opts: { hiddenNote?: boolean } = {}): HTMLElement {
   const header = document.createElement('div');

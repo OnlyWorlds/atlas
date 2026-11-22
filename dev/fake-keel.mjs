@@ -1,9 +1,9 @@
-// Minimal fake keel for live-verifying atlas flows (account-mode S260;
-// world-meta sync S262). Implements: GET /api/v2/account, GET
+// Minimal fake keel for live-verifying atlas flows (account mode,
+// world-meta sync). Implements: GET /api/v2/account, GET
 // /api/v2/account/worlds, POST /api/v2/account/worlds/:id/keys,
 // GET+PATCH /api/v2/world (world-meta, keel@83fe020 semantics),
 // GET /api/v2/:type (cursor-envelope lists). CORS open. Port 8787.
-// Rescued from the S260 scratchpad to tools/atlas/dev/ (S262) — a durable
+// Rescued from a scratchpad to dev/ — a durable
 // verification instrument, not session debris.
 import http from 'node:http';
 
@@ -92,7 +92,7 @@ const server = http.createServer((req, res) => {
   }
 
   // ---- world-key routes ----
-  // World-meta state (S262): the 13-field /world body, keel@83fe020 semantics.
+  // World-meta state: the 13-field /world body, keel@83fe020 semantics.
   // Mutable via PATCH; updated_at bumps on every applied write (even
   // same-value — keel does not diff), never on an empty body.
   if (p === '/api/v2/world' && req.method === 'GET') {

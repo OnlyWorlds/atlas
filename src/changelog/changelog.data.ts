@@ -3877,7 +3877,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'agent-mark',
         title: 'An element an agent changed last carries a quiet mark',
-        body: 'In a synced world, when an agent made the last change to an element (an agent\'s own seat, MCP, or a tool that says it is an agent), a small mark sits after its name. Point at it or tap it to read who: "Last changed by Skeld, an agent". A person\'s change carries none, and your own edit takes the mark away.',
+        body: 'In a synced world, when an agent made the last change to an element (an agent\'s own seat, MCP, or a tool that says it is an agent), a small mark sits after its name. Point at it or tap it to read who: "Last changed by Sable, an agent". A person\'s change carries none, and your own edit takes the mark away.',
         tags: ['sync', 'worlds'],
       },
     ],
@@ -4651,8 +4651,8 @@ export const CHANGELOG: ChangelogRelease[] = [
     theme: 'a seat of its own',
     entries: [
       // The #/join/ door ships in this release too, unannounced: no page can
-      // make its link until keel's Open in Atlas button is live (Skeld,
-      // 2026-10-10). Its entry lands with that button.
+      // make its link until keel's Open in Atlas button is live
+      // (2026-10-10). Its entry lands with that button.
       {
         id: 'seat-worlds',
         title: 'A world on a seat keeps its own secret',

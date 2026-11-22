@@ -165,7 +165,7 @@ test('a player link (#416): opens to read as the Character, no account, no seat,
   expect(after.meta).toMatchObject({ world_id: WORLD_ID, read_only: true });
 });
 
-// keel (PR 110), Seethe's frame 5: a party link's pick in Atlas.
+// keel (PR 110), the designer's frame 5: a party link's pick in Atlas.
 // The table keel here answers as `table_preview` and `_table_pick` do.
 async function mockTable(page: Page, opts: { characters?: Array<{ id: string; name: string }>; taken?: string[]; stealOnPick?: string } = {}) {
   const now = '2026-10-10T00:00:00.000Z';
@@ -177,7 +177,7 @@ async function mockTable(page: Page, opts: { characters?: Array<{ id: string; na
     if (path === '/join/preview') {
       t.previews++;
       return route.fulfill({ json: {
-        reader: 'player', world: { name: 'BM walk copy', description: '' }, invited_by: 'Seethe', owner_character: null,
+        reader: 'player', world: { name: 'BM walk copy', description: '' }, invited_by: 'Sorrel', owner_character: null,
         role: 'guest', with_character: true, expires_at: '2099-10-26T12:00:00Z',
         max_uses: 5, uses_left: 5 - t.seated, name_required: listed.length === 0,
         characters: listed.map(c => ({ ...c, image_url: null, taken: taken.has(c.id) })),
@@ -375,10 +375,10 @@ async function seedHeld(page: Page, name = 'Moppetopia'): Promise<void> {
 }
 
 test('a held row gives the name its row: the state is a line under it, not a chip beside it', async ({ page }) => {
-  // Seethe's note on 1.91.1 (2026-10-25): the chip took half the row and cut the name to ten characters.
+  // A design note on 1.91.1 (2026-10-25): the chip took half the row and cut the name to ten characters.
   await freshBoot(page);
   await mockKeel(page);
-  // 38 characters: 1.92.2 still cut a name this long at 1280 and 360 (Seethe, 2026-10-25).
+  // 38 characters: 1.92.2 still cut a name this long at 1280 and 360 (2026-10-25).
   const long = 'The Moppetopia Harbour Guild of Ferries';
   await seedHeld(page, long);
   const name = page.locator('[data-held-seat] [data-role="held-download"]');

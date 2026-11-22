@@ -379,7 +379,7 @@ describe('the writing room', () => {
     expect(t.querySelector('.atlas-writing-landing-labels-edit')).not.toBeNull();
   });
 
-  it('the labels line reads in sentence case, its link too (Seethe 2026-10-20: a plain link is a label)', () => {
+  it('the labels line reads in sentence case, its link too (2026-10-20: a plain link is a label)', () => {
     const t = room(false, []);
     expect(t.querySelector('.atlas-writing-landing-labels')?.textContent?.trim()).toMatch(/^Labels: /);
     expect(t.querySelector('.atlas-writing-landing-labels-edit')?.textContent).toBe('Edit');

@@ -52,7 +52,7 @@ export { DEMO_WORLD_ID } from '../core/moppetopia';
 /**
  * A demo read that has not answered in this long is given up: on a
  * stalled connection the try otherwise waited forever with nothing on screen
- * (Boss 2026-10-14, the harness `Notes/ui-snapshots/2026-10-14-s405/demo-drop.mjs`).
+ * (2026-10-14, found with a local harness, not in this repository).
  * Moppetopia's biggest page comes down in about a second.
  */
 export const DEMO_READ_TIMEOUT_MS = 30_000;

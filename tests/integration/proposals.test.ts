@@ -1,7 +1,7 @@
 /**
  * A seat's write that lands as a proposal (conv. 163).
  * The engine on FakeOwApiClient's `__propose_writes` seam, and the real
- * adapter against an MSW route that answers as keel did live (Seethe's read,
+ * adapter against an MSW route that answers as keel did live (a read,
  * 2026-10-22).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -364,7 +364,7 @@ describe('the gate\'s findings, each held', () => {
   });
 });
 
-describe('G3: a refused delete takes back the unlinks it set off (TC 2026-10-22)', () => {
+describe('G3: a refused delete takes back the unlinks it set off (2026-10-22)', () => {
   /** Ada links to a place and two species, all the owner's; then the key turns into a seat. */
   async function linkedWorld() {
     const loc = await folder.createElement('location', { name: 'Harbour' });

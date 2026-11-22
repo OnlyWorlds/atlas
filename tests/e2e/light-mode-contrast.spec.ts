@@ -188,7 +188,7 @@ test('the same chrome is still readable in dark mode', async ({ page }) => {
 });
 
 /**
- * F-57 (Seethe, 1.70.0): a text field in focus said so by its border alone, at half-strength
+ * F-57 (1.70.0): a text field in focus said so by its border alone, at half-strength
  * cyan: 2.7:1 against its resting border in dark, 1.6:1 in light. The focused border against
  * the resting one, both composited over the page, must reach the 3:1 UI floor in both themes.
  */

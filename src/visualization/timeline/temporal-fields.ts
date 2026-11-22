@@ -25,7 +25,7 @@ export interface TemporalFieldMapping {
  * The span a node effectively occupies on the axis, resolving open ends against
  * the world's now. Recorded end wins; an open-ended node runs to the now when
  * the now is set and strictly ahead of its start; otherwise null (a point).
- * Pure — computed at render, never stored (the now must read live, Simmer's
+ * Pure — computed at render, never stored (the now must read live, the
  * drift discipline).
  */
 export function effectiveEndDate(

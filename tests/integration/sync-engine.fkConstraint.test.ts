@@ -8,7 +8,7 @@
  * Push → keel returns an honest 400 `invalid_link` → without routing, an
  * infinite retry loop.
  *
- * Keel v2 error shape (probed live 2026-07-12, Notes/2026-07-12-v2-probed-facts.md):
+ * Keel v2 error shape (probed live 2026-07-12):
  *   400 {error:{code:"invalid_link", param:"<field>",
  *        message:"<field> references <Type> '<id>' which does not exist."}}
  * The dangling id comes from the MESSAGE (gate 10.4) — no body lookup. The

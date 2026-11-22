@@ -115,8 +115,8 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
 
   const token = getState().registry.account_token;
   if (token) {
-    // The SDK's one implementation of the account's world create (Kael's
-    // createAccountWorld, SDK 4.66.0, 2026-10-23); Atlas's own call retired
+    // The SDK's one implementation of the account's world create
+    // (createAccountWorld, SDK 4.66.0, 2026-10-23); Atlas's own call retired
     // with 1.83.1.
     const client = new OwV2Client({ apiKey: token, baseUrl: devV2Base() ?? DEFAULT_V2_BASE, client: ATLAS_CLIENT_NAME });
     // The folder's lines are a courtesy to keel, never a reason the world
@@ -718,7 +718,7 @@ function errText(err: unknown): string {
 // ---------------------------------------------------------------------------
 // Client builder. buildV2Adapter — the thin v2 fetch adapter carrying all
 // element CRUD, /bulk, /changes, AND credential validation via GET /world
-// (the v1 SDK buildOwClient lane retired 2026-07-12 when Skeld shipped the
+// (the v1 SDK buildOwClient lane retired 2026-07-12 when keel shipped the
 // /world endpoint; the SDK survives only for FIELD_SCHEMA statics).
 // ---------------------------------------------------------------------------
 

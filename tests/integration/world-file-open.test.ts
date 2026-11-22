@@ -1,6 +1,6 @@
 /**
  * Open a world file (1.17 bout 5, contract §5.2, §9 invariants 6, 14;
- * Skeld 2026-10-04). The file lands as a
+ * 2026-10-04). The file lands as a
  * browser world through the make protocol (fresh nonced directory, world.json
  * last, a failure removes it, a full origin is fatal); the same world already
  * here is refused; a world the browser cleared is restored under its own
@@ -100,7 +100,7 @@ describe('openWorldFile', () => {
     expect(reg().worlds).toHaveLength(1);
     expect(e.cleared_at).toBeUndefined();
     expect(e.folder.folder_name).not.toBe('hollow-reach-0192a000-dead');       // a fresh name (gate B6)
-    expect(e.review_first_sync).toBe(true);                                       // gate A9, Skeld's condition 3
+    expect(e.review_first_sync).toBe(true);                                       // gate A9, condition 3
     const meta = JSON.parse((home.children.get(e.folder.folder_name) as FakeDirHandle).get('world.json')!);
     expect(meta).toMatchObject({ id: WID, api: { world_id: 'srv-1', api_key: 'ow_w_key' } });
   });

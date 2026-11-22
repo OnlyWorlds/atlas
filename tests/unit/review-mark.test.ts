@@ -79,7 +79,7 @@ describe('R1, the readings', () => {
 
   it("the word owner is the world's owner, by the roster's name when served; only the exact word", () => {
     const mark = proposedMarkOf(el('a', 'Quill', { x_review_proposed: { ...MARK, by: 'owner' } }), '2026-10-23')!;
-    // No roster, no platform to resolve it: the word stays the mark's raw value (the S591 gate's M1).
+    // No roster, no platform to resolve it: the word stays the mark's raw value (a review gate's M1).
     expect(proposedLine(mark, 'owner', null, () => undefined)).not.toContain('names');
     expect(proposedLine(mark, 'owner', [], () => undefined)).toContain("The mark names the world's owner.");
     const roster = [{ id: null, kind: 'owner', name: 'titus', role: 'owner' }] as unknown as OwMember[];

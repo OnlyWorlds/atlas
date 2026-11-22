@@ -1,6 +1,6 @@
 /**
  * Bring it down again (1.17, conv. 129; contract §3.3;
- * Skeld 2026-10-04): a LINKED world the browser cleared comes back from
+ * 2026-10-04): a LINKED world the browser cleared comes back from
  * onlyworlds.com under its own row.
  *
  * A named restore, not the link flow: the link would refuse (the cleared row
@@ -100,7 +100,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<BringDown
   const readOnly = !!entry.api.read_only;
   const pin = readOnly ? '' : (worldPin(entry, getState().registry) ?? '');
   // The download only reads, and keel reads a prefixed key without its PIN
-  // (keel core/auth.py rulings 1 and 2, Skeld 2026-10-11): the world
+  // (keel core/auth.py rulings 1 and 2, 2026-10-11): the world
   // comes back and its sync waits on the PIN. A legacy ten-digit key on a
   // private world still needs it to read.
   if (!readOnly && !pin && !readsWithoutPin(entry.api.api_key)) {

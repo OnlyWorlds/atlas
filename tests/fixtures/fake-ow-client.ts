@@ -664,7 +664,7 @@ export class FakeOwApiClient implements OwApiClient {
    * the engine's topo-sort fallback (the engine routes ≥2 creates through
    * /bulk only when `typeof client.bulkCreate === 'function'`).
    *
-   * Faithful to the probed contract (Notes/2026-07-12-v2-probed-facts.md):
+   * Faithful to the probed contract (the 2026-07-12 live probe, kept in a local note):
    *   - HTTP 200 always; consult `errors` + per-item `status`.
    *   - Success items → status 201, id preserved, NO `updated_at` (the engine
    *     backfills authoritative timestamps via GET / list walk).
@@ -716,7 +716,7 @@ export class FakeOwApiClient implements OwApiClient {
     for (const it of items) {
       const wireBody = stripUndefined(it.element);
       const id = (wireBody.id as string) ?? cryptoRandomId();
-      // An id hidden from this key: the item is 404, nothing made (keel's /bulk, Skeld 2026-10-20).
+      // An id hidden from this key: the item is 404, nothing made (keel's /bulk, 2026-10-20).
       if (this.outOfView.has(id)) {
         anyError = true;
         results.push({ status: 404, id, error: { code: 'not_found', message: `${it.type} '${id}' not found.`, param: null } as V2ItemError });

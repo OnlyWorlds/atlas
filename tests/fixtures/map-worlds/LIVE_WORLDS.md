@@ -1,4 +1,4 @@
-# Live test worlds — populated by Skeld 2026-05-15
+# Live test worlds — populated 2026-05-15
 
 These three OW worlds mirror the fixtures in `world-a.ts`, `world-b.ts`,
 `world-c.ts`. They exist for end-to-end verification once atlas's map
@@ -65,8 +65,8 @@ flipping to the live world to see the tree against a real canvas).
 - Orphan Map — `06a06ea7-c21e-7b32-8000-955c081218de` (location: Tavern Loc)
 
 Note: the "Broken Child" entry from `world-c.ts` is fixture-only (intentional
-dangling parent_map for the algorithm's defense path). Skeld did NOT create
-it on the live API and offered to add it via a PATCH-bypass if needed — kept
+dangling parent_map for the algorithm's defense path). It was NOT created
+on the live API; it could be added via a PATCH-bypass if needed — kept
 JSON-fixture-only for now.
 
 ## Repro / cleanup
@@ -77,7 +77,7 @@ The scripts that built these worlds:
 - `verify.py` — re-run tree comparison
 - `uuids.json` — machine-readable UUID map
 
-## OW API quirks confirmed by Skeld (no schema surprises)
+## OW API quirks confirmed live (no schema surprises)
 
 - Write side: `parent_map_id`, `location_id` (with `_id` suffix).
 - Read side: nested `{id, name, ...}` objects under `parent_map` and `location`.

@@ -1,6 +1,6 @@
 /**
  * Bring it down again (1.17, conv. 129; contract §3.3,
- * Skeld 2026-10-04): a linked world the browser cleared comes back from
+ * 2026-10-04): a linked world the browser cleared comes back from
  * onlyworlds.com as a NAMED RESTORE, not the link flow. It downloads into a
  * FRESH nonced directory (gate B6), writes world.json with the entry's OWN
  * world id and its `api` block (a made-online world keeps its local id while

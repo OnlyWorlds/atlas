@@ -64,24 +64,24 @@ test.describe('#526 messages and the charter', () => {
   test('a message shows From and To above its text, and a story does not', async ({ page }) => {
     await setupWorld(page);
     const codex = await createElement(page, 'character', { name: 'Codex' });
-    const bb = await createElement(page, 'character', { name: 'BB' });
-    const kael = await createElement(page, 'character', { name: 'Kael' });
+    const bea = await createElement(page, 'character', { name: 'Bea' });
+    const kit = await createElement(page, 'character', { name: 'Kit' });
     const msg = await createElement(page, 'narrative', {
-      name: 'Re: the partner lines', supertype: 'Message', narrator: codex, characters: [bb, kael], story: 'Checked.', description: 'About the partner lines',
+      name: 'Re: the partner lines', supertype: 'Message', narrator: codex, characters: [bea, kit], story: 'Checked.', description: 'About the partner lines',
     });
-    const saga = await createElement(page, 'narrative', { name: 'A saga', narrator: codex, characters: [bb], description: 'A long tale', story: 'Once.' });
+    const saga = await createElement(page, 'narrative', { name: 'A saga', narrator: codex, characters: [bea], description: 'A long tale', story: 'Once.' });
     const w = await worldId(page);
 
     await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, msg]);
     const line = page.locator('[data-role="message-parties"]');
     // A folder world has no roster, so the sender is a claim (the message profile).
-    await expect(line).toHaveText('Claims to be from Codex · To BB, Kael');
+    await expect(line).toHaveText('Claims to be from Codex · To Bea, Kit');
     // A message's words lead: its story stands right after the description, before the narrative's
     // own sections (the views file's message row).
     const order = await page.locator('[data-field]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.field));
     expect(order.indexOf('story')).toBe(order.indexOf('description') + 1);
-    await line.getByRole('link', { name: 'BB' }).click();
-    await expect(page).toHaveURL(new RegExp(`#/w/${w}/element/${bb}$`));
+    await line.getByRole('link', { name: 'Bea' }).click();
+    await expect(page).toHaveURL(new RegExp(`#/w/${w}/element/${bea}$`));
 
     await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, saga]);
     await expect(page.locator('[data-role="element-name"]')).toHaveText('A saga');
@@ -91,9 +91,9 @@ test.describe('#526 messages and the charter', () => {
     expect(sagaOrder.indexOf('story')).toBeGreaterThan(sagaOrder.indexOf('description') + 1);
 
     // An empty Characters list is addressed to everyone.
-    const all = await createElement(page, 'narrative', { name: 'To the crew', supertype: 'Message', narrator: kael, characters: [] });
+    const all = await createElement(page, 'narrative', { name: 'To the crew', supertype: 'Message', narrator: kit, characters: [] });
     await page.evaluate(([w, id]) => { window.location.hash = `#/w/${w}/element/${id}`; }, [w, all]);
-    await expect(page.locator('[data-role="message-parties"]')).toHaveText('Claims to be from Kael · To everyone');
+    await expect(page.locator('[data-role="message-parties"]')).toHaveText('Claims to be from Kit · To everyone');
   });
 
   test("a world's charter leads Home and opens from there", async ({ page }) => {

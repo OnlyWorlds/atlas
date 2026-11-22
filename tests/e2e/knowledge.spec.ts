@@ -32,7 +32,7 @@ async function setupWorld(page: Page) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'kworld');
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  // Creating a world now flips the sidebar into elements mode (S255v3), so
+  // Creating a world now flips the sidebar into elements mode, so
   // world rows are no longer visible here — wait for the elements body instead.
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }

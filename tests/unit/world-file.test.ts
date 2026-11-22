@@ -229,9 +229,9 @@ describe('the reader refuses before anything is written', () => {
   });
 });
 
-// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; Skeld 2026-10-22; SDK 4.63.0):
+// Folder spec §4.5 rule 11, §4.7 OW-8 (v0.3.15; 2026-10-22; SDK 4.63.0):
 // a producer's records marked private stay out of a world file unless asked.
-// The two files are the standard's own (schema-dist dist.49, Quillon's case):
+// The two files are the standard's own (schema-dist dist.49, a reported case):
 // the asked side holds `records/fold/` (private) and `records/lab/` whole.
 describe('private records (§4.5 rule 11, OW-8)', () => {
   const fixture = (name: string) => new Uint8Array(readFileSync(resolvePath(__dirname, '../fixtures/owworld', name)));

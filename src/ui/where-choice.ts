@@ -45,7 +45,7 @@ export { FIREFOX_PERSIST_NOTE };
 
 /**
  * A world that stays on onlyworlds.com (Download a world, View a shared
- * world; Titus's call, Seethe's line 2026-10-22): clearing this
+ * world; Titus's call, 2026-10-22): clearing this
  * browser loses only what has not synced, so the question folds to one line.
  * A world with no other copy keeps the whole question (1.17, conv. 129).
  */

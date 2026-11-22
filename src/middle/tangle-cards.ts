@@ -2,7 +2,7 @@
  * Tangle record cards (the atlas half of the tangle→atlas seam, 2026-07-19).
  *
  * Tactical Tangle records battles into the world as elements carrying
- * structured extensions (registered in Skeld's tangle-conventions):
+ * structured extensions (registered in the tangle-conventions):
  *   - Event.x_tangle_battle  — { engineVersion, seed, durationSeconds,
  *       winner|null, sides: [{name, fallen}], units: [{name, side, type,
  *       started, remaining, outcome}] }

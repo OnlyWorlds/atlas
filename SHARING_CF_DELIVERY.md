@@ -1,4 +1,4 @@
-# Sharing — Cloudflare Delivery Design (Temper's half)
+# Sharing — Cloudflare Delivery Design (Atlas's half)
 
 **Status**: MERGED (2026-06-12) — Anchor's half is BUILT: she chose **purge-by-URL** (scoped Zone→Cache-Purge token, Titus mints it; degrades to edge TTL when the token's absent). Cache key = `https://www.onlyworlds.com/api/sharing/pages/<slug>/` (configurable via her `SHARING_API_ORIGIN`); all three payload fetchers (atlas client, viewer SPA, OG Function) are pinned to that host. Remaining: the shared Cache Rule (§3) + the §5 deploy-time verify.
 **Context**: `SHARING_CONTRACT.md` v0.2 §7 · Anchor's feasibility review §3.2 (kept with the backend) · the page viewer at show.onlyworlds.com (a separate tool).
@@ -40,7 +40,7 @@ Frozen payloads are **immutable between republishes** — the ideal cacheable ob
 3. **Per-IP throttle on the GET** stays at Django regardless (cache-miss path + cache-bypass attempts are still origin traffic).
 4. **CORS on the public GET** (flagged 2026-06-12): the viewer SPA fetches cross-origin (`show.onlyworlds.com` → `www.onlyworlds.com`). The response needs `Access-Control-Allow-Origin` — and because the response is edge-cached, it should be **`*` set statically**, NOT a per-request Origin reflection (a cached copy carrying `ACAO: <some-other-origin>` without `Vary: Origin` would be served to the viewer and blocked by the browser). Likely covered by ow.com's existing global CORS config — verify which mode it runs in at first deploy.
 
-### Temper's half (done or owned)
+### Atlas's half (done or owned)
 
 1. **Viewer** (the separate page-viewer tool) — static SPA. Fetches the public GET; renders §5 payloads; honest 404/410/network states. No auth, no cookies → maximally cacheable responses work without `Vary` headaches.
 2. **Pages Function** (`functions/[[path]].ts`) — OG meta injection for unfurls; fetches the payload server-side through the same edge cache; fails safe (serves the shell as-is). Response itself carries `max-age=300`.

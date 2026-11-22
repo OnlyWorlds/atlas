@@ -160,7 +160,7 @@ export class JoinWorldModal extends BaseModal {
   private buildModal(): HTMLElement {
     const p = this.preview;
     const player = this.asPlayer;
-    // A party link (Seethe's frame 5): each player picks who
+    // A party link (the designer's frame 5): each player picks who
     // they are from the owner's list, or, on a table with no list, names a
     // fresh Character. A refused pick looks again and spends nothing.
     const table = player ? p.table : undefined;

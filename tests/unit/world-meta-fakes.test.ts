@@ -2,7 +2,7 @@
  * world-meta fakes — proving the test doubles encode the REAL keel PATCH/GET
  * /world contract BEFORE the production caller exists (convention #20). Pinned
  * from keel@83fe020 source dig 2026-07-13
- * (Notes/2026-07-13-worldmeta-sync-design.md, "Wire contract (PINNED)").
+ * (the 2026-07-13 world-meta sync design, "Wire contract (PINNED)").
  *
  * Two doubles, two boundaries:
  *   - FakeOwApiClient is adapter-level → speaks DISK names (`time_current`).

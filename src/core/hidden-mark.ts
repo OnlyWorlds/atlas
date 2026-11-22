@@ -32,7 +32,7 @@ export function hiddenWordOf(answer: unknown): Record<string, unknown> | undefin
 
 /**
  * keel's answer to a push, for the stamp: the word, and keel's mark when keel hides the element.
- * A file never unhides (conv. 173, Skeld 2026-10-24), so a mark taken out here comes back with
+ * A file never unhides (conv. 173, 2026-10-24), so a mark taken out here comes back with
  * the answer that shows keel still hides it; a pull would skip that answer as its own echo.
  */
 export function hiddenKeptOf(answer: unknown): Record<string, unknown> | undefined {

@@ -4,14 +4,14 @@
  * specs, hearts, votes, sittings, reports and member cards are elements of the world
  * itself, each a type with its own supertype. "A tool that shows a world
  * whole filters the room's supertypes out": the element list's "Hide the
- * room" (#350's companion; PROGRESS NEXT 1).
+ * room" (#350's companion).
  *
  * The pair AND the mark (schema-dist's room profile, dist.45): a room element
  * carries `x_room_of`, the id of the world or sitting its room belongs to,
  * written by the parlor on everything it makes. Without the mark a Narrative
  * with supertype Message is lore (a novel's letters, the Manifest's Wire) and
  * stays in view. The rule and its pairs are the SDK's since 1.77. A pair, never a supertype alone: a Location called Board is a place.
- * Member is Skeld's ruling, 2026-10-22. A supertype matches in any case, trimmed.
+ * Member is a ruling of 2026-10-22. A supertype matches in any case, trimmed.
  *
  * The lore leaves out a second kind too, under its own switch (1.101, the
  * charter profile's rule 1): the world's reading aids, its marked Charter,

@@ -45,7 +45,7 @@ const slotKey = (entry: WorldRegistryEntry, type: string, id: string): string | 
 /**
  * A trail line listens while `alive()` says it is on the page. The page rebuilds on every save
  * and an answer that moved is rare, so each new listener first lets go of the ones whose line
- * has left the page (the S523 gate's S1: 200 rebuilds had left 200 listeners).
+ * has left the page (a review gate's S1: 200 rebuilds had left 200 listeners).
  */
 export function onDoorsChanged(fn: () => void, alive: () => boolean = () => true): () => void {
   for (const [other, on] of [...listeners]) if (!on()) listeners.delete(other);

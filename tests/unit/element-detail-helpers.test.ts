@@ -22,7 +22,7 @@ describe('humanizeFieldName', () => {
     expect(humanizeFieldName('description')).toBe('Description');
   });
 
-  it('is sentence case: only the first word takes a capital (Titus, 2026-10-20; Seethe F-28)', () => {
+  it('is sentence case: only the first word takes a capital (Titus, 2026-10-20; F-28)', () => {
     expect(humanizeFieldName('birth_date')).toBe('Birth date');
     expect(humanizeFieldName('primary_power')).toBe('Primary power');
   });
@@ -49,7 +49,7 @@ describe('humanizeFieldName', () => {
 
   it('handles already-capitalized input', () => {
     expect(humanizeFieldName('Name')).toBe('Name');
-    // A word written in capitals stays as written (SDK 4.36, Kael 2026-10-20): a stat block reads STR.
+    // A word written in capitals stays as written (SDK 4.36, 2026-10-20): a stat block reads STR.
     expect(humanizeFieldName('IMAGE_URL')).toBe('IMAGE URL');
     expect(humanizeFieldName('x_STR')).toBe('STR');
     expect(humanizeFieldName('x_max_HP')).toBe('Max HP');

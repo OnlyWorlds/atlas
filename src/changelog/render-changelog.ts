@@ -214,8 +214,8 @@ function rfc822(iso: string): string {
 }
 
 /**
- * RSS 2.0 feed — one item per ENTRY, so a combined ecosystem feed (Skeld's
- * what's-new, 2026-07-24) can interleave items across tools without
+ * RSS 2.0 feed — one item per ENTRY, so a combined ecosystem feed (a
+ * what's-new feed, 2026-07-24) can interleave items across tools without
  * unpacking releases. Item shape, kept deliberately boring and shareable:
  * title = entry title, link + guid = the entry's permalink anchor,
  * description = body, category = tags, pubDate = the release day.

@@ -6,7 +6,7 @@
  *   anything else with its line.
  * - The map edge colour retries a failed http(s) read once under
  *   `atlas-pixels=1`, past the header-less copy the overlay's plain <img>
- *   cached (media.onlyworlds.com, Boss 2026-10-09); other schemes never retry.
+ *   cached (media.onlyworlds.com, 2026-10-09); other schemes never retry.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PinPromptModal } from '../../src/ui/pin-prompt-modal';

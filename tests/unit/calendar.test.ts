@@ -1,6 +1,6 @@
 /**
  * Calendar kernel contract tests — every rule in the gated contract
- * (Notes/2026-07-14-calendar-design-final.md §5) plus the materials fixtures.
+ * (§5 of the final calendar design, kept in a local note) plus the materials fixtures.
  *
  * Fixtures: Kirrowmoss (irregular months, 3 eras incl. closed, free 6-day
  * week), Vessach (year-grain, era gap), Dune B.G./A.G. (down-era astride 0),
@@ -535,7 +535,7 @@ describe('malformed step sizes', () => {
   });
 });
 
-describe('a down era with a mid-year pivot (Quillon 2026-10-20)', () => {
+describe('a down era with a mid-year pivot (2026-10-20)', () => {
   // Day grain, two 10-day months, a down era and an up era both pivoting at
   // step 5, half way through a month. What Atlas shows, typed back into the
   // timeline, must land on the same step on both sides of the pivot; SDK 4.42.2
@@ -563,7 +563,7 @@ describe('a down era with a mid-year pivot (Quillon 2026-10-20)', () => {
     expect(misses).toEqual([]);
   });
 
-  it('a typed date its era does not hold is refused, not moved (Kael 2026-10-21, SDK 4.42.4)', () => {
+  it('a typed date its era does not hold is refused, not moved (2026-10-21, SDK 4.42.4)', () => {
     // Year 1 BG holds only 1 to 5 Frost. 4.42.3 read "10 Thaw, 1 BG" as step 39
     // and "3 Frost, 0 BG" as step 2 (seen in a live walk); the era names the date's era.
     expect(isParseError(parseDate(MIDYEAR, '10 Thaw, 1 BG'))).toBe(true);

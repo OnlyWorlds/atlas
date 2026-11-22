@@ -103,7 +103,7 @@ export function fillMessageParties(line: HTMLElement, parties: MessageParties, w
     line.append(parties.wholeWorld ? 'everyone' : 'everyone, or someone hidden from you');
   } else {
     // Names joined by commas, as before #888; " and " only before the last of the
-    // tail (the ones not shown, the ones unseen), so "BB, Kael" reads as it did.
+    // tail (the ones not shown, the ones unseen), so "Bea, Kit" reads as it did.
     const names: Array<HTMLElement | string> = parties.to.map(p => link(p));
     const tail: string[] = [];
     const n = parties.toOutside;

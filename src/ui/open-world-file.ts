@@ -121,7 +121,7 @@ export async function openDemoWorld(toasts: ToastManager): Promise<void> {
     // The door's callers do not catch (the #/try-demo link fires it and
     // forgets), and opening a copy already here runs outside the download's
     // own catch: a failure there became "a problem it did not expect while
-    // working in the background" (Boss 2026-10-14). Said here, as what it is.
+    // working in the background" (2026-10-14). Said here, as what it is.
     console.warn('[open-world-file] demo failed:', err);
     if (!isCodeLoadError(err)) showProblem(err, { doing: DEMO_WORDS.doing, where: 'browser', toasts });
   } finally {
@@ -172,8 +172,7 @@ async function openDemoWorldOnce(toasts: ToastManager): Promise<void> {
   // with no download and no connection.
   if (await answerDemoHere(DEMO_WORLD_ID, toasts)) return;
   // The download takes seconds on a good line and longer on a weak one: a
-  // toast that left after four of them said nothing for the rest (Boss
-  // 2026-10-14). The overlay stays until the world is open (Boss 2026-10-14: closed
+  // toast that left after four of them said nothing for the rest (2026-10-14). The overlay stays until the world is open (2026-10-14: closed
   // at the download's end, the unpacking after it was two quiet seconds), and
   // gives way to the where-question when there is one.
   const overlay = showLoadingOverlay(`Downloading ${DEMO_WORLD_NAME}`);
