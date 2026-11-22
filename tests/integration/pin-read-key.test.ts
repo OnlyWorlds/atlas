@@ -1071,6 +1071,13 @@ describe('a PIN OnlyWorlds refused is said one way', () => {
     expect([...new Set(wall.map(h => h.at.split(':')[0]))].sort()).toEqual([
       'core/problems.ts', 'sync/element-files.ts', 'sync/rate-wait.ts', 'sync/sharing-client.ts',
     ]);
+    // A seat sends its seat secret as the PIN: the same wall counts seat secrets, said the same way, in the same places.
+    const SEAT_WALL = "OnlyWorlds refused too many different seat secrets for this world";
+    const seatWall = all.filter(({ lit }) => /different seat secrets/.test(lit));
+    expect(seatWall.filter(({ lit }) => !lit.slice(1).startsWith(SEAT_WALL)).map(h => h.at)).toEqual([]);
+    expect([...new Set(seatWall.map(h => h.at.split(':')[0]))].sort()).toEqual([
+      'core/problems.ts', 'sync/element-files.ts', 'sync/rate-wait.ts', 'sync/sharing-client.ts',
+    ]);
     // The instrument sees the old words and the new.
     expect(OLD.test('Too many wrong PIN tries. Check your World PIN in Settings.')).toBe(true);
     expect(OLD.test('OnlyWorlds is holding writes back after wrong PINs.')).toBe(true);

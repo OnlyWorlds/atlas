@@ -2,7 +2,7 @@
  * The account's PIN has one name in every sentence a person reads: the World PIN (1.125.3), the name
  * onlyworlds.com gives it in Account settings. A person met "World PIN", "your OnlyWorlds PIN", "your
  * PIN" and "the PIN" for the same four digits. Two short labels keep the bare word: the pill's and the
- * keepsafe's action Add PIN, and the world list's state chip no PIN. A seat's secret is not the World PIN
+ * keepsafe's action Add PIN, and the world list's state chip no PIN. A seat secret is not the World PIN
  * and keeps its own words. "different PINs" and "takes PINs" (keel's PIN wall) count tries, not the PIN.
  */
 import { describe, it, expect } from 'vitest';
@@ -42,31 +42,21 @@ function bare(lit: string): boolean {
   return /(?<!World )\bPIN\b/.test(body.replace(/\bAdd PIN\b/g, '').replace(/'no PIN'/g, ''));
 }
 
-/**
- * The lines said where the code cannot know whose `API-Pin` it was (no world given and none open): a
- * seat sends its seat's secret, never the World PIN, so these keep the old neutral "PIN". Each is the
- * third arm beside a World PIN line and a seat's line (tests/unit/seat-credential-words.test.ts).
- */
-const NEUTRAL: Array<[file: string, starts: string]> = [
-  ['core/problems.ts', '`OnlyWorlds did not accept this PIN. Atlas could not finish'],
-  ['core/problems.ts', "`OnlyWorlds did not accept this world's key or the PIN, so Atlas"],
-  ['core/problems.ts', '`${wall} Check your PIN in Settings; try again'],
-  ['middle/share-room.ts', "'PIN'"],
-  ['sync/element-files.ts', "'OnlyWorlds did not accept this PIN. Check it in Settings, under OnlyWorlds.'"],
-  ['sync/element-files.ts', '`Check your PIN in Settings; try again'],
-  ['sync/rate-wait.ts', '`${wall} Check your PIN in Settings; Atlas tries again'],
-  ['sync/sharing-client.ts', "'OnlyWorlds refused too many different PINs for this world\\'s key, so it takes none for a while. Nothing changed. Check your PIN in Settings"],
-  ['sync/sharing-client.ts', "'OnlyWorlds did not accept the key or the PIN. Check your PIN in Settings"],
-];
-const neutral = (at: string, lit: string) => NEUTRAL.some(([file, starts]) => at.startsWith(`${file}:`) && lit.startsWith(starts));
-
 describe('the World PIN by one name', () => {
+  // Where the code cannot know whose `API-Pin` it was, the line names both, "the World PIN or seat
+  // secret" (1.125.5): no line keeps the old neutral "PIN" (tests/unit/seat-credential-words.test.ts).
   it('no sentence a person reads names the account PIN any other way', () => {
-    expect(literals().filter(({ at, lit }) => bare(lit) && !neutral(at, lit)).map(h => `${h.at} ${h.lit}`)).toEqual([]);
-    // Each neutral line is still there, once: a row that went takes its place in this list with it.
-    for (const [file, starts] of NEUTRAL) {
-      expect(literals().filter(({ at, lit }) => at.startsWith(`${file}:`) && lit.startsWith(starts)).length, `${file} ${starts}`).toBe(1);
-    }
+    expect(literals().filter(({ lit }) => bare(lit)).map(h => `${h.at} ${h.lit}`)).toEqual([]);
+  });
+
+  // "Check the World PIN": the determiner does not turn inside a line that says "this world's key or the
+  // World PIN". And the seat's credential has one spelling, "seat secret", in every line a person reads.
+  it('no line says "Check your World PIN", and none says "seat\'s secret"', () => {
+    const hits = literals().filter(({ lit }) => /\b[Cc]heck your World PIN\b|then your World PIN\b|seat(?:\\?'|’)s secret/.test(lit));
+    expect(hits.map(h => `${h.at} ${h.lit}`)).toEqual([]);
+    // Each name the census reads, as it is written in code (an escaped quote included).
+    expect(/seat(?:\\?'|’)s secret/.test("'OnlyWorlds did not accept this seat\\'s secret.'")).toBe(true);
+    expect(/seat(?:\\?'|’)s secret/.test('`this seat secret`')).toBe(false);
   });
 
   it('the instrument sees the old words and lets the two labels be', () => {

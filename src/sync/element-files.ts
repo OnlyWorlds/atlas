@@ -276,21 +276,28 @@ const SIGN_IN_AGAIN = 'OnlyWorlds did not accept this world\'s key. Check it in 
 
 /** keel refused the `API-Pin` a file's add or remove sent, said for whose it was (a seat has no PIN to put in again). */
 export function pinRefusedLine(who: PinWho): string {
-  if (who === 'seat') return 'OnlyWorlds did not accept this seat\'s secret.';
+  if (who === 'seat') return 'OnlyWorlds did not accept this seat secret.';
   return who === 'account'
     ? 'OnlyWorlds did not accept this World PIN. Check it in Settings, under OnlyWorlds.'
-    : 'OnlyWorlds did not accept this PIN. Check it in Settings, under OnlyWorlds.';
+    : 'OnlyWorlds did not accept the World PIN or seat secret. Check it in Settings, under OnlyWorlds.';
 }
 
-/** The PIN wall's next step: check the World PIN (or, not known, the PIN) and wait; a seat only waits. */
+/** The PIN wall's first sentence: keel counts different wrong values of `API-Pin`, a seat's its seat secrets. */
+function pinWallLine(who: PinWho): string {
+  return who === 'seat'
+    ? "OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while."
+    : "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while.";
+}
+
+/** The PIN wall's next step: check the World PIN (or, not known, either credential) and wait; a seat only waits. */
 function checkThenWait(who: PinWho, when: string): string {
   if (who === 'seat') return `Try again in ${when}.`;
-  return who === 'account' ? `Check your World PIN in Settings; try again in ${when}.` : `Check your PIN in Settings; try again in ${when}.`;
+  return who === 'account' ? `Check the World PIN in Settings; try again in ${when}.` : `Check the World PIN or seat secret in Settings; try again in ${when}.`;
 }
 
 /**
  * keel's and the upload host's refusals of an add, each in its own sentence. `who` names the world's
- * `API-Pin`: the World PIN, a seat's secret, or (not known) the PIN.
+ * `API-Pin`: the World PIN, a seat secret, or (not known) either.
  */
 export function addRefusal(err: unknown, file: { size: number }, who: PinWho = 'unknown'): string {
   if (err instanceof TypeError) return `OnlyWorlds takes ${FILES_KINDS_LINE} (${EXTENSIONS.join(' ')}). This file is none of those.`;
@@ -302,7 +309,7 @@ export function addRefusal(err: unknown, file: { size: number }, who: PinWho = '
   // A 429 by keel's `param`: its PIN wall (ten different wrong PINs on this key), or any other throttle.
   if (err.code === 'rate_limited' || err.status === 429) {
     return isPinParam(err.param)
-      ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing was added. ${checkThenWait(who, minutes(err.retryAfter))}`
+      ? `${pinWallLine(who)} Nothing was added. ${checkThenWait(who, minutes(err.retryAfter))}`
       : `OnlyWorlds asked Atlas to wait. Nothing was added; try again in ${minutes(err.retryAfter)}.`;
   }
   if (err.code === 'not_author') return 'As a contributor, you can add files only to elements you made.';
@@ -452,7 +459,7 @@ export async function removeFile(
       if (err instanceof OwApiError && err.isAuthError) throw new PlainError(SIGN_IN_AGAIN);
       if (err instanceof OwApiError && err.status === 429) {
         throw new PlainError(isPinParam(err.param)
-          ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. The file is still there. ${checkThenWait(pinWhoOf(entry), minutes(err.retryAfter))}`
+          ? `${pinWallLine(pinWhoOf(entry))} The file is still there. ${checkThenWait(pinWhoOf(entry), minutes(err.retryAfter))}`
           : `OnlyWorlds asked Atlas to wait. The file is still there; try again in ${minutes(err.retryAfter)}.`);
       }
       throw new PlainError('The file was not removed. Try again in a moment.');

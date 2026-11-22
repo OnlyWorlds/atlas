@@ -42,7 +42,7 @@ const OTHER_KEY = 'ow_w_other';
 const RIGHT = '1234';
 const WRONG = '9999';
 
-const WALL_LINE = (when: string) => `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check your World PIN in Settings; Atlas tries again in ${when}.`;
+const WALL_LINE = (when: string) => `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Check the World PIN in Settings; Atlas tries again in ${when}.`;
 const WAIT_LINE = (when: string) => `OnlyWorlds asked Atlas to wait. Your changes are saved in the folder, and Atlas tries again in ${when}.`;
 
 let keel: PlayedKeel;

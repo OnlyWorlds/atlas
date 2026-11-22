@@ -25,7 +25,7 @@ export function keyRefusalPill(reason: KeyRefusal | null | undefined): string {
     case 'key_unknown': return 'OnlyWorlds no longer knows this world\'s key: the world was deleted there, or you were removed from it';
     case 'read_only_key': return 'This key can only read, so edits can\'t sync. Put in a write key in Settings, This world';
     case 'pin': return 'OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds';
-    default: return 'OnlyWorlds did not accept this world\'s key or the World PIN. Check your World PIN in Settings, or put in a new key in Settings, This world';
+    default: return 'OnlyWorlds did not accept this world\'s key or the World PIN. Check the World PIN in Settings, or put in a new key in Settings, This world';
   }
 }
 
@@ -36,7 +36,7 @@ export function keyRefusalLine(reason: KeyRefusal | null | undefined): string {
     case 'key_unknown': return 'Sync paused: OnlyWorlds no longer knows this world\'s key. The world was deleted there, or you were removed from it. If you can still open it on onlyworlds.com, put in a new key in Settings, This world.';
     case 'read_only_key': return 'Sync paused: this world\'s key can only read, so your edits can\'t sync. Put in a write key in Settings, This world.';
     case 'pin': return 'Sync paused: OnlyWorlds did not accept this World PIN. Check it in Settings, OnlyWorlds.';
-    default: return 'Sync paused: OnlyWorlds did not accept this world\'s key or the World PIN. Check your World PIN in Settings, OnlyWorlds, or put in a new key in Settings, This world.';
+    default: return 'Sync paused: OnlyWorlds did not accept this world\'s key or the World PIN. Check the World PIN in Settings, OnlyWorlds, or put in a new key in Settings, This world.';
   }
 }
 
@@ -48,7 +48,7 @@ export function keyRefusalLine(reason: KeyRefusal | null | undefined): string {
 export function seatRefusalLine(reason: KeyRefusal | null | undefined, opts: { paused?: boolean } = { paused: true }): string {
   const lead = opts.paused ? 'Sync paused: ' : '';
   if (reason === 'key_revoked') return `${lead}${opts.paused ? 'this' : 'This'} seat's key was renewed or revoked on onlyworlds.com.`;
-  if (reason === 'pin') return `${lead}OnlyWorlds did not accept this seat's secret.`;
+  if (reason === 'pin') return `${lead}OnlyWorlds did not accept this seat secret.`;
   return `${lead}OnlyWorlds no longer accepts this world's seat. The owner may have removed it.`;
 }
 
@@ -64,6 +64,6 @@ export function keyRefusalHere(reason: KeyRefusal | null | undefined): string {
     case 'key_unknown': return 'OnlyWorlds no longer knows this world\'s key. The world was deleted there, or you were removed from it. If you can still open it on onlyworlds.com, put in a new key below.';
     case 'read_only_key': return 'This key can only read, so edits can\'t sync. Put in a write key below.';
     case 'pin': return 'OnlyWorlds did not accept this World PIN. Check it on the OnlyWorlds tab.';
-    default: return 'OnlyWorlds did not accept this world\'s key or the World PIN. Check your World PIN on the OnlyWorlds tab, or put in a new key below.';
+    default: return 'OnlyWorlds did not accept this world\'s key or the World PIN. Check the World PIN on the OnlyWorlds tab, or put in a new key below.';
   }
 }

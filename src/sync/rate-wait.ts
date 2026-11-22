@@ -75,16 +75,17 @@ export function waitWords(ms: number): string {
  * The sync's words for a 429's wait, by keel's `param`: its PIN wall, or any other throttle. `place` is
  * where the world keeps its changes ("in this browser", "in the folder"). The toast at the 429 and a
  * press made inside the wait say the same sentence. `who` is whose `API-Pin` the world sends: a seat
- * has no World PIN to check, so its wall says the wait alone; not known, the line says "your PIN".
+ * has no World PIN to check, so its wall counts its seat secrets and says the wait alone; not known,
+ * the line names both.
  */
 export function rateWaitLine(pin: boolean, ms: number, place: string, who: PinWho = 'unknown'): string {
   const when = waitWords(ms);
   if (!pin) return `OnlyWorlds asked Atlas to wait. Your changes are saved ${place}, and Atlas tries again in ${when}.`;
+  if (who === 'seat') return `OnlyWorlds refused too many different seat secrets for this world's key, so it takes none for a while. Your changes are saved ${place}, and Atlas tries again in ${when}.`;
   const wall = "OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while.";
-  if (who === 'seat') return `${wall} Your changes are saved ${place}, and Atlas tries again in ${when}.`;
   return who === 'account'
-    ? `${wall} Check your World PIN in Settings; Atlas tries again in ${when}.`
-    : `${wall} Check your PIN in Settings; Atlas tries again in ${when}.`;
+    ? `${wall} Check the World PIN in Settings; Atlas tries again in ${when}.`
+    : `${wall} Check the World PIN or seat secret in Settings; Atlas tries again in ${when}.`;
 }
 
 /**

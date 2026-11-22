@@ -101,12 +101,12 @@ export function sharingErrorMessage(err: SharingApiError, who: PinWho = 'unknown
     case 'revoked': return 'This page has been revoked.';
     case 'not_found': return 'Page not found on the server.';
     // By keel's `param`: its PIN wall (ten different wrong PINs on this key), or any other throttle.
-    // A seat (`who`) sends its seat's secret, never the World PIN, and has no PIN to check.
+    // A seat (`who`) sends its seat secret, never the World PIN, and has no PIN to check.
     case 'rate_limited': return err.param?.toLowerCase() !== 'api-pin'
       ? 'OnlyWorlds asked Atlas to wait. Nothing changed; wait a bit and try again.'
-      : who === 'seat' ? 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Try again later.'
-      : who === 'account' ? 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check your World PIN in Settings, then try again later.'
-      : 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check your PIN in Settings, then try again later.';
+      : who === 'seat' ? 'OnlyWorlds refused too many different seat secrets for this world\'s key, so it takes none for a while. Nothing changed. Try again later.'
+      : who === 'account' ? 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check the World PIN in Settings, then try again later.'
+      : 'OnlyWorlds refused too many different PINs for this world\'s key, so it takes none for a while. Nothing changed. Check the World PIN or seat secret in Settings, then try again later.';
     case 'admin_locked': return 'An administrator locked this URL. Use a different URL.';
     case 'title_too_long': return 'Page name is too long to publish (200 characters max).';
     case 'intent_invalid': return 'OnlyWorlds did not accept this page\'s type. Tell us at onlyworlds.com/feedback.';
@@ -118,9 +118,9 @@ export function sharingErrorMessage(err: SharingApiError, who: PinWho = 'unknown
     // A contributor or guest seat (keel sharing `_require_page_manager`, #104).
     case 'owner_only': return 'Only the owner and co-builders can publish, change or revoke the world\'s pages.';
     case 'unauthorized':
-    case 'auth_failed': return who === 'seat' ? 'OnlyWorlds did not accept the key or its seat\'s secret.'
-      : who === 'account' ? 'OnlyWorlds did not accept the key or the World PIN. Check your World PIN in Settings, under OnlyWorlds.'
-      : 'OnlyWorlds did not accept the key or the PIN. Check your PIN in Settings, under OnlyWorlds.';
+    case 'auth_failed': return who === 'seat' ? 'OnlyWorlds did not accept the key or its seat secret.'
+      : who === 'account' ? 'OnlyWorlds did not accept the key or the World PIN. Check the World PIN in Settings, under OnlyWorlds.'
+      : 'OnlyWorlds did not accept the key, or its World PIN or seat secret. Check them in Settings, under OnlyWorlds.';
     case 'network': return 'Could not reach OnlyWorlds. Check your connection, then try again.';
     default: return 'OnlyWorlds could not finish that. Try again.';
   }

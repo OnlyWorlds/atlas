@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.125.5',
+    date: '2026-11-22',
+    theme: 'Each refusal names the World PIN or the seat secret',
+    entries: [
+      {
+        id: 'world-pin-or-seat-secret',
+        title: 'A refusal names the World PIN, the seat secret, or both',
+        body: 'Where Atlas cannot tell whose credential OnlyWorlds refused, the line now names both, the World PIN or seat secret, where it said this PIN or the PIN. Lines say Check the World PIN, a seat\'s credential is spelled seat secret everywhere, and when OnlyWorlds refuses too many different seat secrets for a seat world\'s key, the line says seat secrets, not PINs.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.125.4',
     date: '2026-11-22',
     theme: 'The Data room\'s AI instruction and its review agree',
