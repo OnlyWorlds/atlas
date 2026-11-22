@@ -224,8 +224,9 @@ async function trueSecondPage(page: Page, context: BrowserContext): Promise<void
 
 /**
  * The claim's wait on a live second page lasts about two seconds with nothing else drawn: after one
- * second a line says what it checks, and it is gone once the open ends (1.125.3). The line is sticky,
- * so only the open's end takes it down: read once after the confirm, never by a retrying count.
+ * second a line says what it checks, and it is gone once the open ends (1.125.3). The line lives about
+ * a second, too short for a retrying assertion to be sure of under load (Firefox missed it so), so a
+ * MutationObserver in the page records when it came and went, timed from the click.
  */
 async function checkingLineDuringTheWait(page: Page, context: BrowserContext): Promise<void> {
   await boot(page);
@@ -239,15 +240,28 @@ async function checkingLineDuringTheWait(page: Page, context: BrowserContext): P
   const second = await context.newPage();
   const dialogs = countDialogs(second);
   await shell(second);
-  const line = second.locator('.ow-toast', { hasText: `Checking whether another tab has "${SALTMERE.name}" open…` });
-  const t0 = Date.now();
+  const text = `Checking whether another tab has "${SALTMERE.name}" open…`;
+  await second.evaluate((want) => {
+    const w = window as any;
+    const seen = w.__checking = { t0: null as number | null, shown: null as number | null, gone: null as number | null };
+    document.addEventListener('click', () => { if (seen.t0 === null) seen.t0 = performance.now(); }, { capture: true });
+    new MutationObserver(() => {
+      if (seen.t0 === null) return;
+      const has = Array.from(document.querySelectorAll('.ow-toast')).some(t => (t.textContent ?? '').includes(want));
+      if (has && seen.shown === null) seen.shown = performance.now() - seen.t0;
+      if (!has && seen.shown !== null && seen.gone === null) seen.gone = performance.now() - seen.t0;    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }, text);
   await clickWorld(second, SALTMERE.name);
-  await expect(line).toBeVisible();
-  expect(Date.now() - t0).toBeGreaterThanOrEqual(900);
   await expect.poll(() => dialogs.at.length).toBe(1);
   await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
-  expect(await line.count()).toBe(0);
-  await second.close();
+  const seen = await second.evaluate(() => (window as any).__checking as { shown: number | null; gone: number | null });
+  // It came after a second of the wait, and went when the open ended, before the confirm's answer was said.
+  expect(seen.shown, 'the line came').not.toBeNull();
+  expect(seen.shown!).toBeGreaterThanOrEqual(900);
+  expect(seen.gone, 'the line went').not.toBeNull();
+  expect(seen.gone!).toBeGreaterThan(seen.shown!);
+  expect(await second.locator('.ow-toast', { hasText: text }).count()).toBe(0);
+  console.log(`[checking line] shown at ${Math.round(seen.shown!)} ms, gone at ${Math.round(seen.gone!)} ms`);  await second.close();
 }
 
 async function addressAtStartup(page: Page, context: BrowserContext): Promise<void> {
