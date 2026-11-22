@@ -147,7 +147,8 @@ describe('R1, the readings', () => {
 
   it('a row word is the word in its span, and nothing for a settled element', () => {
     expect(proposedRowWord(el('b', 'Ada'))).toBe('');
-    expect(proposedRowWord(el('a', 'Quill', { x_review_proposed: MARK }))).toContain('>Proposed<');
+    // Read against today's date: a mark that cannot lapse in this test's life (MARK lapsed on its own day).
+    expect(proposedRowWord(el('a', 'Quill', { x_review_proposed: { ...MARK, expires: '2999-12-31' } }))).toContain('>Proposed<');
   });
 });
 
