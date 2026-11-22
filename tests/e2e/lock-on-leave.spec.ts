@@ -223,10 +223,12 @@ async function trueSecondPage(page: Page, context: BrowserContext): Promise<void
 }
 
 /**
- * The claim's wait on a live second page lasts about two seconds with nothing else drawn: after one
- * second a line says what it checks, and it is gone once the open ends (1.125.3). The line lives about
- * a second, too short for a retrying assertion to be sure of under load (Firefox missed it so), so a
- * MutationObserver in the page records when it came and went, timed from the click.
+ * The claim's wait on a live second page says what it checks: after one second a line, which stays
+ * while the check waits and goes once the open ends (1.125.3). The wait here runs two asks (about four
+ * seconds): during the first, the first page writes its lock again naming another Web Lock it holds, as
+ * a store that wrote meanwhile does, and the claim asks about that one too. A sampler in the page reads
+ * the line every 50 ms from the click, and the confirm (the open's end, held) is marked when it is
+ * called. Was: the line, shown with no timer of its own, went about 300 ms after it came.
  */
 async function checkingLineDuringTheWait(page: Page, context: BrowserContext): Promise<void> {
   await boot(page);
@@ -236,6 +238,12 @@ async function checkingLineDuringTheWait(page: Page, context: BrowserContext): P
   await expect.poll(() => activeWorld(page)).toBe(id);
   // The first page's own open asked no other tab: no line came.
   expect(await page.locator('.ow-toast', { hasText: 'Checking whether another tab' }).count()).toBe(0);
+  // A second Web Lock of the first page, held for the test's length, for its lock to name mid-wait.
+  const EXTRA = 'atlas-writer:checking-line-extra';
+  await page.evaluate((name) => new Promise<void>((held) => {
+    void navigator.locks.request(name, () => { held(); return new Promise(() => {}); });
+  }), EXTRA);
+  const lock = (await readLock(page, SALTMERE.dir))!;
 
   const second = await context.newPage();
   const dialogs = countDialogs(second);
@@ -243,25 +251,41 @@ async function checkingLineDuringTheWait(page: Page, context: BrowserContext): P
   const text = `Checking whether another tab has "${SALTMERE.name}" open…`;
   await second.evaluate((want) => {
     const w = window as any;
-    const seen = w.__checking = { t0: null as number | null, shown: null as number | null, gone: null as number | null };
-    document.addEventListener('click', () => { if (seen.t0 === null) seen.t0 = performance.now(); }, { capture: true });
-    new MutationObserver(() => {
-      if (seen.t0 === null) return;
-      const has = Array.from(document.querySelectorAll('.ow-toast')).some(t => (t.textContent ?? '').includes(want));
-      if (has && seen.shown === null) seen.shown = performance.now() - seen.t0;
-      if (!has && seen.shown !== null && seen.gone === null) seen.gone = performance.now() - seen.t0;    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    const has = () => Array.from(document.querySelectorAll('.ow-toast')).some(t => (t.textContent ?? '').includes(want));
+    const seen = w.__checking = { t0: null as number | null, samples: [] as Array<[number, boolean]>, confirmAt: null as number | null };
+    document.addEventListener('click', () => {
+      if (seen.t0 !== null) return;
+      seen.t0 = performance.now();
+      setInterval(() => seen.samples.push([performance.now() - seen.t0!, has()]), 50);
+    }, { capture: true });
+    const confirm = window.confirm.bind(window);
+    window.confirm = (message?: string) => {
+      if (seen.t0 !== null && seen.confirmAt === null) seen.confirmAt = performance.now() - seen.t0;
+      return confirm(message);
+    };
   }, text);
   await clickWorld(second, SALTMERE.name);
-  await expect.poll(() => dialogs.at.length).toBe(1);
+  await page.waitForTimeout(1_000);
+  await writeLock(page, SALTMERE.dir, { ...lock, web_lock: EXTRA, last_heartbeat: new Date().toISOString() });
+  await expect.poll(() => dialogs.at.length, { timeout: 15_000 }).toBe(1);
   await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
-  const seen = await second.evaluate(() => (window as any).__checking as { shown: number | null; gone: number | null });
-  // It came after a second of the wait, and went when the open ended, before the confirm's answer was said.
-  expect(seen.shown, 'the line came').not.toBeNull();
-  expect(seen.shown!).toBeGreaterThanOrEqual(900);
-  expect(seen.gone, 'the line went').not.toBeNull();
-  expect(seen.gone!).toBeGreaterThan(seen.shown!);
+  await second.waitForTimeout(600);
+  const seen = await second.evaluate(() => (window as any).__checking as { samples: Array<[number, boolean]>; confirmAt: number | null });
+  const at = (ms: number) => [...seen.samples].reverse().find(([t]) => t <= ms)?.[1] ?? false;
+  const firstShown = seen.samples.find(([, on]) => on)?.[0] ?? null;
+  console.log(`[checking line] first shown at ${firstShown === null ? 'never' : Math.round(firstShown)} ms, the confirm at ${seen.confirmAt === null ? 'never' : Math.round(seen.confirmAt)} ms`);
+  // The wait ran two asks, past three seconds.
+  expect(seen.confirmAt, 'the open ended held, at the confirm').not.toBeNull();
+  expect(seen.confirmAt!).toBeGreaterThan(3_300);
+  // Nothing in the first second; then the line, at 1.5 s and again at 3 s, while the check still waits.
+  expect(firstShown, 'the line came').not.toBeNull();
+  expect(firstShown!).toBeGreaterThanOrEqual(900);
+  expect(at(1_500), 'the line at 1.5 s').toBe(true);
+  expect(at(3_000), 'the line at 3 s').toBe(true);
+  // Gone within a moment of the open's end (its fade is 300 ms).
+  expect(seen.samples.filter(([t, on]) => on && t > seen.confirmAt! + 450)).toEqual([]);
   expect(await second.locator('.ow-toast', { hasText: text }).count()).toBe(0);
-  console.log(`[checking line] shown at ${Math.round(seen.shown!)} ms, gone at ${Math.round(seen.gone!)} ms`);  await second.close();
+  await second.close();
 }
 
 async function addressAtStartup(page: Page, context: BrowserContext): Promise<void> {

@@ -17,6 +17,7 @@ import { linkPinRefusal } from '../../src/setup/atlas-root-flow';
 import { seatRefusalPill } from '../../src/sync/world-key-lines';
 import { addRefusal, pinRefusedLine } from '../../src/sync/element-files';
 import { OwApiError } from '@onlyworlds/sdk';
+import { resolveFixes } from '../../src/ui/problem-fixes';
 
 const SEAT = {
   id: 'local-seat', name: 'Seated', state: 'api-linked',
@@ -57,9 +58,33 @@ describe('a problem\'s sentence (problems.ts)', () => {
     expect(problemFor(wall(), { doing: 'saving', worldId: OWN.id }).sentence).toMatch(/Check your World PIN in Settings; try again/);
   });
 
-  it('with no world given, the open world decides', () => {
+  // The open world is not always the step's: a join, a link or a new world runs beside it.
+  it('a seat\'s step while an account world is open names the seat\'s secret', () => {
+    patchSlice('active', { worldId: OWN.id } as never);
+    expect(problemFor(pinRefused(), { doing: 'downloading the world', who: 'seat' }).sentence)
+      .toBe("OnlyWorlds did not accept this seat's secret, so Atlas could not finish downloading the world.");
+    expect(problemFor(wall(), { doing: 'linking this world', who: 'seat' }).sentence).not.toMatch(/World PIN/);
+  });
+
+  it('an account\'s step while a seat world is open names the World PIN', () => {
     patchSlice('active', { worldId: SEAT.id } as never);
-    expect(problemFor(pinRefused(), { doing: 'saving' }).sentence).not.toMatch(/World PIN/);
+    expect(problemFor(pinRefused(), { doing: 'creating the world online', who: 'account' }).sentence)
+      .toMatch(/^OnlyWorlds did not accept this World PIN\. /);
+  });
+
+  it('with neither said, the line names neither, whatever world is open', () => {
+    patchSlice('active', { worldId: SEAT.id } as never);
+    expect(problemFor(pinRefused(), { doing: 'saving' }).sentence).toBe('OnlyWorlds did not accept this PIN. Atlas could not finish saving. Check the PIN in Settings, under OnlyWorlds.');
+    patchSlice('active', { worldId: OWN.id } as never);
+    expect(problemFor(pinRefused(), { doing: 'saving' }).sentence).toMatch(/^OnlyWorlds did not accept this PIN\. /);
+  });
+});
+
+describe('a problem\'s fix (problem-fixes.ts)', () => {
+  it('a seat\'s problem offers no Open settings: its secret is not kept there', () => {
+    expect(resolveFixes(['open-settings'], { worldId: SEAT.id })).toEqual([]);
+    expect(resolveFixes(['open-settings'], { worldId: OWN.id, who: 'seat' })).toEqual([]);
+    expect(resolveFixes(['open-settings'], { worldId: OWN.id }).map(f => f.label)).toEqual(['Open settings']);
   });
 });
 
@@ -98,7 +123,7 @@ describe('a page\'s publish (sharing-client.ts, share-room.ts)', () => {
 
 describe('a link\'s key check (key-check-errors.ts, atlas-root-flow.ts)', () => {
   it('a seat secret typed in the field is refused as a seat secret', () => {
-    expect((keyCheckError(pinRefused(), { seat: true }) as Error).message).toBe('OnlyWorlds did not accept this seat secret. Check it, then try again.');
+    expect((keyCheckError(pinRefused(), { seat: true }) as Error).message).toBe("OnlyWorlds did not accept this seat's secret. Check it, then try again.");
   });
   it('an empty field asks for either of its two names', () => {
     expect(linkPinRefusal('ow_w_' + 'x'.repeat(32), '', false)?.message).toBe('Enter your World PIN or seat secret first.');

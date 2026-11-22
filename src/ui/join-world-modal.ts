@@ -495,7 +495,8 @@ export class JoinWorldModal extends BaseModal {
         console.warn('[join-world] open failed:', err);
         progressBox.hidden = true;
         // The seat is held: Open again retries without spending a new code.
-        say(problemFor(err, { inline: true, doing: 'downloading the world', where }).sentence);
+        // A join downloads on a seat: what it sends as API-Pin is the seat's secret, never the World PIN.
+        say(problemFor(err, { inline: true, doing: 'downloading the world', where, who: 'seat' }).sentence);
         openBtn.textContent = 'Retry';
       }
     };

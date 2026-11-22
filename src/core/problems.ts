@@ -274,17 +274,21 @@ export interface ProblemOpts {
   /** What the person typed for this step is a one-line name: the host's cause offers no code block. */
   oneLine?: boolean;
   /**
-   * The world the step was for, so a line about its `API-Pin` names the World PIN or its seat's secret
-   * (1.125.3). Defaults to the open world's, as `where` does; with none, the line says "the PIN".
+   * Whose credential the step sent as `API-Pin`, so a line about it names the World PIN or a seat's
+   * secret (1.125.3): said by a caller that knows it (a seat's join, a link form's typed secret, a new
+   * world on the account), or read from `worldId`'s entry. Neither given, the line says "the PIN": the
+   * open world is not always the step's (a download or a link runs beside it).
    */
+  who?: PinWho;
+  /** The world the step was for: its entry says whose credential it sent, when `who` is not given. */
   worldId?: string;
 }
 
-/** Whose credential this problem's world sends: the given world's, else the open world's. */
+/** Whose credential this problem's step sent: as the caller said, else the given world's, else not known. */
 function pinWhoFor(opts: ProblemOpts): PinWho {
-  const s = getState();
-  const id = opts.worldId ?? s.active?.worldId;
-  return pinWhoOf(id ? s.registry.worlds.find(w => w.id === id) : undefined);
+  if (opts.who) return opts.who;
+  if (!opts.worldId) return 'unknown';
+  return pinWhoOf(getState().registry.worlds.find(w => w.id === opts.worldId));
 }
 
 /** The open world's `where`, for a caller that did not say. */

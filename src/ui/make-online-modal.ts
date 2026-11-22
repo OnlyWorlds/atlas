@@ -638,7 +638,7 @@ export class MakeOnlineModal extends BaseModal {
       // LINK_STOPPED_LINE, a MergeRefusedError): problemFor
       // passes refusals through and words the rest.
       console.warn('[make-online] link route failed:', err);
-      const sentence = problemFor(err, { inline: true, doing: 'linking this world' }).sentence;
+      const sentence = problemFor(err, { inline: true, doing: 'linking this world', who: isSeatSecret(pin) ? 'seat' : 'account' }).sentence;
       errorBox.textContent = sentence;
       errorBox.hidden = !sentence;
       progressBox.hidden = true;

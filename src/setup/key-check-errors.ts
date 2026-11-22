@@ -44,7 +44,7 @@ export function keyCheckError(err: unknown, opts: { readOnly?: boolean; seat?: b
   if (status === 401 && !opts.readOnly && typeof param === 'string' && param.toLowerCase() === 'api-pin') {
     // A seat's secret typed in the field is no World PIN (R1): the refusal names what was sent.
     return new PinRefusedError(opts.seat
-      ? 'OnlyWorlds did not accept this seat secret. Check it, then try again.'
+      ? 'OnlyWorlds did not accept this seat\'s secret. Check it, then try again.'
       : 'OnlyWorlds did not accept this World PIN. Check it, then try again.');
   }
   if (status === 401 || status === 403) {

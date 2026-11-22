@@ -717,13 +717,16 @@ export function checkingOtherTabLine(name: string): string {
 }
 /** How long the ask runs unsaid: a quick answer (most opens) shows nothing. */
 export const CHECKING_OTHER_TAB_AFTER_MS = 1_000;
-const CHECKING_OTHER_TAB_KEY = 'checking-other-tab';
+let checkingSeq = 0;
 
 /**
  * The checking line of one open: `start` (the store's first ask) arms it, it shows after
- * CHECKING_OTHER_TAB_AFTER_MS, and `end` (the open settled, either way) takes it down.
+ * CHECKING_OTHER_TAB_AFTER_MS, and `end` (the open settled, either way) takes it down. Sticky: a
+ * toast with no actions is otherwise timed, and a duration of 0 took it down within a moment. Each
+ * open has its own key, so one open's end never takes down another open's line.
  */
 function checkingOtherTab(name: string, toasts: ToastManager): { start: () => void; end: () => void } {
+  const key = `checking-other-tab:${++checkingSeq}`;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let shown = false;
   return {
@@ -732,13 +735,13 @@ function checkingOtherTab(name: string, toasts: ToastManager): { start: () => vo
       timer = setTimeout(() => {
         timer = null;
         shown = true;
-        toasts.show(checkingOtherTabLine(name), 'info', 0, { dedupeKey: CHECKING_OTHER_TAB_KEY });
+        toasts.show(checkingOtherTabLine(name), 'info', 0, { dedupeKey: key, sticky: true });
       }, CHECKING_OTHER_TAB_AFTER_MS);
     },
     end: () => {
       if (timer) clearTimeout(timer);
       timer = null;
-      if (shown) toasts.dismiss(CHECKING_OTHER_TAB_KEY);
+      if (shown) toasts.dismiss(key);
       shown = false;
     },
   };
@@ -1039,7 +1042,8 @@ async function doActivateWorld(
   // lock means another tab held the world — close and re-open cold.
   let store: FsFolderStore;
   let revived = false;
-  // While the claim asks whether another tab holds the world (up to six asks of 2 s), a line says so.
+  // While the claim asks whether another tab holds the world (one ask of up to 2 s, another only when the
+  // lock file names a new holder meanwhile), a line says so.
   const checking = checkingOtherTab(entry.name, toasts);
   const parked = takeParkedStore(worldId);
   if (parked) {

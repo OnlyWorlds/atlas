@@ -27,6 +27,7 @@ import { enqueueActivationTask } from '../core/activation-chain';
 import { DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
 import { escapeAttr } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
+import { isSeatSecret } from '../core/seat';
 
 export class LinkWorldModal extends BaseModal {
   private toasts: ToastManager;
@@ -208,7 +209,7 @@ export class LinkWorldModal extends BaseModal {
         // A refused key, an unknown world or no connection arrives worded
         // (keyCheckError); the rest is worded here.
         console.warn('[link-world] link failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'downloading the world', where }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the world', where, who: isSeatSecret(apiPin) ? 'seat' : 'account' }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;
