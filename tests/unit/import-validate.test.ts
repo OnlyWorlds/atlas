@@ -125,3 +125,54 @@ describe('validatePayload — §8c envelope forward-compat (unknown fields, pres
     expect(issues.some(i => i.field === 'name')).toBe(true);
   });
 });
+
+describe('validatePayload — a text or number field holding the wrong kind of value', () => {
+  // A story-press fixture: wrong types beside the link faults the review already said.
+  const FIXTURE = {
+    World: { name: 'Test' },
+    Character: [
+      { name: 'Vera', birth_date: 'the spring of 1899', birthplace: ['Yalta', 'Moscow'], friends: 'Dmitri', height: 'tall', physicality: { hair: 'fair' }, location: 'Nowhere' },
+      { name: 'Dmitri', rivals: ['Vera', 'Ghost'] },
+      { name: 'Dmitri' },
+    ],
+    Location: [{ name: 'Yalta' }],
+    Place: [{ name: 'X' }],
+  };
+
+  it('says each one with the element and the field, before anything is added', () => {
+    const issues = validatePayload(parsePayload(FIXTURE));
+    const typed = (field: string) => issues.find(i => i.path === `Character[0].${field}` && /takes/.test(i.issue));
+    expect(typed('birth_date')?.issue).toBe('"Vera": "birth_date" takes a whole number, and here it holds "the spring of 1899"');
+    expect(typed('height')?.issue).toBe('"Vera": "height" takes a whole number, and here it holds "tall"');
+    expect(typed('physicality')?.issue).toBe('"Vera": "physicality" takes text, and here it holds a group of fields');
+    // The link faults are said as before, once each.
+    expect(issues.filter(i => i.field === 'birthplace' || i.field === 'friends')).toHaveLength(2);
+  });
+
+  it('takes what onlyworlds.com and Atlas write: a numeric string, a number, an unset field', () => {
+    const issues = validatePayload(parsePayload({ Character: [
+      { name: 'A', birth_date: '1899', height: 180, weight: '', physicality: 'tall and fair', mentality: null },
+      { name: 'B', description: 12 },
+    ] }));
+    expect(issues.filter(i => /takes/.test(i.issue))).toEqual([]);
+  });
+
+  it('a whole-number field refuses a fraction; a list in a text field is said as a list', () => {
+    const issues = validatePayload(parsePayload({ Character: [{ name: 'A', height: 180.5, background: ['a', 'b'] }] }));
+    expect(issues.find(i => i.field === 'height')?.issue).toBe('"A": "height" takes a whole number, and here it holds 180.5');
+    expect(issues.find(i => i.field === 'background')?.issue).toBe('"A": "background" takes text, and here it holds a list');
+  });
+
+  it('a nameless element is named by its type and place', () => {
+    const issues = validatePayload(parsePayload({ Character: [{ name: 'A' }, { height: 'tall' }] }));
+    expect(issues.find(i => i.field === 'height')?.issue).toMatch(/^Character 2: "height" takes a whole number/);
+  });
+
+  it('says it on an envelope import too (the unknown-field class is the only one an envelope suppresses)', () => {
+    const issues = validatePayload(parsePayload({
+      format: 'onlyworlds-world-export', world: { id: 'w1', name: 'W' },
+      elements: { character: [{ name: 'A', physicality: { hair: 'fair' } }] },
+    }));
+    expect(issues.some(i => i.field === 'physicality' && /takes text/.test(i.issue))).toBe(true);
+  });
+});
