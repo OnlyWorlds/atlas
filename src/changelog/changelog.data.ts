@@ -63,8 +63,8 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'pin-wall-names-world-pins',
         title: 'The PIN wall names World PINs, and a seat world names its seat secret',
-        body: 'When OnlyWorlds refuses too many different World PINs for a world\'s key, the line now says World PINs, or World PINs or seat secrets where Atlas cannot tell which, where it said PINs. A seat world whose secret this browser lost says it no longer has its seat secret, and Forget everything in this browser names the seat secret of each world opened on a seat.',
-        tags: ['sync', 'fix'],
+        body: 'When OnlyWorlds refuses too many different World PINs for a world\'s key, the line now says World PINs, or World PINs or seat secrets where Atlas cannot tell which, where it said PINs. A seat world whose secret this browser lost says it no longer has its seat secret, and Forget everything in this browser names the seat secret of each world opened on a seat. In the Data room\'s review, a link by id to an element of another type now has its own line, which says the link is kept as written; an unknown field names its type as Location, not location; and the note under the review spells Pin one way and says that a Pin whose element_type names no element type is read as one with none.',
+        tags: ['sync', 'import', 'fix'],
       },
     ],
   },
