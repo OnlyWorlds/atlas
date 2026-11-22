@@ -26,7 +26,7 @@ import { homeHash, importHash, navigate, parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { polymorphicPairFor, sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
-import { jsonTextOf, parsePayload } from '../import/parse';
+import { jsonFaultAdvice, jsonTextOf, parsePayload } from '../import/parse';
 import { reconcile } from '../import/reconcile';
 import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
 import { generateFixPrompt, validatePayload } from '../import/validate';
@@ -319,7 +319,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     try {
       raw = JSON.parse(text);
     } catch (err) {
-      showError(`${sourceLabel} isn't valid JSON${jsonErrorWhere(text, err)}. Check for a missing comma, quote, or bracket.`);
+      showError(`${sourceLabel} isn't valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
       return;
     }
     const result = parsePayload(raw);
@@ -387,7 +387,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       raw = JSON.parse(text);
     } catch (err) {
       pasteEl.classList.add('is-invalid');
-      setLive('invalid', `Not valid JSON${jsonErrorWhere(text, err)}. Check for a missing comma, quote, or bracket.`);
+      setLive('invalid', `Not valid JSON${jsonErrorWhere(text, err)}. ${jsonFaultAdvice(text)}`);
       return;
     }
     const result = parsePayload(raw);

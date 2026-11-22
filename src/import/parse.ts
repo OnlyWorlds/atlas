@@ -46,6 +46,16 @@ export function jsonTextOf(text: string): string {
 }
 
 /**
+ * What to say after "isn't valid JSON": text that still holds code block marks was a reply Atlas could
+ * not read past (two blocks, one left open, a `~~~` fence), and the advice about a comma would be wrong.
+ */
+export function jsonFaultAdvice(text: string): string {
+  return text.includes('```') || text.includes('~~~')
+    ? 'It holds code block marks (``` or ~~~) that Atlas could not read past. Paste only the JSON itself.'
+    : 'Check for a missing comma, quote, or bracket.';
+}
+
+/**
  * The import instruction's field list marks a number `#field` and a link `field>Type`; a reply now and then
  * writes the mark into the key. A key that is a field of this type once its mark is read off becomes that
  * field, so the review and the import read it alike. Never over a bare key written beside it; a mark on a

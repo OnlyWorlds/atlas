@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildSchemaDigest, buildConvertNotesPrompt, jsonErrorWhere } from '../../src/middle/import-room';
-import { jsonTextOf, parsePayload } from '../../src/import/parse';
+import { jsonFaultAdvice, jsonTextOf, parsePayload } from '../../src/import/parse';
 import { validatePayload } from '../../src/import/validate';
 import { knownFieldsFor } from '../../src/editor/field-schema';
 import { ALL_ELEMENT_TYPES } from '../../src/core/types';
@@ -179,6 +179,16 @@ describe('a reply pasted with its code fence', () => {
     jsonTextOf(big);
     jsonTextOf('```'.repeat(300_000));
     expect(performance.now() - t0).toBeLessThan(500);
+  });
+
+  it('text Atlas could not read past names the code block, never a missing comma', () => {
+    const body2 = '{"Character": [{"name": "Aralia"}]}';
+    for (const t of ['```json\n' + body2 + '\n```\nand\n```\nmore\n```', '~~~json\n' + body2 + '\n~~~', '```json\n' + body2]) {
+      const text = jsonTextOf(t);
+      expect(() => JSON.parse(text)).toThrow();
+      expect(jsonFaultAdvice(text)).toContain('code block marks');
+    }
+    expect(jsonFaultAdvice('{"Character": [{"name": "A",}]}')).toBe('Check for a missing comma, quote, or bracket.');
   });
 
   it('the instruction asks for no code block', () => {
