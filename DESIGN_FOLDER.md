@@ -61,7 +61,7 @@ The file names under `.atlas/` are constants in `src/core/constants.ts` (`SYNC_S
 | Behaviour | Rule |
 |---|---|
 | read | **BOTH layouts, unioned** (`buildIndexFor` scans `elements/<type>/` then `spatial/<type>/` for spatial types). A world written either way opens whole |
-| write, new element | `elements/` for all 22, in every folder, one with legacy `spatial/` files included (spec v0.3.8 §4, "One id, one file"; Skeld 2026-10-17). `spatial/` is never created. Until Atlas 1.51.2 a folder already holding spatial files kept receiving new ones there (`detectSpatialLayout`, removed) |
+| write, new element | `elements/` for all 22, in every folder, one with legacy `spatial/` files included (spec v0.3.8 §4, "One id, one file"; 2026-10-17). `spatial/` is never created. Until Atlas 1.51.2 a folder already holding spatial files kept receiving new ones there (`detectSpatialLayout`, removed) |
 | existing element | rewritten **where it was found** (`fileIndex` records each element's `layout`). An edit never migrates a file between layouts; a re-key writes its new file in the old one's layout |
 | same id in BOTH layouts | the `elements/` copy is served, whatever either file's `local_updated_at` says (a conforming writer stamps nothing, so a stamp rule hands the id to any old stamped copy), a warning names both paths, and **neither file is touched**. Same-directory twins are a rename crash and get deduped; cross-directory twins are two tools writing legitimately, and resolving someone else's folder by deleting half of it is not atlas's call. A copy that appears mid-session beside a served one is left unserved until the next open |
 | tidy | scheduled per (type, layout): two directories are two occupancy spaces. A file shadowed by the merge is absent from the index and therefore never renamed |
@@ -86,7 +86,7 @@ Reading: Settings, This world says where a copy came from and which slice (`slic
 
 ## The conformance fixture (2026-07-28)
 
-`tests/fixtures/folder-conformance/` is an **ecosystem artifact**: one tiny world folder plus a machine-readable `expected.json`, which any Folder Format reader can run against and report what it found. Its README states the contract (only `name` required, body type beats directory, id-less files skipped and left, unknown `x_*` round-trips, mapless pins are legal, filenames are presentation). `tests/e2e/folder-conformance.spec.ts` is atlas answering it, so "shipped atlas reads the format" is a failing test rather than a claim in a document. Proposed by Kael, adopted by Skeld's review round; destined for a public sibling repo beside the spec, so it is built portable: plain files, nothing generated at read time.
+`tests/fixtures/folder-conformance/` is an **ecosystem artifact**: one tiny world folder plus a machine-readable `expected.json`, which any Folder Format reader can run against and report what it found. Its README states the contract (only `name` required, body type beats directory, id-less files skipped and left, unknown `x_*` round-trips, mapless pins are legal, filenames are presentation). `tests/e2e/folder-conformance.spec.ts` is atlas answering it, so "shipped atlas reads the format" is a failing test rather than a claim in a document. Proposed and adopted in a review round; destined for a public sibling repo beside the spec, so it is built portable: plain files, nothing generated at read time.
 
 ## File naming (Folder Format spec source — settled 2026-07-03)
 

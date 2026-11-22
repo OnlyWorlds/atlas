@@ -1,7 +1,7 @@
 # Sharing Backend Contract — atlas ↔ onlyworlds.com
 
 **Status**: v0.3 (2026-06-12) — **AS-BUILT**. Anchor's `ow/sharing/` Django slice is implemented (83 backend tests, adversarial self-review, awaiting Titus's deploy); this version folds in her as-built calls from the 2026-06-07 message: **slug-addressed mutations**, the **locked error enum** (+`title_too_long`/`intent_invalid`, enveloped 401), **quota 20/account**, **purge-by-URL** invalidation, base path `/api/sharing/` confirmed, empty payloads are valid pages. Atlas fakes + client synced the same day.
-**Owner pairing**: Temper (atlas + viewer tool) · Anchor (Django backend).
+**Owner pairing**: the Atlas side (atlas + viewer tool) · Anchor (Django backend).
 **Context docs**: `DESIGN_SHARING.md` (the design), `core/sharing.ts` (the block model as built and tested), Anchor's feasibility review (the deployment ground truth).
 
 This is the coordination artifact for Sharing Phase 2. Everything atlas-side that this contract assumes is **built and test-locked**; the backend slice below is **built** — integration smoke (both sides live) is the remaining step.
@@ -10,7 +10,7 @@ This is the coordination artifact for Sharing Phase 2. Everything atlas-side tha
 
 ## 1. What v1 enables (one paragraph)
 
-Atlas users compose **pages** — ordered stacks of blocks (heading / prose / element-card; later map, collection, circle) — and publish them to a public URL: `show.onlyworlds.com/<slug>`. A published page is a **frozen snapshot** (safe: later world edits never leak to link-holders; **all of v1 is frozen-only** — see §6). Updating = republish, one button. A lightweight read-only **viewer tool** (Temper; CF Pages + a meta-injection Function) renders the payloads. Public reads are served from the **Cloudflare edge** (§7) so anonymous traffic never competes with members' API calls for PythonAnywhere workers.
+Atlas users compose **pages** — ordered stacks of blocks (heading / prose / element-card; later map, collection, circle) — and publish them to a public URL: `show.onlyworlds.com/<slug>`. A published page is a **frozen snapshot** (safe: later world edits never leak to link-holders; **all of v1 is frozen-only** — see §6). Updating = republish, one button. A lightweight read-only **viewer tool** (CF Pages + a meta-injection Function) renders the payloads. Public reads are served from the **Cloudflare edge** (§7) so anonymous traffic never competes with members' API calls for PythonAnywhere workers.
 
 ## 2. Decisions locked (v0.1 + Anchor review + Titus sign-off)
 
@@ -191,8 +191,8 @@ v1 ships nothing live. When it lands (post-rebuild, with Redis / a real host): t
 
 1. ✅ Titus decisions (defer-live · 10/account · CF-fronted reads · freeze prototype · slug immutability).
 2. **Anchor builds the §3–§5 slice** (model + migration + endpoints, frozen-only, throttles, cache headers).
-3. **CF mini-design** (Temper + Anchor): Cache Rule + headers + purge — short doc, spans both sides.
-4. **Temper**: payload builder + fakes-first S4 publish flow + viewer fetch locked against §5.
+3. **CF mini-design** (Atlas side + Anchor): Cache Rule + headers + purge — short doc, spans both sides.
+4. **Atlas side**: payload builder + fakes-first S4 publish flow + viewer fetch locked against §5.
 5. Retire the prototype deliberately (freeze now, redirect later).
 6. **Post-rebuild**: light up `is_live` via the second-endpoint path; Phase-3 disclosure features.
 
