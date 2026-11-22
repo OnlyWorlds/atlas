@@ -896,6 +896,9 @@ async function doActivateWorld(
     const free = await ifWorldLockFree(entry.folder.folder_name, async () => true);
     if (!free.ran) {
       if (!silent) toasts.info(MOVING_IN_ANOTHER_TAB);
+      // The open from the address at startup is never left with no word: a
+      // page that moves it, makes it, or checks it this moment has it.
+      else if (opts.sayLockHeld) toasts.show(stayedClosedHere(entry.name), 'info', 8000);
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }
@@ -1059,8 +1062,12 @@ async function doActivateWorld(
     if (err instanceof ELockHeld && !silent) {
       // The claim waited for the other page's Web Lock (conv. 13): a click
       // made meanwhile is the person's word now, and no confirm asks about a
-      // world they have left. The newer activation sets the address.
-      if (gen !== currentActivationGen()) return false;
+      // world they have left. The address goes back first, so the newer
+      // activation reads the true prior address (and restores it if it fails).
+      if (gen !== currentActivationGen()) {
+        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        return false;
+      }
       const hb = Date.parse(err.lock.last_heartbeat);
       const ageS = Number.isFinite(hb) ? Math.max(0, Math.round((Date.now() - hb) / 1000)) : null;
       const take = window.confirm(

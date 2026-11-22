@@ -253,6 +253,127 @@ async function clickDuringTheWait(page: Page, context: BrowserContext): Promise<
   await second.close();
 }
 
+/** A page that shares the holder's tab id, as a duplicated tab does (Duplicate copies sessionStorage), at `at`. */
+async function duplicateOf(page: Page, context: BrowserContext, at: string): Promise<Page> {
+  const tab = await page.evaluate(() => sessionStorage.getItem('atlas_tab_id'));
+  expect(tab).toBeTruthy();
+  const dup = await context.newPage();
+  await shell(dup);
+  await dup.evaluate((t) => { sessionStorage.setItem('atlas_tab_id', t as string); }, tab);
+  await dup.goto(at);
+  await dup.reload();
+  await dup.waitForSelector('.atlas-shell');
+  expect(await dup.evaluate(() => sessionStorage.getItem('atlas_tab_id'))).toBe(tab);
+  return dup;
+}
+
+async function duplicatedTabClick(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  await shell(page);
+  await clickWorld(page, SALTMERE.name);
+  await expect.poll(() => activeWorld(page)).toBe(id);
+  const held = (await readLock(page, SALTMERE.dir))!.web_lock;
+  const dup = await duplicateOf(page, context, '/');
+  const dialogs = countDialogs(dup);
+  const t0 = Date.now();
+  await clickWorld(dup, SALTMERE.name);
+  await expect.poll(() => dialogs.at.length).toBe(1);
+  expect(dialogs.at[0] - t0).toBeGreaterThanOrEqual(1_900);
+  await expect(dup.locator('.ow-toast', { hasText: STAYED })).toBeVisible();
+  expect(await activeWorld(dup)).toBeNull();
+  // The original still owns and beats its own lock.
+  await beatNow(page);
+  expect((await readLock(page, SALTMERE.dir))!.web_lock).toBe(held);
+  await dup.close();
+}
+
+async function duplicatedTabAtStartup(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  await shell(page);
+  await clickWorld(page, SALTMERE.name);
+  await expect.poll(() => activeWorld(page)).toBe(id);
+  const held = (await readLock(page, SALTMERE.dir))!.web_lock;
+  const dup = await duplicateOf(page, context, `/#/w/${id}`);
+  const dialogs = countDialogs(dup);
+  await expect(dup.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
+  expect(dialogs.at).toHaveLength(0);
+  expect(await activeWorld(dup)).toBeNull();
+  expect((await readLock(page, SALTMERE.dir))!.web_lock).toBe(held);
+  await dup.close();
+}
+
+/** Another page holds the world's own make-and-move lock (`atlas-world:<dir>`) while this one starts on its address. */
+async function worldLockHeldAtStartup(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  await shell(page);
+  await page.evaluate((dir) => new Promise<void>(held => {
+    void navigator.locks.request(`atlas-world:${dir}`, () => { held(); return new Promise<void>(r => { (window as any).__releaseWorldLock = r; }); });
+  }), SALTMERE.dir);
+  const second = await context.newPage();
+  const dialogs = countDialogs(second);
+  await shell(second, `/#/w/${id}`);
+  await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
+  expect(dialogs.at).toHaveLength(0);
+  expect(await activeWorld(second)).toBeNull();
+  await page.evaluate(() => (window as any).__releaseWorldLock());
+  await second.close();
+}
+
+/** Two pages start at once on a world whose page closed: exactly one opens, and the other says why, every round. */
+async function twoPagesAtStartup(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  let holder = page;
+  for (let round = 0; round < 3; round++) {
+    await shell(holder);
+    await clickWorld(holder, SALTMERE.name);
+    await expect.poll(() => activeWorld(holder)).toBe(id);
+    await holder.close({ runBeforeUnload: true });
+    const pages = [await context.newPage(), await context.newPage()];
+    const dialogs = pages.map(countDialogs);
+    await Promise.all(pages.map(p => p.goto(`/#/w/${id}`)));
+    await Promise.all(pages.map(p => p.waitForSelector('.atlas-shell')));
+    await expect.poll(async () => (await Promise.all(pages.map(activeWorld))).filter(x => x === id).length, { timeout: 15_000 }).toBe(1);
+    const actives = await Promise.all(pages.map(activeWorld));
+    const winner = pages[actives.indexOf(id)];
+    const loser = pages[1 - actives.indexOf(id)];
+    await expect(loser.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
+    expect(dialogs[0].at.length + dialogs[1].at.length).toBe(0);
+    await loser.close();
+    holder = winner;
+  }
+}
+
+/** A click superseded during the wait puts the address back, so a newer open that fails restores the address from before both. */
+async function supersededRestoresTheAddress(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [saltmere] = await seed(page, [SALTMERE, HARBOR]);
+  await shell(page);
+  await clickWorld(page, SALTMERE.name);
+  await expect.poll(() => activeWorld(page)).toBe(saltmere);
+  const second = await context.newPage();
+  const dialogs = countDialogs(second);
+  await shell(second);
+  const before = await second.evaluate(() => location.hash);
+  // Harbor's storage goes: its open will fail and restore the address it started from.
+  await second.evaluate(async (dir) => {
+    const home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds');
+    await home.removeEntry(dir, { recursive: true });
+  }, HARBOR.dir);
+  await clickWorld(second, SALTMERE.name);
+  await second.waitForTimeout(300);
+  await clickWorld(second, HARBOR.name);
+  await expect(second.locator('.ow-toast').filter({ hasText: 'cleared by this browser' })).toBeVisible();
+  await second.waitForTimeout(2_500);
+  expect(dialogs.at).toHaveLength(0);
+  expect(await second.evaluate(() => location.hash)).toBe(before);
+  expect(await activeWorld(second)).toBeNull();
+  await second.close();
+}
+
 function profileDir(testInfo: { outputPath: (...p: string[]) => string }): string {
   return testInfo.outputPath('profile');
 }
@@ -273,7 +394,7 @@ for (const tag of ['', ' @firefox']) {
       }
     });
 
-    test(`the control: the same quit, its lock read as another browser's, meets the confirm${tag}`, async ({ playwright, browserName }, testInfo) => {
+    test(`the control: after the same quit, a live lock rewritten as another browser's meets the confirm${tag}`, async ({ playwright, browserName }, testInfo) => {
       test.slow();
       const profile = profileDir(testInfo);
       try {
@@ -293,6 +414,27 @@ for (const tag of ['', ' @firefox']) {
 
     test(`a second world clicked during the wait opens, and no confirm asks about the first${tag}`, async ({ page, context }) => {
       await clickDuringTheWait(page, context);
+    });
+
+    test(`a click superseded during the wait puts the address back${tag}`, async ({ page, context }) => {
+      await supersededRestoresTheAddress(page, context);
+    });
+
+    test(`a duplicated tab (same tab id) clicking the world: the confirm after the wait, the original keeps its lock${tag}`, async ({ page, context }) => {
+      await duplicatedTabClick(page, context);
+    });
+
+    test(`a duplicated tab starting on the world's address: said, never asked, never opened${tag}`, async ({ page, context }) => {
+      await duplicatedTabAtStartup(page, context);
+    });
+
+    test(`the address at startup while another page holds the world's own lock: said, never nothing${tag}`, async ({ page, context }) => {
+      await worldLockHeldAtStartup(page, context);
+    });
+
+    test(`two pages starting at once on a world whose page closed: one opens, the other says why${tag}`, async ({ page, context }) => {
+      test.slow();
+      await twoPagesAtStartup(page, context);
     });
   });
 }

@@ -29,9 +29,10 @@
  * whether the Web Lock it names is still held (the page that held it is gone
  * when it is granted). Otherwise `open()` throws `ELockHeld` and the caller
  * offers a consented take-over (`forceTakeLock`); there is no read-only
- * mode. Without Web Locks the lock is `{ tab_id, started_at,
- * last_heartbeat }` and is owned by its `tab_id`. Every lock write runs on
- * one chain (conv. 118).
+ * mode. A lock naming a Web Lock is never taken by a tab id match.
+ * Without Web Locks, or where no browser id can be kept, the lock is
+ * `{ tab_id, started_at, last_heartbeat }` and is owned by its `tab_id`.
+ * Every lock write runs on one chain (conv. 118).
  */
 
 import { PlainError } from '../core/plain-error';
@@ -392,7 +393,7 @@ export class FsFolderStore implements FolderStore {
     this.opts = opts;
     this.clock = opts.clock ?? nowIso;
     this.tabId = opts.tabId ?? getOrCreateTabId();
-    this.browserId = opts.browserId !== undefined ? opts.browserId : browserIdOfThisPage();
+    this.browserId = opts.browserId ?? null; // resolved at open()
   }
 
   // ---- Lifecycle ----
@@ -401,6 +402,7 @@ export class FsFolderStore implements FolderStore {
     if (!handle) throw new Error('FsFolderStore.open requires a directory handle');
     this.root = handle;
     try {
+      await this.resolveBrowserId();
       // Held before the file lock is written, so the file never names a
       // Web Lock nobody holds (conv. 13).
       await this.holdOwnWebLock();
@@ -424,9 +426,10 @@ export class FsFolderStore implements FolderStore {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
+    const root = this.root;
     try {
-      if (this.root) {
-        const atlasDir = await tryGetDir(this.root, [ATLAS_INTERNAL_DIR]);
+      if (root) {
+        const atlasDir = await tryGetDir(root, [ATLAS_INTERNAL_DIR]);
         // Remove the lock only while it is still OURS. A parked store can be
         // evicted long after another tab legitimately took the world over
         // (stale-TTL takeover) — deleting unconditionally would destroy the
@@ -439,22 +442,28 @@ export class FsFolderStore implements FolderStore {
         }
       }
     } finally {
-      // Whatever the removal did (a file OneDrive holds can refuse it): the
-      // next open in this page must not meet this store's name as a live page.
+      // Whatever the removal did (a file OneDrive holds can refuse it), the
+      // store is closed: no root, no caches, so its queued work (a tidy, a
+      // pass) stops at its next `this.root` check. Only then does its Web
+      // Lock go, so nothing of it writes once another page may claim.
+      this.root = null;
+      this.fileIndex.clear();
+      this.fileStamps.clear();
+      this.otherFileStamps.clear();
+      this.pendingAdoptions.clear();
+      this.bareSpellingTypes.clear();
+      this.shadowedIds.clear();
+      this.rekeyPendingIds.clear();
+      this.indexedTypes.clear();
+      this.bodyCache.clear();
+      this.indexBuilds.clear();
+      this.moving = false;
+      // The next open in this page must not meet this store's name as a
+      // live page's. This waits for the browser's release: the request's
+      // promise settles once the hold's callback has, which the release
+      // above makes it do, so it cannot hang in a live page.
       await this.releaseOwnWebLock();
     }
-    this.root = null;
-    this.fileIndex.clear();
-    this.fileStamps.clear();
-    this.otherFileStamps.clear();
-    this.pendingAdoptions.clear();
-    this.bareSpellingTypes.clear();
-    this.shadowedIds.clear();
-    this.rekeyPendingIds.clear();
-    this.indexedTypes.clear();
-    this.bodyCache.clear();
-    this.indexBuilds.clear();
-    this.moving = false;
   }
 
   /**
@@ -570,56 +579,63 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * Claim the file lock (conv. 13). A live lock this browser wrote that
-   * names a Web Lock is asked about: the name granted within the wait means
-   * the store that held it is gone (its page closed, crashed, quit or
-   * reloaded, or sat in the back-forward cache, which the waiting ask
-   * evicts), and the lock is taken with no question. The granted name is
-   * held until this store's own lock is written, so a second claimer of the
-   * same dead name waits, reads the new name, and meets `ELockHeld`. Not
-   * granted: a live store of this browser holds it. Another browser's lock,
-   * or one naming no Web Lock, keeps the rule by tab id; a stale lock (a
-   * parked one included) is taken with nothing asked; the take-over
-   * (`forceTakeLock`) asks nothing; a moving lock is never taken live.
+   * Claim the file lock (conv. 13).
+   * - Missing, or stale (a parked one included): taken, nothing asked.
+   * - A live lock this browser wrote that names a Web Lock, met by a store
+   *   holding one: that name is asked about. Granted within the wait, the
+   *   store that held it is gone (its page closed, crashed, quit or reloaded,
+   *   or sat in the back-forward cache, which the waiting ask evicts), and
+   *   the lock is taken with no question, a moving one too (its mover is
+   *   gone). The granted name is held until this store's own lock is
+   *   written, so a second claimer of the same dead name waits, reads the
+   *   new name, and meets `ELockHeld`. Not granted: the file is read again
+   *   (parked or gone stale during the wait: taken), else `ELockHeld`.
+   * - Any other lock naming a Web Lock is never taken by a tab id match.
+   *   The tab id decides only between a lock naming none and a store
+   *   holding none (no Web Locks here); a store holding one refuses every
+   *   live lock it cannot ask about.
+   * - The take-over (`forceTakeLock`) asks nothing, but never takes a live
+   *   mover's lock.
    */
   private async claimLock(): Promise<void> {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
     let dead: { name: string; release: () => void } | null = null;
+    let refused: string | null = null;
     try {
       for (let round = 0; ; round++) {
         const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
         if (!existing) break;
         const heartbeat = Date.parse(existing.last_heartbeat);
-        // Stale: taken below, with no Web Lock asked.
         if (!(Number.isFinite(heartbeat) && Date.now() - heartbeat < LOCK_STALE_MS)) break;
-        // A world another tab is moving to a folder is never taken, not even
-        // with the take-over consent: edits here would be lost when the browser
-        // copy goes (1.17). Stale (the mover crashed): taken above.
-        if (existing.moving === true && !(this.comparedByTabId(existing) && existing.tab_id === this.tabId)) {
-          throw new ELockHeld(existing);
-        }
-        if (this.opts.forceTakeLock) break;
-        if (this.opts.takeStaleLock === false) throw new ELockHeld(existing);
         // The name this claim holds is still the one the file names: its store is gone.
         if (dead && existing.web_lock === dead.name) break;
+        const moving = existing.moving === true;
+        // A world another tab is moving to a folder is never taken while its
+        // mover lives, not even with the take-over consent: edits here would
+        // be lost when the browser copy goes (1.17).
+        if (this.opts.forceTakeLock && !moving) break;
+        if (this.opts.takeStaleLock === false) throw new ELockHeld(existing);
         if (this.webLock && existing.web_lock && this.browserId && existing.browser_id === this.browserId) {
+          // Asked once already and not granted, and the file still names it live.
+          if (refused === existing.web_lock) throw new ELockHeld(existing);
           // The file names another name now: start again on that one.
           dead?.release();
           dead = null;
           if (round >= MAX_CLAIM_ROUNDS) throw new ELockHeld(existing);
           dead = await this.askWebLock(existing.web_lock);
-          if (!dead) throw new ELockHeld(existing);
-          continue; // read the file again, holding the dead name
+          if (!dead) refused = existing.web_lock;
+          continue; // read the file again: holding the dead name, or after the wait
         }
-        // Another browser's lock, or one naming no Web Lock: the rule by tab
-        // id, as before Web Locks (a reload from the release before them
-        // takes its own tab's lock).
+        // Never by a tab id match when either side names a Web Lock.
+        if (existing.web_lock || this.webLock) throw new ELockHeld(existing);
+        // Neither does (no Web Locks in this browser): the rule by tab id, a
+        // moving lock included (this tab's own move, after a reload).
         if (existing.tab_id !== this.tabId) throw new ELockHeld(existing);
         break;
       }
       const fresh: LockPayload = {
         tab_id: this.tabId,
-        ...(this.webLock ? { ...(this.browserId ? { browser_id: this.browserId } : {}), web_lock: this.webLock.name } : {}),
+        ...(this.webLock && this.browserId ? { browser_id: this.browserId, web_lock: this.webLock.name } : {}),
         started_at: this.clock(),
         last_heartbeat: this.clock(),
       };
@@ -632,23 +648,35 @@ export class FsFolderStore implements FolderStore {
 
   /**
    * Is this lock ours? A store holding a Web Lock owns only a lock naming
-   * it; the tab id decides only for a store without one (conv. 13).
+   * it; a store holding none owns only a lock naming none, of its tab id
+   * (conv. 13).
    */
   private ownsLock(lock: LockPayload | null): lock is LockPayload {
     if (!lock) return false;
     if (this.webLockName) return lock.web_lock === this.webLockName;
-    return lock.tab_id === this.tabId;
+    return !lock.web_lock && lock.tab_id === this.tabId;
   }
 
-  /** A claim reads this lock by its tab id: it names no Web Lock, or this store holds none. */
-  private comparedByTabId(lock: LockPayload): boolean {
-    return !lock.web_lock || !this.webLock;
-  }
-
-  private webLocks(): WriterLocks | null {
+  /** The Web Locks of this page as the browser gives them, or a test's. */
+  private pageLocks(): WriterLocks | null {
     if (this.opts.locks !== undefined) return this.opts.locks;
     const l = (globalThis.navigator as unknown as { locks?: WriterLocks } | undefined)?.locks;
     return l && typeof l.request === 'function' ? l : null;
+  }
+
+  /**
+   * The Web Locks the writer lock uses: none where this browser keeps no
+   * browser id (localStorage refused), so the whole page behaves as without
+   * Web Locks: no name written, none asked.
+   */
+  private webLocks(): WriterLocks | null {
+    return this.browserId ? this.pageLocks() : null;
+  }
+
+  private async resolveBrowserId(): Promise<void> {
+    if (this.opts.browserId !== undefined) { this.browserId = this.opts.browserId; return; }
+    const l = this.pageLocks();
+    this.browserId = l ? await browserIdOfThisPage(l, this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS) : null;
   }
 
   /**
@@ -659,34 +687,22 @@ export class FsFolderStore implements FolderStore {
   private async askWebLock(name: string): Promise<{ name: string; release: () => void; settled: Promise<unknown> } | null> {
     const l = this.webLocks();
     if (!l) return null;
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS);
-    let release: () => void = () => {};
-    let settled: Promise<unknown> = Promise.resolve();
-    const granted = await new Promise<boolean>(resolve => {
-      try {
-        settled = l.request(name, { signal: ac.signal }, () => {
-          resolve(true);
-          return new Promise<void>(r => { release = r; });
-        });
-        settled.catch(() => resolve(false));
-      } catch {
-        resolve(false);
-      }
-    });
-    clearTimeout(timer);
-    return granted ? { name, release, settled: settled.catch(() => undefined) } : null;
+    return requestHeld(l, name, this.opts.claimWaitMs ?? LOCK_CLAIM_WAIT_MS);
   }
 
   /**
    * K1: a Web Lock of this store's own, a fresh name nobody else holds, so
-   * it is granted at once. Not granted in time (or no Web Locks here): the
-   * store holds none and its lock names none, as without Web Locks.
+   * it is granted at once. None here (no Web Locks, or no browser id): the
+   * store holds none and its lock names none. Web Locks here and the fresh
+   * name not granted in time: the open fails, never a silent fallback to
+   * the tab id.
    */
   private async holdOwnWebLock(): Promise<void> {
     if (this.webLock) return;
+    this.webLockName = null;
+    if (!this.webLocks()) return;
     const held = await this.askWebLock(`atlas-writer:${newId()}`);
-    if (!held) return;
+    if (!held) throw new PlainError('Atlas could not open this world just now. Try again in a moment.');
     this.webLock = held;
     this.webLockName = held.name;
   }
@@ -2687,25 +2703,64 @@ export function currentTabId(): string {
 }
 
 /**
- * This browser profile's id (conv. 13), read once per page and kept in
- * memory: a storage clear while the page lives must not make its own lock
- * read as another browser's. Null when localStorage cannot keep one (never
- * a per-page id, which would make a reload meet its own lock as foreign).
+ * Request `name` within `waitMs`; the grant's callback is the hold, until
+ * `release`, and `settled` resolves once the browser has released it. Null
+ * when not granted in time, or when the browser refused the request.
  */
-let pageBrowserId: string | null | undefined;
-function browserIdOfThisPage(): string | null {
-  if (pageBrowserId !== undefined) return pageBrowserId;
+async function requestHeld(l: WriterLocks, name: string, waitMs: number): Promise<{ name: string; release: () => void; settled: Promise<unknown> } | null> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), waitMs);
+  let release: () => void = () => {};
+  let settled: Promise<unknown> = Promise.resolve();
+  const granted = await new Promise<boolean>(resolve => {
+    try {
+      settled = l.request(name, { signal: ac.signal }, () => {
+        resolve(true);
+        return new Promise<void>(r => { release = r; });
+      });
+      settled.catch(() => resolve(false));
+    } catch {
+      resolve(false);
+    }
+  });
+  clearTimeout(timer);
+  return granted ? { name, release, settled: settled.catch(() => undefined) } : null;
+}
+
+/**
+ * This browser profile's id (conv. 13), made once per browser: under the
+ * Web Lock `atlas-browser-id`, read it, make and write it when absent, and
+ * read it back, using what was read back, so two first pages never keep two
+ * ids. Null when localStorage refuses, or the lock did not come in time.
+ */
+export async function makeBrowserId(l: WriterLocks, waitMs: number = LOCK_CLAIM_WAIT_MS): Promise<string | null> {
+  const held = await requestHeld(l, 'atlas-browser-id', waitMs);
+  if (!held) return null;
   try {
     let id = localStorage.getItem(BROWSER_ID_STORAGE_KEY);
     if (!id) {
-      id = newId();
-      localStorage.setItem(BROWSER_ID_STORAGE_KEY, id);
+      localStorage.setItem(BROWSER_ID_STORAGE_KEY, newId());
+      id = localStorage.getItem(BROWSER_ID_STORAGE_KEY);
     }
-    pageBrowserId = id;
+    return id || null;
   } catch {
-    pageBrowserId = null;
+    return null;
+  } finally {
+    held.release();
   }
-  return pageBrowserId;
+}
+
+/**
+ * The id, read once per page and kept in memory: a storage clear while the
+ * page lives must not make its own lock read as another browser's. Only an
+ * id is kept; a null is asked again at the next open.
+ */
+let pageBrowserId: string | null = null;
+async function browserIdOfThisPage(l: WriterLocks, waitMs: number): Promise<string | null> {
+  if (pageBrowserId) return pageBrowserId;
+  const id = await makeBrowserId(l, waitMs);
+  if (id && !pageBrowserId) pageBrowserId = id;
+  return pageBrowserId ?? id;
 }
 
 function getOrCreateTabId(): string {
