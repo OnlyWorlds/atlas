@@ -5,8 +5,8 @@
  * `worlds.get()` credential validation (no v2 equivalent yet) and for
  * FIELD_SCHEMA statics.
  *
- * The v2 wire dialect (FROZEN 2026-07-12, Skeld; hand-probed — see
- * Notes/2026-07-12-v2-probed-facts.md for the verified contract):
+ * The v2 wire dialect (FROZEN 2026-07-12; hand-probed, the verified
+ * contract kept in a private note, not in this repository):
  *
  *   - Paths: /api/v2/{type} and /api/v2/{type}/{id} — no trailing slash.
  *   - Auth: API-Key on every call; API-Pin by keel's rule (`sendsPin`).
@@ -28,7 +28,7 @@
  *     create_only on every batch: an item whose id keel holds is that slot's 409, never a replace,
  *     fixpoint FK resolution including cycles. Response is HTTP 200 always,
  *     `{errors, items: [{status, id, error?}]}` — no per-item updated_at yet
- *     (backfill until Skeld ships the echo).
+ *     (backfill until keel ships the echo).
  *   - /changes: `{cursor, changes, has_more}`, continuation via `?since=` —
  *     NOT `?cursor=`; unknown params are silently ignored, so walkers must
  *     verify the cursor advances (probed 2026-07-12, the silent-replay trap).
@@ -59,7 +59,7 @@ export const DEFAULT_V2_BASE = 'https://www.onlyworlds.com/api/v2';
 export const LIST_BY_IDS_MAX = 200;
 
 /**
- * keel's PIN rule (Skeld 2026-10-22; SDK 4.59.0's own): the secret (a
+ * keel's PIN rule (2026-10-22; SDK 4.59.0's own): the secret (a
  * PIN, or a seat's `ow_s_`) goes on every write, on `GET /me`, and on every
  * call of a legacy ten-digit key. A prefixed key's other reads go bare: each
  * PIN sent is a verify on keel, and a read never needs one. So a wrong PIN
@@ -235,7 +235,7 @@ export function toV2WireShape(
   type: ElementType,
   op: 'create' | 'update'
 ): Record<string, unknown> {
-  // keel's stub never goes out: refused here, never stripped (conv. 155, I4; Kael 2026-10-20).
+  // keel's stub never goes out: refused here, never stripped (conv. 155, I4; 2026-10-20).
   refuseKnownOfBody(body);
   const rename = diskToSchema(type);
   const out: Record<string, unknown> = {};
@@ -410,7 +410,7 @@ export class OwV2ClientAdapter implements OwApiClient {
         jsonBody = true;
         if (parsed?.current && typeof parsed.current === 'object' && !Array.isArray(parsed.current)) current = parsed.current as Record<string, unknown>;
         const inner: Envelope | null = parsed?.error ?? null;
-        // keel's 409 resync_required says why (role or view, Skeld 2026-10-20):
+        // keel's 409 resync_required says why (role or view, 2026-10-20):
         // read inside the envelope or beside it, whichever keel sends.
         envelope = inner && inner.reason === undefined && typeof parsed.reason === 'string' ? { ...inner, reason: parsed.reason } : inner;
       } catch { /* non-JSON error body — envelope stays null */ }
@@ -492,7 +492,7 @@ export class OwV2ClientAdapter implements OwApiClient {
 
   /**
    * GET /world — the key's validation + world identity in one read call
-   * (Skeld's v2 tail, live 2026-07-12; replaced the v1 SDK worlds.get lane).
+   * (keel's v2 tail, live 2026-07-12; replaced the v1 SDK worlds.get lane).
    * A prefixed key reads it bare, so it never checks a PIN: a door that holds
    * one asks `me()` too (`keyScope`). A legacy ten-digit key sends it here.
    */
@@ -594,7 +594,7 @@ export class OwV2ClientAdapter implements OwApiClient {
   /**
    * keel's hide (`PUT /{type}/{id}/hidden`): 204, no body, idempotent; the element's
    * body and `updated_at` do not move. The owner's keys and co-builders only, anyone else 403
-   * (folder spec 4.8, Skeld 2026-10-24; conv. 173). Atlas never sends the unhide.
+   * (folder spec 4.8, 2026-10-24; conv. 173). Atlas never sends the unhide.
    */
   async hideElement(type: ElementType, id: string): Promise<void> {
     await this.request('PUT', `/${type}/${id}/hidden`);
@@ -794,7 +794,7 @@ export class OwV2ClientAdapter implements OwApiClient {
    * upsert ops carry the full element (adapted to disk shape here); delete
    * ops carry `{type, id, deleted_at}` only.
    */
-  // Page size 250 (was 500): Skeld's DB-side pagination sized the
+  // Page size 250 (was 500): keel's DB-side pagination sized the
   // launch runbook around clients walking at ≤ a few hundred — same total
   // wire cost for atlas, flatter server memory under concurrent pulls.
   async pullChanges(since: string | null, limit = 250): Promise<ChangesPage> {
@@ -847,7 +847,7 @@ export class OwV2ClientAdapter implements OwApiClient {
     return {
       cursor: response?.cursor ?? null,
       hasMore: !!response?.has_more,
-      // World's current change_seq (Skeld's v2 tail) — the engine's rewind
+      // World's current change_seq (keel's v2 tail) — the engine's rewind
       // detector: persisted last-applied seq > head means the server was
       // restored from backup; re-baseline with a cold walk.
       head: typeof response?.head === 'number' ? response.head : null,

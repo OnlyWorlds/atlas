@@ -59,8 +59,8 @@ export function anyModalOpen(): boolean {
 }
 
 /**
- * What sits behind the topmost open modal is `inert` (found by
- * Seethe): `aria-modal` tells a screen reader, but Tab walked out of the
+ * What sits behind the topmost open modal is `inert` (found in
+ * a review): `aria-modal` tells a screen reader, but Tab walked out of the
  * panel into the page behind, where Enter on "Start a world" opened a second
  * dialog over the first. Every child of `<body>` but the topmost modal's
  * overlay is made inert while any modal is open (a modal below a picker

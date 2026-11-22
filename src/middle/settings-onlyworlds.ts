@@ -159,7 +159,7 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
 
 /**
  * A linked world whose owner turned its public page on says so, with the
- * address (Skeld 2026-10-23; `core/public-page.ts`). Read live each time the
+ * address (2026-10-23; `core/public-page.ts`). Read live each time the
  * tab opens, never kept: the switch is keel's. Off, unreachable or refused,
  * the section stays hidden: it is a pointer, not a status.
  */

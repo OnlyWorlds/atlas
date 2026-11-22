@@ -29,7 +29,7 @@ export interface WaypointDef {
   glyph: string;
   /** The way in; null when no world is open. */
   link: (worldId: string | null) => string | null;
-  /** The Journey's Atlas chapter steps the row covers (Boss's walk marks them). */
+  /** The Journey's Atlas chapter steps the row covers (the walk marks them). */
   chapter: readonly string[];
 }
 

@@ -29,7 +29,7 @@ export async function keepSignIn(token: string, username: string, toasts: ToastM
   // Only once the new token reached storage: a lost save keeps the old one there, and it must
   // still work.
   if (saved) revokeReplacedToken(before, next);
-  // The ask to sign in is answered: it goes before the door's next question (Kael, 2026-10-16).
+  // The ask to sign in is answered: it goes before the door's next question (2026-10-16).
   toasts.dismiss(WAITS_FOR_SIGN_IN);
   toasts.success(username ? `Signed in as ${username}` : 'Signed in');
   const m = await import('../ui/person-join-modal');

@@ -1,7 +1,7 @@
 /**
  * Sign in with an OnlyWorlds email (or username) and password (#387, the
  * journey's A8: a stranger was sent to onlyworlds.com to make a token and
- * paste it back). The SDK's `signInWithPassword` (4.31, Kael 2026-10-18) logs
+ * paste it back). The SDK's `signInWithPassword` (4.31, 2026-10-18) logs
  * in through keel's app client, mints this browser its own account token
  * named for it (revocable on the site's Account tokens), and ends the
  * session. Only the token is kept, exactly as a pasted one is; the password

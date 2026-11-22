@@ -87,7 +87,7 @@ export async function buildWorldExport(
   }
 
   // THE ENVELOPE (converging on keel's `onlyworlds-world-export`, owed
-  // to Skeld). One shape both ways now: keel exports it, atlas
+  // upstream). One shape both ways now: keel exports it, atlas
   // imports it (parse.ts), and atlas exports it. The world keeps its id: the
   // envelope's whole point is a lossless round-trip (id-is-identity), and
   // atlas's import already offers merge-or-copy when the id is known. The

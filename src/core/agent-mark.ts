@@ -7,9 +7,9 @@
  * is `seat` (an agent seat), `mcp`, `declared` (a client that sent
  * X-OW-Agent), or a plain surface (`api`, `v1`, `sync`, `server`), and
  * `changed_by` the membership (null for the owner). Atlas itself never
- * declares (it is a person's tool; Kael's stitches guard fails if it sets `agent`).
+ * declares (it is a person's tool; the stitches guard fails if it sets `agent`).
  *
- * Who decides, since 1.68.1 (Skeld's ruling, 2026-10-21, on Seethe's 2026-10-21):
+ * Who decides, since 1.68.1 (a ruling of 2026-10-21):
  * the SEAT, not the door. keel's MCP takes a person's own key, so a door says
  * how a write came in, not who made it. With the roster readable, the row for
  * `changed_by` decides (`kind` agent marks; a person, a player or the owner,

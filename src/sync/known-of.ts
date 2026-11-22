@@ -79,7 +79,7 @@ export function knownOfMove(
 /** I5: what the store says when a stub would be changed or deleted here. */
 export const KNOWN_OF_REFUSAL = 'This one is only known of here: you know its name and what is said of it, not the rest, so it cannot be changed.';
 
-/** I4: a body carrying `known_of` is refused before it is sent, never stripped (Kael 2026-10-20). */
+/** I4: a body carrying `known_of` is refused before it is sent, never stripped (2026-10-20). */
 export function refuseKnownOfBody(body: Record<string, unknown>): void {
   if ('known_of' in body) throw new PlainError(KNOWN_OF_REFUSAL);
 }

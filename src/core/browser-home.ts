@@ -62,7 +62,7 @@ export function worldAlreadyHere(reg: WorldsRegistry, worldId: string): WorldReg
  * The cleared browser world a world.json of this id restores: one the browser
  * cleared, holding this EXACT world id (its own handle key, or its link's
  * server id). Never one matched only through a former link: the link goes
- * back only to the world it was made for (Skeld's second condition).
+ * back only to the world it was made for.
  * The file door and the folder door both ask it.
  */
 export function clearedOwnTwin(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | null {

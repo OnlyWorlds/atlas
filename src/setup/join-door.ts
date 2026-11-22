@@ -180,7 +180,7 @@ export function tablePicks(table: JoinTable): TablePick[] {
   return [...table.characters.filter(c => !c.taken), ...table.characters.filter(c => c.taken)];
 }
 
-/** "The link works 5 times, until 26 October. 3 places are left." (Seethe's frame 5). */
+/** "The link works 5 times, until 26 October. 3 places are left." (the designer's frame 5). */
 export function tableTimesLine(table: JoinTable, expiresAt: string): string {
   const t = Date.parse(expiresAt);
   const until = Number.isFinite(t)

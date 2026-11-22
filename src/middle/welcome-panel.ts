@@ -220,7 +220,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // (The example-page door, "see an example page" → #/demo, was removed
       // with the other two example-page links. The #/demo route itself
       // still answers, for old links.)
-      // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Titus's nod,
+      // The OnlyWorlds sigil + eyebrow (an opener note, Titus's nod,
       // 2026-07-19): users routed here from onlyworlds.com need the mark and
       // the stated relationship to read "same universe". Bundled local copy
       // of the animated logo — local-first app, local asset.

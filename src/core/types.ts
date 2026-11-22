@@ -258,7 +258,7 @@ export interface SyncState {
   /**
    * Highest change_seq ever APPLIED from the /changes feed. The rewind
    * detector's memory: a /changes response whose `head` is BELOW this means
-   * the server was restored from backup (the one legal rewind path, Skeld
+   * the server was restored from backup (the one legal rewind path, design
    * §8) — the engine re-baselines with a cold walk instead of trusting a
    * cursor pointing past the world's history. Cleared with the cursor by
    * resetSyncBaseline.
@@ -772,7 +772,7 @@ export interface WorldRegistryEntry {
   /**
    * A linked world restored from a world file (1.17, contract §5.2): its first
    * sync round runs as pause-and-review whatever the policy, so the file's
-   * older edits never overwrite newer ones on OnlyWorlds (Skeld's
+   * older edits never overwrite newer ones on OnlyWorlds (the
    * third condition, 2026-10-04). Cleared once a round has run.
    */
   review_first_sync?: boolean;
@@ -963,7 +963,7 @@ export interface ShowcaseEntry {
 
 /**
  * One world row from GET /api/v2/account/worlds (account-mode). Wire shape
- * pinned 2026-07-13 — see Notes/2026-07-13-account-mode-design.md.
+ * pinned 2026-07-13 (the design note is private, not in this repository).
  */
 export interface AccountWorldRow {
   id: string;

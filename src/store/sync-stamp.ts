@@ -142,7 +142,7 @@ export function stampedBody(
  * The stamp of a local edit: now, or just past the element's sync baseline
  * when this device's clock is behind the server's. The baseline is
  * the SERVER's `updated_at`, the edit's stamp this device's clock; with keel
- * measured about 1.5 s ahead of the crew's laptop, an edit made in that
+ * measured about 1.5 s ahead of a test laptop, an edit made in that
  * window after a sync sorted below its own baseline, read clean, and was
  * never uploaded (found live: a cleared image URL that never reached keel).
  * An edit is always newer than the baseline it was made on. Shared by

@@ -8,7 +8,7 @@ const CSP = readFileSync('public/_headers', 'utf8').match(/Content-Security-Poli
 export default defineConfig({
   // Absolute: the app is served at more than the root since Sign in with
   // OnlyWorlds (`/signin/callback`, public/_redirects), and a relative './'
-  // resolved its scripts under /signin/ there (the S465 gate's G1).
+  // resolved its scripts under /signin/ there (a review gate's G1).
   base: '/',
   // Staging work points at keel directly via the localStorage
   // 'atlas_dev_api_base' override (dev-api-base.ts) — keel serves CORS since
@@ -42,7 +42,7 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      // 'prompt' (S360): 'autoUpdate' reloaded the page under a returning
+      // 'prompt': 'autoUpdate' reloaded the page under a returning
       // visitor the moment a new deploy's worker took over (they saw the old
       // app, then a reload mid-click). Now the new version waits and offers
       // itself (core/offline.ts); closing every Atlas tab also picks it up.
@@ -82,10 +82,10 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // og.png is the social card: crawlers fetch it, the app never does,
         // and a visitor should not pay 100 KB of precache for an image their
-        // browser will never request (S323). assets/404.html (public/) makes
+        // browser will never request. assets/404.html (public/) makes
         // Cloudflare Pages answer a missing /assets/* file with a 404 instead
         // of the app page, so a tab from before a deploy fails its lazy chunk
-        // honestly (conv. 121, Boss's probe S366); nothing in the app loads it.
+        // honestly (conv. 121, a probe); nothing in the app loads it.
         globIgnores: ['**/og.png', 'assets/404.html'],
         // The Material Symbols outlined font is ~4 MB (covers thousands of
         // icons). Subsetting to atlas's ~40 used icons would drop it to
@@ -95,7 +95,7 @@ export default defineConfig({
         // The bundled .webp images (the tour's maps, the example page's
         // Sikelia map at 1.6 MB) are NOT precached: every visitor would pay
         // ~2 MB for pictures most never open. Cache-first once fetched, so a
-        // tour run online works offline afterwards (S365 lane B L3: offline,
+        // tour run online works offline afterwards (a review gate's L3: offline,
         // the tour's maps were blank).
         runtimeCaching: [{
           urlPattern: ({ sameOrigin, url }) => sameOrigin && url.pathname.endsWith('.webp'),

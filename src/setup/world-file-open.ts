@@ -1,6 +1,6 @@
 /**
  * Open a world file (1.17, conv. 129; contract §5.2, §9 invariants 6
- * and 14; Skeld 2026-10-04).
+ * and 14; 2026-10-04).
  *
  * The reader (`store/world-file.ts`) refuses an unsafe or foreign file before
  * anything is written, and hands over the portable copy whoever made the file
@@ -79,7 +79,7 @@ function placeOf(reg: WorldsRegistry, worldId: string): { restore: WorldRegistry
 
 /**
  * Files written at once. One at a time, Firefox's browser storage took 16 s
- * for Moppetopia's 320 files against Chromium's 1.2 s (Boss 2026-10-14);
+ * for Moppetopia's 320 files against Chromium's 1.2 s (2026-10-14);
  * each file's lookups and writer cost it about 50 ms, and they overlap.
  */
 export const WRITE_CONCURRENCY = 8;

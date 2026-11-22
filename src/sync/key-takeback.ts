@@ -7,7 +7,7 @@
  * SCOPE: browser worlds only. A folder world's key lives in its `world.json`,
  * and any Atlas that opens a copy of the folder (another browser, a git clone,
  * Dropbox) syncs on that same key with no record of its own; revoking it would
- * stop a live copy elsewhere (the S492 contract gate, G1). A browser world's
+ * stop a live copy elsewhere (a contract gate, G1). A browser world's
  * files are in OPFS and never copied, so its key is this browser's alone.
  *
  * The record (`api.key_mint = { id, tail }`) is written at every mint, in the

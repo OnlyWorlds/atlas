@@ -8,7 +8,7 @@
  * is a key-minting authority; sync itself always runs on world keys.
  *
  * Wire contract pinned from keel source 2026-07-13 (accounts/api.py,
- * accounts/auth.py; design doc: Notes/2026-07-13-account-mode-design.md):
+ * accounts/auth.py; the design doc is a private note, not in this repository):
  *
  *   GET  /account                      → {id, username, email, date_joined}
  *   GET  /account/worlds               → {data: [AccountWorldRow]}
@@ -24,7 +24,7 @@
  *        else → 404.
  *        Optional {name} (≤255 chars, else 422 param=name) — echoed in the
  *        mint response, GET .../keys rows, and the portal keys table. LIVE
- *        on prod 2026-07-13 (Skeld OPS-3). Unknown body fields are silently
+ *        on prod 2026-07-13 (OPS-3). Unknown body fields are silently
  *        IGNORED (spec §2 — corrected: this route never 422'd unknowns).
  *
  * Errors ride the same §9 envelope as v2 element routes and surface as

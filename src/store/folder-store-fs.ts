@@ -642,7 +642,7 @@ export class FsFolderStore implements FolderStore {
     // file takes the format's bare `map`/`zone` unless some file of this
     // type already declares atlas's suffixed spelling, in which case the
     // folder keeps its dialect (sticky, like layouts and filenames). So a
-    // fresh folder is born bare (Skeld's ruling 2026-09-28: pre-1.3 atlas,
+    // fresh folder is born bare (a ruling of 2026-09-28: pre-1.3 atlas,
     // which cannot read a bare pin's map, is the only cost). Files that
     // declare no spelling (a mapless pin) cast no vote. Recomputed per index
     // build so a folder that changes hands re-detects on next open.

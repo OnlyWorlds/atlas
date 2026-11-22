@@ -135,7 +135,7 @@ export function notSyncedNow(n: DiskNotice, elements: readonly Element[]): numbe
 }
 
 /**
- * The files a world's open left out as unreadable (conv. 176, Seethe 2026-10-24): said in the
+ * The files a world's open left out as unreadable (conv. 176, 2026-10-24): said in the
  * same line as those a rescan finds, once per open, since before 1.89.0 a folder with a damaged
  * file opened one element short and said nothing. `files` is the store's `unreadableFiles()`.
  */

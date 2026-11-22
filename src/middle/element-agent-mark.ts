@@ -1,7 +1,7 @@
 /**
  * The quiet agent mark in an element's header band (#347): a small glyph
  * after the name when keel says an agent made the last write, and nothing
- * otherwise. The line ("Last changed by Skeld, an agent") is its label and
+ * otherwise. The line ("Last changed by Sable, an agent") is its label and
  * tooltip for a mouse, and a tap or click says it as a toast, since a touch
  * screen has no hover (conv. 141). The rule is `src/core/agent-mark.ts`; an
  * agent seat's name comes from the world's roster, read once and only when a
@@ -64,7 +64,7 @@ export function buildProposedMark(el: Element): HTMLElement | null {
   btn.type = 'button';
   btn.className = 'atlas-proposed-mark' + (mark.lapsed ? ' atlas-proposed-mark-lapsed' : '');
   btn.dataset.role = 'proposed-mark';
-  // In a header the lapsed word is one word, so a phone keeps the name its room (Seethe,
+  // In a header the lapsed word is one word, so a phone keeps the name its room (a phone check,
   // 2026-10-23: "Proposed, lapsed" left a name 8 px of 68 at 390); the label carries the line.
   btn.textContent = mark.lapsed ? 'Lapsed' : proposedWord(mark);
   let line = '';
@@ -83,7 +83,7 @@ export function buildProposedMark(el: Element): HTMLElement | null {
 }
 
 /**
- * The proposed element's sentence for its page (conv. 168, Seethe 2026-10-23): the
+ * The proposed element's sentence for its page (conv. 168, 2026-10-23): the
  * header word's line, and what Atlas does and does not do with it. The roster's
  * name when it is already here; the header's word asks for it.
  */

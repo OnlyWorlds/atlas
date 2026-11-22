@@ -25,7 +25,7 @@ export interface LinkedRef {
 
 /**
  * The ORIGIN of a node's date — forward-proofing for fuzzy + relative dates
- * (Simmer's "felt time is the default" + tagged-union-from-the-start insurance).
+ * ("felt time is the default" + tagged-union-from-the-start insurance).
  * Renderers read the resolved numeric `startDate` today; `dateSpec` lets later
  * bouts draw fuzzy as a soft band and resolve relative ("3 days after the
  * siege") at render. `exact` is the only kind chart #1 emits.

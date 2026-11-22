@@ -13,7 +13,7 @@
  *     their element-type color
  *   - GHOST GLYPHS: every span’s end word carries an inline element-type icon,
  *     pre-spaced from step 0 (dim ghost) and LIT when its step is reached —
- *     zero reflow, and the ghosts promise what’s coming (Skeld’s
+ *     zero reflow, and the ghosts promise what’s coming (the
  *     sentence-is-the-progress-bar, ow.com vignette grammar). A span carrying
  *     a `ref` lights on that element’s EXISTENCE instead (the per-mint pop).
  *
@@ -704,7 +704,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       body:
         // A claim fix: the trait this step reveals is Swamp Rage, which is
         // not piano-related — the modifier was a false claim on screen
-        // (Skeld's verify round; minimal edit, flagged to Titus).
+        // (a verify round; minimal edit, flagged to Titus).
         'There is still more to the story: a piano-making character, a piano-related ability, a trait, ' +
         'a musical language, a piano-related phenomenon.'   ,
 

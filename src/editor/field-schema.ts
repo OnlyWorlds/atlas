@@ -160,7 +160,7 @@ export interface RelationField {
  * and future. The day the Council adds a link field to pin or marker, atlas
  * will silently invent a private `_id` disk name for it that no other
  * implementation writes, with nobody having decided that. Folder-format §5
- * already rules the disk names should be bare schema names (Temper, ruled
+ * already rules the disk names should be bare schema names (ruled
  * 2026-07-13, unbuilt): write-bare, read-accept-both forever, open-time tidy
  * converges old files. Until that lands this set is an open tap, and it fires
  * on schema growth rather than on anything atlas does.

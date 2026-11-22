@@ -179,7 +179,7 @@ export function isDemoKey(apiKey: string): boolean {
  *     the preserve-loop would clobber every pulled change with the stale
  *     local value.
  *
- * The v1 dialect rejects ALL extension fields (Skeld 2026-07-12), so wire
+ * The v1 dialect rejects ALL extension fields (2026-07-12), so wire
  * extensions are v2-only. The sync path is v2 only (`OwV2ClientAdapter`);
  * the v1 adapter this line once described is gone.
  *
@@ -299,7 +299,7 @@ export const ATLAS_LOCAL_EXTENSION_FIELDS = [
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
 
 /**
- * The extension NAMESPACES keel v2 round-trips verbatim (Skeld T2, probed
+ * The extension NAMESPACES keel v2 round-trips verbatim (T2, probed
  * live 2026-07-12): any field whose name starts with one of these prefixes is
  * legal wire data — including user-defined custom fields (D9's enablement
  * layer). Import keeps them, the validator doesn't flag them, export carries
@@ -317,12 +317,12 @@ export function isExtensionField(name: string): boolean {
  * Published extension profiles' keys (schema-dist `profiles/`): a meaning other
  * tools read the same way, so a person never names, edits or deletes one as a
  * custom field. `x_identity_key` says two elements are one being (the
- * cross-world identity profile, Skeld 2026-10-20): a typed "Identity key" would
- * merge two beings, and a deleted one would split one (Kael 2026-10-20). Shown
+ * cross-world identity profile, 2026-10-20): a typed "Identity key" would
+ * merge two beings, and a deleted one would split one (2026-10-20). Shown
  * read-only, and never rewritten by a re-key (the profile's rule 9). `x_packet_`
- * is the work packet's (Skeld 2026-10-21): its ids are the source
+ * is the work packet's (2026-10-21): its ids are the source
  * world's as they were when the packet was made, so a re-key never enters it.
- * `x_review_` is the review profile's (dist.37, Skeld 2026-10-22): a new
+ * `x_review_` is the review profile's (dist.37, 2026-10-22): a new
  * element's proposed mark and its last check, sent like any `x_` field.
  * `x_room_` is the room profile's (dist.45): `x_room_of`, the parlor's mark on
  * what its room makes (core/parlor-room.ts).

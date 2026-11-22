@@ -1354,7 +1354,7 @@ async function refreshElementsCache(): Promise<void> {
  * Re-read world.json into `state.active.meta` after a sync round (world-meta
  * sync). Without this, a pull-applied time_current/description changes
  * the DISK but every consumer keeps rendering the stale slice until reload —
- * the exact gap a handover flagged. Guards: the active world must
+ * the exact gap a review flagged. Guards: the active world must
  * still be the world this engine belongs to (world switches race idle
  * transitions), and a no-change read patches nothing (avoids spurious
  * re-renders mid-interaction).

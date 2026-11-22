@@ -3,7 +3,7 @@
  * charts room currently speaks.
  *
  * Detection keys on `atlas_calendar` FIELD PRESENCE, never the supertype
- * (Skeld's swap, design §4): users hand-mint Constructs with arbitrary
+ * (design §4): users hand-mint Constructs with arbitrary
  * supertypes, and a lore-only "Calendar" Construct must never surface as a
  * broken lens. Supertype `calendar` is convention and display only.
  *

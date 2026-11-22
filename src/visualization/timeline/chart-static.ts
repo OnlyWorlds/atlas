@@ -257,7 +257,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       // room's label-budget spirit: labels keep a preview from reading as a
       // monotone dot-run), rows filled centre-out by `layoutStrip`, so a short
       // band fans instead of piling its labels on one line (Titus's
-      // home-strip shots, 2026-07-12; Skeld's pre-smoke).
+      // home-strip shots, 2026-07-12; a pre-smoke).
       const ordered = block.nodes
         .map((n, i) => ({ n, i }))
         .sort((a, b) => a.n.date - b.n.date || a.i - b.i);

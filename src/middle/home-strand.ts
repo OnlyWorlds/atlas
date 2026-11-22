@@ -1,6 +1,6 @@
 /**
  * Home's Strand tab (the strand profile; Atlas 1.114, the journey since 1.120.0): the world's strand as
- * a short journey in Seethe's grid. The story across the top; the Event and the main character on the
+ * a short journey in the designer's grid. The story across the top; the Event and the main character on the
  * left, their places on the right, the joining words between. A filled box is always drawn; the one
  * slot asked for next is drawn as its card (a name and a text, `home-strand-card.ts`); the story's box
  * says in two lines how the parts join (`home-strand-box.ts`).
@@ -262,7 +262,7 @@ function join(words: string): HTMLElement {
   return s;
 }
 
-/** The Strand panel: Seethe's grid, one box asked at a time. */
+/** The Strand panel: the designer's grid, one box asked at a time. */
 export function buildStrandPanel(worldId: string, opts: StrandPanelOptions): HTMLElement {
   const section = document.createElement('section');
   section.className = 'atlas-home-strand';

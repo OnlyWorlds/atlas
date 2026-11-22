@@ -79,7 +79,7 @@ export function installRowKeydownActivation(root: HTMLElement, selector = '[role
     if (!row || !root.contains(row)) return;
     e.preventDefault(); // Space must not scroll the pane.
     // One press per key press: a held key's repeats never press again (a
-    // value focus came back to would reopen its editor, S617).
+    // value focus came back to would reopen its editor).
     if (e.repeat) return;
     row.click();
   });

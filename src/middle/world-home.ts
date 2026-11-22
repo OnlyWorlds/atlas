@@ -783,7 +783,7 @@ function appendCoverLines(cover: HTMLElement, worldId: string): void {
  * `charterOf` at the owner rung (memoised, core/charter.ts); world.json's
  * `charter` picks among marked Charters. Nothing absent draws, and no prompt
  * to add one. A keeper also reads each other marked Charter or Guide with
- * Retire it (one write: its mark to null, Skeld's ruling); everyone else the
+ * Retire it (one write: its mark to null, as ruled); everyone else the
  * leading ones only.
  */
 function buildReadingAids(meta: unknown, worldId: string): { block: HTMLElement } | null {

@@ -912,13 +912,13 @@ const PATTERN_BODY: Record<InkPattern, (c: string) => string> = {
   hatch: c => `<line x1="0" y1="0" x2="0" y2="6" stroke="${c}" stroke-width="1.1" stroke-opacity="0.75"/>`,
   stipple: c => `<circle cx="2" cy="2" r="1.1" fill="${c}"/><circle cx="6.5" cy="6" r="0.9" fill="${c}"/>`,
   marsh: c => `<line x1="1" y1="4" x2="7" y2="4" stroke="${c}" stroke-width="0.9"/><line x1="8" y1="8" x2="12" y2="8" stroke="${c}" stroke-width="0.9"/>`,
-  // Seethe's contour dots (style-atlas.html)
+  // The designer's contour dots (a style study)
   dots: c => `<circle cx="2.5" cy="2.5" r="0.9" fill="${c}" opacity="0.85"/><circle cx="7.5" cy="7.5" r="0.6" fill="${c}" opacity="0.6"/>`,
-  // Seethe's modern-atlas grids (map-atlas.ts): forest dots, marsh dashes, a territory's faint hatch
+  // The designer's modern-atlas grids (map-atlas.ts): forest dots, marsh dashes, a territory's faint hatch
   fdots: c => `<circle cx="2" cy="2" r="0.85" fill="${c}" opacity="0.8"/><circle cx="6" cy="6" r="0.6" fill="${c}" opacity="0.6"/>`,
   dashes: c => `<line x1="1" y1="3" x2="5" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/><line x1="7" y1="3" x2="11" y2="3" stroke="${c}" stroke-width="0.6" opacity="0.75"/>`,
   thinhatch: c => `<line x1="0" y1="0" x2="0" y2="18" stroke="${c}" stroke-width="0.4" opacity="0.14"/>`,
-  // Seethe's hatched textures (map-hatched.ts): one ink, the kind in the texture
+  // The designer's hatched textures (map-hatched.ts): one ink, the kind in the texture
   rhatch: c => `<line x1="0" y1="0" x2="0" y2="6" stroke="${c}" stroke-width="0.85" opacity="0.85"/>`,
   trees: c => `<line x1="2" y1="4" x2="2" y2="7" stroke="${c}" stroke-width="0.7" opacity="0.75"/>`
     + `<circle cx="2" cy="3.5" r="0.7" fill="none" stroke="${c}" stroke-width="0.5" opacity="0.75"/>`

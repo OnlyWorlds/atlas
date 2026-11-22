@@ -245,7 +245,7 @@ function askToOpen(row: AccountWorldRow, token: string, toasts: ToastManager): v
  * A copy already here opens as it is. True when there was one. A route alone
  * never activates a world mid-session, so this activates it. Silently only
  * when no world is open: a link from anyone never moves a person out of the
- * world they are in without their click (Kael, 2026-10-16), and a folder's
+ * world they are in without their click (2026-10-16), and a folder's
  * permission query runs after the open world is cleared, so a refused one
  * would leave that world empty. Any open that did not happen
  * asks for a click too.

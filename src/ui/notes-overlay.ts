@@ -65,7 +65,7 @@ export class NotesOverlay extends BaseModal {
         // Moved underneath while typing: keep both. The part this overlay
         // loaded is replaced by what was typed; anything else stays.
         // A replacer function: typed text holding `$'` or `$&` would expand
-        // as a replacement string (the family of Boss's show find).
+        // as a replacement string (the family of an earlier find).
         value = loaded && current.includes(loaded)
           ? current.replace(loaded, () => ta.value)
           : `${current}\n\nNotes from this browser:\n${ta.value}`;
