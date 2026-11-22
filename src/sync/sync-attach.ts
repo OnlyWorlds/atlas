@@ -34,7 +34,7 @@ import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
 import { detailsContext, resolveFixes } from '../ui/problem-fixes';
 import type { PerElementFailure } from '../core/types';
 import { effectiveSyncPaused, saveRegistry, updateWorldEntry } from '../registry/registry';
-import { isSeatWorld, worldPin } from '../core/seat';
+import { isSeatWorld, pinWhoOf, worldPin } from '../core/seat';
 import { waitsOnPin } from '../core/saves-online';
 import { keyRefusalLine, seatRefusalLine } from './world-key-lines';
 import { rosterFor } from './world-roster';
@@ -789,6 +789,12 @@ function savedPlaceOfSyncWorld(): string {
   return filesWhereOf(getState().registry.worlds.find(w => w.id === id)) === 'browser' ? 'in this browser' : 'in the folder';
 }
 
+/** Whose `API-Pin` the attached engine's world sends: the World PIN, or a seat's secret. */
+function pinWhoOfSyncWorld(): ReturnType<typeof pinWhoOf> {
+  const id = getCurrentSyncWorldId();
+  return pinWhoOf(getState().registry.worlds.find(w => w.id === id));
+}
+
 /**
  * What a toggle says when unticking a pause cannot resume the attached engine: a refused key or PIN
  * stopped it, and only a new one brings it back. Null when it resumed (or nothing is attached).
@@ -894,7 +900,7 @@ export function sayRateWait(): boolean {
   const state = engine.getState();
   if (state.kind === 'paused') toastManager.info(pausedPressLine(state));
   else if (state.kind === 'error') toastManager.error(refusedEngineLine() ?? state.message);
-  else toastManager.info(rateWaitLine(wait.pin, wait.leftMs, savedPlaceOfSyncWorld()));
+  else toastManager.info(rateWaitLine(wait.pin, wait.leftMs, savedPlaceOfSyncWorld(), pinWhoOfSyncWorld()));
   return true;
 }
 
@@ -1120,7 +1126,7 @@ function emitConflictToasts(
     const when = waitWords(waitMs);
     toastManager.info(
       result.transient_reason === 'rate_limited'
-        ? rateWaitLine(result.rate_limited_pin === true, waitMs, savedPlaceOfSyncWorld())
+        ? rateWaitLine(result.rate_limited_pin === true, waitMs, savedPlaceOfSyncWorld(), pinWhoOfSyncWorld())
         : result.transient_reason === 'offline'
           ? `OnlyWorlds could not be reached. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas tries again in ${when}.`
           : `OnlyWorlds is busy. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas tries again in ${when}.`

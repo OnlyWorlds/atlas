@@ -35,14 +35,17 @@ function statusOf(err: unknown): number | null {
  * The error a failed key check should throw: a `PlainError` for a refused
  * key, an unknown world or no connection; otherwise `err` itself.
  */
-export function keyCheckError(err: unknown, opts: { readOnly?: boolean } = {}): unknown {
+export function keyCheckError(err: unknown, opts: { readOnly?: boolean; seat?: boolean } = {}): unknown {
   const status = statusOf(err);
   // keel names the half it refused: a right key with a wrong PIN is
   // invalid_credentials with param "API-Pin" ("Incorrect PIN."), a wrong key
   // has none (#417's live walk: a wrong PIN was told as a wrong key).
   const param = (err as { param?: unknown } | null)?.param;
   if (status === 401 && !opts.readOnly && typeof param === 'string' && param.toLowerCase() === 'api-pin') {
-    return new PinRefusedError('OnlyWorlds did not accept this World PIN. Check it, then try again.');
+    // A seat's secret typed in the field is no World PIN (R1): the refusal names what was sent.
+    return new PinRefusedError(opts.seat
+      ? 'OnlyWorlds did not accept this seat secret. Check it, then try again.'
+      : 'OnlyWorlds did not accept this World PIN. Check it, then try again.');
   }
   if (status === 401 || status === 403) {
     return new PlainError(opts.readOnly

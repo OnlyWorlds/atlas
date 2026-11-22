@@ -31,7 +31,7 @@ import { savePersistedRightTabs } from './right-tabs-persistence';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
 import { filesWhereOf } from '../../core/browser-worlds';
-import { isSeatWorld, SEAT_SECRET_MISSING_LINE } from '../../core/seat';
+import { isSeatWorld, pinWhoOf, SEAT_SECRET_MISSING_LINE } from '../../core/seat';
 import { rateWaitLine } from '../../sync/rate-wait';
 import { renderGate } from '../../ui/render-gate';
 import { copyLine, worldIsCopiedBy } from '../../core/world-copy';
@@ -451,7 +451,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // Inside a 429's wait an idle engine is waiting, never "Synced just now": the pill says the wait.
   const wait = engine?.kind === 'idle' ? getCurrentSyncEngine()?.rateWaitNow() : null;
   const base = wait
-    ? { dataState: 'pending', label: 'Waiting', title: rateWaitLine(wait.pin, wait.leftMs, filesWhereOf(entry) === 'browser' ? 'in this browser' : 'in the folder') }
+    ? { dataState: 'pending', label: 'Waiting', title: rateWaitLine(wait.pin, wait.leftMs, filesWhereOf(entry) === 'browser' ? 'in this browser' : 'in the folder', pinWhoOf(entry)) }
     : mapEngineStateToPill(engine);
   // Pending conflicts override "synced" — sync is technically idle but the
   // user has unresolved divergence. Show warm "review N" label instead of

@@ -23,6 +23,7 @@ import { keyRefusalOf } from '../sync/world-key-lines';
 import { getState } from './state';
 import { hasFolderMode } from './capabilities';
 import { filesWhereOf, type FilesWhere } from './browser-worlds';
+import { pinWhoOf, type PinWho } from './seat';
 
 export { PlainError, isPlainError };
 
@@ -186,11 +187,20 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
       if (keyRefusalOf(err) === 'read_only_key' && err instanceof Error && /read-only/i.test(err.message)) {
         return `This world's key can only read, so Atlas could not finish ${doing}.${saved} Put in a write key in Settings, This world.`;
       }
-      // keel named the PIN (401 `invalid_credentials`, param `API-Pin`): the PIN's own sentence.
+      // keel named the PIN (401 `invalid_credentials`, param `API-Pin`): the PIN's own sentence. A seat
+      // world sends its seat's secret there, never the World PIN (R1), and has no PIN to put in again.
       if (keyRefusalOf(err) === 'pin') {
-        return `OnlyWorlds did not accept this World PIN. Atlas could not finish ${doing}.${saved} Check the World PIN in Settings, under OnlyWorlds.`;
+        const who = pinWhoFor(opts);
+        return who === 'seat' ? `OnlyWorlds did not accept this seat's secret, so Atlas could not finish ${doing}.${saved}`
+          : who === 'account' ? `OnlyWorlds did not accept this World PIN. Atlas could not finish ${doing}.${saved} Check the World PIN in Settings, under OnlyWorlds.`
+          : `OnlyWorlds did not accept this PIN. Atlas could not finish ${doing}.${saved} Check the PIN in Settings, under OnlyWorlds.`;
       }
-      return `OnlyWorlds did not accept this world's key or the World PIN, so Atlas could not finish ${doing}. Check your World PIN in Settings, under OnlyWorlds.`;
+      {
+        const who = pinWhoFor(opts);
+        return who === 'seat' ? `OnlyWorlds did not accept this world's key or its seat's secret, so Atlas could not finish ${doing}.`
+          : who === 'account' ? `OnlyWorlds did not accept this world's key or the World PIN, so Atlas could not finish ${doing}. Check your World PIN in Settings, under OnlyWorlds.`
+          : `OnlyWorlds did not accept this world's key or the PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, under OnlyWorlds.`;
+      }
     case 'offline':
       return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;
     case 'server-busy': {
@@ -201,9 +211,12 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
         const ms = typeof e.retryAfterMs === 'number' ? e.retryAfterMs
           : typeof e.retryAfter === 'number' ? e.retryAfter * 1000 : null;
         const when = ms === null ? 'a minute' : waitWords(ms);
-        return isPinParam(e.param)
-          ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish ${doing}.${saved} Check your World PIN in Settings; try again in ${when}.`
-          : `OnlyWorlds asked Atlas to wait, so Atlas could not finish ${doing}.${saved} Try again in ${when}.`;
+        if (!isPinParam(e.param)) return `OnlyWorlds asked Atlas to wait, so Atlas could not finish ${doing}.${saved} Try again in ${when}.`;
+        const wall = `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish ${doing}.${saved}`;
+        const who = pinWhoFor(opts);
+        return who === 'seat' ? `${wall} Try again in ${when}.`
+          : who === 'account' ? `${wall} Check your World PIN in Settings; try again in ${when}.`
+          : `${wall} Check your PIN in Settings; try again in ${when}.`;
       }
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
     }
@@ -260,6 +273,18 @@ export interface ProblemOpts {
   where?: FilesWhere;
   /** What the person typed for this step is a one-line name: the host's cause offers no code block. */
   oneLine?: boolean;
+  /**
+   * The world the step was for, so a line about its `API-Pin` names the World PIN or its seat's secret
+   * (1.125.3). Defaults to the open world's, as `where` does; with none, the line says "the PIN".
+   */
+  worldId?: string;
+}
+
+/** Whose credential this problem's world sends: the given world's, else the open world's. */
+function pinWhoFor(opts: ProblemOpts): PinWho {
+  const s = getState();
+  const id = opts.worldId ?? s.active?.worldId;
+  return pinWhoOf(id ? s.registry.worlds.find(w => w.id === id) : undefined);
 }
 
 /** The open world's `where`, for a caller that did not say. */

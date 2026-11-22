@@ -65,6 +65,17 @@ describe('SyncEngine push auth_reason', () => {
     expect(state.kind === 'error' && state.message).not.toMatch(/Unlink/);
   });
 
+  // A seat sends its seat's secret, never the World PIN (R1): its pill says the secret (1.125.3).
+  it('a seat\'s refused secret is said as the seat\'s, never the World PIN', async () => {
+    await folder.createElement('character', { name: 'Dora' });
+    const seat = new SyncEngine({ folder, client, seat: true });
+    client.__inject_auth_failure(true, 'invalid_credentials', 'API-Pin');
+    const pin = await seat.pushOnce();
+    expect(pin.auth_reason).toBe('pin');
+    const state = seat.getState();
+    expect(state.kind === 'error' && state.message).toBe("OnlyWorlds did not accept this seat's secret");
+  });
+
   it('leaves auth_reason undefined for a plain (untyped) 401', async () => {
     await folder.createElement('character', { name: 'Bob' });
     client.__inject_auth_failure(true); // no code — historic message-only shape

@@ -18,7 +18,7 @@
  */
 import { FILE_EXTENSIONS, OwApiError, OwNetworkError, OwV2Client, fileKindOf, type OwFileRow, type OwFileTicket, type OwMe } from '@onlyworlds/sdk';
 import { PlainError } from '../core/plain-error';
-import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
+import { isSeatWorld, pinWhoOf, SEAT_SECRET_MISSING_LINE, worldPin, type PinWho } from '../core/seat';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { ATLAS_CLIENT_NAME, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
@@ -274,8 +274,25 @@ const minutes = (seconds: number | null): string => {
 const NOT_REACHED = 'Atlas could not reach OnlyWorlds. Check the connection and try again.';
 const SIGN_IN_AGAIN = 'OnlyWorlds did not accept this world\'s key. Check it in Settings, This world.';
 
-/** keel's and the upload host's refusals of an add, each in its own sentence. */
-export function addRefusal(err: unknown, file: { size: number }): string {
+/** keel refused the `API-Pin` a file's add or remove sent, said for whose it was (a seat has no PIN to put in again). */
+export function pinRefusedLine(who: PinWho): string {
+  if (who === 'seat') return 'OnlyWorlds did not accept this seat\'s secret.';
+  return who === 'account'
+    ? 'OnlyWorlds did not accept this World PIN. Check it in Settings, under OnlyWorlds.'
+    : 'OnlyWorlds did not accept this PIN. Check it in Settings, under OnlyWorlds.';
+}
+
+/** The PIN wall's next step: check the World PIN (or, not known, the PIN) and wait; a seat only waits. */
+function checkThenWait(who: PinWho, when: string): string {
+  if (who === 'seat') return `Try again in ${when}.`;
+  return who === 'account' ? `Check your World PIN in Settings; try again in ${when}.` : `Check your PIN in Settings; try again in ${when}.`;
+}
+
+/**
+ * keel's and the upload host's refusals of an add, each in its own sentence. `who` names the world's
+ * `API-Pin`: the World PIN, a seat's secret, or (not known) the PIN.
+ */
+export function addRefusal(err: unknown, file: { size: number }, who: PinWho = 'unknown'): string {
   if (err instanceof TypeError) return `OnlyWorlds takes ${FILES_KINDS_LINE} (${EXTENSIONS.join(' ')}). This file is none of those.`;
   if (err instanceof OwNetworkError) return `${NOT_REACHED} Nothing was added.`;
   if (!(err instanceof OwApiError)) return 'The file was not added. Try again in a moment.';
@@ -285,7 +302,7 @@ export function addRefusal(err: unknown, file: { size: number }): string {
   // A 429 by keel's `param`: its PIN wall (ten different wrong PINs on this key), or any other throttle.
   if (err.code === 'rate_limited' || err.status === 429) {
     return isPinParam(err.param)
-      ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing was added. Check your World PIN in Settings; try again in ${minutes(err.retryAfter)}.`
+      ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. Nothing was added. ${checkThenWait(who, minutes(err.retryAfter))}`
       : `OnlyWorlds asked Atlas to wait. Nothing was added; try again in ${minutes(err.retryAfter)}.`;
   }
   if (err.code === 'not_author') return 'As a contributor, you can add files only to elements you made.';
@@ -293,7 +310,7 @@ export function addRefusal(err: unknown, file: { size: number }): string {
   if (err.code === 'media_unavailable') return 'Files are not available on OnlyWorlds right now. Try again later.';
   if (err.code === 'write_failed') return 'OnlyWorlds could not store the file just now. Nothing was kept; try again.';
   if (err.status === 404) return FILES_NOT_SYNCED_LINE;
-  if (err.isAuthError && err.param === 'API-Pin') return 'OnlyWorlds did not accept this World PIN. Check it in Settings, under OnlyWorlds.';
+  if (err.isAuthError && err.param === 'API-Pin') return pinRefusedLine(who);
   if (err.isAuthError) return SIGN_IN_AGAIN;
   // The web host in front of OnlyWorlds refused the request for its text (the
   // file's name or label), before OnlyWorlds saw it: never the key (conv. 191).
@@ -337,7 +354,7 @@ export async function addFile(
       try {
         ticket = await client.createFileTicket(type, id, { name: file.name, size: file.size, label });
       } catch (err) {
-        throw new PlainError(addRefusal(err, file));
+        throw new PlainError(addRefusal(err, file, pinWhoOf(entry)));
       }
       fileId = ticket.file_id;
       upload.fileId = fileId;
@@ -355,7 +372,7 @@ export async function addFile(
       } catch (err) {
         if (err instanceof OwApiError && err.status === 409 && err.code === 'exists') break;
         if (attempt === 0 && isTicketSpent(err)) continue;
-        throw new PlainError(addRefusal(err, file));
+        throw new PlainError(addRefusal(err, file, pinWhoOf(entry)));
       }
     }
   } catch (err) {
@@ -431,11 +448,11 @@ export async function removeFile(
       notify();
       if (err instanceof OwNetworkError) throw new PlainError(`${NOT_REACHED} The file is still there.`);
       if (err instanceof OwApiError && err.status === 403) throw new PlainError('Only the person who added this file, or the world\'s owner, can remove it.');
-      if (err instanceof OwApiError && err.isAuthError && err.param === 'API-Pin') throw new PlainError('OnlyWorlds did not accept this World PIN. Check it in Settings, under OnlyWorlds.');
+      if (err instanceof OwApiError && err.isAuthError && err.param === 'API-Pin') throw new PlainError(pinRefusedLine(pinWhoOf(entry)));
       if (err instanceof OwApiError && err.isAuthError) throw new PlainError(SIGN_IN_AGAIN);
       if (err instanceof OwApiError && err.status === 429) {
         throw new PlainError(isPinParam(err.param)
-          ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. The file is still there. Check your World PIN in Settings; try again in ${minutes(err.retryAfter)}.`
+          ? `OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while. The file is still there. ${checkThenWait(pinWhoOf(entry), minutes(err.retryAfter))}`
           : `OnlyWorlds asked Atlas to wait. The file is still there; try again in ${minutes(err.retryAfter)}.`);
       }
       throw new PlainError('The file was not removed. Try again in a moment.');

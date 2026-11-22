@@ -45,6 +45,17 @@ export function isSeatWorld(entry: WorldRegistryEntry | null | undefined): boole
 }
 
 /**
+ * Whose credential a line about the `API-Pin` names: the account's World PIN, a seat's own secret
+ * (never the World PIN, R1), or, where the line cannot know the world, neither (it says "the PIN").
+ */
+export type PinWho = 'account' | 'seat' | 'unknown';
+
+export function pinWhoOf(entry: WorldRegistryEntry | null | undefined): PinWho {
+  if (!entry) return 'unknown';
+  return isSeatWorld(entry) ? 'seat' : 'account';
+}
+
+/**
  * The credential sent as `API-Pin` for this world: a seat world's own secret
  * (undefined when this browser lost it: never the account PIN, R1), else the
  * account PIN.

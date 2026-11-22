@@ -533,7 +533,7 @@ export class MakeOnlineModal extends BaseModal {
         // A refused key, an unknown world or no connection, in words (A38;
         // offline used to show "Failed to fetch"); the rest as it came.
         if (!isSeatSecret(pin) && isPinRefusal(err)) recordPinState(pin, 'refused');
-        throw keyCheckError(err);
+        throw keyCheckError(err, { seat: isSeatSecret(pin) });
       }
       if (!world.id) throw new Error('Server returned no world ID');
 

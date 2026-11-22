@@ -112,6 +112,7 @@ export function showProblem(err: unknown, opts: FixContext & ProblemOpts & { doi
   const problem = problemFor(err, {
     doing: opts.doing, savedLocally: opts.savedLocally, folder: opts.folder, unexpected: opts.unexpected,
     where: opts.where ?? whereFor(opts.worldId),
+    ...(opts.worldId ? { worldId: opts.worldId } : {}),
   });
   markProblemShown(err);
   if (problem.quiet) return problem;

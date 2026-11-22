@@ -949,7 +949,8 @@ export class PinNeededError extends PlainError {
 export function linkPinRefusal(apiKey: string, apiPin: string, readOnly: boolean, pinLater?: boolean): PlainError | null {
   if (apiPin || readOnly) return null;
   if (pinLater) return readsWithoutPin(apiKey) ? null : new PinNeededError();
-  return new PlainError('Enter your World PIN first.');
+  // The key alone does not say whether it is a seat's: the field's own two names.
+  return new PlainError('Enter your World PIN or seat secret first.');
 }
 
 export interface LinkExistingApiWorldResult {
@@ -1063,7 +1064,7 @@ export async function linkExistingApiWorldInRoot(
       }
     } catch (err) {
       if (!seat && !readOnly && isPinRefusal(err)) recordPinState(apiPin, 'refused');
-      throw keyCheckError(err, { readOnly });
+      throw keyCheckError(err, { readOnly, seat: !!seat });
     }
   }
   if (!world.id) throw new Error('Server returned no world ID (unexpected)');

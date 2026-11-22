@@ -28,7 +28,7 @@ import { worldIsViewOnly } from '../core/view-only';
 import { navigate, shareHash, elementHash, settingsHash, parseHash, onHashChange } from '../core/router';
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
-import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
+import { isSeatWorld, pinWhoOf, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import { rateWaitOf } from '../sync/rate-wait';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
@@ -65,6 +65,12 @@ import { missingLabel, nameOrUnnamed, ownName, quotedName } from '../core/type-w
 function pageInLine(page: Element | undefined, start = false): string {
   const own = page ? ownName(page) : '';
   return own ? `"${own}"` : nameOrUnnamed({ type: 'narrative' }, { start, word: 'page' });
+}
+
+/** What a world without a sharing client lacks beside its key: a seat's secret, the World PIN, or (no world) the PIN. */
+export function missingCredentialWords(worldId: string | null): string {
+  const who = pinWhoOf(worldId ? getState().registry.worlds.find(w => w.id === worldId) : undefined);
+  return who === 'seat' ? 'seat secret' : who === 'account' ? 'World PIN' : 'PIN';
 }
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {
@@ -236,7 +242,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const ask = `Delete ${quotedName(el ?? { type: 'narrative' }, { word: 'page', typed: true })}?`;
       const msg = client
         ? `${ask} It is published at ${url}. Deleting it also takes the published page down.`
-        : `${ask} It is published at ${url}, but Atlas has no key or World PIN for this world, so the published page would stay up with no way to revoke it from here.`;
+        : `${ask} It is published at ${url}, but Atlas has no key or ${missingCredentialWords(worldId)} for this world, so the published page would stay up with no way to revoke it from here.`;
       if (!window.confirm(msg)) return;
       publishConfirmed = true;
       if (client) {
@@ -1484,7 +1490,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   /** A sharing-server refusal speaks its code's sentence; anything else is a problem worded for `doing`. */
   function surfaceSharingError(err: unknown, doing: string): void {
     console.error('[share-room] sharing api', err);
-    if (err instanceof SharingApiError) toasts.error(sharingErrorMessage(err));
+    if (err instanceof SharingApiError) toasts.error(sharingErrorMessage(err, pinWhoOf(getState().registry.worlds.find(w => w.id === wid()))));
     else showProblem(err, { doing, toasts });
   }
 

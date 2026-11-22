@@ -15,6 +15,8 @@ import { RekeyPendingError } from '../../src/store/folder-store';
 import { DuplicatePinError, isDuplicatePinError } from '../../src/core/pin-uniqueness';
 import { DownloadCancelledError } from '../../src/sync/initial-download';
 import { parseErrorEnvelope } from '@onlyworlds/sdk';
+import { patchSlice } from '../../src/core/state';
+import { defaultRegistry, type WorldRegistryEntry } from '../../src/core/types';
 
 const HOST_PAGE = (title: string) => `<!DOCTYPE html><html><head><title>${title}</title></head><body>Sorry, you have been blocked</body></html>`;
 const RAW = 'An operation that depends on state cached in an interface object was made';
@@ -267,8 +269,11 @@ describe('a 429 in words, by keel\'s param (1.124.35)', () => {
   const wall = (retry: string | null) => new OwV2Error(429, { code: 'rate_limited', message: 'm', param: 'API-Pin' }, '', retry);
   const other = (retry: string | null) => new OwV2Error(429, { code: 'rate_limited', message: 'm', param: null }, '', retry);
   it('keel\'s PIN wall says the wall, the PIN to check and the wait', () => {
-    expect(problemFor(wall('900'), { doing: 'linking this world' }).sentence)
+    // An account world: the World PIN (a seat's wall, and a world not known, in seat-credential-words).
+    patchSlice('registry', { ...defaultRegistry(), worlds: [{ id: 'local-own', name: 'Owned', state: 'api-linked', api: { world_id: 'w-own', api_key: 'ow_w_' + 'o'.repeat(32) } } as unknown as WorldRegistryEntry] });
+    expect(problemFor(wall('900'), { doing: 'linking this world', worldId: 'local-own' }).sentence)
       .toBe("OnlyWorlds refused too many different PINs for this world's key, so it takes none for a while, and Atlas could not finish linking this world. Check your World PIN in Settings; try again in 15 minutes.");
+    patchSlice('registry', defaultRegistry());
   });
   it('any other 429 says the wait alone, never the PIN', () => {
     const s = problemFor(other('30'), { doing: 'refreshing from OnlyWorlds', savedLocally: true, where: 'folder' }).sentence;

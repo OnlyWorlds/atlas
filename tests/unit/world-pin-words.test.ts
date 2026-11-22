@@ -42,9 +42,31 @@ function bare(lit: string): boolean {
   return /(?<!World )\bPIN\b/.test(body.replace(/\bAdd PIN\b/g, '').replace(/'no PIN'/g, ''));
 }
 
+/**
+ * The lines said where the code cannot know whose `API-Pin` it was (no world given and none open): a
+ * seat sends its seat's secret, never the World PIN, so these keep the old neutral "PIN". Each is the
+ * third arm beside a World PIN line and a seat's line (tests/unit/seat-credential-words.test.ts).
+ */
+const NEUTRAL: Array<[file: string, starts: string]> = [
+  ['core/problems.ts', '`OnlyWorlds did not accept this PIN. Atlas could not finish'],
+  ['core/problems.ts', "`OnlyWorlds did not accept this world's key or the PIN, so Atlas"],
+  ['core/problems.ts', '`${wall} Check your PIN in Settings; try again'],
+  ['middle/share-room.ts', "'PIN'"],
+  ['sync/element-files.ts', "'OnlyWorlds did not accept this PIN. Check it in Settings, under OnlyWorlds.'"],
+  ['sync/element-files.ts', '`Check your PIN in Settings; try again'],
+  ['sync/rate-wait.ts', '`${wall} Check your PIN in Settings; Atlas tries again'],
+  ['sync/sharing-client.ts', "'OnlyWorlds refused too many different PINs for this world\\'s key, so it takes none for a while. Nothing changed. Check your PIN in Settings"],
+  ['sync/sharing-client.ts', "'OnlyWorlds did not accept the key or the PIN. Check your PIN in Settings"],
+];
+const neutral = (at: string, lit: string) => NEUTRAL.some(([file, starts]) => at.startsWith(`${file}:`) && lit.startsWith(starts));
+
 describe('the World PIN by one name', () => {
   it('no sentence a person reads names the account PIN any other way', () => {
-    expect(literals().filter(({ lit }) => bare(lit)).map(h => `${h.at} ${h.lit}`)).toEqual([]);
+    expect(literals().filter(({ at, lit }) => bare(lit) && !neutral(at, lit)).map(h => `${h.at} ${h.lit}`)).toEqual([]);
+    // Each neutral line is still there, once: a row that went takes its place in this list with it.
+    for (const [file, starts] of NEUTRAL) {
+      expect(literals().filter(({ at, lit }) => at.startsWith(`${file}:`) && lit.startsWith(starts)).length, `${file} ${starts}`).toBe(1);
+    }
   });
 
   it('the instrument sees the old words and lets the two labels be', () => {

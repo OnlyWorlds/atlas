@@ -52,6 +52,11 @@ export function seatRefusalLine(reason: KeyRefusal | null | undefined, opts: { p
   return `${lead}OnlyWorlds no longer accepts this world's seat. The owner may have removed it.`;
 }
 
+/** A seat world's pill title: its refusal, short, as `keyRefusalPill` is (no closing stop). */
+export function seatRefusalPill(reason: KeyRefusal | null | undefined): string {
+  return seatRefusalLine(reason, { paused: false }).replace(/\.$/, '');
+}
+
 /** Test connection's answer, said in Settings, This world, where the key goes in. */
 export function keyRefusalHere(reason: KeyRefusal | null | undefined): string {
   switch (reason) {
