@@ -28,6 +28,7 @@ import {
 import { getState, patchSlice, subscribe } from '../core/state';
 import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused, storedRegistry, updateWorldEntry } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
+import { isPlainError } from '../core/plain-error';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { copyChip, copyLine } from '../core/world-copy';
 import { dropHeldSeat, heldSeat, heldSeatBusy, heldSeats, type HeldSeat } from '../core/held-seats';
@@ -691,6 +692,11 @@ export interface ActivateWorldOpts {
   sayLockHeld?: boolean;
 }
 
+/** Said at startup when the world's own make-and-move lock is busy: another page has it, or moves it, and a move cannot be taken over. */
+export function stayedClosedWhileBusy(name: string): string {
+  return `"${name}" stayed closed here. Another Atlas page may still have it open, or be moving it. Open it again here once that page is done.`;
+}
+
 /**
  * Said when a held world stays closed: true for a live second page, a page
  * in another browser or on another computer sharing the folder, and a page
@@ -897,8 +903,9 @@ async function doActivateWorld(
     if (!free.ran) {
       if (!silent) toasts.info(MOVING_IN_ANOTHER_TAB);
       // The open from the address at startup is never left with no word: a
-      // page that moves it, makes it, or checks it this moment has it.
-      else if (opts.sayLockHeld) toasts.show(stayedClosedHere(entry.name), 'info', 8000);
+      // page that moves it, makes it, or checks it this moment has it. No
+      // take-over is offered: a move cannot be taken over.
+      else if (opts.sayLockHeld) toasts.show(stayedClosedWhileBusy(entry.name), 'info', 8000);
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }
@@ -1094,6 +1101,8 @@ async function doActivateWorld(
       if (!silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
       // The world named by the address at startup, held by a live page: said, never asked.
       else if (err instanceof ELockHeld && opts.sayLockHeld) toasts.show(stayedClosedHere(entry.name), 'info', 8000);
+      // A plain sentence ("Atlas could not open this world just now. Try again in a moment.") says itself, with its retry.
+      else if (isPlainError(err) && opts.sayLockHeld) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }

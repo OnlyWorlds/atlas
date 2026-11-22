@@ -15,6 +15,11 @@ import { rmSync } from 'node:fs';
 const SALTMERE = { name: 'Saltmere', worldId: '0192c000-0000-7000-8000-00000000cccc', dir: 'saltmere-0192c000-5e6f' };
 const HARBOR = { name: 'Harbor', worldId: '0192d000-0000-7000-8000-00000000dddd', dir: 'harbor-0192d000-7a8b' };
 const STAYED = 'stayed closed here. Another Atlas page may still have it open.';
+/** Said when the world's own make-and-move lock is busy: no take-over offered. */
+const BUSY = 'stayed closed here. Another Atlas page may still have it open, or be moving it. Open it again here once that page is done.';
+/** Either of the two: a page that loses a start race loses at one check or the other. */
+const EITHER = /stayed closed here\. Another Atlas page may still have it open/;
+const TRY_AGAIN = 'Atlas could not open this world just now. Try again in a moment.';
 
 async function boot(page: Page): Promise<void> {
   await page.goto('/');
@@ -315,7 +320,8 @@ async function worldLockHeldAtStartup(page: Page, context: BrowserContext): Prom
   const second = await context.newPage();
   const dialogs = countDialogs(second);
   await shell(second, `/#/w/${id}`);
-  await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
+  await expect(second.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${BUSY}` })).toBeVisible();
+  await expect(second.locator('.ow-toast', { hasText: 'take it over' })).toHaveCount(0);
   expect(dialogs.at).toHaveLength(0);
   expect(await activeWorld(second)).toBeNull();
   await page.evaluate(() => (window as any).__releaseWorldLock());
@@ -340,7 +346,7 @@ async function twoPagesAtStartup(page: Page, context: BrowserContext): Promise<v
     const actives = await Promise.all(pages.map(activeWorld));
     const winner = pages[actives.indexOf(id)];
     const loser = pages[1 - actives.indexOf(id)];
-    await expect(loser.locator('.ow-toast', { hasText: `"${SALTMERE.name}" ${STAYED}` })).toBeVisible();
+    await expect(loser.locator('.ow-toast', { hasText: EITHER })).toBeVisible();
     expect(dialogs[0].at.length + dialogs[1].at.length).toBe(0);
     await loser.close();
     holder = winner;
@@ -371,6 +377,53 @@ async function supersededRestoresTheAddress(page: Page, context: BrowserContext)
   expect(dialogs.at).toHaveLength(0);
   expect(await second.evaluate(() => location.hash)).toBe(before);
   expect(await activeWorld(second)).toBeNull();
+  await second.close();
+}
+
+/**
+ * The update reload: every open tab reloads into the new release over the lock
+ * its old page wrote, in the old shape ({ tab_id, started_at, last_heartbeat },
+ * of this very tab). It opens at start as before: no toast, no dialog.
+ */
+async function updateReload(page: Page): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  await shell(page, `/#/w/${id}`);
+  await clickWorld(page, SALTMERE.name);
+  await expect.poll(() => activeWorld(page)).toBe(id);
+  const named = (await readLock(page, SALTMERE.dir))!;
+  await writeLock(page, SALTMERE.dir, { tab_id: named.tab_id, started_at: named.started_at, last_heartbeat: new Date().toISOString() });
+  const dialogs = countDialogs(page);
+  expect(page.url()).toContain('#/w/');
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await expect.poll(() => activeWorld(page)).toBe(id);
+  expect(await page.locator('.ow-toast', { hasText: EITHER }).count()).toBe(0);
+  expect(dialogs.at).toHaveLength(0);
+  expect(String((await readLock(page, SALTMERE.dir))!.web_lock)).toMatch(/^atlas-writer:/);
+}
+
+/** The start on a world's address when this page's own Web Lock does not come: said, never nothing. */
+async function lateOwnLockAtStartup(page: Page, context: BrowserContext): Promise<void> {
+  await boot(page);
+  const [id] = await seed(page, [SALTMERE]);
+  const second = await context.newPage();
+  await second.addInitScript(() => {
+    const L = navigator.locks as any;
+    const orig = L.request.bind(L);
+    L.request = (name: string, opts: any, cb: any) => {
+      if (typeof name === 'string' && name.startsWith('atlas-writer:')) {
+        return new Promise((_r, rej) => { opts?.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError'))); });
+      }
+      return orig(name, opts, cb);
+    };
+  });
+  const dialogs = countDialogs(second);
+  await shell(second, `/#/w/${id}`);
+  await expect(second.locator('.ow-toast', { hasText: TRY_AGAIN })).toBeVisible();
+  expect(dialogs.at).toHaveLength(0);
+  expect(await activeWorld(second)).toBeNull();
+  expect(await readLock(second, SALTMERE.dir)).toBeNull();
   await second.close();
 }
 
@@ -435,6 +488,14 @@ for (const tag of ['', ' @firefox']) {
     test(`two pages starting at once on a world whose page closed: one opens, the other says why${tag}`, async ({ page, context }) => {
       test.slow();
       await twoPagesAtStartup(page, context);
+    });
+
+    test(`the update reload over its own lock of the release before: opens at start, no toast, no dialog${tag}`, async ({ page }) => {
+      await updateReload(page);
+    });
+
+    test(`the start on the address when this page's own Web Lock is late: says try again, never nothing${tag}`, async ({ page, context }) => {
+      await lateOwnLockAtStartup(page, context);
     });
   });
 }

@@ -13,6 +13,7 @@ import { FakeDirHandle, setFakeFsJitter } from '../fixtures/fake-fs';
 import { fakeLockBrowser, type FakeLockBrowser, type PageLocks } from '../fixtures/fake-lock-pages';
 import { ELockHeld, FsFolderStore, makeBrowserId, type FsFolderStoreOptions } from '../../src/store/folder-store-fs';
 import { BROWSER_ID_STORAGE_KEY } from '../../src/core/constants';
+import { installFakeLocks } from '../fixtures/fake-locks';
 import { isPlainError } from '../../src/core/plain-error';
 
 const j = (v: unknown) => JSON.stringify(v, null, 2) + '\n';
@@ -272,7 +273,8 @@ describe('the writer lock across browsers and releases', () => {
     const root = world();
     const a = storeOn(browser, 'pA', 'T1', { browserId: null });
     await a.open(asDir(root));
-    expect(Object.keys(lockOf(root)!).sort()).toEqual(['last_heartbeat', 'started_at', 'tab_id']);
+    expect(lockOf(root)).toMatchObject({ web_lock: null });
+    expect(Object.keys(lockOf(root)!).sort()).toEqual(['last_heartbeat', 'started_at', 'tab_id', 'web_lock']);
     expect(a.__debug_webLock()).toBeNull();
     expect(browser.heldBy('pA')).toEqual([]);
     browser.kill('pA');
@@ -295,15 +297,14 @@ describe('the writer lock across browsers and releases', () => {
     expect(root.get('.atlas/lock')).toBe(named);
   });
 
-  it('the release before Web Locks: its live lock is never taken by a store holding a Web Lock, even of its tab id, and never owned by its tab id', async () => {
+  it('the update reload: a live lock in the shape of the release before Web Locks, of this tab\'s id, is taken in silence, and never owned by its tab id after', async () => {
     const browser = fakeLockBrowser();
     const root = world();
     const now = new Date().toISOString();
+    // { tab_id, started_at, last_heartbeat }: no web_lock key, no browser_id, beaten a moment ago.
     root.put('.atlas/lock', j({ tab_id: 'T', started_at: now, last_heartbeat: now }));
-    expect(await openErr(storeOn(browser, 'pU', 'T'), root)).toBeInstanceOf(ELockHeld);
-    root.put('.atlas/lock', j({ tab_id: 'T', started_at: now, last_heartbeat: '2026-01-01T00:00:00.000Z' }));
     const b = storeOn(browser, 'pB', 'T');
-    expect(await openErr(b, root)).toBeNull(); // stale: taken
+    expect(await openErr(b, root)).toBeNull();
     expect(lockOf(root)!.web_lock).toBe(b.__debug_webLock());
     // An old page of the same tab id takes it back by its tab id and writes no name.
     const old = j({ tab_id: 'T', started_at: now, last_heartbeat: new Date().toISOString() });
@@ -315,6 +316,26 @@ describe('the writer lock across browsers and releases', () => {
     expect(root.get('.atlas/lock')).toBe(old);
     await b.close();
     expect(root.get('.atlas/lock')).toBe(old);
+  });
+
+  it('the same shape of another tab\'s id, a moving one of this tab\'s id taken too; this release\'s own nameless lock (web_lock: null) of this tab\'s id refused', async () => {
+    const browser = fakeLockBrowser();
+    const now = new Date().toISOString();
+    const r1 = world();
+    r1.put('.atlas/lock', j({ tab_id: 'other', started_at: now, last_heartbeat: now }));
+    expect(await openErr(storeOn(browser, 'p1', 'T'), r1)).toBeInstanceOf(ELockHeld);
+    const r2 = world();
+    r2.put('.atlas/lock', j({ tab_id: 'T', started_at: now, last_heartbeat: now, moving: true }));
+    expect(await openErr(storeOn(browser, 'p2', 'T'), r2)).toBeNull();
+    const r3 = world();
+    r3.put('.atlas/lock', j({ tab_id: 'T', web_lock: null, started_at: now, last_heartbeat: now }));
+    const named = storeOn(browser, 'p3', 'T');
+    expect(await openErr(named, r3)).toBeInstanceOf(ELockHeld);
+    // and it is what a nameless store of this release writes
+    const r4 = world();
+    await new FsFolderStore({ tabId: 'T', disableHeartbeat: true, locks: null }).open(asDir(r4));
+    expect(lockOf(r4)!.web_lock).toBeNull();
+    expect(await openErr(storeOn(browser, 'p4', 'T'), r4)).toBeInstanceOf(ELockHeld);
   });
 
   it('a live lock of another tab id with no name still reads ELockHeld', async () => {
@@ -347,7 +368,8 @@ describe('no Web Locks, no change', () => {
     const root = world();
     const a = new FsFolderStore({ tabId: 'T1', disableHeartbeat: true });
     await a.open(asDir(root));
-    expect(Object.keys(lockOf(root)!).sort()).toEqual(['last_heartbeat', 'started_at', 'tab_id']);
+    expect(lockOf(root)).toMatchObject({ web_lock: null });
+    expect(Object.keys(lockOf(root)!).sort()).toEqual(['last_heartbeat', 'started_at', 'tab_id', 'web_lock']);
     const same = new FsFolderStore({ tabId: 'T1', disableHeartbeat: true });
     expect(await openErr(same, root)).toBeNull();
     const other = new FsFolderStore({ tabId: 'T2', disableHeartbeat: true });
@@ -360,7 +382,7 @@ describe('no Web Locks, no change', () => {
     const root = world();
     const a = new FsFolderStore({ tabId: 'T1', disableHeartbeat: true, locks: null, browserId: 'browser-1' });
     await a.open(asDir(root));
-    expect(lockOf(root)!.web_lock).toBeUndefined();
+    expect(lockOf(root)!.web_lock).toBeNull();
     expect(lockOf(root)!.browser_id).toBeUndefined();
     expect(a.__debug_webLock()).toBeNull();
   });
@@ -551,5 +573,55 @@ describe('the browser id, made once per browser', () => {
     const s = new FsFolderStore({ tabId: 'T', locks: browser.page('pA'), disableHeartbeat: true, claimWaitMs: WAIT });
     await s.open(asDir(root));
     expect(lockOf(root)!.browser_id).toBe('this-browser');
+  });
+});
+
+describe('the first open of a page, its browser id still to make', () => {
+  // A fresh module each: the page keeps the id it made in memory.
+  afterEach(() => { vi.restoreAllMocks(); localStorage.removeItem(BROWSER_ID_STORAGE_KEY); });
+  const freshStore = async () => { vi.resetModules(); return import('../../src/store/folder-store-fs'); };
+  /** A page whose request for `prefix…` never comes back in time. */
+  const stalls = (inner: PageLocks, prefix: string): PageLocks => ({
+    request(name, opts, cb) {
+      if (name.startsWith(prefix)) return new Promise((_r, rej) => { opts.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError'))); });
+      return inner.request(name, opts, cb);
+    },
+  });
+
+  it('the atlas-browser-id lock late: the open fails with the plain sentence, writes no lock and holds nothing', async () => {
+    const mod = await freshStore();
+    const browser = fakeLockBrowser();
+    const root = world();
+    const s = new mod.FsFolderStore({ tabId: 'T', locks: stalls(browser.page('pA'), 'atlas-browser-id'), disableHeartbeat: true, claimWaitMs: WAIT });
+    const err = await openErr(s, root);
+    expect((err as Error).name).toBe('PlainError'); // a fresh module's class: by name
+    expect((err as Error).message).toBe(COULD_NOT_OPEN);
+    expect(root.get('.atlas/lock')).toBeNull();
+    expect(browser.heldBy('pA')).toEqual([]);
+  });
+
+  it('storage refused: the page opens as without Web Locks, nameless, nothing held', async () => {
+    const mod = await freshStore();
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('denied', 'SecurityError'); });
+    const browser = fakeLockBrowser();
+    const root = world();
+    const s = new mod.FsFolderStore({ tabId: 'T', locks: browser.page('pA'), disableHeartbeat: true, claimWaitMs: WAIT });
+    expect(await openErr(s, root)).toBeNull();
+    expect(lockOf(root)).toMatchObject({ tab_id: 'T', web_lock: null });
+    expect(lockOf(root)!.browser_id).toBeUndefined();
+    expect(browser.heldBy('pA')).toEqual([]);
+  });
+});
+
+describe('the old test fake', () => {
+  it('a request whose signal is already aborted is refused at once, as the real one is', async () => {
+    const { locks, uninstall } = installFakeLocks();
+    try {
+      const ac = new AbortController();
+      ac.abort();
+      let called = false;
+      await expect(locks.request('x', { signal: ac.signal }, () => { called = true; })).rejects.toBeTruthy();
+      expect(called).toBe(false);
+    } finally { uninstall(); }
   });
 });

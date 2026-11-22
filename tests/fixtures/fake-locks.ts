@@ -23,6 +23,7 @@ export function installFakeLocks(): { locks: FakeLocks; uninstall: () => void } 
       const callback = (typeof opts === 'function' ? opts : cb) as Cb;
       const ifAvailable = typeof opts === 'object' && opts?.ifAvailable === true;
       const signal = typeof opts === 'object' ? opts?.signal : undefined;
+      if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('aborted', 'AbortError'));
       if (ifAvailable && held.has(name)) return Promise.resolve(callback(null));
       const prior = tails.get(name) ?? Promise.resolve();
       // `signal` aborts a wait, as the real one does: the request rejects and is never granted.
