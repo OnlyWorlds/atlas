@@ -35,8 +35,8 @@ describe('a review row', () => {
   });
 });
 
-const NOTE_ELEMENT = 'A Pin\'s "element" is not read as its link, so that pin comes in with no element.';
-const NOTE_OTHER_TYPE = 'A link that names an element of another type is removed too.';
+const NOTE_OTHER_TYPE = 'A link by name to an element of another type is removed too; a link by id is kept as written.';
+const NOTE_ELEMENT = 'A Pin\'s "element" is not read: the pin keeps the link in its "element_id", and a pin with only "element" comes in with no element.';
 const NOTE_NO_TYPE = 'A Pin with no "element_type" loses a link written as a name; one written as an id is kept, and its type is filled in when the import or the world holds that element.';
 
 describe('the note under the review', () => {
@@ -48,12 +48,17 @@ describe('the note under the review', () => {
   });
 
   const ADA = '068e5012-d77c-799d-8000-95548fbae78d';
+  const GUILD = '068e5012-d77c-799d-8000-0000000000ee';
   const plan = () => reconcile(parsePayload({
-    Character: [{ id: ADA, name: 'Ada', birthplace: 'The Guild', friends: ['The Guild', 'Bea'] }, { name: 'Bea' }],
-    Collective: [{ name: 'The Guild' }],
+    Character: [
+      { id: ADA, name: 'Ada', birthplace: 'The Guild', friends: ['The Guild', 'Bea'] }, { name: 'Bea' },
+      { name: 'Cy', birthplace: GUILD, friends: [GUILD] },
+    ],
+    Collective: [{ id: GUILD, name: 'The Guild' }],
     Map: [{ name: 'Realm' }],
     Pin: [
       { name: 'By element', map: 'Realm', element: 'Ada' },
+      { name: 'Both', map: 'Realm', element: 'Ada', element_id: ADA, element_type: 'Character' },
       { name: 'By name, no type', map: 'Realm', element_id: 'Ada' },
       { name: 'By id, no type', map: 'Realm', element_id: ADA },
       { name: 'By unknown id, no type', map: 'Realm', element_id: '068e5012-d77c-799d-8000-0000000000ff' },
@@ -61,14 +66,27 @@ describe('the note under the review', () => {
   }), [], { genId: (() => { let n = 0; return () => `068e5012-d77c-799d-8000-${String(++n).padStart(12, '0')}`; })() });
   const pin = (name: string) => plan().creates.find(c => c.type === 'pin' && c.data.name === name)!.data;
 
-  it('a Pin\'s "element" is not its link: the pin has no element', () => {
+  it('a Pin\'s "element" is not read: with only "element" the pin has no element', () => {
     const p = pin('By element');
     expect(p.element_id).toBeUndefined();
     expect(p.element_type).toBeUndefined();
     expect(p.element).toBeUndefined();
   });
 
-  it('a link naming an element of another type is removed, and the element itself still comes in', () => {
+  it('a Pin with "element" and "element_id" keeps the link in its "element_id"', () => {
+    const p = pin('Both');
+    expect(p.element_id).toBe(ADA);
+    expect(p.element_type).toBe('character');
+    expect(p.element).toBeUndefined();
+  });
+
+  it('a link by id to an element of another type is kept as written', () => {
+    const cy = plan().creates.find(c => c.data.name === 'Cy')!.data;
+    expect(cy.birthplace_id ?? cy.birthplace).toBe(GUILD);
+    expect(cy.friends).toEqual([GUILD]);
+  });
+
+  it('a link by name to an element of another type is removed, and the element itself still comes in', () => {
     const ada = plan().creates.find(c => c.data.name === 'Ada')!.data;
     expect(ada.birthplace_id ?? ada.birthplace).toBeUndefined();
     expect((ada.friends as string[]).length).toBe(1);

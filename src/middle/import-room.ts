@@ -188,7 +188,7 @@ export function importIssuesHtml(issues: ValidationIssue[]): string {
         ${shown.map(i => `<li><span class="atlas-import-issue-line">${escapeText(i.issue)}</span> <code class="atlas-import-issue-path">${escapeText(i.path)}</code></li>`).join('')}
         ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
       </ul>
-      <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an entry with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. A link that names an element of another type is removed too. A Pin's "element" is not read as its link, so that pin comes in with no element. A Pin with no "element_type" loses a link written as a name; one written as an id is kept, and its type is filled in when the import or the world holds that element. Paste the fix prompt to your AI to repair the source.</p>
+      <p class="atlas-import-issues-note">Import still runs: a list of an unknown type is left out, an entry with no name skipped, an unknown field dropped, a broken or wrongly shaped link removed, and a value of the wrong kind kept as written. A link by name to an element of another type is removed too; a link by id is kept as written. A Pin's "element" is not read: the pin keeps the link in its "element_id", and a pin with only "element" comes in with no element. A Pin with no "element_type" loses a link written as a name; one written as an id is kept, and its type is filled in when the import or the world holds that element. Paste the fix prompt to your AI to repair the source.</p>
     </div>
   `;
 }
