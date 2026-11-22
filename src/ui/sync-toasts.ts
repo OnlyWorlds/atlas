@@ -34,13 +34,16 @@ export function upToDate(result: SyncResult): boolean {
   return moved === 0;
 }
 
+/** The pill's title while the open world waits on the World PIN (1.125.0). */
+export const ADD_PIN_TITLE = 'Changes are kept here. Add your World PIN to save them to OnlyWorlds.';
+
 /**
  * Inspect why sync is unavailable and toast accordingly. Returns the reason
  * for caller logging/branching, or null if the engine is actually attached
  * (caller's gate failed for an unrelated reason).
  *
- * For the pin-missing case, also navigates to the settings account tab
- * since that's where the fix lives.
+ * For the pin-missing case, asks for the World PIN in the world (its own
+ * dialog, `world-pin-modal.ts`).
  */
 export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof diagnoseSyncUnavailable> {
   const reason = diagnoseSyncUnavailable();
@@ -63,8 +66,8 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
       navigate(settingsHash(reason.worldId, 'world'));
       return reason;
     case 'pin-missing':
-      toasts.info('Enter your PIN in Settings, under OnlyWorlds, to sync.');
-      navigate(settingsHash(reason.worldId, 'onlyworlds'));
+      // Asked here, in the world (1.125.0): the World PIN dialog, never a trip to Settings.
+      void import('./world-pin-modal').then(m => m.askWorldPin(toasts));
       return reason;
     case 'seat-secret-missing':
       toasts.info(SEAT_SECRET_MISSING_LINE);

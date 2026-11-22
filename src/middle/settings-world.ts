@@ -783,7 +783,8 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
   stale.querySelector<HTMLButtonElement>('[data-action="rekey-repair"]')?.addEventListener('click', async () => {
     try {
       const fixed = await rk.repairStaleLinks(store);
-      requestPushIfLinked();
+      // Nothing fixed, nothing to send (and no first-change line, 1.125.0).
+      if (fixed.length > 0) requestPushIfLinked();
       toasts.success(fixed.length === 1 ? 'Updated the links in 1 element.' : `Updated the links in ${fixed.length} elements.`);
     } catch (err) {
       console.error('[settings] updating stale links failed:', err);

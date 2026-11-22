@@ -340,9 +340,10 @@ export function mountWritingSetup(
     patchSlice('registry', nextReg);
 
     // Promote candidates. Each failure is logged but doesn't abort the batch.
+    // Counted out here: nothing written asks for no push (and no first-change line, 1.125.0).
+    let written = 0;
     if (opts.promote && candidates.length > 0 && !viewOnly) {
       const finalCandidates = buildPromoteCandidates(await folder.listElements(), labels);
-      let written = 0;
       const failures: Array<{ id: string; error: unknown }> = [];
       for (const c of finalCandidates) {
         const patch: Record<string, unknown> = {};
@@ -377,7 +378,7 @@ export function mountWritingSetup(
       here = patchElementsFrom(folder, fresh) && here;
     }
 
-    if (here && !viewOnly) requestPushIfLinked();
+    if (here && !viewOnly && written > 0) requestPushIfLinked();
     onFinish();
   }
 

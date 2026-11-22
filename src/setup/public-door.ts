@@ -83,8 +83,11 @@ export function findPublicCopy(reg: WorldsRegistry, serverWorldId: string): Worl
 export interface PublicDoorCtx {
   /** The account token the door ran under; null signed out. */
   token: string | null;
-  /** Signed out, a world the public cannot read: the open door's sign-in words, the id held. */
-  saySignIn: () => void;
+  /**
+   * Signed out: the open door's sign-in card, the id held (1.125.0). `name` from the ask's Sign in, where the
+   * public read named the world; absent for a world the public cannot read.
+   */
+  saySignIn: (name?: string) => void;
   /** Signed in, a world the public cannot read: the open door's not-among words. */
   sayNotAmong: () => void;
   /**
@@ -159,7 +162,7 @@ function askForCopy(id: string, name: string, toasts: ToastManager, ctx: PublicD
   new PublicAskModal({
     line,
     onOpen: () => { void openPublicCopy(id, name, toasts, ctx); },
-    ...(ctx.token ? {} : { onSignIn: () => ctx.saySignIn() }),
+    ...(ctx.token ? {} : { onSignIn: () => ctx.saySignIn(name) }),
   }).open();
 }
 

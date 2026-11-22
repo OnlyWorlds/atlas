@@ -22,7 +22,8 @@ import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
 import { sameElements } from './same-elements';
 import { patchSlice, getState, subscribe } from '../core/state';
-import { patchElementsFrom } from '../core/active-store';
+import { getActiveStore, patchElementsFrom } from '../core/active-store';
+import { askAboutPin, pinQuestionOut } from './pin-ask';
 import { toastManager, type ToastAction } from '../ui/toast-manager';
 import type { FolderStore } from '../store/folder-store';
 import type { Element, WorldRegistryEntry, SyncEngineState } from '../core/types';
@@ -34,6 +35,7 @@ import { detailsContext, resolveFixes } from '../ui/problem-fixes';
 import type { PerElementFailure } from '../core/types';
 import { effectiveSyncPaused, saveRegistry, updateWorldEntry } from '../registry/registry';
 import { isSeatWorld, worldPin } from '../core/seat';
+import { waitsOnPin } from '../core/saves-online';
 import { keyRefusalLine, seatRefusalLine } from './world-key-lines';
 import { rosterFor } from './world-roster';
 import { rosterIsShared, worldPullsOnOpen, worldSyncPolicy, type SyncPolicy } from './shared-world';
@@ -101,6 +103,9 @@ export function attachSyncEngine(
   // (keel reads are keyless-PIN; the engine never writes).
   if (!pin && !readOnly) {
     console.warn('[sync-attach] PIN missing — engine not attached for', entry.name);
+    // The world waits on the PIN (an owner's open from onlyworlds.com, 1.125.0): a PIN that arrives,
+    // from Settings here or another tab, attaches it (`watchRefusedPin`).
+    watchRefusedPin();
     return null;
   }
 
@@ -660,9 +665,63 @@ export function reapplySyncPolicy(): void {
  * Convenience helper for UI callers that just want to schedule a debounced
  * push after a folder write. No-ops if no engine is attached (local-only world
  * or engine startup failed). Used by element-detail.ts after every save.
+ *
+ * Every caller is a person's write (1.125.0's census): with no engine because the world waits on the
+ * World PIN (`pin-missing`), the first change says once a session per world that it is kept here and
+ * how it reaches OnlyWorlds. A toast with an action takes no focus and stays until closed.
  */
 export function requestPushIfLinked(): void {
-  currentEngine?.requestPush();
+  if (currentEngine) { currentEngine.requestPush(); return; }
+  const why = diagnoseSyncUnavailable();
+  if (why?.kind !== 'pin-missing' || toldPinWaits.has(why.worldId)) return;
+  toldPinWaits.add(why.worldId);
+  const name = getState().registry.worlds.find(w => w.id === why.worldId)?.name ?? 'this world';
+  toastManager.show(firstChangeLine(name), 'info', 0, {
+    actions: [{ label: 'Add PIN', run: () => { void import('../ui/world-pin-modal').then(m => m.askWorldPin(toastManager)); } }],
+  });
+}
+
+/** What the first change in a world waiting on the World PIN says (once a session per world). */
+export function firstChangeLine(name: string): string {
+  return `Your change to "${name}" is kept here. Add your World PIN to save it to OnlyWorlds.`;
+}
+
+/** The worlds whose first change waiting on the PIN was said in this session. */
+const toldPinWaits = new Set<string>();
+
+/** Tests: no first change said yet. */
+export function __resetFirstChangeToldForTests(): void {
+  toldPinWaits.clear();
+}
+
+/**
+ * After a question about the account PIN (Settings' field, the watch below): the open world attaches on
+ * it, whatever keel answered, since a refusal recorded first starts the engine stopped and sending nothing
+ * (law 193). Re-read here, after the question's await: only the world asked about, while it is still the
+ * open one, still linked, writes and is not a seat, with `pin` still the kept PIN and no engine already
+ * running on it (a PIN saved again unchanged leaves a running engine as it is). Null when nothing attached.
+ */
+export function attachOnPinAnswer(worldId: string | null, pin: string, opts: { onlyIfNone?: boolean } = {}): SyncEngine | null {
+  const s = getState();
+  if (!worldId || s.active?.worldId !== worldId || s.registry.pin !== pin) return null;
+  const entry = s.registry.worlds.find(w => w.id === worldId);
+  const folder = getActiveStore();
+  if (!entry || entry.state !== 'api-linked' || !entry.api || entry.api.read_only || entry.copy_of || isSeatWorld(entry) || !folder) return null;
+  if (currentEngine && (opts.onlyIfNone || (currentWorldId === worldId && currentPin === pin))) return null;
+  return attachSyncEngine(entry, folder);
+}
+
+/**
+ * The account PIN removed in Settings: the open world's engine on it goes, so the pill says Add PIN and
+ * every reader agrees the world does not save to OnlyWorlds (gate 4 S3). A seat's or a read key's engine
+ * stays: it sends no account PIN.
+ */
+export function detachOnPinRemoved(): void {
+  if (!currentEngine) return;
+  const reg = getState().registry;
+  const entry = reg.worlds.find(w => w.id === currentWorldId);
+  if (!entry || entry.api?.read_only || isSeatWorld(entry) || worldPin(entry, reg)) return;
+  detachSyncEngine();
 }
 
 /**
@@ -728,15 +787,39 @@ function watchRefusedPin(): void {
   refusedPinWatch = subscribe(() => {
     const reg = getState().registry;
     if (reg === seen) return;
+    const was = seen;
     seen = reg;
     const engine = currentEngine;
-    if (engine?.authRefusal() !== 'pin') return;
-    setTimeout(() => reviveRefusedEngine(engine), 0);
+    if (engine?.authRefusal() === 'pin') {
+      setTimeout(() => { void reviveRefusedEngine(engine); }, 0);
+      return;
+    }
+    // No engine, and a PIN arrived (this tab's Settings, another tab's save): the open world that waited
+    // on it attaches, once keel has been asked (1.125.0).
+    if (!engine && reg.pin && reg.pin !== was.pin) setTimeout(() => { void attachWhenPinArrives(reg.pin!); }, 0);
   });
 }
 
+/**
+ * A PIN arrived for an open world with no engine: ask keel about it, sharing a question already out (Settings'
+ * own, registered before this task), unless it is recorded already; then attach by `attachOnPinAnswer`'s rule,
+ * only if no engine attached meanwhile (the dialog's or Settings' own attach stands).
+ */
+async function attachWhenPinArrives(pin: string): Promise<void> {
+  const worldId = getState().active?.worldId ?? null;
+  if (currentEngine || !worldId || getState().registry.pin !== pin) return;
+  const entry = getState().registry.worlds.find(w => w.id === worldId);
+  if (!entry || entry.state !== 'api-linked' || !entry.api || entry.api.read_only || isSeatWorld(entry) || !getActiveStore()) return;
+  if (!getState().registry.pin_state) await askAboutPin(pin);
+  attachOnPinAnswer(worldId, pin, { onlyIfNone: true });
+}
+
 /** Re-attach `engine`, still the attached one and refused on the PIN, when the account PIN moved on. */
-function reviveRefusedEngine(engine: SyncEngine): void {
+async function reviveRefusedEngine(engine: SyncEngine): Promise<void> {
+  // A question about the new PIN still out (Settings asks before it attaches): wait on its answer, so the
+  // revived engine never sends the PIN beside it, and Settings' own attach after it stands.
+  const out = pinQuestionOut(getState().registry.pin);
+  if (out) await out.catch(() => null);
   const now = getState().registry;
   const entry = now.worlds.find(w => w.id === currentWorldId);
   if (currentEngine !== engine || engine.authRefusal() !== 'pin' || !entry || !currentFolder || isSeatWorld(entry) || entry.api?.read_only) return;
@@ -761,7 +844,7 @@ export function pinProvedByPress(pin: string | undefined): void {
   if (!pin) return;
   samePinRevived.delete(pin);
   const engine = currentEngine;
-  if (engine?.authRefusal() === 'pin') setTimeout(() => reviveRefusedEngine(engine), 0);
+  if (engine?.authRefusal() === 'pin') setTimeout(() => { void reviveRefusedEngine(engine); }, 0);
 }
 
 /** Tests: no PIN's try spent. */
@@ -834,7 +917,8 @@ export function diagnoseSyncUnavailable(): SyncUnavailableReason | null {
   const entry = state.registry.worlds.find((w) => w.id === worldId);
   if (!entry) return { kind: 'engine-not-ready' };
   if (entry.state !== 'api-linked') return { kind: 'local-only', worldId };
-  if (!entry.api?.read_only && !worldPin(entry, state.registry)) {
+  // The one predicate every "online" reader shares (`core/saves-online.ts`).
+  if (waitsOnPin(entry, state.registry) || (!entry.api && !worldPin(entry, state.registry))) {
     return isSeatWorld(entry) ? { kind: 'seat-secret-missing', worldId } : { kind: 'pin-missing', worldId };
   }
   return { kind: 'engine-not-ready' };

@@ -32,6 +32,7 @@ import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vau
 import { copyChip, copyLine } from '../core/world-copy';
 import { dropHeldSeat, heldSeat, heldSeatBusy, heldSeats, type HeldSeat } from '../core/held-seats';
 import { SEAT_REMOVE_WHERE } from '../core/seat';
+import { waitsOnPin } from '../core/saves-online';
 import { LANDING_FAILED_HERE, LANDING_IN_ANOTHER_TAB, MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
@@ -529,7 +530,11 @@ function addIconButton(
         </button>`;
 }
 
-function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean, globalPaused: boolean): string {
+/** The chip's words for a linked world waiting on the World PIN (1.125.0). */
+export const PIN_WAITS_CHIP_TITLE = 'Does not save to OnlyWorlds yet. Add your World PIN to save it there.';
+
+/** One world's row (exported for the not-online readers' unit, 1.125.0). */
+export function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean, globalPaused: boolean): string {
   // `cloud_off` (strike-through cloud) when this world is paused — either by
   // its own toggle or by the global "pause all sync" master switch. Local-only
   // worlds always render `folder` regardless of pause state (no sync to pause).
@@ -544,9 +549,12 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // A view-only copy (conv. 177): the eye, and a chip with its day, so two
   // rows of one name say which is the world and which the copy.
   const copy = world.copy_of;
+  // Linked, and waiting on the World PIN (1.125.0): nothing saves to OnlyWorlds yet, so the row shows where
+  // its changes are kept and a chip that says so; its sync controls stay (they are keyed to the link).
+  const pinWaits = waitsOnPin(world, getState().registry);
   const stateIcon = cleared ? 'browser_not_supported'
     : viewOnly || copy ? 'visibility'
-    : world.state === 'api-linked'
+    : world.state === 'api-linked' && !pinWaits
       ? (isPaused ? 'cloud_off' : 'cloud')
       : inBrowser ? 'web' : 'folder';
   const stateChip = cleared
@@ -555,6 +563,8 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
     ? `<span class="atlas-world-state-chip view-only" title="${escapeAttr(copyLine(world.name, copy, false))}">${escapeText(copyChip(copy))}</span>`
     : viewOnly
     ? '<span class="atlas-world-state-chip view-only">view</span>'
+    : pinWaits
+    ? `<span class="atlas-world-state-chip pin-waits" title="${escapeAttr(PIN_WAITS_CHIP_TITLE)}">not online yet</span>`
     : world.state === 'api-linked'
       ? '<span class="atlas-world-state-chip api-linked">online</span>'
       : '';
@@ -589,7 +599,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
         </button>`
     : '';
   const stateIconHtml = world.state === 'api-linked' && !cleared
-    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from OnlyWorlds">
+    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="${pinWaits ? escapeAttr(PIN_WAITS_CHIP_TITLE) : 'Refresh from OnlyWorlds'}">
         <span class="material-symbols-outlined">${stateIcon}</span>
       </button>`
     : `<span class="material-symbols-outlined"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>${stateIcon}</span>`;
