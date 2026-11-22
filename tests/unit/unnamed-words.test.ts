@@ -214,7 +214,7 @@ const STAND_IN_LEFT: Record<string, Array<{ line: string; why: string }>> = {
   ],
   'src/tabs/right/map-tab-pins.ts': [{ line: "const name = el?.name ?? '(loading…)';", why: 'a pin drawn before its element is read' }],
   'src/ui/guide-note.ts': [{ line: "return nameOf(id, elementOf(id)?.type ?? 'element');", why: 'a type word handed to the name builder, not a name' }],
-  'src/visualization/timeline/timeline-view.ts': [{ line: "head.textContent = state.chartLabel ?? 'This chart';", why: 'the chart on screen before it is saved, not an element' }],
+  'src/visualization/timeline/timeline-view.ts': [{ line: "return chartLabel ?? 'This chart';", why: 'the chart on screen before it is saved, not an element (the rail\'s heading and the focused card\'s name, 1.125.3)' }],
 };
 
 /** The lines that say a stand-in and are not comment lines, by number. */

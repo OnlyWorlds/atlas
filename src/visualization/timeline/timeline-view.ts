@@ -1863,7 +1863,7 @@ function renderAmbientRail(state: ViewState): void {
   head.className = 'atlas-timeline-rail-head';
   // An applied saved chart is named where you read it; otherwise the
   // generic heading. Renames flow through on the next room render.
-  head.textContent = state.chartLabel ?? 'This chart';
+  head.textContent = chartHeading(state.chartLabel);
   if (state.chartLabel) head.title = 'Saved chart';
   card.appendChild(head);
 
@@ -2261,7 +2261,12 @@ function focusCard(state: ViewState): void {
  * the chart's when nothing is selected. A plain div takes no name, so it is a group while it holds focus.
  */
 export function chartCardName(selectedName: string | null, chartLabel: string | null): string {
-  return `Chart card: ${selectedName ?? chartLabel ?? 'This chart'}`;
+  return `Chart card: ${selectedName ?? chartHeading(chartLabel)}`;
+}
+
+/** The chart's name as the rail heads it: the saved chart's, or "This chart" before it is saved. */
+function chartHeading(chartLabel: string | null): string {
+  return chartLabel ?? 'This chart';
 }
 
 function nameCard(state: ViewState): void {
