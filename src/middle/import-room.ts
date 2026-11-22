@@ -527,7 +527,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           ${shown.map(i => `<li><code>${escapeText(i.path)}</code>: ${escapeText(i.issue)}</li>`).join('')}
           ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
         </ul>
-        <p class="atlas-import-issues-note">Import still runs; invalid entries are skipped and broken links removed. Paste the fix prompt to your AI to repair the source.</p>
+        <p class="atlas-import-issues-note">Import still runs: an entry with no name is skipped, an unknown field dropped, a broken link removed, and a value of the wrong kind kept as written. Paste the fix prompt to your AI to repair the source.</p>
       </div>
     `;
   }
