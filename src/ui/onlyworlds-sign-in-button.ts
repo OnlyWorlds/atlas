@@ -16,13 +16,18 @@ import { parkedLandingFor } from '../core/open-landing';
 
 const LABEL = 'Sign in with OnlyWorlds';
 
+/** Whether the round trip can come back here: the registered origin, no dev API override, no tour. */
+export function onlyWorldsSignInOffered(): boolean {
+  return canSignInWithOnlyWorlds() && !devV2Base() && !isTourFlagActive();
+}
+
 /**
  * The button and the line under it, or '' where the round trip cannot come
  * back here: off the registered origin, with the dev API override set (the
  * rest of Atlas would talk to another keel), and during the tour.
  */
 export function onlyWorldsSignInButtonHtml(orLine: string): string {
-  if (!canSignInWithOnlyWorlds() || devV2Base() || isTourFlagActive()) return '';
+  if (!onlyWorldsSignInOffered()) return '';
   return `
     <div class="atlas-signin-ow" data-role="sign-in-onlyworlds">
       <button type="button" class="atlas-btn-primary" data-action="sign-in-onlyworlds">${LABEL}</button>

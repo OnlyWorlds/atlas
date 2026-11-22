@@ -36,6 +36,7 @@ import { attachSyncEngine, diagnoseSyncUnavailable } from '../sync/sync-attach';
 import { abandonBrowserMake, releasePriorWorld, scaffoldBrowserWorld } from './atlas-root-flow';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { atlasProducer } from '../core/provenance';
+import { readsWithoutPin } from '../core/key-scope';
 
 /**
  * The world.json id this entry was made with. Every `handle_key` is
@@ -56,10 +57,8 @@ const REGISTRY_NOT_SAVED =
 const CHANGED_ELSEWHERE =
   'This world changed in another tab while it was downloading. Look at its row, then try again.';
 
-/** A v2 key (`ow_w_`, `ow_r_`): keel never asks its PIN on a read route. */
-export function readsWithoutPin(apiKey: string): boolean {
-  return /^ow_[rw]_/.test(apiKey.trim());
-}
+// Moved to `core/key-scope.ts` (1.125.0), where the owner's open reads it too.
+export { readsWithoutPin } from '../core/key-scope';
 
 const NOT_CLEARED_NOW = 'This world is no longer cleared: another tab may have brought it back. Look at its row.';
 

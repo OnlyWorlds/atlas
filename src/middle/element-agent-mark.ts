@@ -19,6 +19,7 @@ function characterNameByKey(key: string): string | undefined {
 }
 import { rosterFor, rosterNow } from '../sync/world-roster';
 import { toastManager } from '../ui/toast-manager';
+import { savesOnline } from '../core/saves-online';
 
 /**
  * The mark for a header that stays up across data ticks (Knowledge's entry,
@@ -92,8 +93,9 @@ export function proposedNoteFor(el: Element): string | null {
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === state.active?.worldId);
   const roster = entry?.state === 'api-linked' ? rosterNow(entry) : null;
-  // Only a linked world sends a change; a folder world saves it (Seethe 2026-10-23).
-  const change = entry?.state === 'api-linked' ? 'sent' : 'saved';
+  // Only a linked world sends a change; a folder world saves it (2026-10-23), and so does one waiting on the
+  // World PIN (1.125.0).
+  const change = savesOnline(entry, state.registry) ? 'sent' : 'saved';
   return `${proposedLine(mark, mark.by, roster, characterNameByKey)} A keeper accepts or declines it on OnlyWorlds; a change made here is ${change} as any other.`;
 }
 

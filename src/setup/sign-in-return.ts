@@ -44,12 +44,14 @@ export async function applySignInOutcome(outcome: SignInOutcome, toasts: ToastMa
   } else {
     if (!outcome.cancelled) console.warn('[sign-in] the return did not sign in:', outcome.error);
     const line = signInCallbackLine(outcome);
-    // Without a door coming back, the way to try again is Settings.
-    const toSettings = !resume.door && parseHash(resume.hash).mode !== 'settings'
+    // Without a door coming back, the way to try again is Settings. An Open in Atlas link held
+    // again gets its sign-in card back instead (1.125.0, 2026-11-22, R1): the id held, its Not now the drop.
+    const toSettings = !resume.door && !resume.open && parseHash(resume.hash).mode !== 'settings'
       ? { actions: [{ label: 'Open Settings', run: () => navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds')) }] }
       : undefined;
     if (outcome.cancelled) toasts.show(line, 'info', 10_000, toSettings);
     else toasts.show(line, 'error', 15_000, toSettings);
+    if (resume.open) (await import('./open-door')).askSignInAgain(toasts);
   }
   // A held invitation or Open link opens its own dialog: the door does not stack on it.
   if (!resume.door || heldDoorRuns) return;

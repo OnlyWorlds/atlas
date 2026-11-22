@@ -4,15 +4,16 @@
  *
  * It rides the account sign-in, never a code or a key in the URL: a world
  * already here opens; signed in, the account's row for that id opens through
- * the same `openAccountWorld` as a click in the Worlds list (#199), after the
- * person says Open (the click the browser-storage request needs, and the
- * confirm that names the world); signed out, or signed in with no row for
- * that id, the public path runs (1.123, `setup/public-door.ts`): a world
- * anyone may read opens as a view-only copy after an ask, and a world the
- * public cannot read gets this door's own words (signed out, the id waits in
- * memory for the sign-in in Settings, as a person's invitation does). Only
- * ever a download: nothing here uploads into the world the link names
- * (contract R7).
+ * the same `openAccountWorld` as a click in the Worlds list (#199), after one
+ * question that names it (1.125.0, 2026-11-22, R2): with a world open, the corner
+ * toast's Open; with none, the where-question itself, or without a folder
+ * picker a card whose Open is the click the browser-storage request needs.
+ * Signed out, or signed in with no row for that id, the public path runs
+ * (1.123, `setup/public-door.ts`): a world anyone may read opens as a
+ * view-only copy after an ask, and a world the public cannot read gets this
+ * door's own words (signed out, a card that holds the sign-in, the id waiting
+ * in memory, as a person's invitation does: R1). Only ever a download:
+ * nothing here uploads into the world the link names (contract R7).
  */
 
 import { getState } from '../core/state';
@@ -22,13 +23,29 @@ import { findLinkedWorld, findWorldByServerId } from '../registry/registry';
 import { accountWorldsWhenFetched, openAccountWorld } from '../sync/account-worlds';
 import { activateWorld } from '../sidebar/worlds-sidebar';
 import { isTourFlagActive } from '../tour/tour-flag';
-import { touchOpenLanding } from '../core/open-landing';
+import { parkedLandingFor, touchOpenLanding } from '../core/open-landing';
 import { WAITS_FOR_SIGN_IN, type ToastManager } from '../ui/toast-manager';
 import type { AccountWorldRow, WorldRegistryEntry } from '../core/types';
 import { runPublicDoor, type PublicDoorCtx } from './public-door';
+import { hasFolderMode } from '../core/capabilities';
+import { PublicAskModal } from '../ui/public-ask-modal';
+import { OpenSignInCard } from '../ui/open-sign-in-card';
+import { onlyWorldsSignInOffered } from '../ui/onlyworlds-sign-in-button';
+import { beginOnlyWorldsSignIn, dropStaleResume, type SignInResume } from '../sync/onlyworlds-sign-in';
+import { flushBeforeUnloading } from '../core/reload-offer';
+import { problemFor } from '../core/problems';
+import { joinHeldForSignIn } from './join-door';
 
 export const OPEN_MALFORMED_LINE = 'This link to open a world is not complete. Open the world again from onlyworlds.com.';
-export const OPEN_SIGN_IN_LINE = 'To open this world from onlyworlds.com, sign in to Atlas with your OnlyWorlds account, under Account. The world opens after that, in this tab; if you reload, open it again from onlyworlds.com.';
+/** The card's line when the world's name is not known (a private world, read keyless). */
+export const OPEN_SIGN_IN_CARD_LINE = 'This link opens a world on onlyworlds.com. Sign in to Atlas with your OnlyWorlds account and it opens here.';
+/** The card's line from the public ask's Sign in, where the name is known. */
+export function openSignInNamedLine(name: string): string {
+  return `Sign in to Atlas with your OnlyWorlds account to open "${name}" here.`;
+}
+/** Said in Settings after the card's Email and password, until the sign-in takes it down. */
+export const OPEN_SIGN_IN_LINE = 'Sign in here with your OnlyWorlds account. The world you opened from onlyworlds.com opens after that.';
+const SIGNED_IN_ANOTHER_LINE = 'Atlas is signed in with another account now. Open the world again from onlyworlds.com.';
 export const OPEN_UNREAD_LINE = 'Atlas could not read your worlds on OnlyWorlds just now. Open the world again from onlyworlds.com in a moment.';
 const OPEN_TOUR_LINE = 'Finish the tour first, then open the world again from onlyworlds.com.';
 
@@ -94,13 +111,67 @@ async function openWorldById(id: string, toasts: ToastManager): Promise<void> {
   askToOpen(row, token, toasts);
 }
 
-/** Signed out, a world the door cannot open: the id waits for the sign-in in Settings. */
-function saySignIn(id: string, toasts: ToastManager): void {
+/** Signed out, a world the door cannot open: the id waits for the sign-in, and the card holds it (R1). */
+function saySignIn(id: string, toasts: ToastManager, name?: string): void {
   heldForSignIn = id;
-  navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
-  // Taken down by the sign-in itself (settings-account), never left up
-  // through the Open question it leads to (a walk, 2026-10-16).
-  toasts.show(OPEN_SIGN_IN_LINE, 'info', 20_000, { dedupeKey: WAITS_FOR_SIGN_IN });
+  showSignInCard(toasts, name);
+}
+
+/**
+ * A sign-in that came back cancelled or failed with an id held (`sign-in-return.ts`): the card again,
+ * the id still held, in place of the return's Open Settings. Its Not now drops the id.
+ */
+export function askSignInAgain(toasts: ToastManager): void {
+  if (heldForSignIn) showSignInCard(toasts);
+}
+
+/** The card (`ui/open-sign-in-card.ts`), over the page as it is: it does not navigate. */
+function showSignInCard(toasts: ToastManager, name?: string): void {
+  new OpenSignInCard({
+    line: name ? openSignInNamedLine(name) : OPEN_SIGN_IN_CARD_LINE,
+    focusNotNow: !!getState().active?.worldId,
+    ...(onlyWorldsSignInOffered() ? { onOnlyWorlds: () => signInWithOnlyWorldsFromCard(toasts, name) } : {}),
+    onPassword: () => {
+      navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
+      // Taken down by the sign-in itself (settings-account), never left up
+      // through the Open question it leads to (a walk, 2026-10-16).
+      toasts.show(OPEN_SIGN_IN_LINE, 'info', 20_000, { dedupeKey: WAITS_FOR_SIGN_IN });
+    },
+    onDrop: dropHeldOpen,
+  }).open();
+}
+
+/**
+ * The card's Sign in with OnlyWorlds, inside its click: the held id and its landing go into the resume
+ * before any await (the page unload drops memory), with the page behind the card as its route, as the
+ * shared button does (`onlyworlds-sign-in-button.ts`); then the rooms are saved, then the tab leaves.
+ * A Back that brings the page out of the browser's cache drops the parked resume and shows the card
+ * again, the id still held; a begin that fails shows it again too.
+ */
+function signInWithOnlyWorldsFromCard(toasts: ToastManager, name?: string): void {
+  const resume: SignInResume = { hash: location.hash || '#/' };
+  const open = heldForSignIn;
+  if (open) {
+    resume.open = open;
+    const landing = parkedLandingFor(open);
+    if (landing) resume.landing = landing;
+  }
+  const join = joinHeldForSignIn();
+  if (join) resume.join = join;
+  void (async () => {
+    try {
+      await flushBeforeUnloading();
+      window.addEventListener('pageshow', (e) => {
+        if (!e.persisted) return;
+        dropStaleResume();
+        if (heldForSignIn) showSignInCard(toasts, name);
+      }, { once: true });
+      await beginOnlyWorldsSignIn(resume);
+    } catch (err) {
+      toasts.error(problemFor(err, { inline: true, doing: 'signing in' }).sentence);
+      if (heldForSignIn) showSignInCard(toasts, name);
+    }
+  })();
 }
 
 function sayNotAmong(toasts: ToastManager): void {
@@ -112,31 +183,62 @@ function sayNotAmong(toasts: ToastManager): void {
 function publicCtx(id: string, token: string | null, toasts: ToastManager): PublicDoorCtx {
   return {
     token,
-    saySignIn: () => saySignIn(id, toasts),
+    saySignIn: (name) => saySignIn(id, toasts, name),
     sayNotAmong: () => sayNotAmong(toasts),
     openHere: (entry, said) => openEntryHere(entry, toasts, said),
   };
 }
 
-/** The confirm: nothing is made before this Open (P1), and its click is the gesture. */
+/** The one question, named: `Open "<name>"[, shared with you], from your worlds on OnlyWorlds?`. */
+export function openAccountLine(row: AccountWorldRow): string {
+  return `Open "${row.name}"${row.role === 'owner' ? '' : ', shared with you'}, from your worlds on OnlyWorlds?`;
+}
+
+/**
+ * The confirm: nothing is made before the person's Open (P1). With a world open in the tab, the corner toast
+ * (it takes no focus). With none (1.125.0, 2026-11-22, R2): with the folder picker, the open runs at once and its
+ * where-question is the confirm, named; without one (Firefox), a card whose Open is the click the storage
+ * request needs. A Cancel or a Not now is the person's no: nothing offers it again, and the row stays under
+ * "Your worlds on OnlyWorlds" on the first screen.
+ */
 function askToOpen(row: AccountWorldRow, token: string, toasts: ToastManager): void {
-  const shared = row.role === 'owner' ? '' : ', shared with you';
-  toasts.show(`Open "${row.name}"${shared}, from your worlds on OnlyWorlds?`, 'info', 0, {
-    actions: [{
-      label: 'Open',
-      run: () => {
-        // The toast stays until clicked: the row is this token's, and the tour
-        // may have started since.
-        if (isTourFlagActive()) { toasts.info(OPEN_TOUR_LINE); return; }
-        if (getState().registry.account_token !== token) {
-          toasts.info('Atlas is signed in with another account now. Open the world again from onlyworlds.com.');
-          return;
-        }
-        touchOpenLanding(row.id);
-        void openAccountWorld(row, toasts);
-      },
-    }],
-  });
+  // The tour may have started, or the sign-in moved, while the list was read: checked before any question.
+  if (isTourFlagActive()) { toasts.info(OPEN_TOUR_LINE); return; }
+  if (getState().registry.account_token !== token) { toasts.info(SIGNED_IN_ANOTHER_LINE); return; }
+  const stillAsked = (): boolean => {
+    // The toast and the card stay until pressed: the row is this token's, and the tour may have started since.
+    if (isTourFlagActive()) { toasts.info(OPEN_TOUR_LINE); return false; }
+    if (getState().registry.account_token !== token) { toasts.info(SIGNED_IN_ANOTHER_LINE); return false; }
+    return true;
+  };
+  if (getState().active?.worldId) {
+    toasts.show(openAccountLine(row), 'info', 0, {
+      actions: [{
+        label: 'Open',
+        run: () => {
+          if (!stillAsked()) return;
+          touchOpenLanding(row.id);
+          void openAccountWorld(row, toasts);
+        },
+      }],
+    });
+    return;
+  }
+  if (hasFolderMode()) {
+    touchOpenLanding(row.id);
+    void openAccountWorld(row, toasts, { fromLink: true });
+    return;
+  }
+  new PublicAskModal({
+    line: openAccountLine(row),
+    dataModal: 'open-account',
+    // Synchronous inside the click: `openAccountWorld` asks the browser to keep worlds before its first await.
+    onOpen: () => {
+      if (!stillAsked()) return;
+      touchOpenLanding(row.id);
+      void openAccountWorld(row, toasts, { fromLink: true });
+    },
+  }).open();
 }
 
 /**

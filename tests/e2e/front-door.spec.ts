@@ -461,13 +461,14 @@ for (const tag of ['', ' @firefox']) {
     await page.fill('input[name="world-name"]', 'pillworld');
     await page.click('[data-modal="create-world"] [data-action="pick"]');
     await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
-    // The pill's linked branch with two conflicts (no server: the UI branch only).
+    // The pill's linked branch with two conflicts (no server: the UI branch only). Conflicts come only from a
+    // running engine, so the world has its PIN: with none, the pill is Add PIN and its button asks for it (1.125.0).
     await page.evaluate(() => {
       const api = (window as any).__atlasTestApi;
       const s = api.getState();
       const worlds = s.registry.worlds.map((w: any) => w.id === s.active.worldId
         ? { ...w, state: 'api-linked', api: { world_id: 'fake-server-id', api_key: 'fake-key' } } : w);
-      api.patchSlice('registry', { ...s.registry, worlds });
+      api.patchSlice('registry', { ...s.registry, worlds, pin: '1234' });
       api.patchSlice('sync', { ...api.getState().sync, activeConflictsCount: 2 });
     });
     const badge = page.locator('[data-role="sync-pill"] [data-role="review-conflicts"]');

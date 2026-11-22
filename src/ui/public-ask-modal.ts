@@ -20,6 +20,11 @@ export interface PublicAskOpts {
   onOpen: () => void;
   /** Present only signed out: the door's own sign-in. */
   onSignIn?: () => void;
+  /**
+   * The dialog's test name: 'public-ask' unless given. The open door's account card (1.125.0, 2026-11-22, R2:
+   * no folder picker, no world open) is the same card with its own name, 'open-account'.
+   */
+  dataModal?: string;
 }
 
 /** The card on screen, so a second ask replaces it rather than stacking. */
@@ -35,7 +40,7 @@ export class PublicAskModal extends BaseModal {
   open(): void {
     shown?.close();
     shown = this;
-    const { overlay, panel, body } = this.buildModalShell({ panelClass: 'atlas-public-ask-panel', dataModal: 'public-ask' });
+    const { overlay, panel, body } = this.buildModalShell({ panelClass: 'atlas-public-ask-panel', dataModal: this.opts.dataModal ?? 'public-ask' });
     const lineId = `atlas-public-ask-line-${++lineSeq}`;
     body.innerHTML = `
       <p class="atlas-public-ask-line" data-role="line" id="${lineId}"></p>

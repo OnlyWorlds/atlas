@@ -1,0 +1,49 @@
+# The desktop shell, built on Windows. The shell lives in desktop/ when it exists; until then
+# this check has nothing to build and says so. When it does, both of its builds must come out:
+# `npm run build:shipped` and `npm run build:test` in desktop/, on the same commit whose web
+# build the other checks read. It runs on every pull request, a fork's included, and on a push
+# to master. It reads the repository and nothing else, uses no secret, signs nothing, and a
+# fork's run gets none.
+name: desktop
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: is there a shell
+        id: shell
+        shell: bash
+        run: |
+          if [ -f desktop/package.json ]; then echo "present=yes" >> "$GITHUB_OUTPUT"; else echo "present=no" >> "$GITHUB_OUTPUT"; echo "No desktop/ folder on this commit: nothing to build."; fi
+      - uses: actions/setup-node@v4
+        if: steps.shell.outputs.present == 'yes'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.shell.outputs.present == 'yes'
+        run: npm ci
+      - if: steps.shell.outputs.present == 'yes'
+        working-directory: desktop
+        run: npm ci
+      # No key of any kind: the release hand signs, never this check.
+      - if: steps.shell.outputs.present == 'yes'
+        working-directory: desktop
+        run: npm run build:shipped
+      - if: steps.shell.outputs.present == 'yes'
+        working-directory: desktop
+        run: npm run build:test

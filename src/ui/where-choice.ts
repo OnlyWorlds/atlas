@@ -30,6 +30,7 @@ import {
   type WorldWhere,
 } from '../setup/world-parent';
 import { BaseModal } from './modal-base';
+import { TOUR_STARTED_EVENT } from '../tour/tour-flag';
 import type { ToastManager } from './toast-manager';
 
 /** Why this window cannot hold a world in its storage, in a sentence; null when it can. */
@@ -146,7 +147,14 @@ export async function readyWhere(where: WorldWhere, toasts: ToastManager, purpos
  * cannot hold a world (said in a toast). Call it before the caller's first
  * await: without the folder picker it asks `persist()` at once.
  */
-export async function askWhere(opts: { title: string; action: string; purpose: string; toasts: ToastManager }): Promise<WorldWhere | null> {
+export async function askWhere(opts: {
+  title: string; action: string; purpose: string; toasts: ToastManager;
+  /**
+   * The open from a link (1.125.0, 2026-11-22, R2): the question goes down, as a Cancel, on the tour's start and on
+   * a real move of the address (a `navigate()` to the same hash fires a synthetic hashchange: compared away).
+   */
+  putDownOnMove?: boolean;
+}): Promise<WorldWhere | null> {
   if (!hasFolderMode()) {
     requestPersistOnFirstBrowserWorld();
     const problem = await browserStorageProblem('making the world');
@@ -194,9 +202,20 @@ interface WhereAnswer { where: WorldWhere; home?: FileSystemDirectoryHandle; hin
 class WhereAskModal extends BaseModal {
   private resolve: ((answer: WhereAnswer | null) => void) | null = null;
 
-  ask(opts: { title: string; action: string; purpose: string; toasts: ToastManager; withHome?: boolean }): Promise<WhereAnswer | null> {
+  ask(opts: { title: string; action: string; purpose: string; toasts: ToastManager; withHome?: boolean; putDownOnMove?: boolean }): Promise<WhereAnswer | null> {
     return new Promise((resolve) => {
       this.resolve = resolve;
+      if (opts.putDownOnMove) {
+        const at = window.location.hash;
+        const moved = (): void => { if (window.location.hash !== at) this.hide(); };
+        const started = (): void => { this.hide(); };
+        window.addEventListener('hashchange', moved);
+        document.addEventListener(TOUR_STARTED_EVENT, started);
+        this.unwatch = () => {
+          window.removeEventListener('hashchange', moved);
+          document.removeEventListener(TOUR_STARTED_EVENT, started);
+        };
+      }
       const { overlay, body } = this.buildModalShell({ title: opts.title, dataModal: 'where-ask' });
       body.innerHTML = `
         <form data-form="where-ask">
@@ -245,7 +264,12 @@ class WhereAskModal extends BaseModal {
     r?.(answer);
   }
 
+  /** The put-down's listeners (`putDownOnMove`), removed with the dialog however it closed. */
+  private unwatch: (() => void) | null = null;
+
   protected hide(): void {
+    this.unwatch?.();
+    this.unwatch = null;
     super.hide();
     if (this.resolve) {
       const r = this.resolve;

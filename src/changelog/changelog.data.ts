@@ -69,6 +69,31 @@ export const CHANGELOG: ChangelogRelease[] = [
     ],
   },
   {
+    version: '1.125.0',
+    date: '2026-11-22',
+    theme: 'Open in Atlas: one card, one question, and the World PIN when you first change the world',
+    entries: [
+      {
+        id: 'arrival-from-onlyworlds',
+        title: 'Open in Atlas from onlyworlds.com takes fewer steps',
+        body: 'Signed out, the link now shows one card in the middle of the page: it says what the link does, and holds Sign in with OnlyWorlds and Email and password. Settings no longer opens by itself. Signed in, the world is named in the first and only question: with the folder picker that is where the world should live, and without it a card with Open. Your own world opens without asking for your PIN, as onlyworlds.com says it will. From the site to an empty world now takes 4 presses, down from 6, and no typed field.',
+        tags: ['sync', 'world'],
+      },
+      {
+        id: 'world-pin-in-the-world',
+        title: 'Your world asks for its World PIN when you first change it',
+        body: 'A world you opened from onlyworlds.com keeps your changes here until you give your World PIN. The pill at the bottom says Add PIN, your first change says so once, and pressing either opens a small World PIN dialog in the world: Atlas checks the four digits with OnlyWorlds before it keeps them, and then saves what waited. A PIN OnlyWorlds does not accept is said under the field and kept nowhere. Until then, Home and the world list say the world does not save to OnlyWorlds yet, never that it is online.',
+        tags: ['sync'],
+      },
+      {
+        id: 'pin-in-settings-asks-first',
+        title: 'A PIN saved in Settings is checked before sync starts on it',
+        body: 'Saving a PIN in Settings now asks OnlyWorlds about it first, then starts sync for the open world whatever the answer: a PIN OnlyWorlds refused starts sync paused, so a wrong PIN reaches OnlyWorlds once. Removing the PIN stops sync for that world, and a PIN saved in another tab starts it here too.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.124.35',
     date: '2026-11-21',
     theme: 'A PIN OnlyWorlds refused is never sent again by itself',

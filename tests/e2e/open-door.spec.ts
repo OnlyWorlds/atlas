@@ -1,8 +1,10 @@
 /**
  * The `#/open/<world id>` door through the real page: a
  * world page's Open in Atlas opens that world on the signed-in account, after
- * the person says Open; a copy already here opens without a second key; signed
- * out, the id waits for the sign-in in Settings; a world not on the account's
+ * one question that names it (1.125.0: with no world open, the where-question
+ * itself with the folder picker, a card without it; with a world open, the
+ * corner toast); a copy already here opens without a second key; signed out,
+ * a card holds the sign-in, the id waiting; a world not on the account's
  * list, or a truncated id, is said. keel's account routes and the element
  * lists are routed (the mint follows keel's rule, as account-mode.spec.ts).
  */
@@ -97,9 +99,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 /**
- * With a home folder (Chromium) the where-question follows Open; with none
- * (Firefox) the world lands in this browser, and the toast's click is the
- * only gesture the storage request gets.
+ * With the folder picker (Chromium) and no world open, the where-question is
+ * the first and only question, named, and no toast comes before it (1.125.0,
+ * R2); without it (Firefox) the world lands in this browser, and the card's
+ * Open is the only gesture the storage request gets. Was: a corner toast's
+ * Open first, then the where-question (two presses with the folder picker).
  */
 async function opensAndReopens(page: Page, folder: boolean) {
   if (folder) await setupAtlasRoot(page);
@@ -108,15 +112,19 @@ async function opensAndReopens(page: Page, folder: boolean) {
   await arriveAt(page, `#/open/${ID}`);
   // The id left the address bar before anything else.
   expect(await page.evaluate(() => location.hash)).not.toContain('/open/');
-  const ask = page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' });
-  await expect(ask).toBeVisible();
-  expect(keel.mints).toBe(0);
-  await ask.locator('.ow-toast-action', { hasText: 'Open' }).click();
   const where = page.locator('[data-modal="where-ask"]');
   if (folder) {
-    await expect(where).toContainText('Open Realm');
+    await expect(where.locator('.atlas-modal-title')).toHaveText('Open "Open Realm", from your worlds on OnlyWorlds');
+    await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
+    expect(keel.mints).toBe(0);
     await where.locator('input[name="where"][value="browser"]').check();
     await where.locator('[data-action="go"]').click();
+  } else {
+    const card = page.locator('[data-modal="open-account"]');
+    await expect(card).toContainText('Open "Open Realm", from your worlds on OnlyWorlds?');
+    await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
+    expect(keel.mints).toBe(0);
+    await card.locator('[data-action="open"]').click();
   }
   await expect.poll(async () => (await entryFor(page)).elements).toBe(1);
   await expect(where).toHaveCount(0);
@@ -130,6 +138,7 @@ async function opensAndReopens(page: Page, folder: boolean) {
   await expect.poll(async () => page.evaluate(() => location.hash)).toBe(`#/w/${entry.localId}`);
   await expect.poll(async () => (await entryFor(page)).active).toBe(entry.localId);
   await expect(page.locator('.ow-toast', { hasText: 'from your worlds on OnlyWorlds?' })).toHaveCount(0);
+  await expect(page.locator('[data-modal="open-account"], [data-modal="where-ask"]')).toHaveCount(0);
   expect(keel.mints).toBe(1);
 
   if (folder) {
@@ -163,7 +172,7 @@ async function opensAndReopens(page: Page, folder: boolean) {
   await arriveAt(page, `#/open/${ID}`);
   await expect.poll(async () => (await entryFor(page)).active).toBe(entry.localId);
   await expect.poll(async () => (await entryFor(page)).elements).toBe(1);
-  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toHaveCount(0);
+  await expect(page.locator('[data-modal="open-sign-in"]')).toHaveCount(0);
   expect(keel.mints).toBe(1);
 }
 
@@ -184,21 +193,51 @@ test('a world not on the signed-in account is said, and nothing is made (#104)',
   expect(keel.mints).toBe(0);
 });
 
-test('signed out, the link waits for the sign-in in Settings, then asks to open (#104)', async ({ page }) => {
+// Was (#104): the link sent the person to Settings with a corner toast. Since 1.125.0 (R1) one card in
+// the middle of the page says what the link does and holds the sign-in; Settings opens only from its
+// Email and password, the id still held, and the sign-in there runs the door again.
+test('signed out, a card holds the sign-in, never Settings by itself; its Email and password keeps the id (#104, 2026-11-22)', async ({ page }) => {
   const keel = await mockKeel(page);
   await arriveAt(page, `#/open/${ID}`);
-  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toBeVisible();
-  await expect(page.locator('input[name="account-login"]')).toBeVisible();
+  const card = page.locator('[data-modal="open-sign-in"]');
+  await expect(card).toContainText('This link opens a world on onlyworlds.com. Sign in to Atlas with your OnlyWorlds account and it opens here.');
+  await expect(page.locator('input[name="account-login"]')).toHaveCount(0);
+  expect(await page.evaluate(() => location.hash)).toBe('#/');
+  // Off the registered origin there is no Sign in with OnlyWorlds: Email and password is the primary.
+  await expect(card.locator('[data-action="sign-in-onlyworlds"]')).toHaveCount(0);
+  await expect(card.locator('[data-action="sign-in-password"]')).toBeFocused();
+  await card.locator('[data-action="sign-in-password"]').click();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'Sign in here with your OnlyWorlds account. The world you opened from onlyworlds.com opens after that.' })).toBeVisible();
   await page.click('[data-role="account-token-alt"] summary');
   const token = page.locator('input[name="account-token"]');
   await expect(token).toBeVisible();
   expect(keel.lists).toBe(0);
   await token.fill(TOKEN);
   await page.click('[data-action="account-sign-in"]');
-  await expect(page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' })).toBeVisible();
+  // Signed in, with a world open nowhere and the folder picker here: the named where-question, at once.
+  await expect(page.locator('[data-modal="where-ask"] .atlas-modal-title')).toHaveText('Open "Open Realm", from your worlds on OnlyWorlds');
   // The ask to sign in is answered, so it is gone (Kael's walk, 2026-10-16).
-  await expect(page.locator('.ow-toast', { hasText: 'sign in to Atlas with your OnlyWorlds account' })).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'Sign in here with your OnlyWorlds account' })).toHaveCount(0);
   expect(keel.mints).toBe(0);
+});
+
+test('signed out with a world open, the card focuses Not now, and Not now drops the link (2026-11-22)', async ({ page }) => {
+  await setupAtlasRoot(page);
+  const keel = await mockKeel(page);
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Typing Desk');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect.poll(async () => (await entryFor(page)).active).not.toBeNull();
+  await page.evaluate((id) => { location.hash = `#/open/${id}`; }, ID);
+  const card = page.locator('[data-modal="open-sign-in"]');
+  await expect(card).toBeVisible();
+  await expect(card.locator('[data-action="not-now"]')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(card).toHaveCount(0);
+  const held = await page.evaluate(async () => (await import('/src/setup/open-door.ts')).openHeldForSignIn());
+  expect(held).toBeNull();
+  expect(keel.lists).toBe(0);
 });
 
 test('a truncated link is said, and the address bar is cleared (#104)', async ({ page }) => {
@@ -231,8 +270,11 @@ test('a pasted site address, outside a text field, goes through the same door (#
   await arriveAt(page, '#/');
   await page.waitForSelector('.atlas-shell');
   await pasteOnPage(page, `Look: ${SITE}${ID}/character/c0000000-0000-4000-8000-000000000077.`);
-  await expect(page.locator('.ow-toast', { hasText: 'Open "Open Realm", from your worlds on OnlyWorlds?' })).toBeVisible();
+  // No world open and the folder picker here (1.125.0): the named where-question, at once. Was the toast.
+  const where = page.locator('[data-modal="where-ask"]');
+  await expect(where.locator('.atlas-modal-title')).toHaveText('Open "Open Realm", from your worlds on OnlyWorlds');
   expect(keel.mints).toBe(0);
+  await where.locator('[data-action="cancel"]').click();
   // A world named by its page name is said, and nothing is asked.
   await pasteOnPage(page, `${SITE}open-realm`);
   await expect(page.locator('.ow-toast', { hasText: 'names the world by its page name' })).toBeVisible();

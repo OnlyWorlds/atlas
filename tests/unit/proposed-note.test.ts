@@ -15,9 +15,11 @@ import { buildProposedMark, proposedNoteFor } from '../../src/middle/element-age
 const proposed = (expires: string) =>
   ({ id: 'e1', type: 'character', name: 'Old ford', x_review_proposed: { by: null, evidence: 'seat', expires } }) as unknown as Element;
 
-function world(state: 'api-linked' | 'local-only') {
+/** A linked world keeps a PIN here (since 1.125.0 one with none waits on the World PIN and sends nothing). */
+function world(state: 'api-linked' | 'local-only', opts: { pin?: string | null } = {}) {
   const entry = { id: 'w', name: 'Abbey', state, ...(state === 'api-linked' ? { api: { world_id: 's', api_key: 'k' } } : {}) } as unknown as WorldRegistryEntry;
-  patchSlice('registry', { ...defaultRegistry(), worlds: [entry] });
+  const pin = opts.pin === undefined ? '1234' : opts.pin;
+  patchSlice('registry', { ...defaultRegistry(), ...(pin ? { pin } : {}), worlds: [entry] });
   patchSlice('active', { worldId: 'w', meta: { name: 'Abbey' } } as never);
   patchSlice('data', { elements: [] } as never);
 }
@@ -36,6 +38,11 @@ describe("the proposed page's sentence", () => {
   it('a linked world sends it', () => {
     world('api-linked');
     expect(proposedNoteFor(proposed('2099-11-22'))).toMatch(/a change made here is sent as any other\.$/);
+  });
+
+  it('a linked world waiting on the World PIN saves it, sending nothing yet (1.125.0)', () => {
+    world('api-linked', { pin: null });
+    expect(proposedNoteFor(proposed('2099-11-22'))).toMatch(/a change made here is saved as any other\.$/);
   });
 
   it("the header's word: Proposed, and one word once lapsed; the label keeps the whole line", () => {

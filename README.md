@@ -11,15 +11,17 @@ The code is MIT (`LICENSE`). The OnlyWorlds name, the logo and the look are not:
 ## Run
 
 ```bash
-npm install
-npm run dev          # Vite dev server (port 3045)
-npm run build        # tsc + vite build
-npm run test         # vitest watch
-npm run test:run     # vitest one-shot
-npm run typecheck    # tsc --noEmit
-npm run e2e          # Playwright (boots dev server)
-npm run e2e:ui       # Playwright UI mode
+npm ci                              # as CI installs, from the lock file
+npm run dev                         # Vite dev server (port 3045); runs npm run changelog first
+npm run build                       # npm run changelog, then tsc and vite build
+npx tsc --noEmit -p .               # the typecheck (npm run typecheck is the same)
+npx vitest run                      # the unit and integration suites, once (npm run test:run)
+npx playwright install chromium firefox
+npx playwright test --workers=1     # the end-to-end suite, as CI runs it (boots the dev server)
+npm run e2e:ui                      # Playwright UI mode
 ```
+
+`npm run test` is vitest in watch mode: it never exits, so it is no gate. The checks a pull request meets, the two that `master` requires among them, are in `AGENTS.md`.
 
 The public changelog is generated from one edit surface, `src/changelog/changelog.data.ts` (`npm run changelog`); `CHANGELOG.md` is the pre-launch log, kept for history.
 

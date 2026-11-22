@@ -1,7 +1,8 @@
 /**
  * Settings → Account tab (extracted from settings-panel). Global
- * PIN + email, used when creating or linking online worlds. PIN changes
- * re-attach any active api-linked engine immediately (stale creds otherwise).
+ * PIN + email, used when creating or linking online worlds. A PIN saved is
+ * asked about first, then the open linked world attaches on it whatever keel
+ * answered (a refusal starts the engine stopped); a PIN removed detaches it.
  *
  * Account-mode: the OnlyWorlds account token block. Paste an
  * `ow_a_` token (minted at onlyworlds.com → Settings → Account tokens) →
@@ -12,8 +13,7 @@
 
 import { getState, patchSlice, subscribe } from '../core/state';
 import { saveRegistry, setPin, setEmail, setAccountToken, mintedTokenId } from '../registry/registry';
-import { getActiveStore } from '../core/active-store';
-import { attachSyncEngine, pinProvedByPress } from '../sync/sync-attach';
+import { attachOnPinAnswer, detachOnPinRemoved, pinProvedByPress } from '../sync/sync-attach';
 import { ToastManager, WAITS_FOR_SIGN_IN } from '../ui/toast-manager';
 import type { WorldsRegistry } from '../core/types';
 import { escapeAttr, escapeText } from '../core/dom-utils';
@@ -26,11 +26,12 @@ import { signInWithPassword, passwordSignInLine } from '../sync/password-sign-in
 import { keepSignIn } from '../sync/after-sign-in';
 import { revokeAtlasToken } from '../sync/token-revoke';
 import { onlyWorldsSignInButtonHtml, wireOnlyWorldsSignIn } from '../ui/onlyworlds-sign-in-button';
-import { isPinRefusal, recordPinState, type PinState } from '../registry/pin-proof';
 import { isSeatWorld } from '../core/seat';
-import { buildV2Adapter } from '../sync/make-online';
-import { isPinParam } from '../sync/sync-engine';
-import { pinCheckWaitLine, rateWaitOf, setRateWait } from '../sync/rate-wait';
+import { pinCheckWaitLine, rateWaitOf } from '../sync/rate-wait';
+import { askAboutPin, __resetPinAskInFlightForTests } from '../sync/pin-ask';
+
+// The question itself lives in `sync/pin-ask.ts` (1.125.0), shared with the World PIN dialog.
+export { askAboutPin, __setPinAskTimeoutForTests, type PinAnswer } from '../sync/pin-ask';
 
 /**
  * The sign-in error line (B6). `accountErrorMessage`'s code branches
@@ -174,24 +175,6 @@ export const PIN_UNCHECKED_LINE = 'Not checked by OnlyWorlds yet';
  */
 const askedOnOpen = new Set<string>();
 
-/** The questions still out, by PIN: a second ask of the same PIN waits on this one's answer. */
-const inFlight = new Map<string, Promise<PinAnswer>>();
-
-/**
- * What a question about the PIN got: OnlyWorlds' word; null for no answer (offline, busy); 'unasked' when
- * there was nothing to ask with; 'waiting' inside a 429's wait on the world's key (`rate-wait.ts`), met by
- * this question or by an earlier send: the PIN is kept, not checked, never refused, and the question is not
- * spent.
- */
-export type PinAnswer = PinState | null | 'unasked' | 'waiting';
-
-/** How long a question waits for `/me`: past it, no answer came (not checked yet, never refused), and it is not spent. */
-let pinAskTimeoutMs = 15_000;
-/** Tests: a shorter wait for a question that hangs. */
-export function __setPinAskTimeoutForTests(ms: number): void {
-  pinAskTimeoutMs = ms;
-}
-
 /** Settings opens: a new opening, nothing asked in it yet. */
 export function beginSettingsOpening(): void {
   askedOnOpen.clear();
@@ -200,56 +183,7 @@ export function beginSettingsOpening(): void {
 /** Tests: a fresh opening, nothing asked yet and nothing out. */
 export function __resetPinAskedForTests(): void {
   beginSettingsOpening();
-  inFlight.clear();
-}
-
-/**
- * Ask OnlyWorlds about `pin` once, beside the open world's key that writes: one `GET /me` through
- * `keyScope` (a key of no known shape asks `/me` bare first, then once with the PIN), no retry. Never beside
- * a read key or for a seat's world. Returns what OnlyWorlds said; null when it asked and no answer came
- * (offline, busy), so the PIN stays not checked, never refused; 'unasked' when there was nothing to ask
- * with (no world open, a read key, a seat), so no question was spent. A question about the same PIN
- * still out is not sent again: this ask waits on its answer, so a wrong PIN reaches OnlyWorlds once.
- */
-export function askAboutPin(pin: string | undefined): Promise<PinAnswer> {
-  const out = pin ? inFlight.get(pin) : undefined;
-  if (out) return out;
-  const asking = askOnce(pin);
-  if (pin) {
-    inFlight.set(pin, asking);
-    const done = (): void => { if (inFlight.get(pin) === asking) inFlight.delete(pin); };
-    asking.then(done, done);
-  }
-  return asking;
-}
-
-async function askOnce(pin: string | undefined): Promise<PinAnswer> {
-  const reg = getState().registry;
-  const active = getState().active;
-  const entry = active ? reg.worlds.find((w) => w.id === active.worldId) : undefined;
-  // A key that reads by its shape is asked nothing with a PIN: `keyScope` answers it read with no call.
-  if (!pin || !entry?.api || entry.state !== 'api-linked' || entry.api.read_only || isSeatWorld(entry)) return 'unasked';
-  // Inside a 429's wait on this key nothing is asked: the answer would be the wait again.
-  if (rateWaitOf(entry.api.api_key)) return 'waiting';
-  try {
-    const { scope, pinProved } = await buildV2Adapter(entry.api.api_key, pin, undefined, { readTimeoutMs: pinAskTimeoutMs }).keyScope();
-    // A key that turned out to read: no PIN went beside it, so nothing was asked.
-    if (scope === 'read') return 'unasked';
-    if (!pinProved) return null;
-    recordPinState(pin, 'proved');
-    return 'proved';
-  } catch (err) {
-    // keel's 429 (its PIN wall refuses even the right PIN): the wait is kept on the key, and the sync
-    // waits it out too. The PIN is never recorded refused by it.
-    const e = err as { status?: unknown; retryAfterMs?: unknown; param?: unknown } | null;
-    if (e?.status === 429) {
-      setRateWait(entry.api.api_key, typeof e.retryAfterMs === 'number' ? e.retryAfterMs : 30_000, isPinParam(e.param));
-      return 'waiting';
-    }
-    if (!isPinRefusal(err)) return null;
-    recordPinState(pin, 'refused');
-    return 'refused';
-  }
+  __resetPinAskInFlightForTests();
 }
 
 /** The wait on the open world's key in Settings' words (the PIN kept, not checked); the plain line when it ended meanwhile. */
@@ -304,29 +238,27 @@ export function wireAccountTab(toasts: ToastManager): void {
     const next = setPin(getState().registry, pinInput.value);
     saveRegistry(next);
     patchSlice('registry', next);
-    // Re-attach engine with new credentials if the active world is api-linked
-    // and the PIN actually changed. Otherwise stale creds would persist.
     const newPin = next.pin;
-    if (newPin && newPin !== prevPin) {
-      const active = getState().active;
-      const entry = active ? next.worlds.find((w) => w.id === active.worldId) : undefined;
-      const folder = getActiveStore();
-      if (entry?.state === 'api-linked' && folder) {
-        attachSyncEngine(entry, folder);
-      }
-    }
+    // A PIN removed: the open world's engine on it goes too, so nothing calls the world online that no
+    // longer saves there (gate 4 S3).
+    if (!newPin) { detachOnPinRemoved(); toasts.info('PIN removed'); return; }
     // Saved here at once; "PIN saved" only once OnlyWorlds took it. One question per save.
-    if (!newPin) { toasts.info('PIN removed'); return; }
     if (newPin === prevPin && next.pin_state) {
       if (next.pin_state === 'refused') toasts.error(pinStateLine(next)); else toasts.info(pinStateLine(next));
       return;
     }
+    // Asked first, then attached on every answer (1.125.0): a refusal is recorded before the attach, so the
+    // engine starts stopped and the wrong PIN reached keel once; no answer or a wait attaches, and the engine
+    // shares the key's wait. The world asked about is the one open now.
+    const askedFor = getState().active?.worldId ?? null;
     askedOnOpen.add(newPin);
     const said = await askAboutPin(newPin);
     if (said === 'unasked' || said === 'waiting') askedOnOpen.delete(newPin);
     // The field moved on while the question was out: say what is kept now, never this save's answer.
     const now = getState().registry;
     if (now.pin !== newPin) { toasts.info(pinStateLine(now) || 'PIN removed'); return; }
+    // Read again after the await: a world switched meanwhile is never attached to another's store (gate 4 S2).
+    attachOnPinAnswer(askedFor, newPin);
     if (said === 'proved') pinProvedByPress(newPin);
     if (said === 'refused') toasts.error(PIN_REFUSED_LINE);
     else if (said === 'waiting') toasts.info(waitLineFor(now));
